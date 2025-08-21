@@ -1,9 +1,9 @@
 /**
  * Semantic Memory System
- * 
+ *
  * Provides knowledge graph storage, GraphRAG-first retrieval,
  * and relationship extraction for factual knowledge.
- * 
+ *
  * @author @darianrosebrook
  */
 
@@ -24,9 +24,16 @@ import { QueryEngine } from './query-engine';
 export function createSemanticMemory() {
   const knowledgeGraphCore = new KnowledgeGraphCore();
   const graphRAG = new GraphRAG(knowledgeGraphCore);
-  const relationshipExtractor = new RelationshipExtractor(knowledgeGraphCore, graphRAG);
-  const queryEngine = new QueryEngine(knowledgeGraphCore, graphRAG, relationshipExtractor);
-  
+  const relationshipExtractor = new RelationshipExtractor(
+    knowledgeGraphCore,
+    graphRAG
+  );
+  const queryEngine = new QueryEngine(
+    knowledgeGraphCore,
+    graphRAG,
+    relationshipExtractor
+  );
+
   return {
     knowledgeGraphCore,
     graphRAG,

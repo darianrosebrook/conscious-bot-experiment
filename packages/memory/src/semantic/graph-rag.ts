@@ -66,18 +66,18 @@ export class GraphRAG {
     options: GraphRAGOptions = {}
   ): Promise<GraphRAGResult> {
     const startTime = Date.now();
-    
+
     // Parse query to determine intent and entities
     const parsedQuery = await this.parseQuery(query);
-    
+
     // Execute knowledge graph query
     const result = await this.executeQuery(parsedQuery, options);
-    
+
     // Format result as context
     const context = this.formatContext(result, options);
-    
+
     const queryTime = Date.now() - startTime;
-    
+
     return {
       query,
       context,
@@ -95,11 +95,15 @@ export class GraphRAG {
   private async parseQuery(query: string): Promise<KnowledgeQuery> {
     // This is a simplified implementation
     // In a real system, this would use NLP to parse the query
-    
+
     const queryLower = query.toLowerCase();
-    
+
     // Check for entity queries
-    if (queryLower.includes('what is') || queryLower.includes('who is') || queryLower.includes('tell me about')) {
+    if (
+      queryLower.includes('what is') ||
+      queryLower.includes('who is') ||
+      queryLower.includes('tell me about')
+    ) {
       const entityName = this.extractEntityName(query);
       return {
         type: QueryType.ENTITY,
@@ -108,9 +112,13 @@ export class GraphRAG {
         },
       };
     }
-    
+
     // Check for relationship queries
-    if (queryLower.includes('relationship') || queryLower.includes('connected to') || queryLower.includes('related to')) {
+    if (
+      queryLower.includes('relationship') ||
+      queryLower.includes('connected to') ||
+      queryLower.includes('related to')
+    ) {
       const [sourceEntity, targetEntity] = this.extractEntityPair(query);
       return {
         type: QueryType.PATH,
@@ -121,9 +129,13 @@ export class GraphRAG {
         },
       };
     }
-    
+
     // Check for neighborhood queries
-    if (queryLower.includes('neighbors') || queryLower.includes('nearby') || queryLower.includes('surrounding')) {
+    if (
+      queryLower.includes('neighbors') ||
+      queryLower.includes('nearby') ||
+      queryLower.includes('surrounding')
+    ) {
       const entityName = this.extractEntityName(query);
       return {
         type: QueryType.NEIGHBORHOOD,
@@ -133,7 +145,7 @@ export class GraphRAG {
         },
       };
     }
-    
+
     // Default to entity query
     return {
       type: QueryType.ENTITY,
@@ -150,21 +162,30 @@ export class GraphRAG {
   private extractEntityName(query: string): string {
     // This is a simplified implementation
     // In a real system, this would use NLP to extract entity names
-    
+
     const queryLower = query.toLowerCase();
-    
+
     if (queryLower.includes('what is ')) {
-      return query.split('what is ')[1].trim().replace(/[?.,!]$/, '');
+      return query
+        .split('what is ')[1]
+        .trim()
+        .replace(/[?.,!]$/, '');
     }
-    
+
     if (queryLower.includes('who is ')) {
-      return query.split('who is ')[1].trim().replace(/[?.,!]$/, '');
+      return query
+        .split('who is ')[1]
+        .trim()
+        .replace(/[?.,!]$/, '');
     }
-    
+
     if (queryLower.includes('tell me about ')) {
-      return query.split('tell me about ')[1].trim().replace(/[?.,!]$/, '');
+      return query
+        .split('tell me about ')[1]
+        .trim()
+        .replace(/[?.,!]$/, '');
     }
-    
+
     return query.trim().replace(/[?.,!]$/, '');
   }
 
@@ -174,24 +195,27 @@ export class GraphRAG {
   private extractEntityPair(query: string): [string, string] {
     // This is a simplified implementation
     // In a real system, this would use NLP to extract entity pairs
-    
+
     const queryLower = query.toLowerCase();
-    
-    if (queryLower.includes('relationship between ') && queryLower.includes(' and ')) {
+
+    if (
+      queryLower.includes('relationship between ') &&
+      queryLower.includes(' and ')
+    ) {
       const parts = query.split('relationship between ')[1].split(' and ');
       return [parts[0].trim(), parts[1].trim().replace(/[?.,!]$/, '')];
     }
-    
+
     if (queryLower.includes('connected to')) {
       const parts = query.split('connected to');
       return [parts[0].trim(), parts[1].trim().replace(/[?.,!]$/, '')];
     }
-    
+
     if (queryLower.includes('related to')) {
       const parts = query.split('related to');
       return [parts[0].trim(), parts[1].trim().replace(/[?.,!]$/, '')];
     }
-    
+
     return ['', ''];
   }
 
@@ -206,7 +230,7 @@ export class GraphRAG {
     if (options.maxEntities) {
       parsedQuery.limit = options.maxEntities;
     }
-    
+
     if (options.minConfidence) {
       parsedQuery.filters = [
         ...(parsedQuery.filters || []),
@@ -217,7 +241,7 @@ export class GraphRAG {
         },
       ];
     }
-    
+
     // Execute query
     return await this.knowledgeGraph.query(parsedQuery);
   }
@@ -225,18 +249,15 @@ export class GraphRAG {
   /**
    * Format query result as context
    */
-  private formatContext(
-    result: QueryResult,
-    options: GraphRAGOptions
-  ): string {
+  private formatContext(result: QueryResult, options: GraphRAGOptions): string {
     if (options.formatAsJson) {
       return this.formatAsJson(result, options);
     }
-    
+
     if (options.formatAsTriples) {
       return this.formatAsTriples(result, options);
     }
-    
+
     // Default to text format
     return this.formatAsText(result, options);
   }
@@ -244,158 +265,164 @@ export class GraphRAG {
   /**
    * Format result as JSON
    */
-  private formatAsJson(
-    result: QueryResult,
-    options: GraphRAGOptions
-  ): string {
-    const formattedEntities = result.entities.map(entity => {
+  private formatAsJson(result: QueryResult, options: GraphRAGOptions): string {
+    const formattedEntities = result.entities.map((entity) => {
       const formatted: any = {
         id: entity.id,
         type: entity.type,
         name: entity.name,
       };
-      
+
       if (entity.description) {
         formatted.description = entity.description;
       }
-      
+
       if (Object.keys(entity.properties).length > 0) {
         formatted.properties = {};
         for (const [key, prop] of Object.entries(entity.properties)) {
           formatted.properties[key] = prop.value;
         }
       }
-      
+
       if (options.includeConfidence) {
         formatted.confidence = entity.confidence;
       }
-      
+
       if (options.includeSources) {
         formatted.source = entity.source;
       }
-      
+
       return formatted;
     });
-    
-    const formattedRelationships = result.relationships.map(rel => {
+
+    const formattedRelationships = result.relationships.map((rel) => {
       const formatted: any = {
         type: rel.type,
-        source: result.entities.find(e => e.id === rel.sourceId)?.name || rel.sourceId,
-        target: result.entities.find(e => e.id === rel.targetId)?.name || rel.targetId,
+        source:
+          result.entities.find((e) => e.id === rel.sourceId)?.name ||
+          rel.sourceId,
+        target:
+          result.entities.find((e) => e.id === rel.targetId)?.name ||
+          rel.targetId,
       };
-      
+
       if (Object.keys(rel.properties).length > 0) {
         formatted.properties = {};
         for (const [key, prop] of Object.entries(rel.properties)) {
           formatted.properties[key] = prop.value;
         }
       }
-      
+
       if (options.includeConfidence) {
         formatted.confidence = rel.confidence;
       }
-      
+
       if (options.includeSources) {
         formatted.source = rel.source;
       }
-      
+
       return formatted;
     });
-    
-    return JSON.stringify({
-      entities: formattedEntities,
-      relationships: formattedRelationships,
-      metadata: {
-        count: result.entities.length,
-        confidence: result.metadata.confidence,
+
+    return JSON.stringify(
+      {
+        entities: formattedEntities,
+        relationships: formattedRelationships,
+        metadata: {
+          count: result.entities.length,
+          confidence: result.metadata.confidence,
+        },
       },
-    }, null, 2);
+      null,
+      2
+    );
   }
 
   /**
    * Format result as text
    */
-  private formatAsText(
-    result: QueryResult,
-    options: GraphRAGOptions
-  ): string {
+  private formatAsText(result: QueryResult, options: GraphRAGOptions): string {
     let text = '';
-    
+
     // Format entities
     if (result.entities.length > 0) {
       text += 'Entities:\n';
-      
+
       for (const entity of result.entities) {
         text += `- ${entity.name} (${entity.type})`;
-        
+
         if (entity.description) {
           text += `: ${entity.description}`;
         }
-        
+
         if (options.includeConfidence) {
           text += ` [confidence: ${entity.confidence.toFixed(2)}]`;
         }
-        
+
         text += '\n';
-        
+
         if (Object.keys(entity.properties).length > 0) {
           text += '  Properties:\n';
-          
+
           for (const [key, prop] of Object.entries(entity.properties)) {
             text += `  - ${key}: ${prop.value}`;
-            
+
             if (prop.unit) {
               text += ` ${prop.unit}`;
             }
-            
+
             if (options.includeConfidence) {
               text += ` [confidence: ${prop.confidence.toFixed(2)}]`;
             }
-            
+
             text += '\n';
           }
         }
       }
-      
+
       text += '\n';
     }
-    
+
     // Format relationships
     if (result.relationships.length > 0) {
       text += 'Relationships:\n';
-      
+
       for (const rel of result.relationships) {
-        const sourceName = result.entities.find(e => e.id === rel.sourceId)?.name || rel.sourceId;
-        const targetName = result.entities.find(e => e.id === rel.targetId)?.name || rel.targetId;
-        
+        const sourceName =
+          result.entities.find((e) => e.id === rel.sourceId)?.name ||
+          rel.sourceId;
+        const targetName =
+          result.entities.find((e) => e.id === rel.targetId)?.name ||
+          rel.targetId;
+
         text += `- ${sourceName} ${rel.type} ${targetName}`;
-        
+
         if (options.includeConfidence) {
           text += ` [confidence: ${rel.confidence.toFixed(2)}]`;
         }
-        
+
         text += '\n';
-        
+
         if (Object.keys(rel.properties).length > 0) {
           text += '  Properties:\n';
-          
+
           for (const [key, prop] of Object.entries(rel.properties)) {
             text += `  - ${key}: ${prop.value}`;
-            
+
             if (prop.unit) {
               text += ` ${prop.unit}`;
             }
-            
+
             if (options.includeConfidence) {
               text += ` [confidence: ${prop.confidence.toFixed(2)}]`;
             }
-            
+
             text += '\n';
           }
         }
       }
     }
-    
+
     return text;
   }
 
@@ -407,67 +434,71 @@ export class GraphRAG {
     options: GraphRAGOptions
   ): string {
     let text = '';
-    
+
     // Format entity properties as triples
     for (const entity of result.entities) {
       // Entity type triple
       text += `(${entity.name}, is_a, ${entity.type})`;
-      
+
       if (options.includeConfidence) {
         text += ` [${entity.confidence.toFixed(2)}]`;
       }
-      
+
       text += '\n';
-      
+
       // Entity property triples
       for (const [key, prop] of Object.entries(entity.properties)) {
         text += `(${entity.name}, ${key}, ${prop.value}`;
-        
+
         if (prop.unit) {
           text += ` ${prop.unit}`;
         }
-        
+
         text += ')';
-        
+
         if (options.includeConfidence) {
           text += ` [${prop.confidence.toFixed(2)}]`;
         }
-        
+
         text += '\n';
       }
     }
-    
+
     // Format relationships as triples
     for (const rel of result.relationships) {
-      const sourceName = result.entities.find(e => e.id === rel.sourceId)?.name || rel.sourceId;
-      const targetName = result.entities.find(e => e.id === rel.targetId)?.name || rel.targetId;
-      
+      const sourceName =
+        result.entities.find((e) => e.id === rel.sourceId)?.name ||
+        rel.sourceId;
+      const targetName =
+        result.entities.find((e) => e.id === rel.targetId)?.name ||
+        rel.targetId;
+
       text += `(${sourceName}, ${rel.type}, ${targetName})`;
-      
+
       if (options.includeConfidence) {
         text += ` [${rel.confidence.toFixed(2)}]`;
       }
-      
+
       text += '\n';
-      
+
       // Relationship property triples
       for (const [key, prop] of Object.entries(rel.properties)) {
         text += `(${rel.type}_relation, ${key}, ${prop.value}`;
-        
+
         if (prop.unit) {
           text += ` ${prop.unit}`;
         }
-        
+
         text += ')';
-        
+
         if (options.includeConfidence) {
           text += ` [${prop.confidence.toFixed(2)}]`;
         }
-        
+
         text += '\n';
       }
     }
-    
+
     return text;
   }
 
@@ -486,7 +517,7 @@ export class GraphRAG {
     } = {}
   ): Promise<Entity> {
     const formattedProperties: Record<string, any> = {};
-    
+
     // Format properties
     for (const [key, value] of Object.entries(properties)) {
       formattedProperties[key] = {
@@ -497,7 +528,7 @@ export class GraphRAG {
         timestamp: Date.now(),
       };
     }
-    
+
     // Create entity
     return this.knowledgeGraph.upsertEntity({
       name,
@@ -525,7 +556,7 @@ export class GraphRAG {
     } = {}
   ): Promise<Relationship> {
     const formattedProperties: Record<string, any> = {};
-    
+
     // Format properties
     for (const [key, value] of Object.entries(properties)) {
       formattedProperties[key] = {
@@ -536,7 +567,7 @@ export class GraphRAG {
         timestamp: Date.now(),
       };
     }
-    
+
     // Create relationship
     return this.knowledgeGraph.upsertRelationship({
       sourceId,
@@ -556,31 +587,31 @@ export class GraphRAG {
     if (value === null) {
       return PropertyType.NULL;
     }
-    
+
     if (typeof value === 'string') {
       return PropertyType.STRING;
     }
-    
+
     if (typeof value === 'number') {
       return PropertyType.NUMBER;
     }
-    
+
     if (typeof value === 'boolean') {
       return PropertyType.BOOLEAN;
     }
-    
+
     if (value instanceof Date) {
       return PropertyType.DATE;
     }
-    
+
     if (Array.isArray(value)) {
       return PropertyType.ARRAY;
     }
-    
+
     if (typeof value === 'object') {
       return PropertyType.OBJECT;
     }
-    
+
     return PropertyType.STRING;
   }
 }

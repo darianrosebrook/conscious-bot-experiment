@@ -73,7 +73,7 @@ This directory contains implementation plans for all modules. Use this Map of Co
 | Memory: Episodic               | memory/episodic/README.md                           | ✅ Implemented | M2: Experience Storage | Core, World | High |
 | Memory: Semantic               | memory/semantic/README.md                           | ✅ Implemented | M2: Knowledge Graph | Core, World | High |
 | Memory: Working                | memory/working/README.md                            | ✅ Implemented | M2: Cognitive Workspace | Core | High |
-| Memory: Provenance             | memory/provenance/README.md                         | Not Started | M2: Decision Tracking | Core, Memory | High |
+| Memory: Provenance             | memory/provenance/README.md                         | ✅ Implemented | M2: Decision Tracking | Core, Memory | High |
 | Interfaces: Constitution       | interfaces/constitution.md                           | ✅ Implemented | M2: Rules Engine | None | Critical |
 | Interfaces: Web Dashboard      | interfaces/web_dashboard.md                          | 📝 Planned | M2: Monitoring | Safety | Medium |
 | Evaluation: Scenarios          | evaluation/scenarios.md                              | 📝 Planned | M2: Test Envs | None | High |

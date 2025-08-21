@@ -59,12 +59,12 @@ export class KnowledgeGraphCore {
    */
   private initializeIndexes(): void {
     // Initialize entitiesByType map
-    Object.values(EntityType).forEach(type => {
+    Object.values(EntityType).forEach((type) => {
       this.entitiesByType.set(type as EntityType, new Set<string>());
     });
 
     // Initialize relationshipsByType map
-    Object.values(RelationType).forEach(type => {
+    Object.values(RelationType).forEach((type) => {
       this.relationshipsByType.set(type as RelationType, new Set<string>());
     });
   }
@@ -72,10 +72,15 @@ export class KnowledgeGraphCore {
   /**
    * Create or update entity in knowledge graph
    */
-  upsertEntity(entity: Omit<Entity, 'id' | 'createdAt' | 'updatedAt' | 'lastAccessed' | 'accessCount'>): Entity {
+  upsertEntity(
+    entity: Omit<
+      Entity,
+      'id' | 'createdAt' | 'updatedAt' | 'lastAccessed' | 'accessCount'
+    >
+  ): Entity {
     const now = Date.now();
     const existingEntity = this.findEntityByName(entity.name, entity.type);
-    
+
     if (existingEntity) {
       // Update existing entity
       const updatedEntity: Entity = {
@@ -133,9 +138,14 @@ export class KnowledgeGraphCore {
   /**
    * Create or update relationship in knowledge graph
    */
-  upsertRelationship(relationship: Omit<Relationship, 'id' | 'createdAt' | 'updatedAt' | 'lastAccessed' | 'accessCount'>): Relationship {
+  upsertRelationship(
+    relationship: Omit<
+      Relationship,
+      'id' | 'createdAt' | 'updatedAt' | 'lastAccessed' | 'accessCount'
+    >
+  ): Relationship {
     const now = Date.now();
-    
+
     // Verify source and target entities exist
     if (!this.entities.has(relationship.sourceId)) {
       throw new Error(`Source entity ${relationship.sourceId} does not exist`);
@@ -150,7 +160,7 @@ export class KnowledgeGraphCore {
       relationship.targetId,
       relationship.type
     );
-    
+
     if (existingRelationship) {
       // Update existing relationship
       const updatedRelationship: Relationship = {
@@ -170,8 +180,12 @@ export class KnowledgeGraphCore {
 
       // Update indexes if type changed
       if (existingRelationship.type !== updatedRelationship.type) {
-        this.relationshipsByType.get(existingRelationship.type)?.delete(existingRelationship.id);
-        this.relationshipsByType.get(updatedRelationship.type)?.add(updatedRelationship.id);
+        this.relationshipsByType
+          .get(existingRelationship.type)
+          ?.delete(existingRelationship.id);
+        this.relationshipsByType
+          .get(updatedRelationship.type)
+          ?.add(updatedRelationship.id);
       }
 
       // Store updated relationship
@@ -199,7 +213,7 @@ export class KnowledgeGraphCore {
       // Add to indexes
       this.relationships.set(id, newRelationship);
       this.relationshipsByType.get(newRelationship.type)?.add(id);
-      
+
       // Update entity-relationship index
       this.entityRelationships.get(newRelationship.sourceId)?.add(id);
       if (newRelationship.bidirectional) {
@@ -225,7 +239,10 @@ export class KnowledgeGraphCore {
     // Remove all relationships involving this entity
     const relationshipsToRemove: string[] = [];
     for (const [relationshipId, relationship] of this.relationships.entries()) {
-      if (relationship.sourceId === entityId || relationship.targetId === entityId) {
+      if (
+        relationship.sourceId === entityId ||
+        relationship.targetId === entityId
+      ) {
         relationshipsToRemove.push(relationshipId);
       }
     }
@@ -257,7 +274,9 @@ export class KnowledgeGraphCore {
     // Remove relationship from entity-relationship index
     this.entityRelationships.get(relationship.sourceId)?.delete(relationshipId);
     if (relationship.bidirectional) {
-      this.entityRelationships.get(relationship.targetId)?.delete(relationshipId);
+      this.entityRelationships
+        .get(relationship.targetId)
+        ?.delete(relationshipId);
     }
 
     // Remove relationship
@@ -277,7 +296,7 @@ export class KnowledgeGraphCore {
     // Update access stats
     entity.lastAccessed = Date.now();
     entity.accessCount++;
-    
+
     return entity;
   }
 
@@ -293,7 +312,7 @@ export class KnowledgeGraphCore {
     // Update access stats
     relationship.lastAccessed = Date.now();
     relationship.accessCount++;
-    
+
     return relationship;
   }
 
@@ -306,35 +325,40 @@ export class KnowledgeGraphCore {
         // Update access stats
         entity.lastAccessed = Date.now();
         entity.accessCount++;
-        
+
         return entity;
       }
     }
-    
+
     return null;
   }
 
   /**
    * Find relationship between entities
    */
-  findRelationship(sourceId: string, targetId: string, type?: RelationType): Relationship | null {
+  findRelationship(
+    sourceId: string,
+    targetId: string,
+    type?: RelationType
+  ): Relationship | null {
     for (const relationship of this.relationships.values()) {
       const sourceMatch = relationship.sourceId === sourceId;
       const targetMatch = relationship.targetId === targetId;
-      const bidirectionalMatch = relationship.bidirectional && 
-                                 relationship.sourceId === targetId && 
-                                 relationship.targetId === sourceId;
+      const bidirectionalMatch =
+        relationship.bidirectional &&
+        relationship.sourceId === targetId &&
+        relationship.targetId === sourceId;
       const typeMatch = !type || relationship.type === type;
-      
-      if ((sourceMatch && targetMatch || bidirectionalMatch) && typeMatch) {
+
+      if (((sourceMatch && targetMatch) || bidirectionalMatch) && typeMatch) {
         // Update access stats
         relationship.lastAccessed = Date.now();
         relationship.accessCount++;
-        
+
         return relationship;
       }
     }
-    
+
     return null;
   }
 
@@ -348,7 +372,7 @@ export class KnowledgeGraphCore {
     }
 
     return Array.from(entityIds)
-      .map(id => this.entities.get(id))
+      .map((id) => this.entities.get(id))
       .filter((entity): entity is Entity => !!entity);
   }
 
@@ -362,14 +386,17 @@ export class KnowledgeGraphCore {
     }
 
     return Array.from(relationshipIds)
-      .map(id => this.relationships.get(id))
+      .map((id) => this.relationships.get(id))
       .filter((relationship): relationship is Relationship => !!relationship);
   }
 
   /**
    * Get relationships for entity
    */
-  getRelationshipsForEntity(entityId: string, direction?: 'outgoing' | 'incoming' | 'both'): Relationship[] {
+  getRelationshipsForEntity(
+    entityId: string,
+    direction?: 'outgoing' | 'incoming' | 'both'
+  ): Relationship[] {
     const entity = this.entities.get(entityId);
     if (!entity) {
       return [];
@@ -427,11 +454,11 @@ export class KnowledgeGraphCore {
       case QueryType.ENTITY:
         entities = await this.queryEntities(query);
         break;
-      
+
       case QueryType.RELATIONSHIP:
         relationships = await this.queryRelationships(query);
         break;
-      
+
       case QueryType.PATH:
         const paths = await this.queryPaths(query);
         if (paths.length > 0) {
@@ -440,16 +467,16 @@ export class KnowledgeGraphCore {
           confidence = paths[0].confidence;
         }
         break;
-      
+
       case QueryType.NEIGHBORHOOD:
         const neighborhood = await this.queryNeighborhood(query);
         if (neighborhood) {
           entities = [neighborhood.entity];
-          relationships = neighborhood.neighbors.map(n => n.relationship);
-          entities.push(...neighborhood.neighbors.map(n => n.entity));
+          relationships = neighborhood.neighbors.map((n) => n.relationship);
+          entities.push(...neighborhood.neighbors.map((n) => n.entity));
         }
         break;
-      
+
       case QueryType.PATTERN:
         const patternResults = await this.queryPatterns(query);
         if (patternResults.entities.length > 0) {
@@ -457,7 +484,7 @@ export class KnowledgeGraphCore {
           relationships = patternResults.relationships;
         }
         break;
-      
+
       case QueryType.INFERENCE:
         if (this.config.enableInference) {
           const inferenceResults = await this.performInference(query);
@@ -475,7 +502,11 @@ export class KnowledgeGraphCore {
 
     // Apply sorting
     if (query.orderBy) {
-      entities = this.applySorting(entities, query.orderBy, query.orderDirection);
+      entities = this.applySorting(
+        entities,
+        query.orderBy,
+        query.orderDirection
+      );
     }
 
     // Apply pagination
@@ -484,7 +515,7 @@ export class KnowledgeGraphCore {
     }
 
     const queryTime = Date.now() - startTime;
-    
+
     return {
       entities,
       relationships,
@@ -510,12 +541,16 @@ export class KnowledgeGraphCore {
     }
 
     if (name) {
-      entities = entities.filter(e => e.name.toLowerCase().includes((name as string).toLowerCase()));
+      entities = entities.filter((e) =>
+        e.name.toLowerCase().includes((name as string).toLowerCase())
+      );
     }
 
     if (properties) {
-      entities = entities.filter(e => {
-        for (const [key, value] of Object.entries(properties as Record<string, any>)) {
+      entities = entities.filter((e) => {
+        for (const [key, value] of Object.entries(
+          properties as Record<string, any>
+        )) {
           if (!e.properties[key] || e.properties[key].value !== value) {
             return false;
           }
@@ -530,7 +565,9 @@ export class KnowledgeGraphCore {
   /**
    * Query relationships
    */
-  private async queryRelationships(query: KnowledgeQuery): Promise<Relationship[]> {
+  private async queryRelationships(
+    query: KnowledgeQuery
+  ): Promise<Relationship[]> {
     const { type, sourceId, targetId } = query.parameters;
     let relationships: Relationship[] = [];
 
@@ -541,11 +578,11 @@ export class KnowledgeGraphCore {
     }
 
     if (sourceId) {
-      relationships = relationships.filter(r => r.sourceId === sourceId);
+      relationships = relationships.filter((r) => r.sourceId === sourceId);
     }
 
     if (targetId) {
-      relationships = relationships.filter(r => r.targetId === targetId);
+      relationships = relationships.filter((r) => r.targetId === targetId);
     }
 
     return relationships;
@@ -556,30 +593,36 @@ export class KnowledgeGraphCore {
    */
   private async queryPaths(query: KnowledgeQuery): Promise<KnowledgePath[]> {
     const { sourceId, targetId, maxDepth = 5 } = query.parameters;
-    
+
     if (!sourceId || !targetId) {
       return [];
     }
 
     const sourceEntity = this.entities.get(sourceId as string);
     const targetEntity = this.entities.get(targetId as string);
-    
+
     if (!sourceEntity || !targetEntity) {
       return [];
     }
 
     // Use breadth-first search to find paths
-    const paths = this.findPaths(sourceId as string, targetId as string, maxDepth as number);
-    
+    const paths = this.findPaths(
+      sourceId as string,
+      targetId as string,
+      maxDepth as number
+    );
+
     return paths;
   }
 
   /**
    * Query entity neighborhood
    */
-  private async queryNeighborhood(query: KnowledgeQuery): Promise<EntityNeighborhood | null> {
+  private async queryNeighborhood(
+    query: KnowledgeQuery
+  ): Promise<EntityNeighborhood | null> {
     const { entityId, depth = 1 } = query.parameters;
-    
+
     if (!entityId) {
       return null;
     }
@@ -597,12 +640,14 @@ export class KnowledgeGraphCore {
 
     // Get relationships for entity
     const relationships = this.getRelationshipsForEntity(entityId as string);
-    
+
     for (const relationship of relationships) {
       const isOutgoing = relationship.sourceId === entityId;
-      const neighborId = isOutgoing ? relationship.targetId : relationship.sourceId;
+      const neighborId = isOutgoing
+        ? relationship.targetId
+        : relationship.sourceId;
       const neighborEntity = this.entities.get(neighborId);
-      
+
       if (neighborEntity) {
         neighbors.push({
           entity: neighborEntity,
@@ -656,7 +701,11 @@ export class KnowledgeGraphCore {
   /**
    * Find paths between entities using breadth-first search
    */
-  private findPaths(sourceId: string, targetId: string, maxDepth: number): KnowledgePath[] {
+  private findPaths(
+    sourceId: string,
+    targetId: string,
+    maxDepth: number
+  ): KnowledgePath[] {
     const visited = new Set<string>();
     const queue: Array<{
       path: string[];
@@ -677,9 +726,11 @@ export class KnowledgeGraphCore {
 
       // Check if we reached the target
       if (currentEntityId === targetId) {
-        const pathEntities = path.map(id => this.entities.get(id)!);
-        const pathRelationships = relationships.map(id => this.relationships.get(id)!);
-        
+        const pathEntities = path.map((id) => this.entities.get(id)!);
+        const pathRelationships = relationships.map(
+          (id) => this.relationships.get(id)!
+        );
+
         // Calculate path confidence as product of entity and relationship confidences
         let confidence = 1.0;
         for (const entity of pathEntities) {
@@ -704,12 +755,15 @@ export class KnowledgeGraphCore {
       }
 
       // Explore neighbors
-      const entityRelationships = this.getRelationshipsForEntity(currentEntityId);
-      
+      const entityRelationships =
+        this.getRelationshipsForEntity(currentEntityId);
+
       for (const relationship of entityRelationships) {
-        const nextEntityId = relationship.sourceId === currentEntityId ? 
-          relationship.targetId : relationship.sourceId;
-        
+        const nextEntityId =
+          relationship.sourceId === currentEntityId
+            ? relationship.targetId
+            : relationship.sourceId;
+
         // Skip if already visited
         if (visited.has(nextEntityId)) {
           continue;
@@ -737,38 +791,38 @@ export class KnowledgeGraphCore {
    * Apply filters to entities
    */
   private applyFilters(entities: Entity[], filters: QueryFilter[]): Entity[] {
-    return entities.filter(entity => {
+    return entities.filter((entity) => {
       for (const filter of filters) {
         const { field, operator, value } = filter;
-        
+
         // Handle property fields
         if (field.startsWith('properties.')) {
           const propertyName = field.substring('properties.'.length);
           const property = entity.properties[propertyName];
-          
+
           if (!property) {
             return false;
           }
-          
+
           const propertyValue = property.value;
-          
+
           if (!this.matchesFilter(propertyValue, operator, value)) {
             return false;
           }
         } else {
           // Handle direct entity fields
           const entityValue = (entity as any)[field];
-          
+
           if (entityValue === undefined) {
             return false;
           }
-          
+
           if (!this.matchesFilter(entityValue, operator, value)) {
             return false;
           }
         }
       }
-      
+
       return true;
     });
   }
@@ -776,26 +830,30 @@ export class KnowledgeGraphCore {
   /**
    * Check if value matches filter
    */
-  private matchesFilter(value: any, operator: FilterOperator, filterValue: any): boolean {
+  private matchesFilter(
+    value: any,
+    operator: FilterOperator,
+    filterValue: any
+  ): boolean {
     switch (operator) {
       case FilterOperator.EQUALS:
         return value === filterValue;
-      
+
       case FilterOperator.NOT_EQUALS:
         return value !== filterValue;
-      
+
       case FilterOperator.GREATER_THAN:
         return value > filterValue;
-      
+
       case FilterOperator.GREATER_THAN_OR_EQUALS:
         return value >= filterValue;
-      
+
       case FilterOperator.LESS_THAN:
         return value < filterValue;
-      
+
       case FilterOperator.LESS_THAN_OR_EQUALS:
         return value <= filterValue;
-      
+
       case FilterOperator.CONTAINS:
         if (typeof value === 'string') {
           return value.includes(filterValue);
@@ -803,31 +861,31 @@ export class KnowledgeGraphCore {
           return value.includes(filterValue);
         }
         return false;
-      
+
       case FilterOperator.STARTS_WITH:
         if (typeof value === 'string') {
           return value.startsWith(filterValue);
         }
         return false;
-      
+
       case FilterOperator.ENDS_WITH:
         if (typeof value === 'string') {
           return value.endsWith(filterValue);
         }
         return false;
-      
+
       case FilterOperator.IN:
         if (Array.isArray(filterValue)) {
           return filterValue.includes(value);
         }
         return false;
-      
+
       case FilterOperator.NOT_IN:
         if (Array.isArray(filterValue)) {
           return !filterValue.includes(value);
         }
         return false;
-      
+
       default:
         return false;
     }
@@ -836,11 +894,15 @@ export class KnowledgeGraphCore {
   /**
    * Apply sorting to entities
    */
-  private applySorting(entities: Entity[], orderBy: string, orderDirection: 'asc' | 'desc' = 'asc'): Entity[] {
+  private applySorting(
+    entities: Entity[],
+    orderBy: string,
+    orderDirection: 'asc' | 'desc' = 'asc'
+  ): Entity[] {
     return [...entities].sort((a, b) => {
       let valueA: any;
       let valueB: any;
-      
+
       // Handle property fields
       if (orderBy.startsWith('properties.')) {
         const propertyName = orderBy.substring('properties.'.length);
@@ -851,7 +913,7 @@ export class KnowledgeGraphCore {
         valueA = (a as any)[orderBy];
         valueB = (b as any)[orderBy];
       }
-      
+
       // Handle undefined values
       if (valueA === undefined && valueB === undefined) {
         return 0;
@@ -862,7 +924,7 @@ export class KnowledgeGraphCore {
       if (valueB === undefined) {
         return orderDirection === 'asc' ? 1 : -1;
       }
-      
+
       // Compare values
       if (valueA < valueB) {
         return orderDirection === 'asc' ? -1 : 1;
@@ -877,17 +939,21 @@ export class KnowledgeGraphCore {
   /**
    * Apply pagination to entities
    */
-  private applyPagination(entities: Entity[], offset?: number, limit?: number): Entity[] {
+  private applyPagination(
+    entities: Entity[],
+    offset?: number,
+    limit?: number
+  ): Entity[] {
     let result = entities;
-    
+
     if (offset !== undefined && offset > 0) {
       result = result.slice(offset);
     }
-    
+
     if (limit !== undefined && limit > 0) {
       result = result.slice(0, limit);
     }
-    
+
     return result;
   }
 
@@ -896,46 +962,52 @@ export class KnowledgeGraphCore {
    */
   getStats(): KnowledgeGraphStats {
     const now = Date.now();
-    
+
     // Calculate entity stats
-    const entitiesByType: Record<EntityType, number> = Object.values(EntityType).reduce(
+    const entitiesByType: Record<EntityType, number> = Object.values(
+      EntityType
+    ).reduce(
       (acc, type) => {
         acc[type] = this.entitiesByType.get(type as EntityType)?.size || 0;
         return acc;
       },
       {} as Record<EntityType, number>
     );
-    
+
     // Calculate relationship stats
-    const relationshipsByType: Record<RelationType, number> = Object.values(RelationType).reduce(
+    const relationshipsByType: Record<RelationType, number> = Object.values(
+      RelationType
+    ).reduce(
       (acc, type) => {
-        acc[type] = this.relationshipsByType.get(type as RelationType)?.size || 0;
+        acc[type] =
+          this.relationshipsByType.get(type as RelationType)?.size || 0;
         return acc;
       },
       {} as Record<RelationType, number>
     );
-    
+
     // Calculate average confidence
     let totalConfidence = 0;
     let confidenceCount = 0;
-    
+
     for (const entity of this.entities.values()) {
       totalConfidence += entity.confidence;
       confidenceCount++;
     }
-    
+
     for (const relationship of this.relationships.values()) {
       totalConfidence += relationship.confidence;
       confidenceCount++;
     }
-    
-    const averageConfidence = confidenceCount > 0 ? totalConfidence / confidenceCount : 0;
-    
+
+    const averageConfidence =
+      confidenceCount > 0 ? totalConfidence / confidenceCount : 0;
+
     // Calculate density score
     const entityCount = this.entities.size;
     const relationshipCount = this.relationships.size;
     const densityScore = entityCount > 0 ? relationshipCount / entityCount : 0;
-    
+
     return {
       entityCount,
       relationshipCount,
@@ -954,12 +1026,12 @@ export class KnowledgeGraphCore {
     this.entities.clear();
     this.relationships.clear();
     this.entityRelationships.clear();
-    
+
     // Clear indexes
     for (const entitySet of this.entitiesByType.values()) {
       entitySet.clear();
     }
-    
+
     for (const relationshipSet of this.relationshipsByType.values()) {
       relationshipSet.clear();
     }
