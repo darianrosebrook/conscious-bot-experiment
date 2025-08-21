@@ -53,7 +53,6 @@ This directory contains implementation plans for all modules. Use this Map of Co
 ## Progress Tracker
 
 **🎉 MILESTONE 1 (FOUNDATION) COMPLETE** - All critical infrastructure modules implemented and tested
-**🎉 MILESTONE 2 (INTELLIGENCE) COMPLETE** - All memory systems, goal formulation, and constitutional framework implemented
 
 | Module                         | Plan Doc                                       | Status | Milestone | Dependencies | Priority |
 |--------------------------------|------------------------------------------------------|---------|-----------|--------------|----------|
@@ -68,6 +67,8 @@ This directory contains implementation plans for all modules. Use this Map of Co
 | Safety: Monitoring             | safety/monitoring.md                                 | ✅ Implemented | M1: Telemetry | None | Critical |
 | Safety: Fail-Safes             | safety/fail_safes.md                                | ✅ Implemented | M1: Watchdogs | Monitoring | Critical |
 | Planning: Goal Formulation     | planning/goal_formulation.md                         | ✅ Implemented | M2: Utility Engine | Core, Memory | Critical |
+| Cognition: Cognitive Core      | cognition/cognitive_core.md                          | ✅ Implemented | M2: LLM Integration | Core | Critical |
+| Cognition: Self Model          | cognition/self_model/self_model.md                   | ✅ Implemented | M2: Identity & Narrative | Cognitive Core | High |
 | World: Place Graph             | world/place_graph/README.md                         | ✅ Implemented | M2: Spatial Memory | Core, Navigation | High |
 | Memory: Episodic               | memory/episodic/README.md                           | ✅ Implemented | M2: Experience Storage | Core, World | High |
 | Memory: Semantic               | memory/semantic/README.md                           | ✅ Implemented | M2: Knowledge Graph | Core, World | High |
@@ -107,7 +108,6 @@ Beyond module-specific plans, the following strategic documents guide overall pr
 - [Risk Management](../../strategy/RISK_MANAGEMENT.md) - Comprehensive risk assessment and mitigation strategies  
 - [Verification Framework](../../strategy/VERIFICATION_FRAMEWORK.md) - Quality assurance and testing methodology
 - [Future Enhancements](../../strategy/FUTURE_ENHANCEMENTS.md) - Advanced features for post-M4 development phases
-- [M3 Implementation Plan](../../strategy/M3_IMPLEMENTATION_PLAN.md) - Detailed plan for M3 implementation
 
 📋 **See [Strategy Overview](../../strategy/README.md) for detailed guidance on using these documents.**
 
