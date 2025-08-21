@@ -18,6 +18,33 @@ export * from './cognitive-core/internal-dialogue';
 export * from './self-model/identity-tracker';
 export * from './self-model/narrative-manager';
 
+// Constitutional Filter
+export * from './constitutional-filter';
+
 // Types
-export * from './types';
-export * from './self-model/types';
+export type {
+  InternalThought,
+  ThoughtType,
+  ThoughtContext,
+  DialogueTrigger,
+  ReasoningStep,
+  ReasoningChain,
+  ReasoningResult,
+  ReasoningRequest,
+  ReasoningType,
+  LLMConfig,
+  LLMContext,
+  LLMResponse,
+} from './types';
+
+export type {
+  IdentityCore,
+  PersonalityTrait,
+  CoreValue,
+  Capability,
+  CapabilityDevelopment,
+  NarrativeStory,
+  NarrativeChapter,
+  ExperienceIntegration,
+  IdentityImpact,
+} from './self-model/types';
