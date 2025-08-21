@@ -205,6 +205,7 @@ export class EventLogger {
       [ExperienceType.DANGER_ENCOUNTER]: 0.9,
       [ExperienceType.SOCIAL_INTERACTION]: 0.6,
       [ExperienceType.LEARNING]: 0.7,
+      [ExperienceType.SKILL_IMPROVEMENT]: 0.75,
       [ExperienceType.EXPLORATION]: 0.5,
       [ExperienceType.CREATIVE_ACTIVITY]: 0.6,
       [ExperienceType.ROUTINE_ACTION]: 0.2,

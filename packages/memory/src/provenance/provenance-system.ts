@@ -275,8 +275,8 @@ export class ProvenanceSystem {
     decisionId: string,
     actionId: string,
     status: import('./types').ActionStatus,
-    result?: any,
-    actor: string
+    actor: string,
+    result?: any
   ): DecisionRecord | null {
     // Update action status
     const decision = this.decisionTracker.updateActionStatus(

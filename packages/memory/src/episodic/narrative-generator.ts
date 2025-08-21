@@ -14,7 +14,7 @@ import { Experience, ExperienceType } from '../types';
  */
 export interface NarrativeStyle {
   tone: 'reflective' | 'descriptive' | 'analytical' | 'storytelling';
-  detailLevel: 'summary' | 'detailed' | 'comprehensive';
+  detailLevel: 'brief' | 'moderate' | 'comprehensive';
   focus: 'temporal' | 'thematic' | 'causal' | 'emotional';
   length: 'brief' | 'moderate' | 'extensive';
 }
@@ -235,7 +235,7 @@ export class NarrativeGenerator {
       content: this.generateTemporalContent(sortedMemories, timeline, milestones),
       style: {
         tone: 'descriptive',
-        detailLevel: 'detailed',
+        detailLevel: 'moderate',
         focus: 'temporal',
         length: 'moderate',
       },
@@ -270,7 +270,7 @@ export class NarrativeGenerator {
       content: this.generateExplanatoryContent(decision, reasoning, outcome, lessons),
       style: {
         tone: 'analytical',
-        detailLevel: 'detailed',
+        detailLevel: 'moderate',
         focus: 'causal',
         length: 'moderate',
       },
@@ -308,7 +308,7 @@ export class NarrativeGenerator {
       content: this.generateComparativeContent(comparisonPeriods, changes, continuities),
       style: {
         tone: 'analytical',
-        detailLevel: 'detailed',
+        detailLevel: 'moderate',
         focus: 'thematic',
         length: 'extensive',
       },

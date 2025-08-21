@@ -217,6 +217,7 @@ export class SalienceScorer {
     const learningTypeBonus: Record<ExperienceType, number> = {
       [ExperienceType.GOAL_FAILURE]: 0.8, // Failures teach valuable lessons
       [ExperienceType.LEARNING]: 0.9, // Explicit learning experiences
+      [ExperienceType.SKILL_IMPROVEMENT]: 0.95, // Skill improvement is high-value learning
       [ExperienceType.EXPLORATION]: 0.6, // Exploration reveals new information
       [ExperienceType.DANGER_ENCOUNTER]: 0.7, // Dangerous situations teach caution
       [ExperienceType.CREATIVE_ACTIVITY]: 0.5, // Creativity builds skills

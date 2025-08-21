@@ -36,6 +36,7 @@ export enum ExperienceType {
   EXPLORATION = 'exploration',
   DANGER_ENCOUNTER = 'danger_encounter',
   LEARNING = 'learning',
+  SKILL_IMPROVEMENT = 'skill_improvement',
   CREATIVE_ACTIVITY = 'creative_activity',
   ROUTINE_ACTION = 'routine_action',
 }
@@ -63,6 +64,7 @@ export interface EmotionalState {
   curiosity: number; // 0-1
   confidence: number; // 0-1
   timestamp: number;
+  [key: string]: number; // Allow dynamic emotion access
 }
 
 // ============================================================================
@@ -339,6 +341,7 @@ export interface Action {
   parameters: Record<string, any>;
   timestamp: number;
   duration: number;
+  target?: string;
   success: boolean;
 }
 

@@ -162,7 +162,7 @@ export class AttentionManager {
       }
     }
 
-    this.logAttentionEvent('focus_start', focus.id, undefined, `Started focusing on ${focusType}`);
+    this.logAttentionEvent('focus_start', `Started focusing on ${focusType}`, focus.id, undefined);
     
     return focus;
   }
@@ -185,11 +185,11 @@ export class AttentionManager {
       if (this.activeFoci.length > 0) {
         this.activeFoci.sort((a, b) => b.priority - a.priority);
         this.currentFocus = this.activeFoci[0];
-        this.logAttentionEvent('focus_switch', this.currentFocus.id, undefined, `Switched to ${this.currentFocus.type}`);
+        this.logAttentionEvent('focus_switch', `Switched to ${this.currentFocus.type}`, this.currentFocus.id, undefined);
       }
     }
 
-    this.logAttentionEvent('focus_end', focusId, undefined, `Ended focus on ${focus.type}`);
+    this.logAttentionEvent('focus_end', `Ended focus on ${focus.type}`, focusId, undefined);
     return true;
   }
 
@@ -213,10 +213,10 @@ export class AttentionManager {
     } else if (this.activeFoci[0]?.id !== this.currentFocus?.id) {
       // Switch to highest priority focus
       this.currentFocus = this.activeFoci[0];
-      this.logAttentionEvent('focus_switch', this.currentFocus.id, undefined, `Switched to higher priority focus`);
+      this.logAttentionEvent('focus_switch', `Switched to higher priority focus`, this.currentFocus.id, undefined);
     }
 
-    this.logAttentionEvent('focus_switch', focusId, undefined, `Updated priority from ${oldPriority} to ${newPriority}`);
+    this.logAttentionEvent('focus_switch', `Updated priority from ${oldPriority} to ${newPriority}`, focusId, undefined);
     return true;
   }
 
@@ -528,7 +528,7 @@ export class AttentionManager {
       this.endFocus(lowestFocus.id);
     }
 
-    this.logAttentionEvent('load_change', undefined, this.calculateCurrentLoad(), 'Reduced cognitive load');
+    this.logAttentionEvent('load_change', 'Reduced cognitive load', undefined, this.calculateCurrentLoad());
   }
 
   /**
@@ -578,9 +578,9 @@ export class AttentionManager {
    */
   private logAttentionEvent(
     eventType: AttentionEvent['eventType'],
+    description: string,
     focusId?: string,
-    loadLevel?: number,
-    description: string
+    loadLevel?: number
   ): void {
     const event: AttentionEvent = {
       timestamp: Date.now(),
@@ -599,7 +599,7 @@ export class AttentionManager {
 
     // Log overload warnings
     if (eventType === 'load_change' && loadLevel && loadLevel > this.loadThreshold) {
-      this.logAttentionEvent('overload_warning', undefined, loadLevel, 'Cognitive overload detected');
+      this.logAttentionEvent('overload_warning', 'Cognitive overload detected', undefined, loadLevel);
     }
   }
 }

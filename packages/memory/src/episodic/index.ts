@@ -9,10 +9,12 @@
 
 export { EventLogger } from './event-logger';
 export { SalienceScorer } from './salience-scorer';
-export { MemoryConsolidation, ConsolidationResult, MemoryPattern, PatternType, SemanticUpdate, ConsolidationMetrics } from './memory-consolidation';
-export { EpisodicRetrieval, RetrievalCue, RetrievalCueType, RetrievalContext, RetrievedMemory, TemporalQuery, SpatialQuery, SocialQuery, EmotionalQuery } from './episodic-retrieval';
-export { 
-  NarrativeGenerator, 
+export { MemoryConsolidation } from './memory-consolidation';
+export type { ConsolidationResult, MemoryPattern, PatternType, SemanticUpdate, ConsolidationMetrics } from './memory-consolidation';
+export { EpisodicRetrieval } from './episodic-retrieval';
+export type { RetrievalCue, RetrievalCueType, RetrievalContext, RetrievedMemory, TemporalQuery, SpatialQuery, SocialQuery, EmotionalQuery } from './episodic-retrieval';
+export { NarrativeGenerator } from './narrative-generator';
+export type { 
   NarrativeStyle, 
   NarrativeTheme, 
   GeneratedNarrative,

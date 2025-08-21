@@ -205,11 +205,11 @@ describe('Provenance System Integration', () => {
         decision.id,
         actionId,
         ActionStatus.COMPLETED,
+        testActor,
         {
           success: true,
           duration: '15 minutes',
-        },
-        testActor
+        }
       );
 
       expect(withUpdatedAction).toBeDefined();

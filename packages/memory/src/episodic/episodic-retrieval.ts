@@ -561,7 +561,7 @@ export class EpisodicRetrieval {
       
       for (const [emotion, intensity] of Object.entries(emotionalValue)) {
         if (memory.emotions[emotion] !== undefined) {
-          const match = 1 - Math.abs(memory.emotions[emotion] - intensity);
+          const match = 1 - Math.abs(memory.emotions[emotion] - (intensity as number));
           totalMatch += match;
           totalEmotions++;
         }
