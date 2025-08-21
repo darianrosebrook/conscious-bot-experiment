@@ -69,9 +69,9 @@ This directory contains implementation plans for all modules. Use this Map of Co
 | Planning: Goal Formulation     | planning/goal_formulation.md                         | ✅ Implemented | M2: Utility Engine | Core, Memory | Critical |
 | Cognition: Cognitive Core      | cognition/cognitive_core.md                          | ✅ Implemented | M2: LLM Integration | Core | Critical |
 | Cognition: Self Model          | cognition/self_model/self_model.md                   | ✅ Implemented | M2: Identity & Narrative | Cognitive Core | High |
-| Memory: Episodic               | memory/episodic/README.md                           | ✅ Implemented | M2: Experience Storage | Core, World | High |
 | World: Place Graph             | world/place_graph/README.md                         | ✅ Implemented | M2: Spatial Memory | Core, Navigation | High |
-| Memory: Semantic               | memory/semantic/README.md                           | Not Started | M2: Knowledge Graph | Core, World | High |
+| Memory: Episodic               | memory/episodic/README.md                           | ✅ Implemented | M2: Experience Storage | Core, World | High |
+| Memory: Semantic               | memory/semantic/README.md                           | ✅ Implemented | M2: Knowledge Graph | Core, World | High |
 | Memory: Working                | memory/working/README.md                            | ✅ Implemented | M2: Cognitive Workspace | Core | High |
 | Memory: Provenance             | memory/provenance/README.md                         | Not Started | M2: Decision Tracking | Core, Memory | High |
 | Interfaces: Constitution       | interfaces/constitution.md                           | ✅ Implemented | M2: Rules Engine | None | Critical |

@@ -17,6 +17,9 @@ export * from './episodic/salience-scorer';
 // Working Memory
 export * from './working';
 
+// Semantic Memory
+export * from './semantic';
+
 // Export only episodic memory types from base types
 export type {
   Experience,
