@@ -14,8 +14,18 @@
 export * from './episodic/event-logger';
 export * from './episodic/salience-scorer';
 
-// Types
-export * from './types';
+// Working Memory
+export * from './working';
 
-// Types
-export * from './types';
+// Export only episodic memory types from base types
+export type {
+  Experience,
+  Outcome,
+  EmotionalState
+} from './types';
+
+export {
+  ExperienceType,
+  OutcomeType,
+  ExperienceSchema
+} from './types';
