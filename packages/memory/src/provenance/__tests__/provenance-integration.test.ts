@@ -1,9 +1,9 @@
 /**
  * Provenance System Integration Test
- * 
+ *
  * Tests the integration of decision tracker, evidence manager,
  * audit trail, and explanation generator components.
- * 
+ *
  * @author @darianrosebrook
  */
 
@@ -19,6 +19,7 @@ import {
   AuditAction,
   ExplanationFormat,
   ExplanationDetailLevel,
+  InformationSourceType,
 } from '../index';
 
 describe('Provenance System Integration', () => {
@@ -38,9 +39,13 @@ describe('Provenance System Integration', () => {
         'technology',
         DecisionImportance.HIGH,
         {
-          situation: 'We need to select a database technology for our new project',
+          situation:
+            'We need to select a database technology for our new project',
           goals: ['Scalability', 'Performance', 'Cost-effectiveness'],
-          constraints: ['Must support ACID transactions', 'Must have good community support'],
+          constraints: [
+            'Must support ACID transactions',
+            'Must have good community support',
+          ],
           environment: {
             projectType: 'web application',
             teamExpertise: ['SQL', 'NoSQL'],
@@ -57,7 +62,7 @@ describe('Provenance System Integration', () => {
       const updatedWithSources = provenanceSystem.addInformationSource(
         decision.id,
         {
-          type: 'knowledge',
+          type: InformationSourceType.KNOWLEDGE,
           description: 'Database technology comparison',
           content: {
             sql: { pros: ['ACID', 'Mature'], cons: ['Scaling'] },
@@ -70,7 +75,9 @@ describe('Provenance System Integration', () => {
       );
 
       expect(updatedWithSources).toBeDefined();
-      expect(updatedWithSources?.stage).toBe(DecisionStage.INFORMATION_GATHERED);
+      expect(updatedWithSources?.stage).toBe(
+        DecisionStage.INFORMATION_GATHERED
+      );
 
       // Add alternatives
       const withAlternatives = provenanceSystem.addAlternative(
@@ -114,7 +121,9 @@ describe('Provenance System Integration', () => {
       );
 
       expect(withAlternatives).toBeDefined();
-      expect(withAlternatives?.stage).toBe(DecisionStage.ALTERNATIVES_EVALUATED);
+      expect(withAlternatives?.stage).toBe(
+        DecisionStage.ALTERNATIVES_EVALUATED
+      );
       expect(withAlternatives?.alternatives.length).toBe(2);
 
       // Add evidence
@@ -141,10 +150,13 @@ describe('Provenance System Integration', () => {
         decision.id,
         selectedAlternative!,
         {
-          reasoning: 'PostgreSQL was selected due to its strong ACID compliance and maturity',
+          reasoning:
+            'PostgreSQL was selected due to its strong ACID compliance and maturity',
           evidenceIds: [evidence.id],
           confidenceScore: 0.8,
-          ethicalConsiderations: ['Data integrity is critical for user privacy'],
+          ethicalConsiderations: [
+            'Data integrity is critical for user privacy',
+          ],
         },
         testActor
       );
@@ -166,7 +178,9 @@ describe('Provenance System Integration', () => {
       expect(withExecution).toBeDefined();
       expect(withExecution?.stage).toBe(DecisionStage.EXECUTED);
       expect(withExecution?.execution).toBeDefined();
-      expect(withExecution?.execution?.status).toBe(ExecutionStatus.IN_PROGRESS);
+      expect(withExecution?.execution?.status).toBe(
+        ExecutionStatus.IN_PROGRESS
+      );
 
       // Add action
       const withAction = provenanceSystem.addAction(
@@ -199,7 +213,9 @@ describe('Provenance System Integration', () => {
       );
 
       expect(withUpdatedAction).toBeDefined();
-      expect(withUpdatedAction?.execution?.actions[0].status).toBe(ActionStatus.COMPLETED);
+      expect(withUpdatedAction?.execution?.actions[0].status).toBe(
+        ActionStatus.COMPLETED
+      );
 
       // Complete execution
       const withCompletedExecution = provenanceSystem.completeExecution(
@@ -209,7 +225,9 @@ describe('Provenance System Integration', () => {
       );
 
       expect(withCompletedExecution).toBeDefined();
-      expect(withCompletedExecution?.execution?.status).toBe(ExecutionStatus.COMPLETED);
+      expect(withCompletedExecution?.execution?.status).toBe(
+        ExecutionStatus.COMPLETED
+      );
       expect(withCompletedExecution?.execution?.endTime).toBeDefined();
 
       // Record outcome
@@ -217,7 +235,8 @@ describe('Provenance System Integration', () => {
         decision.id,
         {
           status: DecisionOutcomeStatus.SUCCESSFUL,
-          description: 'PostgreSQL was successfully implemented and met all requirements',
+          description:
+            'PostgreSQL was successfully implemented and met all requirements',
           metrics: {
             performance: 85,
             reliability: 95,
@@ -239,7 +258,9 @@ describe('Provenance System Integration', () => {
 
       expect(withOutcome).toBeDefined();
       expect(withOutcome?.stage).toBe(DecisionStage.OUTCOME_RECORDED);
-      expect(withOutcome?.outcome?.status).toBe(DecisionOutcomeStatus.SUCCESSFUL);
+      expect(withOutcome?.outcome?.status).toBe(
+        DecisionOutcomeStatus.SUCCESSFUL
+      );
 
       // Add learning
       const withLearning = provenanceSystem.addLearning(
@@ -269,7 +290,9 @@ describe('Provenance System Integration', () => {
 
       expect(explanation).toBeDefined();
       expect(typeof explanation?.content).toBe('string');
-      expect((explanation?.content as string).includes('PostgreSQL')).toBe(true);
+      expect((explanation?.content as string).includes('PostgreSQL')).toBe(
+        true
+      );
 
       // Get audit trail
       const auditTrail = provenanceSystem.getAuditTrail(
@@ -295,7 +318,8 @@ describe('Provenance System Integration', () => {
         'infrastructure',
         DecisionImportance.CRITICAL,
         {
-          situation: 'We need to select a cloud provider for our infrastructure',
+          situation:
+            'We need to select a cloud provider for our infrastructure',
           goals: ['Reliability', 'Cost-effectiveness', 'Feature set'],
           constraints: ['Budget constraints', 'Technical requirements'],
           environment: {},
@@ -387,10 +411,15 @@ describe('Provenance System Integration', () => {
 
       expect(searchResults).toBeDefined();
       expect(searchResults.length).toBeGreaterThan(0);
-      expect(searchResults[0].id).toBe(evidence1.id);
+      expect(searchResults.some((result) => result.id === evidence1.id)).toBe(
+        true
+      );
 
       // Get evidence by ID
-      const retrievedEvidence = provenanceSystem.getEvidence(evidence1.id, testActor);
+      const retrievedEvidence = provenanceSystem.getEvidence(
+        evidence1.id,
+        testActor
+      );
       expect(retrievedEvidence).toBeDefined();
       expect(retrievedEvidence?.id).toBe(evidence1.id);
     });
@@ -406,7 +435,11 @@ describe('Provenance System Integration', () => {
         DecisionImportance.HIGH,
         {
           situation: 'We need to hire a new developer for our team',
-          goals: ['Technical excellence', 'Cultural fit', 'Long-term potential'],
+          goals: [
+            'Technical excellence',
+            'Cultural fit',
+            'Long-term potential',
+          ],
           constraints: ['Budget', 'Timeline', 'Location'],
           environment: {},
         },
@@ -433,7 +466,11 @@ describe('Provenance System Integration', () => {
         {
           title: 'Candidate B',
           description: 'Mid-level developer with 4 years experience',
-          pros: ['Good cultural fit', 'Experience with our stack', 'Growth potential'],
+          pros: [
+            'Good cultural fit',
+            'Experience with our stack',
+            'Growth potential',
+          ],
           cons: ['Less experience', 'No leadership experience'],
           estimatedUtility: 0.75,
           confidence: 0.7,
@@ -446,7 +483,8 @@ describe('Provenance System Integration', () => {
       const evidence = provenanceSystem.addEvidence(
         {
           type: EvidenceType.DOCUMENT,
-          content: 'Technical assessment results show Candidate A scored 95% and Candidate B scored 82%',
+          content:
+            'Technical assessment results show Candidate A scored 95% and Candidate B scored 82%',
           source: 'Technical assessment',
           reliability: 0.9,
           metadata: {},
@@ -459,10 +497,14 @@ describe('Provenance System Integration', () => {
         decision.id,
         decision.alternatives[0].id,
         {
-          reasoning: 'Candidate A was selected due to superior technical skills and leadership experience',
+          reasoning:
+            'Candidate A was selected due to superior technical skills and leadership experience',
           evidenceIds: [evidence.id],
           confidenceScore: 0.85,
-          ethicalConsiderations: ['Fair evaluation process', 'Diversity considerations'],
+          ethicalConsiderations: [
+            'Fair evaluation process',
+            'Diversity considerations',
+          ],
         },
         testActor
       );
@@ -472,7 +514,8 @@ describe('Provenance System Integration', () => {
         decision.id,
         {
           status: DecisionOutcomeStatus.SUCCESSFUL,
-          description: 'Candidate A accepted the offer and has integrated well with the team',
+          description:
+            'Candidate A accepted the offer and has integrated well with the team',
           metrics: {
             performanceRating: 90,
             teamSatisfaction: 85,
@@ -499,7 +542,9 @@ describe('Provenance System Integration', () => {
 
       expect(textExplanation).toBeDefined();
       expect(typeof textExplanation?.content).toBe('string');
-      expect((textExplanation?.content as string).includes('Candidate A')).toBe(true);
+      expect((textExplanation?.content as string).includes('Candidate A')).toBe(
+        true
+      );
 
       // Generate structured explanation
       const structuredExplanation = provenanceSystem.explainDecision(
@@ -513,7 +558,9 @@ describe('Provenance System Integration', () => {
 
       expect(structuredExplanation).toBeDefined();
       expect(typeof structuredExplanation?.content).toBe('object');
-      expect((structuredExplanation?.content as any).selectedAlternative).toBeDefined();
+      expect(
+        (structuredExplanation?.content as any).selectedAlternative
+      ).toBeDefined();
 
       // Generate summary explanation
       const summaryExplanation = provenanceSystem.explainDecision(

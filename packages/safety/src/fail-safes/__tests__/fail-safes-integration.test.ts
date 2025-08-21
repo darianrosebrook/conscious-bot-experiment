@@ -11,7 +11,7 @@ import { PreemptionManager } from '../preemption-manager';
 import { EmergencyResponseCoordinator } from '../emergency-response';
 import {
   FailureType,
-  HealthStatus,
+  FailSafeHealthStatus,
   PreemptionPriority,
   EmergencyType,
   EmergencySeverity,
@@ -230,7 +230,7 @@ describe('Fail-Safes Module Integration Tests', () => {
       await new Promise(resolve => setTimeout(resolve, 200));
 
       const health = watchdogManager.getComponentHealth('failing_service');
-      expect(health).toBe(HealthStatus.UNHEALTHY);
+      expect(health).toBe(FailSafeHealthStatus.UNHEALTHY);
 
       const failures = watchdogManager.getFailureHistory('failing_service');
       expect(failures.length).toBeGreaterThan(0);
@@ -553,7 +553,7 @@ describe('Fail-Safes Module Integration Tests', () => {
         return {
           componentName: 'unstable_component',
           checkId: `check_${Date.now()}`,
-          status: HealthStatus.HEALTHY,
+          status: FailSafeHealthStatus.HEALTHY,
           responseTime: 50,
           timestamp: Date.now(),
         };

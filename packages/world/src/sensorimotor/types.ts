@@ -8,7 +8,6 @@
  */
 
 import { z } from 'zod';
-import { WorldPosition } from '../types';
 
 // ===== CORE SENSORIMOTOR TYPES =====
 

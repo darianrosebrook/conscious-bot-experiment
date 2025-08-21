@@ -498,3 +498,27 @@ export const validateSensingConfig = (data: unknown): SensingConfig =>
 
 export const validateSweepResult = (data: unknown): SweepResult =>
   SweepResultSchema.parse(data);
+
+// Re-export types from other modules for convenience
+export type { WorldPosition, PathPlanningRequest, NavigationConfig } from './navigation/types';
+export type { PerceptionConfig } from './perception/types';
+export type { SensorimotorConfig } from './sensorimotor/types';
+
+// Define missing types that tests expect
+export interface VisualQuery {
+  position: Vec3;
+  radius: number;
+  targetTypes?: string[];
+}
+
+export interface ActionRequest {
+  id: string;
+  type: string;
+  parameters: Record<string, any>;
+  priority: number;
+}
+
+export interface RaycastConfig {
+  maxDistance: number;
+  transparent: string[];
+}

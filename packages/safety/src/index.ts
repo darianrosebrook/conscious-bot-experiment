@@ -17,7 +17,7 @@ export * from './privacy';
 export * from './fail-safes';
 
 // Re-export with explicit naming to avoid conflicts
-export {
+export type {
   HealthCheckResult as SafetyHealthCheckResult,
   HealthCheckResultSchema as SafetyHealthCheckResultSchema,
   HealthStatus as SafetyHealthStatus,

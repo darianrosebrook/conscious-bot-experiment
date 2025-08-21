@@ -162,12 +162,14 @@ describe('Sensorimotor System Integration', () => {
         parameters: { speed: 1.0, duration: 1000 },
         priority: 0.5,
         feedback: true,
+        requiredPrecision: 0.5,
       };
 
       const context: ExecutionContext = {
         currentPosition: {
           position: { x: 0, y: 64, z: 0 },
           timestamp: Date.now(),
+          confidence: 1.0,
         },
         environmentConditions: {
           lighting: 15,
@@ -218,6 +220,7 @@ describe('Sensorimotor System Integration', () => {
         currentPosition: {
           position: { x: 0, y: 64, z: 0 },
           timestamp: Date.now(),
+          confidence: 1.0,
         },
         environmentConditions: {
           lighting: 10,
@@ -283,6 +286,7 @@ describe('Sensorimotor System Integration', () => {
         currentPosition: {
           position: { x: 0, y: 64, z: 0 },
           timestamp: Date.now(),
+          confidence: 1.0,
         },
         environmentConditions: {
           lighting: 15,
@@ -330,6 +334,7 @@ describe('Sensorimotor System Integration', () => {
         currentPosition: {
           position: { x: 0, y: 64, z: 0 },
           timestamp: Date.now(),
+          confidence: 1.0,
         },
         environmentConditions: {
           lighting: 15,
@@ -379,6 +384,7 @@ describe('Sensorimotor System Integration', () => {
         currentPosition: {
           position: { x: 0, y: 64, z: 0 },
           timestamp: Date.now(),
+          confidence: 1.0,
         },
         environmentConditions: {
           lighting: 15,
@@ -458,6 +464,7 @@ describe('Sensorimotor System Integration', () => {
         currentPosition: {
           position: { x: 0, y: 64, z: 0 },
           timestamp: Date.now(),
+          confidence: 1.0,
         },
         environmentConditions: {
           lighting: 8, // Lower lighting for potential learning
@@ -741,6 +748,7 @@ describe('Sensorimotor System Integration', () => {
         currentPosition: {
           position: { x: 0, y: 64, z: 0 },
           timestamp: Date.now(),
+          confidence: 1.0,
         },
         environmentConditions: {
           lighting: 15,
@@ -910,6 +918,7 @@ describe('Individual Sensorimotor Components', () => {
         currentPosition: {
           position: { x: 0, y: 64, z: 0 },
           timestamp: Date.now(),
+          confidence: 1.0,
         },
         environmentConditions: {
           lighting: 15,

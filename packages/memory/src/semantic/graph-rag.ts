@@ -120,14 +120,23 @@ export class GraphRAG {
       queryLower.includes('related to')
     ) {
       const [sourceEntity, targetEntity] = this.extractEntityPair(query);
-      return {
-        type: QueryType.PATH,
-        parameters: {
-          sourceId: sourceEntity,
-          targetId: targetEntity,
-          maxDepth: 3,
-        },
-      };
+
+      // Convert entity names to IDs
+      const sourceEntityObj =
+        this.knowledgeGraph.findEntityByName(sourceEntity);
+      const targetEntityObj =
+        this.knowledgeGraph.findEntityByName(targetEntity);
+
+      if (sourceEntityObj && targetEntityObj) {
+        return {
+          type: QueryType.PATH,
+          parameters: {
+            sourceId: sourceEntityObj.id,
+            targetId: targetEntityObj.id,
+            maxDepth: 3,
+          },
+        };
+      }
     }
 
     // Check for neighborhood queries
@@ -163,27 +172,25 @@ export class GraphRAG {
     // This is a simplified implementation
     // In a real system, this would use NLP to extract entity names
 
+    if (!query || typeof query !== 'string') {
+      return '';
+    }
+
     const queryLower = query.toLowerCase();
 
     if (queryLower.includes('what is ')) {
-      return query
-        .split('what is ')[1]
-        .trim()
-        .replace(/[?.,!]$/, '');
+      const parts = query.split('what is ');
+      return parts.length > 1 ? parts[1].trim().replace(/[?.,!]$/, '') : '';
     }
 
     if (queryLower.includes('who is ')) {
-      return query
-        .split('who is ')[1]
-        .trim()
-        .replace(/[?.,!]$/, '');
+      const parts = query.split('who is ');
+      return parts.length > 1 ? parts[1].trim().replace(/[?.,!]$/, '') : '';
     }
 
     if (queryLower.includes('tell me about ')) {
-      return query
-        .split('tell me about ')[1]
-        .trim()
-        .replace(/[?.,!]$/, '');
+      const parts = query.split('tell me about ');
+      return parts.length > 1 ? parts[1].trim().replace(/[?.,!]$/, '') : '';
     }
 
     return query.trim().replace(/[?.,!]$/, '');
@@ -213,7 +220,16 @@ export class GraphRAG {
 
     if (queryLower.includes('related to')) {
       const parts = query.split('related to');
-      return [parts[0].trim(), parts[1].trim().replace(/[?.,!]$/, '')];
+      const firstPart = parts[0].trim();
+      const secondPart = parts[1].trim().replace(/[?.,!]$/, '');
+
+      // Handle cases like "How is Diamond related to Obsidian?"
+      if (firstPart.includes('is ')) {
+        const entityName = firstPart.split('is ').pop()?.trim() || '';
+        return [entityName, secondPart];
+      }
+
+      return [firstPart, secondPart];
     }
 
     return ['', ''];

@@ -7,11 +7,7 @@
  * @author @darianrosebrook
  */
 
-import {
-  Evidence,
-  EvidenceType,
-  EvidenceSchema,
-} from './types';
+import { Evidence, EvidenceType, EvidenceSchema } from './types';
 
 /**
  * Evidence manager configuration
@@ -58,9 +54,7 @@ export class EvidenceManager {
   /**
    * Add evidence item
    */
-  addEvidence(
-    evidence: Omit<Evidence, 'id' | 'timestamp'>
-  ): Evidence {
+  addEvidence(evidence: Omit<Evidence, 'id' | 'timestamp'>): Evidence {
     const now = Date.now();
     const id = `evidence-${now}-${Math.random().toString(36).substring(2, 9)}`;
 
@@ -164,24 +158,15 @@ export class EvidenceManager {
    */
   private isSimilarContent(content1: any, content2: any): boolean {
     // Handle primitive types
-    if (
-      typeof content1 === 'string' &&
-      typeof content2 === 'string'
-    ) {
+    if (typeof content1 === 'string' && typeof content2 === 'string') {
       return content1 === content2;
     }
 
-    if (
-      typeof content1 === 'number' &&
-      typeof content2 === 'number'
-    ) {
+    if (typeof content1 === 'number' && typeof content2 === 'number') {
       return Math.abs(content1 - content2) < 0.001;
     }
 
-    if (
-      typeof content1 === 'boolean' &&
-      typeof content2 === 'boolean'
-    ) {
+    if (typeof content1 === 'boolean' && typeof content2 === 'boolean') {
       return content1 === content2;
     }
 
@@ -416,12 +401,16 @@ export class EvidenceManager {
     }
 
     if (Array.isArray(content)) {
-      return content.map((item) => this.contentToSearchableString(item)).join(' ');
+      return content
+        .map((item) => this.contentToSearchableString(item))
+        .join(' ');
     }
 
     if (typeof content === 'object' && content !== null) {
-      return Object.values(content)
-        .map((value) => this.contentToSearchableString(value))
+      return Object.entries(content)
+        .map(
+          ([key, value]) => `${key} ${this.contentToSearchableString(value)}`
+        )
         .join(' ');
     }
 

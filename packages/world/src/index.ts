@@ -35,11 +35,12 @@ export { PlaceMemory } from './place-graph/place-memory';
 export { SpatialNavigator } from './place-graph/spatial-navigator';
 export { createPlaceGraph } from './place-graph';
 
-// Types and interfaces
+// Types and interfaces  
 export * from './types';
 export * from './perception/types';
 export * from './navigation/types';
-export * from './sensorimotor/types';
+// Export sensorimotor types without the normalize function to avoid conflict
+export type * from './sensorimotor/types';
 // Export place graph types with namespace to avoid conflicts
 export { 
   PlaceType,

@@ -563,11 +563,12 @@ export class GeofenceManager extends EventEmitter {
     restrictedAreas: number;
   } {
     // This would be tracked over time in a real implementation
+    const allGeofences = this.geofenceRegistry.getAllGeofences();
     return {
-      totalGeofences: this.geofences.size,
+      totalGeofences: allGeofences.length,
       violationsDetected: 0,
-      restrictedAreas: Array.from(this.geofences.values()).filter(
-        (g) => g.type === 'restricted_area'
+      restrictedAreas: allGeofences.filter(
+        (g: Geofence) => g.type === 'restricted_resource'
       ).length,
     };
   }

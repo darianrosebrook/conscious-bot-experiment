@@ -23,7 +23,7 @@ export enum FailureType {
   EXTERNAL_SERVICE_FAILURE = 'external_service_failure',
 }
 
-export enum HealthStatus {
+export enum FailSafeHealthStatus {
   HEALTHY = 'healthy',
   DEGRADED = 'degraded',
   UNHEALTHY = 'unhealthy',
@@ -107,10 +107,10 @@ export const WatchdogMetricsSchema = z.object({
   averageResponseTime: z.number(),
 });
 
-export const HealthCheckResultSchema = z.object({
+export const FailSafeHealthCheckResultSchema = z.object({
   componentName: z.string(),
   checkId: z.string(),
-  status: z.nativeEnum(HealthStatus),
+  status: z.nativeEnum(FailSafeHealthStatus),
   responseTime: z.number(),
   timestamp: z.number(),
   details: z.record(z.any()).optional(),
@@ -453,10 +453,10 @@ export const FailSafeConfigSchema = z.object({
 
 export const SystemStatusSchema = z.object({
   timestamp: z.number(),
-  overallHealth: z.nativeEnum(HealthStatus),
+  overallHealth: z.nativeEnum(FailSafeHealthStatus),
   currentMode: z.nativeEnum(OperationMode),
   activeEmergencies: z.array(z.string()),
-  componentStatuses: z.record(z.nativeEnum(HealthStatus)),
+  componentStatuses: z.record(z.nativeEnum(FailSafeHealthStatus)),
   resourceUsage: ResourceUsageSchema,
   activeTasks: z.number(),
   lastCheckpoint: z.string().optional(),
@@ -470,7 +470,7 @@ export const SystemStatusSchema = z.object({
 
 export type ComponentWatchdogConfig = z.infer<typeof ComponentWatchdogConfigSchema>;
 export type WatchdogMetrics = z.infer<typeof WatchdogMetricsSchema>;
-export type HealthCheckResult = z.infer<typeof HealthCheckResultSchema>;
+export type FailSafeHealthCheckResult = z.infer<typeof FailSafeHealthCheckResultSchema>;
 export type FailureEvent = z.infer<typeof FailureEventSchema>;
 export type Task = z.infer<typeof TaskSchema>;
 export type PreemptionEvent = z.infer<typeof PreemptionEventSchema>;
@@ -504,8 +504,8 @@ export const validateComponentWatchdogConfig = (data: unknown): ComponentWatchdo
   ComponentWatchdogConfigSchema.parse(data);
 export const validateWatchdogMetrics = (data: unknown): WatchdogMetrics =>
   WatchdogMetricsSchema.parse(data);
-export const validateHealthCheckResult = (data: unknown): HealthCheckResult =>
-  HealthCheckResultSchema.parse(data);
+export const validateFailSafeHealthCheckResult = (data: unknown): FailSafeHealthCheckResult =>
+  FailSafeHealthCheckResultSchema.parse(data);
 export const validateFailureEvent = (data: unknown): FailureEvent =>
   FailureEventSchema.parse(data);
 export const validateTask = (data: unknown): Task => TaskSchema.parse(data);

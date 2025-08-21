@@ -12,7 +12,7 @@ import { EmergencyResponseCoordinator } from './emergency-response';
 import {
   FailSafeConfig,
   SystemStatus,
-  HealthStatus,
+  FailSafeHealthStatus,
   OperationMode,
   EmergencyType,
   EmergencySeverity,
@@ -760,7 +760,7 @@ export class FailSafesSystem extends EventEmitter {
 
     if (
       activeEmergencies.length === 0 &&
-      systemHealth.overallStatus === HealthStatus.HEALTHY
+      systemHealth.overallStatus === FailSafeHealthStatus.HEALTHY
     ) {
       this.currentMode = OperationMode.FULL_CAPABILITY;
 
