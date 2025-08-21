@@ -251,7 +251,7 @@ Options:
 
 Bot Configuration:
   --host <host>         Server host (default: localhost)
-  --port <port>         Server port (default: 25565)
+  --port <port>         Server port (default: 58879)
   --username <name>     Bot username (default: ConsciousBot)
   --version <version>   Minecraft version (default: 1.20.1)
   --auth <type>         Auth type: offline|mojang (default: offline)
@@ -261,7 +261,7 @@ Bot Configuration:
 Examples:
   mc-smoke --scenario navigate --verbose
   mc-smoke --scenario gather-wood --runs 5 --log results.json
-  mc-smoke --host play.example.com --port 25566 --username TestBot
+  mc-smoke --host play.example.com --port 58879 --username TestBot
 `);
 }
 

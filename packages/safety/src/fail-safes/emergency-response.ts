@@ -65,7 +65,11 @@ class EmergencyNotificationManager {
     failed: number;
     channels: Array<{ channelId: string; success: boolean; error?: string }>;
   }> {
-    const results: Array<{ channelId: string; success: boolean; error?: string }> = [];
+    const results: Array<{
+      channelId: string;
+      success: boolean;
+      error?: string;
+    }> = [];
     let sent = 0;
     let failed = 0;
 
@@ -75,7 +79,10 @@ class EmergencyNotificationManager {
       }
 
       // Check severity filter
-      if (channel.severityFilter && !channel.severityFilter.includes(emergency.severity)) {
+      if (
+        channel.severityFilter &&
+        !channel.severityFilter.includes(emergency.severity)
+      ) {
         continue;
       }
 
@@ -101,7 +108,10 @@ class EmergencyNotificationManager {
 
     // Keep only last 1000 notifications
     if (this.notificationHistory.length > 1000) {
-      this.notificationHistory.splice(0, this.notificationHistory.length - 1000);
+      this.notificationHistory.splice(
+        0,
+        this.notificationHistory.length - 1000
+      );
     }
 
     return { sent, failed, channels: results };
@@ -120,17 +130,20 @@ class EmergencyNotificationManager {
 
         case 'webhook':
           if (!channel.endpoint) {
-            return { success: false, error: 'No endpoint configured for webhook' };
+            return {
+              success: false,
+              error: 'No endpoint configured for webhook',
+            };
           }
-          
+
           // In a real implementation, this would make an HTTP request
           // For now, simulate the notification
-          await new Promise(resolve => setTimeout(resolve, 100));
+          await new Promise((resolve) => setTimeout(resolve, 100));
           return { success: true };
 
         case 'email':
           // In a real implementation, this would send an email
-          await new Promise(resolve => setTimeout(resolve, 200));
+          await new Promise((resolve) => setTimeout(resolve, 200));
           return { success: true };
 
         case 'dashboard':
@@ -138,12 +151,15 @@ class EmergencyNotificationManager {
           return { success: true };
 
         default:
-          return { success: false, error: `Unknown channel type: ${channel.type}` };
+          return {
+            success: false,
+            error: `Unknown channel type: ${channel.type}`,
+          };
       }
     } catch (error) {
-      return { 
-        success: false, 
-        error: error instanceof Error ? error.message : 'Unknown error' 
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
       };
     }
   }
@@ -162,7 +178,7 @@ class EmergencyNotificationManager {
 
     for (const notification of this.notificationHistory) {
       totalNotifications++;
-      
+
       if (notification.success) {
         successfulNotifications++;
       }
@@ -180,7 +196,10 @@ class EmergencyNotificationManager {
 
     return {
       totalNotifications,
-      successRate: totalNotifications > 0 ? successfulNotifications / totalNotifications : 0,
+      successRate:
+        totalNotifications > 0
+          ? successfulNotifications / totalNotifications
+          : 0,
       channelStats,
     };
   }
@@ -200,12 +219,15 @@ class SafeModeManager extends EventEmitter {
     timestamp: number;
     reason: string;
   }>;
-  private pendingApprovals: Map<string, {
-    actionId: string;
-    actionType: string;
-    timestamp: number;
-    timeout: NodeJS.Timeout;
-  }>;
+  private pendingApprovals: Map<
+    string,
+    {
+      actionId: string;
+      actionType: string;
+      timestamp: number;
+      timeout: NodeJS.Timeout;
+    }
+  >;
 
   constructor(config: SafeModeConfig) {
     super();
@@ -282,7 +304,7 @@ class SafeModeManager extends EventEmitter {
     this.enteredAt = undefined;
     this.triggerReason = undefined;
     this.blockedActions = [];
-    
+
     // Cancel pending approvals
     for (const [approvalId, approval] of this.pendingApprovals.entries()) {
       clearTimeout(approval.timeout);
@@ -295,7 +317,11 @@ class SafeModeManager extends EventEmitter {
   /**
    * Validate action in safe mode
    */
-  validateAction(actionId: string, actionType: string, context: Record<string, any> = {}): SafeModeValidation {
+  validateAction(
+    actionId: string,
+    actionType: string,
+    context: Record<string, any> = {}
+  ): SafeModeValidation {
     if (!this.isActive) {
       return {
         actionId,
@@ -325,7 +351,10 @@ class SafeModeManager extends EventEmitter {
     }
 
     // Check allowed actions
-    if (this.config.allowedActions.length > 0 && !this.config.allowedActions.includes(actionType)) {
+    if (
+      this.config.allowedActions.length > 0 &&
+      !this.config.allowedActions.includes(actionType)
+    ) {
       const validation: SafeModeValidation = {
         actionId,
         actionType,
@@ -345,18 +374,23 @@ class SafeModeManager extends EventEmitter {
     if (this.config.maxMovementDistance && actionType.includes('move')) {
       const distance = context.distance as number;
       if (distance && distance > this.config.maxMovementDistance) {
-        restrictions.push(`movement_limited_to_${this.config.maxMovementDistance}`);
+        restrictions.push(
+          `movement_limited_to_${this.config.maxMovementDistance}`
+        );
       }
     }
 
     // Check if human approval is required
-    const requiresApproval = this.config.requireHumanApproval || this.isRiskyAction(actionType);
+    const requiresApproval =
+      this.config.requireHumanApproval || this.isRiskyAction(actionType);
 
     return {
       actionId,
       actionType,
       allowed: !requiresApproval, // If approval required, action is not immediately allowed
-      reason: requiresApproval ? 'Human approval required' : 'Action permitted in safe mode',
+      reason: requiresApproval
+        ? 'Human approval required'
+        : 'Action permitted in safe mode',
       requiresApproval,
       restrictions,
       validatedAt: Date.now(),
@@ -366,7 +400,11 @@ class SafeModeManager extends EventEmitter {
   /**
    * Request human approval for action
    */
-  requestApproval(actionId: string, actionType: string, timeoutMs: number = 60000): Promise<boolean> {
+  requestApproval(
+    actionId: string,
+    actionType: string,
+    timeoutMs: number = 60000
+  ): Promise<boolean> {
     return new Promise((resolve) => {
       const timeout = setTimeout(() => {
         this.pendingApprovals.delete(actionId);
@@ -428,7 +466,7 @@ class SafeModeManager extends EventEmitter {
     }
 
     // Check if any auto-exit conditions are met
-    const metConditions = conditions.filter(condition => 
+    const metConditions = conditions.filter((condition) =>
       this.config.autoExitConditions.includes(condition)
     );
 
@@ -445,7 +483,7 @@ class SafeModeManager extends EventEmitter {
    */
   updateConfig(newConfig: Partial<SafeModeConfig>): void {
     this.config = validateSafeModeConfig({ ...this.config, ...newConfig });
-    
+
     this.emit('safe-mode-config-updated', {
       config: this.config,
       timestamp: Date.now(),
@@ -475,7 +513,11 @@ class SafeModeManager extends EventEmitter {
     };
   }
 
-  private recordBlockedAction(actionId: string, actionType: string, reason: string): void {
+  private recordBlockedAction(
+    actionId: string,
+    actionType: string,
+    reason: string
+  ): void {
     this.blockedActions.push({
       actionId,
       actionType,
@@ -510,7 +552,7 @@ class SafeModeManager extends EventEmitter {
       'execute_command',
     ];
 
-    return riskyActions.some(risky => actionType.includes(risky));
+    return riskyActions.some((risky) => actionType.includes(risky));
   }
 }
 
@@ -575,8 +617,11 @@ export class EmergencyResponseCoordinator extends EventEmitter {
     };
 
     const validatedEmergency = validateEmergencyDeclaration(emergency);
-    
-    this.activeEmergencies.set(validatedEmergency.emergencyId, validatedEmergency);
+
+    this.activeEmergencies.set(
+      validatedEmergency.emergencyId,
+      validatedEmergency
+    );
     this.emergencyHistory.push(validatedEmergency);
 
     // Execute emergency protocol
@@ -590,7 +635,10 @@ export class EmergencyResponseCoordinator extends EventEmitter {
   /**
    * Resolve emergency
    */
-  resolveEmergency(emergencyId: string, resolution: string = 'manual_resolution'): boolean {
+  resolveEmergency(
+    emergencyId: string,
+    resolution: string = 'manual_resolution'
+  ): boolean {
     const emergency = this.activeEmergencies.get(emergencyId);
     if (!emergency) {
       return false;
@@ -680,12 +728,18 @@ export class EmergencyResponseCoordinator extends EventEmitter {
       activeEmergencies: this.activeEmergencies.size,
       emergenciesByType,
       emergenciesBySeverity,
-      averageResolutionTime: resolvedCount > 0 ? totalResolutionTime / resolvedCount : 0,
-      resolutionRate: this.emergencyHistory.length > 0 ? resolvedCount / this.emergencyHistory.length : 0,
+      averageResolutionTime:
+        resolvedCount > 0 ? totalResolutionTime / resolvedCount : 0,
+      resolutionRate:
+        this.emergencyHistory.length > 0
+          ? resolvedCount / this.emergencyHistory.length
+          : 0,
     };
   }
 
-  private async executeEmergencyProtocol(emergency: EmergencyDeclaration): Promise<void> {
+  private async executeEmergencyProtocol(
+    emergency: EmergencyDeclaration
+  ): Promise<void> {
     const protocolKey = `${emergency.type}_${emergency.severity}`;
     const protocol = this.protocols.get(protocolKey);
 
@@ -714,7 +768,9 @@ export class EmergencyResponseCoordinator extends EventEmitter {
     }
   }
 
-  private async executeDefaultProtocol(emergency: EmergencyDeclaration): Promise<void> {
+  private async executeDefaultProtocol(
+    emergency: EmergencyDeclaration
+  ): Promise<void> {
     // Default actions based on severity
     switch (emergency.severity) {
       case EmergencySeverity.CRITICAL:
@@ -734,7 +790,10 @@ export class EmergencyResponseCoordinator extends EventEmitter {
     }
   }
 
-  private async executeEmergencyAction(action: string, emergency: EmergencyDeclaration): Promise<void> {
+  private async executeEmergencyAction(
+    action: string,
+    emergency: EmergencyDeclaration
+  ): Promise<void> {
     switch (action) {
       case 'enter_safe_mode':
         this.safeModeManager.enterSafeMode(
@@ -774,7 +833,9 @@ export class EmergencyResponseCoordinator extends EventEmitter {
     }
   }
 
-  private getSafeModeSevrityForEmergency(severity: EmergencySeverity): SafeModeSeverity {
+  private getSafeModeSevrityForEmergency(
+    severity: EmergencySeverity
+  ): SafeModeSeverity {
     switch (severity) {
       case EmergencySeverity.CRITICAL:
         return SafeModeSeverity.LOCKDOWN;
@@ -797,7 +858,7 @@ export class EmergencyResponseCoordinator extends EventEmitter {
     if (emergency.severity !== EmergencySeverity.CRITICAL) {
       const newSeverity = this.getNextSeverityLevel(emergency.severity);
       emergency.severity = newSeverity;
-      
+
       // Re-execute protocol with higher severity
       this.executeEmergencyProtocol(emergency);
     }
@@ -823,17 +884,29 @@ export class EmergencyResponseCoordinator extends EventEmitter {
         protocolId: 'system_failure_critical',
         emergencyType: EmergencyType.SYSTEM_FAILURE,
         severity: EmergencySeverity.CRITICAL,
-        immediateActions: ['enter_safe_mode', 'halt_current_action', 'notify_humans'],
+        immediateActions: [
+          'enter_safe_mode',
+          'halt_current_action',
+          'notify_humans',
+        ],
         notificationTargets: ['console', 'webhook'],
         escalationTimeoutMs: 30000, // 30 seconds
+        requiredApprovals: ['system_admin'],
+        rollbackActions: ['restore_last_known_good_state', 'restart_system'],
       },
       {
         protocolId: 'safety_violation_high',
         emergencyType: EmergencyType.SAFETY_VIOLATION,
         severity: EmergencySeverity.HIGH,
-        immediateActions: ['halt_current_action', 'enter_safe_mode', 'log_incident'],
+        immediateActions: [
+          'halt_current_action',
+          'enter_safe_mode',
+          'log_incident',
+        ],
         notificationTargets: ['console', 'webhook'],
         escalationTimeoutMs: 60000, // 1 minute
+        requiredApprovals: ['safety_officer'],
+        rollbackActions: ['halt_current_action', 'log_incident'],
       },
     ];
 

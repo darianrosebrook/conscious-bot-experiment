@@ -101,13 +101,13 @@ M3 will focus on implementing a sophisticated planning system that combines hier
 
 A central component of M3 is the integration of Sapient's Hierarchical Reasoning Model (HRM) into our planning systems. This integration will follow the plan outlined in `docs/plans/hrm-integration-implementation.md` and will proceed in phases:
 
-### Phase 1: Foundation (Weeks 1-4)
+### Phase 1: Foundation 
 - Environment setup and validation
 - Minecraft dataset creation
 - HRM training and optimization
 - Integration architecture development
 
-### Phase 2: Core Integration (Weeks 5-8)
+### Phase 2: Core Integration 
 - Planning system integration
 - Memory system integration
 - Real-time performance optimization

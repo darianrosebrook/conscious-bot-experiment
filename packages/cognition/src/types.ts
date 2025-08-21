@@ -256,6 +256,345 @@ export interface Alternative {
 }
 
 // ============================================================================
+// Creative Problem Solving Types
+// ============================================================================
+
+/**
+ * Problem definition for creative solving
+ */
+export interface Problem {
+  id: string;
+  description: string;
+  type: string;
+  constraints: string[];
+  context?: any;
+  priority: number; // 0-1
+  complexity: number; // 0-1
+}
+
+/**
+ * Solution to a problem
+ */
+export interface Solution {
+  id: string;
+  description?: string;
+  solution?: string;
+  analogy?: string;
+  confidence: number;
+  reasoning?: string;
+  timestamp: number;
+  noveltyScore?: NoveltyScore;
+}
+
+/**
+ * Constraint for problem solving
+ */
+export interface Constraint {
+  id: string;
+  description: string;
+  strength: number; // 0-1, how strict the constraint is
+  type: 'hard' | 'soft' | 'preference';
+  category: string;
+}
+
+/**
+ * Domain knowledge for analogical reasoning
+ */
+export interface Domain {
+  name: string;
+  description: string;
+  principles: string[];
+  examples: string[];
+  relevanceScore?: number;
+}
+
+/**
+ * Analogical solution from another domain
+ */
+export interface AnalogicalSolution extends Solution {
+  sourceDomain: string;
+  analogy: string;
+  solution: string;
+  confidence: number;
+  reasoning: string;
+  timestamp: number;
+}
+
+/**
+ * Solution with relaxed constraints
+ */
+export interface RelaxedSolution extends Solution {
+  relaxationLevel: number;
+  originalConstraints: string[];
+  relaxedConstraints: string[];
+  solution: string;
+  confidence: number;
+  reasoning: string;
+  timestamp: number;
+}
+
+/**
+ * Novelty evaluation of a solution
+ */
+export interface NoveltyScore {
+  score: number; // 0-1
+  reasoning: string;
+  dimensions: {
+    originality: number; // 0-1
+    usefulness: number; // 0-1
+    surprise: number; // 0-1
+  };
+}
+
+/**
+ * Creative solution combining multiple approaches
+ */
+export interface CreativeSolution extends Solution {
+  type: 'analogical' | 'relaxed' | 'alternative';
+  noveltyScore: NoveltyScore;
+  implementationSteps?: string[];
+  risks?: string[];
+  benefits?: string[];
+}
+
+// ============================================================================
+// Advanced Reflection Types
+// ============================================================================
+
+/**
+ * Experience for reflection and analysis
+ */
+export interface Experience {
+  id: string;
+  description: string;
+  outcome: string;
+  timestamp: number;
+  context?: any;
+  emotionalState?: any;
+  participants?: string[];
+  location?: string;
+  duration?: number;
+  success?: boolean;
+  learningValue?: number; // 0-1
+}
+
+/**
+ * Experience analysis result
+ */
+export interface ExperienceAnalysis {
+  id: string;
+  experiences: Experience[];
+  patterns: Pattern[];
+  insights: Insight[];
+  learningSynthesis?: LearningSynthesis;
+  timestamp: number;
+  confidence: number;
+}
+
+/**
+ * Pattern identified in experiences
+ */
+export interface Pattern {
+  id: string;
+  name: string;
+  description: string;
+  type: string;
+  significance: number; // 0-1
+  frequency: number;
+  evidence: string[];
+  timestamp: number;
+}
+
+/**
+ * Learning synthesis from experiences
+ */
+export interface LearningSynthesis {
+  id: string;
+  timestamp: number;
+  insights: string[];
+  skills: string[];
+  improvements: string[];
+  knowledge: string[];
+  behavioralChanges: string[];
+  learningGoals: string[];
+  experienceCount: number;
+  patternCount: number;
+  confidence: number;
+}
+
+/**
+ * Insight generated from analysis
+ */
+export interface Insight {
+  id: string;
+  description: string;
+  evidence: string[];
+  recommendations: string[];
+  impact: number; // 0-1
+  priority: number; // 0-1
+  timestamp: number;
+}
+
+/**
+ * Improvement plan based on insights
+ */
+export interface Plan {
+  id: string;
+  insightId: string;
+  goals: string[];
+  steps: string[];
+  timeline: string;
+  successMetrics: string[];
+  obstacles: string[];
+  resources: string[];
+  priority: number; // 0-1
+  status: 'pending' | 'in_progress' | 'completed' | 'failed';
+  timestamp: number;
+}
+
+/**
+ * Reflection trigger configuration
+ */
+export interface ReflectionTrigger {
+  id: string;
+  type: string;
+  condition: string;
+  frequency?: number; // milliseconds
+  enabled: boolean;
+  priority: number; // 0-1
+}
+
+/**
+ * Reflection insight with metadata
+ */
+export interface ReflectionInsight {
+  id: string;
+  type: string;
+  description: string;
+  evidence: string[];
+  confidence: number;
+  actionableItems: string[];
+  relatedExperiences: string[];
+  timestamp: number;
+}
+
+/**
+ * Performance metrics for reflection
+ */
+export interface PerformanceMetrics {
+  id: string;
+  metric: string;
+  value: number;
+  unit: string;
+  timestamp: number;
+  context?: any;
+}
+
+/**
+ * Learning outcome from reflection
+ */
+export interface LearningOutcome {
+  id: string;
+  description: string;
+  type: 'skill' | 'knowledge' | 'behavior' | 'attitude';
+  confidence: number;
+  evidence: string[];
+  timestamp: number;
+}
+
+// ============================================================================
+// Context Optimization Types
+// ============================================================================
+
+/**
+ * Memory for context retrieval
+ */
+export interface Memory {
+  id: string;
+  content: string;
+  type: string;
+  timestamp: number;
+  source: string;
+  relevanceScore?: number;
+}
+
+/**
+ * Context query for memory retrieval
+ */
+export interface ContextQuery {
+  query: string;
+  filters?: {
+    type?: string[];
+    timeRange?: [number, number];
+    source?: string[];
+  };
+  limit?: number;
+  relevanceThreshold?: number;
+}
+
+/**
+ * Optimized context for LLM interactions
+ */
+export interface OptimizedContext {
+  id: string;
+  task: string;
+  originalContext: LLMContext;
+  retrievedMemories: MemoryRetrieval[];
+  synthesizedContext: ContextSynthesis;
+  tokenCount: number;
+  relevanceScore: number;
+  optimizationLevel: number; // 0-1, how much optimization was applied
+  timestamp: number;
+}
+
+/**
+ * Relevance score for context evaluation
+ */
+export interface RelevanceScore {
+  score: number; // 0-1
+  reasoning: string;
+  dimensions: {
+    taskAlignment: number; // 0-1
+    informationValue: number; // 0-1
+    timeliness: number; // 0-1
+  };
+}
+
+/**
+ * Memory retrieval result
+ */
+export interface MemoryRetrieval {
+  id: string;
+  content: string;
+  type: string;
+  relevanceScore: number;
+  timestamp: number;
+  source: string;
+}
+
+/**
+ * Context synthesis from multiple modules
+ */
+export interface ContextSynthesis {
+  goals: string[];
+  plans: string[];
+  relationships: string[];
+  constraints: string[];
+  opportunities: string[];
+  risks: string[];
+}
+
+/**
+ * Token optimization configuration
+ */
+export interface TokenOptimization {
+  maxTokens: number;
+  compressionRatio: number; // 0-1
+  priorityOrder: string[];
+  preserveKeywords: string[];
+}
+
+// ============================================================================
 // Communication Types
 // ============================================================================
 
@@ -294,6 +633,77 @@ export interface ConversationContext {
   relationship: string;
   formality: number; // 0-1
   emotionalTone: string;
+}
+
+// ============================================================================
+// Conversation Management Types
+// ============================================================================
+
+/**
+ * Conversation state tracking
+ */
+export interface ConversationState {
+  conversationId: string;
+  participants: string[];
+  currentTopic?: string;
+  topicHistory: TopicModel[];
+  relationshipStatus: Map<string, Relationship>;
+  communicationStyle: CommunicationStyle;
+  emotionalTone: string;
+  formalityLevel: number; // 0-1
+  engagementLevel: number; // 0-1
+  lastActivity: number;
+  messageCount: number;
+}
+
+/**
+ * Topic model for conversation tracking
+ */
+export interface TopicModel {
+  id: string;
+  name: string;
+  description: string;
+  startTime: number;
+  endTime?: number;
+  messageCount: number;
+  participants: string[];
+  keywords: string[];
+  sentiment: number; // -1 to 1
+  importance: number; // 0-1
+}
+
+/**
+ * Relationship tracking
+ */
+export interface Relationship {
+  participantId: string;
+  relationshipType: string;
+  familiarity: number; // 0-1
+  trustLevel: number; // 0-1
+  communicationHistory: number;
+  lastInteraction: number;
+  preferences: string[];
+  communicationStyle: CommunicationStyle;
+}
+
+/**
+ * Communication style configuration
+ */
+export interface CommunicationStyle {
+  formality: number; // 0-1
+  verbosity: number; // 0-1
+  emotionalExpressiveness: number; // 0-1
+  technicalLevel: number; // 0-1
+  humorLevel: number; // 0-1
+  directness: number; // 0-1
+}
+
+/**
+ * Style adapter for communication
+ */
+export interface StyleAdapter {
+  adaptStyle(context: ConversationContext): CommunicationStyle;
+  learnFromInteraction(style: CommunicationStyle, outcome: string): void;
 }
 
 // ============================================================================

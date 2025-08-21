@@ -94,6 +94,7 @@ class MoveForwardExecutor extends BaseMinecraftExecutor {
           },
         ],
         actualCost: 5,
+        retryCount: 0,
       };
     } catch (error) {
       return {
@@ -106,6 +107,7 @@ class MoveForwardExecutor extends BaseMinecraftExecutor {
         duration: Date.now() - startTime,
         effects: [],
         error: error instanceof Error ? error.message : 'Unknown error',
+        retryCount: 0,
       };
     }
   }
@@ -174,6 +176,7 @@ class PlaceBlockExecutor extends BaseMinecraftExecutor {
         ],
         actualCost: 12,
         resourcesUsed: { [blockType]: 1 },
+        retryCount: 0,
       };
     } catch (error) {
       return {
@@ -186,6 +189,7 @@ class PlaceBlockExecutor extends BaseMinecraftExecutor {
         duration: Date.now() - startTime,
         effects: [],
         error: error instanceof Error ? error.message : 'Unknown error',
+        retryCount: 0,
       };
     }
   }
@@ -289,6 +293,7 @@ class MineBlockExecutor extends BaseMinecraftExecutor {
         ],
         actualCost: 25,
         resourcesUsed: { durability: 1 },
+        retryCount: 0,
       };
     } catch (error) {
       return {
@@ -301,6 +306,7 @@ class MineBlockExecutor extends BaseMinecraftExecutor {
         duration: Date.now() - startTime,
         effects: [],
         error: error instanceof Error ? error.message : 'Unknown error',
+        retryCount: 0,
       };
     }
   }
@@ -575,7 +581,7 @@ export const BLOCK_CAPABILITIES: CapabilitySpec[] = [
         description: 'Target must be within reach',
       },
       {
-        type: 'tool',
+        type: 'inventory',
         condition: 'has_appropriate_tool',
         args: {},
         description: 'Must have appropriate mining tool',
@@ -601,7 +607,7 @@ export const BLOCK_CAPABILITIES: CapabilitySpec[] = [
         change: 'items_gained',
         metadata: { drops: 'calculated' },
       },
-      { type: 'tool', change: 'durability_decreased', quantity: 1 },
+      { type: 'inventory', change: 'durability_decreased', quantity: 1 },
     ],
 
     costHint: 25,
@@ -647,7 +653,7 @@ export const INVENTORY_CAPABILITIES: CapabilitySpec[] = [
         type: 'inventory',
         change: 'item_added',
         item: 'parameter.itemType',
-        quantity: 'parameter.quantity',
+        quantity: 1,
       },
       {
         type: 'world',

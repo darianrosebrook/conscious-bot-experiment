@@ -521,8 +521,10 @@ export class SignalProcessor extends EventEmitter<SystemEvents> {
           ...typeSignals.map((s) => s.timestamp)
         );
 
+        // Ensure type is valid for Signal schema
+        const validType = this.validateSignalType(type);
         aggregated.push({
-          type,
+          type: validType,
           intensity: avgIntensity,
           confidence: avgConfidence,
           trend: avgTrend,
@@ -533,6 +535,37 @@ export class SignalProcessor extends EventEmitter<SystemEvents> {
     }
 
     return aggregated;
+  }
+
+  /**
+   * Validate and normalize signal type to match schema
+   */
+  private validateSignalType(type: string): Signal['type'] {
+    const validTypes: Signal['type'][] = [
+      'health',
+      'hunger',
+      'fatigue',
+      'threat',
+      'social',
+      'memory',
+      'intrusion',
+    ];
+
+    // Try exact match first
+    if (validTypes.includes(type as Signal['type'])) {
+      return type as Signal['type'];
+    }
+
+    // Try case-insensitive match
+    const lowerType = type.toLowerCase();
+    for (const validType of validTypes) {
+      if (validType === lowerType) {
+        return validType;
+      }
+    }
+
+    // Default to 'threat' for unknown types
+    return 'threat';
   }
 
   /**

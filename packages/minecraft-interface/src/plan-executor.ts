@@ -73,10 +73,10 @@ export class PlanExecutor extends EventEmitter {
   }
 
   /**
-   * Execute a complete planning and execution cycle
+   * Execute a complete planning and execution cycle with enhanced signal processing
    */
   async executePlanningCycle(
-    signals: any[] = []
+    initialSignals: any[] = []
   ): Promise<PlanExecutionResult> {
     if (!this.actionTranslator) {
       throw new Error('PlanExecutor not initialized. Call initialize() first.');
@@ -86,12 +86,25 @@ export class PlanExecutor extends EventEmitter {
     this.executionStartTime = Date.now();
 
     try {
-      // Step 1: Observe current state
-      const context = this.observeCurrentState();
+      const bot = this.botAdapter.getBot();
 
-      // Step 2: Generate plan
+      // Step 1: Generate comprehensive signals from current world state
+      const minecraftSignals = this.observationMapper.generateSignals(bot);
+      const allSignals = [...initialSignals, ...minecraftSignals];
+
+      this.emit('signalsGenerated', {
+        initialSignals,
+        minecraftSignals,
+        totalSignals: allSignals.length,
+        timestamp: Date.now(),
+      });
+
+      // Step 2: Observe current state with enhanced homeostasis
+      const context = this.observeCurrentStateWithSignals(bot);
+
+      // Step 3: Generate plan using comprehensive signals and context
       const planningResult = await this.planningCoordinator.planAndExecute(
-        signals,
+        allSignals,
         context
       );
       this.currentPlan = planningResult.primaryPlan;
@@ -100,18 +113,23 @@ export class PlanExecutor extends EventEmitter {
       this.emit('planGenerated', {
         plan: this.currentPlan,
         planningResult,
+        signalsProcessed: allSignals.length,
+        planningLatency: planningResult.planningLatency,
         timestamp: Date.now(),
       });
 
-      // Step 3: Execute plan
+      // Step 4: Execute plan with enhanced monitoring
       const executionResult = await this.executePlan(this.currentPlan);
 
-      // Step 4: Record telemetry
+      // Step 5: Record comprehensive telemetry
       const telemetry = this.generateTelemetry(planningResult, executionResult);
 
       this.emit('executionComplete', {
         result: executionResult,
         telemetry,
+        signalsUsed: allSignals,
+        finalHomeostasis:
+          this.observationMapper.getEnhancedHomeostasisState(bot),
         timestamp: Date.now(),
       });
 
@@ -121,6 +139,23 @@ export class PlanExecutor extends EventEmitter {
       this.currentPlan = null;
       this.currentStepIndex = 0;
     }
+  }
+
+  /**
+   * Enhanced state observation that includes signal processing
+   */
+  private observeCurrentStateWithSignals(bot: Bot): PlanningContext {
+    const baseContext =
+      this.observationMapper.mapBotStateToPlanningContext(bot);
+    const enhancedHomeostasis =
+      this.observationMapper.getEnhancedHomeostasisState(bot);
+
+    // Merge enhanced homeostasis data into context
+    return {
+      ...baseContext,
+      enhancedHomeostasis,
+      signalProcessingEnabled: true,
+    };
   }
 
   /**

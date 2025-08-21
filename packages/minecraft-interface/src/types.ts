@@ -160,6 +160,9 @@ export interface PlanExecutionResult {
   repairAttempts: number;
   finalWorldState: MinecraftWorldState;
   error?: string;
+  planningResult?: IntegratedPlanningResult;
+  signals?: any[];
+  finalHomeostasis?: any;
 }
 
 // ==================== Scenarios ====================

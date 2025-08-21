@@ -370,9 +370,7 @@ class HighLevelPlanningModule {
     return baseDuration * urgencyMultipliers[context.urgency];
   }
 
-  private analyzeFeedback(
-    feedback: string
-  ): Array<{
+  private analyzeFeedback(feedback: string): Array<{
     type: string;
     criteria?: any;
     constraint?: string;

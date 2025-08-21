@@ -25,7 +25,7 @@ M2 focuses on implementing the **critical cognitive components** identified in t
 
 ## M2 Implementation Strategy
 
-### Phase 1: Cognitive Foundation (Weeks 1-4)
+### Phase 1: Cognitive Foundation 
 
 #### 1.1 Planning: Goal Formulation
 **Priority:** Critical Path - Enables autonomous behavior
@@ -116,7 +116,7 @@ interface EpisodicMemorySystem {
 - Experience retrieval supports decision-making
 - Narrative coherence maintained across sessions
 
-### Phase 2: Intelligence Layer (Weeks 5-8)
+### Phase 2: Intelligence Layer 
 
 #### 2.1 Memory: Semantic
 **Priority:** High - Enables knowledge representation

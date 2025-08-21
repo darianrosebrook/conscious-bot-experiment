@@ -23,8 +23,8 @@ import {
 } from './types';
 
 // Import our HRM-inspired components
-import { 
-  CognitiveTaskRouter, 
+import {
+  CognitiveTaskRouter,
   createCognitiveRouter,
   routeTask,
   RoutingDecision,
@@ -32,8 +32,8 @@ import {
   RouterType,
 } from './hierarchical-planner/cognitive-router';
 
-import { 
-  HRMInspiredPlanner, 
+import {
+  HRMInspiredPlanner,
   createHRMPlanner,
 } from './hierarchical-planner/hrm-inspired-planner';
 
@@ -326,10 +326,12 @@ export class IntegratedPlanningCoordinator extends EventEmitter {
     const taskDescription = this.goalToTaskDescription(primaryGoal, context);
 
     const mappedDomain = this.mapGoalDomain(primaryGoal.type);
-    const domain = (['minecraft', 'general', 'spatial', 'logical'] as const).includes(mappedDomain as any) 
-      ? mappedDomain as 'minecraft' | 'general' | 'spatial' | 'logical'
-      : 'general' as const;
-      
+    const domain = (
+      ['minecraft', 'general', 'spatial', 'logical'] as const
+    ).includes(mappedDomain as any)
+      ? (mappedDomain as 'minecraft' | 'general' | 'spatial' | 'logical')
+      : ('general' as const);
+
     const routingContext = {
       domain,
       urgency: context.timeConstraints.urgency,
@@ -493,8 +495,7 @@ export class IntegratedPlanningCoordinator extends EventEmitter {
       ),
       createdAt: Date.now(),
       updatedAt: Date.now(),
-      successProbability:
-        (hrmPlan.confidence + htnPlan.successProbability) / 2,
+      successProbability: (hrmPlan.confidence + htnPlan.successProbability) / 2,
     };
 
     // Map HRM nodes to plan steps, augment with HTN details

@@ -55,8 +55,8 @@ For M3, we will focus on implementing advanced planning capabilities through the
 
 The integration of Sapient's Hierarchical Reasoning Model (HRM) is a central component of M3. This integration will proceed in three phases:
 
-1. **Foundation (Weeks 1-4)** - Environment setup, dataset creation, model training, and architecture development
-2. **Core Integration (Weeks 5-8)** - Integration with planning and memory systems, performance optimization, and validation
+1. **Foundation ** - Environment setup, dataset creation, model training, and architecture development
+2. **Core Integration ** - Integration with planning and memory systems, performance optimization, and validation
 3. **Advanced Features (Weeks 9-12)** - Collaborative reasoning, learning mechanisms, and research validation
 
 ## Next Immediate Steps

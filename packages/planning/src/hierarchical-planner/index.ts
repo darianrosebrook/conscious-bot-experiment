@@ -22,10 +22,7 @@ export type {
 } from './cognitive-router';
 
 // Export HRM planner components with aliases to avoid conflicts
-export {
-  HRMInspiredPlanner,
-  createHRMPlanner,
-} from './hrm-inspired-planner';
+export { HRMInspiredPlanner, createHRMPlanner } from './hrm-inspired-planner';
 
 export type {
   Plan as HRMPlan,
@@ -81,7 +78,7 @@ export class IntegratedPlanningSystem {
       hrmLatencyTarget: 100,
       llmLatencyTarget: 400,
       emergencyLatencyLimit: 50,
-      ...(config.routerConfig || {})
+      ...(config.routerConfig || {}),
     };
     this.cognitiveRouter = new CognitiveTaskRouter(routerConfig);
     this.hrmPlanner = new HRMInspiredPlanner(config.plannerConfig);

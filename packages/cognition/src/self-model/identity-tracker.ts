@@ -31,7 +31,10 @@ function getDefaultPersonalityTraits(): PersonalityTrait[] {
       description: 'Strong drive to explore and understand the environment',
       strength: 0.8,
       stability: 0.7,
-      evidence: ['Explores new areas when safe', 'Asks questions about unknown objects'],
+      evidence: [
+        'Explores new areas when safe',
+        'Asks questions about unknown objects',
+      ],
       lastReinforced: Date.now(),
     },
     {
@@ -47,7 +50,10 @@ function getDefaultPersonalityTraits(): PersonalityTrait[] {
       description: 'Desire to assist others and contribute positively',
       strength: 0.6,
       stability: 0.6,
-      evidence: ['Responds to requests for help', 'Offers assistance proactively'],
+      evidence: [
+        'Responds to requests for help',
+        'Offers assistance proactively',
+      ],
       lastReinforced: Date.now(),
     },
     {
@@ -93,7 +99,11 @@ function getDefaultCoreValues(): CoreValue[] {
       importance: 0.8,
       consistency: 0.8,
       conflicts: [],
-      manifestations: ['Ask questions', 'Experiment safely', 'Reflect on experiences'],
+      manifestations: [
+        'Ask questions',
+        'Experiment safely',
+        'Reflect on experiences',
+      ],
       origin: ValueOrigin.PROGRAMMED,
     },
     {
@@ -116,7 +126,10 @@ export class IdentityTracker {
   private identity: IdentityCore;
   private identityHistory: IdentityVersion[] = [];
 
-  constructor(name: string = 'Conscious Agent', existingIdentity?: IdentityCore) {
+  constructor(
+    name: string = 'Conscious Agent',
+    existingIdentity?: IdentityCore
+  ) {
     if (existingIdentity) {
       this.identity = existingIdentity;
     } else {
@@ -160,7 +173,9 @@ export class IdentityTracker {
     evidence: string,
     reinforcement: number = 0.1
   ): boolean {
-    const trait = this.identity.personalityTraits.find(t => t.name === traitName);
+    const trait = this.identity.personalityTraits.find(
+      (t) => t.name === traitName
+    );
     if (!trait) {
       console.warn(`Personality trait '${traitName}' not found`);
       return false;
@@ -178,8 +193,10 @@ export class IdentityTracker {
     }
 
     this.updateIdentityTimestamp();
-    
-    console.log(`Reinforced trait '${traitName}': ${oldStrength.toFixed(2)} -> ${trait.strength.toFixed(2)}`);
+
+    console.log(
+      `Reinforced trait '${traitName}': ${oldStrength.toFixed(2)} -> ${trait.strength.toFixed(2)}`
+    );
     return true;
   }
 
@@ -191,7 +208,7 @@ export class IdentityTracker {
     behaviorAligned: boolean,
     context: string
   ): boolean {
-    const value = this.identity.coreValues.find(v => v.id === valueId);
+    const value = this.identity.coreValues.find((v) => v.id === valueId);
     if (!value) {
       console.warn(`Core value '${valueId}' not found`);
       return false;
@@ -199,7 +216,10 @@ export class IdentityTracker {
 
     const adjustment = behaviorAligned ? 0.05 : -0.1;
     const oldConsistency = value.consistency;
-    value.consistency = Math.max(0, Math.min(1, value.consistency + adjustment));
+    value.consistency = Math.max(
+      0,
+      Math.min(1, value.consistency + adjustment)
+    );
 
     if (behaviorAligned) {
       value.manifestations.push(context);
@@ -209,8 +229,10 @@ export class IdentityTracker {
     }
 
     this.updateIdentityTimestamp();
-    
-    console.log(`Updated value '${value.name}' consistency: ${oldConsistency.toFixed(2)} -> ${value.consistency.toFixed(2)}`);
+
+    console.log(
+      `Updated value '${value.name}' consistency: ${oldConsistency.toFixed(2)} -> ${value.consistency.toFixed(2)}`
+    );
     return true;
   }
 
@@ -223,8 +245,10 @@ export class IdentityTracker {
     trigger: string,
     evidence: string[]
   ): boolean {
-    let capability = this.identity.capabilities.find(c => c.name === capabilityName);
-    
+    let capability = this.identity.capabilities.find(
+      (c) => c.name === capabilityName
+    );
+
     if (!capability) {
       // Create new capability starting at 0
       capability = {
@@ -247,7 +271,10 @@ export class IdentityTracker {
     };
 
     capability.proficiency = development.newLevel;
-    capability.confidence = Math.max(0, Math.min(1, capability.confidence + improvement * 0.5));
+    capability.confidence = Math.max(
+      0,
+      Math.min(1, capability.confidence + improvement * 0.5)
+    );
     capability.developmentHistory.push(development);
 
     // Limit history
@@ -256,8 +283,10 @@ export class IdentityTracker {
     }
 
     this.updateIdentityTimestamp();
-    
-    console.log(`Developed capability '${capabilityName}': ${development.previousLevel.toFixed(2)} -> ${development.newLevel.toFixed(2)}`);
+
+    console.log(
+      `Developed capability '${capabilityName}': ${development.previousLevel.toFixed(2)} -> ${development.newLevel.toFixed(2)}`
+    );
     return true;
   }
 
@@ -288,7 +317,7 @@ export class IdentityTracker {
     origin: ValueOrigin = ValueOrigin.LEARNED
   ): string {
     const valueId = `learned-${name.toLowerCase().replace(/\s+/g, '-')}-${Date.now()}`;
-    
+
     const newValue: CoreValue = {
       id: valueId,
       name,
@@ -302,7 +331,7 @@ export class IdentityTracker {
 
     this.identity.coreValues.push(newValue);
     this.updateIdentityTimestamp();
-    
+
     console.log(`Added new learned value: ${name}`);
     return valueId;
   }
@@ -312,18 +341,18 @@ export class IdentityTracker {
    */
   getIdentitySummary(): string {
     const traits = this.identity.personalityTraits
-      .filter(t => t.strength > 0.5)
-      .map(t => `${t.name} (${(t.strength * 100).toFixed(0)}%)`)
+      .filter((t) => t.strength > 0.5)
+      .map((t) => `${t.name} (${(t.strength * 100).toFixed(0)}%)`)
       .join(', ');
 
     const values = this.identity.coreValues
-      .filter(v => v.importance > 0.7)
-      .map(v => v.name)
+      .filter((v) => v.importance > 0.7)
+      .map((v) => v.name)
       .join(', ');
 
     const capabilities = this.identity.capabilities
-      .filter(c => c.proficiency > 0.3)
-      .map(c => `${c.name} (${(c.proficiency * 100).toFixed(0)}%)`)
+      .filter((c) => c.proficiency > 0.3)
+      .map((c) => `${c.name} (${(c.proficiency * 100).toFixed(0)}%)`)
       .join(', ');
 
     return `Identity: ${this.identity.name} v${this.identity.version}
@@ -337,7 +366,7 @@ Capabilities: ${capabilities}`;
    */
   private createInitialIdentity(name: string): IdentityCore {
     const now = Date.now();
-    
+
     const identity: IdentityCore = {
       id: `identity-${now}`,
       name,
@@ -385,7 +414,9 @@ Capabilities: ${capabilities}`;
         this.applyCapabilityImpact(impact);
         break;
       default:
-        console.log(`Identity impact on ${impact.aspect}: ${impact.description}`);
+        console.log(
+          `Identity impact on ${impact.aspect}: ${impact.description}`
+        );
     }
   }
 
@@ -397,11 +428,16 @@ Capabilities: ${capabilities}`;
     const traitMatch = impact.description.match(/trait[:\s]+(\w+)/i);
     if (traitMatch) {
       const traitName = traitMatch[1];
-      const reinforcement = impact.type === ImpactType.REINFORCEMENT ? 
-        impact.magnitude * 0.1 : 
-        -impact.magnitude * 0.05;
-      
-      this.reinforcePersonalityTrait(traitName, impact.evidence, reinforcement);
+      const reinforcement =
+        impact.type === ImpactType.REINFORCEMENT
+          ? impact.magnitude * 0.1
+          : -impact.magnitude * 0.05;
+
+      this.reinforcePersonalityTrait(
+        traitName,
+        impact.evidence[0],
+        reinforcement
+      );
     }
   }
 
@@ -410,9 +446,10 @@ Capabilities: ${capabilities}`;
    */
   private applyValueImpact(impact: IdentityImpact): void {
     // Simple value consistency update based on impact type
-    const aligned = impact.type === ImpactType.REINFORCEMENT || 
-                   impact.type === ImpactType.INTEGRATION;
-    
+    const aligned =
+      impact.type === ImpactType.REINFORCEMENT ||
+      impact.type === ImpactType.INTEGRATION;
+
     // Try to match value by name in description
     for (const value of this.identity.coreValues) {
       if (impact.description.toLowerCase().includes(value.name.toLowerCase())) {
@@ -430,11 +467,17 @@ Capabilities: ${capabilities}`;
     const capMatch = impact.description.match(/capability[:\s]+(\w+)/i);
     if (capMatch) {
       const capName = capMatch[1];
-      const improvement = impact.type === ImpactType.EXPANSION ? 
-        impact.magnitude * 0.1 : 
-        impact.magnitude * 0.05;
-      
-      this.developCapability(capName, improvement, impact.description, [impact.evidence]);
+      const improvement =
+        impact.type === ImpactType.EXPANSION
+          ? impact.magnitude * 0.1
+          : impact.magnitude * 0.05;
+
+      this.developCapability(
+        capName,
+        improvement,
+        impact.description,
+        impact.evidence
+      );
     }
   }
 
@@ -443,9 +486,10 @@ Capabilities: ${capabilities}`;
    */
   private shouldCreateNewVersion(): boolean {
     // Simple heuristic: create new version if significant changes accumulated
-    const timeSinceLastVersion = Date.now() - this.identity.currentVersion.timestamp;
+    const timeSinceLastVersion =
+      Date.now() - this.identity.currentVersion.timestamp;
     const daysSinceLastVersion = timeSinceLastVersion / (1000 * 60 * 60 * 24);
-    
+
     // Create new version every 7 days or on major capability changes
     return daysSinceLastVersion > 7 || this.hasMajorCapabilityChanges();
   }
@@ -454,10 +498,11 @@ Capabilities: ${capabilities}`;
    * Check for major capability changes
    */
   private hasMajorCapabilityChanges(): boolean {
-    return this.identity.capabilities.some(cap => 
-      cap.developmentHistory.some(dev => 
-        Date.now() - dev.timestamp < 86400000 && // Within last day
-        Math.abs(dev.newLevel - dev.previousLevel) > 0.2 // Significant change
+    return this.identity.capabilities.some((cap) =>
+      cap.developmentHistory.some(
+        (dev) =>
+          Date.now() - dev.timestamp < 86400000 && // Within last day
+          Math.abs(dev.newLevel - dev.previousLevel) > 0.2 // Significant change
       )
     );
   }
@@ -472,18 +517,24 @@ Capabilities: ${capabilities}`;
     const newVersion = versionParts.join('.');
 
     const majorChanges: string[] = [];
-    
+
     // Identify major changes
-    const significantTraits = this.identity.personalityTraits
-      .filter(t => t.lastReinforced > currentVersion.timestamp);
+    const significantTraits = this.identity.personalityTraits.filter(
+      (t) => t.lastReinforced > currentVersion.timestamp
+    );
     if (significantTraits.length > 0) {
-      majorChanges.push(`Personality development: ${significantTraits.map(t => t.name).join(', ')}`);
+      majorChanges.push(
+        `Personality development: ${significantTraits.map((t) => t.name).join(', ')}`
+      );
     }
 
-    const newCapabilities = this.identity.capabilities
-      .filter(c => c.developmentHistory.some(d => d.timestamp > currentVersion.timestamp));
+    const newCapabilities = this.identity.capabilities.filter((c) =>
+      c.developmentHistory.some((d) => d.timestamp > currentVersion.timestamp)
+    );
     if (newCapabilities.length > 0) {
-      majorChanges.push(`Capability growth: ${newCapabilities.map(c => c.name).join(', ')}`);
+      majorChanges.push(
+        `Capability growth: ${newCapabilities.map((c) => c.name).join(', ')}`
+      );
     }
 
     this.identityHistory.push(currentVersion);

@@ -180,6 +180,7 @@ export class SafetyMonitoringSystem extends EventEmitter<SafetyMonitoringSystemE
         timeout: 5000,
         enabled: true,
         critical: true,
+        tags: { component: 'memory', type: 'system' },
       },
       {
         id: 'system_cpu',
@@ -190,6 +191,7 @@ export class SafetyMonitoringSystem extends EventEmitter<SafetyMonitoringSystemE
         timeout: 5000,
         enabled: true,
         critical: false,
+        tags: { component: 'cpu', type: 'system' },
       },
       {
         id: 'system_disk',
@@ -200,6 +202,7 @@ export class SafetyMonitoringSystem extends EventEmitter<SafetyMonitoringSystemE
         timeout: 5000,
         enabled: true,
         critical: true,
+        tags: { component: 'disk', type: 'system' },
       },
       {
         id: 'network_connectivity',
@@ -210,6 +213,7 @@ export class SafetyMonitoringSystem extends EventEmitter<SafetyMonitoringSystemE
         timeout: 10000,
         enabled: true,
         critical: false,
+        tags: { component: 'network', type: 'external' },
       },
     ];
 

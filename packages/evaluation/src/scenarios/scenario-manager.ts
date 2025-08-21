@@ -1,18 +1,18 @@
 /**
  * Scenario Manager
- * 
+ *
  * Orchestrates execution of complex multi-step reasoning scenarios
  * Integrates with HRM-inspired cognitive architecture for evaluation
- * 
+ *
  * @author @darianrosebrook
  */
 
-import { 
-  Scenario, 
-  EvaluationSession, 
-  AgentConfig, 
+import {
+  Scenario,
+  EvaluationSession,
+  AgentConfig,
   EvaluationEvent,
-  StressTestConfig
+  StressTestConfig,
 } from '../types';
 import { IntegratedPlanningSystem } from '@conscious-bot/planning';
 import { EventEmitter } from 'events';
@@ -57,14 +57,14 @@ export class ScenarioManager extends EventEmitter {
    * Register multiple scenarios
    */
   registerScenarios(scenarios: Scenario[]): void {
-    scenarios.forEach(scenario => this.registerScenario(scenario));
+    scenarios.forEach((scenario) => this.registerScenario(scenario));
   }
 
   /**
    * Execute a single scenario
    */
   async executeScenario(
-    scenarioId: string, 
+    scenarioId: string,
     agentConfig: AgentConfig,
     options: {
       stressConfig?: StressTestConfig;
@@ -80,7 +80,7 @@ export class ScenarioManager extends EventEmitter {
     // Create planning system with agent configuration
     const planningSystem = new IntegratedPlanningSystem({
       routerConfig: agentConfig.planningConfig?.router || {},
-      plannerConfig: agentConfig.planningConfig?.planner || {}
+      plannerConfig: agentConfig.planningConfig?.planner || {},
     });
 
     // Initialize evaluation session
@@ -92,14 +92,14 @@ export class ScenarioManager extends EventEmitter {
       status: 'running',
       steps: [],
       metrics: {},
-      errors: []
+      errors: [],
     };
 
     this.activeSessions.set(session.id, session);
 
     try {
       // Apply custom initial state if provided
-      const initialState = options.customInitialState 
+      const initialState = options.customInitialState
         ? { ...scenario.initialState, ...options.customInitialState }
         : scenario.initialState;
 
@@ -115,14 +115,13 @@ export class ScenarioManager extends EventEmitter {
 
       session.status = 'completed';
       session.endTime = Date.now();
-
     } catch (error) {
       session.status = 'error';
       session.endTime = Date.now();
       session.errors.push({
         timestamp: Date.now(),
         type: 'execution_error',
-        message: error instanceof Error ? error.message : String(error)
+        message: error instanceof Error ? error.message : String(error),
       });
     }
 
@@ -151,16 +150,19 @@ export class ScenarioManager extends EventEmitter {
       timestamp: Date.now(),
       sessionId: session.id,
       eventType: 'session_start',
-      data: { 
+      data: {
         scenarioId: scenario.id,
         complexity: scenario.complexity,
-        domain: scenario.domain
-      }
+        domain: scenario.domain,
+      },
     });
 
-    while (!this.isGoalAchieved(scenario, currentState) && stepCount < maxSteps) {
+    while (
+      !this.isGoalAchieved(scenario, currentState) &&
+      stepCount < maxSteps
+    ) {
       // Check timeout
-      if (scenario.timeLimit && (Date.now() - startTime) > scenario.timeLimit) {
+      if (scenario.timeLimit && Date.now() - startTime > scenario.timeLimit) {
         session.status = 'timeout';
         break;
       }
@@ -172,15 +174,18 @@ export class ScenarioManager extends EventEmitter {
 
       try {
         // Generate planning input based on current state
-        const planningInput = this.generatePlanningInput(scenario, currentState);
-        
+        const planningInput = this.generatePlanningInput(
+          scenario,
+          currentState
+        );
+
         // Execute planning
         const planningStart = Date.now();
         const planningResult = await planningSystem.planTask(planningInput, {
           domain: this.mapDomainToPlanningDomain(scenario.domain),
           urgency: this.calculateUrgency(scenario, currentState, stepCount),
           currentState,
-          resources: currentState.resources || {}
+          resources: currentState.resources || {},
         });
         const planningLatency = Date.now() - planningStart;
 
@@ -191,7 +196,7 @@ export class ScenarioManager extends EventEmitter {
           parameters: { input: planningInput },
           result: planningResult,
           reasoning: planningResult.routingDecision.reasoning,
-          confidence: planningResult.plan?.confidence
+          confidence: planningResult.plan?.confidence,
         };
         session.steps.push(step);
 
@@ -202,21 +207,26 @@ export class ScenarioManager extends EventEmitter {
             scenario,
             currentState
           );
-          
+
           // Update state based on execution
-          currentState = this.updateState(currentState, executionResult, scenario);
-          
+          currentState = this.updateState(
+            currentState,
+            executionResult,
+            scenario
+          );
+
           // Record execution step
           session.steps.push({
             timestamp: Date.now(),
             action: 'execution',
             parameters: executionResult.parameters,
-            result: executionResult.result
+            result: executionResult.result,
           });
         }
 
         // Update metrics
-        session.metrics.planningLatency = (session.metrics.planningLatency || 0) + planningLatency;
+        session.metrics.planningLatency =
+          (session.metrics.planningLatency || 0) + planningLatency;
         session.metrics.stepCount = stepCount + 1;
 
         // Emit step completion event
@@ -225,32 +235,36 @@ export class ScenarioManager extends EventEmitter {
             timestamp: Date.now(),
             sessionId: session.id,
             eventType: 'step_complete',
-            data: { 
+            data: {
               stepCount,
               planningLatency,
-              currentState: this.sanitizeState(currentState)
-            }
+              currentState: this.sanitizeState(currentState),
+            },
           });
         }
 
         stepCount++;
-
       } catch (error) {
         session.errors.push({
           timestamp: Date.now(),
           type: 'step_execution_error',
           message: error instanceof Error ? error.message : String(error),
-          context: { stepCount, currentState: this.sanitizeState(currentState) }
+          context: {
+            stepCount,
+            currentState: this.sanitizeState(currentState),
+          },
         });
-        
+
         this.emitEvent({
           timestamp: Date.now(),
           sessionId: session.id,
           eventType: 'error_occurred',
-          data: { error: error instanceof Error ? error.message : String(error) },
-          severity: 'error'
+          data: {
+            error: error instanceof Error ? error.message : String(error),
+          },
+          severity: 'error',
         });
-        
+
         break;
       }
     }
@@ -258,26 +272,29 @@ export class ScenarioManager extends EventEmitter {
     // Calculate final metrics
     session.totalLatency = Date.now() - startTime;
     session.success = this.isGoalAchieved(scenario, currentState);
-    
+
     // Emit session end event
     this.emitEvent({
       timestamp: Date.now(),
       sessionId: session.id,
       eventType: 'session_end',
-      data: { 
+      data: {
         success: session.success,
         totalSteps: stepCount,
-        totalLatency: session.totalLatency
-      }
+        totalLatency: session.totalLatency,
+      },
     });
   }
 
   /**
    * Generate planning input based on scenario and current state
    */
-  private generatePlanningInput(scenario: Scenario, currentState: Record<string, any>): string {
-    const unmetGoals = scenario.goalConditions.filter(goal => 
-      !this.isSpecificGoalMet(goal, currentState, scenario)
+  private generatePlanningInput(
+    scenario: Scenario,
+    currentState: Record<string, any>
+  ): string {
+    const unmetGoals = scenario.goalConditions.filter(
+      (goal) => !this.isSpecificGoalMet(goal, currentState, scenario)
     );
 
     if (unmetGoals.length === 0) {
@@ -287,22 +304,27 @@ export class ScenarioManager extends EventEmitter {
     // Create contextual planning input
     const primaryGoal = unmetGoals[0];
     const contextInfo = this.extractRelevantContext(scenario, currentState);
-    
+
     return `${primaryGoal} given current situation: ${JSON.stringify(contextInfo)}`;
   }
 
   /**
    * Map scenario domain to planning system domain
    */
-  private mapDomainToPlanningDomain(domain: string): 'minecraft' | 'general' | 'spatial' | 'logical' {
-    const mapping: Record<string, 'minecraft' | 'general' | 'spatial' | 'logical'> = {
-      'spatial': 'spatial',
-      'logical': 'logical',
-      'resource': 'minecraft',
-      'social': 'general',
-      'ethical': 'general',
-      'meta_cognitive': 'general',
-      'hybrid': 'general'
+  private mapDomainToPlanningDomain(
+    domain: string
+  ): 'minecraft' | 'general' | 'spatial' | 'logical' {
+    const mapping: Record<
+      string,
+      'minecraft' | 'general' | 'spatial' | 'logical'
+    > = {
+      spatial: 'spatial',
+      logical: 'logical',
+      resource: 'minecraft',
+      social: 'general',
+      ethical: 'general',
+      meta_cognitive: 'general',
+      hybrid: 'general',
     };
     return mapping[domain] || 'general';
   }
@@ -311,14 +333,14 @@ export class ScenarioManager extends EventEmitter {
    * Calculate urgency based on scenario progress
    */
   private calculateUrgency(
-    scenario: Scenario, 
-    currentState: Record<string, any>, 
+    scenario: Scenario,
+    currentState: Record<string, any>,
     stepCount: number
   ): 'low' | 'medium' | 'high' | 'emergency' {
     const timeElapsed = Date.now() - (currentState._startTime || Date.now());
     const timeRemaining = (scenario.timeLimit || Infinity) - timeElapsed;
     const progressRatio = stepCount / scenario.estimatedSteps;
-    
+
     if (timeRemaining < 10000) return 'emergency'; // Less than 10 seconds
     if (timeRemaining < 30000 || progressRatio > 0.8) return 'high';
     if (progressRatio > 0.5) return 'medium';
@@ -360,31 +382,35 @@ export class ScenarioManager extends EventEmitter {
   ): Promise<{ parameters: Record<string, any>; result: any }> {
     // Extract movement intent from plan
     const action = plan.nodes?.[0]?.description || 'move';
-    
+
     if (action.includes('move') || action.includes('navigate')) {
       const currentPos = currentState.position || [0, 0];
-      const targetPos = this.extractTargetPosition(plan, currentState, scenario);
-      
+      const targetPos = this.extractTargetPosition(
+        plan,
+        currentState,
+        scenario
+      );
+
       // Simulate movement with basic pathfinding
       const newPos = this.simulateMovement(currentPos, targetPos, currentState);
-      
+
       return {
-        parameters: { 
-          from: currentPos, 
+        parameters: {
+          from: currentPos,
           to: targetPos,
-          action: 'move'
+          action: 'move',
         },
-        result: { 
+        result: {
           newPosition: newPos,
           success: true,
-          energyCost: this.calculateMovementCost(currentPos, newPos)
-        }
+          energyCost: this.calculateMovementCost(currentPos, newPos),
+        },
       };
     }
-    
+
     return {
       parameters: { action },
-      result: { success: false, reason: 'Unknown spatial action' }
+      result: { success: false, reason: 'Unknown spatial action' },
     };
   }
 
@@ -397,18 +423,18 @@ export class ScenarioManager extends EventEmitter {
     scenario: Scenario
   ): Promise<{ parameters: Record<string, any>; result: any }> {
     const action = plan.nodes?.[0]?.description || 'analyze';
-    
+
     if (scenario.id === 'logic_tower_of_hanoi') {
       return this.executeHanoiMove(plan, currentState);
     }
-    
+
     if (scenario.id === 'logic_sequence_prediction') {
       return this.executeSequenceAnalysis(plan, currentState);
     }
-    
+
     return {
       parameters: { action },
-      result: { success: true, reasoning: 'Generic logical action executed' }
+      result: { success: true, reasoning: 'Generic logical action executed' },
     };
   }
 
@@ -421,27 +447,30 @@ export class ScenarioManager extends EventEmitter {
     scenario: Scenario
   ): Promise<{ parameters: Record<string, any>; result: any }> {
     const action = plan.nodes?.[0]?.description || 'manage';
-    
+
     // Resource allocation simulation
     if (action.includes('build') || action.includes('construct')) {
       const resourceCost = this.calculateBuildingCost(action, currentState);
-      const canAfford = this.checkResourceAvailability(resourceCost, currentState);
-      
+      const canAfford = this.checkResourceAvailability(
+        resourceCost,
+        currentState
+      );
+
       if (canAfford) {
         return {
           parameters: { action, cost: resourceCost },
-          result: { 
-            success: true, 
+          result: {
+            success: true,
             resourcesUsed: resourceCost,
-            itemBuilt: this.extractBuildTarget(action)
-          }
+            itemBuilt: this.extractBuildTarget(action),
+          },
         };
       }
     }
-    
+
     return {
       parameters: { action },
-      result: { success: false, reason: 'Insufficient resources' }
+      result: { success: false, reason: 'Insufficient resources' },
     };
   }
 
@@ -454,15 +483,15 @@ export class ScenarioManager extends EventEmitter {
     scenario: Scenario
   ): Promise<{ parameters: Record<string, any>; result: any }> {
     const action = plan.nodes?.[0]?.description || 'communicate';
-    
+
     // Simulate social interaction outcomes
     return {
       parameters: { action },
-      result: { 
-        success: true, 
+      result: {
+        success: true,
         relationshipImpact: this.calculateSocialImpact(action, currentState),
-        response: 'Simulated agent response'
-      }
+        response: 'Simulated agent response',
+      },
     };
   }
 
@@ -475,14 +504,14 @@ export class ScenarioManager extends EventEmitter {
     scenario: Scenario
   ): Promise<{ parameters: Record<string, any>; result: any }> {
     const action = plan.nodes?.[0]?.description || 'decide';
-    
+
     return {
       parameters: { action },
-      result: { 
-        success: true, 
+      result: {
+        success: true,
         ethicalJustification: 'Simulated ethical reasoning',
-        moralWeight: this.calculateMoralImpact(action, currentState)
-      }
+        moralWeight: this.calculateMoralImpact(action, currentState),
+      },
     };
   }
 
@@ -495,18 +524,21 @@ export class ScenarioManager extends EventEmitter {
     scenario: Scenario
   ): Promise<{ parameters: Record<string, any>; result: any }> {
     const action = plan.nodes?.[0]?.description || 'act';
-    
+
     return {
       parameters: { action },
-      result: { success: true, outcome: 'Generic action completed' }
+      result: { success: true, outcome: 'Generic action completed' },
     };
   }
 
   /**
    * Check if scenario goals are achieved
    */
-  private isGoalAchieved(scenario: Scenario, currentState: Record<string, any>): boolean {
-    return scenario.goalConditions.every(goal => 
+  private isGoalAchieved(
+    scenario: Scenario,
+    currentState: Record<string, any>
+  ): boolean {
+    return scenario.goalConditions.every((goal) =>
       this.isSpecificGoalMet(goal, currentState, scenario)
     );
   }
@@ -514,53 +546,67 @@ export class ScenarioManager extends EventEmitter {
   /**
    * Check if a specific goal is met
    */
-  private isSpecificGoalMet(goal: string, currentState: Record<string, any>, scenario: Scenario): boolean {
+  private isSpecificGoalMet(
+    goal: string,
+    currentState: Record<string, any>,
+    scenario: Scenario
+  ): boolean {
     switch (goal) {
       case 'reach_exit':
-        return currentState.position && 
-               JSON.stringify(currentState.position) === JSON.stringify(this.findExit(scenario));
-      
+        return (
+          currentState.position &&
+          JSON.stringify(currentState.position) ===
+            JSON.stringify(this.findExit(scenario))
+        );
+
       case 'collect_all_keys':
         const requiredKeys = this.countRequiredKeys(scenario);
         return (currentState.inventory?.keys || 0) >= requiredKeys;
-      
+
       case 'all_disks_on_C':
         return currentState.towers?.C?.length === 4; // For Tower of Hanoi
-      
+
       case 'survive_7_days':
         return (currentState.daysElapsed || 0) >= 7;
-      
+
       default:
         // Generic goal checking based on state properties
-        return currentState[goal] === true || currentState[goal] === 'completed';
+        return (
+          currentState[goal] === true || currentState[goal] === 'completed'
+        );
     }
   }
 
   /**
    * Apply stress testing conditions
    */
-  private async applyStressTest(config: StressTestConfig, currentState: Record<string, any>): Promise<void> {
+  private async applyStressTest(
+    config: StressTestConfig,
+    currentState: Record<string, any>
+  ): Promise<void> {
     switch (config.type) {
       case 'latency_injection':
-        await new Promise(resolve => setTimeout(resolve, config.intensity * 1000));
+        await new Promise((resolve) =>
+          setTimeout(resolve, config.intensity * 1000)
+        );
         break;
-      
+
       case 'noise_injection':
         // Add random perturbations to state
-        Object.keys(currentState).forEach(key => {
+        Object.keys(currentState).forEach((key) => {
           if (typeof currentState[key] === 'number') {
             currentState[key] += (Math.random() - 0.5) * config.intensity * 10;
           }
         });
         break;
-      
+
       case 'memory_pressure':
         // Simulate memory limitations
         if (currentState.memory) {
-          currentState.memory.available *= (1 - config.intensity);
+          currentState.memory.available *= 1 - config.intensity;
         }
         break;
-        
+
       // Add other stress test implementations as needed
     }
   }
@@ -569,29 +615,31 @@ export class ScenarioManager extends EventEmitter {
    * Update state based on execution results
    */
   private updateState(
-    currentState: Record<string, any>, 
+    currentState: Record<string, any>,
     executionResult: { parameters: Record<string, any>; result: any },
     scenario: Scenario
   ): Record<string, any> {
     const newState = { ...currentState };
-    
+
     // Apply result-specific state changes
     if (executionResult.result.newPosition) {
       newState.position = executionResult.result.newPosition;
     }
-    
+
     if (executionResult.result.energyCost) {
-      newState.energy = (newState.energy || 100) - executionResult.result.energyCost;
+      newState.energy =
+        (newState.energy || 100) - executionResult.result.energyCost;
     }
-    
+
     if (executionResult.result.resourcesUsed) {
-      Object.keys(executionResult.result.resourcesUsed).forEach(resource => {
+      Object.keys(executionResult.result.resourcesUsed).forEach((resource) => {
         if (newState.resources && newState.resources[resource] !== undefined) {
-          newState.resources[resource] -= executionResult.result.resourcesUsed[resource];
+          newState.resources[resource] -=
+            executionResult.result.resourcesUsed[resource];
         }
       });
     }
-    
+
     return newState;
   }
 
@@ -614,7 +662,11 @@ export class ScenarioManager extends EventEmitter {
   }
 
   // Helper methods for scenario-specific logic
-  private extractTargetPosition(plan: any, state: Record<string, any>, scenario: Scenario): [number, number] {
+  private extractTargetPosition(
+    plan: any,
+    state: Record<string, any>,
+    scenario: Scenario
+  ): [number, number] {
     // Simple target extraction logic
     if (scenario.id === 'spatial_maze_basic') {
       return this.findExit(scenario);
@@ -635,18 +687,25 @@ export class ScenarioManager extends EventEmitter {
     return [4, 4]; // Default exit position
   }
 
-  private simulateMovement(from: [number, number], to: [number, number], state: Record<string, any>): [number, number] {
+  private simulateMovement(
+    from: [number, number],
+    to: [number, number],
+    state: Record<string, any>
+  ): [number, number] {
     // Simple movement simulation - move one step towards target
     const [fx, fy] = from;
     const [tx, ty] = to;
-    
+
     const dx = Math.sign(tx - fx);
     const dy = Math.sign(ty - fy);
-    
+
     return [fx + dx, fy + dy];
   }
 
-  private calculateMovementCost(from: [number, number], to: [number, number]): number {
+  private calculateMovementCost(
+    from: [number, number],
+    to: [number, number]
+  ): number {
     const distance = Math.abs(to[0] - from[0]) + Math.abs(to[1] - from[1]);
     return distance * 2; // Energy cost per step
   }
@@ -655,31 +714,43 @@ export class ScenarioManager extends EventEmitter {
     return scenario.initialState.environment?.keys?.length || 0;
   }
 
-  private executeHanoiMove(plan: any, state: Record<string, any>): { parameters: Record<string, any>; result: any } {
+  private executeHanoiMove(
+    plan: any,
+    state: Record<string, any>
+  ): { parameters: Record<string, any>; result: any } {
     // Simplified Hanoi move execution
     return {
       parameters: { action: 'move_disk' },
-      result: { success: true, validMove: true }
+      result: { success: true, validMove: true },
     };
   }
 
-  private executeSequenceAnalysis(plan: any, state: Record<string, any>): { parameters: Record<string, any>; result: any } {
+  private executeSequenceAnalysis(
+    plan: any,
+    state: Record<string, any>
+  ): { parameters: Record<string, any>; result: any } {
     // Simplified sequence analysis
     return {
       parameters: { action: 'analyze_pattern' },
-      result: { success: true, patternIdentified: 'fibonacci' }
+      result: { success: true, patternIdentified: 'fibonacci' },
     };
   }
 
-  private calculateBuildingCost(action: string, state: Record<string, any>): Record<string, number> {
+  private calculateBuildingCost(
+    action: string,
+    state: Record<string, any>
+  ): Record<string, number> {
     // Simple cost calculation
     return { wood: 10, stone: 5 };
   }
 
-  private checkResourceAvailability(cost: Record<string, number>, state: Record<string, any>): boolean {
+  private checkResourceAvailability(
+    cost: Record<string, number>,
+    state: Record<string, any>
+  ): boolean {
     const resources = state.resources || {};
-    return Object.keys(cost).every(resource => 
-      (resources[resource] || 0) >= cost[resource]
+    return Object.keys(cost).every(
+      (resource) => (resources[resource] || 0) >= cost[resource]
     );
   }
 
@@ -689,21 +760,30 @@ export class ScenarioManager extends EventEmitter {
     return 'structure';
   }
 
-  private calculateSocialImpact(action: string, state: Record<string, any>): Record<string, number> {
+  private calculateSocialImpact(
+    action: string,
+    state: Record<string, any>
+  ): Record<string, number> {
     return { trust: 5, cooperation: 3 };
   }
 
-  private calculateMoralImpact(action: string, state: Record<string, any>): number {
+  private calculateMoralImpact(
+    action: string,
+    state: Record<string, any>
+  ): number {
     return 0.8; // Placeholder moral weight
   }
 
-  private extractRelevantContext(scenario: Scenario, state: Record<string, any>): Record<string, any> {
+  private extractRelevantContext(
+    scenario: Scenario,
+    state: Record<string, any>
+  ): Record<string, any> {
     // Extract only relevant state information for planning
     return {
       position: state.position,
       resources: state.resources,
       health: state.health,
-      energy: state.energy
+      energy: state.energy,
     };
   }
 

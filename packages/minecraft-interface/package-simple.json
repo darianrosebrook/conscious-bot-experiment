@@ -1,0 +1,35 @@
+{
+  "name": "@conscious-bot/minecraft-interface-simple",
+  "version": "0.1.0",
+  "description": "Simple Minecraft interface without planning dependencies",
+  "main": "dist-simple/standalone-simple.js",
+  "types": "dist-simple/standalone-simple.d.ts",
+  "bin": {
+    "mc-simple": "dist-simple/bin/mc-simple.js",
+    "mc-sim": "dist-simple/bin/mc-sim.js"
+  },
+  "scripts": {
+    "start": "node dist-simple/bin/mc-simple.js",
+    "connect": "node dist-simple/bin/mc-simple.js --action=connect",
+    "move": "node dist-simple/bin/mc-simple.js --action=move",
+    "turn": "node dist-simple/bin/mc-simple.js --action=turn",
+    "jump": "node dist-simple/bin/mc-simple.js --action=jump",
+    "chat": "node dist-simple/bin/mc-simple.js --action=chat",
+    "sim": "node dist-simple/bin/mc-sim.js",
+    "sim:demo": "node dist-simple/bin/mc-sim.js --action=demo",
+    "sim:connect": "node dist-simple/bin/mc-sim.js --action=connect"
+  },
+  "dependencies": {
+    "mineflayer": "^4.17.0",
+    "mineflayer-pathfinder": "^2.4.1",
+    "vec3": "^0.1.8"
+  },
+  "keywords": [
+    "minecraft",
+    "bot",
+    "mineflayer",
+    "simple"
+  ],
+  "author": "@darianrosebrook",
+  "license": "MIT"
+}

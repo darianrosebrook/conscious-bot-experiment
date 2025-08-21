@@ -1,50 +1,29 @@
 /**
- * High-level reasoning, self-awareness, and social modeling systems
- * 
- * This package provides:
- * - Cognitive core with LLM-based reasoning and internal dialogue
- * - Self-model for identity and narrative continuity
- * - Social cognition for theory of mind and social interaction
- * - Constitutional filtering for ethical behavior
- * 
+ * Cognition Package
+ *
+ * Core cognitive capabilities including reasoning, internal dialogue,
+ * creative problem solving, conversation management, reflection,
+ * context optimization, and self-modeling.
+ *
  * @author @darianrosebrook
  */
 
 // Cognitive Core
 export * from './cognitive-core/llm-interface';
 export * from './cognitive-core/internal-dialogue';
-
-// Self Model
-export * from './self-model/identity-tracker';
-export * from './self-model/narrative-manager';
+export * from './cognitive-core/creative-solver';
+export * from './cognitive-core/conversation-manager';
+export * from './cognitive-core/reflection-engine';
+export * from './cognitive-core/context-optimizer';
 
 // Constitutional Filter
 export * from './constitutional-filter';
 
-// Types
-export type {
-  InternalThought,
-  ThoughtType,
-  ThoughtContext,
-  DialogueTrigger,
-  ReasoningStep,
-  ReasoningChain,
-  ReasoningResult,
-  ReasoningRequest,
-  ReasoningType,
-  LLMConfig,
-  LLMContext,
-  LLMResponse,
-} from './types';
+// Self-Model
+export * from './self-model';
 
-export type {
-  IdentityCore,
-  PersonalityTrait,
-  CoreValue,
-  Capability,
-  CapabilityDevelopment,
-  NarrativeStory,
-  NarrativeChapter,
-  ExperienceIntegration,
-  IdentityImpact,
-} from './self-model/types';
+// Social Cognition
+export * from './social-cognition';
+
+// Types
+export * from './types';

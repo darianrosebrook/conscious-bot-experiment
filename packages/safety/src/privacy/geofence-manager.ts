@@ -1,6 +1,6 @@
 /**
  * Geofence Manager - Location-based Privacy and Access Controls
- * 
+ *
  * Implements geofenced areas with special privacy and access rules
  * @author @darianrosebrook
  */
@@ -71,9 +71,11 @@ class GeofenceRegistry {
       const adjacentGeofenceIds = this.spatialIndex.get(adjacentChunk) || [];
       for (const geofenceId of adjacentGeofenceIds) {
         const geofence = this.geofences.get(geofenceId);
-        if (geofence && 
-            this.locationInGeofence(validatedLocation, geofence) &&
-            !containingGeofences.some(g => g.geofenceId === geofenceId)) {
+        if (
+          geofence &&
+          this.locationInGeofence(validatedLocation, geofence) &&
+          !containingGeofences.some((g) => g.geofenceId === geofenceId)
+        ) {
           containingGeofences.push(geofence);
         }
       }
@@ -99,9 +101,12 @@ class GeofenceRegistry {
   private locationInGeofence(location: Location, geofence: Geofence): boolean {
     const { coordinates } = geofence;
     return (
-      location.x >= coordinates.minX && location.x <= coordinates.maxX &&
-      location.y >= coordinates.minY && location.y <= coordinates.maxY &&
-      location.z >= coordinates.minZ && location.z <= coordinates.maxZ
+      location.x >= coordinates.minX &&
+      location.x <= coordinates.maxX &&
+      location.y >= coordinates.minY &&
+      location.y <= coordinates.maxY &&
+      location.z >= coordinates.minZ &&
+      location.z <= coordinates.maxZ
     );
   }
 
@@ -134,7 +139,7 @@ class GeofenceRegistry {
   private getGeofenceChunks(geofence: Geofence): string[] {
     const chunks: string[] = [];
     const chunkSize = 16; // Minecraft chunk size
-    
+
     const startChunkX = Math.floor(geofence.coordinates.minX / chunkSize);
     const endChunkX = Math.floor(geofence.coordinates.maxX / chunkSize);
     const startChunkZ = Math.floor(geofence.coordinates.minZ / chunkSize);
@@ -159,9 +164,14 @@ class GeofenceRegistry {
   private getAdjacentChunks(chunkKey: string): string[] {
     const [x, z] = chunkKey.split(',').map(Number);
     return [
-      `${x-1},${z-1}`, `${x},${z-1}`, `${x+1},${z-1}`,
-      `${x-1},${z}`,                    `${x+1},${z}`,
-      `${x-1},${z+1}`, `${x},${z+1}`, `${x+1},${z+1}`,
+      `${x - 1},${z - 1}`,
+      `${x},${z - 1}`,
+      `${x + 1},${z - 1}`,
+      `${x - 1},${z}`,
+      `${x + 1},${z}`,
+      `${x - 1},${z + 1}`,
+      `${x},${z + 1}`,
+      `${x + 1},${z + 1}`,
     ];
   }
 }
@@ -190,16 +200,21 @@ class GeofenceAccessPolicies {
 
     // Process geofences by priority (most restrictive first)
     const sortedGeofences = this.sortGeofencesByPriority(geofences);
-    
+
     for (const geofence of sortedGeofences) {
-      const permission = this.evaluateGeofenceAccess(geofence, action, actor, location);
+      const permission = this.evaluateGeofenceAccess(
+        geofence,
+        action,
+        actor,
+        location
+      );
       if (!permission.allowed) {
         return permission;
       }
     }
 
     // All geofences allow the action, but may have privacy requirements
-    const allPrivacyRequirements = geofences.flatMap(g => 
+    const allPrivacyRequirements = geofences.flatMap((g) =>
       this.getPrivacyRequirements(g, action)
     );
 
@@ -218,7 +233,7 @@ class GeofenceAccessPolicies {
     location: Location
   ): AccessPermission {
     const { permissions } = geofence;
-    
+
     // Check ownership-based permissions
     if (geofence.owner && geofence.owner !== actor) {
       if (permissions.entry === 'owner_only') {
@@ -259,14 +274,29 @@ class GeofenceAccessPolicies {
     };
   }
 
-  private getActionPermissions(action: string, permissions: Geofence['permissions']): string {
-    if (action.includes('build') || action.includes('place') || action.includes('break')) {
+  private getActionPermissions(
+    action: string,
+    permissions: Geofence['permissions']
+  ): string {
+    if (
+      action.includes('build') ||
+      action.includes('place') ||
+      action.includes('break')
+    ) {
       return permissions.building;
     }
-    if (action.includes('mine') || action.includes('extract') || action.includes('harvest')) {
+    if (
+      action.includes('mine') ||
+      action.includes('extract') ||
+      action.includes('harvest')
+    ) {
       return permissions.resourceExtraction;
     }
-    if (action.includes('observe') || action.includes('scan') || action.includes('look')) {
+    if (
+      action.includes('observe') ||
+      action.includes('scan') ||
+      action.includes('look')
+    ) {
       return permissions.observation;
     }
     if (action.includes('enter') || action.includes('move')) {
@@ -277,15 +307,15 @@ class GeofenceAccessPolicies {
 
   private getPrivacyRequirements(geofence: Geofence, action: string): string[] {
     const requirements: string[] = [];
-    
+
     if (geofence.privacySettings.anonymizeActivities) {
       requirements.push('anonymize_activity');
     }
-    
+
     if (!geofence.privacySettings.detailedLogging) {
       requirements.push('limit_logging');
     }
-    
+
     if (geofence.privacySettings.logRetention !== 'permanent') {
       requirements.push(`retention_${geofence.privacySettings.logRetention}`);
     }
@@ -294,8 +324,13 @@ class GeofenceAccessPolicies {
   }
 
   private sortGeofencesByPriority(geofences: Geofence[]): Geofence[] {
-    const priorityOrder = ['private_area', 'protected_region', 'restricted_resource', 'social_space'];
-    
+    const priorityOrder = [
+      'private_area',
+      'protected_region',
+      'restricted_resource',
+      'social_space',
+    ];
+
     return geofences.sort((a, b) => {
       const aPriority = priorityOrder.indexOf(a.type);
       const bPriority = priorityOrder.indexOf(b.type);
@@ -333,7 +368,7 @@ class GeofenceViolationDetector extends EventEmitter {
 
     const violationKey = `${actor}_${geofence.geofenceId}`;
     const currentTime = Date.now();
-    
+
     if (!this.violationHistory.has(violationKey)) {
       this.violationHistory.set(violationKey, []);
     }
@@ -342,10 +377,10 @@ class GeofenceViolationDetector extends EventEmitter {
     violations.push(currentTime);
 
     // Clean old violations (older than 1 hour)
-    const oneHourAgo = currentTime - (60 * 60 * 1000);
+    const oneHourAgo = currentTime - 60 * 60 * 1000;
     this.violationHistory.set(
       violationKey,
-      violations.filter(time => time > oneHourAgo)
+      violations.filter((time) => time > oneHourAgo)
     );
 
     const recentViolations = this.violationHistory.get(violationKey)!.length;
@@ -369,7 +404,7 @@ class GeofenceViolationDetector extends EventEmitter {
    */
   getViolationHistory(actor: string): Record<string, number> {
     const history: Record<string, number> = {};
-    
+
     for (const [key, violations] of this.violationHistory.entries()) {
       if (key.startsWith(`${actor}_`)) {
         const geofenceId = key.substring(actor.length + 1);
@@ -408,12 +443,12 @@ export class GeofenceManager extends EventEmitter {
     try {
       const geofenceWithOwner = owner ? { ...geofence, owner } : geofence;
       this.geofenceRegistry.registerGeofence(geofenceWithOwner);
-      
+
       this.emit('geofence-registered', {
         geofence: geofenceWithOwner,
         timestamp: Date.now(),
       });
-      
+
       return true;
     } catch (error) {
       console.error('Failed to register geofence:', error);
@@ -424,10 +459,15 @@ export class GeofenceManager extends EventEmitter {
   /**
    * Check if actor has permission for action at location
    */
-  checkAccessPermission(location: Location, action: string, actor: string): AccessPermission {
+  checkAccessPermission(
+    location: Location,
+    action: string,
+    actor: string
+  ): AccessPermission {
     const validatedLocation = validateLocation(location);
-    const containingGeofences = this.geofenceRegistry.findContainingGeofences(validatedLocation);
-    
+    const containingGeofences =
+      this.geofenceRegistry.findContainingGeofences(validatedLocation);
+
     const permission = this.accessPolicies.evaluateAccess(
       containingGeofences,
       action,
@@ -438,7 +478,13 @@ export class GeofenceManager extends EventEmitter {
     // Check for violations
     if (!permission.allowed && containingGeofences.length > 0) {
       for (const geofence of containingGeofences) {
-        this.violationDetector.detectViolation(actor, action, validatedLocation, geofence, permission);
+        this.violationDetector.detectViolation(
+          actor,
+          action,
+          validatedLocation,
+          geofence,
+          permission
+        );
       }
     }
 
@@ -454,17 +500,21 @@ export class GeofenceManager extends EventEmitter {
     privacyRequirements: string[];
   } {
     const validatedLocation = validateLocation(location);
-    const containingGeofences = this.geofenceRegistry.findContainingGeofences(validatedLocation);
-    
+    const containingGeofences =
+      this.geofenceRegistry.findContainingGeofences(validatedLocation);
+
     const allRestrictions = new Set<string>();
     const allPrivacyRequirements = new Set<string>();
 
     for (const geofence of containingGeofences) {
       // Add basic restriction types
-      if (geofence.permissions.building === 'prohibited') allRestrictions.add('no_building');
-      if (geofence.permissions.entry === 'owner_only') allRestrictions.add('restricted_entry');
-      if (geofence.permissions.observation === 'limited') allRestrictions.add('limited_observation');
-      
+      if (geofence.permissions.building === 'prohibited')
+        allRestrictions.add('no_building');
+      if (geofence.permissions.entry === 'owner_only')
+        allRestrictions.add('restricted_entry');
+      if (geofence.permissions.observation === 'limited')
+        allRestrictions.add('limited_observation');
+
       // Add privacy requirements
       if (geofence.privacySettings.anonymizeActivities) {
         allPrivacyRequirements.add('anonymize_activities');
@@ -486,14 +536,14 @@ export class GeofenceManager extends EventEmitter {
    */
   removeGeofence(geofenceId: string): boolean {
     const removed = this.geofenceRegistry.removeGeofence(geofenceId);
-    
+
     if (removed) {
       this.emit('geofence-removed', {
         geofenceId,
         timestamp: Date.now(),
       });
     }
-    
+
     return removed;
   }
 
@@ -508,29 +558,38 @@ export class GeofenceManager extends EventEmitter {
    * Get violation statistics
    */
   getViolationStats(): {
-    totalViolations: number;
-    violationsByActor: Record<string, number>;
-    violationsByGeofence: Record<string, number>;
+    totalGeofences: number;
+    violationsDetected: number;
+    restrictedAreas: number;
   } {
     // This would be tracked over time in a real implementation
     return {
-      totalViolations: 0,
-      violationsByActor: {},
-      violationsByGeofence: {},
+      totalGeofences: this.geofences.size,
+      violationsDetected: 0,
+      restrictedAreas: Array.from(this.geofences.values()).filter(
+        (g) => g.type === 'restricted_area'
+      ).length,
     };
   }
 
   /**
    * Auto-detect private areas based on building patterns
    */
-  autoDetectPrivateAreas(buildingData: Array<{ location: Location; builder: string; timestamp: number }>): Geofence[] {
+  autoDetectPrivateAreas(
+    buildingData: Array<{
+      location: Location;
+      builder: string;
+      timestamp: number;
+    }>
+  ): Geofence[] {
     // Group buildings by builder and proximity
     const builderClusters = this.clusterBuildingsByBuilder(buildingData);
     const detectedGeofences: Geofence[] = [];
 
     for (const [builder, clusters] of builderClusters.entries()) {
       for (const cluster of clusters) {
-        if (cluster.length >= 3) { // Minimum buildings to constitute a private area
+        if (cluster.length >= 3) {
+          // Minimum buildings to constitute a private area
           const bounds = this.calculateClusterBounds(cluster);
           const geofence: Geofence = {
             geofenceId: `auto_${builder}_${Date.now()}`,
@@ -550,7 +609,7 @@ export class GeofenceManager extends EventEmitter {
               detailedLogging: false,
             },
           };
-          
+
           detectedGeofences.push(geofence);
         }
       }
@@ -559,7 +618,13 @@ export class GeofenceManager extends EventEmitter {
     return detectedGeofences;
   }
 
-  private clusterBuildingsByBuilder(buildingData: Array<{ location: Location; builder: string; timestamp: number }>): Map<string, Location[][]> {
+  private clusterBuildingsByBuilder(
+    buildingData: Array<{
+      location: Location;
+      builder: string;
+      timestamp: number;
+    }>
+  ): Map<string, Location[][]> {
     const builderClusters = new Map<string, Location[][]>();
     const clusterDistance = 50; // Maximum distance between buildings in same cluster
 
@@ -573,7 +638,13 @@ export class GeofenceManager extends EventEmitter {
 
       // Try to add to existing cluster
       for (const cluster of clusters) {
-        if (this.isWithinClusterDistance(building.location, cluster, clusterDistance)) {
+        if (
+          this.isWithinClusterDistance(
+            building.location,
+            cluster,
+            clusterDistance
+          )
+        ) {
           cluster.push(building.location);
           addedToCluster = true;
           break;
@@ -589,11 +660,15 @@ export class GeofenceManager extends EventEmitter {
     return builderClusters;
   }
 
-  private isWithinClusterDistance(location: Location, cluster: Location[], maxDistance: number): boolean {
-    return cluster.some(clusterLocation => {
+  private isWithinClusterDistance(
+    location: Location,
+    cluster: Location[],
+    maxDistance: number
+  ): boolean {
+    return cluster.some((clusterLocation) => {
       const distance = Math.sqrt(
         Math.pow(location.x - clusterLocation.x, 2) +
-        Math.pow(location.z - clusterLocation.z, 2)
+          Math.pow(location.z - clusterLocation.z, 2)
       );
       return distance <= maxDistance;
     });
@@ -601,10 +676,10 @@ export class GeofenceManager extends EventEmitter {
 
   private calculateClusterBounds(cluster: Location[]): Geofence['coordinates'] {
     const padding = 10; // Add padding around cluster
-    
-    const xs = cluster.map(loc => loc.x);
-    const ys = cluster.map(loc => loc.y);
-    const zs = cluster.map(loc => loc.z);
+
+    const xs = cluster.map((loc) => loc.x);
+    const ys = cluster.map((loc) => loc.y);
+    const zs = cluster.map((loc) => loc.z);
 
     return {
       minX: Math.min(...xs) - padding,

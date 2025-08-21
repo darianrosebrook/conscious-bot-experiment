@@ -24,13 +24,13 @@ M3 consists of 5 core modules that will build upon the cognitive foundation esta
 
 The centerpiece of M3 is the integration of Sapient's Hierarchical Reasoning Model:
 
-### Phase 1: Foundation (Weeks 1-4)
+### Phase 1: Foundation 
 - [ ] Environment setup and HRM repository integration
 - [ ] Minecraft dataset creation and training
 - [ ] HRM model optimization and validation
 - [ ] Integration architecture development
 
-### Phase 2: Core Integration (Weeks 5-8)
+### Phase 2: Core Integration 
 - [ ] Planning system integration with HRM
 - [ ] Memory system coordination
 - [ ] Real-time performance optimization
@@ -98,17 +98,17 @@ M3 directly validates our core research hypothesis:
 
 ## Next Immediate Steps
 
-1. **Start HRM Foundation** (Week 1)
+1. **Start HRM Foundation** 
    - Clone HRM repository and set up environment
    - Install dependencies and test pre-trained models
    - Begin Minecraft dataset creation
 
-2. **Design Integration Architecture** (Week 1-2)
+2. **Design Integration Architecture** 
    - Define HRM-HTN integration points
    - Specify collaborative reasoning protocols
    - Design performance monitoring framework
 
-3. **Begin Implementation** (Week 2)
+3. **Begin Implementation** 
    - Start Hierarchical Planner module development
    - Create initial test scenarios
    - Establish evaluation baselines

@@ -240,6 +240,7 @@ export class HealthMonitor
       total: 0,
       healthy: 0,
       warning: 0,
+      degraded: 0,
       critical: 0,
       offline: 0,
     };

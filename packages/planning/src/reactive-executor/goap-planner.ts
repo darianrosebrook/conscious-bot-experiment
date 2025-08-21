@@ -7,7 +7,16 @@
  * @author @darianrosebrook
  */
 
-import { Plan, PlanStep, PlanStatus, Action, Resource, Goal, ActionType, PlanStepStatus } from '../types';
+import {
+  Plan,
+  PlanStep,
+  PlanStatus,
+  Action,
+  Resource,
+  Goal,
+  ActionType,
+  PlanStepStatus,
+} from '../types';
 
 export interface GOAPAction {
   id: string;
@@ -400,20 +409,40 @@ export class GOAPPlanner {
    */
   private mapActionNameToType(actionName: string): ActionType {
     const name = actionName.toLowerCase();
-    
-    if (name.includes('move') || name.includes('navigate') || name.includes('travel')) {
+
+    if (
+      name.includes('move') ||
+      name.includes('navigate') ||
+      name.includes('travel')
+    ) {
       return ActionType.MOVEMENT;
     }
-    if (name.includes('craft') || name.includes('build') || name.includes('make')) {
+    if (
+      name.includes('craft') ||
+      name.includes('build') ||
+      name.includes('make')
+    ) {
       return ActionType.CRAFTING;
     }
-    if (name.includes('attack') || name.includes('fight') || name.includes('defend')) {
+    if (
+      name.includes('attack') ||
+      name.includes('fight') ||
+      name.includes('defend')
+    ) {
       return ActionType.COMBAT;
     }
-    if (name.includes('talk') || name.includes('communicate') || name.includes('trade')) {
+    if (
+      name.includes('talk') ||
+      name.includes('communicate') ||
+      name.includes('trade')
+    ) {
       return ActionType.SOCIAL;
     }
-    if (name.includes('explore') || name.includes('search') || name.includes('scout')) {
+    if (
+      name.includes('explore') ||
+      name.includes('search') ||
+      name.includes('scout')
+    ) {
       return ActionType.EXPLORATION;
     }
     // Default to interaction for anything else

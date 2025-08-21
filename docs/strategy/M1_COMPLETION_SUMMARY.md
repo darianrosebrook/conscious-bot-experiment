@@ -115,7 +115,7 @@ conscious-bot/
 
 ## 🚀 M2 Implementation Plan
 
-### **Phase 1: Cognitive Foundation (Weeks 1-4)**
+### **Phase 1: Cognitive Foundation **
 1. **Planning: Goal Formulation**
    - Homeostasis monitoring and need generation
    - Goal prioritization and utility calculation
@@ -126,7 +126,7 @@ conscious-bot/
    - Memory consolidation and forgetting
    - Experience retrieval and utilization
 
-### **Phase 2: Intelligence Layer (Weeks 5-8)**
+### **Phase 2: Intelligence Layer **
 3. **Memory: Semantic**
    - Knowledge graph construction
    - Relationship modeling and inference

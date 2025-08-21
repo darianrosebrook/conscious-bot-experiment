@@ -27,6 +27,12 @@ export {
 // Types and interfaces
 export * from './types';
 export * from './mcp-capabilities/types';
+// Re-export real-time types with explicit naming to avoid conflicts
+export {
+  PerformanceMetrics as RealTimePerformanceMetrics,
+  PerformanceMetricsSchema as RealTimePerformanceMetricsSchema,
+  DegradationLevel as RealTimeDegradationLevel,
+} from './real-time/types';
 export * from './real-time/types';
 
 // Cognitive module interface

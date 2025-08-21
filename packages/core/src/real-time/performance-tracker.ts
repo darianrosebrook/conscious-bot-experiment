@@ -696,13 +696,7 @@ export class PerformanceTracker
     first: number,
     second: number,
     threshold: number
-  ):
-    | 'improving'
-    | 'stable'
-    | 'degrading'
-    | 'increasing'
-    | 'decreasing'
-    | 'worsening' {
+  ): 'improving' | 'stable' | 'degrading' {
     const change = (second - first) / first;
 
     if (Math.abs(change) < threshold) {

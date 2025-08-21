@@ -364,14 +364,14 @@ export class DataAnonymizer {
    * Get current anonymization statistics
    */
   getAnonymizationStats(): {
-    totalPlayerDataAnonymized: number;
+    totalDataAnonymized: number;
     totalMessagesFiltered: number;
     averageFuzzingDistance: number;
     piiDetectionRate: number;
   } {
     // In a real implementation, these would be tracked over time
     return {
-      totalPlayerDataAnonymized: 0,
+      totalDataAnonymized: 0,
       totalMessagesFiltered: 0,
       averageFuzzingDistance: this.config.locationPrecision,
       piiDetectionRate: 0.0,

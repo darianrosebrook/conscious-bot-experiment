@@ -12,6 +12,32 @@ export { ObservationMapper } from './observation-mapper';
 export { ActionTranslator } from './action-translator';
 export { PlanExecutor } from './plan-executor';
 
+// Standalone interface (no planning system dependency)
+export {
+  StandaloneMinecraftInterface,
+  createStandaloneMinecraftInterface,
+  DEFAULT_STANDALONE_CONFIG,
+} from './standalone';
+
+// Simple interface (minimal dependencies)
+export {
+  SimpleMinecraftInterface,
+  createSimpleMinecraftInterface,
+  DEFAULT_SIMPLE_CONFIG,
+  SimpleBotConfig,
+  SimpleGameState,
+  SimpleAction,
+} from './standalone-simple';
+
+// Simulation stub for offline testing
+export {
+  SimulatedMinecraftInterface,
+  createSimulatedMinecraftInterface,
+  DEFAULT_SIMULATION_CONFIG,
+  SimulationConfig,
+  SimulatedGameState,
+} from './simulation-stub';
+
 // Types
 export * from './types';
 

@@ -17,13 +17,21 @@ import {
   MinecraftEntity,
   BotConfig,
 } from './types';
+import {
+  MinecraftSignalProcessor,
+  MinecraftSignal,
+  MinecraftHomeostasisState,
+  createMinecraftSignalProcessor,
+} from './signal-processor';
 
 export class ObservationMapper {
   private config: BotConfig;
   private lastObservation: MinecraftWorldState | null = null;
+  private signalProcessor: MinecraftSignalProcessor;
 
   constructor(config: BotConfig) {
     this.config = config;
+    this.signalProcessor = createMinecraftSignalProcessor();
   }
 
   /**
@@ -41,6 +49,22 @@ export class ObservationMapper {
       timeConstraints: this.assessTimeConstraints(minecraftWorldState),
       situationalFactors: this.assessSituationalFactors(minecraftWorldState),
     };
+  }
+
+  /**
+   * Generate internal signals for the planning system
+   */
+  generateSignals(bot: Bot): MinecraftSignal[] {
+    const minecraftWorldState = this.extractMinecraftWorldState(bot);
+    return this.signalProcessor.processWorldState(minecraftWorldState, bot);
+  }
+
+  /**
+   * Get enhanced homeostasis state using signal processor
+   */
+  getEnhancedHomeostasisState(bot: Bot): MinecraftHomeostasisState {
+    const minecraftWorldState = this.extractMinecraftWorldState(bot);
+    return this.signalProcessor.getHomeostasisState(minecraftWorldState, bot);
   }
 
   /**

@@ -129,7 +129,8 @@ export interface IdentityImpact {
   type: ImpactType;
   magnitude: number; // 0-1
   description: string;
-  evidence: string;
+  evidence: string[];
+  timestamp: number;
 }
 
 export enum IdentityAspect {
@@ -158,218 +159,358 @@ export interface CoherenceChange {
 }
 
 // ============================================================================
+// Advanced Identity Analysis Types
+// ============================================================================
+
+/**
+ * Comprehensive identity analysis
+ */
+export interface IdentityAnalysis {
+  id: string;
+  timestamp: number;
+  personalityAnalysis: PersonalityAnalysis;
+  valueSystemAnalysis: ValueSystemAnalysis;
+  evolutionAnalysis: IdentityEvolution;
+  coherenceAnalysis: IdentityCoherence;
+  behaviorPatterns: BehaviorPattern[];
+  recommendations: string[];
+}
+
+/**
+ * Personality trait analysis
+ */
+export interface PersonalityAnalysis {
+  traitInteractions: TraitInteraction[];
+  dominantPatterns: string[];
+  potentialConflicts: string[];
+  stabilityInsights: string[];
+  overallCoherence: number;
+  recommendations: string[];
+}
+
+/**
+ * Value system analysis
+ */
+export interface ValueSystemAnalysis {
+  valueHierarchy: string[];
+  conflicts: ValueConflict[];
+  consistencyInsights: string[];
+  evolutionPatterns: string[];
+  overallCoherence: number;
+  recommendations: string[];
+}
+
+/**
+ * Identity evolution tracking
+ */
+export interface IdentityEvolution {
+  evolutionPatterns: string[];
+  triggers: EvolutionTrigger[];
+  stabilityInsights: string[];
+  predictions: string[];
+  evolutionRate: number;
+  authenticityScore: number;
+}
+
+/**
+ * Identity coherence assessment
+ */
+export interface IdentityCoherence {
+  strengths: string[];
+  incoherencies: string[];
+  alignments: string[];
+  improvements: string[];
+  overallCoherence: number;
+  confidence: number;
+}
+
+/**
+ * Behavior pattern for analysis
+ */
+export interface BehaviorPattern {
+  id: string;
+  description: string;
+  type: string;
+  frequency: number;
+  context: string;
+  timestamp: number;
+}
+
+/**
+ * Trait interaction analysis
+ */
+export interface TraitInteraction {
+  traits: string[];
+  type: 'synergy' | 'conflict' | 'neutral';
+  description: string;
+  strength: number;
+}
+
+/**
+ * Value conflict analysis
+ */
+export interface ValueConflict {
+  values: string[];
+  description: string;
+  severity: number;
+  resolution: string;
+}
+
+/**
+ * Evolution trigger
+ */
+export interface EvolutionTrigger {
+  type: string;
+  description: string;
+  impact: number;
+  timestamp: number;
+}
+
+// ============================================================================
+// Narrative Intelligence Types
+// ============================================================================
+
+/**
+ * Story synthesis from experiences
+ */
+export interface StorySynthesis {
+  id: string;
+  timestamp: number;
+  storyElements: StoryElement[];
+  themes: ThemeExtraction[];
+  plotDevelopment: PlotDevelopment;
+  characterArc: CharacterArc;
+  coherence: NarrativeCoherence;
+  insights: NarrativeInsight[];
+}
+
+/**
+ * Story element extraction
+ */
+export interface StoryElement {
+  id: string;
+  category: string;
+  description: string;
+  significance: number;
+  timestamp: number;
+}
+
+/**
+ * Theme extraction from experiences
+ */
+export interface ThemeExtraction {
+  id: string;
+  name: string;
+  description: string;
+  evidence: string[];
+  significance: number;
+  developmentPattern: string;
+  timestamp: number;
+}
+
+/**
+ * Plot development analysis
+ */
+export interface PlotDevelopment {
+  structure: string[];
+  climaxPoints: string[];
+  subplots: string[];
+  pacing: string[];
+  complexity: number;
+  coherence: number;
+}
+
+/**
+ * Character arc analysis
+ */
+export interface CharacterArc {
+  growthAreas: string[];
+  personalityChanges: string[];
+  skillDevelopment: string[];
+  relationshipDevelopment: string[];
+  valueEvolution: string[];
+  arcType: string;
+  completeness: number;
+}
+
+/**
+ * Narrative coherence assessment
+ */
+export interface NarrativeCoherence {
+  strengths: string[];
+  weaknesses: string[];
+  inconsistencies: string[];
+  improvements: string[];
+  overallCoherence: number;
+  metrics: CoherenceMetric[];
+}
+
+/**
+ * Narrative insight
+ */
+export interface NarrativeInsight {
+  id: string;
+  description: string;
+  type: string;
+  significance: number;
+  timestamp: number;
+}
+
+/**
+ * Coherence metric
+ */
+export interface CoherenceMetric {
+  name: string;
+  value: number;
+  threshold: number;
+  trend: string;
+}
+
+/**
+ * Experience analysis for narrative
+ */
+export interface ExperienceAnalysis {
+  id: string;
+  description: string;
+  outcome: string;
+  context?: any;
+  timestamp: number;
+}
+
+// ============================================================================
 // Contract System Types
 // ============================================================================
 
 /**
- * Long-term commitment and promise tracking
+ * Commitment tracking
  */
-export interface PersonalContract {
-  id: string;
-  type: ContractType;
-  title: string;
-  description: string;
-  terms: ContractTerm[];
-  creationDate: number;
-  expirationDate?: number;
-  status: ContractStatus;
-  importance: number; // 0-1
-  stakeholders: string[];
-  fulfillmentHistory: FulfillmentRecord[];
-  integrityScore: number; // 0-1
-  lastReviewed: number;
-}
-
-export enum ContractType {
-  PROMISE = 'promise',
-  COMMITMENT = 'commitment',
-  GOAL = 'goal',
-  PRINCIPLE = 'principle',
-  RELATIONSHIP = 'relationship',
-  SOCIAL = 'social',
-}
-
-export interface ContractTerm {
+export interface Commitment {
   id: string;
   description: string;
-  measurable: boolean;
-  criteria: string[];
-  deadline?: number;
-  status: TermStatus;
-  fulfillmentPercentage: number; // 0-1
-}
-
-export enum TermStatus {
-  PENDING = 'pending',
-  IN_PROGRESS = 'in_progress',
-  FULFILLED = 'fulfilled',
-  VIOLATED = 'violated',
-  RENEGOTIATED = 'renegotiated',
-  CANCELLED = 'cancelled',
-}
-
-export enum ContractStatus {
-  ACTIVE = 'active',
-  FULFILLED = 'fulfilled',
-  VIOLATED = 'violated',
-  SUSPENDED = 'suspended',
-  CANCELLED = 'cancelled',
-  RENEGOTIATED = 'renegotiated',
-}
-
-export interface FulfillmentRecord {
-  timestamp: number;
-  termId: string;
-  action: string;
-  result: FulfillmentResult;
+  category: string;
+  deadline: number;
+  priority: number;
+  createdAt: number;
+  lastUpdated?: number;
+  status: CommitmentStatus;
+  progress: number;
+  integrityScore: number;
   evidence: string[];
-  impact: number; // -1 to 1, negative for violations
 }
-
-export enum FulfillmentResult {
-  SUCCESS = 'success',
-  PARTIAL = 'partial',
-  FAILURE = 'failure',
-  EXCUSE = 'excuse',
-  RENEGOTIATION = 'renegotiation',
-}
-
-// ============================================================================
-// Self-Monitor Types
-// ============================================================================
 
 /**
- * Self-monitoring and behavior analysis
+ * Promise monitoring
  */
-export interface SelfMonitoringResult {
-  timestamp: number;
-  behaviorAnalysis: BehaviorAnalysis;
-  driftDetection: DriftDetection;
-  consistencyCheck: ConsistencyCheck;
-  recommendations: string[];
-  concernLevel: number; // 0-1
-}
-
-export interface BehaviorAnalysis {
-  period: {
-    start: number;
-    end: number;
-  };
-  patterns: BehaviorPattern[];
-  deviations: BehaviorDeviation[];
-  trends: BehaviorTrend[];
-  alignment: ValueAlignment;
-}
-
-export interface BehaviorPattern {
-  name: string;
+export interface Promise {
+  id: string;
   description: string;
-  frequency: number;
-  contexts: string[];
-  outcomes: string[];
-  consistency: number; // 0-1
-  valueAlignment: number; // 0-1
-}
-
-export interface BehaviorDeviation {
-  timestamp: number;
-  expectedBehavior: string;
-  actualBehavior: string;
-  context: string;
-  severity: number; // 0-1
-  explanation?: string;
-  resolved: boolean;
-}
-
-export interface BehaviorTrend {
-  aspect: string;
-  direction: TrendDirection;
-  strength: number; // 0-1
-  duration: number; // milliseconds
-  significance: number; // 0-1
-  implications: string[];
-}
-
-export enum TrendDirection {
-  IMPROVING = 'improving',
-  DECLINING = 'declining',
-  STABLE = 'stable',
-  OSCILLATING = 'oscillating',
-  EMERGING = 'emerging',
-}
-
-export interface ValueAlignment {
-  overall: number; // 0-1
-  byValue: Record<string, number>;
-  conflicts: ValueConflict[];
-  resolutions: string[];
-}
-
-export interface ValueConflict {
-  value1: string;
-  value2: string;
-  situation: string;
-  resolution: string;
-  satisfaction: number; // 0-1
-  learnings: string[];
-}
-
-export interface DriftDetection {
-  overallDrift: number; // 0-1
-  aspects: DriftAspect[];
-  triggers: string[];
-  timeframe: number;
-  significance: DriftSignificance;
-}
-
-export interface DriftAspect {
-  aspect: IdentityAspect;
-  previousState: any;
-  currentState: any;
-  drift: number; // 0-1
-  trend: TrendDirection;
-  concerning: boolean;
-  explanation: string;
-}
-
-export enum DriftSignificance {
-  MINIMAL = 'minimal',
-  MODERATE = 'moderate',
-  SIGNIFICANT = 'significant',
-  MAJOR = 'major',
-  CRITICAL = 'critical',
-}
-
-export interface ConsistencyCheck {
-  overall: number; // 0-1
-  dimensions: ConsistencyDimension[];
-  inconsistencies: Inconsistency[];
-  improvements: string[];
-}
-
-export interface ConsistencyDimension {
-  name: string;
-  score: number; // 0-1
-  examples: string[];
-  concerns: string[];
-}
-
-export interface Inconsistency {
-  type: InconsistencyType;
-  description: string;
-  severity: number; // 0-1
+  recipient: string;
+  deadline?: number;
+  createdAt: number;
+  fulfilledAt?: number;
+  brokenAt?: number;
+  status: PromiseStatus;
+  fulfillmentScore: number;
+  trustImpact: number;
+  breakReason?: string;
+  breakImpact?: string;
   evidence: string[];
-  suggestedResolution: string;
-  resolved: boolean;
 }
 
-export enum InconsistencyType {
-  VALUE_BEHAVIOR = 'value_behavior',
-  PROMISE_ACTION = 'promise_action',
-  BELIEF_STATEMENT = 'belief_statement',
-  PERSONALITY_BEHAVIOR = 'personality_behavior',
-  GOAL_ACTION = 'goal_action',
+/**
+ * Contract management
+ */
+export interface Contract {
+  id: string;
+  title: string;
+  description: string;
+  parties: string[];
+  terms: string[];
+  startDate: number;
+  endDate?: number;
+  createdAt: number;
+  status: string;
+  integrityScore: number;
+  trustScore: number;
 }
+
+/**
+ * Integrity assessment
+ */
+export interface IntegrityAssessment {
+  id: string;
+  timestamp: number;
+  commitmentIntegrity: number;
+  promiseIntegrity: number;
+  contractIntegrity: number;
+  trustScore: TrustScore;
+  metrics: IntegrityMetric[];
+  recommendations: string[];
+}
+
+/**
+ * Trust score calculation
+ */
+export interface TrustScore {
+  overall: number;
+  commitmentTrust: number;
+  promiseTrust: number;
+  contractTrust: number;
+  trend: 'improving' | 'stable' | 'declining';
+  confidence: number;
+}
+
+/**
+ * Integrity metric
+ */
+export interface IntegrityMetric {
+  name: string;
+  value: number;
+  threshold: number;
+  trend: string;
+}
+
+/**
+ * Accountability report
+ */
+export interface AccountabilityReport {
+  id: string;
+  timestamp: number;
+  activeCommitments: number;
+  pendingPromises: number;
+  overallIntegrity: number;
+  areasOfConcern: string[];
+  improvementAreas: string[];
+  recommendations: string[];
+}
+
+/**
+ * Commitment status enum
+ */
+export enum CommitmentStatus {
+  ACTIVE = 'active',
+  IN_PROGRESS = 'in_progress',
+  COMPLETED = 'completed',
+  ABANDONED = 'abandoned',
+}
+
+/**
+ * Promise status enum
+ */
+export enum PromiseStatus {
+  PENDING = 'pending',
+  FULFILLED = 'fulfilled',
+  BROKEN = 'broken',
+  MODIFIED = 'modified',
+}
+
+// ============================================================================
+// Legacy Type Aliases for Backward Compatibility
+// ============================================================================
+
+export type CommitmentTracker = Commitment[];
+export type PromiseMonitor = Promise[];
+export type ContractManager = Contract[];
 
 // ============================================================================
 // Zod Schemas
@@ -406,22 +547,6 @@ export const IdentityCoreSchema = z.object({
   fundamentalBelliefs: z.array(z.string()),
   capabilities: z.array(z.any()),
   currentVersion: z.any(),
-});
-
-export const PersonalContractSchema = z.object({
-  id: z.string(),
-  type: z.nativeEnum(ContractType),
-  title: z.string(),
-  description: z.string(),
-  terms: z.array(z.any()),
-  creationDate: z.number(),
-  expirationDate: z.number().optional(),
-  status: z.nativeEnum(ContractStatus),
-  importance: z.number().min(0).max(1),
-  stakeholders: z.array(z.string()),
-  fulfillmentHistory: z.array(z.any()),
-  integrityScore: z.number().min(0).max(1),
-  lastReviewed: z.number(),
 });
 
 export const NarrativeStorySchema = z.object({

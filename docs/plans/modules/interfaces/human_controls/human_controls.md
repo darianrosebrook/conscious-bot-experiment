@@ -1029,13 +1029,13 @@ class TestInterfaceUsability(unittest.TestCase):
 
 ### Development Schedule
 
-#### Sprint 1: Basic Interface (2 weeks)
+#### Sprint 1: Basic Interface 
 - [ ] Web dashboard framework
 - [ ] Basic agent status display
 - [ ] Emergency stop functionality
 - [ ] Simple control commands
 
-#### Sprint 2: Advanced Controls (2 weeks)
+#### Sprint 2: Advanced Controls 
 - [ ] Approval gate system
 - [ ] Module toggle functionality
 - [ ] State inspection tools

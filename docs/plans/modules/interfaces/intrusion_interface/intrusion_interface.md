@@ -722,19 +722,19 @@ class TestIntrusionPerformance(unittest.TestCase):
 
 ### Development Schedule
 
-#### Sprint 1: Core Infrastructure (2 weeks)
+#### Sprint 1: Core Infrastructure 
 - [ ] Basic intrusion parsing and classification
 - [ ] Constitutional rule engine foundation
 - [ ] Simple risk assessment implementation
 - [ ] Basic API endpoints
 
-#### Sprint 2: Advanced Filtering (2 weeks)
+#### Sprint 2: Advanced Filtering 
 - [ ] Negative priors system implementation
 - [ ] Cognitive queue management
 - [ ] Integration with Cognitive Core
 - [ ] Initial red team test cases
 
-#### Sprint 3: Monitoring and Testing (2 weeks)
+#### Sprint 3: Monitoring and Testing 
 - [ ] Comprehensive metrics collection
 - [ ] Performance monitoring dashboard
 - [ ] Complete red team test suite

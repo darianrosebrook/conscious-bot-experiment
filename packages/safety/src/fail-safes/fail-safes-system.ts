@@ -84,7 +84,7 @@ class ResourceMonitor {
 
   private collectResourceMetrics(): void {
     const usage = this.getCurrentUsage();
-    
+
     this.resourceHistory.push({
       timestamp: Date.now(),
       ...usage,
@@ -130,7 +130,7 @@ class RecoveryCoordinator extends EventEmitter {
   }> {
     const attemptKey = `${componentName}_${failureType}`;
     const attemptNumber = (this.recoveryAttempts.get(attemptKey) || 0) + 1;
-    
+
     this.recoveryAttempts.set(attemptKey, attemptNumber);
 
     if (attemptNumber > this.maxRecoveryAttempts) {
@@ -143,7 +143,11 @@ class RecoveryCoordinator extends EventEmitter {
     }
 
     const strategy = this.selectRecoveryStrategy(failureType, attemptNumber);
-    const result = await this.executeRecoveryStrategy(componentName, strategy, context);
+    const result = await this.executeRecoveryStrategy(
+      componentName,
+      strategy,
+      context
+    );
 
     this.emit('recovery-attempted', {
       componentName,
@@ -166,26 +170,29 @@ class RecoveryCoordinator extends EventEmitter {
     };
   }
 
-  private selectRecoveryStrategy(failureType: FailureType, attemptNumber: number): string {
+  private selectRecoveryStrategy(
+    failureType: FailureType,
+    attemptNumber: number
+  ): string {
     switch (failureType) {
       case FailureType.TIMEOUT:
         return attemptNumber === 1 ? 'retry_operation' : 'restart_component';
-      
+
       case FailureType.CRASH:
         return 'restart_component';
-      
+
       case FailureType.HANG:
         return 'force_restart_component';
-      
+
       case FailureType.RESOURCE_EXHAUSTION:
         return attemptNumber === 1 ? 'free_resources' : 'restart_component';
-      
+
       case FailureType.COMMUNICATION_FAILURE:
         return 'reconnect_component';
-      
+
       case FailureType.PERFORMANCE_DEGRADATION:
         return 'optimize_component';
-      
+
       default:
         return 'generic_restart';
     }
@@ -200,36 +207,45 @@ class RecoveryCoordinator extends EventEmitter {
       switch (strategy) {
         case 'retry_operation':
           // Simulate retry
-          await new Promise(resolve => setTimeout(resolve, 100));
+          await new Promise((resolve) => setTimeout(resolve, 100));
           return { success: true, message: 'Operation retried successfully' };
 
         case 'restart_component':
           // Simulate component restart
-          await new Promise(resolve => setTimeout(resolve, 500));
+          await new Promise((resolve) => setTimeout(resolve, 500));
           return { success: true, message: 'Component restarted successfully' };
 
         case 'force_restart_component':
           // Simulate forced restart
-          await new Promise(resolve => setTimeout(resolve, 1000));
-          return { success: true, message: 'Component force-restarted successfully' };
+          await new Promise((resolve) => setTimeout(resolve, 1000));
+          return {
+            success: true,
+            message: 'Component force-restarted successfully',
+          };
 
         case 'free_resources':
           // Simulate resource cleanup
-          await new Promise(resolve => setTimeout(resolve, 200));
+          await new Promise((resolve) => setTimeout(resolve, 200));
           return { success: true, message: 'Resources freed successfully' };
 
         case 'reconnect_component':
           // Simulate reconnection
-          await new Promise(resolve => setTimeout(resolve, 300));
-          return { success: true, message: 'Component reconnected successfully' };
+          await new Promise((resolve) => setTimeout(resolve, 300));
+          return {
+            success: true,
+            message: 'Component reconnected successfully',
+          };
 
         case 'optimize_component':
           // Simulate optimization
-          await new Promise(resolve => setTimeout(resolve, 400));
+          await new Promise((resolve) => setTimeout(resolve, 400));
           return { success: true, message: 'Component optimized successfully' };
 
         default:
-          return { success: false, message: `Unknown recovery strategy: ${strategy}` };
+          return {
+            success: false,
+            message: `Unknown recovery strategy: ${strategy}`,
+          };
       }
     } catch (error) {
       return {
@@ -242,7 +258,10 @@ class RecoveryCoordinator extends EventEmitter {
   /**
    * Reset recovery attempts for component
    */
-  resetRecoveryAttempts(componentName: string, failureType?: FailureType): void {
+  resetRecoveryAttempts(
+    componentName: string,
+    failureType?: FailureType
+  ): void {
     if (failureType) {
       const attemptKey = `${componentName}_${failureType}`;
       this.recoveryAttempts.delete(attemptKey);
@@ -277,14 +296,16 @@ export class FailSafesSystem extends EventEmitter {
 
   constructor(config: Partial<FailSafeConfig> = {}) {
     super();
-    
+
     this.config = this.createDefaultConfig(config);
     this.currentMode = OperationMode.FULL_CAPABILITY;
-    
+
     // Initialize components
     this.watchdogManager = new WatchdogManager();
     this.preemptionManager = new PreemptionManager(this.config.preemption);
-    this.emergencyCoordinator = new EmergencyResponseCoordinator(this.config.safeMode);
+    this.emergencyCoordinator = new EmergencyResponseCoordinator(
+      this.config.safeMode
+    );
     this.resourceMonitor = new ResourceMonitor();
     this.recoveryCoordinator = new RecoveryCoordinator();
 
@@ -301,12 +322,15 @@ export class FailSafesSystem extends EventEmitter {
 
     try {
       // Register watchdogs
-      for (const [componentName, watchdogConfig] of Object.entries(this.config.watchdogs)) {
+      for (const [componentName, watchdogConfig] of Object.entries(
+        this.config.watchdogs
+      )) {
         this.watchdogManager.registerComponent(watchdogConfig);
       }
 
       // Register notification channels
-      for (const channel of this.config.emergencyResponse.notificationChannels) {
+      for (const channel of this.config.emergencyResponse
+        .notificationChannels) {
         this.emergencyCoordinator.registerNotificationChannel(channel);
       }
 
@@ -322,7 +346,6 @@ export class FailSafesSystem extends EventEmitter {
         componentCount: Object.keys(this.config.watchdogs).length,
         mode: this.currentMode,
       });
-
     } catch (error) {
       this.emit('initialization-error', {
         error: error instanceof Error ? error.message : 'Unknown error',
@@ -339,22 +362,29 @@ export class FailSafesSystem extends EventEmitter {
     config: ComponentWatchdogConfig,
     healthChecker?: () => Promise<any>
   ): boolean {
-    const success = this.watchdogManager.registerComponent(config, healthChecker);
-    
+    const success = this.watchdogManager.registerComponent(
+      config,
+      healthChecker
+    );
+
     if (success && this.isInitialized) {
       // Start monitoring immediately if system is already running
       this.watchdogManager.start();
     }
-    
+
     return success;
   }
 
   /**
    * Submit task for execution
    */
-  submitTask(task: Task): { granted: boolean; grantId?: string; reason?: string } {
+  submitTask(task: Task): {
+    granted: boolean;
+    grantId?: string;
+    reason?: string;
+  } {
     const grant = this.preemptionManager.requestExecution(task);
-    
+
     return {
       granted: grant.granted,
       grantId: grant.granted ? grant.grantId : undefined,
@@ -397,12 +427,12 @@ export class FailSafesSystem extends EventEmitter {
    */
   resolveEmergency(emergencyId: string): boolean {
     const resolved = this.emergencyCoordinator.resolveEmergency(emergencyId);
-    
+
     if (resolved) {
       // Check if we can restore operation mode
       this.attemptModeRestoration();
     }
-    
+
     return resolved;
   }
 
@@ -413,13 +443,17 @@ export class FailSafesSystem extends EventEmitter {
     const systemHealth = this.watchdogManager.getSystemHealth();
     const preemptionStatus = this.preemptionManager.getSystemStatus();
     const emergencyStats = this.emergencyCoordinator.getEmergencyStatistics();
-    const safeModeStatus = this.emergencyCoordinator.getSafeModeManager().getStatus();
+    const safeModeStatus = this.emergencyCoordinator
+      .getSafeModeManager()
+      .getStatus();
 
     return {
       timestamp: Date.now(),
       overallHealth: systemHealth.overallStatus,
       currentMode: this.currentMode,
-      activeEmergencies: this.emergencyCoordinator.getActiveEmergencies().map(e => e.emergencyId),
+      activeEmergencies: this.emergencyCoordinator
+        .getActiveEmergencies()
+        .map((e) => e.emergencyId),
       componentStatuses: systemHealth.componentStatuses,
       resourceUsage: {
         timestamp: Date.now(),
@@ -477,14 +511,16 @@ export class FailSafesSystem extends EventEmitter {
    */
   updateConfiguration(newConfig: Partial<FailSafeConfig>): void {
     this.config = validateFailSafeConfig({ ...this.config, ...newConfig });
-    
+
     // Apply configuration changes
     if (newConfig.preemption) {
       this.preemptionManager.setEnabled(this.config.preemption.enabled);
     }
 
     if (newConfig.safeMode) {
-      this.emergencyCoordinator.getSafeModeManager().updateConfig(this.config.safeMode);
+      this.emergencyCoordinator
+        .getSafeModeManager()
+        .updateConfig(this.config.safeMode);
     }
 
     this.emit('configuration-updated', {
@@ -497,7 +533,9 @@ export class FailSafesSystem extends EventEmitter {
    * Manually trigger safe mode
    */
   enterSafeMode(reason: string, severity?: any): void {
-    this.emergencyCoordinator.getSafeModeManager().enterSafeMode(reason, severity);
+    this.emergencyCoordinator
+      .getSafeModeManager()
+      .enterSafeMode(reason, severity);
     this.currentMode = OperationMode.SAFE_MODE;
   }
 
@@ -505,12 +543,14 @@ export class FailSafesSystem extends EventEmitter {
    * Exit safe mode
    */
   exitSafeMode(): boolean {
-    const exited = this.emergencyCoordinator.getSafeModeManager().exitSafeMode();
-    
+    const exited = this.emergencyCoordinator
+      .getSafeModeManager()
+      .exitSafeMode();
+
     if (exited) {
       this.attemptModeRestoration();
     }
-    
+
     return exited;
   }
 
@@ -540,7 +580,9 @@ export class FailSafesSystem extends EventEmitter {
     });
   }
 
-  private createDefaultConfig(partialConfig: Partial<FailSafeConfig>): FailSafeConfig {
+  private createDefaultConfig(
+    partialConfig: Partial<FailSafeConfig>
+  ): FailSafeConfig {
     const defaultConfig: FailSafeConfig = {
       watchdogs: {},
       preemption: {
@@ -566,6 +608,8 @@ export class FailSafesSystem extends EventEmitter {
             channelId: 'console',
             type: 'console',
             enabled: true,
+            retryAttempts: 3,
+            timeoutMs: 5000,
           },
         ],
         escalationDelays: {
@@ -668,7 +712,9 @@ export class FailSafesSystem extends EventEmitter {
       // Recovery failed, escalate to emergency
       await this.declareEmergency(
         EmergencyType.SYSTEM_FAILURE,
-        failure.severity === 'critical' ? EmergencySeverity.CRITICAL : EmergencySeverity.HIGH,
+        failure.severity === 'critical'
+          ? EmergencySeverity.CRITICAL
+          : EmergencySeverity.HIGH,
         `Component ${failure.componentName} failed and recovery was unsuccessful`,
         { failure, recoveryResult }
       );
@@ -712,9 +758,12 @@ export class FailSafesSystem extends EventEmitter {
     const activeEmergencies = this.emergencyCoordinator.getActiveEmergencies();
     const systemHealth = this.watchdogManager.getSystemHealth();
 
-    if (activeEmergencies.length === 0 && systemHealth.overallStatus === HealthStatus.HEALTHY) {
+    if (
+      activeEmergencies.length === 0 &&
+      systemHealth.overallStatus === HealthStatus.HEALTHY
+    ) {
       this.currentMode = OperationMode.FULL_CAPABILITY;
-      
+
       this.emit('operation-mode-restored', {
         mode: this.currentMode,
         timestamp: Date.now(),

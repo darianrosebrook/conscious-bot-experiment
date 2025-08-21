@@ -536,6 +536,7 @@ export class PrivacySystem extends EventEmitter {
         actionType: 'consent_request',
         limit: 5,
         windowMs: 60 * 60 * 1000, // 1 hour
+        adaptive: false,
         cooldownMs: 10 * 60 * 1000, // 10 minutes
       },
     ];

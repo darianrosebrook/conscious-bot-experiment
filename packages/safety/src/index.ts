@@ -16,5 +16,12 @@ export * from './privacy';
 // Fail-safes and recovery system
 export * from './fail-safes';
 
+// Re-export with explicit naming to avoid conflicts
+export {
+  HealthCheckResult as SafetyHealthCheckResult,
+  HealthCheckResultSchema as SafetyHealthCheckResultSchema,
+  HealthStatus as SafetyHealthStatus,
+} from './monitoring';
+
 // Version info
 export const SAFETY_VERSION = '0.1.0';
