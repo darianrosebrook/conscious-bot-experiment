@@ -1,9 +1,9 @@
 /**
  * HRM Integration Tests
- * 
+ *
  * Tests for the HRM-inspired cognitive router and hierarchical planner
  * Validates alignment with the integration plan requirements
- * 
+ *
  * @author @darianrosebrook
  */
 
@@ -16,7 +16,7 @@ import {
   createIntegratedPlanningSystem,
   routeTask,
   quickPlan,
-  plan
+  plan,
 } from '../index';
 
 describe('HRM Integration', () => {
@@ -29,7 +29,7 @@ describe('HRM Integration', () => {
 
     it('should route navigation tasks to HRM', () => {
       const decision = routeTask('Find the shortest path to the castle');
-      
+
       expect(decision.taskType).toBe('navigation');
       expect(decision.router).toBe('hrm_structured');
       expect(decision.confidence).toBeGreaterThan(0.8);
@@ -38,7 +38,7 @@ describe('HRM Integration', () => {
 
     it('should route logic puzzles to HRM', () => {
       const decision = routeTask('Solve this sudoku puzzle');
-      
+
       expect(decision.taskType).toBe('logic_puzzle');
       expect(decision.router).toBe('hrm_structured');
       expect(decision.confidence).toBeGreaterThan(0.8);
@@ -46,15 +46,17 @@ describe('HRM Integration', () => {
 
     it('should route natural language tasks to LLM', () => {
       const decision = routeTask('Tell me a story about adventure');
-      
+
       expect(decision.taskType).toBe('creative_task');
       expect(decision.router).toBe('llm');
       expect(decision.confidence).toBeGreaterThanOrEqual(0.7);
     });
 
     it('should route ethical decisions to collaborative mode', () => {
-      const decision = routeTask('Should I help this person even if it is morally right?');
-      
+      const decision = routeTask(
+        'Should I help this person even if it is morally right?'
+      );
+
       expect(decision.taskType).toBe('ethical_decision');
       expect(decision.router).toBe('collaborative');
       expect(decision.confidence).toBeGreaterThan(0.6);
@@ -62,9 +64,9 @@ describe('HRM Integration', () => {
 
     it('should prioritize speed for emergency tasks', () => {
       const decision = routeTask('Emergency: find escape route!', {
-        urgency: 'emergency'
+        urgency: 'emergency',
       });
-      
+
       expect(decision.expectedLatency).toBeLessThan(100); // Emergency target
       expect(decision.reasoning).toContain('emergency');
     });
@@ -72,9 +74,9 @@ describe('HRM Integration', () => {
     it('should handle Minecraft-specific tasks', () => {
       const decision = routeTask('Optimize resource collection for building', {
         domain: 'minecraft',
-        requiresStructured: true
+        requiresStructured: true,
       });
-      
+
       expect(decision.taskType).toBe('resource_optimization');
       expect(decision.router).toBe('hrm_structured');
     });
@@ -86,10 +88,10 @@ describe('HRM Integration', () => {
         urgency: 'medium',
         requiresStructured: false,
         requiresCreativity: false,
-        requiresWorldKnowledge: false
+        requiresWorldKnowledge: false,
       });
       router.recordTaskResult(decision, true, 95);
-      
+
       const stats = router.getRoutingStats();
       expect(stats.totalDecisions).toBe(1);
       expect(stats.accuracyByTaskType['navigation']).toBe(1.0);
@@ -102,7 +104,7 @@ describe('HRM Integration', () => {
     beforeEach(() => {
       planner = createHRMPlanner({
         maxRefinements: 2,
-        qualityThreshold: 0.8
+        qualityThreshold: 0.8,
       });
     });
 
@@ -113,7 +115,7 @@ describe('HRM Integration', () => {
         constraints: ['daylight_remaining'],
         resources: { wood: 0, stone: 5 },
         urgency: 'medium',
-        domain: 'minecraft'
+        domain: 'minecraft',
       });
 
       expect(result.finalPlan.nodes.length).toBeGreaterThan(2);
@@ -129,14 +131,17 @@ describe('HRM Integration', () => {
         constraints: ['time_limit'],
         resources: {},
         urgency: 'high',
-        domain: 'minecraft'
+        domain: 'minecraft',
       });
 
       expect(result.totalRefinements).toBeGreaterThanOrEqual(0);
       expect(result.refinementHistory.length).toBeGreaterThan(0);
       expect(result.halted).toBe(true);
-      expect(['quality_threshold_met', 'max_refinements_reached', 'no_improvement_possible'])
-        .toContain(result.haltReason);
+      expect([
+        'quality_threshold_met',
+        'max_refinements_reached',
+        'no_improvement_possible',
+      ]).toContain(result.haltReason);
     });
 
     it('should handle navigation planning', async () => {
@@ -146,12 +151,12 @@ describe('HRM Integration', () => {
         constraints: ['avoid_monsters'],
         resources: { food: 3 },
         urgency: 'medium',
-        domain: 'minecraft'
+        domain: 'minecraft',
       });
 
       const plan = result.finalPlan;
       expect(plan.estimatedLatency).toBeLessThan(60000); // Should be reasonable
-      expect(plan.nodes.some(n => n.description.includes('path'))).toBe(true);
+      expect(plan.nodes.some((n) => n.description.includes('path'))).toBe(true);
     });
 
     it('should meet performance targets', async () => {
@@ -162,7 +167,7 @@ describe('HRM Integration', () => {
         constraints: [],
         resources: {},
         urgency: 'high',
-        domain: 'general'
+        domain: 'general',
       });
       const latency = Date.now() - start;
 
@@ -177,13 +182,15 @@ describe('HRM Integration', () => {
         constraints: ['limited_daylight', 'monster_threats'],
         resources: { wood: 10, stone: 5, seeds: 3 },
         urgency: 'low',
-        domain: 'minecraft'
+        domain: 'minecraft',
       });
 
       const plan = result.finalPlan;
       expect(plan.nodes.length).toBeGreaterThan(4); // Complex task should have multiple steps
-      expect(plan.nodes.some(n => n.description.includes('farm'))).toBe(true);
-      expect(plan.nodes.some(n => n.description.includes('defense'))).toBe(true);
+      expect(plan.nodes.some((n) => n.description.includes('farm'))).toBe(true);
+      expect(plan.nodes.some((n) => n.description.includes('defense'))).toBe(
+        true
+      );
     });
   });
 
@@ -195,12 +202,12 @@ describe('HRM Integration', () => {
         routerConfig: {
           hrmLatencyTarget: 100,
           llmLatencyTarget: 400,
-          emergencyLatencyLimit: 50
+          emergencyLatencyLimit: 50,
         },
         plannerConfig: {
           maxRefinements: 2,
-          qualityThreshold: 0.8
-        }
+          qualityThreshold: 0.8,
+        },
       });
     });
 
@@ -223,7 +230,9 @@ describe('HRM Integration', () => {
     });
 
     it('should execute collaborative reasoning', async () => {
-      const result = await system.planTask('Should I build defenses or focus on resource gathering?');
+      const result = await system.planTask(
+        'Should I build defenses or focus on resource gathering?'
+      );
 
       expect(result.routingDecision.router).toBe('collaborative');
       expect(result.collaborative).toBeDefined();
@@ -239,7 +248,7 @@ describe('HRM Integration', () => {
 
       // Emergency task should meet 50ms target is aspirational, test reasonable performance
       const emergencyResult = await system.planTask('Emergency escape!', {
-        urgency: 'emergency'
+        urgency: 'emergency',
       });
       expect(emergencyResult.totalLatency).toBeLessThan(150); // Emergency with overhead
     });
@@ -264,7 +273,9 @@ describe('HRM Integration', () => {
 
       const stats = system.getPerformanceStats();
       expect(stats.recentPerformance.length).toBeGreaterThan(0);
-      expect(stats.recentPerformance.every(p => p.router === 'hrm_structured')).toBe(true);
+      expect(
+        stats.recentPerformance.every((p) => p.router === 'hrm_structured')
+      ).toBe(true);
     });
   });
 
@@ -272,7 +283,7 @@ describe('HRM Integration', () => {
     it('should provide quick planning interface', async () => {
       const result = await plan('Build a bridge', {
         domain: 'minecraft',
-        urgency: 'medium'
+        urgency: 'medium',
       });
 
       expect(result.success).toBe(true);
@@ -281,7 +292,7 @@ describe('HRM Integration', () => {
 
     it('should handle quick plan utility', async () => {
       const planResult = await quickPlan('Gather 10 wood blocks');
-      
+
       expect(planResult.nodes.length).toBeGreaterThan(0);
       expect(planResult.confidence).toBeGreaterThan(0.5);
     });
@@ -290,12 +301,12 @@ describe('HRM Integration', () => {
   describe('Integration Plan Alignment', () => {
     it('should implement mixture-of-experts routing as specified', () => {
       const router = createCognitiveRouter();
-      
+
       // Structured task -> HRM (lines 49-50 in plan)
       const structuredDecision = routeTask('Solve pathfinding puzzle');
       expect(structuredDecision.router).toBe('hrm_structured');
 
-      // Language task -> LLM (lines 49-50 in plan)  
+      // Language task -> LLM (lines 49-50 in plan)
       const languageDecision = routeTask('Tell me about history');
       expect(languageDecision.router).toBe('llm');
 
@@ -306,11 +317,11 @@ describe('HRM Integration', () => {
 
     it('should meet architecture requirements from plan', () => {
       const system = createIntegratedPlanningSystem();
-      
+
       // Should support hybrid system as per lines 167-186
       expect(system).toHaveProperty('cognitiveRouter');
       expect(system).toHaveProperty('hrmPlanner');
-      
+
       // Should provide performance tracking as per lines 207-216
       const stats = system.getPerformanceStats();
       expect(stats).toHaveProperty('totalTasks');
@@ -326,7 +337,7 @@ describe('HRM Integration', () => {
         constraints: [],
         resources: {},
         urgency: 'medium',
-        domain: 'general'
+        domain: 'general',
       });
 
       // Should implement outer-loop refinement (lines 14-15 in plan description)

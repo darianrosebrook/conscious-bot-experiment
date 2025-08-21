@@ -1,12 +1,12 @@
 /**
  * Planning and goal management system for conscious bot
- * 
+ *
  * This package provides:
  * - Goal formulation and homeostasis monitoring
  * - Hierarchical task planning (HTN)
  * - Goal-oriented action planning (GOAP)
  * - Reactive execution and plan repair
- * 
+ *
  * @author @darianrosebrook
  */
 
@@ -16,10 +16,19 @@ export * from './goal-formulation/need-generator';
 export * from './goal-formulation/goal-manager';
 export * from './goal-formulation/utility-calculator';
 
-// Hierarchical Planning
+// Hierarchical Planning (Legacy)
 export * from './hierarchical-planner/hierarchical-planner';
 export * from './hierarchical-planner/task-network';
 export * from './hierarchical-planner/plan-decomposer';
+
+// HRM-Inspired Planning (M3)
+export * from './hierarchical-planner/cognitive-router';
+export * from './hierarchical-planner/hrm-inspired-planner';
+export {
+  IntegratedPlanningSystem,
+  createIntegratedPlanningSystem,
+  plan as quickPlan,
+} from './hierarchical-planner';
 
 // Reactive Execution
 export * from './reactive-executor/reactive-executor';

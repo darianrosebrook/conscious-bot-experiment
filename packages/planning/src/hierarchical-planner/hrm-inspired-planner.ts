@@ -1,15 +1,15 @@
 /**
  * HRM-Inspired Hierarchical Planner
- * 
+ *
  * TypeScript implementation of HRM's dual-module hierarchical planning architecture
  * Based on integration plan lines 64-67: "Hierarchical RNN Controller"
- * 
+ *
  * Implements:
  * - High-level module: Slow, abstract planning (System 2)
- * - Low-level module: Fast, detailed execution (System 1) 
+ * - Low-level module: Fast, detailed execution (System 1)
  * - Iterative refinement loop with halt/continue mechanism
  * - Multi-timescale processing
- * 
+ *
  * @author @darianrosebrook
  */
 
@@ -25,7 +25,7 @@ export const PlanNodeSchema = z.object({
   estimatedDuration: z.number(), // milliseconds
   dependencies: z.array(z.string()), // node IDs
   constraints: z.array(z.string()),
-  metadata: z.record(z.any()).optional()
+  metadata: z.record(z.any()).optional(),
 });
 
 export type PlanNode = z.infer<typeof PlanNodeSchema>;
@@ -39,7 +39,7 @@ export const PlanSchema = z.object({
   estimatedLatency: z.number(),
   refinementCount: z.number(),
   createdAt: z.number(),
-  lastRefinedAt: z.number()
+  lastRefinedAt: z.number(),
 });
 
 export type Plan = z.infer<typeof PlanSchema>;
@@ -51,14 +51,14 @@ export const PlanningContextSchema = z.object({
   resources: z.record(z.number()),
   timeLimit: z.number().optional(),
   urgency: z.enum(['low', 'medium', 'high', 'emergency']),
-  domain: z.enum(['minecraft', 'general', 'spatial', 'logical'])
+  domain: z.enum(['minecraft', 'general', 'spatial', 'logical']),
 });
 
 export type PlanningContext = z.infer<typeof PlanningContextSchema>;
 
 /**
  * High-Level Planning Module (System 2)
- * 
+ *
  * Handles slow, abstract reasoning and strategic planning
  * Operates on longer timescales with coarse-grained steps
  */
@@ -72,10 +72,10 @@ class HighLevelPlanningModule {
    */
   generateAbstractPlan(context: PlanningContext): Plan {
     const planId = `plan-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
-    
+
     // Decompose goal into high-level subgoals
     const subgoals = this.decomposeGoal(context.goal, context);
-    
+
     // Create abstract plan structure
     const nodes: PlanNode[] = [
       // Main goal node
@@ -87,7 +87,7 @@ class HighLevelPlanningModule {
         priority: 1.0,
         estimatedDuration: this.estimateGoalDuration(context),
         dependencies: [],
-        constraints: context.constraints
+        constraints: context.constraints,
       },
       // Subgoal nodes
       ...subgoals.map((subgoal, index) => ({
@@ -98,8 +98,8 @@ class HighLevelPlanningModule {
         priority: subgoal.priority,
         estimatedDuration: subgoal.estimatedDuration,
         dependencies: subgoal.dependencies,
-        constraints: subgoal.constraints
-      }))
+        constraints: subgoal.constraints,
+      })),
     ];
 
     const executionOrder = this.calculateExecutionOrder(nodes);
@@ -114,7 +114,7 @@ class HighLevelPlanningModule {
       estimatedLatency: this.calculateTotalLatency(nodes),
       refinementCount: 0,
       createdAt: Date.now(),
-      lastRefinedAt: Date.now()
+      lastRefinedAt: Date.now(),
     };
 
     this.planningHistory.push(plan);
@@ -135,7 +135,10 @@ class HighLevelPlanningModule {
     for (const action of refinementActions) {
       switch (action.type) {
         case 'reorder':
-          refinedPlan.executionOrder = this.reorderExecution(refinedPlan.nodes, action.criteria);
+          refinedPlan.executionOrder = this.reorderExecution(
+            refinedPlan.nodes,
+            action.criteria
+          );
           break;
         case 'add_constraint':
           this.addConstraintToNodes(refinedPlan.nodes, action.constraint);
@@ -150,13 +153,21 @@ class HighLevelPlanningModule {
     }
 
     // Recalculate plan metrics
-    refinedPlan.confidence = this.calculatePlanConfidence(refinedPlan.nodes, context);
-    refinedPlan.estimatedLatency = this.calculateTotalLatency(refinedPlan.nodes);
+    refinedPlan.confidence = this.calculatePlanConfidence(
+      refinedPlan.nodes,
+      context
+    );
+    refinedPlan.estimatedLatency = this.calculateTotalLatency(
+      refinedPlan.nodes
+    );
 
     return refinedPlan;
   }
 
-  private decomposeGoal(goal: string, context: PlanningContext): Array<{
+  private decomposeGoal(
+    goal: string,
+    context: PlanningContext
+  ): Array<{
     description: string;
     priority: number;
     estimatedDuration: number;
@@ -174,7 +185,7 @@ class HighLevelPlanningModule {
 
   private decomposeMinecraftGoal(goal: string, context: PlanningContext) {
     const goalLower = goal.toLowerCase();
-    
+
     if (goalLower.includes('build')) {
       return this.decomposeMinecraftBuildGoal(goal);
     } else if (goalLower.includes('find') || goalLower.includes('collect')) {
@@ -193,22 +204,22 @@ class HighLevelPlanningModule {
         priority: 0.9,
         estimatedDuration: 30000, // 30 seconds
         dependencies: [],
-        constraints: ['inventory_space', 'tool_availability']
+        constraints: ['inventory_space', 'tool_availability'],
       },
       {
         description: 'Find suitable building location',
         priority: 0.8,
         estimatedDuration: 15000,
         dependencies: [],
-        constraints: ['terrain_suitable', 'safety_check']
+        constraints: ['terrain_suitable', 'safety_check'],
       },
       {
         description: 'Execute construction plan',
         priority: 1.0,
         estimatedDuration: 60000, // 1 minute
         dependencies: ['gather_materials', 'find_location'],
-        constraints: ['material_sufficiency', 'structural_integrity']
-      }
+        constraints: ['material_sufficiency', 'structural_integrity'],
+      },
     ];
   }
 
@@ -219,22 +230,22 @@ class HighLevelPlanningModule {
         priority: 0.9,
         estimatedDuration: 20000,
         dependencies: [],
-        constraints: ['exploration_safety', 'visibility']
+        constraints: ['exploration_safety', 'visibility'],
       },
       {
         description: 'Plan collection route',
         priority: 0.7,
         estimatedDuration: 10000,
         dependencies: ['locate_resources'],
-        constraints: ['path_safety', 'efficiency']
+        constraints: ['path_safety', 'efficiency'],
       },
       {
         description: 'Execute collection plan',
         priority: 1.0,
         estimatedDuration: 40000,
         dependencies: ['plan_route'],
-        constraints: ['inventory_capacity', 'tool_durability']
-      }
+        constraints: ['inventory_capacity', 'tool_durability'],
+      },
     ];
   }
 
@@ -245,15 +256,15 @@ class HighLevelPlanningModule {
         priority: 0.8,
         estimatedDuration: 5000,
         dependencies: [],
-        constraints: ['obstacle_avoidance', 'distance_optimization']
+        constraints: ['obstacle_avoidance', 'distance_optimization'],
       },
       {
         description: 'Execute navigation plan',
         priority: 1.0,
         estimatedDuration: 25000,
         dependencies: ['calculate_path'],
-        constraints: ['path_safety', 'stamina_management']
-      }
+        constraints: ['path_safety', 'stamina_management'],
+      },
     ];
   }
 
@@ -265,22 +276,22 @@ class HighLevelPlanningModule {
         priority: 0.8,
         estimatedDuration: 10000,
         dependencies: [],
-        constraints: ['information_availability']
+        constraints: ['information_availability'],
       },
       {
         description: `Plan approach for: ${goal}`,
         priority: 0.9,
         estimatedDuration: 15000,
         dependencies: ['analyze_requirements'],
-        constraints: ['resource_constraints', 'time_constraints']
+        constraints: ['resource_constraints', 'time_constraints'],
       },
       {
         description: `Execute plan for: ${goal}`,
         priority: 1.0,
         estimatedDuration: 30000,
         dependencies: ['plan_approach'],
-        constraints: context.constraints
-      }
+        constraints: context.constraints,
+      },
     ];
   }
 
@@ -288,19 +299,19 @@ class HighLevelPlanningModule {
     // Topological sort considering dependencies and priorities
     const visited = new Set<string>();
     const order: string[] = [];
-    
+
     const visit = (nodeId: string) => {
       if (visited.has(nodeId)) return;
       visited.add(nodeId);
-      
-      const node = nodes.find(n => n.id === nodeId);
+
+      const node = nodes.find((n) => n.id === nodeId);
       if (!node) return;
-      
+
       // Visit dependencies first
       for (const depId of node.dependencies) {
         visit(depId);
       }
-      
+
       order.push(nodeId);
     };
 
@@ -313,25 +324,28 @@ class HighLevelPlanningModule {
     return order;
   }
 
-  private calculatePlanConfidence(nodes: PlanNode[], context: PlanningContext): number {
+  private calculatePlanConfidence(
+    nodes: PlanNode[],
+    context: PlanningContext
+  ): number {
     let confidence = 0.7; // Base confidence
-    
+
     // Confidence factors
     const nodeCount = nodes.length;
     if (nodeCount <= 3) confidence += 0.1; // Simple plans are more reliable
     if (nodeCount > 6) confidence -= 0.1; // Complex plans are less reliable
-    
+
     // Domain familiarity
     if (context.domain === 'minecraft') confidence += 0.1;
-    
+
     // Resource availability
     const hasResources = Object.keys(context.resources).length > 0;
     if (hasResources) confidence += 0.1;
-    
+
     // Time pressure
     if (context.urgency === 'emergency') confidence -= 0.2;
     if (context.urgency === 'low') confidence += 0.1;
-    
+
     return Math.max(0.1, Math.min(1.0, confidence));
   }
 
@@ -342,36 +356,44 @@ class HighLevelPlanningModule {
   private estimateGoalDuration(context: PlanningContext): number {
     // Base estimation logic
     const urgencyMultipliers = {
-      'emergency': 0.5,
-      'high': 0.7,
-      'medium': 1.0,
-      'low': 1.5
+      emergency: 0.5,
+      high: 0.7,
+      medium: 1.0,
+      low: 1.5,
     };
-    
+
     const baseDuration = 60000; // 1 minute base
     return baseDuration * urgencyMultipliers[context.urgency];
   }
 
-  private analyzeFeedback(feedback: string): Array<{type: string; criteria?: any; constraint?: string; adjustments?: any; nodeIds?: string[]}> {
+  private analyzeFeedback(
+    feedback: string
+  ): Array<{
+    type: string;
+    criteria?: any;
+    constraint?: string;
+    adjustments?: any;
+    nodeIds?: string[];
+  }> {
     // Simple feedback analysis - in practice, this would be more sophisticated
     const actions = [];
-    
+
     if (feedback.includes('reorder') || feedback.includes('sequence')) {
       actions.push({ type: 'reorder', criteria: 'efficiency' });
     }
-    
+
     if (feedback.includes('constraint') || feedback.includes('limitation')) {
       actions.push({ type: 'add_constraint', constraint: 'safety_first' });
     }
-    
+
     if (feedback.includes('priority') || feedback.includes('important')) {
       actions.push({ type: 'adjust_priority', adjustments: { increase: 0.1 } });
     }
-    
+
     if (feedback.includes('complex') || feedback.includes('break down')) {
       actions.push({ type: 'decompose_further', nodeIds: [] });
     }
-    
+
     return actions;
   }
 
@@ -380,14 +402,14 @@ class HighLevelPlanningModule {
     if (criteria === 'efficiency') {
       return nodes
         .sort((a, b) => a.estimatedDuration - b.estimatedDuration)
-        .map(n => n.id);
+        .map((n) => n.id);
     }
-    
-    return nodes.map(n => n.id);
+
+    return nodes.map((n) => n.id);
   }
 
   private addConstraintToNodes(nodes: PlanNode[], constraint: string): void {
-    nodes.forEach(node => {
+    nodes.forEach((node) => {
       if (!node.constraints.includes(constraint)) {
         node.constraints.push(constraint);
       }
@@ -395,7 +417,7 @@ class HighLevelPlanningModule {
   }
 
   private adjustNodePriorities(nodes: PlanNode[], adjustments: any): void {
-    nodes.forEach(node => {
+    nodes.forEach((node) => {
       if (adjustments.increase) {
         node.priority = Math.min(1.0, node.priority + adjustments.increase);
       }
@@ -410,17 +432,25 @@ class HighLevelPlanningModule {
 
 /**
  * Low-Level Execution Module (System 1)
- * 
+ *
  * Handles fast, detailed operations and immediate responses
  * Operates on shorter timescales with fine-grained actions
  */
 class LowLevelExecutionModule {
-  private executionHistory: Array<{nodeId: string; action: string; result: any; latency: number}> = [];
+  private executionHistory: Array<{
+    nodeId: string;
+    action: string;
+    result: any;
+    latency: number;
+  }> = [];
 
   /**
    * Generate detailed action sequence for a plan node
    */
-  generateDetailedActions(node: PlanNode, context: PlanningContext): Array<{
+  generateDetailedActions(
+    node: PlanNode,
+    context: PlanningContext
+  ): Array<{
     action: string;
     parameters: Record<string, any>;
     estimatedLatency: number;
@@ -441,11 +471,14 @@ class LowLevelExecutionModule {
   /**
    * Execute a specific action with real-time adaptation
    */
-  executeAction(action: {
-    action: string;
-    parameters: Record<string, any>;
-    estimatedLatency: number;
-  }, context: PlanningContext): {
+  executeAction(
+    action: {
+      action: string;
+      parameters: Record<string, any>;
+      estimatedLatency: number;
+    },
+    context: PlanningContext
+  ): {
     success: boolean;
     result: any;
     actualLatency: number;
@@ -476,7 +509,9 @@ class LowLevelExecutionModule {
       }
     } catch (error) {
       success = false;
-      result = { error: error instanceof Error ? error.message : String(error) };
+      result = {
+        error: error instanceof Error ? error.message : String(error),
+      };
       adaptations.push('error_recovery');
     }
 
@@ -487,14 +522,14 @@ class LowLevelExecutionModule {
       nodeId: action.parameters.nodeId || 'unknown',
       action: action.action,
       result,
-      latency: actualLatency
+      latency: actualLatency,
     });
 
     return {
       success,
       result,
       actualLatency,
-      adaptations
+      adaptations,
     };
   }
 
@@ -504,38 +539,53 @@ class LowLevelExecutionModule {
         action: 'analyze',
         parameters: { goal: node.description, context: context.currentState },
         estimatedLatency: 2000,
-        preconditions: ['cognitive_resources_available']
-      }
+        preconditions: ['cognitive_resources_available'],
+      },
     ];
   }
 
   private generateSubgoalActions(node: PlanNode, context: PlanningContext) {
     const actions = [];
-    
-    if (node.description.includes('gather') || node.description.includes('collect')) {
+
+    if (
+      node.description.includes('gather') ||
+      node.description.includes('collect')
+    ) {
       actions.push({
         action: 'collect',
         parameters: { target: node.description, inventory: context.resources },
         estimatedLatency: 5000,
-        preconditions: ['inventory_space_available', 'tools_available']
+        preconditions: ['inventory_space_available', 'tools_available'],
       });
     }
-    
-    if (node.description.includes('navigate') || node.description.includes('location')) {
+
+    if (
+      node.description.includes('navigate') ||
+      node.description.includes('location')
+    ) {
       actions.push({
         action: 'navigate',
-        parameters: { destination: node.description, currentPosition: context.currentState.position },
+        parameters: {
+          destination: node.description,
+          currentPosition: context.currentState.position,
+        },
         estimatedLatency: 3000,
-        preconditions: ['path_clear', 'movement_possible']
+        preconditions: ['path_clear', 'movement_possible'],
       });
     }
-    
-    if (node.description.includes('build') || node.description.includes('construct')) {
+
+    if (
+      node.description.includes('build') ||
+      node.description.includes('construct')
+    ) {
       actions.push({
         action: 'build',
-        parameters: { structure: node.description, materials: context.resources },
+        parameters: {
+          structure: node.description,
+          materials: context.resources,
+        },
         estimatedLatency: 8000,
-        preconditions: ['materials_sufficient', 'location_suitable']
+        preconditions: ['materials_sufficient', 'location_suitable'],
       });
     }
 
@@ -544,7 +594,7 @@ class LowLevelExecutionModule {
         action: 'analyze',
         parameters: { subgoal: node.description },
         estimatedLatency: 1000,
-        preconditions: []
+        preconditions: [],
       });
     }
 
@@ -557,28 +607,34 @@ class LowLevelExecutionModule {
         action: node.description.toLowerCase().replace(/\s+/g, '_'),
         parameters: { details: node.description },
         estimatedLatency: 1000,
-        preconditions: []
-      }
+        preconditions: [],
+      },
     ];
   }
 
-  private executeNavigation(params: Record<string, any>, context: PlanningContext) {
+  private executeNavigation(
+    params: Record<string, any>,
+    context: PlanningContext
+  ) {
     // Simulate navigation execution
     return {
       action: 'navigation_complete',
       destination: params.destination,
       pathTaken: 'optimized_route',
-      success: true
+      success: true,
     };
   }
 
-  private executeCollection(params: Record<string, any>, context: PlanningContext) {
+  private executeCollection(
+    params: Record<string, any>,
+    context: PlanningContext
+  ) {
     // Simulate collection execution
     return {
       action: 'collection_complete',
       itemsCollected: [params.target],
       quantity: Math.floor(Math.random() * 10) + 1,
-      success: true
+      success: true,
     };
   }
 
@@ -588,33 +644,39 @@ class LowLevelExecutionModule {
       action: 'build_complete',
       structure: params.structure,
       materialsUsed: params.materials,
-      success: true
+      success: true,
     };
   }
 
-  private executeAnalysis(params: Record<string, any>, context: PlanningContext) {
+  private executeAnalysis(
+    params: Record<string, any>,
+    context: PlanningContext
+  ) {
     // Simulate analysis execution
     return {
       action: 'analysis_complete',
       insights: [`Analysis of ${params.goal || params.subgoal} completed`],
       recommendations: ['proceed_with_plan'],
-      success: true
+      success: true,
     };
   }
 
-  private executeGenericAction(params: Record<string, any>, context: PlanningContext) {
+  private executeGenericAction(
+    params: Record<string, any>,
+    context: PlanningContext
+  ) {
     // Generic action execution
     return {
       action: 'generic_action_complete',
       parameters: params,
-      success: true
+      success: true,
     };
   }
 }
 
 /**
  * HRM-Inspired Hierarchical Planner
- * 
+ *
  * Integrates high-level planning and low-level execution modules
  * with iterative refinement loop
  */
@@ -624,10 +686,12 @@ export class HRMInspiredPlanner {
   private maxRefinements: number;
   private qualityThreshold: number;
 
-  constructor(config: {
-    maxRefinements?: number;
-    qualityThreshold?: number;
-  } = {}) {
+  constructor(
+    config: {
+      maxRefinements?: number;
+      qualityThreshold?: number;
+    } = {}
+  ) {
     this.highLevelModule = new HighLevelPlanningModule();
     this.lowLevelModule = new LowLevelExecutionModule();
     this.maxRefinements = config.maxRefinements || 3;
@@ -657,7 +721,7 @@ export class HRMInspiredPlanner {
     while (refinementCount < this.maxRefinements && !halted) {
       // Evaluate current plan quality
       const quality = await this.evaluatePlanQuality(currentPlan, context);
-      
+
       // Halt condition: quality threshold met
       if (quality >= this.qualityThreshold) {
         halted = true;
@@ -666,8 +730,12 @@ export class HRMInspiredPlanner {
       }
 
       // Generate refinement feedback
-      const feedback = await this.generateRefinementFeedback(currentPlan, context, quality);
-      
+      const feedback = await this.generateRefinementFeedback(
+        currentPlan,
+        context,
+        quality
+      );
+
       // Halt condition: no meaningful feedback
       if (!feedback || feedback.trim().length === 0) {
         halted = true;
@@ -676,7 +744,11 @@ export class HRMInspiredPlanner {
       }
 
       // Refine the plan
-      currentPlan = this.highLevelModule.refinePlan(currentPlan, feedback, context);
+      currentPlan = this.highLevelModule.refinePlan(
+        currentPlan,
+        feedback,
+        context
+      );
       refinementHistory.push(currentPlan);
       refinementCount++;
     }
@@ -692,14 +764,17 @@ export class HRMInspiredPlanner {
       refinementHistory,
       totalRefinements: refinementCount,
       halted,
-      haltReason
+      haltReason,
     };
   }
 
   /**
    * Execute a plan using the low-level execution module
    */
-  async executePlan(plan: Plan, context: PlanningContext): Promise<{
+  async executePlan(
+    plan: Plan,
+    context: PlanningContext
+  ): Promise<{
     success: boolean;
     results: any[];
     totalLatency: number;
@@ -711,19 +786,25 @@ export class HRMInspiredPlanner {
     let overallSuccess = true;
 
     for (const nodeId of plan.executionOrder) {
-      const node = plan.nodes.find(n => n.id === nodeId);
+      const node = plan.nodes.find((n) => n.id === nodeId);
       if (!node) continue;
 
       // Generate detailed actions for this node
-      const detailedActions = this.lowLevelModule.generateDetailedActions(node, context);
-      
+      const detailedActions = this.lowLevelModule.generateDetailedActions(
+        node,
+        context
+      );
+
       for (const action of detailedActions) {
-        const executionResult = this.lowLevelModule.executeAction(action, context);
-        
+        const executionResult = this.lowLevelModule.executeAction(
+          action,
+          context
+        );
+
         results.push(executionResult);
         totalLatency += executionResult.actualLatency;
         adaptations.push(...executionResult.adaptations);
-        
+
         if (!executionResult.success) {
           overallSuccess = false;
           // Could implement recovery strategies here
@@ -735,56 +816,71 @@ export class HRMInspiredPlanner {
       success: overallSuccess,
       results,
       totalLatency,
-      adaptations
+      adaptations,
     };
   }
 
   /**
    * Evaluate plan quality for halt condition
    */
-  private async evaluatePlanQuality(plan: Plan, context: PlanningContext): Promise<number> {
+  private async evaluatePlanQuality(
+    plan: Plan,
+    context: PlanningContext
+  ): Promise<number> {
     let quality = plan.confidence;
-    
+
     // Factor in plan characteristics
     const nodeComplexity = plan.nodes.length;
     if (nodeComplexity <= 3) quality += 0.1; // Simple plans score higher
     if (nodeComplexity > 8) quality -= 0.1; // Complex plans score lower
-    
+
     // Factor in refinement history
     if (plan.refinementCount > 0) quality += 0.05; // Refined plans score higher
     if (plan.refinementCount > 2) quality -= 0.05; // Over-refined plans score lower
-    
+
     // Factor in estimated latency vs context requirements
     if (context.timeLimit && plan.estimatedLatency > context.timeLimit) {
       quality -= 0.2; // Plans exceeding time limits score lower
     }
-    
+
     return Math.max(0.0, Math.min(1.0, quality));
   }
 
   /**
    * Generate feedback for plan refinement
    */
-  private async generateRefinementFeedback(plan: Plan, context: PlanningContext, quality: number): Promise<string> {
+  private async generateRefinementFeedback(
+    plan: Plan,
+    context: PlanningContext,
+    quality: number
+  ): Promise<string> {
     const feedback: string[] = [];
-    
+
     if (plan.estimatedLatency > (context.timeLimit || Infinity)) {
-      feedback.push('Plan exceeds time limit - consider parallel execution or simplification');
+      feedback.push(
+        'Plan exceeds time limit - consider parallel execution or simplification'
+      );
     }
-    
+
     if (plan.nodes.length > 6) {
-      feedback.push('Plan is complex - consider breaking down complex nodes further');
+      feedback.push(
+        'Plan is complex - consider breaking down complex nodes further'
+      );
     }
-    
-    const highPriorityNodes = plan.nodes.filter(n => n.priority > 0.8);
+
+    const highPriorityNodes = plan.nodes.filter((n) => n.priority > 0.8);
     if (highPriorityNodes.length > 3) {
-      feedback.push('Too many high-priority nodes - reorder by true importance');
+      feedback.push(
+        'Too many high-priority nodes - reorder by true importance'
+      );
     }
-    
+
     if (quality < 0.6) {
-      feedback.push('Low confidence plan - add constraints and verify dependencies');
+      feedback.push(
+        'Low confidence plan - add constraints and verify dependencies'
+      );
     }
-    
+
     return feedback.join('. ');
   }
 
@@ -800,7 +896,7 @@ export class HRMInspiredPlanner {
     return {
       planningLatency: 150, // Target from integration plan
       averageRefinements: 1.5,
-      averagePlanQuality: 0.85
+      averagePlanQuality: 0.85,
     };
   }
 }
@@ -818,7 +914,10 @@ export function createHRMPlanner(config?: {
 /**
  * Utility function for quick planning
  */
-export async function quickPlan(goal: string, options: Partial<PlanningContext> = {}): Promise<Plan> {
+export async function quickPlan(
+  goal: string,
+  options: Partial<PlanningContext> = {}
+): Promise<Plan> {
   const planner = createHRMPlanner();
   const context: PlanningContext = {
     goal,
@@ -827,9 +926,9 @@ export async function quickPlan(goal: string, options: Partial<PlanningContext> 
     resources: options.resources || {},
     timeLimit: options.timeLimit,
     urgency: options.urgency || 'medium',
-    domain: options.domain || 'general'
+    domain: options.domain || 'general',
   };
-  
+
   const result = await planner.planWithRefinement(context);
   return result.finalPlan;
 }
