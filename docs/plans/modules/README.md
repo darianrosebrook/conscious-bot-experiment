@@ -61,21 +61,21 @@ This directory contains implementation plans for all modules. Use this Map of Co
 | World: Navigation              | world/navigation/README.md                          | ✅ Implemented | M1: D* Lite Pathfinding | Core, Perception | Critical |
 | World: Perception              | world/perception/README.md                          | ✅ Implemented | M1: Occlusion & Confidence | Core | Critical |
 | World: Sensorimotor            | world/sensorimotor/README.md                        | ✅ Implemented | M1: Motor Control | Core, MCP | Critical |
-| Safety: Privacy                | safety/privacy.md                                    | 📝 Planned | M1: Data Protection | None | Critical |
+| Safety: Privacy                | safety/privacy.md                                    | ✅ Implemented | M1: Data Protection | None | Critical |
 | Safety: Monitoring             | safety/monitoring.md                                 | ✅ Implemented | M1: Telemetry | None | Critical |
-| Safety: Fail-Safes             | safety/fail_safes.md                                | 📝 Planned | M1: Watchdogs | Monitoring | Critical |
+| Safety: Fail-Safes             | safety/fail_safes.md                                | ✅ Implemented | M1: Watchdogs | Monitoring | Critical |
+| Planning: Goal Formulation     | planning/goal_formulation.md                         | 📝 Planned | M2: Utility Engine | Core, Memory | Critical |
 | World: Place Graph             | world/place_graph/README.md                         | Not Started | M2: Spatial Memory | Core, Navigation | High |
 | Memory: Episodic               | memory/episodic/README.md                           | Not Started | M2: Experience Storage | Core, World | High |
 | Memory: Semantic               | memory/semantic/README.md                           | Not Started | M2: Knowledge Graph | Core, World | High |
 | Memory: Working                | memory/working/README.md                            | Not Started | M2: Cognitive Workspace | Core | High |
 | Memory: Provenance             | memory/provenance/README.md                         | Not Started | M2: Decision Tracking | Core, Memory | High |
-| Planning: Goal Formulation     | planning/goal_formulation.md                         | 📝 Planned | M2: Utility Engine | Core, Memory | Critical |
-| Interfaces: Web Dashboard      | interfaces/web_dashboard.md                          | 📝 Planned | M2: Monitoring | Safety | Medium |
 | Interfaces: Constitution       | interfaces/constitution.md                           | 📝 Planned | M2: Rules Engine | None | Critical |
+| Interfaces: Web Dashboard      | interfaces/web_dashboard.md                          | 📝 Planned | M2: Monitoring | Safety | Medium |
 | Evaluation: Scenarios          | evaluation/scenarios.md                              | 📝 Planned | M2: Test Envs | None | High |
 | Evaluation: Metrics            | evaluation/metrics.md                                | 📝 Planned | M2: Analytics | Scenarios | High |
-| Planning: Hierarchical Planner | planning/hierarchical_planner.md                     | 📝 Planned | M3: HTN Engine | Goal Form., Core | High |
-| Planning: Reactive Executor    | planning/reactive_executor.md                        | 📝 Planned | M3: GOAP Impl. | Hierarchical Plan. | High |
+| Planning: Hierarchical Planner | planning/hierarchical_planner.md                     | 📝 Planned | M3: HTN Engine | Goal Form., Core | Critical |
+| Planning: Reactive Executor    | planning/reactive_executor.md                        | 📝 Planned | M3: GOAP Impl. | Hierarchical Plan. | Critical |
 | Interfaces: Intrusion Interface| interfaces/intrusion_interface.md                   | 📝 Planned | M3: Constitution | Safety, Cognition | High |
 | Cognition: Cognitive Core      | cognition/cognitive_core.md                          | 📝 Planned | M3: LLM Integration | Planning, Memory | High |
 | Evaluation: Curriculum         | evaluation/curriculum.md                             | 📝 Planned | M3: Progression | Metrics | Medium |

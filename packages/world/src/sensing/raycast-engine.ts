@@ -29,6 +29,7 @@ export interface RaycastEngineEvents {
   'ray-cast': [{ origin: Vec3; direction: Direction; hit: RaycastHit | null }];
   'sweep-progress': [{ completed: number; total: number }];
   'performance-warning': [{ metric: string; value: number; threshold: number }];
+  'world-updated': [{ blocks: Array<{ position: Vec3; blockType: string }> }];
 }
 
 /**
@@ -208,6 +209,172 @@ export class RaycastEngine
    */
   setBot(bot: MockBot): void {
     this.bot = bot;
+  }
+
+  /**
+   * Compatibility methods for test interfaces
+   */
+  castRay(
+    origin: Vec3,
+    direction: Direction,
+    maxDistance: number
+  ): RaycastHit | null {
+    return this.raycast(origin, direction, maxDistance);
+  }
+
+  castCone(
+    origin: Vec3,
+    direction: Direction,
+    angle: number,
+    rays: number,
+    maxDistance: number
+  ): RaycastHit[] {
+    const hits: RaycastHit[] = [];
+    const halfAngle = angle / 2;
+
+    for (let i = 0; i < rays; i++) {
+      // Generate ray directions in a cone pattern
+      const t = i / (rays - 1);
+      const currentAngle = -halfAngle + t * angle;
+
+      // Simple cone ray distribution (could be improved with more sophisticated patterns)
+      const coneDirection = {
+        x:
+          direction.x * Math.cos(currentAngle) -
+          direction.z * Math.sin(currentAngle),
+        y: direction.y,
+        z:
+          direction.x * Math.sin(currentAngle) +
+          direction.z * Math.cos(currentAngle),
+      };
+
+      const hit = this.raycast(origin, coneDirection, maxDistance);
+      if (hit) {
+        hits.push(hit);
+      }
+    }
+
+    return hits;
+  }
+
+  castGrid(
+    origin: Vec3,
+    direction: Direction,
+    right: Direction,
+    up: Direction,
+    width: number,
+    height: number,
+    maxDistance: number
+  ): RaycastHit[] {
+    const hits: RaycastHit[] = [];
+
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        const u = x / (width - 1) - 0.5;
+        const v = y / (height - 1) - 0.5;
+
+        const rayDirection = {
+          x: direction.x + u * right.x + v * up.x,
+          y: direction.y + u * right.y + v * up.y,
+          z: direction.z + u * right.z + v * up.z,
+        };
+
+        const hit = this.raycast(origin, rayDirection, maxDistance);
+        if (hit) {
+          hits.push(hit);
+        }
+      }
+    }
+
+    return hits;
+  }
+
+  isBlockVisible(position: Vec3, observer: Vec3): boolean {
+    const direction = {
+      x: position.x - observer.x,
+      y: position.y - observer.y,
+      z: position.z - observer.z,
+    };
+    const distance = Math.sqrt(
+      direction.x ** 2 + direction.y ** 2 + direction.z ** 2
+    );
+
+    if (distance === 0) return true;
+
+    const normalizedDirection = {
+      x: direction.x / distance,
+      y: direction.y / distance,
+      z: direction.z / distance,
+    };
+
+    const hit = this.raycast(observer, normalizedDirection, distance);
+    return hit ? hit.distance >= distance - 0.5 : true;
+  }
+
+  getVisibleBlocks(
+    observer: Vec3,
+    maxDistance: number
+  ): Array<{ position: Vec3; blockType: string; distance: number }> {
+    // Simple implementation - in a real system this would use a spatial index
+    const blocks: Array<{
+      position: Vec3;
+      blockType: string;
+      distance: number;
+    }> = [];
+
+    // Perform a basic sweep to find visible blocks
+    const sweepConfig = {
+      maxDistance,
+      fovDegrees: 90,
+      angularResolution: 5,
+      panoramicSweep: false,
+      maxRaysPerTick: 100,
+      tickBudgetMs: 50,
+      targetBlocks: this.config.targetBlocks,
+      transparentBlocks: this.config.transparentBlocks,
+      confidenceDecayRate: this.config.confidenceDecayRate,
+      minConfidence: this.config.minConfidence,
+    };
+
+    // Use a simple grid pattern for testing
+    const directions: Direction[] = [];
+    const stepSize = 10; // degrees
+    for (let yaw = -45; yaw <= 45; yaw += stepSize) {
+      for (let pitch = -30; pitch <= 30; pitch += stepSize) {
+        const yawRad = (yaw * Math.PI) / 180;
+        const pitchRad = (pitch * Math.PI) / 180;
+
+        directions.push({
+          x: Math.sin(yawRad) * Math.cos(pitchRad),
+          y: Math.sin(pitchRad),
+          z: -Math.cos(yawRad) * Math.cos(pitchRad),
+        });
+      }
+    }
+
+    for (const direction of directions.slice(0, 20)) {
+      // Limit for performance
+      const hit = this.raycast(observer, direction, maxDistance);
+      if (hit) {
+        blocks.push({
+          position: hit.position,
+          blockType: hit.blockId,
+          distance: hit.distance,
+        });
+      }
+    }
+
+    return blocks;
+  }
+
+  updateWorld(blocks: Array<{ position: Vec3; blockType: string }>): void {
+    // In a real implementation, this would update the world state
+    // For testing purposes, we'll just emit an event
+    this.emit('world-updated', { blocks });
+  }
+
+  dispose(): void {
+    this.removeAllListeners();
   }
 
   // ===== PRIVATE METHODS =====

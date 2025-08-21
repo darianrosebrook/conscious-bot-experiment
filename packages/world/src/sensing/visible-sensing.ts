@@ -211,6 +211,14 @@ export class VisibleSensing
   }
 
   /**
+   * Perform environmental scan and return observations
+   * Alias for getObservations() for test compatibility
+   */
+  scanEnvironment(): Observation[] {
+    return this.getObservations();
+  }
+
+  /**
    * Update sensing configuration
    */
   updateConfig(newConfig: Partial<SensingConfig>): void {
