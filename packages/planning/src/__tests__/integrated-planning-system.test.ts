@@ -1,26 +1,26 @@
 /**
  * Integrated Planning System Tests
- * 
- * Tests the full integration of HRM-inspired cognitive architecture with 
+ *
+ * Tests the full integration of HRM-inspired cognitive architecture with
  * classical HTN/GOAP planning, demonstrating end-to-end planning pipeline
  */
 
-import { 
+import {
   IntegratedPlanningCoordinator,
   createIntegratedPlanningCoordinator,
   PlanningConfiguration,
   PlanningContext,
-  IntegratedPlanningResult
+  IntegratedPlanningResult,
 } from '../integrated-planning-coordinator';
 
-import { 
-  Goal, 
-  GoalType, 
-  GoalStatus, 
-  HomeostasisState, 
-  Need, 
+import {
+  Goal,
+  GoalType,
+  GoalStatus,
+  HomeostasisState,
+  Need,
   NeedType,
-  Resource
+  Resource,
 } from '../types';
 
 describe('Integrated Planning System', () => {
@@ -33,14 +33,14 @@ describe('Integrated Planning System', () => {
         maxRefinements: 2,
         qualityThreshold: 0.7,
         hrmLatencyTarget: 100,
-        enableIterativeRefinement: true
+        enableIterativeRefinement: true,
       },
       coordinatorConfig: {
         routingStrategy: 'hybrid',
         fallbackTimeout: 1000,
         enablePlanMerging: true,
-        enableCrossValidation: false // Disable for faster tests
-      }
+        enableCrossValidation: false, // Disable for faster tests
+      },
     };
 
     coordinator = createIntegratedPlanningCoordinator(config);
@@ -52,7 +52,7 @@ describe('Integrated Planning System', () => {
         hunger: 80,
         hasTools: true,
         nearWater: false,
-        inventory: ['pickaxe', 'food']
+        inventory: ['pickaxe', 'food'],
       },
       currentState: {
         energy: 75,
@@ -60,23 +60,23 @@ describe('Integrated Planning System', () => {
         safety: 85,
         social: 40,
         achievement: 50,
-        timestamp: Date.now()
+        timestamp: Date.now(),
       },
       activeGoals: [],
       availableResources: [
         { type: 'energy', amount: 75, availability: 'available' },
-        { type: 'time', amount: 1000, availability: 'limited' }
+        { type: 'time', amount: 1000, availability: 'limited' },
       ],
       timeConstraints: {
         urgency: 'medium',
-        maxPlanningTime: 500
+        maxPlanningTime: 500,
       },
       situationalFactors: {
         threatLevel: 0.2,
         opportunityLevel: 0.7,
         socialContext: ['isolated'],
-        environmentalFactors: ['daytime', 'clear_weather']
-      }
+        environmentalFactors: ['daytime', 'clear_weather'],
+      },
     };
   });
 
@@ -86,7 +86,7 @@ describe('Integrated Planning System', () => {
       const signals = [
         { type: 'hunger', value: 30, urgency: 'high' },
         { type: 'thirst', value: 20, urgency: 'high' },
-        { type: 'threat_detected', value: 0.8, urgency: 'medium' }
+        { type: 'threat_detected', value: 0.8, urgency: 'medium' },
       ];
 
       const result = await coordinator.planAndExecute(signals, mockContext);
@@ -109,31 +109,43 @@ describe('Integrated Planning System', () => {
       expect(result.planGeneration.selectionReasoning).toBeDefined();
 
       // Verify quality assessment
-      expect(result.qualityAssessment.feasibilityScore).toBeGreaterThanOrEqual(0);
-      expect(result.qualityAssessment.optimalityScore).toBeGreaterThanOrEqual(0);
+      expect(result.qualityAssessment.feasibilityScore).toBeGreaterThanOrEqual(
+        0
+      );
+      expect(result.qualityAssessment.optimalityScore).toBeGreaterThanOrEqual(
+        0
+      );
 
       // Verify planning approach selection
-      expect(['hrm', 'htn', 'goap', 'hybrid']).toContain(result.planningApproach);
+      expect(['hrm', 'htn', 'goap', 'hybrid']).toContain(
+        result.planningApproach
+      );
     });
 
     it('should handle creative task routing to appropriate planner', async () => {
       const creativeSignals = [
         { type: 'curiosity', value: 90, urgency: 'low' },
-        { type: 'exploration_drive', value: 85, urgency: 'low' }
+        { type: 'exploration_drive', value: 85, urgency: 'low' },
       ];
 
       // Modify context for creative scenario
       const creativeContext = {
         ...mockContext,
-        timeConstraints: { ...mockContext.timeConstraints, urgency: 'low' as const },
+        timeConstraints: {
+          ...mockContext.timeConstraints,
+          urgency: 'low' as const,
+        },
         situationalFactors: {
           ...mockContext.situationalFactors,
           opportunityLevel: 0.9,
-          environmentalFactors: ['unexplored_area', 'interesting_structures']
-        }
+          environmentalFactors: ['unexplored_area', 'interesting_structures'],
+        },
       };
 
-      const result = await coordinator.planAndExecute(creativeSignals, creativeContext);
+      const result = await coordinator.planAndExecute(
+        creativeSignals,
+        creativeContext
+      );
 
       // Should route to creative planning approach
       expect(result.routingDecision.taskType).toMatch(/creative|exploration/);
@@ -143,30 +155,33 @@ describe('Integrated Planning System', () => {
     it('should handle emergency scenarios with fast reactive planning', async () => {
       const emergencySignals = [
         { type: 'health_critical', value: 10, urgency: 'emergency' },
-        { type: 'imminent_threat', value: 95, urgency: 'emergency' }
+        { type: 'imminent_threat', value: 95, urgency: 'emergency' },
       ];
 
       const emergencyContext = {
         ...mockContext,
-        timeConstraints: { 
-          ...mockContext.timeConstraints, 
+        timeConstraints: {
+          ...mockContext.timeConstraints,
           urgency: 'emergency' as const,
-          maxPlanningTime: 50 // Very tight constraint
+          maxPlanningTime: 50, // Very tight constraint
         },
         situationalFactors: {
           ...mockContext.situationalFactors,
-          threatLevel: 0.95
-        }
+          threatLevel: 0.95,
+        },
       };
 
-      const result = await coordinator.planAndExecute(emergencySignals, emergencyContext);
+      const result = await coordinator.planAndExecute(
+        emergencySignals,
+        emergencyContext
+      );
 
       // Should complete planning quickly
       expect(result.planningLatency).toBeLessThan(200);
-      
+
       // Should generate actionable plan
       expect(result.primaryPlan.steps.length).toBeGreaterThan(0);
-      
+
       // Should have reasonable confidence for emergency response
       expect(result.confidence).toBeGreaterThan(0.3);
     });
@@ -175,7 +190,7 @@ describe('Integrated Planning System', () => {
       const complexSignals = [
         { type: 'social_need', value: 70, urgency: 'medium' },
         { type: 'achievement_drive', value: 80, urgency: 'medium' },
-        { type: 'resource_optimization', value: 60, urgency: 'low' }
+        { type: 'resource_optimization', value: 60, urgency: 'low' },
       ];
 
       const collaborativeContext = {
@@ -183,16 +198,21 @@ describe('Integrated Planning System', () => {
         situationalFactors: {
           ...mockContext.situationalFactors,
           socialContext: ['team_available', 'coordination_needed'],
-          opportunityLevel: 0.8
-        }
+          opportunityLevel: 0.8,
+        },
       };
 
-      const result = await coordinator.planAndExecute(complexSignals, collaborativeContext);
+      const result = await coordinator.planAndExecute(
+        complexSignals,
+        collaborativeContext
+      );
 
       // Should use collaborative approach for complex multi-dimensional tasks
       if (result.planningApproach === 'hybrid') {
         expect(result.planGeneration.hrmPlan).toBeDefined();
-        expect(result.planGeneration.selectionReasoning).toContain('collaborative');
+        expect(result.planGeneration.selectionReasoning).toContain(
+          'collaborative'
+        );
       }
 
       expect(result.primaryPlan.steps.length).toBeGreaterThan(0);
@@ -207,13 +227,13 @@ describe('Integrated Planning System', () => {
           routingStrategy: 'hybrid',
           enablePlanMerging: true,
           enableCrossValidation: true,
-          fallbackTimeout: 2000
-        }
+          fallbackTimeout: 2000,
+        },
       });
 
       const signals = [
         { type: 'complex_task', value: 80, urgency: 'medium' },
-        { type: 'structured_reasoning', value: 90, urgency: 'medium' }
+        { type: 'structured_reasoning', value: 90, urgency: 'medium' },
       ];
 
       const result = await coordinator.planAndExecute(signals, mockContext);
@@ -232,15 +252,23 @@ describe('Integrated Planning System', () => {
         { urgency: 'low' as const, threat: 0.1 },
         { urgency: 'medium' as const, threat: 0.5 },
         { urgency: 'high' as const, threat: 0.8 },
-        { urgency: 'emergency' as const, threat: 0.95 }
+        { urgency: 'emergency' as const, threat: 0.95 },
       ];
 
       for (const scenario of scenarios) {
-        const signals = [{ type: 'adaptive_test', value: 50, urgency: scenario.urgency }];
+        const signals = [
+          { type: 'adaptive_test', value: 50, urgency: scenario.urgency },
+        ];
         const context = {
           ...mockContext,
-          timeConstraints: { ...mockContext.timeConstraints, urgency: scenario.urgency },
-          situationalFactors: { ...mockContext.situationalFactors, threatLevel: scenario.threat }
+          timeConstraints: {
+            ...mockContext.timeConstraints,
+            urgency: scenario.urgency,
+          },
+          situationalFactors: {
+            ...mockContext.situationalFactors,
+            threatLevel: scenario.threat,
+          },
         };
 
         const result = await coordinator.planAndExecute(signals, context);
@@ -249,9 +277,9 @@ describe('Integrated Planning System', () => {
 
       // Verify adaptation
       expect(adaptiveResults.length).toBe(4);
-      
+
       // Should have varying planning latencies based on urgency
-      const latencies = adaptiveResults.map(r => r.planningLatency);
+      const latencies = adaptiveResults.map((r) => r.planningLatency);
       expect(latencies[3]).toBeLessThanOrEqual(latencies[0]); // Emergency should be fastest
     });
   });
@@ -266,7 +294,7 @@ describe('Integrated Planning System', () => {
       }
 
       const metrics = coordinator.getPerformanceMetrics();
-      
+
       expect(metrics.totalSessions).toBe(5);
       expect(metrics.averageLatency).toBeGreaterThan(0);
       expect(metrics.averageConfidence).toBeGreaterThan(0);
@@ -275,14 +303,14 @@ describe('Integrated Planning System', () => {
 
     it('should maintain planning history', async () => {
       const signals = [{ type: 'test', value: 50, urgency: 'medium' }];
-      
+
       await coordinator.planAndExecute(signals, mockContext);
       await coordinator.planAndExecute(signals, mockContext);
 
       const history = coordinator.getPlanningHistory();
       expect(history.length).toBe(2);
-      
-      history.forEach(result => {
+
+      history.forEach((result) => {
         expect(result).toHaveProperty('planningLatency');
         expect(result).toHaveProperty('routingDecision');
         expect(result).toHaveProperty('primaryPlan');
@@ -293,7 +321,7 @@ describe('Integrated Planning System', () => {
   describe('Event System Integration', () => {
     it('should emit planning events during pipeline execution', async () => {
       const events: string[] = [];
-      
+
       coordinator.on('planningComplete', () => events.push('complete'));
       coordinator.on('planReady', () => events.push('ready'));
 
@@ -312,7 +340,10 @@ describe('Integrated Planning System', () => {
       try {
         await coordinator.planAndExecute([], {
           ...mockContext,
-          timeConstraints: { ...mockContext.timeConstraints, maxPlanningTime: 1 } // Too short
+          timeConstraints: {
+            ...mockContext.timeConstraints,
+            maxPlanningTime: 1,
+          }, // Too short
         });
       } catch (error) {
         // Expected to fail
@@ -325,12 +356,14 @@ describe('Integrated Planning System', () => {
 
   describe('Plan Execution Integration', () => {
     it('should prepare plans for execution', async () => {
-      const signals = [{ type: 'execution_test', value: 70, urgency: 'medium' }];
+      const signals = [
+        { type: 'execution_test', value: 70, urgency: 'medium' },
+      ];
       const result = await coordinator.planAndExecute(signals, mockContext);
 
       expect(result.primaryPlan.id).toBeDefined();
       expect(result.primaryPlan.steps.length).toBeGreaterThan(0);
-      
+
       // Plan should be ready for execution
       const success = await coordinator.executePlan(result.primaryPlan.id);
       expect(typeof success).toBe('boolean');
@@ -344,7 +377,7 @@ describe('Integration with Planning Documentation', () => {
     // Signals → Goal Formulation → HTN/HRM Planning → GOAP Execution
 
     const coordinator = createIntegratedPlanningCoordinator();
-    
+
     // Verify component availability
     expect(coordinator).toBeDefined();
     expect(typeof coordinator.planAndExecute).toBe('function');
@@ -354,20 +387,28 @@ describe('Integration with Planning Documentation', () => {
 
   it('should support the documented performance targets', async () => {
     // From planning docs: "Sub-100ms emergency response, <500ms standard planning"
-    
+
     const coordinator = createIntegratedPlanningCoordinator({
       hrmConfig: { hrmLatencyTarget: 50 },
-      coordinatorConfig: { fallbackTimeout: 100 }
+      coordinatorConfig: { fallbackTimeout: 100 },
     });
 
-    const emergencySignals = [{ type: 'emergency', value: 95, urgency: 'emergency' }];
+    const emergencySignals = [
+      { type: 'emergency', value: 95, urgency: 'emergency' },
+    ];
     const emergencyContext = {
       ...mockContext,
-      timeConstraints: { ...mockContext.timeConstraints, urgency: 'emergency' as const }
+      timeConstraints: {
+        ...mockContext.timeConstraints,
+        urgency: 'emergency' as const,
+      },
     };
 
     const start = Date.now();
-    const result = await coordinator.planAndExecute(emergencySignals, emergencyContext);
+    const result = await coordinator.planAndExecute(
+      emergencySignals,
+      emergencyContext
+    );
     const latency = Date.now() - start;
 
     // Should meet emergency response target

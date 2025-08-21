@@ -141,13 +141,17 @@ class HighLevelPlanningModule {
           );
           break;
         case 'add_constraint':
-          this.addConstraintToNodes(refinedPlan.nodes, action.constraint);
+          if (action.constraint) {
+            this.addConstraintToNodes(refinedPlan.nodes, action.constraint);
+          }
           break;
         case 'adjust_priority':
           this.adjustNodePriorities(refinedPlan.nodes, action.adjustments);
           break;
         case 'decompose_further':
-          this.decomposeComplexNodes(refinedPlan, action.nodeIds);
+          if (action.nodeIds) {
+            this.decomposeComplexNodes(refinedPlan, action.nodeIds);
+          }
           break;
       }
     }

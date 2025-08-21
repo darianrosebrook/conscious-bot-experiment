@@ -21,9 +21,29 @@ export * from './hierarchical-planner/hierarchical-planner';
 export * from './hierarchical-planner/task-network';
 export * from './hierarchical-planner/plan-decomposer';
 
-// HRM-Inspired Planning (M3)
-export * from './hierarchical-planner/cognitive-router';
-export * from './hierarchical-planner/hrm-inspired-planner';
+// HRM-Inspired Planning (M3) - Selective exports to avoid conflicts
+export {
+  CognitiveTaskRouter,
+  createCognitiveRouter,
+  routeTask,
+} from './hierarchical-planner/cognitive-router';
+
+export type {
+  TaskType,
+  TaskContext,
+  RoutingDecision,
+  RouterType,
+} from './hierarchical-planner/cognitive-router';
+
+export {
+  HRMInspiredPlanner,
+  createHRMPlanner,
+} from './hierarchical-planner/hrm-inspired-planner';
+
+export type {
+  Plan as HRMPlan,
+  PlanNode as HRMPlanNode,
+} from './hierarchical-planner/hrm-inspired-planner';
 export {
   IntegratedPlanningSystem,
   createIntegratedPlanningSystem,
@@ -41,7 +61,7 @@ export {
   createIntegratedPlanningCoordinator,
   type PlanningConfiguration,
   type PlanningContext,
-  type IntegratedPlanningResult
+  type IntegratedPlanningResult,
 } from './integrated-planning-coordinator';
 
 // Types

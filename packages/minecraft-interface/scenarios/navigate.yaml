@@ -1,0 +1,45 @@
+# Navigate Scenario (Tier 0)
+# Basic navigation test for earliest testable milestone
+
+name: "Navigate to Target"
+description: "Bot spawns and navigates to a nearby coordinate"
+timeout: 30000
+tags: ["tier0", "navigation", "basic"]
+
+preconditions:
+  bot_spawned: true
+  bot_health: ">= 15"
+
+success_conditions:
+  reached_target: true
+  distance_to_target: "< 2.0"
+  execution_time: "< 25000"
+
+failure_conditions:
+  bot_health: "< 5"
+  execution_time: "> 30000"
+  stuck_duration: "> 10000"
+
+signals:
+  - type: "exploration_drive"
+    value: 70
+    urgency: "medium"
+    description: "Drive to explore the immediate area"
+  
+  - type: "curiosity" 
+    value: 60
+    urgency: "low"
+    description: "General curiosity about the environment"
+
+expected_actions:
+  - "navigate"
+  - "look_at"
+
+estimated_steps: 2
+estimated_duration: 15000
+complexity: "low"
+
+notes: |
+  This is the baseline test for Tier 0 functionality.
+  Success indicates basic bot-to-world integration is working.
+  Pathfinding should work without block breaking or advanced planning.

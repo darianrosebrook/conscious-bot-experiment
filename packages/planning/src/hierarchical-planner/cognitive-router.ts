@@ -29,10 +29,13 @@ export const TaskTypeSchema = z.enum([
 
 export type TaskType = z.infer<typeof TaskTypeSchema>;
 
+export const RouterTypeSchema = z.enum(['llm', 'hrm_structured', 'collaborative']);
+export type RouterType = z.infer<typeof RouterTypeSchema>;
+
 export const RoutingDecisionSchema = z.object({
   taskType: TaskTypeSchema,
   confidence: z.number().min(0).max(1),
-  router: z.enum(['llm', 'hrm_structured', 'collaborative']),
+  router: RouterTypeSchema,
   reasoning: z.string(),
   expectedLatency: z.number(), // milliseconds
   complexity: z.number().min(1).max(10),
@@ -283,7 +286,8 @@ export class CognitiveTaskRouter {
     const urgencyNote =
       context.urgency === 'emergency' ? ' (emergency: prioritizing speed)' : '';
 
-    return `Task classified as ${taskType}. Routing to ${routerMap[router]} due to ${this.getTaskCharacteristics(taskType, context)}${urgencyNote}.`;
+    const routerDescription = routerMap[router as keyof typeof routerMap] || 'unknown router';
+    return `Task classified as ${taskType}. Routing to ${routerDescription} due to ${this.getTaskCharacteristics(taskType, context)}${urgencyNote}.`;
   }
 
   /**
@@ -496,7 +500,13 @@ export function createCognitiveRouter(config?: {
   llmLatencyTarget?: number;
   emergencyLatencyLimit?: number;
 }): CognitiveTaskRouter {
-  return new CognitiveTaskRouter(config);
+  const defaultConfig = {
+    hrmLatencyTarget: 100,
+    llmLatencyTarget: 400,
+    emergencyLatencyLimit: 50,
+    ...config
+  };
+  return new CognitiveTaskRouter(defaultConfig);
 }
 
 /**

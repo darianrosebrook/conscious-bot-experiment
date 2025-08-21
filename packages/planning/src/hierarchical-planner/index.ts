@@ -7,18 +7,25 @@
  * @author @darianrosebrook
  */
 
-export * from './cognitive-router';
-export * from './hrm-inspired-planner';
+// Export cognitive router components
+export {
+  CognitiveTaskRouter,
+  createCognitiveRouter,
+  routeTask,
+} from './cognitive-router';
 
-// Re-export key types for convenience
 export type {
   TaskType,
   TaskContext,
   RoutingDecision,
-  Plan,
-  PlanNode,
-  PlanningContext,
+  RouterType,
 } from './cognitive-router';
+
+// Export HRM planner components with aliases to avoid conflicts
+export {
+  HRMInspiredPlanner,
+  createHRMPlanner,
+} from './hrm-inspired-planner';
 
 export type {
   Plan as HRMPlan,
@@ -26,10 +33,8 @@ export type {
   PlanningContext as HRMPlanningContext,
 } from './hrm-inspired-planner';
 
-// Export factory functions
-export { createCognitiveRouter, routeTask } from './cognitive-router';
-
-export { createHRMPlanner, quickPlan } from './hrm-inspired-planner';
+// Export utility functions
+export { quickPlan } from './hrm-inspired-planner';
 
 /**
  * Integrated Planning System
@@ -72,7 +77,13 @@ export class IntegratedPlanningSystem {
       };
     } = {}
   ) {
-    this.cognitiveRouter = new CognitiveTaskRouter(config.routerConfig);
+    const routerConfig = {
+      hrmLatencyTarget: 100,
+      llmLatencyTarget: 400,
+      emergencyLatencyLimit: 50,
+      ...(config.routerConfig || {})
+    };
+    this.cognitiveRouter = new CognitiveTaskRouter(routerConfig);
     this.hrmPlanner = new HRMInspiredPlanner(config.plannerConfig);
   }
 
