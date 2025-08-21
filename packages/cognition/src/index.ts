@@ -13,20 +13,6 @@
 // Cognitive Core
 export * from './cognitive-core/llm-interface';
 export * from './cognitive-core/internal-dialogue';
-export * from './cognitive-core/reasoning-engine';
-export * from './cognitive-core/constitutional-filter';
-
-// Self Model
-export * from './self-model/identity-tracker';
-export * from './self-model/narrative-manager';
-export * from './self-model/contract-system';
-export * from './self-model/self-monitor';
-
-// Social Cognition
-export * from './social-cognition/agent-modeler';
-export * from './social-cognition/theory-of-mind';
-export * from './social-cognition/social-learner';
-export * from './social-cognition/norm-tracker';
 
 // Types
 export * from './types';
