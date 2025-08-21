@@ -66,9 +66,10 @@ This directory contains implementation plans for all modules. Use this Map of Co
 | Safety: Privacy                | safety/privacy.md                                    | ✅ Implemented | M1: Data Protection | None | Critical |
 | Safety: Monitoring             | safety/monitoring.md                                 | ✅ Implemented | M1: Telemetry | None | Critical |
 | Safety: Fail-Safes             | safety/fail_safes.md                                | ✅ Implemented | M1: Watchdogs | Monitoring | Critical |
-| Planning: Goal Formulation     | planning/goal_formulation.md                         | 📝 Planned | M2: Utility Engine | Core, Memory | Critical |
+| Planning: Goal Formulation     | planning/goal_formulation.md                         | ✅ Implemented | M2: Utility Engine | Core, Memory | Critical |
+| Cognition: Cognitive Core      | cognition/cognitive_core.md                          | ✅ Implemented | M2: LLM Integration | Core | Critical |
+| Memory: Episodic               | memory/episodic/README.md                           | ✅ Implemented | M2: Experience Storage | Core, World | High |
 | World: Place Graph             | world/place_graph/README.md                         | Not Started | M2: Spatial Memory | Core, Navigation | High |
-| Memory: Episodic               | memory/episodic/README.md                           | Not Started | M2: Experience Storage | Core, World | High |
 | Memory: Semantic               | memory/semantic/README.md                           | Not Started | M2: Knowledge Graph | Core, World | High |
 | Memory: Working                | memory/working/README.md                            | Not Started | M2: Cognitive Workspace | Core | High |
 | Memory: Provenance             | memory/provenance/README.md                         | Not Started | M2: Decision Tracking | Core, Memory | High |

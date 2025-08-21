@@ -14,5 +14,10 @@
 export * from './cognitive-core/llm-interface';
 export * from './cognitive-core/internal-dialogue';
 
+// Self Model
+export * from './self-model/identity-tracker';
+export * from './self-model/narrative-manager';
+
 // Types
 export * from './types';
+export * from './self-model/types';
