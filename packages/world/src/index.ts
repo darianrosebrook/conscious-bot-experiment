@@ -29,11 +29,35 @@ export { SensorimotorSystem } from './sensorimotor/sensorimotor-system';
 export { MotorController } from './sensorimotor/motor-controller';
 export { SensoryFeedbackProcessor } from './sensorimotor/sensory-feedback-processor';
 
+// Place Graph system
+export { PlaceGraphCore } from './place-graph/place-graph-core';
+export { PlaceMemory } from './place-graph/place-memory';
+export { SpatialNavigator } from './place-graph/spatial-navigator';
+export { createPlaceGraph } from './place-graph';
+
 // Types and interfaces
 export * from './types';
 export * from './perception/types';
 export * from './navigation/types';
 export * from './sensorimotor/types';
+// Export place graph types with namespace to avoid conflicts
+export { 
+  PlaceType,
+  BiomeCategory,
+  PlaceFunction,
+  SafetyLevel,
+  EdgeType,
+  PlaceNode,
+  PlaceEdge,
+  Landmark,
+  Resource,
+  PathFindingOptions,
+  NavigationPath,
+  NavigationInstruction,
+  SpatialQuery as PlaceSpatialQuery,
+  PlaceGraphConfig,
+  PlaceDiscovery,
+} from './place-graph/types';
 
 // Version info
 export const WORLD_VERSION = '0.1.0';
