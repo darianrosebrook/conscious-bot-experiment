@@ -10,7 +10,14 @@
 // Main classes
 export { Arbiter, ReflexModule } from './arbiter';
 export { SignalProcessor } from './signal-processor';
-export { PerformanceMonitor, TrackingSession } from './performance-monitor';
+export { PerformanceMonitor } from './performance-monitor';
+export type { TrackingSession } from './performance-monitor';
+
+// Advanced Components
+export { AdvancedNeedGenerator } from './advanced-need-generator';
+export { GoalTemplateManager } from './goal-template-manager';
+export { AdvancedSignalProcessor } from './advanced-signal-processor';
+export { PriorityRanker } from './priority-ranker';
 
 // MCP Capabilities
 export { CapabilityRegistry, ConstitutionalFilter } from './mcp-capabilities';
@@ -27,13 +34,115 @@ export {
 // Types and interfaces
 export * from './types';
 export * from './mcp-capabilities/types';
+
+// Advanced component types - explicit exports to avoid conflicts
+export type {
+  Need,
+  NeedContext,
+  NeedHistoryEntry,
+  TrendAnalysis,
+  TrendPrediction,
+  EnhancedNeed,
+  MemorySignal,
+  ContextGate,
+  NeedType,
+  TrendDirection,
+  TimeOfDay,
+  LocationType,
+  SocialContext,
+  EnvironmentalFactor,
+  AdvancedNeedGeneratorConfig,
+} from './advanced-need-generator';
+
+export type {
+  GoalTemplate,
+  ResourceRequirement,
+  SuccessCriterion,
+  FailureCondition,
+  FeasibilityFactor,
+  PlanSketchHint,
+  GoalInstance,
+  GoalContext,
+  RiskAssessment,
+  RiskFactor,
+  MitigationStrategy,
+  ContingencyPlan,
+  GoalAdaptation,
+  GoalCheckpoint,
+  ResourceStatus,
+  Blocker,
+  SuccessMetric,
+  GoalCategory,
+  ResourceType,
+  RiskLevel,
+  RiskType,
+  GoalStatus,
+  GoalTemplateManagerConfig,
+} from './goal-template-manager';
+
+export type {
+  Signal,
+  SignalData,
+  SignalMetadata,
+  FusedSignal,
+  IntrusionSignal,
+  MemorySignal as AdvancedMemorySignal,
+  SocialSignal,
+  SignalFusion,
+  FusionMetadata,
+  RedundancyAnalysis,
+  ConfidenceFactor,
+  SignalPattern,
+  ThreatAssessment,
+  MitigationStrategy as SignalMitigationStrategy,
+  SignalType,
+  SignalSource,
+  SignalDirection,
+  FusionMethod,
+  ThreatLevel,
+  ThreatType,
+  MemoryType,
+  SocialSignalType,
+  CommunicationIntent,
+  AdvancedSignalProcessorConfig,
+} from './advanced-signal-processor';
+
+export type {
+  PriorityTask,
+  PrioritizedTask,
+  TaskContext,
+  TaskMetadata,
+  ResourceRequirement as PriorityResourceRequirement,
+  PriorityFactor,
+  Commitment,
+  Opportunity,
+  PriorityRanking,
+  RankingMetadata,
+  PriorityDistribution,
+  TaskType,
+  ResourceType as PriorityResourceType,
+  RiskLevel as PriorityRiskLevel,
+  CommitmentType,
+  OpportunityType,
+  RankingMethod,
+  PriorityRankerConfig,
+} from './priority-ranker';
 // Re-export real-time types with explicit naming to avoid conflicts
-export {
+export type {
   PerformanceMetrics as RealTimePerformanceMetrics,
   PerformanceMetricsSchema as RealTimePerformanceMetricsSchema,
   DegradationLevel as RealTimeDegradationLevel,
 } from './real-time/types';
-export * from './real-time/types';
+
+// Export remaining real-time types that don't conflict
+export type {
+  PerformanceQuery,
+  PerformanceStats,
+  PerformanceBaseline,
+  PerformanceAnomaly,
+  OperationType,
+  PerformanceContext,
+} from './real-time/types';
 
 // Cognitive module interface
 export type { CognitiveModule } from './arbiter';

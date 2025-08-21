@@ -15,6 +15,16 @@ import {
   PerformanceMonitor,
   DEFAULT_PERFORMANCE_CONFIG,
 } from './performance-monitor';
+import { AdvancedNeedGenerator } from './advanced-need-generator';
+import { GoalTemplateManager } from './goal-template-manager';
+import {
+  AdvancedSignalProcessor,
+  Signal as AdvancedSignal,
+  SignalType,
+  SignalSource,
+  SignalDirection,
+} from './advanced-signal-processor';
+import { PriorityRanker } from './priority-ranker';
 import {
   Signal,
   CognitiveTask,
@@ -122,6 +132,10 @@ export class Arbiter extends EventEmitter<SystemEvents> {
   private config: ArbiterConfig;
   private signalProcessor: SignalProcessor;
   private performanceMonitor: PerformanceMonitor;
+  private advancedNeedGenerator: AdvancedNeedGenerator;
+  private goalTemplateManager: GoalTemplateManager;
+  private advancedSignalProcessor: AdvancedSignalProcessor;
+  private priorityRanker: PriorityRanker;
   private registeredModules = new Map<ModuleType, CognitiveModule>();
   private currentTask: CognitiveTask | null = null;
   private running = false;
@@ -138,6 +152,10 @@ export class Arbiter extends EventEmitter<SystemEvents> {
     // Initialize subsystems
     this.signalProcessor = new SignalProcessor(options.signalConfig);
     this.performanceMonitor = new PerformanceMonitor(options.performanceConfig);
+    this.advancedNeedGenerator = new AdvancedNeedGenerator();
+    this.goalTemplateManager = new GoalTemplateManager();
+    this.advancedSignalProcessor = new AdvancedSignalProcessor();
+    this.priorityRanker = new PriorityRanker();
 
     // Set up event forwarding
     this.setupEventForwarding();
@@ -168,10 +186,85 @@ export class Arbiter extends EventEmitter<SystemEvents> {
    *
    * @param signal - Signal to process
    */
-  processSignal(signal: Signal): void {
+  async processSignal(signal: Signal): Promise<void> {
     try {
       const validatedSignal = validateSignal(signal);
+
+      // Process with basic signal processor
       this.signalProcessor.processSignal(validatedSignal);
+
+      // Process with advanced signal processor
+      const advancedSignal: AdvancedSignal = {
+        id: uuidv4(),
+        type: validatedSignal.type as SignalType,
+        source: 'internal' as SignalSource,
+        priority: validatedSignal.intensity,
+        urgency: validatedSignal.intensity,
+        confidence: 0.8,
+        timestamp: validatedSignal.timestamp,
+        data: {
+          content: validatedSignal.type,
+          intensity: validatedSignal.intensity,
+          direction: 'incoming' as SignalDirection,
+          duration: 0,
+          frequency: 1,
+          amplitude: validatedSignal.intensity,
+        },
+        metadata: {
+          location: 'unknown',
+          environment: 'unknown',
+          socialContext: 'unknown',
+          emotionalValence: 0,
+          novelty: 0.5,
+          relevance: 0.8,
+          reliability: 0.8,
+          tags: [],
+        },
+        processed: false,
+        fused: false,
+      };
+
+      const processedSignals =
+        await this.advancedSignalProcessor.processSignals([advancedSignal]);
+
+      // Generate enhanced needs from processed signals
+      if (processedSignals.processedSignals.length > 0) {
+        // Convert signal processor needs to advanced need generator format
+        const baseNeeds = this.signalProcessor
+          .getCurrentNeeds()
+          .map((need) => ({
+            id: uuidv4(),
+            type: need.type as any, // NeedType enum
+            intensity: need.urgency,
+            urgency: need.urgency,
+            trend: 'stable' as any, // TrendDirection enum
+            trendStrength: 0.5,
+            context: this.getCurrentContext(),
+            memoryInfluence: 0.5,
+            noveltyScore: 0.5,
+            commitmentBoost: 0.5,
+            timestamp: need.lastUpdated,
+            history: [],
+          }));
+
+        const enhancedNeeds =
+          await this.advancedNeedGenerator.generateEnhancedNeeds(
+            baseNeeds,
+            this.getCurrentContext(),
+            processedSignals.processedSignals.map((s) => ({
+              type: 'experience' as const,
+              content: s.data.content,
+              relevance: s.metadata.relevance,
+              emotionalValence: s.metadata.emotionalValence,
+              urgency: s.urgency,
+              timestamp: s.timestamp,
+              decayRate: 0.95,
+            }))
+          );
+
+        // Enhanced needs generated - could be used for further processing
+        // Note: Signal processor needs are managed internally
+      }
 
       // Track signal statistics
       this.totalSignalsProcessed++;
@@ -505,18 +598,18 @@ export class Arbiter extends EventEmitter<SystemEvents> {
 
     this.running = true;
 
-    // Start processing loop with basic needs assessment
-    this.processLoopInterval = setInterval(() => {
-      this.processControlLoop();
+    // Start processing loop with advanced needs assessment
+    this.processLoopInterval = setInterval(async () => {
+      await this.processControlLoop();
     }, 100); // 10 Hz control loop
 
-    console.log('Arbiter started');
+    console.log('Arbiter started with advanced components');
   }
 
   /**
    * Main control loop iteration
    */
-  private processControlLoop(): void {
+  private async processControlLoop(): Promise<void> {
     if (!this.running) return;
 
     try {
@@ -524,19 +617,87 @@ export class Arbiter extends EventEmitter<SystemEvents> {
       const currentNeeds = this.signalProcessor.getCurrentNeeds();
       const urgentNeeds = currentNeeds.filter((need) => need.urgency > 0.7);
 
-      // Generate tasks for urgent needs
-      for (const need of urgentNeeds) {
+      // Convert current needs to advanced need generator format
+      const baseNeeds = currentNeeds.map((need) => ({
+        id: uuidv4(),
+        type: need.type as any, // NeedType enum
+        intensity: need.urgency,
+        urgency: need.urgency,
+        trend: 'stable' as any, // TrendDirection enum
+        trendStrength: 0.5,
+        context: this.getCurrentContext(),
+        memoryInfluence: 0.5,
+        noveltyScore: 0.5,
+        commitmentBoost: 0.5,
+        timestamp: need.lastUpdated,
+        history: [],
+      }));
+
+      // Generate enhanced needs with context awareness
+      const enhancedNeeds =
+        await this.advancedNeedGenerator.generateEnhancedNeeds(
+          baseNeeds,
+          this.getCurrentContext(),
+          []
+        );
+
+      // Create priority tasks from enhanced needs
+      const priorityTasks = enhancedNeeds.map((need) => ({
+        id: uuidv4(),
+        name: `${need.type}_need`,
+        description: `Address ${need.type} need with priority ${need.priorityScore}`,
+        type: this.mapNeedTypeToTaskType(need.type),
+        basePriority: need.priorityScore,
+        urgency: need.urgency,
+        importance: need.intensity,
+        complexity: need.intensity,
+        estimatedDuration: 30, // Default 30 minutes
+        dependencies: [],
+        resources: [],
+        context: this.getCurrentContext(),
+        metadata: {
+          category: 'need_satisfaction',
+          tags: [need.type, 'urgent'],
+          difficulty: need.intensity,
+          skillRequirements: [],
+          emotionalImpact: 0.5,
+          satisfaction: 0.8,
+          novelty: need.noveltyScore,
+          socialValue: need.socialImpact,
+        },
+        createdAt: Date.now(),
+        lastUpdated: Date.now(),
+      }));
+
+      // Rank tasks by priority
+      const ranking = await this.priorityRanker.rankTasks(
+        priorityTasks,
+        this.getCurrentContext()
+      );
+
+      // Process top priority tasks
+      const topTasks = ranking.tasks.slice(0, 3); // Process top 3 tasks
+      for (const prioritizedTask of topTasks) {
         const task: CognitiveTask = {
-          id: uuidv4(),
-          type: 'reactive',
-          priority: need.urgency,
-          complexity: 'simple',
-          context: { needType: need.type, needScore: need.score },
+          id: prioritizedTask.id,
+          type: this.mapTaskTypeToCognitiveType(prioritizedTask.type) as
+            | 'social'
+            | 'planning'
+            | 'reasoning'
+            | 'reactive'
+            | 'exploration',
+          priority: prioritizedTask.calculatedPriority,
+          complexity: prioritizedTask.complexity > 0.5 ? 'complex' : 'simple',
+          context: {
+            needType: prioritizedTask.name,
+            needScore: prioritizedTask.calculatedPriority,
+            rankingReason: prioritizedTask.rankingReason,
+          },
         };
 
         // Process task asynchronously
         this.processCognitiveTask(task).catch((error) => {
-          console.error('Failed to process urgent need task:', error);
+          console.error('Failed to process priority task:', error);
         });
       }
 
@@ -667,5 +828,87 @@ export class Arbiter extends EventEmitter<SystemEvents> {
    */
   getPerformanceMonitor(): PerformanceMonitor {
     return this.performanceMonitor;
+  }
+
+  /**
+   * Get current context for advanced components
+   */
+  private getCurrentContext() {
+    return {
+      timeOfDay: 'morning' as any, // TimeOfDay enum
+      location: 'village' as any, // LocationType enum
+      socialContext: 'alone' as any, // SocialContext enum
+      environmentalFactors: [],
+      recentEvents: [],
+      currentGoals: [],
+      availableResources: ['basic_tools', 'food'],
+      environment: 'village',
+      constraints: [],
+      opportunities: [],
+      energyLevel: 0.8,
+      stressLevel: 0.2,
+    };
+  }
+
+  /**
+   * Map need type to task type
+   */
+  private mapNeedTypeToTaskType(needType: string): any {
+    const mapping: Record<string, any> = {
+      safety: 'survival',
+      nutrition: 'survival',
+      social: 'social',
+      exploration: 'exploration',
+      building: 'building',
+      crafting: 'crafting',
+      combat: 'combat',
+      learning: 'learning',
+      achievement: 'achievement',
+      maintenance: 'maintenance',
+      emergency: 'emergency',
+      creative: 'creative',
+      administrative: 'administrative',
+    };
+    return mapping[needType] || 'administrative';
+  }
+
+  /**
+   * Map task type to cognitive type
+   */
+  private mapTaskTypeToCognitiveType(taskType: any): string {
+    const mapping: Record<string, string> = {
+      survival: 'reactive',
+      social: 'social',
+      exploration: 'planning',
+      building: 'planning',
+      crafting: 'planning',
+      combat: 'reactive',
+      learning: 'reasoning',
+      achievement: 'planning',
+      maintenance: 'planning',
+      emergency: 'reactive',
+      creative: 'reasoning',
+      administrative: 'planning',
+    };
+    return mapping[taskType] || 'planning';
+  }
+
+  /**
+   * Get advanced components for direct access
+   */
+  getAdvancedNeedGenerator(): AdvancedNeedGenerator {
+    return this.advancedNeedGenerator;
+  }
+
+  getGoalTemplateManager(): GoalTemplateManager {
+    return this.goalTemplateManager;
+  }
+
+  getAdvancedSignalProcessor(): AdvancedSignalProcessor {
+    return this.advancedSignalProcessor;
+  }
+
+  getPriorityRanker(): PriorityRanker {
+    return this.priorityRanker;
   }
 }

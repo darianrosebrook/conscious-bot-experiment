@@ -7,7 +7,10 @@
  * @author @darianrosebrook
  */
 
-import { LLMConfig, LLMContext, LLMResponse, LLMConfigSchema } from '../types';
+import { LLMConfig, LLMConfigSchema, LLMContext, LLMResponse } from '../types';
+
+// Export LLMContext for use by other modules
+export type { LLMContext, LLMResponse } from '../types';
 
 /**
  * Ollama API client for local LLM interaction
@@ -30,7 +33,7 @@ export class LLMInterface {
     };
 
     this.config = { ...defaultConfig, ...config };
-    
+
     // Validate configuration
     const validation = LLMConfigSchema.safeParse(this.config);
     if (!validation.success) {
@@ -60,8 +63,12 @@ export class LLMInterface {
     const model = options?.model ?? this.config.model;
     const temperature = options?.temperature ?? this.config.temperature;
     const maxTokens = options?.maxTokens ?? this.config.maxTokens;
-    
-    const fullPrompt = this.buildFullPrompt(prompt, context, options?.systemPrompt);
+
+    const fullPrompt = this.buildFullPrompt(
+      prompt,
+      context,
+      options?.systemPrompt
+    );
     const startTime = performance.now();
 
     try {
@@ -69,9 +76,9 @@ export class LLMInterface {
         temperature,
         maxTokens,
       });
-      
+
       const endTime = performance.now();
-      
+
       return {
         id: `llm-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         text: response.response,
@@ -84,23 +91,26 @@ export class LLMInterface {
           usage: {
             promptTokens: response.prompt_eval_count || 0,
             completionTokens: response.eval_count || 0,
-            totalTokens: (response.prompt_eval_count || 0) + (response.eval_count || 0),
+            totalTokens:
+              (response.prompt_eval_count || 0) + (response.eval_count || 0),
           },
         },
         timestamp: Date.now(),
       };
     } catch (error) {
       console.error('LLM generation failed:', error);
-      
+
       // Try fallback model if available
       if (this.config.fallbackModel && model !== this.config.fallbackModel) {
-        console.log(`Retrying with fallback model: ${this.config.fallbackModel}`);
+        console.log(
+          `Retrying with fallback model: ${this.config.fallbackModel}`
+        );
         return this.generateResponse(prompt, context, {
           ...options,
           model: this.config.fallbackModel,
         });
       }
-      
+
       throw error;
     }
   }
@@ -125,7 +135,14 @@ Keep responses concise but thoughtful.`;
     const prompt = `Current situation: ${situation}
 
 ${context?.currentGoals ? `Current goals: ${context.currentGoals.join(', ')}` : ''}
-${context?.recentMemories ? `Recent events: ${context.recentMemories.slice(0, 3).map((m: any) => m.description).join('; ')}` : ''}
+${
+  context?.recentMemories
+    ? `Recent events: ${context.recentMemories
+        .slice(0, 3)
+        .map((m: any) => m.description)
+        .join('; ')}`
+    : ''
+}
 
 What are your thoughts about this situation?`;
 
@@ -228,7 +245,7 @@ How should I respond?`;
   async listModels(): Promise<string[]> {
     try {
       const response = await fetch(`${this.baseUrl}/api/tags`);
-      const data = await response.json() as any;
+      const data = (await response.json()) as any;
       return data.models?.map((m: any) => m.name) || [];
     } catch (error) {
       console.error('Failed to list models:', error);
@@ -316,7 +333,9 @@ How should I respond?`;
       clearTimeout(timeoutId);
 
       if (!response.ok) {
-        throw new Error(`Ollama API error: ${response.status} ${response.statusText}`);
+        throw new Error(
+          `Ollama API error: ${response.status} ${response.statusText}`
+        );
       }
 
       return await response.json();

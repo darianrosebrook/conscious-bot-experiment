@@ -687,8 +687,12 @@ export class PerformanceTracker
 
     return {
       latencyTrend: this.getTrend(firstLatency, secondLatency, 0.1),
-      throughputTrend: this.getTrend(firstHalf.length, secondHalf.length, 0.1),
-      errorTrend: this.getTrend(firstErrors, secondErrors, 0.05),
+      throughputTrend: this.getThroughputTrend(
+        firstHalf.length,
+        secondHalf.length,
+        0.1
+      ),
+      errorTrend: this.getErrorTrend(firstErrors, secondErrors, 0.05),
     };
   }
 
@@ -706,6 +710,43 @@ export class PerformanceTracker
     // For latency and errors, higher is worse
     if (change > threshold) {
       return 'degrading';
+    } else {
+      return 'improving';
+    }
+  }
+
+  private getThroughputTrend(
+    first: number,
+    second: number,
+    threshold: number
+  ): 'increasing' | 'decreasing' | 'stable' {
+    const change = (second - first) / first;
+
+    if (Math.abs(change) < threshold) {
+      return 'stable';
+    }
+
+    if (change > threshold) {
+      return 'increasing';
+    } else {
+      return 'decreasing';
+    }
+  }
+
+  private getErrorTrend(
+    first: number,
+    second: number,
+    threshold: number
+  ): 'improving' | 'stable' | 'worsening' {
+    const change = (second - first) / first;
+
+    if (Math.abs(change) < threshold) {
+      return 'stable';
+    }
+
+    // For errors, higher is worse
+    if (change > threshold) {
+      return 'worsening';
     } else {
       return 'improving';
     }
