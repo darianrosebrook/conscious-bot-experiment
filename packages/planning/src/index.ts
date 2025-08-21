@@ -35,5 +35,14 @@ export * from './reactive-executor/reactive-executor';
 export * from './reactive-executor/goap-planner';
 export * from './reactive-executor/plan-repair';
 
+// Integrated Planning Coordinator (M3 - Full Integration)
+export {
+  IntegratedPlanningCoordinator,
+  createIntegratedPlanningCoordinator,
+  type PlanningConfiguration,
+  type PlanningContext,
+  type IntegratedPlanningResult
+} from './integrated-planning-coordinator';
+
 // Types
 export * from './types';
