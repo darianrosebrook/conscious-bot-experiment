@@ -26,6 +26,7 @@ import {
 import { 
   CognitiveTaskRouter, 
   createCognitiveRouter,
+  routeTask,
   TaskDecision,
   TaskType,
   RouterType
@@ -45,9 +46,9 @@ import { GOAPPlanner } from './reactive-executor/goap-planner';
 
 // Goal formulation components
 import { HomeostasisMonitor } from './goal-formulation/homeostasis-monitor';
-import { NeedGenerator } from './goal-formulation/need-generator';
+import { generateNeeds } from './goal-formulation/need-generator';
 import { GoalManager } from './goal-formulation/goal-manager';
-import { UtilityCalculator } from './goal-formulation/utility-calculator';
+import { createWeightedUtility } from './goal-formulation/utility-calculator';
 
 export interface PlanningConfiguration {
   // HRM Configuration
@@ -147,9 +148,7 @@ export class IntegratedPlanningCoordinator extends EventEmitter {
   
   // Goal Formulation Components
   private homeostasisMonitor: HomeostasisMonitor;
-  private needGenerator: NeedGenerator;
   private goalManager: GoalManager;
-  private utilityCalculator: UtilityCalculator;
   
   // Planning State
   private activePlans: Map<string, Plan> = new Map();
@@ -221,6 +220,8 @@ export class IntegratedPlanningCoordinator extends EventEmitter {
       return result;
       
     } catch (error) {
+      console.error('Planning pipeline error details:', error);
+      console.error('Error stack:', error instanceof Error ? error.stack : 'No stack trace');
       this.emit('planningError', error);
       throw new Error(`Planning pipeline failed: ${error}`);
     }
@@ -235,14 +236,11 @@ export class IntegratedPlanningCoordinator extends EventEmitter {
   ): Promise<IntegratedPlanningResult['goalFormulation']> {
     
     // Process homeostatic signals into needs
-    const homeostasisState = this.homeostasisMonitor.analyzeSignals(signals);
-    const identifiedNeeds = this.needGenerator.generateNeeds(homeostasisState, context);
+    const homeostasisState = this.analyzeSignalsToHomeostasis(signals, context);
+    const identifiedNeeds = generateNeeds(homeostasisState);
     
     // Transform needs into candidate goals
-    const candidateGoals = await this.goalManager.generateCandidateGoals(
-      identifiedNeeds, 
-      context
-    );
+    const candidateGoals = this.generateCandidateGoalsFromNeeds(identifiedNeeds, context);
     
     // Calculate utility scores and prioritize
     const utilityContext: UtilityContext = {
@@ -254,9 +252,17 @@ export class IntegratedPlanningCoordinator extends EventEmitter {
       time: Date.now()
     };
     
+    // Create a utility calculator with balanced weights
+    const utilityCalculator = createWeightedUtility({
+      needIntensity: 0.4,
+      needUrgency: 0.3,
+      healthRisk: 0.2,
+      safetyRisk: 0.1
+    });
+    
     const priorityRanking = candidateGoals.map(goal => ({
       goalId: goal.id,
-      score: this.utilityCalculator.calculateUtility(goal, utilityContext),
+      score: utilityCalculator.calculate(utilityContext),
       reasoning: this.generatePriorityReasoning(goal, utilityContext)
     })).sort((a, b) => b.score - a.score);
     
@@ -281,8 +287,18 @@ export class IntegratedPlanningCoordinator extends EventEmitter {
     context: PlanningContext
   ): Promise<TaskDecision> {
     
-    if (goals.length === 0) {
-      throw new Error('No goals provided for cognitive routing');
+    if (!goals || goals.length === 0) {
+      // Create a default exploration task for empty goals
+      const defaultGoal: Goal = {
+        id: 'default-exploration',
+        type: GoalType.CURIOSITY,
+        description: 'Explore environment and gather information',
+        status: GoalStatus.PENDING,
+        priority: 0.5,
+        createdAt: Date.now(),
+        updatedAt: Date.now()
+      };
+      goals = [defaultGoal];
     }
     
     // Use the primary goal for routing decision
@@ -297,7 +313,7 @@ export class IntegratedPlanningCoordinator extends EventEmitter {
       requiresWorldKnowledge: this.requiresWorldKnowledge(primaryGoal),
     };
     
-    return this.cognitiveRouter.routeTask(taskDescription, routingContext);
+    return routeTask(taskDescription, routingContext);
   }
 
   /**
@@ -393,10 +409,15 @@ export class IntegratedPlanningCoordinator extends EventEmitter {
     style: 'creative' | 'balanced' | 'efficient'
   ): Promise<Plan> {
     // Use existing HTN planner with goal
-    const plan = this.htnPlanner.decompose(goal);
+    let plan = this.htnPlanner.decompose(goal);
     
     if (!plan) {
       throw new Error(`HTN planner failed to generate plan for goal: ${goal.id}`);
+    }
+    
+    // Generate basic steps if plan is empty
+    if (plan.steps.length === 0) {
+      plan.steps = this.generateBasicPlanSteps(goal, context, style);
     }
     
     // Enhance with style-specific modifications
@@ -573,14 +594,192 @@ export class IntegratedPlanningCoordinator extends EventEmitter {
     
     // Initialize goal formulation components
     this.homeostasisMonitor = new HomeostasisMonitor();
-    this.needGenerator = new NeedGenerator();
     this.goalManager = new GoalManager();
-    this.utilityCalculator = new UtilityCalculator();
   }
 
   // Utility methods for conversions and mappings
   private goalToTaskDescription(goal: Goal, context: PlanningContext): string {
-    return `${goal.description} with urgency ${context.timeConstraints.urgency} and threat level ${context.situationalFactors.threatLevel}`;
+    const description = goal?.description || 'unknown task';
+    const urgency = context?.timeConstraints?.urgency || 'medium';
+    const threatLevel = context?.situationalFactors?.threatLevel || 0;
+    return `${description} with urgency ${urgency} and threat level ${threatLevel}`;
+  }
+
+  /**
+   * Convert raw signals into homeostasis state
+   */
+  private analyzeSignalsToHomeostasis(signals: any[], context: PlanningContext): HomeostasisState {
+    // Start with current state from context
+    const baseState = context.currentState || {};
+    
+    // Process signals to adjust homeostasis values
+    const adjustments: Partial<HomeostasisState> = {};
+    
+    signals.forEach(signal => {
+      switch (signal.type) {
+        case 'hunger':
+          adjustments.hunger = this.normalizeSignalValue(signal.value);
+          break;
+        case 'thirst':
+          // Map thirst to health impact
+          adjustments.health = Math.min(baseState.health || 1, 1 - this.normalizeSignalValue(signal.value) * 0.3);
+          break;
+        case 'health_critical':
+          adjustments.health = Math.min(0.2, this.normalizeSignalValue(signal.value));
+          break;
+        case 'threat_detected':
+        case 'imminent_threat':
+          adjustments.safety = 1 - this.normalizeSignalValue(signal.value);
+          break;
+        case 'curiosity':
+        case 'exploration_drive':
+          adjustments.curiosity = this.normalizeSignalValue(signal.value);
+          break;
+        case 'social_need':
+          adjustments.social = this.normalizeSignalValue(signal.value);
+          break;
+        case 'achievement_drive':
+          adjustments.achievement = this.normalizeSignalValue(signal.value);
+          break;
+        case 'energy':
+          adjustments.energy = this.normalizeSignalValue(signal.value);
+          break;
+        default:
+          // Unknown signal type - contribute to general curiosity
+          adjustments.curiosity = Math.max(adjustments.curiosity || 0, 0.5);
+      }
+    });
+    
+    // Merge with context state and apply adjustments
+    return this.homeostasisMonitor.sample({
+      ...baseState,
+      ...adjustments,
+      timestamp: Date.now()
+    });
+  }
+
+  /**
+   * Normalize signal values to 0-1 range
+   */
+  private normalizeSignalValue(value: number): number {
+    if (value >= 0 && value <= 1) return value;
+    if (value > 1 && value <= 100) return value / 100;
+    return Math.max(0, Math.min(1, value));
+  }
+
+  /**
+   * Generate candidate goals from identified needs
+   */
+  private generateCandidateGoalsFromNeeds(needs: Need[], context: PlanningContext): Goal[] {
+    const candidateGoals: Goal[] = [];
+    const now = Date.now();
+    
+    needs.forEach((need, index) => {
+      // Create a goal for each need
+      const goalId = `goal-${now}-${need.type}-${index}`;
+      
+      // Map need types to goal types and descriptions
+      const goalMapping = this.mapNeedToGoal(need, context);
+      
+      const goal: Goal = {
+        id: goalId,
+        type: goalMapping.type,
+        description: goalMapping.description,
+        status: GoalStatus.PENDING,
+        priority: need.intensity * need.urgency, // Combined urgency and intensity
+        deadline: this.calculateGoalDeadline(need, context),
+        createdAt: now,
+        updatedAt: now,
+        context: {
+          sourceNeed: need.id,
+          urgency: context.timeConstraints.urgency,
+          threatLevel: context.situationalFactors.threatLevel
+        }
+      };
+      
+      candidateGoals.push(goal);
+    });
+    
+    return candidateGoals;
+  }
+
+  /**
+   * Map a need to appropriate goal type and description
+   */
+  private mapNeedToGoal(need: Need, context: PlanningContext): { type: GoalType, description: string } {
+    switch (need.type) {
+      case NeedType.SURVIVAL:
+        return {
+          type: GoalType.SURVIVAL,
+          description: 'Ensure survival by maintaining health and resources'
+        };
+      case NeedType.SAFETY:
+        return {
+          type: GoalType.SAFETY,
+          description: 'Establish safety and secure the immediate environment'
+        };
+      case NeedType.EXPLORATION:
+        return {
+          type: GoalType.EXPLORATION,
+          description: 'Explore surroundings to gather information and resources'
+        };
+      case NeedType.SOCIAL:
+        return {
+          type: GoalType.SOCIAL,
+          description: 'Engage with others and build social connections'
+        };
+      case NeedType.ACHIEVEMENT:
+        return {
+          type: GoalType.ACHIEVEMENT,
+          description: 'Accomplish meaningful tasks and make progress'
+        };
+      case NeedType.CREATIVITY:
+        return {
+          type: GoalType.CREATIVITY,
+          description: 'Express creativity and build innovative solutions'
+        };
+      case NeedType.CURIOSITY:
+        return {
+          type: GoalType.CURIOSITY,
+          description: 'Satisfy curiosity and learn about the environment'
+        };
+      default:
+        return {
+          type: GoalType.CURIOSITY,
+          description: `Address ${need.type} need through exploration`
+        };
+    }
+  }
+
+  /**
+   * Calculate appropriate deadline for a goal based on need urgency
+   */
+  private calculateGoalDeadline(need: Need, context: PlanningContext): number | undefined {
+    const now = Date.now();
+    const urgencyMultiplier = need.urgency;
+    
+    // Base deadline calculation
+    let baseTimeMs = 60000; // 1 minute default
+    
+    switch (context.timeConstraints.urgency) {
+      case 'emergency':
+        baseTimeMs = 10000; // 10 seconds
+        break;
+      case 'high':
+        baseTimeMs = 30000; // 30 seconds
+        break;
+      case 'medium':
+        baseTimeMs = 120000; // 2 minutes
+        break;
+      case 'low':
+        baseTimeMs = 300000; // 5 minutes
+        break;
+    }
+    
+    // Adjust by need urgency
+    const adjustedTime = baseTimeMs / Math.max(0.1, urgencyMultiplier);
+    
+    return now + adjustedTime;
   }
 
   private mapGoalDomain(goalType: GoalType): string {
@@ -619,6 +818,112 @@ export class IntegratedPlanningCoordinator extends EventEmitter {
       case 'collaborative': return 'hybrid';
       default: return 'htn';
     }
+  }
+
+  /**
+   * Generate basic plan steps based on goal type
+   */
+  private generateBasicPlanSteps(goal: Goal, context: PlanningContext, style: string): PlanStep[] {
+    const steps: PlanStep[] = [];
+    const now = Date.now();
+    
+    switch (goal.type) {
+      case GoalType.SURVIVAL:
+        steps.push(
+          this.createPlanStep('assess-health', 'Assess current health status', [], 30),
+          this.createPlanStep('secure-resources', 'Secure basic survival resources', ['assess-health'], 120),
+          this.createPlanStep('establish-safety', 'Establish safe environment', ['secure-resources'], 90)
+        );
+        break;
+        
+      case GoalType.SAFETY:
+        steps.push(
+          this.createPlanStep('scan-threats', 'Scan for immediate threats', [], 20),
+          this.createPlanStep('secure-area', 'Secure immediate area', ['scan-threats'], 60),
+          this.createPlanStep('establish-perimeter', 'Establish safety perimeter', ['secure-area'], 90)
+        );
+        break;
+        
+      case GoalType.EXPLORATION:
+        steps.push(
+          this.createPlanStep('plan-route', 'Plan exploration route', [], 40),
+          this.createPlanStep('gather-supplies', 'Gather exploration supplies', ['plan-route'], 80),
+          this.createPlanStep('begin-exploration', 'Begin systematic exploration', ['gather-supplies'], 300)
+        );
+        break;
+        
+      case GoalType.SOCIAL:
+        steps.push(
+          this.createPlanStep('locate-entities', 'Locate social entities', [], 50),
+          this.createPlanStep('initiate-contact', 'Initiate social contact', ['locate-entities'], 120),
+          this.createPlanStep('build-rapport', 'Build social rapport', ['initiate-contact'], 180)
+        );
+        break;
+        
+      case GoalType.ACHIEVEMENT:
+        steps.push(
+          this.createPlanStep('define-objectives', 'Define specific objectives', [], 60),
+          this.createPlanStep('gather-tools', 'Gather necessary tools', ['define-objectives'], 90),
+          this.createPlanStep('execute-tasks', 'Execute planned tasks', ['gather-tools'], 240)
+        );
+        break;
+        
+      case GoalType.CREATIVITY:
+        steps.push(
+          this.createPlanStep('brainstorm-ideas', 'Brainstorm creative ideas', [], 90),
+          this.createPlanStep('select-concept', 'Select best concept', ['brainstorm-ideas'], 45),
+          this.createPlanStep('implement-solution', 'Implement creative solution', ['select-concept'], 180)
+        );
+        break;
+        
+      case GoalType.CURIOSITY:
+        steps.push(
+          this.createPlanStep('identify-questions', 'Identify key questions', [], 30),
+          this.createPlanStep('investigate', 'Investigate phenomena', ['identify-questions'], 150),
+          this.createPlanStep('synthesize-knowledge', 'Synthesize new knowledge', ['investigate'], 90)
+        );
+        break;
+        
+      default:
+        steps.push(
+          this.createPlanStep('analyze-situation', 'Analyze current situation', [], 60),
+          this.createPlanStep('take-action', 'Take appropriate action', ['analyze-situation'], 120)
+        );
+    }
+    
+    // Adjust for urgency
+    if (context.timeConstraints.urgency === 'emergency') {
+      steps.forEach(step => {
+        step.estimatedDuration = Math.max(10, step.estimatedDuration * 0.3);
+      });
+    }
+    
+    return steps;
+  }
+
+  /**
+   * Create a standardized plan step
+   */
+  private createPlanStep(id: string, description: string, dependencies: string[], duration: number): PlanStep {
+    return {
+      id,
+      action: {
+        id,
+        type: description,
+        parameters: {},
+        preconditions: {},
+        effects: { [id.replace('-', '_')]: true },
+        cost: duration / 60, // Convert to relative cost
+        estimatedDuration: duration
+      },
+      status: 'pending' as const,
+      dependencies,
+      estimatedDuration: duration,
+      resources: [
+        { type: 'time', amount: duration, availability: 'available' as const },
+        { type: 'energy', amount: Math.ceil(duration / 30), availability: 'available' as const }
+      ]
+    };
   }
 
   // Placeholder implementations for missing methods
