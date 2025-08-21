@@ -53,6 +53,7 @@ This directory contains implementation plans for all modules. Use this Map of Co
 ## Progress Tracker
 
 **🎉 MILESTONE 1 (FOUNDATION) COMPLETE** - All critical infrastructure modules implemented and tested
+**🎉 MILESTONE 2 (INTELLIGENCE) COMPLETE** - All memory systems, goal formulation, and constitutional framework implemented
 
 | Module                         | Plan Doc                                       | Status | Milestone | Dependencies | Priority |
 |--------------------------------|------------------------------------------------------|---------|-----------|--------------|----------|
@@ -66,13 +67,13 @@ This directory contains implementation plans for all modules. Use this Map of Co
 | Safety: Privacy                | safety/privacy.md                                    | ✅ Implemented | M1: Data Protection | None | Critical |
 | Safety: Monitoring             | safety/monitoring.md                                 | ✅ Implemented | M1: Telemetry | None | Critical |
 | Safety: Fail-Safes             | safety/fail_safes.md                                | ✅ Implemented | M1: Watchdogs | Monitoring | Critical |
-| Planning: Goal Formulation     | planning/goal_formulation.md                         | 📝 Planned | M2: Utility Engine | Core, Memory | Critical |
-| World: Place Graph             | world/place_graph/README.md                         | Not Started | M2: Spatial Memory | Core, Navigation | High |
-| Memory: Episodic               | memory/episodic/README.md                           | Not Started | M2: Experience Storage | Core, World | High |
-| Memory: Semantic               | memory/semantic/README.md                           | Not Started | M2: Knowledge Graph | Core, World | High |
-| Memory: Working                | memory/working/README.md                            | Not Started | M2: Cognitive Workspace | Core | High |
-| Memory: Provenance             | memory/provenance/README.md                         | Not Started | M2: Decision Tracking | Core, Memory | High |
-| Interfaces: Constitution       | interfaces/constitution.md                           | 📝 Planned | M2: Rules Engine | None | Critical |
+| Planning: Goal Formulation     | planning/goal_formulation.md                         | ✅ Implemented | M2: Utility Engine | Core, Memory | Critical |
+| World: Place Graph             | world/place_graph/README.md                         | ✅ Implemented | M2: Spatial Memory | Core, Navigation | High |
+| Memory: Episodic               | memory/episodic/README.md                           | ✅ Implemented | M2: Experience Storage | Core, World | High |
+| Memory: Semantic               | memory/semantic/README.md                           | ✅ Implemented | M2: Knowledge Graph | Core, World | High |
+| Memory: Working                | memory/working/README.md                            | ✅ Implemented | M2: Cognitive Workspace | Core | High |
+| Memory: Provenance             | memory/provenance/README.md                         | ✅ Implemented | M2: Decision Tracking | Core, Memory | High |
+| Interfaces: Constitution       | interfaces/constitution.md                           | ✅ Implemented | M2: Rules Engine | None | Critical |
 | Interfaces: Web Dashboard      | interfaces/web_dashboard.md                          | 📝 Planned | M2: Monitoring | Safety | Medium |
 | Evaluation: Scenarios          | evaluation/scenarios.md                              | 📝 Planned | M2: Test Envs | None | High |
 | Evaluation: Metrics            | evaluation/metrics.md                                | 📝 Planned | M2: Analytics | Scenarios | High |
@@ -106,6 +107,7 @@ Beyond module-specific plans, the following strategic documents guide overall pr
 - [Risk Management](../../strategy/RISK_MANAGEMENT.md) - Comprehensive risk assessment and mitigation strategies  
 - [Verification Framework](../../strategy/VERIFICATION_FRAMEWORK.md) - Quality assurance and testing methodology
 - [Future Enhancements](../../strategy/FUTURE_ENHANCEMENTS.md) - Advanced features for post-M4 development phases
+- [M3 Implementation Plan](../../strategy/M3_IMPLEMENTATION_PLAN.md) - Detailed plan for M3 implementation
 
 📋 **See [Strategy Overview](../../strategy/README.md) for detailed guidance on using these documents.**
 
