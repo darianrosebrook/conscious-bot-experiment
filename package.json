@@ -1,0 +1,48 @@
+{
+  "name": "conscious-bot",
+  "version": "0.1.0",
+  "description": "A conscious AI agent with hierarchical reasoning capabilities",
+  "main": "dist/index.js",
+  "type": "module",
+  "scripts": {
+    "build": "turbo build",
+    "dev": "turbo dev",
+    "lint": "turbo lint",
+    "test": "turbo test",
+    "clean": "turbo clean",
+    "type-check": "turbo type-check",
+    "agent:dev": "pnpm --filter @conscious-bot/agent dev",
+    "core:dev": "pnpm --filter @conscious-bot/core dev",
+    "hrm:train": "cd sapient-hrm && python pretrain.py",
+    "hrm:eval": "cd sapient-hrm && python evaluate.py"
+  },
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "turbo": "^1.13.0",
+    "typescript": "^5.0.0",
+    "eslint": "^8.57.0",
+    "@typescript-eslint/eslint-plugin": "^6.0.0",
+    "@typescript-eslint/parser": "^6.0.0",
+    "prettier": "^3.0.0"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "pnpm": ">=8.0.0"
+  },
+  "packageManager": "pnpm@8.15.0",
+  "keywords": [
+    "ai",
+    "consciousness",
+    "cognitive-architecture",
+    "minecraft",
+    "embodied-ai",
+    "reasoning",
+    "hrm"
+  ],
+  "author": "@darianrosebrook",
+  "license": "MIT"
+}
