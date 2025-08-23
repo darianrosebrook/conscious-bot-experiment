@@ -236,21 +236,20 @@ describe('World Module Performance Regression Tests', () => {
       coordination: {
         conflictResolution: 'priority_based',
         timingSynchronization: true,
-        executionQueuing: true,
-        resourceSharing: true,
-        errorRecovery: true,
+        feedbackIntegration: 'real_time',
+        coordinationTimeout: 5000,
       },
       feedbackProcessing: {
-        responseWindow: 100,
-        qualityThreshold: 0.8,
-        adaptationRate: 0.1,
-        contextSize: 5,
+        bufferDuration: 100,
+        processingFrequency: 20,
+        learningRate: 0.1,
+        confidenceThreshold: 0.8,
       },
       prediction: {
-        lookaheadTime: 200,
-        confidenceThreshold: 0.7,
-        adaptivePrediction: true,
-        maxPredictionDepth: 3,
+        predictionHorizon: 200,
+        modelUpdateFrequency: 1,
+        predictionConfidenceThreshold: 0.7,
+        maxPredictionAge: 1000,
       },
       performance: {
         latencyMonitoring: true,
@@ -259,11 +258,11 @@ describe('World Module Performance Regression Tests', () => {
         performanceLogging: true,
       },
       safety: {
+        emergencyResponseTime: 5,
         collisionAvoidance: true,
-        boundaryEnforcement: true,
-        emergencyStop: true,
         safetyMargin: 0.5,
         automaticRecovery: true,
+        boundaryEnforcement: true,
       },
     };
 
@@ -271,9 +270,15 @@ describe('World Module Performance Regression Tests', () => {
     navigationSystem = new NavigationSystem(navigationConfig);
     perceptionSystem = new PerceptionIntegration(
       perceptionConfig,
-      raycastEngine
+      () => ({
+        position: { x: 0, y: 64, z: 0 },
+        orientation: { yaw: 0, pitch: 0 },
+        headDirection: { x: 0, y: 0, z: -1 },
+        eyeHeight: 1.62,
+      }),
+      raycastEngine as any
     );
-    sensorimotorSystem = new SensorimotorSystem(sensorimotorConfig);
+    sensorimotorSystem = new SensorimotorSystem(sensorimotorConfig, {} as any);
 
     // Setup a basic test world
     setupTestWorld();
@@ -475,9 +480,16 @@ describe('World Module Performance Regression Tests', () => {
         start: { x: 0, y: 64, z: 0 },
         goal: { x: 5, y: 64, z: 5 },
         urgency: 'normal',
+        maxDistance: 200,
+        allowPartialPath: true,
+        avoidHazards: true,
+        timeout: 50,
         preferences: {
-          avoidWater: false,
+          preferLit: true,
           avoidMobs: false,
+          minimizeVertical: false,
+          preferSolid: true,
+          avoidWater: false,
           preferLighting: false,
           maxDetour: 2.0,
         },
@@ -500,9 +512,16 @@ describe('World Module Performance Regression Tests', () => {
         start: { x: 0, y: 64, z: 0 },
         goal: { x: 25, y: 64, z: 25 },
         urgency: 'normal',
+        maxDistance: 200,
+        allowPartialPath: true,
+        avoidHazards: true,
+        timeout: 50,
         preferences: {
-          avoidWater: false,
+          preferLit: true,
           avoidMobs: false,
+          minimizeVertical: false,
+          preferSolid: true,
+          avoidWater: false,
           preferLighting: false,
           maxDetour: 5.0,
         },
@@ -525,9 +544,16 @@ describe('World Module Performance Regression Tests', () => {
         start: { x: 0, y: 64, z: 0 },
         goal: { x: 45, y: 64, z: 45 },
         urgency: 'normal',
+        maxDistance: 200,
+        allowPartialPath: true,
+        avoidHazards: true,
+        timeout: 50,
         preferences: {
-          avoidWater: false,
+          preferLit: true,
           avoidMobs: false,
+          minimizeVertical: false,
+          preferSolid: true,
+          avoidWater: false,
           preferLighting: false,
           maxDetour: 10.0,
         },
@@ -551,11 +577,10 @@ describe('World Module Performance Regression Tests', () => {
   describe('Perception Performance', () => {
     test('basic visual field processing performance', async () => {
       const query: VisualQuery = {
+        position: { x: 0, y: 64, z: 0 },
+        radius: 32,
         observerPosition: { x: 0, y: 64, z: 0 },
-        observerRotation: { yaw: 0, pitch: 0 },
-        fieldOfView: { horizontal: 90, vertical: 60 },
         maxDistance: 32,
-        level: 'standard',
       };
 
       const result = await benchmarkOperation('perception_basic_field', () =>
@@ -572,11 +597,10 @@ describe('World Module Performance Regression Tests', () => {
 
     test('complex scene processing performance', async () => {
       const query: VisualQuery = {
-        observerPosition: { x: 12, y: 65, z: 12 }, // Inside the test building
-        observerRotation: { yaw: 45, pitch: -10 },
-        fieldOfView: { horizontal: 120, vertical: 90 },
+        position: { x: 12, y: 65, z: 12 }, // Inside the test building
+        radius: 64,
+        observerPosition: { x: 12, y: 65, z: 12 },
         maxDistance: 64,
-        level: 'detailed',
       };
 
       const result = await benchmarkOperation('perception_complex_scene', () =>
@@ -595,18 +619,21 @@ describe('World Module Performance Regression Tests', () => {
   describe('Action Execution Performance', () => {
     test('simple action execution performance', async () => {
       const actionRequest: ActionRequest = {
-        type: 'move',
+        id: 'test-simple-move',
+        type: 'move_forward',
         parameters: {
           direction: { x: 1, y: 0, z: 0 },
           speed: 0.5,
           duration: 100,
         },
-        priority: 'normal',
+        priority: 1,
+        requiredPrecision: 0.5,
         timeout: 1000,
+        feedback: true,
       };
 
       const result = await benchmarkOperation('action_execution_simple', () =>
-        sensorimotorSystem.executeAction(actionRequest)
+        sensorimotorSystem.executeAction(actionRequest, {} as any)
       );
 
       expect(result.passed).toBe(true);
@@ -619,7 +646,8 @@ describe('World Module Performance Regression Tests', () => {
 
     test('complex action sequence performance', async () => {
       const actionRequest: ActionRequest = {
-        type: 'composite',
+        id: 'test-composite-action',
+        type: 'compound_action',
         parameters: {
           sequence: [
             { type: 'turn', angle: 90 },
@@ -628,13 +656,15 @@ describe('World Module Performance Regression Tests', () => {
             { type: 'interact', target: { x: 10, y: 64, z: 10 } },
           ],
         },
-        priority: 'normal',
+        priority: 1,
+        requiredPrecision: 0.5,
         timeout: 5000,
+        feedback: true,
       };
 
       const result = await benchmarkOperation(
         'action_execution_complex',
-        () => sensorimotorSystem.executeAction(actionRequest),
+        () => sensorimotorSystem.executeAction(actionRequest, {} as any),
         25 // Fewer iterations for complex operations
       );
 
@@ -664,19 +694,25 @@ describe('World Module Performance Regression Tests', () => {
             start: { x: i % 10, y: 64, z: 0 },
             goal: { x: (i + 5) % 10, y: 64, z: 5 },
             urgency: 'normal',
+            maxDistance: 200,
+            allowPartialPath: true,
+            avoidHazards: true,
+            timeout: 50,
             preferences: {
-              avoidWater: false,
+              preferLit: true,
               avoidMobs: false,
+              minimizeVertical: false,
+              preferSolid: true,
+              avoidWater: false,
               preferLighting: false,
               maxDetour: 2.0,
             },
           }),
           perceptionSystem.processVisualField({
+            position: { x: i % 5, y: 64, z: 0 },
+            radius: 32,
             observerPosition: { x: i % 5, y: 64, z: 0 },
-            observerRotation: { yaw: i * 10, pitch: 0 },
-            fieldOfView: { horizontal: 90, vertical: 60 },
             maxDistance: 32,
-            level: 'standard',
           })
         );
       }
@@ -785,9 +821,16 @@ describe('World Module Performance Regression Tests', () => {
                 start: { x: 0, y: 64, z: 0 },
                 goal: { x: 5, y: 64, z: 5 },
                 urgency: 'normal',
+                maxDistance: 200,
+                allowPartialPath: true,
+                avoidHazards: true,
+                timeout: 50,
                 preferences: {
-                  avoidWater: false,
+                  preferLit: true,
                   avoidMobs: false,
+                  minimizeVertical: false,
+                  preferSolid: true,
+                  avoidWater: false,
                   preferLighting: false,
                   maxDetour: 2.0,
                 },

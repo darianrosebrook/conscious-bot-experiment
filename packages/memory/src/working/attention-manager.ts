@@ -76,7 +76,12 @@ export interface AttentionState {
  */
 export interface AttentionEvent {
   timestamp: number;
-  eventType: 'focus_start' | 'focus_end' | 'focus_switch' | 'load_change' | 'overload_warning';
+  eventType:
+    | 'focus_start'
+    | 'focus_end'
+    | 'focus_switch'
+    | 'load_change'
+    | 'overload_warning';
   focusId?: string;
   loadLevel?: number;
   description: string;
@@ -162,8 +167,13 @@ export class AttentionManager {
       }
     }
 
-    this.logAttentionEvent('focus_start', `Started focusing on ${focusType}`, focus.id, undefined);
-    
+    this.logAttentionEvent(
+      'focus_start',
+      `Started focusing on ${focusType}`,
+      focus.id,
+      undefined
+    );
+
     return focus;
   }
 
@@ -171,25 +181,35 @@ export class AttentionManager {
    * End a specific focus
    */
   endFocus(focusId: string): boolean {
-    const focusIndex = this.activeFoci.findIndex(f => f.id === focusId);
+    const focusIndex = this.activeFoci.findIndex((f) => f.id === focusId);
     if (focusIndex === -1) return false;
 
     const focus = this.activeFoci[focusIndex];
     focus.endTime = Date.now();
-    
+
     this.activeFoci.splice(focusIndex, 1);
-    
+
     if (this.currentFocus?.id === focusId) {
       this.currentFocus = null;
       // Switch to next highest priority focus
       if (this.activeFoci.length > 0) {
         this.activeFoci.sort((a, b) => b.priority - a.priority);
         this.currentFocus = this.activeFoci[0];
-        this.logAttentionEvent('focus_switch', `Switched to ${this.currentFocus.type}`, this.currentFocus.id, undefined);
+        this.logAttentionEvent(
+          'focus_switch',
+          `Switched to ${this.currentFocus.type}`,
+          this.currentFocus.id,
+          undefined
+        );
       }
     }
 
-    this.logAttentionEvent('focus_end', `Ended focus on ${focus.type}`, focusId, undefined);
+    this.logAttentionEvent(
+      'focus_end',
+      `Ended focus on ${focus.type}`,
+      focusId,
+      undefined
+    );
     return true;
   }
 
@@ -197,7 +217,7 @@ export class AttentionManager {
    * Update focus priority
    */
   updateFocusPriority(focusId: string, newPriority: number): boolean {
-    const focus = this.activeFoci.find(f => f.id === focusId);
+    const focus = this.activeFoci.find((f) => f.id === focusId);
     if (!focus) return false;
 
     const oldPriority = focus.priority;
@@ -213,10 +233,20 @@ export class AttentionManager {
     } else if (this.activeFoci[0]?.id !== this.currentFocus?.id) {
       // Switch to highest priority focus
       this.currentFocus = this.activeFoci[0];
-      this.logAttentionEvent('focus_switch', `Switched to higher priority focus`, this.currentFocus.id, undefined);
+      this.logAttentionEvent(
+        'focus_switch',
+        `Switched to higher priority focus`,
+        this.currentFocus.id,
+        undefined
+      );
     }
 
-    this.logAttentionEvent('focus_switch', `Updated priority from ${oldPriority} to ${newPriority}`, focusId, undefined);
+    this.logAttentionEvent(
+      'focus_switch',
+      `Updated priority from ${oldPriority} to ${newPriority}`,
+      focusId,
+      undefined
+    );
     return true;
   }
 
@@ -241,7 +271,10 @@ export class AttentionManager {
     const currentLoad = this.calculateCurrentLoad();
     const capacity = this.calculateCapacity();
     const utilization = currentLoad / capacity;
-    const overloadRisk = Math.max(0, (utilization - this.loadThreshold) / (1 - this.loadThreshold));
+    const overloadRisk = Math.max(
+      0,
+      (utilization - this.loadThreshold) / (1 - this.loadThreshold)
+    );
     const focusStability = this.calculateFocusStability();
     const switchingFrequency = this.calculateSwitchingFrequency();
 
@@ -271,17 +304,25 @@ export class AttentionManager {
     const load = this.calculateCognitiveLoad();
 
     if (load.overloadRisk > 0.8) {
-      recommendations.push('Immediate action required: Reduce cognitive load by ending low-priority foci');
+      recommendations.push(
+        'Immediate action required: Reduce cognitive load by ending low-priority foci'
+      );
     } else if (load.overloadRisk > 0.6) {
-      recommendations.push('Consider reducing focus intensity or ending non-essential tasks');
+      recommendations.push(
+        'Consider reducing focus intensity or ending non-essential tasks'
+      );
     }
 
     if (load.switchingFrequency > 0.5) {
-      recommendations.push('High attention switching detected: Consider consolidating related tasks');
+      recommendations.push(
+        'High attention switching detected: Consider consolidating related tasks'
+      );
     }
 
     if (load.focusStability < 0.3) {
-      recommendations.push('Low focus stability: Consider longer focus durations for complex tasks');
+      recommendations.push(
+        'Low focus stability: Consider longer focus durations for complex tasks'
+      );
     }
 
     return recommendations;
@@ -290,16 +331,14 @@ export class AttentionManager {
   /**
    * Process incoming stimuli and adjust attention accordingly
    */
-  processStimulus(
-    stimulus: {
-      type: string;
-      priority: number;
-      urgency: number;
-      context: any;
-    }
-  ): AttentionFocus | null {
+  processStimulus(stimulus: {
+    type: string;
+    priority: number;
+    urgency: number;
+    context: any;
+  }): AttentionFocus | null {
     const currentLoad = this.calculateCognitiveLoad();
-    
+
     // Check if stimulus warrants attention shift
     if (this.shouldShiftAttention(stimulus, currentLoad)) {
       const focusType = this.determineFocusType(stimulus);
@@ -307,7 +346,10 @@ export class AttentionManager {
     }
 
     // Add to active foci if there's capacity
-    if (this.activeFoci.length < this.maxConcurrentFoci && stimulus.priority > 0.3) {
+    if (
+      this.activeFoci.length < this.maxConcurrentFoci &&
+      stimulus.priority > 0.3
+    ) {
       const focusType = this.determineFocusType(stimulus);
       return this.setFocus(focusType, stimulus.priority, stimulus.context);
     }
@@ -320,7 +362,7 @@ export class AttentionManager {
    */
   optimizeAttentionAllocation(): void {
     const load = this.calculateCognitiveLoad();
-    
+
     if (load.overloadRisk > 0.7) {
       this.reduceCognitiveLoad();
     } else if (load.utilization < 0.3) {
@@ -337,15 +379,18 @@ export class AttentionManager {
   getAttentionStats() {
     const now = Date.now();
     const recentEvents = this.attentionHistory.filter(
-      e => now - e.timestamp < 24 * 60 * 60 * 1000 // Last 24 hours
+      (e) => now - e.timestamp < 24 * 60 * 60 * 1000 // Last 24 hours
     );
 
     return {
       totalFoci: this.activeFoci.length,
       currentFocusType: this.currentFocus?.type || 'none',
       averageFocusDuration: this.calculateAverageFocusDuration(),
-      focusSwitches: recentEvents.filter(e => e.eventType === 'focus_switch').length,
-      overloadWarnings: recentEvents.filter(e => e.eventType === 'overload_warning').length,
+      focusSwitches: recentEvents.filter((e) => e.eventType === 'focus_switch')
+        .length,
+      overloadWarnings: recentEvents.filter(
+        (e) => e.eventType === 'overload_warning'
+      ).length,
       loadUtilization: this.calculateCognitiveLoad().utilization,
     };
   }
@@ -358,11 +403,11 @@ export class AttentionManager {
 
     // Adjust based on context
     if (context.urgency) {
-      intensity *= (1 + context.urgency * 0.3);
+      intensity *= 1 + context.urgency * 0.3;
     }
 
     if (context.complexity) {
-      intensity *= (1 + context.complexity * 0.2);
+      intensity *= 1 + context.complexity * 0.2;
     }
 
     // Apply strategy adjustments
@@ -378,7 +423,10 @@ export class AttentionManager {
   /**
    * Calculate optimal focus duration
    */
-  private calculateOptimalDuration(focusType: FocusType, priority: number): number {
+  private calculateOptimalDuration(
+    focusType: FocusType,
+    priority: number
+  ): number {
     const baseDuration = 5 * 60 * 1000; // 5 minutes base
 
     switch (focusType) {
@@ -404,6 +452,13 @@ export class AttentionManager {
   }
 
   /**
+   * Get current cognitive load
+   */
+  getCurrentLoad(): number {
+    return this.calculateCurrentLoad();
+  }
+
+  /**
    * Calculate current cognitive load
    */
   private calculateCurrentLoad(): number {
@@ -416,8 +471,9 @@ export class AttentionManager {
 
     // Additional load from switching
     const recentSwitches = this.attentionHistory.filter(
-      e => e.eventType === 'focus_switch' && 
-           Date.now() - e.timestamp < 5 * 60 * 1000 // Last 5 minutes
+      (e) =>
+        e.eventType === 'focus_switch' &&
+        Date.now() - e.timestamp < 5 * 60 * 1000 // Last 5 minutes
     );
     load += recentSwitches.length * this.strategy.switchingCost;
 
@@ -451,13 +507,19 @@ export class AttentionManager {
     if (!this.currentFocus) return 0;
 
     const focusDuration = Date.now() - this.currentFocus.startTime;
-    const optimalDuration = this.calculateOptimalDuration(this.currentFocus.type, this.currentFocus.priority);
-    
+    const optimalDuration = this.calculateOptimalDuration(
+      this.currentFocus.type,
+      this.currentFocus.priority
+    );
+
     // Stability increases with duration up to optimal, then decreases
     if (focusDuration <= optimalDuration) {
       return Math.min(1, focusDuration / optimalDuration);
     } else {
-      return Math.max(0, 1 - (focusDuration - optimalDuration) / optimalDuration);
+      return Math.max(
+        0,
+        1 - (focusDuration - optimalDuration) / optimalDuration
+      );
     }
   }
 
@@ -467,17 +529,20 @@ export class AttentionManager {
   private calculateSwitchingFrequency(): number {
     const now = Date.now();
     const recentSwitches = this.attentionHistory.filter(
-      e => e.eventType === 'focus_switch' && 
-           now - e.timestamp < 10 * 60 * 1000 // Last 10 minutes
+      (e) =>
+        e.eventType === 'focus_switch' && now - e.timestamp < 10 * 60 * 1000 // Last 10 minutes
     );
-    
+
     return Math.min(1, recentSwitches.length / 5); // Normalize to 0-1, 5 switches = max frequency
   }
 
   /**
    * Determine if attention should shift to new stimulus
    */
-  private shouldShiftAttention(stimulus: any, currentLoad: CognitiveLoadMetrics): boolean {
+  private shouldShiftAttention(
+    stimulus: any,
+    currentLoad: CognitiveLoadMetrics
+  ): boolean {
     // High urgency stimuli always get attention
     if (stimulus.urgency > 0.8) return true;
 
@@ -485,9 +550,12 @@ export class AttentionManager {
     if (stimulus.priority > 0.7 && currentLoad.utilization < 0.8) return true;
 
     // Current focus is low priority and new stimulus is higher
-    if (this.currentFocus && 
-        this.currentFocus.priority < stimulus.priority && 
-        stimulus.priority > 0.5) return true;
+    if (
+      this.currentFocus &&
+      this.currentFocus.priority < stimulus.priority &&
+      stimulus.priority > 0.5
+    )
+      return true;
 
     return false;
   }
@@ -498,17 +566,35 @@ export class AttentionManager {
   private determineFocusType(stimulus: any): FocusType {
     if (stimulus.type.includes('goal') || stimulus.type.includes('objective')) {
       return FocusType.GOAL;
-    } else if (stimulus.type.includes('task') || stimulus.type.includes('action')) {
+    } else if (
+      stimulus.type.includes('task') ||
+      stimulus.type.includes('action')
+    ) {
       return FocusType.TASK;
-    } else if (stimulus.type.includes('threat') || stimulus.type.includes('danger')) {
+    } else if (
+      stimulus.type.includes('threat') ||
+      stimulus.type.includes('danger')
+    ) {
       return FocusType.THREAT;
-    } else if (stimulus.type.includes('opportunity') || stimulus.type.includes('chance')) {
+    } else if (
+      stimulus.type.includes('opportunity') ||
+      stimulus.type.includes('chance')
+    ) {
       return FocusType.OPPORTUNITY;
-    } else if (stimulus.type.includes('social') || stimulus.type.includes('interaction')) {
+    } else if (
+      stimulus.type.includes('social') ||
+      stimulus.type.includes('interaction')
+    ) {
       return FocusType.SOCIAL;
-    } else if (stimulus.type.includes('explore') || stimulus.type.includes('discover')) {
+    } else if (
+      stimulus.type.includes('explore') ||
+      stimulus.type.includes('discover')
+    ) {
       return FocusType.EXPLORATION;
-    } else if (stimulus.type.includes('learn') || stimulus.type.includes('skill')) {
+    } else if (
+      stimulus.type.includes('learn') ||
+      stimulus.type.includes('skill')
+    ) {
       return FocusType.LEARNING;
     } else {
       return FocusType.MAINTENANCE;
@@ -521,14 +607,22 @@ export class AttentionManager {
   private reduceCognitiveLoad(): void {
     // Sort foci by priority (lowest first)
     this.activeFoci.sort((a, b) => a.priority - b.priority);
-    
+
     // End lowest priority foci until load is manageable
-    while (this.calculateCognitiveLoad().overloadRisk > 0.5 && this.activeFoci.length > 1) {
+    while (
+      this.calculateCognitiveLoad().overloadRisk > 0.5 &&
+      this.activeFoci.length > 1
+    ) {
       const lowestFocus = this.activeFoci[0];
       this.endFocus(lowestFocus.id);
     }
 
-    this.logAttentionEvent('load_change', 'Reduced cognitive load', undefined, this.calculateCurrentLoad());
+    this.logAttentionEvent(
+      'load_change',
+      'Reduced cognitive load',
+      undefined,
+      this.calculateCurrentLoad()
+    );
   }
 
   /**
@@ -536,7 +630,10 @@ export class AttentionManager {
    */
   private increaseFocusIntensity(): void {
     if (this.currentFocus) {
-      this.currentFocus.intensity = Math.min(1, this.currentFocus.intensity * 1.2);
+      this.currentFocus.intensity = Math.min(
+        1,
+        this.currentFocus.intensity * 1.2
+      );
     }
   }
 
@@ -548,8 +645,11 @@ export class AttentionManager {
       // Adjust priorities based on time and performance
       for (const focus of this.activeFoci) {
         const age = Date.now() - focus.startTime;
-        const optimalDuration = this.calculateOptimalDuration(focus.type, focus.priority);
-        
+        const optimalDuration = this.calculateOptimalDuration(
+          focus.type,
+          focus.priority
+        );
+
         // Reduce priority of old foci
         if (age > optimalDuration) {
           focus.priority *= 0.9;
@@ -563,8 +663,8 @@ export class AttentionManager {
    */
   private calculateAverageFocusDuration(): number {
     const endedFoci = this.attentionHistory
-      .filter(e => e.eventType === 'focus_end')
-      .map(e => e.timestamp);
+      .filter((e) => e.eventType === 'focus_end')
+      .map((e) => e.timestamp);
 
     if (endedFoci.length === 0) return 0;
 
@@ -598,8 +698,17 @@ export class AttentionManager {
     }
 
     // Log overload warnings
-    if (eventType === 'load_change' && loadLevel && loadLevel > this.loadThreshold) {
-      this.logAttentionEvent('overload_warning', 'Cognitive overload detected', undefined, loadLevel);
+    if (
+      eventType === 'load_change' &&
+      loadLevel &&
+      loadLevel > this.loadThreshold
+    ) {
+      this.logAttentionEvent(
+        'overload_warning',
+        'Cognitive overload detected',
+        undefined,
+        loadLevel
+      );
     }
   }
 }

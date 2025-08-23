@@ -624,4 +624,15 @@ export class SensorimotorSystem extends EventEmitter<SensorimotorSystemEvents> {
     // This would be tracked in a real implementation
     return 0;
   }
+
+  /**
+   * Dispose of system resources
+   */
+  dispose(): void {
+    // Clear active loops
+    this.activeLoops.clear();
+
+    // Remove all event listeners
+    this.removeAllListeners();
+  }
 }

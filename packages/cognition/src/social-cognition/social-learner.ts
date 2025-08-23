@@ -255,6 +255,72 @@ export class SocialLearner {
     this.config = { ...DEFAULT_CONFIG, ...config };
   }
 
+  async learnBehaviors(observations: any[]): Promise<any[]> {
+    const prompt = `Learn behaviors from these observations:
+
+${observations.map((obs) => `- ${obs.description}`).join('\n')}
+
+Identify learnable behaviors and strategies.`;
+
+    try {
+      const response = await this.llm.generateResponse(prompt, {
+        systemPrompt:
+          'You are learning behaviors from observations. Be specific and actionable.',
+        temperature: 0.4,
+        maxTokens: 512,
+      });
+
+      return this.parseLearnedBehaviors(response.text);
+    } catch (error) {
+      console.error('Error learning behaviors:', error);
+      return [];
+    }
+  }
+
+  async recognizePatterns(behaviorHistory: string[]): Promise<any[]> {
+    const prompt = `Recognize patterns in this behavior history:
+
+${behaviorHistory.join('\n')}
+
+Identify recurring patterns and strategies.`;
+
+    try {
+      const response = await this.llm.generateResponse(prompt, {
+        systemPrompt:
+          'You are recognizing behavioral patterns. Be insightful about recurring themes.',
+        temperature: 0.4,
+        maxTokens: 512,
+      });
+
+      return this.parsePatterns(response.text);
+    } catch (error) {
+      console.error('Error recognizing patterns:', error);
+      return [];
+    }
+  }
+
+  async inferNorms(interactions: any[]): Promise<any[]> {
+    const prompt = `Infer social norms from these interactions:
+
+${interactions.map((int) => `- ${int.description}`).join('\n')}
+
+Identify social norms and expectations.`;
+
+    try {
+      const response = await this.llm.generateResponse(prompt, {
+        systemPrompt:
+          'You are inferring social norms from interactions. Be specific about behavioral expectations.',
+        temperature: 0.4,
+        maxTokens: 512,
+      });
+
+      return this.parseNorms(response.text);
+    } catch (error) {
+      console.error('Error inferring norms:', error);
+      return [];
+    }
+  }
+
   async observeAndLearnBehavior(
     observedBehavior: ObservedBehavior,
     context: LearningContext
@@ -339,8 +405,14 @@ Respond in JSON format.`,
     };
 
     try {
-      const response = await this.llm.generateResponse(context);
-      return this.parseStrategyIdentification(response, strategyObservations);
+      const response = await this.llm.generateResponse(
+        context.messages?.[0]?.content || 'Identify successful strategies',
+        context
+      );
+      return this.parseStrategyIdentification(
+        response.text,
+        strategyObservations
+      );
     } catch (error) {
       console.warn('Failed to identify successful strategies:', error);
       return this.createEmptyStrategyIdentification();
@@ -394,8 +466,14 @@ Respond in JSON format.`,
     };
 
     try {
-      const response = await this.llm.generateResponse(context);
-      const inference = this.parseNormInference(response, socialInteractions);
+      const response = await this.llm.generateResponse(
+        context.messages?.[0]?.content || 'Infer social norms',
+        context
+      );
+      const inference = this.parseNormInference(
+        response.text,
+        socialInteractions
+      );
 
       // Store detected norms
       inference.detectedNorms.forEach((norm) => {
@@ -467,9 +545,12 @@ Respond in JSON format.`,
     };
 
     try {
-      const response = await this.llm.generateResponse(context);
+      const response = await this.llm.generateResponse(
+        context.messages?.[0]?.content || 'Learn through imitation',
+        context
+      );
       const imitation = this.parseImitationLearning(
-        response,
+        response.text,
         targetBehavior,
         expertAgent
       );
@@ -524,9 +605,12 @@ Respond in JSON format.`,
     };
 
     try {
-      const response = await this.llm.generateResponse(context);
+      const response = await this.llm.generateResponse(
+        context.messages?.[0]?.content || 'Adapt learned behavior',
+        context
+      );
       const adaptation = this.parseBehaviorAdaptation(
-        response,
+        response.text,
         learnedBehavior,
         newContext
       );
@@ -584,8 +668,11 @@ Respond in JSON format.`,
     };
 
     try {
-      const response = await this.llm.generateResponse(context_);
-      return this.parseBehaviorAnalysis(response);
+      const response = await this.llm.generateResponse(
+        context_.messages?.[0]?.content || 'Analyze behavior for learning',
+        context_
+      );
+      return this.parseBehaviorAnalysis(response.text);
     } catch (error) {
       console.warn('Failed to analyze behavior for learning:', error);
       return this.createEmptyBehaviorAnalysis();
@@ -656,7 +743,14 @@ Respond in JSON format.`,
           confidence: analysis.confidence,
         },
       ],
-      applicabilityContexts: [observedBehavior.context],
+      applicabilityContexts: [
+        {
+          goals: [],
+          constraints: [],
+          timeframe: 'short_term',
+          ...observedBehavior.context,
+        },
+      ],
       confidence: analysis.confidence,
       learningSource: observedBehavior.observedAgent,
       adaptationHistory: [],
@@ -940,7 +1034,10 @@ Respond in JSON format.`,
       hierarchy: NormType.SOCIAL_HIERARCHY,
     };
 
-    return typeMap[type?.toLowerCase()] || NormType.BEHAVIORAL;
+    return (
+      (type && typeMap[type.toLowerCase() as keyof typeof typeMap]) ||
+      NormType.BEHAVIORAL
+    );
   }
 
   // ============================================================================
@@ -1090,6 +1187,51 @@ Respond in JSON format.`,
       normInferenceEnabled: this.config.enableNormInference,
       learningRate: this.config.learningRate,
     };
+  }
+
+  private parseLearnedBehaviors(response: string): any[] {
+    return response
+      .split('\n')
+      .filter(
+        (line) => line.trim().startsWith('-') || line.trim().startsWith('•')
+      )
+      .map((line, index) => ({
+        id: `behavior-${Date.now()}-${index}`,
+        description: line.replace(/^[-•]\s*/, '').trim(),
+        confidence: 0.7,
+        timestamp: Date.now(),
+      }))
+      .filter((behavior) => behavior.description.length > 0);
+  }
+
+  private parsePatterns(response: string): any[] {
+    return response
+      .split('\n')
+      .filter(
+        (line) => line.trim().startsWith('-') || line.trim().startsWith('•')
+      )
+      .map((line, index) => ({
+        id: `pattern-${Date.now()}-${index}`,
+        pattern: line.replace(/^[-•]\s*/, '').trim(),
+        confidence: 0.7,
+        timestamp: Date.now(),
+      }))
+      .filter((pattern) => pattern.pattern.length > 0);
+  }
+
+  private parseNorms(response: string): any[] {
+    return response
+      .split('\n')
+      .filter(
+        (line) => line.trim().startsWith('-') || line.trim().startsWith('•')
+      )
+      .map((line, index) => ({
+        id: `norm-${Date.now()}-${index}`,
+        norm: line.replace(/^[-•]\s*/, '').trim(),
+        confidence: 0.7,
+        timestamp: Date.now(),
+      }))
+      .filter((norm) => norm.norm.length > 0);
   }
 }
 

@@ -163,6 +163,7 @@ describe('Navigation System Integration', () => {
         maxDistance: 50,
         allowPartialPath: true,
         avoidHazards: true,
+        urgency: 'normal',
         timeout: 100,
       };
 
@@ -191,6 +192,8 @@ describe('Navigation System Integration', () => {
         goal: { x: 1000, y: 64, z: 1000 }, // Outside graph bounds
         maxDistance: 50,
         allowPartialPath: false,
+        avoidHazards: true,
+        urgency: 'normal',
         timeout: 100,
       };
 
@@ -206,6 +209,9 @@ describe('Navigation System Integration', () => {
         start: { x: 1, y: 64, z: 1 },
         goal: { x: 19, y: 64, z: 19 },
         maxDistance: 200,
+        allowPartialPath: true,
+        avoidHazards: true,
+        urgency: 'normal',
         timeout: 1, // Very short timeout
       };
 
@@ -220,6 +226,10 @@ describe('Navigation System Integration', () => {
       const request: PathPlanningRequest = {
         start: { x: 1, y: 64, z: 1 },
         goal: { x: 5, y: 64, z: 5 },
+        maxDistance: 200,
+        allowPartialPath: true,
+        avoidHazards: true,
+        urgency: 'normal',
         timeout: 100,
       };
 
@@ -249,6 +259,10 @@ describe('Navigation System Integration', () => {
       await navigationSystem.planPath({
         start: { x: 1, y: 64, z: 1 },
         goal: { x: 15, y: 64, z: 15 },
+        maxDistance: 200,
+        allowPartialPath: true,
+        avoidHazards: true,
+        urgency: 'normal',
         timeout: 100,
       });
     });
@@ -344,6 +358,10 @@ describe('Navigation System Integration', () => {
       await navigationSystem.planPath({
         start: { x: 1, y: 64, z: 1 },
         goal: { x: 5, y: 64, z: 5 },
+        maxDistance: 200,
+        allowPartialPath: true,
+        avoidHazards: true,
+        urgency: 'normal',
         timeout: 100,
       });
     });
@@ -441,7 +459,10 @@ describe('Navigation System Integration', () => {
       const result = await navigationSystem.planPath({
         start: { x: 5, y: 64, z: 5 },
         goal: { x: 15, y: 64, z: 15 },
+        maxDistance: 200,
+        allowPartialPath: true,
         avoidHazards: true,
+        urgency: 'normal',
         timeout: 100,
       });
 
@@ -499,6 +520,10 @@ describe('Navigation System Integration', () => {
       await navigationSystem.planPath({
         start: { x: 1, y: 64, z: 1 },
         goal: { x: 8, y: 64, z: 8 },
+        maxDistance: 200,
+        allowPartialPath: true,
+        avoidHazards: true,
+        urgency: 'normal',
         timeout: 100,
       });
 
@@ -553,6 +578,10 @@ describe('Navigation System Integration', () => {
       await navigationSystem.planPath({
         start: { x: 1, y: 64, z: 1 },
         goal: { x: 5, y: 64, z: 5 },
+        maxDistance: 200,
+        allowPartialPath: true,
+        avoidHazards: true,
+        urgency: 'normal',
         timeout: 100,
       });
 
@@ -725,7 +754,7 @@ describe('Individual Navigation Components', () => {
         },
       ];
 
-      const penalty = calculator.applyHazardPenalties(10, position, hazards);
+      const penalty = calculator.applyHazardPenalties(10, hazards);
 
       expect(penalty).toBeGreaterThan(0);
     });

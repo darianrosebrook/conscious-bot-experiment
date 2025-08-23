@@ -81,7 +81,12 @@ export class RaycastEngine
     origin: Vec3,
     direction: Direction,
     maxDistance: number,
-    config: RayTraversalConfig = { algorithm: 'mineflayer' }
+    config: RayTraversalConfig = {
+      algorithm: 'mineflayer',
+      maxSteps: 128,
+      earlyExit: true,
+      recordPath: false,
+    }
   ): RaycastHit | null {
     const normalizedDir = normalize(direction);
 

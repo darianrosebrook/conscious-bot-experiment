@@ -41,7 +41,7 @@ export class NarrativeManager {
    * Get current story in progress
    */
   getCurrentStory(): NarrativeStory | undefined {
-    return this.stories.find(story => !story.timespan.end);
+    return this.stories.find((story) => !story.timespan.end);
   }
 
   /**
@@ -73,19 +73,32 @@ export class NarrativeManager {
 
     const currentStory = this.getCurrentStory();
     if (!currentStory) {
-      this.startNewStory('Life Journey', 'The ongoing story of experiences and growth');
+      this.startNewStory(
+        'Life Journey',
+        'The ongoing story of experiences and growth'
+      );
     }
 
     const integration: ExperienceIntegration = {
       experienceId,
       integrationDate: Date.now(),
-      narrativeContext: this.determineNarrativeContext(experienceDescription, context),
+      narrativeContext: this.determineNarrativeContext(
+        experienceDescription,
+        context
+      ),
       lessonsExtracted: this.extractLessons(experienceDescription, context),
       identityImpact: this.assessIdentityImpact(experienceDescription, context),
-      coherenceChanges: this.assessCoherenceChanges(experienceDescription, context),
+      coherenceChanges: this.assessCoherenceChanges(
+        experienceDescription,
+        context
+      ),
     };
 
-    this.addExperienceToCurrentChapter(experienceDescription, integration, context);
+    this.addExperienceToCurrentChapter(
+      experienceDescription,
+      integration,
+      context
+    );
     this.updateStoryCoherence();
 
     return integration;
@@ -94,7 +107,11 @@ export class NarrativeManager {
   /**
    * Start a new narrative story
    */
-  startNewStory(title: string, description: string, themes: string[] = []): string {
+  startNewStory(
+    title: string,
+    description: string,
+    themes: string[] = []
+  ): string {
     // End current story if it exists
     const currentStory = this.getCurrentStory();
     if (currentStory) {
@@ -117,7 +134,10 @@ export class NarrativeManager {
     };
 
     // Start with an initial chapter
-    this.currentChapter = this.createChapter('Beginning', 'The start of a new journey');
+    this.currentChapter = this.createChapter(
+      'Beginning',
+      'The start of a new journey'
+    );
     story.chapters.push(this.currentChapter);
 
     this.stories.push(story);
@@ -125,11 +145,11 @@ export class NarrativeManager {
     // Manage story capacity
     if (this.stories.length > this.maxStories) {
       // Remove least significant completed stories
-      const completedStories = this.stories.filter(s => s.timespan.end);
+      const completedStories = this.stories.filter((s) => s.timespan.end);
       if (completedStories.length > 0) {
         completedStories.sort((a, b) => a.significance - b.significance);
         const toRemove = completedStories[0];
-        this.stories = this.stories.filter(s => s.id !== toRemove.id);
+        this.stories = this.stories.filter((s) => s.id !== toRemove.id);
       }
     }
 
@@ -147,7 +167,7 @@ export class NarrativeManager {
    * End a story and calculate final metrics
    */
   endStory(storyId: string, conclusion?: string): boolean {
-    const story = this.stories.find(s => s.id === storyId);
+    const story = this.stories.find((s) => s.id === storyId);
     if (!story) {
       console.warn(`Story '${storyId}' not found`);
       return false;
@@ -174,7 +194,9 @@ export class NarrativeManager {
     // Calculate final significance based on chapters and themes
     story.significance = this.calculateStorySignificance(story);
 
-    console.log(`Ended story: ${story.title} (significance: ${story.significance.toFixed(2)})`);
+    console.log(
+      `Ended story: ${story.title} (significance: ${story.significance.toFixed(2)})`
+    );
     return true;
   }
 
@@ -196,10 +218,11 @@ export class NarrativeManager {
 
     // Create new chapter
     this.currentChapter = this.createChapter(title, summary);
-    
+
     // Connect to previous chapter
     if (currentStory.chapters.length > 0) {
-      const previousChapter = currentStory.chapters[currentStory.chapters.length - 1];
+      const previousChapter =
+        currentStory.chapters[currentStory.chapters.length - 1];
       this.currentChapter.connectionToPrevious = `Following from: ${previousChapter.title}`;
     }
 
@@ -215,8 +238,8 @@ export class NarrativeManager {
    */
   generateNarrativeSummary(timeWindowMs: number = 86400000): string {
     const cutoff = Date.now() - timeWindowMs;
-    const recentStories = this.stories.filter(story => 
-      story.lastUpdated >= cutoff || !story.timespan.end
+    const recentStories = this.stories.filter(
+      (story) => story.lastUpdated >= cutoff || !story.timespan.end
     );
 
     if (recentStories.length === 0) {
@@ -226,8 +249,8 @@ export class NarrativeManager {
     const summaryParts: string[] = [];
 
     for (const story of recentStories) {
-      const recentChapters = story.chapters.filter(chapter =>
-        chapter.timespan.start >= cutoff || !chapter.timespan.end
+      const recentChapters = story.chapters.filter(
+        (chapter) => chapter.timespan.start >= cutoff || !chapter.timespan.end
       );
 
       if (recentChapters.length > 0) {
@@ -237,10 +260,14 @@ export class NarrativeManager {
         for (const chapter of recentChapters) {
           summaryParts.push(`- ${chapter.title}: ${chapter.summary}`);
           if (chapter.keyEvents.length > 0) {
-            summaryParts.push(`  Key events: ${chapter.keyEvents.slice(-3).join(', ')}`);
+            summaryParts.push(
+              `  Key events: ${chapter.keyEvents.slice(-3).join(', ')}`
+            );
           }
           if (chapter.lessons.length > 0) {
-            summaryParts.push(`  Lessons: ${chapter.lessons.slice(-2).join(', ')}`);
+            summaryParts.push(
+              `  Lessons: ${chapter.lessons.slice(-2).join(', ')}`
+            );
           }
         }
 
@@ -258,12 +285,22 @@ export class NarrativeManager {
   /**
    * Get narrative themes and patterns
    */
-  getNarrativeThemes(): { theme: string; frequency: number; significance: number }[] {
-    const themeMap = new Map<string, { count: number; totalSignificance: number }>();
+  getNarrativeThemes(): {
+    theme: string;
+    frequency: number;
+    significance: number;
+  }[] {
+    const themeMap = new Map<
+      string,
+      { count: number; totalSignificance: number }
+    >();
 
     for (const story of this.stories) {
       for (const theme of story.themes) {
-        const existing = themeMap.get(theme) || { count: 0, totalSignificance: 0 };
+        const existing = themeMap.get(theme) || {
+          count: 0,
+          totalSignificance: 0,
+        };
         existing.count++;
         existing.totalSignificance += story.significance;
         themeMap.set(theme, existing);
@@ -295,7 +332,7 @@ export class NarrativeManager {
    */
   private createChapter(title: string, summary: string): NarrativeChapter {
     const now = Date.now();
-    
+
     return {
       id: `chapter-${now}`,
       title,
@@ -322,12 +359,16 @@ export class NarrativeManager {
     if (!this.currentChapter) return;
 
     // Add as key event if significant
-    if (integration.identityImpact.length > 0 || integration.lessonsExtracted.length > 0) {
+    if (
+      integration.identityImpact.length > 0 ||
+      integration.lessonsExtracted.length > 0
+    ) {
       this.currentChapter.keyEvents.push(experienceDescription);
-      
+
       // Limit key events
       if (this.currentChapter.keyEvents.length > 20) {
-        this.currentChapter.keyEvents = this.currentChapter.keyEvents.slice(-20);
+        this.currentChapter.keyEvents =
+          this.currentChapter.keyEvents.slice(-20);
       }
     }
 
@@ -372,22 +413,34 @@ export class NarrativeManager {
     const lessons: string[] = [];
 
     // Simple pattern-based lesson extraction
-    if (description.toLowerCase().includes('failed') || description.toLowerCase().includes('error')) {
+    if (
+      description.toLowerCase().includes('failed') ||
+      description.toLowerCase().includes('error')
+    ) {
       lessons.push('Learning from failure builds resilience');
       if (context.outcomes) {
         lessons.push(`Specific learning: ${context.outcomes[0]}`);
       }
     }
 
-    if (description.toLowerCase().includes('helped') || description.toLowerCase().includes('assist')) {
+    if (
+      description.toLowerCase().includes('helped') ||
+      description.toLowerCase().includes('assist')
+    ) {
       lessons.push('Helping others creates positive outcomes');
     }
 
-    if (description.toLowerCase().includes('explored') || description.toLowerCase().includes('discovered')) {
+    if (
+      description.toLowerCase().includes('explored') ||
+      description.toLowerCase().includes('discovered')
+    ) {
       lessons.push('Exploration leads to new understanding');
     }
 
-    if (description.toLowerCase().includes('careful') || description.toLowerCase().includes('safe')) {
+    if (
+      description.toLowerCase().includes('careful') ||
+      description.toLowerCase().includes('safe')
+    ) {
       lessons.push('Caution prevents harmful consequences');
     }
 
@@ -397,37 +450,52 @@ export class NarrativeManager {
   /**
    * Assess identity impact from experience
    */
-  private assessIdentityImpact(description: string, context: any): IdentityImpact[] {
+  private assessIdentityImpact(
+    description: string,
+    context: any
+  ): IdentityImpact[] {
     const impacts: IdentityImpact[] = [];
 
     // Simple impact assessment based on keywords
-    if (description.toLowerCase().includes('curious') || description.toLowerCase().includes('explore')) {
+    if (
+      description.toLowerCase().includes('curious') ||
+      description.toLowerCase().includes('explore')
+    ) {
       impacts.push({
         aspect: IdentityAspect.PERSONALITY,
         type: ImpactType.REINFORCEMENT,
         magnitude: 0.3,
         description: 'Reinforced curiosity trait through exploration',
-        evidence: description,
+        evidence: [description],
+        timestamp: Date.now(),
       });
     }
 
-    if (description.toLowerCase().includes('help') || description.toLowerCase().includes('assist')) {
+    if (
+      description.toLowerCase().includes('help') ||
+      description.toLowerCase().includes('assist')
+    ) {
       impacts.push({
         aspect: IdentityAspect.VALUES,
         type: ImpactType.REINFORCEMENT,
         magnitude: 0.4,
         description: 'Reinforced value of helping others',
-        evidence: description,
+        evidence: [description],
+        timestamp: Date.now(),
       });
     }
 
-    if (description.toLowerCase().includes('learned') || description.toLowerCase().includes('skill')) {
+    if (
+      description.toLowerCase().includes('learned') ||
+      description.toLowerCase().includes('skill')
+    ) {
       impacts.push({
         aspect: IdentityAspect.CAPABILITIES,
         type: ImpactType.EXPANSION,
         magnitude: 0.5,
         description: 'Expanded capability through learning',
-        evidence: description,
+        evidence: [description],
+        timestamp: Date.now(),
       });
     }
 
@@ -437,11 +505,17 @@ export class NarrativeManager {
   /**
    * Assess coherence changes from experience
    */
-  private assessCoherenceChanges(description: string, context: any): CoherenceChange[] {
+  private assessCoherenceChanges(
+    description: string,
+    context: any
+  ): CoherenceChange[] {
     const changes: CoherenceChange[] = [];
 
     // Simple coherence assessment
-    if (description.toLowerCase().includes('conflict') || description.toLowerCase().includes('dilemma')) {
+    if (
+      description.toLowerCase().includes('conflict') ||
+      description.toLowerCase().includes('dilemma')
+    ) {
       changes.push({
         area: 'value-alignment',
         previousScore: 0.8,
@@ -462,12 +536,14 @@ export class NarrativeManager {
     if (!currentStory) return;
 
     // Simple coherence calculation based on chapter connections
-    const connectedChapters = currentStory.chapters.filter(c => 
-      c.connectionToPrevious || c.connectionToNext
+    const connectedChapters = currentStory.chapters.filter(
+      (c) => c.connectionToPrevious || c.connectionToNext
     ).length;
 
-    const coherenceRatio = currentStory.chapters.length > 1 ? 
-      connectedChapters / currentStory.chapters.length : 1.0;
+    const coherenceRatio =
+      currentStory.chapters.length > 1
+        ? connectedChapters / currentStory.chapters.length
+        : 1.0;
 
     currentStory.coherenceScore = Math.max(0.3, Math.min(1.0, coherenceRatio));
     currentStory.lastUpdated = Date.now();
@@ -481,18 +557,19 @@ export class NarrativeManager {
 
     // Base significance from themes
     const themeImportance = {
-      'awakening': 0.9,
-      'discovery': 0.7,
-      'learning': 0.6,
-      'growth': 0.8,
-      'challenge': 0.7,
-      'success': 0.6,
-      'failure': 0.5,
-      'relationship': 0.7,
+      awakening: 0.9,
+      discovery: 0.7,
+      learning: 0.6,
+      growth: 0.8,
+      challenge: 0.7,
+      success: 0.6,
+      failure: 0.5,
+      relationship: 0.7,
     };
 
     for (const theme of story.themes) {
-      significance += themeImportance[theme as keyof typeof themeImportance] || 0.3;
+      significance +=
+        themeImportance[theme as keyof typeof themeImportance] || 0.3;
     }
 
     // Normalize by number of themes
@@ -503,9 +580,11 @@ export class NarrativeManager {
     }
 
     // Adjust based on chapter count and significance
-    const avgChapterSignificance = story.chapters.length > 0 ?
-      story.chapters.reduce((sum, ch) => sum + ch.significance, 0) / story.chapters.length :
-      0.3;
+    const avgChapterSignificance =
+      story.chapters.length > 0
+        ? story.chapters.reduce((sum, ch) => sum + ch.significance, 0) /
+          story.chapters.length
+        : 0.3;
 
     significance = (significance + avgChapterSignificance) / 2;
 
@@ -515,7 +594,10 @@ export class NarrativeManager {
   /**
    * Update chapter significance based on integration
    */
-  private updateChapterSignificance(chapter: NarrativeChapter, integration: ExperienceIntegration): void {
+  private updateChapterSignificance(
+    chapter: NarrativeChapter,
+    integration: ExperienceIntegration
+  ): void {
     let significanceBoost = 0;
 
     // Boost for identity impacts
@@ -527,18 +609,26 @@ export class NarrativeManager {
     // Boost for coherence changes
     significanceBoost += integration.coherenceChanges.length * 0.1;
 
-    chapter.significance = Math.max(0.1, Math.min(1.0, chapter.significance + significanceBoost));
+    chapter.significance = Math.max(
+      0.1,
+      Math.min(1.0, chapter.significance + significanceBoost)
+    );
   }
 
   /**
    * Get narrative statistics
    */
   getStats() {
-    const completedStories = this.stories.filter(s => s.timespan.end);
-    const totalChapters = this.stories.reduce((sum, s) => sum + s.chapters.length, 0);
-    const avgCoherence = this.stories.length > 0 ?
-      this.stories.reduce((sum, s) => sum + s.coherenceScore, 0) / this.stories.length :
-      0;
+    const completedStories = this.stories.filter((s) => s.timespan.end);
+    const totalChapters = this.stories.reduce(
+      (sum, s) => sum + s.chapters.length,
+      0
+    );
+    const avgCoherence =
+      this.stories.length > 0
+        ? this.stories.reduce((sum, s) => sum + s.coherenceScore, 0) /
+          this.stories.length
+        : 0;
 
     return {
       totalStories: this.stories.length,
@@ -547,7 +637,8 @@ export class NarrativeManager {
       totalChapters,
       averageCoherence: avgCoherence,
       currentChapter: this.currentChapter?.title || 'None',
-      mostSignificantStory: this.getMostSignificantStories(1)[0]?.title || 'None',
+      mostSignificantStory:
+        this.getMostSignificantStories(1)[0]?.title || 'None',
     };
   }
 }

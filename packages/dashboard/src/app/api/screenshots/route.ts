@@ -3,7 +3,9 @@ import type { Screenshot } from '@/types';
 
 /**
  * API route handler for screenshots
- * Forwards requests to the minecraft bot (port 3005)
+ * Provides bot screenshots from the minecraft interface
+ * 
+ * @author @darianrosebrook
  */
 export async function GET(request: NextRequest) {
   try {
@@ -17,12 +19,15 @@ export async function GET(request: NextRequest) {
     params.append('limit', limit);
 
     // Forward to minecraft bot
-    const response = await fetch(`http://localhost:3005/screenshots?${params}`, {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    });
+    const response = await fetch(
+      `http://localhost:3005/screenshots?${params}`,
+      {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      }
+    );
 
     if (!response.ok) {
       throw new Error(`Minecraft bot error: ${response.statusText}`);
@@ -30,11 +35,7 @@ export async function GET(request: NextRequest) {
 
     const result: Screenshot[] = await response.json();
     return NextResponse.json(result);
-
   } catch (error) {
-    // In production, use proper logging service
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    
     // Return empty array if minecraft bot is unavailable
     return NextResponse.json([]);
   }

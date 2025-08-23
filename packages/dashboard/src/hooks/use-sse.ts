@@ -13,7 +13,7 @@ interface UseSSEOptions {
 /**
  * Server-Sent Events hook for real-time data communication
  * Handles connection, reconnection, and message processing
- * 
+ *
  * @author @darianrosebrook
  */
 export function useSSE({
@@ -23,16 +23,29 @@ export function useSSE({
   onClose,
   onError,
   reconnectInterval = 5000,
-  maxReconnectAttempts = 5,
+  maxReconnectAttempts = 10,
 }: UseSSEOptions) {
   const [isConnected, setIsConnected] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const eventSourceRef = useRef<EventSource | null>(null);
   const reconnectTimeoutRef = useRef<NodeJS.Timeout>();
   const reconnectAttemptsRef = useRef(0);
+  const isReconnectingRef = useRef(false);
 
   const connect = useCallback(() => {
+    // Prevent multiple simultaneous connection attempts
+    if (isReconnectingRef.current) {
+      return;
+    }
+
     try {
+      // Clean up any existing connection
+      if (eventSourceRef.current) {
+        eventSourceRef.current.close();
+        eventSourceRef.current = null;
+      }
+
+      isReconnectingRef.current = true;
       const eventSource = new EventSource(url);
       eventSourceRef.current = eventSource;
 
@@ -40,6 +53,7 @@ export function useSSE({
         setIsConnected(true);
         setError(null);
         reconnectAttemptsRef.current = 0;
+        isReconnectingRef.current = false;
         onOpen?.();
       };
 
@@ -48,48 +62,80 @@ export function useSSE({
           const data = JSON.parse(event.data);
           onMessage?.(data);
         } catch (err) {
-          console.error('Failed to parse SSE message:', err);
+          // Silently handle parsing errors
         }
       };
 
       eventSource.onerror = (event) => {
         setIsConnected(false);
-        setError('SSE connection error');
+        isReconnectingRef.current = false;
+
+        // Only set error if we haven't exceeded max attempts
+        if (reconnectAttemptsRef.current < maxReconnectAttempts) {
+          setError(
+            `SSE connection error (attempt ${reconnectAttemptsRef.current + 1}/${maxReconnectAttempts})`
+          );
+        } else {
+          setError('SSE connection failed - max attempts reached');
+        }
+
         onError?.(event);
 
-        // Attempt to reconnect
+        // Attempt to reconnect with exponential backoff
         if (reconnectAttemptsRef.current < maxReconnectAttempts) {
           reconnectAttemptsRef.current++;
+          const backoffDelay = Math.min(
+            reconnectInterval * Math.pow(2, reconnectAttemptsRef.current - 1),
+            30000 // Cap at 30 seconds
+          );
+
           reconnectTimeoutRef.current = setTimeout(() => {
             connect();
-          }, reconnectInterval);
+          }, backoffDelay);
         }
       };
 
       // Handle connection close
       const handleClose = () => {
         setIsConnected(false);
+        isReconnectingRef.current = false;
         onClose?.();
       };
 
       eventSource.addEventListener('close', handleClose);
-
     } catch (err) {
       setError('Failed to create SSE connection');
-      console.error('SSE connection error:', err);
+      isReconnectingRef.current = false;
     }
-  }, [url, onMessage, onOpen, onClose, onError, reconnectInterval, maxReconnectAttempts]);
+  }, [
+    url,
+    onMessage,
+    onOpen,
+    onClose,
+    onError,
+    reconnectInterval,
+    maxReconnectAttempts,
+  ]);
 
   const disconnect = useCallback(() => {
     if (reconnectTimeoutRef.current) {
       clearTimeout(reconnectTimeoutRef.current);
+      reconnectTimeoutRef.current = undefined;
     }
     if (eventSourceRef.current) {
       eventSourceRef.current.close();
       eventSourceRef.current = null;
     }
+    isReconnectingRef.current = false;
     setIsConnected(false);
   }, []);
+
+  const reconnect = useCallback(() => {
+    disconnect();
+    reconnectAttemptsRef.current = 0;
+    setError(null);
+    connect();
+  }, [disconnect, connect]);
 
   useEffect(() => {
     connect();
@@ -103,5 +149,6 @@ export function useSSE({
     error,
     disconnect,
     connect,
+    reconnect,
   };
 }

@@ -144,7 +144,11 @@ export class DStarLiteCore
       const result: PathPlanningResult = {
         success: true,
         path,
+        waypoints: path,
+        totalLength: totalCost,
         totalCost,
+        estimatedCost: totalCost,
+        estimatedTime: totalCost * 0.1, // Rough estimate: 0.1 seconds per unit cost
         planningTime,
         nodesExpanded: computeResult.iterations,
         metadata: {
@@ -165,7 +169,11 @@ export class DStarLiteCore
       const result: PathPlanningResult = {
         success: false,
         path: [],
+        waypoints: [],
+        totalLength: Infinity,
         totalCost: Infinity,
+        estimatedCost: Infinity,
+        estimatedTime: Infinity,
         planningTime,
         nodesExpanded: computeResult.iterations,
         reason: 'No path found within computation limits',
@@ -363,19 +371,25 @@ export class DStarLiteCore
         const neighbors = this.getNeighbors(currentNodeId);
         for (const { nodeId: neighborId } of neighbors) {
           if (neighborId !== this.goalNodeId) {
-            this.updateVertex(neighborId);
+            const neighbor = this.getNode(neighborId);
+            if (neighbor) {
+              this.updateVertex(neighbor);
+            }
           }
         }
       } else {
         // Underconsistent vertex or consistent
         currentNode.gValue = Infinity;
-        this.updateVertex(currentNodeId);
+        this.updateVertex(currentNode);
 
         // Update predecessors
         const neighbors = this.getNeighbors(currentNodeId);
         for (const { nodeId: neighborId } of neighbors) {
           if (neighborId !== this.goalNodeId) {
-            this.updateVertex(neighborId);
+            const neighbor = this.getNode(neighborId);
+            if (neighbor) {
+              this.updateVertex(neighbor);
+            }
           }
         }
       }
@@ -402,13 +416,12 @@ export class DStarLiteCore
   /**
    * Update vertex costs when conditions change
    */
-  updateVertex(nodeId: string): void {
-    const node = this.getNode(nodeId);
+  updateVertex(node: GraphNode): void {
     if (!node || !this.goalNodeId) return;
 
-    if (nodeId !== this.goalNodeId) {
+    if (node.id !== this.goalNodeId) {
       // Calculate minimum cost to goal through neighbors
-      const neighbors = this.getNeighbors(nodeId);
+      const neighbors = this.getNeighbors(node.id);
       let minRhs = Infinity;
 
       for (const { nodeId: neighborId, cost } of neighbors) {
@@ -422,16 +435,16 @@ export class DStarLiteCore
     }
 
     // Remove from queue if present
-    this.priorityQueue.remove(nodeId);
+    this.priorityQueue.remove(node.id);
 
     // Add to queue if inconsistent
     if (node.gValue !== node.rhsValue) {
       node.key = this.calculateKey(node);
-      this.priorityQueue.insert(nodeId, node.key);
+      this.priorityQueue.insert(node.id, node.key);
     }
 
     this.emit('vertex-updated', {
-      nodeId,
+      nodeId: node.id,
       gValue: node.gValue,
       rhsValue: node.rhsValue,
     });
@@ -499,11 +512,17 @@ export class DStarLiteCore
     const neighbors = this.getNeighbors(nodeId);
 
     // Update the node itself
-    this.updateVertex(nodeId);
+    const node = this.getNode(nodeId);
+    if (node) {
+      this.updateVertex(node);
+    }
 
     // Update all neighbors
     for (const { nodeId: neighborId } of neighbors) {
-      this.updateVertex(neighborId);
+      const neighbor = this.getNode(neighborId);
+      if (neighbor) {
+        this.updateVertex(neighbor);
+      }
     }
   }
 

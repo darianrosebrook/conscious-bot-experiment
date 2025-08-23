@@ -17,7 +17,6 @@ import {
   RelaxedSolution,
   NoveltyScore,
   CreativeSolution,
-  ReasoningChain,
   Alternative,
 } from '../types';
 
@@ -77,7 +76,22 @@ export class CreativeProblemSolver {
         problem,
         constraints
       );
-      solutions.push(...analogicalSolutions);
+      solutions.push(
+        ...analogicalSolutions.map((solution) => ({
+          ...solution,
+          type: 'analogical' as const,
+          noveltyScore: {
+            score: 0.5,
+            reasoning: 'Default novelty score',
+            dimensions: {
+              originality: 0.5,
+              usefulness: 0.5,
+              surprise: 0.5,
+            },
+          },
+          timestamp: Date.now(),
+        }))
+      );
     }
 
     // Generate constraint-relaxed solutions
@@ -86,7 +100,22 @@ export class CreativeProblemSolver {
         problem,
         constraints
       );
-      solutions.push(...relaxedSolutions);
+      solutions.push(
+        ...relaxedSolutions.map((solution) => ({
+          ...solution,
+          type: 'relaxed' as const,
+          noveltyScore: {
+            score: 0.5,
+            reasoning: 'Default novelty score',
+            dimensions: {
+              originality: 0.5,
+              usefulness: 0.5,
+              surprise: 0.5,
+            },
+          },
+          timestamp: Date.now(),
+        }))
+      );
     }
 
     // Generate alternative approaches
@@ -94,7 +123,22 @@ export class CreativeProblemSolver {
       problem,
       constraints
     );
-    solutions.push(...alternativeSolutions);
+    solutions.push(
+      ...alternativeSolutions.map((solution) => ({
+        ...solution,
+        type: 'alternative' as const,
+        noveltyScore: {
+          score: 0.5,
+          reasoning: 'Default novelty score',
+          dimensions: {
+            originality: 0.5,
+            usefulness: 0.5,
+            surprise: 0.5,
+          },
+        },
+        timestamp: Date.now(),
+      }))
+    );
 
     // Evaluate novelty and filter
     if (this.config.enableNoveltyEvaluation) {
@@ -126,7 +170,7 @@ export class CreativeProblemSolver {
    */
   async generateAnalogicalSolutions(
     problem: Problem,
-    constraints: Constraint[]
+    _constraints: Constraint[]
   ): Promise<AnalogicalSolution[]> {
     const analogies: AnalogicalSolution[] = [];
     const domains = Array.from(this.domainKnowledge.values());
@@ -158,13 +202,18 @@ export class CreativeProblemSolver {
     const prompt = this.buildAnalogyPrompt(problem, domain);
 
     try {
-      const response = await this.llm.generateResponse(prompt, {
-        systemPrompt: `You are an expert in creative problem solving using analogical reasoning. 
+      const response = await this.llm.generateResponse(
+        prompt,
+        {
+          systemPrompt: `You are an expert in creative problem solving using analogical reasoning. 
         Find relevant analogies from the specified domain that could help solve the given problem.
         Provide specific, actionable solutions based on the analogy.`,
-        temperature: 0.8,
-        maxTokens: 1024,
-      });
+        },
+        {
+          temperature: 0.8,
+          maxTokens: 1024,
+        }
+      );
 
       const analogy = this.parseAnalogyResponse(response.text, domain);
       return analogy;
@@ -217,7 +266,7 @@ Provide:
       ) || '';
 
     return {
-      id: `analogy-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      id: `analogy-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
       sourceDomain: domain.name,
       analogy: analogy.trim(),
       solution: solution.trim(),
@@ -284,13 +333,18 @@ Generate a solution that works with these relaxed constraints.
 Consider what becomes possible when these constraints are relaxed.`;
 
     try {
-      const response = await this.llm.generateResponse(prompt, {
-        systemPrompt: `You are solving a problem with relaxed constraints. 
+      const response = await this.llm.generateResponse(
+        prompt,
+        {
+          systemPrompt: `You are solving a problem with relaxed constraints. 
         Consider what new possibilities open up when constraints are relaxed.
         Provide innovative solutions that take advantage of the relaxed constraints.`,
-        temperature: 0.9,
-        maxTokens: 512,
-      });
+        },
+        {
+          temperature: 0.9,
+          maxTokens: 512,
+        }
+      );
 
       return {
         id: `relaxed-${relaxationLevel}-${Date.now()}`,
@@ -331,13 +385,18 @@ For each alternative, provide:
 4. Feasibility assessment`;
 
     try {
-      const response = await this.llm.generateResponse(prompt, {
-        systemPrompt: `You are generating alternative approaches to problem solving.
+      const response = await this.llm.generateResponse(
+        prompt,
+        {
+          systemPrompt: `You are generating alternative approaches to problem solving.
         Think creatively and consider multiple perspectives and methodologies.
         Provide diverse, innovative approaches.`,
-        temperature: 0.8,
-        maxTokens: 1024,
-      });
+        },
+        {
+          temperature: 0.8,
+          maxTokens: 1024,
+        }
+      );
 
       return this.parseAlternativesResponse(response.text);
     } catch (error) {
@@ -404,13 +463,18 @@ Consider:
 Provide a score and brief explanation.`;
 
     try {
-      const response = await this.llm.generateResponse(prompt, {
-        systemPrompt: `You are evaluating the novelty and creativity of problem solutions.
+      const response = await this.llm.generateResponse(
+        prompt,
+        {
+          systemPrompt: `You are evaluating the novelty and creativity of problem solutions.
         Be objective and consider multiple dimensions of creativity.
         Provide scores between 0.0 and 1.0 with clear reasoning.`,
-        temperature: 0.3,
-        maxTokens: 256,
-      });
+        },
+        {
+          temperature: 0.3,
+          maxTokens: 256,
+        }
+      );
 
       return this.parseNoveltyScore(response.text);
     } catch (error) {

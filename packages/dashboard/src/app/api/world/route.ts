@@ -7,7 +7,7 @@ import type { Environment } from '@/types';
  * 
  * @author @darianrosebrook
  */
-export async function GET(request: NextRequest) {
+export async function GET(_request: NextRequest) {
   try {
     // Fetch data from world and minecraft systems
     const [worldRes, minecraftRes] = await Promise.allSettled([
@@ -15,7 +15,7 @@ export async function GET(request: NextRequest) {
       fetch('http://localhost:3005/state'),
     ]);
 
-    let environment: Environment = {
+    const environment: Environment = {
       biome: 'Unknown',
       weather: 'Unknown',
       timeOfDay: 'Unknown',
@@ -67,7 +67,6 @@ export async function GET(request: NextRequest) {
     });
 
   } catch (error) {
-    console.error('World API error:', error);
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

@@ -74,12 +74,16 @@ export const PathPlanningRequestSchema = z.object({
   maxDistance: z.number().positive().default(200),
   allowPartialPath: z.boolean().default(true),
   avoidHazards: z.boolean().default(true),
+  urgency: z.enum(['low', 'normal', 'high', 'urgent']).default('normal'),
   preferences: z
     .object({
       preferLit: z.boolean().default(true),
       avoidMobs: z.boolean().default(true),
       minimizeVertical: z.boolean().default(false),
       preferSolid: z.boolean().default(true),
+      avoidWater: z.boolean().default(false),
+      preferLighting: z.boolean().default(true),
+      maxDetour: z.number().positive().default(5.0),
     })
     .optional(),
   timeout: z.number().positive().default(50), // ms
@@ -93,7 +97,11 @@ export type PathPlanningRequest = z.infer<typeof PathPlanningRequestSchema>;
 export const PathPlanningResultSchema = z.object({
   success: z.boolean(),
   path: z.array(WorldPositionSchema),
+  waypoints: z.array(WorldPositionSchema),
+  totalLength: z.number().nonnegative(),
   totalCost: z.number().nonnegative(),
+  estimatedCost: z.number().nonnegative(),
+  estimatedTime: z.number().nonnegative(),
   planningTime: z.number().nonnegative(), // ms
   nodesExpanded: z.number().nonnegative(),
   reason: z.string().optional(), // Failure reason if unsuccessful

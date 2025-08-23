@@ -12,7 +12,7 @@ import {
   Need,
   UtilityContext,
   UtilityFunction,
-} from '@/types';
+} from '../types';
 
 /**
  * Simple utility function: weighted sum of priority factors.

@@ -392,6 +392,162 @@ export class RelationshipManager {
 
   async updateRelationship(
     agentId: string,
+    otherAgentId: string,
+    interaction: any
+  ): Promise<any> {
+    // Check if relationship exists, if not create it
+    let relationship = this.relationships.get(otherAgentId);
+    if (!relationship) {
+      const newInteraction: Interaction = {
+        interactionId: interaction.id,
+        type: interaction.type as InteractionType,
+        description: interaction.description,
+        outcome: {
+          success: interaction.outcome === 'positive',
+          satisfaction: 0.7,
+          goalAchievement: 0.6,
+          unexpectedResults: [],
+          learnings: [],
+          futureImplications: [],
+        },
+        emotionalTone: {
+          valence: 0,
+          intensity: 0.3,
+          dominantEmotion: 'neutral',
+          secondaryEmotions: [],
+        },
+        cooperationLevel: 0.6,
+        trustImpact: 0.1,
+        reciprocityImpact: 0.1,
+        timestamp: interaction.timestamp,
+        context: interaction.context,
+      };
+
+      relationship = await this.initializeRelationship(
+        otherAgentId,
+        newInteraction
+      );
+    }
+
+    return {
+      agentId,
+      otherAgentId,
+      trust: relationship.trustLevels.general || 0.5,
+      familiarity: relationship.emotionalBond.strength,
+      relationshipType: relationship.relationshipType,
+      lastInteraction: relationship.lastInteraction,
+    };
+  }
+
+  async calculateTrust(
+    agentId: string,
+    otherAgentId: string,
+    interactions: any[]
+  ): Promise<any> {
+    const relationship = this.relationships.get(otherAgentId);
+    if (!relationship) {
+      return {
+        score: 0.5,
+        confidence: 0.3,
+        factors: ['No relationship history'],
+      };
+    }
+
+    return {
+      score: relationship.trustLevels.general || 0.5,
+      confidence: 0.8,
+      factors: ['Interaction history', 'Reciprocity', 'Cooperation'],
+    };
+  }
+
+  async createBond(
+    agentId: string,
+    otherAgentId: string,
+    bondType: string
+  ): Promise<any> {
+    const relationship = this.relationships.get(otherAgentId);
+    if (!relationship) {
+      // Create a basic relationship first
+      const interaction: Interaction = {
+        interactionId: `bond-${Date.now()}`,
+        type: 'social' as InteractionType,
+        description: `Created ${bondType} bond`,
+        outcome: {
+          success: true,
+          satisfaction: 0.8,
+          goalAchievement: 0.7,
+          unexpectedResults: [],
+          learnings: [],
+          futureImplications: [],
+        },
+        emotionalTone: {
+          valence: 0.7,
+          intensity: 0.5,
+          dominantEmotion: 'positive',
+          secondaryEmotions: ['satisfied', 'content'],
+        },
+        cooperationLevel: 0.8,
+        trustImpact: 0.2,
+        reciprocityImpact: 0.2,
+        timestamp: Date.now(),
+        context: 'bond_creation',
+      };
+
+      await this.initializeRelationship(otherAgentId, interaction);
+    }
+
+    // Set a higher initial strength for the bond
+    const newRelationship = this.relationships.get(otherAgentId);
+    if (newRelationship) {
+      newRelationship.emotionalBond.strength = 0.8;
+    }
+
+    return {
+      agentId,
+      otherAgentId,
+      type: bondType,
+      strength: 0.8,
+      timestamp: Date.now(),
+    };
+  }
+
+  async strengthenBond(
+    agentId: string,
+    otherAgentId: string,
+    strengthIncrease: number
+  ): Promise<any> {
+    const relationship = this.relationships.get(otherAgentId);
+    if (!relationship) {
+      throw new Error(`Relationship with ${otherAgentId} not found`);
+    }
+
+    const newStrength = Math.min(
+      1.0,
+      relationship.emotionalBond.strength + strengthIncrease
+    );
+    relationship.emotionalBond.strength = newStrength;
+
+    return {
+      agentId,
+      otherAgentId,
+      type: 'strengthened',
+      strength: newStrength,
+      timestamp: Date.now(),
+    };
+  }
+
+  async getRelationships(agentId: string): Promise<any[]> {
+    return Array.from(this.relationships.values()).map((rel) => ({
+      agentId: rel.agentId,
+      trust: rel.trustLevels.general || 0.5,
+      familiarity: rel.emotionalBond.strength,
+      relationshipType: rel.relationshipType,
+      lastInteraction: rel.lastInteraction,
+    }));
+  }
+
+  async updateRelationshipInternal(
+    agentId: string,
     newInteraction: Interaction
   ): Promise<RelationshipUpdate> {
     const relationship = this.relationships.get(agentId);
@@ -524,8 +680,11 @@ Respond in JSON format.`,
     };
 
     try {
-      const response = await this.llm.generateResponse(context);
-      return this.parseTrustAssessment(response, agentId, trustDomain);
+      const response = await this.llm.generateResponse(
+        context.messages?.[0]?.content || 'Calculate trust level',
+        context
+      );
+      return this.parseTrustAssessment(response.text, agentId, trustDomain);
     } catch (error) {
       console.warn(`Failed to calculate trust for ${agentId}:`, error);
       return this.createEmptyTrustAssessment(agentId, trustDomain);
@@ -567,8 +726,11 @@ Respond in JSON format.`,
     };
 
     try {
-      const response = await this.llm.generateResponse(context);
-      return this.parseRelationshipQuality(response, relationship);
+      const response = await this.llm.generateResponse(
+        context.messages?.[0]?.content || 'Assess relationship quality',
+        context
+      );
+      return this.parseRelationshipQuality(response.text, relationship);
     } catch (error) {
       console.warn(
         `Failed to assess relationship quality for ${agentId}:`,
@@ -616,8 +778,11 @@ Respond in JSON format.`,
     };
 
     try {
-      const response = await this.llm.generateResponse(context);
-      return this.parseRelationshipTrajectory(response);
+      const response = await this.llm.generateResponse(
+        context.messages?.[0]?.content || 'Predict relationship trajectory',
+        context
+      );
+      return this.parseRelationshipTrajectory(response.text);
     } catch (error) {
       console.warn(
         `Failed to predict relationship trajectory for ${agentId}:`,
@@ -1212,7 +1377,9 @@ Respond in JSON format.`,
     };
 
     return (
-      directionMap[direction?.toLowerCase()] || TrajectoryDirection.UNCERTAIN
+      (direction &&
+        directionMap[direction.toLowerCase() as keyof typeof directionMap]) ||
+      TrajectoryDirection.UNCERTAIN
     );
   }
 

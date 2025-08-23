@@ -10,7 +10,7 @@
 import { LLMInterface } from '../cognitive-core/llm-interface';
 import {
   Commitment,
-  Promise,
+  Promise as ContractPromise,
   Contract,
   IntegrityAssessment,
   CommitmentTracker,
@@ -58,13 +58,13 @@ export class ContractSystem {
   private llm: LLMInterface;
   private config: ContractSystemConfig;
   private commitments: Commitment[] = [];
-  private promises: Promise[] = [];
+  private promises: ContractPromise[] = [];
   private contracts: Contract[] = [];
   private integrityHistory: IntegrityAssessment[] = [];
   private lastAssessment: number = 0;
 
-  constructor(llm: LLMInterface, config: Partial<ContractSystemConfig> = {}) {
-    this.llm = llm;
+  constructor(llm?: LLMInterface, config: Partial<ContractSystemConfig> = {}) {
+    this.llm = llm as LLMInterface;
     this.config = { ...DEFAULT_CONFIG, ...config };
   }
 
@@ -97,9 +97,9 @@ export class ContractSystem {
    * Monitor a new promise
    */
   monitorPromise(
-    promise: Omit<Promise, 'id' | 'createdAt' | 'status'>
-  ): Promise {
-    const newPromise: Promise = {
+    promise: Omit<ContractPromise, 'id' | 'createdAt' | 'status'>
+  ): ContractPromise {
+    const newPromise: ContractPromise = {
       id: `promise-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       ...promise,
       createdAt: Date.now(),
@@ -116,25 +116,6 @@ export class ContractSystem {
     }
 
     return newPromise;
-  }
-
-  /**
-   * Create a new contract
-   */
-  createContract(
-    contract: Omit<Contract, 'id' | 'createdAt' | 'status'>
-  ): Contract {
-    const newContract: Contract = {
-      id: `contract-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-      ...contract,
-      createdAt: Date.now(),
-      status: 'active',
-      integrityScore: 1.0,
-      trustScore: 1.0,
-    };
-
-    this.contracts.push(newContract);
-    return newContract;
   }
 
   /**
@@ -451,7 +432,7 @@ Generate 3-5 specific, actionable recommendations for improving integrity and tr
   /**
    * Calculate trust impact of promise fulfillment
    */
-  private calculateTrustImpact(promise: Promise): number {
+  private calculateTrustImpact(promise: ContractPromise): number {
     // Trust impact based on fulfillment quality and timeliness
     const timeliness = promise.deadline
       ? Math.max(0, 1 - (Date.now() - promise.deadline) / (24 * 60 * 60 * 1000))
@@ -593,7 +574,7 @@ Generate 3-5 specific, actionable recommendations for improving integrity and tr
   /**
    * Get all promises
    */
-  getPromises(): Promise[] {
+  getPromises(): ContractPromise[] {
     return [...this.promises];
   }
 
@@ -612,9 +593,291 @@ Generate 3-5 specific, actionable recommendations for improving integrity and tr
   }
 
   /**
+   * Create a commitment (alias for trackCommitment)
+   */
+  createCommitment(
+    title: string,
+    description: string,
+    deadline: Date,
+    steps: string[],
+    outcomes: string[]
+  ): string {
+    const commitment = this.trackCommitment({
+      description: title,
+      category: 'personal',
+      deadline: deadline.getTime(),
+      priority: 0.5,
+      evidence: [],
+      progress: 0,
+      integrityScore: 1.0,
+    });
+
+    // Add missing properties for test compatibility
+    (commitment as any).title = title;
+    (commitment as any).steps = steps;
+    (commitment as any).outcomes = outcomes;
+
+    return commitment.id;
+  }
+
+  /**
+   * Get a specific commitment
+   */
+  getCommitment(commitmentId: string): Commitment | undefined {
+    return this.commitments.find((c) => c.id === commitmentId);
+  }
+
+  /**
+   * Create a promise (alias for monitorPromise)
+   */
+  createPromise(
+    title: string,
+    recipient: string,
+    description: string,
+    deadline: Date,
+    requirements: string[]
+  ): string {
+    const promise = this.monitorPromise({
+      description: title,
+      recipient,
+      deadline: deadline.getTime(),
+      fulfillmentScore: 0,
+      trustImpact: 0,
+      evidence: [],
+    });
+
+    // Add missing properties for test compatibility
+    (promise as any).title = title;
+    (promise as any).requirements = requirements;
+
+    return promise.id;
+  }
+
+  /**
+   * Get a specific promise
+   */
+  getPromise(promiseId: string): ContractPromise | undefined {
+    return this.promises.find((p) => p.id === promiseId);
+  }
+
+  /**
+   * Create a formal contract (overloaded method)
+   */
+  createContract(
+    title: string,
+    type: string,
+    description: string,
+    counterparty: string,
+    terms: any
+  ): string;
+  createContract(
+    contract: Omit<Contract, 'id' | 'createdAt' | 'status'>
+  ): Contract;
+  createContract(
+    titleOrContract: string | Omit<Contract, 'id' | 'createdAt' | 'status'>,
+    type?: string,
+    description?: string,
+    counterparty?: string,
+    terms?: any
+  ): string | Contract {
+    if (typeof titleOrContract === 'string') {
+      // New overload for test compatibility
+      const contract = this.createContractFromParams({
+        title: titleOrContract,
+        description: description!,
+        parties: [counterparty!],
+        terms: terms?.myObligations || [],
+        startDate: Date.now(),
+        endDate: terms?.duration
+          ? Date.now() + terms.duration * 24 * 60 * 60 * 1000
+          : undefined,
+        integrityScore: 1.0,
+        trustScore: 1.0,
+      });
+
+      // Add missing properties for test compatibility
+      (contract as any).type = type;
+
+      return contract.id;
+    } else {
+      // Original implementation
+      const newContract: Contract = {
+        id: `contract-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        ...titleOrContract,
+        createdAt: Date.now(),
+        status: 'active',
+        integrityScore: 1.0,
+        trustScore: 1.0,
+      };
+
+      this.contracts.push(newContract);
+      return newContract;
+    }
+  }
+
+  /**
+   * Create contract from parameters (helper method)
+   */
+  private createContractFromParams(
+    contract: Omit<Contract, 'id' | 'createdAt' | 'status'>
+  ): Contract {
+    const newContract: Contract = {
+      id: `contract-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      ...contract,
+      createdAt: Date.now(),
+      status: 'active',
+      integrityScore: 1.0,
+      trustScore: 1.0,
+    };
+
+    this.contracts.push(newContract);
+    return newContract;
+  }
+
+  /**
+   * Get a specific contract
+   */
+  getContract(contractId: string): Contract | undefined {
+    return this.contracts.find((c) => c.id === contractId);
+  }
+
+  /**
+   * Evaluate commitment progress
+   */
+  evaluateCommitmentProgress(commitmentId: string): any {
+    const commitment = this.getCommitment(commitmentId);
+    if (!commitment) return null;
+
+    const timeElapsed = Date.now() - commitment.createdAt;
+    const totalTime = commitment.deadline - commitment.createdAt;
+    const expectedProgress = timeElapsed / totalTime;
+
+    return {
+      currentProgress: commitment.progress,
+      onTrack: commitment.progress >= expectedProgress * 0.8,
+      projectedCompletion: new Date(
+        commitment.createdAt + totalTime / commitment.progress
+      ),
+      recommendations: [
+        commitment.progress < expectedProgress
+          ? 'Accelerate progress'
+          : 'Maintain current pace',
+        'Document evidence regularly',
+        'Review milestones',
+      ],
+    };
+  }
+
+  /**
+   * Get integrity score
+   */
+  getIntegrityScore(): any {
+    const commitmentScore = this.assessCommitmentIntegrity();
+    const promiseScore = this.assessPromiseIntegrity();
+    const trustScore = this.calculateTrustScore();
+
+    return {
+      overall: (commitmentScore + promiseScore + trustScore.overall) / 3,
+      commitmentScore,
+      promiseScore,
+      trustScore: trustScore.overall,
+      trends: {
+        commitment: 'stable',
+        promise: 'stable',
+        trust: trustScore.trend,
+      },
+    };
+  }
+
+  /**
+   * Generate integrity report
+   */
+  generateIntegrityReport(): any {
+    const assessment = this.getLastAssessment();
+
+    return {
+      overallScore: assessment.trustScore.overall,
+      commitmentMetrics: {
+        total: this.commitments.length,
+        active: this.commitments.filter(
+          (c) => c.status === CommitmentStatus.ACTIVE
+        ).length,
+        completed: this.commitments.filter(
+          (c) => c.status === CommitmentStatus.COMPLETED
+        ).length,
+        integrity: assessment.commitmentIntegrity,
+      },
+      promiseMetrics: {
+        total: this.promises.length,
+        fulfilled: this.promises.filter(
+          (p) => p.status === PromiseStatus.FULFILLED
+        ).length,
+        broken: this.promises.filter((p) => p.status === PromiseStatus.BROKEN)
+          .length,
+        integrity: assessment.promiseIntegrity,
+      },
+      trends: {
+        trust: assessment.trustScore.trend,
+        commitment: 'stable',
+        promise: 'stable',
+      },
+      areasOfConcern: this.identifyAreasOfConcern(),
+      recommendations: assessment.recommendations,
+      improvementPlan: this.identifyImprovementAreas(),
+    };
+  }
+
+  /**
+   * Check for contract violations
+   */
+  checkViolations(): any[] {
+    const violations: any[] = [];
+
+    // Check overdue promises
+    const overduePromises = this.promises.filter(
+      (p) =>
+        p.status === PromiseStatus.PENDING &&
+        p.deadline &&
+        Date.now() > p.deadline
+    );
+
+    overduePromises.forEach((promise) => {
+      violations.push({
+        contractId: promise.id,
+        type: 'promise_overdue',
+        severity: 0.8,
+        description: `Promise "${promise.description}" is overdue`,
+        impact: 'trust_loss',
+      });
+    });
+
+    // Check overdue commitments
+    const overdueCommitments = this.commitments.filter(
+      (c) =>
+        c.status === CommitmentStatus.ACTIVE &&
+        c.deadline &&
+        Date.now() > c.deadline
+    );
+
+    overdueCommitments.forEach((commitment) => {
+      violations.push({
+        contractId: commitment.id,
+        type: 'commitment_overdue',
+        severity: 0.7,
+        description: `Commitment "${commitment.description}" is overdue`,
+        impact: 'integrity_loss',
+      });
+    });
+
+    return violations;
+  }
+
+  /**
    * Get contract system statistics
    */
   getStats() {
+    const integrityScore = this.getIntegrityScore();
+
     return {
       totalCommitments: this.commitments.length,
       totalPromises: this.promises.length,
@@ -631,13 +894,17 @@ Generate 3-5 specific, actionable recommendations for improving integrity and tr
       brokenPromises: this.promises.filter(
         (p) => p.status === PromiseStatus.BROKEN
       ).length,
-      averageIntegrity:
-        this.integrityHistory.length > 0
-          ? this.integrityHistory.reduce(
-              (sum, assessment) => sum + assessment.trustScore.overall,
-              0
-            ) / this.integrityHistory.length
-          : 1.0,
+      averageIntegrityScore: integrityScore.overall,
+      activeObligations:
+        this.commitments.filter((c) => c.status === CommitmentStatus.ACTIVE)
+          .length +
+        this.promises.filter((p) => p.status === PromiseStatus.PENDING).length,
+      completionRate:
+        this.commitments.length > 0
+          ? this.commitments.filter(
+              (c) => c.status === CommitmentStatus.COMPLETED
+            ).length / this.commitments.length
+          : 1,
       config: this.config,
     };
   }

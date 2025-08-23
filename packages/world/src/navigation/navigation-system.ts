@@ -124,7 +124,11 @@ export class NavigationSystem extends EventEmitter<NavigationSystemEvents> {
         const result: PathPlanningResult = {
           success: false,
           path: [],
+          waypoints: [],
+          totalLength: Infinity,
           totalCost: Infinity,
+          estimatedCost: Infinity,
+          estimatedTime: Infinity,
           planningTime: Date.now() - startTime,
           nodesExpanded: 0,
           reason: 'Start or goal position not accessible',
@@ -171,6 +175,9 @@ export class NavigationSystem extends EventEmitter<NavigationSystemEvents> {
           metadata: {
             ...dstarResult.metadata,
             optimality,
+            isPartialPath: dstarResult.metadata?.isPartialPath ?? false,
+            goalReached: dstarResult.metadata?.goalReached ?? true,
+            hazardsAvoided: dstarResult.metadata?.hazardsAvoided ?? 0,
           },
         };
 
@@ -186,7 +193,11 @@ export class NavigationSystem extends EventEmitter<NavigationSystemEvents> {
       const result: PathPlanningResult = {
         success: false,
         path: [],
+        waypoints: [],
+        totalLength: Infinity,
         totalCost: Infinity,
+        estimatedCost: Infinity,
+        estimatedTime: Infinity,
         planningTime: Date.now() - startTime,
         nodesExpanded: 0,
         reason: `Planning error: ${error instanceof Error ? error.message : 'Unknown error'}`,
@@ -244,7 +255,7 @@ export class NavigationSystem extends EventEmitter<NavigationSystemEvents> {
         const hazards = hazardChanges
           .filter((change) => change.changeType === 'hazard_added')
           .map((change) => ({
-            type: 'unknown' as const,
+            type: 'mob' as const,
             position: change.position,
             radius: 3,
             severity: change.severity === 'high' ? 0.8 : 0.4,
@@ -423,7 +434,7 @@ export class NavigationSystem extends EventEmitter<NavigationSystemEvents> {
     graph: ReturnType<NavigationGraph['getStatistics']>;
     dstar: ReturnType<DStarLiteCore['getStatistics']>;
     costs: ReturnType<DynamicCostCalculator['getStatistics']>;
-    navigation: typeof this.metrics;
+    navigation: ReturnType<NavigationSystem['getMetrics']>;
   } {
     return {
       graph: this.navigationGraph.getStatistics(),

@@ -252,7 +252,8 @@ export class ObjectRecognition
 
     if (!objectType) return null;
 
-    const viewingCond = viewingConditions.get(observation.pos) || {};
+    const posKey = `${observation.pos.x},${observation.pos.y},${observation.pos.z}`;
+    const viewingCond = viewingConditions.get(posKey) || {};
     const confidence = this.calculateRecognitionConfidence(
       observation,
       viewingCond
@@ -307,63 +308,73 @@ export class ObjectRecognition
     blockId: string,
     config: PerceptionConfig
   ): ObjectType | null {
+    // Defensive programming: ensure blockId exists
+    if (!blockId || typeof blockId !== 'string') {
+      console.warn('Invalid blockId provided to classifyObjectType:', blockId);
+      return null;
+    }
+
+    // Defensive programming: ensure objectClassification exists
+    if (!config?.objectClassification) {
+      console.warn('Object classification config is missing, using defaults');
+      // Return default classification for Minecraft blocks
+      if (blockId.startsWith('minecraft:')) {
+        return 'block';
+      }
+      return null;
+    }
+
+    // Additional check for individual arrays - provide defaults if missing
+    const ores = (config.objectClassification.ores || []).filter(Boolean);
+    const structures = (config.objectClassification.structures || []).filter(
+      Boolean
+    );
+    const hazards = (config.objectClassification.hazards || []).filter(Boolean);
+    const resources = (config.objectClassification.resources || []).filter(
+      Boolean
+    );
+    const hostileEntities = (
+      config.objectClassification.hostileEntities || []
+    ).filter(Boolean);
+    const neutralEntities = (
+      config.objectClassification.neutralEntities || []
+    ).filter(Boolean);
+
     // Check ore types
-    if (config.objectClassification.ores.some((ore) => blockId.includes(ore))) {
+    if (ores.some((ore) => blockId.includes(ore))) {
       return 'block';
     }
 
     // Check structures
-    if (
-      config.objectClassification.structures.some((struct) =>
-        blockId.includes(struct)
-      )
-    ) {
+    if (structures.some((struct) => blockId.includes(struct))) {
       return 'structure';
     }
 
     // Check hazards
-    if (
-      config.objectClassification.hazards.some((hazard) =>
-        blockId.includes(hazard)
-      )
-    ) {
-      return 'block';
+    if (hazards.some((hazard) => blockId.includes(hazard))) {
+      return 'block'; // Hazards are still blocks
     }
 
     // Check resources
-    if (
-      config.objectClassification.resources.some((resource) =>
-        blockId.includes(resource)
-      )
-    ) {
-      return 'block';
+    if (resources.some((resource) => blockId.includes(resource))) {
+      return 'block'; // Resources are still blocks
     }
 
-    // Entity classification would happen in identifyEntities method
-    if (blockId.includes('entity_')) {
-      if (
-        config.objectClassification.hostileEntities.some((entity) =>
-          blockId.includes(entity)
-        )
-      ) {
-        return 'entity_mob_hostile';
-      }
-      if (
-        config.objectClassification.neutralEntities.some((entity) =>
-          blockId.includes(entity)
-        )
-      ) {
-        return 'entity_mob_neutral';
-      }
-      return 'entity_mob_passive';
+    // Check entities
+    if (hostileEntities.some((entity) => blockId.includes(entity))) {
+      return 'entity_mob_hostile';
     }
 
-    // Default to block for Minecraft items
+    if (neutralEntities.some((entity) => blockId.includes(entity))) {
+      return 'entity_mob_neutral';
+    }
+
+    // Default classification for Minecraft blocks
     if (blockId.startsWith('minecraft:')) {
       return 'block';
     }
 
-    return null;
+    return 'unknown';
   }
 
   private extractVisualFeatures(
@@ -384,6 +395,7 @@ export class ObjectRecognition
         shape: 'cube',
         texture: 'rough',
         luminance: 0,
+        animation: false,
       });
     } else if (blockId.includes('log')) {
       features.push({
@@ -391,6 +403,7 @@ export class ObjectRecognition
         texture: 'wood_grain',
         color: 'brown',
         luminance: 0,
+        animation: false,
       });
     } else if (blockId.includes('stone')) {
       features.push({
@@ -398,6 +411,7 @@ export class ObjectRecognition
         texture: 'rough',
         color: 'gray',
         luminance: 0,
+        animation: false,
       });
     } else if (objectType.startsWith('entity_')) {
       features.push({

@@ -3,21 +3,23 @@ import { NextRequest } from 'next/server';
 /**
  * WebSocket route handler for HUD updates
  * Streams real-time HUD data from the bot systems
- * 
+ *
  * @author @darianrosebrook
  */
 export const GET = async (req: NextRequest) => {
   try {
-    // Check if the request is a WebSocket upgrade
-    const upgrade = req.headers.get('upgrade');
-    if (upgrade !== 'websocket') {
-      return new Response('Expected WebSocket upgrade', { status: 400 });
+    // Check if the request is for SSE (Accept: text/event-stream)
+    const accept = req.headers.get('accept');
+    const isSSE = accept?.includes('text/event-stream');
+
+    if (!isSSE) {
+      return new Response('Expected SSE request', { status: 400 });
     }
 
     // For now, we'll use Server-Sent Events (SSE) as a fallback
     // since Next.js App Router doesn't have built-in WebSocket support
     const encoder = new TextEncoder();
-    
+
     const stream = new ReadableStream({
       start(controller) {
         const sendHudData = async () => {
@@ -28,11 +30,11 @@ export const GET = async (req: NextRequest) => {
               fetch('http://localhost:3003/state'),
             ]);
 
-            let hudData = {
+            const hudData = {
               ts: new Date().toISOString(),
               vitals: { health: 100, hunger: 100, stamina: 100, sleep: 100 },
               intero: { stress: 0, focus: 100, curiosity: 50 },
-              mood: "neutral",
+              mood: 'neutral',
             };
 
             // Get Minecraft bot data
@@ -50,25 +52,29 @@ export const GET = async (req: NextRequest) => {
             if (cognitionRes.status === 'fulfilled' && cognitionRes.value.ok) {
               const cognitionData = await cognitionRes.value.json();
               if (cognitionData.cognitiveCore) {
-                const convos = cognitionData.cognitiveCore.conversationManager?.activeConversations || 0;
-                const solutions = cognitionData.cognitiveCore.creativeSolver?.solutionsGenerated || 0;
-                
-                hudData.intero.focus = Math.min(100, 50 + (solutions * 10));
-                hudData.intero.curiosity = Math.min(100, 30 + (convos * 15));
-                hudData.intero.stress = Math.max(0, 20 - (solutions * 2));
-                
+                const convos =
+                  cognitionData.cognitiveCore.conversationManager
+                    ?.activeConversations || 0;
+                const solutions =
+                  cognitionData.cognitiveCore.creativeSolver
+                    ?.solutionsGenerated || 0;
+
+                hudData.intero.focus = Math.min(100, 50 + solutions * 10);
+                hudData.intero.curiosity = Math.min(100, 30 + convos * 15);
+                hudData.intero.stress = Math.max(0, 20 - solutions * 2);
+
                 // Determine mood based on cognitive state
-                if (solutions > 5) hudData.mood = "accomplished";
-                else if (convos > 2) hudData.mood = "engaged";
-                else if (hudData.vitals.health < 50) hudData.mood = "concerned";
-                else hudData.mood = "cautiously curious";
+                if (solutions > 5) hudData.mood = 'accomplished';
+                else if (convos > 2) hudData.mood = 'engaged';
+                else if (hudData.vitals.health < 50) hudData.mood = 'concerned';
+                else hudData.mood = 'cautiously curious';
               }
             }
 
             const data = `data: ${JSON.stringify(hudData)}\n\n`;
             controller.enqueue(encoder.encode(data));
           } catch (error) {
-            console.error('Error fetching HUD data:', error);
+            // Silently handle errors
           }
         };
 
@@ -90,12 +96,10 @@ export const GET = async (req: NextRequest) => {
       headers: {
         'Content-Type': 'text/event-stream',
         'Cache-Control': 'no-cache',
-        'Connection': 'keep-alive',
+        Connection: 'keep-alive',
       },
     });
-
   } catch (error) {
-    console.error('WebSocket HUD route error:', error);
     return new Response('Internal Server Error', { status: 500 });
   }
 };

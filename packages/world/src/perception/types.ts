@@ -569,3 +569,35 @@ export const validateRecognizedObject = (data: unknown): RecognizedObject =>
 
 export const validatePerceptionUpdate = (data: unknown): PerceptionUpdate =>
   PerceptionUpdateSchema.parse(data);
+
+// Export missing types that tests expect
+export type VisualQuery = {
+  position: Vec3;
+  radius: number;
+  targetTypes?: string[];
+  observerPosition?: Vec3;
+  maxDistance?: number;
+};
+
+export type WorldPosition = Vec3;
+
+export type PerceptionResult = {
+  detectedObjects: Array<{
+    worldPosition: Vec3;
+    classification: {
+      primary: string;
+    };
+    confidence: number;
+  }>;
+  overallConfidence: number;
+  processingTime: number;
+  fieldCoverage: number;
+};
+
+export type ObjectClassification = {
+  primary: string;
+  secondary?: string;
+  confidence: number;
+};
+
+export type ConfidenceScore = number;

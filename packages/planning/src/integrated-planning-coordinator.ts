@@ -858,6 +858,9 @@ export class IntegratedPlanningCoordinator extends EventEmitter {
       [GoalType.ACHIEVEMENT]: 'logical',
       [GoalType.CREATIVITY]: 'creative',
       [GoalType.CURIOSITY]: 'exploration',
+      [GoalType.REACH_LOCATION]: 'spatial',
+      [GoalType.ACQUIRE_ITEM]: 'logical',
+      [GoalType.SURVIVE_THREAT]: 'safety',
     };
     return mapping[goalType] || 'general';
   }

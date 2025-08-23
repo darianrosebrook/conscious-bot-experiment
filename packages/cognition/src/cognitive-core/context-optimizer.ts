@@ -10,13 +10,10 @@
 import { LLMInterface } from './llm-interface';
 import {
   LLMContext,
-  Memory,
-  ContextQuery,
   OptimizedContext,
   RelevanceScore,
   MemoryRetrieval,
   ContextSynthesis,
-  TokenOptimization,
 } from '../types';
 
 /**
@@ -74,7 +71,14 @@ export class ContextOptimizer {
       task,
       originalContext: baseContext || {},
       retrievedMemories: [],
-      synthesizedContext: {},
+      synthesizedContext: {
+        goals: [],
+        plans: [],
+        relationships: [],
+        constraints: [],
+        opportunities: [],
+        risks: [],
+      },
       tokenCount: 0,
       relevanceScore: 0,
       optimizationLevel: 0,
@@ -251,12 +255,17 @@ Synthesize additional context that would be helpful for this task:
 Provide concise, relevant context.`;
 
     try {
-      const response = await this.llm.generateResponse(prompt, {
-        systemPrompt:
-          'You are synthesizing context for task execution. Be concise and relevant.',
-        temperature: 0.4,
-        maxTokens: 512,
-      });
+      const response = await this.llm.generateResponse(
+        prompt,
+        {
+          systemPrompt:
+            'You are synthesizing context for task execution. Be concise and relevant.',
+        },
+        {
+          temperature: 0.4,
+          maxTokens: 512,
+        }
+      );
 
       const additionalContext = this.parseSynthesisResponse(response.text);
       return { ...synthesis, ...additionalContext };
@@ -364,14 +373,23 @@ Risks: ${synthesis.risks.join(', ')}
 Provide the compressed context in the same format.`;
 
     try {
-      const response = await this.llm.generateResponse(prompt, {
-        systemPrompt:
-          'You are compressing context while preserving essential information.',
-        temperature: 0.3,
-        maxTokens: 256,
-      });
+      const response = await this.llm.generateResponse(
+        prompt,
+        {
+          systemPrompt:
+            'You are compressing context while preserving essential information.',
+        },
+        {
+          temperature: 0.3,
+          maxTokens: 256,
+        }
+      );
 
-      return this.parseSynthesisResponse(response.text);
+      if (!response.text) {
+        return synthesis;
+      }
+      const parsedResponse = this.parseSynthesisResponse(response.text);
+      return { ...synthesis, ...parsedResponse };
     } catch (error) {
       console.error('Error compressing context:', error);
       return synthesis;
@@ -474,13 +492,29 @@ Consider:
 Provide a score and brief explanation.`;
 
     try {
-      const response = await this.llm.generateResponse(prompt, {
-        systemPrompt:
-          'You are evaluating context relevance. Be objective and provide clear reasoning.',
-        temperature: 0.3,
-        maxTokens: 128,
-      });
+      const response = await this.llm.generateResponse(
+        prompt,
+        {
+          systemPrompt:
+            'You are evaluating context relevance. Be objective and provide clear reasoning.',
+        },
+        {
+          temperature: 0.3,
+          maxTokens: 128,
+        }
+      );
 
+      if (!response.text) {
+        return {
+          score: 0.5,
+          reasoning: 'Evaluation failed - defaulting to moderate relevance',
+          dimensions: {
+            taskAlignment: 0.5,
+            informationValue: 0.5,
+            timeliness: 0.5,
+          },
+        };
+      }
       return this.parseRelevanceScore(response.text);
     } catch (error) {
       console.error('Error scoring context relevance:', error);

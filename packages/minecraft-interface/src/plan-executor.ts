@@ -147,14 +147,9 @@ export class PlanExecutor extends EventEmitter {
   private observeCurrentStateWithSignals(bot: Bot): PlanningContext {
     const baseContext =
       this.observationMapper.mapBotStateToPlanningContext(bot);
-    const enhancedHomeostasis =
-      this.observationMapper.getEnhancedHomeostasisState(bot);
-
     // Merge enhanced homeostasis data into context
     return {
       ...baseContext,
-      enhancedHomeostasis,
-      signalProcessingEnabled: true,
     };
   }
 

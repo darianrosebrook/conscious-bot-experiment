@@ -26,7 +26,13 @@ import {
   validatePerceptionUpdate,
   validateAgentState,
 } from './types';
-import { Vec3, Observation, SweepResult } from '../types';
+import {
+  Vec3,
+  Observation,
+  SweepResult,
+  PerceptionResult,
+  VisualQuery,
+} from '../types';
 
 export interface PerceptionIntegrationEvents {
   'perception-updated': [PerceptionUpdate];
@@ -350,17 +356,24 @@ export class PerceptionIntegration
   getPerceptionStatistics(): {
     trackedObjects: number;
     averageConfidence: number;
-    performanceMetrics: typeof this.performanceMetrics;
+    performanceMetrics: {
+      trackedObjects: number;
+      averageConfidence: number;
+      memoryUsage: number;
+    };
     memoryUsage: number;
   } {
     const stats = this.confidenceTracker.getConfidenceStatistics(
       this.trackedObjects
     );
-
     return {
       trackedObjects: stats.totalObjects,
       averageConfidence: stats.averageConfidence,
-      performanceMetrics: this.performanceMetrics,
+      performanceMetrics: {
+        trackedObjects: stats.totalObjects,
+        averageConfidence: stats.averageConfidence,
+        memoryUsage: this.estimateMemoryUsage(),
+      },
       memoryUsage: this.estimateMemoryUsage(),
     };
   }
@@ -463,12 +476,13 @@ export class PerceptionIntegration
 
   private calculateViewingConditions(
     observations: Observation[],
-    agentState: AgentState
-  ): Map<Vec3, any> {
+    _agentState: AgentState
+  ): Map<string, any> {
     const conditions = new Map();
 
     for (const obs of observations) {
-      conditions.set(obs.pos, {
+      const posKey = `${obs.pos.x},${obs.pos.y},${obs.pos.z}`;
+      conditions.set(posKey, {
         distance: obs.distance,
         lightLevel: obs.light || 15,
         occlusionPercent: 0, // Would be calculated from ray casting
@@ -633,7 +647,7 @@ export class PerceptionIntegration
 
       if (confidenceUpdates.some((update) => update.decayAmount > 0.1)) {
         // Significant confidence changes occurred
-        const stats = this.generateRecognitionStats();
+        const _stats = this.generateRecognitionStats();
         // Could emit an event here if needed
       }
     }
@@ -767,5 +781,120 @@ export class PerceptionIntegration
   private estimateMemoryUsage(): number {
     // Rough memory estimation
     return this.trackedObjects.size * 1000; // ~1KB per tracked object
+  }
+
+  /**
+   * Process visual field query and return perception results
+   */
+  async processVisualField(query: VisualQuery): Promise<PerceptionResult> {
+    const startTime = Date.now();
+
+    // Create agent state from query
+    const agentState: AgentState = {
+      position: query.observerPosition || { x: 0, y: 64, z: 0 },
+      orientation: { yaw: 0, pitch: 0 },
+      headDirection: { x: 0, y: 0, z: 1 },
+      eyeHeight: 1.6,
+    };
+
+    // Perform visual sweep
+    const sweepResult = await this.performVisualSweep(agentState);
+
+    // Process observations
+    const viewingConditions = this.calculateViewingConditions(
+      sweepResult.observations,
+      agentState
+    );
+
+    let recognizedObjects: RecognizedObject[] = [];
+    try {
+      recognizedObjects = this.objectRecognition.recognizeObjects(
+        sweepResult.observations,
+        viewingConditions,
+        this.config
+      );
+    } catch (error) {
+      console.warn('Object recognition failed in processVisualField:', error);
+      // Create basic recognized objects from observations
+      recognizedObjects = sweepResult.observations.map((obs, index) => ({
+        id: `fallback-${index}`,
+        type: 'block' as const,
+        position: obs.pos,
+        recognitionConfidence: 0.5,
+        visualFeatures: [],
+        properties: {
+          category: 'resource',
+          value: 'low',
+        },
+        lastSeen: Date.now(),
+        totalObservations: 1,
+        appearanceData: { visualFeatures: [] },
+        viewingConditions: {
+          distance: obs.distance,
+          lightLevel: obs.light || 15,
+          occlusionPercent: 0,
+          isInPeriphery: false,
+          visualAcuity: 1.0,
+        },
+        confidenceHistory: [],
+        positionHistory: [],
+      }));
+    }
+
+    // Convert to detected objects format
+    const detectedObjects = recognizedObjects.map((obj) => ({
+      worldPosition: obj.position,
+      classification: {
+        primary: obj.type || 'unknown',
+      },
+      confidence: obj.recognitionConfidence,
+    }));
+
+    // Calculate overall confidence
+    const overallConfidence =
+      detectedObjects.length > 0
+        ? detectedObjects.reduce((sum, obj) => sum + obj.confidence, 0) /
+          detectedObjects.length
+        : 0;
+
+    // Calculate field coverage (simplified)
+    const fieldCoverage = Math.min(1.0, detectedObjects.length / 10);
+
+    const processingTime = Date.now() - startTime;
+
+    return {
+      detectedObjects,
+      overallConfidence,
+      processingTime,
+      fieldCoverage,
+    };
+  }
+
+  /**
+   * Calculate confidence with context factors
+   */
+  calculateConfidenceWithContext(
+    baseConfidence: number,
+    distance: number,
+    lightLevel: number,
+    occlusion: number,
+    agentState: AgentState
+  ): number {
+    let confidence = baseConfidence;
+
+    // Distance factor - confidence decreases with distance
+    const distanceFactor = Math.max(0.1, 1.0 - distance / 64);
+    confidence *= distanceFactor;
+
+    // Lighting factor - confidence decreases in darkness
+    const lightingFactor = Math.max(0.2, lightLevel / 15);
+    confidence *= lightingFactor;
+
+    // Occlusion factor - confidence decreases with occlusion
+    const occlusionFactor = 1.0 - occlusion;
+    confidence *= occlusionFactor;
+
+    // Ensure confidence stays within bounds
+    return Math.max(0, Math.min(1, confidence));
   }
 }

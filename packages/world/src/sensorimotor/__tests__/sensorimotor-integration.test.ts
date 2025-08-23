@@ -71,6 +71,7 @@ describe('Sensorimotor System Integration', () => {
         collisionAvoidance: true,
         safetyMargin: 0.5,
         automaticRecovery: true,
+        boundaryEnforcement: true,
       },
     };
 
@@ -279,6 +280,7 @@ describe('Sensorimotor System Integration', () => {
         type: 'move_forward',
         parameters: { speed: 1.0 },
         priority: 0.5,
+        requiredPrecision: 0.5,
         feedback: false,
       };
 
@@ -327,6 +329,7 @@ describe('Sensorimotor System Integration', () => {
         type: 'move_forward',
         parameters: { speed: 0.5 },
         priority: 0.3,
+        requiredPrecision: 0.5,
         feedback: false,
       };
 
@@ -377,6 +380,7 @@ describe('Sensorimotor System Integration', () => {
         type: 'jump',
         parameters: { height: 1.0 },
         priority: 0.6,
+        requiredPrecision: 0.5,
         feedback: true, // Enable feedback processing
       };
 
@@ -504,6 +508,7 @@ describe('Sensorimotor System Integration', () => {
           type: 'move_forward',
           parameters: { speed: 1.0, distance: 2 },
           priority: 0.5,
+          requiredPrecision: 0.5,
           feedback: false,
         },
         {
@@ -511,6 +516,7 @@ describe('Sensorimotor System Integration', () => {
           type: 'turn_right',
           parameters: { angle: 90 },
           priority: 0.5,
+          requiredPrecision: 0.5,
           feedback: false,
         },
         {
@@ -518,6 +524,7 @@ describe('Sensorimotor System Integration', () => {
           type: 'move_forward',
           parameters: { speed: 1.0, distance: 1 },
           priority: 0.5,
+          requiredPrecision: 0.5,
           feedback: false,
         },
       ];
@@ -551,6 +558,7 @@ describe('Sensorimotor System Integration', () => {
           type: 'look_at',
           parameters: { target: { x: 5, y: 64, z: 5 } },
           priority: 0.4,
+          requiredPrecision: 0.5,
           feedback: false,
         },
         {
@@ -558,6 +566,7 @@ describe('Sensorimotor System Integration', () => {
           type: 'gesture',
           parameters: { type: 'wave' },
           priority: 0.3,
+          requiredPrecision: 0.5,
           feedback: false,
         },
       ];
@@ -676,6 +685,7 @@ describe('Sensorimotor System Integration', () => {
           type: 'move_forward',
           parameters: { speed: 0.5 },
           priority: 0.3,
+          requiredPrecision: 0.5,
           feedback: false,
         };
 
@@ -683,6 +693,7 @@ describe('Sensorimotor System Integration', () => {
           currentPosition: {
             position: { x: i, y: 64, z: 0 },
             timestamp: Date.now(),
+            confidence: 1.0,
           },
           environmentConditions: {
             lighting: 15,
@@ -741,6 +752,7 @@ describe('Sensorimotor System Integration', () => {
         type: 'move_forward',
         parameters: { speed: 0.1 },
         priority: 0.2,
+        requiredPrecision: 0.5,
         feedback: false,
       };
 
@@ -854,6 +866,7 @@ describe('Individual Sensorimotor Components', () => {
         collisionAvoidance: true,
         safetyMargin: 0.5,
         automaticRecovery: true,
+        boundaryEnforcement: true,
       },
     };
 
@@ -911,6 +924,7 @@ describe('Individual Sensorimotor Components', () => {
         type: 'move_forward',
         parameters: { speed: 1.0 },
         priority: 0.5,
+        requiredPrecision: 0.5,
         feedback: false,
       };
 

@@ -7,10 +7,12 @@
  * @author @darianrosebrook
  */
 
+import { Bot } from 'mineflayer';
 import { BotAdapter } from './bot-adapter';
 import { ObservationMapper } from './observation-mapper';
 import { ActionTranslator } from './action-translator';
 import { BotConfig } from './types';
+import { PlanStep } from '@conscious-bot/planning';
 
 export interface StandaloneMinecraftInterface {
   botAdapter: BotAdapter;
@@ -34,7 +36,9 @@ export class StandaloneMinecraftInterface
   constructor(config: BotConfig) {
     this.botAdapter = new BotAdapter(config);
     this.observationMapper = new ObservationMapper(config);
-    this.actionTranslator = new ActionTranslator(config);
+    // Create a mock bot for ActionTranslator - will be replaced when connected
+    const mockBot = {} as Bot;
+    this.actionTranslator = new ActionTranslator(mockBot, config);
   }
 
   /**
@@ -74,7 +78,9 @@ export class StandaloneMinecraftInterface
     }
 
     try {
-      const gameState = await this.botAdapter.getGameState();
+      // Get the bot instance from the adapter
+      const bot = await this.botAdapter.connect();
+      const gameState = this.observationMapper.extractMinecraftWorldState(bot);
       return gameState;
     } catch (error) {
       console.error('❌ Error getting game state:', error);
@@ -91,19 +97,36 @@ export class StandaloneMinecraftInterface
     }
 
     try {
-      const commands = this.actionTranslator.translateActionToCommands(action);
-      const results = [];
+      // Convert action to PlanStep format
+      const planStep: PlanStep = {
+        id: `action_${Date.now()}`,
+        planId: 'standalone_plan',
+        action: {
+          id: action.type,
+          name: action.type,
+          description: action.type,
+          type: action.type as any,
+          parameters: action.parameters || {},
+          preconditions: [],
+          effects: [],
+          cost: 1,
+          duration: 1000,
+          successProbability: 0.8,
+        },
+        preconditions: [],
+        effects: [],
+        status: 'pending' as any,
+        order: 0,
+        estimatedDuration: 1000,
+        dependencies: [],
+      };
 
-      for (const command of commands) {
-        const result = await this.botAdapter.executeCommand(command);
-        results.push(result);
-      }
+      const result = await this.actionTranslator.executePlanStep(planStep);
 
       return {
         action,
-        commands,
-        results,
-        success: results.every((r) => r.success),
+        result,
+        success: result.success,
       };
     } catch (error) {
       console.error('❌ Error executing action:', error);
@@ -115,8 +138,18 @@ export class StandaloneMinecraftInterface
    * Get cognitive context from current game state
    */
   async getCognitiveContext(): Promise<any> {
-    const gameState = await this.getGameState();
-    return this.observationMapper.mapGameStateToContext(gameState);
+    if (!this.isConnected) {
+      throw new Error('Not connected to Minecraft server');
+    }
+
+    try {
+      // Get the bot instance from the adapter
+      const bot = await this.botAdapter.connect();
+      return this.observationMapper.mapBotStateToPlanningContext(bot);
+    } catch (error) {
+      console.error('❌ Error getting cognitive context:', error);
+      throw error;
+    }
   }
 
   /**
@@ -178,21 +211,10 @@ export const DEFAULT_STANDALONE_CONFIG: BotConfig = {
   username: 'StandaloneBot',
   version: '1.20.1',
   auth: 'offline',
-  viewDistance: 'tiny',
-  chatLengthLimit: 100,
-  skipValidation: true,
-  connectTimeout: 30000,
-  keepAlive: true,
-  checkTimeoutInterval: 60000,
-  loadInternalPlugins: true,
-  plugins: {},
-  chat: 'enabled',
-  colorsEnabled: true,
-  logErrors: true,
-  hideErrors: false,
-  client: {
-    username: 'StandaloneBot',
-    version: '1.20.1',
-    protocol: 763,
-  },
+  pathfindingTimeout: 30000,
+  actionTimeout: 10000,
+  observationRadius: 10,
+  autoReconnect: true,
+  maxReconnectAttempts: 3,
+  emergencyDisconnect: false,
 };

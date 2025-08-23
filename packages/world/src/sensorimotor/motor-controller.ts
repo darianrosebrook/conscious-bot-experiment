@@ -776,6 +776,7 @@ export class MotorController
       currentPosition: {
         position: { x: 0, y: 64, z: 0 },
         timestamp: Date.now(),
+        confidence: 1.0,
       },
       environmentConditions: {
         lighting: 15,

@@ -73,7 +73,7 @@ export class ActionTranslator {
    */
   private translatePlanStepToAction(step: PlanStep): MinecraftAction {
     const actionType = step.action.type.toLowerCase();
-    const params = step.action.parameters;
+    const params = step.action.parameters ?? {};
 
     // Map common planning actions to Minecraft actions
     switch (actionType) {
@@ -253,14 +253,14 @@ export class ActionTranslator {
     const description =
       step.action.type.toLowerCase() +
       ' ' +
-      (step.action.parameters.description || '').toLowerCase();
+      (step.action.parameters?.description || '').toLowerCase();
 
     if (
       description.includes('navigate') ||
       description.includes('move') ||
       description.includes('go')
     ) {
-      return this.createNavigateAction(step.action.parameters);
+      return this.createNavigateAction(step.action.parameters ?? {});
     }
 
     if (
@@ -268,11 +268,11 @@ export class ActionTranslator {
       description.includes('break') ||
       description.includes('dig')
     ) {
-      return this.createMineAction(step.action.parameters);
+      return this.createMineAction(step.action.parameters ?? {});
     }
 
     if (description.includes('craft') || description.includes('make')) {
-      return this.createCraftAction(step.action.parameters);
+      return this.createCraftAction(step.action.parameters ?? {});
     }
 
     // Default to wait if we can't determine the action
@@ -504,7 +504,7 @@ export class ActionTranslator {
       (entity) =>
         entity.name === 'item' &&
         (!item ||
-          entity.metadata?.[8]?.itemId ===
+          (entity.metadata?.[8] as any)?.itemId ===
             (this.bot as any).mcData.itemsByName[item]?.id) &&
         entity.position.distanceTo(this.bot.entity.position) <= maxDistance
     );

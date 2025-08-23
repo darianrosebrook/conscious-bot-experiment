@@ -11,6 +11,7 @@ import { createSimulatedMinecraftInterface } from './simulation-stub';
 import { createMinecraftSignalProcessor } from './signal-processor';
 import { ObservationMapper } from './observation-mapper';
 import { BotConfig } from './types';
+import { Vec3 } from 'vec3';
 
 export interface QuickDemoResult {
   success: boolean;
@@ -34,27 +35,8 @@ export async function runQuickIntegrationDemo(): Promise<QuickDemoResult> {
     // Create a simulated Minecraft interface
     console.log('🎮 Creating simulated Minecraft environment...');
     const simInterface = createSimulatedMinecraftInterface({
-      worldSeed: 'demo_seed',
-      spawnPosition: { x: 10, y: 64, z: 10 },
-      initialInventory: [
-        { type: 'wooden_pickaxe', count: 1, slot: 0, metadata: {} },
-        { type: 'bread', count: 3, slot: 1, metadata: {} },
-      ],
-      worldBlocks: [
-        {
-          type: 'stone',
-          position: { x: 12, y: 64, z: 10 },
-          properties: {},
-          hardness: 1.5,
-        },
-        {
-          type: 'coal_ore',
-          position: { x: 15, y: 63, z: 12 },
-          properties: {},
-          hardness: 3.0,
-        },
-      ],
-      timeStep: 50,
+      initialPosition: { x: 10, y: 64, z: 10 },
+      tickRate: 50,
     });
 
     // Connect to the simulation
@@ -99,9 +81,7 @@ export async function runQuickIntegrationDemo(): Promise<QuickDemoResult> {
       blockAt: () => null,
       inventory: {
         slots: worldState.inventory.map((item, index) =>
-          index < 36
-            ? { name: item.type, count: item.count, metadata: item.metadata }
-            : null
+          index < 36 ? { name: item.id, count: item.count, metadata: {} } : null
         ),
       },
       game: {
@@ -117,7 +97,11 @@ export async function runQuickIntegrationDemo(): Promise<QuickDemoResult> {
     const signals = signalProcessor.processWorldState(
       {
         player: {
-          position: worldState.position,
+          position: new Vec3(
+            worldState.position.x,
+            worldState.position.y,
+            worldState.position.z
+          ),
           health: worldState.health,
           food: worldState.food,
           experience: 0,
@@ -125,7 +109,12 @@ export async function runQuickIntegrationDemo(): Promise<QuickDemoResult> {
           dimension: 'overworld',
         },
         inventory: {
-          items: worldState.inventory,
+          items: worldState.inventory.map((item, index) => ({
+            type: item.id,
+            count: item.count,
+            slot: index,
+            metadata: {},
+          })),
           totalSlots: 36,
           usedSlots: worldState.inventory.length,
         },
@@ -135,13 +124,13 @@ export async function runQuickIntegrationDemo(): Promise<QuickDemoResult> {
           nearbyBlocks: [
             {
               type: 'stone',
-              position: { x: 12, y: 64, z: 10 },
+              position: new Vec3(12, 64, 10),
               properties: {},
               hardness: 1.5,
             },
             {
               type: 'coal_ore',
-              position: { x: 15, y: 63, z: 12 },
+              position: new Vec3(15, 63, 12),
               properties: {},
               hardness: 3.0,
             },
@@ -161,7 +150,11 @@ export async function runQuickIntegrationDemo(): Promise<QuickDemoResult> {
     const homeostasisState = signalProcessor.getHomeostasisState(
       {
         player: {
-          position: worldState.position,
+          position: new Vec3(
+            worldState.position.x,
+            worldState.position.y,
+            worldState.position.z
+          ),
           health: worldState.health,
           food: worldState.food,
           experience: 0,
@@ -169,7 +162,12 @@ export async function runQuickIntegrationDemo(): Promise<QuickDemoResult> {
           dimension: 'overworld',
         },
         inventory: {
-          items: worldState.inventory,
+          items: worldState.inventory.map((item, index) => ({
+            type: item.id,
+            count: item.count,
+            slot: index,
+            metadata: {},
+          })),
           totalSlots: 36,
           usedSlots: worldState.inventory.length,
         },
@@ -179,13 +177,13 @@ export async function runQuickIntegrationDemo(): Promise<QuickDemoResult> {
           nearbyBlocks: [
             {
               type: 'stone',
-              position: { x: 12, y: 64, z: 10 },
+              position: new Vec3(12, 64, 10),
               properties: {},
               hardness: 1.5,
             },
             {
               type: 'coal_ore',
-              position: { x: 15, y: 63, z: 12 },
+              position: new Vec3(15, 63, 12),
               properties: {},
               hardness: 3.0,
             },
@@ -213,7 +211,7 @@ export async function runQuickIntegrationDemo(): Promise<QuickDemoResult> {
         hunger: worldState.food,
         inventory: worldState.inventory.reduce(
           (acc, item) => {
-            acc[item.type] = (acc[item.type] || 0) + item.count;
+            acc[item.id] = (acc[item.id] || 0) + item.count;
             return acc;
           },
           {} as Record<string, number>
@@ -242,7 +240,7 @@ export async function runQuickIntegrationDemo(): Promise<QuickDemoResult> {
           availability: 'available' as const,
         },
         ...worldState.inventory.map((item) => ({
-          type: item.type,
+          type: item.id,
           amount: item.count,
           availability: 'available' as const,
         })),

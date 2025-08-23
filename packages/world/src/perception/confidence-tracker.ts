@@ -296,7 +296,7 @@ export class ConfidenceTracker
     obj.confidenceHistory.push({
       timestamp: Date.now(),
       confidence: obj.recognitionConfidence,
-      reason: `forced_update: ${reason}`,
+      reason: 'refresh' as const,
     });
 
     const update: ConfidenceUpdate = {
@@ -304,7 +304,7 @@ export class ConfidenceTracker
       previousConfidence,
       newConfidence: obj.recognitionConfidence,
       decayAmount: previousConfidence - obj.recognitionConfidence,
-      reason: `forced_update: ${reason}`,
+      reason: 'refresh' as const,
       timestamp: Date.now(),
     };
 
@@ -326,7 +326,16 @@ export class ConfidenceTracker
     obj: RecognizedObject,
     timeElapsed: number,
     decayModel: ConfidenceDecayModel
-  ): { newConfidence: number; decayAmount: number; reason: string } {
+  ): {
+    newConfidence: number;
+    decayAmount: number;
+    reason:
+      | 'time_decay'
+      | 'distance_decay'
+      | 'occlusion'
+      | 'refresh'
+      | 'new_observation';
+  } {
     const timeElapsedSeconds = timeElapsed / 1000;
     const timeSinceLastSeen = (Date.now() - obj.lastSeen) / 1000;
 
@@ -354,9 +363,14 @@ export class ConfidenceTracker
       obj.recognitionConfidence - totalDecayAmount
     );
 
-    let reason = 'time_decay';
+    let reason:
+      | 'time_decay'
+      | 'distance_decay'
+      | 'occlusion'
+      | 'refresh'
+      | 'new_observation' = 'time_decay';
     if (distanceDecay > decayModel.baseDecayRate) reason = 'distance_decay';
-    if (stalenessDecayAmount > baseDecayAmount) reason = 'staleness_decay';
+    if (stalenessDecayAmount > baseDecayAmount) reason = 'time_decay';
 
     return { newConfidence, decayAmount: totalDecayAmount, reason };
   }

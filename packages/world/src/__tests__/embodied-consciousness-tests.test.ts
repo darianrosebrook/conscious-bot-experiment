@@ -9,6 +9,7 @@
  */
 
 import { RaycastEngine } from '../sensing/raycast-engine';
+import { VisibleSensing } from '../sensing/visible-sensing';
 import { PerceptionIntegration } from '../perception/perception-integration';
 import { NavigationSystem } from '../navigation/navigation-system';
 import { SensorimotorSystem } from '../sensorimotor/sensorimotor-system';
@@ -22,6 +23,7 @@ import {
   NavigationConfig,
   SensorimotorConfig,
 } from '../types';
+import { MotorAction } from '../sensorimotor/types';
 
 interface SpatialMemoryState {
   knownLocations: Map<string, WorldPosition>;
@@ -194,21 +196,20 @@ describe('Embodied Consciousness Tests', () => {
       coordination: {
         conflictResolution: 'priority_based',
         timingSynchronization: true,
-        executionQueuing: true,
-        resourceSharing: true,
-        errorRecovery: true,
+        feedbackIntegration: 'real_time',
+        coordinationTimeout: 5000,
       },
       feedbackProcessing: {
-        responseWindow: 100,
-        qualityThreshold: 0.8,
-        adaptationRate: 0.1,
-        contextSize: 5,
+        bufferDuration: 100,
+        processingFrequency: 20,
+        learningRate: 0.1,
+        confidenceThreshold: 0.8,
       },
       prediction: {
-        lookaheadTime: 200,
-        confidenceThreshold: 0.7,
-        adaptivePrediction: true,
-        maxPredictionDepth: 3,
+        predictionHorizon: 200,
+        modelUpdateFrequency: 1,
+        predictionConfidenceThreshold: 0.7,
+        maxPredictionAge: 1000,
       },
       performance: {
         latencyMonitoring: true,
@@ -217,21 +218,37 @@ describe('Embodied Consciousness Tests', () => {
         performanceLogging: true,
       },
       safety: {
+        emergencyResponseTime: 5,
         collisionAvoidance: true,
-        boundaryEnforcement: true,
-        emergencyStop: true,
         safetyMargin: 0.5,
         automaticRecovery: true,
+        boundaryEnforcement: true,
       },
     };
 
     raycastEngine = new RaycastEngine(sensingConfig);
+    const visibleSensing = new VisibleSensing(sensingConfig, () => ({
+      position: { x: 0, y: 64, z: 0 },
+      orientation: { yaw: 0, pitch: 0 },
+    }));
+
     perceptionSystem = new PerceptionIntegration(
       perceptionConfig,
-      raycastEngine
+      () => ({
+        position: { x: 0, y: 64, z: 0 },
+        orientation: { yaw: 0, pitch: 0 },
+        headDirection: { x: 0, y: 0, z: 1 },
+        eyeHeight: 1.6,
+      }),
+      visibleSensing
     );
     navigationSystem = new NavigationSystem(navigationConfig);
-    sensorimotorSystem = new SensorimotorSystem(sensorimotorConfig);
+    sensorimotorSystem = new SensorimotorSystem(sensorimotorConfig, () => ({
+      position: { x: 0, y: 64, z: 0 },
+      orientation: { yaw: 0, pitch: 0 },
+      headDirection: { x: 0, y: 0, z: 1 },
+      eyeHeight: 1.6,
+    }));
 
     // Initialize consciousness state
     spatialMemory = {
@@ -487,11 +504,9 @@ describe('Embodied Consciousness Tests', () => {
       const observerRotation = { yaw: 0, pitch: 0 };
 
       const visualQuery: VisualQuery = {
-        observerPosition,
-        observerRotation,
-        fieldOfView: { horizontal: 90, vertical: 60 },
+        position: observerPosition,
+        radius: 64,
         maxDistance: 64,
-        level: 'standard',
       };
 
       const result = await perceptionSystem.processVisualField(visualQuery);
@@ -553,11 +568,9 @@ describe('Embodied Consciousness Tests', () => {
       const observerRotation = { yaw: 0, pitch: 0 }; // Looking north (negative Z)
 
       const visualQuery: VisualQuery = {
-        observerPosition,
-        observerRotation,
-        fieldOfView: { horizontal: 60, vertical: 45 }, // Narrow field of view
+        position: observerPosition,
+        radius: 32,
         maxDistance: 32,
-        level: 'standard',
       };
 
       const result = await perceptionSystem.processVisualField(visualQuery);
@@ -592,11 +605,9 @@ describe('Embodied Consciousness Tests', () => {
       const observerRotation = { yaw: 45, pitch: -10 }; // Looking into the maze
 
       const visualQuery: VisualQuery = {
-        observerPosition,
-        observerRotation,
-        fieldOfView: { horizontal: 90, vertical: 60 },
+        position: observerPosition,
+        radius: 64,
         maxDistance: 64,
-        level: 'detailed',
       };
 
       const result = await perceptionSystem.processVisualField(visualQuery);
@@ -636,10 +647,17 @@ describe('Embodied Consciousness Tests', () => {
       const pathRequest: PathPlanningRequest = {
         start: startPosition,
         goal: goalPosition,
+        maxDistance: 200,
+        allowPartialPath: true,
+        avoidHazards: true,
         urgency: 'normal',
+        timeout: 100,
         preferences: {
-          avoidWater: false,
+          preferLit: true,
           avoidMobs: false,
+          minimizeVertical: false,
+          preferSolid: true,
+          avoidWater: false,
           preferLighting: false,
           maxDetour: 2.0,
         },
@@ -650,9 +668,9 @@ describe('Embodied Consciousness Tests', () => {
 
       // Validate spatial continuity
       const path = pathResult.path!;
-      for (let i = 1; i < path.waypoints.length; i++) {
-        const prev = path.waypoints[i - 1];
-        const curr = path.waypoints[i];
+      for (let i = 1; i < path.length; i++) {
+        const prev = path[i - 1];
+        const curr = path[i];
 
         // Steps should be physically possible
         const stepDistance = Math.sqrt(
@@ -710,19 +728,49 @@ describe('Embodied Consciousness Tests', () => {
       ];
 
       for (const action of actions) {
-        const actionRequest: ActionRequest = {
-          type: action.type as any,
+        const actionRequest: MotorAction = {
+          id: `action-${Date.now()}-${Math.random()}`,
+          type: action.type === 'move' ? 'move_forward' : (action.type as any),
           parameters: action.parameters,
-          priority: 'normal',
-          timeout: 5000,
+          priority: 1,
+          requiredPrecision: 0.5,
+          feedback: true,
         };
 
         try {
-          const result = await sensorimotorSystem.executeAction(actionRequest);
+          const executionContext = {
+            currentPosition: {
+              position: { x: 0, y: 64, z: 0 },
+              timestamp: Date.now(),
+              confidence: 1.0,
+            },
+            targetPosition: {
+              position: { x: 0, y: 64, z: 0 },
+              timestamp: Date.now(),
+              confidence: 1.0,
+            },
+            environmentConditions: {
+              lighting: 15,
+              weather: 'clear' as const,
+              temperature: 20,
+              terrain: 'flat' as const,
+            },
+            constraints: {
+              maxSpeed: 1.0,
+              maxAcceleration: 0.5,
+              maxForce: 10.0,
+              collisionAvoidance: true,
+            },
+            resources: { energy: 1.0, health: 1.0, inventory: [], tools: [] },
+          };
+          const result = await sensorimotorSystem.executeAction(
+            actionRequest,
+            executionContext
+          );
 
           if (action.expected === 'impossible') {
             // Should either fail or be rejected
-            expect(result.success || result.rejected).toBeDefined();
+            expect(result.success || result.errors.length > 0).toBeDefined();
             if (result.success) {
               expect(result.success).toBe(false);
             }
@@ -785,11 +833,9 @@ describe('Embodied Consciousness Tests', () => {
       const observerRotation = { yaw: 0, pitch: 0 };
 
       const visualQuery: VisualQuery = {
-        observerPosition,
-        observerRotation,
-        fieldOfView: { horizontal: 90, vertical: 60 },
+        position: observerPosition,
+        radius: 32,
         maxDistance: 32,
-        level: 'standard',
       };
 
       // Take multiple perception samples
@@ -846,11 +892,9 @@ describe('Embodied Consciousness Tests', () => {
 
       // Initial perception
       const initialQuery: VisualQuery = {
-        observerPosition,
-        observerRotation: { yaw: 0, pitch: 0 },
-        fieldOfView: { horizontal: 90, vertical: 60 },
+        position: observerPosition,
+        radius: 32,
         maxDistance: 32,
-        level: 'standard',
       };
 
       const initialResult =
@@ -904,11 +948,9 @@ describe('Embodied Consciousness Tests', () => {
 
       for (const step of explorationSequence) {
         const visualQuery: VisualQuery = {
-          observerPosition: step.position,
-          observerRotation: step.rotation,
-          fieldOfView: { horizontal: 90, vertical: 60 },
+          position: step.position,
+          radius: 32,
           maxDistance: 32,
-          level: 'standard',
         };
 
         const result = await perceptionSystem.processVisualField(visualQuery);
@@ -965,37 +1007,66 @@ describe('Embodied Consciousness Tests', () => {
 
       // 1. Perception
       const perceptionResult = await perceptionSystem.processVisualField({
-        observerPosition: testPosition,
-        observerRotation: testRotation,
-        fieldOfView: { horizontal: 90, vertical: 60 },
+        position: testPosition,
+        radius: 32,
         maxDistance: 32,
-        level: 'standard',
       });
 
       // 2. Navigation planning
       const navigationResult = await navigationSystem.planPath({
         start: testPosition,
         goal: { x: 8, y: 64, z: 8 },
+        maxDistance: 200,
+        allowPartialPath: true,
+        avoidHazards: true,
         urgency: 'normal',
+        timeout: 100,
         preferences: {
-          avoidWater: false,
+          preferLit: true,
           avoidMobs: false,
+          minimizeVertical: false,
+          preferSolid: true,
+          avoidWater: false,
           preferLighting: false,
           maxDetour: 3.0,
         },
       });
 
       // 3. Action planning
-      const actionResult = await sensorimotorSystem.executeAction({
-        type: 'move',
-        parameters: {
-          direction: { x: 1, y: 0, z: 1 },
-          speed: 0.5,
-          duration: 1000,
+      const actionResult = await sensorimotorSystem.executeAction(
+        {
+          id: 'test-action-1',
+          type: 'move_forward',
+          parameters: {
+            direction: { x: 1, y: 0, z: 1 },
+            speed: 0.5,
+            duration: 1000,
+          },
+          priority: 1,
+          requiredPrecision: 0.5,
+          feedback: true,
         },
-        priority: 'normal',
-        timeout: 2000,
-      });
+        {
+          currentPosition: {
+            position: { x: testPosition.x, y: 64, z: testPosition.z },
+            timestamp: Date.now(),
+            confidence: 1.0,
+          },
+          environmentConditions: {
+            lighting: 15,
+            weather: 'clear' as const,
+            temperature: 20,
+            terrain: 'flat' as const,
+          },
+          constraints: {
+            maxSpeed: 1.0,
+            maxAcceleration: 0.5,
+            maxForce: 10.0,
+            collisionAvoidance: true,
+          },
+          resources: { energy: 1.0, health: 1.0, inventory: [], tools: [] },
+        }
+      );
 
       // Calculate comprehensive consciousness metrics
       const metrics = calculateConsciousnessMetrics(
@@ -1047,31 +1118,65 @@ describe('Embodied Consciousness Tests', () => {
         const [perceptionResult, navigationResult, actionResult] =
           await Promise.all([
             perceptionSystem.processVisualField({
-              observerPosition: position,
-              observerRotation: rotation,
-              fieldOfView: { horizontal: 90, vertical: 60 },
+              position: position,
+              radius: 32,
               maxDistance: 32,
-              level: 'standard',
             }),
             navigationSystem.planPath({
               start: position,
               goal: { x: position.x + 5, y: 64, z: position.z + 5 },
+              maxDistance: 200,
+              allowPartialPath: true,
+              avoidHazards: true,
               urgency: 'urgent',
+              timeout: 100,
               preferences: {
-                avoidWater: false,
+                preferLit: true,
                 avoidMobs: false,
+                minimizeVertical: false,
+                preferSolid: true,
+                avoidWater: false,
                 preferLighting: false,
                 maxDetour: 2.0,
               },
             }),
-            sensorimotorSystem.executeAction({
-              type: 'look',
-              parameters: {
-                target: { x: position.x + 3, y: 64, z: position.z + 3 },
+            sensorimotorSystem.executeAction(
+              {
+                id: `stress-action-${i}`,
+                type: 'look_at',
+                parameters: {
+                  target: { x: position.x + 3, y: 64, z: position.z + 3 },
+                },
+                priority: 2,
+                requiredPrecision: 0.5,
+                feedback: true,
               },
-              priority: 'high',
-              timeout: 500,
-            }),
+              {
+                currentPosition: {
+                  position: { x: position.x, y: 64, z: position.z },
+                  timestamp: Date.now(),
+                  confidence: 1.0,
+                },
+                environmentConditions: {
+                  lighting: 15,
+                  weather: 'clear' as const,
+                  temperature: 20,
+                  terrain: 'flat' as const,
+                },
+                resources: {
+                  energy: 1.0,
+                  health: 1.0,
+                  inventory: [],
+                  tools: [],
+                },
+                constraints: {
+                  maxSpeed: 1.0,
+                  maxAcceleration: 0.5,
+                  maxForce: 10.0,
+                  collisionAvoidance: true,
+                },
+              }
+            ),
           ]);
 
         const processingTime = Date.now() - start;

@@ -35,6 +35,9 @@ export enum GoalType {
   ACHIEVEMENT = 'achievement',
   CREATIVITY = 'creativity',
   CURIOSITY = 'curiosity',
+  REACH_LOCATION = 'reach_location',
+  ACQUIRE_ITEM = 'acquire_item',
+  SURVIVE_THREAT = 'survive_threat',
 }
 
 export enum GoalStatus {
@@ -116,6 +119,19 @@ export enum NeedType {
   CURIOSITY = 'curiosity',
 }
 
+export enum SignalType {
+  HUNGER = 'hunger',
+  SAFETY_THREAT = 'safety_threat',
+  SOCIAL_ISOLATION = 'social_isolation',
+  CURIOSITY = 'curiosity',
+  EXPLORATION = 'exploration',
+  INTRUSION = 'intrusion',
+  ENERGY_DEPLETION = 'energy_depletion',
+  HEALTH_DECLINE = 'health_decline',
+  ACHIEVEMENT_OPPORTUNITY = 'achievement_opportunity',
+  CREATIVITY_DRIVE = 'creativity_drive',
+}
+
 // =========================================================================
 // Planning Types
 // =========================================================================
@@ -167,6 +183,7 @@ export interface Action {
   name: string;
   description: string;
   type: ActionType;
+  parameters?: Record<string, any>;
   preconditions: Precondition[];
   effects: Effect[];
   cost: number;

@@ -7,6 +7,14 @@
   "scripts": {
     "build": "turbo build",
     "dev": "turbo dev",
+    "dev:all": "pnpm run dev:services",
+    "dev:services": "concurrently \"pnpm run dev:dashboard\" \"pnpm run dev:minecraft\" \"pnpm run dev:cognition\" \"pnpm run dev:memory\" \"pnpm run dev:world\" \"pnpm run dev:planning\"",
+    "dev:dashboard": "pnpm --filter @conscious-bot/dashboard dev",
+    "dev:minecraft": "pnpm --filter @conscious-bot/minecraft-interface run dev:server",
+    "dev:cognition": "pnpm --filter @conscious-bot/cognition run dev:server",
+    "dev:memory": "pnpm --filter @conscious-bot/memory run dev:server",
+    "dev:world": "pnpm --filter @conscious-bot/world run dev:server",
+    "dev:planning": "pnpm --filter @conscious-bot/planning run dev:server",
     "lint": "turbo lint",
     "test": "turbo test",
     "clean": "turbo clean",
@@ -22,12 +30,14 @@
   ],
   "devDependencies": {
     "@types/node": "^20.0.0",
-    "turbo": "^1.13.0",
-    "typescript": "^5.0.0",
-    "eslint": "^8.57.0",
     "@typescript-eslint/eslint-plugin": "^6.0.0",
     "@typescript-eslint/parser": "^6.0.0",
-    "prettier": "^3.0.0"
+    "concurrently": "^8.2.2",
+    "eslint": "^8.57.0",
+    "prettier": "^3.0.0",
+    "tsx": "^4.0.0",
+    "turbo": "^1.13.0",
+    "typescript": "^5.0.0"
   },
   "engines": {
     "node": ">=18.0.0",
@@ -44,5 +54,8 @@
     "hrm"
   ],
   "author": "@darianrosebrook",
-  "license": "MIT"
+  "license": "MIT",
+  "dependencies": {
+    "canvas": "^3.2.0"
+  }
 }

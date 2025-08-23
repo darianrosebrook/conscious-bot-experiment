@@ -36,6 +36,9 @@ export interface LLMContext {
   agentState?: any;
   conversationHistory?: Message[];
   systemPrompt?: string;
+  temperature?: number;
+  messages?: any[];
+  maxTokens?: number;
 }
 
 /**

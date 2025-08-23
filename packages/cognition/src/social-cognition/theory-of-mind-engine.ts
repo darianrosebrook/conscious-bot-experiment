@@ -8,7 +8,8 @@
  */
 
 import { LLMInterface, LLMContext } from '../cognitive-core/llm-interface';
-import { AgentModeler, AgentModel } from './agent-modeler';
+import { AgentModeler } from './agent-modeler';
+import { AgentModel, Intention } from './types';
 
 // ============================================================================
 // Theory of Mind Core Types
@@ -265,6 +266,78 @@ export class TheoryOfMindEngine {
     );
   }
 
+  async predictIntentions(
+    agentId: string,
+    context: SocialContext
+  ): Promise<Intention[]> {
+    const mentalState = await this.inferMentalState(agentId, context);
+
+    const prompt = `Based on the mental state analysis, predict the agent's intentions:
+
+Mental State:
+- Beliefs: ${Object.values(mentalState.currentBeliefs)
+      .map((b) => b.content)
+      .join(', ')}
+- Goals: ${mentalState.currentGoals.map((g) => g.description).join(', ')}
+- Emotions: ${mentalState.currentEmotions.primary} (${mentalState.currentEmotions.intensity})
+
+Context: ${context.situation} in ${context.environment}
+
+Predict specific intentions the agent is likely to have.`;
+
+    try {
+      const response = await this.llm.generateResponse(prompt, {
+        systemPrompt:
+          'You are predicting agent intentions. Be specific and evidence-based.',
+        temperature: 0.4,
+        maxTokens: 512,
+      });
+
+      return this.parseIntentions(response.text);
+    } catch (error) {
+      console.error('Error predicting intentions:', error);
+      return [];
+    }
+  }
+
+  async simulatePerspective(agentId: string, situation: any): Promise<any> {
+    const agentModel = this.agentModeler.getAgentModel(agentId);
+    if (!agentModel) {
+      return this.createEmptyPerspective(agentId);
+    }
+
+    const prompt = `Simulate the perspective of agent ${agentId} in this situation:
+
+Situation: ${JSON.stringify(situation, null, 2)}
+
+Agent Model:
+- Personality: ${agentModel.personality}
+- Beliefs: ${agentModel.beliefs.join(', ')}
+- Goals: ${agentModel.goals.join(', ')}
+- Behaviors: ${agentModel.behaviors.join(', ')}
+
+Provide the agent's perspective on this situation.`;
+
+    try {
+      const response = await this.llm.generateResponse(prompt, {
+        systemPrompt:
+          "You are simulating an agent's perspective. Think from their viewpoint.",
+        temperature: 0.5,
+        maxTokens: 512,
+      });
+
+      return {
+        agentId,
+        perspective: response.text,
+        confidence: 0.7,
+        timestamp: Date.now(),
+      };
+    } catch (error) {
+      console.error('Error simulating perspective:', error);
+      return this.createEmptyPerspective(agentId);
+    }
+  }
+
   async simulateAgentPerspective(
     agentId: string,
     scenario: Scenario
@@ -304,8 +377,11 @@ Respond in JSON format.`,
     };
 
     try {
-      const response = await this.llm.generateResponse(context);
-      return this.parsePerspectiveSimulation(response, agentId, scenario);
+      const response = await this.llm.generateResponse(
+        context.messages?.[0]?.content || 'Simulate perspective',
+        context
+      );
+      return this.parsePerspectiveSimulation(response.text, agentId, scenario);
     } catch (error) {
       console.warn(
         `Failed to simulate perspective for agent ${agentId}:`,
@@ -353,8 +429,15 @@ Respond in JSON format.`,
     };
 
     try {
-      const response = await this.llm.generateResponse(context);
-      return this.parseFalseBeliefDetection(response, agentId, beliefDomain);
+      const response = await this.llm.generateResponse(
+        context.messages?.[0]?.content || 'Detect false beliefs',
+        context
+      );
+      return this.parseFalseBeliefDetection(
+        response.text,
+        agentId,
+        beliefDomain
+      );
     } catch (error) {
       console.warn(
         `Failed to detect false beliefs for agent ${agentId}:`,
@@ -406,8 +489,11 @@ Respond in JSON format.`,
     };
 
     try {
-      const response = await this.llm.generateResponse(context);
-      return this.parseMetaReasoning(response, agentId, reasoningTarget);
+      const response = await this.llm.generateResponse(
+        context.messages?.[0]?.content || 'Reason about agent reasoning',
+        context
+      );
+      return this.parseMetaReasoning(response.text, agentId, reasoningTarget);
     } catch (error) {
       console.warn(
         `Failed to reason about agent reasoning for ${agentId}:`,
@@ -456,8 +542,11 @@ Respond in JSON format.`,
     };
 
     try {
-      const response = await this.llm.generateResponse(context_);
-      return this.parseMentalStateInference(response, agentModel.agentId);
+      const response = await this.llm.generateResponse(
+        context_.messages?.[0]?.content || 'Infer mental state',
+        context_
+      );
+      return this.parseMentalStateInference(response.text, agentModel.agentId);
     } catch (error) {
       console.warn(
         `Failed to infer mental state for agent ${agentModel.agentId}:`,
@@ -504,8 +593,11 @@ Respond in JSON format.`,
     };
 
     try {
-      const response = await this.llm.generateResponse(context);
-      return this.parseActionPrediction(response, agentModel.agentId);
+      const response = await this.llm.generateResponse(
+        context.messages?.[0]?.content || 'Predict agent action',
+        context
+      );
+      return this.parseActionPrediction(response.text, agentModel.agentId);
     } catch (error) {
       console.warn(
         `Failed to predict actions for agent ${agentModel.agentId}:`,
@@ -732,7 +824,10 @@ Respond in JSON format.`,
       causal: ReasoningType.CAUSAL_REASONING,
     };
 
-    return typeMap[type.toLowerCase()] || ReasoningType.BELIEF_INFERENCE;
+    return (
+      typeMap[type.toLowerCase() as keyof typeof typeMap] ||
+      ReasoningType.BELIEF_INFERENCE
+    );
   }
 
   private parseAlternativeScenarios(scenarios: any[]): AlternativeScenario[] {
@@ -799,7 +894,7 @@ Respond in JSON format.`,
         expertiseDomains: [],
         confidence: 0.5,
       },
-      confidence: 0,
+      confidence: 0.5,
       inferenceReasoning: 'No inference available',
       timestamp: Date.now(),
     };
@@ -820,6 +915,34 @@ Respond in JSON format.`,
       },
       timestamp: Date.now(),
     };
+  }
+
+  private createEmptyPerspective(agentId: string): any {
+    return {
+      agentId,
+      perspective: 'Unable to simulate perspective',
+      confidence: 0,
+      timestamp: Date.now(),
+    };
+  }
+
+  private parseIntentions(response: string): Intention[] {
+    return response
+      .split('\n')
+      .filter(
+        (line) => line.trim().startsWith('-') || line.trim().startsWith('•')
+      )
+      .map((line, index) => ({
+        id: `intention-${Date.now()}-${index}`,
+        description: line.replace(/^[-•]\s*/, '').trim(),
+        confidence: 0.7,
+        reasoning: 'Based on mental state analysis',
+        timestamp: Date.now(),
+        type: 'general' as const,
+        timeframe: 'short_term' as const,
+        prerequisites: [],
+      }))
+      .filter((intention) => intention.description.length > 0);
   }
 
   private createEmptyPerspectiveSimulation(

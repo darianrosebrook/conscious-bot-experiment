@@ -85,7 +85,7 @@ export class PlaceMemory {
 
     const now = Date.now();
     const id = `memory-${now}-${Math.random().toString(36).substring(2, 9)}`;
-    
+
     const memory: PlaceMemoryEntry = {
       id,
       placeId,
@@ -93,7 +93,8 @@ export class PlaceMemory {
       content: options.content,
       timestamp: options.timestamp || now,
       importance: options.importance !== undefined ? options.importance : 0.5,
-      emotionalValence: options.emotionalValence !== undefined ? options.emotionalValence : 0,
+      emotionalValence:
+        options.emotionalValence !== undefined ? options.emotionalValence : 0,
       tags: options.tags || [],
       associatedPlaces: options.associatedPlaces || [],
       associatedEntities: options.associatedEntities || [],
@@ -121,7 +122,10 @@ export class PlaceMemory {
     }
 
     // Increase place memorability
-    place.memorability = Math.min(1.0, place.memorability + (memory.importance * 0.2));
+    place.memorability = Math.min(
+      1.0,
+      place.memorability + memory.importance * 0.2
+    );
 
     return memory;
   }
@@ -129,7 +133,10 @@ export class PlaceMemory {
   /**
    * Update an existing memory
    */
-  updateMemory(memoryId: string, updates: Partial<PlaceMemoryEntry>): PlaceMemoryEntry | null {
+  updateMemory(
+    memoryId: string,
+    updates: Partial<PlaceMemoryEntry>
+  ): PlaceMemoryEntry | null {
     const memory = this.memories.get(memoryId);
     if (!memory) {
       return null;
@@ -141,7 +148,7 @@ export class PlaceMemory {
       for (const tag of memory.tags) {
         this.memoriesByTag.get(tag)?.delete(memoryId);
       }
-      
+
       // Add to new tags
       for (const tag of updates.tags) {
         let tagMemories = this.memoriesByTag.get(tag);
@@ -163,7 +170,7 @@ export class PlaceMemory {
 
       // Remove from old place
       this.memoriesByPlace.get(memory.placeId)?.delete(memoryId);
-      
+
       // Add to new place
       let placeMemories = this.memoriesByPlace.get(updates.placeId);
       if (!placeMemories) {
@@ -191,7 +198,7 @@ export class PlaceMemory {
 
     // Remove from place index
     this.memoriesByPlace.get(memory.placeId)?.delete(memoryId);
-    
+
     // Remove from tag indexes
     for (const tag of memory.tags) {
       this.memoriesByTag.get(tag)?.delete(memoryId);
@@ -227,7 +234,7 @@ export class PlaceMemory {
     } = {}
   ): PlaceMemoryEntry[] {
     const placeIds = new Set<string>([placeId]);
-    
+
     // Include child places if requested
     if (options.includeChildren) {
       const childPlaces = this.placeGraph.getChildPlaces(placeId);
@@ -235,7 +242,7 @@ export class PlaceMemory {
         placeIds.add(child.id);
       }
     }
-    
+
     // Include parent place if requested
     if (options.includeParent) {
       const place = this.placeGraph.getPlace(placeId);
@@ -243,9 +250,9 @@ export class PlaceMemory {
         placeIds.add(place.parent);
       }
     }
-    
+
     // Collect all memories for the places
-    const memories: PlaceMemory[] = [];
+    const memories: PlaceMemoryEntry[] = [];
     for (const pid of placeIds) {
       const placeMemories = this.memoriesByPlace.get(pid);
       if (placeMemories) {
@@ -253,28 +260,40 @@ export class PlaceMemory {
           const memory = this.memories.get(memoryId);
           if (memory) {
             // Apply filters
-            if (options.tags && !options.tags.some(tag => memory.tags.includes(tag))) {
+            if (
+              options.tags &&
+              !options.tags.some((tag) => memory.tags.includes(tag))
+            ) {
               continue;
             }
-            
-            if (options.timeStart !== undefined && memory.timestamp < options.timeStart) {
+
+            if (
+              options.timeStart !== undefined &&
+              memory.timestamp < options.timeStart
+            ) {
               continue;
             }
-            
-            if (options.timeEnd !== undefined && memory.timestamp > options.timeEnd) {
+
+            if (
+              options.timeEnd !== undefined &&
+              memory.timestamp > options.timeEnd
+            ) {
               continue;
             }
-            
-            if (options.minImportance !== undefined && memory.importance < options.minImportance) {
+
+            if (
+              options.minImportance !== undefined &&
+              memory.importance < options.minImportance
+            ) {
               continue;
             }
-            
+
             memories.push(memory);
           }
         }
       }
     }
-    
+
     // Sort memories
     if (options.sortBy === 'importance') {
       memories.sort((a, b) => b.importance - a.importance);
@@ -282,12 +301,12 @@ export class PlaceMemory {
       // Default to time (newest first)
       memories.sort((a, b) => b.timestamp - a.timestamp);
     }
-    
+
     // Apply limit
     if (options.limit !== undefined && options.limit > 0) {
       return memories.slice(0, options.limit);
     }
-    
+
     return memories;
   }
 
@@ -307,17 +326,17 @@ export class PlaceMemory {
     if (tags.length === 0) {
       return [];
     }
-    
+
     // Find memories with all specified tags
     const memoryIds = new Set<string>();
     let isFirst = true;
-    
+
     for (const tag of tags) {
       const tagMemories = this.memoriesByTag.get(tag);
       if (!tagMemories) {
         return []; // No memories with this tag
       }
-      
+
       if (isFirst) {
         // Initialize with first tag's memories
         for (const id of tagMemories) {
@@ -338,29 +357,38 @@ export class PlaceMemory {
         }
       }
     }
-    
+
     // Collect and filter memories
-    const memories: PlaceMemory[] = [];
+    const memories: PlaceMemoryEntry[] = [];
     for (const id of memoryIds) {
       const memory = this.memories.get(id);
       if (memory) {
         // Apply filters
-        if (options.timeStart !== undefined && memory.timestamp < options.timeStart) {
+        if (
+          options.timeStart !== undefined &&
+          memory.timestamp < options.timeStart
+        ) {
           continue;
         }
-        
-        if (options.timeEnd !== undefined && memory.timestamp > options.timeEnd) {
+
+        if (
+          options.timeEnd !== undefined &&
+          memory.timestamp > options.timeEnd
+        ) {
           continue;
         }
-        
-        if (options.minImportance !== undefined && memory.importance < options.minImportance) {
+
+        if (
+          options.minImportance !== undefined &&
+          memory.importance < options.minImportance
+        ) {
           continue;
         }
-        
+
         memories.push(memory);
       }
     }
-    
+
     // Sort memories
     if (options.sortBy === 'importance') {
       memories.sort((a, b) => b.importance - a.importance);
@@ -368,44 +396,47 @@ export class PlaceMemory {
       // Default to time (newest first)
       memories.sort((a, b) => b.timestamp - a.timestamp);
     }
-    
+
     // Apply limit
     if (options.limit !== undefined && options.limit > 0) {
       return memories.slice(0, options.limit);
     }
-    
+
     return memories;
   }
 
   /**
    * Recall memories based on location and other criteria
    */
-  recallMemories(options: MemoryRecallOptions = {}): PlaceMemory[] {
+  recallMemories(options: MemoryRecallOptions = {}): PlaceMemoryEntry[] {
     let placeIds: Set<string> = new Set();
-    
+
     // Get memories by place ID
     if (options.placeId) {
       placeIds.add(options.placeId);
     }
-    
+
     // Get memories by position
     if (options.position) {
-      const place = this.placeGraph.getPlaceByPosition(options.position, options.radius || 50);
+      const place = this.placeGraph.getPlaceByPosition(
+        options.position,
+        options.radius || 50
+      );
       if (place) {
         placeIds.add(place.id);
       }
     }
-    
+
     // If no place specified, include all places
     if (placeIds.size === 0 && !options.tags) {
       for (const place of this.placeGraph.getAllPlaces()) {
         placeIds.add(place.id);
       }
     }
-    
+
     // Collect memories from places
-    const memories: PlaceMemory[] = [];
-    
+    const memories: PlaceMemoryEntry[] = [];
+
     // If we have place IDs, get memories for those places
     if (placeIds.size > 0) {
       for (const placeId of placeIds) {
@@ -415,30 +446,42 @@ export class PlaceMemory {
             const memory = this.memories.get(memoryId);
             if (memory) {
               // Apply tag filter if specified
-              if (options.tags && !options.tags.some(tag => memory.tags.includes(tag))) {
+              if (
+                options.tags &&
+                !options.tags.some((tag) => memory.tags.includes(tag))
+              ) {
                 continue;
               }
-              
+
               // Apply time filters
-              if (options.timeStart !== undefined && memory.timestamp < options.timeStart) {
+              if (
+                options.timeStart !== undefined &&
+                memory.timestamp < options.timeStart
+              ) {
                 continue;
               }
-              
-              if (options.timeEnd !== undefined && memory.timestamp > options.timeEnd) {
+
+              if (
+                options.timeEnd !== undefined &&
+                memory.timestamp > options.timeEnd
+              ) {
                 continue;
               }
-              
+
               // Apply importance filter
-              if (options.minImportance !== undefined && memory.importance < options.minImportance) {
+              if (
+                options.minImportance !== undefined &&
+                memory.importance < options.minImportance
+              ) {
                 continue;
               }
-              
+
               memories.push(memory);
             }
           }
         }
       }
-    } 
+    }
     // If we only have tags, get memories by tag
     else if (options.tags) {
       const tagMemories = this.getMemoriesByTag(options.tags, {
@@ -446,32 +489,38 @@ export class PlaceMemory {
         timeEnd: options.timeEnd,
         minImportance: options.minImportance,
       });
-      
+
       memories.push(...tagMemories);
     }
-    
+
     // Sort memories
     if (options.sortBy === 'importance') {
       memories.sort((a, b) => b.importance - a.importance);
     } else if (options.sortBy === 'relevance') {
       // For relevance, we combine recency and importance
       memories.sort((a, b) => {
-        const recencyA = Math.max(0, 1 - ((Date.now() - a.timestamp) / (30 * 24 * 60 * 60 * 1000))); // 30 days max
-        const recencyB = Math.max(0, 1 - ((Date.now() - b.timestamp) / (30 * 24 * 60 * 60 * 1000)));
-        const scoreA = (a.importance * 0.7) + (recencyA * 0.3);
-        const scoreB = (b.importance * 0.7) + (recencyB * 0.3);
+        const recencyA = Math.max(
+          0,
+          1 - (Date.now() - a.timestamp) / (30 * 24 * 60 * 60 * 1000)
+        ); // 30 days max
+        const recencyB = Math.max(
+          0,
+          1 - (Date.now() - b.timestamp) / (30 * 24 * 60 * 60 * 1000)
+        );
+        const scoreA = a.importance * 0.7 + recencyA * 0.3;
+        const scoreB = b.importance * 0.7 + recencyB * 0.3;
         return scoreB - scoreA;
       });
     } else {
       // Default to time (newest first)
       memories.sort((a, b) => b.timestamp - a.timestamp);
     }
-    
+
     // Apply limit
     if (options.limit !== undefined && options.limit > 0) {
       return memories.slice(0, options.limit);
     }
-    
+
     return memories;
   }
 
@@ -485,16 +534,23 @@ export class PlaceMemory {
       minImportance?: number;
       maxDistance?: number;
     } = {}
-  ): { place: PlaceNode; distance: number; memories: PlaceMemory[] } | null {
+  ): {
+    place: PlaceNode;
+    distance: number;
+    memories: PlaceMemoryEntry[];
+  } | null {
     const maxDistance = options.maxDistance || 1000;
     let nearestPlace: PlaceNode | null = null;
     let nearestDistance = maxDistance;
-    let nearestMemories: PlaceMemory[] = [];
+    let nearestMemories: PlaceMemoryEntry[] = [];
 
     // Check all places
     for (const place of this.placeGraph.getAllPlaces()) {
       // Calculate distance
-      const distance = this.placeGraph.calculateDistance(position, place.position);
+      const distance = this.placeGraph.calculateDistance(
+        position,
+        place.position
+      );
       if (distance > maxDistance) {
         continue;
       }
@@ -535,7 +591,7 @@ export class PlaceMemory {
   generatePlaceSummary(placeId: string): string {
     const place = this.placeGraph.getPlace(placeId);
     if (!place) {
-      return "Place not found";
+      return 'Place not found';
     }
 
     // Get memories for this place
@@ -558,40 +614,40 @@ export class PlaceMemory {
 
     // Add landmarks
     if (place.landmarks.length > 0) {
-      summary += "Notable landmarks:\n";
+      summary += 'Notable landmarks:\n';
       for (const landmark of place.landmarks) {
         summary += `- ${landmark.name}: ${landmark.description}\n`;
       }
-      summary += "\n";
+      summary += '\n';
     }
 
     // Add resources
     if (place.resources.length > 0) {
-      summary += "Available resources:\n";
+      summary += 'Available resources:\n';
       for (const resource of place.resources) {
         summary += `- ${resource.type} (${resource.quantity}): ${resource.description}\n`;
       }
-      summary += "\n";
+      summary += '\n';
     }
 
     // Add child places
     if (childPlaces.length > 0) {
-      summary += "Contains:\n";
+      summary += 'Contains:\n';
       for (const child of childPlaces) {
         summary += `- ${child.name} (${child.type}): ${child.description}\n`;
       }
-      summary += "\n";
+      summary += '\n';
     }
 
     // Add key memories
     if (memories.length > 0) {
-      summary += "Key memories:\n";
+      summary += 'Key memories:\n';
       const topMemories = memories.slice(0, 5);
       for (const memory of topMemories) {
         summary += `- ${memory.title}: ${memory.content.substring(0, 100)}${memory.content.length > 100 ? '...' : ''}\n`;
       }
     } else {
-      summary += "No significant memories associated with this place.";
+      summary += 'No significant memories associated with this place.';
     }
 
     return summary;
@@ -600,7 +656,7 @@ export class PlaceMemory {
   /**
    * Get all memories
    */
-  getAllMemories(): PlaceMemory[] {
+  getAllMemories(): PlaceMemoryEntry[] {
     return Array.from(this.memories.values());
   }
 
@@ -621,8 +677,10 @@ export class PlaceMemory {
         .map(([tag, memories]) => ({ tag, count: memories.size }))
         .sort((a, b) => b.count - a.count)
         .slice(0, 10),
-      averageMemoriesPerPlace: this.memoriesByPlace.size > 0 ?
-        this.memories.size / this.memoriesByPlace.size : 0,
+      averageMemoriesPerPlace:
+        this.memoriesByPlace.size > 0
+          ? this.memories.size / this.memoriesByPlace.size
+          : 0,
     };
   }
 

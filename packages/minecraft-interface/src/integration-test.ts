@@ -415,7 +415,7 @@ export class MinecraftPlanningIntegrationTest {
 
       this.results.push({
         scenario: testName,
-        success: result.planningResult?.planningLatency < 1000, // Should be fast for emergencies
+        success: (result.planningResult?.planningLatency ?? 0) < 1000, // Should be fast for emergencies
         executionTime: Date.now() - startTime,
         planningApproach: result.planningResult?.planningApproach || 'unknown',
         signalsGenerated: result.signals?.length || 0,
@@ -424,7 +424,9 @@ export class MinecraftPlanningIntegrationTest {
         cognitiveMetrics: {
           responseTime: result.planningResult?.planningLatency || 9999,
           emergencyHandling:
-            result.planningResult?.planningLatency < 1000 ? 'fast' : 'slow',
+            (result.planningResult?.planningLatency ?? 0) < 1000
+              ? 'fast'
+              : 'slow',
         },
       });
 
@@ -601,7 +603,10 @@ export class MinecraftPlanningIntegrationTest {
   private createPlanningCoordinator(): IntegratedPlanningCoordinator {
     return createIntegratedPlanningCoordinator({
       coordinatorConfig: {
-        routingStrategy: this.config.planning.routingStrategy,
+        routingStrategy:
+          this.config.planning.routingStrategy === 'llm_first'
+            ? 'htn_first'
+            : this.config.planning.routingStrategy,
         fallbackTimeout: this.config.planning.maxPlanningTime,
         enablePlanMerging: true,
         enableCrossValidation: false,
@@ -609,12 +614,13 @@ export class MinecraftPlanningIntegrationTest {
       hrmConfig: {
         maxRefinements: 3,
         qualityThreshold: 0.7,
-        emergencyLatencyLimit: 500,
+        hrmLatencyTarget: 500,
+        enableIterativeRefinement: true,
       },
       goapConfig: {
-        maxDepth: 5,
-        planningBudget: 200,
-        enablePlanRepair: this.config.planning.enablePlanRepair,
+        maxPlanLength: 10,
+        planningBudgetMs: 200,
+        repairThreshold: 0.5,
       },
     });
   }

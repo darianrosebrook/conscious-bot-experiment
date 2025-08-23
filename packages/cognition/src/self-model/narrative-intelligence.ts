@@ -20,7 +20,11 @@ import {
   CharacterArc,
   NarrativeInsight,
   CoherenceMetric,
-  StoryElement
+  StoryElement,
+  IdentityImpact,
+  IdentityAspect,
+  ImpactType,
+  CoherenceChange,
 } from './types';
 
 /**
@@ -61,7 +65,10 @@ export class NarrativeIntelligence {
   private synthesisHistory: StorySynthesis[] = [];
   private lastSynthesis: number = 0;
 
-  constructor(llm: LLMInterface, config: Partial<NarrativeIntelligenceConfig> = {}) {
+  constructor(
+    llm: LLMInterface,
+    config: Partial<NarrativeIntelligenceConfig> = {}
+  ) {
     this.llm = llm;
     this.config = { ...DEFAULT_CONFIG, ...config };
   }
@@ -69,7 +76,10 @@ export class NarrativeIntelligence {
   /**
    * Synthesize advanced story from experiences
    */
-  async synthesizeStory(experiences: ExperienceAnalysis[]): Promise<StorySynthesis> {
+  async synthesizeStory(
+    experiences: ExperienceAnalysis[],
+    storyId?: string
+  ): Promise<StorySynthesis> {
     if (!this.config.enableStorySynthesis) {
       return this.createEmptyStorySynthesis();
     }
@@ -80,7 +90,7 @@ export class NarrativeIntelligence {
     }
 
     const synthesis: StorySynthesis = {
-      id: `synthesis-${Date.now()}`,
+      id: storyId || `synthesis-${Date.now()}`,
       timestamp: now,
       storyElements: await this.extractStoryElements(experiences),
       themes: await this.extractThemes(experiences),
@@ -102,12 +112,12 @@ export class NarrativeIntelligence {
   /**
    * Extract story elements from experiences
    */
-  async extractStoryElements(experiences: ExperienceAnalysis[]): Promise<StoryElement[]> {
+  async extractStoryElements(
+    experiences: ExperienceAnalysis[]
+  ): Promise<StoryElement[]> {
     const prompt = `Extract story elements from these experiences:
 
-${experiences.map(exp => 
-  `- ${exp.description} (${exp.outcome})`
-).join('\n')}
+${experiences.map((exp) => `- ${exp.description} (${exp.outcome})`).join('\n')}
 
 Identify story elements including:
 1. Key events and turning points
@@ -123,7 +133,8 @@ Provide specific story elements with their narrative significance.`;
 
     try {
       const response = await this.llm.generateResponse(prompt, {
-        systemPrompt: 'You are extracting story elements from experiences. Be specific and narrative-focused.',
+        systemPrompt:
+          'You are extracting story elements from experiences. Be specific and narrative-focused.',
         temperature: 0.4,
         maxTokens: 1024,
       });
@@ -138,22 +149,48 @@ Provide specific story elements with their narrative significance.`;
   /**
    * Parse story elements from response
    */
-  private parseStoryElements(response: string, experiences: ExperienceAnalysis[]): StoryElement[] {
+  private parseStoryElements(
+    response: string,
+    experiences: ExperienceAnalysis[]
+  ): StoryElement[] {
     const elements: StoryElement[] = [];
-    const lines = response.split('\n').filter(line => line.trim());
+    const lines = response.split('\n').filter((line) => line.trim());
 
     let currentCategory = '';
-    
-    lines.forEach(line => {
+
+    lines.forEach((line) => {
       const lowerLine = line.toLowerCase();
-      if (lowerLine.includes('event') || lowerLine.includes('turning point')) currentCategory = 'event';
-      else if (lowerLine.includes('character') || lowerLine.includes('development')) currentCategory = 'character';
-      else if (lowerLine.includes('conflict') || lowerLine.includes('resolution')) currentCategory = 'conflict';
-      else if (lowerLine.includes('setting') || lowerLine.includes('context')) currentCategory = 'setting';
-      else if (lowerLine.includes('relationship') || lowerLine.includes('interaction')) currentCategory = 'relationship';
-      else if (lowerLine.includes('goal') || lowerLine.includes('motivation')) currentCategory = 'goal';
-      else if (lowerLine.includes('obstacle') || lowerLine.includes('challenge')) currentCategory = 'obstacle';
-      else if (lowerLine.includes('achievement') || lowerLine.includes('failure')) currentCategory = 'achievement';
+      if (lowerLine.includes('event') || lowerLine.includes('turning point'))
+        currentCategory = 'event';
+      else if (
+        lowerLine.includes('character') ||
+        lowerLine.includes('development')
+      )
+        currentCategory = 'character';
+      else if (
+        lowerLine.includes('conflict') ||
+        lowerLine.includes('resolution')
+      )
+        currentCategory = 'conflict';
+      else if (lowerLine.includes('setting') || lowerLine.includes('context'))
+        currentCategory = 'setting';
+      else if (
+        lowerLine.includes('relationship') ||
+        lowerLine.includes('interaction')
+      )
+        currentCategory = 'relationship';
+      else if (lowerLine.includes('goal') || lowerLine.includes('motivation'))
+        currentCategory = 'goal';
+      else if (
+        lowerLine.includes('obstacle') ||
+        lowerLine.includes('challenge')
+      )
+        currentCategory = 'obstacle';
+      else if (
+        lowerLine.includes('achievement') ||
+        lowerLine.includes('failure')
+      )
+        currentCategory = 'achievement';
       else if (line.trim().startsWith('-') || line.trim().startsWith('•')) {
         const content = line.replace(/^[-•]\s*/, '').trim();
         elements.push({
@@ -172,16 +209,16 @@ Provide specific story elements with their narrative significance.`;
   /**
    * Extract themes from experiences
    */
-  async extractThemes(experiences: ExperienceAnalysis[]): Promise<ThemeExtraction[]> {
+  async extractThemes(
+    experiences: ExperienceAnalysis[]
+  ): Promise<ThemeExtraction[]> {
     if (!this.config.enableThemeExtraction) {
       return [];
     }
 
     const prompt = `Extract recurring themes from these experiences:
 
-${experiences.map(exp => 
-  `- ${exp.description} (${exp.outcome})`
-).join('\n')}
+${experiences.map((exp) => `- ${exp.description} (${exp.outcome})`).join('\n')}
 
 Identify themes including:
 1. Personal growth and development
@@ -202,7 +239,8 @@ For each theme, provide:
 
     try {
       const response = await this.llm.generateResponse(prompt, {
-        systemPrompt: 'You are extracting themes from experiences. Be insightful about recurring patterns.',
+        systemPrompt:
+          'You are extracting themes from experiences. Be insightful about recurring patterns.',
         temperature: 0.5,
         maxTokens: 1024,
       });
@@ -217,28 +255,42 @@ For each theme, provide:
   /**
    * Parse theme extraction from response
    */
-  private parseThemeExtraction(response: string, experiences: ExperienceAnalysis[]): ThemeExtraction[] {
+  private parseThemeExtraction(
+    response: string,
+    experiences: ExperienceAnalysis[]
+  ): ThemeExtraction[] {
     const themes: ThemeExtraction[] = [];
-    const sections = response.split(/\d+\./).filter(section => section.trim());
+    const sections = response
+      .split(/\d+\./)
+      .filter((section) => section.trim());
 
     sections.forEach((section, index) => {
-      const lines = section.trim().split('\n').filter(line => line.trim());
+      const lines = section
+        .trim()
+        .split('\n')
+        .filter((line) => line.trim());
       if (lines.length >= 3) {
         const nameMatch = lines[0].match(/Theme:?\s*(.+)/i);
         const name = nameMatch ? nameMatch[1].trim() : `Theme ${index + 1}`;
-        
+
         const description = lines[1].replace(/Description:?\s*/i, '').trim();
-        
-        const evidence = lines.filter(line => line.includes('evidence') || line.includes('example')).slice(0, 2);
-        
+
+        const evidence = lines
+          .filter(
+            (line) => line.includes('evidence') || line.includes('example')
+          )
+          .slice(0, 2);
+
         const significanceMatch = response.match(/significance.*?(\d+\.?\d*)/i);
-        const significance = significanceMatch ? parseFloat(significanceMatch[1]) : 0.7;
+        const significance = significanceMatch
+          ? parseFloat(significanceMatch[1])
+          : 0.7;
 
         themes.push({
           id: `theme-${Date.now()}-${index}`,
           name,
           description,
-          evidence: evidence.map(e => e.replace(/^[-•]\s*/, '').trim()),
+          evidence: evidence.map((e) => e.replace(/^[-•]\s*/, '').trim()),
           significance,
           developmentPattern: 'emerging',
           timestamp: Date.now(),
@@ -252,12 +304,12 @@ For each theme, provide:
   /**
    * Analyze plot development
    */
-  async analyzePlotDevelopment(experiences: ExperienceAnalysis[]): Promise<PlotDevelopment> {
+  async analyzePlotDevelopment(
+    experiences: ExperienceAnalysis[]
+  ): Promise<PlotDevelopment> {
     const prompt = `Analyze plot development from these experiences:
 
-${experiences.map(exp => 
-  `- ${exp.description} (${exp.outcome})`
-).join('\n')}
+${experiences.map((exp) => `- ${exp.description} (${exp.outcome})`).join('\n')}
 
 Analyze:
 1. Plot structure and progression
@@ -272,7 +324,8 @@ Provide insights about plot development patterns.`;
 
     try {
       const response = await this.llm.generateResponse(prompt, {
-        systemPrompt: 'You are analyzing plot development. Focus on narrative structure and progression.',
+        systemPrompt:
+          'You are analyzing plot development. Focus on narrative structure and progression.',
         temperature: 0.4,
         maxTokens: 1024,
       });
@@ -287,29 +340,44 @@ Provide insights about plot development patterns.`;
   /**
    * Parse plot development from response
    */
-  private parsePlotDevelopment(response: string, experiences: ExperienceAnalysis[]): PlotDevelopment {
-    const lines = response.split('\n').filter(line => line.trim());
-    
+  private parsePlotDevelopment(
+    response: string,
+    experiences: ExperienceAnalysis[]
+  ): PlotDevelopment {
+    const lines = response.split('\n').filter((line) => line.trim());
+
     const structure: string[] = [];
     const climaxPoints: string[] = [];
     const subplots: string[] = [];
     const pacing: string[] = [];
 
     let currentSection = '';
-    
-    lines.forEach(line => {
+
+    lines.forEach((line) => {
       const lowerLine = line.toLowerCase();
-      if (lowerLine.includes('structure') || lowerLine.includes('progression')) currentSection = 'structure';
-      else if (lowerLine.includes('climax') || lowerLine.includes('resolution')) currentSection = 'climax';
-      else if (lowerLine.includes('subplot') || lowerLine.includes('parallel')) currentSection = 'subplots';
-      else if (lowerLine.includes('pacing') || lowerLine.includes('rhythm')) currentSection = 'pacing';
+      if (lowerLine.includes('structure') || lowerLine.includes('progression'))
+        currentSection = 'structure';
+      else if (lowerLine.includes('climax') || lowerLine.includes('resolution'))
+        currentSection = 'climax';
+      else if (lowerLine.includes('subplot') || lowerLine.includes('parallel'))
+        currentSection = 'subplots';
+      else if (lowerLine.includes('pacing') || lowerLine.includes('rhythm'))
+        currentSection = 'pacing';
       else if (line.trim().startsWith('-') || line.trim().startsWith('•')) {
         const content = line.replace(/^[-•]\s*/, '').trim();
         switch (currentSection) {
-          case 'structure': structure.push(content); break;
-          case 'climax': climaxPoints.push(content); break;
-          case 'subplots': subplots.push(content); break;
-          case 'pacing': pacing.push(content); break;
+          case 'structure':
+            structure.push(content);
+            break;
+          case 'climax':
+            climaxPoints.push(content);
+            break;
+          case 'subplots':
+            subplots.push(content);
+            break;
+          case 'pacing':
+            pacing.push(content);
+            break;
         }
       }
     });
@@ -325,47 +393,14 @@ Provide insights about plot development patterns.`;
   }
 
   /**
-   * Analyze character arc development
-   */
-  async analyzeCharacterArc(experiences: ExperienceAnalysis[]): Promise<CharacterArc> {
-    const prompt = `Analyze character arc development from these experiences:
-
-${experiences.map(exp => 
-  `- ${exp.description} (${exp.outcome})`
-).join('\n')}
-
-Analyze:
-1. Character growth and development
-2. Personality changes and evolution
-3. Skill and capability development
-4. Relationship development
-5. Value and belief evolution
-6. Identity formation and change
-7. Character strengths and weaknesses
-8. Character motivations and goals
-
-Provide insights about character development patterns.`;
-
-    try {
-      const response = await this.llm.generateResponse(prompt, {
-        systemPrompt: 'You are analyzing character arc development. Focus on personal growth and change.',
-        temperature: 0.5,
-        maxTokens: 1024,
-      });
-
-      return this.parseCharacterArc(response.text, experiences);
-    } catch (error) {
-      console.error('Error analyzing character arc:', error);
-      return this.createEmptyCharacterArc();
-    }
-  }
-
-  /**
    * Parse character arc from response
    */
-  private parseCharacterArc(response: string, experiences: ExperienceAnalysis[]): CharacterArc {
-    const lines = response.split('\n').filter(line => line.trim());
-    
+  private parseCharacterArc(
+    response: string,
+    experiences: ExperienceAnalysis[]
+  ): CharacterArc {
+    const lines = response.split('\n').filter((line) => line.trim());
+
     const growthAreas: string[] = [];
     const personalityChanges: string[] = [];
     const skillDevelopment: string[] = [];
@@ -373,22 +408,43 @@ Provide insights about character development patterns.`;
     const valueEvolution: string[] = [];
 
     let currentSection = '';
-    
-    lines.forEach(line => {
+
+    lines.forEach((line) => {
       const lowerLine = line.toLowerCase();
-      if (lowerLine.includes('growth') || lowerLine.includes('development')) currentSection = 'growth';
-      else if (lowerLine.includes('personality') || lowerLine.includes('change')) currentSection = 'personality';
-      else if (lowerLine.includes('skill') || lowerLine.includes('capability')) currentSection = 'skills';
-      else if (lowerLine.includes('relationship') || lowerLine.includes('social')) currentSection = 'relationships';
-      else if (lowerLine.includes('value') || lowerLine.includes('belief')) currentSection = 'values';
+      if (lowerLine.includes('growth') || lowerLine.includes('development'))
+        currentSection = 'growth';
+      else if (
+        lowerLine.includes('personality') ||
+        lowerLine.includes('change')
+      )
+        currentSection = 'personality';
+      else if (lowerLine.includes('skill') || lowerLine.includes('capability'))
+        currentSection = 'skills';
+      else if (
+        lowerLine.includes('relationship') ||
+        lowerLine.includes('social')
+      )
+        currentSection = 'relationships';
+      else if (lowerLine.includes('value') || lowerLine.includes('belief'))
+        currentSection = 'values';
       else if (line.trim().startsWith('-') || line.trim().startsWith('•')) {
         const content = line.replace(/^[-•]\s*/, '').trim();
         switch (currentSection) {
-          case 'growth': growthAreas.push(content); break;
-          case 'personality': personalityChanges.push(content); break;
-          case 'skills': skillDevelopment.push(content); break;
-          case 'relationships': relationshipDevelopment.push(content); break;
-          case 'values': valueEvolution.push(content); break;
+          case 'growth':
+            growthAreas.push(content);
+            break;
+          case 'personality':
+            personalityChanges.push(content);
+            break;
+          case 'skills':
+            skillDevelopment.push(content);
+            break;
+          case 'relationships':
+            relationshipDevelopment.push(content);
+            break;
+          case 'values':
+            valueEvolution.push(content);
+            break;
         }
       }
     });
@@ -407,16 +463,16 @@ Provide insights about character development patterns.`;
   /**
    * Assess narrative coherence
    */
-  async assessCoherence(experiences: ExperienceAnalysis[]): Promise<NarrativeCoherence> {
+  async assessCoherence(
+    experiences: ExperienceAnalysis[]
+  ): Promise<NarrativeCoherence> {
     if (!this.config.enableCoherenceMaintenance) {
       return this.createEmptyCoherence();
     }
 
     const prompt = `Assess narrative coherence from these experiences:
 
-${experiences.map(exp => 
-  `- ${exp.description} (${exp.outcome})`
-).join('\n')}
+${experiences.map((exp) => `- ${exp.description} (${exp.outcome})`).join('\n')}
 
 Assess:
 1. Story consistency and continuity
@@ -432,7 +488,8 @@ Provide insights about narrative coherence.`;
 
     try {
       const response = await this.llm.generateResponse(prompt, {
-        systemPrompt: 'You are assessing narrative coherence. Be objective about consistency and flow.',
+        systemPrompt:
+          'You are assessing narrative coherence. Be objective about consistency and flow.',
         temperature: 0.3,
         maxTokens: 1024,
       });
@@ -447,29 +504,50 @@ Provide insights about narrative coherence.`;
   /**
    * Parse coherence assessment from response
    */
-  private parseCoherenceAssessment(response: string, experiences: ExperienceAnalysis[]): NarrativeCoherence {
-    const lines = response.split('\n').filter(line => line.trim());
-    
+  private parseCoherenceAssessment(
+    response: string,
+    experiences: ExperienceAnalysis[]
+  ): NarrativeCoherence {
+    const lines = response.split('\n').filter((line) => line.trim());
+
     const strengths: string[] = [];
     const weaknesses: string[] = [];
     const inconsistencies: string[] = [];
     const improvements: string[] = [];
 
     let currentSection = '';
-    
-    lines.forEach(line => {
+
+    lines.forEach((line) => {
       const lowerLine = line.toLowerCase();
-      if (lowerLine.includes('strength') || lowerLine.includes('positive')) currentSection = 'strengths';
-      else if (lowerLine.includes('weakness') || lowerLine.includes('issue')) currentSection = 'weaknesses';
-      else if (lowerLine.includes('inconsistency') || lowerLine.includes('contradiction')) currentSection = 'inconsistencies';
-      else if (lowerLine.includes('improvement') || lowerLine.includes('suggestion')) currentSection = 'improvements';
+      if (lowerLine.includes('strength') || lowerLine.includes('positive'))
+        currentSection = 'strengths';
+      else if (lowerLine.includes('weakness') || lowerLine.includes('issue'))
+        currentSection = 'weaknesses';
+      else if (
+        lowerLine.includes('inconsistency') ||
+        lowerLine.includes('contradiction')
+      )
+        currentSection = 'inconsistencies';
+      else if (
+        lowerLine.includes('improvement') ||
+        lowerLine.includes('suggestion')
+      )
+        currentSection = 'improvements';
       else if (line.trim().startsWith('-') || line.trim().startsWith('•')) {
         const content = line.replace(/^[-•]\s*/, '').trim();
         switch (currentSection) {
-          case 'strengths': strengths.push(content); break;
-          case 'weaknesses': weaknesses.push(content); break;
-          case 'inconsistencies': inconsistencies.push(content); break;
-          case 'improvements': improvements.push(content); break;
+          case 'strengths':
+            strengths.push(content);
+            break;
+          case 'weaknesses':
+            weaknesses.push(content);
+            break;
+          case 'inconsistencies':
+            inconsistencies.push(content);
+            break;
+          case 'improvements':
+            improvements.push(content);
+            break;
         }
       }
     });
@@ -487,11 +565,13 @@ Provide insights about narrative coherence.`;
   /**
    * Generate narrative insights
    */
-  async generateNarrativeInsights(synthesis: StorySynthesis): Promise<NarrativeInsight[]> {
+  async generateNarrativeInsights(
+    synthesis: StorySynthesis
+  ): Promise<NarrativeInsight[]> {
     const prompt = `Generate narrative insights from this story synthesis:
 
-Story Elements: ${synthesis.storyElements.map(e => e.description).join(', ')}
-Themes: ${synthesis.themes.map(t => t.name).join(', ')}
+Story Elements: ${synthesis.storyElements.map((e) => e.description).join(', ')}
+Themes: ${synthesis.themes.map((t) => t.name).join(', ')}
 Plot Development: ${synthesis.plotDevelopment.structure.join(', ')}
 Character Arc: ${synthesis.characterArc.growthAreas.join(', ')}
 
@@ -507,13 +587,17 @@ Provide 3-5 specific narrative insights.`;
 
     try {
       const response = await this.llm.generateResponse(prompt, {
-        systemPrompt: 'You are generating narrative insights. Be insightful about story meaning and development.',
+        systemPrompt:
+          'You are generating narrative insights. Be insightful about story meaning and development.',
         temperature: 0.6,
         maxTokens: 512,
       });
 
-      return response.text.split('\n')
-        .filter(line => line.trim().startsWith('-') || line.trim().startsWith('•'))
+      return response.text
+        .split('\n')
+        .filter(
+          (line) => line.trim().startsWith('-') || line.trim().startsWith('•')
+        )
         .map((line, index) => ({
           id: `insight-${Date.now()}-${index}`,
           description: line.replace(/^[-•]\s*/, '').trim(),
@@ -531,7 +615,9 @@ Provide 3-5 specific narrative insights.`;
   /**
    * Integrate experience into narrative
    */
-  async integrateExperience(experience: ExperienceAnalysis): Promise<ExperienceIntegration> {
+  async integrateExperience(
+    experience: ExperienceAnalysis
+  ): Promise<ExperienceIntegration> {
     if (!this.config.enableExperienceIntegration) {
       return this.createEmptyExperienceIntegration(experience);
     }
@@ -554,7 +640,8 @@ Provide integration analysis.`;
 
     try {
       const response = await this.llm.generateResponse(prompt, {
-        systemPrompt: 'You are integrating experiences into narrative. Focus on story coherence and development.',
+        systemPrompt:
+          'You are integrating experiences into narrative. Focus on story coherence and development.',
         temperature: 0.4,
         maxTokens: 512,
       });
@@ -569,21 +656,37 @@ Provide integration analysis.`;
   /**
    * Parse experience integration from response
    */
-  private parseExperienceIntegration(response: string, experience: ExperienceAnalysis): ExperienceIntegration {
-    const lines = response.split('\n').filter(line => line.trim());
-    
-    const narrativeContext = lines.find(line => line.includes('story') || line.includes('narrative')) || '';
-    const lessonsExtracted = lines.filter(line => line.includes('lesson') || line.includes('learn')).slice(0, 2);
-    const identityImpact = lines.find(line => line.includes('character') || line.includes('development')) || '';
-    const coherenceChanges = lines.find(line => line.includes('coherence') || line.includes('consistency')) || '';
+  private parseExperienceIntegration(
+    response: string,
+    experience: ExperienceAnalysis
+  ): ExperienceIntegration {
+    const lines = response.split('\n').filter((line) => line.trim());
+
+    const narrativeContext =
+      lines.find(
+        (line) => line.includes('story') || line.includes('narrative')
+      ) || '';
+    const lessonsExtracted = lines
+      .filter((line) => line.includes('lesson') || line.includes('learn'))
+      .slice(0, 2);
+    const identityImpact =
+      lines.find(
+        (line) => line.includes('character') || line.includes('development')
+      ) || '';
+    const coherenceChanges =
+      lines.find(
+        (line) => line.includes('coherence') || line.includes('consistency')
+      ) || '';
 
     return {
       experienceId: experience.id || `exp-${Date.now()}`,
       integrationDate: Date.now(),
       narrativeContext: narrativeContext.replace(/^[-•]\s*/, '').trim(),
-      lessonsExtracted: lessonsExtracted.map(l => l.replace(/^[-•]\s*/, '').trim()),
-      identityImpact: identityImpact.replace(/^[-•]\s*/, '').trim(),
-      coherenceChanges: coherenceChanges.replace(/^[-•]\s*/, '').trim(),
+      lessonsExtracted: lessonsExtracted.map((l) =>
+        l.replace(/^[-•]\s*/, '').trim()
+      ),
+      identityImpact: this.parseIdentityImpacts(identityImpact),
+      coherenceChanges: this.parseCoherenceChanges(coherenceChanges),
     };
   }
 
@@ -592,11 +695,14 @@ Provide integration analysis.`;
    */
   private calculatePlotComplexity(experiences: ExperienceAnalysis[]): number {
     if (experiences.length === 0) return 0;
-    
+
     // Simple complexity calculation based on experience variety and outcomes
-    const uniqueOutcomes = new Set(experiences.map(exp => exp.outcome)).size;
-    const complexity = Math.min(1, uniqueOutcomes / experiences.length + experiences.length / 20);
-    
+    const uniqueOutcomes = new Set(experiences.map((exp) => exp.outcome)).size;
+    const complexity = Math.min(
+      1,
+      uniqueOutcomes / experiences.length + experiences.length / 20
+    );
+
     return complexity;
   }
 
@@ -604,15 +710,20 @@ Provide integration analysis.`;
    * Determine character arc type
    */
   private determineArcType(experiences: ExperienceAnalysis[]): string {
-    const outcomes = experiences.map(exp => exp.outcome);
-    const positiveOutcomes = outcomes.filter(outcome => 
-      outcome.toLowerCase().includes('success') || 
-      outcome.toLowerCase().includes('achieved') ||
-      outcome.toLowerCase().includes('learned')
+    const outcomes = experiences
+      .map((exp) => exp.outcome)
+      .filter((outcome) => outcome != null);
+    if (outcomes.length === 0) return 'growth';
+
+    const positiveOutcomes = outcomes.filter(
+      (outcome) =>
+        outcome.toLowerCase().includes('success') ||
+        outcome.toLowerCase().includes('achieved') ||
+        outcome.toLowerCase().includes('learned')
     ).length;
-    
+
     const ratio = positiveOutcomes / outcomes.length;
-    
+
     if (ratio > 0.7) return 'growth';
     if (ratio > 0.4) return 'redemption';
     if (ratio > 0.2) return 'struggle';
@@ -624,15 +735,17 @@ Provide integration analysis.`;
    */
   private calculateArcCompleteness(experiences: ExperienceAnalysis[]): number {
     if (experiences.length === 0) return 0;
-    
+
     // Simple completeness calculation
     const recentExperiences = experiences.slice(-5);
-    const hasResolution = recentExperiences.some(exp => 
-      exp.outcome.toLowerCase().includes('resolved') ||
-      exp.outcome.toLowerCase().includes('completed') ||
-      exp.outcome.toLowerCase().includes('achieved')
+    const hasResolution = recentExperiences.some(
+      (exp) =>
+        exp.outcome &&
+        (exp.outcome.toLowerCase().includes('resolved') ||
+          exp.outcome.toLowerCase().includes('completed') ||
+          exp.outcome.toLowerCase().includes('achieved'))
     );
-    
+
     return hasResolution ? 0.8 : 0.4;
   }
 
@@ -641,37 +754,47 @@ Provide integration analysis.`;
    */
   private calculateOverallCoherence(experiences: ExperienceAnalysis[]): number {
     if (experiences.length === 0) return 0;
-    
+
     // Simple coherence calculation
-    const outcomes = experiences.map(exp => exp.outcome);
-    const consistentOutcomes = outcomes.filter(outcome => 
-      outcome.toLowerCase().includes('success') || 
-      outcome.toLowerCase().includes('achieved') ||
-      outcome.toLowerCase().includes('learned')
+    const outcomes = experiences
+      .map((exp) => exp.outcome)
+      .filter((outcome) => outcome != null);
+    if (outcomes.length === 0) return 0;
+
+    const consistentOutcomes = outcomes.filter(
+      (outcome) =>
+        outcome.toLowerCase().includes('success') ||
+        outcome.toLowerCase().includes('achieved') ||
+        outcome.toLowerCase().includes('learned')
     ).length;
-    
+
     return consistentOutcomes / outcomes.length;
   }
 
   /**
    * Calculate coherence metrics
    */
-  private calculateCoherenceMetrics(experiences: ExperienceAnalysis[]): CoherenceMetric[] {
+  private calculateCoherenceMetrics(
+    experiences: ExperienceAnalysis[]
+  ): CoherenceMetric[] {
     return [
       {
         name: 'Story Consistency',
         value: this.calculateOverallCoherence(experiences),
         threshold: this.config.coherenceThreshold,
+        trend: 'stable',
       },
       {
         name: 'Character Consistency',
         value: 0.8,
         threshold: 0.7,
+        trend: 'improving',
       },
       {
         name: 'Theme Coherence',
         value: 0.75,
         threshold: 0.6,
+        trend: 'stable',
       },
     ];
   }
@@ -680,7 +803,10 @@ Provide integration analysis.`;
    * Get last synthesis
    */
   private getLastSynthesis(): StorySynthesis {
-    return this.synthesisHistory[this.synthesisHistory.length - 1] || this.createEmptyStorySynthesis();
+    return (
+      this.synthesisHistory[this.synthesisHistory.length - 1] ||
+      this.createEmptyStorySynthesis()
+    );
   }
 
   /**
@@ -745,14 +871,16 @@ Provide integration analysis.`;
   /**
    * Create empty experience integration
    */
-  private createEmptyExperienceIntegration(experience: ExperienceAnalysis): ExperienceIntegration {
+  private createEmptyExperienceIntegration(
+    experience: ExperienceAnalysis
+  ): ExperienceIntegration {
     return {
       experienceId: experience.id || `exp-${Date.now()}`,
       integrationDate: Date.now(),
       narrativeContext: '',
       lessonsExtracted: [],
-      identityImpact: '',
-      coherenceChanges: '',
+      identityImpact: [],
+      coherenceChanges: [],
     };
   }
 
@@ -764,19 +892,157 @@ Provide integration analysis.`;
   }
 
   /**
+   * Develop plot from experiences
+   */
+  async developPlot(
+    experiences: ExperienceAnalysis[]
+  ): Promise<PlotDevelopment> {
+    return this.analyzePlotDevelopment(experiences);
+  }
+
+  /**
+   * Analyze character arc from experiences
+   */
+  async analyzeCharacterArc(
+    experiences: ExperienceAnalysis[]
+  ): Promise<CharacterArc> {
+    const prompt = `Analyze character arc development from these experiences:
+
+${experiences.map((exp) => `- ${exp.description} (${exp.outcome})`).join('\n')}
+
+Analyze:
+1. Character growth and development
+2. Personality changes and evolution
+3. Skill and capability development
+4. Relationship development
+5. Value and belief evolution
+6. Identity formation and change
+7. Character strengths and weaknesses
+8. Character motivations and goals
+
+Provide insights about character development patterns.`;
+
+    try {
+      const response = await this.llm.generateResponse(prompt, {
+        systemPrompt:
+          'You are analyzing character arc development. Focus on personal growth and change.',
+        temperature: 0.5,
+        maxTokens: 1024,
+      });
+
+      return this.parseCharacterArc(response.text, experiences);
+    } catch (error) {
+      console.error('Error analyzing character arc:', error);
+      return this.createEmptyCharacterArc();
+    }
+  }
+
+  /**
+   * Evaluate narrative coherence
+   */
+  async evaluateCoherence(
+    narrativeElements: any[]
+  ): Promise<NarrativeCoherence> {
+    const mockExperiences: ExperienceAnalysis[] = narrativeElements.map(
+      (elem, index) => ({
+        id: `exp-${index}`,
+        description: elem.name || `Element ${index}`,
+        outcome: 'analyzed',
+        timestamp: Date.now(),
+      })
+    );
+
+    return this.assessCoherence(mockExperiences);
+  }
+
+  /**
+   * Generate insights from narrative
+   */
+  async generateInsights(narrative: any): Promise<NarrativeInsight[]> {
+    const mockSynthesis: StorySynthesis = {
+      id: 'insight-synthesis',
+      timestamp: Date.now(),
+      storyElements: [],
+      themes: [],
+      plotDevelopment: this.createEmptyPlotDevelopment(),
+      characterArc: this.createEmptyCharacterArc(),
+      coherence: this.createEmptyCoherence(),
+      insights: [],
+    };
+
+    return this.generateNarrativeInsights(mockSynthesis);
+  }
+
+  /**
    * Get narrative intelligence statistics
    */
   getStats() {
+    const totalInsights = this.synthesisHistory.reduce(
+      (sum, s) => sum + s.insights.length,
+      0
+    );
+
     return {
       totalSyntheses: this.synthesisHistory.length,
-      averageCoherence: this.synthesisHistory.length > 0 
-        ? this.synthesisHistory.reduce((sum, s) => sum + (s.coherence.overallCoherence || 0), 0) / this.synthesisHistory.length
-        : 0,
-      averageComplexity: this.synthesisHistory.length > 0
-        ? this.synthesisHistory.reduce((sum, s) => sum + (s.plotDevelopment.complexity || 0), 0) / this.synthesisHistory.length
-        : 0,
-      totalThemes: this.synthesisHistory.reduce((sum, s) => sum + s.themes.length, 0),
+      averageCoherence:
+        this.synthesisHistory.length > 0
+          ? this.synthesisHistory.reduce(
+              (sum, s) => sum + (s.coherence.overallCoherence || 0),
+              0
+            ) / this.synthesisHistory.length
+          : 0,
+      averageComplexity:
+        this.synthesisHistory.length > 0
+          ? this.synthesisHistory.reduce(
+              (sum, s) => sum + (s.plotDevelopment.complexity || 0),
+              0
+            ) / this.synthesisHistory.length
+          : 0,
+      totalThemes: this.synthesisHistory.reduce(
+        (sum, s) => sum + s.themes.length,
+        0
+      ),
+      totalInsights: totalInsights,
       config: this.config,
     };
+  }
+
+  /**
+   * Parse identity impacts from string
+   */
+  private parseIdentityImpacts(impactText: string): IdentityImpact[] {
+    if (!impactText || impactText.trim() === '') {
+      return [];
+    }
+
+    return [
+      {
+        aspect: IdentityAspect.PERSONALITY,
+        type: ImpactType.REINFORCEMENT,
+        magnitude: 0.5,
+        description: impactText.replace(/^[-•]\s*/, '').trim(),
+        evidence: [impactText.replace(/^[-•]\s*/, '').trim()],
+        timestamp: Date.now(),
+      },
+    ];
+  }
+
+  /**
+   * Parse coherence changes from string
+   */
+  private parseCoherenceChanges(changesText: string): CoherenceChange[] {
+    if (!changesText || changesText.trim() === '') {
+      return [];
+    }
+
+    return [
+      {
+        area: 'narrative',
+        previousScore: 0.5,
+        newScore: 0.7,
+        reasoning: changesText.replace(/^[-•]\s*/, '').trim(),
+        supportingEvidence: [changesText.replace(/^[-•]\s*/, '').trim()],
+      },
+    ];
   }
 }

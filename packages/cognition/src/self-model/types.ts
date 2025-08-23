@@ -229,10 +229,12 @@ export interface IdentityCoherence {
  */
 export interface BehaviorPattern {
   id: string;
-  description: string;
-  type: string;
+  pattern: string;
   frequency: number;
   context: string;
+  triggers: string[];
+  outcomes: string[];
+  confidence: number;
   timestamp: number;
 }
 
@@ -502,6 +504,18 @@ export enum PromiseStatus {
   FULFILLED = 'fulfilled',
   BROKEN = 'broken',
   MODIFIED = 'modified',
+}
+
+/**
+ * Contract type enum
+ */
+export enum ContractType {
+  LEARNING = 'learning',
+  COLLABORATION = 'collaboration',
+  RESOURCE_SHARING = 'resource_sharing',
+  MENTORSHIP = 'mentorship',
+  PROJECT = 'project',
+  SOCIAL = 'social',
 }
 
 // ============================================================================

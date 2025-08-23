@@ -35,14 +35,49 @@ export { PlaceMemory } from './place-graph/place-memory';
 export { SpatialNavigator } from './place-graph/spatial-navigator';
 export { createPlaceGraph } from './place-graph';
 
-// Types and interfaces  
+// Types and interfaces
 export * from './types';
-export * from './perception/types';
-export * from './navigation/types';
-// Export sensorimotor types without the normalize function to avoid conflict
-export type * from './sensorimotor/types';
+// Export perception types explicitly to avoid conflicts
+export type {
+  AgentState,
+  FieldOfViewConfig,
+  VisualField,
+  ObjectType,
+  VisualFeature,
+  RecognizedObject,
+  PerceptionUpdate,
+  PerceptionConfig,
+  ConfidenceDecayModel,
+  VisualQuery,
+  PerceptionResult,
+  ObjectClassification,
+  ConfidenceScore,
+} from './perception/types';
+// Export navigation types explicitly to avoid conflicts
+export type {
+  PathPlanningRequest,
+  PathPlanningResult,
+  NavigationConfig,
+  WorldChange,
+  BlockChange,
+  MovementCost,
+  NavigationMetrics,
+  NavigationStep,
+  PathUpdateResult,
+} from './navigation/types';
+// Export sensorimotor types explicitly to avoid conflicts
+export type {
+  SensorimotorConfig,
+  MotorAction,
+  MotorExecutionResult,
+  ProcessedFeedback,
+  SensorimotorMetrics,
+  ExecutionContext,
+  IMotorController,
+  ISensoryFeedbackProcessor,
+} from './sensorimotor/types';
 // Export place graph types with namespace to avoid conflicts
-export { 
+export type {
   PlaceType,
   BiomeCategory,
   PlaceFunction,

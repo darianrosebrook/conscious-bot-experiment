@@ -32,7 +32,7 @@ export interface FeedbackProcessorEvents {
  */
 interface ProcessingStage {
   name: string;
-  process: (data: any) => any;
+  process: (data: any, actionId?: string) => any;
   latency: number;
   successRate: number;
 }
@@ -279,7 +279,13 @@ export class SensoryFeedbackProcessor
     proprioceptiveFeedback: any,
     environmentalFeedback: any
   ): any {
-    const integration = {
+    const integration: {
+      timestamp: number;
+      confidence: number;
+      consensus: any;
+      conflicts: string[];
+      weightedOutcome: any;
+    } = {
       timestamp: Date.now(),
       confidence: 0,
       consensus: {},
@@ -457,7 +463,7 @@ export class SensoryFeedbackProcessor
     };
   }
 
-  private temporalAlignment(data: RawSensoryData, actionId: string): any {
+  private temporalAlignment(data: RawSensoryData, actionId?: string): any {
     // Find related data within temporal window
     const currentTime = data.timestamp;
     const temporalWindow = this.config.feedbackProcessing.bufferDuration;
@@ -475,7 +481,7 @@ export class SensoryFeedbackProcessor
     };
   }
 
-  private extractRelevantFeatures(alignedData: any, actionId: string): any {
+  private extractRelevantFeatures(alignedData: any, actionId?: string): any {
     const features = {
       actionId,
       primary_features: {},
@@ -743,7 +749,7 @@ export class SensoryFeedbackProcessor
     modalityData: Record<string, { data: any; weight: number }>,
     totalWeight: number
   ): any {
-    const integrated = {};
+    const integrated: Record<string, number> = {};
 
     // Combine data using weighted average where applicable
     for (const [modality, { data, weight }] of Object.entries(modalityData)) {

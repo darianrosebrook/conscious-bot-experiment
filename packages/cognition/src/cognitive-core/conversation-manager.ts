@@ -8,16 +8,7 @@
  */
 
 import { LLMInterface } from './llm-interface';
-import {
-  ConversationContext,
-  Message,
-  MessageType,
-  ConversationState,
-  TopicModel,
-  StyleAdapter,
-  Relationship,
-  CommunicationStyle,
-} from '../types';
+import { Message } from '../types';
 
 /**
  * Configuration for conversation management
@@ -329,12 +320,17 @@ Provide:
 4. Sentiment (-1 to 1)`;
 
     try {
-      const response = await this.llm.generateResponse(prompt, {
-        systemPrompt:
-          'You are analyzing conversation topics. Be concise and accurate.',
-        temperature: 0.3,
-        maxTokens: 128,
-      });
+      const response = await this.llm.generateResponse(
+        prompt,
+        {
+          systemPrompt:
+            'You are analyzing conversation topics. Be concise and accurate.',
+        },
+        {
+          temperature: 0.3,
+          maxTokens: 128,
+        }
+      );
 
       return this.parseTopicResponse(response.text, keywords);
     } catch (error) {
@@ -473,12 +469,17 @@ Adapt the communication style for future responses. Consider:
 Provide style recommendations.`;
 
     try {
-      const response = await this.llm.generateResponse(prompt, {
-        systemPrompt:
-          'You are adapting communication style based on conversation context.',
-        temperature: 0.4,
-        maxTokens: 256,
-      });
+      const response = await this.llm.generateResponse(
+        prompt,
+        {
+          systemPrompt:
+            'You are adapting communication style based on conversation context.',
+        },
+        {
+          temperature: 0.4,
+          maxTokens: 256,
+        }
+      );
 
       const adaptedStyle = this.parseStyleAdaptation(response.text);
       state.communicationStyle = {

@@ -276,21 +276,20 @@ describe('World Module Contract Testing', () => {
       coordination: {
         conflictResolution: 'priority_based',
         timingSynchronization: true,
-        executionQueuing: true,
-        resourceSharing: true,
-        errorRecovery: true,
+        feedbackIntegration: 'real_time',
+        coordinationTimeout: 5000,
       },
       feedbackProcessing: {
-        responseWindow: 100,
-        qualityThreshold: 0.8,
-        adaptationRate: 0.1,
-        contextSize: 5,
+        bufferDuration: 100,
+        processingFrequency: 20,
+        learningRate: 0.01,
+        confidenceThreshold: 0.7,
       },
       prediction: {
-        lookaheadTime: 200,
-        confidenceThreshold: 0.7,
-        adaptivePrediction: true,
-        maxPredictionDepth: 3,
+        predictionHorizon: 500,
+        modelUpdateFrequency: 1,
+        predictionConfidenceThreshold: 0.6,
+        maxPredictionAge: 1000,
       },
       performance: {
         latencyMonitoring: true,
@@ -299,11 +298,11 @@ describe('World Module Contract Testing', () => {
         performanceLogging: true,
       },
       safety: {
+        emergencyResponseTime: 5,
         collisionAvoidance: true,
-        boundaryEnforcement: true,
-        emergencyStop: true,
         safetyMargin: 0.5,
         automaticRecovery: true,
+        boundaryEnforcement: true,
       },
     };
 
@@ -311,9 +310,15 @@ describe('World Module Contract Testing', () => {
     navigationSystem = new NavigationSystem(navigationConfig);
     perceptionSystem = new PerceptionIntegration(
       perceptionConfig,
-      raycastEngine
+      () => ({
+        position: { x: 0, y: 64, z: 0 },
+        orientation: { yaw: 0, pitch: 0 },
+        headDirection: { x: 0, y: 0, z: -1 },
+        eyeHeight: 1.62,
+      }),
+      raycastEngine as any
     );
-    sensorimotorSystem = new SensorimotorSystem(sensorimotorConfig);
+    sensorimotorSystem = new SensorimotorSystem(sensorimotorConfig, {} as any);
 
     // Setup mock interfaces
     mockCoreModule = {
@@ -376,10 +381,17 @@ describe('World Module Contract Testing', () => {
           planPath: {
             start: { x: 0, y: 64, z: 0 },
             goal: { x: 10, y: 64, z: 10 },
+            maxDistance: 100,
+            allowPartialPath: true,
+            avoidHazards: true,
             urgency: 'normal',
+            timeout: 100,
             preferences: {
-              avoidWater: false,
+              preferLit: true,
               avoidMobs: false,
+              minimizeVertical: false,
+              preferSolid: true,
+              avoidWater: false,
               preferLighting: false,
               maxDetour: 2.0,
             },
@@ -388,14 +400,18 @@ describe('World Module Contract Testing', () => {
         output: {
           planPath: {
             success: true,
-            path: {
-              waypoints: [],
-              totalLength: 0,
-              estimatedCost: 0,
-              estimatedTime: 0,
-            },
+            path: [{ x: 10, y: 64, z: 10 }],
             planningTime: 0,
-            alternatives: [],
+            waypoints: [{ x: 10, y: 64, z: 10 }],
+            totalLength: 10,
+            estimatedCost: 10,
+            estimatedTime: 10,
+            nodesExpanded: 10,
+            metadata: {
+              goalReached: true,
+              isPartialPath: false,
+              hazardsAvoided: 0,
+            },
           },
         },
         constraints: {
@@ -406,11 +422,9 @@ describe('World Module Contract Testing', () => {
       perceptionSystem: {
         input: {
           processVisualField: {
-            observerPosition: { x: 0, y: 64, z: 0 },
-            observerRotation: { yaw: 0, pitch: 0 },
-            fieldOfView: { horizontal: 90, vertical: 60 },
+            position: { x: 0, y: 64, z: 0 },
+            radius: 32,
             maxDistance: 64,
-            level: 'standard',
           },
         },
         output: {
@@ -429,21 +443,26 @@ describe('World Module Contract Testing', () => {
       sensorimotorSystem: {
         input: {
           executeAction: {
-            type: 'move',
+            id: 'test-move-action',
+            type: 'move_forward',
             parameters: {
               direction: { x: 1, y: 0, z: 0 },
               speed: 0.5,
               duration: 1000,
             },
-            priority: 'normal',
+            priority: 1,
+            requiredPrecision: 0.5,
             timeout: 5000,
+            feedback: true,
           },
         },
         output: {
           executeAction: {
             success: true,
-            result: {},
+            actionId: 'test-action',
             executionTime: 0,
+            errors: [],
+            warnings: [],
             feedback: '',
           },
         },
@@ -589,13 +608,13 @@ describe('World Module Contract Testing', () => {
         expect(result.path).toHaveProperty('estimatedCost');
         expect(result.path).toHaveProperty('estimatedTime');
 
-        expect(Array.isArray(result.path.waypoints)).toBe(true);
-        expect(typeof result.path.totalLength).toBe('number');
-        expect(typeof result.path.estimatedCost).toBe('number');
-        expect(typeof result.path.estimatedTime).toBe('number');
+        expect(Array.isArray(result.waypoints)).toBe(true);
+        expect(typeof result.totalLength).toBe('number');
+        expect(typeof result.estimatedCost).toBe('number');
+        expect(typeof result.estimatedTime).toBe('number');
 
         // Validate waypoint structure
-        result.path.waypoints.forEach((waypoint) => {
+        result.waypoints.forEach((waypoint) => {
           expect(waypoint).toHaveProperty('x');
           expect(waypoint).toHaveProperty('y');
           expect(waypoint).toHaveProperty('z');
@@ -613,7 +632,7 @@ describe('World Module Contract Testing', () => {
 
       // Validate path length constraint if path exists
       if (result.success && result.path) {
-        expect(result.path.totalLength).toBeLessThanOrEqual(
+        expect(result.totalLength).toBeLessThanOrEqual(
           contract.navigationSystem.constraints.maxPathLength
         );
       }
@@ -623,13 +642,20 @@ describe('World Module Contract Testing', () => {
       const invalidRequest: PathPlanningRequest = {
         start: { x: 0, y: 64, z: 0 },
         goal: { x: 0, y: 64, z: 0 }, // Same as start
+        maxDistance: 200,
+        allowPartialPath: true,
+        avoidHazards: true,
         urgency: 'normal',
         preferences: {
-          avoidWater: false,
+          preferLit: true,
           avoidMobs: false,
+          minimizeVertical: false,
+          preferSolid: true,
+          avoidWater: false,
           preferLighting: false,
           maxDetour: 2.0,
         },
+        timeout: 50,
       };
 
       const result = await navigationSystem.planPath(invalidRequest);
@@ -646,13 +672,20 @@ describe('World Module Contract Testing', () => {
         const request: PathPlanningRequest = {
           start: { x: 0, y: 64, z: 0 },
           goal: { x: 5, y: 64, z: 5 },
+          maxDistance: 200,
+          allowPartialPath: true,
+          avoidHazards: true,
           urgency,
           preferences: {
-            avoidWater: false,
+            preferLit: true,
             avoidMobs: false,
+            minimizeVertical: false,
+            preferSolid: true,
+            avoidWater: false,
             preferLighting: false,
             maxDetour: 2.0,
           },
+          timeout: 50,
         };
 
         const startTime = performance.now();
@@ -731,11 +764,9 @@ describe('World Module Contract Testing', () => {
 
       for (const fov of fovConfigurations) {
         const query: VisualQuery = {
-          observerPosition: { x: 0, y: 64, z: 0 },
-          observerRotation: { yaw: 0, pitch: 0 },
-          fieldOfView: fov,
+          position: { x: 0, y: 64, z: 0 },
+          radius: 32,
           maxDistance: 32,
-          level: 'standard',
         };
 
         const result = await perceptionSystem.processVisualField(query);
@@ -753,11 +784,9 @@ describe('World Module Contract Testing', () => {
 
       for (const level of qualityLevels) {
         const query: VisualQuery = {
-          observerPosition: { x: 0, y: 64, z: 0 },
-          observerRotation: { yaw: 0, pitch: 0 },
-          fieldOfView: { horizontal: 90, vertical: 60 },
+          position: { x: 0, y: 64, z: 0 },
+          radius: 32,
           maxDistance: 32,
-          level,
         };
 
         const result = await perceptionSystem.processVisualField(query);
@@ -775,17 +804,17 @@ describe('World Module Contract Testing', () => {
       const input = contract.sensorimotorSystem.input.executeAction;
 
       const startTime = performance.now();
-      const result = await sensorimotorSystem.executeAction(input);
+      const result = await sensorimotorSystem.executeAction(input, {} as any);
       const endTime = performance.now();
 
       // Validate output structure contract
       expect(result).toHaveProperty('success');
-      expect(result).toHaveProperty('result');
+      expect(result).toHaveProperty('actionId');
       expect(result).toHaveProperty('executionTime');
       expect(result).toHaveProperty('feedback');
 
       expect(typeof result.success).toBe('boolean');
-      expect(typeof result.result).toBe('object');
+      expect(typeof result.actionId).toBe('string');
       expect(typeof result.executionTime).toBe('number');
       expect(typeof result.feedback).toBe('string');
 
@@ -802,28 +831,37 @@ describe('World Module Contract Testing', () => {
 
       for (const actionType of supportedActions) {
         const actionRequest: ActionRequest = {
+          id: `test-action-${actionType}`,
           type: actionType as any,
           parameters: getDefaultParametersForAction(actionType),
-          priority: 'normal',
+          priority: 1,
+          requiredPrecision: 0.5,
           timeout: 1000,
+          feedback: true,
         };
 
         // Should not throw for supported action types
         await expect(
-          sensorimotorSystem.executeAction(actionRequest)
+          sensorimotorSystem.executeAction(actionRequest, {} as any)
         ).resolves.toBeDefined();
       }
     });
 
     test('should handle unsupported actions gracefully', async () => {
       const unsupportedAction: ActionRequest = {
-        type: 'teleport' as any, // Not in supported actions list
+        id: 'test-unsupported-action',
+        type: 'emergency_response', // Not in supported actions list
         parameters: { target: { x: 100, y: 64, z: 100 } },
-        priority: 'normal',
+        priority: 1,
+        requiredPrecision: 0.5,
         timeout: 1000,
+        feedback: true,
       };
 
-      const result = await sensorimotorSystem.executeAction(unsupportedAction);
+      const result = await sensorimotorSystem.executeAction(
+        unsupportedAction,
+        {} as any
+      );
 
       // Should handle gracefully, not crash
       expect(result).toHaveProperty('success');
@@ -837,18 +875,24 @@ describe('World Module Contract Testing', () => {
 
     test('should respect timeout constraints', async () => {
       const shortTimeoutAction: ActionRequest = {
-        type: 'move',
+        id: 'test-short-timeout-action',
+        type: 'move_forward',
         parameters: {
           direction: { x: 1, y: 0, z: 0 },
           speed: 0.1,
           duration: 5000,
         },
-        priority: 'normal',
+        priority: 1,
+        requiredPrecision: 0.5,
         timeout: 100, // Very short timeout
+        feedback: true,
       };
 
       const startTime = performance.now();
-      const result = await sensorimotorSystem.executeAction(shortTimeoutAction);
+      const result = await sensorimotorSystem.executeAction(
+        shortTimeoutAction,
+        {} as any
+      );
       const endTime = performance.now();
 
       const actualTime = endTime - startTime;
@@ -863,11 +907,9 @@ describe('World Module Contract Testing', () => {
     test('should integrate raycast engine with perception system', async () => {
       // Raycast engine provides data to perception system
       const visualQuery: VisualQuery = {
-        observerPosition: { x: 0, y: 64, z: 0 },
-        observerRotation: { yaw: 0, pitch: 0 },
-        fieldOfView: { horizontal: 90, vertical: 60 },
+        position: { x: 0, y: 64, z: 0 },
+        radius: 32,
         maxDistance: 32,
-        level: 'standard',
       };
 
       const perceptionResult =
@@ -881,14 +923,11 @@ describe('World Module Contract Testing', () => {
         perceptionResult.detectedObjects.forEach((obj) => {
           // Verify object is within raycast range
           const distance = Math.sqrt(
-            Math.pow(obj.worldPosition.x - visualQuery.observerPosition.x, 2) +
-              Math.pow(
-                obj.worldPosition.y - visualQuery.observerPosition.y,
-                2
-              ) +
-              Math.pow(obj.worldPosition.z - visualQuery.observerPosition.z, 2)
+            Math.pow(obj.worldPosition.x - visualQuery.position.x, 2) +
+              Math.pow(obj.worldPosition.y - visualQuery.position.y, 2) +
+              Math.pow(obj.worldPosition.z - visualQuery.position.z, 2)
           );
-          expect(distance).toBeLessThanOrEqual(visualQuery.maxDistance);
+          expect(distance).toBeLessThanOrEqual(visualQuery.maxDistance ?? 32);
         });
       }
     });
@@ -898,13 +937,20 @@ describe('World Module Contract Testing', () => {
       const pathRequest: PathPlanningRequest = {
         start: { x: 0, y: 64, z: 0 },
         goal: { x: 3, y: 64, z: 3 },
+        maxDistance: 200,
+        allowPartialPath: true,
+        avoidHazards: true,
         urgency: 'normal',
         preferences: {
-          avoidWater: false,
+          preferLit: true,
           avoidMobs: false,
+          minimizeVertical: false,
+          preferSolid: true,
+          avoidWater: false,
           preferLighting: false,
           maxDetour: 2.0,
         },
+        timeout: 50,
       };
 
       const pathResult = await navigationSystem.planPath(pathRequest);
@@ -913,7 +959,7 @@ describe('World Module Contract Testing', () => {
       if (pathResult.success && pathResult.path) {
         // Execute movement towards first waypoint
         const firstWaypoint =
-          pathResult.path.waypoints[1] || pathResult.path.waypoints[0];
+          pathResult.waypoints[1] || pathResult.waypoints[0];
         const direction = {
           x: firstWaypoint.x - pathRequest.start.x,
           y: firstWaypoint.y - pathRequest.start.y,
@@ -931,13 +977,19 @@ describe('World Module Contract Testing', () => {
         }
 
         const moveAction: ActionRequest = {
-          type: 'move',
+          id: 'test-move-action',
+          type: 'move_forward',
           parameters: { direction, speed: 0.5, duration: 1000 },
-          priority: 'normal',
+          priority: 1,
+          requiredPrecision: 0.5,
           timeout: 2000,
+          feedback: true,
         };
 
-        const actionResult = await sensorimotorSystem.executeAction(moveAction);
+        const actionResult = await sensorimotorSystem.executeAction(
+          moveAction,
+          {} as any
+        );
         expect(actionResult.success).toBe(true);
       }
     });
@@ -956,11 +1008,9 @@ describe('World Module Contract Testing', () => {
 
       // Trigger perception update
       await perceptionSystem.processVisualField({
-        observerPosition: { x: 0, y: 64, z: 0 },
-        observerRotation: { yaw: 0, pitch: 0 },
-        fieldOfView: { horizontal: 90, vertical: 60 },
+        position: { x: 0, y: 64, z: 0 },
+        radius: 32,
         maxDistance: 32,
-        level: 'standard',
       });
 
       // Emit event manually for test (in real system, this would be automatic)
@@ -983,7 +1033,7 @@ describe('World Module Contract Testing', () => {
           start: { x: 0, y: 64, z: 0 },
           goal: { x: 5, y: 64, z: 5 },
         },
-        priority: 'normal',
+        priority: 1,
       };
 
       const approval =
@@ -998,13 +1048,20 @@ describe('World Module Contract Testing', () => {
         const pathResult = await navigationSystem.planPath({
           start: executionRequest.parameters.start,
           goal: executionRequest.parameters.goal,
-          urgency: approval.priority || 'normal',
+          maxDistance: 200,
+          allowPartialPath: true,
+          avoidHazards: true,
+          urgency: approval.priority || 1,
           preferences: {
-            avoidWater: false,
+            preferLit: true,
             avoidMobs: false,
+            minimizeVertical: false,
+            preferSolid: true,
+            avoidWater: false,
             preferLighting: false,
             maxDetour: 2.0,
           },
+          timeout: 50,
         });
 
         // Report status back to arbiter
@@ -1073,31 +1130,47 @@ describe('World Module Contract Testing', () => {
             await navigationSystem.planPath({
               start: { x: 0, y: 64, z: 0 },
               goal: { x: 2, y: 64, z: 2 },
+              maxDistance: 200,
+              allowPartialPath: true,
+              avoidHazards: true,
               urgency: 'normal',
               preferences: {
-                avoidWater: false,
+                preferLit: true,
                 avoidMobs: false,
+                minimizeVertical: false,
+                preferSolid: true,
+                avoidWater: false,
                 preferLighting: false,
                 maxDetour: 2.0,
               },
+              timeout: 50,
             });
             break;
           case 'perception':
             await perceptionSystem.processVisualField({
               observerPosition: { x: 0, y: 64, z: 0 },
-              observerRotation: { yaw: 0, pitch: 0 },
-              fieldOfView: { horizontal: 90, vertical: 60 },
               maxDistance: 32,
-              level: 'standard',
+              position: { x: 0, y: 64, z: 0 },
+              radius: 32,
             });
             break;
           case 'action':
-            await sensorimotorSystem.executeAction({
-              type: 'look',
-              parameters: { target: { x: 1, y: 64, z: 1 } },
-              priority: 'normal',
-              timeout: 1000,
-            });
+            await sensorimotorSystem.executeAction(
+              {
+                id: 'test-action',
+                type: 'move_forward',
+                parameters: {
+                  direction: { x: 1, y: 0, z: 0 },
+                  speed: 0.5,
+                  duration: 1000,
+                },
+                priority: 1,
+                requiredPrecision: 0.5,
+
+                feedback: true,
+              },
+              {} as any
+            );
             break;
         }
 

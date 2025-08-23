@@ -9,21 +9,37 @@
  */
 
 // Cognitive Core
-export * from './cognitive-core/llm-interface';
-export * from './cognitive-core/internal-dialogue';
-export * from './cognitive-core/creative-solver';
-export * from './cognitive-core/conversation-manager';
-export * from './cognitive-core/reflection-engine';
-export * from './cognitive-core/context-optimizer';
+export { LLMInterface } from './cognitive-core/llm-interface';
+export { InternalDialogue } from './cognitive-core/internal-dialogue';
+export { CreativeProblemSolver } from './cognitive-core/creative-solver';
+export { ConversationManager } from './cognitive-core/conversation-manager';
+export { AdvancedReflectionEngine } from './cognitive-core/reflection-engine';
+export { ContextOptimizer } from './cognitive-core/context-optimizer';
 
 // Constitutional Filter
-export * from './constitutional-filter';
+export { ConstitutionalFilter } from './constitutional-filter';
 
 // Self-Model
-export * from './self-model';
+export {
+  IdentityTracker,
+  NarrativeManager,
+  ContractSystem,
+} from './self-model';
 
 // Social Cognition
-export * from './social-cognition';
+export { AgentModeler } from './social-cognition/agent-modeler';
+export { RelationshipManager } from './social-cognition/relationship-manager';
+export { SocialLearner } from './social-cognition/social-learner';
+export { TheoryOfMindEngine } from './social-cognition/theory-of-mind-engine';
 
-// Types
-export * from './types';
+// Core Types (specific exports to avoid conflicts)
+export type {
+  LLMConfig,
+  LLMContext,
+  LLMResponse,
+  Message,
+  InternalThought,
+  ConversationState as CognitiveConversationState,
+  CommunicationStyle as CognitiveCommunicationStyle,
+  Relationship as CognitiveRelationship,
+} from './types';

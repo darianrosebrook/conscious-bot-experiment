@@ -464,6 +464,7 @@ export const SensorimotorConfigSchema = z.object({
     collisionAvoidance: z.boolean().default(true),
     safetyMargin: z.number().nonnegative().default(0.5), // blocks
     automaticRecovery: z.boolean().default(true),
+    boundaryEnforcement: z.boolean().default(true),
   }),
 });
 

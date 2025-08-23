@@ -15,10 +15,6 @@ import {
   LearningSynthesis,
   Insight,
   Plan,
-  ReflectionTrigger,
-  ReflectionInsight,
-  PerformanceMetrics,
-  LearningOutcome,
 } from '../types';
 
 /**
@@ -141,12 +137,17 @@ Identify patterns with:
 - Recommendations`;
 
     try {
-      const response = await this.llm.generateResponse(prompt, {
-        systemPrompt:
-          'You are analyzing behavioral patterns in experiences. Be objective and identify meaningful patterns.',
-        temperature: 0.4,
-        maxTokens: 1024,
-      });
+      const response = await this.llm.generateResponse(
+        prompt,
+        {
+          systemPrompt:
+            'You are analyzing behavioral patterns in experiences. Be objective and identify meaningful patterns.',
+        },
+        {
+          temperature: 0.4,
+          maxTokens: 1024,
+        }
+      );
 
       return this.parsePatternResponse(response.text, 'behavioral');
     } catch (error) {
@@ -190,12 +191,17 @@ Identify patterns with:
 - Improvement suggestions`;
 
     try {
-      const response = await this.llm.generateResponse(prompt, {
-        systemPrompt:
-          'You are analyzing decision-making patterns. Focus on quality and effectiveness.',
-        temperature: 0.4,
-        maxTokens: 1024,
-      });
+      const response = await this.llm.generateResponse(
+        prompt,
+        {
+          systemPrompt:
+            'You are analyzing decision-making patterns. Focus on quality and effectiveness.',
+        },
+        {
+          temperature: 0.4,
+          maxTokens: 1024,
+        }
+      );
 
       return this.parsePatternResponse(response.text, 'decision');
     } catch (error) {
@@ -230,12 +236,17 @@ Identify patterns with:
 - Causal factors`;
 
     try {
-      const response = await this.llm.generateResponse(prompt, {
-        systemPrompt:
-          'You are analyzing outcome patterns. Focus on causality and predictability.',
-        temperature: 0.4,
-        maxTokens: 1024,
-      });
+      const response = await this.llm.generateResponse(
+        prompt,
+        {
+          systemPrompt:
+            'You are analyzing outcome patterns. Focus on causality and predictability.',
+        },
+        {
+          temperature: 0.4,
+          maxTokens: 1024,
+        }
+      );
 
       return this.parsePatternResponse(response.text, 'outcome');
     } catch (error) {
@@ -276,12 +287,17 @@ Identify patterns with:
 - Regulation strategies`;
 
     try {
-      const response = await this.llm.generateResponse(prompt, {
-        systemPrompt:
-          'You are analyzing emotional patterns. Focus on understanding and regulation.',
-        temperature: 0.4,
-        maxTokens: 1024,
-      });
+      const response = await this.llm.generateResponse(
+        prompt,
+        {
+          systemPrompt:
+            'You are analyzing emotional patterns. Focus on understanding and regulation.',
+        },
+        {
+          temperature: 0.4,
+          maxTokens: 1024,
+        }
+      );
 
       return this.parsePatternResponse(response.text, 'emotional');
     } catch (error) {
@@ -367,12 +383,17 @@ Generate a learning synthesis that includes:
 Provide specific, actionable learning outcomes.`;
 
     try {
-      const response = await this.llm.generateResponse(prompt, {
-        systemPrompt:
-          'You are synthesizing learning from experiences and patterns. Focus on actionable insights.',
-        temperature: 0.5,
-        maxTokens: 1024,
-      });
+      const response = await this.llm.generateResponse(
+        prompt,
+        {
+          systemPrompt:
+            'You are synthesizing learning from experiences and patterns. Focus on actionable insights.',
+        },
+        {
+          temperature: 0.5,
+          maxTokens: 1024,
+        }
+      );
 
       const synthesis = this.parseLearningSynthesis(
         response.text,
@@ -494,12 +515,17 @@ Generate actionable insights that include:
 Focus on insights that can drive improvement.`;
 
     try {
-      const response = await this.llm.generateResponse(prompt, {
-        systemPrompt:
-          'You are generating actionable insights from analysis. Be specific and practical.',
-        temperature: 0.6,
-        maxTokens: 1024,
-      });
+      const response = await this.llm.generateResponse(
+        prompt,
+        {
+          systemPrompt:
+            'You are generating actionable insights from analysis. Be specific and practical.',
+        },
+        {
+          temperature: 0.6,
+          maxTokens: 1024,
+        }
+      );
 
       const insights = this.parseInsightsResponse(response.text);
       this.insights.push(...insights);
@@ -597,12 +623,17 @@ For each insight, create a detailed improvement plan with:
 Make plans specific, measurable, and achievable.`;
 
     try {
-      const response = await this.llm.generateResponse(prompt, {
-        systemPrompt:
-          'You are creating improvement plans. Make them specific and actionable.',
-        temperature: 0.4,
-        maxTokens: 1024,
-      });
+      const response = await this.llm.generateResponse(
+        prompt,
+        {
+          systemPrompt:
+            'You are creating improvement plans. Make them specific and actionable.',
+        },
+        {
+          temperature: 0.4,
+          maxTokens: 1024,
+        }
+      );
 
       return this.parseImprovementPlans(response.text, highPriorityInsights);
     } catch (error) {

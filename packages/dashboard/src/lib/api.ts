@@ -1,18 +1,14 @@
-import type { 
-  IntrusiveThoughtRequest, 
+import type {
+  IntrusiveThoughtRequest,
   IntrusiveThoughtResponse,
   Environment,
-  Screenshot 
+  Screenshot,
 } from '@/types';
 
 /**
- * API service for dashboard communication with backend services
- */
-
-/**
- * Submit an intrusive thought to the cognition system
- * @param request - The intrusive thought request
- * @returns Promise with the response
+ * Submit an intrusive thought to the bot's cognition system
+ *
+ * @author @darianrosebrook
  */
 export async function submitIntrusiveThought(
   request: IntrusiveThoughtRequest
@@ -26,7 +22,9 @@ export async function submitIntrusiveThought(
   });
 
   if (!response.ok) {
-    throw new Error(`Failed to submit intrusive thought: ${response.statusText}`);
+    throw new Error(
+      `Failed to submit intrusive thought: ${response.statusText}`
+    );
   }
 
   return response.json();
@@ -38,7 +36,7 @@ export async function submitIntrusiveThought(
  */
 export async function getWorldSnapshot(): Promise<Environment> {
   const response = await fetch('/api/world');
-  
+
   if (!response.ok) {
     throw new Error(`Failed to get world snapshot: ${response.statusText}`);
   }
@@ -61,7 +59,7 @@ export async function getScreenshots(
   params.append('limit', limit.toString());
 
   const response = await fetch(`/api/screenshots?${params}`);
-  
+
   if (!response.ok) {
     throw new Error(`Failed to get screenshots: ${response.statusText}`);
   }
@@ -85,7 +83,7 @@ export async function getNearestScreenshot(
   });
 
   const response = await fetch(`/api/screenshots/nearest?${params}`);
-  
+
   if (!response.ok) {
     if (response.status === 404) {
       return null;

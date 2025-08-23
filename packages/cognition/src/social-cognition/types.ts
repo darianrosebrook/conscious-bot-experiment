@@ -11,7 +11,6 @@ import { z } from 'zod';
 
 // Re-export main types from component modules
 export * from './agent-modeler';
-export * from './theory-of-mind-engine';
 export * from './social-learner';
 export * from './relationship-manager';
 
@@ -37,6 +36,15 @@ export interface SocialEvent {
   significance: number;
   timestamp: number;
   outcomes: string[];
+}
+
+export interface SocialContext {
+  location?: string;
+  participants?: string[];
+  setting?: string;
+  mood?: string;
+  purpose?: string;
+  dynamics?: string[];
 }
 
 export interface SocialEventContext {
@@ -197,8 +205,131 @@ export enum SocialFeedbackType {
 // Agent Modeling Extended Types
 // ============================================================================
 
+export interface AgentModel {
+  agentId: string;
+  name?: string;
+  description?: string;
+  capabilities: CapabilityAssessment;
+  personality: PersonalityAssessment;
+  behaviors: BehavioralPattern[];
+  relationships: string[];
+  trustScore: number;
+  reputation: number;
+  lastSeen: number;
+  confidence: number;
+  observations: Observation[];
+  beliefs: string[];
+  goals: string[];
+  emotions: string[];
+  history: string[];
+  predictions: string[];
+  intentions: string[];
+  context: string;
+  timestamp: number;
+  source: string;
+  lastUpdated: number;
+  lastInteraction: number;
+  lastObservation: number;
+  lastPrediction: number;
+  lastIntention: number;
+  lastBehavior: number;
+  // Additional properties used in theory of mind
+  inferredPersonality?: any;
+  goalInferences?: any;
+  beliefStates?: any;
+  behavioralPatterns?: any;
+  socialRole?: any;
+  relationshipStatus?: any;
+}
+
+export interface Entity {
+  id: string;
+  type: string;
+  name?: string;
+  properties: Record<string, any>;
+  lastObserved: number;
+  confidence: number;
+}
+
+export interface Observation {
+  id: string;
+  agentId: string;
+  type: string;
+  description: string;
+  context: SocialContext;
+  timestamp: number;
+  reliability: number;
+  confidence: number;
+  metadata: Record<string, any>;
+}
+
+export interface Action {
+  id: string;
+  type: string;
+  description: string;
+  parameters: Record<string, any>;
+  timestamp: number;
+  outcome?: string;
+  success?: boolean;
+}
+
+export interface CapabilityInference {
+  domain: string;
+  capability: string;
+  confidence: number;
+  evidence: string[];
+  implications: string[];
+}
+
+export interface PersonalityInference {
+  trait: string;
+  strength: number;
+  confidence: number;
+  evidence: string[];
+  manifestations: string[];
+}
+
+export interface BehavioralPattern {
+  id: string;
+  pattern: string;
+  frequency: number;
+  contexts: string[];
+  triggers: string[];
+  confidence: number;
+}
+
+export interface ModelUpdate {
+  agentId: string;
+  updateType?: string;
+  changes: string[];
+  confidence: number;
+  timestamp: number;
+  newObservations?: number;
+  updated?: boolean;
+  reason?: string;
+}
+
+export interface AgentInteraction {
+  id: string;
+  participants: string[];
+  type: string;
+  description: string;
+  outcome: string;
+  timestamp: number;
+  context: SocialContext;
+}
+
+export interface Intention {
+  id: string;
+  type: string;
+  description: string;
+  confidence: number;
+  timeframe: string;
+  prerequisites: string[];
+}
+
 export interface AgentModelingResult {
-  agentModel: any; // AgentModel from agent-modeler.ts
+  agentModel: AgentModel;
   confidence: number;
   gaps: string[];
   recommendations: string[];

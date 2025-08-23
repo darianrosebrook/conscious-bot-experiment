@@ -500,7 +500,11 @@ export const validateSweepResult = (data: unknown): SweepResult =>
   SweepResultSchema.parse(data);
 
 // Re-export types from other modules for convenience
-export type { WorldPosition, PathPlanningRequest, NavigationConfig } from './navigation/types';
+export type {
+  WorldPosition,
+  PathPlanningRequest,
+  NavigationConfig,
+} from './navigation/types';
 export type { PerceptionConfig } from './perception/types';
 export type { SensorimotorConfig } from './sensorimotor/types';
 
@@ -509,16 +513,101 @@ export interface VisualQuery {
   position: Vec3;
   radius: number;
   targetTypes?: string[];
+  observerPosition?: Vec3;
+  maxDistance?: number;
 }
 
 export interface ActionRequest {
   id: string;
-  type: string;
+  type:
+    | 'move_forward'
+    | 'move_backward'
+    | 'strafe_left'
+    | 'strafe_right'
+    | 'turn_left'
+    | 'turn_right'
+    | 'jump'
+    | 'crouch'
+    | 'sprint'
+    | 'swim'
+    | 'climb'
+    | 'stop'
+    | 'mine_block'
+    | 'place_block'
+    | 'interact_block'
+    | 'pickup_item'
+    | 'drop_item'
+    | 'use_item'
+    | 'craft_item'
+    | 'wield_tool'
+    | 'chat_message'
+    | 'gesture'
+    | 'look_at'
+    | 'point'
+    | 'compound_action'
+    | 'emergency_response';
   parameters: Record<string, any>;
   priority: number;
+  requiredPrecision: number;
+  timeout: number;
+  feedback: boolean;
 }
 
 export interface RaycastConfig {
   maxDistance: number;
   transparent: string[];
+}
+
+export interface PerceptionResult {
+  detectedObjects: Array<{
+    worldPosition: Vec3;
+    classification: {
+      primary: string;
+    };
+    confidence: number;
+  }>;
+  overallConfidence: number;
+  processingTime: number;
+  fieldCoverage: number;
+}
+
+export interface PathPlanningResult {
+  success: boolean;
+  path: Vec3[];
+  waypoints: Vec3[];
+  totalLength: number;
+  estimatedCost: number;
+  estimatedTime: number;
+  planningTime: number;
+  nodesExpanded: number;
+  reason?: string;
+  metadata: {
+    isPartialPath: boolean;
+    goalReached: boolean;
+    hazardsAvoided: number;
+    optimality?: number;
+  };
+}
+
+export interface ActionResult {
+  success: boolean;
+  actionId: string;
+  executionTime: number;
+  errors: string[];
+  warnings: string[];
+  actualDuration?: number;
+  finalPosition?: {
+    timestamp: number;
+    confidence: number;
+    position: Vec3;
+    orientation?: Orientation;
+  };
+  achievedPrecision?: number;
+  performanceMetrics?: {
+    latency: number;
+    throughput: number;
+    resourceUsage: number;
+  };
+  result?: Record<string, any>;
+  feedback?: string;
 }

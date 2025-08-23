@@ -3,31 +3,34 @@ import { NextRequest } from 'next/server';
 /**
  * WebSocket route handler for Chain of Thought updates
  * Streams real-time thoughts from the bot systems
- * 
+ *
  * @author @darianrosebrook
  */
 export const GET = async (req: NextRequest) => {
   try {
-    // Check if the request is a WebSocket upgrade
-    const upgrade = req.headers.get('upgrade');
-    if (upgrade !== 'websocket') {
-      return new Response('Expected WebSocket upgrade', { status: 400 });
+    // Check if the request is for SSE (Accept: text/event-stream)
+    const accept = req.headers.get('accept');
+    const isSSE = accept?.includes('text/event-stream');
+
+    if (!isSSE) {
+      return new Response('Expected SSE request', { status: 400 });
     }
 
     const encoder = new TextEncoder();
-    
+
     const stream = new ReadableStream({
       start(controller) {
         let lastThoughtId = '';
-        
+
         const sendThoughts = async () => {
           try {
             // Fetch thoughts from bot systems
-            const [planningRes, cognitionRes, memoryRes] = await Promise.allSettled([
-              fetch('http://localhost:3002/state'),
-              fetch('http://localhost:3003/state'),
-              fetch('http://localhost:3001/state'),
-            ]);
+            const [planningRes, cognitionRes, memoryRes] =
+              await Promise.allSettled([
+                fetch('http://localhost:3002/state'),
+                fetch('http://localhost:3003/state'),
+                fetch('http://localhost:3001/state'),
+              ]);
 
             const thoughts = [];
 
@@ -102,9 +105,8 @@ export const GET = async (req: NextRequest) => {
                 lastThoughtId = thought.id;
               }
             }
-
           } catch (error) {
-            console.error('Error fetching thoughts:', error);
+            // Silently handle errors
           }
         };
 
@@ -126,12 +128,10 @@ export const GET = async (req: NextRequest) => {
       headers: {
         'Content-Type': 'text/event-stream',
         'Cache-Control': 'no-cache',
-        'Connection': 'keep-alive',
+        Connection: 'keep-alive',
       },
     });
-
   } catch (error) {
-    console.error('WebSocket COT route error:', error);
     return new Response('Internal Server Error', { status: 500 });
   }
 };

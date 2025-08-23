@@ -381,7 +381,7 @@ export class MinecraftSignalProcessor {
         );
 
         threats.push({
-          type: entity.name || entity.type,
+          type: entity.type,
           threatLevel,
           distance,
         });

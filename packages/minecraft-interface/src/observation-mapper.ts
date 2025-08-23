@@ -70,7 +70,7 @@ export class ObservationMapper {
   /**
    * Extract raw Minecraft world state from mineflayer bot
    */
-  private extractMinecraftWorldState(bot: Bot): MinecraftWorldState {
+  public extractMinecraftWorldState(bot: Bot): MinecraftWorldState {
     return {
       player: {
         position: bot.entity.position.clone(),
@@ -332,6 +332,7 @@ export class ObservationMapper {
       social,
       achievement,
       curiosity,
+      creativity: 0.5, // Default creativity level
       timestamp: Date.now(),
     };
   }
@@ -339,22 +340,38 @@ export class ObservationMapper {
   /**
    * Extract available resources for planning
    */
-  private extractResources(worldState: MinecraftWorldState) {
-    const resources = [
-      { type: 'time', amount: 1000, availability: 'available' as const },
+  private extractResources(worldState: MinecraftWorldState): any[] {
+    const resources: any[] = [
       {
-        type: 'energy',
-        amount: Math.floor(worldState.player.food * 5),
-        availability: 'available' as const,
+        id: 'time',
+        type: 'time' as any,
+        name: 'Time',
+        quantity: 1000,
+        maxQuantity: 1000,
+        unit: 'ms',
+        value: 1,
+      },
+      {
+        id: 'energy',
+        type: 'energy' as any,
+        name: 'Energy',
+        quantity: Math.floor(worldState.player.food * 5),
+        maxQuantity: 100,
+        unit: 'units',
+        value: 1,
       },
     ];
 
     // Add inventory items as resources
-    worldState.inventory.items.forEach((item) => {
+    worldState.inventory.items.forEach((item, index) => {
       resources.push({
-        type: item.type,
-        amount: item.count,
-        availability: 'available' as const,
+        id: `item_${index}`,
+        type: 'inventory_item' as any,
+        name: item.type,
+        quantity: item.count,
+        maxQuantity: 64,
+        unit: 'items',
+        value: 1,
       });
     });
 
