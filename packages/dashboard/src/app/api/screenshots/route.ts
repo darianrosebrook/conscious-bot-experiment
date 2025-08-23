@@ -32,7 +32,8 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(result);
 
   } catch (error) {
-    console.error('Screenshots API error:', error);
+    // In production, use proper logging service
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     
     // Return empty array if minecraft bot is unavailable
     return NextResponse.json([]);

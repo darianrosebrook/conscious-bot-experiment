@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
-import type { WsMessage } from '@/types';
 
-interface UseWebSocketOptions {
+interface UseSSEOptions {
   url: string;
   onMessage?: (data: unknown) => void;
   onOpen?: () => void;
@@ -12,10 +11,12 @@ interface UseWebSocketOptions {
 }
 
 /**
- * WebSocket hook for real-time data communication
+ * Server-Sent Events hook for real-time data communication
  * Handles connection, reconnection, and message processing
+ * 
+ * @author @darianrosebrook
  */
-export function useWebSocket({
+export function useSSE({
   url,
   onMessage,
   onOpen,
@@ -23,41 +24,41 @@ export function useWebSocket({
   onError,
   reconnectInterval = 5000,
   maxReconnectAttempts = 5,
-}: UseWebSocketOptions) {
+}: UseSSEOptions) {
   const [isConnected, setIsConnected] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const wsRef = useRef<WebSocket | null>(null);
+  const eventSourceRef = useRef<EventSource | null>(null);
   const reconnectTimeoutRef = useRef<NodeJS.Timeout>();
   const reconnectAttemptsRef = useRef(0);
 
   const connect = useCallback(() => {
     try {
-      const ws = new WebSocket(url);
-      wsRef.current = ws;
+      const eventSource = new EventSource(url);
+      eventSourceRef.current = eventSource;
 
-      ws.onopen = () => {
+      eventSource.onopen = () => {
         setIsConnected(true);
         setError(null);
         reconnectAttemptsRef.current = 0;
         onOpen?.();
       };
 
-      ws.onmessage = (event) => {
+      eventSource.onmessage = (event) => {
         try {
-          const data = JSON.parse(event.data) as WsMessage;
+          const data = JSON.parse(event.data);
           onMessage?.(data);
         } catch (err) {
-          // In production, use proper logging service
-          // console.error('Failed to parse WebSocket message:', err);
+          console.error('Failed to parse SSE message:', err);
         }
       };
 
-      ws.onclose = (event) => {
+      eventSource.onerror = (event) => {
         setIsConnected(false);
-        onClose?.();
+        setError('SSE connection error');
+        onError?.(event);
 
-        // Attempt to reconnect if not a clean close
-        if (!event.wasClean && reconnectAttemptsRef.current < maxReconnectAttempts) {
+        // Attempt to reconnect
+        if (reconnectAttemptsRef.current < maxReconnectAttempts) {
           reconnectAttemptsRef.current++;
           reconnectTimeoutRef.current = setTimeout(() => {
             connect();
@@ -65,14 +66,17 @@ export function useWebSocket({
         }
       };
 
-      ws.onerror = (event) => {
-        setError('WebSocket connection error');
-        onError?.(event);
+      // Handle connection close
+      const handleClose = () => {
+        setIsConnected(false);
+        onClose?.();
       };
+
+      eventSource.addEventListener('close', handleClose);
+
     } catch (err) {
-      setError('Failed to create WebSocket connection');
-      // In production, use proper logging service
-      // console.error('WebSocket connection error:', err);
+      setError('Failed to create SSE connection');
+      console.error('SSE connection error:', err);
     }
   }, [url, onMessage, onOpen, onClose, onError, reconnectInterval, maxReconnectAttempts]);
 
@@ -80,20 +84,11 @@ export function useWebSocket({
     if (reconnectTimeoutRef.current) {
       clearTimeout(reconnectTimeoutRef.current);
     }
-    if (wsRef.current) {
-      wsRef.current.close();
-      wsRef.current = null;
+    if (eventSourceRef.current) {
+      eventSourceRef.current.close();
+      eventSourceRef.current = null;
     }
     setIsConnected(false);
-  }, []);
-
-  const send = useCallback((data: unknown) => {
-    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-      wsRef.current.send(JSON.stringify(data));
-    } else {
-      // In production, use proper logging service
-      // console.warn('WebSocket is not connected');
-    }
   }, []);
 
   useEffect(() => {
@@ -106,7 +101,6 @@ export function useWebSocket({
   return {
     isConnected,
     error,
-    send,
     disconnect,
     connect,
   };

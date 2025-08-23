@@ -2,44 +2,81 @@ import { NextRequest, NextResponse } from 'next/server';
 import type { IntrusiveThoughtRequest, IntrusiveThoughtResponse } from '@/types';
 
 /**
- * API route handler for intrusive thoughts
- * Forwards requests to the cognition system (port 3003)
+ * Intrusive Thought API
+ * Submits intrusive thoughts to the bot's cognition system
+ * 
+ * @author @darianrosebrook
  */
 export async function POST(request: NextRequest) {
   try {
     const body: IntrusiveThoughtRequest = await request.json();
-    
-    // Validate request
-    if (!body.text || typeof body.text !== 'string') {
+    const { text, tags, strength = 1.0 } = body;
+
+    if (!text || text.trim().length === 0) {
       return NextResponse.json(
-        { error: 'Invalid request: text is required' },
+        { error: 'Thought text is required' },
         { status: 400 }
       );
     }
 
-    // Forward to cognition system
-    const response = await fetch('http://localhost:3003/intrusive', {
+    // Submit to cognition system
+    const cognitionResponse = await fetch('http://localhost:3003/process', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify(body),
+      body: JSON.stringify({
+        type: 'intrusion',
+        content: text,
+        metadata: {
+          tags: tags || [],
+          strength: strength,
+          timestamp: new Date().toISOString(),
+        },
+      }),
     });
 
-    if (!response.ok) {
-      throw new Error(`Cognition system error: ${response.statusText}`);
+    if (!cognitionResponse.ok) {
+      return NextResponse.json(
+        { error: 'Failed to process intrusive thought' },
+        { status: 500 }
+      );
     }
 
-    const result: IntrusiveThoughtResponse = await response.json();
-    return NextResponse.json(result);
+    const cognitionData = await cognitionResponse.json();
+
+    // Also submit to planning system if it's a goal-related intrusion
+    if (text.toLowerCase().includes('goal') || text.toLowerCase().includes('task')) {
+      try {
+        await fetch('http://localhost:3002/goal', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            type: 'intrusion',
+            description: text,
+            priority: strength,
+            source: 'intrusion',
+          }),
+        });
+      } catch (error) {
+        console.warn('Failed to submit intrusion to planning system:', error);
+      }
+    }
+
+    const response: IntrusiveThoughtResponse = {
+      id: `intrusion-${Date.now()}`,
+      accepted: true,
+      rationale: 'Intrusive thought processed and integrated into cognitive systems',
+    };
+
+    return NextResponse.json(response);
 
   } catch (error) {
     console.error('Intrusive thought API error:', error);
     return NextResponse.json(
-      { 
-        error: 'Internal server error',
-        details: error instanceof Error ? error.message : 'Unknown error'
-      },
+      { error: 'Internal server error' },
       { status: 500 }
     );
   }
