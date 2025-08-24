@@ -37,6 +37,7 @@ export interface CognitiveIntegrationConfig {
   successThreshold: number;
   cognitiveEndpoint: string;
   memoryEndpoint: string;
+  maxHistorySize: number;
 }
 
 const DEFAULT_CONFIG: CognitiveIntegrationConfig = {
@@ -46,6 +47,7 @@ const DEFAULT_CONFIG: CognitiveIntegrationConfig = {
   successThreshold: 0.7,
   cognitiveEndpoint: 'http://localhost:3003',
   memoryEndpoint: 'http://localhost:3001',
+  maxHistorySize: 10,
 };
 
 /**
@@ -78,12 +80,18 @@ export class CognitiveIntegration extends EventEmitter {
     if (!this.taskHistory.has(taskId)) {
       this.taskHistory.set(taskId, []);
     }
-    this.taskHistory.get(taskId)!.push({
+    const history = this.taskHistory.get(taskId)!;
+    history.push({
       task,
       result,
       context,
       timestamp: Date.now(),
     });
+
+    // Limit history size to prevent memory leaks
+    if (history.length > this.config.maxHistorySize) {
+      history.splice(0, history.length - this.config.maxHistorySize);
+    }
 
     // Update success/failure counts
     const success = result.success === true && !result.error;

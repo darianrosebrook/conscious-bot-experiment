@@ -1,9 +1,9 @@
 /**
  * Jest Configuration for Dashboard Package
- * 
+ *
  * Configures Jest to test the dashboard components and cognitive stream
  * integration with proper TypeScript and React support.
- * 
+ *
  * @author @darianrosebrook
  */
 

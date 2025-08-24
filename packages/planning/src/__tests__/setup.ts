@@ -1,9 +1,9 @@
 /**
  * Test Setup for Planning Package
- * 
+ *
  * Configures the testing environment with global mocks and setup
  * for the planning system and cognitive integration tests.
- * 
+ *
  * @author @darianrosebrook
  */
 
@@ -76,7 +76,7 @@ global.testUtils = {
     ...overrides,
   }),
 
-  waitForAsync: (ms = 100) => new Promise(resolve => setTimeout(resolve, ms)),
+  waitForAsync: (ms = 100) => new Promise((resolve) => setTimeout(resolve, ms)),
 };
 
 // Type declarations for global test utilities

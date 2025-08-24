@@ -1,9 +1,9 @@
 /**
  * Jest Configuration for Planning Package
- * 
+ *
  * Configures Jest to test the planning system, cognitive integration,
  * and related modules with proper TypeScript support.
- * 
+ *
  * @author @darianrosebrook
  */
 
@@ -12,14 +12,14 @@ export default {
   extensionsToTreatAsEsm: ['.ts'],
   testEnvironment: 'node',
   roots: ['<rootDir>/src'],
-  testMatch: [
-    '**/__tests__/**/*.test.ts',
-    '**/?(*.)+(spec|test).ts',
-  ],
+  testMatch: ['**/__tests__/**/*.test.ts', '**/?(*.)+(spec|test).ts'],
   transform: {
-    '^.+\\.ts$': ['ts-jest', { 
-      useESM: true,
-    }],
+    '^.+\\.ts$': [
+      'ts-jest',
+      {
+        useESM: true,
+      },
+    ],
   },
   collectCoverageFrom: [
     'src/**/*.ts',

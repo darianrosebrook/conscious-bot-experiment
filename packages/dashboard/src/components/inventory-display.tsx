@@ -13,6 +13,10 @@ import { Section } from './section';
 import { EmptyState } from './empty-state';
 import { getItemDisplayName as getMinecraftItemDisplayName } from '@/lib/minecraft-assets';
 import { getItemSprite, getFallbackSprite } from '@/lib/minecraft-sprites';
+import {
+  getMineflayerItemSprite,
+  getMineflayerItemDisplayName,
+} from '@/lib/mineflayer-item-mapping';
 
 interface InventoryItem {
   type: string | number | null;
@@ -44,6 +48,14 @@ const getItemNameFromId = (itemId: number): string => {
     4: 'cobblestone',
     5: 'oak_planks',
     17: 'oak_log',
+    162: 'birch_log',
+    163: 'spruce_log',
+    164: 'jungle_log',
+    165: 'acacia_log',
+    166: 'dark_oak_log',
+    167: 'mangrove_log',
+    168: 'cherry_log',
+    169: 'bamboo_block',
     263: 'coal',
     264: 'diamond',
     265: 'iron_ingot',
@@ -610,10 +622,10 @@ const getItemSpriteLocal = (
     return getFallbackSprite();
   }
 
-  // Convert numeric item ID to item name
+  // Convert numeric item ID to item name (Mineflayer format)
   if (typeof itemType === 'number') {
-    const itemName = getItemNameFromId(itemType);
-    return getItemSprite(itemName);
+    const spriteName = getMineflayerItemSprite(itemType);
+    return getItemSprite(spriteName);
   }
 
   // Handle string item types
@@ -657,10 +669,10 @@ const getItemDisplayName = (item: InventoryItem | undefined): string => {
 
   const itemName =
     typeof item.type === 'number'
-      ? getItemNameFromId(item.type)
+      ? getMineflayerItemDisplayName(item.type)
       : String(item.type);
 
-  return getMinecraftItemDisplayName(itemName);
+  return itemName;
 };
 
 /**
@@ -703,9 +715,6 @@ export const InventoryDisplay: React.FC<InventoryDisplayProps> = ({
   selectedSlot = 0,
   className = '',
 }) => {
-  // Debug logging
-  console.log('InventoryDisplay received inventory:', inventory);
-  
   // Separate hotbar (slots 0-8) from main inventory
   const hotbarItems = inventory.filter(
     (item) => item.slot >= 0 && item.slot <= 8
@@ -713,9 +722,6 @@ export const InventoryDisplay: React.FC<InventoryDisplayProps> = ({
   const mainInventoryItems = inventory.filter(
     (item) => item.slot >= 9 && item.slot <= 35
   );
-  
-  console.log('Hotbar items:', hotbarItems);
-  console.log('Main inventory items:', mainInventoryItems);
 
   return (
     <Section

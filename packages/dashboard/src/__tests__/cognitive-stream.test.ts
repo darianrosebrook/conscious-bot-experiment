@@ -1,9 +1,9 @@
 /**
  * Dashboard Cognitive Stream Integration Test Suite
- * 
+ *
  * Tests the integration between the cognitive system and dashboard display,
  * including cognitive feedback processing and stream updates.
- * 
+ *
  * @author @darianrosebrook
  */
 
@@ -13,8 +13,12 @@ describe('Dashboard Cognitive Stream Integration', () => {
       const mockCognitiveFeedback = {
         taskId: 'test-task-1',
         success: false,
-        reasoning: 'High failure rate (75.0%) for craft task. Current strategy may not be optimal.',
-        alternativeSuggestions: ['Gather the required materials first', 'Try crafting simpler items first'],
+        reasoning:
+          'High failure rate (75.0%) for craft task. Current strategy may not be optimal.',
+        alternativeSuggestions: [
+          'Gather the required materials first',
+          'Try crafting simpler items first',
+        ],
         emotionalImpact: 'negative' as const,
         confidence: 0.3,
         timestamp: Date.now(),
@@ -54,7 +58,10 @@ describe('Dashboard Cognitive Stream Integration', () => {
         taskId: 'test-task-2',
         success: false,
         reasoning: 'Failed to complete craft task: Missing required materials.',
-        alternativeSuggestions: ['Gather the required materials first', 'Try crafting simpler items first'],
+        alternativeSuggestions: [
+          'Gather the required materials first',
+          'Try crafting simpler items first',
+        ],
         emotionalImpact: 'neutral' as const,
         confidence: 0.4,
         timestamp: Date.now(),
@@ -85,8 +92,12 @@ describe('Dashboard Cognitive Stream Integration', () => {
 
       expect(processedSuggestions).toBeDefined();
       expect(processedSuggestions?.text).toContain('💡 Alternatives:');
-      expect(processedSuggestions?.text).toContain('Gather the required materials first');
-      expect(processedSuggestions?.text).toContain('Try crafting simpler items first');
+      expect(processedSuggestions?.text).toContain(
+        'Gather the required materials first'
+      );
+      expect(processedSuggestions?.text).toContain(
+        'Try crafting simpler items first'
+      );
     });
 
     it('should handle tasks without cognitive feedback gracefully', () => {
@@ -120,7 +131,8 @@ describe('Dashboard Cognitive Stream Integration', () => {
         cognitiveFeedback: {
           taskId: 'test-task-4',
           success: true,
-          reasoning: 'Successfully completed mine task on first attempt. The approach was effective.',
+          reasoning:
+            'Successfully completed mine task on first attempt. The approach was effective.',
           alternativeSuggestions: [],
           emotionalImpact: 'positive' as const,
           confidence: 0.9,
@@ -158,7 +170,8 @@ describe('Dashboard Cognitive Stream Integration', () => {
         cognitiveFeedback: {
           taskId: 'test-task-5',
           success: false,
-          reasoning: 'Failed to complete craft task: Missing required materials. May need different resources or approach.',
+          reasoning:
+            'Failed to complete craft task: Missing required materials. May need different resources or approach.',
           alternativeSuggestions: ['Gather the required materials first'],
           emotionalImpact: 'negative' as const,
           confidence: 0.2,
@@ -198,8 +211,12 @@ describe('Dashboard Cognitive Stream Integration', () => {
         cognitiveFeedback: {
           taskId: 'test-task-6',
           success: false,
-          reasoning: 'Stuck in a loop with craft task. Failed 3 times consecutively. Need to change approach.',
-          alternativeSuggestions: ['Try a different task type', 'Focus on other achievable goals first'],
+          reasoning:
+            'Stuck in a loop with craft task. Failed 3 times consecutively. Need to change approach.',
+          alternativeSuggestions: [
+            'Try a different task type',
+            'Focus on other achievable goals first',
+          ],
           emotionalImpact: 'negative' as const,
           confidence: 0.1,
           timestamp: Date.now(),
@@ -210,15 +227,19 @@ describe('Dashboard Cognitive Stream Integration', () => {
         return {
           status: task.status,
           abandonReason: task.abandonReason,
-          hasAlternatives: task.cognitiveFeedback?.alternativeSuggestions?.length > 0,
-          alternativeCount: task.cognitiveFeedback?.alternativeSuggestions?.length || 0,
+          hasAlternatives:
+            task.cognitiveFeedback?.alternativeSuggestions?.length > 0,
+          alternativeCount:
+            task.cognitiveFeedback?.alternativeSuggestions?.length || 0,
         };
       };
 
       const displayInfo = getTaskDisplayInfo(mockTask);
 
       expect(displayInfo.status).toBe('abandoned');
-      expect(displayInfo.abandonReason).toBe('Cognitive feedback suggests abandonment');
+      expect(displayInfo.abandonReason).toBe(
+        'Cognitive feedback suggests abandonment'
+      );
       expect(displayInfo.hasAlternatives).toBe(true);
       expect(displayInfo.alternativeCount).toBe(2);
     });
@@ -253,8 +274,8 @@ describe('Dashboard Cognitive Stream Integration', () => {
 
       const aggregateCognitiveFeedback = (tasks: any[]) => {
         return tasks
-          .filter(task => task.cognitiveFeedback)
-          .map(task => ({
+          .filter((task) => task.cognitiveFeedback)
+          .map((task) => ({
             id: `feedback-${task.cognitiveFeedback.timestamp}`,
             taskId: task.id,
             taskType: task.type,
@@ -300,9 +321,10 @@ describe('Dashboard Cognitive Stream Integration', () => {
 
       const filterRecentTasksWithFeedback = (tasks: any[], maxAgeMs = 3000) => {
         const now = Date.now();
-        return tasks.filter(task => 
-          task.cognitiveFeedback && 
-          (now - task.cognitiveFeedback.timestamp) <= maxAgeMs
+        return tasks.filter(
+          (task) =>
+            task.cognitiveFeedback &&
+            now - task.cognitiveFeedback.timestamp <= maxAgeMs
         );
       };
 
@@ -400,9 +422,9 @@ describe('Dashboard Cognitive Stream Integration', () => {
 
       const processLimitedFeedback = (tasks: any[], limit = 10) => {
         return tasks
-          .filter(task => task.cognitiveFeedback)
+          .filter((task) => task.cognitiveFeedback)
           .slice(0, limit)
-          .map(task => ({
+          .map((task) => ({
             id: task.id,
             reasoning: task.cognitiveFeedback.reasoning,
           }));
@@ -427,13 +449,16 @@ describe('Dashboard Cognitive Stream Integration', () => {
         },
         {
           id: 'task-3',
-          cognitiveFeedback: { timestamp: 2000, reasoning: 'Different feedback' },
+          cognitiveFeedback: {
+            timestamp: 2000,
+            reasoning: 'Different feedback',
+          },
         },
       ];
 
       const deduplicateFeedback = (tasks: any[]) => {
         const seen = new Set();
-        return tasks.filter(task => {
+        return tasks.filter((task) => {
           const feedback = task.cognitiveFeedback;
           if (!feedback) return false;
 

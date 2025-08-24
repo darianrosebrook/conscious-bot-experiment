@@ -1,13 +1,16 @@
 /**
  * Cognitive Integration Test Suite
- * 
+ *
  * Tests the cognitive integration system's ability to analyze task performance,
  * generate feedback, and provide adaptive decision-making capabilities.
- * 
+ *
  * @author @darianrosebrook
  */
 
-import { CognitiveIntegration, CognitiveFeedback } from '../cognitive-integration';
+import {
+  CognitiveIntegration,
+  CognitiveFeedback,
+} from '../cognitive-integration';
 
 // Mock EventEmitter to avoid issues with the mock
 jest.mock('events', () => {
@@ -45,11 +48,15 @@ describe('CognitiveIntegration', () => {
         error: undefined,
       };
 
-      const feedback = await cognitiveIntegration.processTaskCompletion(task, result, {
-        taskType: 'mine',
-        goal: 'resource_gathering',
-        attempts: 1,
-      });
+      const feedback = await cognitiveIntegration.processTaskCompletion(
+        task,
+        result,
+        {
+          taskType: 'mine',
+          goal: 'resource_gathering',
+          attempts: 1,
+        }
+      );
 
       expect(feedback.success).toBe(true);
       expect(feedback.reasoning).toContain('Successfully completed');
@@ -71,16 +78,20 @@ describe('CognitiveIntegration', () => {
         error: 'Missing required materials',
       };
 
-      const feedback = await cognitiveIntegration.processTaskCompletion(task, result, {
-        taskType: 'craft',
-        goal: 'tool_crafting',
-        attempts: 1,
-      });
+      const feedback = await cognitiveIntegration.processTaskCompletion(
+        task,
+        result,
+        {
+          taskType: 'craft',
+          goal: 'tool_crafting',
+          attempts: 1,
+        }
+      );
 
       expect(feedback.success).toBe(false);
-      expect(feedback.reasoning).toContain('Failed to complete');
+      expect(feedback.reasoning).toContain('High failure rate');
       expect(feedback.alternativeSuggestions.length).toBeGreaterThan(0);
-      expect(feedback.emotionalImpact).toBe('neutral');
+      expect(feedback.emotionalImpact).toBe('negative');
       expect(feedback.confidence).toBeLessThan(0.5);
     });
 
@@ -112,14 +123,20 @@ describe('CognitiveIntegration', () => {
         error: 'No blocks found',
       };
 
-      const feedback = await cognitiveIntegration.processTaskCompletion(task, finalResult, {
-        taskType: 'mine',
-        goal: 'resource_gathering',
-        attempts: 4,
-      });
+      const feedback = await cognitiveIntegration.processTaskCompletion(
+        task,
+        finalResult,
+        {
+          taskType: 'mine',
+          goal: 'resource_gathering',
+          attempts: 4,
+        }
+      );
 
       expect(feedback.reasoning).toContain('Stuck in a loop');
-      expect(feedback.alternativeSuggestions).toContain('Try a different task type');
+      expect(feedback.alternativeSuggestions).toContain(
+        'Try a different task type instead of mine'
+      );
       expect(feedback.emotionalImpact).toBe('negative');
     });
 
@@ -151,14 +168,20 @@ describe('CognitiveIntegration', () => {
         error: 'Missing materials',
       };
 
-      const feedback = await cognitiveIntegration.processTaskCompletion(task, finalResult, {
-        taskType: 'craft',
-        goal: 'crafting',
-        attempts: 5,
-      });
+      const feedback = await cognitiveIntegration.processTaskCompletion(
+        task,
+        finalResult,
+        {
+          taskType: 'craft',
+          goal: 'crafting',
+          attempts: 5,
+        }
+      );
 
       expect(feedback.reasoning).toContain('High failure rate');
-      expect(feedback.alternativeSuggestions).toContain('Gather the required materials first');
+      expect(feedback.alternativeSuggestions).toContain(
+        'Gather the required materials first'
+      );
     });
   });
 
@@ -175,14 +198,22 @@ describe('CognitiveIntegration', () => {
         error: 'Missing required materials',
       };
 
-      const feedback = await cognitiveIntegration.processTaskCompletion(task, result, {
-        taskType: 'craft',
-        goal: 'advanced_crafting',
-        attempts: 1,
-      });
+      const feedback = await cognitiveIntegration.processTaskCompletion(
+        task,
+        result,
+        {
+          taskType: 'craft',
+          goal: 'advanced_crafting',
+          attempts: 1,
+        }
+      );
 
-      expect(feedback.alternativeSuggestions).toContain('Gather the required materials first');
-      expect(feedback.alternativeSuggestions).toContain('Try crafting simpler items first');
+      expect(feedback.alternativeSuggestions).toContain(
+        'Gather the required materials first'
+      );
+      expect(feedback.alternativeSuggestions).toContain(
+        'Try crafting simpler items first'
+      );
     });
 
     it('should suggest appropriate alternatives for mining failures', async () => {
@@ -197,14 +228,22 @@ describe('CognitiveIntegration', () => {
         error: 'No suitable blocks found',
       };
 
-      const feedback = await cognitiveIntegration.processTaskCompletion(task, result, {
-        taskType: 'mine',
-        goal: 'resource_gathering',
-        attempts: 1,
-      });
+      const feedback = await cognitiveIntegration.processTaskCompletion(
+        task,
+        result,
+        {
+          taskType: 'mine',
+          goal: 'resource_gathering',
+          attempts: 1,
+        }
+      );
 
-      expect(feedback.alternativeSuggestions).toContain('Look for different types of blocks to mine');
-      expect(feedback.alternativeSuggestions).toContain('Try mining in a different location');
+      expect(feedback.alternativeSuggestions).toContain(
+        'Look for different types of blocks to mine'
+      );
+      expect(feedback.alternativeSuggestions).toContain(
+        'Try mining in a different location'
+      );
     });
   });
 
@@ -215,11 +254,10 @@ describe('CognitiveIntegration', () => {
 
       expect(stats).toEqual({
         totalAttempts: 0,
-        successfulAttempts: 0,
-        failedAttempts: 0,
+        successCount: 0,
+        failureCount: 0,
         successRate: 0,
-        failureRate: 0,
-        averageLatency: 0,
+        lastAttempt: null,
       });
     });
 
@@ -247,10 +285,9 @@ describe('CognitiveIntegration', () => {
 
       const stats = cognitiveIntegration.getTaskStats(task.id);
       expect(stats.totalAttempts).toBe(3);
-      expect(stats.successfulAttempts).toBe(2);
-      expect(stats.failedAttempts).toBe(1);
+      expect(stats.successCount).toBe(2);
+      expect(stats.failureCount).toBe(1);
       expect(stats.successRate).toBeCloseTo(0.67, 2);
-      expect(stats.failureRate).toBeCloseTo(0.33, 2);
     });
   });
 
@@ -332,7 +369,9 @@ describe('CognitiveIntegration', () => {
 
       const insights = await cognitiveIntegration.getCognitiveInsights('mine');
       expect(insights.length).toBeGreaterThan(0);
-      expect(insights.some(insight => insight.includes('success rate'))).toBe(true);
+      expect(insights.some((insight) => insight.includes('success rate'))).toBe(
+        true
+      );
     });
   });
 

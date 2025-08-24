@@ -1,9 +1,9 @@
 /**
  * Test Setup for Dashboard Package
- * 
+ *
  * Configures the testing environment with global mocks and setup
  * for the dashboard components and cognitive stream integration tests.
- * 
+ *
  * @author @darianrosebrook
  */
 
@@ -118,7 +118,7 @@ global.testUtils = {
     ...overrides,
   }),
 
-  waitForAsync: (ms = 100) => new Promise(resolve => setTimeout(resolve, ms)),
+  waitForAsync: (ms = 100) => new Promise((resolve) => setTimeout(resolve, ms)),
 };
 
 // Type declarations for global test utilities

@@ -1,9 +1,9 @@
 /**
  * Planning System Integration Test Suite
- * 
+ *
  * Tests the integration between the planning system and cognitive integration,
  * including task validation, alternative task generation, and workflow management.
- * 
+ *
  * @author @darianrosebrook
  */
 
@@ -33,7 +33,7 @@ describe('Planning System Integration', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     cognitiveIntegration = new CognitiveIntegration();
-    
+
     // Reset mock planning system state
     mockPlanningSystem.goalFormulation._failedTaskCount = 0;
     mockPlanningSystem.goalFormulation._lastTaskExecution = 0;
@@ -100,11 +100,11 @@ describe('Planning System Integration', () => {
 
     it('should validate successful mining tasks', () => {
       const task = { type: 'mine' };
-      const result = { 
-        success: true, 
+      const result = {
+        success: true,
         error: undefined,
         results: [{ success: true }],
-        type: 'mining'
+        type: 'mining',
       };
 
       const validateTaskCompletion = (task: any, result: any): boolean => {
@@ -133,11 +133,11 @@ describe('Planning System Integration', () => {
 
     it('should validate failed mining tasks', () => {
       const task = { type: 'mine' };
-      const result = { 
-        success: false, 
+      const result = {
+        success: false,
         error: 'No blocks were successfully mined',
         results: [{ success: false }],
-        type: 'mining'
+        type: 'mining',
       };
 
       const validateTaskCompletion = (task: any, result: any): boolean => {
@@ -188,8 +188,11 @@ describe('Planning System Integration', () => {
           },
         ];
 
-        const availableTypes = alternativeTaskTypes.filter(t => t.type !== failedTask.type);
-        const selectedType = availableTypes[Math.floor(Math.random() * availableTypes.length)];
+        const availableTypes = alternativeTaskTypes.filter(
+          (t) => t.type !== failedTask.type
+        );
+        const selectedType =
+          availableTypes[Math.floor(Math.random() * availableTypes.length)];
 
         return {
           id: `alt-task-${Date.now()}`,
@@ -208,7 +211,7 @@ describe('Planning System Integration', () => {
       };
 
       const alternativeTask = generateAlternativeTask(failedTask);
-      
+
       expect(alternativeTask).toBeDefined();
       expect(alternativeTask.type).not.toBe('craft');
       expect(alternativeTask.isAlternative).toBe(true);
@@ -216,9 +219,14 @@ describe('Planning System Integration', () => {
     });
 
     it('should generate tasks from cognitive feedback suggestions', () => {
-      const suggestions = ['Explore the environment', 'Gather the required materials'];
+      const suggestions = [
+        'Explore the environment',
+        'Gather the required materials',
+      ];
 
-      const generateTaskFromSuggestions = (suggestions: string[]): any | null => {
+      const generateTaskFromSuggestions = (
+        suggestions: string[]
+      ): any | null => {
         for (const suggestion of suggestions) {
           if (suggestion.includes('Explore the environment')) {
             return {
@@ -256,7 +264,7 @@ describe('Planning System Integration', () => {
       };
 
       const task = generateTaskFromSuggestions(suggestions);
-      
+
       expect(task).toBeDefined();
       expect(task.type).toBe('explore'); // First suggestion should match
       expect(task.isAlternative).toBe(true);
@@ -269,7 +277,8 @@ describe('Planning System Integration', () => {
         const taskTypes = [
           {
             type: 'explore',
-            description: 'Explore the surroundings to understand the environment',
+            description:
+              'Explore the surroundings to understand the environment',
             parameters: { distance: 5, direction: 'forward' },
           },
           {
@@ -284,7 +293,8 @@ describe('Planning System Integration', () => {
           },
         ];
 
-        const taskType = taskTypes[Math.floor(Math.random() * taskTypes.length)];
+        const taskType =
+          taskTypes[Math.floor(Math.random() * taskTypes.length)];
 
         return {
           id: `auto-task-${Date.now()}`,
@@ -302,7 +312,7 @@ describe('Planning System Integration', () => {
       };
 
       const task = generateAutonomousTask();
-      
+
       expect(task).toBeDefined();
       expect(task.id).toMatch(/^auto-task-\d+$/);
       expect(task.autonomous).toBe(true);
@@ -339,17 +349,19 @@ describe('Planning System Integration', () => {
         timestamp: Date.now(),
       };
 
-      jest.spyOn(cognitiveIntegration, 'processTaskCompletion').mockResolvedValue(mockFeedback);
+      jest
+        .spyOn(cognitiveIntegration, 'processTaskCompletion')
+        .mockResolvedValue(mockFeedback);
 
       // Simulate task completion workflow
       const taskCompleted = true; // validateTaskCompletion would return true
-      
+
       if (taskCompleted) {
         task.status = 'completed';
         task.completedAt = Date.now();
         task.result = result;
         task.cognitiveFeedback = mockFeedback;
-        
+
         // Reset failure counter on success
         mockPlanningSystem.goalFormulation._failedTaskCount = 0;
       }
@@ -385,18 +397,20 @@ describe('Planning System Integration', () => {
         timestamp: Date.now(),
       };
 
-      jest.spyOn(cognitiveIntegration, 'processTaskCompletion').mockResolvedValue(mockFeedback);
+      jest
+        .spyOn(cognitiveIntegration, 'processTaskCompletion')
+        .mockResolvedValue(mockFeedback);
 
       // Simulate task failure workflow
       const taskCompleted = false; // validateTaskCompletion would return false
-      
+
       if (!taskCompleted) {
         task.status = 'failed';
         task.failedAt = Date.now();
         task.failureReason = result.error;
         task.result = result;
         task.cognitiveFeedback = mockFeedback;
-        
+
         // Increment failure counter
         mockPlanningSystem.goalFormulation._failedTaskCount++;
       }
@@ -426,26 +440,34 @@ describe('Planning System Integration', () => {
       const mockFeedback = {
         taskId: task.id,
         success: false,
-        reasoning: 'Stuck in a loop with craft task. Failed 3 times consecutively.',
-        alternativeSuggestions: ['Try a different task type', 'Gather materials first'],
+        reasoning:
+          'Stuck in a loop with craft task. Failed 3 times consecutively.',
+        alternativeSuggestions: [
+          'Try a different task type',
+          'Gather materials first',
+        ],
         emotionalImpact: 'negative' as const,
         confidence: 0.1,
         timestamp: Date.now(),
       };
 
-      jest.spyOn(cognitiveIntegration, 'processTaskCompletion').mockResolvedValue(mockFeedback);
-      jest.spyOn(cognitiveIntegration, 'shouldAbandonTask').mockReturnValue(true);
+      jest
+        .spyOn(cognitiveIntegration, 'processTaskCompletion')
+        .mockResolvedValue(mockFeedback);
+      jest
+        .spyOn(cognitiveIntegration, 'shouldAbandonTask')
+        .mockReturnValue(true);
 
       // Simulate task abandonment workflow
       const taskCompleted = false;
-      
+
       if (!taskCompleted) {
         task.status = 'failed';
         task.failedAt = Date.now();
         task.failureReason = result.error;
         task.result = result;
         task.cognitiveFeedback = mockFeedback;
-        
+
         mockPlanningSystem.goalFormulation._failedTaskCount++;
 
         // Check if task should be abandoned
@@ -457,8 +479,12 @@ describe('Planning System Integration', () => {
       }
 
       expect(task.status).toBe('abandoned');
-      expect(task.abandonReason).toBe('Cognitive feedback suggests abandonment');
-      expect(cognitiveIntegration.shouldAbandonTask).toHaveBeenCalledWith(task.id);
+      expect(task.abandonReason).toBe(
+        'Cognitive feedback suggests abandonment'
+      );
+      expect(cognitiveIntegration.shouldAbandonTask).toHaveBeenCalledWith(
+        task.id
+      );
     });
   });
 
@@ -469,13 +495,17 @@ describe('Planning System Integration', () => {
         { success: true, block: 'stone', position: { x: 0, y: 63, z: 0 } },
       ];
 
-      const successfulMining = mineResults.some((result: any) => result.success === true);
-      
+      const successfulMining = mineResults.some(
+        (result: any) => result.success === true
+      );
+
       const formattedResult = {
         results: mineResults,
         type: 'mining',
         success: successfulMining,
-        error: successfulMining ? undefined : 'No blocks were successfully mined',
+        error: successfulMining
+          ? undefined
+          : 'No blocks were successfully mined',
       };
 
       expect(formattedResult.success).toBe(true);
@@ -490,13 +520,17 @@ describe('Planning System Integration', () => {
         { success: false, error: 'Block not mineable' },
       ];
 
-      const successfulMining = mineResults.some((result: any) => result.success === true);
-      
+      const successfulMining = mineResults.some(
+        (result: any) => result.success === true
+      );
+
       const formattedResult = {
         results: mineResults,
         type: 'mining',
         success: successfulMining,
-        error: successfulMining ? undefined : 'No blocks were successfully mined',
+        error: successfulMining
+          ? undefined
+          : 'No blocks were successfully mined',
       };
 
       expect(formattedResult.success).toBe(false);
