@@ -301,6 +301,61 @@ app.get('/chat', (req, res) => {
   }
 });
 
+// Get player interactions
+app.get('/player-interactions', (req, res) => {
+  try {
+    if (!minecraftInterface?.connected) {
+      return res.status(503).json({
+        success: false,
+        message: 'Bot not connected',
+        status: 'disconnected',
+      });
+    }
+
+    const playerInteractions = minecraftInterface.getPlayerInteractions();
+    res.json({
+      success: true,
+      status: 'connected',
+      data: playerInteractions,
+    });
+  } catch (error) {
+    console.error('❌ Failed to get player interactions:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to get player interactions',
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
+
+// Get recent processed messages
+app.get('/processed-messages', (req, res) => {
+  try {
+    if (!minecraftInterface?.connected) {
+      return res.status(503).json({
+        success: false,
+        message: 'Bot not connected',
+        status: 'disconnected',
+      });
+    }
+
+    const count = parseInt(req.query.count as string) || 10;
+    const processedMessages = minecraftInterface.getRecentProcessedMessages(count);
+    res.json({
+      success: true,
+      status: 'connected',
+      data: processedMessages,
+    });
+  } catch (error) {
+    console.error('❌ Failed to get processed messages:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to get processed messages',
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
+
 // Get bot state
 app.get('/state', async (req, res) => {
   try {

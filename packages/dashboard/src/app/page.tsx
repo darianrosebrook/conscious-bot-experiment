@@ -263,7 +263,7 @@ export default function ConsciousMinecraftDashboard() {
         };
         addThought(thought);
         setIntrusion('');
-        
+
         // Add a follow-up thought about what the bot might do
         setTimeout(() => {
           const followUpThought: Thought = {
@@ -702,7 +702,8 @@ export default function ConsciousMinecraftDashboard() {
               </Button>
             </div>
             <div className="mt-1 text-[11px] text-zinc-500">
-              Try: "craft a wooden pickaxe", "mine some stone", "explore the area", "build a house"
+              Try: "craft a wooden pickaxe", "mine some stone", "explore the
+              area", "build a house"
             </div>
           </div>
         </aside>

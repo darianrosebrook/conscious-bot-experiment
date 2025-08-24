@@ -9,6 +9,7 @@
 
 import { createBot, Bot } from 'mineflayer';
 import { EventEmitter } from 'events';
+import { ChatProcessor, type ChatMessage, type ChatResponse } from './chat-processor';
 
 export interface SimpleBotConfig {
   host: string;
@@ -41,10 +42,27 @@ export class SimpleMinecraftInterface extends EventEmitter {
     message: string;
     sender: string;
   }> = [];
+  private chatProcessor: ChatProcessor;
 
   constructor(config: SimpleBotConfig) {
     super();
     this.config = config;
+    this.chatProcessor = new ChatProcessor(config.username);
+    
+    // Set up chat processor event handlers
+    this.chatProcessor.on('messageProcessed', (message: ChatMessage) => {
+      console.log(`💬 Processed message from ${message.sender}: "${message.content}" (${message.messageType})`);
+    });
+    
+    this.chatProcessor.on('responseReady', (response: ChatResponse) => {
+      console.log(`🤖 Response ready: "${response.content}"`);
+      this.sendChat(response.content);
+    });
+    
+    this.chatProcessor.on('commandReceived', ({ command, message }) => {
+      console.log(`🎮 Command received: ${command} from ${message.sender}`);
+      this.handleCommand(command, message);
+    });
   }
 
   /**
@@ -81,11 +99,14 @@ export class SimpleMinecraftInterface extends EventEmitter {
       });
 
       // Listen for chat messages
-      this.bot.on('message', (message) => {
+      this.bot.on('message', async (message) => {
+        const sender = (message as any).author || 'unknown';
+        const content = message.toString();
+        
         const chatMessage = {
           timestamp: Date.now(),
-          message: message.toString(),
-          sender: (message as any).author || 'unknown',
+          message: content,
+          sender: sender,
         };
         this.chatHistory.push(chatMessage);
 
@@ -93,6 +114,9 @@ export class SimpleMinecraftInterface extends EventEmitter {
         if (this.chatHistory.length > 100) {
           this.chatHistory = this.chatHistory.slice(-100);
         }
+
+        // Process message through chat processor
+        await this.chatProcessor.processMessage(sender, content);
 
         // Emit chat event
         this.emit('chat', chatMessage);
@@ -550,6 +574,168 @@ export class SimpleMinecraftInterface extends EventEmitter {
         error: error instanceof Error ? error.message : String(error),
       };
     }
+  }
+
+  /**
+   * Handle commands from other players
+   */
+  private async handleCommand(command: string, message: ChatMessage): Promise<void> {
+    try {
+      switch (command) {
+        case 'help':
+          await this.executeAction({
+            type: 'chat',
+            parameters: { message: 'I can help with building, crafting, mining, exploring, and following you!' },
+          });
+          break;
+          
+        case 'follow':
+          // TODO: Implement follow logic
+          await this.executeAction({
+            type: 'chat',
+            parameters: { message: 'I\'ll follow you! Lead the way.' },
+          });
+          break;
+          
+        case 'stop':
+          // TODO: Implement stop logic
+          await this.executeAction({
+            type: 'chat',
+            parameters: { message: 'Stopping here.' },
+          });
+          break;
+          
+        case 'come':
+          // TODO: Implement come logic
+          await this.executeAction({
+            type: 'chat',
+            parameters: { message: 'Coming to you!' },
+          });
+          break;
+          
+        case 'go':
+          // TODO: Implement go logic
+          await this.executeAction({
+            type: 'chat',
+            parameters: { message: 'I\'ll go explore the area.' },
+          });
+          break;
+          
+        case 'build':
+          // Create a goal to build something
+          try {
+            await fetch('http://localhost:3002/goal', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                name: 'Build request from player',
+                description: `Build something as requested by ${message.sender}`,
+                priority: 0.8,
+                urgency: 0.7,
+                tasks: [{
+                  type: 'build',
+                  description: 'Build something useful',
+                  priority: 0.8,
+                  urgency: 0.7,
+                  parameters: {},
+                }],
+              }),
+            });
+            await this.executeAction({
+              type: 'chat',
+              parameters: { message: 'I\'ll start building something useful!' },
+            });
+          } catch (error) {
+            console.error('Failed to create build goal:', error);
+          }
+          break;
+          
+        case 'craft':
+          // Create a goal to craft something
+          try {
+            await fetch('http://localhost:3002/goal', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                name: 'Craft request from player',
+                description: `Craft something as requested by ${message.sender}`,
+                priority: 0.8,
+                urgency: 0.7,
+                tasks: [{
+                  type: 'craft',
+                  description: 'Craft useful items',
+                  priority: 0.8,
+                  urgency: 0.7,
+                  parameters: {},
+                }],
+              }),
+            });
+            await this.executeAction({
+              type: 'chat',
+              parameters: { message: 'I\'ll craft some useful items!' },
+            });
+          } catch (error) {
+            console.error('Failed to create craft goal:', error);
+          }
+          break;
+          
+        case 'mine':
+          // Create a goal to mine
+          try {
+            await fetch('http://localhost:3002/goal', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                name: 'Mine request from player',
+                description: `Mine resources as requested by ${message.sender}`,
+                priority: 0.8,
+                urgency: 0.7,
+                tasks: [{
+                  type: 'mine',
+                  description: 'Mine for resources',
+                  priority: 0.8,
+                  urgency: 0.7,
+                  parameters: {},
+                }],
+              }),
+            });
+            await this.executeAction({
+              type: 'chat',
+              parameters: { message: 'I\'ll mine for resources!' },
+            });
+          } catch (error) {
+            console.error('Failed to create mine goal:', error);
+          }
+          break;
+          
+        default:
+          await this.executeAction({
+            type: 'chat',
+            parameters: { message: `I understand the ${command} command. Let me work on it.` },
+          });
+          break;
+      }
+    } catch (error) {
+      console.error('Error handling command:', error);
+      await this.executeAction({
+        type: 'chat',
+        parameters: { message: 'Sorry, I had trouble processing that command.' },
+      });
+    }
+  }
+
+  /**
+   * Get player interaction data
+   */
+  getPlayerInteractions() {
+    return this.chatProcessor.getAllPlayerInteractions();
+  }
+
+  /**
+   * Get recent processed messages
+   */
+  getRecentProcessedMessages(count: number = 10) {
+    return this.chatProcessor.getRecentMessages(count);
   }
 }
 
