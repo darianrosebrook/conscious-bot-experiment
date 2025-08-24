@@ -1,20 +1,28 @@
 /**
  * Minecraft Integration Test Suite
- * 
+ *
  * Tests the integration between cognitive/task modules and the actual Minecraft bot connection.
  * Validates the full flow from planning system through HTTP API to mineflayer actions.
- * 
+ *
  * @author @darianrosebrook
  */
 
-import { SimpleMinecraftInterface, SimpleBotConfig } from '../standalone-simple';
+import {
+  SimpleMinecraftInterface,
+  SimpleBotConfig,
+} from '../standalone-simple';
 import { EventEmitter } from 'events';
 
 // Mock mineflayer to avoid requiring actual Minecraft server
 jest.mock('mineflayer', () => ({
   createBot: jest.fn(() => ({
     entity: {
-      position: { x: 0, y: 64, z: 0, clone: () => ({ offset: () => ({ x: 0, y: 64, z: 5 }) }) },
+      position: {
+        x: 0,
+        y: 64,
+        z: 0,
+        clone: () => ({ offset: () => ({ x: 0, y: 64, z: 5 }) }),
+      },
       yaw: 0,
       pitch: 0,
     },
@@ -54,7 +62,11 @@ jest.mock('mineflayer', () => ({
       },
     },
     vec3: class MockVec3 {
-      constructor(public x: number, public y: number, public z: number) {}
+      constructor(
+        public x: number,
+        public y: number,
+        public z: number
+      ) {}
     },
   })),
 }));
@@ -83,7 +95,7 @@ describe('Minecraft Integration Tests', () => {
   describe('Connection Management', () => {
     it('should connect to minecraft server successfully', async () => {
       const connectPromise = minecraftInterface.connect();
-      
+
       // Simulate the connection events
       setTimeout(() => {
         minecraftInterface.emit('connected');
@@ -101,7 +113,9 @@ describe('Minecraft Integration Tests', () => {
         }
       });
 
-      await expect(minecraftInterface.connect()).rejects.toThrow('Connection failed');
+      await expect(minecraftInterface.connect()).rejects.toThrow(
+        'Connection failed'
+      );
     });
 
     it('should disconnect properly', async () => {
@@ -134,7 +148,9 @@ describe('Minecraft Integration Tests', () => {
 
     it('should throw error when not connected', async () => {
       await minecraftInterface.disconnect();
-      await expect(minecraftInterface.getGameState()).rejects.toThrow('Not connected to server');
+      await expect(minecraftInterface.getGameState()).rejects.toThrow(
+        'Not connected to server'
+      );
     });
   });
 
@@ -151,7 +167,7 @@ describe('Minecraft Integration Tests', () => {
         });
 
         expect(result).toEqual({ success: true, distance: 2 });
-        
+
         const mockBot = minecraftInterface.botInstance;
         expect(mockBot?.setControlState).toHaveBeenCalledWith('forward', true);
         expect(mockBot?.setControlState).toHaveBeenCalledWith('forward', false);
@@ -164,7 +180,7 @@ describe('Minecraft Integration Tests', () => {
         });
 
         expect(result).toEqual({ success: true, angle: 45 });
-        
+
         const mockBot = minecraftInterface.botInstance;
         expect(mockBot?.look).toHaveBeenCalled();
       });
@@ -176,7 +192,7 @@ describe('Minecraft Integration Tests', () => {
         });
 
         expect(result).toEqual({ success: true });
-        
+
         const mockBot = minecraftInterface.botInstance;
         expect(mockBot?.setControlState).toHaveBeenCalledWith('jump', true);
         expect(mockBot?.setControlState).toHaveBeenCalledWith('jump', false);
@@ -191,7 +207,7 @@ describe('Minecraft Integration Tests', () => {
         });
 
         expect(result).toEqual({ success: true, message: 'Hello, world!' });
-        
+
         const mockBot = minecraftInterface.botInstance;
         expect(mockBot?.chat).toHaveBeenCalledWith('Hello, world!');
       });

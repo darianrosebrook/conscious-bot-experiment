@@ -1,9 +1,9 @@
 /**
  * End-to-End Integration Test Suite
- * 
+ *
  * Tests the complete flow from planning system through cognitive integration
  * to minecraft actions using a mock minecraft server.
- * 
+ *
  * @author @darianrosebrook
  */
 
@@ -77,13 +77,23 @@ describe('End-to-End Integration Tests', () => {
       // Mock HTTP responses for successful crafting
       mockFetch
         .mockResolvedValueOnce({
-          json: () => Promise.resolve({ success: true, canCraft: true, hasRecipe: true }),
+          json: () =>
+            Promise.resolve({ success: true, canCraft: true, hasRecipe: true }),
         } as any)
         .mockResolvedValueOnce({
-          json: () => Promise.resolve({ success: true, item: 'wooden_pickaxe', crafted: true }),
+          json: () =>
+            Promise.resolve({
+              success: true,
+              item: 'wooden_pickaxe',
+              crafted: true,
+            }),
         } as any)
         .mockResolvedValueOnce({
-          json: () => Promise.resolve({ success: true, message: 'Successfully crafted wooden_pickaxe!' }),
+          json: () =>
+            Promise.resolve({
+              success: true,
+              message: 'Successfully crafted wooden_pickaxe!',
+            }),
         } as any);
 
       // Simulate the complete task execution flow
@@ -148,26 +158,28 @@ describe('End-to-End Integration Tests', () => {
       const result = await executeTaskInMinecraft(task);
 
       // Validate task completion
-      const taskCompleted = (result as any).success === true && !(result as any).error;
+      const taskCompleted =
+        (result as any).success === true && !(result as any).error;
 
       // Update task status
       task.status = taskCompleted ? 'completed' : 'failed';
       task.attempts = 1;
 
       // Process cognitive feedback
-      const cognitiveFeedback = await cognitiveIntegration.processTaskCompletion(
-        task,
-        result,
-        {
+      const cognitiveFeedback =
+        await cognitiveIntegration.processTaskCompletion(task, result, {
           taskType: 'craft',
           goal: 'tool_creation',
           attempts: 1,
-        }
-      );
+        });
 
       // Verify the complete flow
       expect(mockFetch).toHaveBeenCalledTimes(3);
-      expect(result).toEqual({ success: true, item: 'wooden_pickaxe', crafted: true });
+      expect(result).toEqual({
+        success: true,
+        item: 'wooden_pickaxe',
+        crafted: true,
+      });
       expect(taskCompleted).toBe(true);
       expect(task.status).toBe('completed');
       expect(cognitiveFeedback.success).toBe(true);
@@ -180,14 +192,19 @@ describe('End-to-End Integration Tests', () => {
       // Mock HTTP responses for failed crafting
       mockFetch
         .mockResolvedValueOnce({
-          json: () => Promise.resolve({ 
-            success: true, 
-            canCraft: false, 
-            error: 'Insufficient materials' 
-          }),
+          json: () =>
+            Promise.resolve({
+              success: true,
+              canCraft: false,
+              error: 'Insufficient materials',
+            }),
         } as any)
         .mockResolvedValueOnce({
-          json: () => Promise.resolve({ success: true, message: 'Cannot craft wooden_pickaxe: Insufficient materials' }),
+          json: () =>
+            Promise.resolve({
+              success: true,
+              message: 'Cannot craft wooden_pickaxe: Insufficient materials',
+            }),
         } as any);
 
       const task = {
@@ -240,15 +257,12 @@ describe('End-to-End Integration Tests', () => {
       task.status = taskCompleted ? 'completed' : 'failed';
 
       // Process cognitive feedback
-      const cognitiveFeedback = await cognitiveIntegration.processTaskCompletion(
-        task,
-        result,
-        {
+      const cognitiveFeedback =
+        await cognitiveIntegration.processTaskCompletion(task, result, {
           taskType: 'craft',
           goal: 'tool_creation',
           attempts: 2,
-        }
-      );
+        });
 
       // Verify failure handling
       expect(result).toEqual({
@@ -259,8 +273,12 @@ describe('End-to-End Integration Tests', () => {
       expect(taskCompleted).toBe(false);
       expect(task.status).toBe('failed');
       expect(cognitiveFeedback.success).toBe(false);
-      expect(cognitiveFeedback.reasoning).toContain('Failed to complete craft task');
-      expect(cognitiveFeedback.alternativeSuggestions).toContain('Gather the required materials first');
+      expect(cognitiveFeedback.reasoning).toContain(
+        'Failed to complete craft task'
+      );
+      expect(cognitiveFeedback.alternativeSuggestions).toContain(
+        'Gather the required materials first'
+      );
       expect(cognitiveFeedback.emotionalImpact).toBe('negative');
     });
 
@@ -271,10 +289,16 @@ describe('End-to-End Integration Tests', () => {
           json: () => Promise.resolve({ position: { x: 0, y: 64, z: 0 } }),
         } as any)
         .mockResolvedValueOnce({
-          json: () => Promise.resolve({ success: false, error: 'No block found' }),
+          json: () =>
+            Promise.resolve({ success: false, error: 'No block found' }),
         } as any)
         .mockResolvedValueOnce({
-          json: () => Promise.resolve({ success: true, block: 'stone', position: { x: 1, y: 64, z: 0 } }),
+          json: () =>
+            Promise.resolve({
+              success: true,
+              block: 'stone',
+              position: { x: 1, y: 64, z: 0 },
+            }),
         } as any);
 
       const task = {
@@ -327,7 +351,9 @@ describe('End-to-End Integration Tests', () => {
           results: mineResults,
           type: 'mining',
           success: successfulMining,
-          error: successfulMining ? undefined : 'No blocks were successfully mined',
+          error: successfulMining
+            ? undefined
+            : 'No blocks were successfully mined',
         };
       };
 
@@ -337,15 +363,12 @@ describe('End-to-End Integration Tests', () => {
       task.status = taskCompleted ? 'completed' : 'failed';
 
       // Process cognitive feedback
-      const cognitiveFeedback = await cognitiveIntegration.processTaskCompletion(
-        task,
-        result,
-        {
+      const cognitiveFeedback =
+        await cognitiveIntegration.processTaskCompletion(task, result, {
           taskType: 'mine',
           goal: 'resource_gathering',
           attempts: 1,
-        }
-      );
+        });
 
       // Verify mining workflow
       expect(mockFetch).toHaveBeenCalledTimes(3);
@@ -384,13 +407,16 @@ describe('End-to-End Integration Tests', () => {
       }
 
       // Check if task should be abandoned
-      const shouldAbandon = cognitiveIntegration.shouldAbandonTask('stuck-task-4');
+      const shouldAbandon =
+        cognitiveIntegration.shouldAbandonTask('stuck-task-4');
       expect(shouldAbandon).toBe(true);
 
       // Get cognitive insights
       const insights = await cognitiveIntegration.getCognitiveInsights('craft');
       expect(insights.length).toBeGreaterThan(0);
-      expect(insights.some((insight) => insight.includes('failure rate'))).toBe(true);
+      expect(insights.some((insight) => insight.includes('failure rate'))).toBe(
+        true
+      );
     });
 
     it('should provide performance-based recommendations', async () => {
@@ -451,7 +477,9 @@ describe('End-to-End Integration Tests', () => {
         }).then((res) => res.json());
       };
 
-      await expect(executeTaskInMinecraft(task)).rejects.toThrow('Network timeout');
+      await expect(executeTaskInMinecraft(task)).rejects.toThrow(
+        'Network timeout'
+      );
     });
 
     it('should handle malformed responses', async () => {
@@ -478,7 +506,9 @@ describe('End-to-End Integration Tests', () => {
         }).then((res) => res.json());
       };
 
-      await expect(executeTaskInMinecraft(task)).rejects.toThrow('Invalid JSON');
+      await expect(executeTaskInMinecraft(task)).rejects.toThrow(
+        'Invalid JSON'
+      );
     });
   });
 });

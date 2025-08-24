@@ -98,6 +98,18 @@ export class SimpleMinecraftInterface extends EventEmitter {
         this.emit('chat', chatMessage);
       });
 
+      // Listen for inventory changes
+      this.bot.on('inventoryChanged', (oldItem, newItem) => {
+        console.log('Inventory changed:', { oldItem, newItem });
+        this.emit('inventoryChanged', { oldItem, newItem });
+      });
+
+      // Listen for item moved events
+      this.bot.on('itemMoved', (oldItem, newItem) => {
+        console.log('Item moved:', { oldItem, newItem });
+        this.emit('itemMoved', { oldItem, newItem });
+      });
+
       this.bot.once('error', (error) => {
         clearTimeout(timeoutId);
         console.error('❌ Connection error:', error.message);
@@ -188,6 +200,15 @@ export class SimpleMinecraftInterface extends EventEmitter {
             action.parameters.position,
             action.parameters.blockType
           );
+
+        case 'move_to_hotbar':
+          return await this.moveItemToHotbar(
+            action.parameters.itemName,
+            action.parameters.slot || 0
+          );
+
+        case 'organize_inventory':
+          return await this.organizeInventory();
 
         default:
           throw new Error(`Unknown action type: ${action.type}`);
@@ -472,6 +493,67 @@ export class SimpleMinecraftInterface extends EventEmitter {
         position,
         message: `Would place ${blockType} at ${position.x}, ${position.y}, ${position.z}`,
       };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : String(error),
+      };
+    }
+  }
+
+  /**
+   * Move an item to the hotbar
+   */
+  private async moveItemToHotbar(itemName: string, slot: number): Promise<any> {
+    if (!this.bot) throw new Error('Bot not connected');
+
+    try {
+      const item = this.bot.inventory.items().find((i) => i.name === itemName);
+      if (!item) {
+        return {
+          success: false,
+          error: `No ${itemName} found in inventory`,
+        };
+      }
+
+      // Move item to hotbar slot
+      await this.bot.moveSlotItem(item.slot, slot);
+      return { success: true, itemName, slot };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : String(error),
+      };
+    }
+  }
+
+  /**
+   * Organize inventory by moving items to hotbar
+   */
+  private async organizeInventory(): Promise<any> {
+    if (!this.bot) throw new Error('Bot not connected');
+
+    try {
+      const inventory = this.bot.inventory.items();
+      const hotbarSlots = [0, 1, 2, 3, 4, 5, 6, 7, 8];
+      const movedItems = [];
+
+      // Move first few items to hotbar
+      for (let i = 0; i < Math.min(inventory.length, hotbarSlots.length); i++) {
+        const item = inventory[i];
+        const hotbarSlot = hotbarSlots[i];
+        
+        if (item && item.slot >= 9) { // Only move items from main inventory
+          try {
+            await this.bot.moveSlotItem(item.slot, hotbarSlot);
+            movedItems.push({ item: item.name, slot: hotbarSlot });
+          } catch (error) {
+            console.error(`Failed to move ${item.name} to slot ${hotbarSlot}:`, error);
+          }
+        }
+      }
+
+      return { success: true, movedItems };
     } catch (error) {
       return {
         success: false,

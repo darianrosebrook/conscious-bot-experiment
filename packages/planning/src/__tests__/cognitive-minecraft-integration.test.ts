@@ -1,9 +1,9 @@
 /**
  * Cognitive-Minecraft Integration Test Suite
- * 
+ *
  * Tests the full cognitive feedback loop with minecraft actions.
  * Validates how cognitive integration processes real minecraft task results.
- * 
+ *
  * @author @darianrosebrook
  */
 
@@ -138,8 +138,12 @@ describe('Cognitive-Minecraft Integration Tests', () => {
       expect(feedback.reasoning).toContain('Failed to complete craft task');
       expect(feedback.emotionalImpact).toBe('negative');
       expect(feedback.confidence).toBeLessThan(0.5);
-      expect(feedback.alternativeSuggestions).toContain('Gather the required materials first');
-      expect(feedback.alternativeSuggestions).toContain('Try crafting simpler items first');
+      expect(feedback.alternativeSuggestions).toContain(
+        'Gather the required materials first'
+      );
+      expect(feedback.alternativeSuggestions).toContain(
+        'Try crafting simpler items first'
+      );
     });
 
     it('should process failed mining task and suggest location changes', async () => {
@@ -175,8 +179,12 @@ describe('Cognitive-Minecraft Integration Tests', () => {
       expect(feedback.success).toBe(false);
       expect(feedback.reasoning).toContain('Failed to complete mine task');
       expect(feedback.emotionalImpact).toBe('negative');
-      expect(feedback.alternativeSuggestions).toContain('Look for different types of blocks to mine');
-      expect(feedback.alternativeSuggestions).toContain('Try mining in a different location');
+      expect(feedback.alternativeSuggestions).toContain(
+        'Look for different types of blocks to mine'
+      );
+      expect(feedback.alternativeSuggestions).toContain(
+        'Try mining in a different location'
+      );
     });
   });
 
@@ -242,12 +250,15 @@ describe('Cognitive-Minecraft Integration Tests', () => {
       );
 
       expect(feedback.reasoning).toContain('Stuck in a loop');
-      expect(feedback.alternativeSuggestions).toContain('Try a different task type');
+      expect(feedback.alternativeSuggestions).toContain(
+        'Try a different task type'
+      );
       expect(feedback.emotionalImpact).toBe('negative');
       expect(feedback.confidence).toBeLessThan(0.3);
 
       // Check if task should be abandoned
-      const shouldAbandon = cognitiveIntegration.shouldAbandonTask('craft-task-stuck-4');
+      const shouldAbandon =
+        cognitiveIntegration.shouldAbandonTask('craft-task-stuck-4');
       expect(shouldAbandon).toBe(true);
     });
 
@@ -273,11 +284,15 @@ describe('Cognitive-Minecraft Integration Tests', () => {
 
       // Process mining tasks to build failure pattern
       for (const task of miningTasks) {
-        await cognitiveIntegration.processTaskCompletion(task, failedMiningResult, {
-          taskType: 'mine',
-          goal: 'resource_gathering',
-          attempts: task.attempts,
-        });
+        await cognitiveIntegration.processTaskCompletion(
+          task,
+          failedMiningResult,
+          {
+            taskType: 'mine',
+            goal: 'resource_gathering',
+            attempts: task.attempts,
+          }
+        );
       }
 
       const finalFeedback = await cognitiveIntegration.processTaskCompletion(
@@ -291,8 +306,12 @@ describe('Cognitive-Minecraft Integration Tests', () => {
       );
 
       expect(finalFeedback.reasoning).toContain('High failure rate');
-      expect(finalFeedback.alternativeSuggestions).toContain('Try mining in a different location');
-      expect(finalFeedback.alternativeSuggestions).toContain('Look for different types of blocks to mine');
+      expect(finalFeedback.alternativeSuggestions).toContain(
+        'Try mining in a different location'
+      );
+      expect(finalFeedback.alternativeSuggestions).toContain(
+        'Look for different types of blocks to mine'
+      );
     });
   });
 
@@ -383,7 +402,9 @@ describe('Cognitive-Minecraft Integration Tests', () => {
 
       const insights = await cognitiveIntegration.getCognitiveInsights('mine');
       expect(insights.length).toBeGreaterThan(0);
-      expect(insights.some((insight) => insight.includes('success rate'))).toBe(true);
+      expect(insights.some((insight) => insight.includes('success rate'))).toBe(
+        true
+      );
     });
   });
 
@@ -420,10 +441,10 @@ describe('Cognitive-Minecraft Integration Tests', () => {
       );
 
       expect(feedback.taskId).toBe('memory-test-1');
-      
+
       // Verify the feedback contains minecraft-specific reasoning
       expect(feedback.reasoning).toContain('Successfully completed craft task');
-      
+
       // The memory storage is internal, but we can verify the task was processed
       const stats = cognitiveIntegration.getTaskStats('memory-test-1');
       expect(stats.totalAttempts).toBe(1);

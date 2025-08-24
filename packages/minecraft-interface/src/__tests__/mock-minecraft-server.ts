@@ -1,9 +1,9 @@
 /**
  * Mock Minecraft Server for Testing
- * 
+ *
  * Provides a mock HTTP server that simulates the minecraft interface API
  * for comprehensive end-to-end testing without requiring actual Minecraft.
- * 
+ *
  * @author @darianrosebrook
  */
 
@@ -32,7 +32,11 @@ export class MockMinecraftServer {
   private port: number;
   private state: MockMinecraftState;
   private world: Map<string, MockWorldBlock>;
-  private chatHistory: Array<{ timestamp: number; message: string; sender: string }> = [];
+  private chatHistory: Array<{
+    timestamp: number;
+    message: string;
+    sender: string;
+  }> = [];
 
   constructor(port: number = 3005) {
     this.port = port;
@@ -202,7 +206,10 @@ export class MockMinecraftServer {
   }
 
   private canCraftItem(itemName: string): any {
-    const recipes: Record<string, { materials: Record<string, number>; result: string }> = {
+    const recipes: Record<
+      string,
+      { materials: Record<string, number>; result: string }
+    > = {
       wooden_pickaxe: {
         materials: { oak_log: 3, stick: 2 },
         result: 'wooden_pickaxe',
@@ -227,10 +234,14 @@ export class MockMinecraftServer {
     }
 
     // Check if we have the required materials
-    const canCraft = Object.entries(recipe.materials).every(([material, required]) => {
-      const inventoryItem = this.state.inventory.find((item) => item.name === material);
-      return inventoryItem && inventoryItem.count >= required;
-    });
+    const canCraft = Object.entries(recipe.materials).every(
+      ([material, required]) => {
+        const inventoryItem = this.state.inventory.find(
+          (item) => item.name === material
+        );
+        return inventoryItem && inventoryItem.count >= required;
+      }
+    );
 
     return {
       success: true,
@@ -244,7 +255,7 @@ export class MockMinecraftServer {
 
   private craftItem(itemName: string, quantity: number): any {
     const canCraftResult = this.canCraftItem(itemName);
-    
+
     if (!canCraftResult.canCraft) {
       return {
         success: false,
@@ -255,17 +266,23 @@ export class MockMinecraftServer {
     // Consume materials from inventory
     const recipe = canCraftResult.requiredMaterials;
     Object.entries(recipe).forEach(([material, required]) => {
-      const inventoryItem = this.state.inventory.find((item) => item.name === material);
+      const inventoryItem = this.state.inventory.find(
+        (item) => item.name === material
+      );
       if (inventoryItem) {
         inventoryItem.count -= (required as number) * quantity;
         if (inventoryItem.count <= 0) {
-          this.state.inventory = this.state.inventory.filter((item) => item !== inventoryItem);
+          this.state.inventory = this.state.inventory.filter(
+            (item) => item !== inventoryItem
+          );
         }
       }
     });
 
     // Add crafted item to inventory
-    const existingItem = this.state.inventory.find((item) => item.name === itemName);
+    const existingItem = this.state.inventory.find(
+      (item) => item.name === itemName
+    );
     if (existingItem) {
       existingItem.count += quantity;
     } else {
@@ -302,7 +319,9 @@ export class MockMinecraftServer {
     this.world.delete(key);
 
     // Add block to inventory
-    const existingItem = this.state.inventory.find((item) => item.name === block.type);
+    const existingItem = this.state.inventory.find(
+      (item) => item.name === block.type
+    );
     if (existingItem) {
       existingItem.count += 1;
     } else {
@@ -317,9 +336,14 @@ export class MockMinecraftServer {
     };
   }
 
-  private placeBlock(position: { x: number; y: number; z: number }, blockType: string): any {
+  private placeBlock(
+    position: { x: number; y: number; z: number },
+    blockType: string
+  ): any {
     // Check if we have the block in inventory
-    const inventoryItem = this.state.inventory.find((item) => item.name === blockType);
+    const inventoryItem = this.state.inventory.find(
+      (item) => item.name === blockType
+    );
     if (!inventoryItem || inventoryItem.count <= 0) {
       return {
         success: false,
@@ -339,7 +363,9 @@ export class MockMinecraftServer {
     // Remove block from inventory
     inventoryItem.count -= 1;
     if (inventoryItem.count <= 0) {
-      this.state.inventory = this.state.inventory.filter((item) => item !== inventoryItem);
+      this.state.inventory = this.state.inventory.filter(
+        (item) => item !== inventoryItem
+      );
     }
 
     // Place block in world
@@ -395,7 +421,11 @@ export class MockMinecraftServer {
     return new Map(this.world);
   }
 
-  public addBlock(position: { x: number; y: number; z: number }, type: string, harvestable: boolean = true): void {
+  public addBlock(
+    position: { x: number; y: number; z: number },
+    type: string,
+    harvestable: boolean = true
+  ): void {
     const key = `${position.x},${position.y},${position.z}`;
     this.world.set(key, { position, type, harvestable });
   }
@@ -405,7 +435,11 @@ export class MockMinecraftServer {
     return this.world.delete(key);
   }
 
-  public getChatHistory(): Array<{ timestamp: number; message: string; sender: string }> {
+  public getChatHistory(): Array<{
+    timestamp: number;
+    message: string;
+    sender: string;
+  }> {
     return [...this.chatHistory];
   }
 

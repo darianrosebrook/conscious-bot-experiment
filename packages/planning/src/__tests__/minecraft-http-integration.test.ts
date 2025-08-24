@@ -1,9 +1,9 @@
 /**
  * Minecraft HTTP Integration Test Suite
- * 
+ *
  * Tests the HTTP communication between the planning system and minecraft interface.
  * Validates the full request/response cycle and error handling.
- * 
+ *
  * @author @darianrosebrook
  */
 
@@ -36,7 +36,10 @@ async function executeTaskInMinecraft(task: any) {
           body: JSON.stringify({
             type: 'chat',
             parameters: {
-              message: task.parameters?.message || task.description || 'Executing task!',
+              message:
+                task.parameters?.message ||
+                task.description ||
+                'Executing task!',
             },
           }),
         }).then((res) => res.json());
@@ -145,7 +148,9 @@ async function executeTaskInMinecraft(task: any) {
           results: mineResults,
           type: 'mining',
           success: successfulMining,
-          error: successfulMining ? undefined : 'No blocks were successfully mined',
+          error: successfulMining
+            ? undefined
+            : 'No blocks were successfully mined',
         };
 
       default:
@@ -217,14 +222,27 @@ describe('Minecraft HTTP Integration Tests', () => {
       // Mock can_craft response
       const canCraftResponse = { success: true, canCraft: true };
       // Mock craft_item response
-      const craftResponse = { success: true, item: 'wooden_pickaxe', quantity: 1 };
+      const craftResponse = {
+        success: true,
+        item: 'wooden_pickaxe',
+        quantity: 1,
+      };
       // Mock chat response
-      const chatResponse = { success: true, message: 'Successfully crafted wooden_pickaxe!' };
+      const chatResponse = {
+        success: true,
+        message: 'Successfully crafted wooden_pickaxe!',
+      };
 
       mockFetch
-        .mockResolvedValueOnce({ json: () => Promise.resolve(canCraftResponse) } as any)
-        .mockResolvedValueOnce({ json: () => Promise.resolve(craftResponse) } as any)
-        .mockResolvedValueOnce({ json: () => Promise.resolve(chatResponse) } as any);
+        .mockResolvedValueOnce({
+          json: () => Promise.resolve(canCraftResponse),
+        } as any)
+        .mockResolvedValueOnce({
+          json: () => Promise.resolve(craftResponse),
+        } as any)
+        .mockResolvedValueOnce({
+          json: () => Promise.resolve(chatResponse),
+        } as any);
 
       const task = {
         type: 'craft',
@@ -239,13 +257,24 @@ describe('Minecraft HTTP Integration Tests', () => {
 
     it('should handle failed crafting workflow', async () => {
       // Mock can_craft response (failure)
-      const canCraftResponse = { success: true, canCraft: false, error: 'Missing materials' };
+      const canCraftResponse = {
+        success: true,
+        canCraft: false,
+        error: 'Missing materials',
+      };
       // Mock chat response
-      const chatResponse = { success: true, message: 'Cannot craft wooden_pickaxe: Missing materials' };
+      const chatResponse = {
+        success: true,
+        message: 'Cannot craft wooden_pickaxe: Missing materials',
+      };
 
       mockFetch
-        .mockResolvedValueOnce({ json: () => Promise.resolve(canCraftResponse) } as any)
-        .mockResolvedValueOnce({ json: () => Promise.resolve(chatResponse) } as any);
+        .mockResolvedValueOnce({
+          json: () => Promise.resolve(canCraftResponse),
+        } as any)
+        .mockResolvedValueOnce({
+          json: () => Promise.resolve(chatResponse),
+        } as any);
 
       const task = {
         type: 'craft',
@@ -267,12 +296,22 @@ describe('Minecraft HTTP Integration Tests', () => {
       const gameStateResponse = { position: { x: 10, y: 64, z: 20 } };
       // Mock mining responses (first fails, second succeeds)
       const mineResponse1 = { success: false, error: 'No block found' };
-      const mineResponse2 = { success: true, block: 'stone', position: { x: 11, y: 64, z: 20 } };
+      const mineResponse2 = {
+        success: true,
+        block: 'stone',
+        position: { x: 11, y: 64, z: 20 },
+      };
 
       mockFetch
-        .mockResolvedValueOnce({ json: () => Promise.resolve(gameStateResponse) } as any)
-        .mockResolvedValueOnce({ json: () => Promise.resolve(mineResponse1) } as any)
-        .mockResolvedValueOnce({ json: () => Promise.resolve(mineResponse2) } as any);
+        .mockResolvedValueOnce({
+          json: () => Promise.resolve(gameStateResponse),
+        } as any)
+        .mockResolvedValueOnce({
+          json: () => Promise.resolve(mineResponse1),
+        } as any)
+        .mockResolvedValueOnce({
+          json: () => Promise.resolve(mineResponse2),
+        } as any);
 
       const task = {
         type: 'mine',
@@ -300,7 +339,9 @@ describe('Minecraft HTTP Integration Tests', () => {
         parameters: { distance: 1 },
       };
 
-      await expect(executeTaskInMinecraft(task)).rejects.toThrow('Network error');
+      await expect(executeTaskInMinecraft(task)).rejects.toThrow(
+        'Network error'
+      );
     });
 
     it('should handle invalid JSON responses', async () => {
@@ -313,7 +354,9 @@ describe('Minecraft HTTP Integration Tests', () => {
         parameters: { message: 'test' },
       };
 
-      await expect(executeTaskInMinecraft(task)).rejects.toThrow('Invalid JSON');
+      await expect(executeTaskInMinecraft(task)).rejects.toThrow(
+        'Invalid JSON'
+      );
     });
 
     it('should handle unknown task types', async () => {
@@ -322,7 +365,9 @@ describe('Minecraft HTTP Integration Tests', () => {
         parameters: {},
       };
 
-      await expect(executeTaskInMinecraft(task)).rejects.toThrow('Unknown task type: unknown_task');
+      await expect(executeTaskInMinecraft(task)).rejects.toThrow(
+        'Unknown task type: unknown_task'
+      );
     });
   });
 
@@ -351,7 +396,10 @@ describe('Minecraft HTTP Integration Tests', () => {
     });
 
     it('should use task description as chat message fallback', async () => {
-      const mockResponse = { success: true, message: 'Task description message' };
+      const mockResponse = {
+        success: true,
+        message: 'Task description message',
+      };
       mockFetch.mockResolvedValueOnce({
         json: () => Promise.resolve(mockResponse),
       } as any);
