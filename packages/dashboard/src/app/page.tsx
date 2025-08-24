@@ -231,8 +231,8 @@ export default function ConsciousMinecraftDashboard() {
       }
     };
 
-    // Refresh every 5 seconds
-    const interval = setInterval(refreshBotState, 5000);
+    // Refresh every 30 seconds (reduced from 5 seconds to reduce API spam)
+    const interval = setInterval(refreshBotState, 30000);
     return () => clearInterval(interval);
   }, [setInventory]);
 

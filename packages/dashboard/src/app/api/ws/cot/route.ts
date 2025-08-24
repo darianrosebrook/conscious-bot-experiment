@@ -194,6 +194,11 @@ export const GET = async (req: NextRequest) => {
                 lastThoughtId = thought.id;
               }
             }
+            
+            // Log thoughts update (reduced frequency)
+            if (thoughts.length > 0) {
+              console.log(`🧠 Thoughts update sent at ${new Date().toISOString()} (${thoughts.length} thoughts)`);
+            }
           } catch (error) {
             // Silently handle errors
           }
@@ -202,8 +207,8 @@ export const GET = async (req: NextRequest) => {
         // Send initial thoughts
         sendThoughts();
 
-        // Send updates every 3 seconds
-        const interval = setInterval(sendThoughts, 3000);
+        // Send updates every 15 seconds (reduced from 3 seconds to reduce API spam)
+        const interval = setInterval(sendThoughts, 15000);
 
         // Cleanup on close
         req.signal.addEventListener('abort', () => {

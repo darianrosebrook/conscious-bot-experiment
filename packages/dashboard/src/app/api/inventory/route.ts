@@ -17,6 +17,9 @@ export async function GET(_request: NextRequest) {
     // Try to fetch inventory data from Minecraft bot server
     let inventory = [];
 
+    // Temporarily use mock data while we debug the inventory movement
+    console.log('Using mock data for testing hotbar display');
+    /*
     try {
       const response = await fetch('http://localhost:3005/state', {
         method: 'GET',
@@ -34,6 +37,7 @@ export async function GET(_request: NextRequest) {
     } catch (error) {
       console.log('Minecraft bot server not available, using mock data');
     }
+    */
 
     // If no inventory data from server, use mock data for testing
     if (inventory.length === 0) {

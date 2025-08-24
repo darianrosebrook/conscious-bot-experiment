@@ -80,6 +80,9 @@ export const GET = async (req: NextRequest) => {
 
             const data = `data: ${JSON.stringify(hudData)}\n\n`;
             controller.enqueue(encoder.encode(data));
+            
+            // Log HUD update (reduced frequency)
+            console.log(`📊 HUD update sent at ${new Date().toISOString()}`);
           } catch (error) {
             // Silently handle errors
           }
@@ -88,8 +91,8 @@ export const GET = async (req: NextRequest) => {
         // Send initial data
         sendHudData();
 
-        // Send updates every 2 seconds
-        const interval = setInterval(sendHudData, 2000);
+        // Send updates every 10 seconds (reduced from 2 seconds to reduce API spam)
+        const interval = setInterval(sendHudData, 10000);
 
         // Cleanup on close
         req.signal.addEventListener('abort', () => {
