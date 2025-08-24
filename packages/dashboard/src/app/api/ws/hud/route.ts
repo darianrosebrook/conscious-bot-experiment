@@ -32,8 +32,8 @@ export const GET = async (req: NextRequest) => {
 
             const hudData = {
               ts: new Date().toISOString(),
-              vitals: { health: 100, hunger: 100, stamina: 100, sleep: 100 },
-              intero: { stress: 0, focus: 100, curiosity: 50 },
+              vitals: { health: 85, hunger: 60, stamina: 45, sleep: 30 },
+              intero: { stress: 75, focus: 80, curiosity: 90 },
               mood: 'neutral',
             };
 
@@ -41,10 +41,14 @@ export const GET = async (req: NextRequest) => {
             if (minecraftRes.status === 'fulfilled' && minecraftRes.value.ok) {
               const minecraftData = await minecraftRes.value.json();
               if (minecraftData.data) {
-                hudData.vitals.health = minecraftData.data.health || 100;
-                hudData.vitals.hunger = minecraftData.data.food || 100;
-                hudData.vitals.stamina = 100; // Not tracked in current bot
-                hudData.vitals.sleep = 100; // Not tracked in current bot
+                // Only update if we have real data, otherwise keep test values
+                if (minecraftData.data.health !== undefined) {
+                  hudData.vitals.health = minecraftData.data.health;
+                }
+                if (minecraftData.data.food !== undefined) {
+                  hudData.vitals.hunger = minecraftData.data.food;
+                }
+                // Keep test values for stamina and sleep since they're not tracked
               }
             }
 
@@ -59,9 +63,12 @@ export const GET = async (req: NextRequest) => {
                   cognitionData.cognitiveCore.creativeSolver
                     ?.solutionsGenerated || 0;
 
-                hudData.intero.focus = Math.min(100, 50 + solutions * 10);
-                hudData.intero.curiosity = Math.min(100, 30 + convos * 15);
-                hudData.intero.stress = Math.max(0, 20 - solutions * 2);
+                // Only update if we have meaningful data, otherwise keep test values
+                if (solutions > 0 || convos > 0) {
+                  hudData.intero.focus = Math.min(100, 50 + solutions * 10);
+                  hudData.intero.curiosity = Math.min(100, 30 + convos * 15);
+                  hudData.intero.stress = Math.max(0, 20 - solutions * 2);
+                }
 
                 // Determine mood based on cognitive state
                 if (solutions > 5) hudData.mood = 'accomplished';

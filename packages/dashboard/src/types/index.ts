@@ -93,6 +93,23 @@ export interface Environment {
   nearbyEntities: string[];
 }
 
+// Inventory types
+export interface InventoryItem {
+  type: string | number | null;
+  count: number;
+  slot: number;
+  metadata?: Record<string, unknown>;
+  displayName?: string;
+  durability?: number;
+  maxDurability?: number;
+}
+
+export interface InventoryData {
+  inventory: InventoryItem[];
+  totalItems: number;
+  timestamp: number;
+}
+
 // Intrusive thought request/response
 export interface IntrusiveThoughtRequest {
   text: string;
@@ -133,4 +150,5 @@ export interface DashboardState {
   memories: Memory[];
   environment: Environment | null;
   currentScreenshot: Screenshot | null;
+  inventory: InventoryItem[];
 }

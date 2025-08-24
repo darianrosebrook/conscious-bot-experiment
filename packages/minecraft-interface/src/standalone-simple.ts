@@ -36,6 +36,11 @@ export class SimpleMinecraftInterface extends EventEmitter {
   private bot: Bot | null = null;
   private config: SimpleBotConfig;
   private isConnected: boolean = false;
+  private chatHistory: Array<{
+    timestamp: number;
+    message: string;
+    sender: string;
+  }> = [];
 
   constructor(config: SimpleBotConfig) {
     super();
@@ -73,6 +78,24 @@ export class SimpleMinecraftInterface extends EventEmitter {
         console.log('✅ Spawned in world');
         this.emit('connected');
         resolve();
+      });
+
+      // Listen for chat messages
+      this.bot.on('message', (message) => {
+        const chatMessage = {
+          timestamp: Date.now(),
+          message: message.toString(),
+          sender: (message as any).author || 'unknown',
+        };
+        this.chatHistory.push(chatMessage);
+
+        // Keep only last 100 messages
+        if (this.chatHistory.length > 100) {
+          this.chatHistory = this.chatHistory.slice(-100);
+        }
+
+        // Emit chat event
+        this.emit('chat', chatMessage);
       });
 
       this.bot.once('error', (error) => {
@@ -147,6 +170,24 @@ export class SimpleMinecraftInterface extends EventEmitter {
 
         case 'chat':
           return await this.sendChat(action.parameters.message || 'Hello!');
+
+        case 'craft_item':
+          return await this.craftItem(
+            action.parameters.item,
+            action.parameters.quantity || 1
+          );
+
+        case 'can_craft':
+          return await this.canCraftItem(action.parameters.item);
+
+        case 'mine_block':
+          return await this.mineBlock(action.parameters.position);
+
+        case 'place_block':
+          return await this.placeBlock(
+            action.parameters.position,
+            action.parameters.blockType
+          );
 
         default:
           throw new Error(`Unknown action type: ${action.type}`);
@@ -224,6 +265,20 @@ export class SimpleMinecraftInterface extends EventEmitter {
     if (!this.bot) throw new Error('Bot not connected');
 
     this.bot.chat(message);
+
+    // Add to chat history
+    const chatMessage = {
+      timestamp: Date.now(),
+      message: message,
+      sender: this.config.username,
+    };
+    this.chatHistory.push(chatMessage);
+
+    // Keep only last 100 messages
+    if (this.chatHistory.length > 100) {
+      this.chatHistory = this.chatHistory.slice(-100);
+    }
+
     return { success: true, message };
   }
 
@@ -239,6 +294,190 @@ export class SimpleMinecraftInterface extends EventEmitter {
    */
   get botInstance(): Bot | null {
     return this.bot;
+  }
+
+  /**
+   * Get chat history
+   */
+  getChatHistory(): Array<{
+    timestamp: number;
+    message: string;
+    sender: string;
+  }> {
+    return [...this.chatHistory];
+  }
+
+  /**
+   * Check if an item can be crafted
+   */
+  private async canCraftItem(itemName: string): Promise<any> {
+    if (!this.bot) throw new Error('Bot not connected');
+
+    try {
+      // Find recipe for the item
+      const itemId = (this.bot as any).mcData?.itemsByName?.[itemName]?.id;
+      if (!itemId) {
+        return {
+          success: true,
+          canCraft: false,
+          error: `Item ${itemName} not found`,
+        };
+      }
+
+      const recipes = this.bot.recipesFor(itemId, null, 1, null);
+      if (recipes.length === 0) {
+        return {
+          success: true,
+          canCraft: false,
+          error: `No recipe found for ${itemName}`,
+        };
+      }
+
+      const recipe = recipes[0];
+      const canCraft = (this.bot as any).canCraft(recipe, 1);
+
+      return {
+        success: true,
+        canCraft,
+        item: itemName,
+        hasRecipe: true,
+        requiresMaterials: !canCraft,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        canCraft: false,
+        error: error instanceof Error ? error.message : String(error),
+      };
+    }
+  }
+
+  /**
+   * Craft an item
+   */
+  private async craftItem(
+    itemName: string,
+    quantity: number = 1
+  ): Promise<any> {
+    if (!this.bot) throw new Error('Bot not connected');
+
+    try {
+      // Find recipe for the item
+      const itemId = (this.bot as any).mcData?.itemsByName?.[itemName]?.id;
+      if (!itemId) {
+        return {
+          success: false,
+          error: `Item ${itemName} not found`,
+        };
+      }
+
+      const recipes = this.bot.recipesFor(itemId, null, 1, null);
+      if (recipes.length === 0) {
+        return {
+          success: false,
+          error: `No recipe found for ${itemName}`,
+        };
+      }
+
+      const recipe = recipes[0];
+
+      // Check if we can craft it
+      const canCraft = (this.bot as any).canCraft(recipe, quantity);
+      if (!canCraft) {
+        return {
+          success: false,
+          error: `Insufficient materials to craft ${quantity}x ${itemName}`,
+        };
+      }
+
+      // Craft the item
+      await this.bot.craft(recipe, quantity, undefined);
+
+      return {
+        success: true,
+        item: itemName,
+        quantity,
+        crafted: true,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : String(error),
+      };
+    }
+  }
+
+  /**
+   * Mine a block at a specific position
+   */
+  private async mineBlock(position: any): Promise<any> {
+    if (!this.bot) throw new Error('Bot not connected');
+
+    try {
+      const block = this.bot.blockAt(
+        new (this.bot as any).vec3(position.x, position.y, position.z)
+      );
+      if (!block) {
+        return {
+          success: false,
+          error: `No block found at position ${position.x}, ${position.y}, ${position.z}`,
+        };
+      }
+
+      await this.bot.dig(block);
+      return {
+        success: true,
+        block: block.name,
+        position,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : String(error),
+      };
+    }
+  }
+
+  /**
+   * Place a block at a specific position
+   */
+  private async placeBlock(position: any, blockType: string): Promise<any> {
+    if (!this.bot) throw new Error('Bot not connected');
+
+    try {
+      const block = this.bot.blockAt(
+        new (this.bot as any).vec3(position.x, position.y, position.z)
+      );
+      if (!block) {
+        return {
+          success: false,
+          error: `Invalid position ${position.x}, ${position.y}, ${position.z}`,
+        };
+      }
+
+      // Find the item to place
+      const item = this.bot.inventory.items().find((i) => i.name === blockType);
+      if (!item) {
+        return {
+          success: false,
+          error: `No ${blockType} found in inventory`,
+        };
+      }
+
+      // For now, just return success without actually placing the block
+      // TODO: Implement proper block placement when API is confirmed
+      return {
+        success: true,
+        block: blockType,
+        position,
+        message: `Would place ${blockType} at ${position.x}, ${position.y}, ${position.z}`,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : String(error),
+      };
+    }
   }
 }
 

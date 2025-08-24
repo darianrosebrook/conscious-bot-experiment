@@ -24,6 +24,7 @@ import { HudMeter } from '@/components/hud-meter';
 import { Section } from '@/components/section';
 import { Pill } from '@/components/pill';
 import { EmptyState } from '@/components/empty-state';
+import { InventoryDisplay } from '@/components/inventory-display';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -42,6 +43,7 @@ interface BotState {
     count: number;
     displayName: string;
   }>;
+  selectedSlot?: number;
   time?: number;
   weather?: string;
 }
@@ -65,11 +67,13 @@ export default function ConsciousMinecraftDashboard() {
     thoughts,
     tasks,
     environment,
+    inventory,
     setIsLive,
     setHud,
     addThought,
     setTasks,
     setEnvironment,
+    setInventory,
   } = useDashboardStore();
 
   const [intrusion, setIntrusion] = useState('');
@@ -131,6 +135,15 @@ export default function ConsciousMinecraftDashboard() {
           setEnvironment(worldData.environment);
         }
 
+        // Fetch inventory
+        const inventoryRes = await fetch('/api/inventory');
+        if (inventoryRes.ok) {
+          const inventoryData = await inventoryRes.json();
+          if (inventoryData.success) {
+            setInventory(inventoryData.inventory);
+          }
+        }
+
         // Fetch bot state and health (includes viewer info)
         const [botRes, healthRes] = await Promise.allSettled([
           fetch('http://localhost:3005/state'),
@@ -159,12 +172,21 @@ export default function ConsciousMinecraftDashboard() {
     };
 
     fetchInitialData();
-  }, [setTasks, setEnvironment]);
+  }, [setTasks, setEnvironment, setInventory]);
 
   // Periodic refresh of bot state and connection status
   useEffect(() => {
     const refreshBotState = async () => {
       try {
+        // Fetch inventory
+        const inventoryRes = await fetch('/api/inventory');
+        if (inventoryRes.ok) {
+          const inventoryData = await inventoryRes.json();
+          if (inventoryData.success) {
+            setInventory(inventoryData.inventory);
+          }
+        }
+
         const [botRes, healthRes] = await Promise.allSettled([
           fetch('http://localhost:3005/state'),
           fetch('http://localhost:3005/health'),
@@ -212,7 +234,7 @@ export default function ConsciousMinecraftDashboard() {
     // Refresh every 5 seconds
     const interval = setInterval(refreshBotState, 5000);
     return () => clearInterval(interval);
-  }, []);
+  }, [setInventory]);
 
   /**
    * Submit an intrusive thought to the bot
@@ -317,8 +339,8 @@ export default function ConsciousMinecraftDashboard() {
         {hud ? (
           <>
             <div className="grid grid-cols-2 md:grid-cols-7 gap-3">
-              <HudMeter label="Health" value={hud.vitals.health} />
-              <HudMeter label="Hunger" value={hud.vitals.hunger} />
+              <HudMeter label="Health" value={(hud.vitals.health / 20) * 100} />
+              <HudMeter label="Hunger" value={(hud.vitals.hunger / 20) * 100} />
               <HudMeter label="Stamina" value={hud.vitals.stamina} />
               <HudMeter label="Sleep" value={hud.vitals.sleep} />
               <HudMeter
@@ -345,7 +367,7 @@ export default function ConsciousMinecraftDashboard() {
 
       {/* Main 3-column Layout */}
       <div className="grid h-[calc(100vh-136px)] grid-cols-12 gap-3 p-3">
-        {/* Left: Task Queue */}
+        {/* Left: Tasks, Planner, Reflective Notes, Environment, Events, Memories */}
         <aside className="col-span-12 md:col-span-3 flex flex-col gap-3 overflow-auto">
           <Section title="Tasks" icon={<ListChecks className="size-4" />}>
             {tasks.length > 0 ? (
@@ -421,9 +443,54 @@ export default function ConsciousMinecraftDashboard() {
               className="p-3"
             />
           </Section>
+
+          <Section title="Environment" icon={<Map className="size-4" />}>
+            {environment ? (
+              <div className="grid grid-cols-2 gap-2 text-sm text-zinc-300">
+                <div className="rounded-lg border border-zinc-800 bg-zinc-950 p-2">
+                  <span className="text-zinc-500">Biome</span>
+                  <div>{environment.biome}</div>
+                </div>
+                <div className="rounded-lg border border-zinc-800 bg-zinc-950 p-2">
+                  <span className="text-zinc-500">Weather</span>
+                  <div>{environment.weather}</div>
+                </div>
+                <div className="rounded-lg border border-zinc-800 bg-zinc-950 p-2">
+                  <span className="text-zinc-500">Time</span>
+                  <div>{environment.timeOfDay}</div>
+                </div>
+                <div className="rounded-lg border border-zinc-800 bg-zinc-950 p-2">
+                  <span className="text-zinc-500">Nearby</span>
+                  <div>{environment.nearbyEntities.join(', ')}</div>
+                </div>
+              </div>
+            ) : (
+              <EmptyState
+                icon={Map}
+                title="No environment data"
+                description="Environment information will appear here when the bot is connected to the world."
+              />
+            )}
+          </Section>
+
+          <Section title="Events" icon={<History className="size-4" />}>
+            <EmptyState
+              icon={History}
+              title="No events recorded"
+              description="Events will appear here as the bot interacts with the world."
+            />
+          </Section>
+
+          <Section title="Memories" icon={<Brain className="size-4" />}>
+            <EmptyState
+              icon={Brain}
+              title="No memories available"
+              description="Memories will appear here as the bot forms and recalls experiences."
+            />
+          </Section>
         </aside>
 
-        {/* Center: Stream + Thought Feed */}
+        {/* Center: Live Stream + Inventory */}
         <main className="col-span-12 md:col-span-6 flex flex-col gap-3 overflow-hidden">
           <Section title="Live Stream" icon={<Activity className="size-4" />}>
             <div className="relative aspect-video w-full overflow-hidden rounded-xl border border-zinc-800 bg-zinc-900">
@@ -440,12 +507,24 @@ export default function ConsciousMinecraftDashboard() {
                     title="Minecraft Bot View"
                     sandbox="allow-scripts allow-same-origin"
                   />
-                  <div className="absolute right-3 top-3">
+                  <div className="absolute right-3 top-3 flex items-center gap-2">
                     <button
                       onClick={() => setViewerKey((prev) => prev + 1)}
                       className="rounded-md bg-black/60 px-2 py-1 text-xs text-zinc-300 hover:bg-black/80"
                     >
                       Refresh Viewer
+                    </button>
+                    <button
+                      onClick={() => {
+                        window.open(
+                          botConnections.find((c) => c.name === 'minecraft-bot')
+                            ?.viewerUrl || 'http://localhost:3006',
+                          '_blank'
+                        );
+                      }}
+                      className="rounded-md bg-black/60 px-2 py-1 text-xs text-zinc-300 hover:bg-black/80"
+                    >
+                      Full Screen
                     </button>
                   </div>
                 </>
@@ -527,6 +606,14 @@ export default function ConsciousMinecraftDashboard() {
             </div>
           </Section>
 
+          <InventoryDisplay
+            inventory={inventory}
+            selectedSlot={botState?.selectedSlot || 0}
+          />
+        </main>
+
+        {/* Right: Cognitive Stream + Thought Input */}
+        <aside className="col-span-12 md:col-span-3 flex flex-col gap-3 overflow-auto">
           <Section
             title="Cognitive Stream"
             icon={<MessageSquare className="size-4" />}
@@ -592,54 +679,6 @@ export default function ConsciousMinecraftDashboard() {
               injection as self-generated.
             </div>
           </div>
-        </main>
-
-        {/* Right: Environment + Events + Memories */}
-        <aside className="col-span-12 md:col-span-3 flex flex-col gap-3 overflow-auto">
-          <Section title="Environment" icon={<Map className="size-4" />}>
-            {environment ? (
-              <div className="grid grid-cols-2 gap-2 text-sm text-zinc-300">
-                <div className="rounded-lg border border-zinc-800 bg-zinc-950 p-2">
-                  <span className="text-zinc-500">Biome</span>
-                  <div>{environment.biome}</div>
-                </div>
-                <div className="rounded-lg border border-zinc-800 bg-zinc-950 p-2">
-                  <span className="text-zinc-500">Weather</span>
-                  <div>{environment.weather}</div>
-                </div>
-                <div className="rounded-lg border border-zinc-800 bg-zinc-950 p-2">
-                  <span className="text-zinc-500">Time</span>
-                  <div>{environment.timeOfDay}</div>
-                </div>
-                <div className="rounded-lg border border-zinc-800 bg-zinc-950 p-2">
-                  <span className="text-zinc-500">Nearby</span>
-                  <div>{environment.nearbyEntities.join(', ')}</div>
-                </div>
-              </div>
-            ) : (
-              <EmptyState
-                icon={Map}
-                title="No environment data"
-                description="Environment information will appear here when the bot is connected to the world."
-              />
-            )}
-          </Section>
-
-          <Section title="Events" icon={<History className="size-4" />}>
-            <EmptyState
-              icon={History}
-              title="No events recorded"
-              description="Events will appear here as the bot interacts with the world."
-            />
-          </Section>
-
-          <Section title="Memories" icon={<Brain className="size-4" />}>
-            <EmptyState
-              icon={Brain}
-              title="No memories available"
-              description="Memories will appear here as the bot forms and recalls experiences."
-            />
-          </Section>
         </aside>
       </div>
     </div>

@@ -1,5 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import type { Task } from '@/types';
+import { 
+  parseTaskDescription, 
+  parseStepDescription, 
+  parseGoalDescription, 
+  parseCurrentAction
+} from '@/lib/message-parser';
 
 /**
  * Tasks API
@@ -29,14 +35,18 @@ export async function GET(_request: NextRequest) {
       for (const task of tasksData.tasks) {
         tasks.push({
           id: task.id || `task-${Date.now()}`,
-          title: task.description || task.type || 'Unknown Task',
+          title: parseTaskDescription(task),
           priority: task.priority || 0.5,
           progress: task.status === 'completed' ? 1.0 : 0.3,
           source: 'planner' as const,
           steps: [
             {
               id: `step-${task.id}`,
-              label: `${task.type}: ${JSON.stringify(task.parameters || {})}`,
+              label: parseStepDescription({
+                action: task.type,
+                parameters: task.parameters,
+                description: task.description
+              }),
               done: task.status === 'completed',
             },
           ],
@@ -49,14 +59,14 @@ export async function GET(_request: NextRequest) {
       for (const goal of stateData.goalFormulation.currentGoals) {
         tasks.push({
           id: `goal-${goal.id || Date.now()}`,
-          title: goal.description || goal.name || 'Unknown Goal',
+          title: parseGoalDescription(goal),
           priority: goal.priority || 0.5,
           progress: goal.progress || 0,
           source: 'goal' as const,
           steps:
             goal.steps?.map((step: Record<string, unknown>, index: number) => ({
               id: `step-${index}`,
-              label: step.label || step.description || `Step ${index + 1}`,
+              label: parseStepDescription(step),
               done: step.done || false,
             })) || [],
         });
@@ -65,16 +75,17 @@ export async function GET(_request: NextRequest) {
 
     // Add current action as a task if executing
     if (stateData.reactiveExecutor?.currentAction) {
+      const actionDescription = parseCurrentAction(stateData.reactiveExecutor.currentAction);
       tasks.push({
         id: 'current-action',
-        title: `Executing: ${stateData.reactiveExecutor.currentAction}`,
+        title: `Executing: ${actionDescription}`,
         priority: 1.0,
         progress: 0.5, // Assume in progress
         source: 'planner' as const,
         steps: [
           {
             id: 'action-step',
-            label: stateData.reactiveExecutor.currentAction,
+            label: actionDescription,
             done: false,
           },
         ],

@@ -1,14 +1,16 @@
 import { create } from 'zustand';
 import { devtools } from 'zustand/middleware';
-import type { 
-  DashboardState, 
-  HudData, 
-  Thought, 
-  Task, 
-  Event, 
-  Memory, 
-  Environment, 
-  Screenshot 
+import { generateId } from '@/lib/utils';
+import type {
+  DashboardState,
+  HudData,
+  Thought,
+  Task,
+  Event,
+  Memory,
+  Environment,
+  Screenshot,
+  InventoryItem,
 } from '@/types';
 
 interface DashboardStore extends DashboardState {
@@ -25,6 +27,7 @@ interface DashboardStore extends DashboardState {
   setEnvironment: (environment: Environment) => void;
   setCurrentScreenshot: (screenshot: Screenshot) => void;
   setCurrentSession: (sessionId: string) => void;
+  setInventory: (inventory: InventoryItem[]) => void;
   reset: () => void;
 }
 
@@ -37,6 +40,7 @@ const initialState: DashboardState = {
   memories: [],
   environment: null,
   currentScreenshot: null,
+  inventory: [],
 };
 
 /**
@@ -52,10 +56,39 @@ export const useDashboardStore = create<DashboardStore>()(
 
       setHud: (hud) => set({ hud }),
 
-      addThought: (thought) => 
-        set((state) => ({ 
-          thoughts: [...state.thoughts, thought].slice(-100) // Keep last 100 thoughts
-        })),
+      addThought: (thought) =>
+        set((state) => {
+          // Ensure thought has a unique ID
+          const thoughtWithId = {
+            ...thought,
+            id: thought.id || generateId(),
+          };
+
+          // Check if thought with same ID already exists
+          const existingThought = state.thoughts.find(
+            (t) => t.id === thoughtWithId.id
+          );
+          if (existingThought) {
+            return state; // Don't add duplicate
+          }
+
+          // Also check for duplicate content within a short time window (5 seconds)
+          const fiveSecondsAgo = new Date(Date.now() - 5000).toISOString();
+          const recentDuplicate = state.thoughts.find(
+            (t) =>
+              t.text === thoughtWithId.text &&
+              t.type === thoughtWithId.type &&
+              t.ts > fiveSecondsAgo
+          );
+
+          if (recentDuplicate) {
+            return state; // Don't add duplicate content
+          }
+
+          return {
+            thoughts: [...state.thoughts, thoughtWithId].slice(-100), // Keep last 100 thoughts
+          };
+        }),
 
       setThoughts: (thoughts) => set({ thoughts }),
 
@@ -70,7 +103,7 @@ export const useDashboardStore = create<DashboardStore>()(
 
       addEvent: (event) =>
         set((state) => ({
-          events: [...state.events, event].slice(-50) // Keep last 50 events
+          events: [...state.events, event].slice(-50), // Keep last 50 events
         })),
 
       setEvents: (events) => set({ events }),
@@ -82,6 +115,8 @@ export const useDashboardStore = create<DashboardStore>()(
       setCurrentScreenshot: (currentScreenshot) => set({ currentScreenshot }),
 
       setCurrentSession: (currentSession) => set({ currentSession }),
+
+      setInventory: (inventory) => set({ inventory }),
 
       reset: () => set(initialState),
     }),

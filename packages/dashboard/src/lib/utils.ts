@@ -47,14 +47,28 @@ export function formatRelativeTime(ts: string): string {
 /**
  * Get color for HUD meter based on value and type
  * @param value - Current value (0-100)
- * @param type - Type of meter (health, hunger, etc.)
+ * @param type - Type of meter (health, hunger, stress, etc.)
  * @returns Tailwind color class
  */
-export function getHudColor(value: number, _type: string): string {
-  if (value >= 80) return "bg-hud-health";
-  if (value >= 60) return "bg-hud-safe";
-  if (value >= 40) return "bg-hud-warning";
-  return "bg-hud-danger";
+export function getHudColor(value: number, type: string): string {
+  // For stress-like metrics (lower is better)
+  if (type.includes('stress') || type.includes('fatigue') || type.includes('anxiety')) {
+    if (value <= 10) return "bg-green-500"; // Green for low stress
+    if (value <= 50) return "bg-yellow-500"; // Yellow for moderate stress
+    return "bg-red-500"; // Red for high stress
+  }
+  
+  // For health-like metrics (higher is better)
+  if (type.includes('health') || type.includes('energy') || type.includes('happiness') || type.includes('hunger')) {
+    if (value >= 80) return "bg-green-500"; // Green for high health
+    if (value >= 50) return "bg-yellow-500"; // Yellow for moderate health
+    return "bg-red-500"; // Red for low health
+  }
+  
+  // Default behavior (higher is better)
+  if (value >= 80) return "bg-green-500";
+  if (value >= 50) return "bg-yellow-500";
+  return "bg-red-500";
 }
 
 /**

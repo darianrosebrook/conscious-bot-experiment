@@ -6,8 +6,8 @@
   "type": "module",
   "scripts": {
     "build": "turbo build",
-    "dev": "turbo dev",
-    "dev:all": "pnpm run dev:services",
+    "dev": "pnpm run dev:services",
+    "dev:all": "node scripts/dev.js",
     "dev:services": "concurrently \"pnpm run dev:dashboard\" \"pnpm run dev:minecraft\" \"pnpm run dev:cognition\" \"pnpm run dev:memory\" \"pnpm run dev:world\" \"pnpm run dev:planning\"",
     "dev:dashboard": "pnpm --filter @conscious-bot/dashboard dev",
     "dev:minecraft": "pnpm --filter @conscious-bot/minecraft-interface run dev:server",

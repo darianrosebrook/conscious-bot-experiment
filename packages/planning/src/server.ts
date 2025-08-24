@@ -8,6 +8,7 @@
 
 import express from 'express';
 import cors from 'cors';
+import { CognitiveIntegration } from './cognitive-integration';
 
 const app = express();
 const port = process.env.PORT ? parseInt(process.env.PORT) : 3002;
@@ -15,6 +16,14 @@ const port = process.env.PORT ? parseInt(process.env.PORT) : 3002;
 // Middleware
 app.use(cors());
 app.use(express.json());
+
+// Initialize cognitive integration
+const cognitiveIntegration = new CognitiveIntegration({
+  reflectionEnabled: true,
+  maxRetries: 3,
+  failureThreshold: 0.3,
+  successThreshold: 0.7,
+});
 
 // Initialize planning system (simplified for now)
 const planningSystem = {
@@ -32,6 +41,9 @@ const planningSystem = {
       planningSystem.goalFormulation._tasks.push(task);
     },
     _tasks: [] as any[],
+    _lastTaskExecution: 0, // Track when last task was executed
+    _failedTaskCount: 0, // Track failed tasks to prevent infinite loops
+    _maxConsecutiveFailures: 3, // Maximum consecutive failures before switching strategies
   },
   hierarchicalPlanner: {
     getCurrentPlan: () => null,
@@ -49,22 +61,363 @@ const planningSystem = {
         throw new Error('No tasks to execute');
       }
 
-      const task = tasks.shift(); // Remove and get first task
-      if (!task) {
-        throw new Error('No task available');
+      // Find the first pending task
+      const taskIndex = tasks.findIndex((t: any) => t.status === 'pending');
+      if (taskIndex === -1) {
+        throw new Error('No pending tasks to execute');
       }
 
-      // Execute the task by sending commands to Minecraft bot
-      const result = await executeTaskInMinecraft(task);
+      const task = tasks[taskIndex];
 
-      // Mark task as completed
-      task.status = 'completed';
-      task.completedAt = Date.now();
+      // Mark task as in progress
+      task.status = 'in_progress';
+      task.startedAt = Date.now();
+      task.attempts = (task.attempts || 0) + 1;
 
-      return { task, result };
+      try {
+        // Execute the task by sending commands to Minecraft bot
+        const result = await executeTaskInMinecraft(task);
+
+        // Validate task completion based on result
+        const taskCompleted = validateTaskCompletion(task, result);
+
+        // Debug logging
+        console.log(`🔍 Task Validation for ${task.type}:`, {
+          taskId: task.id,
+          resultSuccess: (result as any).success,
+          resultError: (result as any).error,
+          resultType: (result as any).type,
+          taskCompleted,
+          taskStatus: task.status,
+        });
+
+        // Process cognitive feedback
+        const cognitiveFeedback =
+          await cognitiveIntegration.processTaskCompletion(task, result, {
+            taskType: task.type,
+            goal: task.goal,
+            attempts: task.attempts,
+          });
+
+        if (taskCompleted) {
+          // Mark task as completed
+          task.status = 'completed';
+          task.completedAt = Date.now();
+          task.result = result;
+          task.cognitiveFeedback = cognitiveFeedback;
+
+          // Reset failure counter on success
+          planningSystem.goalFormulation._failedTaskCount = 0;
+
+          console.log(
+            `✅ Task completed successfully: ${task.type} - ${task.description}`
+          );
+          console.log(`🧠 Cognitive feedback: ${cognitiveFeedback.reasoning}`);
+        } else {
+          // Mark task as failed
+          task.status = 'failed';
+          task.failedAt = Date.now();
+          task.failureReason =
+            (result as any)?.error || 'Task validation failed';
+          task.result = result;
+          task.cognitiveFeedback = cognitiveFeedback;
+
+          // Increment failure counter
+          planningSystem.goalFormulation._failedTaskCount++;
+
+          console.log(
+            `❌ Task failed: ${task.type} - ${task.description} - Reason: ${task.failureReason}`
+          );
+          console.log(`🧠 Cognitive feedback: ${cognitiveFeedback.reasoning}`);
+
+          // Check if task should be abandoned based on cognitive feedback
+          if (cognitiveIntegration.shouldAbandonTask(task.id)) {
+            console.log(
+              `🚫 Abandoning task ${task.id} based on cognitive feedback`
+            );
+            task.status = 'abandoned';
+            task.abandonedAt = Date.now();
+            task.abandonReason = 'Cognitive feedback suggests abandonment';
+
+            // Generate alternative suggestions from cognitive feedback
+            if (cognitiveFeedback.alternativeSuggestions.length > 0) {
+              console.log(
+                `💡 Alternative suggestions: ${cognitiveFeedback.alternativeSuggestions.join(', ')}`
+              );
+
+              // Create alternative tasks based on suggestions
+              const alternativeTask = generateTaskFromSuggestions(
+                cognitiveFeedback.alternativeSuggestions
+              );
+              if (alternativeTask) {
+                planningSystem.goalFormulation.addTask(alternativeTask);
+              }
+            }
+          } else if (
+            planningSystem.goalFormulation._failedTaskCount >=
+            planningSystem.goalFormulation._maxConsecutiveFailures
+          ) {
+            console.log(
+              `⚠️ Too many consecutive failures (${planningSystem.goalFormulation._failedTaskCount}), switching task strategy`
+            );
+            planningSystem.goalFormulation._failedTaskCount = 0;
+
+            // Generate a different type of task
+            const alternativeTask = generateAlternativeTask(task);
+            planningSystem.goalFormulation.addTask(alternativeTask);
+          }
+        }
+
+        // Update last execution time
+        planningSystem.goalFormulation._lastTaskExecution = Date.now();
+
+        return { task, result, completed: taskCompleted };
+      } catch (error) {
+        // Mark task as failed due to exception
+        task.status = 'failed';
+        task.failedAt = Date.now();
+        task.failureReason =
+          error instanceof Error ? error.message : String(error);
+
+        // Increment failure counter
+        planningSystem.goalFormulation._failedTaskCount++;
+
+        console.error(
+          `❌ Task execution error: ${task.type} - ${task.description} - Error: ${task.failureReason}`
+        );
+
+        throw error;
+      }
     },
   },
 };
+
+/**
+ * Validate if a task was actually completed successfully
+ */
+function validateTaskCompletion(task: any, result: any): boolean {
+  // Check if the result indicates success
+  if (!result || result.error) {
+    return false;
+  }
+
+  // For crafting tasks, check if the item was actually crafted
+  if (task.type === 'craft') {
+    // Check if the crafting was successful based on the new implementation
+    return result.success === true && !result.error;
+  }
+
+  // For mining tasks, check if any blocks were successfully mined
+  if (task.type === 'mine') {
+    return result.success === true && !result.error;
+  }
+
+  // For other task types, check the result structure
+  if (result.success === false) {
+    return false;
+  }
+
+  // Default to true if no specific validation rules apply
+  return true;
+}
+
+/**
+ * Generate a task from cognitive feedback suggestions
+ */
+function generateTaskFromSuggestions(suggestions: string[]): any | null {
+  // Parse suggestions to determine task type
+  for (const suggestion of suggestions) {
+    if (suggestion.includes('different task type')) {
+      return generateAlternativeTask({ type: 'unknown' });
+    } else if (suggestion.includes('Explore the environment')) {
+      return {
+        id: `explore-task-${Date.now()}`,
+        type: 'explore',
+        description: 'Explore the environment to find new resources',
+        priority: 0.8,
+        urgency: 0.6,
+        parameters: { distance: 5, direction: 'forward' },
+        goal: 'exploration',
+        status: 'pending',
+        createdAt: Date.now(),
+        completedAt: null,
+        autonomous: true,
+        isAlternative: true,
+      };
+    } else if (suggestion.includes('Gather the required materials')) {
+      return {
+        id: `gather-task-${Date.now()}`,
+        type: 'gather',
+        description: 'Gather required materials for crafting',
+        priority: 0.9,
+        urgency: 0.8,
+        parameters: { resource: 'wood', amount: 1 },
+        goal: 'resource_gathering',
+        status: 'pending',
+        createdAt: Date.now(),
+        completedAt: null,
+        autonomous: true,
+        isAlternative: true,
+      };
+    } else if (suggestion.includes('Try crafting simpler items')) {
+      return {
+        id: `craft-simple-task-${Date.now()}`,
+        type: 'craft',
+        description: 'Try crafting simpler items first',
+        priority: 0.7,
+        urgency: 0.5,
+        parameters: { item: 'planks', quantity: 1 },
+        goal: 'basic_crafting',
+        status: 'pending',
+        createdAt: Date.now(),
+        completedAt: null,
+        autonomous: true,
+        isAlternative: true,
+      };
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Generate an alternative task when the current strategy is failing
+ */
+function generateAlternativeTask(failedTask: any): any {
+  const alternativeTaskTypes = [
+    {
+      type: 'explore',
+      description: 'Explore the surroundings to find resources',
+      parameters: { distance: 3, direction: 'forward' },
+    },
+    {
+      type: 'gather',
+      description: 'Look for and collect nearby resources',
+      parameters: { resource: 'wood', amount: 1 },
+    },
+    {
+      type: 'move',
+      description: 'Move to a different location',
+      parameters: { distance: 2, direction: 'forward' },
+    },
+  ];
+
+  // Select a different task type than the failed one
+  const availableTypes = alternativeTaskTypes.filter(
+    (t) => t.type !== failedTask.type
+  );
+  const selectedType =
+    availableTypes[Math.floor(Math.random() * availableTypes.length)];
+
+  return {
+    id: `alt-task-${Date.now()}`,
+    type: selectedType.type,
+    description: selectedType.description,
+    priority: 0.7, // Higher priority for alternative tasks
+    urgency: 0.6,
+    parameters: selectedType.parameters,
+    goal: 'alternative_strategy',
+    status: 'pending',
+    createdAt: Date.now(),
+    completedAt: null,
+    autonomous: true,
+    isAlternative: true, // Mark as alternative strategy
+  };
+}
+
+// Helper function to generate autonomous tasks based on goals
+function generateAutonomousTask() {
+  const taskTypes = [
+    {
+      type: 'explore',
+      description: 'Explore the surroundings to understand the environment',
+      parameters: { distance: 5, direction: 'forward' },
+    },
+    {
+      type: 'gather',
+      description: 'Look for and collect nearby resources',
+      parameters: { resource: 'wood', amount: 1 },
+    },
+    {
+      type: 'craft',
+      description: 'Attempt to craft basic tools',
+      parameters: { item: 'wooden_pickaxe' },
+    },
+    {
+      type: 'build',
+      description: 'Build a simple shelter or structure',
+      parameters: { structure: 'house', size: 'small' },
+    },
+    {
+      type: 'farm',
+      description: 'Start a small farm for food',
+      parameters: { crop: 'wheat', area: 3 },
+    },
+    {
+      type: 'mine',
+      description: 'Mine for valuable resources',
+      parameters: { depth: 5, resource: 'stone' },
+    },
+  ];
+
+  // Randomly select a task type
+  const taskType = taskTypes[Math.floor(Math.random() * taskTypes.length)];
+
+  return {
+    id: `auto-task-${Date.now()}`,
+    type: taskType.type,
+    description: taskType.description,
+    priority: 0.6,
+    urgency: 0.5,
+    parameters: taskType.parameters,
+    goal: 'autonomous_exploration',
+    status: 'pending',
+    createdAt: Date.now(),
+    completedAt: null,
+    autonomous: true, // Mark as autonomously generated
+  };
+}
+
+// Autonomous task execution system
+async function autonomousTaskExecutor() {
+  const now = Date.now();
+  const twoMinutes = 2 * 60 * 1000; // 2 minutes in milliseconds
+
+  // Check if enough time has passed since last task execution
+  if (now - planningSystem.goalFormulation._lastTaskExecution < twoMinutes) {
+    return; // Not enough time has passed
+  }
+
+  // Check if there are any pending tasks
+  const pendingTasks = planningSystem.goalFormulation._tasks.filter(
+    (task: any) => task.status === 'pending'
+  );
+
+  // If no pending tasks, generate a new autonomous task
+  if (pendingTasks.length === 0) {
+    console.log('🤖 No tasks available, generating autonomous task...');
+    const newTask = generateAutonomousTask();
+    planningSystem.goalFormulation.addTask(newTask);
+
+    // Execute the task immediately
+    try {
+      await planningSystem.reactiveExecutor.executeNextTask();
+      planningSystem.goalFormulation._lastTaskExecution = now;
+      console.log('✅ Autonomous task executed successfully');
+    } catch (error) {
+      console.error('❌ Failed to execute autonomous task:', error);
+    }
+  } else {
+    // Execute the next pending task
+    try {
+      await planningSystem.reactiveExecutor.executeNextTask();
+      planningSystem.goalFormulation._lastTaskExecution = now;
+      console.log('✅ Pending task executed successfully');
+    } catch (error) {
+      console.error('❌ Failed to execute pending task:', error);
+    }
+  }
+}
 
 // Helper function to execute tasks in Minecraft
 async function executeTaskInMinecraft(task: any) {
@@ -102,10 +455,304 @@ async function executeTaskInMinecraft(task: any) {
           body: JSON.stringify({
             type: 'chat',
             parameters: {
-              message: task.parameters?.message || 'Executing task!',
+              message:
+                task.parameters?.message ||
+                task.description ||
+                'Executing task!',
             },
           }),
         }).then((res) => res.json());
+
+      case 'explore':
+        // Execute exploration by moving around and looking
+        const exploreResults = [];
+        exploreResults.push(
+          await fetch(`${minecraftUrl}/action`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              type: 'move_forward',
+              parameters: { distance: task.parameters?.distance || 3 },
+            }),
+          }).then((res) => res.json())
+        );
+
+        exploreResults.push(
+          await fetch(`${minecraftUrl}/action`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              type: 'chat',
+              parameters: {
+                message: `Exploring: ${task.description}`,
+              },
+            }),
+          }).then((res) => res.json())
+        );
+
+        return {
+          results: exploreResults,
+          type: 'exploration',
+          success: true,
+          error: undefined,
+        };
+
+      case 'gather':
+        // Execute gathering by looking for and collecting resources
+        const gatherResults = [];
+        gatherResults.push(
+          await fetch(`${minecraftUrl}/action`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              type: 'chat',
+              parameters: {
+                message: `Looking for ${task.parameters?.resource || 'resources'}`,
+              },
+            }),
+          }).then((res) => res.json())
+        );
+
+        return {
+          results: gatherResults,
+          type: 'gathering',
+          success: true,
+          error: undefined,
+        };
+
+      case 'craft':
+        // Execute actual crafting instead of just sending chat messages
+        const craftResults = [];
+
+        try {
+          // First, check if we have the required materials
+          const inventoryCheck = await fetch(`${minecraftUrl}/inventory`)
+            .then((res) => res.json())
+            .catch(() => ({ items: [] }));
+
+          const itemToCraft = task.parameters?.item || 'item';
+
+          // Check if we can actually craft the item
+          const canCraft = await fetch(`${minecraftUrl}/action`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              type: 'can_craft',
+              parameters: { item: itemToCraft },
+            }),
+          }).then((res) => res.json());
+
+          if ((canCraft as any).success && (canCraft as any).canCraft) {
+            // Actually attempt to craft the item
+            const craftResult = await fetch(`${minecraftUrl}/action`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                type: 'craft_item',
+                parameters: {
+                  item: itemToCraft,
+                  quantity: task.parameters?.quantity || 1,
+                },
+              }),
+            }).then((res) => res.json());
+
+            craftResults.push(craftResult);
+
+            // Send a chat message to inform about the result
+            craftResults.push(
+              await fetch(`${minecraftUrl}/action`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  type: 'chat',
+                  parameters: {
+                    message: (craftResult as any).success
+                      ? `Successfully crafted ${itemToCraft}!`
+                      : `Failed to craft ${itemToCraft}: ${(craftResult as any).error || 'Unknown error'}`,
+                  },
+                }),
+              }).then((res) => res.json())
+            );
+
+            return {
+              results: craftResults,
+              type: 'crafting',
+              success: (craftResult as any).success,
+              error: (craftResult as any).error,
+              item: itemToCraft,
+            };
+          } else {
+            // Cannot craft - send informative message
+            craftResults.push(
+              await fetch(`${minecraftUrl}/action`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  type: 'chat',
+                  parameters: {
+                    message: `Cannot craft ${itemToCraft} - missing required materials`,
+                  },
+                }),
+              }).then((res) => res.json())
+            );
+
+            return {
+              results: craftResults,
+              type: 'crafting',
+              success: false,
+              error: 'Missing required materials',
+              item: itemToCraft,
+            };
+          }
+        } catch (error) {
+          // Fallback to chat message if crafting system is unavailable
+          craftResults.push(
+            await fetch(`${minecraftUrl}/action`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                type: 'chat',
+                parameters: {
+                  message: `Crafting system unavailable - cannot craft ${task.parameters?.item || 'item'}`,
+                },
+              }),
+            }).then((res) => res.json())
+          );
+
+          return {
+            results: craftResults,
+            type: 'crafting',
+            success: false,
+            error: 'Crafting system unavailable',
+            item: task.parameters?.item || 'item',
+          };
+        }
+
+      case 'build':
+        // Execute building by creating structures
+        const buildResults = [];
+        buildResults.push(
+          await fetch(`${minecraftUrl}/action`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              type: 'chat',
+              parameters: {
+                message: `Building ${task.parameters?.structure || 'structure'}`,
+              },
+            }),
+          }).then((res) => res.json())
+        );
+
+        return {
+          results: buildResults,
+          type: 'building',
+          success: true,
+          error: undefined,
+        };
+
+      case 'farm':
+        // Execute farming by planting crops
+        const farmResults = [];
+        farmResults.push(
+          await fetch(`${minecraftUrl}/action`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              type: 'chat',
+              parameters: {
+                message: `Starting farm for ${task.parameters?.crop || 'crops'}`,
+              },
+            }),
+          }).then((res) => res.json())
+        );
+
+        return {
+          results: farmResults,
+          type: 'farming',
+          success: true,
+          error: undefined,
+        };
+
+      case 'mine':
+        // Execute mining by digging for resources
+        const mineResults = [];
+
+        // First, announce what we're doing
+        mineResults.push(
+          await fetch(`${minecraftUrl}/action`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              type: 'chat',
+              parameters: {
+                message: `Starting to mine for ${task.parameters?.resource || 'resources'}`,
+              },
+            }),
+          }).then((res) => res.json())
+        );
+
+        // Get current bot position and look for blocks to mine nearby
+        const gameState = await fetch(`${minecraftUrl}/state`)
+          .then((res) => res.json())
+          .catch(() => ({ position: { x: 0, y: 64, z: 0 } }));
+
+        const botPos = (gameState as any).position || { x: 0, y: 64, z: 0 };
+
+        // Try to mine blocks in a small area around the bot
+        const miningPositions = [
+          { x: botPos.x, y: botPos.y - 1, z: botPos.z }, // Block below
+          { x: botPos.x + 1, y: botPos.y, z: botPos.z }, // Block to the right
+          { x: botPos.x - 1, y: botPos.y, z: botPos.z }, // Block to the left
+          { x: botPos.x, y: botPos.y, z: botPos.z + 1 }, // Block in front
+          { x: botPos.x, y: botPos.y, z: botPos.z - 1 }, // Block behind
+        ];
+
+        // Try to mine each position
+        for (const position of miningPositions) {
+          try {
+            const mineResult = await fetch(`${minecraftUrl}/action`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                type: 'mine_block',
+                parameters: {
+                  position,
+                  blockType: task.parameters?.resource, // Optional: specify what to mine
+                },
+              }),
+            }).then((res) => res.json());
+
+            mineResults.push(mineResult);
+
+            // If mining was successful, break out of the loop
+            if ((mineResult as any).success) {
+              console.log(
+                `✅ Successfully mined block at ${JSON.stringify(position)}`
+              );
+              break;
+            }
+          } catch (error) {
+            console.log(
+              `⚠️ Failed to mine at ${JSON.stringify(position)}:`,
+              error
+            );
+          }
+        }
+
+        // Check if any mining was successful
+        const successfulMining = mineResults.some(
+          (result: any) => result.success === true
+        );
+
+        return {
+          results: mineResults,
+          type: 'mining',
+          success: successfulMining,
+          error: successfulMining
+            ? undefined
+            : 'No blocks were successfully mined',
+        };
 
       default:
         throw new Error(`Unknown task type: ${task.type}`);
@@ -136,6 +783,9 @@ app.get('/state', (req, res) => {
         goalCount: planningSystem.goalFormulation.getGoalCount(),
         currentTasks: planningSystem.goalFormulation.getCurrentTasks(),
         completedTasks: planningSystem.goalFormulation.getCompletedTasks(),
+        failedTaskCount: planningSystem.goalFormulation._failedTaskCount,
+        maxConsecutiveFailures:
+          planningSystem.goalFormulation._maxConsecutiveFailures,
       },
       hierarchicalPlanner: {
         currentPlan: planningSystem.hierarchicalPlanner.getCurrentPlan(),
@@ -147,12 +797,60 @@ app.get('/state', (req, res) => {
         actionQueue: planningSystem.reactiveExecutor.getActionQueue(),
         executing: planningSystem.reactiveExecutor.isExecuting(),
       },
+      cognitiveIntegration: {
+        reflectionEnabled: cognitiveIntegration['config'].reflectionEnabled,
+        maxRetries: cognitiveIntegration['config'].maxRetries,
+        failureThreshold: cognitiveIntegration['config'].failureThreshold,
+        successThreshold: cognitiveIntegration['config'].successThreshold,
+      },
+      lastTaskExecution: planningSystem.goalFormulation._lastTaskExecution,
+      timestamp: Date.now(),
     };
 
     res.json(state);
   } catch (error) {
     console.error('Error getting planning state:', error);
     res.status(500).json({ error: 'Failed to get planning state' });
+  }
+});
+
+// Get cognitive insights
+app.get('/cognitive-insights', async (req, res) => {
+  try {
+    const taskType = req.query.taskType as string;
+    const insights = taskType
+      ? await cognitiveIntegration.getCognitiveInsights(taskType)
+      : ['No specific task type requested for insights'];
+
+    res.json({
+      success: true,
+      taskType: taskType || 'all',
+      insights,
+      timestamp: Date.now(),
+    });
+  } catch (error) {
+    console.error('Error getting cognitive insights:', error);
+    res.status(500).json({ error: 'Failed to get cognitive insights' });
+  }
+});
+
+// Get task statistics
+app.get('/task-stats/:taskId', (req, res) => {
+  try {
+    const taskId = req.params.taskId;
+    const stats = cognitiveIntegration.getTaskStats(taskId);
+    const shouldAbandon = cognitiveIntegration.shouldAbandonTask(taskId);
+
+    res.json({
+      success: true,
+      taskId,
+      stats,
+      shouldAbandon,
+      timestamp: Date.now(),
+    });
+  } catch (error) {
+    console.error('Error getting task stats:', error);
+    res.status(500).json({ error: 'Failed to get task stats' });
   }
 });
 
@@ -340,6 +1038,24 @@ app.post('/execute', async (req, res) => {
   }
 });
 
+// Trigger autonomous task execution
+app.post('/autonomous', async (req, res) => {
+  try {
+    await autonomousTaskExecutor();
+    res.json({
+      success: true,
+      message: 'Autonomous task execution triggered',
+    });
+  } catch (error) {
+    console.error('Error triggering autonomous execution:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to trigger autonomous execution',
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
+
 // Get telemetry data
 app.get('/telemetry', (req, res) => {
   try {
@@ -376,4 +1092,14 @@ app.get('/telemetry', (req, res) => {
 // Start server
 app.listen(port, () => {
   console.log(`Planning system server running on port ${port}`);
+
+  // Start autonomous task executor
+  console.log('🤖 Starting autonomous task executor...');
+  setInterval(autonomousTaskExecutor, 120000); // Check every 2 minutes
+
+  // Initial task generation after 30 seconds
+  setTimeout(() => {
+    console.log('🚀 Initializing autonomous behavior...');
+    autonomousTaskExecutor();
+  }, 30000);
 });

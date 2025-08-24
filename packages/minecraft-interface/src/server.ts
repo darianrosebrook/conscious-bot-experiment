@@ -43,6 +43,7 @@ const botConfig: SimpleBotConfig = {
 let minecraftInterface: SimpleMinecraftInterface | null = null;
 let isConnecting = false;
 let viewerActive = false;
+let autoConnectInterval: NodeJS.Timeout | null = null;
 
 // Health check endpoint
 app.get('/health', (req, res) => {
@@ -135,6 +136,71 @@ app.post('/connect', async (req, res) => {
   }
 });
 
+// Auto-connect function
+async function attemptAutoConnect() {
+  if (minecraftInterface?.connected || isConnecting) {
+    return;
+  }
+
+  try {
+    console.log('🔄 Auto-connecting to Minecraft server...');
+    isConnecting = true;
+
+    minecraftInterface = createSimpleMinecraftInterface(botConfig);
+
+    // Set up event listeners
+    minecraftInterface.on('connected', () => {
+      console.log('✅ Bot auto-connected to Minecraft server');
+      // Start Prismarine viewer on first connect
+      try {
+        const bot = minecraftInterface?.botInstance;
+        if (bot && !viewerActive) {
+          startMineflayerViewer(bot as any, {
+            port: viewerPort,
+            firstPerson: true,
+          });
+          viewerActive = true;
+          console.log(
+            `🖥️ Prismarine viewer running at http://localhost:${viewerPort}`
+          );
+        }
+      } catch (err) {
+        console.error('Failed to start Prismarine viewer:', err);
+        viewerActive = false;
+      }
+    });
+
+    minecraftInterface.on('disconnected', (reason) => {
+      console.log('🔌 Bot disconnected:', reason);
+      minecraftInterface = null;
+      viewerActive = false;
+      // Attempt to reconnect after a delay
+      setTimeout(() => {
+        if (!minecraftInterface?.connected && !isConnecting) {
+          attemptAutoConnect();
+        }
+      }, 5000);
+    });
+
+    await minecraftInterface.connect();
+    isConnecting = false;
+  } catch (error) {
+    isConnecting = false;
+    console.error('❌ Auto-connection failed:', error);
+    // Retry after 10 seconds
+    setTimeout(() => {
+      if (!minecraftInterface?.connected && !isConnecting) {
+        attemptAutoConnect();
+      }
+    }, 10000);
+  }
+}
+
+// Start auto-connection when server starts
+setTimeout(() => {
+  attemptAutoConnect();
+}, 2000); // Wait 2 seconds after server starts
+
 // Disconnect from server
 app.post('/disconnect', async (req, res) => {
   try {
@@ -165,6 +231,76 @@ app.post('/disconnect', async (req, res) => {
   }
 });
 
+// Stop auto-connection
+app.post('/stop-auto-connect', async (req, res) => {
+  try {
+    if (autoConnectInterval) {
+      clearInterval(autoConnectInterval);
+      autoConnectInterval = null;
+    }
+
+    res.json({
+      success: true,
+      message: 'Auto-connection stopped',
+    });
+  } catch (error) {
+    console.error('❌ Failed to stop auto-connection:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to stop auto-connection',
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
+
+// Start auto-connection
+app.post('/start-auto-connect', async (req, res) => {
+  try {
+    if (!minecraftInterface?.connected && !isConnecting) {
+      attemptAutoConnect();
+    }
+
+    res.json({
+      success: true,
+      message: 'Auto-connection started',
+    });
+  } catch (error) {
+    console.error('❌ Failed to start auto-connection:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to start auto-connection',
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
+
+// Get chat history
+app.get('/chat', (req, res) => {
+  try {
+    if (!minecraftInterface?.connected) {
+      return res.status(503).json({
+        success: false,
+        message: 'Bot not connected',
+        status: 'disconnected',
+      });
+    }
+
+    const chatHistory = minecraftInterface.getChatHistory();
+    res.json({
+      success: true,
+      status: 'connected',
+      data: chatHistory,
+    });
+  } catch (error) {
+    console.error('❌ Failed to get chat history:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to get chat history',
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
+
 // Get bot state
 app.get('/state', async (req, res) => {
   try {
@@ -188,6 +324,35 @@ app.get('/state', async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Failed to get bot state',
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
+
+// Get inventory
+app.get('/inventory', async (req, res) => {
+  try {
+    if (!minecraftInterface?.connected) {
+      return res.status(503).json({
+        success: false,
+        message: 'Bot not connected',
+        status: 'disconnected',
+      });
+    }
+
+    const gameState = await minecraftInterface.getGameState();
+    const inventory = gameState.inventory || [];
+
+    res.json({
+      success: true,
+      status: 'connected',
+      data: inventory,
+    });
+  } catch (error) {
+    console.error('❌ Failed to get inventory:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to get inventory',
       error: error instanceof Error ? error.message : 'Unknown error',
     });
   }

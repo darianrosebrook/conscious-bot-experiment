@@ -1,5 +1,30 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  images: {
+    remotePatterns: [
+      // Minecraft Wiki CDN (primary sprite source)
+      {
+        protocol: 'https',
+        hostname: 'static.wikia.nocookie.net',
+        port: '',
+        pathname: '/minecraft_gamepedia/images/**',
+      },
+      // PrismarineJS Minecraft Data (fallback)
+      {
+        protocol: 'https',
+        hostname: 'raw.githubusercontent.com',
+        port: '',
+        pathname: '/PrismarineJS/minecraft-data/**',
+      },
+      // Mojang Assets CDN (official Minecraft assets)
+      {
+        protocol: 'https',
+        hostname: 'assets.mojang.com',
+        port: '',
+        pathname: '/content-assets/**',
+      },
+    ],
+  },
   async rewrites() {
     return [
       // Proxy WebSocket connections to internal services
