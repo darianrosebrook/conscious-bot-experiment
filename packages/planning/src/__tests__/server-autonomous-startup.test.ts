@@ -1,9 +1,9 @@
 /**
  * Server Autonomous Startup Test Suite
- * 
+ *
  * Tests that the autonomous task executor starts properly when the server starts
  * and that the bot actually begins performing tasks rather than standing idle.
- * 
+ *
  * @author @darianrosebrook
  */
 
@@ -26,7 +26,8 @@ describe('Server Autonomous Startup Tests', () => {
           json: () => Promise.resolve({ success: true, distance: 3 }),
         } as any)
         .mockResolvedValueOnce({
-          json: () => Promise.resolve({ success: true, message: 'Hello, world!' }),
+          json: () =>
+            Promise.resolve({ success: true, message: 'Hello, world!' }),
         } as any);
 
       // Simulate server startup sequence
@@ -130,7 +131,7 @@ describe('Server Autonomous Startup Tests', () => {
 
         // Simulate scheduled executions over 10 minutes
         for (let i = 1; i <= 5; i++) {
-          const executionTime = Date.now() + (i * schedule.interval);
+          const executionTime = Date.now() + i * schedule.interval;
           schedule.scheduledExecutions.push(executionTime);
         }
 
@@ -142,7 +143,9 @@ describe('Server Autonomous Startup Tests', () => {
       expect(schedule.immediate).toBe(true);
       expect(schedule.interval).toBe(120000);
       expect(schedule.scheduledExecutions).toHaveLength(5);
-      expect(schedule.scheduledExecutions[1] - schedule.scheduledExecutions[0]).toBe(120000);
+      expect(
+        schedule.scheduledExecutions[1] - schedule.scheduledExecutions[0]
+      ).toBe(120000);
     });
 
     it('should handle startup when minecraft interface is not available', async () => {
@@ -185,26 +188,28 @@ describe('Server Autonomous Startup Tests', () => {
 
       // Simulate multiple autonomous task generations
       for (let i = 0; i < 10; i++) {
-        const taskType = taskTypes[Math.floor(Math.random() * taskTypes.length)];
+        const taskType =
+          taskTypes[Math.floor(Math.random() * taskTypes.length)];
         const task = {
           id: `auto-task-${Date.now()}-${i}`,
           type: taskType,
           description: `Autonomous ${taskType} task`,
           status: 'pending',
           autonomous: true,
-          createdAt: Date.now() + (i * 120000), // 2 minutes apart
+          createdAt: Date.now() + i * 120000, // 2 minutes apart
         };
         generatedTasks.push(task);
       }
 
       // Verify variety in task types
-      const uniqueTypes = new Set(generatedTasks.map(t => t.type));
+      const uniqueTypes = new Set(generatedTasks.map((t) => t.type));
       expect(uniqueTypes.size).toBeGreaterThan(1);
-      expect(generatedTasks.every(t => t.autonomous)).toBe(true);
+      expect(generatedTasks.every((t) => t.autonomous)).toBe(true);
 
       // Verify tasks are spaced out in time
       for (let i = 1; i < generatedTasks.length; i++) {
-        const timeDiff = generatedTasks[i].createdAt - generatedTasks[i - 1].createdAt;
+        const timeDiff =
+          generatedTasks[i].createdAt - generatedTasks[i - 1].createdAt;
         expect(timeDiff).toBe(120000); // 2 minutes
       }
     });
@@ -223,14 +228,29 @@ describe('Server Autonomous Startup Tests', () => {
         if (context.food < 0.3) return taskPriorities.lowFood;
         if (!context.hasShelter) return taskPriorities.noShelter;
         if (context.explorationLevel < 0.5) return taskPriorities.exploration;
-        
+
         return taskPriorities.default;
       };
 
       // Test different contexts
-      const lowHealthContext = { health: 0.2, food: 0.8, hasShelter: true, explorationLevel: 0.7 };
-      const lowFoodContext = { health: 0.8, food: 0.2, hasShelter: true, explorationLevel: 0.7 };
-      const noShelterContext = { health: 0.8, food: 0.8, hasShelter: false, explorationLevel: 0.7 };
+      const lowHealthContext = {
+        health: 0.2,
+        food: 0.8,
+        hasShelter: true,
+        explorationLevel: 0.7,
+      };
+      const lowFoodContext = {
+        health: 0.8,
+        food: 0.2,
+        hasShelter: true,
+        explorationLevel: 0.7,
+      };
+      const noShelterContext = {
+        health: 0.8,
+        food: 0.8,
+        hasShelter: false,
+        explorationLevel: 0.7,
+      };
 
       expect(contextBasedTaskSelection(lowHealthContext)).toContain('craft');
       expect(contextBasedTaskSelection(lowHealthContext)).toContain('gather');
@@ -249,7 +269,7 @@ describe('Server Autonomous Startup Tests', () => {
         lastExecutionTime: 0,
         executionHistory: [] as any[],
 
-        recordExecution: function(task: any, result: any) {
+        recordExecution: function (task: any, result: any) {
           this.totalExecutions++;
           this.lastExecutionTime = Date.now();
 
@@ -272,16 +292,20 @@ describe('Server Autonomous Startup Tests', () => {
           this.successRate = this.successfulExecutions / this.totalExecutions;
         },
 
-        getStats: function() {
+        getStats: function () {
           return {
             totalExecutions: this.totalExecutions,
             successfulExecutions: this.successfulExecutions,
             failedExecutions: this.failedExecutions,
             successRate: this.successRate,
             lastExecutionTime: this.lastExecutionTime,
-            averageExecutionTime: this.executionHistory.length > 0 
-              ? this.executionHistory.reduce((sum, exec) => sum + exec.duration, 0) / this.executionHistory.length
-              : 0,
+            averageExecutionTime:
+              this.executionHistory.length > 0
+                ? this.executionHistory.reduce(
+                    (sum, exec) => sum + exec.duration,
+                    0
+                  ) / this.executionHistory.length
+                : 0,
           };
         },
       };
@@ -317,27 +341,43 @@ describe('Server Autonomous Startup Tests', () => {
         executionHistory: [] as any[],
         taskTypeSuccessRates: {} as Record<string, number>,
 
-        recordExecution: function(taskType: string, success: boolean) {
-          this.executionHistory.push({ taskType, success, timestamp: Date.now() });
+        recordExecution: function (taskType: string, success: boolean) {
+          this.executionHistory.push({
+            taskType,
+            success,
+            timestamp: Date.now(),
+          });
           this.updateSuccessRates();
         },
 
-        updateSuccessRates: function() {
-          const taskTypes = new Set(this.executionHistory.map(h => h.taskType));
-          
-          taskTypes.forEach(type => {
-            const typeExecutions = this.executionHistory.filter(h => h.taskType === type);
-            const successful = typeExecutions.filter(h => h.success).length;
-            this.taskTypeSuccessRates[type] = successful / typeExecutions.length;
+        updateSuccessRates: function () {
+          const taskTypes = new Set(
+            this.executionHistory.map((h) => h.taskType)
+          );
+
+          taskTypes.forEach((type) => {
+            const typeExecutions = this.executionHistory.filter(
+              (h) => h.taskType === type
+            );
+            const successful = typeExecutions.filter((h) => h.success).length;
+            this.taskTypeSuccessRates[type] =
+              successful / typeExecutions.length;
           });
         },
 
-        selectNextTask: function() {
-          const taskTypes = ['explore', 'gather', 'craft', 'build', 'farm', 'mine'];
-          
+        selectNextTask: function () {
+          const taskTypes = [
+            'explore',
+            'gather',
+            'craft',
+            'build',
+            'farm',
+            'mine',
+          ];
+
           // Prefer task types with higher success rates
           const rankedTasks = taskTypes
-            .map(type => ({
+            .map((type) => ({
               type,
               successRate: this.taskTypeSuccessRates[type] || 0.5, // Default to 0.5 for new types
             }))

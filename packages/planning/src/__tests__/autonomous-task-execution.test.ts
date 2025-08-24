@@ -1,9 +1,9 @@
 /**
  * Autonomous Task Execution Test Suite
- * 
+ *
  * Tests the autonomous task generation and execution system to ensure
  * the bot actually performs tasks when it joins rather than just standing there.
- * 
+ *
  * @author @darianrosebrook
  */
 
@@ -55,7 +55,7 @@ describe('Autonomous Task Execution Tests', () => {
       });
 
       const task = generateAutonomousTask();
-      
+
       expect(task).toBeDefined();
       expect(task.type).toBe('explore');
       expect(task.autonomous).toBe(true);
@@ -85,9 +85,9 @@ describe('Autonomous Task Execution Tests', () => {
       }
 
       // Verify we get different task types
-      const uniqueTypes = new Set(generatedTasks.map(t => t.type));
+      const uniqueTypes = new Set(generatedTasks.map((t) => t.type));
       expect(uniqueTypes.size).toBeGreaterThan(1);
-      expect(generatedTasks.every(t => t.autonomous)).toBe(true);
+      expect(generatedTasks.every((t) => t.autonomous)).toBe(true);
     });
 
     it('should generate tasks with appropriate parameters', () => {
@@ -125,7 +125,7 @@ describe('Autonomous Task Execution Tests', () => {
         };
 
         expect(task.parameters).toBeDefined();
-        expectedParams.forEach(param => {
+        expectedParams.forEach((param) => {
           expect(task.parameters[param]).toBeDefined();
         });
       });
@@ -140,7 +140,10 @@ describe('Autonomous Task Execution Tests', () => {
       // Mock the autonomous task executor logic
       const autonomousTaskExecutor = async () => {
         // Check if enough time has passed
-        if (now - mockPlanningSystem.goalFormulation._lastTaskExecution < twoMinutes) {
+        if (
+          now - mockPlanningSystem.goalFormulation._lastTaskExecution <
+          twoMinutes
+        ) {
           return;
         }
 
@@ -160,21 +163,23 @@ describe('Autonomous Task Execution Tests', () => {
           };
 
           mockPlanningSystem.goalFormulation.addTask(newTask);
-          
+
           // Execute the task
           await mockPlanningSystem.reactiveExecutor.executeNextTask();
           mockPlanningSystem.goalFormulation._lastTaskExecution = now;
-          
+
           return newTask;
         }
       };
 
       const result = await autonomousTaskExecutor();
-      
+
       expect(result).toBeDefined();
       expect(result.type).toBe('explore');
       expect(result.autonomous).toBe(true);
-      expect(mockPlanningSystem.reactiveExecutor.executeNextTask).toHaveBeenCalled();
+      expect(
+        mockPlanningSystem.reactiveExecutor.executeNextTask
+      ).toHaveBeenCalled();
     });
 
     it('should execute pending tasks before generating new ones', async () => {
@@ -192,7 +197,10 @@ describe('Autonomous Task Execution Tests', () => {
       mockPlanningSystem.goalFormulation.addTask(pendingTask);
 
       const autonomousTaskExecutor = async () => {
-        if (now - mockPlanningSystem.goalFormulation._lastTaskExecution < twoMinutes) {
+        if (
+          now - mockPlanningSystem.goalFormulation._lastTaskExecution <
+          twoMinutes
+        ) {
           return;
         }
 
@@ -209,11 +217,13 @@ describe('Autonomous Task Execution Tests', () => {
       };
 
       const result = await autonomousTaskExecutor();
-      
+
       expect(result).toBeDefined();
       expect(result.id).toBe('pending-task-1');
       expect(result.status).toBe('pending');
-      expect(mockPlanningSystem.reactiveExecutor.executeNextTask).toHaveBeenCalled();
+      expect(
+        mockPlanningSystem.reactiveExecutor.executeNextTask
+      ).toHaveBeenCalled();
     });
 
     it('should respect time intervals between task executions', async () => {
@@ -221,10 +231,14 @@ describe('Autonomous Task Execution Tests', () => {
       const twoMinutes = 2 * 60 * 1000;
 
       // Set last execution to 1 minute ago (should not execute)
-      mockPlanningSystem.goalFormulation._lastTaskExecution = now - (1 * 60 * 1000);
+      mockPlanningSystem.goalFormulation._lastTaskExecution =
+        now - 1 * 60 * 1000;
 
       const autonomousTaskExecutor = async () => {
-        if (now - mockPlanningSystem.goalFormulation._lastTaskExecution < twoMinutes) {
+        if (
+          now - mockPlanningSystem.goalFormulation._lastTaskExecution <
+          twoMinutes
+        ) {
           return null; // Should not execute
         }
 
@@ -241,9 +255,11 @@ describe('Autonomous Task Execution Tests', () => {
       };
 
       const result = await autonomousTaskExecutor();
-      
+
       expect(result).toBeNull();
-      expect(mockPlanningSystem.reactiveExecutor.executeNextTask).not.toHaveBeenCalled();
+      expect(
+        mockPlanningSystem.reactiveExecutor.executeNextTask
+      ).not.toHaveBeenCalled();
     });
   });
 
@@ -303,16 +319,21 @@ describe('Autonomous Task Execution Tests', () => {
       ];
 
       mockFetch
-        .mockResolvedValueOnce({ json: () => Promise.resolve(mockResponses[0]) } as any)
-        .mockResolvedValueOnce({ json: () => Promise.resolve(mockResponses[1]) } as any);
+        .mockResolvedValueOnce({
+          json: () => Promise.resolve(mockResponses[0]),
+        } as any)
+        .mockResolvedValueOnce({
+          json: () => Promise.resolve(mockResponses[1]),
+        } as any);
 
       const executeTaskInMinecraft = async (task: any) => {
         const minecraftUrl = 'http://localhost:3005';
 
         if (task.type === 'gather') {
           // Get current position
-          const gameState = await fetch(`${minecraftUrl}/state`)
-            .then((res) => res.json());
+          const gameState = await fetch(`${minecraftUrl}/state`).then((res) =>
+            res.json()
+          );
 
           // Try to gather resources
           const gatherResult = await fetch(`${minecraftUrl}/action`, {
@@ -385,10 +406,10 @@ describe('Autonomous Task Execution Tests', () => {
         // Simulate setInterval behavior
         const interval = 120000; // 2 minutes
         const executions: number[] = [];
-        
+
         // Simulate 3 executions over 6 minutes
         for (let i = 0; i < 3; i++) {
-          const executionTime = Date.now() + (i * interval);
+          const executionTime = Date.now() + i * interval;
           executions.push(executionTime);
         }
 
@@ -396,7 +417,7 @@ describe('Autonomous Task Execution Tests', () => {
       };
 
       const executions = scheduleAutonomousExecution();
-      
+
       expect(executions).toHaveLength(3);
       expect(executions[1] - executions[0]).toBe(120000);
       expect(executions[2] - executions[1]).toBe(120000);
@@ -406,10 +427,10 @@ describe('Autonomous Task Execution Tests', () => {
       const startAutonomousExecution = () => {
         // Immediate execution
         const immediateExecution = Date.now();
-        
+
         // Scheduled interval execution
         const intervalExecution = Date.now() + 120000;
-        
+
         return {
           immediate: immediateExecution,
           nextScheduled: intervalExecution,
@@ -417,7 +438,7 @@ describe('Autonomous Task Execution Tests', () => {
       };
 
       const execution = startAutonomousExecution();
-      
+
       expect(execution.immediate).toBeLessThanOrEqual(Date.now());
       expect(execution.nextScheduled).toBeGreaterThan(Date.now());
     });
@@ -455,7 +476,7 @@ describe('Autonomous Task Execution Tests', () => {
       };
 
       const nextTask = selectNextTask(tasks);
-      
+
       expect(nextTask.id).toBe('urgent-task');
       expect(nextTask.urgency).toBe(0.8);
       expect(nextTask.autonomous).toBe(false);
@@ -486,7 +507,7 @@ describe('Autonomous Task Execution Tests', () => {
       };
 
       const nextTask = selectNextTask(tasks);
-      
+
       expect(nextTask.id).toBe('auto-task-2');
       expect(nextTask.priority).toBe(0.7);
       expect(nextTask.autonomous).toBe(true);
