@@ -29,11 +29,18 @@ export class ActionTranslator {
     this.bot = bot;
     this.config = config;
 
-    // Initialize pathfinder
-    bot.loadPlugin(pathfinder);
-    this.movements = new Movements(bot);
-    this.movements.scafoldingBlocks = []; // Don't place blocks while pathfinding
-    this.movements.canDig = false; // Don't break blocks while pathfinding initially
+    // Initialize pathfinder only if bot is spawned
+    if (bot.entity && bot.entity.position) {
+      bot.loadPlugin(pathfinder);
+      this.movements = new Movements(bot);
+      this.movements.scafoldingBlocks = []; // Don't place blocks while pathfinding
+      this.movements.canDig = false; // Don't break blocks while pathfinding initially
+    } else {
+      // Initialize with basic movements, will be updated when bot spawns
+      this.movements = new Movements(bot);
+      this.movements.scafoldingBlocks = [];
+      this.movements.canDig = false;
+    }
   }
 
   /**
@@ -127,6 +134,10 @@ export class ActionTranslator {
         target = params.target;
       }
     } else if (params.x !== undefined) {
+      // Ensure bot is spawned before accessing position
+      if (!this.bot.entity || !this.bot.entity.position) {
+        throw new Error('Bot not fully spawned - cannot access position');
+      }
       target = new Vec3(
         params.x,
         params.y || this.bot.entity.position.y,
@@ -134,6 +145,9 @@ export class ActionTranslator {
       );
     } else {
       // Default to nearby exploration
+      if (!this.bot.entity || !this.bot.entity.position) {
+        throw new Error('Bot not fully spawned - cannot access position');
+      }
       const pos = this.bot.entity.position;
       target = pos.offset(Math.random() * 20 - 10, 0, Math.random() * 20 - 10);
     }
@@ -621,6 +635,12 @@ export class ActionTranslator {
    */
   private findNearestBlock(blockType: string): Vec3 {
     const bot = this.bot;
+
+    // Ensure bot is spawned before accessing position
+    if (!bot.entity || !bot.entity.position) {
+      throw new Error('Bot not fully spawned - cannot access position');
+    }
+
     const pos = bot.entity.position;
 
     for (let radius = 1; radius <= 10; radius++) {

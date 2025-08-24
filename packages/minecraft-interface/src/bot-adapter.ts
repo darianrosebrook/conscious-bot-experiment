@@ -65,11 +65,18 @@ export class BotAdapter extends EventEmitter {
 
       this.bot.once('spawn', () => {
         this.connectionState = 'spawned';
-        this.emitBotEvent('spawned', {
-          position: this.bot!.entity.position.clone(),
+        
+        const spawnData: any = {
           gameMode: this.bot!.game.gameMode,
           dimension: this.bot!.game.dimension,
-        });
+        };
+        
+        // Only include position if entity exists
+        if (this.bot && this.bot.entity && this.bot.entity.position) {
+          spawnData.position = this.bot.entity.position.clone();
+        }
+        
+        this.emitBotEvent('spawned', spawnData);
         resolve(this.bot!);
       });
 
@@ -175,23 +182,36 @@ export class BotAdapter extends EventEmitter {
       }
     });
 
-    // Position monitoring (throttled)
-    let lastPosition = this.bot.entity.position.clone();
-    const positionCheckInterval = setInterval(() => {
-      if (!this.bot || this.connectionState !== 'spawned') {
-        clearInterval(positionCheckInterval);
-        return;
-      }
+    // Position monitoring (throttled) - only start after bot is spawned
+    let lastPosition: any = null;
+    let positionCheckInterval: NodeJS.Timeout | null = null;
+    
+    const startPositionMonitoring = () => {
+      if (this.bot && this.bot.entity && this.bot.entity.position) {
+        lastPosition = this.bot.entity.position.clone();
+        positionCheckInterval = setInterval(() => {
+          if (!this.bot || this.connectionState !== 'spawned') {
+            if (positionCheckInterval) {
+              clearInterval(positionCheckInterval);
+              positionCheckInterval = null;
+            }
+            return;
+          }
 
-      const currentPosition = this.bot.entity.position;
-      if (currentPosition.distanceTo(lastPosition) > 0.5) {
-        lastPosition = currentPosition.clone();
-        this.emitBotEvent('position_changed', {
-          position: currentPosition.clone(),
-          dimension: this.bot.game.dimension,
-        });
+          const currentPosition = this.bot.entity.position;
+          if (currentPosition.distanceTo(lastPosition) > 0.5) {
+            lastPosition = currentPosition.clone();
+            this.emitBotEvent('position_changed', {
+              position: currentPosition.clone(),
+              dimension: this.bot.game.dimension,
+            });
+          }
+        }, 1000); // Check every second
       }
-    }, 1000); // Check every second
+    };
+
+    // Start position monitoring when bot spawns
+    this.bot.once('spawn', startPositionMonitoring);
 
     // Block breaking
     this.bot.on('diggingCompleted', (block) => {
@@ -204,7 +224,7 @@ export class BotAdapter extends EventEmitter {
 
     // Item pickup
     this.bot.on('playerCollect', (collector, collected) => {
-      if (collector === this.bot!.entity) {
+      if (this.bot && this.bot.entity && collector === this.bot.entity) {
         this.emitBotEvent('item_picked_up', {
           item: collected.metadata?.[8],
           position: collected.position.clone(),
@@ -231,11 +251,17 @@ export class BotAdapter extends EventEmitter {
 
     // Death handling
     this.bot.on('death', () => {
-      this.emitBotEvent('error', {
+      const deathData: any = {
         error: 'Bot died',
         health: 0,
-        position: this.bot!.entity.position.clone(),
-      });
+      };
+      
+      // Only include position if entity exists
+      if (this.bot && this.bot.entity && this.bot.entity.position) {
+        deathData.position = this.bot.entity.position.clone();
+      }
+      
+      this.emitBotEvent('error', deathData);
     });
 
     // Kicked handling
@@ -315,14 +341,13 @@ export class BotAdapter extends EventEmitter {
       };
     }
 
-    return {
+    const status: any = {
       connected: true,
       connectionState: this.connectionState,
       reconnectAttempts: this.reconnectAttempts,
       username: this.bot.username,
       health: this.bot.health,
       food: this.bot.food,
-      position: this.bot.entity.position.clone(),
       gameMode: this.bot.game.gameMode,
       dimension: this.bot.game.dimension,
       server: {
@@ -332,6 +357,13 @@ export class BotAdapter extends EventEmitter {
         difficulty: this.bot.game.difficulty,
       },
     };
+
+    // Only include position if bot is spawned
+    if (this.bot.entity && this.bot.entity.position) {
+      status.position = this.bot.entity.position.clone();
+    }
+
+    return status;
   }
 
   /**

@@ -71,6 +71,11 @@ export class ObservationMapper {
    * Extract raw Minecraft world state from mineflayer bot
    */
   public extractMinecraftWorldState(bot: Bot): MinecraftWorldState {
+    // Ensure bot is spawned before accessing position
+    if (!bot.entity || !bot.entity.position) {
+      throw new Error('Bot not fully spawned - cannot extract world state');
+    }
+
     return {
       player: {
         position: bot.entity.position.clone(),
@@ -120,6 +125,12 @@ export class ObservationMapper {
    */
   private extractEnvironmentState(bot: Bot) {
     const radius = this.config.observationRadius;
+    
+    // Ensure bot is spawned before accessing position
+    if (!bot.entity || !bot.entity.position) {
+      throw new Error('Bot not fully spawned - cannot extract environment state');
+    }
+    
     const playerPos = bot.entity.position;
 
     return {

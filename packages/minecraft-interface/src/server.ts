@@ -110,7 +110,10 @@ app.post('/connect', async (req, res) => {
     });
 
     // Create full minecraft interface
-    minecraftInterface = await createMinecraftInterface(botConfig, planningCoordinator);
+    minecraftInterface = await createMinecraftInterface(
+      botConfig,
+      planningCoordinator
+    );
 
     // Set up event listeners
     minecraftInterface.planExecutor.on('initialized', (event) => {
@@ -179,7 +182,10 @@ async function attemptAutoConnect() {
     });
 
     // Create full minecraft interface
-    minecraftInterface = await createMinecraftInterface(botConfig, planningCoordinator);
+    minecraftInterface = await createMinecraftInterface(
+      botConfig,
+      planningCoordinator
+    );
 
     // Set up event listeners
     minecraftInterface.planExecutor.on('initialized', () => {
@@ -209,7 +215,10 @@ async function attemptAutoConnect() {
       viewerActive = false;
       // Attempt to reconnect after a delay
       setTimeout(() => {
-        if (!minecraftInterface?.botAdapter.getStatus()?.connected && !isConnecting) {
+        if (
+          !minecraftInterface?.botAdapter.getStatus()?.connected &&
+          !isConnecting
+        ) {
           attemptAutoConnect();
         }
       }, 5000);
@@ -233,7 +242,10 @@ async function attemptAutoConnect() {
 
     // Retry after 30 seconds for other errors
     setTimeout(() => {
-      if (!minecraftInterface?.botAdapter.getStatus()?.connected && !isConnecting) {
+      if (
+        !minecraftInterface?.botAdapter.getStatus()?.connected &&
+        !isConnecting
+      ) {
         attemptAutoConnect();
       }
     }, 30000);
@@ -413,7 +425,8 @@ app.get('/state', async (req, res) => {
     }
 
     const bot = minecraftInterface.botAdapter.getBot();
-    const gameState = minecraftInterface.observationMapper.mapBotStateToPlanningContext(bot);
+    const gameState =
+      minecraftInterface.observationMapper.mapBotStateToPlanningContext(bot);
 
     res.json({
       success: true,
@@ -442,7 +455,8 @@ app.get('/inventory', async (req, res) => {
     }
 
     const bot = minecraftInterface.botAdapter.getBot();
-    const gameState = minecraftInterface.observationMapper.mapBotStateToPlanningContext(bot);
+    const gameState =
+      minecraftInterface.observationMapper.mapBotStateToPlanningContext(bot);
     const inventory = gameState.worldState.inventory?.items || [];
 
     res.json({
@@ -493,7 +507,10 @@ app.post('/action', async (req, res) => {
     };
 
     // Execute the action through the action translator
-    const result = await minecraftInterface.planExecutor['actionTranslator'].executePlanStep(planStep);
+    const result =
+      await minecraftInterface.planExecutor['actionTranslator'].executePlanStep(
+        planStep
+      );
 
     res.json({
       success: true,
@@ -631,7 +648,9 @@ app.post('/execute-scenario', async (req, res) => {
     }
 
     // Execute planning cycle with the scenario signals
-    const result = await minecraftInterface.planExecutor.executePlanningCycle(signals || []);
+    const result = await minecraftInterface.planExecutor.executePlanningCycle(
+      signals || []
+    );
 
     res.json({
       success: true,
@@ -643,6 +662,64 @@ app.post('/execute-scenario', async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Failed to execute scenario',
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
+
+// Test with simulation (no Minecraft server required)
+app.post('/test-simulation', async (req, res) => {
+  try {
+    const { createSimulatedMinecraftInterface } = await import('./simulation-stub');
+    
+    // Create a simulated interface for testing
+    const simulation = createSimulatedMinecraftInterface({
+      worldSize: { x: 50, y: 64, z: 50 },
+      spawnPosition: { x: 25, y: 64, z: 25 },
+      enableRandomEvents: true,
+    });
+
+    // Connect to simulation
+    await simulation.connect();
+
+    // Test basic actions
+    const testResults = [];
+    
+    // Test movement
+    const moveResult = await simulation.executeAction({
+      type: 'move_forward',
+      parameters: { distance: 3 },
+    });
+    testResults.push({ action: 'move_forward', result: moveResult });
+
+    // Test mining
+    const mineResult = await simulation.executeAction({
+      type: 'mine_block',
+      parameters: { position: { x: 25, y: 63, z: 25 } },
+    });
+    testResults.push({ action: 'mine_block', result: mineResult });
+
+    // Test chat
+    const chatResult = await simulation.executeAction({
+      type: 'chat',
+      parameters: { message: 'Hello from simulation!' },
+    });
+    testResults.push({ action: 'chat', result: chatResult });
+
+    // Get final state
+    const finalState = await simulation.getGameState();
+
+    res.json({
+      success: true,
+      message: 'Simulation test completed',
+      testResults,
+      finalState,
+    });
+  } catch (error) {
+    console.error(' Simulation test failed:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to run simulation test',
       error: error instanceof Error ? error.message : 'Unknown error',
     });
   }
