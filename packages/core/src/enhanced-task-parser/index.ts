@@ -12,6 +12,37 @@
 export { TaskParser } from './task-parser';
 export { EnvironmentalImmersion } from './environmental-immersion';
 
+// Enhanced task parser components
+export { EnhancedTaskParser } from './enhanced-task-parser';
+export type { 
+  EnhancedTaskParserConfig,
+  EnhancedTaskParsingResult,
+  UserInteractionContext,
+  SchemaValidationResult,
+} from './enhanced-task-parser';
+
+// Dual-channel prompting components
+export { DualChannelPrompting } from './dual-channel-prompting';
+export type {
+  ChannelType,
+  PromptConfig,
+  DualChannelConfig,
+  ChannelSelectionCriteria,
+  PromptResult,
+  TaskParaphraseResult,
+} from './dual-channel-prompting';
+
+// Creative paraphrasing components
+export { CreativeParaphrasing } from './creative-paraphrasing';
+export type {
+  ParaphrasingStyle,
+  ContextAdaptation,
+  CreativeParaphrasingConfig,
+  ParaphrasingContext,
+  EnhancedParaphraseResult,
+  LanguageGenerationRequest,
+} from './creative-paraphrasing';
+
 // Cognitive integration components
 export { CognitiveTaskParser } from './cognitive-integration';
 export type { CognitiveTaskIntegration } from './cognitive-integration';

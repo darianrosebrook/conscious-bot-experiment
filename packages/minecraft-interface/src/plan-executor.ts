@@ -64,6 +64,14 @@ export class PlanExecutor extends EventEmitter {
    */
   async initialize(): Promise<void> {
     const bot = await this.botAdapter.connect();
+    
+    // Wait for bot to be fully spawned before creating ActionTranslator
+    if (!bot.entity || !bot.entity.position) {
+      await new Promise<void>((resolve) => {
+        bot.once('spawn', () => resolve());
+      });
+    }
+    
     this.actionTranslator = new ActionTranslator(bot, this.config);
 
     this.emit('initialized', {

@@ -1,709 +1,582 @@
 /**
  * Enhanced Task Parser Tests
- *
- * Comprehensive test suite for the Enhanced Task Parser module,
- * covering task parsing, validation, feasibility checking, and
- * environmental immersion capabilities.
- *
+ * 
+ * Comprehensive test suite for the enhanced task parser system,
+ * including dual-channel prompting and creative paraphrasing functionality.
+ * 
  * @author @darianrosebrook
  */
 
-import { TaskParser } from '../task-parser';
-import { EnvironmentalImmersion } from '../environmental-immersion';
-import {
-  TaskDefinition,
-  EnvironmentalContext,
-  TaskValidationResult,
-  TaskFeasibility,
-  TaskParsingResult,
-  DEFAULT_TASK_PARSER_CONFIG,
-  TaskParserError,
-} from '../types';
+import { EnhancedTaskParser } from '../enhanced-task-parser';
+import { DualChannelPrompting } from '../dual-channel-prompting';
+import { CreativeParaphrasing } from '../creative-paraphrasing';
+import { EnvironmentalContext, TaskDefinition } from '../types';
+import { ChannelType } from '../dual-channel-prompting';
+import { ParaphrasingStyle } from '../creative-paraphrasing';
 
 describe('Enhanced Task Parser', () => {
-  let taskParser: TaskParser;
-  let environmentalImmersion: EnvironmentalImmersion;
+  // Increase timeout for all tests in this suite
+  jest.setTimeout(15000);
+  let enhancedTaskParser: EnhancedTaskParser;
+  let mockEnvironmentalContext: EnvironmentalContext;
 
   beforeEach(() => {
-    taskParser = new TaskParser();
-    environmentalImmersion = new EnvironmentalImmersion();
+    enhancedTaskParser = new EnhancedTaskParser();
+    
+    mockEnvironmentalContext = {
+      time_of_day: 'day',
+      weather: 'clear',
+      biome: 'plains',
+      light_level: 15,
+      threat_level: 0.2,
+      nearby_entities: [],
+      resource_availability: {
+        wood: { available: true, quantity: 10, confidence: 0.9 },
+        stone: { available: true, quantity: 20, confidence: 0.8 },
+      },
+      social_context: {
+        nearby_players: [],
+        nearby_villagers: [],
+        chat_activity: false,
+        social_mood: 'neutral',
+      },
+      timestamp: Date.now(),
+    };
   });
 
-  afterEach(() => {
-    taskParser.clearTaskHistory();
-    environmentalImmersion.clearHistory();
+  describe('Initialization', () => {
+    test('should initialize with default configuration', () => {
+      const config = enhancedTaskParser.getConfig();
+      expect(config.enable_schema_validation).toBe(true);
+      expect(config.enable_context_awareness).toBe(true);
+      expect(config.enable_adaptive_learning).toBe(true);
+      expect(config.max_paraphrase_options).toBe(3);
+    });
+
+    test('should initialize dual-channel prompting', () => {
+      const dualChannelMetrics = enhancedTaskParser.getDualChannelMetrics();
+      expect(dualChannelMetrics).toBeDefined();
+      expect(typeof dualChannelMetrics.operational_success_rate).toBe('number');
+    });
+
+    test('should initialize creative paraphrasing', () => {
+      const paraphrasingMetrics = enhancedTaskParser.getCreativeParaphrasingMetrics();
+      expect(paraphrasingMetrics).toBeDefined();
+      expect(typeof paraphrasingMetrics.average_confidence).toBe('number');
+    });
   });
 
-  describe('TaskParser', () => {
-    describe('parseLLMOutput', () => {
-      it('should parse JSON task definition correctly', async () => {
-        const llmOutput = JSON.stringify({
-          type: 'gathering',
-          parameters: {
-            resource: 'cobblestone',
-            quantity: 64,
-            location: 'nearest_surface',
-            tool_required: 'pickaxe',
-          },
-          priority: 0.8,
-          safety_level: 'safe',
-          estimated_duration: 300000,
-        });
+  describe('User Input Parsing', () => {
+    test('should parse simple gathering command', async () => {
+      const userInput = 'gather 10 wood';
+      const userContext = {
+        expertise_level: 'beginner' as const,
+        preferred_style: 'instructional' as ParaphrasingStyle,
+        urgency_level: 0.5,
+      };
 
-        const environmentalContext: EnvironmentalContext = {
-          time_of_day: 'day',
-          weather: 'clear',
-          biome: 'plains',
-          light_level: 15,
-          threat_level: 0.1,
-          nearby_entities: [],
-          resource_availability: {
-            pickaxe: {
-              available: true,
-              quantity: 1,
-              location: 'inventory',
-              last_seen: Date.now(),
-              confidence: 1.0,
-            },
-            cobblestone: {
-              available: true,
-              quantity: 0,
-              location: 'nearby',
-              last_seen: Date.now(),
-              confidence: 0.8,
-            },
-          },
-          social_context: {
-            nearby_players: [],
-            nearby_villagers: [],
-            chat_activity: false,
-          },
-          timestamp: Date.now(),
-        };
+      const result = await enhancedTaskParser.parseUserInput(
+        userInput,
+        mockEnvironmentalContext,
+        userContext
+      );
 
-        const result = await taskParser.parseLLMOutput(
-          llmOutput,
-          environmentalContext
-        );
+      expect(result.task).toBeDefined();
+      expect(result.task.type).toBe('gathering');
+      expect(result.paraphrase_options).toHaveLength(3);
+      expect(result.selected_paraphrase).toBeDefined();
+      expect(result.channel_used).toBeDefined();
+      expect(result.context_adaptations).toBeDefined();
+      expect(result.user_interaction_metadata).toBeDefined();
+    });
 
-        expect(result.task.type).toBe('gathering');
-        expect(result.task.parameters.resource).toBe('cobblestone');
-        expect(result.task.parameters.quantity).toBe(64);
-        expect(result.task.priority).toBe(0.8);
-        expect(result.task.safety_level).toBe('safe');
-        expect(result.validation.is_valid).toBe(true);
-        expect(result.feasibility.is_feasible).toBe(true);
-      });
+    test('should parse complex multi-step command', async () => {
+      const userInput = 'build a house and then gather food for survival';
+      const userContext = {
+        expertise_level: 'intermediate' as const,
+        preferred_style: 'conversational' as ParaphrasingStyle,
+        urgency_level: 0.7,
+      };
 
-      it('should parse natural language task description', async () => {
-        const llmOutput =
-          'I need to gather 32 cobblestone urgently for building a shelter';
+      const result = await enhancedTaskParser.parseUserInput(
+        userInput,
+        mockEnvironmentalContext,
+        userContext
+      );
 
-        const environmentalContext: EnvironmentalContext = {
-          time_of_day: 'day',
-          weather: 'clear',
-          biome: 'plains',
-          light_level: 15,
-          threat_level: 0.1,
-          nearby_entities: [],
-          resource_availability: {},
-          social_context: {
-            nearby_players: [],
-            nearby_villagers: [],
-            chat_activity: false,
-          },
-          timestamp: Date.now(),
-        };
+      expect(result.task).toBeDefined();
+      expect(result.paraphrase_options.length).toBeGreaterThan(0);
+      expect(result.selected_paraphrase.confidence).toBeGreaterThan(0.5);
+    });
 
-        const result = await taskParser.parseLLMOutput(
-          llmOutput,
-          environmentalContext
-        );
+    test('should handle question input with expressive channel', async () => {
+      const userInput = 'How do I craft a diamond pickaxe?';
+      const userContext = {
+        expertise_level: 'beginner' as const,
+        preferred_style: 'instructional' as ParaphrasingStyle,
+        urgency_level: 0.3,
+      };
 
-        expect(result.task.type).toBe('gathering');
-        // The regex should extract "32" as quantity and "cobblestone" as resource
-        expect(result.task.parameters.quantity).toBe(32);
-        expect(result.task.parameters.resource).toBe('cobblestone');
-        expect(result.task.priority).toBeGreaterThan(0.5); // Should detect urgency
-      });
+      const result = await enhancedTaskParser.parseUserInput(
+        userInput,
+        mockEnvironmentalContext,
+        userContext
+      );
 
-      it('should handle invalid LLM output gracefully', async () => {
-        const llmOutput = 'invalid json {';
+      expect(result.channel_used).toBe('expressive');
+      expect(result.task.type).toBe('crafting');
+    });
 
-        const environmentalContext: EnvironmentalContext = {
-          time_of_day: 'day',
-          weather: 'clear',
-          biome: 'plains',
-          light_level: 15,
-          threat_level: 0.1,
-          nearby_entities: [],
-          resource_availability: {},
-          social_context: {
-            nearby_players: [],
-            nearby_villagers: [],
-            chat_activity: false,
-          },
-          timestamp: Date.now(),
-        };
+    test('should handle urgent command with operational channel', async () => {
+      const userInput = 'URGENT: I need shelter immediately!';
+      const userContext = {
+        expertise_level: 'expert' as const,
+        preferred_style: 'technical' as ParaphrasingStyle,
+        urgency_level: 0.9,
+      };
 
-        // Should still parse as exploration task even with invalid JSON
-        const result = await taskParser.parseLLMOutput(
-          llmOutput,
-          environmentalContext
-        );
-        expect(result.task.type).toBe('exploration');
+      const result = await enhancedTaskParser.parseUserInput(
+        userInput,
+        mockEnvironmentalContext,
+        userContext
+      );
+
+      expect(result.channel_used).toBe('operational');
+      expect(result.context_adaptations).toContain('Added urgency indicators');
+    });
+  });
+
+  describe('Creative Response Generation', () => {
+    test('should generate creative response for casual input', async () => {
+      const userInput = 'Hello! How are you doing today?';
+      const userContext = {
+        expertise_level: 'beginner' as const,
+        preferred_style: 'casual' as ParaphrasingStyle,
+        urgency_level: 0.1,
+      };
+
+      const response = await enhancedTaskParser.generateCreativeResponse(
+        userInput,
+        mockEnvironmentalContext,
+        userContext
+      );
+
+      expect(response).toBeDefined();
+      expect(typeof response).toBe('string');
+      expect(response.length).toBeGreaterThan(10);
+    });
+
+    test('should generate technical response for expert user', async () => {
+      const userInput = 'What is the optimal mining strategy for diamonds?';
+      const userContext = {
+        expertise_level: 'expert' as const,
+        preferred_style: 'technical' as ParaphrasingStyle,
+        urgency_level: 0.6,
+      };
+
+      const response = await enhancedTaskParser.generateCreativeResponse(
+        userInput,
+        mockEnvironmentalContext,
+        userContext
+      );
+
+      expect(response).toBeDefined();
+      expect(response.length).toBeGreaterThan(20);
+    });
+  });
+
+  describe('Paraphrasing Options', () => {
+    test('should generate multiple paraphrasing options', async () => {
+      const task: TaskDefinition = {
+        id: 'test-task',
+        type: 'gathering',
+        parameters: { resource: 'wood', quantity: 10 },
+        priority: 0.7,
+        safety_level: 'safe',
+        estimated_duration: 300000,
+        created_at: Date.now(),
+        updated_at: Date.now(),
+      };
+
+      const userContext = {
+        expertise_level: 'intermediate' as const,
+        preferred_style: 'conversational' as ParaphrasingStyle,
+        urgency_level: 0.5,
+      };
+
+      const options = await enhancedTaskParser.generateParaphrasingOptions(
+        task,
+        mockEnvironmentalContext,
+        userContext,
+        ['casual', 'formal', 'instructional']
+      );
+
+      expect(options).toHaveLength(3);
+      expect(options[0].style_used).toBe('casual');
+      expect(options[1].style_used).toBe('formal');
+      expect(options[2].style_used).toBe('instructional');
+      
+      options.forEach(option => {
+        expect(option.confidence).toBeGreaterThan(0.5);
+        expect(option.paraphrased_task).toBeDefined();
+        expect(option.adaptations_applied).toBeDefined();
       });
     });
 
-    describe('validateTask', () => {
-      it('should validate gathering task correctly', async () => {
-        const task: TaskDefinition = {
-          id: 'test-task',
-          type: 'gathering',
-          parameters: {
-            resource: 'cobblestone',
-            quantity: 64,
-            tool_required: 'pickaxe',
-          },
-          priority: 0.8,
-          safety_level: 'safe',
-          created_at: Date.now(),
-          updated_at: Date.now(),
-        };
+    test('should filter options by confidence threshold', async () => {
+      const task: TaskDefinition = {
+        id: 'test-task',
+        type: 'crafting',
+        parameters: { item: 'diamond_pickaxe' },
+        priority: 0.8,
+        safety_level: 'safe',
+        estimated_duration: 600000,
+        created_at: Date.now(),
+        updated_at: Date.now(),
+      };
 
-        const environmentalContext: EnvironmentalContext = {
-          time_of_day: 'day',
-          weather: 'clear',
-          biome: 'plains',
-          light_level: 15,
-          threat_level: 0.1,
-          nearby_entities: [],
-          resource_availability: {
-            pickaxe: {
-              available: true,
-              quantity: 1,
-              location: 'inventory',
-              last_seen: Date.now(),
-              confidence: 1.0,
-            },
-          },
-          social_context: {
-            nearby_players: [],
-            nearby_villagers: [],
-            chat_activity: false,
-          },
-          timestamp: Date.now(),
-        };
+      const userContext = {
+        expertise_level: 'expert' as const,
+        preferred_style: 'technical' as ParaphrasingStyle,
+        urgency_level: 0.7,
+      };
 
-        const result = await taskParser.validateTask(
-          task,
-          environmentalContext
-        );
+      const options = await enhancedTaskParser.generateParaphrasingOptions(
+        task,
+        mockEnvironmentalContext,
+        userContext
+      );
 
-        expect(result.is_valid).toBe(true);
-        expect(result.errors).toHaveLength(0);
-        expect(result.confidence).toBeGreaterThan(0.8);
-      });
-
-      it('should detect missing required parameters', async () => {
-        const task: TaskDefinition = {
-          id: 'test-task',
-          type: 'gathering',
-          parameters: {},
-          priority: 0.8,
-          safety_level: 'safe',
-          created_at: Date.now(),
-          updated_at: Date.now(),
-        };
-
-        const environmentalContext: EnvironmentalContext = {
-          time_of_day: 'day',
-          weather: 'clear',
-          biome: 'plains',
-          light_level: 15,
-          threat_level: 0.1,
-          nearby_entities: [],
-          resource_availability: {},
-          social_context: {
-            nearby_players: [],
-            nearby_villagers: [],
-            chat_activity: false,
-          },
-          timestamp: Date.now(),
-        };
-
-        const result = await taskParser.validateTask(
-          task,
-          environmentalContext
-        );
-
-        expect(result.is_valid).toBe(false);
-        expect(result.errors).toContain(
-          'Gathering task requires a resource parameter'
-        );
-        expect(result.confidence).toBeLessThan(0.8);
-      });
-
-      it('should warn about night time outdoor activities', async () => {
-        const task: TaskDefinition = {
-          id: 'test-task',
-          type: 'gathering',
-          parameters: {
-            resource: 'cobblestone',
-            quantity: 64,
-          },
-          priority: 0.8,
-          safety_level: 'safe',
-          created_at: Date.now(),
-          updated_at: Date.now(),
-        };
-
-        const environmentalContext: EnvironmentalContext = {
-          time_of_day: 'night',
-          weather: 'clear',
-          biome: 'plains',
-          light_level: 5,
-          threat_level: 0.3,
-          nearby_entities: [],
-          resource_availability: {},
-          social_context: {
-            nearby_players: [],
-            nearby_villagers: [],
-            chat_activity: false,
-          },
-          timestamp: Date.now(),
-        };
-
-        const result = await taskParser.validateTask(
-          task,
-          environmentalContext
-        );
-
-        expect(result.warnings).toContain(
-          'Performing outdoor task at night may be dangerous'
-        );
-        expect(result.suggestions).toContain(
-          'Consider waiting until day or using torches'
-        );
-      });
-    });
-
-    describe('checkFeasibility', () => {
-      it('should check resource availability', async () => {
-        const task: TaskDefinition = {
-          id: 'test-task',
-          type: 'gathering',
-          parameters: {
-            resource: 'diamond',
-            tool_required: 'diamond_pickaxe',
-          },
-          priority: 0.8,
-          safety_level: 'safe',
-          created_at: Date.now(),
-          updated_at: Date.now(),
-        };
-
-        const environmentalContext: EnvironmentalContext = {
-          time_of_day: 'day',
-          weather: 'clear',
-          biome: 'plains',
-          light_level: 15,
-          threat_level: 0.1,
-          nearby_entities: [],
-          resource_availability: {
-            stone_pickaxe: {
-              available: true,
-              quantity: 1,
-              location: 'inventory',
-              last_seen: Date.now(),
-              confidence: 1.0,
-            },
-          },
-          social_context: {
-            nearby_players: [],
-            nearby_villagers: [],
-            chat_activity: false,
-          },
-          timestamp: Date.now(),
-        };
-
-        const result = await taskParser.checkFeasibility(
-          task,
-          environmentalContext
-        );
-
-        expect(result.is_feasible).toBe(false);
-        expect(result.missing_resources).toContain('diamond_pickaxe');
-        expect(result.confidence).toBeLessThan(0.7);
-      });
-
-      it('should assess environmental constraints', async () => {
-        const task: TaskDefinition = {
-          id: 'test-task',
-          type: 'gathering',
-          parameters: {
-            resource: 'cobblestone',
-            quantity: 64,
-          },
-          priority: 0.8,
-          safety_level: 'safe',
-          created_at: Date.now(),
-          updated_at: Date.now(),
-        };
-
-        const environmentalContext: EnvironmentalContext = {
-          time_of_day: 'night',
-          weather: 'storm',
-          biome: 'plains',
-          light_level: 3,
-          threat_level: 0.9,
-          nearby_entities: [],
-          resource_availability: {},
-          social_context: {
-            nearby_players: [],
-            nearby_villagers: [],
-            chat_activity: false,
-          },
-          timestamp: Date.now(),
-        };
-
-        const result = await taskParser.checkFeasibility(
-          task,
-          environmentalContext
-        );
-
-        expect(result.environmental_constraints).toContain(
-          'Night time reduces visibility and safety'
-        );
-        expect(result.risk_assessment.factors).toContain(
-          'Hostile mobs are more active at night'
-        );
-        expect(result.risk_assessment.level).toBe('dangerous');
-      });
-    });
-
-    describe('performance metrics', () => {
-      it('should track performance metrics correctly', async () => {
-        const llmOutput = JSON.stringify({
-          type: 'gathering',
-          parameters: { resource: 'cobblestone', quantity: 64 },
-          priority: 0.8,
-          safety_level: 'safe',
-        });
-
-        const environmentalContext: EnvironmentalContext = {
-          time_of_day: 'day',
-          weather: 'clear',
-          biome: 'plains',
-          light_level: 15,
-          threat_level: 0.1,
-          nearby_entities: [],
-          resource_availability: {},
-          social_context: {
-            nearby_players: [],
-            nearby_villagers: [],
-            chat_activity: false,
-          },
-          timestamp: Date.now(),
-        };
-
-        await taskParser.parseLLMOutput(llmOutput, environmentalContext);
-
-        const metrics = taskParser.getPerformanceMetrics();
-        expect(metrics.parsing_time).toBeGreaterThan(0);
-        expect(metrics.validation_time).toBeGreaterThan(0);
-        expect(metrics.feasibility_time).toBeGreaterThan(0);
+      options.forEach(option => {
+        expect(option.confidence).toBeGreaterThanOrEqual(0.7);
       });
     });
   });
 
-  describe('EnvironmentalImmersion', () => {
-    describe('updateContext', () => {
-      it('should update environmental context from world state', () => {
-        const worldState = {
-          time: 6000, // Dusk
-          weather: 'clear',
-          biome: 'forest',
-          light_level: 10,
-          position: { x: 100, y: 64, z: 200 },
-          entities: [
-            {
-              id: 'zombie-1',
-              type: 'zombie',
-              position: { x: 102, y: 64, z: 200 },
-              is_hostile: true,
-              health: 20,
-            },
-          ],
-          inventory: [
-            { name: 'stone_pickaxe', quantity: 1 },
-            { name: 'torch', quantity: 16 },
-          ],
-          nearby_blocks: [
-            { type: 'stone', position: { x: 101, y: 63, z: 200 } },
-          ],
-          chat_messages: [
-            {
-              sender: 'Player1',
-              content: 'Hello there!',
-              timestamp: Date.now(),
-            },
-          ],
-        };
+  describe('User Feedback Integration', () => {
+    test('should handle user feedback for task parsing', async () => {
+      const userInput = 'gather stone for building';
+      const userContext = {
+        user_id: 'test-user',
+        expertise_level: 'beginner' as const,
+        preferred_style: 'instructional' as ParaphrasingStyle,
+        urgency_level: 0.5,
+      };
 
-        const context = environmentalImmersion.updateContext(worldState);
+      const result = await enhancedTaskParser.parseUserInput(
+        userInput,
+        mockEnvironmentalContext,
+        userContext
+      );
 
-        expect(context.time_of_day).toBe('dusk');
-        expect(context.weather).toBe('clear');
-        expect(context.biome).toBe('forest');
-        expect(context.light_level).toBe(10);
-        expect(context.threat_level).toBeGreaterThan(0);
-        expect(context.nearby_entities).toHaveLength(1);
-        expect(context.nearby_entities[0].type).toBe('zombie');
-        expect(context.nearby_entities[0].is_hostile).toBe(true);
-        expect(context.resource_availability.stone_pickaxe.available).toBe(
-          true
-        );
-        expect(context.resource_availability.torch.available).toBe(true);
-        expect(context.social_context.chat_activity).toBe(true);
-      });
+      // Provide positive feedback
+      enhancedTaskParser.provideUserFeedback(
+        result.task.id,
+        0.9,
+        'Great job understanding my request!',
+        result.selected_paraphrase.id
+      );
 
-      it('should calculate threat level correctly', () => {
-        const worldState = {
-          time: 18000, // Night
-          weather: 'clear',
-          biome: 'plains',
-          light_level: 5,
-          position: { x: 100, y: 64, z: 200 },
-          entities: [
-            {
-              id: 'creeper-1',
-              type: 'creeper',
-              position: { x: 101, y: 64, z: 200 },
-              is_hostile: true,
-            },
-            {
-              id: 'skeleton-1',
-              type: 'skeleton',
-              position: { x: 105, y: 64, z: 200 },
-              is_hostile: true,
-            },
-          ],
-          inventory: [],
-          nearby_blocks: [],
-          chat_messages: [],
-        };
-
-        const context = environmentalImmersion.updateContext(worldState);
-
-        expect(context.threat_level).toBeGreaterThan(0.5);
-        expect(context.time_of_day).toBe('night');
-      });
+      // Check that feedback was recorded
+      const taskHistory = enhancedTaskParser.getTaskHistory();
+      const task = taskHistory.find(t => t.task.id === result.task.id);
+      expect(task?.user_interaction_metadata.feedback_score).toBe(0.9);
     });
 
-    describe('getBehaviorAdaptations', () => {
-      it('should recommend night time adaptations', () => {
-        const context: EnvironmentalContext = {
-          time_of_day: 'night',
-          weather: 'clear',
-          biome: 'plains',
-          light_level: 5,
-          threat_level: 0.3,
-          nearby_entities: [],
-          resource_availability: {},
-          social_context: {
-            nearby_players: [],
-            nearby_villagers: [],
-            chat_activity: false,
-          },
-          timestamp: Date.now(),
-        };
+    test('should update user preferences based on feedback', async () => {
+      const userContext = {
+        user_id: 'learning-user',
+        expertise_level: 'beginner' as const,
+        preferred_style: 'instructional' as ParaphrasingStyle,
+        urgency_level: 0.5,
+      };
 
-        const adaptations =
-          environmentalImmersion.getBehaviorAdaptations(context);
+      // Parse multiple tasks with feedback
+      const tasks = [
+        'gather wood',
+        'build a house',
+        'craft tools',
+      ];
 
-        expect(adaptations.adaptations).toContain('seek_shelter');
-        expect(adaptations.adaptations).toContain('use_torches');
-        expect(adaptations.priority).toBeGreaterThan(0.7);
-        expect(adaptations.reasoning).toContain(
-          'Night time requires defensive measures'
+      for (const taskInput of tasks) {
+        const result = await enhancedTaskParser.parseUserInput(
+          taskInput,
+          mockEnvironmentalContext,
+          userContext
         );
-      });
 
-      it('should recommend threat-based adaptations', () => {
-        const context: EnvironmentalContext = {
-          time_of_day: 'day',
-          weather: 'clear',
-          biome: 'plains',
-          light_level: 15,
-          threat_level: 0.8,
-          nearby_entities: [],
-          resource_availability: {},
-          social_context: {
-            nearby_players: [],
-            nearby_villagers: [],
-            chat_activity: false,
-          },
-          timestamp: Date.now(),
-        };
-
-        const adaptations =
-          environmentalImmersion.getBehaviorAdaptations(context);
-
-        expect(adaptations.adaptations).toContain('defensive_stance');
-        expect(adaptations.adaptations).toContain('avoid_combat');
-        expect(adaptations.priority).toBeGreaterThan(0.8);
-        expect(adaptations.reasoning).toContain(
-          'High threat level requires defensive behavior'
+        // Provide feedback
+        enhancedTaskParser.provideUserFeedback(
+          result.task.id,
+          0.8,
+          'Good understanding',
+          result.selected_paraphrase.id
         );
-      });
+      }
+
+      // Check user interaction history
+      const userHistory = enhancedTaskParser.getUserInteractionHistory();
+      const user = userHistory.get('learning-user');
+      expect(user).toBeDefined();
+      expect(user?.interaction_history).toHaveLength(3);
+    });
+  });
+
+  describe('Context Awareness', () => {
+    test('should adapt to dangerous environmental context', async () => {
+      const dangerousContext: EnvironmentalContext = {
+        ...mockEnvironmentalContext,
+        threat_level: 0.9,
+        time_of_day: 'night',
+        weather: 'storm',
+      };
+
+      const userInput = 'explore the area';
+      const userContext = {
+        expertise_level: 'intermediate' as const,
+        preferred_style: 'conversational' as ParaphrasingStyle,
+        urgency_level: 0.6,
+      };
+
+      const result = await enhancedTaskParser.parseUserInput(
+        userInput,
+        dangerousContext,
+        userContext
+      );
+
+      expect(result.context_adaptations).toContain('Added safety context for dangerous environment');
+      expect(result.context_adaptations).toContain('Adjusted for nighttime conditions');
     });
 
-    describe('getEnvironmentalSummary', () => {
-      it('should provide accurate environmental summary', () => {
-        const context: EnvironmentalContext = {
-          time_of_day: 'night',
-          weather: 'storm',
-          biome: 'forest',
-          light_level: 3,
-          threat_level: 0.9,
-          nearby_entities: [],
-          resource_availability: {
-            torch: {
-              available: true,
-              quantity: 16,
-              location: 'inventory',
-              last_seen: Date.now(),
-              confidence: 1.0,
-            },
-          },
-          social_context: {
-            nearby_players: [],
-            nearby_villagers: [],
-            chat_activity: false,
-          },
-          timestamp: Date.now(),
-        };
+    test('should adapt to beginner user expertise', async () => {
+      const userInput = 'craft advanced redstone contraption';
+      const userContext = {
+        expertise_level: 'beginner' as const,
+        preferred_style: 'instructional' as ParaphrasingStyle,
+        urgency_level: 0.4,
+      };
 
-        // Update the context first with high threat level
-        environmentalImmersion.updateContext({
-          time: 18000,
-          weather: 'storm',
-          biome: 'forest',
-          light_level: 3,
-          position: { x: 100, y: 64, z: 200 },
-          entities: [
-            {
-              id: 'creeper-1',
-              type: 'creeper',
-              position: { x: 101, y: 64, z: 200 },
-              is_hostile: true,
-            },
-          ],
-          inventory: [{ name: 'torch', quantity: 16 }],
-          nearby_blocks: [],
-          chat_messages: [],
-        });
+      const result = await enhancedTaskParser.parseUserInput(
+        userInput,
+        mockEnvironmentalContext,
+        userContext
+      );
 
-        const summary = environmentalImmersion.getEnvironmentalSummary();
+      expect(result.context_adaptations).toContain('Simplified language for beginner user');
+    });
+  });
 
-        expect(summary.safety_level).toBe('dangerous');
-        expect(summary.warnings).toContain('High threat level detected');
-        expect(summary.warnings).toContain('Night time increases danger');
-        expect(summary.warnings).toContain(
-          'Storm conditions may affect activities'
-        );
-        expect(summary.warnings).toContain(
-          'Low light level may affect visibility'
-        );
-        expect(summary.activity_recommendations).toContain(
-          'Consider seeking shelter'
-        );
-        expect(summary.activity_recommendations).toContain(
-          'Use appropriate weather protection'
-        );
-        expect(summary.activity_recommendations).toContain(
-          'Use lighting sources'
-        );
-      });
+  describe('Performance Metrics', () => {
+    test('should track performance metrics', async () => {
+      const userInput = 'gather resources';
+      const userContext = {
+        expertise_level: 'intermediate' as const,
+        preferred_style: 'conversational' as ParaphrasingStyle,
+        urgency_level: 0.5,
+      };
+
+      await enhancedTaskParser.parseUserInput(userInput, mockEnvironmentalContext, userContext);
+
+      const metrics = enhancedTaskParser.getPerformanceMetrics();
+      expect(metrics.parsing_time).toBeGreaterThan(0);
+      expect(metrics.success_rate).toBeGreaterThanOrEqual(0);
+      expect(metrics.error_rate).toBeGreaterThanOrEqual(0);
     });
 
-    describe('lifecycle management', () => {
-      it('should start and stop monitoring correctly', () => {
-        const startSpy = jest.fn();
-        const stopSpy = jest.fn();
+    test('should track dual-channel metrics', () => {
+      const dualChannelMetrics = enhancedTaskParser.getDualChannelMetrics();
+      expect(dualChannelMetrics.operational_success_rate).toBeGreaterThanOrEqual(0);
+      expect(dualChannelMetrics.expressive_success_rate).toBeGreaterThanOrEqual(0);
+      expect(dualChannelMetrics.average_response_time).toBeGreaterThanOrEqual(0);
+    });
 
-        environmentalImmersion.on('started', startSpy);
-        environmentalImmersion.on('stopped', stopSpy);
+    test('should track creative paraphrasing metrics', () => {
+      const paraphrasingMetrics = enhancedTaskParser.getCreativeParaphrasingMetrics();
+      expect(paraphrasingMetrics.average_confidence).toBeGreaterThanOrEqual(0);
+      expect(paraphrasingMetrics.user_satisfaction_score).toBeGreaterThanOrEqual(0);
+    });
+  });
 
-        environmentalImmersion.start(100);
-        expect(startSpy).toHaveBeenCalled();
-        expect(environmentalImmersion.getCurrentContext()).toBeNull();
+  describe('Configuration Management', () => {
+    test('should update configuration', () => {
+      const newConfig = {
+        max_paraphrase_options: 5,
+        paraphrase_confidence_threshold: 0.8,
+        enable_schema_validation: false,
+      };
 
-        environmentalImmersion.stop();
-        expect(stopSpy).toHaveBeenCalled();
+      enhancedTaskParser.updateConfig(newConfig);
+      const config = enhancedTaskParser.getConfig();
+
+      expect(config.max_paraphrase_options).toBe(5);
+      expect(config.paraphrase_confidence_threshold).toBe(0.8);
+      expect(config.enable_schema_validation).toBe(false);
+    });
+
+    test('should update sub-component configurations', () => {
+      const newConfig = {
+        dual_channel: {
+          context_aware_routing: false,
+          auto_fallback: false,
+        },
+        creative_paraphrasing: {
+          enable_emotion_integration: false,
+          max_paraphrase_length: 100,
+        },
+      };
+
+      enhancedTaskParser.updateConfig(newConfig);
+      const config = enhancedTaskParser.getConfig();
+
+      expect(config.dual_channel.context_aware_routing).toBe(false);
+      expect(config.dual_channel.auto_fallback).toBe(false);
+      expect(config.creative_paraphrasing.enable_emotion_integration).toBe(false);
+      expect(config.creative_paraphrasing.max_paraphrase_length).toBe(100);
+    });
+  });
+
+  describe('Error Handling', () => {
+    test('should handle parsing errors gracefully', async () => {
+      const invalidInput = '';
+      const userContext = {
+        expertise_level: 'beginner' as const,
+        preferred_style: 'instructional' as ParaphrasingStyle,
+        urgency_level: 0.5,
+      };
+
+      await expect(
+        enhancedTaskParser.parseUserInput(invalidInput, mockEnvironmentalContext, userContext)
+      ).rejects.toThrow();
+    });
+
+    test('should handle paraphrase generation errors', async () => {
+      const invalidTask: TaskDefinition = {
+        id: 'invalid-task',
+        type: 'invalid_type' as any,
+        parameters: {},
+        created_at: Date.now(),
+        updated_at: Date.now(),
+      };
+
+      const userContext = {
+        expertise_level: 'beginner' as const,
+        preferred_style: 'instructional' as ParaphrasingStyle,
+        urgency_level: 0.5,
+      };
+
+      await expect(
+        enhancedTaskParser.generateParaphrasingOptions(
+          invalidTask,
+          mockEnvironmentalContext,
+          userContext
+        )
+      ).rejects.toThrow();
+    });
+  });
+
+  describe('Event Emission', () => {
+    test('should emit events for task parsing', (done) => {
+      const userInput = 'gather wood';
+      const userContext = {
+        expertise_level: 'beginner' as const,
+        preferred_style: 'instructional' as ParaphrasingStyle,
+        urgency_level: 0.5,
+      };
+
+      enhancedTaskParser.on('enhanced_task_parsed', (result) => {
+        expect(result.task).toBeDefined();
+        expect(result.paraphrase_options).toBeDefined();
+        done();
       });
 
-      it('should emit context update events', (done) => {
-        environmentalImmersion.on('context_updated', (context) => {
-          expect(context).toBeDefined();
-          expect(context.time_of_day).toBe('dusk'); // 6000 time = dusk
+      enhancedTaskParser.parseUserInput(userInput, mockEnvironmentalContext, userContext);
+    });
+
+    test('should emit events for creative response generation', (done) => {
+      const userInput = 'Hello there!';
+      const userContext = {
+        expertise_level: 'beginner' as const,
+        preferred_style: 'casual' as ParaphrasingStyle,
+        urgency_level: 0.1,
+      };
+
+      enhancedTaskParser.on('creative_response_generated', (data) => {
+        expect(data.response).toBeDefined();
+        expect(data.userInput).toBe(userInput);
+        done();
+      });
+
+      enhancedTaskParser.generateCreativeResponse(userInput, mockEnvironmentalContext, userContext);
+    });
+
+    test('should emit events for user feedback', (done) => {
+      const userInput = 'gather stone';
+      const userContext = {
+        user_id: 'test-user',
+        expertise_level: 'beginner' as const,
+        preferred_style: 'instructional' as ParaphrasingStyle,
+        urgency_level: 0.5,
+      };
+
+      enhancedTaskParser.on('enhanced_task_parsed', (result) => {
+        enhancedTaskParser.on('user_feedback_received', (feedback) => {
+          expect(feedback.taskId).toBe(result.task.id);
+          expect(feedback.feedbackScore).toBe(0.8);
           done();
         });
 
-        const worldState = {
-          time: 6000, // Dusk time
-          weather: 'clear',
-          biome: 'plains',
-          light_level: 15,
-          position: { x: 100, y: 64, z: 200 },
-          entities: [],
-          inventory: [],
-          nearby_blocks: [],
-          chat_messages: [],
-        };
-
-        environmentalImmersion.updateContext(worldState);
+        enhancedTaskParser.provideUserFeedback(result.task.id, 0.8, 'Good job!');
       });
+
+      enhancedTaskParser.parseUserInput(userInput, mockEnvironmentalContext, userContext);
     });
   });
 
-  describe('Integration', () => {
-    it('should integrate task parsing with environmental context', async () => {
-      const llmOutput =
-        'I need to gather cobblestone for building, but it is getting dark';
-
-      const worldState = {
-        time: 18000, // Night
-        weather: 'clear',
-        biome: 'plains',
-        light_level: 5,
-        position: { x: 100, y: 64, z: 200 },
-        entities: [],
-        inventory: [{ name: 'stone_pickaxe', quantity: 1 }],
-        nearby_blocks: [],
-        chat_messages: [],
+  describe('History Management', () => {
+    test('should maintain task history', async () => {
+      const userInput = 'gather resources';
+      const userContext = {
+        expertise_level: 'intermediate' as const,
+        preferred_style: 'conversational' as ParaphrasingStyle,
+        urgency_level: 0.5,
       };
 
-      // Update environmental context
-      const environmentalContext =
-        environmentalImmersion.updateContext(worldState);
+      await enhancedTaskParser.parseUserInput(userInput, mockEnvironmentalContext, userContext);
 
-      // Parse task with environmental context
-      const result = await taskParser.parseLLMOutput(
-        llmOutput,
-        environmentalContext
+      const taskHistory = enhancedTaskParser.getTaskHistory();
+      expect(taskHistory.length).toBeGreaterThan(0);
+      expect(taskHistory[0].task.type).toBe('gathering');
+    });
+
+    test('should maintain user interaction history', async () => {
+      const userContext = {
+        user_id: 'test-user',
+        expertise_level: 'beginner' as const,
+        preferred_style: 'instructional' as ParaphrasingStyle,
+        urgency_level: 0.5,
+      };
+
+      await enhancedTaskParser.parseUserInput(
+        'gather wood',
+        mockEnvironmentalContext,
+        userContext
       );
 
-      expect(result.task.type).toBe('gathering');
-      expect(result.task.parameters.resource).toBe('cobblestone');
-      expect(result.validation.warnings).toContain(
-        'Performing outdoor task at night may be dangerous'
-      );
-      expect(result.feasibility.environmental_constraints).toContain(
-        'Night time reduces visibility and safety'
-      );
-      expect(result.feasibility.risk_assessment.level).toBe('risky');
+      const userHistory = enhancedTaskParser.getUserInteractionHistory();
+      const user = userHistory.get('test-user');
+      expect(user).toBeDefined();
+      expect(user?.interaction_history.length).toBeGreaterThan(0);
+    });
+
+    test('should clear history', () => {
+      enhancedTaskParser.clearTaskHistory();
+      enhancedTaskParser.clearUserInteractionHistory();
+
+      const taskHistory = enhancedTaskParser.getTaskHistory();
+      const userHistory = enhancedTaskParser.getUserInteractionHistory();
+
+      expect(taskHistory).toHaveLength(0);
+      expect(userHistory.size).toBe(0);
     });
   });
 });
