@@ -29,30 +29,26 @@ export const GET = async (req: NextRequest) => {
     const isSSE = accept?.includes('text/event-stream');
     const isJSON = accept?.includes('application/json');
 
-    console.log(`Bot state request - SSE: ${isSSE}, JSON: ${isJSON}, Accept: ${accept}`);
+    console.log(
+      `Bot state request - SSE: ${isSSE}, JSON: ${isJSON}, Accept: ${accept}`
+    );
 
     // If it's a JSON request, return a single response
     if (isJSON) {
       try {
         // Fetch bot state from Minecraft interface
-        const minecraftResponse = await fetch(
-          'http://localhost:3005/state',
-          {
-            method: 'GET',
-            headers: { 'Content-Type': 'application/json' },
-            signal: AbortSignal.timeout(5000), // 5 second timeout
-          }
-        );
+        const minecraftResponse = await fetch('http://localhost:3005/state', {
+          method: 'GET',
+          headers: { 'Content-Type': 'application/json' },
+          signal: AbortSignal.timeout(5000), // 5 second timeout
+        });
 
         // Fetch cognition state
-        const cognitionResponse = await fetch(
-          'http://localhost:3003/state',
-          {
-            method: 'GET',
-            headers: { 'Content-Type': 'application/json' },
-            signal: AbortSignal.timeout(5000), // 5 second timeout
-          }
-        );
+        const cognitionResponse = await fetch('http://localhost:3003/state', {
+          method: 'GET',
+          headers: { 'Content-Type': 'application/json' },
+          signal: AbortSignal.timeout(5000), // 5 second timeout
+        });
 
         // Fetch world state
         const worldResponse = await fetch('http://localhost:3004/state', {
@@ -67,9 +63,7 @@ export const GET = async (req: NextRequest) => {
         const cognitionData = cognitionResponse.ok
           ? await cognitionResponse.json()
           : null;
-        const worldData = worldResponse.ok
-          ? await worldResponse.json()
-          : null;
+        const worldData = worldResponse.ok ? await worldResponse.json() : null;
 
         const botState = {
           type: 'bot_state_update',
@@ -95,12 +89,15 @@ export const GET = async (req: NextRequest) => {
         });
       } catch (error) {
         console.error('Error fetching bot state for JSON request:', error);
-        return new Response(JSON.stringify({ error: 'Failed to fetch bot state' }), {
-          status: 500,
-          headers: {
-            'Content-Type': 'application/json',
-          },
-        });
+        return new Response(
+          JSON.stringify({ error: 'Failed to fetch bot state' }),
+          {
+            status: 500,
+            headers: {
+              'Content-Type': 'application/json',
+            },
+          }
+        );
       }
     }
 
@@ -111,7 +108,9 @@ export const GET = async (req: NextRequest) => {
 
     // Check connection limit
     if (activeConnections.size >= MAX_CONNECTIONS) {
-      console.log(`Connection limit reached (${MAX_CONNECTIONS}), rejecting new connection`);
+      console.log(
+        `Connection limit reached (${MAX_CONNECTIONS}), rejecting new connection`
+      );
       return new Response('Too many connections', { status: 429 });
     }
 
@@ -231,7 +230,9 @@ export const GET = async (req: NextRequest) => {
             clearInterval(intervalId);
           }
           activeConnections.delete(controller);
-          console.log(`SSE connection closed. Total connections: ${activeConnections.size}`);
+          console.log(
+            `SSE connection closed. Total connections: ${activeConnections.size}`
+          );
           try {
             controller.close();
           } catch (error) {

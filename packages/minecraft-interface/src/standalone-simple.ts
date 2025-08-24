@@ -121,8 +121,10 @@ export class SimpleMinecraftInterface extends EventEmitter {
           this.chatHistory = this.chatHistory.slice(-100);
         }
 
-        // Process message through chat processor
-        await this.chatProcessor.processMessage(sender, content);
+        // Only process messages from other players, not from ourselves
+        if (sender !== this.config.username && sender !== 'unknown') {
+          await this.chatProcessor.processMessage(sender, content);
+        }
 
         // Emit chat event
         this.emit('chat', chatMessage);

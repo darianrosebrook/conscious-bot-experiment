@@ -181,44 +181,48 @@ export default function ConsciousMinecraftDashboard() {
       if (data && typeof data === 'object' && 'type' in data) {
         if ((data as any).type === 'cognitive_stream_init') {
           // Initialize with existing thoughts
-          const existingThoughts = (data as any).data.thoughts.map((thought: any) => ({
-            id: thought.id,
-            ts: new Date(thought.timestamp).toISOString(),
-            text: thought.content,
-            type:
-              thought.attribution === 'intrusive'
-                ? 'intrusion'
-                : thought.type === 'external_chat_in'
-                  ? 'external'
-                  : thought.type === 'external_chat_out'
-                    ? 'self'
-                    : 'self',
-            attrHidden: thought.attribution !== 'intrusive',
-            sender: thought.sender,
-            thoughtType: thought.type,
-            attribution: thought.attribution,
-          }));
+          const existingThoughts = (data as any).data.thoughts.map(
+            (thought: any) => ({
+              id: thought.id,
+              ts: new Date(thought.timestamp).toISOString(),
+              text: thought.content,
+              type:
+                thought.attribution === 'intrusive'
+                  ? 'intrusion'
+                  : thought.type === 'external_chat_in'
+                    ? 'external'
+                    : thought.type === 'external_chat_out'
+                      ? 'self'
+                      : 'self',
+              attrHidden: thought.attribution !== 'intrusive',
+              sender: thought.sender,
+              thoughtType: thought.type,
+              attribution: thought.attribution,
+            })
+          );
           // Add each thought individually
           existingThoughts.forEach((thought: any) => addThought(thought));
         } else if ((data as any).type === 'cognitive_thoughts') {
           // Add new thoughts
-          const newThoughts = (data as any).data.thoughts.map((thought: any) => ({
-            id: thought.id,
-            ts: new Date(thought.timestamp).toISOString(),
-            text: thought.content,
-            type:
-              thought.attribution === 'intrusive'
-                ? 'intrusion'
-                : thought.type === 'external_chat_in'
-                  ? 'external'
-                  : thought.type === 'external_chat_out'
-                    ? 'self'
-                    : 'self',
-            attrHidden: thought.attribution !== 'intrusive',
-            sender: thought.sender,
-            thoughtType: thought.type,
-            attribution: thought.attribution,
-          }));
+          const newThoughts = (data as any).data.thoughts.map(
+            (thought: any) => ({
+              id: thought.id,
+              ts: new Date(thought.timestamp).toISOString(),
+              text: thought.content,
+              type:
+                thought.attribution === 'intrusive'
+                  ? 'intrusion'
+                  : thought.type === 'external_chat_in'
+                    ? 'external'
+                    : thought.type === 'external_chat_out'
+                      ? 'self'
+                      : 'self',
+              attrHidden: thought.attribution !== 'intrusive',
+              sender: thought.sender,
+              thoughtType: thought.type,
+              attribution: thought.attribution,
+            })
+          );
           newThoughts.forEach((thought: any) => addThought(thought));
         }
       }
@@ -542,7 +546,7 @@ export default function ConsciousMinecraftDashboard() {
             {botStateSSE.error && (
               <button
                 onClick={() => {
-                  botStateSSE.reconnect();
+                  botStateSSE.connect();
                 }}
                 className="ml-2 text-xs text-zinc-400 hover:text-zinc-200 underline"
               >

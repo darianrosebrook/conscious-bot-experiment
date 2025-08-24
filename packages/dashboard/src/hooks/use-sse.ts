@@ -17,6 +17,7 @@ const connectionManager = new Map<string, {
   onOpen: Set<() => void>;
   onClose: Set<() => void>;
   onError: Set<(error: Event) => void>;
+  isConnecting: boolean;
 }>();
 
 /**
@@ -40,14 +41,27 @@ export function useSSE({
   const reconnectAttemptsRef = useRef(0);
   const isMountedRef = useRef(true);
 
+  // Use refs to store callbacks to prevent unnecessary reconnections
+  const onMessageRef = useRef(onMessage);
+  const onOpenRef = useRef(onOpen);
+  const onCloseRef = useRef(onClose);
+  const onErrorRef = useRef(onError);
+
+  // Update refs when callbacks change
+  useEffect(() => {
+    onMessageRef.current = onMessage;
+    onOpenRef.current = onOpen;
+    onCloseRef.current = onClose;
+    onErrorRef.current = onError;
+  }, [onMessage, onOpen, onClose, onError]);
+
   const connect = useCallback(() => {
     if (!isMountedRef.current) return;
 
-    // Check if we already have a connection for this URL
     let connection = connectionManager.get(url);
 
+    // If no connection exists, create one
     if (!connection) {
-      // Create new connection
       try {
         const eventSource = new EventSource(url);
         
@@ -57,109 +71,111 @@ export function useSSE({
           onOpen: new Set(),
           onClose: new Set(),
           onError: new Set(),
+          isConnecting: true,
         };
 
+        connectionManager.set(url, connection);
+
         eventSource.onopen = () => {
-          setIsConnected(true);
-          setError(null);
-          reconnectAttemptsRef.current = 0;
-          connection!.onOpen.forEach(callback => callback());
+          if (connection) {
+            connection.isConnecting = false;
+            setIsConnected(true);
+            setError(null);
+            reconnectAttemptsRef.current = 0;
+            connection.onOpen.forEach((callback) => callback());
+          }
         };
 
         eventSource.onmessage = (event) => {
           try {
             const data = JSON.parse(event.data);
-            connection!.subscribers.forEach(callback => callback(data));
+            if (connection) {
+              connection.subscribers.forEach((callback) => callback(data));
+            }
           } catch (err) {
             // Silently handle parsing errors
           }
         };
 
         eventSource.onerror = (event) => {
-          setIsConnected(false);
-          setError('SSE connection error');
-          connection!.onError.forEach(callback => callback(event));
-
-          // Attempt to reconnect if we haven't exceeded max attempts
-          if (reconnectAttemptsRef.current < maxReconnectAttempts) {
-            reconnectAttemptsRef.current++;
-            const backoffDelay = Math.min(
-              reconnectInterval * Math.pow(2, reconnectAttemptsRef.current - 1),
-              30000 // Cap at 30 seconds
-            );
-
-            setTimeout(() => {
-              if (isMountedRef.current) {
-                // Remove the failed connection
-                connectionManager.delete(url);
-                // Try to reconnect
-                connect();
-              }
-            }, backoffDelay);
+          if (connection) {
+            connection.isConnecting = false;
+            setIsConnected(false);
+            setError('SSE connection error');
+            connection.onError.forEach((callback) => callback(event));
           }
         };
 
-        connectionManager.set(url, connection);
+        // Handle connection close
+        eventSource.addEventListener('close', () => {
+          if (connection) {
+            connection.isConnecting = false;
+            setIsConnected(false);
+            connection.onClose.forEach((callback) => callback());
+          }
+        });
+
       } catch (err) {
-        setError('Failed to create SSE connection');
+        console.error('Failed to create EventSource:', err);
+        setError('Failed to create connection');
         return;
       }
     }
 
-    // Subscribe to this connection
-    if (onMessage) {
-      connection.subscribers.add(onMessage);
-    }
-    if (onOpen) {
-      connection.onOpen.add(onOpen);
-    }
-    if (onClose) {
-      connection.onClose.add(onClose);
-    }
-    if (onError) {
-      connection.onError.add(onError);
-    }
+    // Add this component's callbacks to the connection
+    if (connection) {
+      if (onMessageRef.current) {
+        connection.subscribers.add(onMessageRef.current);
+      }
+      if (onOpenRef.current) {
+        connection.onOpen.add(onOpenRef.current);
+      }
+      if (onCloseRef.current) {
+        connection.onClose.add(onCloseRef.current);
+      }
+      if (onErrorRef.current) {
+        connection.onError.add(onErrorRef.current);
+      }
 
-    // Set connected state if the connection is already open
-    if (connection.eventSource.readyState === EventSource.OPEN) {
-      setIsConnected(true);
+      // Update connection state
+      setIsConnected(!connection.isConnecting);
       setError(null);
     }
-  }, [url, onMessage, onOpen, onClose, onError, reconnectInterval, maxReconnectAttempts]);
+  }, [url]);
 
   const disconnect = useCallback(() => {
     const connection = connectionManager.get(url);
     if (connection) {
-      // Unsubscribe from this connection
-      if (onMessage) {
-        connection.subscribers.delete(onMessage);
+      // Remove this component's callbacks
+      if (onMessageRef.current) {
+        connection.subscribers.delete(onMessageRef.current);
       }
-      if (onOpen) {
-        connection.onOpen.delete(onOpen);
+      if (onOpenRef.current) {
+        connection.onOpen.delete(onOpenRef.current);
       }
-      if (onClose) {
-        connection.onClose.delete(onClose);
+      if (onCloseRef.current) {
+        connection.onClose.delete(onCloseRef.current);
       }
-      if (onError) {
-        connection.onError.delete(onError);
+      if (onErrorRef.current) {
+        connection.onError.delete(onErrorRef.current);
       }
 
       // If no more subscribers, close the connection
-      if (connection.subscribers.size === 0) {
+      if (
+        connection.subscribers.size === 0 &&
+        connection.onOpen.size === 0 &&
+        connection.onClose.size === 0 &&
+        connection.onError.size === 0
+      ) {
         connection.eventSource.close();
         connectionManager.delete(url);
+        console.log(`SSE connection closed. Total connections: ${connectionManager.size}`);
       }
     }
     setIsConnected(false);
-  }, [url, onMessage, onOpen, onClose, onError]);
+  }, [url]);
 
-  const reconnect = useCallback(() => {
-    disconnect();
-    reconnectAttemptsRef.current = 0;
-    setError(null);
-    connect();
-  }, [disconnect, connect]);
-
+  // Connect on mount
   useEffect(() => {
     isMountedRef.current = true;
     connect();
@@ -173,8 +189,7 @@ export function useSSE({
   return {
     isConnected,
     error,
-    disconnect,
     connect,
-    reconnect,
+    disconnect,
   };
 }
