@@ -1,0 +1,68 @@
+{
+  "id": "opt.chop_tree_safe",
+  "name": "Safe Tree Chopping",
+  "description": "Gather N logs from target species with safety checks",
+  "root": {
+    "type": "sequence",
+    "children": [
+      {
+        "type": "condition",
+        "name": "check_tools",
+        "condition": "has_axe && (light_level >= 7 || has_torch)"
+      },
+      {
+        "type": "selector",
+        "name": "find_tree",
+        "children": [
+          {
+            "type": "action",
+            "name": "find_nearby_tree",
+            "action": "scan_for_trees",
+            "args": { "radius": 50, "species": "target_species" }
+          },
+          {
+            "type": "action",
+            "name": "pathfind_to_tree",
+            "action": "pathfind",
+            "args": { "target": "nearest_tree", "avoid_water": true }
+          }
+        ]
+      },
+      {
+        "type": "sequence",
+        "name": "chop_tree",
+        "children": [
+          {
+            "type": "action",
+            "name": "scan_canopy",
+            "action": "scan_tree_structure",
+            "args": { "method": "top_down" }
+          },
+          {
+            "type": "action",
+            "name": "chop_logs",
+            "action": "dig_blocks",
+            "args": { "pattern": "tree_logs_top_down", "tool": "axe" }
+          },
+          {
+            "type": "action",
+            "name": "collect_drops",
+            "action": "collect_items",
+            "args": { "radius": 3 }
+          }
+        ]
+      },
+      {
+        "type": "condition",
+        "name": "verify_logs",
+        "condition": "inventory.logs >= target_amount"
+      }
+    ]
+  },
+  "metadata": {
+    "timeout": 45000,
+    "retries": 2,
+    "priority": "medium",
+    "interruptible": true
+  }
+}

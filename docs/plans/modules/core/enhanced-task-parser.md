@@ -3,7 +3,7 @@
 **Module:** `modules/core/enhanced_task_parser/`  
 **Purpose:** Unified task parsing and environmental immersion for conscious bot  
 **Author:** @darianrosebrook  
-**Status:** 📝 Planned  
+**Status:**  Planned  
 **Milestone:** M4 Advanced Features  
 **Dependencies:** Core Arbiter, World Systems, Planning Systems  
 

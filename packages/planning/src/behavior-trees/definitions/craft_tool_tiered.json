@@ -1,0 +1,84 @@
+{
+  "id": "opt.craft_tool_tiered",
+  "name": "Tiered Tool Crafting",
+  "description": "Craft requested tool at the highest valid tier (wood→stone→iron)",
+  "root": {
+    "type": "sequence",
+    "children": [
+      {
+        "type": "action",
+        "name": "check_available_tiers",
+        "action": "analyze_available_materials",
+        "args": { "tool_type": "target_tool" }
+      },
+      {
+        "type": "selector",
+        "name": "craft_at_best_tier",
+        "children": [
+          {
+            "type": "sequence",
+            "name": "craft_iron_tool",
+            "children": [
+              {
+                "type": "condition",
+                "name": "check_iron_available",
+                "condition": "has_iron_ingots && can_craft_iron_tool"
+              },
+              {
+                "type": "action",
+                "name": "craft_iron_tool",
+                "action": "craft_item",
+                "args": { "recipe": "iron_tool", "tool_type": "target_tool" }
+              }
+            ]
+          },
+          {
+            "type": "sequence",
+            "name": "craft_stone_tool",
+            "children": [
+              {
+                "type": "condition",
+                "name": "check_stone_available",
+                "condition": "has_stone && can_craft_stone_tool"
+              },
+              {
+                "type": "action",
+                "name": "craft_stone_tool",
+                "action": "craft_item",
+                "args": { "recipe": "stone_tool", "tool_type": "target_tool" }
+              }
+            ]
+          },
+          {
+            "type": "sequence",
+            "name": "craft_wood_tool",
+            "children": [
+              {
+                "type": "condition",
+                "name": "check_wood_available",
+                "condition": "has_wood && can_craft_wood_tool"
+              },
+              {
+                "type": "action",
+                "name": "craft_wood_tool",
+                "action": "craft_item",
+                "args": { "recipe": "wood_tool", "tool_type": "target_tool" }
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "type": "condition",
+        "name": "verify_tool_crafted",
+        "condition": "has_tool_of_type && tool_tier >= best_available"
+      }
+    ]
+  },
+  "metadata": {
+    "timeout": 30000,
+    "retries": 2,
+    "priority": "medium",
+    "interruptible": true
+  }
+}

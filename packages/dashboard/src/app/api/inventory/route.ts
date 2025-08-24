@@ -7,10 +7,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import {
-  getMineflayerItemSprite,
-  getMineflayerItemDisplayName,
-} from '@/lib/mineflayer-item-mapping';
+import { getMineflayerItemDisplayName } from '@/lib/mineflayer-item-mapping';
 
 export async function GET(_request: NextRequest) {
   try {
@@ -40,27 +37,77 @@ export async function GET(_request: NextRequest) {
 
     // Transform Mineflayer inventory items to our format
     const transformedInventory = inventory.map((item: any) => {
-      // Mineflayer items have: id, type, count, slot, metadata, name, displayName, etc.
-      const itemType = item.type || item.id || null;
+      try {
+        // Mineflayer items have: id, type, count, slot, metadata, name, displayName, etc.
+        const itemType = item.type || item.id || null;
 
-      const mineflayerItem = {
-        type: itemType,
-        count: typeof item.count === 'number' ? item.count : 1,
-        slot: typeof item.slot === 'number' ? item.slot : 0,
-        metadata: item.metadata || null,
-        displayName:
-          item.displayName ||
-          item.name ||
-          (itemType ? getMineflayerItemDisplayName(itemType) : null),
-        durability:
-          typeof item.durability === 'number' ? item.durability : null,
-        maxDurability:
-          typeof item.maxDurability === 'number' ? item.maxDurability : null,
-      };
+        // Mineflayer slot mapping:
+        // - Hotbar: slots 36-44 (maps to 0-8)
+        // - Main inventory: slots 9-35 (maps to 9-35)
+        // - Armor: slots 5-8 (maps to 100-103)
+        // - Offhand: slot 45 (maps to 104)
+        let mappedSlot = item.slot;
 
-      // Debug logging removed for production
+        if (typeof item.slot === 'number') {
+          if (item.slot >= 36 && item.slot <= 44) {
+            // Hotbar items (36-44 -> 0-8)
+            mappedSlot = item.slot - 36;
+          } else if (item.slot >= 5 && item.slot <= 8) {
+            // Armor items (5-8 -> 100-103)
+            mappedSlot = item.slot + 95;
+          } else if (item.slot === 45) {
+            // Offhand (45 -> 104)
+            mappedSlot = 104;
+          }
+          // Main inventory slots 9-35 stay the same
+        }
 
-      return mineflayerItem;
+        // Safely get display name
+        let displayName = item.displayName || item.name;
+        if (!displayName && itemType !== null) {
+          try {
+            displayName = getMineflayerItemDisplayName(itemType);
+          } catch (error) {
+            console.warn(
+              `Failed to get display name for item type ${itemType}:`,
+              error
+            );
+            displayName = `Item ${itemType}`;
+          }
+        }
+
+        const mineflayerItem = {
+          type: itemType,
+          count: typeof item.count === 'number' ? item.count : 1,
+          slot: mappedSlot,
+          metadata: item.metadata || null,
+          displayName: displayName,
+          name: item.name || null, // Preserve the original name from Mineflayer
+          durability:
+            typeof item.durability === 'number' ? item.durability : null,
+          maxDurability:
+            typeof item.maxDurability === 'number' ? item.maxDurability : null,
+        };
+
+        console.log(
+          `Mapped item: ${displayName} from slot ${item.slot} to slot ${mappedSlot}`
+        );
+
+        return mineflayerItem;
+      } catch (error) {
+        console.error('Error processing inventory item:', error, item);
+        // Return a safe fallback item
+        return {
+          type: item.type || item.id || null,
+          count: typeof item.count === 'number' ? item.count : 1,
+          slot: typeof item.slot === 'number' ? item.slot : 0,
+          metadata: null,
+          displayName: item.displayName || item.name || 'Unknown Item',
+          name: item.name || null,
+          durability: null,
+          maxDurability: null,
+        };
+      }
     });
 
     return NextResponse.json({

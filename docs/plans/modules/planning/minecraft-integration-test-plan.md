@@ -51,10 +51,10 @@ Scope for Earliest Testable: Single-agent, offline-auth (no premium account), lo
 
 ### 3) Environment and Tooling
 
-- Local Server: Vanilla or Paper 1.20.1 (stable for mineflayer); offline mode
+- Local Server: Vanilla or Paper 1.21.4 (stable for mineflayer); offline mode
 - Client Bot: mineflayer + mineflayer-pathfinder
 - Node: ≥ v18; Workspace: pnpm
-- Config: env or JSON: host (localhost), port (25565), username (bot), version (1.20.1)
+- Config: env or JSON: host (localhost), port (25565), username (bot), version (1.21.4)
 - Safety: Test world, offline auth, no public servers
 
 ---
@@ -132,7 +132,7 @@ packages/
 
 ### 8) Risks & Mitigations
 
-- Version Mismatch: lock server to 1.20.1 and set mineflayer version explicitly
+- Version Mismatch: lock server to 1.21.4 and set mineflayer version explicitly
 - Pathfinding Reliability: tune movements, waypoints; add timeouts and retries
 - Block Identification: use conservative radius and filtering; verify block type
 - Inventory Edge Cases: start with empty inventory; handle full inventory gracefully later
@@ -166,16 +166,16 @@ Tier 1 Acceptance
 
 ### 11) Concrete Task List (Tracked in TODOs)
 
-- ✅ Write plan doc (this file)
-- ✅ Scaffold minecraft-interface package
-- ✅ Implement ObservationMapper
-- ✅ Implement ActionTranslator (navigate, mine, craft minimal)
-- ✅ Create PlanExecutor loop with GOAP repair
-- ✅ Add simulation stub for CI
-- ✅ Author YAML scenarios (gather-wood, craft-planks)
-- ✅ Implement smoke test CLI
-- ✅ Add telemetry and logs
-- ⏳ Add CI nightly simulation job
+-  Write plan doc (this file)
+-  Scaffold minecraft-interface package
+-  Implement ObservationMapper
+-  Implement ActionTranslator (navigate, mine, craft minimal)
+-  Create PlanExecutor loop with GOAP repair
+-  Add simulation stub for CI
+-  Author YAML scenarios (gather-wood, craft-planks)
+-  Implement smoke test CLI
+-  Add telemetry and logs
+-  Add CI nightly simulation job
 
 ---
 
@@ -184,23 +184,23 @@ Tier 1 Acceptance
 **Date:** August 21, 2024  
 **Status:** Milestone A (Tier 0) COMPLETED + Enhanced Testing Infrastructure
 
-#### ✅ Completed Features
+####  Completed Features
 
 **Core Minecraft Interface:**
-- ✅ BotAdapter with mineflayer integration
-- ✅ ObservationMapper for game state translation
-- ✅ ActionTranslator for command execution
-- ✅ PlanExecutor for coordinated actions
-- ✅ TypeScript types and interfaces
+-  BotAdapter with mineflayer integration
+-  ObservationMapper for game state translation
+-  ActionTranslator for command execution
+-  PlanExecutor for coordinated actions
+-  TypeScript types and interfaces
 
 **Enhanced Testing Infrastructure:**
-- ✅ **Standalone Interface**: `SimpleMinecraftInterface` for testing without planning dependencies
-- ✅ **Simulation Stub**: `SimulatedMinecraftInterface` for offline testing without Minecraft server
-- ✅ **CLI Tools**: Both `mc-simple.js` (real server) and `mc-sim.js` (simulation)
-- ✅ **Build System**: Custom build script for standalone compilation
-- ✅ **Demo Sequences**: Automated test scenarios with verbose output
+-  **Standalone Interface**: `SimpleMinecraftInterface` for testing without planning dependencies
+-  **Simulation Stub**: `SimulatedMinecraftInterface` for offline testing without Minecraft server
+-  **CLI Tools**: Both `mc-simple.js` (real server) and `mc-sim.js` (simulation)
+-  **Build System**: Custom build script for standalone compilation
+-  **Demo Sequences**: Automated test scenarios with verbose output
 
-#### 🚀 Available Commands
+####  Available Commands
 
 ```bash
 # Real Minecraft server testing
@@ -222,7 +222,7 @@ npm run sim:stats
 npm run build:simple
 ```
 
-#### 📊 Current Capabilities
+####  Current Capabilities
 
 **Real Server Interface:**
 - Connect to Minecraft server (localhost:25565)
@@ -239,7 +239,7 @@ npm run build:simple
 - Real-time simulation tick system
 - Comprehensive statistics and telemetry
 
-#### 🔄 Next Steps
+####  Next Steps
 
 1. **Performance Optimization**: Optimize latency to meet real-time targets
 2. **CI Pipeline**: Add nightly simulation smoke tests
@@ -247,12 +247,12 @@ npm run build:simple
 4. **Advanced Planning**: Integrate with HRM/HTN/GOAP planning system
 5. **Scenario Testing**: Implement complex multi-step scenarios
 
-#### 🎯 Success Metrics
+####  Success Metrics
 
-- ✅ **Connection**: Successfully connects to both real and simulated environments
-- ✅ **Basic Actions**: All fundamental actions working in both environments
-- ✅ **Error Handling**: Graceful handling of connection failures and invalid actions
-- ✅ **Testing Infrastructure**: Comprehensive offline testing capabilities
-- ✅ **Developer Experience**: Simple CLI tools for rapid iteration
+-  **Connection**: Successfully connects to both real and simulated environments
+-  **Basic Actions**: All fundamental actions working in both environments
+-  **Error Handling**: Graceful handling of connection failures and invalid actions
+-  **Testing Infrastructure**: Comprehensive offline testing capabilities
+-  **Developer Experience**: Simple CLI tools for rapid iteration
 
 

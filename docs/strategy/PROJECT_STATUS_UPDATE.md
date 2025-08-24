@@ -14,10 +14,10 @@ The Conscious Bot project has successfully completed **Milestone 2 (M2)** with a
 
 | Milestone | Status | Modules Completed | Completion % |
 |-----------|--------|-------------------|--------------|
-| M1: Foundation | ✅ Complete | 11/11 | 100% |
-| M2: Intelligence | ✅ Complete | 9/9 | 100% |
-| M3: Planning | 🚧 Planning | 0/5 | 0% |
-| M4: Advanced | 📝 Future | 0/4 | 0% |
+| M1: Foundation |  Complete | 11/11 | 100% |
+| M2: Intelligence |  Complete | 9/9 | 100% |
+| M3: Planning |  Planning | 0/5 | 0% |
+| M4: Advanced |  Future | 0/4 | 0% |
 
 ### Recently Completed Modules (M2)
 
@@ -57,10 +57,10 @@ We have verified alignment across all key documentation:
 
 ## M2 Completion Verified
 
-✅ **All M2 modules successfully merged to main branch**  
-✅ **Progress tracker updated to reflect implementation status**  
-✅ **Repository structure verified with all packages in place**  
-✅ **Documentation aligned across all files**
+ **All M2 modules successfully merged to main branch**  
+ **Progress tracker updated to reflect implementation status**  
+ **Repository structure verified with all packages in place**  
+ **Documentation aligned across all files**
 
 M2 is now officially complete and ready for M3 transition.
 

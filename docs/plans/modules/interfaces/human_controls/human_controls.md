@@ -677,15 +677,15 @@ For field monitoring and emergency control:
   <div class="status-summary">
     <h2>Agent Status</h2>
     <div class="status-indicators">
-      <span class="status-healthy">🟢 Operational</span>
-      <span class="location-info">📍 Forest Area</span>
-      <span class="goal-info">🎯 Gathering Resources</span>
+      <span class="status-healthy"> Operational</span>
+      <span class="location-info"> Forest Area</span>
+      <span class="goal-info"> Gathering Resources</span>
     </div>
   </div>
   
   <div class="emergency-controls">
     <button class="big-emergency-btn" onclick="emergencyStop()">
-      🛑 EMERGENCY STOP
+       EMERGENCY STOP
     </button>
   </div>
   
@@ -736,11 +736,11 @@ class OperatorRegistry:
 
 | Permission Level | View Status | Basic Control | Emergency Stop | Module Toggle | System Config | Data Export |
 |-----------------|-------------|---------------|----------------|---------------|---------------|-------------|
-| Observer        | ✅          | ❌            | ❌             | ❌            | ❌            | ❌          |
-| Operator        | ✅          | ✅            | ✅             | ❌            | ❌            | ❌          |
-| Administrator   | ✅          | ✅            | ✅             | ✅            | ✅            | ✅          |
-| Researcher      | ✅          | ✅            | ❌             | ✅            | ❌            | ✅          |
-| Emergency       | ✅          | ❌            | ✅             | ❌            | ❌            | ❌          |
+| Observer        |           |             |              |             |             |           |
+| Operator        |           |             |              |             |             |           |
+| Administrator   |           |             |              |             |             |           |
+| Researcher      |           |             |              |             |             |           |
+| Emergency       |           |             |              |             |             |           |
 
 ### Session Management
 

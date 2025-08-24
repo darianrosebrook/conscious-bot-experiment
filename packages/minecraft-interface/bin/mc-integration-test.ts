@@ -110,7 +110,7 @@ function parseArgs(): CLIOptions {
 
 function printHelp(): void {
   console.log(`
-🤖 Minecraft Planning Integration Test CLI
+ Minecraft Planning Integration Test CLI
 
 Usage: mc-integration-test [options]
 
@@ -162,7 +162,7 @@ async function main(): Promise<void> {
     process.exit(0);
   }
 
-  console.log('🚀 Minecraft Planning Integration Test CLI');
+  console.log(' Minecraft Planning Integration Test CLI');
   console.log('='.repeat(50));
 
   // Build test configuration
@@ -171,7 +171,7 @@ async function main(): Promise<void> {
       host: options.host || 'localhost',
       port: options.port || 25565,
       username: options.username || 'IntegrationTestBot',
-      version: '1.20.1',
+      version: '1.21.4',
       auth: 'offline',
       pathfindingTimeout: 5000,
       actionTimeout: 10000,
@@ -198,7 +198,7 @@ async function main(): Promise<void> {
     verbose: options.verbose || false,
   };
 
-  console.log(`🎯 Test Configuration:`);
+  console.log(` Test Configuration:`);
   console.log(`   Server: ${config.minecraft!.host}:${config.minecraft!.port}`);
   console.log(`   Bot: ${config.minecraft!.username}`);
   console.log(`   Strategy: ${config.planning!.routingStrategy}`);
@@ -214,53 +214,51 @@ async function main(): Promise<void> {
   try {
     const startTime = Date.now();
 
-    console.log('🔬 Starting integration tests...');
+    console.log(' Starting integration tests...');
     const result = await runMinecraftPlanningIntegrationTest(config);
 
     const totalTime = Date.now() - startTime;
 
     // Print final summary
     console.log('\n' + '='.repeat(60));
-    console.log('📊 FINAL TEST REPORT');
+    console.log(' FINAL TEST REPORT');
     console.log('='.repeat(60));
+    console.log(` Overall Result: ${result.success ? ' PASSED' : ' FAILED'}`);
     console.log(
-      `🎯 Overall Result: ${result.success ? '✅ PASSED' : '❌ FAILED'}`
-    );
-    console.log(
-      `📈 Success Rate: ${Math.round((result.passedTests / result.totalTests) * 100)}% (${result.passedTests}/${result.totalTests})`
+      ` Success Rate: ${Math.round((result.passedTests / result.totalTests) * 100)}% (${result.passedTests}/${result.totalTests})`
     );
     console.log(`⏱️  Total Duration: ${Math.round(totalTime / 1000)}s`);
     console.log(
-      `🧠 Planning Avg: ${result.summary.planningSystemPerformance.averageExecutionTime}ms`
+      ` Planning Avg: ${result.summary.planningSystemPerformance.averageExecutionTime}ms`
     );
     console.log(
       `⚙️  Steps Executed: ${result.summary.minecraftInterfacePerformance.totalStepsExecuted}`
     );
     console.log(
-      `🔧 Repairs Needed: ${result.summary.minecraftInterfacePerformance.totalRepairAttempts}`
+      ` Repairs Needed: ${result.summary.minecraftInterfacePerformance.totalRepairAttempts}`
     );
 
     if (
       result.summary.integrationQuality.emergencyResponseCapability ===
       'operational'
     ) {
-      console.log(`🚨 Emergency Response: ✅ Operational`);
+      console.log(` Emergency Response:  Operational`);
     } else {
-      console.log(`🚨 Emergency Response: ⚠️  Needs Improvement`);
+      console.log(` Emergency Response: ⚠️  Needs Improvement`);
     }
 
     if (
       result.summary.integrationQuality.planningIntegrationStability ===
       'stable'
     ) {
-      console.log(`🔗 Integration Stability: ✅ Stable`);
+      console.log(` Integration Stability:  Stable`);
     } else {
-      console.log(`🔗 Integration Stability: ⚠️  Unstable`);
+      console.log(` Integration Stability: ⚠️  Unstable`);
     }
 
-    console.log('\n📋 Test Details:');
+    console.log('\n Test Details:');
     result.results.forEach((test, index) => {
-      const status = test.success ? '✅' : '❌';
+      const status = test.success ? '' : '';
       const duration = Math.round((test.executionTime / 1000) * 100) / 100;
       console.log(`   ${index + 1}. ${status} ${test.scenario}`);
       console.log(
@@ -272,12 +270,12 @@ async function main(): Promise<void> {
     });
 
     // Recommendations
-    console.log('\n💡 Recommendations:');
+    console.log('\n Recommendations:');
     if (result.summary.integrationQuality.overallSuccessRate >= 90) {
-      console.log('   🎉 Excellent! Planning integration is production-ready.');
+      console.log('    Excellent! Planning integration is production-ready.');
     } else if (result.summary.integrationQuality.overallSuccessRate >= 75) {
       console.log(
-        '   ✅ Good integration. Consider optimizing failed scenarios.'
+        '    Good integration. Consider optimizing failed scenarios.'
       );
     } else if (result.summary.integrationQuality.overallSuccessRate >= 50) {
       console.log(
@@ -285,7 +283,7 @@ async function main(): Promise<void> {
       );
     } else {
       console.log(
-        '   🚫 Poor integration. Major fixes needed before production.'
+        '    Poor integration. Major fixes needed before production.'
       );
     }
 
@@ -297,19 +295,19 @@ async function main(): Promise<void> {
 
     if (result.summary.minecraftInterfacePerformance.totalRepairAttempts > 5) {
       console.log(
-        '   🔧 High repair attempts indicate planning instability - review algorithms.'
+        '    High repair attempts indicate planning instability - review algorithms.'
       );
     }
 
     // Exit with appropriate code
     process.exit(result.success ? 0 : 1);
   } catch (error) {
-    console.error('\n💥 Integration test failed with error:');
+    console.error('\n Integration test failed with error:');
     console.error(error);
 
     if (error instanceof Error && error.message.includes('ECONNREFUSED')) {
       console.error(
-        '\n💡 Tip: Make sure a Minecraft server is running on the specified host/port.'
+        '\n Tip: Make sure a Minecraft server is running on the specified host/port.'
       );
       console.error(
         '   You can use the simulation mode instead: npm run sim:demo'
@@ -322,18 +320,18 @@ async function main(): Promise<void> {
 
 // Handle graceful shutdown
 process.on('SIGINT', () => {
-  console.log('\n\n🛑 Integration test interrupted by user.');
+  console.log('\n\n Integration test interrupted by user.');
   process.exit(130);
 });
 
 process.on('unhandledRejection', (reason, promise) => {
-  console.error('\n💥 Unhandled promise rejection:', reason);
+  console.error('\n Unhandled promise rejection:', reason);
   process.exit(1);
 });
 
 if (require.main === module) {
   main().catch((error) => {
-    console.error('\n💥 Fatal error:', error);
+    console.error('\n Fatal error:', error);
     process.exit(1);
   });
 }

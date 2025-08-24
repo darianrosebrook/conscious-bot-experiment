@@ -40,7 +40,7 @@ describe('Dashboard Cognitive Stream Integration', () => {
         return {
           id: `feedback-${feedback.timestamp}-${Math.random().toString(36).substr(2, 9)}`,
           ts: new Date(feedback.timestamp).toISOString(),
-          text: `🧠 ${feedback.reasoning}`,
+          text: ` ${feedback.reasoning}`,
           type: 'reflection' as const,
         };
       };
@@ -48,7 +48,7 @@ describe('Dashboard Cognitive Stream Integration', () => {
       const processedFeedback = processCognitiveFeedback(mockTask);
 
       expect(processedFeedback).toBeDefined();
-      expect(processedFeedback?.text).toContain('🧠');
+      expect(processedFeedback?.text).toContain('');
       expect(processedFeedback?.text).toContain('High failure rate');
       expect(processedFeedback?.type).toBe('reflection');
     });
@@ -83,7 +83,7 @@ describe('Dashboard Cognitive Stream Integration', () => {
         return {
           id: `suggestions-${feedback.timestamp}-${Math.random().toString(36).substr(2, 9)}`,
           ts: new Date(feedback.timestamp).toISOString(),
-          text: `💡 Alternatives: ${feedback.alternativeSuggestions.slice(0, 2).join(', ')}`,
+          text: ` Alternatives: ${feedback.alternativeSuggestions.slice(0, 2).join(', ')}`,
           type: 'reflection' as const,
         };
       };
@@ -91,7 +91,7 @@ describe('Dashboard Cognitive Stream Integration', () => {
       const processedSuggestions = processAlternativeSuggestions(mockTask);
 
       expect(processedSuggestions).toBeDefined();
-      expect(processedSuggestions?.text).toContain('💡 Alternatives:');
+      expect(processedSuggestions?.text).toContain(' Alternatives:');
       expect(processedSuggestions?.text).toContain(
         'Gather the required materials first'
       );
@@ -362,7 +362,7 @@ describe('Dashboard Cognitive Stream Integration', () => {
 
           return {
             id: `feedback-${feedback.timestamp || Date.now()}`,
-            text: `🧠 ${feedback.reasoning}`,
+            text: ` ${feedback.reasoning}`,
             type: 'reflection' as const,
           };
         } catch (error) {

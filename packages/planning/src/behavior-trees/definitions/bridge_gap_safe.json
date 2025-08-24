@@ -1,0 +1,91 @@
+{
+  "id": "opt.bridge_gap_safe",
+  "name": "Safe Gap Bridging",
+  "description": "Traverse ravines safely with crouch-place; optional rails later",
+  "root": {
+    "type": "sequence",
+    "children": [
+      {
+        "type": "condition",
+        "name": "check_materials",
+        "condition": "has_building_blocks && has_safety_equipment"
+      },
+      {
+        "type": "action",
+        "name": "analyze_gap",
+        "action": "scan_gap_dimensions",
+        "args": { "method": "safe_analysis" }
+      },
+      {
+        "type": "sequence",
+        "name": "build_bridge",
+        "children": [
+          {
+            "type": "action",
+            "name": "start_bridge",
+            "action": "place_anchor_block",
+            "args": { "position": "safe_start_position" }
+          },
+          {
+            "type": "action",
+            "name": "extend_bridge",
+            "action": "place_blocks_crouching",
+            "args": { "method": "crouch_place", "width": "bridge_width" }
+          },
+          {
+            "type": "selector",
+            "name": "add_rails",
+            "children": [
+              {
+                "type": "sequence",
+                "name": "add_rail_system",
+                "children": [
+                  {
+                    "type": "condition",
+                    "name": "check_rails_requested",
+                    "condition": "include_rails == true"
+                  },
+                  {
+                    "type": "action",
+                    "name": "place_rails",
+                    "action": "place_rail_blocks",
+                    "args": { "pattern": "side_rails", "height": 1 }
+                  }
+                ]
+              },
+              {
+                "type": "action",
+                "name": "skip_rails",
+                "action": "no_op",
+                "args": {}
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "type": "action",
+        "name": "test_bridge",
+        "action": "test_bridge_stability",
+        "args": { "method": "weight_test" }
+      },
+      {
+        "type": "action",
+        "name": "cross_bridge",
+        "action": "traverse_bridge",
+        "args": { "method": "cautious_walking" }
+      },
+      {
+        "type": "condition",
+        "name": "verify_crossing",
+        "condition": "successfully_crossed && bridge_stable"
+      }
+    ]
+  },
+  "metadata": {
+    "timeout": 60000,
+    "retries": 2,
+    "priority": "high",
+    "interruptible": false
+  }
+}

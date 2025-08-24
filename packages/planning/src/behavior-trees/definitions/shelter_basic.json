@@ -1,0 +1,68 @@
+{
+  "id": "opt.shelter_basic",
+  "name": "Basic Shelter",
+  "description": "Safe, lighted 3×3×2 shelter with door; used at dusk or danger",
+  "root": {
+    "type": "sequence",
+    "children": [
+      {
+        "type": "condition",
+        "name": "check_preconditions",
+        "condition": "has_wood_or_trees && (is_dusk || hostiles_detected)"
+      },
+      {
+        "type": "sequence",
+        "name": "build_shelter",
+        "children": [
+          {
+            "type": "action",
+            "name": "clear_area",
+            "action": "clear_3x3_area",
+            "args": { "size": { "x": 3, "y": 2, "z": 3 } }
+          },
+          {
+            "type": "action",
+            "name": "place_floor",
+            "action": "place_blocks",
+            "args": { "block": "wooden_planks", "pattern": "3x3_floor" }
+          },
+          {
+            "type": "action",
+            "name": "place_walls",
+            "action": "place_blocks",
+            "args": { "block": "wooden_planks", "pattern": "3x3_walls_2_high" }
+          },
+          {
+            "type": "action",
+            "name": "place_roof",
+            "action": "place_blocks",
+            "args": { "block": "wooden_planks", "pattern": "3x3_roof" }
+          },
+          {
+            "type": "action",
+            "name": "add_door",
+            "action": "place_door",
+            "args": { "position": "front_center" }
+          },
+          {
+            "type": "action",
+            "name": "add_lighting",
+            "action": "place_torch",
+            "args": { "position": "center_wall" }
+          }
+        ]
+      },
+      {
+        "type": "condition",
+        "name": "verify_shelter",
+        "condition": "shelter_built && lighted && has_door"
+      }
+    ]
+  },
+  "metadata": {
+    "timeout": 30000,
+    "retries": 2,
+    "priority": "high",
+    "interruptible": false
+  }
+}

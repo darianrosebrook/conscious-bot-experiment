@@ -102,7 +102,7 @@ async function waitForService(url, serviceName, maxAttempts = 30) {
 
       const req = client.get(url, (res) => {
         if (res.statusCode >= 200 && res.statusCode < 500) {
-          log(`✅ ${serviceName} is ready!`, colors.green);
+          log(` ${serviceName} is ready!`, colors.green);
           resolve();
         } else {
           if (attempts < maxAttempts) {
@@ -116,7 +116,7 @@ async function waitForService(url, serviceName, maxAttempts = 30) {
       req.on('error', () => {
         if (attempts < maxAttempts) {
           log(
-            `⏳ Attempt ${attempts}/${maxAttempts} - ${serviceName} not ready yet...`,
+            ` Attempt ${attempts}/${maxAttempts} - ${serviceName} not ready yet...`,
             colors.yellow
           );
           setTimeout(check, 2000);
@@ -145,16 +145,16 @@ async function waitForService(url, serviceName, maxAttempts = 30) {
 
 // Main function
 async function main() {
-  log('🤖 Conscious Bot Development Environment', colors.blue);
+  log(' Conscious Bot Development Environment', colors.blue);
   log('=====================================', colors.blue);
   log('');
 
   // Check if required ports are available
-  log('🔍 Checking port availability...', colors.cyan);
+  log(' Checking port availability...', colors.cyan);
   for (const service of services) {
     if (checkPort(service.port)) {
       log(
-        `❌ Port ${service.port} is already in use by another process`,
+        ` Port ${service.port} is already in use by another process`,
         colors.red
       );
       log(
@@ -164,39 +164,39 @@ async function main() {
       process.exit(1);
     }
   }
-  log('✅ All ports are available', colors.green);
+  log(' All ports are available', colors.green);
   log('');
 
   // Install dependencies if needed
-  log('📦 Installing dependencies...', colors.cyan);
+  log(' Installing dependencies...', colors.cyan);
   try {
     execSync('pnpm install', { stdio: 'inherit' });
-    log('✅ Dependencies installed', colors.green);
+    log(' Dependencies installed', colors.green);
   } catch (error) {
-    log('❌ Failed to install dependencies', colors.red);
+    log(' Failed to install dependencies', colors.red);
     process.exit(1);
   }
   log('');
 
   // Build packages if needed
-  log('🔨 Building packages...', colors.cyan);
+  log(' Building packages...', colors.cyan);
   try {
     execSync('pnpm build', { stdio: 'inherit' });
-    log('✅ Packages built', colors.green);
+    log(' Packages built', colors.green);
   } catch (error) {
-    log('❌ Failed to build packages', colors.red);
+    log(' Failed to build packages', colors.red);
     process.exit(1);
   }
   log('');
 
   // Start all services
-  log('🚀 Starting all services...', colors.cyan);
+  log(' Starting all services...', colors.cyan);
   log('');
 
   const processes = [];
 
   for (const service of services) {
-    log(`📊 Starting ${service.name} (port ${service.port})...`, colors.purple);
+    log(` Starting ${service.name} (port ${service.port})...`, colors.purple);
 
     const child = spawn(service.command, service.args, {
       stdio: 'pipe',
@@ -220,7 +220,7 @@ async function main() {
     });
 
     child.on('error', (error) => {
-      log(`❌ Failed to start ${service.name}: ${error.message}`, colors.red);
+      log(` Failed to start ${service.name}: ${error.message}`, colors.red);
     });
 
     processes.push({ child, service });
@@ -231,7 +231,7 @@ async function main() {
 
   // Check if services are ready
   log('');
-  log('🔍 Checking service status...', colors.cyan);
+  log(' Checking service status...', colors.cyan);
 
   try {
     await Promise.all(
@@ -240,14 +240,14 @@ async function main() {
       )
     );
   } catch (error) {
-    log(`❌ ${error.message}`, colors.red);
+    log(` ${error.message}`, colors.red);
     // Continue anyway, some services might not have health endpoints
   }
 
   log('');
-  log('🎉 All services started successfully!', colors.green);
+  log(' All services started successfully!', colors.green);
   log('');
-  log('📋 Service URLs:', colors.blue);
+  log(' Service URLs:', colors.blue);
   log(`  ${colors.cyan}Dashboard:${colors.reset}     http://localhost:3000`);
   log(`  ${colors.cyan}Minecraft Bot:${colors.reset}  http://localhost:3005`);
   log(`  ${colors.cyan}Minecraft Viewer:${colors.reset} http://localhost:3006`);
@@ -256,23 +256,23 @@ async function main() {
   log(`  ${colors.cyan}World:${colors.reset}          http://localhost:3004`);
   log(`  ${colors.cyan}Planning:${colors.reset}       http://localhost:3002`);
   log('');
-  log('💡 To connect the bot to Minecraft:', colors.yellow);
+  log(' To connect the bot to Minecraft:', colors.yellow);
   log('  curl -X POST http://localhost:3005/connect');
   log('');
-  log('🛑 To stop all services:', colors.yellow);
+  log(' To stop all services:', colors.yellow);
   log('  Press Ctrl+C');
   log('');
 
   // Handle cleanup on exit
   const cleanup = () => {
     log('');
-    log('🛑 Stopping all services...', colors.yellow);
+    log(' Stopping all services...', colors.yellow);
 
     processes.forEach(({ child }) => {
       child.kill('SIGTERM');
     });
 
-    log('✅ All services stopped', colors.green);
+    log(' All services stopped', colors.green);
     process.exit(0);
   };
 
@@ -280,11 +280,11 @@ async function main() {
   process.on('SIGTERM', cleanup);
 
   // Keep the script running
-  log('🔄 Services are running. Press Ctrl+C to stop.', colors.green);
+  log(' Services are running. Press Ctrl+C to stop.', colors.green);
 }
 
 // Run the main function
 main().catch((error) => {
-  log(`❌ Error: ${error.message}`, colors.red);
+  log(` Error: ${error.message}`, colors.red);
   process.exit(1);
 });

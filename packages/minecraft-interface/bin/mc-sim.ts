@@ -28,7 +28,7 @@ for (const arg of args) {
 // Help function
 function showHelp(): void {
   console.log(`
-🤖 Minecraft Simulation CLI
+ Minecraft Simulation CLI
 
 Usage: node mc-sim.js [options]
 
@@ -67,7 +67,7 @@ Examples:
 // Main execution function
 async function main(): Promise<void> {
   console.log(`
-🤖 Minecraft Simulation Test
+ Minecraft Simulation Test
 ============================
 
 ⚙️  Configuration: {
@@ -100,11 +100,11 @@ async function main(): Promise<void> {
     // Show final stats
     if (options.verbose === 'true') {
       const stats = simulation.getSimulationStats();
-      console.log('\n📊 Simulation Statistics:');
+      console.log('\n Simulation Statistics:');
       console.log(JSON.stringify(stats, null, 2));
     }
   } catch (error) {
-    console.error('❌ Simulation error:', error);
+    console.error(' Simulation error:', error);
     process.exit(1);
   } finally {
     await simulation.disconnect();
@@ -117,13 +117,13 @@ async function runAction(
   action: string,
   verbose: boolean = false
 ): Promise<void> {
-  console.log(`🎯 Executing action: ${action}`);
+  console.log(` Executing action: ${action}`);
 
   switch (action) {
     case 'connect':
       // Just connect and show state
       const gameState = await simulation.getGameState();
-      console.log('📊 Game state:', JSON.stringify(gameState, null, 2));
+      console.log(' Game state:', JSON.stringify(gameState, null, 2));
       break;
 
     case 'move':
@@ -132,9 +132,9 @@ async function runAction(
         type: 'move_forward',
         parameters: { distance },
       });
-      console.log(`✅ ${moveResult.message}`);
+      console.log(` ${moveResult.message}`);
       if (verbose && moveResult.data) {
-        console.log('📊 Move data:', JSON.stringify(moveResult.data, null, 2));
+        console.log(' Move data:', JSON.stringify(moveResult.data, null, 2));
       }
       break;
 
@@ -144,7 +144,7 @@ async function runAction(
         type: 'turn_left',
         parameters: { angle: leftAngle },
       });
-      console.log(`✅ ${turnLeftResult.message}`);
+      console.log(` ${turnLeftResult.message}`);
       break;
 
     case 'turn-right':
@@ -153,7 +153,7 @@ async function runAction(
         type: 'turn_right',
         parameters: { angle: rightAngle },
       });
-      console.log(`✅ ${turnRightResult.message}`);
+      console.log(` ${turnRightResult.message}`);
       break;
 
     case 'jump':
@@ -161,7 +161,7 @@ async function runAction(
         type: 'jump',
         parameters: {},
       });
-      console.log(`✅ ${jumpResult.message}`);
+      console.log(` ${jumpResult.message}`);
       break;
 
     case 'chat':
@@ -170,7 +170,7 @@ async function runAction(
         type: 'chat',
         parameters: { message },
       });
-      console.log(`✅ ${chatResult.message}`);
+      console.log(` ${chatResult.message}`);
       break;
 
     case 'mine':
@@ -178,9 +178,9 @@ async function runAction(
         type: 'mine_block',
         parameters: {},
       });
-      console.log(`✅ ${mineResult.message}`);
+      console.log(` ${mineResult.message}`);
       if (verbose && mineResult.data) {
-        console.log('📊 Mine data:', JSON.stringify(mineResult.data, null, 2));
+        console.log(' Mine data:', JSON.stringify(mineResult.data, null, 2));
       }
       break;
 
@@ -190,18 +190,15 @@ async function runAction(
         type: 'place_block',
         parameters: { blockType },
       });
-      console.log(`✅ ${placeResult.message}`);
+      console.log(` ${placeResult.message}`);
       if (verbose && placeResult.data) {
-        console.log(
-          '📊 Place data:',
-          JSON.stringify(placeResult.data, null, 2)
-        );
+        console.log(' Place data:', JSON.stringify(placeResult.data, null, 2));
       }
       break;
 
     case 'stats':
       const stats = simulation.getSimulationStats();
-      console.log('📊 Simulation Statistics:');
+      console.log(' Simulation Statistics:');
       console.log(JSON.stringify(stats, null, 2));
       break;
 
@@ -210,7 +207,7 @@ async function runAction(
       break;
 
     default:
-      console.error(`❌ Unknown action: ${action}`);
+      console.error(` Unknown action: ${action}`);
       showHelp();
       process.exit(1);
   }
@@ -221,7 +218,7 @@ async function runDemo(
   simulation: any,
   verbose: boolean = false
 ): Promise<void> {
-  console.log('🎬 Running demonstration sequence...\n');
+  console.log(' Running demonstration sequence...\n');
 
   const actions = [
     { type: 'chat', params: { message: 'Starting demo sequence!' } },
@@ -238,17 +235,17 @@ async function runDemo(
 
   for (let i = 0; i < actions.length; i++) {
     const action = actions[i];
-    console.log(`🎯 Step ${i + 1}/${actions.length}: ${action.type}`);
+    console.log(` Step ${i + 1}/${actions.length}: ${action.type}`);
 
     const result = await simulation.executeAction({
       type: action.type,
       parameters: action.params,
     });
 
-    console.log(`✅ ${result.message}`);
+    console.log(` ${result.message}`);
 
     if (verbose && result.data) {
-      console.log('📊 Data:', JSON.stringify(result.data, null, 2));
+      console.log(' Data:', JSON.stringify(result.data, null, 2));
     }
 
     // Small delay between actions
@@ -256,7 +253,7 @@ async function runDemo(
     console.log('');
   }
 
-  console.log('🎉 Demonstration sequence completed!');
+  console.log(' Demonstration sequence completed!');
 }
 
 // Handle help option
@@ -267,6 +264,6 @@ if (options.help || options.h) {
 
 // Run main function
 main().catch((error) => {
-  console.error('💥 Fatal error:', error);
+  console.error(' Fatal error:', error);
   process.exit(1);
 });

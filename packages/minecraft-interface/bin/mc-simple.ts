@@ -59,7 +59,7 @@ function parseArgs(): CLIOptions {
 
 function printHelp(): void {
   console.log(`
-🤖 Simple Minecraft Interface CLI
+ Simple Minecraft Interface CLI
 
 Usage: node mc-simple.js [options]
 
@@ -90,14 +90,14 @@ async function runAction(
   action: string,
   verbose: boolean = false
 ): Promise<void> {
-  console.log(`🎯 Executing action: ${action}`);
+  console.log(` Executing action: ${action}`);
 
   try {
     switch (action) {
       case 'connect':
         // Just connect and show state
         const gameState = await mcInterface.getGameState();
-        console.log('📊 Game state:', JSON.stringify(gameState, null, 2));
+        console.log(' Game state:', JSON.stringify(gameState, null, 2));
         break;
 
       case 'move':
@@ -105,7 +105,7 @@ async function runAction(
           type: 'move_forward',
           parameters: { distance: 3 },
         });
-        console.log('🚶 Move result:', moveResult);
+        console.log(' Move result:', moveResult);
         break;
 
       case 'turn':
@@ -113,7 +113,7 @@ async function runAction(
           type: 'turn_left',
           parameters: { angle: 90 },
         });
-        console.log('🔄 Turn result:', turnResult);
+        console.log(' Turn result:', turnResult);
         break;
 
       case 'jump':
@@ -121,7 +121,7 @@ async function runAction(
           type: 'jump',
           parameters: {},
         });
-        console.log('🦘 Jump result:', jumpResult);
+        console.log(' Jump result:', jumpResult);
         break;
 
       case 'chat':
@@ -129,18 +129,18 @@ async function runAction(
           type: 'chat',
           parameters: { message: 'Hello from SimpleBot!' },
         });
-        console.log('💬 Chat result:', chatResult);
+        console.log(' Chat result:', chatResult);
         break;
 
       default:
-        console.error(`❌ Unknown action: ${action}`);
+        console.error(` Unknown action: ${action}`);
         console.log('Available actions: connect, move, turn, jump, chat');
         return;
     }
 
-    console.log('✅ Action completed successfully');
+    console.log(' Action completed successfully');
   } catch (error) {
-    console.error(`❌ Action ${action} failed:`, error);
+    console.error(` Action ${action} failed:`, error);
     throw error;
   }
 }
@@ -149,7 +149,7 @@ async function main(): Promise<void> {
   try {
     const options = parseArgs();
 
-    console.log('🤖 Simple Minecraft Interface Test');
+    console.log(' Simple Minecraft Interface Test');
     console.log('==================================');
     console.log();
 
@@ -171,9 +171,9 @@ async function main(): Promise<void> {
     const minecraftInterface = createSimpleMinecraftInterface(config);
 
     // Connect to server
-    console.log('🔌 Connecting to Minecraft server...');
+    console.log(' Connecting to Minecraft server...');
     await minecraftInterface.connect();
-    console.log('✅ Connected successfully!');
+    console.log(' Connected successfully!');
 
     // Run action if specified
     if (options.action) {
@@ -181,7 +181,7 @@ async function main(): Promise<void> {
     } else {
       // Default: just show game state
       const gameState = await minecraftInterface.getGameState();
-      console.log('📊 Current game state:');
+      console.log(' Current game state:');
       console.log(
         `  Position: (${gameState.position.x}, ${gameState.position.y}, ${gameState.position.z})`
       );
@@ -193,13 +193,13 @@ async function main(): Promise<void> {
     }
 
     // Disconnect
-    console.log('🔌 Disconnecting...');
+    console.log(' Disconnecting...');
     await minecraftInterface.disconnect();
 
     console.log();
-    console.log('🎉 Test completed successfully!');
+    console.log(' Test completed successfully!');
   } catch (error) {
-    console.error('💥 Test failed:', error);
+    console.error(' Test failed:', error);
     process.exit(1);
   }
 }
@@ -207,7 +207,7 @@ async function main(): Promise<void> {
 // Run if called directly
 if (require.main === module) {
   main().catch((error) => {
-    console.error('💥 Fatal error:', error);
+    console.error(' Fatal error:', error);
     process.exit(1);
   });
 }

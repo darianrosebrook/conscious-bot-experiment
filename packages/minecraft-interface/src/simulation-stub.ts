@@ -146,7 +146,7 @@ export class SimulatedMinecraftInterface extends EventEmitter {
       throw new Error('Already connected to simulation');
     }
 
-    console.log('🔌 Connecting to simulated Minecraft environment...');
+    console.log(' Connecting to simulated Minecraft environment...');
 
     // Simulate connection delay
     await new Promise((resolve) => setTimeout(resolve, 100));
@@ -155,7 +155,7 @@ export class SimulatedMinecraftInterface extends EventEmitter {
     this.startSimulation();
 
     this.emit('connected');
-    console.log('✅ Connected to simulation');
+    console.log(' Connected to simulation');
   }
 
   /**
@@ -166,13 +166,13 @@ export class SimulatedMinecraftInterface extends EventEmitter {
       return;
     }
 
-    console.log('🔌 Disconnecting from simulation...');
+    console.log(' Disconnecting from simulation...');
 
     this.stopSimulation();
     this.isConnected = false;
 
     this.emit('disconnected');
-    console.log('✅ Disconnected from simulation');
+    console.log(' Disconnected from simulation');
   }
 
   /**
@@ -197,7 +197,7 @@ export class SimulatedMinecraftInterface extends EventEmitter {
       throw new Error('Not connected to simulation');
     }
 
-    console.log(`🎯 Executing action: ${action.type}`, action.parameters);
+    console.log(` Executing action: ${action.type}`, action.parameters);
 
     try {
       switch (action.type) {

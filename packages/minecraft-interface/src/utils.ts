@@ -14,7 +14,7 @@ export function createDefaultBotConfig(): BotConfig {
     host: 'localhost',
     port: 25565,
     username: 'ConsciousBot',
-    version: '1.20.1',
+    version: '1.21.4',
     auth: 'offline',
 
     pathfindingTimeout: 30000,
@@ -114,16 +114,16 @@ export function parseBotConfigFromArgs(args: string[]): Partial<BotConfig> {
  */
 export function formatTelemetryOutput(telemetry: any): string {
   const lines = [
-    `🎯 Planning: ${telemetry.planningLatency}ms`,
-    `⚡ Execution: ${telemetry.executionLatency}ms`,
-    `📊 Total: ${telemetry.totalLatency}ms`,
+    ` Planning: ${telemetry.planningLatency}ms`,
+    ` Execution: ${telemetry.executionLatency}ms`,
+    ` Total: ${telemetry.totalLatency}ms`,
     ``,
-    `📋 Steps: ${telemetry.stepMetrics.succeeded}/${telemetry.stepMetrics.planned} succeeded`,
-    `🔧 Repairs: ${telemetry.stepMetrics.repaired}`,
-    `🧠 Approach: ${telemetry.cognitiveMetrics.planningApproach}`,
-    `🎲 Confidence: ${(telemetry.cognitiveMetrics.confidence * 100).toFixed(1)}%`,
+    ` Steps: ${telemetry.stepMetrics.succeeded}/${telemetry.stepMetrics.planned} succeeded`,
+    ` Repairs: ${telemetry.stepMetrics.repaired}`,
+    ` Approach: ${telemetry.cognitiveMetrics.planningApproach}`,
+    ` Confidence: ${(telemetry.cognitiveMetrics.confidence * 100).toFixed(1)}%`,
     ``,
-    `🌍 Minecraft:`,
+    ` Minecraft:`,
     `  Blocks: ${telemetry.minecraftMetrics.blocksInteracted}`,
     `  Distance: ${telemetry.minecraftMetrics.distanceTraveled.toFixed(1)}m`,
     `  Items: ${telemetry.minecraftMetrics.itemsCollected}`,
@@ -151,13 +151,13 @@ export function createPerformanceSummary(results: any[]): string {
   const totalRepairs = results.reduce((sum, r) => sum + r.repairAttempts, 0);
 
   return [
-    `📈 Performance Summary:`,
+    ` Performance Summary:`,
     `  Success Rate: ${successRate}% (${successCount}/${results.length})`,
     `  Avg Execution: ${avgExecutionTime.toFixed(0)}ms`,
     `  Avg Steps: ${avgStepsExecuted.toFixed(1)}`,
     `  Total Repairs: ${totalRepairs}`,
     ``,
-    `🏆 Best: ${Math.min(...results.map((r) => r.executionTime))}ms`,
+    ` Best: ${Math.min(...results.map((r) => r.executionTime))}ms`,
     `⚠️  Worst: ${Math.max(...results.map((r) => r.executionTime))}ms`,
   ].join('\n');
 }

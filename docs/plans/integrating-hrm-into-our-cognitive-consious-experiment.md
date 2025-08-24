@@ -82,7 +82,7 @@ Moving forward, we have the opportunity to combine the best of both worlds: usin
 
 ## Detailed Implementation Plan & Progress Tracker
 
-**Repository:** [Official Sapient HRM GitHub](https://github.com/sapientinc/HRM) (✅ **Cloned Locally**)  
+**Repository:** [Official Sapient HRM GitHub](https://github.com/sapientinc/HRM) ( **Cloned Locally**)  
 **Local Path:** `/hrm-official/`  
 **Model Size:** 27M parameters  
 **Integration Target:** M3 Planning Module Enhancement
@@ -93,11 +93,11 @@ Moving forward, we have the opportunity to combine the best of both worlds: usin
 
 | Task | Status | Owner | Notes |
 |------|--------|-------|-------|
-| ✅ Clone HRM repository | **Complete** | @darianrosebrook | Located at `/hrm-official/` |
-| 🔲 Install HRM dependencies | **Pending** | - | `pip install -r requirements.txt` |
-| 🔲 Set up CUDA environment | **Pending** | - | FlashAttention 2/3 installation |
-| 🔲 Test pre-trained checkpoints | **Pending** | - | Validate Sudoku/Maze models |
-| 🔲 Run baseline benchmarks | **Pending** | - | Performance on existing tasks |
+|  Clone HRM repository | **Complete** | @darianrosebrook | Located at `/hrm-official/` |
+|  Install HRM dependencies | **Pending** | - | `pip install -r requirements.txt` |
+|  Set up CUDA environment | **Pending** | - | FlashAttention 2/3 installation |
+|  Test pre-trained checkpoints | **Pending** | - | Validate Sudoku/Maze models |
+|  Run baseline benchmarks | **Pending** | - | Performance on existing tasks |
 
 **Commands to Execute:**
 ```bash
@@ -111,10 +111,10 @@ python evaluate.py checkpoint=https://huggingface.co/sapientinc/HRM-checkpoint-s
 
 | Task | Status | Owner | Notes |
 |------|--------|-------|-------|
-| 🔲 Design Minecraft reasoning tasks | **Pending** | - | Pathfinding, crafting, building |
-| 🔲 Create Minecraft dataset builder | **Pending** | - | Based on `build_maze_dataset.py` |
-| 🔲 Generate 1000 training examples | **Pending** | - | With augmentation (×1000) |
-| 🔲 Validate dataset quality | **Pending** | - | Human review of samples |
+|  Design Minecraft reasoning tasks | **Pending** | - | Pathfinding, crafting, building |
+|  Create Minecraft dataset builder | **Pending** | - | Based on `build_maze_dataset.py` |
+|  Generate 1000 training examples | **Pending** | - | With augmentation (×1000) |
+|  Validate dataset quality | **Pending** | - | Human review of samples |
 
 **Minecraft-Specific Tasks:**
 - **Pathfinding**: Cave navigation, obstacle avoidance
@@ -126,10 +126,10 @@ python evaluate.py checkpoint=https://huggingface.co/sapientinc/HRM-checkpoint-s
 
 | Task | Status | Owner | Notes |
 |------|--------|-------|-------|
-| 🔲 Configure training hyperparameters | **Pending** | - | Based on maze/sudoku configs |
-| 🔲 Train HRM on Minecraft tasks | **Pending** | - | ~10 hour training cycle |
-| 🔲 Evaluate training performance | **Pending** | - | Target >90% accuracy |
-| 🔲 Save trained checkpoints | **Pending** | - | For integration use |
+|  Configure training hyperparameters | **Pending** | - | Based on maze/sudoku configs |
+|  Train HRM on Minecraft tasks | **Pending** | - | ~10 hour training cycle |
+|  Evaluate training performance | **Pending** | - | Target >90% accuracy |
+|  Save trained checkpoints | **Pending** | - | For integration use |
 
 **Training Configuration:**
 ```bash
@@ -146,19 +146,19 @@ python pretrain.py \
 
 | Task | Status | Owner | Notes |
 |------|--------|-------|-------|
-| 🔲 Create HRM wrapper module | **Pending** | - | Interface for our architecture |
-| 🔲 Implement cognitive task router | **Pending** | - | HRM vs LLM decision logic |
-| 🔲 Integrate with HTN planner | **Pending** | - | Structured reasoning tasks |
-| 🔲 Add collaborative reasoning | **Pending** | - | HRM logic + LLM narrative |
+|  Create HRM wrapper module | **Pending** | - | Interface for our architecture |
+|  Implement cognitive task router | **Pending** | - | HRM vs LLM decision logic |
+|  Integrate with HTN planner | **Pending** | - | Structured reasoning tasks |
+|  Add collaborative reasoning | **Pending** | - | HRM logic + LLM narrative |
 
 #### **System Optimization: Performance Validation**
 
 | Task | Status | Owner | Notes |
 |------|--------|-------|-------|
-| 🔲 Performance benchmarking | **Pending** | - | Latency, accuracy, memory |
-| 🔲 Ablation studies | **Pending** | - | HRM vs LLM-only comparison |
-| 🔲 Integration stress testing | **Pending** | - | Real-time Minecraft scenarios |
-| 🔲 Documentation updates | **Pending** | - | Architecture and API docs |
+|  Performance benchmarking | **Pending** | - | Latency, accuracy, memory |
+|  Ablation studies | **Pending** | - | HRM vs LLM-only comparison |
+|  Integration stress testing | **Pending** | - | Real-time Minecraft scenarios |
+|  Documentation updates | **Pending** | - | Architecture and API docs |
 
 ### Technical Architecture
 

@@ -75,9 +75,24 @@ export const GET = async (req: NextRequest) => {
               main: [],
             },
             position: minecraftData?.data?.position || null,
-            vitals: minecraftData?.data?.vitals || null,
-            environment: worldData?.data || null,
-            cognition: cognitionData?.data || null,
+            vitals: minecraftData?.data
+              ? {
+                  health: minecraftData.data.health || 0,
+                  food: minecraftData.data.food || 0,
+                  hunger: minecraftData.data.food || 0, // Map food to hunger
+                  stamina: 100, // Default stamina value
+                  sleep: 100, // Default sleep value
+                }
+              : null,
+            environment: worldData || null,
+            cognition: {
+              ...cognitionData,
+              // Add default interoceptive data
+              stress: 20, // Default stress level (lower is better)
+              focus: 80, // Default focus level
+              curiosity: 75, // Default curiosity level
+              mood: 'neutral', // Default mood
+            },
           },
         };
 
@@ -121,7 +136,13 @@ export const GET = async (req: NextRequest) => {
       start(controller) {
         let lastBotState: string | null = null;
         let isConnected = true;
-        let intervalId: NodeJS.Timeout;
+        const intervalId: NodeJS.Timeout = setInterval(() => {
+          if (!isConnected) {
+            clearInterval(intervalId);
+            return;
+          }
+          sendBotState();
+        }, 2000);
 
         // Track this connection
         activeConnections.add(controller);
@@ -133,42 +154,68 @@ export const GET = async (req: NextRequest) => {
           if (!isConnected) return;
 
           try {
-            // Fetch bot state from Minecraft interface
-            const minecraftResponse = await fetch(
-              'http://localhost:3005/state',
-              {
+            // Fetch bot state from Minecraft interface with fallback
+            let minecraftData = null;
+            try {
+              const minecraftResponse = await fetch(
+                'http://localhost:3005/state',
+                {
+                  method: 'GET',
+                  headers: { 'Content-Type': 'application/json' },
+                  signal: AbortSignal.timeout(3000), // 3 second timeout
+                }
+              );
+              minecraftData = minecraftResponse.ok
+                ? await minecraftResponse.json()
+                : null;
+            } catch (minecraftError) {
+              console.log(
+                'Minecraft interface unavailable, using fallback state'
+              );
+              minecraftData = {
+                success: false,
+                data: {
+                  inventory: { hotbar: [], main: [] },
+                  position: null,
+                  vitals: null,
+                },
+              };
+            }
+
+            // Fetch cognition state with fallback
+            let cognitionData = null;
+            try {
+              const cognitionResponse = await fetch(
+                'http://localhost:3003/state',
+                {
+                  method: 'GET',
+                  headers: { 'Content-Type': 'application/json' },
+                  signal: AbortSignal.timeout(3000), // 3 second timeout
+                }
+              );
+              cognitionData = cognitionResponse.ok
+                ? await cognitionResponse.json()
+                : null;
+            } catch (cognitionError) {
+              console.log(
+                'Cognition service unavailable, using fallback state'
+              );
+              cognitionData = { data: null };
+            }
+
+            // Fetch world state with fallback
+            let worldData = null;
+            try {
+              const worldResponse = await fetch('http://localhost:3004/state', {
                 method: 'GET',
                 headers: { 'Content-Type': 'application/json' },
-                signal: AbortSignal.timeout(5000), // 5 second timeout
-              }
-            );
-
-            // Fetch cognition state
-            const cognitionResponse = await fetch(
-              'http://localhost:3003/state',
-              {
-                method: 'GET',
-                headers: { 'Content-Type': 'application/json' },
-                signal: AbortSignal.timeout(5000), // 5 second timeout
-              }
-            );
-
-            // Fetch world state
-            const worldResponse = await fetch('http://localhost:3004/state', {
-              method: 'GET',
-              headers: { 'Content-Type': 'application/json' },
-              signal: AbortSignal.timeout(5000), // 5 second timeout
-            });
-
-            const minecraftData = minecraftResponse.ok
-              ? await minecraftResponse.json()
-              : null;
-            const cognitionData = cognitionResponse.ok
-              ? await cognitionResponse.json()
-              : null;
-            const worldData = worldResponse.ok
-              ? await worldResponse.json()
-              : null;
+                signal: AbortSignal.timeout(3000), // 3 second timeout
+              });
+              worldData = worldResponse.ok ? await worldResponse.json() : null;
+            } catch (worldError) {
+              console.log('World service unavailable, using fallback state');
+              worldData = { data: null };
+            }
 
             const botState = {
               type: 'bot_state_update',
@@ -180,9 +227,22 @@ export const GET = async (req: NextRequest) => {
                   main: [],
                 },
                 position: minecraftData?.data?.position || null,
-                vitals: minecraftData?.data?.vitals || null,
-                environment: worldData?.data || null,
-                cognition: cognitionData?.data || null,
+                vitals: {
+                  health: minecraftData?.data?.health || 0,
+                  food: minecraftData?.data?.food || 0,
+                  hunger: minecraftData?.data?.food || 0, // Map food to hunger
+                  stamina: 100, // Default stamina value
+                  sleep: 100, // Default sleep value
+                },
+                environment: worldData || null,
+                cognition: {
+                  ...cognitionData,
+                  // Add default interoceptive data
+                  stress: 20, // Default stress level (lower is better)
+                  focus: 80, // Default focus level
+                  curiosity: 75, // Default curiosity level
+                  mood: 'neutral', // Default mood
+                },
               },
             };
 
@@ -213,15 +273,6 @@ export const GET = async (req: NextRequest) => {
 
         // Send initial state
         sendBotState();
-
-        // Set up periodic updates (every 2 seconds)
-        intervalId = setInterval(() => {
-          if (!isConnected) {
-            clearInterval(intervalId);
-            return;
-          }
-          sendBotState();
-        }, 2000);
 
         // Clean up on disconnect - Enhanced for Next.js 15
         const cleanup = () => {

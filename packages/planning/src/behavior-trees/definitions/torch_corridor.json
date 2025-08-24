@@ -1,0 +1,74 @@
+{
+  "id": "opt.torch_corridor",
+  "name": "Torch Corridor",
+  "description": "Torch a mining corridor every 6 blocks; place barricade every 30m",
+  "root": {
+    "type": "sequence",
+    "children": [
+      {
+        "type": "condition",
+        "name": "check_supplies",
+        "condition": "has_torches && has_building_blocks"
+      },
+      {
+        "type": "action",
+        "name": "analyze_corridor",
+        "action": "scan_corridor_structure",
+        "args": { "length": "corridor_length" }
+      },
+      {
+        "type": "sequence",
+        "name": "light_corridor",
+        "children": [
+          {
+            "type": "action",
+            "name": "place_initial_torch",
+            "action": "place_torch",
+            "args": { "position": "entrance" }
+          },
+          {
+            "type": "action",
+            "name": "place_torch_spacing",
+            "action": "place_torches_at_intervals",
+            "args": { "spacing": "torch_spacing", "pattern": "wall_mounted" }
+          }
+        ]
+      },
+      {
+        "type": "sequence",
+        "name": "add_barricades",
+        "children": [
+          {
+            "type": "action",
+            "name": "place_barricades",
+            "action": "place_barricades_at_intervals",
+            "args": { "spacing": "barricade_spacing", "height": 2 }
+          },
+          {
+            "type": "action",
+            "name": "add_lighting_to_barricades",
+            "action": "place_torch_on_barricade",
+            "args": { "position": "top_center" }
+          }
+        ]
+      },
+      {
+        "type": "action",
+        "name": "verify_lighting",
+        "action": "check_light_levels",
+        "args": { "minimum_light": 8 }
+      },
+      {
+        "type": "condition",
+        "name": "verify_corridor_secure",
+        "condition": "corridor_lighted && barricades_placed && light_level >= 8"
+      }
+    ]
+  },
+  "metadata": {
+    "timeout": 90000,
+    "retries": 2,
+    "priority": "medium",
+    "interruptible": true
+  }
+}

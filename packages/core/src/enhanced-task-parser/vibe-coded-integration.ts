@@ -1,8 +1,8 @@
 /**
- * Vibe-Coded Integration Implementation
+ * Task-Oriented Integration Implementation
  *
- * Concrete implementation of vibe-coded patterns within the conscious-bot architecture,
- * providing task-oriented structure while maintaining cognitive depth.
+ * Concrete implementation of task-oriented patterns within the conscious-bot architecture,
+ * providing immediate task execution capabilities while maintaining cognitive depth.
  *
  * @author @darianrosebrook
  */
@@ -11,9 +11,9 @@ import { CognitiveTaskIntegration } from './cognitive-integration';
 import { TaskDefinition, TaskExecutionContext } from './types';
 
 /**
- * Vibe-coded style task executor interface
+ * Task executor interface for immediate task execution
  */
-export interface VibeCodedTaskExecutor {
+export interface TaskExecutor {
   execute(task: TaskDefinition, context: TaskExecutionContext): Promise<any>;
   canExecute(task: TaskDefinition): boolean;
   estimateDuration(task: TaskDefinition): number;
@@ -21,10 +21,12 @@ export interface VibeCodedTaskExecutor {
 
 /**
  * Concrete implementation of cognitive task integration
- * using vibe-coded patterns
+ * using task-oriented execution patterns
  */
-export class VibeCodedCognitiveIntegration implements CognitiveTaskIntegration {
-  private taskExecutors: Map<string, VibeCodedTaskExecutor> = new Map();
+export class TaskOrientedCognitiveIntegration
+  implements CognitiveTaskIntegration
+{
+  private taskExecutors: Map<string, TaskExecutor> = new Map();
   private skillLevels: Map<string, number> = new Map();
   private currentGoals: any[] = [];
   private memory: any[] = [];
@@ -123,10 +125,7 @@ export class VibeCodedCognitiveIntegration implements CognitiveTaskIntegration {
   /**
    * Register a task executor
    */
-  registerTaskExecutor(
-    taskType: string,
-    executor: VibeCodedTaskExecutor
-  ): void {
+  registerTaskExecutor(taskType: string, executor: TaskExecutor): void {
     this.taskExecutors.set(taskType, executor);
   }
 
@@ -138,7 +137,7 @@ export class VibeCodedCognitiveIntegration implements CognitiveTaskIntegration {
   }
 
   /**
-   * Execute a task using vibe-coded style
+   * Execute a task using immediate execution style
    */
   async executeTask(
     task: TaskDefinition,

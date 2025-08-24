@@ -35,7 +35,7 @@ const botConfig: SimpleBotConfig = {
     ? parseInt(process.env.MINECRAFT_PORT)
     : 25565,
   username: process.env.MINECRAFT_USERNAME || 'ConsciousBot',
-  version: process.env.MINECRAFT_VERSION || '1.20.1',
+  version: process.env.MINECRAFT_VERSION || undefined,
   auth: 'offline',
 };
 
@@ -85,13 +85,13 @@ app.post('/connect', async (req, res) => {
     }
 
     isConnecting = true;
-    console.log('🔌 Connecting to Minecraft server...');
+    console.log(' Connecting to Minecraft server...');
 
     minecraftInterface = createSimpleMinecraftInterface(botConfig);
 
     // Set up event listeners
     minecraftInterface.on('connected', () => {
-      console.log('✅ Bot connected to Minecraft server');
+      console.log(' Bot connected to Minecraft server');
       // Start Prismarine viewer on first connect
       try {
         const bot = minecraftInterface?.botInstance;
@@ -112,7 +112,7 @@ app.post('/connect', async (req, res) => {
     });
 
     minecraftInterface.on('disconnected', (reason) => {
-      console.log('🔌 Bot disconnected:', reason);
+      console.log(' Bot disconnected:', reason);
       minecraftInterface = null;
       viewerActive = false;
     });
@@ -127,7 +127,7 @@ app.post('/connect', async (req, res) => {
     });
   } catch (error) {
     isConnecting = false;
-    console.error('❌ Connection failed:', error);
+    console.error(' Connection failed:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to connect to Minecraft server',
@@ -143,14 +143,14 @@ async function attemptAutoConnect() {
   }
 
   try {
-    console.log('🔄 Auto-connecting to Minecraft server...');
+    console.log(' Auto-connecting to Minecraft server...');
     isConnecting = true;
 
     minecraftInterface = createSimpleMinecraftInterface(botConfig);
 
     // Set up event listeners
     minecraftInterface.on('connected', () => {
-      console.log('✅ Bot auto-connected to Minecraft server');
+      console.log(' Bot auto-connected to Minecraft server');
       // Start Prismarine viewer on first connect
       try {
         const bot = minecraftInterface?.botInstance;
@@ -171,7 +171,7 @@ async function attemptAutoConnect() {
     });
 
     minecraftInterface.on('disconnected', (reason) => {
-      console.log('🔌 Bot disconnected:', reason);
+      console.log(' Bot disconnected:', reason);
       minecraftInterface = null;
       viewerActive = false;
       // Attempt to reconnect after a delay
@@ -186,13 +186,25 @@ async function attemptAutoConnect() {
     isConnecting = false;
   } catch (error) {
     isConnecting = false;
-    console.error('❌ Auto-connection failed:', error);
-    // Retry after 10 seconds
+    console.error(' Auto-connection failed:', error);
+
+    // Don't retry on protocol version errors - this is a compatibility issue
+    if (error instanceof Error && error.message.includes('protocol version')) {
+      console.log(
+        ' Protocol version incompatibility detected. Skipping auto-reconnect.'
+      );
+      console.log(
+        ' To resolve: Use Minecraft server version 1.21.1 or earlier, or wait for minecraft-protocol library update.'
+      );
+      return;
+    }
+
+    // Retry after 30 seconds for other errors
     setTimeout(() => {
       if (!minecraftInterface?.connected && !isConnecting) {
         attemptAutoConnect();
       }
-    }, 10000);
+    }, 30000);
   }
 }
 
@@ -222,7 +234,7 @@ app.post('/disconnect', async (req, res) => {
       status: 'disconnected',
     });
   } catch (error) {
-    console.error('❌ Disconnect failed:', error);
+    console.error(' Disconnect failed:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to disconnect from Minecraft server',
@@ -244,7 +256,7 @@ app.post('/stop-auto-connect', async (req, res) => {
       message: 'Auto-connection stopped',
     });
   } catch (error) {
-    console.error('❌ Failed to stop auto-connection:', error);
+    console.error(' Failed to stop auto-connection:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to stop auto-connection',
@@ -265,7 +277,7 @@ app.post('/start-auto-connect', async (req, res) => {
       message: 'Auto-connection started',
     });
   } catch (error) {
-    console.error('❌ Failed to start auto-connection:', error);
+    console.error(' Failed to start auto-connection:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to start auto-connection',
@@ -292,7 +304,7 @@ app.get('/chat', (req, res) => {
       data: chatHistory,
     });
   } catch (error) {
-    console.error('❌ Failed to get chat history:', error);
+    console.error(' Failed to get chat history:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to get chat history',
@@ -319,7 +331,7 @@ app.get('/player-interactions', (req, res) => {
       data: playerInteractions,
     });
   } catch (error) {
-    console.error('❌ Failed to get player interactions:', error);
+    console.error(' Failed to get player interactions:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to get player interactions',
@@ -348,7 +360,7 @@ app.get('/processed-messages', (req, res) => {
       data: processedMessages,
     });
   } catch (error) {
-    console.error('❌ Failed to get processed messages:', error);
+    console.error(' Failed to get processed messages:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to get processed messages',
@@ -376,7 +388,7 @@ app.get('/state', async (req, res) => {
       data: gameState,
     });
   } catch (error) {
-    console.error('❌ Failed to get bot state:', error);
+    console.error(' Failed to get bot state:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to get bot state',
@@ -405,7 +417,7 @@ app.get('/inventory', async (req, res) => {
       data: inventory,
     });
   } catch (error) {
-    console.error('❌ Failed to get inventory:', error);
+    console.error(' Failed to get inventory:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to get inventory',
@@ -445,7 +457,7 @@ app.post('/action', async (req, res) => {
       result,
     });
   } catch (error) {
-    console.error('❌ Action failed:', error);
+    console.error(' Action failed:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to execute action',

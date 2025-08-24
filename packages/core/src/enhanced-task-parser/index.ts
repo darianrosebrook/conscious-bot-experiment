@@ -13,14 +13,10 @@ export { TaskParser } from './task-parser';
 export { EnvironmentalImmersion } from './environmental-immersion';
 
 // Cognitive integration components
-export {
-  CognitiveTaskParser,
-  CognitiveTaskIntegration,
-} from './cognitive-integration';
-export {
-  VibeCodedCognitiveIntegration,
-  VibeCodedTaskExecutor,
-} from './vibe-coded-integration';
+export { CognitiveTaskParser } from './cognitive-integration';
+export type { CognitiveTaskIntegration } from './cognitive-integration';
+export { TaskOrientedCognitiveIntegration } from './task-oriented-integration';
+export type { TaskExecutor } from './task-oriented-integration';
 
 // Types and interfaces
 export * from './types';

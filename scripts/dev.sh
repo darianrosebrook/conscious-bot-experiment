@@ -23,7 +23,7 @@ MEMORY_PORT=3001
 WORLD_PORT=3004
 PLANNING_PORT=3002
 
-echo -e "${BLUE}🤖 Conscious Bot Development Environment${NC}"
+echo -e "${BLUE} Conscious Bot Development Environment${NC}"
 echo -e "${BLUE}=====================================${NC}"
 echo ""
 
@@ -32,7 +32,7 @@ check_port() {
     local port=$1
     local service=$2
     if lsof -Pi :$port -sTCP:LISTEN -t >/dev/null 2>&1; then
-        echo -e "${RED}❌ Port $port is already in use by another process${NC}"
+        echo -e "${RED} Port $port is already in use by another process${NC}"
         echo -e "${YELLOW}   Please stop the process using port $port and try again${NC}"
         exit 1
     fi
@@ -45,11 +45,11 @@ wait_for_service() {
     local max_attempts=30
     local attempt=1
     
-    echo -e "${YELLOW}⏳ Waiting for $service to be ready...${NC}"
+    echo -e "${YELLOW} Waiting for $service to be ready...${NC}"
     
     while [ $attempt -le $max_attempts ]; do
         if curl -s "$url" >/dev/null 2>&1; then
-            echo -e "${GREEN}✅ $service is ready!${NC}"
+            echo -e "${GREEN} $service is ready!${NC}"
             return 0
         fi
         
@@ -58,12 +58,12 @@ wait_for_service() {
         attempt=$((attempt + 1))
     done
     
-    echo -e "${RED}❌ $service failed to start within expected time${NC}"
+    echo -e "${RED} $service failed to start within expected time${NC}"
     return 1
 }
 
 # Check if required ports are available
-echo -e "${CYAN}🔍 Checking port availability...${NC}"
+echo -e "${CYAN} Checking port availability...${NC}"
 check_port $DASHBOARD_PORT "Dashboard"
 check_port $MINECRAFT_PORT "Minecraft Bot"
 check_port $MINECRAFT_VIEWER_PORT "Minecraft Viewer"
@@ -71,47 +71,47 @@ check_port $COGNITION_PORT "Cognition"
 check_port $MEMORY_PORT "Memory"
 check_port $WORLD_PORT "World"
 check_port $PLANNING_PORT "Planning"
-echo -e "${GREEN}✅ All ports are available${NC}"
+echo -e "${GREEN} All ports are available${NC}"
 echo ""
 
 # Install dependencies if needed
-echo -e "${CYAN}📦 Installing dependencies...${NC}"
+echo -e "${CYAN} Installing dependencies...${NC}"
 pnpm install
-echo -e "${GREEN}✅ Dependencies installed${NC}"
+echo -e "${GREEN} Dependencies installed${NC}"
 echo ""
 
 # Build packages if needed
-echo -e "${CYAN}🔨 Building packages...${NC}"
+echo -e "${CYAN} Building packages...${NC}"
 pnpm build
-echo -e "${GREEN}✅ Packages built${NC}"
+echo -e "${GREEN} Packages built${NC}"
 echo ""
 
 # Start all services
-echo -e "${CYAN}🚀 Starting all services...${NC}"
+echo -e "${CYAN} Starting all services...${NC}"
 echo ""
 
 # Start services in background
-echo -e "${PURPLE}📊 Starting Dashboard (port $DASHBOARD_PORT)...${NC}"
+echo -e "${PURPLE} Starting Dashboard (port $DASHBOARD_PORT)...${NC}"
 pnpm --filter @conscious-bot/dashboard dev &
 DASHBOARD_PID=$!
 
-echo -e "${PURPLE}🎮 Starting Minecraft Bot (port $MINECRAFT_PORT)...${NC}"
+echo -e "${PURPLE} Starting Minecraft Bot (port $MINECRAFT_PORT)...${NC}"
 pnpm --filter @conscious-bot/minecraft-interface run dev:server &
 MINECRAFT_PID=$!
 
-echo -e "${PURPLE}🧠 Starting Cognition (port $COGNITION_PORT)...${NC}"
+echo -e "${PURPLE} Starting Cognition (port $COGNITION_PORT)...${NC}"
 pnpm --filter @conscious-bot/cognition run dev:server &
 COGNITION_PID=$!
 
-echo -e "${PURPLE}💾 Starting Memory (port $MEMORY_PORT)...${NC}"
+echo -e "${PURPLE} Starting Memory (port $MEMORY_PORT)...${NC}"
 pnpm --filter @conscious-bot/memory run dev:server &
 MEMORY_PID=$!
 
-echo -e "${PURPLE}🌍 Starting World (port $WORLD_PORT)...${NC}"
+echo -e "${PURPLE} Starting World (port $WORLD_PORT)...${NC}"
 pnpm --filter @conscious-bot/world run dev:server &
 WORLD_PID=$!
 
-echo -e "${PURPLE}📋 Starting Planning (port $PLANNING_PORT)...${NC}"
+echo -e "${PURPLE} Starting Planning (port $PLANNING_PORT)...${NC}"
 pnpm --filter @conscious-bot/planning run dev:server &
 PLANNING_PID=$!
 
@@ -120,7 +120,7 @@ sleep 5
 
 # Check if services are ready
 echo ""
-echo -e "${CYAN}🔍 Checking service status...${NC}"
+echo -e "${CYAN} Checking service status...${NC}"
 
 # Wait for services to be ready
 wait_for_service "http://localhost:$DASHBOARD_PORT" "Dashboard" &
@@ -134,9 +134,9 @@ wait_for_service "http://localhost:$PLANNING_PORT/health" "Planning" &
 wait
 
 echo ""
-echo -e "${GREEN}🎉 All services started successfully!${NC}"
+echo -e "${GREEN} All services started successfully!${NC}"
 echo ""
-echo -e "${BLUE}📋 Service URLs:${NC}"
+echo -e "${BLUE} Service URLs:${NC}"
 echo -e "  ${CYAN}Dashboard:${NC}     http://localhost:$DASHBOARD_PORT"
 echo -e "  ${CYAN}Minecraft Bot:${NC}  http://localhost:$MINECRAFT_PORT"
 echo -e "  ${CYAN}Minecraft Viewer:${NC} http://localhost:$MINECRAFT_VIEWER_PORT"
@@ -145,17 +145,17 @@ echo -e "  ${CYAN}Memory:${NC}         http://localhost:$MEMORY_PORT"
 echo -e "  ${CYAN}World:${NC}          http://localhost:$WORLD_PORT"
 echo -e "  ${CYAN}Planning:${NC}       http://localhost:$PLANNING_PORT"
 echo ""
-echo -e "${YELLOW}💡 To connect the bot to Minecraft:${NC}"
+echo -e "${YELLOW} To connect the bot to Minecraft:${NC}"
 echo -e "  curl -X POST http://localhost:$MINECRAFT_PORT/connect"
 echo ""
-echo -e "${YELLOW}🛑 To stop all services:${NC}"
+echo -e "${YELLOW} To stop all services:${NC}"
 echo -e "  Press Ctrl+C or run: pkill -f 'conscious-bot'"
 echo ""
 
 # Function to cleanup on exit
 cleanup() {
     echo ""
-    echo -e "${YELLOW}🛑 Stopping all services...${NC}"
+    echo -e "${YELLOW} Stopping all services...${NC}"
     
     # Kill all background processes
     kill $DASHBOARD_PID 2>/dev/null || true
@@ -165,7 +165,7 @@ cleanup() {
     kill $WORLD_PID 2>/dev/null || true
     kill $PLANNING_PID 2>/dev/null || true
     
-    echo -e "${GREEN}✅ All services stopped${NC}"
+    echo -e "${GREEN} All services stopped${NC}"
     exit 0
 }
 
@@ -173,7 +173,7 @@ cleanup() {
 trap cleanup SIGINT SIGTERM
 
 # Keep the script running
-echo -e "${GREEN}🔄 Services are running. Press Ctrl+C to stop.${NC}"
+echo -e "${GREEN} Services are running. Press Ctrl+C to stop.${NC}"
 while true; do
     sleep 1
 done

@@ -8,6 +8,7 @@
 
 import express from 'express';
 import cors from 'cors';
+import { ReActArbiter } from './react-arbiter/ReActArbiter';
 
 const app = express();
 const port = process.env.PORT ? parseInt(process.env.PORT) : 3003;
@@ -15,6 +16,16 @@ const port = process.env.PORT ? parseInt(process.env.PORT) : 3003;
 // Middleware
 app.use(cors());
 app.use(express.json());
+
+// Initialize ReAct Arbiter
+const reactArbiter = new ReActArbiter({
+  provider: 'ollama',
+  model: 'llama3.2',
+  maxTokens: 1000,
+  temperature: 0.3,
+  timeout: 30000,
+  retries: 3,
+});
 
 // Initialize cognition system (simplified for now)
 const cognitionSystem = {
@@ -373,6 +384,81 @@ app.get('/telemetry', (req, res) => {
   } catch (error) {
     console.error('Error getting cognition telemetry:', error);
     res.status(500).json({ error: 'Failed to get telemetry' });
+  }
+});
+
+// ============================================================================
+// ReAct Endpoints
+// ============================================================================
+
+// POST /reason - Execute a single ReAct reasoning step
+app.post('/reason', async (req, res) => {
+  try {
+    const { snapshot, inventory, goalStack, memorySummaries, lastToolResult, reflexionHints } = req.body;
+
+    // Validate required fields
+    if (!snapshot || !inventory || !goalStack) {
+      return res.status(400).json({ 
+        error: 'Missing required fields: snapshot, inventory, goalStack' 
+      });
+    }
+
+    const context = {
+      snapshot,
+      inventory,
+      goalStack,
+      memorySummaries: memorySummaries || [],
+      lastToolResult,
+      reflexionHints,
+    };
+
+    const step = await reactArbiter.reason(context);
+    
+    res.json({
+      success: true,
+      step,
+      timestamp: Date.now(),
+    });
+  } catch (error) {
+    console.error('ReAct reasoning failed:', error);
+    res.status(500).json({ 
+      error: 'ReAct reasoning failed', 
+      details: error instanceof Error ? error.message : 'Unknown error' 
+    });
+  }
+});
+
+// POST /reflect - Generate Reflexion-style verbal self-feedback
+app.post('/reflect', async (req, res) => {
+  try {
+    const { episodeTrace, outcome, errors } = req.body;
+
+    // Validate required fields
+    if (!episodeTrace || !outcome) {
+      return res.status(400).json({ 
+        error: 'Missing required fields: episodeTrace, outcome' 
+      });
+    }
+
+    if (!['success', 'failure'].includes(outcome)) {
+      return res.status(400).json({ 
+        error: 'Outcome must be either "success" or "failure"' 
+      });
+    }
+
+    const reflection = await reactArbiter.reflect(episodeTrace, outcome, errors);
+    
+    res.json({
+      success: true,
+      reflection,
+      timestamp: Date.now(),
+    });
+  } catch (error) {
+    console.error('Reflection generation failed:', error);
+    res.status(500).json({ 
+      error: 'Reflection generation failed', 
+      details: error instanceof Error ? error.message : 'Unknown error' 
+    });
   }
 });
 

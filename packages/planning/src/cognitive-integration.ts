@@ -197,7 +197,7 @@ export class CognitiveIntegration extends EventEmitter {
       history[history.length - 1].result.success !== history[0].result.success;
 
     // Debug logging
-    console.log(`🔍 Task Performance Analysis for ${task.type}:`, {
+    console.log(` Task Performance Analysis for ${task.type}:`, {
       taskId: task.id,
       totalAttempts,
       successfulAttempts,

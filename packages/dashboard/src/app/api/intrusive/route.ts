@@ -58,7 +58,7 @@ export async function POST(request: NextRequest) {
       text.toLowerCase().includes('farm')
     ) {
       try {
-        console.log(`🎯 Creating goal from intrusive thought: "${text}"`);
+        console.log(` Creating goal from intrusive thought: "${text}"`);
         const planningResponse = await fetch('http://localhost:3002/goal', {
           method: 'POST',
           headers: {
@@ -69,21 +69,26 @@ export async function POST(request: NextRequest) {
             description: text,
             priority: strength,
             urgency: 0.6,
-            tasks: [{
-              type: 'autonomous',
-              description: text,
-              priority: strength,
-              urgency: 0.6,
-              parameters: {},
-            }],
+            tasks: [
+              {
+                type: 'autonomous',
+                description: text,
+                priority: strength,
+                urgency: 0.6,
+                parameters: {},
+              },
+            ],
           }),
         });
 
         if (planningResponse.ok) {
           const planningResult = await planningResponse.json();
-          console.log(`✅ Goal created successfully:`, planningResult);
+          console.log(` Goal created successfully:`, planningResult);
         } else {
-          console.error(`❌ Failed to create goal:`, await planningResponse.text());
+          console.error(
+            ` Failed to create goal:`,
+            await planningResponse.text()
+          );
         }
       } catch (error) {
         console.error('Failed to create goal from intrusive thought:', error);

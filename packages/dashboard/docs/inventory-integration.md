@@ -64,7 +64,7 @@ interface InventoryItem {
 ### Sprite System
 
 - **Source**: Uses PrismarineJS Minecraft data repository
-- **URL Pattern**: `https://raw.githubusercontent.com/PrismarineJS/minecraft-data/master/data/pc/1.20.1/items/{item_name}.png`
+- **URL Pattern**: `https://raw.githubusercontent.com/PrismarineJS/minecraft-data/master/data/pc/1.21.4/items/{item_name}.png`
 - **Fallback**: Generic item icon for missing sprites
 - **Optimization**: Next.js Image component for performance
 

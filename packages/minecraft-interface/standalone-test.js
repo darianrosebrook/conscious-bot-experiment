@@ -8,12 +8,12 @@
 
 const path = require('path');
 
-console.log('🤖 Standalone Minecraft Interface Test');
+console.log(' Standalone Minecraft Interface Test');
 console.log('======================================');
 console.log();
 
 // Test 1: Check if TypeScript files exist
-console.log('📁 Checking TypeScript files...');
+console.log(' Checking TypeScript files...');
 const fs = require('fs');
 
 const requiredFiles = [
@@ -29,9 +29,9 @@ const requiredFiles = [
 let allFilesExist = true;
 requiredFiles.forEach((file) => {
   if (fs.existsSync(file)) {
-    console.log(`   ✅ ${file}`);
+    console.log(`    ${file}`);
   } else {
-    console.log(`   ❌ ${file} - MISSING`);
+    console.log(`    ${file} - MISSING`);
     allFilesExist = false;
   }
 });
@@ -39,7 +39,7 @@ requiredFiles.forEach((file) => {
 console.log();
 
 // Test 2: Check package.json structure
-console.log('📋 Checking package.json configuration...');
+console.log(' Checking package.json configuration...');
 const packageJson = JSON.parse(fs.readFileSync('package.json', 'utf8'));
 
 const requiredDeps = ['mineflayer', 'mineflayer-pathfinder', 'vec3', 'js-yaml'];
@@ -48,9 +48,9 @@ const requiredDevDeps = ['@types/js-yaml', '@types/node', 'jest', 'typescript'];
 console.log('   Dependencies:');
 requiredDeps.forEach((dep) => {
   if (packageJson.dependencies && packageJson.dependencies[dep]) {
-    console.log(`     ✅ ${dep}: ${packageJson.dependencies[dep]}`);
+    console.log(`      ${dep}: ${packageJson.dependencies[dep]}`);
   } else {
-    console.log(`     ❌ ${dep} - MISSING`);
+    console.log(`      ${dep} - MISSING`);
     allFilesExist = false;
   }
 });
@@ -58,9 +58,9 @@ requiredDeps.forEach((dep) => {
 console.log('   Dev Dependencies:');
 requiredDevDeps.forEach((dep) => {
   if (packageJson.devDependencies && packageJson.devDependencies[dep]) {
-    console.log(`     ✅ ${dep}: ${packageJson.devDependencies[dep]}`);
+    console.log(`      ${dep}: ${packageJson.devDependencies[dep]}`);
   } else {
-    console.log(`     ❌ ${dep} - MISSING`);
+    console.log(`      ${dep} - MISSING`);
     allFilesExist = false;
   }
 });
@@ -68,7 +68,7 @@ requiredDevDeps.forEach((dep) => {
 console.log();
 
 // Test 3: Check scenario files
-console.log('🎯 Checking scenario definitions...');
+console.log(' Checking scenario definitions...');
 const scenarioFiles = [
   'scenarios/navigate.yaml',
   'scenarios/gather-wood.yaml',
@@ -77,9 +77,9 @@ const scenarioFiles = [
 
 scenarioFiles.forEach((file) => {
   if (fs.existsSync(file)) {
-    console.log(`   ✅ ${file}`);
+    console.log(`    ${file}`);
   } else {
-    console.log(`   ❌ ${file} - MISSING`);
+    console.log(`    ${file} - MISSING`);
     allFilesExist = false;
   }
 });
@@ -87,29 +87,29 @@ scenarioFiles.forEach((file) => {
 console.log();
 
 // Test 4: Basic mineflayer import test
-console.log('🔌 Testing basic mineflayer imports...');
+console.log(' Testing basic mineflayer imports...');
 try {
   const mineflayer = require('mineflayer');
   const pathfinder = require('mineflayer-pathfinder');
   const Vec3 = require('vec3');
-  console.log('   ✅ mineflayer');
-  console.log('   ✅ mineflayer-pathfinder');
-  console.log('   ✅ vec3');
+  console.log('    mineflayer');
+  console.log('    mineflayer-pathfinder');
+  console.log('    vec3');
 } catch (error) {
-  console.log(`   ❌ Import error: ${error.message}`);
+  console.log(`    Import error: ${error.message}`);
   allFilesExist = false;
 }
 
 console.log();
 
 // Summary
-console.log('📊 Test Summary');
+console.log(' Test Summary');
 console.log('================');
 if (allFilesExist) {
-  console.log('✅ All basic components are in place!');
+  console.log(' All basic components are in place!');
   console.log('');
   console.log(
-    '🎯 Ready for integration testing once planning package imports are resolved.'
+    ' Ready for integration testing once planning package imports are resolved.'
   );
   console.log('');
   console.log('Next steps:');
@@ -119,7 +119,7 @@ if (allFilesExist) {
 
   process.exit(0);
 } else {
-  console.log('❌ Some components are missing or misconfigured.');
+  console.log(' Some components are missing or misconfigured.');
   console.log('Please check the issues above and fix them before proceeding.');
 
   process.exit(1);

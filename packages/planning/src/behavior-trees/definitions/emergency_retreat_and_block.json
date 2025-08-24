@@ -1,0 +1,91 @@
+{
+  "id": "opt.emergency_retreat_and_block",
+  "name": "Emergency Retreat and Block",
+  "description": "Hard abort: path back along breadcrumbs; block behind; heal",
+  "root": {
+    "type": "sequence",
+    "children": [
+      {
+        "type": "condition",
+        "name": "check_danger",
+        "condition": "danger_detected || health_low || hostiles_near"
+      },
+      {
+        "type": "action",
+        "name": "immediate_retreat",
+        "action": "emergency_retreat",
+        "args": { "method": "breadcrumb_path", "speed": "maximum" }
+      },
+      {
+        "type": "sequence",
+        "name": "secure_position",
+        "children": [
+          {
+            "type": "action",
+            "name": "block_behind",
+            "action": "place_emergency_blocks",
+            "args": { "pattern": "wall_off", "height": 3 }
+          },
+          {
+            "type": "action",
+            "name": "create_safe_space",
+            "action": "create_enclosed_area",
+            "args": { "size": "2x2x2", "material": "cobblestone" }
+          }
+        ]
+      },
+      {
+        "type": "selector",
+        "name": "heal_self",
+        "children": [
+          {
+            "type": "sequence",
+            "name": "use_healing_items",
+            "children": [
+              {
+                "type": "condition",
+                "name": "check_healing_items",
+                "condition": "has_golden_apple || has_healing_potion"
+              },
+              {
+                "type": "action",
+                "name": "consume_healing",
+                "action": "use_healing_item",
+                "args": { "item": "best_available" }
+              }
+            ]
+          },
+          {
+            "type": "sequence",
+            "name": "natural_healing",
+            "children": [
+              {
+                "type": "action",
+                "name": "wait_for_healing",
+                "action": "wait_for_health_regeneration",
+                "args": { "target_health": "heal_threshold" }
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "type": "action",
+        "name": "assess_situation",
+        "action": "evaluate_safety",
+        "args": { "method": "comprehensive_scan" }
+      },
+      {
+        "type": "condition",
+        "name": "verify_safety",
+        "condition": "health >= heal_threshold && position_secure && no_immediate_threat"
+      }
+    ]
+  },
+  "metadata": {
+    "timeout": 30000,
+    "retries": 0,
+    "priority": "critical",
+    "interruptible": false
+  }
+}

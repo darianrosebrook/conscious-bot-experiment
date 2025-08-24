@@ -8,6 +8,7 @@
  */
 
 import { createBot, Bot } from 'mineflayer';
+import { Vec3 } from 'vec3';
 import { EventEmitter } from 'events';
 import {
   ChatProcessor,
@@ -19,7 +20,7 @@ export interface SimpleBotConfig {
   host: string;
   port: number;
   username: string;
-  version: string;
+  version?: string;
   auth?: 'offline' | 'mojang' | 'microsoft';
 }
 
@@ -56,17 +57,17 @@ export class SimpleMinecraftInterface extends EventEmitter {
     // Set up chat processor event handlers
     this.chatProcessor.on('messageProcessed', (message: ChatMessage) => {
       console.log(
-        `💬 Processed message from ${message.sender}: "${message.content}" (${message.messageType})`
+        ` Processed message from ${message.sender}: "${message.content}" (${message.messageType})`
       );
     });
 
     this.chatProcessor.on('responseReady', (response: ChatResponse) => {
-      console.log(`🤖 Response ready: "${response.content}"`);
+      console.log(` Response ready: "${response.content}"`);
       this.sendChat(response.content);
     });
 
     this.chatProcessor.on('commandReceived', ({ command, message }) => {
-      console.log(`🎮 Command received: ${command} from ${message.sender}`);
+      console.log(` Command received: ${command} from ${message.sender}`);
       this.handleCommand(command, message);
     });
   }
@@ -94,12 +95,12 @@ export class SimpleMinecraftInterface extends EventEmitter {
 
       this.bot.once('login', () => {
         clearTimeout(timeoutId);
-        console.log('✅ Logged in to Minecraft server');
+        console.log(' Logged in to Minecraft server');
       });
 
       this.bot.once('spawn', () => {
         this.isConnected = true;
-        console.log('✅ Spawned in world');
+        console.log(' Spawned in world');
         this.emit('connected');
         resolve();
       });
@@ -132,13 +133,13 @@ export class SimpleMinecraftInterface extends EventEmitter {
 
       this.bot.once('error', (error) => {
         clearTimeout(timeoutId);
-        console.error('❌ Connection error:', error.message);
+        console.error(' Connection error:', error.message);
         reject(error);
       });
 
       this.bot.once('end', (reason) => {
         this.isConnected = false;
-        console.log('🔌 Disconnected:', reason);
+        console.log(' Disconnected:', reason);
         this.emit('disconnected', reason);
       });
     });
@@ -152,7 +153,7 @@ export class SimpleMinecraftInterface extends EventEmitter {
       this.bot.quit();
       this.bot = null;
       this.isConnected = false;
-      console.log('✅ Disconnected from server');
+      console.log(' Disconnected from server');
     }
   }
 
@@ -234,7 +235,7 @@ export class SimpleMinecraftInterface extends EventEmitter {
           throw new Error(`Unknown action type: ${action.type}`);
       }
     } catch (error) {
-      console.error(`❌ Action ${action.type} failed:`, error);
+      console.error(` Action ${action.type} failed:`, error);
       throw error;
     }
   }
@@ -456,7 +457,7 @@ export class SimpleMinecraftInterface extends EventEmitter {
 
     try {
       const block = this.bot.blockAt(
-        new (this.bot as any).vec3(position.x, position.y, position.z)
+        new Vec3(position.x, position.y, position.z)
       );
       if (!block) {
         return {
@@ -487,7 +488,7 @@ export class SimpleMinecraftInterface extends EventEmitter {
 
     try {
       const block = this.bot.blockAt(
-        new (this.bot as any).vec3(position.x, position.y, position.z)
+        new Vec3(position.x, position.y, position.z)
       );
       if (!block) {
         return {
@@ -781,6 +782,5 @@ export const DEFAULT_SIMPLE_CONFIG: SimpleBotConfig = {
   host: 'localhost',
   port: 58897,
   username: 'SimpleBot',
-  version: '1.20.1',
   auth: 'offline',
 };

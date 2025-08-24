@@ -12,7 +12,7 @@
  */
 export function getMineflayerItemSprite(itemType: number): string {
   // Mineflayer uses different item IDs than the legacy mapping
-  // This mapping is based on Minecraft 1.20.1 item IDs
+  // This mapping is based on Minecraft 1.21.4 item IDs
   const mineflayerItemMap: Record<number, string> = {
     // Blocks
     0: 'air',

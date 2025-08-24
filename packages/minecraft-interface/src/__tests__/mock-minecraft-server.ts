@@ -386,7 +386,7 @@ export class MockMinecraftServer {
   public async start(): Promise<void> {
     return new Promise((resolve, reject) => {
       this.server = this.app.listen(this.port, () => {
-        console.log(`🎮 Mock Minecraft server running on port ${this.port}`);
+        console.log(` Mock Minecraft server running on port ${this.port}`);
         resolve();
       });
 
@@ -400,7 +400,7 @@ export class MockMinecraftServer {
     return new Promise((resolve) => {
       if (this.server) {
         this.server.close(() => {
-          console.log('🛑 Mock Minecraft server stopped');
+          console.log(' Mock Minecraft server stopped');
           resolve();
         });
       } else {

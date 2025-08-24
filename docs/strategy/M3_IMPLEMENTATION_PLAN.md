@@ -14,15 +14,15 @@ Before detailing the M3 plan, it's important to acknowledge the successful compl
 
 | Module | Status | Key Components |
 |--------|--------|----------------|
-| Planning: Goal Formulation | ✅ Complete | Homeostasis monitoring, need generation, goal management, utility calculation |
-| Cognition: Cognitive Core | ✅ Complete | LLM interface (Ollama), internal dialogue, reasoning engine |
-| Memory: Episodic | ✅ Complete | Event logging, salience scoring, experience retrieval |
-| Memory: Working | ✅ Complete | Central executive, context manager, goal tracker, memory integration |
-| Memory: Semantic | ✅ Complete | Knowledge graph, GraphRAG retrieval, relationship extraction, query engine |
-| Memory: Provenance | ✅ Complete | Decision tracking, evidence management, audit trail, explanation generation |
-| Cognition: Self Model | ✅ Complete | Identity tracking, narrative management, contract system |
-| World: Place Graph | ✅ Complete | Spatial representation, place memory, spatial navigation |
-| Interfaces: Constitution | ✅ Complete | Rules database, rules engine, constitutional filter |
+| Planning: Goal Formulation |  Complete | Homeostasis monitoring, need generation, goal management, utility calculation |
+| Cognition: Cognitive Core |  Complete | LLM interface (Ollama), internal dialogue, reasoning engine |
+| Memory: Episodic |  Complete | Event logging, salience scoring, experience retrieval |
+| Memory: Working |  Complete | Central executive, context manager, goal tracker, memory integration |
+| Memory: Semantic |  Complete | Knowledge graph, GraphRAG retrieval, relationship extraction, query engine |
+| Memory: Provenance |  Complete | Decision tracking, evidence management, audit trail, explanation generation |
+| Cognition: Self Model |  Complete | Identity tracking, narrative management, contract system |
+| World: Place Graph |  Complete | Spatial representation, place memory, spatial navigation |
+| Interfaces: Constitution |  Complete | Rules database, rules engine, constitutional filter |
 
 These modules have established a solid cognitive foundation with memory systems, goal formulation, and self-model capabilities that will serve as the basis for M3's planning systems.
 

@@ -37,7 +37,7 @@ jest.mock('mineflayer', () => ({
     },
     entities: {},
     players: {},
-    version: '1.20.1',
+    version: '1.21.4',
     username: 'TestBot',
     loadPlugin: jest.fn(),
     blockAt: jest.fn(() => null),
@@ -75,7 +75,7 @@ describe('Minecraft Interface - Standalone Tests', () => {
       host: 'localhost',
       port: 25565,
       username: 'TestBot',
-      version: '1.20.1',
+      version: '1.21.4',
       auth: 'offline',
       viewDistance: 'tiny',
       chatLengthLimit: 100,
@@ -91,7 +91,7 @@ describe('Minecraft Interface - Standalone Tests', () => {
       hideErrors: false,
       client: {
         username: 'TestBot',
-        version: '1.20.1',
+        version: '1.21.4',
         protocol: 763,
       },
     };

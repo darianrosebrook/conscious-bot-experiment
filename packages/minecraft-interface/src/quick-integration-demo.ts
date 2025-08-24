@@ -28,12 +28,12 @@ export interface QuickDemoResult {
 export async function runQuickIntegrationDemo(): Promise<QuickDemoResult> {
   const startTime = Date.now();
 
-  console.log('🚀 Quick Minecraft-Planning Integration Demo');
+  console.log(' Quick Minecraft-Planning Integration Demo');
   console.log('='.repeat(50));
 
   try {
     // Create a simulated Minecraft interface
-    console.log('🎮 Creating simulated Minecraft environment...');
+    console.log(' Creating simulated Minecraft environment...');
     const simInterface = createSimulatedMinecraftInterface({
       initialPosition: { x: 10, y: 64, z: 10 },
       tickRate: 50,
@@ -41,16 +41,16 @@ export async function runQuickIntegrationDemo(): Promise<QuickDemoResult> {
 
     // Connect to the simulation
     await simInterface.connect();
-    console.log('✅ Connected to simulation');
+    console.log(' Connected to simulation');
 
     // Create signal processor and observation mapper
-    console.log('🧠 Setting up signal processing and observation mapping...');
+    console.log(' Setting up signal processing and observation mapping...');
     const signalProcessor = createMinecraftSignalProcessor();
     const observationMapper = new ObservationMapper({
       host: 'localhost',
       port: 25565,
       username: 'DemoBot',
-      version: '1.20.1',
+      version: '1.21.4',
       auth: 'offline',
       pathfindingTimeout: 5000,
       actionTimeout: 10000,
@@ -61,7 +61,7 @@ export async function runQuickIntegrationDemo(): Promise<QuickDemoResult> {
     });
 
     // Simulate getting world state and processing it
-    console.log('🔍 Processing world state and generating signals...');
+    console.log(' Processing world state and generating signals...');
     const worldState = await simInterface.getGameState();
 
     // Create a mock bot object for signal processing
@@ -89,7 +89,7 @@ export async function runQuickIntegrationDemo(): Promise<QuickDemoResult> {
         dimension: 'overworld',
         difficulty: 'normal',
       },
-      version: '1.20.1',
+      version: '1.21.4',
       experience: { points: 0 },
     } as any;
 
@@ -140,7 +140,7 @@ export async function runQuickIntegrationDemo(): Promise<QuickDemoResult> {
         server: {
           playerCount: 1,
           difficulty: 'normal',
-          version: '1.20.1',
+          version: '1.21.4',
         },
       },
       mockBot
@@ -193,7 +193,7 @@ export async function runQuickIntegrationDemo(): Promise<QuickDemoResult> {
         server: {
           playerCount: 1,
           difficulty: 'normal',
-          version: '1.20.1',
+          version: '1.21.4',
         },
       },
       mockBot
@@ -259,23 +259,23 @@ export async function runQuickIntegrationDemo(): Promise<QuickDemoResult> {
     };
 
     // Display results
-    console.log('\n📊 Integration Demo Results:');
+    console.log('\n Integration Demo Results:');
     console.log('='.repeat(30));
-    console.log(`🎯 Signals Generated: ${signals.length}`);
-    console.log('📈 Signal Types:', [...new Set(signals.map((s) => s.type))]);
+    console.log(` Signals Generated: ${signals.length}`);
+    console.log(' Signal Types:', [...new Set(signals.map((s) => s.type))]);
     console.log(
-      '💪 Signal Intensities:',
+      ' Signal Intensities:',
       signals.map((s) => `${s.type}: ${s.intensity}`)
     );
 
-    console.log('\n🏥 Homeostasis State:');
+    console.log('\n Homeostasis State:');
     Object.entries(homeostasisState).forEach(([key, value]) => {
       console.log(
         `   ${key}: ${typeof value === 'number' ? Math.round(value * 100) / 100 : value}`
       );
     });
 
-    console.log('\n🌍 Planning Context Generated:');
+    console.log('\n Planning Context Generated:');
     console.log(
       `   World State Keys: ${Object.keys(planningContext.worldState).length}`
     );
@@ -291,7 +291,7 @@ export async function runQuickIntegrationDemo(): Promise<QuickDemoResult> {
     );
 
     // Show what signals would drive planning
-    console.log('\n🧠 Planning Implications:');
+    console.log('\n Planning Implications:');
     signals.forEach((signal) => {
       if (signal.intensity > 50) {
         console.log(
@@ -299,17 +299,17 @@ export async function runQuickIntegrationDemo(): Promise<QuickDemoResult> {
         );
       } else if (signal.intensity > 25) {
         console.log(
-          `   📊 MED: ${signal.type} (${signal.intensity}) - ${signal.metadata?.description || 'Monitor'}`
+          `    MED: ${signal.type} (${signal.intensity}) - ${signal.metadata?.description || 'Monitor'}`
         );
       } else {
         console.log(
-          `   ✅ LOW: ${signal.type} (${signal.intensity}) - ${signal.metadata?.description || 'Normal'}`
+          `    LOW: ${signal.type} (${signal.intensity}) - ${signal.metadata?.description || 'Normal'}`
         );
       }
     });
 
     // Demonstrate signal-to-action mapping
-    console.log('\n🎯 Example Planning Decisions:');
+    console.log('\n Example Planning Decisions:');
     const criticalSignals = signals.filter((s) => s.intensity > 70);
     const moderateSignals = signals.filter(
       (s) => s.intensity > 40 && s.intensity <= 70
@@ -317,7 +317,7 @@ export async function runQuickIntegrationDemo(): Promise<QuickDemoResult> {
 
     if (criticalSignals.length > 0) {
       console.log(
-        `   🚨 EMERGENCY: Would prioritize ${criticalSignals[0].type} (${criticalSignals[0].intensity})`
+        `    EMERGENCY: Would prioritize ${criticalSignals[0].type} (${criticalSignals[0].intensity})`
       );
       console.log(
         `      → Planning Approach: REACTIVE/GOAP (immediate response)`
@@ -325,19 +325,19 @@ export async function runQuickIntegrationDemo(): Promise<QuickDemoResult> {
       console.log(`      → Max Planning Time: 100ms`);
     } else if (moderateSignals.length > 0) {
       console.log(
-        `   ⚡ MODERATE: Would address ${moderateSignals[0].type} (${moderateSignals[0].intensity})`
+        `    MODERATE: Would address ${moderateSignals[0].type} (${moderateSignals[0].intensity})`
       );
       console.log(`      → Planning Approach: HTN+GOAP (structured planning)`);
       console.log(`      → Max Planning Time: 1000ms`);
     } else {
-      console.log(`   🎯 STRATEGIC: Would pursue exploration/optimization`);
+      console.log(`    STRATEGIC: Would pursue exploration/optimization`);
       console.log(`      → Planning Approach: HRM+HTN (strategic planning)`);
       console.log(`      → Max Planning Time: 5000ms`);
     }
 
     // Cleanup
     await simInterface.disconnect();
-    console.log('\n✅ Demo completed successfully!');
+    console.log('\n Demo completed successfully!');
 
     const executionTime = Date.now() - startTime;
 
@@ -350,7 +350,7 @@ export async function runQuickIntegrationDemo(): Promise<QuickDemoResult> {
       summary: `Generated ${signals.length} signals, homeostasis monitoring active, planning context ready`,
     };
   } catch (error) {
-    console.error('\n❌ Demo failed:', error);
+    console.error('\n Demo failed:', error);
     return {
       success: false,
       signalsGenerated: 0,
@@ -366,14 +366,14 @@ export async function runQuickIntegrationDemo(): Promise<QuickDemoResult> {
 if (require.main === module) {
   runQuickIntegrationDemo()
     .then((result) => {
-      console.log('\n🎉 Quick Integration Demo Summary:');
+      console.log('\n Quick Integration Demo Summary:');
       console.log('='.repeat(40));
-      console.log(`Status: ${result.success ? '✅ SUCCESS' : '❌ FAILED'}`);
+      console.log(`Status: ${result.success ? ' SUCCESS' : ' FAILED'}`);
       console.log(`Execution Time: ${result.executionTime}ms`);
       console.log(`Summary: ${result.summary}`);
 
       if (result.success) {
-        console.log('\n💡 Next Steps:');
+        console.log('\n Next Steps:');
         console.log('1. Fix TypeScript build errors in dependencies');
         console.log('2. Integrate with full planning coordinator');
         console.log('3. Test with real Minecraft server');

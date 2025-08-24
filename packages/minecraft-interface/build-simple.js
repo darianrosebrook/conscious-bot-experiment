@@ -11,7 +11,7 @@ const { execSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 
-console.log('🔨 Building simple Minecraft interface...');
+console.log(' Building simple Minecraft interface...');
 
 // Create a temporary tsconfig for simple build
 const simpleTsConfig = {
@@ -97,18 +97,18 @@ try {
     JSON.stringify(simplePackageJson, null, 2)
   );
 
-  console.log('✅ Simple build completed successfully!');
-  console.log('📁 Output directory: dist-simple/');
-  console.log('📦 Package file: package-simple.json');
+  console.log(' Simple build completed successfully!');
+  console.log(' Output directory: dist-simple/');
+  console.log(' Package file: package-simple.json');
   console.log('');
-  console.log('🚀 Usage:');
+  console.log(' Usage:');
   console.log('  node dist-simple/bin/mc-simple.js --help');
   console.log('  node dist-simple/bin/mc-simple.js --action=connect');
   console.log('  node dist-simple/bin/mc-simple.js --action=move');
   console.log('  node dist-simple/bin/mc-sim.js --help');
   console.log('  node dist-simple/bin/mc-sim.js --action=demo');
 } catch (error) {
-  console.error('❌ Build failed:', error.message);
+  console.error(' Build failed:', error.message);
   process.exit(1);
 } finally {
   // Clean up temporary tsconfig

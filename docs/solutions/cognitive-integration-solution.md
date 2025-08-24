@@ -121,7 +121,7 @@ Implemented smart task abandonment based on cognitive feedback:
 ```typescript
 // Check if task should be abandoned based on cognitive feedback
 if (cognitiveIntegration.shouldAbandonTask(task.id)) {
-  console.log(`🚫 Abandoning task ${task.id} based on cognitive feedback`);
+  console.log(` Abandoning task ${task.id} based on cognitive feedback`);
   task.status = 'abandoned';
   
   // Generate alternative suggestions from cognitive feedback
@@ -157,7 +157,7 @@ for (const task of tasksWithFeedback) {
   thoughts.push({
     id: `feedback-${feedback.timestamp}`,
     ts: new Date(feedback.timestamp).toISOString(),
-    text: `🧠 ${feedback.reasoning}`,
+    text: ` ${feedback.reasoning}`,
     type: 'reflection' as const,
   });
 }
@@ -194,8 +194,8 @@ pnpm run dev:all
 
 ### 2. Monitor the Cognitive Stream
 - Watch the dashboard's cognitive stream for task reflections
-- Look for messages like "🧠 Stuck in a loop with craft task. Failed 3 times consecutively. Need to change approach."
-- Observe alternative suggestions like "💡 Alternatives: Try a different task type instead of craft, Gather the required materials first"
+- Look for messages like " Stuck in a loop with craft task. Failed 3 times consecutively. Need to change approach."
+- Observe alternative suggestions like " Alternatives: Try a different task type instead of craft, Gather the required materials first"
 
 ### 3. Check Task Statistics
 ```bash

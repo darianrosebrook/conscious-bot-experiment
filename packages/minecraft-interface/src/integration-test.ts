@@ -68,13 +68,11 @@ export class MinecraftPlanningIntegrationTest {
   async runIntegrationTests(): Promise<IntegrationTestResult> {
     const startTime = Date.now();
 
-    console.log('🚀 Starting Minecraft Planning Integration Tests...');
-    console.log(`📊 Running ${this.config.scenarios.length} scenarios`);
+    console.log(' Starting Minecraft Planning Integration Tests...');
+    console.log(` Running ${this.config.scenarios.length} scenarios`);
+    console.log(` Planning approach: ${this.config.planning.routingStrategy}`);
     console.log(
-      `🧠 Planning approach: ${this.config.planning.routingStrategy}`
-    );
-    console.log(
-      `🔍 Signal processing: ${this.config.planning.enableSignalProcessing ? 'enabled' : 'disabled'}`
+      ` Signal processing: ${this.config.planning.enableSignalProcessing ? 'enabled' : 'disabled'}`
     );
 
     // Test 1: Basic Connection and Signal Generation
@@ -126,7 +124,7 @@ export class MinecraftPlanningIntegrationTest {
     const startTime = Date.now();
 
     try {
-      console.log(`🔗 Running test: ${testName}`);
+      console.log(` Running test: ${testName}`);
 
       const minecraftInterface = await createMinecraftInterface(
         this.config.minecraft,
@@ -155,7 +153,7 @@ export class MinecraftPlanningIntegrationTest {
 
       await minecraftInterface.planExecutor.shutdown();
       console.log(
-        `✅ Test completed: ${testName} - ${signals.length} signals generated`
+        ` Test completed: ${testName} - ${signals.length} signals generated`
       );
     } catch (error) {
       this.results.push({
@@ -170,7 +168,7 @@ export class MinecraftPlanningIntegrationTest {
         error: error instanceof Error ? error.message : String(error),
       });
 
-      console.log(`❌ Test failed: ${testName} - ${error}`);
+      console.log(` Test failed: ${testName} - ${error}`);
     }
   }
 
@@ -182,7 +180,7 @@ export class MinecraftPlanningIntegrationTest {
     const startTime = Date.now();
 
     try {
-      console.log(`🎯 Running test: ${testName}`);
+      console.log(` Running test: ${testName}`);
 
       const minecraftInterface = await createMinecraftInterface(
         this.config.minecraft,
@@ -219,7 +217,7 @@ export class MinecraftPlanningIntegrationTest {
 
       await minecraftInterface.planExecutor.shutdown();
       console.log(
-        `✅ Test completed: ${testName} - Plan generated with ${result.executedSteps}/${result.totalSteps} steps`
+        ` Test completed: ${testName} - Plan generated with ${result.executedSteps}/${result.totalSteps} steps`
       );
     } catch (error) {
       this.results.push({
@@ -234,7 +232,7 @@ export class MinecraftPlanningIntegrationTest {
         error: error instanceof Error ? error.message : String(error),
       });
 
-      console.log(`❌ Test failed: ${testName} - ${error}`);
+      console.log(` Test failed: ${testName} - ${error}`);
     }
   }
 
@@ -291,7 +289,7 @@ export class MinecraftPlanningIntegrationTest {
 
       await minecraftInterface.planExecutor.shutdown();
       console.log(
-        `✅ Test completed: ${testName} - Complex plan executed (${result.executedSteps}/${result.totalSteps} steps)`
+        ` Test completed: ${testName} - Complex plan executed (${result.executedSteps}/${result.totalSteps} steps)`
       );
     } catch (error) {
       this.results.push({
@@ -306,7 +304,7 @@ export class MinecraftPlanningIntegrationTest {
         error: error instanceof Error ? error.message : String(error),
       });
 
-      console.log(`❌ Test failed: ${testName} - ${error}`);
+      console.log(` Test failed: ${testName} - ${error}`);
     }
   }
 
@@ -318,7 +316,7 @@ export class MinecraftPlanningIntegrationTest {
     const startTime = Date.now();
 
     try {
-      console.log(`🔧 Running test: ${testName}`);
+      console.log(` Running test: ${testName}`);
 
       const minecraftInterface = await createMinecraftInterface(
         this.config.minecraft,
@@ -363,7 +361,7 @@ export class MinecraftPlanningIntegrationTest {
 
       await minecraftInterface.planExecutor.shutdown();
       console.log(
-        `✅ Test completed: ${testName} - Adaptation tested (${result.repairAttempts} repairs)`
+        ` Test completed: ${testName} - Adaptation tested (${result.repairAttempts} repairs)`
       );
     } catch (error) {
       this.results.push({
@@ -378,7 +376,7 @@ export class MinecraftPlanningIntegrationTest {
         error: error instanceof Error ? error.message : String(error),
       });
 
-      console.log(`❌ Test failed: ${testName} - ${error}`);
+      console.log(` Test failed: ${testName} - ${error}`);
     }
   }
 
@@ -390,7 +388,7 @@ export class MinecraftPlanningIntegrationTest {
     const startTime = Date.now();
 
     try {
-      console.log(`🚨 Running test: ${testName}`);
+      console.log(` Running test: ${testName}`);
 
       const minecraftInterface = await createMinecraftInterface(
         this.config.minecraft,
@@ -432,7 +430,7 @@ export class MinecraftPlanningIntegrationTest {
 
       await minecraftInterface.planExecutor.shutdown();
       console.log(
-        `✅ Test completed: ${testName} - Emergency response (${result.planningResult?.planningLatency}ms)`
+        ` Test completed: ${testName} - Emergency response (${result.planningResult?.planningLatency}ms)`
       );
     } catch (error) {
       this.results.push({
@@ -447,7 +445,7 @@ export class MinecraftPlanningIntegrationTest {
         error: error instanceof Error ? error.message : String(error),
       });
 
-      console.log(`❌ Test failed: ${testName} - ${error}`);
+      console.log(` Test failed: ${testName} - ${error}`);
     }
   }
 
@@ -459,7 +457,7 @@ export class MinecraftPlanningIntegrationTest {
     const startTime = Date.now();
 
     try {
-      console.log(`💎 Running test: ${testName}`);
+      console.log(` Running test: ${testName}`);
 
       const minecraftInterface = await createMinecraftInterface(
         this.config.minecraft,
@@ -504,9 +502,7 @@ export class MinecraftPlanningIntegrationTest {
       });
 
       await minecraftInterface.planExecutor.shutdown();
-      console.log(
-        `✅ Test completed: ${testName} - Resource planning evaluated`
-      );
+      console.log(` Test completed: ${testName} - Resource planning evaluated`);
     } catch (error) {
       this.results.push({
         scenario: testName,
@@ -520,7 +516,7 @@ export class MinecraftPlanningIntegrationTest {
         error: error instanceof Error ? error.message : String(error),
       });
 
-      console.log(`❌ Test failed: ${testName} - ${error}`);
+      console.log(` Test failed: ${testName} - ${error}`);
     }
   }
 
@@ -532,7 +528,7 @@ export class MinecraftPlanningIntegrationTest {
     const startTime = Date.now();
 
     try {
-      console.log(`🌍 Running test: ${testName}`);
+      console.log(` Running test: ${testName}`);
 
       const minecraftInterface = await createMinecraftInterface(
         this.config.minecraft,
@@ -578,7 +574,7 @@ export class MinecraftPlanningIntegrationTest {
 
       await minecraftInterface.planExecutor.shutdown();
       console.log(
-        `✅ Test completed: ${testName} - Social/environmental adaptation tested`
+        ` Test completed: ${testName} - Social/environmental adaptation tested`
       );
     } catch (error) {
       this.results.push({
@@ -593,7 +589,7 @@ export class MinecraftPlanningIntegrationTest {
         error: error instanceof Error ? error.message : String(error),
       });
 
-      console.log(`❌ Test failed: ${testName} - ${error}`);
+      console.log(` Test failed: ${testName} - ${error}`);
     }
   }
 
@@ -687,24 +683,24 @@ export class MinecraftPlanningIntegrationTest {
    * Log comprehensive test results
    */
   private logTestResults(result: IntegrationTestResult): void {
-    console.log('\n🎯 Integration Test Results');
+    console.log('\n Integration Test Results');
     console.log('='.repeat(50));
-    console.log(`📊 Overall Success: ${result.success ? '✅' : '❌'}`);
-    console.log(`📈 Tests Passed: ${result.passedTests}/${result.totalTests}`);
+    console.log(` Overall Success: ${result.success ? '' : ''}`);
+    console.log(` Tests Passed: ${result.passedTests}/${result.totalTests}`);
     console.log(`⏱️  Total Time: ${Math.round(result.totalTime / 1000)}s`);
     console.log(
-      `🧠 Planning Performance: ${result.summary.planningSystemPerformance.averageExecutionTime}ms avg`
+      ` Planning Performance: ${result.summary.planningSystemPerformance.averageExecutionTime}ms avg`
     );
     console.log(
       `⚙️  Interface Performance: ${result.summary.minecraftInterfacePerformance.totalStepsExecuted} steps executed`
     );
     console.log(
-      `🔗 Integration Quality: ${result.summary.integrationQuality.overallSuccessRate}% success rate`
+      ` Integration Quality: ${result.summary.integrationQuality.overallSuccessRate}% success rate`
     );
 
-    console.log('\n📋 Detailed Results:');
+    console.log('\n Detailed Results:');
     result.results.forEach((test, index) => {
-      const status = test.success ? '✅' : '❌';
+      const status = test.success ? '' : '';
       console.log(
         `  ${index + 1}. ${status} ${test.scenario} (${test.executionTime}ms, ${test.stepsExecuted} steps)`
       );
@@ -715,7 +711,7 @@ export class MinecraftPlanningIntegrationTest {
 
     if (result.summary.integrationQuality.overallSuccessRate >= 80) {
       console.log(
-        '\n🎉 Integration test suite PASSED! Planning system is ready for production.'
+        '\n Integration test suite PASSED! Planning system is ready for production.'
       );
     } else {
       console.log(
@@ -736,7 +732,7 @@ export async function runMinecraftPlanningIntegrationTest(
       host: 'localhost',
       port: 25565,
       username: 'IntegrationTestBot',
-      version: '1.20.1',
+      version: '1.21.4',
       auth: 'offline',
       pathfindingTimeout: 5000,
       actionTimeout: 10000,

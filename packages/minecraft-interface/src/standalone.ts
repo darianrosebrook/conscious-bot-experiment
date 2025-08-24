@@ -48,9 +48,9 @@ export class StandaloneMinecraftInterface
     try {
       await this.botAdapter.connect();
       this.isConnected = true;
-      console.log('✅ Connected to Minecraft server');
+      console.log(' Connected to Minecraft server');
     } catch (error) {
-      console.error('❌ Failed to connect to Minecraft server:', error);
+      console.error(' Failed to connect to Minecraft server:', error);
       throw error;
     }
   }
@@ -62,9 +62,9 @@ export class StandaloneMinecraftInterface
     try {
       await this.botAdapter.disconnect();
       this.isConnected = false;
-      console.log('✅ Disconnected from Minecraft server');
+      console.log(' Disconnected from Minecraft server');
     } catch (error) {
-      console.error('❌ Error disconnecting from Minecraft server:', error);
+      console.error(' Error disconnecting from Minecraft server:', error);
       throw error;
     }
   }
@@ -83,7 +83,7 @@ export class StandaloneMinecraftInterface
       const gameState = this.observationMapper.extractMinecraftWorldState(bot);
       return gameState;
     } catch (error) {
-      console.error('❌ Error getting game state:', error);
+      console.error(' Error getting game state:', error);
       throw error;
     }
   }
@@ -129,7 +129,7 @@ export class StandaloneMinecraftInterface
         success: result.success,
       };
     } catch (error) {
-      console.error('❌ Error executing action:', error);
+      console.error(' Error executing action:', error);
       throw error;
     }
   }
@@ -147,7 +147,7 @@ export class StandaloneMinecraftInterface
       const bot = await this.botAdapter.connect();
       return this.observationMapper.mapBotStateToPlanningContext(bot);
     } catch (error) {
-      console.error('❌ Error getting cognitive context:', error);
+      console.error(' Error getting cognitive context:', error);
       throw error;
     }
   }
@@ -156,12 +156,12 @@ export class StandaloneMinecraftInterface
    * Run a simple test scenario
    */
   async runTestScenario(): Promise<any> {
-    console.log('🧪 Running test scenario...');
+    console.log(' Running test scenario...');
 
     try {
       // Get initial state
       const initialState = await this.getGameState();
-      console.log('📊 Initial state:', initialState);
+      console.log(' Initial state:', initialState);
 
       // Execute a simple movement action
       const movementAction = {
@@ -171,11 +171,11 @@ export class StandaloneMinecraftInterface
       };
 
       const movementResult = await this.executeAction(movementAction);
-      console.log('🚶 Movement result:', movementResult);
+      console.log(' Movement result:', movementResult);
 
       // Get state after movement
       const finalState = await this.getGameState();
-      console.log('📊 Final state:', finalState);
+      console.log(' Final state:', finalState);
 
       return {
         success: true,
@@ -184,7 +184,7 @@ export class StandaloneMinecraftInterface
         finalState,
       };
     } catch (error) {
-      console.error('❌ Test scenario failed:', error);
+      console.error(' Test scenario failed:', error);
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error',
@@ -209,7 +209,7 @@ export const DEFAULT_STANDALONE_CONFIG: BotConfig = {
   host: 'localhost',
   port: 25565,
   username: 'StandaloneBot',
-  version: '1.20.1',
+  version: '1.21.4',
   auth: 'offline',
   pathfindingTimeout: 30000,
   actionTimeout: 10000,

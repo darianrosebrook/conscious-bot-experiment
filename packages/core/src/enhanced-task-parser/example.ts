@@ -1,9 +1,9 @@
 /**
  * Enhanced Task Parser Example
- * 
+ *
  * Demonstrates how to use the Enhanced Task Parser module for sophisticated
  * task parsing and environmental immersion capabilities.
- * 
+ *
  * @author @darianrosebrook
  */
 
@@ -37,11 +37,11 @@ export async function enhancedTaskParserExample() {
       resource: 'cobblestone',
       quantity: 64,
       location: 'nearest_surface',
-      tool_required: 'pickaxe'
+      tool_required: 'pickaxe',
     },
     priority: 0.8,
     safety_level: 'safe',
-    estimated_duration: 300000
+    estimated_duration: 300000,
   });
 
   const environmentalContext: EnvironmentalContext = {
@@ -65,7 +65,7 @@ export async function enhancedTaskParserExample() {
         location: 'nearby',
         last_seen: Date.now(),
         confidence: 0.8,
-      }
+      },
     },
     social_context: {
       nearby_players: [],
@@ -76,8 +76,11 @@ export async function enhancedTaskParserExample() {
   };
 
   try {
-    const result = await taskParser.parseLLMOutput(jsonTask, environmentalContext);
-    console.log('✅ Task parsed successfully:');
+    const result = await taskParser.parseLLMOutput(
+      jsonTask,
+      environmentalContext
+    );
+    console.log(' Task parsed successfully:');
     console.log(`   Type: ${result.task.type}`);
     console.log(`   Resource: ${result.task.parameters.resource}`);
     console.log(`   Quantity: ${result.task.parameters.quantity}`);
@@ -86,16 +89,20 @@ export async function enhancedTaskParserExample() {
     console.log(`   Feasible: ${result.feasibility.is_feasible}`);
     console.log(`   Parsing time: ${result.parsing_time}ms\n`);
   } catch (error) {
-    console.error('❌ Failed to parse JSON task:', error);
+    console.error(' Failed to parse JSON task:', error);
   }
 
   // Example 2: Parse natural language task description
   console.log('2. Parsing Natural Language Task:');
-  const naturalLanguageTask = 'I need to gather 32 cobblestone urgently for building a shelter';
-  
+  const naturalLanguageTask =
+    'I need to gather 32 cobblestone urgently for building a shelter';
+
   try {
-    const result = await taskParser.parseLLMOutput(naturalLanguageTask, environmentalContext);
-    console.log('✅ Natural language task parsed successfully:');
+    const result = await taskParser.parseLLMOutput(
+      naturalLanguageTask,
+      environmentalContext
+    );
+    console.log(' Natural language task parsed successfully:');
     console.log(`   Type: ${result.task.type}`);
     console.log(`   Resource: ${result.task.parameters.resource}`);
     console.log(`   Quantity: ${result.task.parameters.quantity}`);
@@ -103,7 +110,7 @@ export async function enhancedTaskParserExample() {
     console.log(`   Valid: ${result.validation.is_valid}`);
     console.log(`   Feasible: ${result.feasibility.is_feasible}\n`);
   } catch (error) {
-    console.error('❌ Failed to parse natural language task:', error);
+    console.error(' Failed to parse natural language task:', error);
   }
 
   // Example 3: Environmental context with threats
@@ -119,32 +126,37 @@ export async function enhancedTaskParserExample() {
         id: 'creeper-1',
         type: 'creeper',
         position: { x: 101, y: 64, z: 200 },
-        is_hostile: true
+        is_hostile: true,
       },
       {
         id: 'skeleton-1',
         type: 'skeleton',
         position: { x: 105, y: 64, z: 200 },
-        is_hostile: true
-      }
+        is_hostile: true,
+      },
     ],
     inventory: [{ name: 'stone_pickaxe', quantity: 1 }],
     nearby_blocks: [],
-    chat_messages: []
+    chat_messages: [],
   };
 
-  const threateningContext = environmentalImmersion.updateContext(threateningWorldState);
-  console.log('✅ Environmental context updated:');
+  const threateningContext = environmentalImmersion.updateContext(
+    threateningWorldState
+  );
+  console.log(' Environmental context updated:');
   console.log(`   Time of day: ${threateningContext.time_of_day}`);
   console.log(`   Weather: ${threateningContext.weather}`);
   console.log(`   Light level: ${threateningContext.light_level}`);
   console.log(`   Threat level: ${threateningContext.threat_level}`);
-  console.log(`   Nearby entities: ${threateningContext.nearby_entities.length}\n`);
+  console.log(
+    `   Nearby entities: ${threateningContext.nearby_entities.length}\n`
+  );
 
   // Example 4: Behavior adaptations
   console.log('4. Behavior Adaptations:');
-  const adaptations = environmentalImmersion.getBehaviorAdaptations(threateningContext);
-  console.log('✅ Behavior adaptations recommended:');
+  const adaptations =
+    environmentalImmersion.getBehaviorAdaptations(threateningContext);
+  console.log(' Behavior adaptations recommended:');
   console.log(`   Adaptations: ${adaptations.adaptations.join(', ')}`);
   console.log(`   Priority: ${adaptations.priority}`);
   console.log(`   Reasoning: ${adaptations.reasoning}\n`);
@@ -152,18 +164,23 @@ export async function enhancedTaskParserExample() {
   // Example 5: Environmental summary
   console.log('5. Environmental Summary:');
   const summary = environmentalImmersion.getEnvironmentalSummary();
-  console.log('✅ Environmental summary:');
+  console.log(' Environmental summary:');
   console.log(`   Safety level: ${summary.safety_level}`);
   console.log(`   Warnings: ${summary.warnings.join(', ')}`);
-  console.log(`   Recommendations: ${summary.activity_recommendations.join(', ')}\n`);
+  console.log(
+    `   Recommendations: ${summary.activity_recommendations.join(', ')}\n`
+  );
 
   // Example 6: Task validation with environmental constraints
   console.log('6. Task Validation with Environmental Constraints:');
   const nightTask = 'I need to gather wood for building';
-  
+
   try {
-    const result = await taskParser.parseLLMOutput(nightTask, threateningContext);
-    console.log('✅ Night task validation:');
+    const result = await taskParser.parseLLMOutput(
+      nightTask,
+      threateningContext
+    );
+    console.log(' Night task validation:');
     console.log(`   Task type: ${result.task.type}`);
     console.log(`   Valid: ${result.validation.is_valid}`);
     console.log(`   Warnings: ${result.validation.warnings.join(', ')}`);
@@ -171,13 +188,13 @@ export async function enhancedTaskParserExample() {
     console.log(`   Feasible: ${result.feasibility.is_feasible}`);
     console.log(`   Risk level: ${result.feasibility.risk_assessment.level}\n`);
   } catch (error) {
-    console.error('❌ Failed to validate night task:', error);
+    console.error(' Failed to validate night task:', error);
   }
 
   // Example 7: Performance metrics
   console.log('7. Performance Metrics:');
   const metrics = taskParser.getPerformanceMetrics();
-  console.log('✅ Performance metrics:');
+  console.log(' Performance metrics:');
   console.log(`   Parsing time: ${metrics.parsing_time}ms`);
   console.log(`   Validation time: ${metrics.validation_time}ms`);
   console.log(`   Feasibility time: ${metrics.feasibility_time}ms`);
@@ -187,14 +204,16 @@ export async function enhancedTaskParserExample() {
   // Example 8: Task history
   console.log('8. Task History:');
   const history = taskParser.getTaskHistory();
-  console.log(`✅ Task history: ${history.length} tasks`);
+  console.log(` Task history: ${history.length} tasks`);
   history.forEach((task, index) => {
-    console.log(`   ${index + 1}. ${task.type} - ${task.parameters.resource || 'N/A'}`);
+    console.log(
+      `   ${index + 1}. ${task.type} - ${task.parameters.resource || 'N/A'}`
+    );
   });
 
   // Stop environmental monitoring
   environmentalImmersion.stop();
-  
+
   console.log('\n=== Example Complete ===');
 }
 

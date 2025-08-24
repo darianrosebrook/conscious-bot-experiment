@@ -10,7 +10,7 @@ After setting up the HRM environment and exploring the codebase, we've identifie
 
 ## HRM Environment Setup Status
 
-### ✅ Completed
+###  Completed
 - HRM repository cloned and accessible
 - Python 3.11 virtual environment created
 - Core dependencies installed (PyTorch, NumPy, Einops, etc.)
@@ -22,7 +22,7 @@ After setting up the HRM environment and exploring the codebase, we've identifie
 - adam_atan2 optimizer backend requires compilation
 - Full HRM model loading requires GPU dependencies
 
-### 🎯 Practical Solution
+###  Practical Solution
 Instead of running the full HRM Python model, we'll implement the **HRM architectural principles** directly in our TypeScript cognitive architecture.
 
 ## HRM Architectural Principles

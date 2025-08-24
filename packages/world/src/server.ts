@@ -92,7 +92,120 @@ app.get('/state', (req, res) => {
   }
 });
 
-// Get bot position and environment data
+// GET /snapshot - Enhanced world snapshot with grounded context
+app.get('/snapshot', (req, res) => {
+  try {
+    const stateId = `snapshot-${Date.now()}`;
+    const snapshot = {
+      stateId,
+      position: {
+        x: 100.0,
+        y: 64.0,
+        z: 100.0,
+      },
+      biome: 'plains',
+      time: 6000, // Minecraft time (0-24000)
+      light: 15,
+      hazards: ['none'],
+      nearbyEntities: [
+        {
+          id: 'entity-1',
+          type: 'cow',
+          position: { x: 105.0, y: 64.0, z: 100.0 },
+          hostile: false,
+        },
+      ],
+      nearbyBlocks: [
+        {
+          type: 'grass_block',
+          position: { x: 100.0, y: 63.0, z: 100.0 },
+          hardness: 0.6,
+        },
+      ],
+      weather: 'clear',
+    };
+
+    res.json(snapshot);
+  } catch (error) {
+    console.error('Error getting world snapshot:', error);
+    res.status(500).json({ error: 'Failed to get world snapshot' });
+  }
+});
+
+// GET /inventory - Enhanced inventory with versioning
+app.get('/inventory', (req, res) => {
+  try {
+    const stateId = `inventory-${Date.now()}`;
+    const inventory = {
+      stateId,
+      items: [
+        {
+          id: 'item-1',
+          name: 'wooden_pickaxe',
+          quantity: 1,
+          durability: 59,
+        },
+        {
+          id: 'item-2',
+          name: 'oak_log',
+          quantity: 8,
+        },
+      ],
+      armor: [
+        {
+          slot: 'head',
+          item: {
+            id: 'item-3',
+            name: 'leather_helmet',
+            quantity: 1,
+            durability: 55,
+          },
+        },
+      ],
+      tools: [
+        {
+          type: 'pickaxe',
+          item: {
+            id: 'item-1',
+            name: 'wooden_pickaxe',
+            quantity: 1,
+            durability: 59,
+          },
+        },
+      ],
+    };
+
+    res.json(inventory);
+  } catch (error) {
+    console.error('Error getting inventory:', error);
+    res.status(500).json({ error: 'Failed to get inventory' });
+  }
+});
+
+// GET /waypoints - Get known waypoints
+app.get('/waypoints', (req, res) => {
+  try {
+    const waypoints = [
+      {
+        name: 'spawn',
+        pos: { x: 100.0, y: 64.0, z: 100.0 },
+        kind: 'spawn',
+      },
+      {
+        name: 'mine_entrance',
+        pos: { x: 120.0, y: 64.0, z: 100.0 },
+        kind: 'mine',
+      },
+    ];
+
+    res.json(waypoints);
+  } catch (error) {
+    console.error('Error getting waypoints:', error);
+    res.status(500).json({ error: 'Failed to get waypoints' });
+  }
+});
+
+// Get bot position and environment data (legacy endpoint)
 app.get('/bot-state', (req, res) => {
   try {
     const botState = {

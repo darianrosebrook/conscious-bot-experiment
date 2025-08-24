@@ -62,7 +62,7 @@ async function main() {
   try {
     const options = parseArgs();
 
-    console.log('🤖 Minecraft Smoke Test Runner');
+    console.log(' Minecraft Smoke Test Runner');
     console.log('================================');
     console.log();
 
@@ -73,22 +73,22 @@ async function main() {
 
     const scenario = SCENARIOS[options.scenario as keyof typeof SCENARIOS];
     if (!scenario) {
-      console.error(`❌ Unknown scenario: ${options.scenario}`);
+      console.error(` Unknown scenario: ${options.scenario}`);
       console.error(
         `Available scenarios: ${Object.keys(SCENARIOS).join(', ')}`
       );
       process.exit(1);
     }
 
-    console.log(`🎯 Scenario: ${scenario.name}`);
-    console.log(`📝 Description: ${scenario.description}`);
-    console.log(`🔄 Runs: ${options.runs}`);
+    console.log(` Scenario: ${scenario.name}`);
+    console.log(` Description: ${scenario.description}`);
+    console.log(` Runs: ${options.runs}`);
     console.log();
 
     const results = [];
 
     for (let run = 1; run <= options.runs; run++) {
-      console.log(`\n🚀 Run ${run}/${options.runs}`);
+      console.log(`\n Run ${run}/${options.runs}`);
       console.log('─'.repeat(40));
 
       try {
@@ -99,7 +99,7 @@ async function main() {
         );
         results.push(result);
 
-        const status = result.success ? '✅' : '❌';
+        const status = result.success ? '' : '';
         console.log(`${status} ${result.success ? 'SUCCESS' : 'FAILED'}`);
 
         if (result.error) {
@@ -113,7 +113,7 @@ async function main() {
           console.log(`   Repairs: ${result.repairAttempts}`);
         }
       } catch (error) {
-        console.error(`❌ FAILED: ${error}`);
+        console.error(` FAILED: ${error}`);
         results.push({
           scenario: scenario.name,
           success: false,
@@ -133,7 +133,7 @@ async function main() {
     }
 
     // Summary
-    console.log('\n📊 Summary');
+    console.log('\n Summary');
     console.log('═'.repeat(40));
     console.log(createPerformanceSummary(results));
 
@@ -152,7 +152,7 @@ async function main() {
         JSON.stringify(logData, null, 2)
       );
 
-      console.log(`\n📄 Results logged to: ${options.logFile}`);
+      console.log(`\n Results logged to: ${options.logFile}`);
     }
 
     // Exit code based on overall success
@@ -160,7 +160,7 @@ async function main() {
       results.filter((r) => r.success).length / results.length;
     process.exit(successRate >= 0.8 ? 0 : 1);
   } catch (error) {
-    console.error('❌ Fatal error:', error);
+    console.error(' Fatal error:', error);
     process.exit(1);
   }
 }
@@ -171,13 +171,13 @@ async function runSingleTest(
   verbose: boolean
 ) {
   if (verbose) {
-    console.log(`📡 Connecting to ${config.host}:${config.port}...`);
+    console.log(` Connecting to ${config.host}:${config.port}...`);
   }
 
   const result = await runMinecraftScenario(config, scenario);
 
   if (verbose && result.telemetry) {
-    console.log('\n📈 Telemetry:');
+    console.log('\n Telemetry:');
     console.log(formatTelemetryOutput(result.telemetry));
   }
 
@@ -233,7 +233,7 @@ function parseArgs(): CLIOptions {
 
 function printHelp() {
   console.log(`
-🤖 Minecraft Smoke Test Runner
+ Minecraft Smoke Test Runner
 
 Usage: mc-smoke [options]
 
@@ -253,7 +253,7 @@ Bot Configuration:
   --host <host>         Server host (default: localhost)
   --port <port>         Server port (default: 58879)
   --username <name>     Bot username (default: ConsciousBot)
-  --version <version>   Minecraft version (default: 1.20.1)
+  --version <version>   Minecraft version (default: 1.21.4)
   --auth <type>         Auth type: offline|mojang (default: offline)
   --timeout <ms>        Operation timeout (default: 30000)
   --radius <blocks>     Observation radius (default: 16)
@@ -268,7 +268,7 @@ Examples:
 // Run if called directly
 if (require.main === module) {
   main().catch((error) => {
-    console.error('❌ Unhandled error:', error);
+    console.error(' Unhandled error:', error);
     process.exit(1);
   });
 }

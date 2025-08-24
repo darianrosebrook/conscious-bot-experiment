@@ -1,11 +1,14 @@
 /**
  * Simple test script for Enhanced Task Parser
- * 
+ *
  * This script demonstrates the key functionality of the Enhanced Task Parser
  * without requiring complex module resolution.
  */
 
-import { TaskParser, EnvironmentalImmersion } from './dist/src/enhanced-task-parser/index.js';
+import {
+  TaskParser,
+  EnvironmentalImmersion,
+} from './dist/src/enhanced-task-parser/index.js';
 
 async function testEnhancedTaskParser() {
   console.log('=== Enhanced Task Parser Test ===\n');
@@ -26,10 +29,10 @@ async function testEnhancedTaskParser() {
     parameters: {
       resource: 'cobblestone',
       quantity: 64,
-      tool_required: 'pickaxe'
+      tool_required: 'pickaxe',
     },
     priority: 0.8,
-    safety_level: 'safe'
+    safety_level: 'safe',
   });
 
   const environmentalContext = {
@@ -53,7 +56,7 @@ async function testEnhancedTaskParser() {
         location: 'nearby',
         last_seen: Date.now(),
         confidence: 0.8,
-      }
+      },
     },
     social_context: {
       nearby_players: [],
@@ -64,30 +67,36 @@ async function testEnhancedTaskParser() {
   };
 
   try {
-    const result = await taskParser.parseLLMOutput(jsonTask, environmentalContext);
-    console.log('✅ JSON task parsed successfully:');
+    const result = await taskParser.parseLLMOutput(
+      jsonTask,
+      environmentalContext
+    );
+    console.log(' JSON task parsed successfully:');
     console.log(`   Type: ${result.task.type}`);
     console.log(`   Resource: ${result.task.parameters.resource}`);
     console.log(`   Quantity: ${result.task.parameters.quantity}`);
     console.log(`   Valid: ${result.validation.is_valid}`);
     console.log(`   Feasible: ${result.feasibility.is_feasible}\n`);
   } catch (error) {
-    console.error('❌ Failed to parse JSON task:', error.message);
+    console.error(' Failed to parse JSON task:', error.message);
   }
 
   // Test 2: Parse natural language
   console.log('2. Testing Natural Language Parsing:');
   const naturalTask = 'I need to gather 32 cobblestone urgently for building';
-  
+
   try {
-    const result = await taskParser.parseLLMOutput(naturalTask, environmentalContext);
-    console.log('✅ Natural language task parsed successfully:');
+    const result = await taskParser.parseLLMOutput(
+      naturalTask,
+      environmentalContext
+    );
+    console.log(' Natural language task parsed successfully:');
     console.log(`   Type: ${result.task.type}`);
     console.log(`   Resource: ${result.task.parameters.resource}`);
     console.log(`   Quantity: ${result.task.parameters.quantity}`);
     console.log(`   Priority: ${result.task.priority}\n`);
   } catch (error) {
-    console.error('❌ Failed to parse natural language task:', error.message);
+    console.error(' Failed to parse natural language task:', error.message);
   }
 
   // Test 3: Environmental context
@@ -103,16 +112,16 @@ async function testEnhancedTaskParser() {
         id: 'creeper-1',
         type: 'creeper',
         position: { x: 101, y: 64, z: 200 },
-        is_hostile: true
-      }
+        is_hostile: true,
+      },
     ],
     inventory: [{ name: 'stone_pickaxe', quantity: 1 }],
     nearby_blocks: [],
-    chat_messages: []
+    chat_messages: [],
   };
 
   const context = environmentalImmersion.updateContext(worldState);
-  console.log('✅ Environmental context created:');
+  console.log(' Environmental context created:');
   console.log(`   Time of day: ${context.time_of_day}`);
   console.log(`   Weather: ${context.weather}`);
   console.log(`   Threat level: ${context.threat_level}`);
@@ -121,7 +130,7 @@ async function testEnhancedTaskParser() {
   // Test 4: Behavior adaptations
   console.log('4. Testing Behavior Adaptations:');
   const adaptations = environmentalImmersion.getBehaviorAdaptations(context);
-  console.log('✅ Behavior adaptations:');
+  console.log(' Behavior adaptations:');
   console.log(`   Adaptations: ${adaptations.adaptations.join(', ')}`);
   console.log(`   Priority: ${adaptations.priority}`);
   console.log(`   Reasoning: ${adaptations.reasoning}\n`);
@@ -129,7 +138,7 @@ async function testEnhancedTaskParser() {
   // Test 5: Performance metrics
   console.log('5. Testing Performance Metrics:');
   const metrics = taskParser.getPerformanceMetrics();
-  console.log('✅ Performance metrics:');
+  console.log(' Performance metrics:');
   console.log(`   Parsing time: ${metrics.parsing_time}ms`);
   console.log(`   Validation time: ${metrics.validation_time}ms`);
   console.log(`   Feasibility time: ${metrics.feasibility_time}ms`);

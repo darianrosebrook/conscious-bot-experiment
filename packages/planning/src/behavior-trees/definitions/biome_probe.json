@@ -1,0 +1,116 @@
+{
+  "id": "opt.biome_probe",
+  "name": "Biome Exploration",
+  "description": "Explore in a star pattern; log waypoints & semantic facts",
+  "root": {
+    "type": "sequence",
+    "children": [
+      {
+        "type": "condition",
+        "name": "check_exploration_ready",
+        "condition": "has_food && has_tools && is_safe"
+      },
+      {
+        "type": "action",
+        "name": "plan_exploration",
+        "action": "calculate_star_pattern",
+        "args": { "arms": "star_pattern_arms", "radius": "exploration_radius" }
+      },
+      {
+        "type": "sequence",
+        "name": "explore_directions",
+        "children": [
+          {
+            "type": "action",
+            "name": "explore_north",
+            "action": "explore_direction",
+            "args": { "direction": "north", "distance": "exploration_radius" }
+          },
+          {
+            "type": "action",
+            "name": "explore_northeast",
+            "action": "explore_direction",
+            "args": { "direction": "northeast", "distance": "exploration_radius" }
+          },
+          {
+            "type": "action",
+            "name": "explore_east",
+            "action": "explore_direction",
+            "args": { "direction": "east", "distance": "exploration_radius" }
+          },
+          {
+            "type": "action",
+            "name": "explore_southeast",
+            "action": "explore_direction",
+            "args": { "direction": "southeast", "distance": "exploration_radius" }
+          },
+          {
+            "type": "action",
+            "name": "explore_south",
+            "action": "explore_direction",
+            "args": { "direction": "south", "distance": "exploration_radius" }
+          },
+          {
+            "type": "action",
+            "name": "explore_southwest",
+            "action": "explore_direction",
+            "args": { "direction": "southwest", "distance": "exploration_radius" }
+          },
+          {
+            "type": "action",
+            "name": "explore_west",
+            "action": "explore_direction",
+            "args": { "direction": "west", "distance": "exploration_radius" }
+          },
+          {
+            "type": "action",
+            "name": "explore_northwest",
+            "action": "explore_direction",
+            "args": { "direction": "northwest", "distance": "exploration_radius" }
+          }
+        ]
+      },
+      {
+        "type": "sequence",
+        "name": "log_discoveries",
+        "children": [
+          {
+            "type": "action",
+            "name": "log_waypoints",
+            "action": "record_waypoints",
+            "args": { "format": "semantic_facts" }
+          },
+          {
+            "type": "action",
+            "name": "log_structures",
+            "action": "record_structures",
+            "args": { "include_coordinates": true }
+          },
+          {
+            "type": "action",
+            "name": "log_biome_facts",
+            "action": "record_biome_information",
+            "args": { "include_resources": true }
+          }
+        ]
+      },
+      {
+        "type": "action",
+        "name": "return_to_base",
+        "action": "pathfind_home",
+        "args": { "method": "breadcrumb_trail" }
+      },
+      {
+        "type": "condition",
+        "name": "verify_exploration_complete",
+        "condition": "waypoints_logged && facts_recorded && returned_safely"
+      }
+    ]
+  },
+  "metadata": {
+    "timeout": 120000,
+    "retries": 2,
+    "priority": "medium",
+    "interruptible": true
+  }
+}

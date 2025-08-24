@@ -7,7 +7,7 @@ The Minecraft Assets System (`src/lib/minecraft-assets.ts`) provides reliable ac
 ## Problem Solved
 
 Previously, the inventory display was using external GitHub repositories for item sprites:
-- `https://raw.githubusercontent.com/PrismarineJS/minecraft-data/master/data/pc/1.20.1/items/{item_name}.png`
+- `https://raw.githubusercontent.com/PrismarineJS/minecraft-data/master/data/pc/1.21.4/items/{item_name}.png`
 - These URLs were often unreliable or inaccessible
 - Many items had missing or broken sprites
 - No fallback system for failed image loads
@@ -109,7 +109,7 @@ The inventory display component now uses the new assets system:
 
 ```typescript
 // Old way (unreliable)
-const spriteUrl = `https://raw.githubusercontent.com/PrismarineJS/minecraft-data/master/data/pc/1.20.1/items/${itemName}.png`;
+const spriteUrl = `https://raw.githubusercontent.com/PrismarineJS/minecraft-data/master/data/pc/1.21.4/items/${itemName}.png`;
 
 // New way (reliable)
 const spriteUrl = getItemSpriteUrl(itemName);

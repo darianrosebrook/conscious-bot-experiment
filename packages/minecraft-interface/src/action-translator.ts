@@ -162,6 +162,12 @@ export class ActionTranslator {
           params.position[1],
           params.position[2]
         );
+      } else if (params.position.x !== undefined) {
+        position = new Vec3(
+          params.position.x,
+          params.position.y,
+          params.position.z
+        );
       } else {
         position = params.position;
       }

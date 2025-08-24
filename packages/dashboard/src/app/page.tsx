@@ -252,6 +252,7 @@ export default function ConsciousMinecraftDashboard() {
             headers: {
               Accept: 'application/json',
             },
+            signal: AbortSignal.timeout(5000), // 5 second timeout
           });
 
           if (response.ok) {
@@ -309,6 +310,8 @@ export default function ConsciousMinecraftDashboard() {
           }
         } catch (error) {
           console.error('Polling fallback error:', error);
+          // Don't throw the error, just log it and continue
+          // This prevents the component from crashing
         }
       };
 
@@ -381,7 +384,8 @@ export default function ConsciousMinecraftDashboard() {
           ]);
         }
       } catch (error) {
-        // Silently handle errors
+        console.warn('Initial data fetch error:', error);
+        // Silently handle errors to prevent component crashes
       }
     };
 
@@ -562,17 +566,23 @@ export default function ConsciousMinecraftDashboard() {
         {hud ? (
           <>
             <div className="grid grid-cols-2 md:grid-cols-7 gap-3">
-              <HudMeter label="Health" value={(hud.vitals.health / 20) * 100} />
-              <HudMeter label="Hunger" value={(hud.vitals.hunger / 20) * 100} />
-              <HudMeter label="Stamina" value={hud.vitals.stamina} />
-              <HudMeter label="Sleep" value={hud.vitals.sleep} />
+              <HudMeter
+                label="Health"
+                value={((hud.vitals.health || 0) / 20) * 100}
+              />
+              <HudMeter
+                label="Hunger"
+                value={((hud.vitals.hunger || 0) / 20) * 100}
+              />
+              <HudMeter label="Stamina" value={hud.vitals.stamina || 0} />
+              <HudMeter label="Sleep" value={hud.vitals.sleep || 0} />
               <HudMeter
                 label="Stress"
-                value={hud.intero.stress}
+                value={hud.intero.stress || 0}
                 hint="lower is better"
               />
-              <HudMeter label="Focus" value={hud.intero.focus} />
-              <HudMeter label="Curiosity" value={hud.intero.curiosity} />
+              <HudMeter label="Focus" value={hud.intero.focus || 0} />
+              <HudMeter label="Curiosity" value={hud.intero.curiosity || 0} />
             </div>
             <div className="mt-1 text-xs text-zinc-400">
               Mood: <span className="text-zinc-200">{hud.mood}</span>
@@ -877,27 +887,27 @@ export default function ConsciousMinecraftDashboard() {
                     if (isIntrusive) {
                       borderColor = 'border-purple-600/50';
                       bgColor = 'bg-purple-950/20';
-                      prefix = '💭 ';
+                      prefix = ' ';
                       typeLabel = 'intrusive';
                     } else if (isExternalChat) {
                       borderColor = 'border-blue-600/50';
                       bgColor = 'bg-blue-950/20';
-                      prefix = `💬 ${thought.sender}: `;
+                      prefix = ` ${thought.sender}: `;
                       typeLabel = 'chat_in';
                     } else if (isBotResponse) {
                       borderColor = 'border-green-600/50';
                       bgColor = 'bg-green-950/20';
-                      prefix = '🤖 ';
+                      prefix = ' ';
                       typeLabel = 'chat_out';
                     } else if (isSocial) {
                       borderColor = 'border-orange-600/50';
                       bgColor = 'bg-orange-950/20';
-                      prefix = '👥 ';
+                      prefix = ' ';
                       typeLabel = 'social';
                     } else if (isInternal) {
                       borderColor = 'border-yellow-600/50';
                       bgColor = 'bg-yellow-950/20';
-                      prefix = '🧠 ';
+                      prefix = ' ';
                       typeLabel = 'internal';
                     }
 

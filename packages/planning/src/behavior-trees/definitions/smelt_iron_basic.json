@@ -1,0 +1,86 @@
+{
+  "id": "opt.smelt_iron_basic",
+  "name": "Basic Iron Smelting",
+  "description": "Smelt iron ore using coal/charcoal; craft ingots",
+  "root": {
+    "type": "sequence",
+    "children": [
+      {
+        "type": "condition",
+        "name": "check_resources",
+        "condition": "has_iron_ore && has_fuel"
+      },
+      {
+        "type": "selector",
+        "name": "get_furnace",
+        "children": [
+          {
+            "type": "action",
+            "name": "find_existing_furnace",
+            "action": "scan_for_furnace",
+            "args": { "radius": 50 }
+          },
+          {
+            "type": "sequence",
+            "name": "craft_furnace",
+            "children": [
+              {
+                "type": "action",
+                "name": "craft_furnace",
+                "action": "craft_item",
+                "args": { "recipe": "furnace" }
+              },
+              {
+                "type": "action",
+                "name": "place_furnace",
+                "action": "place_block",
+                "args": { "block": "furnace", "position": "safe_location" }
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "type": "sequence",
+        "name": "smelt_iron",
+        "children": [
+          {
+            "type": "action",
+            "name": "add_fuel",
+            "action": "add_fuel_to_furnace",
+            "args": { "fuel_type": "coal_or_charcoal" }
+          },
+          {
+            "type": "action",
+            "name": "add_ore",
+            "action": "add_ore_to_furnace",
+            "args": { "ore_type": "iron_ore", "amount": "target_amount" }
+          },
+          {
+            "type": "action",
+            "name": "wait_for_smelting",
+            "action": "wait_for_furnace_completion",
+            "args": { "timeout": 30000 }
+          },
+          {
+            "type": "action",
+            "name": "collect_ingots",
+            "action": "collect_from_furnace",
+            "args": { "item": "iron_ingot" }
+          }
+        ]
+      },
+      {
+        "type": "condition",
+        "name": "verify_ingots",
+        "condition": "inventory.iron_ingot >= target_amount"
+      }
+    ]
+  },
+  "metadata": {
+    "timeout": 45000,
+    "retries": 2,
+    "priority": "medium",
+    "interruptible": true
+  }
+}

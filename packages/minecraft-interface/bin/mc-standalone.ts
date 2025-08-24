@@ -59,7 +59,7 @@ function parseArgs(): CLIOptions {
 
 function printHelp(): void {
   console.log(`
-🤖 Standalone Minecraft Interface CLI
+ Standalone Minecraft Interface CLI
 
 Usage: node mc-standalone.js [options]
 
@@ -88,7 +88,7 @@ async function runBasicScenario(
   interface: any,
   verbose: boolean = false
 ): Promise<void> {
-  console.log('🎯 Running basic scenario...');
+  console.log(' Running basic scenario...');
 
   try {
     // Connect to server
@@ -98,7 +98,7 @@ async function runBasicScenario(
     const initialState = await interface.getGameState();
     if (verbose) {
       console.log(
-        '📊 Initial game state:',
+        ' Initial game state:',
         JSON.stringify(initialState, null, 2)
       );
     }
@@ -110,31 +110,28 @@ async function runBasicScenario(
       priority: 1,
     };
 
-    console.log('🚶 Executing movement action...');
+    console.log(' Executing movement action...');
     const movementResult = await interface.executeAction(movementAction);
 
     if (movementResult.success) {
-      console.log('✅ Movement successful');
+      console.log(' Movement successful');
     } else {
-      console.log('❌ Movement failed');
+      console.log(' Movement failed');
     }
 
     if (verbose) {
-      console.log(
-        '📊 Movement result:',
-        JSON.stringify(movementResult, null, 2)
-      );
+      console.log(' Movement result:', JSON.stringify(movementResult, null, 2));
     }
 
     // Get final state
     const finalState = await interface.getGameState();
     if (verbose) {
-      console.log('📊 Final game state:', JSON.stringify(finalState, null, 2));
+      console.log(' Final game state:', JSON.stringify(finalState, null, 2));
     }
 
-    console.log('✅ Basic scenario completed successfully');
+    console.log(' Basic scenario completed successfully');
   } catch (error) {
-    console.error('❌ Basic scenario failed:', error);
+    console.error(' Basic scenario failed:', error);
     throw error;
   } finally {
     await interface.disconnect();
@@ -145,7 +142,7 @@ async function runNavigationScenario(
   interface: any,
   verbose: boolean = false
 ): Promise<void> {
-  console.log('🧭 Running navigation scenario...');
+  console.log(' Running navigation scenario...');
 
   try {
     await interface.connect();
@@ -159,29 +156,29 @@ async function runNavigationScenario(
     ];
 
     for (const movement of movements) {
-      console.log(`🚶 Executing ${movement.type}...`);
+      console.log(` Executing ${movement.type}...`);
       const result = await interface.executeAction({
         ...movement,
         priority: 1,
       });
 
       if (result.success) {
-        console.log(`✅ ${movement.type} successful`);
+        console.log(` ${movement.type} successful`);
       } else {
-        console.log(`❌ ${movement.type} failed`);
+        console.log(` ${movement.type} failed`);
       }
 
       if (verbose) {
-        console.log('📊 Result:', JSON.stringify(result, null, 2));
+        console.log(' Result:', JSON.stringify(result, null, 2));
       }
 
       // Small delay between movements
       await new Promise((resolve) => setTimeout(resolve, 1000));
     }
 
-    console.log('✅ Navigation scenario completed successfully');
+    console.log(' Navigation scenario completed successfully');
   } catch (error) {
-    console.error('❌ Navigation scenario failed:', error);
+    console.error(' Navigation scenario failed:', error);
     throw error;
   } finally {
     await interface.disconnect();
@@ -192,21 +189,18 @@ async function runInventoryScenario(
   interface: any,
   verbose: boolean = false
 ): Promise<void> {
-  console.log('🎒 Running inventory scenario...');
+  console.log(' Running inventory scenario...');
 
   try {
     await interface.connect();
 
     // Get current inventory
     const gameState = await interface.getGameState();
-    console.log(
-      '📦 Current inventory items:',
-      gameState.inventory?.length || 0
-    );
+    console.log(' Current inventory items:', gameState.inventory?.length || 0);
 
     if (verbose) {
       console.log(
-        '📊 Full inventory:',
+        ' Full inventory:',
         JSON.stringify(gameState.inventory, null, 2)
       );
     }
@@ -221,14 +215,14 @@ async function runInventoryScenario(
     const result = await interface.executeAction(inventoryAction);
 
     if (result.success) {
-      console.log('✅ Inventory check successful');
+      console.log(' Inventory check successful');
     } else {
-      console.log('❌ Inventory check failed');
+      console.log(' Inventory check failed');
     }
 
-    console.log('✅ Inventory scenario completed successfully');
+    console.log(' Inventory scenario completed successfully');
   } catch (error) {
-    console.error('❌ Inventory scenario failed:', error);
+    console.error(' Inventory scenario failed:', error);
     throw error;
   } finally {
     await interface.disconnect();
@@ -239,7 +233,7 @@ async function runCraftingScenario(
   interface: any,
   verbose: boolean = false
 ): Promise<void> {
-  console.log('🔨 Running crafting scenario...');
+  console.log(' Running crafting scenario...');
 
   try {
     await interface.connect();
@@ -254,22 +248,22 @@ async function runCraftingScenario(
       priority: 1,
     };
 
-    console.log('🔨 Attempting to craft planks...');
+    console.log(' Attempting to craft planks...');
     const result = await interface.executeAction(craftingAction);
 
     if (result.success) {
-      console.log('✅ Crafting successful');
+      console.log(' Crafting successful');
     } else {
-      console.log('❌ Crafting failed (may not have required materials)');
+      console.log(' Crafting failed (may not have required materials)');
     }
 
     if (verbose) {
-      console.log('📊 Crafting result:', JSON.stringify(result, null, 2));
+      console.log(' Crafting result:', JSON.stringify(result, null, 2));
     }
 
-    console.log('✅ Crafting scenario completed successfully');
+    console.log(' Crafting scenario completed successfully');
   } catch (error) {
-    console.error('❌ Crafting scenario failed:', error);
+    console.error(' Crafting scenario failed:', error);
     throw error;
   } finally {
     await interface.disconnect();
@@ -280,7 +274,7 @@ async function main(): Promise<void> {
   try {
     const options = parseArgs();
 
-    console.log('🤖 Standalone Minecraft Interface Test');
+    console.log(' Standalone Minecraft Interface Test');
     console.log('=====================================');
     console.log();
 
@@ -317,7 +311,7 @@ async function main(): Promise<void> {
         await runCraftingScenario(minecraftInterface, options.verbose);
         break;
       default:
-        console.error(`❌ Unknown scenario: ${scenario}`);
+        console.error(` Unknown scenario: ${scenario}`);
         console.log(
           'Available scenarios: basic, navigation, inventory, crafting'
         );
@@ -325,9 +319,9 @@ async function main(): Promise<void> {
     }
 
     console.log();
-    console.log('🎉 All tests completed successfully!');
+    console.log(' All tests completed successfully!');
   } catch (error) {
-    console.error('💥 Test execution failed:', error);
+    console.error(' Test execution failed:', error);
     process.exit(1);
   }
 }
@@ -335,7 +329,7 @@ async function main(): Promise<void> {
 // Run if called directly
 if (require.main === module) {
   main().catch((error) => {
-    console.error('💥 Fatal error:', error);
+    console.error(' Fatal error:', error);
     process.exit(1);
   });
 }

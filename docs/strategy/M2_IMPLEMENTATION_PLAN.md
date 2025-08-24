@@ -11,13 +11,13 @@ M2 focuses on implementing the **critical cognitive components** identified in t
 
 ## Current Status Assessment
 
-### ✅ M1 Achievements (Foundation Complete)
+###  M1 Achievements (Foundation Complete)
 - **Core Infrastructure**: Arbiter, MCP Capabilities, Real-Time Performance
 - **World Interface**: Visible-Only Sensing, Perception, Navigation, Sensorimotor
 - **Safety Systems**: Monitoring, Privacy, Fail-Safes
 - **Technical Excellence**: 81 test suites, real-time budgets, event-driven architecture
 
-### ❌ Critical Gaps (M2 Focus)
+###  Critical Gaps (M2 Focus)
 1. **Cognitive Core (LLM Integration)**: 0% implemented - **CRITICAL**
 2. **Memory Systems**: 0% implemented - **CRITICAL**  
 3. **Goal Formulation**: 0% implemented - **CRITICAL**
@@ -258,28 +258,28 @@ interface SystemIntegration {
 
 ```
 packages/
-├── core/                    # ✅ M1 Complete
+├── core/                    #  M1 Complete
 │   ├── arbiter/
 │   ├── mcp-capabilities/
 │   └── real-time/
-├── planning/               # 🆕 M2 New
+├── planning/               #  M2 New
 │   ├── goal-formulation/
 │   ├── hierarchical-planner/
 │   └── reactive-executor/
-├── memory/                 # 🆕 M2 New
+├── memory/                 #  M2 New
 │   ├── episodic/
 │   ├── semantic/
 │   ├── working/
 │   └── provenance/
-├── cognition/              # 🆕 M2 New
+├── cognition/              #  M2 New
 │   ├── cognitive-core/
 │   ├── self-model/
 │   └── social-cognition/
-├── world/                  # ✅ M1 Complete
+├── world/                  #  M1 Complete
 │   ├── perception/
 │   ├── navigation/
 │   └── sensorimotor/
-└── safety/                 # ✅ M1 Complete
+└── safety/                 #  M1 Complete
     ├── monitoring/
     ├── privacy/
     └── fail-safes/
@@ -366,22 +366,22 @@ m2_implementation:
 ## Success Metrics
 
 ### Functional Metrics
-- ✅ Agent generates and explains its own goals
-- ✅ Agent can recall and use past experiences
-- ✅ Agent can plan and execute complex multi-step actions
-- ✅ Agent can engage in basic internal dialogue
+-  Agent generates and explains its own goals
+-  Agent can recall and use past experiences
+-  Agent can plan and execute complex multi-step actions
+-  Agent can engage in basic internal dialogue
 
 ### Performance Metrics
-- ✅ Maintain <200ms p95 for routine operations
-- ✅ Maintain <50ms p95 for critical operations
-- ✅ LLM response time <2 seconds for cognitive tasks
-- ✅ Memory query latency <100ms for relevant information
+-  Maintain <200ms p95 for routine operations
+-  Maintain <50ms p95 for critical operations
+-  LLM response time <2 seconds for cognitive tasks
+-  Memory query latency <100ms for relevant information
 
 ### Quality Metrics
-- ✅ 90% test coverage for new cognitive modules
-- ✅ Zero safety violations in cognitive decision-making
-- ✅ Successful integration with existing M1 modules
-- ✅ Passing all regression tests
+-  90% test coverage for new cognitive modules
+-  Zero safety violations in cognitive decision-making
+-  Successful integration with existing M1 modules
+-  Passing all regression tests
 
 ## Implementation Timeline
 

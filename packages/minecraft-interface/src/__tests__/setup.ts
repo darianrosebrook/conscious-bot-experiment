@@ -38,7 +38,7 @@ jest.mock('mineflayer-pathfinder', () => ({
   },
   entities: {},
   players: {},
-  version: '1.20.1',
+  version: '1.21.4',
   username: 'TestBot',
   loadPlugin: jest.fn(),
   blockAt: jest.fn(() => null),

@@ -1,0 +1,80 @@
+{
+  "id": "opt.ore_ladder_iron",
+  "name": "Iron Ore Mining",
+  "description": "Acquire iron: locate veins, mine with stone pick, ascend safely",
+  "root": {
+    "type": "sequence",
+    "children": [
+      {
+        "type": "condition",
+        "name": "check_equipment",
+        "condition": "has_stone_pick && has_torches && has_food"
+      },
+      {
+        "type": "selector",
+        "name": "find_mining_location",
+        "children": [
+          {
+            "type": "action",
+            "name": "find_cave_entrance",
+            "action": "scan_for_caves",
+            "args": { "radius": 100 }
+          },
+          {
+            "type": "action",
+            "name": "dig_entrance",
+            "action": "dig_staircase",
+            "args": { "depth": 5, "width": 2 }
+          }
+        ]
+      },
+      {
+        "type": "sequence",
+        "name": "mine_iron",
+        "children": [
+          {
+            "type": "action",
+            "name": "place_torches",
+            "action": "place_torch_every_6_blocks",
+            "args": { "spacing": 6 }
+          },
+          {
+            "type": "action",
+            "name": "scan_for_iron",
+            "action": "scan_for_ore",
+            "args": { "ore_type": "iron", "radius": 10 }
+          },
+          {
+            "type": "action",
+            "name": "mine_iron_vein",
+            "action": "dig_blocks",
+            "args": { "pattern": "iron_vein", "tool": "stone_pick" }
+          },
+          {
+            "type": "action",
+            "name": "collect_ore",
+            "action": "collect_items",
+            "args": { "radius": 3 }
+          }
+        ]
+      },
+      {
+        "type": "action",
+        "name": "ascend_safely",
+        "action": "climb_ladder",
+        "args": { "method": "ladder_or_stairs" }
+      },
+      {
+        "type": "condition",
+        "name": "verify_iron",
+        "condition": "inventory.iron_ore >= target_amount"
+      }
+    ]
+  },
+  "metadata": {
+    "timeout": 60000,
+    "retries": 2,
+    "priority": "medium",
+    "interruptible": true
+  }
+}

@@ -9,6 +9,10 @@
 import express from 'express';
 import cors from 'cors';
 import { CognitiveIntegration } from './cognitive-integration';
+import {
+  BehaviorTreeRunner,
+  BTNodeStatus,
+} from './behavior-trees/BehaviorTreeRunner';
 
 const app = express();
 const port = process.env.PORT ? parseInt(process.env.PORT) : 3002;
@@ -16,6 +20,22 @@ const port = process.env.PORT ? parseInt(process.env.PORT) : 3002;
 // Middleware
 app.use(cors());
 app.use(express.json());
+
+// Initialize tool executor (mock for now)
+const toolExecutor = {
+  async execute(tool: string, args: Record<string, any>) {
+    // TODO: Implement actual tool execution
+    console.log(`Executing tool: ${tool} with args:`, args);
+    return {
+      ok: true,
+      data: { result: 'mock_success' },
+      environmentDeltas: {},
+    };
+  },
+};
+
+// Initialize Behavior Tree Runner
+const btRunner = new BehaviorTreeRunner(toolExecutor);
 
 // Initialize cognitive integration
 const cognitiveIntegration = new CognitiveIntegration({
@@ -33,11 +53,18 @@ const planningSystem = {
     getGoalCount: () => 0,
     getCurrentTasks: () => {
       const tasks = planningSystem.goalFormulation._tasks || [];
-      return tasks.filter((t: any) => t.status === 'pending' || t.status === 'in_progress');
+      return tasks.filter(
+        (t: any) => t.status === 'pending' || t.status === 'in_progress'
+      );
     },
     getCompletedTasks: () => {
       const tasks = planningSystem.goalFormulation._tasks || [];
-      return tasks.filter((t: any) => t.status === 'completed' || t.status === 'failed' || t.status === 'abandoned');
+      return tasks.filter(
+        (t: any) =>
+          t.status === 'completed' ||
+          t.status === 'failed' ||
+          t.status === 'abandoned'
+      );
     },
     addTask: (task: any) => {
       // Simple in-memory task storage
@@ -45,7 +72,7 @@ const planningSystem = {
         planningSystem.goalFormulation._tasks = [];
       }
       planningSystem.goalFormulation._tasks.push(task);
-      console.log(`📋 Task added: ${task.type} - ${task.description}`);
+      console.log(` Task added: ${task.type} - ${task.description}`);
     },
     _tasks: [] as any[],
     _lastTaskExecution: 0, // Track when last task was executed
@@ -89,7 +116,7 @@ const planningSystem = {
         const taskCompleted = validateTaskCompletion(task, result);
 
         // Debug logging
-        console.log(`🔍 Task Validation for ${task.type}:`, {
+        console.log(` Task Validation for ${task.type}:`, {
           taskId: task.id,
           resultSuccess: (result as any).success,
           resultError: (result as any).error,
@@ -117,9 +144,9 @@ const planningSystem = {
           planningSystem.goalFormulation._failedTaskCount = 0;
 
           console.log(
-            `✅ Task completed successfully: ${task.type} - ${task.description}`
+            ` Task completed successfully: ${task.type} - ${task.description}`
           );
-          console.log(`🧠 Cognitive feedback: ${cognitiveFeedback.reasoning}`);
+          console.log(` Cognitive feedback: ${cognitiveFeedback.reasoning}`);
         } else {
           // Mark task as failed
           task.status = 'failed';
@@ -133,14 +160,14 @@ const planningSystem = {
           planningSystem.goalFormulation._failedTaskCount++;
 
           console.log(
-            `❌ Task failed: ${task.type} - ${task.description} - Reason: ${task.failureReason}`
+            ` Task failed: ${task.type} - ${task.description} - Reason: ${task.failureReason}`
           );
-          console.log(`🧠 Cognitive feedback: ${cognitiveFeedback.reasoning}`);
+          console.log(` Cognitive feedback: ${cognitiveFeedback.reasoning}`);
 
           // Check if task should be abandoned based on cognitive feedback
           if (cognitiveIntegration.shouldAbandonTask(task.id)) {
             console.log(
-              `🚫 Abandoning task ${task.id} based on cognitive feedback`
+              ` Abandoning task ${task.id} based on cognitive feedback`
             );
             task.status = 'abandoned';
             task.abandonedAt = Date.now();
@@ -149,7 +176,7 @@ const planningSystem = {
             // Generate alternative suggestions from cognitive feedback
             if (cognitiveFeedback.alternativeSuggestions.length > 0) {
               console.log(
-                `💡 Alternative suggestions: ${cognitiveFeedback.alternativeSuggestions.join(', ')}`
+                ` Alternative suggestions: ${cognitiveFeedback.alternativeSuggestions.join(', ')}`
               );
 
               // Create alternative tasks based on suggestions
@@ -190,7 +217,7 @@ const planningSystem = {
         planningSystem.goalFormulation._failedTaskCount++;
 
         console.error(
-          `❌ Task execution error: ${task.type} - ${task.description} - Error: ${task.failureReason}`
+          ` Task execution error: ${task.type} - ${task.description} - Error: ${task.failureReason}`
         );
 
         throw error;
@@ -402,7 +429,7 @@ async function autonomousTaskExecutor() {
 
   // If no pending tasks, generate a new autonomous task
   if (pendingTasks.length === 0) {
-    console.log('🤖 No tasks available, generating autonomous task...');
+    console.log(' No tasks available, generating autonomous task...');
     const newTask = generateAutonomousTask();
     planningSystem.goalFormulation.addTask(newTask);
 
@@ -410,18 +437,18 @@ async function autonomousTaskExecutor() {
     try {
       await planningSystem.reactiveExecutor.executeNextTask();
       planningSystem.goalFormulation._lastTaskExecution = now;
-      console.log('✅ Autonomous task executed successfully');
+      console.log(' Autonomous task executed successfully');
     } catch (error) {
-      console.error('❌ Failed to execute autonomous task:', error);
+      console.error(' Failed to execute autonomous task:', error);
     }
   } else {
     // Execute the next pending task
     try {
       await planningSystem.reactiveExecutor.executeNextTask();
       planningSystem.goalFormulation._lastTaskExecution = now;
-      console.log('✅ Pending task executed successfully');
+      console.log(' Pending task executed successfully');
     } catch (error) {
-      console.error('❌ Failed to execute pending task:', error);
+      console.error(' Failed to execute pending task:', error);
     }
   }
 }
@@ -735,7 +762,7 @@ async function executeTaskInMinecraft(task: any) {
             // If mining was successful, break out of the loop
             if ((mineResult as any).success) {
               console.log(
-                `✅ Successfully mined block at ${JSON.stringify(position)}`
+                ` Successfully mined block at ${JSON.stringify(position)}`
               );
               break;
             }
@@ -747,8 +774,11 @@ async function executeTaskInMinecraft(task: any) {
           }
         }
 
-        // Check if any mining was successful
-        const successfulMining = mineResults.some(
+        // Check if any mining was successful (exclude chat messages)
+        const miningActionResults = mineResults.filter(
+          (result: any) => result.action === 'mine_block'
+        );
+        const successfulMining = miningActionResults.some(
           (result: any) => result.success === true
         );
 
@@ -1096,17 +1126,144 @@ app.get('/telemetry', (req, res) => {
   }
 });
 
+// ============================================================================
+// Behavior Tree Endpoints
+// ============================================================================
+
+// POST /run-option - Execute an option (skill) via Behavior Tree
+app.post('/run-option', async (req, res) => {
+  try {
+    const { option_id, args, options } = req.body;
+
+    if (!option_id) {
+      return res.status(400).json({ error: 'Missing required field: option_id' });
+    }
+
+    const result = await btRunner.runOption(option_id, args || {}, options || {});
+    
+    res.json({
+      success: true,
+      result,
+      timestamp: Date.now(),
+    });
+  } catch (error) {
+    console.error('BT execution failed:', error);
+    res.status(500).json({ 
+      error: 'BT execution failed', 
+      details: error instanceof Error ? error.message : 'Unknown error' 
+    });
+  }
+});
+
+// POST /run-option/stream - Stream BT execution with SSE
+app.post('/run-option/stream', async (req, res) => {
+  try {
+    const { option_id, args, options } = req.body;
+
+    if (!option_id) {
+      return res.status(400).json({ error: 'Missing required field: option_id' });
+    }
+
+    // Set up SSE headers
+    res.writeHead(200, {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache',
+      'Connection': 'keep-alive',
+    });
+
+    const runId = `${option_id}-${Date.now()}`;
+    
+    // Set up event listeners for streaming
+    const onTick = (data: { runId: string; tick: any }) => {
+      if (data.runId === runId) {
+        res.write(`data: ${JSON.stringify({ type: 'tick', data: data.tick })}\n\n`);
+      }
+    };
+
+    const onStatus = (data: { runId: string; status: BTNodeStatus }) => {
+      if (data.runId === runId) {
+        res.write(`data: ${JSON.stringify({ type: 'status', data: data.status })}\n\n`);
+        
+        // Close stream when execution completes
+        if (data.status === BTNodeStatus.SUCCESS || data.status === BTNodeStatus.FAILURE) {
+          res.write(`data: ${JSON.stringify({ type: 'complete', data: data.status })}\n\n`);
+          res.end();
+        }
+      }
+    };
+
+    btRunner.on('tick', onTick);
+    btRunner.on('status', onStatus);
+
+    // Execute the option
+    const result = await btRunner.runOption(option_id, args || {}, options || {});
+
+    // Clean up event listeners
+    btRunner.off('tick', onTick);
+    btRunner.off('status', onStatus);
+
+  } catch (error) {
+    console.error('BT streaming failed:', error);
+    res.write(`data: ${JSON.stringify({ type: 'error', error: error instanceof Error ? error.message : 'Unknown error' })}\n\n`);
+    res.end();
+  }
+});
+
+// POST /cancel - Cancel an active run
+app.post('/cancel', async (req, res) => {
+  try {
+    const { run_id } = req.body;
+
+    if (!run_id) {
+      return res.status(400).json({ error: 'Missing required field: run_id' });
+    }
+
+    const cancelled = await btRunner.cancel(run_id);
+    
+    res.json({
+      success: cancelled,
+      cancelled,
+      timestamp: Date.now(),
+    });
+  } catch (error) {
+    console.error('Cancel failed:', error);
+    res.status(500).json({ 
+      error: 'Cancel failed', 
+      details: error instanceof Error ? error.message : 'Unknown error' 
+    });
+  }
+});
+
+// GET /active-runs - Get status of active runs
+app.get('/active-runs', (req, res) => {
+  try {
+    const activeRuns = btRunner.getActiveRuns();
+    
+    res.json({
+      success: true,
+      activeRuns,
+      timestamp: Date.now(),
+    });
+  } catch (error) {
+    console.error('Failed to get active runs:', error);
+    res.status(500).json({ 
+      error: 'Failed to get active runs', 
+      details: error instanceof Error ? error.message : 'Unknown error' 
+    });
+  }
+});
+
 // Start server
 app.listen(port, () => {
   console.log(`Planning system server running on port ${port}`);
 
   // Start autonomous task executor
-  console.log('🤖 Starting autonomous task executor...');
+  console.log(' Starting autonomous task executor...');
   setInterval(autonomousTaskExecutor, 120000); // Check every 2 minutes
 
   // Initial task generation after 30 seconds
   setTimeout(() => {
-    console.log('🚀 Initializing autonomous behavior...');
+    console.log(' Initializing autonomous behavior...');
     autonomousTaskExecutor();
   }, 30000);
 });

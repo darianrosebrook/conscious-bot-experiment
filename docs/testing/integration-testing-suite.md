@@ -151,22 +151,22 @@ export default {
 ### Cognitive Integration Test Results
 
 **Passing Tests (9/14)**:
-- ✅ Successful task completion analysis
-- ✅ Failure rate calculation
-- ✅ Alternative suggestions for crafting failures
-- ✅ Alternative suggestions for mining failures
-- ✅ Task abandonment for high failure rates
-- ✅ Task retention for good success rates
-- ✅ Cognitive insights generation
-- ✅ Default and custom configuration
-- ✅ Configuration validation
+-  Successful task completion analysis
+-  Failure rate calculation
+-  Alternative suggestions for crafting failures
+-  Alternative suggestions for mining failures
+-  Task abandonment for high failure rates
+-  Task retention for good success rates
+-  Cognitive insights generation
+-  Default and custom configuration
+-  Configuration validation
 
 **Failing Tests (5/14)**:
-- ❌ Failed task completion reasoning (expects "Failed to complete" but gets "High failure rate")
-- ❌ Stuck pattern detection (expects exact string match)
-- ❌ Task statistics structure (API mismatch)
-- ❌ Success rate calculation (missing properties)
-- ❌ Memory management (history size limit not enforced)
+-  Failed task completion reasoning (expects "Failed to complete" but gets "High failure rate")
+-  Stuck pattern detection (expects exact string match)
+-  Task statistics structure (API mismatch)
+-  Success rate calculation (missing properties)
+-  Memory management (history size limit not enforced)
 
 ### Key Insights from Test Results
 

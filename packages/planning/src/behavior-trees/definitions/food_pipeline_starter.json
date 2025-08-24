@@ -1,0 +1,115 @@
+{
+  "id": "opt.food_pipeline_starter",
+  "name": "Starter Food Pipeline",
+  "description": "Satisfy hunger via nearest viable path (cook meat, bread, berries)",
+  "root": {
+    "type": "sequence",
+    "children": [
+      {
+        "type": "action",
+        "name": "assess_biome",
+        "action": "analyze_biome_resources",
+        "args": { "radius": 100 }
+      },
+      {
+        "type": "selector",
+        "name": "choose_food_path",
+        "children": [
+          {
+            "type": "sequence",
+            "name": "meat_cooking_path",
+            "children": [
+              {
+                "type": "condition",
+                "name": "check_meat_available",
+                "condition": "has_raw_meat || can_hunt_animals"
+              },
+              {
+                "type": "selector",
+                "name": "get_meat",
+                "children": [
+                  {
+                    "type": "action",
+                    "name": "find_animals",
+                    "action": "scan_for_animals",
+                    "args": { "radius": 50 }
+                  },
+                  {
+                    "type": "action",
+                    "name": "hunt_animal",
+                    "action": "attack_entity",
+                    "args": { "target": "nearest_animal" }
+                  }
+                ]
+              },
+              {
+                "type": "action",
+                "name": "cook_meat",
+                "action": "cook_food",
+                "args": { "food_type": "meat", "method": "furnace_or_campfire" }
+              }
+            ]
+          },
+          {
+            "type": "sequence",
+            "name": "bread_baking_path",
+            "children": [
+              {
+                "type": "condition",
+                "name": "check_wheat_available",
+                "condition": "has_wheat || can_farm_wheat"
+              },
+              {
+                "type": "action",
+                "name": "harvest_wheat",
+                "action": "harvest_crops",
+                "args": { "crop": "wheat" }
+              },
+              {
+                "type": "action",
+                "name": "craft_bread",
+                "action": "craft_item",
+                "args": { "recipe": "bread" }
+              }
+            ]
+          },
+          {
+            "type": "sequence",
+            "name": "berry_foraging_path",
+            "children": [
+              {
+                "type": "action",
+                "name": "find_berries",
+                "action": "scan_for_berries",
+                "args": { "radius": 100 }
+              },
+              {
+                "type": "action",
+                "name": "collect_berries",
+                "action": "collect_items",
+                "args": { "item": "berries" }
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "type": "action",
+        "name": "consume_food",
+        "action": "eat_food",
+        "args": { "until_saturation": "target_level" }
+      },
+      {
+        "type": "condition",
+        "name": "verify_saturation",
+        "condition": "saturation >= target_saturation"
+      }
+    ]
+  },
+  "metadata": {
+    "timeout": 60000,
+    "retries": 2,
+    "priority": "high",
+    "interruptible": true
+  }
+}
