@@ -12,14 +12,14 @@ import {
   MessageSquare,
   PauseCircle,
   PlayCircle,
+  RefreshCw,
   Search,
   UploadCloud,
 } from 'lucide-react';
 
 import { useDashboardStore } from '@/stores/dashboard-store';
 import { useSSE } from '@/hooks/use-sse';
-import { submitIntrusiveThought } from '@/lib/api';
-import { generateId, formatTime } from '@/lib/utils';
+import { formatTime } from '@/lib/utils';
 import { HudMeter } from '@/components/hud-meter';
 import { Section } from '@/components/section';
 import { Pill } from '@/components/pill';
@@ -28,7 +28,7 @@ import { InventoryDisplay } from '@/components/inventory-display';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import type { Thought, HudData } from '@/types';
+import type {} from '@/types';
 
 interface BotState {
   position?: {
@@ -87,7 +87,27 @@ export default function ConsciousMinecraftDashboard() {
     },
   ]);
   const [viewerKey, setViewerKey] = useState(0);
+  const [viewerStatus, setViewerStatus] = useState<{
+    canStart: boolean;
+    reason?: string;
+    details?: any;
+  } | null>(null);
   const thoughtsEndRef = useRef<HTMLDivElement>(null);
+
+  // Function to check viewer status
+  const checkViewerStatus = async () => {
+    try {
+      const response = await fetch('http://localhost:3005/viewer-status');
+      const result = await response.json();
+      setViewerStatus(result);
+    } catch (error) {
+      console.error('Error checking viewer status:', error);
+      setViewerStatus({
+        canStart: false,
+        reason: 'Failed to check viewer status',
+      });
+    }
+  };
 
   // SSE connections for real-time data
   const botStateSSE = useSSE({
@@ -178,8 +198,10 @@ export default function ConsciousMinecraftDashboard() {
   const cognitiveSSE = useSSE({
     url: '/api/ws/cognitive-stream',
     onMessage: (data) => {
+      console.log('Cognitive SSE received data:', data);
       if (data && typeof data === 'object' && 'type' in data) {
         if ((data as any).type === 'cognitive_stream_init') {
+          console.log('Processing cognitive_stream_init');
           // Initialize with existing thoughts
           const existingThoughts = (data as any).data.thoughts.map(
             (thought: any) => ({
@@ -200,9 +222,14 @@ export default function ConsciousMinecraftDashboard() {
               attribution: thought.attribution,
             })
           );
+          console.log('Existing thoughts to add:', existingThoughts);
           // Add each thought individually
-          existingThoughts.forEach((thought: any) => addThought(thought));
+          existingThoughts.forEach((thought: any) => {
+            console.log('Adding existing thought:', thought);
+            addThought(thought);
+          });
         } else if ((data as any).type === 'cognitive_thoughts') {
+          console.log('Processing cognitive_thoughts');
           // Add new thoughts
           const newThoughts = (data as any).data.thoughts.map(
             (thought: any) => ({
@@ -223,7 +250,11 @@ export default function ConsciousMinecraftDashboard() {
               attribution: thought.attribution,
             })
           );
-          newThoughts.forEach((thought: any) => addThought(thought));
+          console.log('New thoughts to add:', newThoughts);
+          newThoughts.forEach((thought: any) => {
+            console.log('Adding new thought:', thought);
+            addThought(thought);
+          });
         }
       }
     },
@@ -369,7 +400,28 @@ export default function ConsciousMinecraftDashboard() {
 
         if (botRes.status === 'fulfilled' && botRes.value.ok) {
           const botData = await botRes.value.json();
-          setBotState(botData.data);
+          const worldState = botData.data?.worldState || botData.data;
+
+          // Map minecraft interface data to dashboard BotState structure
+          setBotState({
+            position: worldState.playerPosition
+              ? {
+                  x: worldState.playerPosition[0],
+                  y: worldState.playerPosition[1],
+                  z: worldState.playerPosition[2],
+                }
+              : undefined,
+            health: worldState.health,
+            food: worldState.hunger,
+            inventory:
+              worldState.inventory?.items?.map((item: any) => ({
+                name: item.type,
+                count: item.count,
+                displayName: item.type,
+              })) || [],
+            time: worldState.timeOfDay,
+            weather: worldState.weather,
+          });
         }
 
         if (healthRes.status === 'fulfilled' && healthRes.value.ok) {
@@ -382,6 +434,11 @@ export default function ConsciousMinecraftDashboard() {
               viewerUrl: healthData.viewer?.url || 'http://localhost:3006',
             },
           ]);
+
+          // Check viewer status if bot is connected
+          if (healthData.status === 'connected') {
+            await checkViewerStatus();
+          }
         }
       } catch (error) {
         console.warn('Initial data fetch error:', error);
@@ -412,7 +469,28 @@ export default function ConsciousMinecraftDashboard() {
 
         if (botRes.status === 'fulfilled' && botRes.value.ok) {
           const botData = await botRes.value.json();
-          setBotState(botData.data);
+          const worldState = botData.data?.worldState || botData.data;
+
+          // Map minecraft interface data to dashboard BotState structure
+          setBotState({
+            position: worldState.playerPosition
+              ? {
+                  x: worldState.playerPosition[0],
+                  y: worldState.playerPosition[1],
+                  z: worldState.playerPosition[2],
+                }
+              : undefined,
+            health: worldState.health,
+            food: worldState.hunger,
+            inventory:
+              worldState.inventory?.items?.map((item: any) => ({
+                name: item.type,
+                count: item.count,
+                displayName: item.type,
+              })) || [],
+            time: worldState.timeOfDay,
+            weather: worldState.weather,
+          });
         }
 
         if (healthRes.status === 'fulfilled' && healthRes.value.ok) {
@@ -425,6 +503,11 @@ export default function ConsciousMinecraftDashboard() {
               viewerUrl: healthData.viewer?.url || 'http://localhost:3006',
             },
           ]);
+
+          // Check viewer status if bot is connected
+          if (healthData.status === 'connected') {
+            await checkViewerStatus();
+          }
         } else {
           // If health check fails, mark as disconnected
           setBotConnections([
@@ -462,7 +545,7 @@ export default function ConsciousMinecraftDashboard() {
     if (!text) return;
 
     try {
-      // Submit to cognitive stream as intrusive thought
+      // Submit to cognitive stream for immediate UI feedback
       const response = await fetch('/api/ws/cognitive-stream', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -483,7 +566,22 @@ export default function ConsciousMinecraftDashboard() {
 
       if (response.ok) {
         setIntrusion('');
-        console.log('Intrusive thought submitted to cognitive stream');
+        console.log('Intrusive thought submitted successfully');
+
+        // Also submit to intrusive API for processing
+        try {
+          await fetch('/api/intrusive', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              text: text,
+              tags: ['external', 'intrusion'],
+              strength: 0.8,
+            }),
+          });
+        } catch (error) {
+          console.warn('Failed to submit to intrusive API:', error);
+        }
       } else {
         console.error('Failed to submit intrusive thought');
       }
@@ -541,6 +639,19 @@ export default function ConsciousMinecraftDashboard() {
               <PlayCircle className="size-4 mr-2" />
             )}
             {isLive ? 'Pause' : 'Go Live'}
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="bg-zinc-900 border-zinc-800 hover:bg-zinc-800/80"
+            onClick={() => {
+              // Refresh bot state data
+              botStateSSE.connect();
+              setViewerKey((prev) => prev + 1);
+            }}
+          >
+            <RefreshCw className="size-4 mr-2" />
+            Refresh
           </Button>
           <div className="flex items-center gap-1 text-xs">
             <div
@@ -776,6 +887,67 @@ export default function ConsciousMinecraftDashboard() {
                         ? 'Bot connected, starting viewer...'
                         : 'Waiting for Minecraft bot to connect...'}
                     </p>
+                    {botConnections.find((c) => c.name === 'minecraft-bot')
+                      ?.connected && (
+                      <button
+                        onClick={async () => {
+                          try {
+                            // Check viewer status first
+                            await checkViewerStatus();
+
+                            if (!viewerStatus?.canStart) {
+                              console.error(
+                                'Cannot start viewer:',
+                                viewerStatus?.reason
+                              );
+                              return;
+                            }
+
+                            // Start the viewer
+                            const response = await fetch(
+                              'http://localhost:3005/start-viewer',
+                              {
+                                method: 'POST',
+                              }
+                            );
+                            const result = await response.json();
+                            if (result.success) {
+                              // Update viewer status
+                              setBotConnections((prev) =>
+                                prev.map((conn) =>
+                                  conn.name === 'minecraft-bot'
+                                    ? { ...conn, viewerActive: true }
+                                    : conn
+                                )
+                              );
+                              // Refresh viewer status
+                              await checkViewerStatus();
+                            } else {
+                              console.error(
+                                'Failed to start viewer:',
+                                result.message
+                              );
+                              if (result.details) {
+                                console.error('Details:', result.details);
+                              }
+                            }
+                          } catch (error) {
+                            console.error('Error starting viewer:', error);
+                          }
+                        }}
+                        className={`rounded-md px-3 py-1 text-xs ${
+                          viewerStatus?.canStart
+                            ? 'bg-sky-600 text-white hover:bg-sky-700'
+                            : 'bg-gray-400 text-gray-200 cursor-not-allowed'
+                        }`}
+                        disabled={!viewerStatus?.canStart}
+                        title={viewerStatus?.reason || 'Start Minecraft viewer'}
+                      >
+                        {viewerStatus?.canStart
+                          ? 'Start Viewer'
+                          : 'Viewer Not Ready'}
+                      </button>
+                    )}
                     <div className="text-xs text-zinc-500 space-y-1">
                       {botState ? (
                         <>
@@ -964,8 +1136,9 @@ export default function ConsciousMinecraftDashboard() {
               </Button>
             </div>
             <div className="mt-1 text-[11px] text-zinc-500">
-              Try: "craft a wooden pickaxe", "mine some stone", "explore the
-              area", "build a house"
+              Try: &quot;craft a wooden pickaxe&quot;, &quot;mine some
+              stone&quot;, &quot;explore the area&quot;, &quot;build a
+              house&quot;
             </div>
           </div>
         </aside>

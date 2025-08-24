@@ -63,12 +63,41 @@ export async function createMinecraftInterface(
   observationMapper: ObservationMapper;
   planExecutor: PlanExecutor;
 }> {
-  const botAdapter = new BotAdapter(config);
   const observationMapper = new ObservationMapper(config);
   const planExecutor = new PlanExecutor(config, planningCoordinator);
 
   // Initialize the plan executor (which handles bot connection)
   await planExecutor.initialize();
+
+  // Use the bot adapter from the plan executor to ensure consistency
+  const botAdapter = (planExecutor as any).botAdapter;
+
+  return {
+    botAdapter,
+    observationMapper,
+    planExecutor,
+  };
+}
+
+/**
+ * Create a Minecraft interface without auto-connecting
+ */
+export async function createMinecraftInterfaceWithoutConnect(
+  config: BotConfig,
+  planningCoordinator: IntegratedPlanningCoordinator
+): Promise<{
+  botAdapter: BotAdapter;
+  observationMapper: ObservationMapper;
+  planExecutor: PlanExecutor;
+}> {
+  const observationMapper = new ObservationMapper(config);
+  const planExecutor = new PlanExecutor(config, planningCoordinator);
+
+  // Don't initialize (which would auto-connect)
+  // await planExecutor.initialize();
+
+  // Use the bot adapter from the plan executor to ensure consistency
+  const botAdapter = (planExecutor as any).botAdapter;
 
   return {
     botAdapter,

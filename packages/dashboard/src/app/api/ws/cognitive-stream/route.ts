@@ -125,13 +125,23 @@ export const GET = async (req: NextRequest) => {
     return new Response('Too many connections', { status: 429 });
   }
 
+  console.log(
+    'GET /api/ws/cognitive-stream: New connection, total connections:',
+    activeConnections.size
+  );
+
   const encoder = new TextEncoder();
   const stream = new ReadableStream({
     async start(controller) {
       activeConnections.add(controller);
+      console.log(
+        'GET /api/ws/cognitive-stream: Connection added, total connections:',
+        activeConnections.size
+      );
+
       controller.enqueue(
         encoder.encode(
-          `data: ${JSON.stringify({ type: 'stream_init', timestamp: Date.now(), thoughts: thoughtHistory.slice(-50) })}\n\n`
+          `data: ${JSON.stringify({ type: 'cognitive_stream_init', timestamp: Date.now(), data: { thoughts: thoughtHistory.slice(-50) } })}\n\n`
         )
       );
 
@@ -145,7 +155,7 @@ export const GET = async (req: NextRequest) => {
         if (thoughts.length) {
           controller.enqueue(
             encoder.encode(
-              `data: ${JSON.stringify({ type: 'new_thoughts', timestamp: Date.now(), thoughts })}\n\n`
+              `data: ${JSON.stringify({ type: 'cognitive_thoughts', timestamp: Date.now(), data: { thoughts } })}\n\n`
             )
           );
         }
@@ -155,6 +165,10 @@ export const GET = async (req: NextRequest) => {
       req.signal.addEventListener('abort', () => {
         clearInterval(interval);
         activeConnections.delete(controller);
+        console.log(
+          'GET /api/ws/cognitive-stream: Connection removed, total connections:',
+          activeConnections.size
+        );
         controller.close();
       });
     },
@@ -169,4 +183,68 @@ export const GET = async (req: NextRequest) => {
   });
 };
 
-// POST endpoint similarly simplified...
+export const POST = async (req: NextRequest) => {
+  try {
+    const body = await req.json();
+    const { type, content, attribution, context, metadata } = body;
+
+    console.log('POST /api/ws/cognitive-stream received:', {
+      type,
+      content,
+      attribution,
+    });
+
+    if (!content || content.trim().length === 0) {
+      return new Response('Thought content is required', { status: 400 });
+    }
+
+    // Add the thought to the history
+    const newThought = addThought({
+      type: type || 'intrusive',
+      content: content.trim(),
+      attribution: attribution || 'external',
+      context: context || {
+        emotionalState: 'neutral',
+        confidence: 0.5,
+      },
+      metadata: metadata || {},
+    });
+
+    console.log('New thought added to history:', newThought);
+
+    // Broadcast to all connected clients
+    const message = JSON.stringify({
+      type: 'cognitive_thoughts',
+      timestamp: Date.now(),
+      data: { thoughts: [newThought] },
+    });
+
+    console.log(
+      'Broadcasting message to',
+      activeConnections.size,
+      'connections:',
+      message
+    );
+
+    activeConnections.forEach((controller) => {
+      try {
+        controller.enqueue(new TextEncoder().encode(`data: ${message}\n\n`));
+        console.log('Message sent to connection');
+      } catch (error) {
+        console.log('Error sending to connection:', error);
+        // Remove dead connections
+        activeConnections.delete(controller);
+      }
+    });
+
+    return new Response(
+      JSON.stringify({ success: true, thought: newThought }),
+      {
+        headers: { 'Content-Type': 'application/json' },
+      }
+    );
+  } catch (error) {
+    console.error('POST /api/ws/cognitive-stream error:', error);
+    return new Response('Internal server error', { status: 500 });
+  }
+};

@@ -368,8 +368,18 @@ export class MinecraftSignalProcessor {
       distance: number;
     }> = [];
 
+    // Check for hostile entities including phantoms
     for (const entity of worldState.environment.nearbyEntities) {
-      if (entity.type === 'hostile') {
+      const isHostile =
+        entity.type === 'hostile' ||
+        entity.name === 'phantom' ||
+        entity.name === 'zombie' ||
+        entity.name === 'skeleton' ||
+        entity.name === 'creeper' ||
+        entity.name === 'spider' ||
+        entity.name === 'enderman';
+
+      if (isHostile) {
         const distance = this.calculateDistance(
           worldState.player.position,
           entity.position
@@ -381,11 +391,44 @@ export class MinecraftSignalProcessor {
         );
 
         threats.push({
-          type: entity.type,
+          type: entity.name || entity.type,
           threatLevel,
           distance,
         });
       }
+    }
+
+    // Check for damage-based threats (health loss)
+    const currentHealth = worldState.player.health;
+    const maxHealth = 100; // Assuming max health is 100
+    const healthPercentage = (currentHealth / maxHealth) * 100;
+
+    // If health is low, create a high-priority threat signal
+    if (healthPercentage < 80) {
+      threats.push({
+        type: 'low_health',
+        threatLevel: 90 + (80 - healthPercentage), // Higher threat for lower health
+        distance: 0, // Self-inflicted threat
+      });
+    }
+
+    // Check for night-time vulnerability (phantoms spawn at night)
+    const timeOfDay = this.getTimeOfDay(worldState);
+    if (timeOfDay === 'night' && currentHealth < 90) {
+      threats.push({
+        type: 'night_vulnerability',
+        threatLevel: 85,
+        distance: 0,
+      });
+    }
+
+    // Critical health emergency
+    if (healthPercentage < 30) {
+      threats.push({
+        type: 'critical_health',
+        threatLevel: 95,
+        distance: 0,
+      });
     }
 
     return threats;
@@ -402,12 +445,33 @@ export class MinecraftSignalProcessor {
     if (distance < 5) threatLevel += 30;
     else if (distance < 10) threatLevel += 15;
 
-    // Specific threat types
-    if (entity.name === 'creeper') threatLevel += 20;
-    if (entity.name === 'enderman') threatLevel += 15;
+    // Specific threat types with appropriate threat levels
+    if (entity.name === 'phantom') {
+      threatLevel += 40; // Phantoms are very dangerous, especially at night
+      // Phantoms are more dangerous at night
+      if (this.getTimeOfDay(worldState) === 'night') {
+        threatLevel += 20;
+      }
+    } else if (entity.name === 'creeper') {
+      threatLevel += 35; // Creepers are extremely dangerous
+    } else if (entity.name === 'enderman') {
+      threatLevel += 25;
+    } else if (entity.name === 'zombie') {
+      threatLevel += 15;
+    } else if (entity.name === 'skeleton') {
+      threatLevel += 20;
+    } else if (entity.name === 'spider') {
+      threatLevel += 15;
+    }
 
     // Player vulnerability increases threat
-    if (worldState.player.health < 10) threatLevel += 20;
+    if (worldState.player.health < 10) threatLevel += 30;
+    else if (worldState.player.health < 30) threatLevel += 20;
+    else if (worldState.player.health < 50) threatLevel += 10;
+
+    // Low light level increases threat
+    const lightLevel = this.getLightLevel(worldState, null as any);
+    if (lightLevel < 8) threatLevel += 15;
 
     return Math.min(100, threatLevel);
   }

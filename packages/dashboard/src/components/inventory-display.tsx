@@ -209,7 +209,10 @@ export const InventoryDisplay: React.FC<InventoryDisplayProps> = ({
                         {/* Item sprite - centered */}
                         <div className="flex-1 flex items-center justify-center p-1">
                           <Image
-                            src={getItemSpriteLocal(item.type, item.name)}
+                            src={getItemSpriteLocal(
+                              item.type,
+                              item.name || undefined
+                            )}
                             alt={itemName}
                             width={32}
                             height={32}
@@ -296,7 +299,10 @@ export const InventoryDisplay: React.FC<InventoryDisplayProps> = ({
                         {/* Item sprite - centered */}
                         <div className="flex-1 flex items-center justify-center p-1">
                           <Image
-                            src={getItemSpriteLocal(item.type, item.name)}
+                            src={getItemSpriteLocal(
+                              item.type,
+                              item.name || undefined
+                            )}
                             alt={itemName}
                             width={32}
                             height={32}
@@ -358,7 +364,10 @@ export const InventoryDisplay: React.FC<InventoryDisplayProps> = ({
                 >
                   <div className="relative w-8 h-8">
                     <Image
-                      src={getItemSpriteLocal(item.type, item.name)}
+                      src={getItemSpriteLocal(
+                        item.type,
+                        item.name || undefined
+                      )}
                       alt={getItemDisplayName(item)}
                       width={32}
                       height={32}

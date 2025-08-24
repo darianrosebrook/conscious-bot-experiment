@@ -25,6 +25,11 @@ export class BotAdapter extends EventEmitter {
   constructor(config: BotConfig) {
     super();
     this.config = config;
+
+    // Handle error events to prevent unhandled errors
+    this.on('error', (error) => {
+      console.error('BotAdapter error:', error);
+    });
   }
 
   /**
@@ -65,17 +70,17 @@ export class BotAdapter extends EventEmitter {
 
       this.bot.once('spawn', () => {
         this.connectionState = 'spawned';
-        
+
         const spawnData: any = {
           gameMode: this.bot!.game.gameMode,
           dimension: this.bot!.game.dimension,
         };
-        
+
         // Only include position if entity exists
         if (this.bot && this.bot.entity && this.bot.entity.position) {
           spawnData.position = this.bot.entity.position.clone();
         }
-        
+
         this.emitBotEvent('spawned', spawnData);
         resolve(this.bot!);
       });
@@ -123,7 +128,9 @@ export class BotAdapter extends EventEmitter {
    */
   getBot(): Bot {
     if (!this.bot) {
-      throw new Error('Bot is not connected');
+      throw new Error(
+        `Bot is not connected. Connection state: ${this.connectionState}`
+      );
     }
     return this.bot;
   }
@@ -133,6 +140,24 @@ export class BotAdapter extends EventEmitter {
    */
   isReady(): boolean {
     return this.connectionState === 'spawned' && this.bot !== null;
+  }
+
+  /**
+   * Check if viewer can be started
+   */
+  canStartViewer(): { canStart: boolean; reason?: string } {
+    if (!this.bot) {
+      return { canStart: false, reason: 'Bot instance not available' };
+    }
+
+    if (this.connectionState !== 'spawned') {
+      return {
+        canStart: false,
+        reason: `Bot not spawned. Current state: ${this.connectionState}`,
+      };
+    }
+
+    return { canStart: true };
   }
 
   /**
@@ -156,18 +181,19 @@ export class BotAdapter extends EventEmitter {
         saturation: this.bot!.foodSaturation,
       });
 
-      // Emergency disconnect on critical health
-      if (this.config.emergencyDisconnect && this.bot!.health <= 2) {
-        this.emitBotEvent('error', {
-          error: 'Emergency disconnect - critical health',
+      // Log critical health but don't disconnect
+      if (this.bot!.health <= 2) {
+        this.emitBotEvent('warning', {
+          message: 'Critical health detected',
           health: this.bot!.health,
         });
-        this.disconnect();
       }
     });
 
     // Inventory monitoring
     let lastInventoryHash = '';
+
+    // Monitor inventory changes using multiple events
     (this.bot as any).on('windowUpdate', () => {
       const currentHash = this.getInventoryHash();
       if (currentHash !== lastInventoryHash) {
@@ -182,11 +208,43 @@ export class BotAdapter extends EventEmitter {
       }
     });
 
-    // Position monitoring (throttled) - only start after bot is spawned
-    let lastPosition: any = null;
-    let positionCheckInterval: NodeJS.Timeout | null = null;
-    
-    const startPositionMonitoring = () => {
+    // Also monitor for item pickup and other inventory events
+    this.bot.on('playerCollect', () => {
+      const currentHash = this.getInventoryHash();
+      if (currentHash !== lastInventoryHash) {
+        lastInventoryHash = currentHash;
+        this.emitBotEvent('inventory_changed', {
+          items: this.bot!.inventory.items().map((item) => ({
+            name: item.name,
+            count: item.count,
+            slot: item.slot,
+          })),
+        });
+      }
+    });
+
+    // Monitor for crafting and other inventory operations
+    (this.bot as any).on('craft', () => {
+      const currentHash = this.getInventoryHash();
+      if (currentHash !== lastInventoryHash) {
+        lastInventoryHash = currentHash;
+        this.emitBotEvent('inventory_changed', {
+          items: this.bot!.inventory.items().map((item) => ({
+            name: item.name,
+            count: item.count,
+            slot: item.slot,
+          })),
+        });
+      }
+    });
+
+    // Position monitoring will be set up after bot spawns
+    this.bot.once('spawn', () => {
+      // Set up position monitoring after spawn
+      let lastPosition: any = null;
+      let positionCheckInterval: NodeJS.Timeout | null = null;
+      let inventoryCheckInterval: NodeJS.Timeout | null = null;
+
       if (this.bot && this.bot.entity && this.bot.entity.position) {
         lastPosition = this.bot.entity.position.clone();
         positionCheckInterval = setInterval(() => {
@@ -207,11 +265,31 @@ export class BotAdapter extends EventEmitter {
             });
           }
         }, 1000); // Check every second
-      }
-    };
 
-    // Start position monitoring when bot spawns
-    this.bot.once('spawn', startPositionMonitoring);
+        // Set up periodic inventory check
+        inventoryCheckInterval = setInterval(() => {
+          if (!this.bot || this.connectionState !== 'spawned') {
+            if (inventoryCheckInterval) {
+              clearInterval(inventoryCheckInterval);
+              inventoryCheckInterval = null;
+            }
+            return;
+          }
+
+          const currentHash = this.getInventoryHash();
+          if (currentHash !== lastInventoryHash) {
+            lastInventoryHash = currentHash;
+            this.emitBotEvent('inventory_changed', {
+              items: this.bot.inventory.items().map((item) => ({
+                name: item.name,
+                count: item.count,
+                slot: item.slot,
+              })),
+            });
+          }
+        }, 2000); // Check every 2 seconds
+      }
+    });
 
     // Block breaking
     this.bot.on('diggingCompleted', (block) => {
@@ -255,12 +333,12 @@ export class BotAdapter extends EventEmitter {
         error: 'Bot died',
         health: 0,
       };
-      
+
       // Only include position if entity exists
       if (this.bot && this.bot.entity && this.bot.entity.position) {
         deathData.position = this.bot.entity.position.clone();
       }
-      
+
       this.emitBotEvent('error', deathData);
     });
 

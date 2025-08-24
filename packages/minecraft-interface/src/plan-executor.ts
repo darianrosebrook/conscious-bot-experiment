@@ -56,6 +56,11 @@ export class PlanExecutor extends EventEmitter {
       operations: {},
     };
 
+    // Handle error events to prevent unhandled errors
+    this.on('error', (error) => {
+      console.error('PlanExecutor error:', error);
+    });
+
     this.setupEventHandlers();
   }
 

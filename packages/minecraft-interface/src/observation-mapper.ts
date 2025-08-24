@@ -40,9 +40,10 @@ export class ObservationMapper {
   mapBotStateToPlanningContext(bot: Bot): PlanningContext {
     const minecraftWorldState = this.extractMinecraftWorldState(bot);
     const homeostasisState = this.deriveHomeostasisState(minecraftWorldState);
+    const worldState = this.convertToGenericWorldState(minecraftWorldState);
 
     return {
-      worldState: this.convertToGenericWorldState(minecraftWorldState),
+      worldState: worldState,
       currentState: homeostasisState,
       activeGoals: [], // Planning system will populate this
       availableResources: this.extractResources(minecraftWorldState),
@@ -99,19 +100,22 @@ export class ObservationMapper {
     const items: MinecraftItem[] = [];
     let usedSlots = 0;
 
-    // Main inventory (slots 9-35) + hotbar (slots 0-8)
-    for (let slot = 0; slot < 36; slot++) {
-      const item = bot.inventory.slots[slot];
-      if (item) {
+    // Use the correct mineflayer API method to get inventory items
+    const inventoryItems = bot.inventory.items();
+
+    // Process all inventory items
+    inventoryItems.forEach((item) => {
+      // Check if item exists and has a valid name
+      if (item && item.name) {
         items.push({
           type: item.name,
           count: item.count,
-          slot: slot,
+          slot: item.slot,
           metadata: item.metadata,
         });
         usedSlots++;
       }
-    }
+    });
 
     return {
       items,
@@ -125,12 +129,14 @@ export class ObservationMapper {
    */
   private extractEnvironmentState(bot: Bot) {
     const radius = this.config.observationRadius;
-    
+
     // Ensure bot is spawned before accessing position
     if (!bot.entity || !bot.entity.position) {
-      throw new Error('Bot not fully spawned - cannot extract environment state');
+      throw new Error(
+        'Bot not fully spawned - cannot extract environment state'
+      );
     }
-    
+
     const playerPos = bot.entity.position;
 
     return {
@@ -247,14 +253,17 @@ export class ObservationMapper {
       health: minecraftState.player.health,
       hunger: minecraftState.player.food,
 
-      // Inventory summary
-      inventory: this.summarizeInventory(minecraftState.inventory.items),
-      inventorySpace: {
-        used: minecraftState.inventory.usedSlots,
-        total: minecraftState.inventory.totalSlots,
-        free:
-          minecraftState.inventory.totalSlots -
-          minecraftState.inventory.usedSlots,
+      // Inventory - preserve both detailed items and summary
+      inventory: {
+        items: minecraftState.inventory.items, // Detailed items for UI
+        summary: this.summarizeInventory(minecraftState.inventory.items), // Summary for planning
+        space: {
+          used: minecraftState.inventory.usedSlots,
+          total: minecraftState.inventory.totalSlots,
+          free:
+            minecraftState.inventory.totalSlots -
+            minecraftState.inventory.usedSlots,
+        },
       },
 
       // Environment

@@ -20,27 +20,27 @@ export { PerformanceAnalyzer } from './metrics/performance-analyzer';
 
 // Benchmarking
 export { PerformanceBenchmarker } from './benchmarking/performance-benchmarker';
-export type { 
-  BenchmarkConfig, 
-  BenchmarkResult, 
-  BenchmarkSuiteResult 
+export type {
+  BenchmarkConfig,
+  BenchmarkResult,
+  BenchmarkSuiteResult,
 } from './benchmarking/performance-benchmarker';
 
 // Regression monitoring
 export { RegressionMonitor } from './regression/regression-monitor';
-export type { 
-  RegressionConfig, 
-  RegressionDetection, 
+export type {
+  RegressionConfig,
+  RegressionDetection,
   PerformanceBaseline,
-  MonitoringDashboard 
+  MonitoringDashboard,
 } from './regression/regression-monitor';
 
 // Dashboard
 export { EvaluationDashboard } from './dashboard/evaluation-dashboard';
-export type { 
-  DashboardConfig, 
-  DashboardWidget, 
-  DashboardState 
+export type {
+  DashboardConfig,
+  DashboardWidget,
+  DashboardState,
 } from './dashboard/evaluation-dashboard';
 
 // Main evaluation interfaces

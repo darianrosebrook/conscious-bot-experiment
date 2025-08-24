@@ -70,16 +70,13 @@ export const GET = async (req: NextRequest) => {
           timestamp: Date.now(),
           data: {
             connected: minecraftData?.success || false,
-            inventory: minecraftData?.data?.inventory || {
-              hotbar: [],
-              main: [],
-            },
-            position: minecraftData?.data?.position || null,
-            vitals: minecraftData?.data
+            inventory: minecraftData?.data?.worldState?.inventory?.items || [],
+            position: minecraftData?.data?.worldState?.playerPosition || null,
+            vitals: minecraftData?.data?.worldState
               ? {
-                  health: minecraftData.data.health || 0,
-                  food: minecraftData.data.food || 0,
-                  hunger: minecraftData.data.food || 0, // Map food to hunger
+                  health: minecraftData.data.worldState.health || 0,
+                  food: minecraftData.data.worldState.hunger || 0,
+                  hunger: minecraftData.data.worldState.hunger || 0, // Map hunger to hunger
                   stamina: 100, // Default stamina value
                   sleep: 100, // Default sleep value
                 }
@@ -222,18 +219,19 @@ export const GET = async (req: NextRequest) => {
               timestamp: Date.now(),
               data: {
                 connected: minecraftData?.success || false,
-                inventory: minecraftData?.data?.inventory || {
-                  hotbar: [],
-                  main: [],
-                },
-                position: minecraftData?.data?.position || null,
-                vitals: {
-                  health: minecraftData?.data?.health || 0,
-                  food: minecraftData?.data?.food || 0,
-                  hunger: minecraftData?.data?.food || 0, // Map food to hunger
-                  stamina: 100, // Default stamina value
-                  sleep: 100, // Default sleep value
-                },
+                inventory:
+                  minecraftData?.data?.worldState?.inventory?.items || [],
+                position:
+                  minecraftData?.data?.worldState?.playerPosition || null,
+                vitals: minecraftData?.data?.worldState
+                  ? {
+                      health: minecraftData.data.worldState.health || 0,
+                      food: minecraftData.data.worldState.hunger || 0,
+                      hunger: minecraftData.data.worldState.hunger || 0,
+                      stamina: 100, // Default stamina value
+                      sleep: 100, // Default sleep value
+                    }
+                  : null,
                 environment: worldData || null,
                 cognition: {
                   ...cognitionData,

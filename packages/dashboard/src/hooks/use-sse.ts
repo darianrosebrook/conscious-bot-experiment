@@ -36,8 +36,8 @@ export function useSSE({
   onOpen,
   onClose,
   onError,
-  reconnectInterval = 5000,
-  maxReconnectAttempts = 10,
+  // reconnectInterval = 5000,
+  // maxReconnectAttempts = 10,
 }: UseSSEOptions) {
   const [isConnected, setIsConnected] = useState(false);
   const [error, setError] = useState<string | null>(null);

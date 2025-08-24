@@ -25,7 +25,8 @@ export async function GET(_request: NextRequest) {
       if (response.ok) {
         const data = await response.json();
         if (data.success) {
-          inventory = data.data?.inventory || [];
+          // The inventory is now at data.data.worldState.inventory.items
+          inventory = data.data?.worldState?.inventory?.items || [];
         }
       }
     } catch (error) {
@@ -65,13 +66,23 @@ export async function GET(_request: NextRequest) {
         // Safely get display name
         let displayName = item.displayName || item.name;
         if (!displayName && itemType !== null) {
-          try {
-            displayName = getMineflayerItemDisplayName(itemType);
-          } catch (error) {
-            console.warn(
-              `Failed to get display name for item type ${itemType}:`,
-              error
-            );
+          // Convert string item type to display name
+          if (typeof itemType === 'string') {
+            displayName = itemType
+              .split('_')
+              .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+              .join(' ');
+          } else if (typeof itemType === 'number') {
+            try {
+              displayName = getMineflayerItemDisplayName(itemType);
+            } catch (error) {
+              console.warn(
+                `Failed to get display name for item type ${itemType}:`,
+                error
+              );
+              displayName = `Item ${itemType}`;
+            }
+          } else {
             displayName = `Item ${itemType}`;
           }
         }

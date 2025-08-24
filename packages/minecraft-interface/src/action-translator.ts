@@ -18,6 +18,9 @@ import {
   NavigateAction,
   MineBlockAction,
   CraftAction,
+  ConsumeFoodAction,
+  PlaceBlockAction,
+  FindShelterAction,
 } from './types';
 
 export class ActionTranslator {
@@ -82,6 +85,8 @@ export class ActionTranslator {
     const actionType = step.action.type.toLowerCase();
     const params = step.action.parameters ?? {};
 
+    console.log(`Translating action type: ${actionType} with params:`, params);
+
     // Map common planning actions to Minecraft actions
     switch (actionType) {
       case 'navigate':
@@ -89,16 +94,98 @@ export class ActionTranslator {
       case 'go_to':
         return this.createNavigateAction(params);
 
+      case 'move_forward':
+        console.log('Creating move_forward action');
+        return {
+          type: 'move_forward',
+          parameters: {
+            distance: params.distance || 1,
+          },
+          timeout: this.config.actionTimeout,
+        };
+
+      case 'move_backward':
+        return {
+          type: 'move_backward',
+          parameters: {
+            distance: params.distance || 1,
+          },
+          timeout: this.config.actionTimeout,
+        };
+
+      case 'strafe_left':
+        return {
+          type: 'strafe_left',
+          parameters: {
+            distance: params.distance || 1,
+          },
+          timeout: this.config.actionTimeout,
+        };
+
+      case 'strafe_right':
+        return {
+          type: 'strafe_right',
+          parameters: {
+            distance: params.distance || 1,
+          },
+          timeout: this.config.actionTimeout,
+        };
+
+      case 'consume_food':
+        console.log('Creating consume_food action');
+        return {
+          type: 'consume_food',
+          parameters: {
+            food_type: params.food_type || 'any',
+            amount: params.amount || 1,
+          },
+          timeout: this.config.actionTimeout,
+        };
+
+      case 'place_block':
+        console.log('Creating place_block action');
+        return {
+          type: 'place_block',
+          parameters: {
+            block_type: params.block_type || 'torch',
+            count: params.count || 1,
+            placement: params.placement || 'around_player',
+          },
+          timeout: this.config.actionTimeout,
+        };
+
+      case 'find_shelter':
+        console.log('Creating find_shelter action');
+        return {
+          type: 'find_shelter',
+          parameters: {
+            shelter_type: params.shelter_type || 'cave_or_house',
+            light_sources: params.light_sources || true,
+            search_radius: params.search_radius || 10,
+          },
+          timeout: this.config.actionTimeout,
+        };
+
+      case 'flee':
+        console.log('Creating flee action (converted to move_forward)');
+        return {
+          type: 'move_forward',
+          parameters: {
+            distance: params.distance || 10,
+          },
+          timeout: this.config.actionTimeout,
+        };
+
+      case 'mine_block':
+        return this.createMineBlockAction(params);
+
+      case 'craft_item':
+        return this.createCraftAction(params);
+
       case 'mine':
       case 'break':
       case 'dig':
-      case 'mine_block':
         return this.createMineAction(params);
-
-      case 'craft':
-      case 'make':
-      case 'craft_item':
-        return this.createCraftAction(params);
 
       case 'pickup':
       case 'collect':
@@ -114,6 +201,9 @@ export class ActionTranslator {
         return this.createWaitAction(params);
 
       default:
+        console.log(
+          `Unknown action type: ${actionType}, inferring from description`
+        );
         // Try to infer action from step description
         return this.inferActionFromDescription(step);
     }
@@ -312,6 +402,30 @@ export class ActionTranslator {
         case 'navigate':
           return await this.executeNavigate(action as NavigateAction, timeout);
 
+        case 'move_forward':
+        case 'move_backward':
+        case 'strafe_left':
+        case 'strafe_right':
+          return await this.executeDirectMovement(action, timeout);
+
+        case 'consume_food':
+          return await this.executeConsumeFood(
+            action as ConsumeFoodAction,
+            timeout
+          );
+
+        case 'place_block':
+          return await this.executePlaceBlock(
+            action as PlaceBlockAction,
+            timeout
+          );
+
+        case 'find_shelter':
+          return await this.executeFindShelter(
+            action as FindShelterAction,
+            timeout
+          );
+
         case 'mine_block':
           return await this.executeMineBlock(
             action as MineBlockAction,
@@ -340,6 +454,377 @@ export class ActionTranslator {
       return {
         success: false,
         error: error instanceof Error ? error.message : String(error),
+      };
+    }
+  }
+
+  /**
+   * Execute direct movement using control states
+   */
+  private async executeDirectMovement(
+    action: MinecraftAction,
+    timeout: number
+  ): Promise<{ success: boolean; data?: any; error?: string }> {
+    const { distance = 1 } = action.parameters;
+    const controlState = action.type
+      .replace('move_', '')
+      .replace('strafe_', '');
+
+    return new Promise((resolve) => {
+      let distanceMoved = 0;
+      const startPosition = this.bot.entity.position.clone();
+
+      // Start movement
+      this.bot.setControlState(controlState as any, true);
+
+      // Stop movement after distance * 1000ms (1 second per block)
+      setTimeout(() => {
+        this.bot.setControlState(controlState as any, false);
+        const endPosition = this.bot.entity.position;
+        distanceMoved = startPosition.distanceTo(endPosition);
+
+        resolve({
+          success: true,
+          data: {
+            distanceMoved,
+            startPosition: {
+              x: startPosition.x,
+              y: startPosition.y,
+              z: startPosition.z,
+            },
+            endPosition: {
+              x: endPosition.x,
+              y: endPosition.y,
+              z: endPosition.z,
+            },
+          },
+        });
+      }, distance * 1000);
+    });
+  }
+
+  /**
+   * Execute food consumption to restore health
+   */
+  private async executeConsumeFood(
+    action: ConsumeFoodAction,
+    timeout: number
+  ): Promise<{ success: boolean; data?: any; error?: string }> {
+    try {
+      const { food_type = 'any', amount = 1 } = action.parameters;
+
+      // Find food in inventory
+      const foodItems = this.bot.inventory
+        .items()
+        .filter(
+          (item) =>
+            item.name.includes('apple') ||
+            item.name.includes('bread') ||
+            item.name.includes('cooked') ||
+            item.name.includes('beef') ||
+            item.name.includes('chicken') ||
+            item.name.includes('porkchop') ||
+            item.name.includes('mutton') ||
+            item.name.includes('rabbit') ||
+            item.name.includes('fish') ||
+            item.name.includes('potato') ||
+            item.name.includes('carrot')
+        );
+
+      if (foodItems.length === 0) {
+        return {
+          success: false,
+          error: 'No food available in inventory',
+        };
+      }
+
+      // Consume the first available food item
+      const foodItem = foodItems[0];
+      await this.bot.consume(foodItem);
+
+      return {
+        success: true,
+        data: {
+          foodConsumed: foodItem.name,
+          healthBefore: this.bot.health,
+          foodBefore: this.bot.food,
+        },
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error:
+          error instanceof Error
+            ? error.message
+            : 'Unknown error consuming food',
+      };
+    }
+  }
+
+  /**
+   * Execute block placement (e.g., placing torches for light)
+   */
+  private async executePlaceBlock(
+    action: PlaceBlockAction,
+    timeout: number
+  ): Promise<{ success: boolean; data?: any; error?: string }> {
+    try {
+      const {
+        block_type = 'torch',
+        count = 1,
+        placement = 'around_player',
+      } = action.parameters;
+
+      // Find the block in inventory
+      const blockItem = this.bot.inventory
+        .items()
+        .find(
+          (item) => item.name === block_type || item.name.includes(block_type)
+        );
+
+      if (!blockItem) {
+        return {
+          success: false,
+          error: `No ${block_type} available in inventory`,
+        };
+      }
+
+      let blocksPlaced = 0;
+      const botPosition = this.bot.entity.position;
+
+      if (placement === 'around_player') {
+        // Place blocks around the player in a circle
+        const radius = 2;
+        for (let i = 0; i < count && i < 8; i++) {
+          const angle = (i / 8) * 2 * Math.PI;
+          const x = botPosition.x + Math.cos(angle) * radius;
+          const z = botPosition.z + Math.sin(angle) * radius;
+          const y = botPosition.y;
+
+          try {
+            const targetPosition = new Vec3(x, y, z);
+            await this.bot.placeBlock(targetPosition, blockItem);
+            blocksPlaced++;
+          } catch (error) {
+            // Continue trying other positions
+            continue;
+          }
+        }
+      }
+
+      return {
+        success: blocksPlaced > 0,
+        data: {
+          blocksPlaced,
+          blockType: block_type,
+          placement: placement,
+        },
+        error: blocksPlaced === 0 ? 'Could not place any blocks' : undefined,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error:
+          error instanceof Error
+            ? error.message
+            : 'Unknown error placing block',
+      };
+    }
+  }
+
+  /**
+   * Execute shelter finding/building
+   */
+  private async executeFindShelter(
+    action: FindShelterAction,
+    timeout: number
+  ): Promise<{ success: boolean; data?: any; error?: string }> {
+    try {
+      const {
+        shelter_type = 'cave_or_house',
+        light_sources = true,
+        search_radius = 10,
+      } = action.parameters;
+
+      const botPosition = this.bot.entity.position;
+      let shelterFound = false;
+      let shelterPosition = null;
+
+      // Look for nearby caves or existing structures
+      const nearbyBlocks = this.bot.findBlocks({
+        matching: [0], // Air blocks (caves)
+        maxDistance: search_radius,
+        count: 10,
+      });
+
+      if (nearbyBlocks.length > 0) {
+        // Find the closest suitable shelter position
+        for (const blockPos of nearbyBlocks) {
+          const position = new Vec3(blockPos.x, blockPos.y, blockPos.z);
+
+          // Check if this position is suitable for shelter
+          const isSuitable = await this.checkShelterSuitability(position);
+
+          if (isSuitable) {
+            shelterPosition = position;
+            shelterFound = true;
+            break;
+          }
+        }
+      }
+
+      if (shelterFound && shelterPosition) {
+        // Move to the shelter
+        await this.bot.pathfinder.goto(
+          new goals.GoalBlock(
+            shelterPosition.x,
+            shelterPosition.y,
+            shelterPosition.z
+          )
+        );
+
+        // Place light sources if requested
+        if (light_sources) {
+          const torchItem = this.bot.inventory
+            .items()
+            .find(
+              (item) => item.name === 'torch' || item.name.includes('torch')
+            );
+
+          if (torchItem) {
+            try {
+              await this.bot.placeBlock(shelterPosition, torchItem);
+            } catch (error) {
+              // Continue even if torch placement fails
+            }
+          }
+        }
+
+        return {
+          success: true,
+          data: {
+            shelterFound: true,
+            shelterPosition: {
+              x: shelterPosition.x,
+              y: shelterPosition.y,
+              z: shelterPosition.z,
+            },
+            shelterType: shelter_type,
+            lightSourcesPlaced: light_sources,
+          },
+        };
+      } else {
+        // No suitable shelter found, try to build a simple one
+        return await this.buildSimpleShelter(botPosition, light_sources);
+      }
+    } catch (error) {
+      return {
+        success: false,
+        error:
+          error instanceof Error
+            ? error.message
+            : 'Unknown error finding shelter',
+      };
+    }
+  }
+
+  /**
+   * Check if a position is suitable for shelter
+   */
+  private async checkShelterSuitability(position: Vec3): Promise<boolean> {
+    try {
+      // Check if there's enough space (at least 2x2x2)
+      const blocks = [
+        position,
+        position.offset(1, 0, 0),
+        position.offset(0, 0, 1),
+        position.offset(1, 0, 1),
+        position.offset(0, 1, 0),
+        position.offset(1, 1, 0),
+        position.offset(0, 1, 1),
+        position.offset(1, 1, 1),
+      ];
+
+      for (const blockPos of blocks) {
+        const block = this.bot.blockAt(blockPos);
+        if (block && block.name !== 'air') {
+          return false; // Not enough space
+        }
+      }
+
+      return true;
+    } catch (error) {
+      return false;
+    }
+  }
+
+  /**
+   * Build a simple shelter when no natural shelter is found
+   */
+  private async buildSimpleShelter(
+    position: Vec3,
+    lightSources: boolean
+  ): Promise<{ success: boolean; data?: any; error?: string }> {
+    try {
+      // Look for building materials
+      const buildingBlocks = this.bot.inventory
+        .items()
+        .filter(
+          (item) =>
+            item.name.includes('stone') ||
+            item.name.includes('dirt') ||
+            item.name.includes('wood') ||
+            item.name.includes('cobblestone')
+        );
+
+      if (buildingBlocks.length === 0) {
+        return {
+          success: false,
+          error: 'No building materials available',
+        };
+      }
+
+      const blockItem = buildingBlocks[0];
+      let blocksPlaced = 0;
+
+      // Build a simple 2x2x2 shelter
+      const shelterPositions = [
+        position.offset(0, 0, 0),
+        position.offset(1, 0, 0),
+        position.offset(0, 0, 1),
+        position.offset(1, 0, 1),
+        position.offset(0, 1, 0),
+        position.offset(1, 1, 0),
+        position.offset(0, 1, 1),
+        position.offset(1, 1, 1),
+      ];
+
+      for (const blockPos of shelterPositions) {
+        try {
+          await this.bot.placeBlock(blockPos, blockItem);
+          blocksPlaced++;
+        } catch (error) {
+          // Continue building even if some blocks fail
+          continue;
+        }
+      }
+
+      return {
+        success: blocksPlaced > 0,
+        data: {
+          shelterBuilt: true,
+          blocksPlaced,
+          shelterType: 'simple_2x2x2',
+        },
+        error: blocksPlaced === 0 ? 'Could not build shelter' : undefined,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error:
+          error instanceof Error
+            ? error.message
+            : 'Unknown error building shelter',
       };
     }
   }

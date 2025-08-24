@@ -8,7 +8,12 @@
  */
 
 import { CognitiveTaskIntegration } from './cognitive-integration';
-import { TaskDefinition, TaskExecutionContext } from './types';
+import {
+  SafetyLevel,
+  TaskDefinition,
+  TaskExecutionContext,
+  TaskType,
+} from './types';
 
 /**
  * Task executor interface for immediate task execution
@@ -79,11 +84,11 @@ export class TaskOrientedCognitiveIntegration
     // Convert internal cognitive goal to concrete task
     const task: TaskDefinition = {
       id: `cognitive_${Date.now()}`,
-      type: this.mapGoalTypeToTaskType(goal.type),
+      type: this.mapGoalTypeToTaskType(goal.type) as TaskType,
       parameters: this.extractTaskParameters(goal, context),
       priority: goal.priority || 0.5,
       timeout: this.calculateTimeout(goal),
-      safety_level: this.assessSafetyLevel(goal, context),
+      safety_level: this.assessSafetyLevel(goal, context) as SafetyLevel,
       estimated_duration: this.estimateDuration(goal, context),
       dependencies: this.identifyDependencies(goal, context),
       fallback_actions: this.generateFallbackActions(goal, context),
@@ -323,11 +328,11 @@ export class TaskOrientedCognitiveIntegration
     task: TaskDefinition,
     context: TaskExecutionContext
   ): any {
-    const plan = {
-      steps: [],
+    const plan: any = {
+      steps: [] as string[],
       estimatedDuration: task.estimated_duration || 60000,
-      requiredResources: [],
-      potentialObstacles: [],
+      requiredResources: [] as string[],
+      potentialObstacles: [] as string[],
     };
 
     // Add task-specific steps
@@ -549,7 +554,7 @@ export class TaskOrientedCognitiveIntegration
   /**
    * Estimate duration
    */
-  private estimateDuration(goal: any, context: TaskExecutionContext): number {
+  private estimateDuration(goal: any, _context: TaskExecutionContext): number {
     const baseDuration = 60000; // 1 minute
 
     // Adjust based on goal complexity
@@ -569,7 +574,7 @@ export class TaskOrientedCognitiveIntegration
    */
   private identifyDependencies(
     goal: any,
-    context: TaskExecutionContext
+    _context: TaskExecutionContext
   ): string[] {
     const dependencies: string[] = [];
 
@@ -675,7 +680,8 @@ export class TaskOrientedCognitiveIntegration
     recentTasks.forEach((task) => {
       if (task.task?.emotionalContext) {
         Object.keys(emotions).forEach((key) => {
-          emotions[key] += task.task.emotionalContext[key] || 0;
+          emotions[key as keyof typeof emotions] +=
+            task.task.emotionalContext[key as keyof typeof emotions] || 0;
         });
       }
     });
@@ -683,7 +689,10 @@ export class TaskOrientedCognitiveIntegration
     // Normalize
     const count = Math.max(1, recentTasks.length);
     Object.keys(emotions).forEach((key) => {
-      emotions[key] = Math.min(1.0, emotions[key] / count);
+      emotions[key as keyof typeof emotions] = Math.min(
+        1.0,
+        emotions[key as keyof typeof emotions] / count
+      );
     });
 
     return emotions;

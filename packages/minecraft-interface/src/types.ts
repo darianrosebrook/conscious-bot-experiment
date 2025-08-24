@@ -101,7 +101,13 @@ export type MinecraftActionType =
   | 'use_item'
   | 'attack_entity'
   | 'chat'
-  | 'wait';
+  | 'wait'
+  | 'consume_food'
+  | 'find_shelter'
+  | 'move_forward'
+  | 'move_backward'
+  | 'strafe_left'
+  | 'strafe_right';
 
 export interface MinecraftAction {
   type: MinecraftActionType;
@@ -135,6 +141,33 @@ export interface CraftAction extends MinecraftAction {
     item: string;
     count: number;
     useCraftingTable?: boolean;
+  };
+}
+
+export interface ConsumeFoodAction extends MinecraftAction {
+  type: 'consume_food';
+  parameters: {
+    food_type?: string;
+    amount?: number;
+  };
+}
+
+export interface PlaceBlockAction extends MinecraftAction {
+  type: 'place_block';
+  parameters: {
+    block_type: string;
+    count?: number;
+    placement?: 'around_player' | 'specific_position';
+    position?: Vec3;
+  };
+}
+
+export interface FindShelterAction extends MinecraftAction {
+  type: 'find_shelter';
+  parameters: {
+    shelter_type?: 'cave_or_house' | 'underground' | 'above_ground';
+    light_sources?: boolean;
+    search_radius?: number;
   };
 }
 
@@ -230,6 +263,7 @@ export type BotEventType =
   | 'spawned'
   | 'disconnected'
   | 'error'
+  | 'warning'
   | 'health_changed'
   | 'inventory_changed'
   | 'position_changed'

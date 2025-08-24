@@ -1,19 +1,19 @@
 /**
  * Phase 5 Integration Tests
- * 
+ *
  * Comprehensive integration tests for the evaluation suite including
  * MineDojo scenarios, performance benchmarking, and regression detection.
- * 
+ *
  * @author @darianrosebrook
  */
 
-import { 
+import {
   PerformanceBenchmarker,
   RegressionMonitor,
   EvaluationDashboard,
   allMinedojoScenarios,
   minedojoCurriculumProgression,
-  MINEDOJO_METADATA
+  MINEDOJO_METADATA,
 } from '../index';
 
 describe('Phase 5: Evaluation Suite Integration', () => {
@@ -36,40 +36,53 @@ describe('Phase 5: Evaluation Suite Integration', () => {
     test('should have comprehensive MineDojo scenario suite', () => {
       expect(allMinedojoScenarios).toBeDefined();
       expect(allMinedojoScenarios.length).toBeGreaterThan(10);
-      
+
       // Check scenario diversity
-      const complexityLevels = new Set(allMinedojoScenarios.map(s => s.complexity));
+      const complexityLevels = new Set(
+        allMinedojoScenarios.map((s) => s.complexity)
+      );
       expect(complexityLevels.size).toBeGreaterThanOrEqual(4);
-      
-      const domains = new Set(allMinedojoScenarios.map(s => s.domain));
+
+      const domains = new Set(allMinedojoScenarios.map((s) => s.domain));
       expect(domains.size).toBeGreaterThanOrEqual(3);
     });
 
     test('should have valid curriculum progression', () => {
       expect(minedojoCurriculumProgression).toBeDefined();
       expect(minedojoCurriculumProgression.length).toBeGreaterThan(5);
-      
+
       // Check that overall progression increases in difficulty
-      const difficulties = minedojoCurriculumProgression.map(s => s.difficulty);
-      const firstHalf = difficulties.slice(0, Math.floor(difficulties.length / 2));
-      const secondHalf = difficulties.slice(Math.floor(difficulties.length / 2));
-      
-      const firstHalfAvg = firstHalf.reduce((sum, d) => sum + d, 0) / firstHalf.length;
-      const secondHalfAvg = secondHalf.reduce((sum, d) => sum + d, 0) / secondHalf.length;
-      
+      const difficulties = minedojoCurriculumProgression.map(
+        (s) => s.difficulty
+      );
+      const firstHalf = difficulties.slice(
+        0,
+        Math.floor(difficulties.length / 2)
+      );
+      const secondHalf = difficulties.slice(
+        Math.floor(difficulties.length / 2)
+      );
+
+      const firstHalfAvg =
+        firstHalf.reduce((sum, d) => sum + d, 0) / firstHalf.length;
+      const secondHalfAvg =
+        secondHalf.reduce((sum, d) => sum + d, 0) / secondHalf.length;
+
       // Second half should be generally more difficult than first half
       expect(secondHalfAvg).toBeGreaterThan(firstHalfAvg);
     });
 
     test('should have proper metadata', () => {
       expect(MINEDOJO_METADATA).toBeDefined();
-      expect(MINEDOJO_METADATA.totalScenarios).toBe(allMinedojoScenarios.length);
+      expect(MINEDOJO_METADATA.totalScenarios).toBe(
+        allMinedojoScenarios.length
+      );
       expect(MINEDOJO_METADATA.averageDifficulty).toBeGreaterThan(0);
       expect(MINEDOJO_METADATA.totalEstimatedDuration).toBeGreaterThan(0);
     });
 
     test('should have valid scenario structures', () => {
-      allMinedojoScenarios.forEach(scenario => {
+      allMinedojoScenarios.forEach((scenario) => {
         expect(scenario.id).toBeDefined();
         expect(scenario.name).toBeDefined();
         expect(scenario.description).toBeDefined();
@@ -79,9 +92,12 @@ describe('Phase 5: Evaluation Suite Integration', () => {
         expect(scenario.goalConditions).toBeDefined();
         expect(scenario.successCriteria).toBeDefined();
         expect(scenario.successCriteria.length).toBeGreaterThan(0);
-        
+
         // Check success criteria weights sum to reasonable value
-        const totalWeight = scenario.successCriteria.reduce((sum, c) => sum + c.weight, 0);
+        const totalWeight = scenario.successCriteria.reduce(
+          (sum, c) => sum + c.weight,
+          0
+        );
         expect(totalWeight).toBeCloseTo(1.0, 1);
       });
     });
@@ -100,7 +116,7 @@ describe('Phase 5: Evaluation Suite Integration', () => {
         scenarios: ['minedojo_wood_collection'],
         agents: ['test_agent'],
         iterations: 3,
-        warmupIterations: 1
+        warmupIterations: 1,
       };
 
       expect(() => {
@@ -113,7 +129,7 @@ describe('Phase 5: Evaluation Suite Integration', () => {
     test('should export benchmark data', () => {
       const exportedData = benchmarker.exportBenchmarkData('json');
       expect(typeof exportedData).toBe('string');
-      
+
       const parsed = JSON.parse(exportedData);
       expect(Array.isArray(parsed)).toBe(true);
     });
@@ -128,7 +144,7 @@ describe('Phase 5: Evaluation Suite Integration', () => {
   describe('Regression Monitor', () => {
     test('should initialize with default configuration', () => {
       expect(regressionMonitor).toBeDefined();
-      
+
       const dashboard = regressionMonitor.getMonitoringDashboard();
       expect(dashboard).toBeDefined();
       expect(dashboard.overallHealth).toBe('healthy');
@@ -150,31 +166,41 @@ describe('Phase 5: Evaluation Suite Integration', () => {
         overallScore: 0.85,
         success: true,
         metrics: [
-          { type: 'success_rate', value: 1.0, weight: 0.5, description: 'Task completion' },
-          { type: 'efficiency', value: 0.8, weight: 0.3, description: 'Resource efficiency' }
+          {
+            type: 'success_rate',
+            value: 1.0,
+            weight: 0.5,
+            description: 'Task completion',
+          },
+          {
+            type: 'efficiency',
+            value: 0.8,
+            weight: 0.3,
+            description: 'Resource efficiency',
+          },
         ],
         planningPerformance: {
           latency: 1000,
           qualityScore: 0.9,
           refinementCount: 2,
-          routingDecisions: ['skill_based']
+          routingDecisions: ['skill_based'],
         },
         executionPerformance: {
           latency: 2000,
           accuracyScore: 0.85,
           adaptationCount: 1,
-          errorRate: 0.1
+          errorRate: 0.1,
         },
         cognitivePerformance: {
           memoryUtilization: 0.6,
           reasoningDepth: 3,
           coherenceScore: 0.8,
-          creativityScore: 0.7
+          creativityScore: 0.7,
         },
         strengths: ['planning', 'execution'],
         weaknesses: [],
         recommendations: [],
-        timestamp: Date.now()
+        timestamp: Date.now(),
       };
 
       expect(() => {
@@ -194,7 +220,7 @@ describe('Phase 5: Evaluation Suite Integration', () => {
   describe('Evaluation Dashboard', () => {
     test('should initialize correctly', () => {
       expect(dashboard).toBeDefined();
-      
+
       const state = dashboard.getState();
       expect(state).toBeDefined();
       expect(state.widgets).toBeDefined();
@@ -220,24 +246,24 @@ describe('Phase 5: Evaluation Suite Integration', () => {
           latency: 1000,
           qualityScore: 0.9,
           refinementCount: 2,
-          routingDecisions: ['skill_based']
+          routingDecisions: ['skill_based'],
         },
         executionPerformance: {
           latency: 2000,
           accuracyScore: 0.85,
           adaptationCount: 1,
-          errorRate: 0.1
+          errorRate: 0.1,
         },
         cognitivePerformance: {
           memoryUtilization: 0.6,
           reasoningDepth: 3,
           coherenceScore: 0.8,
-          creativityScore: 0.7
+          creativityScore: 0.7,
         },
         strengths: [],
         weaknesses: [],
         recommendations: [],
-        timestamp: Date.now()
+        timestamp: Date.now(),
       };
 
       expect(() => {
@@ -255,11 +281,11 @@ describe('Phase 5: Evaluation Suite Integration', () => {
         title: 'Custom Metric',
         data: { value: 42 },
         lastUpdated: Date.now(),
-        isLoading: false
+        isLoading: false,
       };
 
       dashboard.addWidget(customWidget);
-      
+
       const retrievedWidget = dashboard.getWidget('custom_widget');
       expect(retrievedWidget).toBeDefined();
       expect(retrievedWidget?.title).toBe('Custom Metric');
@@ -271,7 +297,7 @@ describe('Phase 5: Evaluation Suite Integration', () => {
     test('should export data correctly', () => {
       const jsonData = dashboard.exportData('json');
       expect(typeof jsonData).toBe('string');
-      
+
       const parsed = JSON.parse(jsonData);
       expect(parsed.timestamp).toBeDefined();
       expect(parsed.config).toBeDefined();
@@ -298,7 +324,7 @@ describe('Phase 5: Evaluation Suite Integration', () => {
           includeStressTesting: false,
           generateReport: true,
           includeDetailedMetrics: true,
-          exportRawData: false
+          exportRawData: false,
         },
         overallScore: 0.85,
         overallSuccessRate: 0.9,
@@ -311,17 +337,17 @@ describe('Phase 5: Evaluation Suite Integration', () => {
           severeRegressions: 0,
           affectedAgents: [],
           affectedScenarios: [],
-          recommendations: []
+          recommendations: [],
         },
         performanceTrends: {},
         executionTime: 30000,
         totalIterations: 3,
-        timestamp: Date.now()
+        timestamp: Date.now(),
       };
 
       // Add benchmark result to dashboard
       dashboard.addBenchmarkResult(mockBenchmarkResult);
-      
+
       const state = dashboard.getState();
       expect(state.systemHealth).toBeDefined();
     });
@@ -340,10 +366,28 @@ describe('Phase 5: Evaluation Suite Integration', () => {
           overallScore: 0.9,
           success: true,
           metrics: [],
-          planningPerformance: { latency: 1000, qualityScore: 0.9, refinementCount: 2, routingDecisions: [] },
-          executionPerformance: { latency: 2000, accuracyScore: 0.9, adaptationCount: 1, errorRate: 0.1 },
-          cognitivePerformance: { memoryUtilization: 0.6, reasoningDepth: 3, coherenceScore: 0.8, creativityScore: 0.7 },
-          strengths: [], weaknesses: [], recommendations: [], timestamp: Date.now()
+          planningPerformance: {
+            latency: 1000,
+            qualityScore: 0.9,
+            refinementCount: 2,
+            routingDecisions: [],
+          },
+          executionPerformance: {
+            latency: 2000,
+            accuracyScore: 0.9,
+            adaptationCount: 1,
+            errorRate: 0.1,
+          },
+          cognitivePerformance: {
+            memoryUtilization: 0.6,
+            reasoningDepth: 3,
+            coherenceScore: 0.8,
+            creativityScore: 0.7,
+          },
+          strengths: [],
+          weaknesses: [],
+          recommendations: [],
+          timestamp: Date.now(),
         },
         {
           sessionId: 'session_2',
@@ -352,14 +396,32 @@ describe('Phase 5: Evaluation Suite Integration', () => {
           overallScore: 0.85,
           success: true,
           metrics: [],
-          planningPerformance: { latency: 1100, qualityScore: 0.85, refinementCount: 2, routingDecisions: [] },
-          executionPerformance: { latency: 2100, accuracyScore: 0.85, adaptationCount: 1, errorRate: 0.15 },
-          cognitivePerformance: { memoryUtilization: 0.65, reasoningDepth: 3, coherenceScore: 0.75, creativityScore: 0.65 },
-          strengths: [], weaknesses: [], recommendations: [], timestamp: Date.now()
-        }
+          planningPerformance: {
+            latency: 1100,
+            qualityScore: 0.85,
+            refinementCount: 2,
+            routingDecisions: [],
+          },
+          executionPerformance: {
+            latency: 2100,
+            accuracyScore: 0.85,
+            adaptationCount: 1,
+            errorRate: 0.15,
+          },
+          cognitivePerformance: {
+            memoryUtilization: 0.65,
+            reasoningDepth: 3,
+            coherenceScore: 0.75,
+            creativityScore: 0.65,
+          },
+          strengths: [],
+          weaknesses: [],
+          recommendations: [],
+          timestamp: Date.now(),
+        },
       ];
 
-      results.forEach(result => {
+      results.forEach((result) => {
         regressionMonitor.addEvaluationResult(result);
         dashboard.addEvaluationResult(result);
       });
@@ -378,7 +440,7 @@ describe('Phase 5: Evaluation Suite Integration', () => {
   describe('Performance and Scalability', () => {
     test('should handle large numbers of evaluation results efficiently', () => {
       const startTime = Date.now();
-      
+
       // Add 100 mock results
       for (let i = 0; i < 100; i++) {
         const mockResult = {
@@ -388,10 +450,28 @@ describe('Phase 5: Evaluation Suite Integration', () => {
           overallScore: Math.random(),
           success: Math.random() > 0.2,
           metrics: [],
-          planningPerformance: { latency: Math.random() * 2000, qualityScore: Math.random(), refinementCount: Math.floor(Math.random() * 5), routingDecisions: [] },
-          executionPerformance: { latency: Math.random() * 3000, accuracyScore: Math.random(), adaptationCount: Math.floor(Math.random() * 3), errorRate: Math.random() * 0.3 },
-          cognitivePerformance: { memoryUtilization: Math.random(), reasoningDepth: Math.floor(Math.random() * 5), coherenceScore: Math.random(), creativityScore: Math.random() },
-          strengths: [], weaknesses: [], recommendations: [], timestamp: Date.now()
+          planningPerformance: {
+            latency: Math.random() * 2000,
+            qualityScore: Math.random(),
+            refinementCount: Math.floor(Math.random() * 5),
+            routingDecisions: [],
+          },
+          executionPerformance: {
+            latency: Math.random() * 3000,
+            accuracyScore: Math.random(),
+            adaptationCount: Math.floor(Math.random() * 3),
+            errorRate: Math.random() * 0.3,
+          },
+          cognitivePerformance: {
+            memoryUtilization: Math.random(),
+            reasoningDepth: Math.floor(Math.random() * 5),
+            coherenceScore: Math.random(),
+            creativityScore: Math.random(),
+          },
+          strengths: [],
+          weaknesses: [],
+          recommendations: [],
+          timestamp: Date.now(),
         };
 
         dashboard.addEvaluationResult(mockResult);
@@ -399,10 +479,10 @@ describe('Phase 5: Evaluation Suite Integration', () => {
 
       const endTime = Date.now();
       const processingTime = endTime - startTime;
-      
+
       // Should process 100 results in reasonable time (< 1 second)
       expect(processingTime).toBeLessThan(1000);
-      
+
       const state = dashboard.getState();
       expect(state.statistics.totalEvaluations).toBe(100);
     });
@@ -410,10 +490,10 @@ describe('Phase 5: Evaluation Suite Integration', () => {
     test('should maintain memory efficiency with data cleanup', () => {
       // This test would check memory usage patterns
       // For now, we'll just verify the dashboard handles data correctly
-      
+
       const initialState = dashboard.getState();
       const initialWidgetCount = initialState.widgets.length;
-      
+
       // Add many results
       for (let i = 0; i < 200; i++) {
         const mockResult = {
@@ -423,17 +503,35 @@ describe('Phase 5: Evaluation Suite Integration', () => {
           overallScore: Math.random(),
           success: true,
           metrics: [],
-          planningPerformance: { latency: 1000, qualityScore: 0.9, refinementCount: 2, routingDecisions: [] },
-          executionPerformance: { latency: 2000, accuracyScore: 0.9, adaptationCount: 1, errorRate: 0.1 },
-          cognitivePerformance: { memoryUtilization: 0.6, reasoningDepth: 3, coherenceScore: 0.8, creativityScore: 0.7 },
-          strengths: [], weaknesses: [], recommendations: [], timestamp: Date.now()
+          planningPerformance: {
+            latency: 1000,
+            qualityScore: 0.9,
+            refinementCount: 2,
+            routingDecisions: [],
+          },
+          executionPerformance: {
+            latency: 2000,
+            accuracyScore: 0.9,
+            adaptationCount: 1,
+            errorRate: 0.1,
+          },
+          cognitivePerformance: {
+            memoryUtilization: 0.6,
+            reasoningDepth: 3,
+            coherenceScore: 0.8,
+            creativityScore: 0.7,
+          },
+          strengths: [],
+          weaknesses: [],
+          recommendations: [],
+          timestamp: Date.now(),
         };
 
         dashboard.addEvaluationResult(mockResult);
       }
-      
+
       const finalState = dashboard.getState();
-      
+
       // Should maintain reasonable data size (dashboard should limit history)
       expect(finalState.statistics.totalEvaluations).toBeLessThanOrEqual(200);
       expect(finalState.widgets.length).toBe(initialWidgetCount); // Widget count should remain stable
@@ -444,7 +542,7 @@ describe('Phase 5: Evaluation Suite Integration', () => {
     test('should handle invalid evaluation results gracefully', () => {
       const invalidResult = {
         // Missing required fields
-        sessionId: 'invalid_session'
+        sessionId: 'invalid_session',
       } as any;
 
       expect(() => {
@@ -486,18 +584,18 @@ describe('Phase 5: Evaluation Suite Integration', () => {
 
 describe('Phase 5: MineDojo Scenario Validation', () => {
   test('should validate all MineDojo scenarios', () => {
-    allMinedojoScenarios.forEach(scenario => {
+    allMinedojoScenarios.forEach((scenario) => {
       // Validate required fields
       expect(scenario.id).toMatch(/^minedojo_/);
       expect(scenario.name).toBeTruthy();
       expect(scenario.description).toBeTruthy();
-      
+
       // Validate numeric fields
       expect(scenario.difficulty).toBeGreaterThanOrEqual(1);
       expect(scenario.difficulty).toBeLessThanOrEqual(10);
       expect(scenario.expectedDuration).toBeGreaterThan(0);
       expect(scenario.estimatedSteps).toBeGreaterThan(0);
-      
+
       // Validate arrays
       expect(Array.isArray(scenario.goalConditions)).toBe(true);
       expect(scenario.goalConditions.length).toBeGreaterThan(0);
@@ -505,19 +603,19 @@ describe('Phase 5: MineDojo Scenario Validation', () => {
       expect(Array.isArray(scenario.successCriteria)).toBe(true);
       expect(scenario.successCriteria.length).toBeGreaterThan(0);
       expect(Array.isArray(scenario.tags)).toBe(true);
-      
+
       // Validate success criteria
-      scenario.successCriteria.forEach(criteria => {
+      scenario.successCriteria.forEach((criteria) => {
         expect(criteria.metric).toBeTruthy();
         expect(criteria.threshold).toBeGreaterThanOrEqual(0);
         expect(criteria.weight).toBeGreaterThan(0);
         expect(criteria.weight).toBeLessThanOrEqual(1);
       });
-      
+
       // Validate initial state
       expect(scenario.initialState).toBeDefined();
       expect(typeof scenario.initialState).toBe('object');
-      
+
       // Validate resources
       expect(scenario.resources).toBeDefined();
       expect(typeof scenario.resources).toBe('object');
@@ -525,26 +623,36 @@ describe('Phase 5: MineDojo Scenario Validation', () => {
   });
 
   test('should have proper MineDojo scenario categorization', () => {
-    const basicScenarios = allMinedojoScenarios.filter(s => s.complexity === 'basic');
-    const intermediateScenarios = allMinedojoScenarios.filter(s => s.complexity === 'intermediate');
-    const advancedScenarios = allMinedojoScenarios.filter(s => s.complexity === 'advanced');
-    const expertScenarios = allMinedojoScenarios.filter(s => s.complexity === 'expert');
-    const emergentScenarios = allMinedojoScenarios.filter(s => s.complexity === 'emergent');
+    const basicScenarios = allMinedojoScenarios.filter(
+      (s) => s.complexity === 'basic'
+    );
+    const intermediateScenarios = allMinedojoScenarios.filter(
+      (s) => s.complexity === 'intermediate'
+    );
+    const advancedScenarios = allMinedojoScenarios.filter(
+      (s) => s.complexity === 'advanced'
+    );
+    const expertScenarios = allMinedojoScenarios.filter(
+      (s) => s.complexity === 'expert'
+    );
+    const emergentScenarios = allMinedojoScenarios.filter(
+      (s) => s.complexity === 'emergent'
+    );
 
     // Should have scenarios at each complexity level
     expect(basicScenarios.length).toBeGreaterThan(0);
     expect(intermediateScenarios.length).toBeGreaterThan(0);
     expect(advancedScenarios.length).toBeGreaterThan(0);
     expect(expertScenarios.length).toBeGreaterThan(0);
-    
+
     // Basic scenarios should be easier
-    basicScenarios.forEach(scenario => {
+    basicScenarios.forEach((scenario) => {
       expect(scenario.difficulty).toBeLessThanOrEqual(4);
       expect(scenario.estimatedSteps).toBeLessThanOrEqual(10);
     });
 
     // Expert scenarios should be harder
-    expertScenarios.forEach(scenario => {
+    expertScenarios.forEach((scenario) => {
       expect(scenario.difficulty).toBeGreaterThanOrEqual(7);
       expect(scenario.estimatedSteps).toBeGreaterThanOrEqual(15);
     });
@@ -555,7 +663,7 @@ describe('Phase 5: System Integration', () => {
   test('should integrate with existing evaluation framework', () => {
     // Test that new components work with existing framework
     const { createEvaluationFramework } = require('../index');
-    
+
     expect(() => {
       const framework = createEvaluationFramework();
       expect(framework).toBeDefined();
@@ -568,7 +676,7 @@ describe('Phase 5: System Integration', () => {
   test('should maintain backward compatibility', () => {
     // Test that existing functionality still works
     const { quickEvaluate, batchEvaluate } = require('../index');
-    
+
     expect(typeof quickEvaluate).toBe('function');
     expect(typeof batchEvaluate).toBe('function');
   });

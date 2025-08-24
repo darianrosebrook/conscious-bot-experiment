@@ -1,20 +1,20 @@
 /**
  * Regression Detection and Monitoring System
- * 
+ *
  * Continuous monitoring system for detecting performance regressions,
  * capability degradation, and system health issues in the conscious bot.
- * 
+ *
  * @author @darianrosebrook
  */
 
 import { EventEmitter } from 'events';
 import { z } from 'zod';
-import { 
-  EvaluationResults, 
-  EvaluationSession, 
+import {
+  EvaluationResults,
+  EvaluationSession,
   AgentConfig,
   Scenario,
-  MetricType 
+  MetricType,
 } from '../types';
 
 /**
@@ -24,7 +24,7 @@ export enum RegressionSeverity {
   INFO = 'info',
   WARNING = 'warning',
   CRITICAL = 'critical',
-  EMERGENCY = 'emergency'
+  EMERGENCY = 'emergency',
 }
 
 /**
@@ -34,33 +34,39 @@ export const RegressionConfigSchema = z.object({
   // Detection thresholds
   warningThreshold: z.number().default(0.05), // 5% degradation
   criticalThreshold: z.number().default(0.15), // 15% degradation
-  emergencyThreshold: z.number().default(0.30), // 30% degradation
-  
+  emergencyThreshold: z.number().default(0.3), // 30% degradation
+
   // Statistical parameters
   minimumSamples: z.number().default(5),
   confidenceLevel: z.number().default(0.95),
   windowSize: z.number().default(20), // Number of recent results to consider
-  
+
   // Monitoring settings
   continuousMonitoring: z.boolean().default(true),
   alertingEnabled: z.boolean().default(true),
   autoRecoveryEnabled: z.boolean().default(false),
-  
+
   // Baseline management
-  baselineUpdateFrequency: z.enum(['never', 'daily', 'weekly', 'monthly']).default('weekly'),
+  baselineUpdateFrequency: z
+    .enum(['never', 'daily', 'weekly', 'monthly'])
+    .default('weekly'),
   baselineMinimumSamples: z.number().default(10),
-  
+
   // Metric-specific settings
   metricWeights: z.record(z.number()).default({}),
   ignoredMetrics: z.array(z.string()).default([]),
-  
+
   // Notification settings
   notificationChannels: z.array(z.string()).default(['console', 'log']),
-  escalationRules: z.array(z.object({
-    severity: z.nativeEnum(RegressionSeverity),
-    delay: z.number(), // minutes
-    channels: z.array(z.string())
-  })).default([])
+  escalationRules: z
+    .array(
+      z.object({
+        severity: z.nativeEnum(RegressionSeverity),
+        delay: z.number(), // minutes
+        channels: z.array(z.string()),
+      })
+    )
+    .default([]),
 });
 
 export type RegressionConfig = z.infer<typeof RegressionConfigSchema>;
@@ -71,32 +77,32 @@ export type RegressionConfig = z.infer<typeof RegressionConfigSchema>;
 export const RegressionDetectionSchema = z.object({
   id: z.string(),
   timestamp: z.number(),
-  
+
   // Detection details
   scenarioId: z.string(),
   agentId: z.string(),
   metricType: z.string(),
-  
+
   // Regression analysis
   severity: z.nativeEnum(RegressionSeverity),
   degradationPercentage: z.number(),
   confidenceLevel: z.number(),
-  
+
   // Statistical data
   currentValue: z.number(),
   baselineValue: z.number(),
   historicalMean: z.number(),
   historicalStdDev: z.number(),
-  
+
   // Context
   affectedCapabilities: z.array(z.string()),
   potentialCauses: z.array(z.string()),
   recommendations: z.array(z.string()),
-  
+
   // Metadata
   sampleSize: z.number(),
   detectionMethod: z.string(),
-  additionalData: z.record(z.any()).optional()
+  additionalData: z.record(z.any()).optional(),
 });
 
 export type RegressionDetection = z.infer<typeof RegressionDetectionSchema>;
@@ -108,27 +114,29 @@ export const PerformanceBaselineSchema = z.object({
   id: z.string(),
   scenarioId: z.string(),
   agentId: z.string(),
-  
+
   // Baseline metrics
-  metrics: z.record(z.object({
-    mean: z.number(),
-    stdDev: z.number(),
-    median: z.number(),
-    percentile95: z.number(),
-    sampleSize: z.number(),
-    lastUpdated: z.number()
-  })),
-  
+  metrics: z.record(
+    z.object({
+      mean: z.number(),
+      stdDev: z.number(),
+      median: z.number(),
+      percentile95: z.number(),
+      sampleSize: z.number(),
+      lastUpdated: z.number(),
+    })
+  ),
+
   // Baseline metadata
   version: z.string(),
   createdAt: z.number(),
   updatedAt: z.number(),
   isActive: z.boolean(),
-  
+
   // Quality indicators
   stability: z.number(), // 0-1, how stable the baseline is
   reliability: z.number(), // 0-1, how reliable the baseline is
-  coverage: z.number() // 0-1, how much of the metric space is covered
+  coverage: z.number(), // 0-1, how much of the metric space is covered
 });
 
 export type PerformanceBaseline = z.infer<typeof PerformanceBaselineSchema>;
@@ -138,41 +146,45 @@ export type PerformanceBaseline = z.infer<typeof PerformanceBaselineSchema>;
  */
 export const MonitoringDashboardSchema = z.object({
   timestamp: z.number(),
-  
+
   // Overall health
   overallHealth: z.enum(['healthy', 'degraded', 'critical', 'emergency']),
   healthScore: z.number(), // 0-1
-  
+
   // Active regressions
   activeRegressions: z.array(RegressionDetectionSchema),
   recentRegressions: z.array(RegressionDetectionSchema),
   resolvedRegressions: z.array(RegressionDetectionSchema),
-  
+
   // Performance trends
-  performanceTrends: z.record(z.object({
-    trend: z.enum(['improving', 'stable', 'declining']),
-    slope: z.number(),
-    confidence: z.number(),
-    recentChange: z.number()
-  })),
-  
+  performanceTrends: z.record(
+    z.object({
+      trend: z.enum(['improving', 'stable', 'declining']),
+      slope: z.number(),
+      confidence: z.number(),
+      recentChange: z.number(),
+    })
+  ),
+
   // System metrics
   systemMetrics: z.object({
     totalScenarios: z.number(),
     totalAgents: z.number(),
     monitoredMetrics: z.number(),
     baselinesCurrent: z.number(),
-    baselinesOutdated: z.number()
+    baselinesOutdated: z.number(),
   }),
-  
+
   // Alerts and notifications
-  pendingAlerts: z.array(z.object({
-    id: z.string(),
-    severity: z.nativeEnum(RegressionSeverity),
-    message: z.string(),
-    timestamp: z.number(),
-    acknowledged: z.boolean()
-  }))
+  pendingAlerts: z.array(
+    z.object({
+      id: z.string(),
+      severity: z.nativeEnum(RegressionSeverity),
+      message: z.string(),
+      timestamp: z.number(),
+      acknowledged: z.boolean(),
+    })
+  ),
 });
 
 export type MonitoringDashboard = z.infer<typeof MonitoringDashboardSchema>;
@@ -207,9 +219,12 @@ export class RegressionMonitor extends EventEmitter {
 
     if (this.config.continuousMonitoring) {
       // Check for regressions every 5 minutes
-      this.monitoringInterval = setInterval(() => {
-        this.performRoutineCheck();
-      }, 5 * 60 * 1000);
+      this.monitoringInterval = setInterval(
+        () => {
+          this.performRoutineCheck();
+        },
+        5 * 60 * 1000
+      );
     }
   }
 
@@ -222,7 +237,7 @@ export class RegressionMonitor extends EventEmitter {
     }
 
     this.isMonitoring = false;
-    
+
     if (this.monitoringInterval) {
       clearInterval(this.monitoringInterval);
       this.monitoringInterval = undefined;
@@ -236,7 +251,7 @@ export class RegressionMonitor extends EventEmitter {
    */
   addEvaluationResult(result: EvaluationResults): void {
     const key = `${result.scenarioId}_${result.agentConfiguration.id || 'unknown'}`;
-    
+
     if (!this.recentResults.has(key)) {
       this.recentResults.set(key, []);
     }
@@ -260,7 +275,10 @@ export class RegressionMonitor extends EventEmitter {
   /**
    * Check for regressions in recent results
    */
-  private async checkForRegressions(key: string, results: EvaluationResults[]): Promise<void> {
+  private async checkForRegressions(
+    key: string,
+    results: EvaluationResults[]
+  ): Promise<void> {
     const baseline = this.baselines.get(key);
     if (!baseline) {
       // Create baseline if it doesn't exist
@@ -273,7 +291,7 @@ export class RegressionMonitor extends EventEmitter {
 
     // Check each metric for regressions
     const metricValues = this.extractMetricValues(results);
-    
+
     for (const [metricType, values] of Object.entries(metricValues)) {
       if (this.config.ignoredMetrics.includes(metricType)) {
         continue;
@@ -317,7 +335,8 @@ export class RegressionMonitor extends EventEmitter {
       return null;
     }
 
-    const currentMean = currentValues.reduce((sum, v) => sum + v, 0) / currentValues.length;
+    const currentMean =
+      currentValues.reduce((sum, v) => sum + v, 0) / currentValues.length;
     const degradation = (baseline.mean - currentMean) / baseline.mean;
 
     // Determine severity
@@ -333,7 +352,10 @@ export class RegressionMonitor extends EventEmitter {
     }
 
     // Statistical analysis
-    const currentStdDev = this.calculateStandardDeviation(currentValues, currentMean);
+    const currentStdDev = this.calculateStandardDeviation(
+      currentValues,
+      currentMean
+    );
     const confidenceLevel = this.calculateConfidenceLevel(
       currentValues,
       baseline.mean,
@@ -354,11 +376,22 @@ export class RegressionMonitor extends EventEmitter {
       baselineValue: baseline.mean,
       historicalMean: baseline.mean,
       historicalStdDev: baseline.stdDev,
-      affectedCapabilities: this.identifyAffectedCapabilities(scenarioId, metricType),
-      potentialCauses: this.identifyPotentialCauses(scenarioId, metricType, degradation),
-      recommendations: this.generateRecommendations(severity, metricType, degradation),
+      affectedCapabilities: this.identifyAffectedCapabilities(
+        scenarioId,
+        metricType
+      ),
+      potentialCauses: this.identifyPotentialCauses(
+        scenarioId,
+        metricType,
+        degradation
+      ),
+      recommendations: this.generateRecommendations(
+        severity,
+        metricType,
+        degradation
+      ),
       sampleSize: currentValues.length,
-      detectionMethod: 'statistical_comparison'
+      detectionMethod: 'statistical_comparison',
     };
 
     return detection;
@@ -367,18 +400,20 @@ export class RegressionMonitor extends EventEmitter {
   /**
    * Process a regression detection
    */
-  private async processRegressionDetection(detection: RegressionDetection): Promise<void> {
+  private async processRegressionDetection(
+    detection: RegressionDetection
+  ): Promise<void> {
     const key = `${detection.scenarioId}_${detection.agentId}_${detection.metricType}`;
-    
+
     // Check if this is a new regression or update to existing
     const existingRegression = this.activeRegressions.get(key);
-    
+
     if (existingRegression) {
       // Update existing regression
       if (detection.severity !== existingRegression.severity) {
-        this.emit('regression_severity_changed', { 
-          previous: existingRegression, 
-          current: detection 
+        this.emit('regression_severity_changed', {
+          previous: existingRegression,
+          current: detection,
         });
       }
       this.activeRegressions.set(key, detection);
@@ -397,9 +432,11 @@ export class RegressionMonitor extends EventEmitter {
     }
 
     // Trigger auto-recovery if enabled and severity is high
-    if (this.config.autoRecoveryEnabled && 
-        (detection.severity === RegressionSeverity.CRITICAL || 
-         detection.severity === RegressionSeverity.EMERGENCY)) {
+    if (
+      this.config.autoRecoveryEnabled &&
+      (detection.severity === RegressionSeverity.CRITICAL ||
+        detection.severity === RegressionSeverity.EMERGENCY)
+    ) {
       await this.triggerAutoRecovery(detection);
     }
   }
@@ -407,7 +444,10 @@ export class RegressionMonitor extends EventEmitter {
   /**
    * Create performance baseline
    */
-  private async createBaseline(key: string, results: EvaluationResults[]): Promise<void> {
+  private async createBaseline(
+    key: string,
+    results: EvaluationResults[]
+  ): Promise<void> {
     if (results.length < this.config.baselineMinimumSamples) {
       return;
     }
@@ -427,7 +467,7 @@ export class RegressionMonitor extends EventEmitter {
         median: sorted[Math.floor(sorted.length / 2)],
         percentile95: sorted[Math.floor(sorted.length * 0.95)],
         sampleSize: values.length,
-        lastUpdated: Date.now()
+        lastUpdated: Date.now(),
       };
     }
 
@@ -442,7 +482,7 @@ export class RegressionMonitor extends EventEmitter {
       isActive: true,
       stability: this.calculateStability(metricValues),
       reliability: this.calculateReliability(results),
-      coverage: this.calculateCoverage(metricValues)
+      coverage: this.calculateCoverage(metricValues),
     };
 
     this.baselines.set(key, baseline);
@@ -452,16 +492,18 @@ export class RegressionMonitor extends EventEmitter {
   /**
    * Extract metric values from evaluation results
    */
-  private extractMetricValues(results: EvaluationResults[]): Record<string, number[]> {
+  private extractMetricValues(
+    results: EvaluationResults[]
+  ): Record<string, number[]> {
     const metricValues: Record<string, number[]> = {};
 
-    results.forEach(result => {
+    results.forEach((result) => {
       // Overall score
       if (!metricValues.overallScore) metricValues.overallScore = [];
       metricValues.overallScore.push(result.overallScore);
 
       // Individual metrics
-      result.metrics.forEach(metric => {
+      result.metrics.forEach((metric) => {
         if (!metricValues[metric.type]) metricValues[metric.type] = [];
         metricValues[metric.type].push(metric.value);
       });
@@ -474,7 +516,9 @@ export class RegressionMonitor extends EventEmitter {
       metricValues.executionLatency.push(result.executionPerformance.latency);
 
       if (!metricValues.memoryUtilization) metricValues.memoryUtilization = [];
-      metricValues.memoryUtilization.push(result.cognitivePerformance.memoryUtilization);
+      metricValues.memoryUtilization.push(
+        result.cognitivePerformance.memoryUtilization
+      );
     });
 
     return metricValues;
@@ -484,7 +528,8 @@ export class RegressionMonitor extends EventEmitter {
    * Calculate standard deviation
    */
   private calculateStandardDeviation(values: number[], mean: number): number {
-    const variance = values.reduce((sum, v) => sum + Math.pow(v - mean, 2), 0) / values.length;
+    const variance =
+      values.reduce((sum, v) => sum + Math.pow(v - mean, 2), 0) / values.length;
     return Math.sqrt(variance);
   }
 
@@ -497,13 +542,20 @@ export class RegressionMonitor extends EventEmitter {
     baselineStdDev: number
   ): number {
     // Simplified t-test calculation
-    const currentMean = currentValues.reduce((sum, v) => sum + v, 0) / currentValues.length;
-    const currentStdDev = this.calculateStandardDeviation(currentValues, currentMean);
-    
-    const pooledStdDev = Math.sqrt((baselineStdDev ** 2 + currentStdDev ** 2) / 2);
-    const tStatistic = Math.abs(currentMean - baselineMean) / 
-                      (pooledStdDev * Math.sqrt(2 / currentValues.length));
-    
+    const currentMean =
+      currentValues.reduce((sum, v) => sum + v, 0) / currentValues.length;
+    const currentStdDev = this.calculateStandardDeviation(
+      currentValues,
+      currentMean
+    );
+
+    const pooledStdDev = Math.sqrt(
+      (baselineStdDev ** 2 + currentStdDev ** 2) / 2
+    );
+    const tStatistic =
+      Math.abs(currentMean - baselineMean) /
+      (pooledStdDev * Math.sqrt(2 / currentValues.length));
+
     // Simplified confidence calculation (would use proper t-distribution in real implementation)
     return Math.min(0.99, tStatistic / 3);
   }
@@ -512,13 +564,17 @@ export class RegressionMonitor extends EventEmitter {
    * Calculate baseline stability
    */
   private calculateStability(metricValues: Record<string, number[]>): number {
-    const coefficientsOfVariation = Object.values(metricValues).map(values => {
-      const mean = values.reduce((sum, v) => sum + v, 0) / values.length;
-      const stdDev = this.calculateStandardDeviation(values, mean);
-      return stdDev / mean;
-    });
+    const coefficientsOfVariation = Object.values(metricValues).map(
+      (values) => {
+        const mean = values.reduce((sum, v) => sum + v, 0) / values.length;
+        const stdDev = this.calculateStandardDeviation(values, mean);
+        return stdDev / mean;
+      }
+    );
 
-    const avgCoV = coefficientsOfVariation.reduce((sum, cov) => sum + cov, 0) / coefficientsOfVariation.length;
+    const avgCoV =
+      coefficientsOfVariation.reduce((sum, cov) => sum + cov, 0) /
+      coefficientsOfVariation.length;
     return Math.max(0, 1 - avgCoV); // Lower CoV = higher stability
   }
 
@@ -526,7 +582,8 @@ export class RegressionMonitor extends EventEmitter {
    * Calculate baseline reliability
    */
   private calculateReliability(results: EvaluationResults[]): number {
-    const successRate = results.filter(r => r.success).length / results.length;
+    const successRate =
+      results.filter((r) => r.success).length / results.length;
     return successRate;
   }
 
@@ -535,16 +592,26 @@ export class RegressionMonitor extends EventEmitter {
    */
   private calculateCoverage(metricValues: Record<string, number[]>): number {
     // Simple coverage based on number of metrics
-    const expectedMetrics = ['overallScore', 'planningLatency', 'executionLatency', 'memoryUtilization'];
+    const expectedMetrics = [
+      'overallScore',
+      'planningLatency',
+      'executionLatency',
+      'memoryUtilization',
+    ];
     const actualMetrics = Object.keys(metricValues);
-    const coverage = actualMetrics.filter(m => expectedMetrics.includes(m)).length / expectedMetrics.length;
+    const coverage =
+      actualMetrics.filter((m) => expectedMetrics.includes(m)).length /
+      expectedMetrics.length;
     return coverage;
   }
 
   /**
    * Identify affected capabilities
    */
-  private identifyAffectedCapabilities(scenarioId: string, metricType: string): string[] {
+  private identifyAffectedCapabilities(
+    scenarioId: string,
+    metricType: string
+  ): string[] {
     const capabilities: string[] = [];
 
     // Map metrics to capabilities
@@ -575,13 +642,25 @@ export class RegressionMonitor extends EventEmitter {
   /**
    * Identify potential causes
    */
-  private identifyPotentialCauses(scenarioId: string, metricType: string, degradation: number): string[] {
+  private identifyPotentialCauses(
+    scenarioId: string,
+    metricType: string,
+    degradation: number
+  ): string[] {
     const causes: string[] = [];
 
     if (degradation > 0.2) {
-      causes.push('major_code_change', 'configuration_change', 'environment_change');
+      causes.push(
+        'major_code_change',
+        'configuration_change',
+        'environment_change'
+      );
     } else if (degradation > 0.1) {
-      causes.push('algorithm_modification', 'parameter_tuning', 'dependency_update');
+      causes.push(
+        'algorithm_modification',
+        'parameter_tuning',
+        'dependency_update'
+      );
     } else {
       causes.push('minor_optimization', 'data_drift', 'system_load');
     }
@@ -647,7 +726,7 @@ export class RegressionMonitor extends EventEmitter {
       severity: detection.severity,
       message: `Regression detected: ${detection.metricType} degraded by ${detection.degradationPercentage.toFixed(1)}% in ${detection.scenarioId}`,
       timestamp: Date.now(),
-      detection
+      detection,
     };
 
     // Send to configured channels
@@ -681,9 +760,11 @@ export class RegressionMonitor extends EventEmitter {
   /**
    * Trigger auto-recovery
    */
-  private async triggerAutoRecovery(detection: RegressionDetection): Promise<void> {
+  private async triggerAutoRecovery(
+    detection: RegressionDetection
+  ): Promise<void> {
     this.emit('auto_recovery_triggered', detection);
-    
+
     // Implementation would depend on the specific recovery mechanisms available
     // For example: restart services, rollback configurations, etc.
   }
@@ -720,16 +801,21 @@ export class RegressionMonitor extends EventEmitter {
     const resolvedKeys: string[] = [];
 
     for (const [key, regression] of this.activeRegressions.entries()) {
-      const recentResults = this.recentResults.get(key.replace(`_${regression.metricType}`, ''));
-      
+      const recentResults = this.recentResults.get(
+        key.replace(`_${regression.metricType}`, '')
+      );
+
       if (recentResults && recentResults.length >= this.config.minimumSamples) {
         const metricValues = this.extractMetricValues(recentResults);
         const currentValues = metricValues[regression.metricType];
-        
+
         if (currentValues) {
-          const currentMean = currentValues.reduce((sum, v) => sum + v, 0) / currentValues.length;
-          const degradation = Math.abs((regression.baselineValue - currentMean) / regression.baselineValue);
-          
+          const currentMean =
+            currentValues.reduce((sum, v) => sum + v, 0) / currentValues.length;
+          const degradation = Math.abs(
+            (regression.baselineValue - currentMean) / regression.baselineValue
+          );
+
           if (degradation < this.config.warningThreshold) {
             resolvedKeys.push(key);
             this.emit('regression_resolved', regression);
@@ -739,7 +825,7 @@ export class RegressionMonitor extends EventEmitter {
     }
 
     // Remove resolved regressions
-    resolvedKeys.forEach(key => {
+    resolvedKeys.forEach((key) => {
       this.activeRegressions.delete(key);
     });
   }
@@ -748,16 +834,16 @@ export class RegressionMonitor extends EventEmitter {
    * Clean up old data
    */
   private cleanupOldData(): void {
-    const cutoffTime = Date.now() - (7 * 24 * 60 * 60 * 1000); // 7 days
+    const cutoffTime = Date.now() - 7 * 24 * 60 * 60 * 1000; // 7 days
 
     // Clean up old regression history
     this.regressionHistory = this.regressionHistory.filter(
-      r => r.timestamp > cutoffTime
+      (r) => r.timestamp > cutoffTime
     );
 
     // Clean up old results
     for (const [key, results] of this.recentResults.entries()) {
-      const filteredResults = results.filter(r => r.timestamp > cutoffTime);
+      const filteredResults = results.filter((r) => r.timestamp > cutoffTime);
       if (filteredResults.length > 0) {
         this.recentResults.set(key, filteredResults);
       } else {
@@ -772,17 +858,22 @@ export class RegressionMonitor extends EventEmitter {
   getMonitoringDashboard(): MonitoringDashboard {
     const activeRegressions = Array.from(this.activeRegressions.values());
     const recentRegressions = this.regressionHistory
-      .filter(r => r.timestamp > Date.now() - (24 * 60 * 60 * 1000))
+      .filter((r) => r.timestamp > Date.now() - 24 * 60 * 60 * 1000)
       .slice(0, 10);
 
     // Calculate overall health
-    let overallHealth: 'healthy' | 'degraded' | 'critical' | 'emergency' = 'healthy';
+    let overallHealth: 'healthy' | 'degraded' | 'critical' | 'emergency' =
+      'healthy';
     let healthScore = 1.0;
 
-    if (activeRegressions.some(r => r.severity === RegressionSeverity.EMERGENCY)) {
+    if (
+      activeRegressions.some((r) => r.severity === RegressionSeverity.EMERGENCY)
+    ) {
       overallHealth = 'emergency';
       healthScore = 0.2;
-    } else if (activeRegressions.some(r => r.severity === RegressionSeverity.CRITICAL)) {
+    } else if (
+      activeRegressions.some((r) => r.severity === RegressionSeverity.CRITICAL)
+    ) {
       overallHealth = 'critical';
       healthScore = 0.4;
     } else if (activeRegressions.length > 0) {
@@ -794,7 +885,7 @@ export class RegressionMonitor extends EventEmitter {
     const performanceTrends: Record<string, any> = {};
     for (const [key, results] of this.recentResults.entries()) {
       if (results.length >= 5) {
-        const recentScores = results.slice(-5).map(r => r.overallScore);
+        const recentScores = results.slice(-5).map((r) => r.overallScore);
         const trend = this.calculateTrend(recentScores);
         performanceTrends[key] = trend;
       }
@@ -809,13 +900,21 @@ export class RegressionMonitor extends EventEmitter {
       resolvedRegressions: [], // Would track resolved regressions
       performanceTrends,
       systemMetrics: {
-        totalScenarios: new Set(Array.from(this.recentResults.keys()).map(k => k.split('_')[0])).size,
-        totalAgents: new Set(Array.from(this.recentResults.keys()).map(k => k.split('_')[1])).size,
+        totalScenarios: new Set(
+          Array.from(this.recentResults.keys()).map((k) => k.split('_')[0])
+        ).size,
+        totalAgents: new Set(
+          Array.from(this.recentResults.keys()).map((k) => k.split('_')[1])
+        ).size,
         monitoredMetrics: this.baselines.size,
-        baselinesCurrent: Array.from(this.baselines.values()).filter(b => b.isActive).length,
-        baselinesOutdated: Array.from(this.baselines.values()).filter(b => !b.isActive).length
+        baselinesCurrent: Array.from(this.baselines.values()).filter(
+          (b) => b.isActive
+        ).length,
+        baselinesOutdated: Array.from(this.baselines.values()).filter(
+          (b) => !b.isActive
+        ).length,
       },
-      pendingAlerts: [] // Would track pending alerts
+      pendingAlerts: [], // Would track pending alerts
     };
   }
 
@@ -854,8 +953,11 @@ export class RegressionMonitor extends EventEmitter {
       const predicted = slope * i + intercept;
       return sum + Math.pow(val - predicted, 2);
     }, 0);
-    const ssTot = values.reduce((sum, val) => sum + Math.pow(val - yMean, 2), 0);
-    const confidence = 1 - (ssRes / ssTot);
+    const ssTot = values.reduce(
+      (sum, val) => sum + Math.pow(val - yMean, 2),
+      0
+    );
+    const confidence = 1 - ssRes / ssTot;
 
     const recentChange = values[values.length - 1] - values[0];
 
@@ -863,7 +965,7 @@ export class RegressionMonitor extends EventEmitter {
       trend,
       slope,
       confidence: Math.max(0, Math.min(1, confidence)),
-      recentChange
+      recentChange,
     };
   }
 
@@ -874,7 +976,7 @@ export class RegressionMonitor extends EventEmitter {
     return {
       warningThreshold: 0.05,
       criticalThreshold: 0.15,
-      emergencyThreshold: 0.30,
+      emergencyThreshold: 0.3,
       minimumSamples: 5,
       confidenceLevel: 0.95,
       windowSize: 20,
@@ -886,7 +988,7 @@ export class RegressionMonitor extends EventEmitter {
       metricWeights: {},
       ignoredMetrics: [],
       notificationChannels: ['console', 'log'],
-      escalationRules: []
+      escalationRules: [],
     };
   }
 
@@ -899,11 +1001,13 @@ export class RegressionMonitor extends EventEmitter {
       baselines: Array.from(this.baselines.entries()),
       activeRegressions: Array.from(this.activeRegressions.entries()),
       regressionHistory: this.regressionHistory,
-      recentResults: Array.from(this.recentResults.entries()).map(([key, results]) => ({
-        key,
-        resultCount: results.length,
-        latestTimestamp: Math.max(...results.map(r => r.timestamp))
-      }))
+      recentResults: Array.from(this.recentResults.entries()).map(
+        ([key, results]) => ({
+          key,
+          resultCount: results.length,
+          latestTimestamp: Math.max(...results.map((r) => r.timestamp)),
+        })
+      ),
     };
   }
 }
@@ -915,24 +1019,24 @@ export const DEFAULT_REGRESSION_CONFIGS = {
   strict: {
     warningThreshold: 0.02,
     criticalThreshold: 0.05,
-    emergencyThreshold: 0.10,
+    emergencyThreshold: 0.1,
     minimumSamples: 10,
-    confidenceLevel: 0.99
+    confidenceLevel: 0.99,
   },
-  
+
   moderate: {
     warningThreshold: 0.05,
     criticalThreshold: 0.15,
-    emergencyThreshold: 0.30,
+    emergencyThreshold: 0.3,
     minimumSamples: 5,
-    confidenceLevel: 0.95
+    confidenceLevel: 0.95,
   },
-  
+
   lenient: {
-    warningThreshold: 0.10,
+    warningThreshold: 0.1,
     criticalThreshold: 0.25,
-    emergencyThreshold: 0.50,
+    emergencyThreshold: 0.5,
     minimumSamples: 3,
-    confidenceLevel: 0.90
-  }
+    confidenceLevel: 0.9,
+  },
 };

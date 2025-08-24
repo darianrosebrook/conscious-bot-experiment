@@ -6,7 +6,8 @@
   "type": "module",
   "scripts": {
     "build": "turbo build",
-    "dev": "pnpm run dev:services",
+    "dev": "node scripts/start-servers.js",
+    "dev:legacy": "pnpm run dev:services",
     "dev:all": "node scripts/dev.js",
     "dev:services": "concurrently \"pnpm run dev:dashboard\" \"pnpm run dev:minecraft\" \"pnpm run dev:cognition\" \"pnpm run dev:memory\" \"pnpm run dev:world\" \"pnpm run dev:planning\"",
     "dev:dashboard": "pnpm --filter @conscious-bot/dashboard dev",
@@ -15,6 +16,8 @@
     "dev:memory": "pnpm --filter @conscious-bot/memory run dev:server",
     "dev:world": "pnpm --filter @conscious-bot/world run dev:server",
     "dev:planning": "pnpm --filter @conscious-bot/planning run dev:server",
+    "kill": "node scripts/kill-servers.js",
+    "status": "node scripts/status.js",
     "lint": "turbo lint",
     "test": "turbo test",
     "clean": "turbo clean",

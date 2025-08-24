@@ -1,22 +1,25 @@
 /**
  * Evaluation Dashboard
- * 
+ *
  * Real-time dashboard for monitoring evaluation progress, performance metrics,
  * and system health with interactive visualizations and reporting.
- * 
+ *
  * @author @darianrosebrook
  */
 
 import { EventEmitter } from 'events';
 import { z } from 'zod';
-import { 
-  EvaluationResults, 
-  EvaluationSession, 
+import {
+  EvaluationResults,
+  EvaluationSession,
   Scenario,
   AgentConfig,
-  BenchmarkSuiteResult 
+  BenchmarkSuiteResult,
 } from '../types';
-import { RegressionDetection, MonitoringDashboard } from '../regression/regression-monitor';
+import {
+  RegressionDetection,
+  MonitoringDashboard,
+} from '../regression/regression-monitor';
 
 /**
  * Dashboard configuration
@@ -26,25 +29,36 @@ export const DashboardConfigSchema = z.object({
   refreshInterval: z.number().default(5000), // 5 seconds
   maxHistoryPoints: z.number().default(100),
   autoRefresh: z.boolean().default(true),
-  
+
   // Visualization settings
-  chartTypes: z.array(z.enum(['line', 'bar', 'scatter', 'heatmap'])).default(['line', 'bar']),
+  chartTypes: z
+    .array(z.enum(['line', 'bar', 'scatter', 'heatmap']))
+    .default(['line', 'bar']),
   colorScheme: z.enum(['light', 'dark', 'auto']).default('auto'),
-  
+
   // Data settings
-  metricsToDisplay: z.array(z.string()).default([
-    'overallScore', 'successRate', 'planningLatency', 'executionLatency'
-  ]),
+  metricsToDisplay: z
+    .array(z.string())
+    .default([
+      'overallScore',
+      'successRate',
+      'planningLatency',
+      'executionLatency',
+    ]),
   scenariosToMonitor: z.array(z.string()).default([]),
   agentsToMonitor: z.array(z.string()).default([]),
-  
+
   // Alert settings
   showAlerts: z.boolean().default(true),
-  alertSeverityFilter: z.array(z.string()).default(['warning', 'critical', 'emergency']),
-  
+  alertSeverityFilter: z
+    .array(z.string())
+    .default(['warning', 'critical', 'emergency']),
+
   // Export settings
   enableExport: z.boolean().default(true),
-  exportFormats: z.array(z.enum(['json', 'csv', 'pdf'])).default(['json', 'csv'])
+  exportFormats: z
+    .array(z.enum(['json', 'csv', 'pdf']))
+    .default(['json', 'csv']),
 });
 
 export type DashboardConfig = z.infer<typeof DashboardConfigSchema>;
@@ -60,7 +74,7 @@ export const DashboardWidgetSchema = z.object({
   config: z.record(z.any()).optional(),
   lastUpdated: z.number(),
   isLoading: z.boolean().default(false),
-  error: z.string().optional()
+  error: z.string().optional(),
 });
 
 export type DashboardWidget = z.infer<typeof DashboardWidgetSchema>;
@@ -72,19 +86,19 @@ export const DashboardStateSchema = z.object({
   timestamp: z.number(),
   isConnected: z.boolean(),
   isLoading: z.boolean(),
-  
+
   // Widgets
   widgets: z.array(DashboardWidgetSchema),
-  
+
   // Current data
   activeEvaluations: z.array(z.any()),
   recentResults: z.array(z.any()),
   performanceMetrics: z.record(z.any()),
-  
+
   // System status
   systemHealth: z.enum(['healthy', 'degraded', 'critical', 'emergency']),
   activeAlerts: z.array(z.any()),
-  
+
   // Statistics
   statistics: z.object({
     totalEvaluations: z.number(),
@@ -92,8 +106,8 @@ export const DashboardStateSchema = z.object({
     averageScore: z.number(),
     averageDuration: z.number(),
     activeScenarios: z.number(),
-    activeAgents: z.number()
-  })
+    activeAgents: z.number(),
+  }),
 });
 
 export type DashboardState = z.infer<typeof DashboardStateSchema>;
@@ -172,10 +186,12 @@ export class EvaluationDashboard extends EventEmitter {
     }
 
     this.evaluationResults.push(result);
-    
+
     // Keep only recent results
     if (this.evaluationResults.length > this.config.maxHistoryPoints) {
-      this.evaluationResults = this.evaluationResults.slice(-this.config.maxHistoryPoints);
+      this.evaluationResults = this.evaluationResults.slice(
+        -this.config.maxHistoryPoints
+      );
     }
 
     this.updateDataHistory('evaluationResults', result);
@@ -189,10 +205,12 @@ export class EvaluationDashboard extends EventEmitter {
    */
   addBenchmarkResult(result: BenchmarkSuiteResult): void {
     this.benchmarkResults.push(result);
-    
+
     // Keep only recent results
     if (this.benchmarkResults.length > this.config.maxHistoryPoints) {
-      this.benchmarkResults = this.benchmarkResults.slice(-this.config.maxHistoryPoints);
+      this.benchmarkResults = this.benchmarkResults.slice(
+        -this.config.maxHistoryPoints
+      );
     }
 
     this.updateDataHistory('benchmarkResults', result);
@@ -276,16 +294,15 @@ export class EvaluationDashboard extends EventEmitter {
     try {
       // Update statistics
       this.updateStatistics();
-      
+
       // Update system health
       this.updateSystemHealth();
-      
+
       // Update all widgets
       this.updateWidgets();
-      
+
       this.state.isLoading = false;
       this.emit('data_refreshed');
-      
     } catch (error) {
       this.state.isLoading = false;
       this.emit('refresh_error', error);
@@ -297,19 +314,33 @@ export class EvaluationDashboard extends EventEmitter {
    */
   private updateStatistics(): void {
     const totalEvaluations = this.evaluationResults.length;
-    const successfulEvaluations = this.evaluationResults.filter(r => r.success).length;
-    const averageScore = totalEvaluations > 0 
-      ? this.evaluationResults.reduce((sum, r) => sum + r.overallScore, 0) / totalEvaluations
-      : 0;
-    
+    const successfulEvaluations = this.evaluationResults.filter(
+      (r) => r.success
+    ).length;
+    const averageScore =
+      totalEvaluations > 0
+        ? this.evaluationResults.reduce((sum, r) => sum + r.overallScore, 0) /
+          totalEvaluations
+        : 0;
+
     // Calculate average duration from recent results
     const recentResults = this.evaluationResults.slice(-20);
-    const averageDuration = recentResults.length > 0
-      ? recentResults.reduce((sum, r) => sum + (r.planningPerformance.latency + r.executionPerformance.latency), 0) / recentResults.length
-      : 0;
+    const averageDuration =
+      recentResults.length > 0
+        ? recentResults.reduce(
+            (sum, r) =>
+              sum +
+              (r.planningPerformance.latency + r.executionPerformance.latency),
+            0
+          ) / recentResults.length
+        : 0;
 
-    const activeScenarios = new Set(this.evaluationResults.map(r => r.scenarioId)).size;
-    const activeAgents = new Set(this.evaluationResults.map(r => r.agentConfiguration.id || 'unknown')).size;
+    const activeScenarios = new Set(
+      this.evaluationResults.map((r) => r.scenarioId)
+    ).size;
+    const activeAgents = new Set(
+      this.evaluationResults.map((r) => r.agentConfiguration.id || 'unknown')
+    ).size;
 
     this.state.statistics = {
       totalEvaluations,
@@ -317,7 +348,7 @@ export class EvaluationDashboard extends EventEmitter {
       averageScore,
       averageDuration,
       activeScenarios,
-      activeAgents
+      activeAgents,
     };
   }
 
@@ -327,18 +358,21 @@ export class EvaluationDashboard extends EventEmitter {
   private updateSystemHealth(): void {
     if (this.monitoringData) {
       this.state.systemHealth = this.monitoringData.overallHealth;
-      this.state.activeAlerts = this.monitoringData.activeRegressions.map(r => ({
-        id: r.id,
-        severity: r.severity,
-        message: `${r.metricType} regression in ${r.scenarioId}`,
-        timestamp: r.timestamp
-      }));
+      this.state.activeAlerts = this.monitoringData.activeRegressions.map(
+        (r) => ({
+          id: r.id,
+          severity: r.severity,
+          message: `${r.metricType} regression in ${r.scenarioId}`,
+          timestamp: r.timestamp,
+        })
+      );
     } else {
       // Determine health from recent results
       const recentResults = this.evaluationResults.slice(-10);
-      const recentSuccessRate = recentResults.length > 0
-        ? recentResults.filter(r => r.success).length / recentResults.length
-        : 1;
+      const recentSuccessRate =
+        recentResults.length > 0
+          ? recentResults.filter((r) => r.success).length / recentResults.length
+          : 1;
 
       if (recentSuccessRate >= 0.9) {
         this.state.systemHealth = 'healthy';
@@ -357,23 +391,32 @@ export class EvaluationDashboard extends EventEmitter {
    */
   private updateWidgets(): void {
     // Update performance metrics widget
-    this.updateWidget('performance_metrics', this.generatePerformanceMetricsData());
-    
+    this.updateWidget(
+      'performance_metrics',
+      this.generatePerformanceMetricsData()
+    );
+
     // Update success rate chart
-    this.updateWidget('success_rate_chart', this.generateSuccessRateChartData());
-    
+    this.updateWidget(
+      'success_rate_chart',
+      this.generateSuccessRateChartData()
+    );
+
     // Update latency chart
     this.updateWidget('latency_chart', this.generateLatencyChartData());
-    
+
     // Update scenario performance table
-    this.updateWidget('scenario_performance', this.generateScenarioPerformanceData());
-    
+    this.updateWidget(
+      'scenario_performance',
+      this.generateScenarioPerformanceData()
+    );
+
     // Update agent comparison
     this.updateWidget('agent_comparison', this.generateAgentComparisonData());
-    
+
     // Update alerts widget
     this.updateWidget('alerts', this.generateAlertsData());
-    
+
     // Update system status
     this.updateWidget('system_status', this.generateSystemStatusData());
 
@@ -385,16 +428,21 @@ export class EvaluationDashboard extends EventEmitter {
    */
   private generatePerformanceMetricsData(): any {
     const recentResults = this.evaluationResults.slice(-20);
-    
+
     if (recentResults.length === 0) {
       return { metrics: [], message: 'No recent evaluation data' };
     }
 
     // Filter out invalid results
-    const validResults = recentResults.filter(r => 
-      r && r.overallScore !== undefined && r.success !== undefined &&
-      r.planningPerformance && r.planningPerformance.latency !== undefined &&
-      r.executionPerformance && r.executionPerformance.latency !== undefined
+    const validResults = recentResults.filter(
+      (r) =>
+        r &&
+        r.overallScore !== undefined &&
+        r.success !== undefined &&
+        r.planningPerformance &&
+        r.planningPerformance.latency !== undefined &&
+        r.executionPerformance &&
+        r.executionPerformance.latency !== undefined
     );
 
     if (validResults.length === 0) {
@@ -404,32 +452,61 @@ export class EvaluationDashboard extends EventEmitter {
     const metrics = [
       {
         name: 'Overall Score',
-        value: (validResults.reduce((sum, r) => sum + (r.overallScore || 0), 0) / validResults.length * 100).toFixed(1),
+        value: (
+          (validResults.reduce((sum, r) => sum + (r.overallScore || 0), 0) /
+            validResults.length) *
+          100
+        ).toFixed(1),
         unit: '%',
-        trend: this.calculateTrend(validResults.map(r => r.overallScore || 0)),
-        color: 'blue'
+        trend: this.calculateTrend(
+          validResults.map((r) => r.overallScore || 0)
+        ),
+        color: 'blue',
       },
       {
         name: 'Success Rate',
-        value: (validResults.filter(r => r.success).length / validResults.length * 100).toFixed(1),
+        value: (
+          (validResults.filter((r) => r.success).length / validResults.length) *
+          100
+        ).toFixed(1),
         unit: '%',
-        trend: this.calculateTrend(validResults.map(r => r.success ? 1 : 0)),
-        color: 'green'
+        trend: this.calculateTrend(
+          validResults.map((r) => (r.success ? 1 : 0))
+        ),
+        color: 'green',
       },
       {
         name: 'Avg Planning Time',
-        value: (validResults.reduce((sum, r) => sum + (r.planningPerformance?.latency || 0), 0) / validResults.length / 1000).toFixed(2),
+        value: (
+          validResults.reduce(
+            (sum, r) => sum + (r.planningPerformance?.latency || 0),
+            0
+          ) /
+          validResults.length /
+          1000
+        ).toFixed(2),
         unit: 's',
-        trend: this.calculateTrend(validResults.map(r => r.planningPerformance?.latency || 0)),
-        color: 'orange'
+        trend: this.calculateTrend(
+          validResults.map((r) => r.planningPerformance?.latency || 0)
+        ),
+        color: 'orange',
       },
       {
         name: 'Avg Execution Time',
-        value: (validResults.reduce((sum, r) => sum + (r.executionPerformance?.latency || 0), 0) / validResults.length / 1000).toFixed(2),
+        value: (
+          validResults.reduce(
+            (sum, r) => sum + (r.executionPerformance?.latency || 0),
+            0
+          ) /
+          validResults.length /
+          1000
+        ).toFixed(2),
         unit: 's',
-        trend: this.calculateTrend(validResults.map(r => r.executionPerformance?.latency || 0)),
-        color: 'purple'
-      }
+        trend: this.calculateTrend(
+          validResults.map((r) => r.executionPerformance?.latency || 0)
+        ),
+        color: 'purple',
+      },
     ];
 
     return { metrics };
@@ -443,7 +520,7 @@ export class EvaluationDashboard extends EventEmitter {
       x: index,
       y: result.success ? 1 : 0,
       timestamp: result.timestamp,
-      scenarioId: result.scenarioId
+      scenarioId: result.scenarioId,
     }));
 
     // Calculate moving average
@@ -463,16 +540,16 @@ export class EvaluationDashboard extends EventEmitter {
             label: 'Success Rate',
             data: data,
             borderColor: 'rgb(75, 192, 192)',
-            backgroundColor: 'rgba(75, 192, 192, 0.2)'
+            backgroundColor: 'rgba(75, 192, 192, 0.2)',
           },
           {
             label: 'Moving Average',
             data: movingAverage,
             borderColor: 'rgb(255, 99, 132)',
-            backgroundColor: 'rgba(255, 99, 132, 0.2)'
-          }
-        ]
-      }
+            backgroundColor: 'rgba(255, 99, 132, 0.2)',
+          },
+        ],
+      },
     };
   }
 
@@ -484,8 +561,11 @@ export class EvaluationDashboard extends EventEmitter {
       x: index,
       planning: result.planningPerformance.latency / 1000,
       execution: result.executionPerformance.latency / 1000,
-      total: (result.planningPerformance.latency + result.executionPerformance.latency) / 1000,
-      timestamp: result.timestamp
+      total:
+        (result.planningPerformance.latency +
+          result.executionPerformance.latency) /
+        1000,
+      timestamp: result.timestamp,
     }));
 
     return {
@@ -494,24 +574,24 @@ export class EvaluationDashboard extends EventEmitter {
         datasets: [
           {
             label: 'Planning Latency (s)',
-            data: data.map(d => ({ x: d.x, y: d.planning })),
+            data: data.map((d) => ({ x: d.x, y: d.planning })),
             borderColor: 'rgb(255, 159, 64)',
-            backgroundColor: 'rgba(255, 159, 64, 0.2)'
+            backgroundColor: 'rgba(255, 159, 64, 0.2)',
           },
           {
             label: 'Execution Latency (s)',
-            data: data.map(d => ({ x: d.x, y: d.execution })),
+            data: data.map((d) => ({ x: d.x, y: d.execution })),
             borderColor: 'rgb(153, 102, 255)',
-            backgroundColor: 'rgba(153, 102, 255, 0.2)'
+            backgroundColor: 'rgba(153, 102, 255, 0.2)',
           },
           {
             label: 'Total Latency (s)',
-            data: data.map(d => ({ x: d.x, y: d.total })),
+            data: data.map((d) => ({ x: d.x, y: d.total })),
             borderColor: 'rgb(255, 99, 132)',
-            backgroundColor: 'rgba(255, 99, 132, 0.2)'
-          }
-        ]
-      }
+            backgroundColor: 'rgba(255, 99, 132, 0.2)',
+          },
+        ],
+      },
     };
   }
 
@@ -519,37 +599,55 @@ export class EvaluationDashboard extends EventEmitter {
    * Generate scenario performance data
    */
   private generateScenarioPerformanceData(): any {
-    const scenarioStats = new Map<string, { 
-      total: number; 
-      successful: number; 
-      avgScore: number; 
-      avgLatency: number; 
-    }>();
+    const scenarioStats = new Map<
+      string,
+      {
+        total: number;
+        successful: number;
+        avgScore: number;
+        avgLatency: number;
+      }
+    >();
 
-    this.evaluationResults.forEach(result => {
+    this.evaluationResults.forEach((result) => {
       const scenarioId = result.scenarioId;
       if (!scenarioStats.has(scenarioId)) {
-        scenarioStats.set(scenarioId, { total: 0, successful: 0, avgScore: 0, avgLatency: 0 });
+        scenarioStats.set(scenarioId, {
+          total: 0,
+          successful: 0,
+          avgScore: 0,
+          avgLatency: 0,
+        });
       }
 
       const stats = scenarioStats.get(scenarioId)!;
       stats.total++;
       if (result.success) stats.successful++;
       stats.avgScore += result.overallScore;
-      stats.avgLatency += result.planningPerformance.latency + result.executionPerformance.latency;
+      stats.avgLatency +=
+        result.planningPerformance.latency +
+        result.executionPerformance.latency;
     });
 
-    const tableData = Array.from(scenarioStats.entries()).map(([scenarioId, stats]) => ({
-      scenario: scenarioId,
-      total: stats.total,
-      successRate: ((stats.successful / stats.total) * 100).toFixed(1) + '%',
-      avgScore: (stats.avgScore / stats.total * 100).toFixed(1) + '%',
-      avgLatency: (stats.avgLatency / stats.total / 1000).toFixed(2) + 's'
-    }));
+    const tableData = Array.from(scenarioStats.entries()).map(
+      ([scenarioId, stats]) => ({
+        scenario: scenarioId,
+        total: stats.total,
+        successRate: ((stats.successful / stats.total) * 100).toFixed(1) + '%',
+        avgScore: ((stats.avgScore / stats.total) * 100).toFixed(1) + '%',
+        avgLatency: (stats.avgLatency / stats.total / 1000).toFixed(2) + 's',
+      })
+    );
 
     return {
-      columns: ['Scenario', 'Total', 'Success Rate', 'Avg Score', 'Avg Latency'],
-      data: tableData
+      columns: [
+        'Scenario',
+        'Total',
+        'Success Rate',
+        'Avg Score',
+        'Avg Latency',
+      ],
+      data: tableData,
     };
   }
 
@@ -557,21 +655,24 @@ export class EvaluationDashboard extends EventEmitter {
    * Generate agent comparison data
    */
   private generateAgentComparisonData(): any {
-    const agentStats = new Map<string, {
-      total: number;
-      successful: number;
-      avgScore: number;
-      scenarios: Set<string>;
-    }>();
+    const agentStats = new Map<
+      string,
+      {
+        total: number;
+        successful: number;
+        avgScore: number;
+        scenarios: Set<string>;
+      }
+    >();
 
-    this.evaluationResults.forEach(result => {
+    this.evaluationResults.forEach((result) => {
       const agentId = result.agentConfiguration.id || 'unknown';
       if (!agentStats.has(agentId)) {
-        agentStats.set(agentId, { 
-          total: 0, 
-          successful: 0, 
-          avgScore: 0, 
-          scenarios: new Set() 
+        agentStats.set(agentId, {
+          total: 0,
+          successful: 0,
+          avgScore: 0,
+          scenarios: new Set(),
         });
       }
 
@@ -582,17 +683,19 @@ export class EvaluationDashboard extends EventEmitter {
       stats.scenarios.add(result.scenarioId);
     });
 
-    const comparisonData = Array.from(agentStats.entries()).map(([agentId, stats]) => ({
-      agent: agentId,
-      successRate: (stats.successful / stats.total) * 100,
-      avgScore: (stats.avgScore / stats.total) * 100,
-      scenarios: stats.scenarios.size,
-      evaluations: stats.total
-    }));
+    const comparisonData = Array.from(agentStats.entries()).map(
+      ([agentId, stats]) => ({
+        agent: agentId,
+        successRate: (stats.successful / stats.total) * 100,
+        avgScore: (stats.avgScore / stats.total) * 100,
+        scenarios: stats.scenarios.size,
+        evaluations: stats.total,
+      })
+    );
 
     return {
       type: 'bar',
-      data: comparisonData.sort((a, b) => b.avgScore - a.avgScore)
+      data: comparisonData.sort((a, b) => b.avgScore - a.avgScore),
     };
   }
 
@@ -602,17 +705,17 @@ export class EvaluationDashboard extends EventEmitter {
   private generateAlertsData(): any {
     const alerts = [
       ...this.state.activeAlerts,
-      ...this.regressionData.slice(-10).map(r => ({
+      ...this.regressionData.slice(-10).map((r) => ({
         id: r.id,
         severity: r.severity,
         message: `Regression: ${r.metricType} degraded by ${r.degradationPercentage.toFixed(1)}%`,
         timestamp: r.timestamp,
-        type: 'regression'
-      }))
+        type: 'regression',
+      })),
     ];
 
     return {
-      alerts: alerts.sort((a, b) => b.timestamp - a.timestamp).slice(0, 20)
+      alerts: alerts.sort((a, b) => b.timestamp - a.timestamp).slice(0, 20),
     };
   }
 
@@ -622,14 +725,16 @@ export class EvaluationDashboard extends EventEmitter {
   private generateSystemStatusData(): any {
     return {
       health: this.state.systemHealth,
-      uptime: this.isRunning ? Date.now() - (this.state.timestamp - this.config.refreshInterval) : 0,
+      uptime: this.isRunning
+        ? Date.now() - (this.state.timestamp - this.config.refreshInterval)
+        : 0,
       lastUpdate: this.state.timestamp,
       components: {
         evaluation: this.evaluationResults.length > 0 ? 'operational' : 'idle',
         benchmarking: this.benchmarkResults.length > 0 ? 'operational' : 'idle',
         monitoring: this.monitoringData ? 'operational' : 'idle',
-        regression: this.regressionData.length > 0 ? 'active' : 'idle'
-      }
+        regression: this.regressionData.length > 0 ? 'active' : 'idle',
+      },
     };
   }
 
@@ -638,17 +743,17 @@ export class EvaluationDashboard extends EventEmitter {
    */
   private calculateTrend(values: number[]): 'up' | 'down' | 'stable' {
     if (values.length < 2) return 'stable';
-    
+
     const recent = values.slice(-5);
     const older = values.slice(-10, -5);
-    
+
     if (recent.length === 0 || older.length === 0) return 'stable';
-    
+
     const recentAvg = recent.reduce((sum, v) => sum + v, 0) / recent.length;
     const olderAvg = older.reduce((sum, v) => sum + v, 0) / older.length;
-    
+
     const change = (recentAvg - olderAvg) / olderAvg;
-    
+
     if (Math.abs(change) < 0.05) return 'stable';
     return change > 0 ? 'up' : 'down';
   }
@@ -664,7 +769,7 @@ export class EvaluationDashboard extends EventEmitter {
     const history = this.dataHistory.get(key)!;
     history.push({
       timestamp: Date.now(),
-      data
+      data,
     });
 
     // Keep only recent history
@@ -684,7 +789,7 @@ export class EvaluationDashboard extends EventEmitter {
       evaluationResults: this.evaluationResults,
       benchmarkResults: this.benchmarkResults,
       regressionData: this.regressionData,
-      monitoringData: this.monitoringData
+      monitoringData: this.monitoringData,
     };
 
     if (format === 'json') {
@@ -701,15 +806,15 @@ export class EvaluationDashboard extends EventEmitter {
   private convertToCSV(data: any): string {
     // Simplified CSV conversion
     const headers = ['Timestamp', 'Scenario', 'Agent', 'Success', 'Score'];
-    const rows = this.evaluationResults.map(result => [
+    const rows = this.evaluationResults.map((result) => [
       new Date(result.timestamp).toISOString(),
       result.scenarioId,
       result.agentConfiguration.id || 'unknown',
       result.success.toString(),
-      result.overallScore.toString()
+      result.overallScore.toString(),
     ]);
 
-    return [headers, ...rows].map(row => row.join(',')).join('\n');
+    return [headers, ...rows].map((row) => row.join(',')).join('\n');
   }
 
   /**
@@ -732,8 +837,8 @@ export class EvaluationDashboard extends EventEmitter {
         averageScore: 0,
         averageDuration: 0,
         activeScenarios: 0,
-        activeAgents: 0
-      }
+        activeAgents: 0,
+      },
     };
   }
 
@@ -748,7 +853,7 @@ export class EvaluationDashboard extends EventEmitter {
         title: 'Performance Metrics',
         data: {},
         lastUpdated: Date.now(),
-        isLoading: false
+        isLoading: false,
       },
       {
         id: 'success_rate_chart',
@@ -756,7 +861,7 @@ export class EvaluationDashboard extends EventEmitter {
         title: 'Success Rate Over Time',
         data: {},
         lastUpdated: Date.now(),
-        isLoading: false
+        isLoading: false,
       },
       {
         id: 'latency_chart',
@@ -764,7 +869,7 @@ export class EvaluationDashboard extends EventEmitter {
         title: 'Latency Trends',
         data: {},
         lastUpdated: Date.now(),
-        isLoading: false
+        isLoading: false,
       },
       {
         id: 'scenario_performance',
@@ -772,7 +877,7 @@ export class EvaluationDashboard extends EventEmitter {
         title: 'Scenario Performance',
         data: {},
         lastUpdated: Date.now(),
-        isLoading: false
+        isLoading: false,
       },
       {
         id: 'agent_comparison',
@@ -780,7 +885,7 @@ export class EvaluationDashboard extends EventEmitter {
         title: 'Agent Comparison',
         data: {},
         lastUpdated: Date.now(),
-        isLoading: false
+        isLoading: false,
       },
       {
         id: 'alerts',
@@ -788,7 +893,7 @@ export class EvaluationDashboard extends EventEmitter {
         title: 'Active Alerts',
         data: {},
         lastUpdated: Date.now(),
-        isLoading: false
+        isLoading: false,
       },
       {
         id: 'system_status',
@@ -796,11 +901,11 @@ export class EvaluationDashboard extends EventEmitter {
         title: 'System Status',
         data: {},
         lastUpdated: Date.now(),
-        isLoading: false
-      }
+        isLoading: false,
+      },
     ];
 
-    defaultWidgets.forEach(widget => {
+    defaultWidgets.forEach((widget) => {
       this.widgets.set(widget.id, widget);
     });
 
@@ -817,13 +922,18 @@ export class EvaluationDashboard extends EventEmitter {
       autoRefresh: true,
       chartTypes: ['line', 'bar'],
       colorScheme: 'auto',
-      metricsToDisplay: ['overallScore', 'successRate', 'planningLatency', 'executionLatency'],
+      metricsToDisplay: [
+        'overallScore',
+        'successRate',
+        'planningLatency',
+        'executionLatency',
+      ],
       scenariosToMonitor: [],
       agentsToMonitor: [],
       showAlerts: true,
       alertSeverityFilter: ['warning', 'critical', 'emergency'],
       enableExport: true,
-      exportFormats: ['json', 'csv']
+      exportFormats: ['json', 'csv'],
     };
   }
 }

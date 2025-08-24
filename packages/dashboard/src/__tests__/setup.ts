@@ -123,14 +123,11 @@ global.testUtils = {
 
 // Type declarations for global test utilities
 declare global {
-  namespace NodeJS {
-    interface Global {
-      testUtils: {
-        createMockCognitiveFeedback: (overrides?: any) => any;
-        createMockTask: (overrides?: any) => any;
-        createMockThought: (overrides?: any) => any;
-        waitForAsync: (ms?: number) => Promise<void>;
-      };
-    }
-  }
+  // eslint-disable-next-line no-var
+  var testUtils: {
+    createMockCognitiveFeedback: (overrides?: any) => any;
+    createMockTask: (overrides?: any) => any;
+    createMockThought: (overrides?: any) => any;
+    waitForAsync: (ms?: number) => Promise<void>;
+  };
 }

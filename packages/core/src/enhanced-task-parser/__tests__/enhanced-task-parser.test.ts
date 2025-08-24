@@ -1,18 +1,16 @@
 /**
  * Enhanced Task Parser Tests
- * 
+ *
  * Comprehensive test suite for the enhanced task parser system,
  * including dual-channel prompting and creative paraphrasing functionality.
- * 
+ *
  * @author @darianrosebrook
  */
 
 import { EnhancedTaskParser } from '../enhanced-task-parser';
-import { DualChannelPrompting } from '../dual-channel-prompting';
-import { CreativeParaphrasing } from '../creative-paraphrasing';
 import { EnvironmentalContext, TaskDefinition } from '../types';
-import { ChannelType } from '../dual-channel-prompting';
 import { ParaphrasingStyle } from '../creative-paraphrasing';
+import { TaskType } from '../types';
 
 describe('Enhanced Task Parser', () => {
   // Increase timeout for all tests in this suite
@@ -22,7 +20,7 @@ describe('Enhanced Task Parser', () => {
 
   beforeEach(() => {
     enhancedTaskParser = new EnhancedTaskParser();
-    
+
     mockEnvironmentalContext = {
       time_of_day: 'day',
       weather: 'clear',
@@ -60,7 +58,8 @@ describe('Enhanced Task Parser', () => {
     });
 
     test('should initialize creative paraphrasing', () => {
-      const paraphrasingMetrics = enhancedTaskParser.getCreativeParaphrasingMetrics();
+      const paraphrasingMetrics =
+        enhancedTaskParser.getCreativeParaphrasingMetrics();
       expect(paraphrasingMetrics).toBeDefined();
       expect(typeof paraphrasingMetrics.average_confidence).toBe('number');
     });
@@ -215,8 +214,8 @@ describe('Enhanced Task Parser', () => {
       expect(options[0].style_used).toBe('casual');
       expect(options[1].style_used).toBe('formal');
       expect(options[2].style_used).toBe('instructional');
-      
-      options.forEach(option => {
+
+      options.forEach((option) => {
         expect(option.confidence).toBeGreaterThan(0.5);
         expect(option.paraphrased_task).toBeDefined();
         expect(option.adaptations_applied).toBeDefined();
@@ -247,7 +246,7 @@ describe('Enhanced Task Parser', () => {
         userContext
       );
 
-      options.forEach(option => {
+      options.forEach((option) => {
         expect(option.confidence).toBeGreaterThanOrEqual(0.7);
       });
     });
@@ -279,7 +278,7 @@ describe('Enhanced Task Parser', () => {
 
       // Check that feedback was recorded
       const taskHistory = enhancedTaskParser.getTaskHistory();
-      const task = taskHistory.find(t => t.task.id === result.task.id);
+      const task = taskHistory.find((t) => t.task.id === result.task.id);
       expect(task?.user_interaction_metadata.feedback_score).toBe(0.9);
     });
 
@@ -292,11 +291,7 @@ describe('Enhanced Task Parser', () => {
       };
 
       // Parse multiple tasks with feedback
-      const tasks = [
-        'gather wood',
-        'build a house',
-        'craft tools',
-      ];
+      const tasks = ['gather wood', 'build a house', 'craft tools'];
 
       for (const taskInput of tasks) {
         const result = await enhancedTaskParser.parseUserInput(
@@ -344,8 +339,12 @@ describe('Enhanced Task Parser', () => {
         userContext
       );
 
-      expect(result.context_adaptations).toContain('Added safety context for dangerous environment');
-      expect(result.context_adaptations).toContain('Adjusted for nighttime conditions');
+      expect(result.context_adaptations).toContain(
+        'Added safety context for dangerous environment'
+      );
+      expect(result.context_adaptations).toContain(
+        'Adjusted for nighttime conditions'
+      );
     });
 
     test('should adapt to beginner user expertise', async () => {
@@ -362,7 +361,9 @@ describe('Enhanced Task Parser', () => {
         userContext
       );
 
-      expect(result.context_adaptations).toContain('Simplified language for beginner user');
+      expect(result.context_adaptations).toContain(
+        'Simplified language for beginner user'
+      );
     });
   });
 
@@ -375,7 +376,11 @@ describe('Enhanced Task Parser', () => {
         urgency_level: 0.5,
       };
 
-      await enhancedTaskParser.parseUserInput(userInput, mockEnvironmentalContext, userContext);
+      await enhancedTaskParser.parseUserInput(
+        userInput,
+        mockEnvironmentalContext,
+        userContext
+      );
 
       const metrics = enhancedTaskParser.getPerformanceMetrics();
       expect(metrics.parsing_time).toBeGreaterThan(0);
@@ -385,15 +390,24 @@ describe('Enhanced Task Parser', () => {
 
     test('should track dual-channel metrics', () => {
       const dualChannelMetrics = enhancedTaskParser.getDualChannelMetrics();
-      expect(dualChannelMetrics.operational_success_rate).toBeGreaterThanOrEqual(0);
-      expect(dualChannelMetrics.expressive_success_rate).toBeGreaterThanOrEqual(0);
-      expect(dualChannelMetrics.average_response_time).toBeGreaterThanOrEqual(0);
+      expect(
+        dualChannelMetrics.operational_success_rate
+      ).toBeGreaterThanOrEqual(0);
+      expect(dualChannelMetrics.expressive_success_rate).toBeGreaterThanOrEqual(
+        0
+      );
+      expect(dualChannelMetrics.average_response_time).toBeGreaterThanOrEqual(
+        0
+      );
     });
 
     test('should track creative paraphrasing metrics', () => {
-      const paraphrasingMetrics = enhancedTaskParser.getCreativeParaphrasingMetrics();
+      const paraphrasingMetrics =
+        enhancedTaskParser.getCreativeParaphrasingMetrics();
       expect(paraphrasingMetrics.average_confidence).toBeGreaterThanOrEqual(0);
-      expect(paraphrasingMetrics.user_satisfaction_score).toBeGreaterThanOrEqual(0);
+      expect(
+        paraphrasingMetrics.user_satisfaction_score
+      ).toBeGreaterThanOrEqual(0);
     });
   });
 
@@ -416,12 +430,38 @@ describe('Enhanced Task Parser', () => {
     test('should update sub-component configurations', () => {
       const newConfig = {
         dual_channel: {
+          operational: {
+            temperature: 0.5,
+            max_tokens: 1000,
+            top_p: 0.9,
+            frequency_penalty: 0.1,
+            presence_penalty: 0.1,
+            system_prompt: 'You are a helpful assistant',
+            user_prompt_template: 'User: {user_input}\nAssistant:',
+          },
+          expressive: {
+            temperature: 0.7,
+            max_tokens: 1500,
+            top_p: 0.8,
+            frequency_penalty: 0.2,
+            presence_penalty: 0.2,
+            system_prompt: 'You are a creative writer',
+            user_prompt_template: 'User: {user_input}\nAssistant:',
+          },
           context_aware_routing: false,
           auto_fallback: false,
+          max_retries: 3,
+          timeout_ms: 10000,
         },
         creative_paraphrasing: {
+          enable_context_adaptation: false,
+          enable_style_matching: false,
           enable_emotion_integration: false,
+          enable_cultural_adaptation: false,
+          min_confidence_threshold: 0.5,
           max_paraphrase_length: 100,
+          enable_fallback_paraphrasing: false,
+          max_adaptation_attempts: 2,
         },
       };
 
@@ -430,7 +470,9 @@ describe('Enhanced Task Parser', () => {
 
       expect(config.dual_channel.context_aware_routing).toBe(false);
       expect(config.dual_channel.auto_fallback).toBe(false);
-      expect(config.creative_paraphrasing.enable_emotion_integration).toBe(false);
+      expect(config.creative_paraphrasing.enable_emotion_integration).toBe(
+        false
+      );
       expect(config.creative_paraphrasing.max_paraphrase_length).toBe(100);
     });
   });
@@ -445,14 +487,18 @@ describe('Enhanced Task Parser', () => {
       };
 
       await expect(
-        enhancedTaskParser.parseUserInput(invalidInput, mockEnvironmentalContext, userContext)
+        enhancedTaskParser.parseUserInput(
+          invalidInput,
+          mockEnvironmentalContext,
+          userContext
+        )
       ).rejects.toThrow();
     });
 
     test('should handle paraphrase generation errors', async () => {
       const invalidTask: TaskDefinition = {
         id: 'invalid-task',
-        type: 'invalid_type' as any,
+        type: 'invalid_type' as TaskType,
         parameters: {},
         created_at: Date.now(),
         updated_at: Date.now(),
@@ -489,7 +535,11 @@ describe('Enhanced Task Parser', () => {
         done();
       });
 
-      enhancedTaskParser.parseUserInput(userInput, mockEnvironmentalContext, userContext);
+      enhancedTaskParser.parseUserInput(
+        userInput,
+        mockEnvironmentalContext,
+        userContext
+      );
     });
 
     test('should emit events for creative response generation', (done) => {
@@ -506,7 +556,11 @@ describe('Enhanced Task Parser', () => {
         done();
       });
 
-      enhancedTaskParser.generateCreativeResponse(userInput, mockEnvironmentalContext, userContext);
+      enhancedTaskParser.generateCreativeResponse(
+        userInput,
+        mockEnvironmentalContext,
+        userContext
+      );
     });
 
     test('should emit events for user feedback', (done) => {
@@ -525,10 +579,18 @@ describe('Enhanced Task Parser', () => {
           done();
         });
 
-        enhancedTaskParser.provideUserFeedback(result.task.id, 0.8, 'Good job!');
+        enhancedTaskParser.provideUserFeedback(
+          result.task.id,
+          0.8,
+          'Good job!'
+        );
       });
 
-      enhancedTaskParser.parseUserInput(userInput, mockEnvironmentalContext, userContext);
+      enhancedTaskParser.parseUserInput(
+        userInput,
+        mockEnvironmentalContext,
+        userContext
+      );
     });
   });
 
@@ -541,7 +603,11 @@ describe('Enhanced Task Parser', () => {
         urgency_level: 0.5,
       };
 
-      await enhancedTaskParser.parseUserInput(userInput, mockEnvironmentalContext, userContext);
+      await enhancedTaskParser.parseUserInput(
+        userInput,
+        mockEnvironmentalContext,
+        userContext
+      );
 
       const taskHistory = enhancedTaskParser.getTaskHistory();
       expect(taskHistory.length).toBeGreaterThan(0);

@@ -235,24 +235,139 @@ function validateTaskCompletion(task: any, result: any): boolean {
     return false;
   }
 
+  // Check if the bot is connected and ready
+  if (result.botStatus && result.botStatus.connected === false) {
+    return false;
+  }
+
   // For crafting tasks, check if the item was actually crafted
   if (task.type === 'craft') {
-    // Check if the crafting was successful based on the new implementation
-    return result.success === true && !result.error;
+    return (
+      result.success === true &&
+      !result.error &&
+      (result.data?.craftedItems?.length > 0 || result.item)
+    );
   }
 
   // For mining tasks, check if any blocks were successfully mined
   if (task.type === 'mine') {
-    return result.success === true && !result.error;
+    return (
+      result.success === true &&
+      !result.error &&
+      (result.data?.minedBlocks?.length > 0 || result.results?.some((r: any) => r.success))
+    );
   }
 
-  // For other task types, check the result structure
-  if (result.success === false) {
+  // For building tasks, check if something was actually built
+  if (task.type === 'build') {
+    return (
+      result.success === true && 
+      !result.error && 
+      (result.data?.builtStructure || result.results?.length > 0)
+    );
+  }
+
+  // For gathering tasks, check if items were actually collected
+  if (task.type === 'gather') {
+    return (
+      result.success === true &&
+      !result.error &&
+      (result.data?.gatheredItems?.length > 0 || result.results?.length > 0)
+    );
+  }
+
+  // For movement tasks, check if the bot actually moved
+  if (task.type === 'move' || task.type === 'navigate') {
+    return (
+      result.success === true &&
+      !result.error &&
+      (result.data?.distanceTraveled > 0 || result.results?.length > 0)
+    );
+  }
+
+  // For flee tasks, check if defensive action was taken
+  if (task.type === 'flee') {
+    return (
+      result.success === true &&
+      !result.error &&
+      (result.defensive === true || result.results?.length > 0)
+    );
+  }
+
+  // For explore tasks, check if exploration was attempted
+  if (task.type === 'explore') {
+    return (
+      result.success === true &&
+      !result.error &&
+      (result.type === 'exploration' || result.results?.length > 0)
+    );
+  }
+
+  // For heal tasks, check if healing was attempted
+  if (task.type === 'heal') {
+    return (
+      result.success === true &&
+      !result.error &&
+      (result.defensive === true || result.results?.length > 0)
+    );
+  }
+
+  // For place_light tasks, check if lighting was placed
+  if (task.type === 'place_light') {
+    return (
+      result.success === true &&
+      !result.error &&
+      (result.defensive === true || result.results?.length > 0)
+    );
+  }
+
+  // For seek_shelter tasks, check if shelter was sought
+  if (task.type === 'seek_shelter') {
+    return (
+      result.success === true &&
+      !result.error &&
+      (result.defensive === true || result.results?.length > 0)
+    );
+  }
+
+  // For turn tasks, check if turning was attempted
+  if (task.type === 'turn') {
+    return (
+      result.success === true &&
+      !result.error &&
+      (result.results?.length > 0 || result.botStatus)
+    );
+  }
+
+  // For chat tasks, check if message was sent
+  if (task.type === 'chat') {
+    return (
+      result.success === true &&
+      !result.error &&
+      (result.results?.length > 0 || result.botStatus)
+    );
+  }
+
+  // For farm tasks, check if farming was attempted
+  if (task.type === 'farm') {
+    return (
+      result.success === true &&
+      !result.error &&
+      (result.type === 'farming' || result.results?.length > 0)
+    );
+  }
+
+  // For other task types, require explicit success and no errors
+  if (result.success === false || result.error) {
     return false;
   }
 
-  // Default to true if no specific validation rules apply
-  return true;
+  // If we have any form of execution evidence, consider it successful
+  if (result.results?.length > 0 || result.botStatus || result.type || result.defensive) {
+    return true;
+  }
+
+  return false;
 }
 
 /**
@@ -360,7 +475,113 @@ function generateAlternativeTask(failedTask: any): any {
 }
 
 // Helper function to generate autonomous tasks based on goals
-function generateAutonomousTask() {
+async function generateAutonomousTask() {
+  // Check current bot state for threats and health
+  let threatLevel = 0;
+  let healthLevel = 100;
+  let isNight = false;
+
+  try {
+    const minecraftUrl = 'http://localhost:3005';
+    const botStatus = await fetch(`${minecraftUrl}/health`).then((res) =>
+      res.json()
+    );
+
+    if (botStatus.botStatus?.health) {
+      healthLevel = botStatus.botStatus.health;
+    }
+
+    // Check if it's night time (phantoms spawn at night)
+    const worldState = await fetch(`${minecraftUrl}/state`).then((res) =>
+      res.json()
+    );
+    if (worldState.data?.worldState?.environment?.timeOfDay) {
+      const timeOfDay = worldState.data.worldState.environment.timeOfDay;
+      isNight = timeOfDay > 13000 || timeOfDay < 1000; // Night time in Minecraft
+    }
+
+    // Calculate threat level based on health and time
+    if (healthLevel < 80) threatLevel += 50; // High threat if health is below 80%
+    if (healthLevel < 50) threatLevel += 40; // Very high threat if health is below 50%
+    if (healthLevel < 30) threatLevel += 50; // Critical threat if health is below 30%
+    if (isNight && healthLevel < 90) threatLevel += 40; // Night vulnerability
+  } catch (error) {
+    console.log(' Could not check bot state for threat assessment');
+  }
+
+  // If under threat, prioritize defensive tasks
+  if (threatLevel > 30) {
+    // Lowered from 50 to 30 for faster response
+    const defensiveTasks = [
+      {
+        type: 'flee',
+        description: 'Flee from immediate danger to a safe location',
+        parameters: { direction: 'away_from_threat', distance: 10 },
+        priority: 0.9,
+        urgency: 0.9,
+      },
+      {
+        type: 'seek_shelter',
+        description: 'Find or build shelter to protect from threats',
+        parameters: { shelter_type: 'cave_or_house', light_sources: true },
+        priority: 0.8,
+        urgency: 0.8,
+      },
+      {
+        type: 'heal',
+        description: 'Restore health by eating food or finding healing items',
+        parameters: { food_type: 'any', amount: 1 },
+        priority: 0.7,
+        urgency: 0.7,
+      },
+      {
+        type: 'place_light',
+        description:
+          'Place light sources to deter phantoms and other hostile mobs',
+        parameters: { light_type: 'torch', count: 3 },
+        priority: 0.6,
+        urgency: 0.6,
+      },
+    ];
+
+    // Select the most appropriate defensive task based on threat level
+    let selectedTask;
+    if (healthLevel < 20) {
+      // Critical health - flee immediately
+      selectedTask =
+        defensiveTasks.find((t) => t.type === 'flee') || defensiveTasks[0];
+    } else if (healthLevel < 30) {
+      // Very low health - heal first, then flee
+      selectedTask =
+        defensiveTasks.find((t) => t.type === 'heal') || defensiveTasks[0];
+    } else if (isNight) {
+      // Night time - place light to deter phantoms
+      selectedTask =
+        defensiveTasks.find((t) => t.type === 'place_light') ||
+        defensiveTasks[1];
+    } else {
+      // General threat - flee to safety
+      selectedTask =
+        defensiveTasks.find((t) => t.type === 'flee') || defensiveTasks[0];
+    }
+
+    return {
+      id: `defense-task-${Date.now()}`,
+      type: selectedTask.type,
+      description: selectedTask.description,
+      priority: selectedTask.priority,
+      urgency: selectedTask.urgency,
+      parameters: selectedTask.parameters,
+      goal: 'survival_defense',
+      status: 'pending',
+      createdAt: Date.now(),
+      completedAt: null,
+      autonomous: true,
+      defensive: true, // Mark as defensive task
+    };
+  }
+
+  // Normal exploration tasks when not under threat
   const taskTypes = [
     {
       type: 'explore',
@@ -430,7 +651,7 @@ async function autonomousTaskExecutor() {
   // If no pending tasks, generate a new autonomous task
   if (pendingTasks.length === 0) {
     console.log(' No tasks available, generating autonomous task...');
-    const newTask = generateAutonomousTask();
+    const newTask = await generateAutonomousTask();
     planningSystem.goalFormulation.addTask(newTask);
 
     // Execute the task immediately
@@ -458,9 +679,22 @@ async function executeTaskInMinecraft(task: any) {
   try {
     const minecraftUrl = 'http://localhost:3005';
 
+    // Check if the bot is connected first
+    const botStatus = await fetch(`${minecraftUrl}/health`).then((res) =>
+      res.json()
+    );
+    if (!botStatus.executionStatus?.bot?.connected) {
+      return {
+        success: false,
+        error: 'Bot not connected to Minecraft server',
+        botStatus: botStatus,
+        type: task.type,
+      };
+    }
+
     switch (task.type) {
       case 'move':
-        return await fetch(`${minecraftUrl}/action`, {
+        const result = await fetch(`${minecraftUrl}/action`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -469,8 +703,103 @@ async function executeTaskInMinecraft(task: any) {
           }),
         }).then((res) => res.json());
 
+        return {
+          ...result,
+          botStatus: botStatus,
+        };
+
+      case 'move_forward':
+        const moveForwardResult = await fetch(`${minecraftUrl}/action`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            type: 'move_forward',
+            parameters: { distance: task.parameters?.distance || 1 },
+          }),
+        }).then((res) => res.json());
+
+        return {
+          ...moveForwardResult,
+          botStatus: botStatus,
+        };
+
+      case 'flee':
+        // Flee by moving away from current position (simple implementation)
+        const fleeResult = await fetch(`${minecraftUrl}/action`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            type: 'move_forward',
+            parameters: { distance: task.parameters?.distance || 10 },
+          }),
+        }).then((res) => res.json());
+
+        return {
+          ...fleeResult,
+          botStatus: botStatus,
+          defensive: true,
+        };
+
+      case 'heal':
+        // Try to eat food to heal
+        const healResult = await fetch(`${minecraftUrl}/action`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            type: 'consume_food',
+            parameters: { food_type: task.parameters?.food_type || 'any' },
+          }),
+        }).then((res) => res.json());
+
+        return {
+          ...healResult,
+          botStatus: botStatus,
+          defensive: true,
+        };
+
+      case 'place_light':
+        // Place torches to create light (deters phantoms)
+        const lightResult = await fetch(`${minecraftUrl}/action`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            type: 'place_block',
+            parameters: {
+              block_type: 'torch',
+              count: task.parameters?.count || 3,
+              placement: 'around_player',
+            },
+          }),
+        }).then((res) => res.json());
+
+        return {
+          ...lightResult,
+          botStatus: botStatus,
+          defensive: true,
+        };
+
+      case 'seek_shelter':
+        // Look for nearby caves or build a simple shelter
+        const shelterResult = await fetch(`${minecraftUrl}/action`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            type: 'find_shelter',
+            parameters: {
+              shelter_type: task.parameters?.shelter_type || 'cave_or_house',
+              light_sources: task.parameters?.light_sources || true,
+            },
+          }),
+        }).then((res) => res.json());
+
+        return {
+          ...shelterResult,
+          botStatus: botStatus,
+          defensive: true,
+        };
+
       case 'turn':
-        return await fetch(`${minecraftUrl}/action`, {
+        const turnResult = await fetch(`${minecraftUrl}/action`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -482,8 +811,13 @@ async function executeTaskInMinecraft(task: any) {
           }),
         }).then((res) => res.json());
 
+        return {
+          ...turnResult,
+          botStatus: botStatus,
+        };
+
       case 'chat':
-        return await fetch(`${minecraftUrl}/action`, {
+        const chatResult = await fetch(`${minecraftUrl}/action`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -496,6 +830,11 @@ async function executeTaskInMinecraft(task: any) {
             },
           }),
         }).then((res) => res.json());
+
+        return {
+          ...chatResult,
+          botStatus: botStatus,
+        };
 
       case 'explore':
         // Execute exploration by moving around and looking
@@ -529,6 +868,7 @@ async function executeTaskInMinecraft(task: any) {
           type: 'exploration',
           success: true,
           error: undefined,
+          botStatus: botStatus,
         };
 
       case 'gather':
@@ -552,6 +892,7 @@ async function executeTaskInMinecraft(task: any) {
           type: 'gathering',
           success: true,
           error: undefined,
+          botStatus: botStatus,
         };
 
       case 'craft':
@@ -1136,11 +1477,17 @@ app.post('/run-option', async (req, res) => {
     const { option_id, args, options } = req.body;
 
     if (!option_id) {
-      return res.status(400).json({ error: 'Missing required field: option_id' });
+      return res
+        .status(400)
+        .json({ error: 'Missing required field: option_id' });
     }
 
-    const result = await btRunner.runOption(option_id, args || {}, options || {});
-    
+    const result = await btRunner.runOption(
+      option_id,
+      args || {},
+      options || {}
+    );
+
     res.json({
       success: true,
       result,
@@ -1148,9 +1495,9 @@ app.post('/run-option', async (req, res) => {
     });
   } catch (error) {
     console.error('BT execution failed:', error);
-    res.status(500).json({ 
-      error: 'BT execution failed', 
-      details: error instanceof Error ? error.message : 'Unknown error' 
+    res.status(500).json({
+      error: 'BT execution failed',
+      details: error instanceof Error ? error.message : 'Unknown error',
     });
   }
 });
@@ -1161,32 +1508,43 @@ app.post('/run-option/stream', async (req, res) => {
     const { option_id, args, options } = req.body;
 
     if (!option_id) {
-      return res.status(400).json({ error: 'Missing required field: option_id' });
+      return res
+        .status(400)
+        .json({ error: 'Missing required field: option_id' });
     }
 
     // Set up SSE headers
     res.writeHead(200, {
       'Content-Type': 'text/event-stream',
       'Cache-Control': 'no-cache',
-      'Connection': 'keep-alive',
+      Connection: 'keep-alive',
     });
 
     const runId = `${option_id}-${Date.now()}`;
-    
+
     // Set up event listeners for streaming
     const onTick = (data: { runId: string; tick: any }) => {
       if (data.runId === runId) {
-        res.write(`data: ${JSON.stringify({ type: 'tick', data: data.tick })}\n\n`);
+        res.write(
+          `data: ${JSON.stringify({ type: 'tick', data: data.tick })}\n\n`
+        );
       }
     };
 
     const onStatus = (data: { runId: string; status: BTNodeStatus }) => {
       if (data.runId === runId) {
-        res.write(`data: ${JSON.stringify({ type: 'status', data: data.status })}\n\n`);
-        
+        res.write(
+          `data: ${JSON.stringify({ type: 'status', data: data.status })}\n\n`
+        );
+
         // Close stream when execution completes
-        if (data.status === BTNodeStatus.SUCCESS || data.status === BTNodeStatus.FAILURE) {
-          res.write(`data: ${JSON.stringify({ type: 'complete', data: data.status })}\n\n`);
+        if (
+          data.status === BTNodeStatus.SUCCESS ||
+          data.status === BTNodeStatus.FAILURE
+        ) {
+          res.write(
+            `data: ${JSON.stringify({ type: 'complete', data: data.status })}\n\n`
+          );
           res.end();
         }
       }
@@ -1196,15 +1554,20 @@ app.post('/run-option/stream', async (req, res) => {
     btRunner.on('status', onStatus);
 
     // Execute the option
-    const result = await btRunner.runOption(option_id, args || {}, options || {});
+    const result = await btRunner.runOption(
+      option_id,
+      args || {},
+      options || {}
+    );
 
     // Clean up event listeners
     btRunner.off('tick', onTick);
     btRunner.off('status', onStatus);
-
   } catch (error) {
     console.error('BT streaming failed:', error);
-    res.write(`data: ${JSON.stringify({ type: 'error', error: error instanceof Error ? error.message : 'Unknown error' })}\n\n`);
+    res.write(
+      `data: ${JSON.stringify({ type: 'error', error: error instanceof Error ? error.message : 'Unknown error' })}\n\n`
+    );
     res.end();
   }
 });
@@ -1219,7 +1582,7 @@ app.post('/cancel', async (req, res) => {
     }
 
     const cancelled = await btRunner.cancel(run_id);
-    
+
     res.json({
       success: cancelled,
       cancelled,
@@ -1227,9 +1590,9 @@ app.post('/cancel', async (req, res) => {
     });
   } catch (error) {
     console.error('Cancel failed:', error);
-    res.status(500).json({ 
-      error: 'Cancel failed', 
-      details: error instanceof Error ? error.message : 'Unknown error' 
+    res.status(500).json({
+      error: 'Cancel failed',
+      details: error instanceof Error ? error.message : 'Unknown error',
     });
   }
 });
@@ -1238,7 +1601,7 @@ app.post('/cancel', async (req, res) => {
 app.get('/active-runs', (req, res) => {
   try {
     const activeRuns = btRunner.getActiveRuns();
-    
+
     res.json({
       success: true,
       activeRuns,
@@ -1246,9 +1609,9 @@ app.get('/active-runs', (req, res) => {
     });
   } catch (error) {
     console.error('Failed to get active runs:', error);
-    res.status(500).json({ 
-      error: 'Failed to get active runs', 
-      details: error instanceof Error ? error.message : 'Unknown error' 
+    res.status(500).json({
+      error: 'Failed to get active runs',
+      details: error instanceof Error ? error.message : 'Unknown error',
     });
   }
 });

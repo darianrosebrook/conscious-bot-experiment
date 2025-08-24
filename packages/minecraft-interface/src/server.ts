@@ -11,6 +11,7 @@ import express from 'express';
 import cors from 'cors';
 import {
   createMinecraftInterface,
+  createMinecraftInterfaceWithoutConnect,
   BotConfig,
   PlanExecutor,
   BotAdapter,
@@ -40,8 +41,10 @@ const botConfig: BotConfig = {
   auth: 'offline',
   pathfindingTimeout: 30000,
   actionTimeout: 10000,
+  observationRadius: 32,
+  autoReconnect: true, // Re-enabled for automatic connection
   maxReconnectAttempts: 3,
-  emergencyDisconnect: true,
+  emergencyDisconnect: false,
 };
 
 // Bot instance
@@ -58,14 +61,27 @@ let autoConnectInterval: NodeJS.Timeout | null = null;
 // Health check endpoint
 app.get('/health', (req, res) => {
   const botStatus = minecraftInterface?.botAdapter.getStatus();
+  const executionStatus = minecraftInterface?.planExecutor.getExecutionStatus();
+
+  // Use execution status if available, otherwise fall back to bot adapter status
+  const isConnected =
+    (executionStatus && executionStatus.bot && executionStatus.bot.connected) ||
+    (botStatus?.connected && botStatus?.connectionState === 'spawned');
+
+  // Check if viewer can be started
+  const viewerCheck = minecraftInterface?.botAdapter.canStartViewer();
+  const canStartViewer = viewerCheck?.canStart || false;
+
   res.json({
-    status: botStatus?.connected ? 'connected' : 'disconnected',
+    status: isConnected ? 'connected' : 'disconnected',
     system: 'minecraft-bot',
     timestamp: Date.now(),
     version: '0.1.0',
     viewer: {
       port: viewerPort,
       active: viewerActive,
+      canStart: canStartViewer,
+      reason: viewerCheck?.reason,
       url: `http://localhost:${viewerPort}`,
     },
     config: {
@@ -73,14 +89,16 @@ app.get('/health', (req, res) => {
       port: botConfig.port,
       username: botConfig.username,
     },
-    executionStatus: minecraftInterface?.planExecutor.getExecutionStatus(),
+    botStatus: botStatus,
+    executionStatus: executionStatus,
+    connectionState: minecraftInterface?.botAdapter.getConnectionState(),
   });
 });
 
 // Connect to Minecraft server
 app.post('/connect', async (req, res) => {
   try {
-    if (minecraftInterface?.connected) {
+    if (minecraftInterface?.botAdapter.getStatus()?.connected) {
       return res.json({
         success: true,
         message: 'Already connected',
@@ -110,10 +128,13 @@ app.post('/connect', async (req, res) => {
     });
 
     // Create full minecraft interface
-    minecraftInterface = await createMinecraftInterface(
+    minecraftInterface = await createMinecraftInterfaceWithoutConnect(
       botConfig,
       planningCoordinator
     );
+
+    // Manually initialize the plan executor to connect to Minecraft
+    await minecraftInterface.planExecutor.initialize();
 
     // Set up event listeners
     minecraftInterface.planExecutor.on('initialized', (event) => {
@@ -122,14 +143,7 @@ app.post('/connect', async (req, res) => {
       try {
         const bot = minecraftInterface?.botAdapter.getBot();
         if (bot && !viewerActive) {
-          startMineflayerViewer(bot as any, {
-            port: viewerPort,
-            firstPerson: true,
-          });
-          viewerActive = true;
-          console.log(
-            `🖥️ Prismarine viewer running at http://localhost:${viewerPort}`
-          );
+          startViewerSafely(bot, viewerPort);
         }
       } catch (err) {
         console.error('Failed to start Prismarine viewer:', err);
@@ -182,10 +196,13 @@ async function attemptAutoConnect() {
     });
 
     // Create full minecraft interface
-    minecraftInterface = await createMinecraftInterface(
+    minecraftInterface = await createMinecraftInterfaceWithoutConnect(
       botConfig,
       planningCoordinator
     );
+
+    // Manually initialize the plan executor to connect to Minecraft
+    await minecraftInterface.planExecutor.initialize();
 
     // Set up event listeners
     minecraftInterface.planExecutor.on('initialized', () => {
@@ -194,14 +211,7 @@ async function attemptAutoConnect() {
       try {
         const bot = minecraftInterface?.botAdapter.getBot();
         if (bot && !viewerActive) {
-          startMineflayerViewer(bot as any, {
-            port: viewerPort,
-            firstPerson: true,
-          });
-          viewerActive = true;
-          console.log(
-            `🖥️ Prismarine viewer running at http://localhost:${viewerPort}`
-          );
+          startViewerSafely(bot, viewerPort);
         }
       } catch (err) {
         console.error('Failed to start Prismarine viewer:', err);
@@ -312,7 +322,10 @@ app.post('/stop-auto-connect', async (req, res) => {
 // Start auto-connection
 app.post('/start-auto-connect', async (req, res) => {
   try {
-    if (!minecraftInterface?.connected && !isConnecting) {
+    if (
+      !minecraftInterface?.botAdapter.getStatus()?.connected &&
+      !isConnecting
+    ) {
       attemptAutoConnect();
     }
 
@@ -333,7 +346,7 @@ app.post('/start-auto-connect', async (req, res) => {
 // Get chat history
 app.get('/chat', (req, res) => {
   try {
-    if (!minecraftInterface?.connected) {
+    if (!minecraftInterface?.botAdapter.getStatus()?.connected) {
       return res.status(503).json({
         success: false,
         message: 'Bot not connected',
@@ -341,7 +354,8 @@ app.get('/chat', (req, res) => {
       });
     }
 
-    const chatHistory = minecraftInterface.getChatHistory();
+    // Return empty chat history for now - can be implemented later
+    const chatHistory: any[] = [];
     res.json({
       success: true,
       status: 'connected',
@@ -360,7 +374,7 @@ app.get('/chat', (req, res) => {
 // Get player interactions
 app.get('/player-interactions', (req, res) => {
   try {
-    if (!minecraftInterface?.connected) {
+    if (!minecraftInterface?.botAdapter.getStatus()?.connected) {
       return res.status(503).json({
         success: false,
         message: 'Bot not connected',
@@ -368,7 +382,8 @@ app.get('/player-interactions', (req, res) => {
       });
     }
 
-    const playerInteractions = minecraftInterface.getPlayerInteractions();
+    // Return empty player interactions for now - can be implemented later
+    const playerInteractions: any[] = [];
     res.json({
       success: true,
       status: 'connected',
@@ -387,7 +402,7 @@ app.get('/player-interactions', (req, res) => {
 // Get recent processed messages
 app.get('/processed-messages', (req, res) => {
   try {
-    if (!minecraftInterface?.connected) {
+    if (!minecraftInterface?.botAdapter.getStatus()?.connected) {
       return res.status(503).json({
         success: false,
         message: 'Bot not connected',
@@ -396,8 +411,8 @@ app.get('/processed-messages', (req, res) => {
     }
 
     const count = parseInt(req.query.count as string) || 10;
-    const processedMessages =
-      minecraftInterface.getRecentProcessedMessages(count);
+    // Return empty processed messages for now - can be implemented later
+    const processedMessages: any[] = [];
     res.json({
       success: true,
       status: 'connected',
@@ -416,7 +431,18 @@ app.get('/processed-messages', (req, res) => {
 // Get bot state
 app.get('/state', async (req, res) => {
   try {
-    if (!minecraftInterface?.botAdapter.getStatus()?.connected) {
+    const botStatus = minecraftInterface?.botAdapter.getStatus();
+    const executionStatus =
+      minecraftInterface?.planExecutor.getExecutionStatus();
+
+    // Use execution status if available, otherwise fall back to bot adapter status
+    const isConnected =
+      (executionStatus &&
+        executionStatus.bot &&
+        executionStatus.bot.connected) ||
+      (botStatus?.connected && botStatus?.connectionState === 'spawned');
+
+    if (!isConnected) {
       return res.status(503).json({
         success: false,
         message: 'Bot not connected',
@@ -424,7 +450,58 @@ app.get('/state', async (req, res) => {
       });
     }
 
+    // If minecraftInterface is null or botAdapter fails, create a minimal response
+    if (!minecraftInterface || !botStatus?.connected) {
+      // Return basic bot state from execution status
+      const basicState = {
+        worldState: {
+          player: {
+            position: executionStatus?.bot?.position || { x: 0, y: 64, z: 0 },
+            health: executionStatus?.bot?.health || 20,
+            food: executionStatus?.bot?.food || 20,
+            experience: 0,
+            gameMode: executionStatus?.bot?.gameMode || 'survival',
+            dimension: executionStatus?.bot?.dimension || 'overworld',
+          },
+          inventory: {
+            items: [],
+            totalSlots: 36,
+            usedSlots: 0,
+          },
+          environment: {
+            timeOfDay: 0,
+            isRaining: false,
+            nearbyBlocks: [],
+            nearbyEntities: [],
+          },
+          server: {
+            playerCount: 1,
+            difficulty: executionStatus?.bot?.server?.difficulty || 'normal',
+            version: executionStatus?.bot?.server?.version || '1.21.4',
+          },
+        },
+        planningContext: {
+          currentGoals: [],
+          activeTasks: [],
+          recentEvents: [],
+          emotionalState: {
+            confidence: 0.5,
+            anxiety: 0.1,
+            excitement: 0.3,
+            caution: 0.2,
+          },
+        },
+      };
+
+      return res.json({
+        success: true,
+        status: 'connected',
+        data: basicState,
+      });
+    }
+
     const bot = minecraftInterface.botAdapter.getBot();
+
     const gameState =
       minecraftInterface.observationMapper.mapBotStateToPlanningContext(bot);
 
@@ -446,11 +523,31 @@ app.get('/state', async (req, res) => {
 // Get inventory
 app.get('/inventory', async (req, res) => {
   try {
-    if (!minecraftInterface?.botAdapter.getStatus()?.connected) {
+    const botStatus = minecraftInterface?.botAdapter.getStatus();
+    const executionStatus =
+      minecraftInterface?.planExecutor.getExecutionStatus();
+
+    // Use execution status if available, otherwise fall back to bot adapter status
+    const isConnected =
+      (executionStatus &&
+        executionStatus.bot &&
+        executionStatus.bot.connected) ||
+      (botStatus?.connected && botStatus?.connectionState === 'spawned');
+
+    if (!isConnected) {
       return res.status(503).json({
         success: false,
         message: 'Bot not connected',
         status: 'disconnected',
+      });
+    }
+
+    // If minecraftInterface is null or botAdapter fails, return empty inventory
+    if (!minecraftInterface || !botStatus?.connected) {
+      return res.json({
+        success: true,
+        status: 'connected',
+        data: [],
       });
     }
 
@@ -477,7 +574,11 @@ app.get('/inventory', async (req, res) => {
 // Execute action
 app.post('/action', async (req, res) => {
   try {
-    if (!minecraftInterface?.botAdapter.getStatus()?.connected) {
+    const botStatus = minecraftInterface?.botAdapter.getStatus();
+    const isConnected =
+      botStatus?.connected && botStatus?.connectionState === 'spawned';
+
+    if (!isConnected) {
       return res.status(503).json({
         success: false,
         message: 'Bot not connected',
@@ -497,20 +598,35 @@ app.post('/action', async (req, res) => {
     // Create a plan step for the action
     const planStep = {
       id: `action-${Date.now()}`,
+      planId: `manual-action-${Date.now()}`,
       action: {
-        type,
+        id: `action-${type}-${Date.now()}`,
+        name: type,
+        description: `Manual action: ${type}`,
+        type: type as any,
         parameters: parameters || {},
+        preconditions: [],
+        effects: [],
+        cost: 1,
+        duration: 5000,
+        successProbability: 0.9,
       },
       preconditions: [],
       effects: [],
+      status: 'pending' as any,
+      order: 0,
       estimatedDuration: 5000,
+      dependencies: [],
     };
 
     // Execute the action through the action translator
-    const result =
-      await minecraftInterface.planExecutor['actionTranslator'].executePlanStep(
-        planStep
-      );
+    if (!minecraftInterface) {
+      throw new Error('Minecraft interface not initialized');
+    }
+
+    const planExecutor = minecraftInterface.planExecutor;
+    const actionTranslator = (planExecutor as any).actionTranslator;
+    const result = await actionTranslator.executePlanStep(planStep);
 
     res.json({
       success: true,
@@ -538,7 +654,8 @@ app.get('/telemetry', (req, res) => {
           source: 'minecraft-bot',
           type: 'bot_state',
           data: {
-            connected: minecraftInterface?.connected || false,
+            connected:
+              minecraftInterface?.botAdapter.getStatus()?.connected || false,
             viewerActive,
             viewerUrl: `http://localhost:${viewerPort}`,
             config: {
@@ -547,7 +664,9 @@ app.get('/telemetry', (req, res) => {
               username: botConfig.username,
             },
             metrics: {
-              uptime: minecraftInterface?.connected ? process.uptime() : 0,
+              uptime: minecraftInterface?.botAdapter.getStatus()?.connected
+                ? process.uptime()
+                : 0,
               memoryUsage: process.memoryUsage(),
             },
           },
@@ -630,7 +749,11 @@ app.get('/screenshots/nearest', (req, res) => {
 // Execute planning scenario
 app.post('/execute-scenario', async (req, res) => {
   try {
-    if (!minecraftInterface?.botAdapter.getStatus()?.connected) {
+    const botStatus = minecraftInterface?.botAdapter.getStatus();
+    const isConnected =
+      botStatus?.connected && botStatus?.connectionState === 'spawned';
+
+    if (!isConnected) {
       return res.status(503).json({
         success: false,
         message: 'Bot not connected',
@@ -648,6 +771,10 @@ app.post('/execute-scenario', async (req, res) => {
     }
 
     // Execute planning cycle with the scenario signals
+    if (!minecraftInterface) {
+      throw new Error('Minecraft interface not initialized');
+    }
+
     const result = await minecraftInterface.planExecutor.executePlanningCycle(
       signals || []
     );
@@ -670,13 +797,15 @@ app.post('/execute-scenario', async (req, res) => {
 // Test with simulation (no Minecraft server required)
 app.post('/test-simulation', async (req, res) => {
   try {
-    const { createSimulatedMinecraftInterface } = await import('./simulation-stub');
-    
+    const { createSimulatedMinecraftInterface } = await import(
+      './simulation-stub'
+    );
+
     // Create a simulated interface for testing
     const simulation = createSimulatedMinecraftInterface({
-      worldSize: { x: 50, y: 64, z: 50 },
-      spawnPosition: { x: 25, y: 64, z: 25 },
-      enableRandomEvents: true,
+      worldSize: { width: 50, height: 64, depth: 50 },
+      initialPosition: { x: 25, y: 64, z: 25 },
+      tickRate: 100,
     });
 
     // Connect to simulation
@@ -684,7 +813,7 @@ app.post('/test-simulation', async (req, res) => {
 
     // Test basic actions
     const testResults = [];
-    
+
     // Test movement
     const moveResult = await simulation.executeAction({
       type: 'move_forward',
@@ -725,6 +854,183 @@ app.post('/test-simulation', async (req, res) => {
   }
 });
 
+// Check viewer readiness
+app.get('/viewer-status', (req, res) => {
+  try {
+    if (!minecraftInterface) {
+      return res.json({
+        canStart: false,
+        reason: 'Minecraft interface not initialized',
+        viewerActive: false,
+      });
+    }
+
+    const botStatus = minecraftInterface.botAdapter.getStatus();
+    const executionStatus =
+      minecraftInterface.planExecutor.getExecutionStatus();
+    const viewerCheck = minecraftInterface.botAdapter.canStartViewer();
+
+    res.json({
+      canStart: viewerCheck.canStart,
+      reason: viewerCheck.reason,
+      viewerActive: viewerActive,
+      botStatus: botStatus,
+      executionStatus: executionStatus,
+      connectionState: minecraftInterface.botAdapter.getConnectionState(),
+    });
+  } catch (error) {
+    console.error('Error checking viewer status:', error);
+    res.status(500).json({
+      canStart: false,
+      reason: 'Error checking viewer status',
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
+
+// Start Prismarine viewer endpoint
+app.post('/start-viewer', async (req, res) => {
+  try {
+    if (viewerActive) {
+      return res.json({
+        success: true,
+        message: 'Viewer already active',
+        url: `http://localhost:${viewerPort}`,
+      });
+    }
+
+    // Check if minecraftInterface exists
+    if (!minecraftInterface) {
+      return res.status(400).json({
+        success: false,
+        message: 'Minecraft interface not initialized',
+      });
+    }
+
+    const botStatus = minecraftInterface.botAdapter.getStatus();
+    const executionStatus =
+      minecraftInterface.planExecutor.getExecutionStatus();
+
+    // Use execution status if available, otherwise fall back to bot adapter status
+    const isConnected =
+      (executionStatus &&
+        executionStatus.bot &&
+        executionStatus.bot.connected) ||
+      (botStatus?.connected && botStatus?.connectionState === 'spawned');
+
+    if (!isConnected) {
+      return res.status(400).json({
+        success: false,
+        message: 'Bot not connected',
+        details: {
+          botStatus: botStatus,
+          executionStatus: executionStatus,
+        },
+      });
+    }
+
+    // Check if bot adapter can start viewer
+    const viewerCheck = minecraftInterface.botAdapter.canStartViewer();
+    if (!viewerCheck.canStart) {
+      return res.status(400).json({
+        success: false,
+        message: 'Bot adapter not ready for viewer',
+        details: {
+          reason: viewerCheck.reason,
+          connectionState: minecraftInterface.botAdapter.getConnectionState(),
+          botStatus: botStatus,
+        },
+      });
+    }
+
+    // Try to get the bot instance
+    let bot = null;
+    try {
+      bot = minecraftInterface.botAdapter.getBot();
+    } catch (error) {
+      return res.status(400).json({
+        success: false,
+        message: 'Bot adapter disconnected, cannot start viewer',
+        error: error instanceof Error ? error.message : 'Unknown error',
+        details: {
+          connectionState: minecraftInterface.botAdapter.getConnectionState(),
+          botStatus: botStatus,
+        },
+      });
+    }
+
+    if (!bot) {
+      return res.status(400).json({
+        success: false,
+        message: 'Bot instance not available',
+      });
+    }
+
+    startViewerSafely(bot, viewerPort);
+
+    res.json({
+      success: true,
+      message: 'Viewer started successfully',
+      url: `http://localhost:${viewerPort}`,
+    });
+  } catch (error) {
+    console.error('Failed to start viewer:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to start viewer',
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
+
+// Robust viewer startup function with error handling
+function startViewerSafely(bot: any, port: number) {
+  if (viewerActive) {
+    console.log('Viewer already active, skipping startup');
+    return;
+  }
+
+  try {
+    // Add error handling to prevent crashes from unknown entities
+    const originalConsoleError = console.error;
+    const errorMessages: string[] = [];
+
+    // Temporarily suppress unknown entity errors
+    console.error = (...args: any[]) => {
+      const message = args.join(' ');
+      if (
+        message.includes('Unknown entity') ||
+        message.includes('Unknown entity type')
+      ) {
+        errorMessages.push(message);
+        // Don't log these errors to avoid spam
+        return;
+      }
+      originalConsoleError(...args);
+    };
+
+    startMineflayerViewer(bot as any, {
+      port: port,
+      firstPerson: true,
+    });
+
+    // Restore console.error
+    console.error = originalConsoleError;
+
+    viewerActive = true;
+    console.log(`🖥️ Prismarine viewer started at http://localhost:${port}`);
+
+    if (errorMessages.length > 0) {
+      console.log(
+        `⚠️ Suppressed ${errorMessages.length} unknown entity errors during viewer startup`
+      );
+    }
+  } catch (err) {
+    console.error('Failed to start Prismarine viewer:', err);
+    viewerActive = false;
+  }
+}
+
 // Start server
 app.listen(port, () => {
   console.log(`Minecraft bot server running on port ${port}`);
@@ -733,4 +1039,38 @@ app.listen(port, () => {
   );
   console.log(`Use POST /connect to start the bot`);
   console.log(`Prismarine viewer port reserved at ${viewerPort}`);
+
+  // Attempt to start viewer if bot is already connected
+  setTimeout(() => {
+    try {
+      const botStatus = minecraftInterface?.botAdapter.getStatus();
+      const executionStatus =
+        minecraftInterface?.planExecutor.getExecutionStatus();
+
+      // Use execution status if available, otherwise fall back to bot adapter status
+      const isConnected =
+        (executionStatus &&
+          executionStatus.bot &&
+          executionStatus.bot.connected) ||
+        (botStatus?.connected && botStatus?.connectionState === 'spawned');
+
+      if (isConnected && !viewerActive && minecraftInterface) {
+        const viewerCheck = minecraftInterface.botAdapter.canStartViewer();
+        if (viewerCheck.canStart) {
+          try {
+            const bot = minecraftInterface.botAdapter.getBot();
+            if (bot) {
+              startViewerSafely(bot, viewerPort);
+            }
+          } catch (err) {
+            console.error('Failed to auto-start Prismarine viewer:', err);
+          }
+        } else {
+          console.log('Auto-start viewer skipped:', viewerCheck.reason);
+        }
+      }
+    } catch (err) {
+      console.error('Failed to check bot status for auto-start viewer:', err);
+    }
+  }, 5000); // Wait 5 seconds for bot to connect
 });
