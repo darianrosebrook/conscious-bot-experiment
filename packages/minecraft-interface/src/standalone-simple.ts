@@ -98,17 +98,7 @@ export class SimpleMinecraftInterface extends EventEmitter {
         this.emit('chat', chatMessage);
       });
 
-      // Listen for inventory changes
-      this.bot.on('inventoryChanged', (oldItem, newItem) => {
-        console.log('Inventory changed:', { oldItem, newItem });
-        this.emit('inventoryChanged', { oldItem, newItem });
-      });
 
-      // Listen for item moved events
-      this.bot.on('itemMoved', (oldItem, newItem) => {
-        console.log('Item moved:', { oldItem, newItem });
-        this.emit('itemMoved', { oldItem, newItem });
-      });
 
       this.bot.once('error', (error) => {
         clearTimeout(timeoutId);
