@@ -208,6 +208,143 @@ app.post('/process', async (req, res) => {
   }
 });
 
+// Generate authentic thoughts using internal dialogue system
+app.post('/generate-thoughts', async (req, res) => {
+  try {
+    const { situation, context, thoughtTypes } = req.body;
+
+    console.log(`Generating thoughts for situation:`, {
+      situation,
+      thoughtTypes,
+    });
+
+    // Mock internal dialogue system for now
+    // In a real implementation, this would use the actual InternalDialogue class
+    const thoughts = [];
+
+    // Generate thoughts based on the situation and context
+    if (thoughtTypes.includes('reflection')) {
+      thoughts.push({
+        type: 'reflection',
+        content: `I'm reflecting on my current situation. ${situation}`,
+        emotionalState: 'contemplative',
+        confidence: 0.8,
+      });
+    }
+
+    if (thoughtTypes.includes('observation')) {
+      const position = context.currentState?.position;
+      if (position) {
+        thoughts.push({
+          type: 'observation',
+          content: `I notice I'm at position (${position.x}, ${position.y}, ${position.z}). The environment seems interesting.`,
+          emotionalState: 'curious',
+          confidence: 0.9,
+        });
+      }
+    }
+
+    if (thoughtTypes.includes('planning')) {
+      const currentTasks = context.currentState?.currentTasks || [];
+      if (currentTasks.length > 0) {
+        thoughts.push({
+          type: 'planning',
+          content: `I'm currently working on: ${currentTasks[0].description}. I should focus on completing this task.`,
+          emotionalState: 'determined',
+          confidence: 0.7,
+        });
+      }
+    }
+
+    // Add some contextual thoughts based on the current state
+    if (context.currentGoals?.length > 0) {
+      thoughts.push({
+        type: 'reflection',
+        content: `My current goals include: ${context.currentGoals.join(', ')}. I'm making progress toward these objectives.`,
+        emotionalState: 'satisfied',
+        confidence: 0.6,
+      });
+    }
+
+    const result = {
+      thoughts,
+      count: thoughts.length,
+      timestamp: Date.now(),
+    };
+
+    res.json(result);
+  } catch (error) {
+    console.error('Error generating thoughts:', error);
+    res.status(500).json({ error: 'Failed to generate thoughts' });
+  }
+});
+
+// Process social cognition for external messages
+app.post('/process-social', async (req, res) => {
+  try {
+    const { message, sender, context } = req.body;
+
+    console.log(`Processing social cognition for message from ${sender}:`, {
+      message,
+    });
+
+    // Mock social cognition system for now
+    // In a real implementation, this would use the actual TheoryOfMindEngine
+    const thoughts = [];
+
+    // Analyze the message content and generate social thoughts
+    const lowerMessage = message.toLowerCase();
+
+    if (
+      lowerMessage.includes('hello') ||
+      lowerMessage.includes('hi') ||
+      lowerMessage.includes('hey')
+    ) {
+      thoughts.push({
+        type: 'social',
+        content: `${sender} seems to be greeting me. They appear friendly and want to interact.`,
+        emotionalState: 'welcoming',
+        confidence: 0.8,
+      });
+    } else if (
+      lowerMessage.includes('help') ||
+      lowerMessage.includes('please')
+    ) {
+      thoughts.push({
+        type: 'social',
+        content: `${sender} is asking for help. They seem to trust me and think I can assist them.`,
+        emotionalState: 'helpful',
+        confidence: 0.7,
+      });
+    } else if (lowerMessage.includes('thank')) {
+      thoughts.push({
+        type: 'social',
+        content: `${sender} is expressing gratitude. This suggests they appreciate my assistance.`,
+        emotionalState: 'appreciated',
+        confidence: 0.9,
+      });
+    } else {
+      thoughts.push({
+        type: 'social',
+        content: `${sender} said: "${message}". I should consider how to respond appropriately.`,
+        emotionalState: 'thoughtful',
+        confidence: 0.6,
+      });
+    }
+
+    const result = {
+      thoughts,
+      count: thoughts.length,
+      timestamp: Date.now(),
+    };
+
+    res.json(result);
+  } catch (error) {
+    console.error('Error processing social cognition:', error);
+    res.status(500).json({ error: 'Failed to process social cognition' });
+  }
+});
+
 // Get telemetry data
 app.get('/telemetry', (req, res) => {
   try {

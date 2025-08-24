@@ -1,9 +1,9 @@
 /**
  * Vibe-Coded Integration Implementation
- * 
+ *
  * Concrete implementation of vibe-coded patterns within the conscious-bot architecture,
  * providing task-oriented structure while maintaining cognitive depth.
- * 
+ *
  * @author @darianrosebrook
  */
 
@@ -36,7 +36,10 @@ export class VibeCodedCognitiveIntegration implements CognitiveTaskIntegration {
   /**
    * Convert external task to cognitive task
    */
-  externalTaskToCognitive(task: TaskDefinition, context: TaskExecutionContext): any {
+  externalTaskToCognitive(
+    task: TaskDefinition,
+    context: TaskExecutionContext
+  ): any {
     // Create a cognitive task that incorporates both external command and internal context
     const cognitiveTask = {
       id: task.id,
@@ -67,7 +70,10 @@ export class VibeCodedCognitiveIntegration implements CognitiveTaskIntegration {
   /**
    * Convert cognitive goal to executable task
    */
-  cognitiveGoalToTask(goal: any, context: TaskExecutionContext): TaskDefinition {
+  cognitiveGoalToTask(
+    goal: any,
+    context: TaskExecutionContext
+  ): TaskDefinition {
     // Convert internal cognitive goal to concrete task
     const task: TaskDefinition = {
       id: `cognitive_${Date.now()}`,
@@ -94,23 +100,33 @@ export class VibeCodedCognitiveIntegration implements CognitiveTaskIntegration {
   /**
    * Merge external and internal task priorities
    */
-  mergeTaskPriorities(externalPriority: number, internalPriority: number): number {
+  mergeTaskPriorities(
+    externalPriority: number,
+    internalPriority: number
+  ): number {
     // Weight external commands slightly higher to maintain responsiveness
     const externalWeight = 0.6;
     const internalWeight = 0.4;
-    
-    const mergedPriority = (externalPriority * externalWeight) + (internalPriority * internalWeight);
-    
+
+    const mergedPriority =
+      externalPriority * externalWeight + internalPriority * internalWeight;
+
     // Apply cognitive adjustments based on current state
-    const cognitiveAdjustment = this.calculateCognitiveAdjustment(externalPriority, internalPriority);
-    
+    const cognitiveAdjustment = this.calculateCognitiveAdjustment(
+      externalPriority,
+      internalPriority
+    );
+
     return Math.min(1.0, Math.max(0.0, mergedPriority + cognitiveAdjustment));
   }
 
   /**
    * Register a task executor
    */
-  registerTaskExecutor(taskType: string, executor: VibeCodedTaskExecutor): void {
+  registerTaskExecutor(
+    taskType: string,
+    executor: VibeCodedTaskExecutor
+  ): void {
     this.taskExecutors.set(taskType, executor);
   }
 
@@ -124,17 +140,20 @@ export class VibeCodedCognitiveIntegration implements CognitiveTaskIntegration {
   /**
    * Execute a task using vibe-coded style
    */
-  async executeTask(task: TaskDefinition, context: TaskExecutionContext): Promise<any> {
+  async executeTask(
+    task: TaskDefinition,
+    context: TaskExecutionContext
+  ): Promise<any> {
     const executor = this.taskExecutors.get(task.type);
-    
+
     if (!executor) {
       throw new Error(`No executor available for task type: ${task.type}`);
     }
-    
+
     if (!executor.canExecute(task)) {
       throw new Error(`Task cannot be executed: ${task.id}`);
     }
-    
+
     // Log execution for memory
     this.memory.push({
       type: 'task_execution',
@@ -142,56 +161,69 @@ export class VibeCodedCognitiveIntegration implements CognitiveTaskIntegration {
       context: context,
       timestamp: Date.now(),
     });
-    
+
     return await executor.execute(task, context);
   }
 
   /**
    * Calculate urgency based on task and context
    */
-  private calculateUrgency(task: TaskDefinition, context: TaskExecutionContext): number {
+  private calculateUrgency(
+    task: TaskDefinition,
+    context: TaskExecutionContext
+  ): number {
     let urgency = task.priority || 0.5;
-    
+
     // Environmental factors
     if (context.environmental_context.threat_level > 0.8) {
       urgency += 0.2;
     }
-    
+
     if (context.environmental_context.time_of_day === 'night') {
       urgency += 0.1;
     }
-    
+
     // Resource availability
-    if (task.parameters.resource && !context.available_resources[task.parameters.resource]?.available) {
+    if (
+      task.parameters.resource &&
+      !context.available_resources[task.parameters.resource]?.available
+    ) {
       urgency += 0.15;
     }
-    
+
     // Social factors
     if (context.social_context.nearby_players.length > 0) {
       urgency += 0.1;
     }
-    
+
     return Math.min(1.0, urgency);
   }
 
   /**
    * Generate cognitive reasoning for task
    */
-  private generateCognitiveReasoning(task: TaskDefinition, context: TaskExecutionContext): string {
+  private generateCognitiveReasoning(
+    task: TaskDefinition,
+    context: TaskExecutionContext
+  ): string {
     const reasons: string[] = [];
-    
+
     // Task-specific reasoning
     switch (task.type) {
       case 'gathering':
         reasons.push('Resource gathering supports survival and progress');
         if (task.parameters.resource) {
-          reasons.push(`Need ${task.parameters.resource} for current objectives`);
+          reasons.push(
+            `Need ${task.parameters.resource} for current objectives`
+          );
         }
         break;
       case 'crafting':
         reasons.push('Crafting advances technological capabilities');
         if (task.parameters.item) {
-          reasons.push(`Creating ${task.parameters.item} will improve efficiency`);
+          reasons.push(
+            `Creating ${task.parameters.item} will improve efficiency`
+          );
         }
         break;
       case 'navigation':
@@ -204,55 +236,58 @@ export class VibeCodedCognitiveIntegration implements CognitiveTaskIntegration {
         reasons.push('Social interaction maintains positive relationships');
         break;
     }
-    
+
     // Environmental reasoning
     if (context.environmental_context.threat_level > 0.7) {
       reasons.push('High threat environment requires immediate action');
     }
-    
+
     if (context.environmental_context.time_of_day === 'night') {
       reasons.push('Night time conditions affect task execution');
     }
-    
+
     return reasons.join('. ');
   }
 
   /**
    * Assess emotional context of task
    */
-  private assessEmotionalContext(task: TaskDefinition, context: TaskExecutionContext): any {
+  private assessEmotionalContext(
+    task: TaskDefinition,
+    context: TaskExecutionContext
+  ): any {
     const emotions: any = {
       confidence: 0.7,
       anxiety: 0.0,
       excitement: 0.0,
       caution: 0.0,
     };
-    
+
     // Adjust based on environmental factors
     if (context.environmental_context.threat_level > 0.8) {
       emotions.anxiety += 0.3;
       emotions.confidence -= 0.2;
     }
-    
+
     if (context.environmental_context.time_of_day === 'night') {
       emotions.caution += 0.2;
     }
-    
+
     // Adjust based on task type
     if (task.type === 'combat') {
       emotions.anxiety += 0.2;
       emotions.caution += 0.3;
     }
-    
+
     if (task.type === 'exploration') {
       emotions.excitement += 0.2;
     }
-    
+
     // Normalize values
-    Object.keys(emotions).forEach(key => {
+    Object.keys(emotions).forEach((key) => {
       emotions[key] = Math.min(1.0, Math.max(0.0, emotions[key]));
     });
-    
+
     return emotions;
   }
 
@@ -261,19 +296,23 @@ export class VibeCodedCognitiveIntegration implements CognitiveTaskIntegration {
    */
   private integrateWithMemory(task: TaskDefinition): any {
     // Find similar tasks in memory
-    const similarTasks = this.memory.filter(m => 
-      m.type === 'task_execution' && 
-      m.task.type === task.type
-    ).slice(-5); // Last 5 similar tasks
-    
-    const successRate = similarTasks.length > 0 
-      ? similarTasks.filter(t => t.success !== false).length / similarTasks.length 
-      : 0.8; // Default confidence
-    
+    const similarTasks = this.memory
+      .filter((m) => m.type === 'task_execution' && m.task.type === task.type)
+      .slice(-5); // Last 5 similar tasks
+
+    const successRate =
+      similarTasks.length > 0
+        ? similarTasks.filter((t) => t.success !== false).length /
+          similarTasks.length
+        : 0.8; // Default confidence
+
     return {
       similarTasksFound: similarTasks.length,
       successRate,
-      lastExecuted: similarTasks.length > 0 ? similarTasks[similarTasks.length - 1].timestamp : null,
+      lastExecuted:
+        similarTasks.length > 0
+          ? similarTasks[similarTasks.length - 1].timestamp
+          : null,
       confidence: successRate,
     };
   }
@@ -281,14 +320,17 @@ export class VibeCodedCognitiveIntegration implements CognitiveTaskIntegration {
   /**
    * Create execution plan
    */
-  private createExecutionPlan(task: TaskDefinition, context: TaskExecutionContext): any {
+  private createExecutionPlan(
+    task: TaskDefinition,
+    context: TaskExecutionContext
+  ): any {
     const plan = {
       steps: [],
       estimatedDuration: task.estimated_duration || 60000,
       requiredResources: [],
       potentialObstacles: [],
     };
-    
+
     // Add task-specific steps
     switch (task.type) {
       case 'gathering':
@@ -298,7 +340,9 @@ export class VibeCodedCognitiveIntegration implements CognitiveTaskIntegration {
           'Extract resource using appropriate tool',
           'Return to safe location',
         ];
-        plan.requiredResources = [task.parameters.tool_required].filter(Boolean);
+        plan.requiredResources = [task.parameters.tool_required].filter(
+          Boolean
+        );
         break;
       case 'crafting':
         plan.steps = [
@@ -316,50 +360,57 @@ export class VibeCodedCognitiveIntegration implements CognitiveTaskIntegration {
         ];
         break;
     }
-    
+
     // Add environmental considerations
     if (context.environmental_context.threat_level > 0.5) {
       plan.potentialObstacles.push('Hostile entities may interfere');
       plan.steps.unshift('Assess threat level and prepare defenses');
     }
-    
+
     return plan;
   }
 
   /**
    * Generate fallback strategies
    */
-  private generateFallbackStrategies(task: TaskDefinition, context: TaskExecutionContext): string[] {
+  private generateFallbackStrategies(
+    task: TaskDefinition,
+    context: TaskExecutionContext
+  ): string[] {
     const strategies: string[] = [];
-    
+
     // Resource-based fallbacks
     if (task.parameters.resource) {
       strategies.push(`Find alternative source of ${task.parameters.resource}`);
       strategies.push(`Craft substitute for ${task.parameters.resource}`);
     }
-    
+
     // Tool-based fallbacks
     if (task.parameters.tool_required) {
       strategies.push(`Use alternative tool for ${task.type}`);
       strategies.push(`Craft required tool first`);
     }
-    
+
     // Environmental fallbacks
     if (context.environmental_context.threat_level > 0.7) {
       strategies.push('Seek shelter and wait for safer conditions');
       strategies.push('Request assistance from nearby players');
     }
-    
+
     return strategies;
   }
 
   /**
    * Assess social implications
    */
-  private assessSocialImplications(task: TaskDefinition, context: TaskExecutionContext): any {
+  private assessSocialImplications(
+    task: TaskDefinition,
+    context: TaskExecutionContext
+  ): any {
     return {
       affectsOthers: context.social_context.nearby_players.length > 0,
-      requiresCooperation: task.type === 'social' || task.parameters.requires_help,
+      requiresCooperation:
+        task.type === 'social' || task.parameters.requires_help,
       socialRisk: this.calculateSocialRisk(task, context),
       socialBenefit: this.calculateSocialBenefit(task, context),
     };
@@ -368,34 +419,49 @@ export class VibeCodedCognitiveIntegration implements CognitiveTaskIntegration {
   /**
    * Calculate social risk
    */
-  private calculateSocialRisk(task: TaskDefinition, context: TaskExecutionContext): number {
+  private calculateSocialRisk(
+    task: TaskDefinition,
+    context: TaskExecutionContext
+  ): number {
     let risk = 0.0;
-    
-    if (task.type === 'combat' && context.social_context.nearby_players.length > 0) {
+
+    if (
+      task.type === 'combat' &&
+      context.social_context.nearby_players.length > 0
+    ) {
       risk += 0.3; // Risk of friendly fire or collateral damage
     }
-    
-    if (task.parameters.resource && context.social_context.nearby_players.length > 0) {
+
+    if (
+      task.parameters.resource &&
+      context.social_context.nearby_players.length > 0
+    ) {
       risk += 0.1; // Risk of resource competition
     }
-    
+
     return Math.min(1.0, risk);
   }
 
   /**
    * Calculate social benefit
    */
-  private calculateSocialBenefit(task: TaskDefinition, context: TaskExecutionContext): number {
+  private calculateSocialBenefit(
+    task: TaskDefinition,
+    context: TaskExecutionContext
+  ): number {
     let benefit = 0.0;
-    
+
     if (task.type === 'social') {
       benefit += 0.4;
     }
-    
-    if (task.type === 'crafting' && context.social_context.nearby_players.length > 0) {
+
+    if (
+      task.type === 'crafting' &&
+      context.social_context.nearby_players.length > 0
+    ) {
       benefit += 0.2; // Can share crafted items
     }
-    
+
     return Math.min(1.0, benefit);
   }
 
@@ -404,14 +470,14 @@ export class VibeCodedCognitiveIntegration implements CognitiveTaskIntegration {
    */
   private mapGoalTypeToTaskType(goalType: string): string {
     const mapping: Record<string, string> = {
-      'survival': 'gathering',
-      'safety': 'combat',
-      'exploration': 'navigation',
-      'social': 'social',
-      'progress': 'crafting',
-      'curiosity': 'exploration',
+      survival: 'gathering',
+      safety: 'combat',
+      exploration: 'navigation',
+      social: 'social',
+      progress: 'crafting',
+      curiosity: 'exploration',
     };
-    
+
     return mapping[goalType] || 'exploration';
   }
 
@@ -420,29 +486,29 @@ export class VibeCodedCognitiveIntegration implements CognitiveTaskIntegration {
    */
   private extractTaskParameters(goal: any, context: TaskExecutionContext): any {
     const parameters: any = {};
-    
+
     // Map goal-specific parameters
     if (goal.resource) {
       parameters.resource = goal.resource;
     }
-    
+
     if (goal.quantity) {
       parameters.quantity = goal.quantity;
     }
-    
+
     if (goal.location) {
       parameters.destination = goal.location;
     }
-    
+
     if (goal.target) {
       parameters.target = goal.target;
     }
-    
+
     // Add environmental context
     if (context.environmental_context.threat_level > 0.7) {
       parameters.requires_defense = true;
     }
-    
+
     return parameters;
   }
 
@@ -451,15 +517,15 @@ export class VibeCodedCognitiveIntegration implements CognitiveTaskIntegration {
    */
   private calculateTimeout(goal: any): number {
     const baseTimeout = 300000; // 5 minutes
-    
+
     if (goal.urgency === 'high') {
       return baseTimeout * 0.5;
     }
-    
+
     if (goal.urgency === 'low') {
       return baseTimeout * 2;
     }
-    
+
     return baseTimeout;
   }
 
@@ -467,14 +533,17 @@ export class VibeCodedCognitiveIntegration implements CognitiveTaskIntegration {
    * Assess safety level
    */
   private assessSafetyLevel(goal: any, context: TaskExecutionContext): string {
-    if (goal.type === 'combat' || context.environmental_context.threat_level > 0.8) {
+    if (
+      goal.type === 'combat' ||
+      context.environmental_context.threat_level > 0.8
+    ) {
       return 'dangerous';
     }
-    
+
     if (context.environmental_context.threat_level > 0.5) {
       return 'risky';
     }
-    
+
     return 'safe';
   }
 
@@ -483,86 +552,95 @@ export class VibeCodedCognitiveIntegration implements CognitiveTaskIntegration {
    */
   private estimateDuration(goal: any, context: TaskExecutionContext): number {
     const baseDuration = 60000; // 1 minute
-    
+
     // Adjust based on goal complexity
     if (goal.complexity === 'high') {
       return baseDuration * 3;
     }
-    
+
     if (goal.complexity === 'low') {
       return baseDuration * 0.5;
     }
-    
+
     return baseDuration;
   }
 
   /**
    * Identify dependencies
    */
-  private identifyDependencies(goal: any, context: TaskExecutionContext): string[] {
+  private identifyDependencies(
+    goal: any,
+    context: TaskExecutionContext
+  ): string[] {
     const dependencies: string[] = [];
-    
+
     // Resource dependencies
     if (goal.requires_tool) {
       dependencies.push(`obtain_${goal.requires_tool}`);
     }
-    
+
     if (goal.requires_material) {
       dependencies.push(`gather_${goal.requires_material}`);
     }
-    
+
     // Skill dependencies
     if (goal.requires_skill && !this.skillLevels.has(goal.requires_skill)) {
       dependencies.push(`learn_${goal.requires_skill}`);
     }
-    
+
     return dependencies;
   }
 
   /**
    * Generate fallback actions
    */
-  private generateFallbackActions(goal: any, context: TaskExecutionContext): string[] {
+  private generateFallbackActions(
+    goal: any,
+    context: TaskExecutionContext
+  ): string[] {
     const actions: string[] = [];
-    
+
     // Add goal-specific fallbacks
     if (goal.type === 'survival') {
       actions.push('seek_shelter');
       actions.push('find_alternative_food');
     }
-    
+
     if (goal.type === 'safety') {
       actions.push('retreat_to_safe_location');
       actions.push('request_help');
     }
-    
+
     return actions;
   }
 
   /**
    * Calculate cognitive adjustment
    */
-  private calculateCognitiveAdjustment(externalPriority: number, internalPriority: number): number {
+  private calculateCognitiveAdjustment(
+    externalPriority: number,
+    internalPriority: number
+  ): number {
     // Consider current cognitive load and emotional state
     const cognitiveLoad = this.assessCognitiveLoad();
     const emotionalState = this.assessEmotionalState();
-    
+
     let adjustment = 0.0;
-    
+
     // High cognitive load reduces priority for complex tasks
     if (cognitiveLoad > 0.8) {
       adjustment -= 0.1;
     }
-    
+
     // Emotional state affects decision making
     if (emotionalState.anxiety > 0.7) {
       adjustment -= 0.05;
     }
-    
+
     if (emotionalState.confidence > 0.8) {
       adjustment += 0.05;
     }
-    
+
     return adjustment;
   }
 
@@ -571,10 +649,10 @@ export class VibeCodedCognitiveIntegration implements CognitiveTaskIntegration {
    */
   private assessCognitiveLoad(): number {
     // Simple heuristic based on recent task count
-    const recentTasks = this.memory.filter(m => 
-      Date.now() - m.timestamp < 60000 // Last minute
+    const recentTasks = this.memory.filter(
+      (m) => Date.now() - m.timestamp < 60000 // Last minute
     );
-    
+
     return Math.min(1.0, recentTasks.length / 5);
   }
 
@@ -583,32 +661,32 @@ export class VibeCodedCognitiveIntegration implements CognitiveTaskIntegration {
    */
   private assessEmotionalState(): any {
     // Aggregate emotional context from recent tasks
-    const recentTasks = this.memory.filter(m => 
-      Date.now() - m.timestamp < 300000 // Last 5 minutes
+    const recentTasks = this.memory.filter(
+      (m) => Date.now() - m.timestamp < 300000 // Last 5 minutes
     );
-    
+
     const emotions = {
       confidence: 0.7,
       anxiety: 0.0,
       excitement: 0.0,
       caution: 0.0,
     };
-    
+
     // Calculate average emotional state
-    recentTasks.forEach(task => {
+    recentTasks.forEach((task) => {
       if (task.task?.emotionalContext) {
-        Object.keys(emotions).forEach(key => {
+        Object.keys(emotions).forEach((key) => {
           emotions[key] += task.task.emotionalContext[key] || 0;
         });
       }
     });
-    
+
     // Normalize
     const count = Math.max(1, recentTasks.length);
-    Object.keys(emotions).forEach(key => {
+    Object.keys(emotions).forEach((key) => {
       emotions[key] = Math.min(1.0, emotions[key] / count);
     });
-    
+
     return emotions;
   }
 

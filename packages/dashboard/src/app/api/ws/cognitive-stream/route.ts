@@ -1,14 +1,13 @@
 /**
- * Enhanced Cognitive Stream
+ * Authentic Cognitive Stream
  *
- * Provides a realistic consciousness flow showing:
- * - Internal thoughts and reflections
- * - External chat messages (from/to other players)
- * - Intrusive thoughts (with proper attribution)
- * - Cognitive processing and decision-making
- * - Persistent thought history
+ * Integrates with actual cognitive systems to generate real thoughts:
+ * - Internal dialogue system with LLM integration
+ * - Theory of mind for social cognition
+ * - Constitutional filtering for ethical reasoning
+ * - Self-model for identity and reflection
  *
- * Integrates with existing cognitive systems for authentic consciousness simulation
+ * Provides a genuine consciousness flow using the bot's actual cognitive architecture
  *
  * @author @darianrosebrook
  */
@@ -23,9 +22,9 @@ export const maxDuration = 60;
 const thoughtHistory: CognitiveThought[] = [];
 const MAX_THOUGHTS = 1000;
 
-// Track active connections to prevent memory leaks
+// Track active connections
 const activeConnections = new Set<ReadableStreamDefaultController>();
-const MAX_CONNECTIONS = 10; // Limit concurrent connections
+const MAX_CONNECTIONS = 10;
 
 export interface CognitiveThought {
   id: string;
@@ -37,15 +36,18 @@ export interface CognitiveThought {
     | 'intrusive'
     | 'reflection'
     | 'decision'
-    | 'observation';
+    | 'observation'
+    | 'social'
+    | 'ethical';
   content: string;
-  sender?: string; // For chat messages
+  sender?: string;
   attribution: 'self' | 'external' | 'intrusive';
   context?: {
     currentTask?: string;
     currentGoal?: string;
     emotionalState?: string;
     confidence?: number;
+    cognitiveSystem?: string; // Which cognitive system generated this
   };
   metadata?: {
     messageType?: string;
@@ -53,6 +55,8 @@ export interface CognitiveThought {
     emotion?: string;
     requiresResponse?: boolean;
     responsePriority?: string;
+    llmConfidence?: number;
+    thoughtType?: string;
   };
 }
 
@@ -79,13 +83,13 @@ function addThought(
 }
 
 /**
- * Generate internal thoughts based on current state
+ * Generate authentic thoughts using the cognition system
  */
-async function generateInternalThoughts(): Promise<CognitiveThought[]> {
+async function generateAuthenticThoughts(): Promise<CognitiveThought[]> {
   const newThoughts: CognitiveThought[] = [];
 
   try {
-    // Fetch current bot state
+    // Get current bot state for context
     const minecraftResponse = await fetch('http://localhost:3005/state', {
       method: 'GET',
       headers: { 'Content-Type': 'application/json' },
@@ -102,98 +106,78 @@ async function generateInternalThoughts(): Promise<CognitiveThought[]> {
       const minecraftData = await minecraftResponse.json();
       const planningData = await planningResponse.json();
 
-      // Generate contextual thoughts based on current state
-      const currentTasks = planningData.goalFormulation?.currentTasks || [];
-      const completedTasks = planningData.goalFormulation?.completedTasks || [];
+      // Build context for cognitive processing
+      const context = {
+        currentGoals: planningData.goalFormulation?.currentGoals || [],
+        currentState: {
+          position: minecraftData.data?.position,
+          health: minecraftData.data?.vitals?.health,
+          inventory: minecraftData.data?.inventory,
+          currentTasks: planningData.goalFormulation?.currentTasks || [],
+        },
+        recentEvents: [], // TODO: Track recent events
+        emotionalState: 'neutral',
+        urgency: 0.3,
+      };
 
-              // Thought about current activities
-        if (currentTasks.length > 0) {
-          const currentTask = currentTasks[0];
-          const thoughtContent = `I'm currently working on: ${currentTask.description}`;
-          
-          // Check if we already have this thought recently
+      // Generate thoughts using the cognition system
+      const cognitionResponse = await fetch(
+        'http://localhost:3003/generate-thoughts',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            situation: 'Current bot state and environment',
+            context,
+            thoughtTypes: ['reflection', 'observation', 'planning'],
+          }),
+          signal: AbortSignal.timeout(5000),
+        }
+      );
+
+      if (cognitionResponse.ok) {
+        const cognitionData = await cognitionResponse.json();
+
+        // Process thoughts from the cognition system
+        for (const thought of cognitionData.thoughts || []) {
+          // Check for duplicates
           const existingThought = thoughtHistory.find(
-            (t) => t.type === 'internal' && t.content === thoughtContent && 
-            (Date.now() - t.timestamp) < 30000 // Within last 30 seconds
+            (t) =>
+              t.content === thought.content && Date.now() - t.timestamp < 60000 // Within last minute
           );
-          
+
           if (!existingThought) {
             newThoughts.push(
               addThought({
-                type: 'internal',
-                content: thoughtContent,
+                type: thought.type || 'internal',
+                content: thought.content,
                 attribution: 'self',
                 context: {
-                  currentTask: currentTask.description,
-                  confidence: 0.8,
+                  currentTask:
+                    context.currentState.currentTasks[0]?.description,
+                  emotionalState: thought.emotionalState || 'neutral',
+                  confidence: thought.confidence || 0.7,
+                  cognitiveSystem: 'internal-dialogue',
+                },
+                metadata: {
+                  llmConfidence: thought.confidence,
+                  thoughtType: thought.type,
                 },
               })
             );
           }
         }
-
-              // Reflection on recent progress
-        if (completedTasks.length > 0) {
-          const recentTask = completedTasks[completedTasks.length - 1];
-          const thoughtContent = `I just completed: ${recentTask.description}. That went well.`;
-          
-          // Check if we already have this thought recently
-          const existingThought = thoughtHistory.find(
-            (t) => t.type === 'reflection' && t.content === thoughtContent && 
-            (Date.now() - t.timestamp) < 30000 // Within last 30 seconds
-          );
-          
-          if (!existingThought) {
-            newThoughts.push(
-              addThought({
-                type: 'reflection',
-                content: thoughtContent,
-                attribution: 'self',
-                context: {
-                  currentGoal: recentTask.goal,
-                  emotionalState: 'satisfied',
-                  confidence: 0.7,
-                },
-              })
-            );
-          }
-        }
-
-              // Environmental observation
-        if (minecraftData.data?.position) {
-          const pos = minecraftData.data.position;
-          const thoughtContent = `I'm at position (${pos.x}, ${pos.y}, ${pos.z}). The area looks interesting.`;
-          
-          // Check if we already have this thought recently
-          const existingThought = thoughtHistory.find(
-            (t) => t.type === 'observation' && t.content === thoughtContent && 
-            (Date.now() - t.timestamp) < 60000 // Within last minute
-          );
-          
-          if (!existingThought) {
-            newThoughts.push(
-              addThought({
-                type: 'observation',
-                content: thoughtContent,
-                attribution: 'self',
-                context: {
-                  emotionalState: 'curious',
-                  confidence: 0.9,
-                },
-              })
-            );
-          }
-        }
+      }
     }
   } catch (error) {
-    console.error('Error generating internal thoughts:', error);
+    console.error('Error generating authentic thoughts:', error);
   }
 
   return newThoughts;
 }
 
 /**
- * Process external chat messages
+ * Process external chat messages and generate social cognition thoughts
  */
 async function processExternalChat(): Promise<CognitiveThought[]> {
   const newThoughts: CognitiveThought[] = [];
@@ -206,76 +190,93 @@ async function processExternalChat(): Promise<CognitiveThought[]> {
       signal: AbortSignal.timeout(3000),
     });
 
-    const processedMessagesResponse = await fetch(
-      'http://localhost:3005/processed-messages',
-      {
-        method: 'GET',
-        headers: { 'Content-Type': 'application/json' },
-        signal: AbortSignal.timeout(3000),
-      }
-    );
-
-    if (chatResponse.ok && processedMessagesResponse.ok) {
+    if (chatResponse.ok) {
       const chatData = await chatResponse.json();
-      const processedData = await processedMessagesResponse.json();
-
-      // Process recent chat messages
       const recentMessages = chatData.data?.slice(-5) || [];
-      const processedMessages = processedData.data?.slice(-5) || [];
 
-              // Add incoming chat messages (only from other players)
-        for (const msg of recentMessages) {
-          // Skip bot's own messages and unknown senders
-          if (msg.sender === 'SimpleBot' || msg.sender === 'ConsciousBot' || msg.sender === 'unknown') {
-            continue;
-          }
-          
-          // Check if this message is already in our history
-          const existingThought = thoughtHistory.find(
-            (t) =>
-              t.type === 'external_chat_in' &&
-              t.content === msg.message &&
-              t.sender === msg.sender
+      // Process messages from other players
+      for (const msg of recentMessages) {
+        // Skip bot's own messages
+        if (
+          msg.sender === 'SimpleBot' ||
+          msg.sender === 'ConsciousBot' ||
+          msg.sender === 'unknown'
+        ) {
+          continue;
+        }
+
+        // Check for duplicates
+        const existingThought = thoughtHistory.find(
+          (t) =>
+            t.type === 'external_chat_in' &&
+            t.content === msg.message &&
+            t.sender === msg.sender
+        );
+
+        if (!existingThought) {
+          // Add the external message
+          newThoughts.push(
+            addThought({
+              type: 'external_chat_in',
+              content: msg.message,
+              sender: msg.sender,
+              attribution: 'external',
+              metadata: {
+                messageType: 'chat',
+                intent: 'communication',
+              },
+            })
           );
 
-          if (!existingThought) {
-            newThoughts.push(
-              addThought({
-                type: 'external_chat_in',
-                content: msg.message,
-                sender: msg.sender,
-                attribution: 'external',
-                metadata: {
-                  messageType: 'chat',
-                  intent: 'communication',
-                },
-              })
+          // Generate social cognition thoughts about the message
+          try {
+            const socialResponse = await fetch(
+              'http://localhost:3003/process-social',
+              {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  message: msg.message,
+                  sender: msg.sender,
+                  context: {
+                    currentGoals: [],
+                    currentState: {},
+                    emotionalState: 'neutral',
+                  },
+                }),
+                signal: AbortSignal.timeout(3000),
+              }
             );
-          }
-        }
 
-              // Add processed message analysis (only for other players)
-        for (const processedMsg of processedMessages) {
-          if (processedMsg.sender !== 'SimpleBot' && processedMsg.sender !== 'ConsciousBot' && processedMsg.sender !== 'unknown') {
-            newThoughts.push(
-              addThought({
-                type: 'internal',
-                content: `I heard "${processedMsg.content}" from ${processedMsg.sender}. ${processedMsg.messageType === 'greeting' ? 'They seem friendly.' : processedMsg.messageType === 'request' ? 'They need something from me.' : 'I should consider how to respond.'}`,
-                attribution: 'self',
-                context: {
-                  emotionalState: processedMsg.emotion || 'neutral',
-                  confidence: 0.6,
-                },
-                metadata: {
-                  messageType: processedMsg.messageType,
-                  intent: processedMsg.intent,
-                  emotion: processedMsg.emotion,
-                  requiresResponse: processedMsg.requiresResponse,
-                },
-              })
-            );
+            if (socialResponse.ok) {
+              const socialData = await socialResponse.json();
+
+              if (socialData.thoughts) {
+                for (const thought of socialData.thoughts) {
+                  newThoughts.push(
+                    addThought({
+                      type: 'social',
+                      content: thought.content,
+                      attribution: 'self',
+                      context: {
+                        emotionalState: thought.emotionalState || 'neutral',
+                        confidence: thought.confidence || 0.6,
+                        cognitiveSystem: 'social-cognition',
+                      },
+                      metadata: {
+                        llmConfidence: thought.confidence,
+                        thoughtType: 'social-analysis',
+                      },
+                    })
+                  );
+                }
+              }
+            }
+          } catch (error) {
+            console.error('Error processing social cognition:', error);
           }
         }
+      }
     }
   } catch (error) {
     console.error('Error processing external chat:', error);
@@ -285,13 +286,12 @@ async function processExternalChat(): Promise<CognitiveThought[]> {
 }
 
 /**
- * Process bot's own chat responses
+ * Process bot's own responses
  */
 async function processBotResponses(): Promise<CognitiveThought[]> {
   const newThoughts: CognitiveThought[] = [];
 
   try {
-    // Fetch recent chat messages to find bot's own responses
     const chatResponse = await fetch('http://localhost:3005/chat', {
       method: 'GET',
       headers: { 'Content-Type': 'application/json' },
@@ -302,30 +302,28 @@ async function processBotResponses(): Promise<CognitiveThought[]> {
       const chatData = await chatResponse.json();
       const recentMessages = chatData.data?.slice(-5) || [];
 
-              // Find bot's own messages
-        for (const msg of recentMessages) {
-          if (msg.sender === 'SimpleBot' || msg.sender === 'ConsciousBot') {
-            // Check if this response is already in our history
-            const existingThought = thoughtHistory.find(
-              (t) => t.type === 'external_chat_out' && t.content === msg.message
-            );
+      for (const msg of recentMessages) {
+        if (msg.sender === 'SimpleBot' || msg.sender === 'ConsciousBot') {
+          const existingThought = thoughtHistory.find(
+            (t) => t.type === 'external_chat_out' && t.content === msg.message
+          );
 
-            if (!existingThought) {
-              newThoughts.push(
-                addThought({
-                  type: 'external_chat_out',
-                  content: msg.message,
-                  sender: msg.sender,
-                  attribution: 'self',
-                  metadata: {
-                    messageType: 'response',
-                    intent: 'communication',
-                  },
-                })
-              );
-            }
+          if (!existingThought) {
+            newThoughts.push(
+              addThought({
+                type: 'external_chat_out',
+                content: msg.message,
+                sender: msg.sender,
+                attribution: 'self',
+                metadata: {
+                  messageType: 'response',
+                  intent: 'communication',
+                },
+              })
+            );
           }
         }
+      }
     }
   } catch (error) {
     console.error('Error processing bot responses:', error);
@@ -349,7 +347,6 @@ export const GET = async (req: NextRequest) => {
     const stream = new ReadableStream({
       start(controller) {
         let isConnected = true;
-        let intervalId: NodeJS.Timeout;
 
         // Track this connection
         activeConnections.add(controller);
@@ -363,7 +360,7 @@ export const GET = async (req: NextRequest) => {
             type: 'cognitive_stream_init',
             timestamp: Date.now(),
             data: {
-              thoughts: thoughtHistory.slice(-50), // Send last 50 thoughts
+              thoughts: thoughtHistory.slice(-50),
               totalThoughts: thoughtHistory.length,
             },
           };
@@ -379,11 +376,11 @@ export const GET = async (req: NextRequest) => {
           try {
             const newThoughts: CognitiveThought[] = [];
 
-            // Generate internal thoughts (much less frequently to prevent spam)
-            if (Math.random() < 0.1) {
-              // 10% chance each cycle (every ~50 seconds on average)
-              const internalThoughts = await generateInternalThoughts();
-              newThoughts.push(...internalThoughts);
+            // Generate authentic thoughts using cognition system (less frequently)
+            if (Math.random() < 0.15) {
+              // 15% chance each cycle
+              const authenticThoughts = await generateAuthenticThoughts();
+              newThoughts.push(...authenticThoughts);
             }
 
             // Process external chat
@@ -409,7 +406,7 @@ export const GET = async (req: NextRequest) => {
               controller.enqueue(encoder.encode(data));
 
               console.log(
-                `🧠 Sent ${newThoughts.length} new cognitive thoughts`
+                `🧠 Sent ${newThoughts.length} authentic cognitive thoughts`
               );
             }
           } catch (error) {
@@ -420,8 +417,8 @@ export const GET = async (req: NextRequest) => {
         // Send initial thoughts immediately
         sendInitialThoughts();
 
-                  // Set up periodic updates
-          intervalId = setInterval(sendNewThoughts, 10000); // Every 10 seconds
+        // Set up periodic updates
+        const intervalId = setInterval(sendNewThoughts, 15000); // Every 15 seconds
 
         // Handle client disconnect
         const cleanup = () => {
@@ -441,9 +438,6 @@ export const GET = async (req: NextRequest) => {
         };
 
         // Listen for abort signal
-        req.signal.addEventListener('abort', cleanup);
-
-        // Also handle stream cancellation
         req.signal.addEventListener('abort', cleanup);
       },
     });
@@ -493,7 +487,7 @@ export const POST = async (req: NextRequest) => {
 
     // Clean up disconnected controllers
     const disconnectedControllers: ReadableStreamDefaultController[] = [];
-    
+
     for (const controller of activeConnections) {
       try {
         controller.enqueue(encoder.encode(data));

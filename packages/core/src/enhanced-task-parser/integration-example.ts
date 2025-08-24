@@ -1,16 +1,16 @@
 /**
  * Integration Example: Vibe-Coded + Conscious-Bot Architecture
- * 
+ *
  * Demonstrates how the task-oriented approach of vibe-coded integrates
  * with the cognitive depth of the conscious-bot architecture.
- * 
+ *
  * @author @darianrosebrook
  */
 
-import { 
-  CognitiveTaskParser, 
+import {
+  CognitiveTaskParser,
   VibeCodedCognitiveIntegration,
-  VibeCodedTaskExecutor 
+  VibeCodedTaskExecutor,
 } from './index';
 import { TaskDefinition, TaskExecutionContext } from './types';
 
@@ -18,22 +18,25 @@ import { TaskDefinition, TaskExecutionContext } from './types';
  * Example task executors implementing vibe-coded patterns
  */
 class GatheringTaskExecutor implements VibeCodedTaskExecutor {
-  async execute(task: TaskDefinition, context: TaskExecutionContext): Promise<any> {
+  async execute(
+    task: TaskDefinition,
+    context: TaskExecutionContext
+  ): Promise<any> {
     console.log(`🎯 Executing gathering task: ${task.parameters.resource}`);
-    
+
     // Simulate vibe-coded style execution
     const steps = [
       'Locating resource...',
       'Navigating to location...',
       'Extracting resource...',
-      'Returning to safe location...'
+      'Returning to safe location...',
     ];
-    
+
     for (const step of steps) {
       console.log(`  ${step}`);
       await this.delay(1000); // Simulate execution time
     }
-    
+
     return {
       success: true,
       gathered: task.parameters.quantity || 1,
@@ -41,36 +44,39 @@ class GatheringTaskExecutor implements VibeCodedTaskExecutor {
       duration: 4000,
     };
   }
-  
+
   canExecute(task: TaskDefinition): boolean {
     return task.type === 'gathering' && task.parameters.resource;
   }
-  
+
   estimateDuration(task: TaskDefinition): number {
     return 4000; // 4 seconds for gathering
   }
-  
+
   private delay(ms: number): Promise<void> {
-    return new Promise(resolve => setTimeout(resolve, ms));
+    return new Promise((resolve) => setTimeout(resolve, ms));
   }
 }
 
 class CraftingTaskExecutor implements VibeCodedTaskExecutor {
-  async execute(task: TaskDefinition, context: TaskExecutionContext): Promise<any> {
+  async execute(
+    task: TaskDefinition,
+    context: TaskExecutionContext
+  ): Promise<any> {
     console.log(`🔨 Executing crafting task: ${task.parameters.item}`);
-    
+
     const steps = [
       'Gathering materials...',
       'Locating crafting station...',
       'Executing crafting process...',
-      'Collecting crafted item...'
+      'Collecting crafted item...',
     ];
-    
+
     for (const step of steps) {
       console.log(`  ${step}`);
       await this.delay(1500);
     }
-    
+
     return {
       success: true,
       crafted: task.parameters.item,
@@ -78,17 +84,17 @@ class CraftingTaskExecutor implements VibeCodedTaskExecutor {
       duration: 6000,
     };
   }
-  
+
   canExecute(task: TaskDefinition): boolean {
     return task.type === 'crafting' && task.parameters.item;
   }
-  
+
   estimateDuration(task: TaskDefinition): number {
     return 6000; // 6 seconds for crafting
   }
-  
+
   private delay(ms: number): Promise<void> {
-    return new Promise(resolve => setTimeout(resolve, ms));
+    return new Promise((resolve) => setTimeout(resolve, ms));
   }
 }
 
@@ -97,27 +103,33 @@ class CraftingTaskExecutor implements VibeCodedTaskExecutor {
  */
 export async function demonstrateIntegration() {
   console.log('=== Vibe-Coded + Conscious-Bot Integration Demo ===\n');
-  
+
   // Initialize the cognitive integration
   const cognitiveIntegration = new VibeCodedCognitiveIntegration();
-  
+
   // Register task executors (vibe-coded style)
-  cognitiveIntegration.registerTaskExecutor('gathering', new GatheringTaskExecutor());
-  cognitiveIntegration.registerTaskExecutor('crafting', new CraftingTaskExecutor());
-  
+  cognitiveIntegration.registerTaskExecutor(
+    'gathering',
+    new GatheringTaskExecutor()
+  );
+  cognitiveIntegration.registerTaskExecutor(
+    'crafting',
+    new CraftingTaskExecutor()
+  );
+
   // Initialize the cognitive task parser
   const cognitiveTaskParser = new CognitiveTaskParser(
     { debug_mode: true },
     cognitiveIntegration
   );
-  
+
   // Start environmental monitoring
   cognitiveTaskParser.startMonitoring(2000);
-  
+
   // Example 1: User command with cognitive context
   console.log('1. User Command with Cognitive Context:');
   const userCommand = '.bot mine 32 cobblestone urgently';
-  
+
   const cognitiveContext = {
     currentNeeds: {
       safety: 0.3,
@@ -128,7 +140,7 @@ export async function demonstrateIntegration() {
     skills: ['basic_mining', 'basic_movement'],
     socialNeeds: { interaction: 0.4 },
   };
-  
+
   const worldState = {
     time: 12000, // Day
     weather: 'clear',
@@ -137,29 +149,37 @@ export async function demonstrateIntegration() {
     position: { x: 100, y: 64, z: 200 },
     entities: [],
     inventory: [{ name: 'stone_pickaxe', quantity: 1 }],
-    nearby_blocks: [
-      { type: 'stone', position: { x: 101, y: 63, z: 200 } }
-    ],
-    chat_messages: []
+    nearby_blocks: [{ type: 'stone', position: { x: 101, y: 63, z: 200 } }],
+    chat_messages: [],
   };
-  
+
   try {
     const result = await cognitiveTaskParser.parseUserCommand(
       userCommand,
       cognitiveContext,
       worldState
     );
-    
+
     console.log('✅ Command parsed successfully:');
-    console.log(`   Task: ${result.task.type} - ${result.task.parameters.resource}`);
+    console.log(
+      `   Task: ${result.task.type} - ${result.task.parameters.resource}`
+    );
     console.log(`   Priority: ${result.priority.toFixed(2)}`);
     console.log(`   Reasoning: ${result.reasoning}`);
     console.log(`   Cognitive Task: ${result.cognitiveTask.type}`);
-    console.log(`   Emotional Context: ${JSON.stringify(result.cognitiveTask.emotionalContext)}`);
-    console.log(`   Memory Integration: ${result.cognitiveTask.memoryIntegration.similarTasksFound} similar tasks found`);
-    console.log(`   Execution Plan: ${result.cognitiveTask.executionPlan.steps.length} steps`);
-    console.log(`   Fallback Strategies: ${result.cognitiveTask.fallbackStrategies.length} strategies\n`);
-    
+    console.log(
+      `   Emotional Context: ${JSON.stringify(result.cognitiveTask.emotionalContext)}`
+    );
+    console.log(
+      `   Memory Integration: ${result.cognitiveTask.memoryIntegration.similarTasksFound} similar tasks found`
+    );
+    console.log(
+      `   Execution Plan: ${result.cognitiveTask.executionPlan.steps.length} steps`
+    );
+    console.log(
+      `   Fallback Strategies: ${result.cognitiveTask.fallbackStrategies.length} strategies\n`
+    );
+
     // Execute the task
     console.log('🚀 Executing task...');
     const executionResult = await cognitiveIntegration.executeTask(
@@ -167,11 +187,10 @@ export async function demonstrateIntegration() {
       result.environmentalContext
     );
     console.log(`✅ Task completed: ${JSON.stringify(executionResult)}\n`);
-    
   } catch (error) {
     console.error('❌ Error:', error);
   }
-  
+
   // Example 2: Cognitive goal to executable task
   console.log('2. Cognitive Goal to Executable Task:');
   const cognitiveGoal = {
@@ -183,25 +202,27 @@ export async function demonstrateIntegration() {
     quantity: 5,
     complexity: 'low',
   };
-  
+
   try {
-    const executableTask = await cognitiveTaskParser.cognitiveGoalToExecutableTask(
-      cognitiveGoal,
-      worldState
-    );
-    
+    const executableTask =
+      await cognitiveTaskParser.cognitiveGoalToExecutableTask(
+        cognitiveGoal,
+        worldState
+      );
+
     console.log('✅ Cognitive goal converted to executable task:');
     console.log(`   Type: ${executableTask.type}`);
     console.log(`   Resource: ${executableTask.parameters.resource}`);
     console.log(`   Priority: ${executableTask.priority}`);
     console.log(`   Safety Level: ${executableTask.safety_level}`);
     console.log(`   Dependencies: ${executableTask.dependencies.join(', ')}`);
-    console.log(`   Fallback Actions: ${executableTask.fallback_actions.join(', ')}\n`);
-    
+    console.log(
+      `   Fallback Actions: ${executableTask.fallback_actions.join(', ')}\n`
+    );
   } catch (error) {
     console.error('❌ Error:', error);
   }
-  
+
   // Example 3: Chat message processing
   console.log('3. Chat Message Processing:');
   const chatMessage = {
@@ -216,14 +237,14 @@ export async function demonstrateIntegration() {
     requires_response: true,
     response_priority: 0.7,
   };
-  
+
   try {
     const chatResult = await cognitiveTaskParser.processChatMessage(
       chatMessage,
       cognitiveContext,
       worldState
     );
-    
+
     console.log('✅ Chat message processed:');
     console.log(`   Should Respond: ${chatResult.shouldRespond}`);
     if (chatResult.command) {
@@ -233,37 +254,40 @@ export async function demonstrateIntegration() {
       console.log(`   Response: ${chatResult.cognitiveResponse.content}`);
     }
     console.log();
-    
   } catch (error) {
     console.error('❌ Error:', error);
   }
-  
+
   // Example 4: Priority merging demonstration
   console.log('4. Priority Merging Demonstration:');
   const externalPriority = 0.8; // User command
   const internalPriority = 0.6; // Internal drive
-  
+
   const mergedPriority = cognitiveIntegration.mergeTaskPriorities(
     externalPriority,
     internalPriority
   );
-  
+
   console.log('✅ Priority merging:');
   console.log(`   External Priority: ${externalPriority}`);
   console.log(`   Internal Priority: ${internalPriority}`);
   console.log(`   Merged Priority: ${mergedPriority.toFixed(2)}`);
-  console.log(`   Available Executors: ${cognitiveIntegration.getAvailableExecutors().join(', ')}\n`);
-  
+  console.log(
+    `   Available Executors: ${cognitiveIntegration.getAvailableExecutors().join(', ')}\n`
+  );
+
   // Example 5: Performance metrics
   console.log('5. Performance Metrics:');
   const metrics = cognitiveTaskParser.getPerformanceMetrics();
   console.log('✅ Performance metrics:');
   console.log(`   Task Parser: ${JSON.stringify(metrics.taskParser, null, 2)}`);
-  console.log(`   Environmental Immersion: ${JSON.stringify(metrics.environmentalImmersion, null, 2)}\n`);
-  
+  console.log(
+    `   Environmental Immersion: ${JSON.stringify(metrics.environmentalImmersion, null, 2)}\n`
+  );
+
   // Stop monitoring
   cognitiveTaskParser.stopMonitoring();
-  
+
   console.log('=== Integration Demo Complete ===');
   console.log('\nKey Benefits Demonstrated:');
   console.log('✅ Vibe-coded style task parsing and execution');

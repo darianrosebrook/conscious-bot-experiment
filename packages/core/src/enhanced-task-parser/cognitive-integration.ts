@@ -1,9 +1,9 @@
 /**
  * Cognitive Integration Layer
- * 
+ *
  * Bridges the Enhanced Task Parser with the conscious-bot's cognitive architecture,
  * incorporating the best patterns from both vibe-coded and conscious-bot systems.
- * 
+ *
  * @author @darianrosebrook
  */
 
@@ -25,22 +25,28 @@ export interface CognitiveTaskIntegration {
   /**
    * Convert external task to cognitive task
    */
-  externalTaskToCognitive(task: TaskDefinition, context: TaskExecutionContext): any;
-  
+  externalTaskToCognitive(
+    task: TaskDefinition,
+    context: TaskExecutionContext
+  ): any;
+
   /**
    * Convert cognitive goal to executable task
    */
   cognitiveGoalToTask(goal: any, context: TaskExecutionContext): TaskDefinition;
-  
+
   /**
    * Merge external and internal task priorities
    */
-  mergeTaskPriorities(externalPriority: number, internalPriority: number): number;
+  mergeTaskPriorities(
+    externalPriority: number,
+    internalPriority: number
+  ): number;
 }
 
 /**
  * Enhanced Task Parser with Cognitive Integration
- * 
+ *
  * Integrates sophisticated task parsing with the conscious-bot's cognitive architecture,
  * incorporating proven patterns from vibe-coded while maintaining cognitive depth.
  */
@@ -60,7 +66,7 @@ export class CognitiveTaskParser extends EventEmitter {
     this.taskParser = new TaskParser(taskParserConfig);
     this.environmentalImmersion = new EnvironmentalImmersion();
     this.cognitiveIntegration = cognitiveIntegration;
-    
+
     // Set up event listeners for cognitive integration
     this.setupCognitiveEventListeners();
   }
@@ -81,13 +87,13 @@ export class CognitiveTaskParser extends EventEmitter {
   }> {
     // Update environmental context
     const environmentalContext = this.updateEnvironmentalContext(worldState);
-    
+
     // Parse the user command into a task
     const parsingResult = await this.taskParser.parseLLMOutput(
       userMessage,
       environmentalContext
     );
-    
+
     // Create task execution context
     const taskContext: TaskExecutionContext = {
       task: parsingResult.task,
@@ -97,26 +103,26 @@ export class CognitiveTaskParser extends EventEmitter {
       social_context: environmentalContext.social_context,
       timestamp: Date.now(),
     };
-    
+
     // Convert to cognitive task
     const cognitiveTask = this.cognitiveIntegration.externalTaskToCognitive(
       parsingResult.task,
       taskContext
     );
-    
+
     // Merge priorities (external command vs internal drives)
     const mergedPriority = this.cognitiveIntegration.mergeTaskPriorities(
       parsingResult.task.priority || 0.5,
       cognitiveContext.currentPriority || 0.3
     );
-    
+
     // Generate reasoning for the task
     const reasoning = this.generateTaskReasoning(
       parsingResult,
       cognitiveContext,
       environmentalContext
     );
-    
+
     const result = {
       task: parsingResult.task,
       cognitiveTask,
@@ -124,7 +130,7 @@ export class CognitiveTaskParser extends EventEmitter {
       priority: mergedPriority,
       reasoning,
     };
-    
+
     this.emit('user_command_parsed', result);
     return result;
   }
@@ -137,7 +143,7 @@ export class CognitiveTaskParser extends EventEmitter {
     worldState: any
   ): Promise<TaskDefinition> {
     const environmentalContext = this.updateEnvironmentalContext(worldState);
-    
+
     const taskContext: TaskExecutionContext = {
       task: {} as TaskDefinition, // Placeholder
       environmental_context: environmentalContext,
@@ -146,12 +152,12 @@ export class CognitiveTaskParser extends EventEmitter {
       social_context: environmentalContext.social_context,
       timestamp: Date.now(),
     };
-    
+
     const task = this.cognitiveIntegration.cognitiveGoalToTask(
       cognitiveGoal,
       taskContext
     );
-    
+
     this.emit('cognitive_goal_converted', { goal: cognitiveGoal, task });
     return task;
   }
@@ -170,9 +176,12 @@ export class CognitiveTaskParser extends EventEmitter {
     shouldRespond: boolean;
   }> {
     const environmentalContext = this.updateEnvironmentalContext(worldState);
-    
+
     // Check if this is a command (e.g., ".bot mine coal")
-    if (message.content.startsWith('.bot') || message.content.startsWith('/bot')) {
+    if (
+      message.content.startsWith('.bot') ||
+      message.content.startsWith('/bot')
+    ) {
       const command = this.extractCommand(message);
       if (command) {
         const taskResult = await this.parseUserCommand(
@@ -180,7 +189,7 @@ export class CognitiveTaskParser extends EventEmitter {
           cognitiveContext,
           worldState
         );
-        
+
         return {
           command,
           task: taskResult.task,
@@ -188,7 +197,7 @@ export class CognitiveTaskParser extends EventEmitter {
         };
       }
     }
-    
+
     // Check if this requires a cognitive response
     if (this.shouldGenerateCognitiveResponse(message, cognitiveContext)) {
       const cognitiveResponse = await this.generateCognitiveResponse(
@@ -196,13 +205,13 @@ export class CognitiveTaskParser extends EventEmitter {
         cognitiveContext,
         environmentalContext
       );
-      
+
       return {
         cognitiveResponse,
         shouldRespond: true,
       };
     }
-    
+
     return { shouldRespond: false };
   }
 
@@ -215,34 +224,34 @@ export class CognitiveTaskParser extends EventEmitter {
     environmentalContext: EnvironmentalContext
   ): string {
     const reasons: string[] = [];
-    
+
     // Add environmental context
     if (environmentalContext.threat_level > 0.7) {
       reasons.push('High threat environment requires immediate action');
     }
-    
+
     if (environmentalContext.time_of_day === 'night') {
       reasons.push('Night time conditions affect task execution');
     }
-    
+
     // Add cognitive context
     if (cognitiveContext.currentNeeds?.safety > 0.8) {
       reasons.push('Safety needs are high priority');
     }
-    
+
     if (cognitiveContext.currentNeeds?.nutrition > 0.7) {
       reasons.push('Nutrition needs require attention');
     }
-    
+
     // Add task-specific reasoning
     if (parsingResult.task.type === 'gathering') {
       reasons.push('Resource gathering supports current goals');
     }
-    
+
     if (parsingResult.task.type === 'crafting') {
       reasons.push('Crafting advances technological capabilities');
     }
-    
+
     return reasons.join('. ');
   }
 
@@ -251,14 +260,14 @@ export class CognitiveTaskParser extends EventEmitter {
    */
   private extractCommand(message: ChatMessage): Command | null {
     const content = message.content;
-    
+
     // Remove command prefix
     const commandText = content.replace(/^\.?bot\s+/i, '').trim();
-    
+
     if (!commandText) {
       return null;
     }
-    
+
     // Simple command extraction (can be enhanced with LLM)
     const command: Command = {
       type: 'user_command',
@@ -271,7 +280,7 @@ export class CognitiveTaskParser extends EventEmitter {
       timestamp: message.timestamp,
       original_message: content,
     };
-    
+
     // Detect command type based on keywords
     const lowerText = commandText.toLowerCase();
     if (lowerText.includes('mine') || lowerText.includes('gather')) {
@@ -283,7 +292,7 @@ export class CognitiveTaskParser extends EventEmitter {
     } else if (lowerText.includes('build') || lowerText.includes('construct')) {
       command.type = 'construction';
     }
-    
+
     return command;
   }
 
@@ -298,23 +307,25 @@ export class CognitiveTaskParser extends EventEmitter {
     if (message.content.includes('?')) {
       return true;
     }
-    
+
     // Respond to greetings
     if (message.content.toLowerCase().match(/^(hi|hello|hey|greetings)/)) {
       return true;
     }
-    
+
     // Respond to mentions
-    if (message.content.toLowerCase().includes('bot') || 
-        message.content.toLowerCase().includes('ai')) {
+    if (
+      message.content.toLowerCase().includes('bot') ||
+      message.content.toLowerCase().includes('ai')
+    ) {
       return true;
     }
-    
+
     // Respond based on social context
     if (cognitiveContext.socialNeeds?.interaction > 0.6) {
       return true;
     }
-    
+
     return false;
   }
 
@@ -330,7 +341,11 @@ export class CognitiveTaskParser extends EventEmitter {
     // For now, return a structured response
     return {
       type: 'social_response',
-      content: this.generateContextualResponse(message, cognitiveContext, environmentalContext),
+      content: this.generateContextualResponse(
+        message,
+        cognitiveContext,
+        environmentalContext
+      ),
       priority: 0.5,
       reasoning: 'Social interaction maintains positive relationships',
     };
@@ -345,35 +360,35 @@ export class CognitiveTaskParser extends EventEmitter {
     environmentalContext: EnvironmentalContext
   ): string {
     const responses: string[] = [];
-    
+
     // Add environmental context
     if (environmentalContext.threat_level > 0.7) {
       responses.push("I'm currently dealing with some threats nearby.");
     }
-    
+
     if (environmentalContext.time_of_day === 'night') {
       responses.push("It's getting dark, so I'm being extra careful.");
     }
-    
+
     // Add cognitive context
     if (cognitiveContext.currentNeeds?.safety > 0.8) {
       responses.push("I'm prioritizing safety right now.");
     }
-    
+
     if (cognitiveContext.currentNeeds?.nutrition > 0.7) {
-      responses.push("I could use some food soon.");
+      responses.push('I could use some food soon.');
     }
-    
+
     // Add social context
     if (environmentalContext.social_context.nearby_players.length > 0) {
-      responses.push("I see other players around - hello!");
+      responses.push('I see other players around - hello!');
     }
-    
+
     // Default response
     if (responses.length === 0) {
       responses.push("I'm here and ready to help!");
     }
-    
+
     return responses.join(' ');
   }
 
@@ -382,17 +397,19 @@ export class CognitiveTaskParser extends EventEmitter {
    */
   private updateEnvironmentalContext(worldState: any): EnvironmentalContext {
     const now = Date.now();
-    
+
     // Use cached context if recent enough
-    if (this.worldStateCache && 
-        (now - this.lastContextUpdate) < this.contextUpdateInterval) {
+    if (
+      this.worldStateCache &&
+      now - this.lastContextUpdate < this.contextUpdateInterval
+    ) {
       return this.worldStateCache;
     }
-    
+
     const context = this.environmentalImmersion.updateContext(worldState);
     this.worldStateCache = context;
     this.lastContextUpdate = now;
-    
+
     return context;
   }
 
@@ -402,11 +419,11 @@ export class CognitiveTaskParser extends EventEmitter {
   private getCurrentSkills(cognitiveContext: any): string[] {
     // This would integrate with the skill system
     const baseSkills = ['basic_movement', 'basic_interaction'];
-    
+
     if (cognitiveContext.skills) {
       return [...baseSkills, ...cognitiveContext.skills];
     }
-    
+
     return baseSkills;
   }
 
@@ -417,11 +434,11 @@ export class CognitiveTaskParser extends EventEmitter {
     this.taskParser.on('task_parsed', (result) => {
       this.emit('task_parsed', result);
     });
-    
+
     this.taskParser.on('parsing_error', (error) => {
       this.emit('parsing_error', error);
     });
-    
+
     this.environmentalImmersion.on('context_updated', (context) => {
       this.emit('environmental_context_updated', context);
     });
@@ -434,8 +451,10 @@ export class CognitiveTaskParser extends EventEmitter {
     return {
       taskParser: this.taskParser.getPerformanceMetrics(),
       environmentalImmersion: {
-        contextHistorySize: this.environmentalImmersion.getContextHistory().length,
-        currentContext: this.environmentalImmersion.getCurrentContext() !== null,
+        contextHistorySize:
+          this.environmentalImmersion.getContextHistory().length,
+        currentContext:
+          this.environmentalImmersion.getCurrentContext() !== null,
       },
     };
   }

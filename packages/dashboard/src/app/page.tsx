@@ -862,14 +862,15 @@ export default function ConsciousMinecraftDashboard() {
                       thought.thoughtType === 'external_chat_in';
                     const isBotResponse =
                       thought.thoughtType === 'external_chat_out';
+                    const isSocial = thought.thoughtType === 'social';
                     const isInternal =
                       thought.thoughtType === 'internal' ||
                       thought.thoughtType === 'reflection' ||
-                      thought.thoughtType === 'observation';
+                      thought.thoughtType === 'observation' ||
+                      thought.thoughtType === 'planning';
 
                     let borderColor = 'border-zinc-800';
                     let bgColor = 'bg-zinc-950';
-                    let textColor = 'text-zinc-200';
                     let prefix = '';
                     let typeLabel = thought.thoughtType || thought.type;
 
@@ -888,6 +889,11 @@ export default function ConsciousMinecraftDashboard() {
                       bgColor = 'bg-green-950/20';
                       prefix = '🤖 ';
                       typeLabel = 'chat_out';
+                    } else if (isSocial) {
+                      borderColor = 'border-orange-600/50';
+                      bgColor = 'bg-orange-950/20';
+                      prefix = '👥 ';
+                      typeLabel = 'social';
                     } else if (isInternal) {
                       borderColor = 'border-yellow-600/50';
                       bgColor = 'bg-yellow-950/20';

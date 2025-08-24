@@ -11,14 +11,17 @@ interface UseSSEOptions {
 }
 
 // Global connection manager to prevent multiple connections to the same URL
-const connectionManager = new Map<string, {
-  eventSource: EventSource;
-  subscribers: Set<(data: unknown) => void>;
-  onOpen: Set<() => void>;
-  onClose: Set<() => void>;
-  onError: Set<(error: Event) => void>;
-  isConnecting: boolean;
-}>();
+const connectionManager = new Map<
+  string,
+  {
+    eventSource: EventSource;
+    subscribers: Set<(data: unknown) => void>;
+    onOpen: Set<() => void>;
+    onClose: Set<() => void>;
+    onError: Set<(error: Event) => void>;
+    isConnecting: boolean;
+  }
+>();
 
 /**
  * Server-Sent Events hook for real-time data communication
@@ -64,7 +67,7 @@ export function useSSE({
     if (!connection) {
       try {
         const eventSource = new EventSource(url);
-        
+
         connection = {
           eventSource,
           subscribers: new Set(),
@@ -114,7 +117,6 @@ export function useSSE({
             connection.onClose.forEach((callback) => callback());
           }
         });
-
       } catch (err) {
         console.error('Failed to create EventSource:', err);
         setError('Failed to create connection');
@@ -169,7 +171,9 @@ export function useSSE({
       ) {
         connection.eventSource.close();
         connectionManager.delete(url);
-        console.log(`SSE connection closed. Total connections: ${connectionManager.size}`);
+        console.log(
+          `SSE connection closed. Total connections: ${connectionManager.size}`
+        );
       }
     }
     setIsConnected(false);
