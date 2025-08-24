@@ -46,26 +46,47 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Also submit to planning system if it's a goal-related intrusion
+    // Also submit to planning system if it's a goal-related or action-related intrusion
     if (
       text.toLowerCase().includes('goal') ||
-      text.toLowerCase().includes('task')
+      text.toLowerCase().includes('task') ||
+      text.toLowerCase().includes('craft') ||
+      text.toLowerCase().includes('mine') ||
+      text.toLowerCase().includes('build') ||
+      text.toLowerCase().includes('explore') ||
+      text.toLowerCase().includes('gather') ||
+      text.toLowerCase().includes('farm')
     ) {
       try {
-        await fetch('http://localhost:3002/goal', {
+        console.log(`🎯 Creating goal from intrusive thought: "${text}"`);
+        const planningResponse = await fetch('http://localhost:3002/goal', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            type: 'intrusion',
+            name: `Goal from intrusion`,
             description: text,
             priority: strength,
-            source: 'intrusion',
+            urgency: 0.6,
+            tasks: [{
+              type: 'autonomous',
+              description: text,
+              priority: strength,
+              urgency: 0.6,
+              parameters: {},
+            }],
           }),
         });
+
+        if (planningResponse.ok) {
+          const planningResult = await planningResponse.json();
+          console.log(`✅ Goal created successfully:`, planningResult);
+        } else {
+          console.error(`❌ Failed to create goal:`, await planningResponse.text());
+        }
       } catch (error) {
-        // Silently fail if planning system is unavailable
+        console.error('Failed to create goal from intrusive thought:', error);
       }
     }
 

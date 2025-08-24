@@ -31,14 +31,21 @@ const planningSystem = {
     getCurrentGoals: () => [],
     getActiveGoals: () => [],
     getGoalCount: () => 0,
-    getCurrentTasks: () => [],
-    getCompletedTasks: () => [],
+    getCurrentTasks: () => {
+      const tasks = planningSystem.goalFormulation._tasks || [];
+      return tasks.filter((t: any) => t.status === 'pending' || t.status === 'in_progress');
+    },
+    getCompletedTasks: () => {
+      const tasks = planningSystem.goalFormulation._tasks || [];
+      return tasks.filter((t: any) => t.status === 'completed' || t.status === 'failed' || t.status === 'abandoned');
+    },
     addTask: (task: any) => {
       // Simple in-memory task storage
       if (!planningSystem.goalFormulation._tasks) {
         planningSystem.goalFormulation._tasks = [];
       }
       planningSystem.goalFormulation._tasks.push(task);
+      console.log(`📋 Task added: ${task.type} - ${task.description}`);
     },
     _tasks: [] as any[],
     _lastTaskExecution: 0, // Track when last task was executed

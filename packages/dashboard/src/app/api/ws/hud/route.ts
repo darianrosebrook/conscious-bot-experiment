@@ -80,7 +80,7 @@ export const GET = async (req: NextRequest) => {
 
             const data = `data: ${JSON.stringify(hudData)}\n\n`;
             controller.enqueue(encoder.encode(data));
-            
+
             // Log HUD update (reduced frequency)
             console.log(`📊 HUD update sent at ${new Date().toISOString()}`);
           } catch (error) {

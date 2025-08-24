@@ -194,10 +194,12 @@ export const GET = async (req: NextRequest) => {
                 lastThoughtId = thought.id;
               }
             }
-            
+
             // Log thoughts update (reduced frequency)
             if (thoughts.length > 0) {
-              console.log(`🧠 Thoughts update sent at ${new Date().toISOString()} (${thoughts.length} thoughts)`);
+              console.log(
+                `🧠 Thoughts update sent at ${new Date().toISOString()} (${thoughts.length} thoughts)`
+              );
             }
           } catch (error) {
             // Silently handle errors

@@ -243,20 +243,47 @@ export default function ConsciousMinecraftDashboard() {
     const text = intrusion.trim();
     if (!text) return;
 
+    // Add immediate feedback thought
+    const feedbackThought: Thought = {
+      id: generateId(),
+      ts: new Date().toISOString(),
+      text: `💭 Processing: "${text}"`,
+      type: 'intrusion',
+    };
+    addThought(feedbackThought);
+
     try {
       const response = await submitIntrusiveThought({ text });
       if (response.accepted) {
         const thought: Thought = {
           id: generateId(),
           ts: new Date().toISOString(),
-          text,
+          text: `✅ Intrusive thought processed: "${text}"`,
           type: 'intrusion',
         };
         addThought(thought);
         setIntrusion('');
+        
+        // Add a follow-up thought about what the bot might do
+        setTimeout(() => {
+          const followUpThought: Thought = {
+            id: generateId(),
+            ts: new Date().toISOString(),
+            text: `🤔 Considering how to act on: "${text}"`,
+            type: 'reflection',
+          };
+          addThought(followUpThought);
+        }, 1000);
       }
     } catch (error) {
-      // Silently handle errors
+      const errorThought: Thought = {
+        id: generateId(),
+        ts: new Date().toISOString(),
+        text: `❌ Failed to process intrusive thought: "${text}"`,
+        type: 'intrusion',
+      };
+      addThought(errorThought);
+      console.error('Error submitting intrusive thought:', error);
     }
   };
 
@@ -675,8 +702,7 @@ export default function ConsciousMinecraftDashboard() {
               </Button>
             </div>
             <div className="mt-1 text-[11px] text-zinc-500">
-              Debug tip: keep attribution hidden in prod so the bot treats the
-              injection as self-generated.
+              Try: "craft a wooden pickaxe", "mine some stone", "explore the area", "build a house"
             </div>
           </div>
         </aside>

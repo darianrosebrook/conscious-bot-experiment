@@ -44,7 +44,7 @@ const mockDate = new Date('2024-01-01T00:00:00.000Z');
 jest.spyOn(Date, 'now').mockImplementation(() => mockDate.getTime());
 
 // Global test utilities
-global.testUtils = {
+(global as any).testUtils = {
   createMockTask: (overrides = {}) => ({
     id: `test-task-${Date.now()}`,
     type: 'mine',
@@ -79,16 +79,4 @@ global.testUtils = {
   waitForAsync: (ms = 100) => new Promise((resolve) => setTimeout(resolve, ms)),
 };
 
-// Type declarations for global test utilities
-declare global {
-  namespace NodeJS {
-    interface Global {
-      testUtils: {
-        createMockTask: (overrides?: any) => any;
-        createMockResult: (overrides?: any) => any;
-        createMockCognitiveFeedback: (overrides?: any) => any;
-        waitForAsync: (ms?: number) => Promise<void>;
-      };
-    }
-  }
-}
+// Global test utilities are available as (global as any).testUtils
