@@ -703,6 +703,9 @@ export const InventoryDisplay: React.FC<InventoryDisplayProps> = ({
   selectedSlot = 0,
   className = '',
 }) => {
+  // Debug logging
+  console.log('InventoryDisplay received inventory:', inventory);
+  
   // Separate hotbar (slots 0-8) from main inventory
   const hotbarItems = inventory.filter(
     (item) => item.slot >= 0 && item.slot <= 8
@@ -710,6 +713,9 @@ export const InventoryDisplay: React.FC<InventoryDisplayProps> = ({
   const mainInventoryItems = inventory.filter(
     (item) => item.slot >= 9 && item.slot <= 35
   );
+  
+  console.log('Hotbar items:', hotbarItems);
+  console.log('Main inventory items:', mainInventoryItems);
 
   return (
     <Section
