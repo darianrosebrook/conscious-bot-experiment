@@ -10,9 +10,19 @@ interface UseSSEOptions {
   maxReconnectAttempts?: number;
 }
 
+// Global connection manager to prevent multiple connections to the same URL
+const connectionManager = new Map<string, {
+  eventSource: EventSource;
+  subscribers: Set<(data: unknown) => void>;
+  onOpen: Set<() => void>;
+  onClose: Set<() => void>;
+  onError: Set<(error: Event) => void>;
+}>();
+
 /**
  * Server-Sent Events hook for real-time data communication
- * Handles connection, reconnection, and message processing
+ * Uses a global connection manager to prevent multiple connections to the same URL
+ * Fixed for Next.js 15 StrictMode and excessive reconnection issues
  *
  * @author @darianrosebrook
  */
@@ -27,108 +37,121 @@ export function useSSE({
 }: UseSSEOptions) {
   const [isConnected, setIsConnected] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const eventSourceRef = useRef<EventSource | null>(null);
-  const reconnectTimeoutRef = useRef<NodeJS.Timeout>();
   const reconnectAttemptsRef = useRef(0);
-  const isReconnectingRef = useRef(false);
+  const isMountedRef = useRef(true);
 
   const connect = useCallback(() => {
-    // Prevent multiple simultaneous connection attempts
-    if (isReconnectingRef.current) {
-      return;
-    }
+    if (!isMountedRef.current) return;
 
-    try {
-      // Clean up any existing connection
-      if (eventSourceRef.current) {
-        eventSourceRef.current.close();
-        eventSourceRef.current = null;
+    // Check if we already have a connection for this URL
+    let connection = connectionManager.get(url);
+
+    if (!connection) {
+      // Create new connection
+      try {
+        const eventSource = new EventSource(url);
+        
+        connection = {
+          eventSource,
+          subscribers: new Set(),
+          onOpen: new Set(),
+          onClose: new Set(),
+          onError: new Set(),
+        };
+
+        eventSource.onopen = () => {
+          setIsConnected(true);
+          setError(null);
+          reconnectAttemptsRef.current = 0;
+          connection!.onOpen.forEach(callback => callback());
+        };
+
+        eventSource.onmessage = (event) => {
+          try {
+            const data = JSON.parse(event.data);
+            connection!.subscribers.forEach(callback => callback(data));
+          } catch (err) {
+            // Silently handle parsing errors
+          }
+        };
+
+        eventSource.onerror = (event) => {
+          setIsConnected(false);
+          setError('SSE connection error');
+          connection!.onError.forEach(callback => callback(event));
+
+          // Attempt to reconnect if we haven't exceeded max attempts
+          if (reconnectAttemptsRef.current < maxReconnectAttempts) {
+            reconnectAttemptsRef.current++;
+            const backoffDelay = Math.min(
+              reconnectInterval * Math.pow(2, reconnectAttemptsRef.current - 1),
+              30000 // Cap at 30 seconds
+            );
+
+            setTimeout(() => {
+              if (isMountedRef.current) {
+                // Remove the failed connection
+                connectionManager.delete(url);
+                // Try to reconnect
+                connect();
+              }
+            }, backoffDelay);
+          }
+        };
+
+        connectionManager.set(url, connection);
+      } catch (err) {
+        setError('Failed to create SSE connection');
+        return;
       }
-
-      isReconnectingRef.current = true;
-      const eventSource = new EventSource(url);
-      eventSourceRef.current = eventSource;
-
-      eventSource.onopen = () => {
-        setIsConnected(true);
-        setError(null);
-        reconnectAttemptsRef.current = 0;
-        isReconnectingRef.current = false;
-        onOpen?.();
-      };
-
-      eventSource.onmessage = (event) => {
-        try {
-          const data = JSON.parse(event.data);
-          onMessage?.(data);
-        } catch (err) {
-          // Silently handle parsing errors
-        }
-      };
-
-      eventSource.onerror = (event) => {
-        setIsConnected(false);
-        isReconnectingRef.current = false;
-
-        // Only set error if we haven't exceeded max attempts
-        if (reconnectAttemptsRef.current < maxReconnectAttempts) {
-          setError(
-            `SSE connection error (attempt ${reconnectAttemptsRef.current + 1}/${maxReconnectAttempts})`
-          );
-        } else {
-          setError('SSE connection failed - max attempts reached');
-        }
-
-        onError?.(event);
-
-        // Attempt to reconnect with exponential backoff
-        if (reconnectAttemptsRef.current < maxReconnectAttempts) {
-          reconnectAttemptsRef.current++;
-          const backoffDelay = Math.min(
-            reconnectInterval * Math.pow(2, reconnectAttemptsRef.current - 1),
-            30000 // Cap at 30 seconds
-          );
-
-          reconnectTimeoutRef.current = setTimeout(() => {
-            connect();
-          }, backoffDelay);
-        }
-      };
-
-      // Handle connection close
-      const handleClose = () => {
-        setIsConnected(false);
-        isReconnectingRef.current = false;
-        onClose?.();
-      };
-
-      eventSource.addEventListener('close', handleClose);
-    } catch (err) {
-      setError('Failed to create SSE connection');
-      isReconnectingRef.current = false;
     }
-  }, [
-    url,
-    onMessage,
-    onOpen,
-    onClose,
-    onError,
-    reconnectInterval,
-    maxReconnectAttempts,
-  ]);
+
+    // Subscribe to this connection
+    if (onMessage) {
+      connection.subscribers.add(onMessage);
+    }
+    if (onOpen) {
+      connection.onOpen.add(onOpen);
+    }
+    if (onClose) {
+      connection.onClose.add(onClose);
+    }
+    if (onError) {
+      connection.onError.add(onError);
+    }
+
+    // Set connected state if the connection is already open
+    if (connection.eventSource.readyState === EventSource.OPEN) {
+      setIsConnected(true);
+      setError(null);
+    }
+  }, [url, onMessage, onOpen, onClose, onError, reconnectInterval, maxReconnectAttempts]);
 
   const disconnect = useCallback(() => {
-    if (reconnectTimeoutRef.current) {
-      clearTimeout(reconnectTimeoutRef.current);
-      reconnectTimeoutRef.current = undefined;
+    const connection = connectionManager.get(url);
+    if (connection) {
+      // Unsubscribe from this connection
+      if (onMessage) {
+        connection.subscribers.delete(onMessage);
+      }
+      if (onOpen) {
+        connection.onOpen.delete(onOpen);
+      }
+      if (onClose) {
+        connection.onClose.delete(onClose);
+      }
+      if (onError) {
+        connection.onError.delete(onError);
+      }
+
+      // If no more subscribers, close the connection
+      if (connection.subscribers.size === 0) {
+        connection.eventSource.close();
+        connectionManager.delete(url);
+      }
     }
-    if (eventSourceRef.current) {
-      eventSourceRef.current.close();
-      eventSourceRef.current = null;
-    }
-    isReconnectingRef.current = false;
     setIsConnected(false);
-  }, []);
+  }, [url, onMessage, onOpen, onClose, onError]);
 
   const reconnect = useCallback(() => {
     disconnect();
@@ -138,8 +161,11 @@ export function useSSE({
   }, [disconnect, connect]);
 
   useEffect(() => {
+    isMountedRef.current = true;
     connect();
+
     return () => {
+      isMountedRef.current = false;
       disconnect();
     };
   }, [connect, disconnect]);

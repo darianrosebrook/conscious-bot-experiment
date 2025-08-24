@@ -33,6 +33,9 @@ export interface Thought {
   text: string;
   type: ThoughtType;
   attrHidden?: boolean; // true in prod; debugging only
+  sender?: string; // For chat messages
+  thoughtType?: string; // Internal thought type (internal, external_chat_in, external_chat_out, intrusive, reflection, observation)
+  attribution?: 'self' | 'external' | 'intrusive'; // Source of the thought
 }
 
 // Task types

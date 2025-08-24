@@ -90,27 +90,237 @@ export default function ConsciousMinecraftDashboard() {
   const thoughtsEndRef = useRef<HTMLDivElement>(null);
 
   // SSE connections for real-time data
-  const hudSSE = useSSE({
-    url: '/api/ws/hud',
+  const botStateSSE = useSSE({
+    url: '/api/ws/bot-state',
     onMessage: (data) => {
-      // Type-safe HUD data handling
+      // Handle centralized bot state data
       if (
         data &&
         typeof data === 'object' &&
-        'vitals' in data &&
-        'intero' in data
+        'type' in data &&
+        data.type === 'bot_state_update' &&
+        'data' in data
       ) {
-        setHud(data as HudData);
+        const botStateData = (data as any).data;
+
+        // Update HUD data
+        if (botStateData.vitals) {
+          setHud({
+            ts: new Date().toISOString(),
+            vitals: botStateData.vitals,
+            intero: botStateData.cognition,
+            mood: botStateData.cognition?.mood || 'neutral',
+          });
+        }
+
+        // Update inventory
+        if (botStateData.inventory) {
+          setInventory(
+            botStateData.inventory.hotbar.concat(botStateData.inventory.main)
+          );
+        }
+
+        // Update bot state
+        setBotState({
+          position: botStateData.position,
+          health: botStateData.vitals?.health,
+          food: botStateData.vitals?.hunger,
+          inventory: botStateData.inventory?.hotbar
+            .concat(botStateData.inventory.main)
+            .map((item: any) => ({
+              name: item.name || item.displayName,
+              count: item.count,
+              displayName: item.displayName,
+            })),
+          time: botStateData.environment?.time,
+          weather: botStateData.environment?.weather,
+        });
+
+        // Update connection status
+        setBotConnections([
+          {
+            name: 'minecraft-bot',
+            connected: botStateData.connected,
+            viewerActive: false, // Will be updated separately if needed
+            viewerUrl: 'http://localhost:3006',
+          },
+        ]);
+
+        // Add thoughts from events
+        if (botStateData.events && Array.isArray(botStateData.events)) {
+          botStateData.events.forEach((event: any) => {
+            if (event.type === 'state_change') {
+              addThought({
+                id: `event-${event.timestamp}-${Math.random().toString(36).substr(2, 9)}`,
+                ts: event.timestamp,
+                text: `State change detected: ${Object.keys(event.changes)
+                  .filter((k) => event.changes[k])
+                  .join(', ')}`,
+                type: 'reflection',
+              });
+            }
+          });
+        }
       }
+    },
+    onError: (error) => {
+      console.warn('Bot state SSE connection error:', error);
+    },
+    onOpen: () => {
+      console.log('Bot state SSE connection opened');
+    },
+    onClose: () => {
+      console.log('Bot state SSE connection closed');
     },
   });
 
-  const cotSSE = useSSE({
-    url: '/api/ws/cot',
+  // Cognitive stream for thoughts and consciousness
+  const cognitiveSSE = useSSE({
+    url: '/api/ws/cognitive-stream',
     onMessage: (data) => {
-      addThought(data as Thought);
+      if (data && typeof data === 'object' && 'type' in data) {
+        if ((data as any).type === 'cognitive_stream_init') {
+          // Initialize with existing thoughts
+          const existingThoughts = (data as any).data.thoughts.map((thought: any) => ({
+            id: thought.id,
+            ts: new Date(thought.timestamp).toISOString(),
+            text: thought.content,
+            type:
+              thought.attribution === 'intrusive'
+                ? 'intrusion'
+                : thought.type === 'external_chat_in'
+                  ? 'external'
+                  : thought.type === 'external_chat_out'
+                    ? 'self'
+                    : 'self',
+            attrHidden: thought.attribution !== 'intrusive',
+            sender: thought.sender,
+            thoughtType: thought.type,
+            attribution: thought.attribution,
+          }));
+          // Add each thought individually
+          existingThoughts.forEach((thought: any) => addThought(thought));
+        } else if ((data as any).type === 'cognitive_thoughts') {
+          // Add new thoughts
+          const newThoughts = (data as any).data.thoughts.map((thought: any) => ({
+            id: thought.id,
+            ts: new Date(thought.timestamp).toISOString(),
+            text: thought.content,
+            type:
+              thought.attribution === 'intrusive'
+                ? 'intrusion'
+                : thought.type === 'external_chat_in'
+                  ? 'external'
+                  : thought.type === 'external_chat_out'
+                    ? 'self'
+                    : 'self',
+            attrHidden: thought.attribution !== 'intrusive',
+            sender: thought.sender,
+            thoughtType: thought.type,
+            attribution: thought.attribution,
+          }));
+          newThoughts.forEach((thought: any) => addThought(thought));
+        }
+      }
+    },
+    onError: (error) => {
+      console.warn('Cognitive SSE connection error:', error);
+    },
+    onOpen: () => {
+      console.log('Cognitive SSE connection opened');
+    },
+    onClose: () => {
+      console.log('Cognitive SSE connection closed');
     },
   });
+
+  // Polling fallback when SSE fails
+  useEffect(() => {
+    let pollInterval: NodeJS.Timeout;
+
+    // Only start polling if SSE is not connected and we have an error
+    if (!botStateSSE.isConnected && botStateSSE.error) {
+      console.log('Starting polling fallback for bot state');
+
+      const pollBotState = async () => {
+        try {
+          const response = await fetch('/api/ws/bot-state', {
+            headers: {
+              Accept: 'application/json',
+            },
+          });
+
+          if (response.ok) {
+            const data = await response.json();
+            // Handle the data similar to SSE
+            if (
+              data &&
+              typeof data === 'object' &&
+              'type' in data &&
+              data.type === 'bot_state_update'
+            ) {
+              const botStateData = data.data;
+
+              if (botStateData.vitals) {
+                setHud({
+                  ts: new Date().toISOString(),
+                  vitals: botStateData.vitals,
+                  intero: botStateData.cognition,
+                  mood: botStateData.cognition?.mood || 'neutral',
+                });
+              }
+
+              if (botStateData.inventory) {
+                setInventory(
+                  botStateData.inventory.hotbar.concat(
+                    botStateData.inventory.main
+                  )
+                );
+              }
+
+              setBotState({
+                position: botStateData.position,
+                health: botStateData.vitals?.health,
+                food: botStateData.vitals?.hunger,
+                inventory: botStateData.inventory?.hotbar
+                  .concat(botStateData.inventory.main)
+                  .map((item: any) => ({
+                    name: item.name || item.displayName,
+                    count: item.count,
+                    displayName: item.displayName,
+                  })),
+                time: botStateData.environment?.time,
+                weather: botStateData.environment?.weather,
+              });
+
+              setBotConnections([
+                {
+                  name: 'minecraft-bot',
+                  connected: botStateData.connected,
+                  viewerActive: false,
+                  viewerUrl: 'http://localhost:3006',
+                },
+              ]);
+            }
+          }
+        } catch (error) {
+          console.error('Polling fallback error:', error);
+        }
+      };
+
+      // Initial poll
+      pollBotState();
+
+      // Poll every 5 seconds
+      pollInterval = setInterval(pollBotState, 5000);
+    }
+
+    return () => {
+      if (pollInterval) {
+        clearInterval(pollInterval);
+      }
+    };
+  }, [botStateSSE.isConnected, botStateSSE.error]);
 
   // Auto-scroll to bottom of thoughts
   useEffect(() => {
@@ -243,46 +453,33 @@ export default function ConsciousMinecraftDashboard() {
     const text = intrusion.trim();
     if (!text) return;
 
-    // Add immediate feedback thought
-    const feedbackThought: Thought = {
-      id: generateId(),
-      ts: new Date().toISOString(),
-      text: `💭 Processing: "${text}"`,
-      type: 'intrusion',
-    };
-    addThought(feedbackThought);
-
     try {
-      const response = await submitIntrusiveThought({ text });
-      if (response.accepted) {
-        const thought: Thought = {
-          id: generateId(),
-          ts: new Date().toISOString(),
-          text: `✅ Intrusive thought processed: "${text}"`,
-          type: 'intrusion',
-        };
-        addThought(thought);
-        setIntrusion('');
+      // Submit to cognitive stream as intrusive thought
+      const response = await fetch('/api/ws/cognitive-stream', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'intrusive',
+          content: text,
+          attribution: 'intrusive',
+          context: {
+            emotionalState: 'curious',
+            confidence: 0.8,
+          },
+          metadata: {
+            messageType: 'intrusion',
+            intent: 'external_suggestion',
+          },
+        }),
+      });
 
-        // Add a follow-up thought about what the bot might do
-        setTimeout(() => {
-          const followUpThought: Thought = {
-            id: generateId(),
-            ts: new Date().toISOString(),
-            text: `🤔 Considering how to act on: "${text}"`,
-            type: 'reflection',
-          };
-          addThought(followUpThought);
-        }, 1000);
+      if (response.ok) {
+        setIntrusion('');
+        console.log('Intrusive thought submitted to cognitive stream');
+      } else {
+        console.error('Failed to submit intrusive thought');
       }
     } catch (error) {
-      const errorThought: Thought = {
-        id: generateId(),
-        ts: new Date().toISOString(),
-        text: `❌ Failed to process intrusive thought: "${text}"`,
-        type: 'intrusion',
-      };
-      addThought(errorThought);
       console.error('Error submitting intrusive thought:', error);
     }
   };
@@ -339,18 +536,13 @@ export default function ConsciousMinecraftDashboard() {
           </Button>
           <div className="flex items-center gap-1 text-xs">
             <div
-              className={`size-2 rounded-full ${hudSSE.isConnected ? 'bg-green-500' : hudSSE.error ? 'bg-red-500' : 'bg-yellow-500'}`}
+              className={`size-2 rounded-full ${botStateSSE.isConnected ? 'bg-green-500' : botStateSSE.error ? 'bg-red-500' : 'bg-yellow-500'}`}
             />
-            <span className="text-zinc-400">HUD</span>
-            <div
-              className={`size-2 rounded-full ${cotSSE.isConnected ? 'bg-green-500' : cotSSE.error ? 'bg-red-500' : 'bg-yellow-500'}`}
-            />
-            <span className="text-zinc-400">CoT</span>
-            {(hudSSE.error || cotSSE.error) && (
+            <span className="text-zinc-400">Bot State</span>
+            {botStateSSE.error && (
               <button
                 onClick={() => {
-                  hudSSE.reconnect();
-                  cotSSE.reconnect();
+                  botStateSSE.reconnect();
                 }}
                 className="ml-2 text-xs text-zinc-400 hover:text-zinc-200 underline"
               >
@@ -629,6 +821,16 @@ export default function ConsciousMinecraftDashboard() {
                         ?.connected
                     ? 'BOT CONNECTED'
                     : 'DISCONNECTED'}
+                <div
+                  className={`size-2 rounded-full ${
+                    cognitiveSSE.isConnected
+                      ? 'bg-green-500'
+                      : cognitiveSSE.error
+                        ? 'bg-red-500'
+                        : 'bg-yellow-500'
+                  }`}
+                />
+                <span className="text-zinc-400">COG</span>
               </div>
             </div>
           </Section>
@@ -644,31 +846,71 @@ export default function ConsciousMinecraftDashboard() {
           <Section
             title="Cognitive Stream"
             icon={<MessageSquare className="size-4" />}
-            actions={<Pill>attribution hidden</Pill>}
+            actions={<Pill>consciousness flow</Pill>}
           >
             {thoughts.length > 0 ? (
               <ScrollArea className="max-h-[38vh]">
                 <div className="flex flex-col gap-2 pr-1">
-                  {thoughts.map((thought) => (
-                    <div
-                      key={thought.id}
-                      className="rounded-xl border border-zinc-800 bg-zinc-950 p-2.5"
-                    >
-                      <div className="flex items-center justify-between text-[11px] text-zinc-400">
-                        <span className="uppercase tracking-wide">
-                          {thought.type === 'intrusion'
-                            ? 'thought'
-                            : thought.type}
-                        </span>
-                        <time className="tabular-nums">
-                          {formatTime(thought.ts)}
-                        </time>
+                  {thoughts.map((thought) => {
+                    // Determine styling based on thought type and attribution
+                    const isIntrusive = thought.attribution === 'intrusive';
+                    const isExternalChat =
+                      thought.thoughtType === 'external_chat_in';
+                    const isBotResponse =
+                      thought.thoughtType === 'external_chat_out';
+                    const isInternal =
+                      thought.thoughtType === 'internal' ||
+                      thought.thoughtType === 'reflection' ||
+                      thought.thoughtType === 'observation';
+
+                    let borderColor = 'border-zinc-800';
+                    let bgColor = 'bg-zinc-950';
+                    let textColor = 'text-zinc-200';
+                    let prefix = '';
+                    let typeLabel = thought.thoughtType || thought.type;
+
+                    if (isIntrusive) {
+                      borderColor = 'border-purple-600/50';
+                      bgColor = 'bg-purple-950/20';
+                      prefix = '💭 ';
+                      typeLabel = 'intrusive';
+                    } else if (isExternalChat) {
+                      borderColor = 'border-blue-600/50';
+                      bgColor = 'bg-blue-950/20';
+                      prefix = `💬 ${thought.sender}: `;
+                      typeLabel = 'chat_in';
+                    } else if (isBotResponse) {
+                      borderColor = 'border-green-600/50';
+                      bgColor = 'bg-green-950/20';
+                      prefix = '🤖 ';
+                      typeLabel = 'chat_out';
+                    } else if (isInternal) {
+                      borderColor = 'border-yellow-600/50';
+                      bgColor = 'bg-yellow-950/20';
+                      prefix = '🧠 ';
+                      typeLabel = 'internal';
+                    }
+
+                    return (
+                      <div
+                        key={thought.id}
+                        className={`rounded-xl border ${borderColor} ${bgColor} p-2.5`}
+                      >
+                        <div className="flex items-center justify-between text-[11px] text-zinc-400">
+                          <span className="uppercase tracking-wide">
+                            {typeLabel}
+                          </span>
+                          <time className="tabular-nums">
+                            {formatTime(thought.ts)}
+                          </time>
+                        </div>
+                        <p className="mt-1 text-sm text-zinc-200">
+                          {prefix}
+                          {thought.text}
+                        </p>
                       </div>
-                      <p className="mt-1 text-sm text-zinc-200">
-                        {thought.text}
-                      </p>
-                    </div>
-                  ))}
+                    );
+                  })}
                   <div ref={thoughtsEndRef} />
                 </div>
               </ScrollArea>
@@ -690,7 +932,7 @@ export default function ConsciousMinecraftDashboard() {
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') handleSubmitIntrusion();
                 }}
-                placeholder="Enter a thought… (appears to the bot as its own)"
+                placeholder="Enter an intrusive thought… (appears as bot's own idea)"
                 className="flex-1 rounded-xl bg-zinc-900 px-3 py-2 text-sm outline-none placeholder:text-zinc-600"
               />
               <Button

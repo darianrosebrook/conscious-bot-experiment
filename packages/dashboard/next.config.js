@@ -1,5 +1,9 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // Temporarily disable StrictMode in development to prevent double mounting
+  // which can cause SSE connection issues
+  reactStrictMode: process.env.NODE_ENV === 'production',
+
   images: {
     remotePatterns: [
       // Minecraft Wiki CDN (primary sprite source)

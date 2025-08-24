@@ -1,227 +1,270 @@
 import { NextRequest } from 'next/server';
 
+// Fix for Next.js 15 SSE issues - Force Node.js runtime
+export const runtime = 'nodejs';
+export const maxDuration = 60; // Allow longer execution time
+
+// Track active connections to prevent memory leaks
+const activeConnections = new Set<ReadableStreamDefaultController>();
+const MAX_CONNECTIONS = 10; // Limit concurrent connections
+
 /**
  * Centralized Bot State Stream
- * 
+ *
  * Provides a single SSE stream for all bot state data including:
  * - Inventory updates
  * - HUD/vitals data
  * - Cognitive state
  * - Position and environment
  * - Real-time events
- * 
+ *
+ * Fixed for Next.js 15 SSE compatibility issues
+ *
  * @author @darianrosebrook
  */
 export const GET = async (req: NextRequest) => {
   try {
-    // Check if the request is for SSE
+    // Check if the request is for SSE or JSON
     const accept = req.headers.get('accept');
     const isSSE = accept?.includes('text/event-stream');
+    const isJSON = accept?.includes('application/json');
 
-    if (!isSSE) {
-      return new Response('Expected SSE request', { status: 400 });
+    console.log(`Bot state request - SSE: ${isSSE}, JSON: ${isJSON}, Accept: ${accept}`);
+
+    // If it's a JSON request, return a single response
+    if (isJSON) {
+      try {
+        // Fetch bot state from Minecraft interface
+        const minecraftResponse = await fetch(
+          'http://localhost:3005/state',
+          {
+            method: 'GET',
+            headers: { 'Content-Type': 'application/json' },
+            signal: AbortSignal.timeout(5000), // 5 second timeout
+          }
+        );
+
+        // Fetch cognition state
+        const cognitionResponse = await fetch(
+          'http://localhost:3003/state',
+          {
+            method: 'GET',
+            headers: { 'Content-Type': 'application/json' },
+            signal: AbortSignal.timeout(5000), // 5 second timeout
+          }
+        );
+
+        // Fetch world state
+        const worldResponse = await fetch('http://localhost:3004/state', {
+          method: 'GET',
+          headers: { 'Content-Type': 'application/json' },
+          signal: AbortSignal.timeout(5000), // 5 second timeout
+        });
+
+        const minecraftData = minecraftResponse.ok
+          ? await minecraftResponse.json()
+          : null;
+        const cognitionData = cognitionResponse.ok
+          ? await cognitionResponse.json()
+          : null;
+        const worldData = worldResponse.ok
+          ? await worldResponse.json()
+          : null;
+
+        const botState = {
+          type: 'bot_state_update',
+          timestamp: Date.now(),
+          data: {
+            connected: minecraftData?.success || false,
+            inventory: minecraftData?.data?.inventory || {
+              hotbar: [],
+              main: [],
+            },
+            position: minecraftData?.data?.position || null,
+            vitals: minecraftData?.data?.vitals || null,
+            environment: worldData?.data || null,
+            cognition: cognitionData?.data || null,
+          },
+        };
+
+        return new Response(JSON.stringify(botState), {
+          headers: {
+            'Content-Type': 'application/json',
+            'Cache-Control': 'no-cache',
+          },
+        });
+      } catch (error) {
+        console.error('Error fetching bot state for JSON request:', error);
+        return new Response(JSON.stringify({ error: 'Failed to fetch bot state' }), {
+          status: 500,
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        });
+      }
     }
 
+    // If it's not SSE, return an error
+    if (!isSSE) {
+      return new Response('Expected SSE or JSON request', { status: 400 });
+    }
+
+    // Check connection limit
+    if (activeConnections.size >= MAX_CONNECTIONS) {
+      console.log(`Connection limit reached (${MAX_CONNECTIONS}), rejecting new connection`);
+      return new Response('Too many connections', { status: 429 });
+    }
+
+    console.log('Creating SSE stream for bot state');
     const encoder = new TextEncoder();
 
     const stream = new ReadableStream({
       start(controller) {
-        let lastInventoryHash = '';
-        let lastPositionHash = '';
-        let lastVitalsHash = '';
+        let lastBotState: string | null = null;
+        let isConnected = true;
+        let intervalId: NodeJS.Timeout;
+
+        // Track this connection
+        activeConnections.add(controller);
+        console.log(
+          `SSE connection established. Total connections: ${activeConnections.size}`
+        );
 
         const sendBotState = async () => {
+          if (!isConnected) return;
+
           try {
-            // Fetch data from all bot systems
-            const [minecraftRes, cognitionRes] = await Promise.allSettled([
-              fetch('http://localhost:3005/state'),
-              fetch('http://localhost:3003/state'),
-            ]);
+            // Fetch bot state from Minecraft interface
+            const minecraftResponse = await fetch(
+              'http://localhost:3005/state',
+              {
+                method: 'GET',
+                headers: { 'Content-Type': 'application/json' },
+                signal: AbortSignal.timeout(5000), // 5 second timeout
+              }
+            );
+
+            // Fetch cognition state
+            const cognitionResponse = await fetch(
+              'http://localhost:3003/state',
+              {
+                method: 'GET',
+                headers: { 'Content-Type': 'application/json' },
+                signal: AbortSignal.timeout(5000), // 5 second timeout
+              }
+            );
+
+            // Fetch world state
+            const worldResponse = await fetch('http://localhost:3004/state', {
+              method: 'GET',
+              headers: { 'Content-Type': 'application/json' },
+              signal: AbortSignal.timeout(5000), // 5 second timeout
+            });
+
+            const minecraftData = minecraftResponse.ok
+              ? await minecraftResponse.json()
+              : null;
+            const cognitionData = cognitionResponse.ok
+              ? await cognitionResponse.json()
+              : null;
+            const worldData = worldResponse.ok
+              ? await worldResponse.json()
+              : null;
 
             const botState = {
-              ts: new Date().toISOString(),
               type: 'bot_state_update',
+              timestamp: Date.now(),
               data: {
-                // Connection status
-                connected: false,
-                
-                // Inventory data
-                inventory: {
+                connected: minecraftData?.success || false,
+                inventory: minecraftData?.data?.inventory || {
                   hotbar: [],
                   main: [],
-                  totalItems: 0,
-                  lastUpdated: null,
                 },
-                
-                // HUD/Vitals data
-                vitals: {
-                  health: 20,
-                  hunger: 20,
-                  stamina: 100,
-                  sleep: 100,
-                },
-                
-                // Cognitive state
-                cognition: {
-                  focus: 50,
-                  stress: 25,
-                  curiosity: 75,
-                  mood: 'neutral',
-                  activeConversations: 0,
-                  solutionsGenerated: 0,
-                },
-                
-                // Position and environment
-                position: {
-                  x: 0,
-                  y: 0,
-                  z: 0,
-                  yaw: 0,
-                  pitch: 0,
-                },
-                
-                // Environment
-                environment: {
-                  time: 0,
-                  weather: 'clear',
-                  biome: 'unknown',
-                },
-                
-                // Recent events
-                events: [],
+                position: minecraftData?.data?.position || null,
+                vitals: minecraftData?.data?.vitals || null,
+                environment: worldData?.data || null,
+                cognition: cognitionData?.data || null,
               },
             };
 
-            // Process Minecraft bot data
-            if (minecraftRes.status === 'fulfilled' && minecraftRes.value.ok) {
-              const minecraftData = await minecraftRes.value.json();
-              if (minecraftData.success && minecraftData.data) {
-                const data = minecraftData.data;
-                
-                botState.data.connected = true;
-                
-                // Update inventory
-                if (data.inventory) {
-                  const hotbar = data.inventory.filter((item: any) => item.slot >= 0 && item.slot <= 8);
-                  const main = data.inventory.filter((item: any) => item.slot >= 9);
-                  
-                  botState.data.inventory = {
-                    hotbar,
-                    main,
-                    totalItems: data.inventory.length,
-                    lastUpdated: new Date().toISOString(),
-                  };
+            // Only send if data has changed
+            const stateString = JSON.stringify(botState);
+            if (stateString !== lastBotState) {
+              lastBotState = stateString;
+              const data = `data: ${stateString}\n\n`;
+
+              try {
+                controller.enqueue(encoder.encode(data));
+              } catch (error) {
+                if (
+                  error instanceof Error &&
+                  error.message.includes('Controller is already closed')
+                ) {
+                  isConnected = false;
+                  return;
                 }
-                
-                // Update position
-                if (data.position) {
-                  botState.data.position = {
-                    x: data.position.x || 0,
-                    y: data.position.y || 0,
-                    z: data.position.z || 0,
-                    yaw: data.yaw || 0,
-                    pitch: data.pitch || 0,
-                  };
-                }
-                
-                // Update vitals
-                if (data.health !== undefined) {
-                  botState.data.vitals.health = data.health;
-                }
-                if (data.food !== undefined) {
-                  botState.data.vitals.hunger = data.food;
-                }
-                
-                // Update environment
-                if (data.time !== undefined) {
-                  botState.data.environment.time = data.time;
-                }
-                if (data.weather) {
-                  botState.data.environment.weather = data.weather;
-                }
+                throw error;
               }
-            }
-
-            // Process cognition data
-            if (cognitionRes.status === 'fulfilled' && cognitionRes.value.ok) {
-              const cognitionData = await cognitionRes.value.json();
-              if (cognitionData.cognitiveCore) {
-                const convos = cognitionData.cognitiveCore.conversationManager?.activeConversations || 0;
-                const solutions = cognitionData.cognitiveCore.creativeSolver?.solutionsGenerated || 0;
-                
-                botState.data.cognition = {
-                  focus: Math.min(100, 50 + solutions * 10),
-                  stress: Math.max(0, 25 - solutions * 2),
-                  curiosity: Math.min(100, 30 + convos * 15),
-                  mood: solutions > 5 ? 'accomplished' : convos > 2 ? 'engaged' : 'neutral',
-                  activeConversations: convos,
-                  solutionsGenerated: solutions,
-                };
-              }
-            }
-
-            // Check for significant changes to reduce noise
-            const inventoryHash = JSON.stringify(botState.data.inventory);
-            const positionHash = JSON.stringify(botState.data.position);
-            const vitalsHash = JSON.stringify(botState.data.vitals);
-
-            const hasChanges = 
-              inventoryHash !== lastInventoryHash ||
-              positionHash !== lastPositionHash ||
-              vitalsHash !== lastVitalsHash;
-
-            if (hasChanges) {
-              // Update hashes
-              lastInventoryHash = inventoryHash;
-              lastPositionHash = positionHash;
-              lastVitalsHash = vitalsHash;
-
-              // Add change event
-              botState.data.events.push({
-                type: 'state_change',
-                timestamp: new Date().toISOString(),
-                changes: {
-                  inventory: inventoryHash !== lastInventoryHash,
-                  position: positionHash !== lastPositionHash,
-                  vitals: vitalsHash !== lastVitalsHash,
-                },
-              });
-
-              // Keep only last 10 events
-              if (botState.data.events.length > 10) {
-                botState.data.events = botState.data.events.slice(-10);
-              }
-
-              const data = `data: ${JSON.stringify(botState)}\n\n`;
-              controller.enqueue(encoder.encode(data));
             }
           } catch (error) {
             console.error('Error in bot state stream:', error);
+            // Don't throw - just log and continue
           }
         };
 
-        // Send initial data
+        // Send initial state
         sendBotState();
 
-        // Send updates every 2 seconds (more frequent for real-time feel)
-        const interval = setInterval(sendBotState, 2000);
+        // Set up periodic updates (every 2 seconds)
+        intervalId = setInterval(() => {
+          if (!isConnected) {
+            clearInterval(intervalId);
+            return;
+          }
+          sendBotState();
+        }, 2000);
 
-        // Cleanup on close
-        req.signal.addEventListener('abort', () => {
-          clearInterval(interval);
-          controller.close();
-        });
+        // Clean up on disconnect - Enhanced for Next.js 15
+        const cleanup = () => {
+          isConnected = false;
+          if (intervalId) {
+            clearInterval(intervalId);
+          }
+          activeConnections.delete(controller);
+          console.log(`SSE connection closed. Total connections: ${activeConnections.size}`);
+          try {
+            controller.close();
+          } catch (error) {
+            // Controller might already be closed
+          }
+        };
+
+        // Handle client disconnect
+        req.signal.addEventListener('abort', cleanup);
+
+        // Additional cleanup for connection close
+        if (typeof req.signal.addEventListener === 'function') {
+          req.signal.addEventListener('close', cleanup);
+        }
+
+        // Handle process termination
+        process.on('SIGTERM', cleanup);
+        process.on('SIGINT', cleanup);
       },
     });
 
     return new Response(stream, {
       headers: {
         'Content-Type': 'text/event-stream',
-        'Cache-Control': 'no-cache',
+        'Cache-Control': 'no-cache, no-transform', // Fix for proxy buffering
         Connection: 'keep-alive',
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Headers': 'Cache-Control',
+        'X-Accel-Buffering': 'no', // Disable nginx buffering
       },
     });
   } catch (error) {
+    console.error('Failed to create bot state stream:', error);
     return new Response('Internal Server Error', { status: 500 });
   }
 };

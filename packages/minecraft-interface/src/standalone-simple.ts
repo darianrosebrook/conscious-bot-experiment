@@ -9,7 +9,11 @@
 
 import { createBot, Bot } from 'mineflayer';
 import { EventEmitter } from 'events';
-import { ChatProcessor, type ChatMessage, type ChatResponse } from './chat-processor';
+import {
+  ChatProcessor,
+  type ChatMessage,
+  type ChatResponse,
+} from './chat-processor';
 
 export interface SimpleBotConfig {
   host: string;
@@ -48,17 +52,19 @@ export class SimpleMinecraftInterface extends EventEmitter {
     super();
     this.config = config;
     this.chatProcessor = new ChatProcessor(config.username);
-    
+
     // Set up chat processor event handlers
     this.chatProcessor.on('messageProcessed', (message: ChatMessage) => {
-      console.log(`💬 Processed message from ${message.sender}: "${message.content}" (${message.messageType})`);
+      console.log(
+        `💬 Processed message from ${message.sender}: "${message.content}" (${message.messageType})`
+      );
     });
-    
+
     this.chatProcessor.on('responseReady', (response: ChatResponse) => {
       console.log(`🤖 Response ready: "${response.content}"`);
       this.sendChat(response.content);
     });
-    
+
     this.chatProcessor.on('commandReceived', ({ command, message }) => {
       console.log(`🎮 Command received: ${command} from ${message.sender}`);
       this.handleCommand(command, message);
@@ -102,7 +108,7 @@ export class SimpleMinecraftInterface extends EventEmitter {
       this.bot.on('message', async (message) => {
         const sender = (message as any).author || 'unknown';
         const content = message.toString();
-        
+
         const chatMessage = {
           timestamp: Date.now(),
           message: content,
@@ -121,8 +127,6 @@ export class SimpleMinecraftInterface extends EventEmitter {
         // Emit chat event
         this.emit('chat', chatMessage);
       });
-
-
 
       this.bot.once('error', (error) => {
         clearTimeout(timeoutId);
@@ -556,13 +560,17 @@ export class SimpleMinecraftInterface extends EventEmitter {
       for (let i = 0; i < Math.min(inventory.length, hotbarSlots.length); i++) {
         const item = inventory[i];
         const hotbarSlot = hotbarSlots[i];
-        
-        if (item && item.slot >= 9) { // Only move items from main inventory
+
+        if (item && item.slot >= 9) {
+          // Only move items from main inventory
           try {
             await this.bot.moveSlotItem(item.slot, hotbarSlot);
             movedItems.push({ item: item.name, slot: hotbarSlot });
           } catch (error) {
-            console.error(`Failed to move ${item.name} to slot ${hotbarSlot}:`, error);
+            console.error(
+              `Failed to move ${item.name} to slot ${hotbarSlot}:`,
+              error
+            );
           }
         }
       }
@@ -579,24 +587,30 @@ export class SimpleMinecraftInterface extends EventEmitter {
   /**
    * Handle commands from other players
    */
-  private async handleCommand(command: string, message: ChatMessage): Promise<void> {
+  private async handleCommand(
+    command: string,
+    message: ChatMessage
+  ): Promise<void> {
     try {
       switch (command) {
         case 'help':
           await this.executeAction({
             type: 'chat',
-            parameters: { message: 'I can help with building, crafting, mining, exploring, and following you!' },
+            parameters: {
+              message:
+                'I can help with building, crafting, mining, exploring, and following you!',
+            },
           });
           break;
-          
+
         case 'follow':
           // TODO: Implement follow logic
           await this.executeAction({
             type: 'chat',
-            parameters: { message: 'I\'ll follow you! Lead the way.' },
+            parameters: { message: "I'll follow you! Lead the way." },
           });
           break;
-          
+
         case 'stop':
           // TODO: Implement stop logic
           await this.executeAction({
@@ -604,7 +618,7 @@ export class SimpleMinecraftInterface extends EventEmitter {
             parameters: { message: 'Stopping here.' },
           });
           break;
-          
+
         case 'come':
           // TODO: Implement come logic
           await this.executeAction({
@@ -612,15 +626,15 @@ export class SimpleMinecraftInterface extends EventEmitter {
             parameters: { message: 'Coming to you!' },
           });
           break;
-          
+
         case 'go':
           // TODO: Implement go logic
           await this.executeAction({
             type: 'chat',
-            parameters: { message: 'I\'ll go explore the area.' },
+            parameters: { message: "I'll go explore the area." },
           });
           break;
-          
+
         case 'build':
           // Create a goal to build something
           try {
@@ -632,24 +646,26 @@ export class SimpleMinecraftInterface extends EventEmitter {
                 description: `Build something as requested by ${message.sender}`,
                 priority: 0.8,
                 urgency: 0.7,
-                tasks: [{
-                  type: 'build',
-                  description: 'Build something useful',
-                  priority: 0.8,
-                  urgency: 0.7,
-                  parameters: {},
-                }],
+                tasks: [
+                  {
+                    type: 'build',
+                    description: 'Build something useful',
+                    priority: 0.8,
+                    urgency: 0.7,
+                    parameters: {},
+                  },
+                ],
               }),
             });
             await this.executeAction({
               type: 'chat',
-              parameters: { message: 'I\'ll start building something useful!' },
+              parameters: { message: "I'll start building something useful!" },
             });
           } catch (error) {
             console.error('Failed to create build goal:', error);
           }
           break;
-          
+
         case 'craft':
           // Create a goal to craft something
           try {
@@ -661,24 +677,26 @@ export class SimpleMinecraftInterface extends EventEmitter {
                 description: `Craft something as requested by ${message.sender}`,
                 priority: 0.8,
                 urgency: 0.7,
-                tasks: [{
-                  type: 'craft',
-                  description: 'Craft useful items',
-                  priority: 0.8,
-                  urgency: 0.7,
-                  parameters: {},
-                }],
+                tasks: [
+                  {
+                    type: 'craft',
+                    description: 'Craft useful items',
+                    priority: 0.8,
+                    urgency: 0.7,
+                    parameters: {},
+                  },
+                ],
               }),
             });
             await this.executeAction({
               type: 'chat',
-              parameters: { message: 'I\'ll craft some useful items!' },
+              parameters: { message: "I'll craft some useful items!" },
             });
           } catch (error) {
             console.error('Failed to create craft goal:', error);
           }
           break;
-          
+
         case 'mine':
           // Create a goal to mine
           try {
@@ -690,28 +708,32 @@ export class SimpleMinecraftInterface extends EventEmitter {
                 description: `Mine resources as requested by ${message.sender}`,
                 priority: 0.8,
                 urgency: 0.7,
-                tasks: [{
-                  type: 'mine',
-                  description: 'Mine for resources',
-                  priority: 0.8,
-                  urgency: 0.7,
-                  parameters: {},
-                }],
+                tasks: [
+                  {
+                    type: 'mine',
+                    description: 'Mine for resources',
+                    priority: 0.8,
+                    urgency: 0.7,
+                    parameters: {},
+                  },
+                ],
               }),
             });
             await this.executeAction({
               type: 'chat',
-              parameters: { message: 'I\'ll mine for resources!' },
+              parameters: { message: "I'll mine for resources!" },
             });
           } catch (error) {
             console.error('Failed to create mine goal:', error);
           }
           break;
-          
+
         default:
           await this.executeAction({
             type: 'chat',
-            parameters: { message: `I understand the ${command} command. Let me work on it.` },
+            parameters: {
+              message: `I understand the ${command} command. Let me work on it.`,
+            },
           });
           break;
       }
@@ -719,7 +741,9 @@ export class SimpleMinecraftInterface extends EventEmitter {
       console.error('Error handling command:', error);
       await this.executeAction({
         type: 'chat',
-        parameters: { message: 'Sorry, I had trouble processing that command.' },
+        parameters: {
+          message: 'Sorry, I had trouble processing that command.',
+        },
       });
     }
   }

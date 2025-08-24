@@ -340,7 +340,8 @@ app.get('/processed-messages', (req, res) => {
     }
 
     const count = parseInt(req.query.count as string) || 10;
-    const processedMessages = minecraftInterface.getRecentProcessedMessages(count);
+    const processedMessages =
+      minecraftInterface.getRecentProcessedMessages(count);
     res.json({
       success: true,
       status: 'connected',

@@ -61,6 +61,7 @@ This directory contains implementation plans for all modules. Use this Map of Co
 | Core: Arbiter/Signals          | core/arbiter/README.md                               | ✅ Implemented | `packages/core/src/arbiter.ts` (672 lines)<br>`packages/core/src/signal-processor.ts` (712 lines) | M1: Signal Pipeline | World, Memory | Critical |
 | Core: MCP Capabilities         | core/mcp_capabilities/README.md                     | ✅ Implemented | `packages/core/src/mcp-capabilities/capability-registry.ts` (669 lines)<br>`packages/core/src/mcp-capabilities/constitutional-filter.ts` (665 lines)<br>`packages/core/src/mcp-capabilities/rate-limiter.ts` (568 lines) | M1: Action Interface | Core | Critical |
 | Core: Real-Time Performance    | core/real_time/README.md                            | ✅ Implemented | `packages/core/src/real-time/performance-tracker.ts` (782 lines)<br>`packages/core/src/real-time/budget-enforcer.ts` (540 lines)<br>`packages/core/src/real-time/degradation-manager.ts` (721 lines) | M1: Performance Monitoring | Core | Critical |
+| Core: Enhanced Task Parser     | core/enhanced_task_parser.md                        | 📝 Planned | Not implemented | M4: Advanced Features | Core Arbiter, World, Planning | High |
 | World: Visible-Only Sensing    | world/visible_only_sensing.md                       | ✅ Implemented | `packages/world/src/sensing/visible-sensing.ts` (427 lines)<br>`packages/world/src/sensing/raycast-engine.ts` (597 lines) | M1: Ray Casting | Core | Critical |
 | World: Navigation              | world/navigation/README.md                          | ✅ Implemented | `packages/world/src/navigation/dstar-lite-core.ts` (646 lines)<br>`packages/world/src/navigation/navigation-graph.ts` (674 lines)<br>`packages/world/src/navigation/cost-calculator.ts` (568 lines) | M1: D* Lite Pathfinding | Core, Perception | Critical |
 | World: Perception              | world/perception/README.md                          | ✅ Implemented | `packages/world/src/perception/perception-integration.ts` (772 lines)<br>`packages/world/src/perception/object-recognition.ts` (743 lines)<br>`packages/world/src/perception/confidence-tracker.ts` (483 lines) | M1: Occlusion & Confidence | Core | Critical |
@@ -199,14 +200,14 @@ Notes:
 ### Critical Development Priorities
 
 #### High Priority (Immediate Focus)
-1. **✅ Goal Formulation Enhancement** - Complete advanced signal processing and goal decomposition
-2. **✅ Reactive Executor Enhancement** - Complete advanced GOAP features and real-time adaptation
-3. **✅ Self-Model Enhancement** - Complete advanced identity and narrative features
+1. **Enhanced Task Parser Implementation** - Complete unified task parsing and environmental immersion
+2. **Social Cognition Implementation** - Complete theory of mind and social learning
+3. **Curriculum System Implementation** - Complete progressive skill building and regression testing
 
 #### Medium Priority (Next Phase)
-1. **Social Cognition Implementation** - Complete theory of mind and social learning
-2. **Curriculum System Implementation** - Complete progressive skill building and regression testing
-3. **Advanced Metrics Enhancement** - Complete social and ethical metrics
+1. **Advanced Metrics Enhancement** - Complete social and ethical metrics
+2. **Interface Systems Development** - Complete web dashboard and human controls
+3. **Integration Optimization** - Optimize cross-module coordination and performance
 
 #### Low Priority (Future Enhancement)
 1. **Interface Systems** - Web dashboard, human controls, intrusion interface
@@ -274,14 +275,14 @@ Notes:
 ### Immediate Alignment Priorities
 
 #### Phase 1: Foundation Completion (Weeks 1-2)
-1. **✅ Goal Formulation Enhancement** - Complete Signals→Needs→Goals pipeline (75% → 90%)
-2. **✅ Reactive Executor Enhancement** - Complete GOAP with real-time adaptation (70% → 85%)
+1. **Enhanced Task Parser Implementation** - Complete unified task parsing and environmental immersion (0% → 85%)
+2. **Social Cognition Implementation** - Complete theory of mind capabilities (45% → 80%)
 3. **Configuration Management** - Implement production-ready configuration system (60% → 85%)
 
 #### Phase 2: Advanced Features (Weeks 3-4)
-1. **Social Cognition Implementation** - Complete theory of mind capabilities (45% → 80%)
-2. **✅ Self-Model Enhancement** - Complete identity and narrative features (65% → 85%)
-3. **Curriculum System** - Implement progressive learning framework (35% → 75%)
+1. **Curriculum System** - Implement progressive learning framework (35% → 75%)
+2. **Interface Systems Development** - Complete web dashboard and human controls (0% → 70%)
+3. **Integration Optimization** - Optimize cross-module coordination (82% → 90%)
 
 #### Phase 3: Integration Optimization (Weeks 5-6)
 1. **Interface Systems** - Complete web dashboard and human controls (0% → 70%)
@@ -290,8 +291,8 @@ Notes:
 
 ### Success Metrics for Full Alignment
 
-- [ ] **Goal Formulation**: 90%+ alignment with Signals→Needs→Goals specification
-- [x] **Reactive Executor**: 85%+ alignment with F.E.A.R.-style reactive execution
+- [ ] **Enhanced Task Parser**: 85%+ alignment with unified task parsing and environmental immersion
+- [ ] **Social Cognition**: 80%+ alignment with theory of mind capabilities
 - [ ] **Configuration Management**: 85%+ alignment with production deployment requirements
 - [ ] **Overall System**: 90%+ alignment across all planning documents
 - [ ] **Research Readiness**: All planned consciousness metrics implemented and validated
