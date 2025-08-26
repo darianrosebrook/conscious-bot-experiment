@@ -190,11 +190,22 @@ export function parseCurrentAction(action: string | Record<string, unknown>): st
   }
   
   if (typeof action === 'object' && action !== null) {
+    // Handle planning system action format
+    if ('name' in action) {
+      return action.name as string;
+    }
+    
     if ('type' in action && 'parameters' in action) {
       return parsePlannerAction(
         action.type as string,
         action.parameters as Record<string, unknown>
       );
+    }
+    
+    if ('type' in action && 'target' in action) {
+      const type = action.type as string;
+      const target = action.target as string;
+      return `${type.charAt(0).toUpperCase() + type.slice(1)} ${target}`;
     }
     
     if ('description' in action) {
