@@ -27,6 +27,29 @@ const reactArbiter = new ReActArbiter({
   retries: 3,
 });
 
+// Import enhanced components
+import { EnhancedThoughtGenerator } from './enhanced-thought-generator';
+import { IntrusiveThoughtProcessor } from './enhanced-intrusive-thought-processor';
+
+// Initialize enhanced thought generator
+const enhancedThoughtGenerator = new EnhancedThoughtGenerator({
+  thoughtInterval: 30000, // 30 seconds between thoughts
+  maxThoughtsPerCycle: 3,
+  enableIdleThoughts: true,
+  enableContextualThoughts: true,
+  enableEventDrivenThoughts: true,
+});
+
+// Initialize enhanced intrusive thought processor
+const intrusiveThoughtProcessor = new IntrusiveThoughtProcessor({
+  enableActionParsing: true,
+  enableTaskCreation: true,
+  enablePlanningIntegration: true,
+  enableMinecraftIntegration: true,
+  planningEndpoint: 'http://localhost:3002',
+  minecraftEndpoint: 'http://localhost:3005',
+});
+
 // Initialize cognition system (simplified for now)
 const cognitionSystem = {
   cognitiveCore: {
@@ -42,6 +65,24 @@ const cognitionSystem = {
 
 // Store cognitive thoughts for external access
 const cognitiveThoughts: any[] = [];
+
+// Set up event listeners for enhanced components
+enhancedThoughtGenerator.on('thoughtGenerated', (thought) => {
+  console.log('Enhanced thought generated:', thought.content);
+  cognitiveThoughts.push(thought);
+});
+
+intrusiveThoughtProcessor.on('taskCreated', ({ thought, task, action }) => {
+  console.log('Task created from intrusive thought:', { thought, task, action });
+});
+
+intrusiveThoughtProcessor.on('planningSystemUpdated', ({ task, result }) => {
+  console.log('Planning system updated with task:', { task, result });
+});
+
+intrusiveThoughtProcessor.on('processingError', ({ thought, error }) => {
+  console.error('Error processing intrusive thought:', { thought, error });
+});
 
 // Health check endpoint
 app.get('/health', (req, res) => {
@@ -99,17 +140,12 @@ app.get('/state', (req, res) => {
 // Get cognitive thoughts
 app.get('/thoughts', (req, res) => {
   try {
-    // Return recent thoughts (last 50)
-    const recentThoughts = cognitiveThoughts.slice(-50).map((thought) => ({
-      ...thought,
-      id:
-        thought.id ||
-        `thought-${thought.timestamp}-${Math.random().toString(36).substr(2, 9)}`,
-    }));
-
+    const limit = parseInt(req.query.limit as string) || 50;
+    const thoughts = enhancedThoughtGenerator.getThoughtHistory(limit);
+    
     res.json({
-      thoughts: recentThoughts,
-      count: recentThoughts.length,
+      thoughts: thoughts,
+      count: thoughts.length,
       timestamp: Date.now(),
     });
   } catch (error) {
@@ -126,18 +162,9 @@ app.post('/process', async (req, res) => {
     console.log(`Processing ${type} request:`, { content, metadata });
 
     if (type === 'intrusion') {
-      // Handle intrusive thought
-      const thought = {
-        id: `intrusion-${Date.now()}`,
-        content: content,
-        metadata: metadata || {},
-        timestamp: Date.now(),
-        processed: true,
-      };
-
-      // Log the intrusive thought
-      console.log(`Intrusive thought received: "${content}"`);
-
+      // Use enhanced intrusive thought processor
+      const result = await intrusiveThoughtProcessor.processIntrusiveThought(content);
+      
       // Send the intrusive thought to the cognitive stream
       try {
         const cognitiveStreamResponse = await fetch(
@@ -148,7 +175,7 @@ app.post('/process', async (req, res) => {
             body: JSON.stringify({
               type: 'intrusive',
               content: content,
-              attribution: 'intrusive',
+              attribution: 'external',
               context: {
                 emotionalState: metadata?.emotion || 'curious',
                 confidence: metadata?.strength || 0.8,
@@ -158,6 +185,8 @@ app.post('/process', async (req, res) => {
                 intent: 'external_suggestion',
                 tags: metadata?.tags || [],
                 strength: metadata?.strength || 0.8,
+                processed: result.accepted,
+                taskId: result.taskId
               },
             }),
           }
@@ -177,94 +206,14 @@ app.post('/process', async (req, res) => {
         );
       }
 
-      // If it's a goal-related thought, forward to planning system
-      if (
-        content.toLowerCase().includes('goal') ||
-        content.toLowerCase().includes('task') ||
-        content.toLowerCase().includes('craft') ||
-        content.toLowerCase().includes('mine') ||
-        content.toLowerCase().includes('build') ||
-        content.toLowerCase().includes('explore') ||
-        content.toLowerCase().includes('gather')
-      ) {
-        try {
-          const planningResponse = await fetch('http://localhost:3002/goal', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              name: `Goal from intrusion`,
-              description: content,
-              priority: metadata?.strength || 0.7,
-              urgency: 0.6,
-              tasks: [
-                {
-                  type: 'autonomous',
-                  description: content,
-                  priority: metadata?.strength || 0.7,
-                  urgency: 0.6,
-                  parameters: {},
-                },
-              ],
-            }),
-          });
-
-          if (planningResponse.ok) {
-            const planningResult = (await planningResponse.json()) as any;
-            console.log(`Goal created from intrusive thought:`, planningResult);
-            (thought as any).goalCreated = true;
-            (thought as any).goalId = planningResult.goal?.id;
-          }
-        } catch (error) {
-          console.error('Failed to create goal from intrusive thought:', error);
-        }
-      }
-
-      // If it's a direct action command, forward to minecraft interface
-      if (
-        content.toLowerCase().includes('move') ||
-        content.toLowerCase().includes('turn') ||
-        content.toLowerCase().includes('jump') ||
-        content.toLowerCase().includes('chat')
-      ) {
-        try {
-          const minecraftResponse = await fetch(
-            'http://localhost:3005/action',
-            {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                type: 'chat',
-                parameters: {
-                  message: `Executing command: ${content}`,
-                },
-              }),
-            }
-          );
-
-          if (minecraftResponse.ok) {
-            const minecraftResult = await minecraftResponse.json();
-            console.log(
-              `Action executed from intrusive thought:`,
-              minecraftResult
-            );
-            (thought as any).actionExecuted = true;
-          }
-        } catch (error) {
-          console.error(
-            'Failed to execute action from intrusive thought:',
-            error
-          );
-        }
-      }
-
-      const result = {
-        processed: true,
+      res.json({
+        processed: result.accepted,
         type: 'intrusion',
-        thought,
+        response: result.response,
+        taskId: result.taskId,
+        task: result.task,
         timestamp: Date.now(),
-      };
-
-      res.json(result);
+      });
     } else {
       // Handle other cognitive tasks
       const result = {
@@ -283,7 +232,7 @@ app.post('/process', async (req, res) => {
   }
 });
 
-// Generate authentic thoughts using internal dialogue system
+// Generate authentic thoughts using enhanced thought generator
 app.post('/generate-thoughts', async (req, res) => {
   try {
     const { situation, context, thoughtTypes } = req.body;
@@ -293,133 +242,20 @@ app.post('/generate-thoughts', async (req, res) => {
       thoughtTypes,
     });
 
-    // Mock internal dialogue system for now
-    // In a real implementation, this would use the actual InternalDialogue class
-    const thoughts = [];
+    // Use enhanced thought generator
+    const thought = await enhancedThoughtGenerator.generateThought({
+      currentState: context.currentState,
+      currentTasks: context.currentState?.currentTasks || [],
+      recentEvents: context.recentEvents || [],
+      emotionalState: context.emotional || 'neutral',
+      memoryContext: context.memoryContext
+    });
 
-    // Generate thoughts based on the situation and context
-    if (thoughtTypes.includes('reflection')) {
-      const currentTasks = context.currentState?.currentTasks || [];
-      const currentGoals = context.currentGoals || [];
-      const inventory = context.currentState?.inventory || [];
-
-      if (inventory.length === 0) {
-        thoughts.push({
-          type: 'reflection',
-          content: `My inventory is completely empty. I need to gather wood first to craft basic tools, then I can mine stone and other resources.`,
-          emotionalState: 'determined',
-          confidence: 0.8,
-        });
-      } else if (inventory.some((item: any) => item.name?.includes('wood'))) {
-        thoughts.push({
-          type: 'reflection',
-          content: `I have some wood now. I should craft wooden planks and then make a wooden pickaxe so I can mine stone and other valuable resources.`,
-          emotionalState: 'focused',
-          confidence: 0.7,
-        });
-      } else if (inventory.some((item: any) => item.name?.includes('stone'))) {
-        thoughts.push({
-          type: 'reflection',
-          content: `I have stone now. I should look for a good location to build a shelter, or explore for more valuable resources like iron ore.`,
-          emotionalState: 'optimistic',
-          confidence: 0.6,
-        });
-      } else {
-        thoughts.push({
-          type: 'reflection',
-          content: `I'm making progress with my resources. I should continue gathering materials and start thinking about building a proper shelter for safety.`,
-          emotionalState: 'satisfied',
-          confidence: 0.5,
-        });
-      }
-    }
-
-    if (thoughtTypes.includes('observation')) {
-      const health = context.currentState?.health || 100;
-      const isNight =
-        context.currentState?.timeOfDay > 13000 ||
-        context.currentState?.timeOfDay < 1000;
-
-      if (health < 50) {
-        thoughts.push({
-          type: 'observation',
-          content: `My health is getting low (${health}%). I need to find food or a safe place to rest before I get into more danger.`,
-          emotionalState: 'concerned',
-          confidence: 0.9,
-        });
-      } else if (isNight) {
-        thoughts.push({
-          type: 'observation',
-          content: `It's night time now. I should find shelter quickly or place some light sources to avoid hostile mobs.`,
-          emotionalState: 'alert',
-          confidence: 0.8,
-        });
-      } else {
-        thoughts.push({
-          type: 'observation',
-          content: `The environment looks safe for now. I can focus on gathering resources and building up my capabilities.`,
-          emotionalState: 'calm',
-          confidence: 0.6,
-        });
-      }
-    }
-
-    if (thoughtTypes.includes('planning')) {
-      const currentTasks = context.currentState?.currentTasks || [];
-      const currentGoals = context.currentGoals || [];
-      const inventory = context.currentState?.inventory || [];
-
-      if (currentTasks.length > 0) {
-        const task = currentTasks[0];
-        thoughts.push({
-          type: 'planning',
-          content: `I'm currently working on: "${task.description}". I should focus on completing this task efficiently and then move on to the next priority.`,
-          emotionalState: 'determined',
-          confidence: 0.7,
-        });
-      } else if (inventory.length === 0) {
-        thoughts.push({
-          type: 'planning',
-          content: `I need to gather wood from nearby trees first. Then I can craft basic tools and start mining stone for building materials.`,
-          emotionalState: 'focused',
-          confidence: 0.8,
-        });
-      } else if (
-        inventory.some((item: any) => item.name?.includes('wood')) &&
-        !inventory.some((item: any) => item.name?.includes('pickaxe'))
-      ) {
-        thoughts.push({
-          type: 'planning',
-          content: `I have wood now. My next priority should be crafting a wooden pickaxe so I can mine stone and other valuable resources.`,
-          emotionalState: 'determined',
-          confidence: 0.7,
-        });
-      } else if (
-        inventory.some((item: any) => item.name?.includes('pickaxe'))
-      ) {
-        thoughts.push({
-          type: 'planning',
-          content: `I have a pickaxe now. I should mine stone and cobblestone to build a shelter, and look for iron ore for better tools.`,
-          emotionalState: 'excited',
-          confidence: 0.6,
-        });
-      } else {
-        thoughts.push({
-          type: 'planning',
-          content: `I should explore the area to find new resources, or work on building a shelter to protect myself from the elements.`,
-          emotionalState: 'contemplative',
-          confidence: 0.5,
-        });
-      }
-    }
+    const thoughts = thought ? [thought] : [];
 
     // Store thoughts for external access
     thoughts.forEach((thought) => {
-      cognitiveThoughts.push({
-        ...thought,
-        id: `thought-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-        timestamp: Date.now(),
-      });
+      cognitiveThoughts.push(thought);
     });
 
     // Keep only the last 100 thoughts to prevent memory leaks
