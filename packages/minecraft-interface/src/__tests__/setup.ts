@@ -1,65 +1,56 @@
 /**
- * Test setup for Minecraft interface tests
+ * Test setup file for minecraft-interface package
+ * 
+ * @author @darianrosebrook
  */
 
-// Extend Jest timeout for Minecraft operations
-jest.setTimeout(30000);
+// Global test setup
+beforeAll(() => {
+  // Set up any global test configuration
+  process.env.NODE_ENV = 'test';
+  
+  // Mock console methods to reduce noise in tests
+  jest.spyOn(console, 'log').mockImplementation(() => {});
+  jest.spyOn(console, 'warn').mockImplementation(() => {});
+  jest.spyOn(console, 'error').mockImplementation(() => {});
+});
 
-// Mock mineflayer for unit tests
-jest.mock('mineflayer', () => ({
-  createBot: jest.fn(),
-}));
-
-jest.mock('mineflayer-pathfinder', () => ({
-  pathfinder: {},
-  Movements: jest.fn(),
-  goals: {
-    GoalNear: jest.fn(),
-  },
-}));
+afterAll(() => {
+  // Clean up global mocks
+  jest.restoreAllMocks();
+});
 
 // Global test utilities
-(global as any).createMockBot = () => ({
+export const createMockBot = () => ({
   entity: {
-    position: { x: 0, y: 64, z: 0, clone: () => ({ x: 0, y: 64, z: 0 }) },
-    yaw: 0,
-    pitch: 0,
+    position: { x: 0, y: 64, z: 0 },
+    on: jest.fn(),
+    once: jest.fn(),
   },
-  health: 20,
-  food: 20,
-  foodSaturation: 5,
-  experience: { points: 0 },
-  game: { gameMode: 'survival', dimension: 'overworld', difficulty: 'normal' },
-  time: { timeOfDay: 6000 },
-  isRaining: false,
   inventory: {
-    slots: new Array(36).fill(null),
     items: () => [],
+    slots: () => [],
   },
-  entities: {},
-  players: {},
-  version: '1.21.4',
-  username: 'TestBot',
-  loadPlugin: jest.fn(),
-  blockAt: jest.fn(() => null),
+  blockAt: jest.fn().mockReturnValue(null),
+  findBlock: jest.fn().mockResolvedValue(null),
+  pathfinder: {
+    goto: jest.fn().mockResolvedValue({}),
+    stop: jest.fn(),
+  },
+  chat: jest.fn(),
   on: jest.fn(),
   once: jest.fn(),
   emit: jest.fn(),
-  quit: jest.fn(),
-  end: jest.fn(),
-  lookAt: jest.fn(),
-  dig: jest.fn(),
-  craft: jest.fn(),
-  equip: jest.fn(),
-  recipesFor: jest.fn(() => []),
-  canCraft: jest.fn(() => true),
-  mcData: {
-    itemsByName: {},
-  },
-  pathfinder: {
-    setMovements: jest.fn(),
-    setGoal: jest.fn(),
-  },
-  setControlState: jest.fn(),
-  heldItem: null,
+});
+
+export const createMockWorld = () => ({
+  blocks: new Map(),
+  entities: new Map(),
+  players: new Map(),
+});
+
+export const createMockContext = () => ({
+  worldSeed: 'test-seed',
+  worldName: 'test-world',
+  sessionId: 'test-session-123',
 });

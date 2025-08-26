@@ -9,7 +9,13 @@
 
 import express from 'express';
 import cors from 'cors';
-import { EventLogger, SalienceScorer, MemoryConsolidation, EpisodicRetrieval, NarrativeGenerator } from './episodic';
+import {
+  EventLogger,
+  SalienceScorer,
+  MemoryConsolidation,
+  EpisodicRetrieval,
+  NarrativeGenerator,
+} from './episodic';
 import { createSemanticMemory } from './semantic';
 import { createWorkingMemory } from './working';
 import { createProvenanceSystem } from './provenance';
@@ -425,7 +431,7 @@ app.get('/stats', (req, res) => {
 app.post('/versioning/activate', (req, res) => {
   try {
     const { worldSeed, worldName, sessionId } = req.body;
-    
+
     const context: MemoryContext = {
       worldSeed,
       worldName,
@@ -434,7 +440,8 @@ app.post('/versioning/activate', (req, res) => {
       version: '1.0.0',
     };
 
-    const namespace = memorySystem.versioning.manager.activateNamespace(context);
+    const namespace =
+      memorySystem.versioning.manager.activateNamespace(context);
 
     res.json({
       success: true,
