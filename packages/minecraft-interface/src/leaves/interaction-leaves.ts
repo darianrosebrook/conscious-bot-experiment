@@ -14,7 +14,7 @@ import {
   LeafContext,
   LeafResult,
   LeafSpec,
-} from '../../../core/src/mcp-capabilities/leaf-contracts';
+} from '@conscious-bot/core';
 import { pathfinder, goals } from 'mineflayer-pathfinder';
 
 // Extend Bot type to include pathfinder
@@ -143,7 +143,7 @@ export class PlaceTorchIfNeededLeaf implements LeafImpl {
       // Check if we have torches
       const torchItem = bot.inventory
         .items()
-        .find((item) => item.name === 'torch');
+        .find((item: any) => item.name === 'torch');
       if (!torchItem) {
         return {
           status: 'failure',
@@ -416,7 +416,7 @@ export class RetreatAndBlockLeaf implements LeafImpl {
       try {
         const blockItem = bot.inventory
           .items()
-          .find((item) => item.name === blockType);
+          .find((item: any) => item.name === blockType);
         if (blockItem) {
           const entrancePos = this.findEntrancePosition(
             bot as BotWithPathfinder,
@@ -677,7 +677,7 @@ export class DigBlockLeaf implements LeafImpl {
       if (tool) {
         const toolItem = bot.inventory
           .items()
-          .find((item) => item.name.includes(tool));
+          .find((item: any) => item.name.includes(tool));
         if (toolItem) {
           await bot.equip(toolItem, 'hand');
           toolUsed = toolItem.name;
@@ -821,7 +821,7 @@ export class PlaceBlockLeaf implements LeafImpl {
       // Find the item in inventory
       const itemToPlace = bot.inventory
         .items()
-        .find((invItem) => invItem.name === item);
+        .find((invItem: any) => invItem.name === item);
       if (!itemToPlace) {
         return {
           status: 'failure',

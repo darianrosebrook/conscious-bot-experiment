@@ -134,6 +134,9 @@ export class PlanExecutor extends EventEmitter {
       });
 
       // Step 4: Execute plan with enhanced monitoring
+      if (!this.currentPlan) {
+        throw new Error('No plan available for execution');
+      }
       const executionResult = await this.executePlan(this.currentPlan);
 
       // Step 5: Record comprehensive telemetry

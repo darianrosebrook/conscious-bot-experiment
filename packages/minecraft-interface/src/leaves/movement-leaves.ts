@@ -15,7 +15,7 @@ import {
   LeafContext,
   LeafResult,
   LeafSpec,
-} from '../../../core/src/mcp-capabilities/leaf-contracts';
+} from '@conscious-bot/core';
 
 // Extend Bot type to include pathfinder
 interface BotWithPathfinder extends Bot {

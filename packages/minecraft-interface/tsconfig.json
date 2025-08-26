@@ -2,9 +2,10 @@
   "compilerOptions": {
     "target": "ES2020",
     "lib": ["ES2020"],
-    "module": "CommonJS",
+    "module": "ESNext",
     "moduleResolution": "node",
     "outDir": "./dist",
+    "rootDir": "./src",
     "declaration": true,
     "declarationMap": true,
     "sourceMap": true,
@@ -15,30 +16,19 @@
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,
     "allowSyntheticDefaultImports": true,
-    "baseUrl": ".",
-    "paths": {
-      "@conscious-bot/core": ["../core/dist"],
-      "@conscious-bot/planning": ["../planning/dist"]
-    },
     "noEmit": false
   },
-  "references": [
-    { "path": "../core" },
-    { "path": "../planning" }
-  ],
   "include": ["src/**/*"],
   "exclude": [
     "dist", 
     "node_modules", 
     "**/*.test.ts", 
-    "**/*.spec.ts", 
-    "src/examples/**/*", 
-    "src/hybrid-arbiter-integration.ts", 
-    "src/integration-test.ts", 
-    "src/memory-integration.ts", 
-    "src/observation-mapper.ts", 
-    "src/plan-executor.ts", 
-    "src/server.ts", 
-    "src/standalone.ts"
+    "**/*.spec.ts",
+    "src/demo/**/*",
+    "src/bin/**/*"
+  ],
+  "references": [
+    { "path": "../core" },
+    { "path": "../planning" }
   ]
 }

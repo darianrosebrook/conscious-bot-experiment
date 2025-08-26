@@ -51,7 +51,9 @@ export class MemoryIntegrationService {
       autoActivateNamespaces: true,
       ...config,
     };
-    this.currentSessionId = config.sessionId || `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    this.currentSessionId =
+      config.sessionId ||
+      `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
   }
 
   /**
@@ -67,30 +69,40 @@ export class MemoryIntegrationService {
         serverAddress: `${this.botConfig.host}:${this.botConfig.port}`,
       };
 
-      const response = await fetch(`${this.config.memoryServiceUrl}/versioning/activate`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          worldSeed: context.worldSeed,
-          worldName: context.worldName,
-          sessionId: context.sessionId,
-        }),
-      });
+      const response = await fetch(
+        `${this.config.memoryServiceUrl}/versioning/activate`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            worldSeed: context.worldSeed,
+            worldName: context.worldName,
+            sessionId: context.sessionId,
+          }),
+        }
+      );
 
       if (!response.ok) {
-        throw new Error(`Memory service responded with status: ${response.status}`);
+        throw new Error(
+          `Memory service responded with status: ${response.status}`
+        );
       }
 
-      const result = await response.json();
-      
+      const result = (await response.json()) as any;
+
       if (result.success) {
-        console.log(`✅ Activated memory namespace: ${result.data.namespace.id}`);
+        console.log(
+          `✅ Activated memory namespace: ${result.data.namespace.id}`
+        );
         this.isConnected = true;
         return true;
       } else {
-        console.error('❌ Failed to activate memory namespace:', result.message);
+        console.error(
+          '❌ Failed to activate memory namespace:',
+          result.message
+        );
         return false;
       }
     } catch (error) {
@@ -104,13 +116,17 @@ export class MemoryIntegrationService {
    */
   async getActiveNamespace(): Promise<any> {
     try {
-      const response = await fetch(`${this.config.memoryServiceUrl}/versioning/active`);
-      
+      const response = await fetch(
+        `${this.config.memoryServiceUrl}/versioning/active`
+      );
+
       if (!response.ok) {
-        throw new Error(`Memory service responded with status: ${response.status}`);
+        throw new Error(
+          `Memory service responded with status: ${response.status}`
+        );
       }
 
-      const result = await response.json();
+      const result = (await response.json()) as any;
       return result.success ? result.data : null;
     } catch (error) {
       console.error('❌ Error getting active namespace:', error);
@@ -124,12 +140,14 @@ export class MemoryIntegrationService {
   async getMemoryStats(): Promise<any> {
     try {
       const response = await fetch(`${this.config.memoryServiceUrl}/stats`);
-      
+
       if (!response.ok) {
-        throw new Error(`Memory service responded with status: ${response.status}`);
+        throw new Error(
+          `Memory service responded with status: ${response.status}`
+        );
       }
 
-      const result = await response.json();
+      const result = (await response.json()) as any;
       return result.success ? result.data : null;
     } catch (error) {
       console.error('❌ Error getting memory stats:', error);
@@ -151,10 +169,12 @@ export class MemoryIntegrationService {
       });
 
       if (!response.ok) {
-        throw new Error(`Memory service responded with status: ${response.status}`);
+        throw new Error(
+          `Memory service responded with status: ${response.status}`
+        );
       }
 
-      const result = await response.json();
+      const result = (await response.json()) as any;
       return result.success;
     } catch (error) {
       console.error('❌ Error storing memory:', error);
@@ -167,19 +187,24 @@ export class MemoryIntegrationService {
    */
   async retrieveMemories(query: any): Promise<any[]> {
     try {
-      const response = await fetch(`${this.config.memoryServiceUrl}/episodic/retrieve`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(query),
-      });
+      const response = await fetch(
+        `${this.config.memoryServiceUrl}/episodic/retrieve`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(query),
+        }
+      );
 
       if (!response.ok) {
-        throw new Error(`Memory service responded with status: ${response.status}`);
+        throw new Error(
+          `Memory service responded with status: ${response.status}`
+        );
       }
 
-      const result = await response.json();
+      const result = (await response.json()) as any;
       return result.success ? result.data : [];
     } catch (error) {
       console.error('❌ Error retrieving memories:', error);

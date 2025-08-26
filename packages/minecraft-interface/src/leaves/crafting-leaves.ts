@@ -14,7 +14,7 @@ import {
   LeafContext,
   LeafResult,
   LeafSpec,
-} from '../../../core/src/mcp-capabilities/leaf-contracts';
+} from '@conscious-bot/core';
 
 // ============================================================================
 // Shared Helpers

@@ -14,7 +14,7 @@ import {
   LeafContext,
   LeafResult,
   LeafSpec,
-} from '../../../core/src/mcp-capabilities/leaf-contracts';
+} from '@conscious-bot/core';
 
 // ============================================================================
 // Sense Hostiles Leaf
@@ -158,21 +158,22 @@ export class SenseHostilesLeaf implements LeafImpl {
       let nearestDistance = Infinity;
 
       for (const entity of Object.values(bot.entities)) {
-        if (!entity.position || !entity.type) continue;
+        const typedEntity = entity as any;
+        if (!typedEntity.position || !typedEntity.type) continue;
 
-        const distance = botPos.distanceTo(entity.position);
+        const distance = botPos.distanceTo(typedEntity.position);
 
-        if (distance <= radius && targetTypes.includes(entity.type)) {
+        if (distance <= radius && targetTypes.includes(typedEntity.type)) {
           const hostileInfo = {
-            id: entity.id,
-            type: entity.type,
+            id: typedEntity.id,
+            type: typedEntity.type,
             position: {
-              x: entity.position.x,
-              y: entity.position.y,
-              z: entity.position.z,
+              x: typedEntity.position.x,
+              y: typedEntity.position.y,
+              z: typedEntity.position.z,
             },
             distance,
-            health: entity.health || 0,
+            health: typedEntity.health || 0,
           };
 
           hostiles.push(hostileInfo);
