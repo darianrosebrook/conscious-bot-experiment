@@ -1,127 +1,204 @@
-# Development Environment Setup
+# Conscious Bot Startup Scripts
 
-This directory contains scripts to start the complete Conscious Bot development environment.
+This directory contains scripts for managing the Conscious Bot system startup and development environment.
 
 ## Quick Start
 
-To start all services with one command:
+To start the entire Conscious Bot system with a single command:
 
 ```bash
+pnpm start
+# or
 pnpm dev
 ```
 
 This will:
-1. Check port availability
-2. Install dependencies
-3. Build all packages
-4. Start all services in parallel
-5. Monitor service health
-6. Display service URLs
+- ✅ Check system requirements (Node.js 18+, pnpm)
+- 🔄 Clean up existing processes
+- 📦 Install dependencies
+- 🔨 Build all packages
+- 🚀 Start all services
+- 🔍 Monitor service health
+- 🎉 Provide status and URLs
 
 ## Available Scripts
 
-### Main Commands
-- `pnpm dev` - Start all services (recommended)
-- `pnpm dev:all` - Same as `pnpm dev`
-- `pnpm dev:services` - Start services using concurrently
+### `start.js` / `dev` - Main Startup Script
+The primary script for starting the entire system. Handles everything from dependency installation to service monitoring.
 
-### Individual Service Commands
-- `pnpm dev:dashboard` - Start dashboard only
-- `pnpm dev:minecraft` - Start minecraft bot only
-- `pnpm dev:cognition` - Start cognition service only
-- `pnpm dev:memory` - Start memory service only
-- `pnpm dev:world` - Start world service only
-- `pnpm dev:planning` - Start planning service only
+**Usage:**
+```bash
+pnpm start
+```
+
+**Features:**
+- System requirement validation
+- Process cleanup
+- Dependency management
+- Package building
+- Service orchestration
+- Health monitoring
+- Graceful shutdown
+
+### `start-servers.js` - Legacy Server Manager
+Legacy script for starting services without full system setup.
+
+**Usage:**
+```bash
+node scripts/start-servers.js
+```
+
+### `dev.js` - Development Environment
+Alternative development startup with enhanced monitoring.
+
+**Usage:**
+```bash
+node scripts/dev.js
+```
+
+### `kill-servers.js` - Process Cleanup
+Kills all running Conscious Bot processes.
+
+**Usage:**
+```bash
+pnpm kill
+```
+
+### `status.js` - Service Status
+Shows the status of all running services.
+
+**Usage:**
+```bash
+pnpm status
+```
 
 ## Service Ports
 
-| Service | Port | URL |
-|---------|------|-----|
-| Dashboard | 3000 | http://localhost:3000 |
-| Minecraft Bot | 3005 | http://localhost:3005 |
-| Minecraft Viewer | 3006 | http://localhost:3006 |
-| Cognition | 3003 | http://localhost:3003 |
-| Memory | 3001 | http://localhost:3001 |
-| World | 3004 | http://localhost:3004 |
-| Planning | 3002 | http://localhost:3002 |
+| Service | Port | Description |
+|---------|------|-------------|
+| Dashboard | 3000 | Web dashboard for monitoring and control |
+| Minecraft Interface | 3005 | Minecraft bot interface and control |
+| Cognition | 3003 | Cognitive reasoning and decision making |
+| Memory | 3001 | Memory storage and retrieval system |
+| World | 3004 | World state management and simulation |
+| Planning | 3002 | Task planning and execution coordination |
 
-## Connecting to Minecraft
+## Quick Commands
 
-Once all services are running, connect the bot to Minecraft:
-
+### Start the system
 ```bash
-curl -X POST http://localhost:3005/connect
+pnpm start
 ```
 
-## Stopping Services
+### Stop all services
+```bash
+pnpm kill
+```
 
-Press `Ctrl+C` to stop all services gracefully.
+### Check service status
+```bash
+pnpm status
+```
+
+### Start individual services
+```bash
+pnpm dev:dashboard      # Dashboard only
+pnpm dev:minecraft      # Minecraft interface only
+pnpm dev:cognition      # Cognition service only
+pnpm dev:memory         # Memory service only
+pnpm dev:world          # World service only
+pnpm dev:planning       # Planning service only
+```
+
+## Minecraft Integration
+
+Once the system is running, you can interact with the Minecraft bot:
+
+```bash
+# Connect the bot to Minecraft
+curl -X POST http://localhost:3005/connect
+
+# Disconnect the bot
+curl -X POST http://localhost:3005/disconnect
+
+# Get bot status
+curl http://localhost:3005/status
+```
 
 ## Troubleshooting
 
-### Port Already in Use
-If you see "Port X is already in use", stop the process using that port:
-
+### Port Conflicts
+If you see port conflicts, run:
 ```bash
-# Find process using port
-lsof -i :3000
+pnpm kill
+```
+Then try starting again.
 
-# Kill process
-kill -9 <PID>
+### Node.js Version
+Ensure you have Node.js 18 or higher:
+```bash
+node --version
 ```
 
-### Service Not Starting
-Check the logs for specific error messages. Common issues:
-- Missing dependencies: Run `pnpm install`
-- Build errors: Run `pnpm build`
-- Canvas compilation: Run `pnpm rebuild canvas`
-
-### Health Check Failures
-Some services might take longer to start. The script will continue even if health checks fail initially.
-
-## Scripts
-
-### `dev.js`
-Cross-platform JavaScript script that:
-- Checks port availability
-- Installs dependencies
-- Builds packages
-- Starts all services
-- Monitors health endpoints
-- Provides colored output
-- Handles graceful shutdown
-
-### `dev.sh`
-Bash script with similar functionality (Unix/macOS only).
-
-## Environment Variables
-
-The scripts use default ports. To override, set environment variables:
-
+### pnpm Installation
+If pnpm is not installed:
 ```bash
-export DASHBOARD_PORT=3000
-export MINECRAFT_PORT=3005
-# ... etc
+npm install -g pnpm
 ```
 
-## Development Workflow
+### Build Issues
+If packages fail to build:
+```bash
+pnpm clean
+pnpm install
+pnpm build
+```
 
-1. **Start Development**: `pnpm dev`
-2. **Open Dashboard**: http://localhost:3000
-3. **Connect Bot**: `curl -X POST http://localhost:3005/connect`
-4. **View Minecraft**: http://localhost:3006 (when connected)
-5. **Monitor Services**: Check individual service URLs
-6. **Stop Development**: `Ctrl+C`
+## Development
+
+### Adding New Services
+To add a new service to the startup script:
+
+1. Add the service configuration to the `services` array in `start.js`
+2. Include the service in the package.json scripts
+3. Update this README with the new service information
+
+### Modifying Service Configuration
+Edit the `services` array in `start.js` to modify:
+- Service names and descriptions
+- Port assignments
+- Health check URLs
+- Startup commands
 
 ## Architecture
 
-The development environment starts these microservices:
+The startup system uses:
+- **Process Management**: Spawns and monitors child processes
+- **Health Monitoring**: HTTP health checks for service readiness
+- **Graceful Shutdown**: SIGTERM/SIGKILL handling for clean exits
+- **Port Management**: Automatic port conflict detection and resolution
+- **Dependency Management**: Automatic installation and building
 
-- **Dashboard**: Next.js frontend for monitoring
-- **Minecraft Bot**: Mineflayer integration with prismarine viewer
-- **Cognition**: High-level reasoning and self-awareness
-- **Memory**: Multi-store memory system with GraphRAG
-- **World**: World sensing and navigation
-- **Planning**: Hierarchical planning and goal management
+## Environment Variables
 
-All services communicate via HTTP APIs and can be monitored through the dashboard.
+The following environment variables can be set:
+- `FORCE_COLOR=1`: Enable colored output
+- `NODE_ENV`: Set to 'development' for dev mode
+- `PORT`: Override default ports (not recommended)
+
+## Logging
+
+All services output is prefixed with the service name:
+```
+[Dashboard] Ready on http://localhost:3000
+[Minecraft Interface] Server started on port 3005
+[Cognition] Health check passed
+```
+
+## Error Handling
+
+The startup script includes comprehensive error handling:
+- System requirement validation
+- Process cleanup on failures
+- Graceful degradation for health check failures
+- Clear error messages with resolution steps

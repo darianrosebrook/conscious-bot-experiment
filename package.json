@@ -5,8 +5,9 @@
   "main": "dist/index.js",
   "type": "module",
   "scripts": {
+    "start": "node scripts/start.js",
+    "dev": "node scripts/start.js",
     "build": "turbo build",
-    "dev": "node scripts/start-servers.js",
     "dev:legacy": "pnpm run dev:services",
     "dev:all": "node scripts/dev.js",
     "dev:services": "concurrently \"pnpm run dev:dashboard\" \"pnpm run dev:minecraft\" \"pnpm run dev:cognition\" \"pnpm run dev:memory\" \"pnpm run dev:world\" \"pnpm run dev:planning\"",

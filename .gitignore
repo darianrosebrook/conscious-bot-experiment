@@ -62,6 +62,12 @@ Thumbs.db
 # Project specific
 sapient-hrm/
 
+# Python virtual environments
+venv/
+venv-*/
+env/
+env-*/
+
 # Runtime data
 pids
 *.pid
