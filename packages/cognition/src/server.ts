@@ -73,7 +73,11 @@ enhancedThoughtGenerator.on('thoughtGenerated', (thought) => {
 });
 
 intrusiveThoughtProcessor.on('taskCreated', ({ thought, task, action }) => {
-  console.log('Task created from intrusive thought:', { thought, task, action });
+  console.log('Task created from intrusive thought:', {
+    thought,
+    task,
+    action,
+  });
 });
 
 intrusiveThoughtProcessor.on('planningSystemUpdated', ({ task, result }) => {
@@ -142,7 +146,7 @@ app.get('/thoughts', (req, res) => {
   try {
     const limit = parseInt(req.query.limit as string) || 50;
     const thoughts = enhancedThoughtGenerator.getThoughtHistory(limit);
-    
+
     res.json({
       thoughts: thoughts,
       count: thoughts.length,
@@ -163,8 +167,9 @@ app.post('/process', async (req, res) => {
 
     if (type === 'intrusion') {
       // Use enhanced intrusive thought processor
-      const result = await intrusiveThoughtProcessor.processIntrusiveThought(content);
-      
+      const result =
+        await intrusiveThoughtProcessor.processIntrusiveThought(content);
+
       // Send the intrusive thought to the cognitive stream
       try {
         const cognitiveStreamResponse = await fetch(
@@ -186,7 +191,7 @@ app.post('/process', async (req, res) => {
                 tags: metadata?.tags || [],
                 strength: metadata?.strength || 0.8,
                 processed: result.accepted,
-                taskId: result.taskId
+                taskId: result.taskId,
               },
             }),
           }
@@ -248,7 +253,7 @@ app.post('/generate-thoughts', async (req, res) => {
       currentTasks: context.currentState?.currentTasks || [],
       recentEvents: context.recentEvents || [],
       emotionalState: context.emotional || 'neutral',
-      memoryContext: context.memoryContext
+      memoryContext: context.memoryContext,
     });
 
     const thoughts = thought ? [thought] : [];

@@ -147,38 +147,7 @@ export async function GET(_request: NextRequest) {
       console.log('Minecraft bot events unavailable');
     }
 
-    // If no events found, create demo events
-    if (events.length === 0) {
-      events.push(
-        {
-          id: `demo-event-1-${Date.now()}`,
-          type: 'world_joined',
-          title: 'World Joined',
-          content: 'Successfully connected to Minecraft world',
-          timestamp: Date.now() - 3600000, // 1 hour ago
-          source: 'demo',
-          severity: 'info',
-        },
-        {
-          id: `demo-event-2-${Date.now()}`,
-          type: 'exploration_started',
-          title: 'Exploration Started',
-          content: 'Began exploring the surrounding environment',
-          timestamp: Date.now() - 1800000, // 30 minutes ago
-          source: 'demo',
-          severity: 'info',
-        },
-        {
-          id: `demo-event-3-${Date.now()}`,
-          type: 'resource_found',
-          title: 'Resource Found',
-          content: 'Discovered trees and other natural resources',
-          timestamp: Date.now() - 900000, // 15 minutes ago
-          source: 'demo',
-          severity: 'success',
-        }
-      );
-    }
+    // Return empty array if no events found - no demo data
 
     // Sort events by timestamp (newest first)
     events.sort((a, b) => b.timestamp - a.timestamp);
@@ -189,39 +158,12 @@ export async function GET(_request: NextRequest) {
       timestamp: new Date().toISOString(),
     });
   } catch (error) {
-    // Return demo data on error
+    console.error('Error fetching events:', error);
     return NextResponse.json({
-      events: [
-        {
-          id: `demo-event-1-${Date.now()}`,
-          type: 'world_joined',
-          title: 'World Joined',
-          content: 'Successfully connected to Minecraft world',
-          timestamp: Date.now() - 3600000,
-          source: 'demo',
-          severity: 'info',
-        },
-        {
-          id: `demo-event-2-${Date.now()}`,
-          type: 'exploration_started',
-          title: 'Exploration Started',
-          content: 'Began exploring the surrounding environment',
-          timestamp: Date.now() - 1800000,
-          source: 'demo',
-          severity: 'info',
-        },
-        {
-          id: `demo-event-3-${Date.now()}`,
-          type: 'resource_found',
-          title: 'Resource Found',
-          content: 'Discovered trees and other natural resources',
-          timestamp: Date.now() - 900000,
-          source: 'demo',
-          severity: 'success',
-        },
-      ],
-      totalEvents: 3,
+      events: [],
+      totalEvents: 0,
       timestamp: new Date().toISOString(),
+      error: 'Failed to fetch events',
     });
   }
 }

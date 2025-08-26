@@ -2,7 +2,7 @@
  * Task Updates API
  * Receives real-time task updates from the planning system
  * and broadcasts them to connected dashboard clients
- * 
+ *
  * @author @darianrosebrook
  */
 
@@ -84,7 +84,7 @@ export async function GET() {
     headers: {
       'Content-Type': 'text/event-stream',
       'Cache-Control': 'no-cache',
-      'Connection': 'keep-alive',
+      Connection: 'keep-alive',
     },
   });
 }

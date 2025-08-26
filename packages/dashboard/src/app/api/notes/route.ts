@@ -90,41 +90,7 @@ export async function GET(_request: NextRequest) {
       console.log('Cognition system telemetry unavailable');
     }
 
-    // If no notes found, create demo notes
-    if (notes.length === 0) {
-      notes.push(
-        {
-          id: `demo-note-1-${Date.now()}`,
-          type: 'reflection',
-          title: 'World Exploration Strategy',
-          content:
-            'The world appears to be a plains biome with scattered trees. Should focus on gathering wood first, then explore for other resources like stone and food.',
-          timestamp: Date.now() - 1800000, // 30 minutes ago
-          source: 'demo',
-          confidence: 0.8,
-        },
-        {
-          id: `demo-note-2-${Date.now()}`,
-          type: 'reflection',
-          title: 'Resource Prioritization',
-          content:
-            'Wood is the most accessible resource and essential for crafting tools. Should prioritize tree gathering before attempting to mine stone.',
-          timestamp: Date.now() - 900000, // 15 minutes ago
-          source: 'demo',
-          confidence: 0.9,
-        },
-        {
-          id: `demo-note-3-${Date.now()}`,
-          type: 'reflection',
-          title: 'Safety Considerations',
-          content:
-            'Night time brings increased danger from hostile mobs. Should ensure adequate lighting and shelter before nightfall.',
-          timestamp: Date.now() - 300000, // 5 minutes ago
-          source: 'demo',
-          confidence: 0.7,
-        }
-      );
-    }
+    // Return empty array if no notes found - no demo data
 
     // Sort notes by timestamp (newest first)
     notes.sort((a, b) => b.timestamp - a.timestamp);
@@ -135,42 +101,12 @@ export async function GET(_request: NextRequest) {
       timestamp: new Date().toISOString(),
     });
   } catch (error) {
-    // Return demo data on error
+    console.error('Error fetching notes:', error);
     return NextResponse.json({
-      notes: [
-        {
-          id: `demo-note-1-${Date.now()}`,
-          type: 'reflection',
-          title: 'World Exploration Strategy',
-          content:
-            'The world appears to be a plains biome with scattered trees. Should focus on gathering wood first, then explore for other resources like stone and food.',
-          timestamp: Date.now() - 1800000,
-          source: 'demo',
-          confidence: 0.8,
-        },
-        {
-          id: `demo-note-2-${Date.now()}`,
-          type: 'reflection',
-          title: 'Resource Prioritization',
-          content:
-            'Wood is the most accessible resource and essential for crafting tools. Should prioritize tree gathering before attempting to mine stone.',
-          timestamp: Date.now() - 900000,
-          source: 'demo',
-          confidence: 0.9,
-        },
-        {
-          id: `demo-note-3-${Date.now()}`,
-          type: 'reflection',
-          title: 'Safety Considerations',
-          content:
-            'Night time brings increased danger from hostile mobs. Should ensure adequate lighting and shelter before nightfall.',
-          timestamp: Date.now() - 300000,
-          source: 'demo',
-          confidence: 0.7,
-        },
-      ],
-      totalNotes: 3,
+      notes: [],
+      totalNotes: 0,
       timestamp: new Date().toISOString(),
+      error: 'Failed to fetch notes',
     });
   }
 }

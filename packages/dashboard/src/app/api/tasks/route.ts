@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import type { Task } from '@/types';
-import {
-  parseCurrentAction,
-} from '@/lib/message-parser';
+import { parseCurrentAction } from '@/lib/message-parser';
 
 /**
  * Tasks API
@@ -47,11 +45,12 @@ export async function GET(_request: NextRequest) {
           priority: task.priority,
           progress: task.progress,
           source: task.source as any,
-          steps: task.steps?.map((step: any) => ({
-            id: step.id,
-            label: step.label,
-            done: step.done,
-          })) || [],
+          steps:
+            task.steps?.map((step: any) => ({
+              id: step.id,
+              label: step.label,
+              done: step.done,
+            })) || [],
         });
       }
     }
@@ -60,18 +59,19 @@ export async function GET(_request: NextRequest) {
     if (stateData.enhancedTaskIntegration?.activeTasks) {
       for (const task of stateData.enhancedTaskIntegration.activeTasks) {
         // Avoid duplicates
-        if (!tasks.find(t => t.id === task.id)) {
+        if (!tasks.find((t) => t.id === task.id)) {
           tasks.push({
             id: task.id,
             title: task.title,
             priority: task.priority,
             progress: task.progress,
             source: task.source as any,
-            steps: task.steps?.map((step: any) => ({
-              id: step.id,
-              label: step.label,
-              done: step.done,
-            })) || [],
+            steps:
+              task.steps?.map((step: any) => ({
+                id: step.id,
+                label: step.label,
+                done: step.done,
+              })) || [],
           });
         }
       }

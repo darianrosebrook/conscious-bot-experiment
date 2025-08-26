@@ -1,10 +1,10 @@
 /**
  * Enhanced Task Integration System
- * 
+ *
  * Provides comprehensive task management and real-time integration
  * with the dashboard, eliminating "No active tasks" messages and
  * providing meaningful task progress and status information.
- * 
+ *
  * @author @darianrosebrook
  */
 
@@ -113,7 +113,7 @@ export class EnhancedTaskIntegration extends EventEmitter {
   constructor(config: Partial<EnhancedTaskIntegrationConfig> = {}) {
     super();
     this.config = { ...DEFAULT_CONFIG, ...config };
-    
+
     if (this.config.enableProgressTracking) {
       this.startProgressTracking();
     }
@@ -124,7 +124,9 @@ export class EnhancedTaskIntegration extends EventEmitter {
    */
   addTask(taskData: Partial<Task>): Task {
     const task: Task = {
-      id: taskData.id || `task-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      id:
+        taskData.id ||
+        `task-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       title: taskData.title || 'Untitled Task',
       description: taskData.description || '',
       type: taskData.type || 'general',
@@ -149,7 +151,7 @@ export class EnhancedTaskIntegration extends EventEmitter {
     this.tasks.set(task.id, task);
     this.updateStatistics();
     this.emit('taskAdded', task);
-    
+
     if (this.config.enableRealTimeUpdates) {
       this.notifyDashboard('taskAdded', task);
     }
@@ -160,7 +162,11 @@ export class EnhancedTaskIntegration extends EventEmitter {
   /**
    * Update task progress and status
    */
-  updateTaskProgress(taskId: string, progress: number, status?: Task['status']): boolean {
+  updateTaskProgress(
+    taskId: string,
+    progress: number,
+    status?: Task['status']
+  ): boolean {
     const task = this.tasks.get(taskId);
     if (!task) {
       return false;
@@ -174,19 +180,21 @@ export class EnhancedTaskIntegration extends EventEmitter {
 
     if (status) {
       task.status = status;
-      
+
       if (status === 'active' && !task.metadata.startedAt) {
         task.metadata.startedAt = Date.now();
       } else if (status === 'completed' && !task.metadata.completedAt) {
         task.metadata.completedAt = Date.now();
-        task.metadata.actualDuration = task.metadata.completedAt - (task.metadata.startedAt || task.metadata.createdAt);
+        task.metadata.actualDuration =
+          task.metadata.completedAt -
+          (task.metadata.startedAt || task.metadata.createdAt);
       }
     }
 
     // Update progress tracker
-    const currentStep = task.steps.findIndex(step => !step.done);
-    const completedSteps = task.steps.filter(step => step.done).length;
-    
+    const currentStep = task.steps.findIndex((step) => !step.done);
+    const completedSteps = task.steps.filter((step) => step.done).length;
+
     this.progressTracker.set(taskId, {
       taskId,
       progress: task.progress,
@@ -199,9 +207,13 @@ export class EnhancedTaskIntegration extends EventEmitter {
 
     this.updateStatistics();
     this.emit('taskProgressUpdated', { task, oldProgress, oldStatus });
-    
+
     if (this.config.enableRealTimeUpdates) {
-      this.notifyDashboard('taskProgressUpdated', { task, oldProgress, oldStatus });
+      this.notifyDashboard('taskProgressUpdated', {
+        task,
+        oldProgress,
+        oldStatus,
+      });
     }
 
     return true;
@@ -216,7 +228,7 @@ export class EnhancedTaskIntegration extends EventEmitter {
       return false;
     }
 
-    const step = task.steps.find(s => s.id === stepId);
+    const step = task.steps.find((s) => s.id === stepId);
     if (!step) {
       return false;
     }
@@ -228,9 +240,10 @@ export class EnhancedTaskIntegration extends EventEmitter {
     }
 
     // Update task progress
-    const completedSteps = task.steps.filter(s => s.done).length;
-    const newProgress = task.steps.length > 0 ? completedSteps / task.steps.length : 1;
-    
+    const completedSteps = task.steps.filter((s) => s.done).length;
+    const newProgress =
+      task.steps.length > 0 ? completedSteps / task.steps.length : 1;
+
     this.updateTaskProgress(taskId, newProgress);
 
     // Check if task is complete
@@ -239,7 +252,7 @@ export class EnhancedTaskIntegration extends EventEmitter {
     }
 
     this.emit('taskStepCompleted', { task, step });
-    
+
     if (this.config.enableRealTimeUpdates) {
       this.notifyDashboard('taskStepCompleted', { task, step });
     }
@@ -256,20 +269,20 @@ export class EnhancedTaskIntegration extends EventEmitter {
       return false;
     }
 
-    const step = task.steps.find(s => s.id === stepId);
+    const step = task.steps.find((s) => s.id === stepId);
     if (!step) {
       return false;
     }
 
     step.startedAt = Date.now();
-    
+
     // Update task status to active if it was pending
     if (task.status === 'pending') {
       this.updateTaskProgress(taskId, task.progress, 'active');
     }
 
     this.emit('taskStepStarted', { task, step });
-    
+
     if (this.config.enableRealTimeUpdates) {
       this.notifyDashboard('taskStepStarted', { task, step });
     }
@@ -281,8 +294,8 @@ export class EnhancedTaskIntegration extends EventEmitter {
    * Get all active tasks
    */
   getActiveTasks(): Task[] {
-    return Array.from(this.tasks.values()).filter(task => 
-      task.status === 'active' || task.status === 'pending'
+    return Array.from(this.tasks.values()).filter(
+      (task) => task.status === 'active' || task.status === 'pending'
     );
   }
 
@@ -298,15 +311,17 @@ export class EnhancedTaskIntegration extends EventEmitter {
     let tasks = Array.from(this.tasks.values());
 
     if (filters?.status) {
-      tasks = tasks.filter(task => task.status === filters.status);
+      tasks = tasks.filter((task) => task.status === filters.status);
     }
 
     if (filters?.source) {
-      tasks = tasks.filter(task => task.source === filters.source);
+      tasks = tasks.filter((task) => task.source === filters.source);
     }
 
     if (filters?.category) {
-      tasks = tasks.filter(task => task.metadata.category === filters.category);
+      tasks = tasks.filter(
+        (task) => task.metadata.category === filters.category
+      );
     }
 
     if (filters?.limit) {
@@ -379,37 +394,52 @@ export class EnhancedTaskIntegration extends EventEmitter {
    */
   private updateStatistics(): void {
     const tasks = Array.from(this.tasks.values());
-    
+
     this.statistics.totalTasks = tasks.length;
-    this.statistics.activeTasks = tasks.filter(t => t.status === 'active').length;
-    this.statistics.completedTasks = tasks.filter(t => t.status === 'completed').length;
-    this.statistics.failedTasks = tasks.filter(t => t.status === 'failed').length;
+    this.statistics.activeTasks = tasks.filter(
+      (t) => t.status === 'active'
+    ).length;
+    this.statistics.completedTasks = tasks.filter(
+      (t) => t.status === 'completed'
+    ).length;
+    this.statistics.failedTasks = tasks.filter(
+      (t) => t.status === 'failed'
+    ).length;
 
     // Calculate success rate
-    const completedOrFailed = this.statistics.completedTasks + this.statistics.failedTasks;
-    this.statistics.successRate = completedOrFailed > 0 
-      ? this.statistics.completedTasks / completedOrFailed 
-      : 0;
+    const completedOrFailed =
+      this.statistics.completedTasks + this.statistics.failedTasks;
+    this.statistics.successRate =
+      completedOrFailed > 0
+        ? this.statistics.completedTasks / completedOrFailed
+        : 0;
 
     // Calculate average completion time
-    const completedTasks = tasks.filter(t => t.status === 'completed' && t.metadata.actualDuration);
+    const completedTasks = tasks.filter(
+      (t) => t.status === 'completed' && t.metadata.actualDuration
+    );
     if (completedTasks.length > 0) {
-      const totalTime = completedTasks.reduce((sum, task) => sum + (task.metadata.actualDuration || 0), 0);
+      const totalTime = completedTasks.reduce(
+        (sum, task) => sum + (task.metadata.actualDuration || 0),
+        0
+      );
       this.statistics.averageCompletionTime = totalTime / completedTasks.length;
     }
 
     // Count tasks by category
     this.statistics.tasksByCategory = {};
-    tasks.forEach(task => {
+    tasks.forEach((task) => {
       const category = task.metadata.category;
-      this.statistics.tasksByCategory[category] = (this.statistics.tasksByCategory[category] || 0) + 1;
+      this.statistics.tasksByCategory[category] =
+        (this.statistics.tasksByCategory[category] || 0) + 1;
     });
 
     // Count tasks by source
     this.statistics.tasksBySource = {};
-    tasks.forEach(task => {
+    tasks.forEach((task) => {
       const source = task.source;
-      this.statistics.tasksBySource[source] = (this.statistics.tasksBySource[source] || 0) + 1;
+      this.statistics.tasksBySource[source] =
+        (this.statistics.tasksBySource[source] || 0) + 1;
     });
   }
 
@@ -419,12 +449,12 @@ export class EnhancedTaskIntegration extends EventEmitter {
   private startProgressTracking(): void {
     setInterval(() => {
       const activeTasks = this.getActiveTasks();
-      
-      activeTasks.forEach(task => {
+
+      activeTasks.forEach((task) => {
         // Update progress based on step completion
-        const completedSteps = task.steps.filter(step => step.done).length;
+        const completedSteps = task.steps.filter((step) => step.done).length;
         const totalSteps = task.steps.length;
-        
+
         if (totalSteps > 0) {
           const newProgress = completedSteps / totalSteps;
           if (Math.abs(newProgress - task.progress) > 0.01) {
@@ -455,11 +485,11 @@ export class EnhancedTaskIntegration extends EventEmitter {
    * Clean up completed tasks from memory
    */
   cleanupCompletedTasks(): void {
-    const completedTasks = Array.from(this.tasks.values()).filter(task => 
-      task.status === 'completed' || task.status === 'failed'
+    const completedTasks = Array.from(this.tasks.values()).filter(
+      (task) => task.status === 'completed' || task.status === 'failed'
     );
 
-    completedTasks.forEach(task => {
+    completedTasks.forEach((task) => {
       // Move to history
       this.taskHistory.push(task);
       this.tasks.delete(task.id);

@@ -37,10 +37,10 @@ const createMockContext = (): LeafContext => ({
   bot: {} as any,
   abortSignal: new AbortController().signal,
   now: () => performance.now(),
-  snapshot: jest.fn().mockResolvedValue({}),
-  inventory: jest.fn().mockResolvedValue({ items: [] }),
-  emitMetric: jest.fn(),
-  emitError: jest.fn(),
+  snapshot: vi.fn().mockResolvedValue({}),
+  inventory: vi.fn().mockResolvedValue({ items: [] }),
+  emitMetric: vi.fn(),
+  emitError: vi.fn(),
 });
 
 describe('EnhancedRegistry', () => {

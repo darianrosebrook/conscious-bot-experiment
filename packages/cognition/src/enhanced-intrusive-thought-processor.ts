@@ -1,9 +1,9 @@
 /**
  * Enhanced Intrusive Thought Processor
- * 
+ *
  * Processes intrusive thoughts and converts them into actionable tasks
  * that actually influence bot behavior through the planning system.
- * 
+ *
  * @author @darianrosebrook
  */
 
@@ -90,45 +90,45 @@ export class IntrusiveThoughtProcessor extends EventEmitter {
 
       // Parse the thought for actionable content
       const action = this.parseActionFromThought(thought);
-      
+
       if (action && this.config.enableTaskCreation) {
         // Create a new task from the intrusive thought
         const task = await this.createTaskFromThought(thought, action);
-        
+
         // Update the planning system
         if (this.config.enablePlanningIntegration) {
           await this.updatePlanningSystem(task);
         }
-        
+
         this.emit('taskCreated', { thought, task, action });
-        
+
         return {
           accepted: true,
           response: `Processing thought: "${thought}". Creating task: ${task.title}`,
           taskId: task.id,
-          task: task
+          task: task,
         };
       }
-      
+
       // Even if no action, record the thought
       this.emit('thoughtRecorded', { thought, action: null });
-      
+
       return {
         accepted: true,
         response: `Thought recorded: "${thought}". No immediate action required.`,
-        recorded: true
+        recorded: true,
       };
-      
     } catch (error) {
       console.error('Failed to process intrusive thought:', error);
       this.emit('processingError', { thought, error });
-      
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      
+
+      const errorMessage =
+        error instanceof Error ? error.message : 'Unknown error';
+
       return {
         accepted: false,
         response: `Failed to process thought: "${thought}". Error: ${errorMessage}`,
-        error: errorMessage
+        error: errorMessage,
       };
     }
   }
@@ -141,90 +141,90 @@ export class IntrusiveThoughtProcessor extends EventEmitter {
       craft: {
         pattern: /craft\s+(.+)/i,
         priority: 'high' as const,
-        category: 'crafting'
+        category: 'crafting',
       },
       mine: {
         pattern: /mine\s+(.+)/i,
         priority: 'medium' as const,
-        category: 'mining'
+        category: 'mining',
       },
       explore: {
         pattern: /explore\s+(.+)/i,
         priority: 'medium' as const,
-        category: 'exploration'
+        category: 'exploration',
       },
       build: {
         pattern: /build\s+(.+)/i,
         priority: 'high' as const,
-        category: 'building'
+        category: 'building',
       },
       gather: {
         pattern: /gather\s+(.+)/i,
         priority: 'medium' as const,
-        category: 'gathering'
+        category: 'gathering',
       },
       find: {
         pattern: /find\s+(.+)/i,
         priority: 'medium' as const,
-        category: 'search'
+        category: 'search',
       },
       go: {
         pattern: /go\s+(.+)/i,
         priority: 'medium' as const,
-        category: 'movement'
+        category: 'movement',
       },
       move: {
         pattern: /move\s+(.+)/i,
         priority: 'medium' as const,
-        category: 'movement'
+        category: 'movement',
       },
       collect: {
         pattern: /collect\s+(.+)/i,
         priority: 'medium' as const,
-        category: 'gathering'
+        category: 'gathering',
       },
       search: {
         pattern: /search\s+(.+)/i,
         priority: 'medium' as const,
-        category: 'search'
+        category: 'search',
       },
       create: {
         pattern: /create\s+(.+)/i,
         priority: 'high' as const,
-        category: 'crafting'
+        category: 'crafting',
       },
       make: {
         pattern: /make\s+(.+)/i,
         priority: 'high' as const,
-        category: 'crafting'
+        category: 'crafting',
       },
       dig: {
         pattern: /dig\s+(.+)/i,
         priority: 'medium' as const,
-        category: 'mining'
+        category: 'mining',
       },
       chop: {
         pattern: /chop\s+(.+)/i,
         priority: 'medium' as const,
-        category: 'gathering'
+        category: 'gathering',
       },
       cut: {
         pattern: /cut\s+(.+)/i,
         priority: 'medium' as const,
-        category: 'gathering'
+        category: 'gathering',
       },
       place: {
         pattern: /place\s+(.+)/i,
         priority: 'medium' as const,
-        category: 'building'
+        category: 'building',
       },
       put: {
         pattern: /put\s+(.+)/i,
         priority: 'medium' as const,
-        category: 'building'
-      }
+        category: 'building',
+      },
     };
-    
+
     for (const [actionType, config] of Object.entries(actionPatterns)) {
       const match = thought.match(config.pattern);
       if (match) {
@@ -232,21 +232,24 @@ export class IntrusiveThoughtProcessor extends EventEmitter {
           type: actionType,
           target: match[1].trim(),
           priority: config.priority,
-          category: config.category
+          category: config.category,
         };
       }
     }
-    
+
     return null;
   }
 
   /**
    * Create a task from an intrusive thought and action
    */
-  private async createTaskFromThought(thought: string, action: Action): Promise<Task> {
+  private async createTaskFromThought(
+    thought: string,
+    action: Action
+  ): Promise<Task> {
     const taskTitle = this.generateTaskTitle(action);
     const taskDescription = this.generateTaskDescription(action, thought);
-    
+
     const task: Task = {
       id: `task-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       title: taskTitle,
@@ -262,10 +265,10 @@ export class IntrusiveThoughtProcessor extends EventEmitter {
       metadata: {
         originalThought: thought,
         action: action,
-        confidence: 0.7
-      }
+        confidence: 0.7,
+      },
     };
-    
+
     return task;
   }
 
@@ -290,16 +293,19 @@ export class IntrusiveThoughtProcessor extends EventEmitter {
       chop: `Chop ${action.target}`,
       cut: `Cut ${action.target}`,
       place: `Place ${action.target}`,
-      put: `Put ${action.target}`
+      put: `Put ${action.target}`,
     };
-    
+
     return titles[action.type] || `Perform ${action.type} on ${action.target}`;
   }
 
   /**
    * Generate a task description from an action and original thought
    */
-  private generateTaskDescription(action: Action, originalThought: string): string {
+  private generateTaskDescription(
+    action: Action,
+    originalThought: string
+  ): string {
     return `Task created from intrusive thought: "${originalThought}". ${action.type} ${action.target}.`;
   }
 
@@ -312,28 +318,28 @@ export class IntrusiveThoughtProcessor extends EventEmitter {
         id: `step-${Date.now()}-1`,
         label: `Prepare for ${action.type}`,
         done: false,
-        order: 1
+        order: 1,
       },
       {
         id: `step-${Date.now()}-2`,
         label: `Locate ${action.target}`,
         done: false,
-        order: 2
+        order: 2,
       },
       {
         id: `step-${Date.now()}-3`,
         label: `Perform ${action.type} on ${action.target}`,
         done: false,
-        order: 3
+        order: 3,
       },
       {
         id: `step-${Date.now()}-4`,
         label: `Complete ${action.type} task`,
         done: false,
-        order: 4
-      }
+        order: 4,
+      },
     ];
-    
+
     return baseSteps;
   }
 
@@ -352,9 +358,9 @@ export class IntrusiveThoughtProcessor extends EventEmitter {
           priority: task.priority,
           source: task.source,
           steps: task.steps,
-          metadata: task.metadata
+          metadata: task.metadata,
         }),
-        signal: AbortSignal.timeout(10000) // 10 second timeout
+        signal: AbortSignal.timeout(10000), // 10 second timeout
       });
 
       if (!response.ok) {
@@ -363,9 +369,8 @@ export class IntrusiveThoughtProcessor extends EventEmitter {
 
       const result = await response.json();
       console.log(`Task created in planning system:`, result);
-      
+
       this.emit('planningSystemUpdated', { task, result });
-      
     } catch (error) {
       console.error('Failed to update planning system:', error);
       this.emit('planningSystemError', { task, error });
@@ -385,10 +390,10 @@ export class IntrusiveThoughtProcessor extends EventEmitter {
           type: action.type,
           parameters: {
             target: action.target,
-            priority: action.priority
-          }
+            priority: action.priority,
+          },
         }),
-        signal: AbortSignal.timeout(10000) // 10 second timeout
+        signal: AbortSignal.timeout(10000), // 10 second timeout
       });
 
       if (!response.ok) {
@@ -397,25 +402,25 @@ export class IntrusiveThoughtProcessor extends EventEmitter {
 
       const result = await response.json();
       console.log(`Direct action executed:`, result);
-      
+
       this.emit('directActionExecuted', { action, result });
-      
+
       return {
         accepted: true,
         response: `Direct action executed: ${action.type} ${action.target}`,
-        taskId: (result as any).taskId
+        taskId: (result as any).taskId,
       };
-      
     } catch (error) {
       console.error('Failed to execute direct action:', error);
       this.emit('directActionError', { action, error });
-      
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      
+
+      const errorMessage =
+        error instanceof Error ? error.message : 'Unknown error';
+
       return {
         accepted: false,
         response: `Failed to execute action: ${action.type} ${action.target}. Error: ${errorMessage}`,
-        error: errorMessage
+        error: errorMessage,
       };
     }
   }

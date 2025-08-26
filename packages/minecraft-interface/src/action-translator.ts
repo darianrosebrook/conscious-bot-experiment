@@ -115,6 +115,19 @@ export class ActionTranslator {
           timeout: 15000,
         };
 
+      case 'place_block':
+        console.log('Creating place_block action');
+        return {
+          type: 'place_block',
+          parameters: {
+            block_type: params.block_type || 'stone',
+            count: params.count || 1,
+            placement: params.placement || 'around_player',
+            position: params.position,
+          },
+          timeout: 15000,
+        };
+
       case 'craft':
       case 'make':
         return {
@@ -175,6 +188,95 @@ export class ActionTranslator {
             duration: 2000,
           },
           timeout: 2500,
+        };
+
+      // Behavior Tree action mappings
+      case 'clear_3x3_area':
+        console.log('Creating clear_3x3_area action');
+        return {
+          type: 'mine_block',
+          parameters: {
+            position: params.position || 'current',
+            tool: params.tool || 'pickaxe',
+            area: { x: 3, y: 2, z: 3 },
+          },
+          timeout: 15000,
+        };
+
+      case 'place_blocks':
+        console.log('Creating place_blocks action');
+        const pattern = params.pattern || 'single';
+        const blockType = params.block || 'stone';
+
+        if (pattern === '3x3_floor') {
+          return {
+            type: 'place_block',
+            parameters: {
+              block_type: blockType,
+              count: 9,
+              placement: 'pattern_3x3_floor',
+            },
+            timeout: 15000,
+          };
+        } else if (pattern === '3x3_walls_2_high') {
+          return {
+            type: 'place_block',
+            parameters: {
+              block_type: blockType,
+              count: 12,
+              placement: 'pattern_3x3_walls',
+            },
+            timeout: 15000,
+          };
+        } else if (pattern === '3x3_roof') {
+          return {
+            type: 'place_block',
+            parameters: {
+              block_type: blockType,
+              count: 9,
+              placement: 'pattern_3x3_roof',
+            },
+            timeout: 15000,
+          };
+        } else {
+          return {
+            type: 'place_block',
+            parameters: {
+              block_type: blockType,
+              count: 1,
+              placement: 'around_player',
+            },
+            timeout: 15000,
+          };
+        }
+
+      case 'place_door':
+        console.log('Creating place_door action');
+        return {
+          type: 'place_block',
+          parameters: {
+            block_type: 'oak_door',
+            count: 1,
+            placement: 'specific_position',
+            position: params.position || 'front_center',
+          },
+          timeout: 15000,
+        };
+
+      case 'place_torch':
+        console.log('Creating place_torch action');
+        return {
+          type: 'place_block',
+          parameters: {
+            block_type: 'torch',
+            count: 1,
+            placement:
+              params.position === 'center_wall'
+                ? 'specific_position'
+                : 'around_player',
+            position: params.position || 'around_player',
+          },
+          timeout: 15000,
         };
 
       case 'cook_food':

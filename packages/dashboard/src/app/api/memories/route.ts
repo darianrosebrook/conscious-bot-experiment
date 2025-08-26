@@ -67,30 +67,7 @@ export async function GET(_request: NextRequest) {
       });
     }
 
-    // If no memories found, create demo memories
-    if (memories.length === 0) {
-      memories.push(
-        {
-          id: `demo-memory-1-${Date.now()}`,
-          type: 'episodic',
-          title: 'First Minecraft Experience',
-          content: 'Joined the world and began exploring the environment',
-          timestamp: Date.now() - 3600000, // 1 hour ago
-          salience: 0.8,
-          source: 'demo',
-        },
-        {
-          id: `demo-memory-2-${Date.now()}`,
-          type: 'semantic',
-          title: 'World Knowledge',
-          content:
-            'Learning about the Minecraft world structure and available resources',
-          timestamp: Date.now() - 1800000, // 30 minutes ago
-          salience: 0.6,
-          source: 'demo',
-        }
-      );
-    }
+    // Return empty array if no memories found - no demo data
 
     return NextResponse.json({
       memories,
@@ -98,31 +75,12 @@ export async function GET(_request: NextRequest) {
       timestamp: new Date().toISOString(),
     });
   } catch (error) {
-    // Return demo data on error
+    console.error('Error fetching memories:', error);
     return NextResponse.json({
-      memories: [
-        {
-          id: `demo-memory-1-${Date.now()}`,
-          type: 'episodic',
-          title: 'First Minecraft Experience',
-          content: 'Joined the world and began exploring the environment',
-          timestamp: Date.now() - 3600000,
-          salience: 0.8,
-          source: 'demo',
-        },
-        {
-          id: `demo-memory-2-${Date.now()}`,
-          type: 'semantic',
-          title: 'World Knowledge',
-          content:
-            'Learning about the Minecraft world structure and available resources',
-          timestamp: Date.now() - 1800000,
-          salience: 0.6,
-          source: 'demo',
-        },
-      ],
-      totalMemories: 2,
+      memories: [],
+      totalMemories: 0,
       timestamp: new Date().toISOString(),
+      error: 'Failed to fetch memories',
     });
   }
 }

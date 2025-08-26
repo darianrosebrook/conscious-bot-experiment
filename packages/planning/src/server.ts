@@ -257,6 +257,7 @@ import { EnhancedGoalManager } from './goal-formulation/enhanced-goal-manager';
 import { EnhancedReactiveExecutor } from './reactive-executor/enhanced-reactive-executor';
 import { Goal, GoalStatus } from './types';
 import { EnhancedTaskIntegration } from './enhanced-task-integration';
+import { EnhancedMemoryIntegration } from './enhanced-memory-integration';
 
 // Initialize the integrated planning coordinator
 const integratedPlanningCoordinator = new IntegratedPlanningCoordinator({
@@ -289,6 +290,17 @@ const enhancedTaskIntegration = new EnhancedTaskIntegration({
   dashboardEndpoint: 'http://localhost:3000',
 });
 
+// Initialize enhanced memory integration system
+const enhancedMemoryIntegration = new EnhancedMemoryIntegration({
+  enableRealTimeUpdates: true,
+  enableReflectiveNotes: true,
+  enableEventLogging: true,
+  dashboardEndpoint: 'http://localhost:3000',
+  memorySystemEndpoint: 'http://localhost:3001',
+  maxEvents: 100,
+  maxNotes: 50,
+});
+
 // Set up event listeners for enhanced task integration
 enhancedTaskIntegration.on('taskAdded', (task) => {
   console.log('Task added to enhanced integration:', task.title);
@@ -311,10 +323,19 @@ enhancedTaskIntegration.on('taskStepStarted', ({ task, step }) => {
   console.log(`Task step started: ${task.title} - ${step.label}`);
 });
 
+// Set up event listeners for enhanced memory integration
+enhancedMemoryIntegration.on('eventAdded', (event) => {
+  console.log('Memory event added:', event.title);
+});
+
+enhancedMemoryIntegration.on('noteAdded', (note) => {
+  console.log('Reflective note added:', note.title);
+});
+
 // Add some initial tasks for testing
 setTimeout(() => {
   console.log('Adding initial tasks for testing...');
-  
+
   enhancedTaskIntegration.addTask({
     title: 'Gather Wood',
     description: 'Collect wood from nearby trees for crafting',
@@ -2829,50 +2850,22 @@ app.get('/health', (req, res) => {
 });
 
 // Get reflective notes
-app.get('/notes', (req, res) => {
+app.get('/notes', async (req, res) => {
   try {
-    const notes = [];
-    const mockNotes = [
-      {
-        id: `note-${Date.now()}`,
-        timestamp: Date.now() - 300000, // 5 minutes ago
-        type: 'reflection',
-        title: 'Resource Scarcity Observation',
-        content:
-          'The plains biome appears to have limited resources. Should prioritize agriculture and explore cave systems for minerals.',
-        insights: ['Resource management critical', 'Exploration needed'],
-        priority: 0.8,
-      },
-      {
-        id: `note-${Date.now()}-2`,
-        timestamp: Date.now() - 420000, // 7 minutes ago
-        type: 'strategy',
-        title: 'Defensive Protocol Effectiveness',
-        content:
-          'Flee response was successful in avoiding immediate danger. Should maintain defensive awareness during night time.',
-        insights: [
-          'Defensive protocols working',
-          'Night time vigilance important',
-        ],
-        priority: 0.9,
-      },
-      {
-        id: `note-${Date.now()}-3`,
-        timestamp: Date.now() - 540000, // 9 minutes ago
-        type: 'learning',
-        title: 'Task Execution Patterns',
-        content:
-          'Simple tasks like gathering wood are more reliable than complex crafting operations. Should break down complex tasks into smaller steps.',
-        insights: [
-          'Task decomposition effective',
-          'Simple tasks more reliable',
-        ],
-        priority: 0.7,
-      },
-    ];
+    // Get notes from enhanced memory integration
+    const localNotes = enhancedMemoryIntegration.getNotes();
+    
+    // Get memories from memory system
+    const memoryNotes = await enhancedMemoryIntegration.getMemorySystemMemories();
+    
+    // Combine all notes
+    const allNotes = [...localNotes, ...memoryNotes];
+    
+    // Sort by timestamp (newest first)
+    allNotes.sort((a, b) => b.timestamp - a.timestamp);
 
     res.json({
-      notes,
+      notes: allNotes,
       timestamp: Date.now(),
     });
   } catch (error) {
@@ -2882,68 +2875,22 @@ app.get('/notes', (req, res) => {
 });
 
 // Get events
-app.get('/events', (req, res) => {
+app.get('/events', async (req, res) => {
   try {
-    const events = [];
-    const mockEvents = [
-      {
-        id: `event-${Date.now()}`,
-        timestamp: Date.now() - 60000, // 1 minute ago
-        type: 'task_completed',
-        title: 'Flee Task Completed',
-        description:
-          'Successfully fled from immediate danger to a safe location',
-        source: 'planning',
-        data: {
-          taskId: 'defense-task-1756085123897',
-          taskType: 'flee',
-          result: 'success',
-        },
-      },
-      {
-        id: `event-${Date.now()}-2`,
-        timestamp: Date.now() - 120000, // 2 minutes ago
-        type: 'task_started',
-        title: 'Resource Gathering Started',
-        description: 'Began gathering wood and other essential resources',
-        source: 'planning',
-        data: {
-          taskId: 'gather-task-1',
-          taskType: 'gather',
-          target: 'oak_log',
-        },
-      },
-      {
-        id: `event-${Date.now()}-3`,
-        timestamp: Date.now() - 180000, // 3 minutes ago
-        type: 'plan_created',
-        title: 'Survival Plan Created',
-        description:
-          'Established comprehensive survival and exploration strategy',
-        source: 'hierarchical_planner',
-        data: {
-          planId: 'current-plan-1',
-          planName: 'Survival and Exploration',
-          steps: 4,
-        },
-      },
-      {
-        id: `event-${Date.now()}-4`,
-        timestamp: Date.now() - 240000, // 4 minutes ago
-        type: 'environment_change',
-        title: 'Night Time Detected',
-        description:
-          'Environment shifted to night time, activating defensive protocols',
-        source: 'world',
-        data: {
-          timeOfDay: 'night',
-          weather: 'clear',
-        },
-      },
-    ];
+    // Get events from enhanced memory integration
+    const localEvents = enhancedMemoryIntegration.getEvents();
+    
+    // Get events from memory system
+    const memoryEvents = await enhancedMemoryIntegration.getMemorySystemEvents();
+    
+    // Combine all events
+    const allEvents = [...localEvents, ...memoryEvents];
+    
+    // Sort by timestamp (newest first)
+    allEvents.sort((a, b) => b.timestamp - a.timestamp);
 
     res.json({
-      events,
+      events: allEvents,
       timestamp: Date.now(),
     });
   } catch (error) {
@@ -3013,6 +2960,12 @@ app.get('/state', (req, res) => {
         taskProgress: enhancedTaskIntegration.getAllTaskProgress(),
         taskHistory: enhancedTaskIntegration.getTaskHistory(10),
       },
+      enhancedMemoryIntegration: {
+        events: enhancedMemoryIntegration.getEvents({ limit: 20 }),
+        notes: enhancedMemoryIntegration.getNotes({ limit: 10 }),
+        totalEvents: enhancedMemoryIntegration.getEvents().length,
+        totalNotes: enhancedMemoryIntegration.getNotes().length,
+      },
       lastTaskExecution: planningSystem.goalFormulation._lastTaskExecution,
       timestamp: Date.now(),
     };
@@ -3041,6 +2994,112 @@ app.get('/cognitive-insights', async (req, res) => {
   } catch (error) {
     console.error('Error getting cognitive insights:', error);
     res.status(500).json({ error: 'Failed to get cognitive insights' });
+  }
+});
+
+// Add memory event
+app.post('/memory-events', (req, res) => {
+  try {
+    const { type, title, description, source, data, priority } = req.body;
+    
+    if (!type || !title || !description || !source) {
+      return res.status(400).json({
+        success: false,
+        message: 'Event type, title, description, and source are required',
+      });
+    }
+
+    const event = enhancedMemoryIntegration.addEvent(
+      type,
+      title,
+      description,
+      source,
+      data || {},
+      priority || 0.5
+    );
+
+    res.json({
+      success: true,
+      event,
+      timestamp: Date.now(),
+    });
+  } catch (error) {
+    console.error('Error adding memory event:', error);
+    res.status(500).json({ error: 'Failed to add memory event' });
+  }
+});
+
+// Add reflective note
+app.post('/memory-notes', (req, res) => {
+  try {
+    const { type, title, content, insights, source, confidence } = req.body;
+    
+    if (!type || !title || !content) {
+      return res.status(400).json({
+        success: false,
+        message: 'Note type, title, and content are required',
+      });
+    }
+
+    const note = enhancedMemoryIntegration.addReflectiveNote(
+      type,
+      title,
+      content,
+      insights || [],
+      source || 'cognitive-system',
+      confidence || 0.7
+    );
+
+    res.json({
+      success: true,
+      note,
+      timestamp: Date.now(),
+    });
+  } catch (error) {
+    console.error('Error adding reflective note:', error);
+    res.status(500).json({ error: 'Failed to add reflective note' });
+  }
+});
+
+// Get memory statistics
+app.get('/memory-statistics', (req, res) => {
+  try {
+    const events = enhancedMemoryIntegration.getEvents();
+    const notes = enhancedMemoryIntegration.getNotes();
+    
+    const statistics = {
+      totalEvents: events.length,
+      totalNotes: notes.length,
+      eventsByType: {},
+      notesByType: {},
+      eventsBySource: {},
+      notesBySource: {},
+      recentActivity: {
+        eventsLastHour: events.filter(e => Date.now() - e.timestamp < 3600000).length,
+        notesLastHour: notes.filter(n => Date.now() - n.timestamp < 3600000).length,
+      },
+    };
+
+    // Count events by type
+    events.forEach(event => {
+      statistics.eventsByType[event.type] = (statistics.eventsByType[event.type] || 0) + 1;
+      statistics.eventsBySource[event.source] = (statistics.eventsBySource[event.source] || 0) + 1;
+    });
+
+    // Count notes by type
+    notes.forEach(note => {
+      statistics.notesByType[note.type] = (statistics.notesByType[note.type] || 0) + 1;
+      statistics.notesBySource[note.source] = (statistics.notesBySource[note.source] || 0) + 1;
+    });
+
+    res.json({
+      success: true,
+      statistics,
+      timestamp: Date.now(),
+    });
+  } catch (error) {
+    console.error('Error getting memory statistics:', error);
+    res.status(500).json({ error: 'Failed to get memory statistics' });
   }
 });
 

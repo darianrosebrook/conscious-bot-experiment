@@ -457,8 +457,9 @@ class BTRun extends EventEmitter {
       // Handle option IDs like "opt.chop_tree_safe" -> "chop_tree_safe.json"
       const optionName = optionId.replace(/^opt\./, '');
 
-      // Use a relative path from the current working directory
+      // Use a path relative to the current working directory (planning package)
       const btDefinitionPath = path.join(
+        process.cwd(),
         'src',
         'behavior-trees',
         'definitions',
@@ -466,6 +467,13 @@ class BTRun extends EventEmitter {
       );
 
       console.log(`Loading BT definition from: ${btDefinitionPath}`);
+      console.log(`Current working directory: ${process.cwd()}`);
+      console.log(
+        `File exists check: ${await fs
+          .access(btDefinitionPath)
+          .then(() => 'YES')
+          .catch(() => 'NO')}`
+      );
 
       try {
         const btDefinitionContent = await fs.readFile(btDefinitionPath, 'utf8');
