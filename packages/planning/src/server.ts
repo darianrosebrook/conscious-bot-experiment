@@ -1708,8 +1708,6 @@ async function executeTaskInMinecraft(task: any) {
       res.json()
     );
     const typedBotStatus = botStatus as any;
-    
-    // Enhanced verification: check both connection and health
     if (!typedBotStatus.executionStatus?.bot?.connected) {
       return {
         success: false,
@@ -1718,84 +1716,6 @@ async function executeTaskInMinecraft(task: any) {
         type: task.type,
       };
     }
-
-    // Critical: Check if bot is actually alive (health > 0)
-    if (!typedBotStatus.isAlive || typedBotStatus.botStatus?.health <= 0) {
-      return {
-        success: false,
-        error: 'Bot is dead and cannot execute actions',
-        botStatus: botStatus,
-        type: task.type,
-        botHealth: typedBotStatus.botStatus?.health || 0,
-      };
-    }
-
-    // Additional verification: check if bot is responsive
-    try {
-      const stateCheck = await fetch(`${minecraftUrl}/state`, {
-        signal: AbortSignal.timeout(2000) // 2 second timeout
-      });
-      
-      if (!stateCheck.ok) {
-        return {
-          success: false,
-          error: 'Bot is not responsive to state requests',
-          botStatus: botStatus,
-          type: task.type,
-        };
-      }
-    } catch (stateError) {
-      return {
-        success: false,
-        error: 'Bot state check failed - bot may be unresponsive',
-        botStatus: botStatus,
-        type: task.type,
-      };
-    }
-
-    // Helper function to get bot position
-    const getBotPosition = async () => {
-      try {
-        const stateResponse = await fetch(`${minecraftUrl}/state`);
-        const stateData = await stateResponse.json();
-        return stateData.data?.worldState?._minecraftState?.player?.position || { x: 0, y: 0, z: 0 };
-      } catch (error) {
-        console.error('Failed to get bot position:', error);
-        return { x: 0, y: 0, z: 0 };
-      }
-    };
-
-    // Helper function to get bot inventory
-    const getBotInventory = async () => {
-      try {
-        const stateResponse = await fetch(`${minecraftUrl}/state`);
-        const stateData = await stateResponse.json();
-        return stateData.data?.worldState?.inventory?.items || [];
-      } catch (error) {
-        console.error('Failed to get bot inventory:', error);
-        return [];
-      }
-    };
-
-    // Helper function to check if inventory changed
-    const inventoryChanged = (before: any[], after: any[], targetItem?: string) => {
-      if (targetItem) {
-        // Check if specific item count changed
-        const beforeCount = before.filter(item => item.name === targetItem).length;
-        const afterCount = after.filter(item => item.name === targetItem).length;
-        return afterCount > beforeCount;
-      }
-      // Check if any items changed
-      return before.length !== after.length;
-    };
-
-    // Helper function to check if positions are different
-    const positionsAreDifferent = (pos1: any, pos2: any) => {
-      const tolerance = 0.1; // Small tolerance for floating point precision
-      return Math.abs(pos1.x - pos2.x) > tolerance ||
-             Math.abs(pos1.y - pos2.y) > tolerance ||
-             Math.abs(pos1.z - pos2.z) > tolerance;
-    };
 
     switch (task.type) {
       case 'move':
@@ -1822,7 +1742,7 @@ async function executeTaskInMinecraft(task: any) {
         }
 
         // Wait a moment for movement to complete
-        await new Promise(resolve => setTimeout(resolve, 500));
+        await new Promise((resolve) => setTimeout(resolve, 500));
 
         // Get position after movement
         const afterPosition = await getBotPosition();
@@ -1831,7 +1751,8 @@ async function executeTaskInMinecraft(task: any) {
         if (!positionsAreDifferent(beforePosition, afterPosition)) {
           return {
             success: false,
-            error: 'Move action reported success but bot did not change position',
+            error:
+              'Move action reported success but bot did not change position',
             botStatus: typedBotStatus,
             type: task.type,
             beforePosition,
@@ -1847,8 +1768,8 @@ async function executeTaskInMinecraft(task: any) {
           afterPosition,
           distanceMoved: Math.sqrt(
             Math.pow(afterPosition.x - beforePosition.x, 2) +
-            Math.pow(afterPosition.y - beforePosition.y, 2) +
-            Math.pow(afterPosition.z - beforePosition.z, 2)
+              Math.pow(afterPosition.y - beforePosition.y, 2) +
+              Math.pow(afterPosition.z - beforePosition.z, 2)
           ),
         };
 
@@ -1869,23 +1790,27 @@ async function executeTaskInMinecraft(task: any) {
         if (!(moveForwardResult as any).success) {
           return {
             success: false,
-            error: (moveForwardResult as any).error || 'Move forward action failed',
+            error:
+              (moveForwardResult as any).error || 'Move forward action failed',
             botStatus: typedBotStatus,
             type: task.type,
           };
         }
 
         // Wait a moment for movement to complete
-        await new Promise(resolve => setTimeout(resolve, 500));
+        await new Promise((resolve) => setTimeout(resolve, 500));
 
         // Get position after movement
         const afterPositionForward = await getBotPosition();
 
         // Verify the bot actually moved
-        if (!positionsAreDifferent(beforePositionForward, afterPositionForward)) {
+        if (
+          !positionsAreDifferent(beforePositionForward, afterPositionForward)
+        ) {
           return {
             success: false,
-            error: 'Move forward action reported success but bot did not change position',
+            error:
+              'Move forward action reported success but bot did not change position',
             botStatus: typedBotStatus,
             type: task.type,
             beforePosition: beforePositionForward,
@@ -1901,8 +1826,8 @@ async function executeTaskInMinecraft(task: any) {
           afterPosition: afterPositionForward,
           distanceMoved: Math.sqrt(
             Math.pow(afterPositionForward.x - beforePositionForward.x, 2) +
-            Math.pow(afterPositionForward.y - beforePositionForward.y, 2) +
-            Math.pow(afterPositionForward.z - beforePositionForward.z, 2)
+              Math.pow(afterPositionForward.y - beforePositionForward.y, 2) +
+              Math.pow(afterPositionForward.z - beforePositionForward.z, 2)
           ),
         };
 
