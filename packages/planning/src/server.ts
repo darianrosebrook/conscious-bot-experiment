@@ -2001,11 +2001,9 @@ async function executeTaskInMinecraft(task: any) {
         const craftResults = [];
 
         try {
-          // First, check if we have the required materials
-          const inventoryCheck = await fetch(`${minecraftUrl}/inventory`)
-            .then((res) => res.json())
-            .catch(() => ({ items: [] }));
-
+          // Get inventory before crafting
+          const beforeInventory = await getBotInventory();
+          
           const itemToCraft = task.parameters?.item || 'item';
 
           // Check if we can actually craft the item
@@ -2034,6 +2032,39 @@ async function executeTaskInMinecraft(task: any) {
 
             craftResults.push(craftResult);
 
+            // Verify the action actually succeeded
+            if (!(craftResult as any).success) {
+              return {
+                results: craftResults,
+                type: 'crafting',
+                success: false,
+                error: (craftResult as any).error || 'Crafting action failed',
+                item: itemToCraft,
+                beforeInventory,
+                afterInventory: beforeInventory,
+              };
+            }
+
+            // Wait a moment for crafting to complete
+            await new Promise(resolve => setTimeout(resolve, 500));
+
+            // Get inventory after crafting
+            const afterInventory = await getBotInventory();
+
+            // Verify the bot actually gained the crafted item
+            if (!inventoryChanged(beforeInventory, afterInventory, itemToCraft)) {
+              return {
+                results: craftResults,
+                type: 'crafting',
+                success: false,
+                error: `Crafting reported success but bot did not gain ${itemToCraft}`,
+                item: itemToCraft,
+                beforeInventory,
+                afterInventory,
+                actionData: craftResult,
+              };
+            }
+
             // Send a chat message to inform about the result
             craftResults.push(
               await fetch(`${minecraftUrl}/action`, {
@@ -2042,9 +2073,7 @@ async function executeTaskInMinecraft(task: any) {
                 body: JSON.stringify({
                   type: 'chat',
                   parameters: {
-                    message: (craftResult as any).success
-                      ? `Successfully crafted ${itemToCraft}!`
-                      : `Failed to craft ${itemToCraft}: ${(craftResult as any).error || 'Unknown error'}`,
+                    message: `Successfully crafted ${itemToCraft}!`,
                   },
                 }),
               }).then((res) => res.json())
@@ -2053,9 +2082,13 @@ async function executeTaskInMinecraft(task: any) {
             return {
               results: craftResults,
               type: 'crafting',
-              success: (craftResult as any).success,
-              error: (craftResult as any).error,
+              success: true,
+              error: undefined,
               item: itemToCraft,
+              beforeInventory,
+              afterInventory,
+              itemsGained: afterInventory.filter(item => item.name === itemToCraft).length - 
+                          beforeInventory.filter(item => item.name === itemToCraft).length,
             };
           } else {
             // Cannot craft - send informative message
@@ -2078,6 +2111,8 @@ async function executeTaskInMinecraft(task: any) {
               success: false,
               error: 'Missing required materials',
               item: itemToCraft,
+              beforeInventory,
+              afterInventory: beforeInventory,
             };
           }
         } catch (error) {
@@ -2099,8 +2134,10 @@ async function executeTaskInMinecraft(task: any) {
             results: craftResults,
             type: 'crafting',
             success: false,
-            error: 'Crafting system unavailable',
+            error: error instanceof Error ? error.message : 'Crafting system error',
             item: task.parameters?.item || 'item',
+            beforeInventory: [],
+            afterInventory: [],
           };
         }
 
