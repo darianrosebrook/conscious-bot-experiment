@@ -101,7 +101,7 @@ const services = [
     command: 'bash',
     args: [
       '-c',
-      'source venv-hrm-py311/bin/activate && python hrm_bridge.py --port 5001',
+      './venv-hrm-py311/bin/python hrm_bridge.py --port 5001',
     ],
     port: 5001,
     healthUrl: 'http://localhost:5001/health',
