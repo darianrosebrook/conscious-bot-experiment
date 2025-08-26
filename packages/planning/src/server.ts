@@ -1173,7 +1173,7 @@ async function autonomousTaskExecutor() {
     }
 
     // Step 4: Get the highest priority goal and execute it directly
-    const availableGoals = planningSystem.goalFormulation.getCurrentGoals();
+    const availableGoals = planningSystem.goalFormulation.getActiveGoals();
     if (availableGoals && availableGoals.length > 0) {
       // Get the highest priority goal
       const highestPriorityGoal = availableGoals.reduce(
@@ -3407,15 +3407,15 @@ app.post('/tasks', (req, res) => {
 app.post('/trigger-goals', async (req, res) => {
   try {
     console.log('🚀 Manually triggering goal execution...');
-    
+
     // Execute the autonomous task executor
     await autonomousTaskExecutor();
-    
+
     // Get current state after execution
     const currentGoals = planningSystem.goalFormulation.getCurrentGoals();
     const activeGoals = planningSystem.goalFormulation.getActiveGoals();
     const completedGoals = planningSystem.goalFormulation.getCompletedTasks();
-    
+
     res.json({
       success: true,
       message: 'Goal execution triggered successfully',
@@ -3428,8 +3428,8 @@ app.post('/trigger-goals', async (req, res) => {
           type: g.type,
           description: g.description,
           priority: g.priority,
-          status: g.status
-        }))
+          status: g.status,
+        })),
       },
       timestamp: Date.now(),
     });
