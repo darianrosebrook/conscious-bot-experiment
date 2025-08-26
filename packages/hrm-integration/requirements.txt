@@ -1,4 +1,5 @@
 torch
+numpy<2
 adam-atan2
 einops
 tqdm
@@ -9,3 +10,5 @@ wandb
 omegaconf
 hydra-core
 huggingface_hub
+flask
+flask-cors
