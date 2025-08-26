@@ -68,6 +68,11 @@ const toolExecutor = {
  * Map Behavior Tree actions to Minecraft actions
  */
 function mapBTActionToMinecraft(tool: string, args: Record<string, any>) {
+  console.log(`🔧 Mapping BT action: ${tool} with args:`, args);
+
+  // Add debugging info to the response
+  const debugInfo = { originalAction: tool, args: args };
+
   switch (tool) {
     case 'scan_for_trees':
       // Look around for trees
@@ -115,6 +120,95 @@ function mapBTActionToMinecraft(tool: string, args: Record<string, any>) {
         },
       };
 
+    // Building actions - map to primitive Minecraft actions
+    case 'clear_3x3_area':
+      // Clear a 3x3 area by mining blocks
+      return {
+        type: 'mine_block',
+        parameters: {
+          position: args.position || 'current',
+          tool: args.tool || 'pickaxe',
+          area: { x: 3, y: 2, z: 3 },
+        },
+        debug: debugInfo,
+      };
+
+    case 'place_blocks':
+      console.log(`✅ Matched place_blocks action with args:`, args);
+      // Place blocks according to pattern
+      const pattern = args.pattern || 'single';
+      const blockType = args.block || 'stone';
+
+      console.log(`📦 Pattern: ${pattern}, BlockType: ${blockType}`);
+
+      if (pattern === '3x3_floor') {
+        return {
+          type: 'place_block',
+          parameters: {
+            block_type: blockType,
+            count: 9,
+            placement: 'pattern_3x3_floor',
+          },
+        };
+      } else if (pattern === '3x3_walls_2_high') {
+        return {
+          type: 'place_block',
+          parameters: {
+            block_type: blockType,
+            count: 12, // 4 walls * 3 blocks high
+            placement: 'pattern_3x3_walls',
+          },
+        };
+      } else if (pattern === '3x3_roof') {
+        return {
+          type: 'place_block',
+          parameters: {
+            block_type: blockType,
+            count: 9,
+            placement: 'pattern_3x3_roof',
+          },
+        };
+      } else {
+        // Default single block placement
+        return {
+          type: 'place_block',
+          parameters: {
+            block_type: blockType,
+            count: 1,
+            placement: 'around_player',
+          },
+        };
+      }
+
+    case 'place_door':
+      console.log(`✅ Matched place_door action with args:`, args);
+      // Place a door at specified position
+      return {
+        type: 'place_block',
+        parameters: {
+          block_type: 'oak_door',
+          count: 1,
+          placement: 'specific_position',
+          position: args.position || 'front_center',
+        },
+      };
+
+    case 'place_torch':
+      console.log(`✅ Matched place_torch action with args:`, args);
+      // Place a torch for lighting
+      return {
+        type: 'place_block',
+        parameters: {
+          block_type: 'torch',
+          count: 1,
+          placement:
+            args.position === 'center_wall'
+              ? 'specific_position'
+              : 'around_player',
+          position: args.position || 'around_player',
+        },
+      };
+
     case 'wait':
       // Wait action
       return {
@@ -126,9 +220,13 @@ function mapBTActionToMinecraft(tool: string, args: Record<string, any>) {
 
     default:
       // Unknown action, try to execute as-is
+      console.log(
+        `⚠️ Unknown BT action: ${tool}, falling through to default case`
+      );
       return {
         type: tool,
         parameters: args,
+        debug: debugInfo,
       };
   }
 }
@@ -158,6 +256,7 @@ import { IntegratedPlanningCoordinator } from './integrated-planning-coordinator
 import { EnhancedGoalManager } from './goal-formulation/enhanced-goal-manager';
 import { EnhancedReactiveExecutor } from './reactive-executor/enhanced-reactive-executor';
 import { Goal, GoalStatus } from './types';
+import { EnhancedTaskIntegration } from './enhanced-task-integration';
 
 // Initialize the integrated planning coordinator
 const integratedPlanningCoordinator = new IntegratedPlanningCoordinator({
@@ -178,6 +277,83 @@ const enhancedGoalManager = new EnhancedGoalManager();
 
 // Initialize enhanced reactive executor
 const enhancedReactiveExecutor = new EnhancedReactiveExecutor();
+
+// Initialize enhanced task integration system
+const enhancedTaskIntegration = new EnhancedTaskIntegration({
+  enableRealTimeUpdates: true,
+  enableProgressTracking: true,
+  enableTaskStatistics: true,
+  enableTaskHistory: true,
+  maxTaskHistory: 1000,
+  progressUpdateInterval: 5000,
+  dashboardEndpoint: 'http://localhost:3000',
+});
+
+// Set up event listeners for enhanced task integration
+enhancedTaskIntegration.on('taskAdded', (task) => {
+  console.log('Task added to enhanced integration:', task.title);
+});
+
+enhancedTaskIntegration.on(
+  'taskProgressUpdated',
+  ({ task, oldProgress, oldStatus }) => {
+    console.log(
+      `Task progress updated: ${task.title} - ${Math.round(task.progress * 100)}% (${oldStatus} -> ${task.status})`
+    );
+  }
+);
+
+enhancedTaskIntegration.on('taskStepCompleted', ({ task, step }) => {
+  console.log(`Task step completed: ${task.title} - ${step.label}`);
+});
+
+enhancedTaskIntegration.on('taskStepStarted', ({ task, step }) => {
+  console.log(`Task step started: ${task.title} - ${step.label}`);
+});
+
+// Add some initial tasks for testing
+setTimeout(() => {
+  console.log('Adding initial tasks for testing...');
+  
+  enhancedTaskIntegration.addTask({
+    title: 'Gather Wood',
+    description: 'Collect wood from nearby trees for crafting',
+    type: 'gathering',
+    priority: 0.8,
+    urgency: 0.7,
+    source: 'autonomous',
+    metadata: {
+      category: 'survival',
+      tags: ['wood', 'gathering', 'crafting'],
+    },
+  });
+
+  enhancedTaskIntegration.addTask({
+    title: 'Craft Wooden Pickaxe',
+    description: 'Create a wooden pickaxe for mining stone',
+    type: 'crafting',
+    priority: 0.9,
+    urgency: 0.8,
+    source: 'autonomous',
+    metadata: {
+      category: 'crafting',
+      tags: ['pickaxe', 'wood', 'tools'],
+    },
+  });
+
+  enhancedTaskIntegration.addTask({
+    title: 'Explore Cave System',
+    description: 'Search for valuable resources in nearby caves',
+    type: 'exploration',
+    priority: 0.6,
+    urgency: 0.5,
+    source: 'autonomous',
+    metadata: {
+      category: 'exploration',
+      tags: ['cave', 'mining', 'resources'],
+    },
+  });
+}, 2000);
 
 // Initialize planning system with proper integration
 const planningSystem = {
@@ -2655,7 +2831,8 @@ app.get('/health', (req, res) => {
 // Get reflective notes
 app.get('/notes', (req, res) => {
   try {
-    const notes = [
+    const notes = [];
+    const mockNotes = [
       {
         id: `note-${Date.now()}`,
         timestamp: Date.now() - 300000, // 5 minutes ago
@@ -2707,7 +2884,8 @@ app.get('/notes', (req, res) => {
 // Get events
 app.get('/events', (req, res) => {
   try {
-    const events = [
+    const events = [];
+    const mockEvents = [
       {
         id: `event-${Date.now()}`,
         timestamp: Date.now() - 60000, // 1 minute ago
@@ -2828,6 +3006,12 @@ app.get('/state', (req, res) => {
         maxRetries: cognitiveIntegration['config'].maxRetries,
         failureThreshold: cognitiveIntegration['config'].failureThreshold,
         successThreshold: cognitiveIntegration['config'].successThreshold,
+      },
+      enhancedTaskIntegration: {
+        activeTasks: enhancedTaskIntegration.getActiveTasks(),
+        taskStatistics: enhancedTaskIntegration.getTaskStatistics(),
+        taskProgress: enhancedTaskIntegration.getAllTaskProgress(),
+        taskHistory: enhancedTaskIntegration.getTaskHistory(10),
       },
       lastTaskExecution: planningSystem.goalFormulation._lastTaskExecution,
       timestamp: Date.now(),
@@ -3030,16 +3214,196 @@ app.post('/goal', async (req, res) => {
 // Get current tasks
 app.get('/tasks', (req, res) => {
   try {
-    const tasks = planningSystem.goalFormulation._tasks || [];
+    const filters = {
+      status: req.query.status as any,
+      source: req.query.source as any,
+      category: req.query.category as string,
+      limit: req.query.limit ? parseInt(req.query.limit as string) : undefined,
+    };
+
+    const tasks = enhancedTaskIntegration.getTasks(filters);
+
     res.json({
       success: true,
       tasks,
+      count: tasks.length,
+      timestamp: Date.now(),
     });
   } catch (error) {
     console.error('Error getting tasks:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to get tasks',
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
+
+// Add new task
+app.post('/tasks', (req, res) => {
+  try {
+    const taskData = req.body;
+    const task = enhancedTaskIntegration.addTask(taskData);
+
+    res.json({
+      success: true,
+      task,
+      message: 'Task added successfully',
+    });
+  } catch (error) {
+    console.error('Error adding task:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to add task',
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
+
+// Update task progress
+app.put('/tasks/:taskId/progress', (req, res) => {
+  try {
+    const { taskId } = req.params;
+    const { progress, status } = req.body;
+
+    const success = enhancedTaskIntegration.updateTaskProgress(
+      taskId,
+      progress,
+      status
+    );
+
+    if (success) {
+      res.json({
+        success: true,
+        message: 'Task progress updated successfully',
+      });
+    } else {
+      res.status(404).json({
+        success: false,
+        message: 'Task not found',
+      });
+    }
+  } catch (error) {
+    console.error('Error updating task progress:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to update task progress',
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
+
+// Complete task step
+app.post('/tasks/:taskId/steps/:stepId/complete', (req, res) => {
+  try {
+    const { taskId, stepId } = req.params;
+
+    const success = enhancedTaskIntegration.completeTaskStep(taskId, stepId);
+
+    if (success) {
+      res.json({
+        success: true,
+        message: 'Task step completed successfully',
+      });
+    } else {
+      res.status(404).json({
+        success: false,
+        message: 'Task or step not found',
+      });
+    }
+  } catch (error) {
+    console.error('Error completing task step:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to complete task step',
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
+
+// Start task step
+app.post('/tasks/:taskId/steps/:stepId/start', (req, res) => {
+  try {
+    const { taskId, stepId } = req.params;
+
+    const success = enhancedTaskIntegration.startTaskStep(taskId, stepId);
+
+    if (success) {
+      res.json({
+        success: true,
+        message: 'Task step started successfully',
+      });
+    } else {
+      res.status(404).json({
+        success: false,
+        message: 'Task or step not found',
+      });
+    }
+  } catch (error) {
+    console.error('Error starting task step:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to start task step',
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
+
+// Get task statistics
+app.get('/task-statistics', (req, res) => {
+  try {
+    const statistics = enhancedTaskIntegration.getTaskStatistics();
+
+    res.json({
+      success: true,
+      statistics,
+      timestamp: Date.now(),
+    });
+  } catch (error) {
+    console.error('Error getting task statistics:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to get task statistics',
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
+
+// Get task progress
+app.get('/task-progress', (req, res) => {
+  try {
+    const { taskId } = req.query;
+
+    if (taskId) {
+      const progress = enhancedTaskIntegration.getTaskProgress(
+        taskId as string
+      );
+
+      if (progress) {
+        res.json({
+          success: true,
+          progress,
+        });
+      } else {
+        res.status(404).json({
+          success: false,
+          message: 'Task not found',
+        });
+      }
+    } else {
+      const allProgress = enhancedTaskIntegration.getAllTaskProgress();
+
+      res.json({
+        success: true,
+        progress: allProgress,
+        count: allProgress.length,
+      });
+    }
+  } catch (error) {
+    console.error('Error getting task progress:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to get task progress',
       error: error instanceof Error ? error.message : 'Unknown error',
     });
   }

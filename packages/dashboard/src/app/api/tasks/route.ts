@@ -1,9 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import type { Task } from '@/types';
 import {
-  parseTaskDescription,
-  parseStepDescription,
-  parseGoalDescription,
   parseCurrentAction,
 } from '@/lib/message-parser';
 
@@ -41,56 +38,42 @@ export async function GET(_request: NextRequest) {
     const stateData = await stateRes.value.json();
     const tasks: Task[] = [];
 
-    // Convert planning tasks to dashboard tasks with deduplication
-    if (tasksData.tasks && Array.isArray(tasksData.tasks)) {
-      const seenTasks = new Set<string>();
-
+    // Convert enhanced task integration tasks to dashboard format
+    if (tasksData.success && tasksData.tasks) {
       for (const task of tasksData.tasks) {
-        const taskKey = `${task.type}-${task.description}`;
-
-        // Skip if we've already seen this task
-        if (seenTasks.has(taskKey)) {
-          continue;
-        }
-        seenTasks.add(taskKey);
-
         tasks.push({
-          id: task.id || `task-${Date.now()}`,
-          title: parseTaskDescription(task),
-          priority: task.priority || 0.5,
-          progress: task.status === 'completed' ? 1.0 : 0.3,
-          source: 'planner' as const,
-          steps: [
-            {
-              id: `step-${task.id}`,
-              label: parseStepDescription({
-                action: task.type,
-                parameters: task.parameters,
-                description: task.description,
-              }),
-              done: task.status === 'completed',
-            },
-          ],
+          id: task.id,
+          title: task.title,
+          priority: task.priority,
+          progress: task.progress,
+          source: task.source as any,
+          steps: task.steps?.map((step: any) => ({
+            id: step.id,
+            label: step.label,
+            done: step.done,
+          })) || [],
         });
       }
     }
 
-    // Convert planning goals to tasks
-    if (stateData.goalFormulation?.currentGoals) {
-      for (const goal of stateData.goalFormulation.currentGoals) {
-        tasks.push({
-          id: `goal-${goal.id || Date.now()}`,
-          title: parseGoalDescription(goal),
-          priority: goal.priority || 0.5,
-          progress: goal.progress || 0,
-          source: 'goal' as const,
-          steps:
-            goal.steps?.map((step: Record<string, unknown>, index: number) => ({
-              id: `step-${index}`,
-              label: parseStepDescription(step),
-              done: step.done || false,
+    // Add enhanced task integration data from state
+    if (stateData.enhancedTaskIntegration?.activeTasks) {
+      for (const task of stateData.enhancedTaskIntegration.activeTasks) {
+        // Avoid duplicates
+        if (!tasks.find(t => t.id === task.id)) {
+          tasks.push({
+            id: task.id,
+            title: task.title,
+            priority: task.priority,
+            progress: task.progress,
+            source: task.source as any,
+            steps: task.steps?.map((step: any) => ({
+              id: step.id,
+              label: step.label,
+              done: step.done,
             })) || [],
-        });
+          });
+        }
       }
     }
 
