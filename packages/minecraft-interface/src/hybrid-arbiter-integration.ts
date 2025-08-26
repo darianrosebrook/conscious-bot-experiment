@@ -13,6 +13,7 @@ import {
   HybridHRMArbiter,
   HRMSignal,
   HRMGoalCandidate,
+  HRMPerformanceBudgets,
 } from '@conscious-bot/core';
 import { BotAdapter } from './bot-adapter';
 import { ObservationMapper } from './observation-mapper';
@@ -29,35 +30,7 @@ export interface HybridArbiterConfig {
   };
 
   // Performance budgets
-  performanceBudgets?: Partial<{
-    emergency: {
-      totalBudget: number;
-      signalProcessing: number;
-      needGeneration: number;
-      goalEnumeration: number;
-      priorityRanking: number;
-      hrmPlanning: number;
-      execution: number;
-    };
-    routine: {
-      totalBudget: number;
-      signalProcessing: number;
-      needGeneration: number;
-      goalEnumeration: number;
-      priorityRanking: number;
-      hrmPlanning: number;
-      execution: number;
-    };
-    deliberative: {
-      totalBudget: number;
-      signalProcessing: number;
-      needGeneration: number;
-      goalEnumeration: number;
-      priorityRanking: number;
-      hrmPlanning: number;
-      execution: number;
-    };
-  }>;
+  performanceBudgets?: Partial<HRMPerformanceBudgets>;
 
   // Signal processing
   signalProcessingInterval: number; // ms
@@ -222,7 +195,7 @@ export class HybridArbiterIntegration extends EventEmitter {
         return;
       }
 
-      const context = createLeafContext(bot);
+      const context = createLeafContext(bot as any);
 
       // Process signals through the arbiter
       const goals = await this.arbiter.processMultipleSignals(signals, context);
@@ -456,10 +429,14 @@ export class HybridArbiterIntegration extends EventEmitter {
   private async executeActionPlan(actionPlan: any[]): Promise<void> {
     try {
       const result = await this.actionExecutor.executeActionPlan(actionPlan);
-      
+
       if (result.success) {
-        console.log(`✅ Action plan executed successfully in ${result.durationMs}ms`);
-        console.log(`   Actions executed: ${result.actionsExecuted.join(', ')}`);
+        console.log(
+          `✅ Action plan executed successfully in ${result.durationMs}ms`
+        );
+        console.log(
+          `   Actions executed: ${result.actionsExecuted.join(', ')}`
+        );
       } else {
         console.warn(`⚠️ Action plan failed: ${result.error}`);
       }
@@ -625,7 +602,7 @@ export class HybridArbiterIntegration extends EventEmitter {
         return;
       }
 
-      const context = createLeafContext(bot);
+      const context = createLeafContext(bot as any);
       const goals = await this.arbiter.processHRMSignal(signal, context);
 
       console.log(`🎯 Injected signal generated ${goals.length} goals`);

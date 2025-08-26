@@ -21,6 +21,7 @@ import {
 } from './arbiter';
 import { HybridHRMRouter } from './mcp-capabilities/hybrid-hrm-integration';
 import { LeafContext } from './mcp-capabilities/leaf-contracts';
+import { LeafFactory } from './mcp-capabilities/leaf-factory';
 
 // Enhanced signal types for HRM integration
 export interface HRMSignal {
@@ -154,7 +155,7 @@ export class HybridHRMArbiter extends Arbiter {
   private needHistory: NeedScore[] = [];
   private goalTemplates: HRMGoalTemplate[] = [];
   private currentContext: LeafContext | null = null;
-  private leafFactory: any; // Leaf factory for executing leaves
+  private leafFactory: LeafFactory; // Leaf factory for executing leaves
 
   // Optimization properties
   private cache = new Map<string, CachedResult>();
@@ -207,6 +208,9 @@ export class HybridHRMArbiter extends Arbiter {
       },
       ...performanceBudgets,
     };
+
+    // Initialize leaf factory
+    this.leafFactory = new LeafFactory();
 
     // Register HRM cognitive module
     this.registerModule(new HRMCognitiveModule(this.hybridHRM));
@@ -772,7 +776,7 @@ export class HybridHRMArbiter extends Arbiter {
       }
 
       // Execute the leaf
-      const result = await leaf.run(parameters, context);
+      const result = await leaf.run(context, parameters);
 
       return {
         success: result.status === 'success',

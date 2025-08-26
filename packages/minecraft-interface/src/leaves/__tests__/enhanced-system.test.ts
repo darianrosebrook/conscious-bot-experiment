@@ -10,8 +10,8 @@
 import { EnhancedRegistry } from '../../../../core/src/mcp-capabilities/enhanced-registry';
 import {
   DynamicCreationFlow,
-  MockLLMInterface,
 } from '../../../../core/src/mcp-capabilities/dynamic-creation-flow';
+import { HRMLLMInterface } from '../../../../core/src/mcp-capabilities/llm-integration';
 import {
   createLeafContext,
   LeafImpl,
@@ -22,6 +22,58 @@ import {
 import { MoveToLeaf, StepForwardSafelyLeaf } from '../movement-leaves';
 import { SenseHostilesLeaf, WaitLeaf } from '../sensing-leaves';
 import { PlaceTorchIfNeededLeaf } from '../interaction-leaves';
+
+// Mock HRMLLMInterface for testing
+class MockHRMLLMInterface extends HRMLLMInterface {
+  constructor() {
+    super({
+      abstractPlanner: {
+        model: 'mock-model',
+        maxTokens: 1000,
+        temperature: 0.1,
+        purpose: 'testing',
+        latency: 'fast'
+      },
+      detailedExecutor: {
+        model: 'mock-model',
+        maxTokens: 1000,
+        temperature: 0.1,
+        purpose: 'testing',
+        latency: 'fast'
+      },
+      refinementLoop: {
+        maxIterations: 3,
+        haltCondition: 'confidence_threshold',
+        confidenceThreshold: 0.8,
+        timeBudgetMs: 5000
+      }
+    });
+  }
+
+  async proposeOption(request: any): Promise<any> {
+    return {
+      name: 'mock_option',
+      version: '1.0.0',
+      btDsl: {
+        name: 'mock_option',
+        version: '1.0.0',
+        root: {
+          type: 'Sequence',
+          children: [
+            {
+              type: 'Leaf',
+              leafName: 'wait',
+              args: { durationMs: 100 }
+            }
+          ]
+        }
+      },
+      confidence: 0.8,
+      estimatedSuccessRate: 0.9,
+      reasoning: 'Mock option for testing'
+    };
+  }
+}
 
 // Custom test leaf
 class TestLeaf implements LeafImpl {
@@ -75,12 +127,12 @@ const mockBot = {
 describe('Enhanced System Integration', () => {
   let registry: EnhancedRegistry;
   let dynamicFlow: DynamicCreationFlow;
-  let llmInterface: MockLLMInterface;
+  let llmInterface: MockHRMLLMInterface;
   let context: any;
 
   beforeEach(() => {
     registry = new EnhancedRegistry();
-    llmInterface = new MockLLMInterface();
+    llmInterface = new MockHRMLLMInterface();
 
     // Configure dynamic creation flow
     dynamicFlow = new DynamicCreationFlow(
@@ -159,12 +211,17 @@ describe('Enhanced System Integration', () => {
       };
 
       const shadowConfig = {
-        promotionThreshold: 0.8,
+        successThreshold: 0.8,
         maxShadowRuns: 10,
-        autoRetirementThreshold: 0.3,
+        failureThreshold: 0.3,
       };
 
-      const result = registry.registerOption(btDsl, provenance, shadowConfig);
+      const result = registry.registerOption(btDsl, provenance, {
+        successThreshold: 0.8,
+        maxShadowRuns: 10,
+        failureThreshold: 0.3,
+        minShadowRuns: 3
+      });
       expect(result.ok).toBe(true);
       expect(result.id).toBe('test_option@1.0.0');
     });
@@ -190,9 +247,9 @@ describe('Enhanced System Integration', () => {
       };
 
       registry.registerOption(btDsl, provenance, {
-        promotionThreshold: 0.8,
+        successThreshold: 0.8,
         maxShadowRuns: 10,
-        autoRetirementThreshold: 0.3,
+        failureThreshold: 0.3,
       });
 
       // Get initial stats
@@ -300,7 +357,7 @@ describe('Enhanced System Integration', () => {
       expect(proposal?.name).toBe('mock_option');
       expect(proposal?.version).toBe('1.0.0');
       expect(proposal?.confidence).toBe(0.8);
-      expect(proposal?.estimatedSuccessRate).toBe(0.75);
+      expect(proposal?.estimatedSuccessRate).toBe(0.9);
     });
 
     it('should register proposed options', async () => {
@@ -356,9 +413,9 @@ describe('Enhanced System Integration', () => {
       };
 
       registry.registerOption(btDsl, provenance, {
-        promotionThreshold: 0.8,
+        successThreshold: 0.8,
         maxShadowRuns: 10,
-        autoRetirementThreshold: 0.3,
+        failureThreshold: 0.3,
       });
 
       // Evaluate retirement (should not retire due to insufficient runs)
@@ -411,7 +468,7 @@ describe('Enhanced System Integration', () => {
       // Check proposal history
       const history = dynamicFlow.getProposalHistory(taskId);
       expect(history.length).toBe(1);
-      expect(history[0].proposal.name).toBe('mock_option');
+      expect(history[0].proposal?.name).toBe('mock_option');
     });
 
     it('should manage multiple tasks independently', () => {

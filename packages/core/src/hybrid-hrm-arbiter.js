@@ -14,6 +14,7 @@ exports.HybridHRMArbiter = void 0;
 const uuid_1 = require("uuid");
 const arbiter_1 = require("./arbiter");
 const hybrid_hrm_integration_1 = require("./mcp-capabilities/hybrid-hrm-integration");
+const leaf_factory_1 = require("./mcp-capabilities/leaf-factory");
 /**
  * Enhanced Arbiter with HRM Integration
  *
@@ -74,6 +75,10 @@ class HybridHRMArbiter extends arbiter_1.Arbiter {
             },
             ...performanceBudgets,
         };
+        // Initialize leaf factory
+        console.log('🔧 Initializing leaf factory...');
+        this.leafFactory = new leaf_factory_1.LeafFactory();
+        console.log('✅ Leaf factory initialized:', this.leafFactory);
         // Register HRM cognitive module
         this.registerModule(new HRMCognitiveModule(this.hybridHRM));
         // Initialize goal templates
@@ -284,7 +289,7 @@ class HybridHRMArbiter extends arbiter_1.Arbiter {
                 }
                 // 4. Priority Ranking (batched)
                 const priorityTime = performance.now();
-                const rankedGoals = await this.rankGoals(goalCandidates, needs, context);
+                const rankedGoals = await this.rankGoals(goalCandidates);
                 if (performance.now() - priorityTime >
                     this.performanceBudgets.routine.priorityRanking) {
                     console.warn('⚠️ Priority ranking exceeded budget');
@@ -310,7 +315,7 @@ class HybridHRMArbiter extends arbiter_1.Arbiter {
             console.log(`🧠 Optimized HRM Pipeline completed in ${totalTime.toFixed(1)}ms`);
             // Log optimization stats
             this.logOptimizationStats();
-            // 6. Goal Execution (new phase)
+            // 6. Goal Execution
             if (allResults.length > 0) {
                 console.log(`🎯 Executing ${allResults.length} goals...`);
                 const executionResults = await this.executeGoals(allResults, context);
@@ -367,6 +372,168 @@ class HybridHRMArbiter extends arbiter_1.Arbiter {
         this.optimizationStats.cacheHits = 0;
     }
     /**
+     * Execute goals using the leaf system and action translator
+     */
+    async executeGoals(goals, context) {
+        const executionPromises = goals.map(async (goal) => {
+            try {
+                if (!goal.plan) {
+                    return { success: false, error: 'No plan available for goal' };
+                }
+                console.log(`🎯 Executing goal: ${goal.template.name}`);
+                // Execute the plan using the leaf system
+                const executionResult = await this.executePlanWithLeaves(goal.plan, context);
+                if (executionResult.success) {
+                    console.log(`✅ Goal execution completed: ${goal.template.name}`);
+                    return {
+                        success: true,
+                        actions: executionResult.actions || ['goal_completed'],
+                    };
+                }
+                else {
+                    console.error(`❌ Goal execution failed: ${goal.template.name}`, executionResult.error);
+                    return {
+                        success: false,
+                        error: executionResult.error || 'Unknown execution error',
+                    };
+                }
+            }
+            catch (error) {
+                console.error(`❌ Goal execution failed: ${goal.template.name}`, error);
+                return {
+                    success: false,
+                    error: error instanceof Error ? error.message : 'Unknown error',
+                };
+            }
+        });
+        return Promise.all(executionPromises);
+    }
+    /**
+     * Execute a plan using the leaf system
+     */
+    async executePlanWithLeaves(plan, context) {
+        try {
+            const actions = [];
+            // If plan has steps, execute them sequentially
+            if (plan.steps && Array.isArray(plan.steps)) {
+                for (const step of plan.steps) {
+                    const stepResult = await this.executePlanStep(step, context);
+                    if (stepResult.success) {
+                        actions.push(stepResult.action || 'step_completed');
+                    }
+                    else {
+                        return { success: false, error: stepResult.error };
+                    }
+                }
+            }
+            // If plan has a single action, execute it directly
+            if (plan.action) {
+                const actionResult = await this.executePlanStep(plan, context);
+                if (actionResult.success) {
+                    actions.push(actionResult.action || 'action_completed');
+                }
+                else {
+                    return { success: false, error: actionResult.error };
+                }
+            }
+            return { success: true, actions };
+        }
+        catch (error) {
+            return {
+                success: false,
+                error: error instanceof Error ? error.message : 'Unknown error',
+            };
+        }
+    }
+    /**
+     * Execute a single plan step using the leaf system
+     */
+    async executePlanStep(step, context) {
+        try {
+            // Extract action information from the step
+            const actionName = step.action?.name || step.name || 'unknown_action';
+            const parameters = step.action?.parameters || step.parameters || {};
+            // Map common action types to leaf operations
+            const leafName = this.mapActionToLeaf(actionName, parameters);
+            if (!leafName) {
+                return {
+                    success: false,
+                    error: `No leaf mapping found for action: ${actionName}`,
+                };
+            }
+            // Execute the leaf using the leaf factory
+            const leafResult = await this.executeLeaf(leafName, parameters, context);
+            return {
+                success: leafResult.success,
+                error: leafResult.error,
+                action: actionName,
+            };
+        }
+        catch (error) {
+            return {
+                success: false,
+                error: error instanceof Error ? error.message : 'Unknown error',
+            };
+        }
+    }
+    /**
+     * Map action names to leaf operations
+     */
+    mapActionToLeaf(actionName, parameters) {
+        const actionMap = {
+            move_to: 'move_to',
+            dig_block: 'dig_block',
+            place_block: 'place_block',
+            consume_food: 'consume_food',
+            craft_item: 'craft_item',
+            find_shelter: 'find_shelter',
+            explore_area: 'explore_area',
+            collect_resources: 'collect_resources',
+            build_structure: 'build_structure',
+            defend_position: 'defend_position',
+            retreat: 'retreat_and_block',
+            light_area: 'place_torch_if_needed',
+            sense_environment: 'sense_hostiles',
+            wait: 'wait',
+            chat: 'chat',
+        };
+        return actionMap[actionName] || null;
+    }
+    /**
+     * Execute a leaf operation using the leaf factory
+     */
+    async executeLeaf(leafName, parameters, context) {
+        try {
+            if (!this.leafFactory) {
+                return {
+                    success: false,
+                    error: 'Leaf factory not initialized',
+                };
+            }
+            // Get the leaf implementation
+            const leaf = this.leafFactory.get(leafName);
+            if (!leaf) {
+                return {
+                    success: false,
+                    error: `Leaf not found: ${leafName}`,
+                };
+            }
+            // Execute the leaf
+            const result = await leaf.run(parameters, context);
+            return {
+                success: result.status === 'success',
+                error: result.error?.detail ||
+                    (result.status === 'failure' ? 'Leaf execution failed' : undefined),
+            };
+        }
+        catch (error) {
+            return {
+                success: false,
+                error: error instanceof Error ? error.message : 'Unknown error',
+            };
+        }
+    }
+    /**
      * Compute needs from signals with context gates
      */
     async computeNeeds(signals, context) {
@@ -377,23 +544,23 @@ class HybridHRMArbiter extends arbiter_1.Arbiter {
         needs.push(safetyScore);
         // Nutrition need
         const nutritionSignals = signals.filter((s) => s.provenance === 'body' && s.name.includes('hunger'));
-        const nutritionScore = this.computeNutritionNeed(nutritionSignals, context);
+        const nutritionScore = this.computeNutritionNeed(nutritionSignals);
         needs.push(nutritionScore);
         // Progress need
         const progressSignals = signals.filter((s) => s.name.includes('tool') || s.name.includes('armor'));
-        const progressScore = await this.computeProgressNeed(progressSignals, context);
+        const progressScore = await this.computeProgressNeed(progressSignals);
         needs.push(progressScore);
         // Social need
         const socialSignals = signals.filter((s) => s.provenance === 'social');
-        const socialScore = await this.computeSocialNeed(socialSignals, context);
+        const socialScore = await this.computeSocialNeed(socialSignals);
         needs.push(socialScore);
         // Curiosity need
         const curiositySignals = signals.filter((s) => s.name.includes('novelty') || s.name.includes('unexplored'));
-        const curiosityScore = this.computeCuriosityNeed(curiositySignals, context);
+        const curiosityScore = this.computeCuriosityNeed(curiositySignals);
         needs.push(curiosityScore);
         // Integrity need
         const integritySignals = signals.filter((s) => s.provenance === 'memory' && s.name.includes('promise'));
-        const integrityScore = this.computeIntegrityNeed(integritySignals, context);
+        const integrityScore = this.computeIntegrityNeed(integritySignals);
         needs.push(integrityScore);
         return needs;
     }

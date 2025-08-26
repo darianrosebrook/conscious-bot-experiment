@@ -93,9 +93,8 @@ class HybridHRMRouter {
     /**
      * Analyze task to determine optimal routing
      */
-    analyzeTaskSignature(task
-    // context: LeafContext
-    ) {
+    analyzeTaskSignature(task, context) {
+        console.log(`TODO: Use ${context} to analyse task ${task}`);
         const signature = {
             structuredReasoning: 0,
             narrativeReasoning: 0,
@@ -247,16 +246,15 @@ class HybridHRMRouter {
             'biome',
             'position',
         ];
-        return simpleSignals.some(() => 
-        /* signal */
-        signature.reactiveResponse > 0.2 || signature.timeCritical);
+        return simpleSignals.some((signal) => {
+            console.log(`TODO: Use ${signal} to analyse signal`);
+            return signature.reactiveResponse > 0.2 || signature.timeCritical;
+        });
     }
     /**
      * Execute task using GOAP (reactive responses)
      */
-    async executeGOAP(task, context
-    // budget: { maxTimeMs: number; maxComplexity: number }
-    ) {
+    async executeGOAP(task, context, budget) {
         const startTime = performance.now();
         try {
             const result = await this.goap.plan({
@@ -398,7 +396,7 @@ class HybridHRMRouter {
     /**
      * Create Python HRM interface
      */
-    createPythonHRMInterface() {
+    createPythonHRMInterface(config) {
         return {
             async initialize() {
                 try {
@@ -540,7 +538,7 @@ class HybridHRMRouter {
     /**
      * Create GOAP interface
      */
-    createGOAPInterface() {
+    createGOAPInterface(config) {
         // This would integrate with our existing GOAP system
         return {
             async plan(input) {

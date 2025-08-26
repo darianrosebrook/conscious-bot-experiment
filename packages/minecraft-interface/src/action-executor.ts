@@ -104,7 +104,7 @@ export class ActionExecutor {
     action: ActionPlan,
     bot: Bot
   ): Promise<{ success: boolean; error?: string }> {
-    const context = createLeafContext(bot);
+    const context = createLeafContext(bot as any);
 
     try {
       switch (action.type) {
