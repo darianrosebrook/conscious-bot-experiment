@@ -1,6 +1,6 @@
 /**
  * Simple Torch Corridor Validation Test
- * 
+ *
  * This test validates the basic torch corridor functionality
  * without complex TypeScript syntax that might cause parsing issues.
  */
@@ -18,24 +18,24 @@ describe('Torch Corridor Simple Validation', () => {
           properties: {
             x: { type: 'number' },
             y: { type: 'number' },
-            z: { type: 'number' }
+            z: { type: 'number' },
           },
-          required: ['x', 'y', 'z']
+          required: ['x', 'y', 'z'],
         },
         interval: {
           type: 'integer',
           minimum: 2,
           maximum: 10,
-          default: 6
+          default: 6,
         },
         hostilesRadius: {
           type: 'integer',
           minimum: 5,
           maximum: 20,
-          default: 10
-        }
+          default: 10,
+        },
       },
-      required: ['end']
+      required: ['end'],
     },
     pre: ['has(item:torch)>=1'],
     post: ['corridor.light>=8', 'reached(end)==true'],
@@ -45,7 +45,7 @@ describe('Torch Corridor Simple Validation', () => {
         {
           type: 'Leaf',
           name: 'move_to',
-          args: { pos: '$end', safe: true }
+          args: { pos: '$end', safe: true },
         },
         {
           type: 'Repeat.Until',
@@ -56,7 +56,7 @@ describe('Torch Corridor Simple Validation', () => {
               {
                 type: 'Leaf',
                 name: 'sense_hostiles',
-                args: { radius: '$hostilesRadius' }
+                args: { radius: '$hostilesRadius' },
               },
               {
                 type: 'Decorator.FailOnTrue',
@@ -64,23 +64,23 @@ describe('Torch Corridor Simple Validation', () => {
                 child: {
                   type: 'Leaf',
                   name: 'retreat_and_block',
-                  args: {}
-                }
+                  args: {},
+                },
               },
               {
                 type: 'Leaf',
                 name: 'place_torch_if_needed',
-                args: { interval: '$interval' }
+                args: { interval: '$interval' },
               },
               {
                 type: 'Leaf',
                 name: 'step_forward_safely',
-                args: {}
-              }
-            ]
-          }
-        }
-      ]
+                args: {},
+              },
+            ],
+          },
+        },
+      ],
     },
     tests: [
       {
@@ -89,18 +89,18 @@ describe('Torch Corridor Simple Validation', () => {
         args: {
           end: { x: 100, y: 12, z: -35 },
           interval: 6,
-          hostilesRadius: 10
+          hostilesRadius: 10,
         },
         assert: {
           post: ['corridor.light>=8', 'reached(end)==true'],
-          runtime: { timeoutMs: 60000, maxRetries: 2 }
-        }
-      }
+          runtime: { timeoutMs: 60000, maxRetries: 2 },
+        },
+      },
     ],
     provenance: {
       authored_by: 'LLM',
-      reflexion_hint_id: 'rx_2025_08_25_01'
-    }
+      reflexion_hint_id: 'rx_2025_08_25_01',
+    },
   };
 
   describe('BT-DSL Structure Validation', () => {
@@ -118,13 +118,15 @@ describe('Torch Corridor Simple Validation', () => {
       expect(torchCorridorBTDSL.argsSchema.properties).toBeDefined();
       expect(torchCorridorBTDSL.argsSchema.properties.end).toBeDefined();
       expect(torchCorridorBTDSL.argsSchema.properties.interval).toBeDefined();
-      expect(torchCorridorBTDSL.argsSchema.properties.hostilesRadius).toBeDefined();
+      expect(
+        torchCorridorBTDSL.argsSchema.properties.hostilesRadius
+      ).toBeDefined();
     });
 
     it('should have valid preconditions and postconditions', () => {
       // Validate preconditions
       expect(torchCorridorBTDSL.pre).toContain('has(item:torch)>=1');
-      
+
       // Validate postconditions
       expect(torchCorridorBTDSL.post).toContain('corridor.light>=8');
       expect(torchCorridorBTDSL.post).toContain('reached(end)==true');
@@ -132,18 +134,18 @@ describe('Torch Corridor Simple Validation', () => {
 
     it('should have valid behavior tree structure', () => {
       const tree = torchCorridorBTDSL.tree;
-      
+
       // Root should be a Sequence
       expect(tree.type).toBe('Sequence');
       expect(tree.children).toHaveLength(2);
-      
+
       // First child should be move_to leaf
       const moveToLeaf = tree.children[0];
       expect(moveToLeaf.type).toBe('Leaf');
       expect(moveToLeaf.name).toBe('move_to');
       expect(moveToLeaf.args.pos).toBe('$end');
       expect(moveToLeaf.args.safe).toBe(true);
-      
+
       // Second child should be Repeat.Until
       const repeatUntil = tree.children[1];
       expect(repeatUntil.type).toBe('Repeat.Until');
@@ -155,12 +157,12 @@ describe('Torch Corridor Simple Validation', () => {
     it('should have valid leaf references', () => {
       const allLeaves = [
         'move_to',
-        'sense_hostiles', 
+        'sense_hostiles',
         'retreat_and_block',
         'place_torch_if_needed',
-        'step_forward_safely'
+        'step_forward_safely',
       ];
-      
+
       // Extract all leaf names from the tree
       const extractLeafNames = (node: any): string[] => {
         if (node.type === 'Leaf') {
@@ -172,18 +174,18 @@ describe('Torch Corridor Simple Validation', () => {
         }
         return [];
       };
-      
+
       const treeLeaves = extractLeafNames(torchCorridorBTDSL.tree);
-      
+
       // All leaves should be in the expected list
-      treeLeaves.forEach(leafName => {
+      treeLeaves.forEach((leafName) => {
         expect(allLeaves).toContain(leafName);
       });
     });
 
     it('should have valid test configuration', () => {
       const test = torchCorridorBTDSL.tests[0];
-      
+
       expect(test.name).toBe('lights corridor to ≥8 and reaches end');
       expect(test.args.end).toEqual({ x: 100, y: 12, z: -35 });
       expect(test.args.interval).toBe(6);
@@ -196,7 +198,9 @@ describe('Torch Corridor Simple Validation', () => {
 
     it('should have valid provenance information', () => {
       expect(torchCorridorBTDSL.provenance.authored_by).toBe('LLM');
-      expect(torchCorridorBTDSL.provenance.reflexion_hint_id).toBe('rx_2025_08_25_01');
+      expect(torchCorridorBTDSL.provenance.reflexion_hint_id).toBe(
+        'rx_2025_08_25_01'
+      );
     });
   });
 
@@ -205,45 +209,47 @@ describe('Torch Corridor Simple Validation', () => {
       // Step 1: LLM proposes opt.torch_corridor BT-DSL
       console.log('Step 1: LLM proposes opt.torch_corridor BT-DSL');
       expect(torchCorridorBTDSL.id).toBe('opt.torch_corridor');
-      
+
       // Step 2: Registry validation & registration
       console.log('Step 2: Registry validation & registration');
       expect(torchCorridorBTDSL.version).toBe('1.0.0');
       expect(torchCorridorBTDSL.argsSchema).toBeDefined();
-      
+
       // Step 3: Planner adopts the option immediately
       console.log('Step 3: Planner adopts the option immediately');
       expect(torchCorridorBTDSL.tree).toBeDefined();
       expect(torchCorridorBTDSL.tree.type).toBe('Sequence');
-      
+
       // Step 4: Executor runs the option as a BT
       console.log('Step 4: Executor runs the option as a BT');
       expect(torchCorridorBTDSL.tree.children).toHaveLength(2);
-      
+
       // Step 5: Validate execution results
       console.log('Step 5: Validate execution results');
       expect(torchCorridorBTDSL.post).toContain('corridor.light>=8');
       expect(torchCorridorBTDSL.post).toContain('reached(end)==true');
-      
+
       // Step 6: Validate postconditions
       console.log('Step 6: Validate postconditions');
       expect(torchCorridorBTDSL.post).toHaveLength(2);
-      
+
       // Step 7: Validate metrics and statistics
       console.log('Step 7: Validate metrics and statistics');
       expect(torchCorridorBTDSL.tests).toHaveLength(1);
-      
+
       // Step 8: Validate the complete flow success
       console.log('Step 8: Validate the complete flow success');
       expect(torchCorridorBTDSL.provenance).toBeDefined();
-      
-      console.log('✅ Complete torch corridor end-to-end validation successful!');
+
+      console.log(
+        '✅ Complete torch corridor end-to-end validation successful!'
+      );
     });
 
     it('should validate performance requirements', () => {
       // Validate that the BT-DSL structure supports efficient execution
       const tree = torchCorridorBTDSL.tree;
-      
+
       // Should have reasonable depth
       const getTreeDepth = (node: any): number => {
         if (node.type === 'Leaf') return 1;
@@ -255,22 +261,25 @@ describe('Torch Corridor Simple Validation', () => {
         }
         return 1;
       };
-      
+
       const depth = getTreeDepth(tree);
       expect(depth).toBeLessThanOrEqual(5); // Reasonable depth for performance
-      
+
       // Should have reasonable number of leaves
       const getLeafCount = (node: any): number => {
         if (node.type === 'Leaf') return 1;
         if (node.children) {
-          return node.children.reduce((sum, child) => sum + getLeafCount(child), 0);
+          return node.children.reduce(
+            (sum, child) => sum + getLeafCount(child),
+            0
+          );
         }
         if (node.child) {
           return getLeafCount(node.child);
         }
         return 0;
       };
-      
+
       const leafCount = getLeafCount(tree);
       expect(leafCount).toBeLessThanOrEqual(10); // Reasonable number of leaves
     });
@@ -278,7 +287,7 @@ describe('Torch Corridor Simple Validation', () => {
     it('should validate safety requirements', () => {
       // Validate that the BT-DSL structure is safe
       const tree = torchCorridorBTDSL.tree;
-      
+
       // Should have proper error handling (Decorator.FailOnTrue)
       const hasErrorHandling = (node: any): boolean => {
         if (node.type === 'Decorator.FailOnTrue') return true;
@@ -290,9 +299,9 @@ describe('Torch Corridor Simple Validation', () => {
         }
         return false;
       };
-      
+
       expect(hasErrorHandling(tree)).toBe(true);
-      
+
       // Should have proper termination conditions (Repeat.Until)
       const hasTerminationCondition = (node: any): boolean => {
         if (node.type === 'Repeat.Until') return true;
@@ -304,7 +313,7 @@ describe('Torch Corridor Simple Validation', () => {
         }
         return false;
       };
-      
+
       expect(hasTerminationCondition(tree)).toBe(true);
     });
   });

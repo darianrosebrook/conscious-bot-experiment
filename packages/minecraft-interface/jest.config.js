@@ -4,7 +4,7 @@ module.exports = {
   roots: ['<rootDir>/src'],
   testMatch: [
     '**/__tests__/**/*.+(ts|tsx|js)',
-    '**/*.(test|spec).+(ts|tsx|js)'
+    '**/*.(test|spec).+(ts|tsx|js)',
   ],
   transform: {
     '^.+\\.(ts|tsx)$': 'ts-jest',
@@ -16,15 +16,16 @@ module.exports = {
     '!src/**/*.spec.{ts,tsx}',
     '!src/__tests__/**/*',
     '!src/examples/**/*',
-    '!src/bin/**/*'
+    '!src/bin/**/*',
   ],
-  moduleNameMapping: {
-    '^@conscious-bot/core$': '<rootDir>/../core/src',
-    '^@conscious-bot/planning$': '<rootDir>/../planning/src',
+  moduleNameMapper: {
+    '^@conscious-bot/core$': '<rootDir>/../core/dist',
+    '^@conscious-bot/planning$': '<rootDir>/../planning/dist',
   },
   setupFilesAfterEnv: ['<rootDir>/src/__tests__/setup.ts'],
   testTimeout: 30000,
   verbose: true,
   clearMocks: true,
   restoreMocks: true,
+  moduleDirectories: ['node_modules', '<rootDir>/../node_modules'],
 };

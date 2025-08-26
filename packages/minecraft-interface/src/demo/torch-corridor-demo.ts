@@ -1,6 +1,6 @@
 /**
  * Torch Corridor End-to-End Demonstration
- * 
+ *
  * This script demonstrates the complete torch corridor flow:
  * 1. LLM proposes opt.torch_corridor BT-DSL
  * 2. Registry validates and registers the option
@@ -26,24 +26,24 @@ const torchCorridorBTDSL = {
         properties: {
           x: { type: 'number' },
           y: { type: 'number' },
-          z: { type: 'number' }
+          z: { type: 'number' },
         },
-        required: ['x', 'y', 'z']
+        required: ['x', 'y', 'z'],
       },
       interval: {
         type: 'integer',
         minimum: 2,
         maximum: 10,
-        default: 6
+        default: 6,
       },
       hostilesRadius: {
         type: 'integer',
         minimum: 5,
         maximum: 20,
-        default: 10
-      }
+        default: 10,
+      },
     },
-    required: ['end']
+    required: ['end'],
   },
   pre: ['has(item:torch)>=1'],
   post: ['corridor.light>=8', 'reached(end)==true'],
@@ -53,7 +53,7 @@ const torchCorridorBTDSL = {
       {
         type: 'Leaf',
         name: 'move_to',
-        args: { pos: '$end', safe: true }
+        args: { pos: '$end', safe: true },
       },
       {
         type: 'Repeat.Until',
@@ -64,7 +64,7 @@ const torchCorridorBTDSL = {
             {
               type: 'Leaf',
               name: 'sense_hostiles',
-              args: { radius: '$hostilesRadius' }
+              args: { radius: '$hostilesRadius' },
             },
             {
               type: 'Decorator.FailOnTrue',
@@ -72,23 +72,23 @@ const torchCorridorBTDSL = {
               child: {
                 type: 'Leaf',
                 name: 'retreat_and_block',
-                args: {}
-              }
+                args: {},
+              },
             },
             {
               type: 'Leaf',
               name: 'place_torch_if_needed',
-              args: { interval: '$interval' }
+              args: { interval: '$interval' },
             },
             {
               type: 'Leaf',
               name: 'step_forward_safely',
-              args: {}
-            }
-          ]
-        }
-      }
-    ]
+              args: {},
+            },
+          ],
+        },
+      },
+    ],
   },
   tests: [
     {
@@ -97,18 +97,18 @@ const torchCorridorBTDSL = {
       args: {
         end: { x: 100, y: 12, z: -35 },
         interval: 6,
-        hostilesRadius: 10
+        hostilesRadius: 10,
       },
       assert: {
         post: ['corridor.light>=8', 'reached(end)==true'],
-        runtime: { timeoutMs: 60000, maxRetries: 2 }
-      }
-    }
+        runtime: { timeoutMs: 60000, maxRetries: 2 },
+      },
+    },
   ],
   provenance: {
     authored_by: 'LLM',
-    reflexion_hint_id: 'rx_2025_08_25_01'
-  }
+    reflexion_hint_id: 'rx_2025_08_25_01',
+  },
 };
 
 async function demonstrateTorchCorridorFlow() {
@@ -126,11 +126,13 @@ async function demonstrateTorchCorridorFlow() {
     console.log(`✅ BT-DSL ID: ${torchCorridorBTDSL.id}`);
     console.log(`✅ Version: ${torchCorridorBTDSL.version}`);
     console.log(`✅ Tree Type: ${torchCorridorBTDSL.tree.type}`);
-    console.log(`✅ Children Count: ${torchCorridorBTDSL.tree.children.length}\n`);
+    console.log(
+      `✅ Children Count: ${torchCorridorBTDSL.tree.children.length}\n`
+    );
 
     // Step 2: Registry validation & registration
     console.log('Step 2: Registry validation & registration');
-    
+
     // Validate BT-DSL structure (simulated since validate is private)
     console.log('✅ BT-DSL Structure Validation: PASS');
     console.log('   - ID format: valid');
@@ -139,28 +141,36 @@ async function demonstrateTorchCorridorFlow() {
     console.log('   - Schema structure: valid');
 
     // Register the option
-    const registrationResult = await registry.registerOption(torchCorridorBTDSL, {
-      author: 'llm-proposal',
-      parentLineage: [],
-      codeHash: 'bt-dsl-generated',
-      createdAt: new Date().toISOString(),
-      metadata: { source: 'demo-registration' }
-    }, {
-      successThreshold: 0.7,
-      failureThreshold: 0.3,
-      maxShadowRuns: 10,
-      minShadowRuns: 3
-    });
+    const registrationResult = await registry.registerOption(
+      torchCorridorBTDSL,
+      {
+        author: 'llm-proposal',
+        parentLineage: [],
+        codeHash: 'bt-dsl-generated',
+        createdAt: new Date().toISOString(),
+        metadata: { source: 'demo-registration' },
+      },
+      {
+        successThreshold: 0.7,
+        failureThreshold: 0.3,
+        maxShadowRuns: 10,
+        minShadowRuns: 3,
+      }
+    );
 
-    console.log(`✅ Registration Result: ${registrationResult.ok ? 'SUCCESS' : 'FAILED'}`);
+    console.log(
+      `✅ Registration Result: ${registrationResult.ok ? 'SUCCESS' : 'FAILED'}`
+    );
     console.log(`✅ Capability ID: ${registrationResult.id}\n`);
 
     // Step 3: Planner adopts the option immediately
     console.log('Step 3: Planner adopts the option immediately');
-    
+
     const capabilities = await registry.listCapabilities();
-    const torchCapability = capabilities.find(cap => cap.id === registrationResult.id);
-    
+    const torchCapability = capabilities.find(
+      (cap) => cap.id === registrationResult.id
+    );
+
     if (torchCapability) {
       console.log(`✅ Capability Found: ${torchCapability.name}`);
       console.log(`✅ Status: ${torchCapability.status}`);
@@ -172,7 +182,7 @@ async function demonstrateTorchCorridorFlow() {
 
     // Step 4: Executor runs the option as a BT
     console.log('Step 4: Executor runs the option as a BT');
-    
+
     const capability = await registry.getCapability(registrationResult.id);
     if (capability && capability.tree) {
       console.log(`✅ Capability Retrieved: ${capability.id}`);
@@ -185,31 +195,33 @@ async function demonstrateTorchCorridorFlow() {
 
     // Step 5: Validate execution results
     console.log('Step 5: Validate execution results');
-    
+
     // Simulate leaf executions
     const mockLeaves = {
-      'move_to': { status: 'success', result: { distance: 0.9 } },
-      'sense_hostiles': { status: 'success', result: { count: 0 } },
-      'place_torch_if_needed': { status: 'success', result: { placed: true } },
-      'step_forward_safely': { status: 'success', result: { moved: true } }
+      move_to: { status: 'success', result: { distance: 0.9 } },
+      sense_hostiles: { status: 'success', result: { count: 0 } },
+      place_torch_if_needed: { status: 'success', result: { placed: true } },
+      step_forward_safely: { status: 'success', result: { moved: true } },
     };
 
     console.log('✅ Simulating leaf executions:');
     Object.entries(mockLeaves).forEach(([name, result]) => {
-      console.log(`   - ${name}: ${result.status} (${JSON.stringify(result.result)})`);
+      console.log(
+        `   - ${name}: ${result.status} (${JSON.stringify(result.result)})`
+      );
     });
     console.log('');
 
     // Step 6: Validate postconditions
     console.log('Step 6: Validate postconditions');
-    
+
     const postconditions = torchCorridorBTDSL.post;
     console.log(`✅ Postconditions: ${postconditions.join(', ')}`);
     console.log(`✅ Postcondition Count: ${postconditions.length}\n`);
 
     // Step 7: Validate metrics and statistics
     console.log('Step 7: Validate metrics and statistics');
-    
+
     const stats = await registry.getStatistics();
     console.log(`✅ Total Capabilities: ${stats.totalCapabilities}`);
     console.log(`✅ Active Capabilities: ${stats.activeCapabilities}`);
@@ -218,7 +230,7 @@ async function demonstrateTorchCorridorFlow() {
 
     // Step 8: Validate the complete flow success
     console.log('Step 8: Validate the complete flow success');
-    
+
     // All steps should have completed successfully
     console.log('✅ All validation steps completed successfully');
     console.log('✅ BT-DSL structure is valid');
@@ -235,7 +247,6 @@ async function demonstrateTorchCorridorFlow() {
     console.log(`   - Leaf Count: ${getLeafCount(torchCorridorBTDSL.tree)}`);
     console.log(`   - Postconditions: ${postconditions.length}`);
     console.log(`   - Test Cases: ${torchCorridorBTDSL.tests.length}`);
-
   } catch (error) {
     console.error('❌ Error during demonstration:', error);
   }
