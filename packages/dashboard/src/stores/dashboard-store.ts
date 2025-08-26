@@ -11,6 +11,7 @@ import type {
   Environment,
   Screenshot,
   InventoryItem,
+  PlannerData,
 } from '@/types';
 
 interface DashboardStore extends DashboardState {
@@ -28,6 +29,7 @@ interface DashboardStore extends DashboardState {
   setCurrentScreenshot: (screenshot: Screenshot) => void;
   setCurrentSession: (sessionId: string) => void;
   setInventory: (inventory: InventoryItem[]) => void;
+  setPlannerData: (plannerData: PlannerData) => void;
   reset: () => void;
 }
 
@@ -41,6 +43,7 @@ const initialState: DashboardState = {
   environment: null,
   currentScreenshot: null,
   inventory: [],
+  plannerData: null,
 };
 
 /**
@@ -127,6 +130,8 @@ export const useDashboardStore = create<DashboardStore>()(
       setCurrentSession: (currentSession) => set({ currentSession }),
 
       setInventory: (inventory) => set({ inventory }),
+
+      setPlannerData: (plannerData) => set({ plannerData }),
 
       reset: () => set(initialState),
     }),

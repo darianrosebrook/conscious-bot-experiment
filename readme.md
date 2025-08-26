@@ -33,7 +33,13 @@ cd conscious-bot
 pnpm install
 
 # Start all services (dashboard, minecraft interface, cognitive systems)
-pnpm run dev:services
+pnpm dev
+
+# Check server status
+pnpm status
+
+# Stop all services
+pnpm kill
 
 # Or start individual services
 pnpm run dev:dashboard      # Web dashboard
@@ -55,6 +61,47 @@ pnpm --filter @conscious-bot/planning test
 
 # Type checking
 pnpm type-check
+```
+
+### Server Management
+
+The project includes robust server management scripts to handle the multi-service architecture:
+
+#### **Start All Services**
+```bash
+pnpm dev
+```
+- Automatically kills any existing server processes
+- Frees up occupied ports (3000-3005)
+- Starts all 6 services in parallel
+- Provides real-time logging with service identification
+
+#### **Check Server Status**
+```bash
+pnpm status
+```
+- Shows health status of all 6 servers
+- Displays process information and port usage
+- Provides summary statistics
+- Checks server responsiveness
+
+#### **Stop All Services**
+```bash
+pnpm kill
+```
+- Terminates all running server processes
+- Frees all occupied ports
+- Cleans up background processes
+
+#### **Individual Service Control**
+```bash
+# Start specific services
+pnpm run dev:dashboard      # Web dashboard (port 3000)
+pnpm run dev:minecraft      # Minecraft interface (port 3005)
+pnpm run dev:cognition      # Cognitive systems (port 3003)
+pnpm run dev:memory         # Memory systems (port 3001)
+pnpm run dev:world          # World perception (port 3004)
+pnpm run dev:planning       # Planning systems (port 3002)
 ```
 
 ### Architecture Overview

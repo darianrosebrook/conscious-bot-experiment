@@ -6,7 +6,7 @@
  * Author: @darianrosebrook
  */
 
-import { Plan } from '@/types';
+import { Plan } from '../types';
 
 export class ReactiveExecutor {
   async execute(plan?: Plan): Promise<boolean> {

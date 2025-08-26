@@ -128,7 +128,8 @@ export class ObservationMapper {
    * Extract environment information within observation radius
    */
   private extractEnvironmentState(bot: Bot) {
-    const radius = this.config.observationRadius;
+    // Reduce radius for better performance and less duplication
+    const radius = Math.min(this.config.observationRadius, 8);
 
     // Ensure bot is spawned before accessing position
     if (!bot.entity || !bot.entity.position) {
@@ -148,14 +149,25 @@ export class ObservationMapper {
   }
 
   /**
-   * Find interesting blocks within radius
+   * Find interesting blocks within radius - optimized to reduce duplication
    */
   private findNearbyBlocks(
     bot: Bot,
     center: Vec3,
     radius: number
   ): MinecraftBlock[] {
-    const blocks: MinecraftBlock[] = [];
+    const blockGroups = new Map<
+      string,
+      {
+        type: string;
+        count: number;
+        positions: Vec3[];
+        properties: any;
+        hardness: number;
+        tool: string;
+      }
+    >();
+
     const interestingBlocks = new Set([
       'oak_log',
       'birch_log',
@@ -173,6 +185,11 @@ export class ObservationMapper {
       'chest',
       'water',
       'lava',
+      'grass_block',
+      'dirt',
+      'sand',
+      'gravel',
+      'clay',
     ]);
 
     // Search in a cube around the player
@@ -183,19 +200,105 @@ export class ObservationMapper {
           const block = bot.blockAt(pos);
 
           if (block && interestingBlocks.has(block.name)) {
-            blocks.push({
-              type: block.name,
-              position: pos.clone(),
-              properties: block.getProperties(),
-              hardness: block.hardness,
-              tool: this.getOptimalTool(block.name),
-            });
+            const key = block.name;
+
+            if (!blockGroups.has(key)) {
+              blockGroups.set(key, {
+                type: block.name,
+                count: 0,
+                positions: [],
+                properties: block.getProperties(),
+                hardness: block.hardness,
+                tool: this.getOptimalTool(block.name),
+              });
+            }
+
+            const group = blockGroups.get(key)!;
+            group.count++;
+            group.positions.push(pos.clone());
           }
         }
       }
     }
 
+    // Convert groups to abstract block representations
+    const blocks: MinecraftBlock[] = [];
+
+    for (const [blockType, group] of blockGroups) {
+      // For common blocks like stone, dirt, grass, create abstract representations
+      if (group.count > 5) {
+        // Create an abstract representation for large groups
+        blocks.push({
+          type: this.getAbstractBlockType(blockType),
+          position: group.positions[0].clone(), // Representative position
+          properties: {
+            ...group.properties,
+            abstract: true,
+            totalCount: group.count,
+            area: this.calculateArea(group.positions),
+          },
+          hardness: group.hardness,
+          tool: group.tool,
+        });
+      } else {
+        // For rare blocks, keep individual entries but limit them
+        const limitedPositions = group.positions.slice(0, 3); // Max 3 instances
+        limitedPositions.forEach((pos) => {
+          blocks.push({
+            type: blockType,
+            position: pos,
+            properties: group.properties,
+            hardness: group.hardness,
+            tool: group.tool,
+          });
+        });
+      }
+    }
+
     return blocks;
+  }
+
+  /**
+   * Get abstract block type for common blocks
+   */
+  private getAbstractBlockType(blockType: string): string {
+    const abstractions: Record<string, string> = {
+      stone: 'stone_wall',
+      dirt: 'dirt_ground',
+      grass_block: 'grass_ground',
+      sand: 'sand_ground',
+      gravel: 'gravel_patch',
+      clay: 'clay_deposit',
+      oak_log: 'tree_trunk',
+      birch_log: 'tree_trunk',
+      spruce_log: 'tree_trunk',
+      jungle_log: 'tree_trunk',
+      acacia_log: 'tree_trunk',
+      dark_oak_log: 'tree_trunk',
+    };
+
+    return abstractions[blockType] || blockType;
+  }
+
+  /**
+   * Calculate approximate area covered by block positions
+   */
+  private calculateArea(positions: Vec3[]): string {
+    if (positions.length <= 1) return 'single_block';
+
+    const xs = positions.map((p) => p.x);
+    const ys = positions.map((p) => p.y);
+    const zs = positions.map((p) => p.z);
+
+    const xRange = Math.max(...xs) - Math.min(...xs);
+    const yRange = Math.max(...ys) - Math.min(...ys);
+    const zRange = Math.max(...zs) - Math.min(...zs);
+
+    const volume = xRange * yRange * zRange;
+
+    if (volume <= 8) return 'small_patch';
+    if (volume <= 64) return 'medium_area';
+    return 'large_area';
   }
 
   /**
@@ -232,8 +335,10 @@ export class ObservationMapper {
   private extractServerState(bot: Bot) {
     return {
       playerCount: Object.keys(bot.players).length,
-      difficulty: bot.game.difficulty,
+      difficulty: bot.game.difficulty || 'normal',
       version: bot.version,
+      worldSeed: this.config.worldSeed, // Include configured world seed
+      worldName: this.config.worldName, // Include configured world name
     };
   }
 

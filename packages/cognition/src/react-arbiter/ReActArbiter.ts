@@ -76,6 +76,7 @@ export interface ReflexionHint {
   failure?: string;
   lesson: string;
   guardrail?: Record<string, any>;
+  relevance?: number;
 }
 
 // ============================================================================

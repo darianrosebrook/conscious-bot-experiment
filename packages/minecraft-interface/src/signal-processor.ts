@@ -39,6 +39,7 @@ export interface MinecraftHomeostasisState {
 
 export class MinecraftSignalProcessor {
   private lastProcessedTime = 0;
+  private initializationTime = Date.now(); // Add initialization time
   private explorationHistory: Set<string> = new Set();
   private threatHistory: Array<{ timestamp: number; threatLevel: number }> = [];
   private socialHistory: Array<{ timestamp: number; playerCount: number }> = [];
@@ -112,9 +113,30 @@ export class MinecraftSignalProcessor {
     timestamp: number
   ): MinecraftSignal | null {
     const health = worldState.player.health;
+    const maxHealth = 20;
+    const healthPercentage = (health / maxHealth) * 100;
 
+    // Generate health signal if health is below 80% and food is available
+    if (healthPercentage < 80 && this.checkAvailableFood(worldState)) {
+      return {
+        type: 'health',
+        intensity: Math.max(0, 100 - healthPercentage), // Higher intensity for lower health
+        source: 'homeostasis_monitor',
+        timestamp,
+        metadata: {
+          currentHealth: health,
+          maxHealth: maxHealth,
+          healthPercentage: healthPercentage,
+          criticalThreshold: 6,
+          causeAnalysis: this.analyzeHealthLoss(worldState),
+          foodAvailable: this.checkAvailableFood(worldState),
+          shouldHeal: true,
+        },
+      };
+    }
+
+    // Also generate signal for critical health regardless of food availability
     if (health <= 6) {
-      // Critical health (≤ 3 hearts)
       return {
         type: 'health',
         intensity: Math.max(0, 100 - health * 5), // Higher intensity for lower health
@@ -122,9 +144,12 @@ export class MinecraftSignalProcessor {
         timestamp,
         metadata: {
           currentHealth: health,
-          maxHealth: 20,
+          maxHealth: maxHealth,
           criticalThreshold: 6,
           causeAnalysis: this.analyzeHealthLoss(worldState),
+          foodAvailable: this.checkAvailableFood(worldState),
+          shouldHeal: true,
+          critical: true,
         },
       };
     }
@@ -274,8 +299,9 @@ export class MinecraftSignalProcessor {
   }
 
   private calculateFatigue(currentTime: number): number {
-    const hoursPlayed =
-      (currentTime - this.lastProcessedTime) / (1000 * 60 * 60);
+    // Use initialization time to prevent infinite recursion
+    const timeSinceStart = currentTime - this.initializationTime;
+    const hoursPlayed = timeSinceStart / (1000 * 60 * 60);
     return Math.min(100, hoursPlayed * 10); // Increase fatigue over time
   }
 
@@ -347,15 +373,29 @@ export class MinecraftSignalProcessor {
   }
 
   private checkAvailableFood(worldState: MinecraftWorldState): boolean {
-    return worldState.inventory.items.some((item) =>
-      [
-        'bread',
-        'apple',
-        'cooked_beef',
-        'cooked_pork',
-        'cooked_chicken',
-      ].includes(item.type)
-    );
+    // Instead of hardcoded food types, check if any items have been discovered as edible
+    // This will be populated through experience and interaction
+    return worldState.inventory.items.some((item) => {
+      // Check if this item type has been discovered as edible through previous interactions
+      // For now, we'll use a simple heuristic based on item names that might indicate edibility
+      const itemName = item.type.toLowerCase();
+
+      // Basic heuristics that could be learned through experience
+      const potentiallyEdible =
+        itemName.includes('apple') ||
+        itemName.includes('bread') ||
+        itemName.includes('cooked') ||
+        itemName.includes('food') ||
+        itemName.includes('meal');
+
+      // In a true discovery system, this would be based on:
+      // 1. Previous successful consumption attempts
+      // 2. Observed effects (health restoration, hunger satisfaction)
+      // 3. Learning from other players or entities
+      // 4. Trial and error experimentation
+
+      return potentiallyEdible;
+    });
   }
 
   private detectThreats(
@@ -367,6 +407,11 @@ export class MinecraftSignalProcessor {
       threatLevel: number;
       distance: number;
     }> = [];
+
+    // If bot is dead, don't generate threats
+    if (worldState.player.health <= 0) {
+      return threats;
+    }
 
     // Check for hostile entities including phantoms
     for (const entity of worldState.environment.nearbyEntities) {
@@ -398,13 +443,13 @@ export class MinecraftSignalProcessor {
       }
     }
 
-    // Check for damage-based threats (health loss)
+    // Check for damage-based threats (health loss) - only if bot is alive
     const currentHealth = worldState.player.health;
-    const maxHealth = 100; // Assuming max health is 100
+    const maxHealth = 20; // Minecraft health is 0-20
     const healthPercentage = (currentHealth / maxHealth) * 100;
 
     // If health is low, create a high-priority threat signal
-    if (healthPercentage < 80) {
+    if (healthPercentage < 80 && currentHealth > 0) {
       threats.push({
         type: 'low_health',
         threatLevel: 90 + (80 - healthPercentage), // Higher threat for lower health
@@ -412,9 +457,9 @@ export class MinecraftSignalProcessor {
       });
     }
 
-    // Check for night-time vulnerability (phantoms spawn at night)
+    // Check for night-time vulnerability (phantoms spawn at night) - only if bot is alive
     const timeOfDay = this.getTimeOfDay(worldState);
-    if (timeOfDay === 'night' && currentHealth < 90) {
+    if (timeOfDay === 'night' && currentHealth < 18 && currentHealth > 0) {
       threats.push({
         type: 'night_vulnerability',
         threatLevel: 85,
@@ -422,8 +467,8 @@ export class MinecraftSignalProcessor {
       });
     }
 
-    // Critical health emergency
-    if (healthPercentage < 30) {
+    // Critical health emergency - only if bot is alive
+    if (healthPercentage < 30 && currentHealth > 0) {
       threats.push({
         type: 'critical_health',
         threatLevel: 95,

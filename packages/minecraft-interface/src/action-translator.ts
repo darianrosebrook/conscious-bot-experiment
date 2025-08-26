@@ -99,36 +99,31 @@ export class ActionTranslator {
         return {
           type: 'move_forward',
           parameters: {
-            distance: params.distance || 1,
+            distance: params.distance || 5,
           },
-          timeout: this.config.actionTimeout,
+          timeout: 10000,
         };
 
-      case 'move_backward':
+      case 'mine_block':
+      case 'break_block':
         return {
-          type: 'move_backward',
+          type: 'mine_block',
           parameters: {
-            distance: params.distance || 1,
+            position: params.position,
+            tool: params.tool,
           },
-          timeout: this.config.actionTimeout,
+          timeout: 15000,
         };
 
-      case 'strafe_left':
+      case 'craft':
+      case 'make':
         return {
-          type: 'strafe_left',
+          type: 'craft',
           parameters: {
-            distance: params.distance || 1,
+            item: params.item,
+            amount: params.amount || 1,
           },
-          timeout: this.config.actionTimeout,
-        };
-
-      case 'strafe_right':
-        return {
-          type: 'strafe_right',
-          parameters: {
-            distance: params.distance || 1,
-          },
-          timeout: this.config.actionTimeout,
+          timeout: 20000,
         };
 
       case 'consume_food':
@@ -139,73 +134,97 @@ export class ActionTranslator {
             food_type: params.food_type || 'any',
             amount: params.amount || 1,
           },
-          timeout: this.config.actionTimeout,
+          timeout: 10000,
         };
 
-      case 'place_block':
-        console.log('Creating place_block action');
+      case 'experiment_with_item':
+      case 'try_item':
+        console.log('Creating experimental item interaction');
         return {
-          type: 'place_block',
+          type: 'experiment_with_item',
           parameters: {
-            block_type: params.block_type || 'torch',
-            count: params.count || 1,
-            placement: params.placement || 'around_player',
+            item_type: params.item_type || 'unknown',
+            action: params.action || 'consume', // consume, place, craft, etc.
           },
-          timeout: this.config.actionTimeout,
+          timeout: 15000,
         };
 
-      case 'find_shelter':
-        console.log('Creating find_shelter action');
+      case 'explore_item_properties':
         return {
-          type: 'find_shelter',
+          type: 'explore_item_properties',
           parameters: {
-            shelter_type: params.shelter_type || 'cave_or_house',
-            light_sources: params.light_sources || true,
-            search_radius: params.search_radius || 10,
+            item_type: params.item_type,
+            properties_to_test: params.properties_to_test || [
+              'edible',
+              'placeable',
+              'craftable',
+            ],
           },
-          timeout: this.config.actionTimeout,
+          timeout: 20000,
         };
 
-      case 'flee':
-        console.log('Creating flee action (converted to move_forward)');
+      case 'chat':
+      case 'say':
+        console.log('Creating chat action');
         return {
-          type: 'move_forward',
+          type: 'chat',
           parameters: {
-            distance: params.distance || 10,
+            message: params.message || 'Hello!',
           },
-          timeout: this.config.actionTimeout,
+          timeout: 5000,
         };
-
-      case 'mine_block':
-        return this.createMineBlockAction(params);
-
-      case 'craft_item':
-        return this.createCraftAction(params);
-
-      case 'mine':
-      case 'break':
-      case 'dig':
-        return this.createMineAction(params);
-
-      case 'pickup':
-      case 'collect':
-      case 'gather':
-        return this.createPickupAction(params);
-
-      case 'look':
-      case 'look_at':
-        return this.createLookAction(params);
-
-      case 'wait':
-      case 'pause':
-        return this.createWaitAction(params);
 
       default:
         console.log(
           `Unknown action type: ${actionType}, inferring from description`
         );
-        // Try to infer action from step description
-        return this.inferActionFromDescription(step);
+        // Try to infer action from description
+        const description = step.action.description?.toLowerCase() || '';
+
+        if (description.includes('move') || description.includes('go')) {
+          return this.createNavigateAction(params);
+        }
+
+        if (description.includes('mine') || description.includes('break')) {
+          return {
+            type: 'mine_block',
+            parameters: params,
+            timeout: 15000,
+          };
+        }
+
+        if (
+          description.includes('eat') ||
+          description.includes('consume') ||
+          description.includes('food')
+        ) {
+          return {
+            type: 'consume_food',
+            parameters: params,
+            timeout: 10000,
+          };
+        }
+
+        if (
+          description.includes('try') ||
+          description.includes('experiment') ||
+          description.includes('test')
+        ) {
+          return {
+            type: 'experiment_with_item',
+            parameters: params,
+            timeout: 15000,
+          };
+        }
+
+        // Default to wait action
+        return {
+          type: 'wait',
+          parameters: {
+            duration: 2000,
+          },
+          timeout: 2500,
+        };
     }
   }
 
@@ -411,19 +430,31 @@ export class ActionTranslator {
         case 'consume_food':
           return await this.executeConsumeFood(
             action as ConsumeFoodAction,
-            timeout
+            action.timeout || this.config.actionTimeout
+          );
+
+        case 'experiment_with_item':
+          return await this.executeExperimentWithItem(
+            action,
+            action.timeout || this.config.actionTimeout
+          );
+
+        case 'explore_item_properties':
+          return await this.executeExploreItemProperties(
+            action,
+            action.timeout || this.config.actionTimeout
           );
 
         case 'place_block':
           return await this.executePlaceBlock(
             action as PlaceBlockAction,
-            timeout
+            action.timeout || this.config.actionTimeout
           );
 
         case 'find_shelter':
           return await this.executeFindShelter(
             action as FindShelterAction,
-            timeout
+            action.timeout || this.config.actionTimeout
           );
 
         case 'mine_block':
@@ -513,23 +544,37 @@ export class ActionTranslator {
     try {
       const { food_type = 'any', amount = 1 } = action.parameters;
 
-      // Find food in inventory
-      const foodItems = this.bot.inventory
-        .items()
-        .filter(
-          (item) =>
-            item.name.includes('apple') ||
-            item.name.includes('bread') ||
-            item.name.includes('cooked') ||
-            item.name.includes('beef') ||
-            item.name.includes('chicken') ||
-            item.name.includes('porkchop') ||
-            item.name.includes('mutton') ||
-            item.name.includes('rabbit') ||
-            item.name.includes('fish') ||
-            item.name.includes('potato') ||
-            item.name.includes('carrot')
-        );
+      // Find food in inventory - use discovery-based approach
+      const foodItems = this.bot.inventory.items().filter((item) => {
+        const itemName = item.name.toLowerCase();
+
+        // Discovery-based food detection:
+        // 1. Items that have been successfully consumed before (would be stored in memory)
+        // 2. Items that look potentially edible based on name patterns
+        // 3. Items that other entities have been observed consuming
+
+        // For now, use basic heuristics that could be learned:
+        const potentiallyEdible =
+          itemName.includes('apple') ||
+          itemName.includes('bread') ||
+          itemName.includes('cooked') ||
+          itemName.includes('food') ||
+          itemName.includes('meal') ||
+          itemName.includes('beef') ||
+          itemName.includes('chicken') ||
+          itemName.includes('pork') ||
+          itemName.includes('fish') ||
+          itemName.includes('potato') ||
+          itemName.includes('carrot');
+
+        // In a true discovery system, this would check:
+        // - Memory of successful consumption attempts
+        // - Observed effects on health/hunger
+        // - Learning from other entities
+        // - Trial and error results
+
+        return potentiallyEdible;
+      });
 
       if (foodItems.length === 0) {
         return {
@@ -944,13 +989,13 @@ export class ActionTranslator {
   }
 
   /**
-   * Execute crafting action (2x2 only for now)
+   * Execute crafting action (supports both 2x2 and 3x3 crafting)
    */
   private async executeCraft(
     action: CraftAction,
     timeout: number
   ): Promise<{ success: boolean; data?: any; error?: string }> {
-    const { item, count } = action.parameters;
+    const { item, count, useCraftingTable } = action.parameters;
 
     try {
       // Find recipe for the item
@@ -976,6 +1021,35 @@ export class ActionTranslator {
         };
       }
 
+      // Handle 3x3 crafting with crafting table
+      if (useCraftingTable) {
+        // Find nearby crafting table
+        const craftingTable = this.bot.findBlock({
+          matching: (this.bot as any).mcData.blocksByName.crafting_table.id,
+          maxDistance: 3,
+        });
+
+        if (!craftingTable) {
+          return {
+            success: false,
+            error: 'No crafting table found within range',
+          };
+        }
+
+        // Move to crafting table
+        await this.bot.pathfinder.goto(
+          new goals.GoalNear(
+            craftingTable.position.x,
+            craftingTable.position.y,
+            craftingTable.position.z,
+            2
+          )
+        );
+
+        // Use the crafting table
+        await this.bot.useBlock(craftingTable);
+      }
+
       // Craft the item
       await this.bot.craft(recipe, count, undefined);
 
@@ -985,6 +1059,7 @@ export class ActionTranslator {
           item,
           count,
           recipe: recipe.result,
+          usedCraftingTable: useCraftingTable || false,
         },
       };
     } catch (error) {
@@ -1111,6 +1186,233 @@ export class ActionTranslator {
       success: true,
       data: { duration },
     };
+  }
+
+  /**
+   * Execute experimental item interaction to discover properties
+   */
+  private async executeExperimentWithItem(
+    action: any,
+    timeout: number
+  ): Promise<{ success: boolean; data?: any; error?: string }> {
+    try {
+      const { item_type = 'any', action: experimentAction = 'consume' } =
+        action.parameters;
+
+      // Find items to experiment with
+      const items = this.bot.inventory.items();
+      let targetItems = items;
+
+      if (item_type !== 'any') {
+        targetItems = items.filter((item) =>
+          item.name.toLowerCase().includes(item_type.toLowerCase())
+        );
+      }
+
+      if (targetItems.length === 0) {
+        return {
+          success: false,
+          error: `No items found for experimentation with type: ${item_type}`,
+        };
+      }
+
+      // Choose an item to experiment with
+      const itemToTest = targetItems[0];
+      const healthBefore = this.bot.health;
+      const foodBefore = this.bot.food;
+
+      let experimentResult = null;
+
+      // Try different interactions based on the experiment action
+      switch (experimentAction) {
+        case 'consume':
+          try {
+            await this.bot.consume(itemToTest);
+            experimentResult = {
+              action: 'consume',
+              success: true,
+              healthChange: this.bot.health - healthBefore,
+              foodChange: this.bot.food - foodBefore,
+            };
+          } catch (error) {
+            experimentResult = {
+              action: 'consume',
+              success: false,
+              error: error instanceof Error ? error.message : 'Unknown error',
+            };
+          }
+          break;
+
+        case 'place':
+          try {
+            const position = this.bot.entity.position.offset(0, 0, 1);
+            await this.bot.placeBlock(position, itemToTest);
+            experimentResult = {
+              action: 'place',
+              success: true,
+              position: position,
+            };
+          } catch (error) {
+            experimentResult = {
+              action: 'place',
+              success: false,
+              error: error instanceof Error ? error.message : 'Unknown error',
+            };
+          }
+          break;
+
+        default:
+          return {
+            success: false,
+            error: `Unknown experiment action: ${experimentAction}`,
+          };
+      }
+
+      return {
+        success: true,
+        data: {
+          itemTested: itemToTest.name,
+          experimentAction,
+          result: experimentResult,
+          discovery: {
+            itemType: itemToTest.name,
+            isEdible:
+              experimentAction === 'consume' &&
+              experimentResult.success &&
+              experimentResult.healthChange > 0,
+            isPlaceable:
+              experimentAction === 'place' && experimentResult.success,
+            healthEffect: experimentResult.healthChange || 0,
+            foodEffect: experimentResult.foodChange || 0,
+          },
+        },
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error:
+          error instanceof Error
+            ? error.message
+            : 'Unknown error during experimentation',
+      };
+    }
+  }
+
+  /**
+   * Execute comprehensive item property exploration
+   */
+  private async executeExploreItemProperties(
+    action: any,
+    timeout: number
+  ): Promise<{ success: boolean; data?: any; error?: string }> {
+    try {
+      const { item_type, properties_to_test = ['edible', 'placeable'] } =
+        action.parameters;
+
+      const items = this.bot.inventory.items();
+      const targetItems = items.filter((item) =>
+        item.name.toLowerCase().includes(item_type.toLowerCase())
+      );
+
+      if (targetItems.length === 0) {
+        return {
+          success: false,
+          error: `No items found for property exploration: ${item_type}`,
+        };
+      }
+
+      const itemToTest = targetItems[0];
+      const healthBefore = this.bot.health;
+      const foodBefore = this.bot.food;
+      const discoveries = [];
+
+      // Test each property
+      for (const property of properties_to_test) {
+        try {
+          switch (property) {
+            case 'edible':
+              try {
+                await this.bot.consume(itemToTest);
+                discoveries.push({
+                  property: 'edible',
+                  result: true,
+                  healthEffect: this.bot.health - healthBefore,
+                  foodEffect: this.bot.food - foodBefore,
+                });
+              } catch (error) {
+                discoveries.push({
+                  property: 'edible',
+                  result: false,
+                  error:
+                    error instanceof Error ? error.message : 'Cannot consume',
+                });
+              }
+              break;
+
+            case 'placeable':
+              try {
+                const position = this.bot.entity.position.offset(0, 0, 1);
+                await this.bot.placeBlock(position, itemToTest);
+                discoveries.push({
+                  property: 'placeable',
+                  result: true,
+                  position: position,
+                });
+              } catch (error) {
+                discoveries.push({
+                  property: 'placeable',
+                  result: false,
+                  error:
+                    error instanceof Error ? error.message : 'Cannot place',
+                });
+              }
+              break;
+
+            default:
+              discoveries.push({
+                property,
+                result: false,
+                error: 'Property test not implemented',
+              });
+          }
+        } catch (error) {
+          discoveries.push({
+            property,
+            result: false,
+            error: error instanceof Error ? error.message : 'Test failed',
+          });
+        }
+      }
+
+      return {
+        success: true,
+        data: {
+          itemExplored: itemToTest.name,
+          propertiesTested: properties_to_test,
+          discoveries,
+          summary: {
+            isEdible:
+              discoveries.find((d) => d.property === 'edible')?.result || false,
+            isPlaceable:
+              discoveries.find((d) => d.property === 'placeable')?.result ||
+              false,
+            healthEffect:
+              discoveries.find((d) => d.property === 'edible')?.healthEffect ||
+              0,
+            foodEffect:
+              discoveries.find((d) => d.property === 'edible')?.foodEffect || 0,
+          },
+        },
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error:
+          error instanceof Error
+            ? error.message
+            : 'Unknown error during property exploration',
+      };
+    }
   }
 
   // ==================== Helper Methods ====================

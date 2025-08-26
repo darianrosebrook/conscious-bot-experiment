@@ -14,7 +14,11 @@
     "forceConsistentCasingInFileNames": true,
     "moduleResolution": "node",
     "resolveJsonModule": true,
-    "allowSyntheticDefaultImports": true
+    "allowSyntheticDefaultImports": true,
+    "baseUrl": ".",
+    "paths": {
+      "@conscious-bot/core": ["../core/src"]
+    }
   },
   "include": [
     "src/**/*"

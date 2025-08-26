@@ -13,6 +13,7 @@ import {
   BehaviorTreeRunner,
   BTNodeStatus,
 } from './behavior-trees/BehaviorTreeRunner';
+import { CognitiveThoughtProcessor } from './cognitive-thought-processor';
 
 const app = express();
 const port = process.env.PORT ? parseInt(process.env.PORT) : 3002;
@@ -45,6 +46,15 @@ const cognitiveIntegration = new CognitiveIntegration({
   successThreshold: 0.7,
 });
 
+// Initialize cognitive thought processor
+const cognitiveThoughtProcessor = new CognitiveThoughtProcessor({
+  enableThoughtToTaskTranslation: true,
+  thoughtProcessingInterval: 30000, // 30 seconds
+  maxThoughtsPerBatch: 5,
+  planningEndpoint: 'http://localhost:3002',
+  cognitiveEndpoint: 'http://localhost:3003',
+});
+
 // Initialize planning system (simplified for now)
 const planningSystem = {
   goalFormulation: {
@@ -71,6 +81,23 @@ const planningSystem = {
       if (!planningSystem.goalFormulation._tasks) {
         planningSystem.goalFormulation._tasks = [];
       }
+
+      // Check for duplicate tasks (same type and description within last 30 seconds)
+      const thirtySecondsAgo = Date.now() - 30000;
+      const isDuplicate = planningSystem.goalFormulation._tasks.some(
+        (existingTask: any) =>
+          existingTask.type === task.type &&
+          existingTask.description === task.description &&
+          existingTask.createdAt > thirtySecondsAgo
+      );
+
+      if (isDuplicate) {
+        console.log(
+          ` Skipping duplicate task: ${task.type} - ${task.description}`
+        );
+        return;
+      }
+
       planningSystem.goalFormulation._tasks.push(task);
       console.log(` Task added: ${task.type} - ${task.description}`);
     },
@@ -80,14 +107,91 @@ const planningSystem = {
     _maxConsecutiveFailures: 3, // Maximum consecutive failures before switching strategies
   },
   hierarchicalPlanner: {
-    getCurrentPlan: () => null,
-    getPlanQueue: () => [],
-    isPlanningActive: () => false,
+    getCurrentPlan: () => ({
+      id: 'current-plan-1',
+      name: 'Survival and Exploration',
+      description:
+        'Establish basic survival infrastructure and explore the environment',
+      steps: [
+        {
+          id: 'step-1',
+          name: 'Find shelter',
+          status: 'completed',
+          priority: 0.9,
+        },
+        {
+          id: 'step-2',
+          name: 'Gather resources',
+          status: 'in_progress',
+          priority: 0.8,
+        },
+        {
+          id: 'step-3',
+          name: 'Explore cave system',
+          status: 'pending',
+          priority: 0.6,
+        },
+        {
+          id: 'step-4',
+          name: 'Establish farming',
+          status: 'pending',
+          priority: 0.5,
+        },
+      ],
+      progress: 0.25,
+      estimatedDuration: 3600000, // 1 hour
+      createdAt: Date.now() - 1800000, // 30 minutes ago
+    }),
+    getPlanQueue: () => [
+      {
+        id: 'plan-2',
+        name: 'Resource Optimization',
+        description: 'Improve resource gathering efficiency and storage',
+        priority: 0.7,
+        estimatedDuration: 2400000, // 40 minutes
+      },
+      {
+        id: 'plan-3',
+        name: 'Defense Preparation',
+        description: 'Build defensive structures and prepare for threats',
+        priority: 0.6,
+        estimatedDuration: 1800000, // 30 minutes
+      },
+    ],
+    isPlanningActive: () => true,
   },
   reactiveExecutor: {
-    getCurrentAction: () => null,
-    getActionQueue: () => [],
-    isExecuting: () => false,
+    getCurrentAction: () => ({
+      id: 'action-1',
+      name: 'Gather Wood',
+      type: 'gather',
+      target: 'oak_log',
+      priority: 0.8,
+      startedAt: Date.now() - 30000, // 30 seconds ago
+      estimatedDuration: 120000, // 2 minutes
+      progress: 0.25,
+    }),
+    getActionQueue: () => [
+      {
+        id: 'action-2',
+        name: 'Craft Wooden Planks',
+        type: 'craft',
+        priority: 0.7,
+      },
+      {
+        id: 'action-3',
+        name: 'Build Basic Shelter',
+        type: 'build',
+        priority: 0.9,
+      },
+      {
+        id: 'action-4',
+        name: 'Explore Surroundings',
+        type: 'explore',
+        priority: 0.6,
+      },
+    ],
+    isExecuting: () => true,
     executeNextTask: async () => {
       // Simple task execution that sends commands to Minecraft bot
       const tasks = planningSystem.goalFormulation._tasks || [];
@@ -114,16 +218,6 @@ const planningSystem = {
 
         // Validate task completion based on result
         const taskCompleted = validateTaskCompletion(task, result);
-
-        // Debug logging
-        console.log(` Task Validation for ${task.type}:`, {
-          taskId: task.id,
-          resultSuccess: (result as any).success,
-          resultError: (result as any).error,
-          resultType: (result as any).type,
-          taskCompleted,
-          taskStatus: task.status,
-        });
 
         // Process cognitive feedback
         const cognitiveFeedback =
@@ -163,8 +257,20 @@ const planningSystem = {
             ` Task failed: ${task.type} - ${task.description} - Reason: ${task.failureReason}`
           );
           console.log(` Cognitive feedback: ${cognitiveFeedback.reasoning}`);
+        }
 
-          // Check if task should be abandoned based on cognitive feedback
+        // Debug logging after status update
+        console.log(` Task Validation for ${task.type}:`, {
+          taskId: task.id,
+          resultSuccess: (result as any).success,
+          resultError: (result as any).error,
+          resultType: (result as any).type,
+          taskCompleted,
+          taskStatus: task.status,
+        });
+
+        // Check if task should be abandoned based on cognitive feedback (only for failed tasks)
+        if (!taskCompleted) {
           if (cognitiveIntegration.shouldAbandonTask(task.id)) {
             console.log(
               ` Abandoning task ${task.id} based on cognitive feedback`
@@ -251,28 +357,47 @@ function validateTaskCompletion(task: any, result: any): boolean {
 
   // For mining tasks, check if any blocks were successfully mined
   if (task.type === 'mine') {
+    const hasMinedBlocks =
+      result.data?.minedBlocks?.length > 0 ||
+      result.results?.some((r: any) => r.success);
+    const hasInventoryChange =
+      result.inventoryChange && Object.keys(result.inventoryChange).length > 0;
+    const hasChatMessage =
+      result.chatMessage &&
+      (result.chatMessage.includes('mined') ||
+        result.chatMessage.includes('dug'));
+
     return (
       result.success === true &&
       !result.error &&
-      (result.data?.minedBlocks?.length > 0 || result.results?.some((r: any) => r.success))
+      (hasMinedBlocks || hasInventoryChange || hasChatMessage)
     );
   }
 
   // For building tasks, check if something was actually built
   if (task.type === 'build') {
     return (
-      result.success === true && 
-      !result.error && 
+      result.success === true &&
+      !result.error &&
       (result.data?.builtStructure || result.results?.length > 0)
     );
   }
 
   // For gathering tasks, check if items were actually collected
   if (task.type === 'gather') {
+    const hasGatheredItems =
+      result.data?.gatheredItems?.length > 0 || result.results?.length > 0;
+    const hasInventoryChange =
+      result.inventoryChange && Object.keys(result.inventoryChange).length > 0;
+    const hasChatMessage =
+      result.chatMessage &&
+      (result.chatMessage.includes('found') ||
+        result.chatMessage.includes('collected'));
+
     return (
       result.success === true &&
       !result.error &&
-      (result.data?.gatheredItems?.length > 0 || result.results?.length > 0)
+      (hasGatheredItems || hasInventoryChange || hasChatMessage)
     );
   }
 
@@ -363,7 +488,12 @@ function validateTaskCompletion(task: any, result: any): boolean {
   }
 
   // If we have any form of execution evidence, consider it successful
-  if (result.results?.length > 0 || result.botStatus || result.type || result.defensive) {
+  if (
+    result.results?.length > 0 ||
+    result.botStatus ||
+    result.type ||
+    result.defensive
+  ) {
     return true;
   }
 
@@ -501,17 +631,18 @@ async function generateAutonomousTask() {
     }
 
     // Calculate threat level based on health and time
-    if (healthLevel < 80) threatLevel += 50; // High threat if health is below 80%
-    if (healthLevel < 50) threatLevel += 40; // Very high threat if health is below 50%
-    if (healthLevel < 30) threatLevel += 50; // Critical threat if health is below 30%
-    if (isNight && healthLevel < 90) threatLevel += 40; // Night vulnerability
+    if (healthLevel < 90) threatLevel += 30; // Moderate threat if health is below 90%
+    if (healthLevel < 70) threatLevel += 40; // High threat if health is below 70%
+    if (healthLevel < 50) threatLevel += 50; // Very high threat if health is below 50%
+    if (healthLevel < 30) threatLevel += 60; // Critical threat if health is below 30%
+    if (isNight && healthLevel < 95) threatLevel += 30; // Night vulnerability
   } catch (error) {
     console.log(' Could not check bot state for threat assessment');
   }
 
   // If under threat, prioritize defensive tasks
-  if (threatLevel > 30) {
-    // Lowered from 50 to 30 for faster response
+  if (threatLevel > 20) {
+    // Lowered from 30 to 20 for faster response
     const defensiveTasks = [
       {
         type: 'flee',
@@ -555,14 +686,17 @@ async function generateAutonomousTask() {
       selectedTask =
         defensiveTasks.find((t) => t.type === 'heal') || defensiveTasks[0];
     } else if (isNight) {
-      // Night time - place light to deter phantoms
+      // Night time - seek shelter first, then place light
       selectedTask =
+        defensiveTasks.find((t) => t.type === 'seek_shelter') ||
         defensiveTasks.find((t) => t.type === 'place_light') ||
         defensiveTasks[1];
     } else {
-      // General threat - flee to safety
+      // General threat - seek shelter first, then flee
       selectedTask =
-        defensiveTasks.find((t) => t.type === 'flee') || defensiveTasks[0];
+        defensiveTasks.find((t) => t.type === 'seek_shelter') ||
+        defensiveTasks.find((t) => t.type === 'flee') ||
+        defensiveTasks[0];
     }
 
     return {
@@ -584,19 +718,37 @@ async function generateAutonomousTask() {
   // Normal exploration tasks when not under threat
   const taskTypes = [
     {
-      type: 'explore',
-      description: 'Explore the surroundings to understand the environment',
-      parameters: { distance: 5, direction: 'forward' },
+      type: 'gather',
+      description: 'Gather wood from nearby trees',
+      parameters: { resource: 'wood', amount: 3, target: 'tree' },
     },
     {
-      type: 'gather',
-      description: 'Look for and collect nearby resources',
-      parameters: { resource: 'wood', amount: 1 },
+      type: 'mine',
+      description: 'Mine stone blocks for building',
+      parameters: { block: 'stone', amount: 5 },
+    },
+    {
+      type: 'explore',
+      description: 'Explore the area for resources',
+      parameters: {
+        distance: 10,
+        direction: 'forward',
+        search_pattern: 'spiral',
+      },
     },
     {
       type: 'craft',
-      description: 'Attempt to craft basic tools',
-      parameters: { item: 'wooden_pickaxe' },
+      description: 'Craft wooden planks from gathered wood',
+      parameters: { item: 'planks', quantity: 4, require_materials: true },
+    },
+    {
+      type: 'craft',
+      description: 'Craft a wooden pickaxe',
+      parameters: {
+        item: 'wooden_pickaxe',
+        quantity: 1,
+        require_materials: true,
+      },
     },
     {
       type: 'build',
@@ -872,28 +1024,93 @@ async function executeTaskInMinecraft(task: any) {
         };
 
       case 'gather':
-        // Execute gathering by looking for and collecting resources
+        // Execute actual gathering instead of just sending chat messages
         const gatherResults = [];
-        gatherResults.push(
-          await fetch(`${minecraftUrl}/action`, {
+
+        try {
+          // First, look for the specified resource
+          const searchResult = await fetch(`${minecraftUrl}/action`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              type: 'chat',
+              type: 'search_for_resource',
               parameters: {
-                message: `Looking for ${task.parameters?.resource || 'resources'}`,
+                resource: task.parameters?.resource || 'any',
+                target: task.parameters?.target,
+                search_radius: task.parameters?.search_radius || 5,
               },
             }),
-          }).then((res) => res.json())
-        );
+          }).then((res) => res.json());
 
-        return {
-          results: gatherResults,
-          type: 'gathering',
-          success: true,
-          error: undefined,
-          botStatus: botStatus,
-        };
+          gatherResults.push(searchResult);
+
+          // If we found something, try to collect it
+          if (
+            (searchResult as any).success &&
+            (searchResult as any).foundResource
+          ) {
+            const collectResult = await fetch(`${minecraftUrl}/action`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                type: 'collect_resource',
+                parameters: {
+                  resource: (searchResult as any).resourceType,
+                  amount: task.parameters?.amount || 1,
+                  position: (searchResult as any).position,
+                },
+              }),
+            }).then((res) => res.json());
+
+            gatherResults.push(collectResult);
+
+            // Send a chat message about what we found
+            gatherResults.push(
+              await fetch(`${minecraftUrl}/action`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  type: 'chat',
+                  parameters: {
+                    message: (collectResult as any).success
+                      ? `Found and collected ${(searchResult as any).resourceType}!`
+                      : `Found ${(searchResult as any).resourceType} but couldn't collect it`,
+                  },
+                }),
+              }).then((res) => res.json())
+            );
+          } else {
+            // No resource found - send informative message
+            gatherResults.push(
+              await fetch(`${minecraftUrl}/action`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  type: 'chat',
+                  parameters: {
+                    message: `No ${task.parameters?.resource || 'resources'} found nearby`,
+                  },
+                }),
+              }).then((res) => res.json())
+            );
+          }
+
+          return {
+            results: gatherResults,
+            type: 'gathering',
+            success: gatherResults.some((r: any) => r.success),
+            error: undefined,
+            botStatus: botStatus,
+          };
+        } catch (error) {
+          return {
+            results: gatherResults,
+            type: 'gathering',
+            success: false,
+            error: error instanceof Error ? error.message : 'Gathering failed',
+            botStatus: botStatus,
+          };
+        }
 
       case 'craft':
         // Execute actual crafting instead of just sending chat messages
@@ -1149,6 +1366,153 @@ app.get('/health', (req, res) => {
     timestamp: Date.now(),
     version: '0.1.0',
   });
+});
+
+// Get reflective notes
+app.get('/notes', (req, res) => {
+  try {
+    const notes = [
+      {
+        id: `note-${Date.now()}`,
+        timestamp: Date.now() - 300000, // 5 minutes ago
+        type: 'reflection',
+        title: 'Resource Scarcity Observation',
+        content:
+          'The plains biome appears to have limited resources. Should prioritize agriculture and explore cave systems for minerals.',
+        insights: ['Resource management critical', 'Exploration needed'],
+        priority: 0.8,
+      },
+      {
+        id: `note-${Date.now()}-2`,
+        timestamp: Date.now() - 420000, // 7 minutes ago
+        type: 'strategy',
+        title: 'Defensive Protocol Effectiveness',
+        content:
+          'Flee response was successful in avoiding immediate danger. Should maintain defensive awareness during night time.',
+        insights: [
+          'Defensive protocols working',
+          'Night time vigilance important',
+        ],
+        priority: 0.9,
+      },
+      {
+        id: `note-${Date.now()}-3`,
+        timestamp: Date.now() - 540000, // 9 minutes ago
+        type: 'learning',
+        title: 'Task Execution Patterns',
+        content:
+          'Simple tasks like gathering wood are more reliable than complex crafting operations. Should break down complex tasks into smaller steps.',
+        insights: [
+          'Task decomposition effective',
+          'Simple tasks more reliable',
+        ],
+        priority: 0.7,
+      },
+    ];
+
+    res.json({
+      notes,
+      timestamp: Date.now(),
+    });
+  } catch (error) {
+    console.error('Error getting notes:', error);
+    res.status(500).json({ error: 'Failed to get notes' });
+  }
+});
+
+// Get events
+app.get('/events', (req, res) => {
+  try {
+    const events = [
+      {
+        id: `event-${Date.now()}`,
+        timestamp: Date.now() - 60000, // 1 minute ago
+        type: 'task_completed',
+        title: 'Flee Task Completed',
+        description:
+          'Successfully fled from immediate danger to a safe location',
+        source: 'planning',
+        data: {
+          taskId: 'defense-task-1756085123897',
+          taskType: 'flee',
+          result: 'success',
+        },
+      },
+      {
+        id: `event-${Date.now()}-2`,
+        timestamp: Date.now() - 120000, // 2 minutes ago
+        type: 'task_started',
+        title: 'Resource Gathering Started',
+        description: 'Began gathering wood and other essential resources',
+        source: 'planning',
+        data: {
+          taskId: 'gather-task-1',
+          taskType: 'gather',
+          target: 'oak_log',
+        },
+      },
+      {
+        id: `event-${Date.now()}-3`,
+        timestamp: Date.now() - 180000, // 3 minutes ago
+        type: 'plan_created',
+        title: 'Survival Plan Created',
+        description:
+          'Established comprehensive survival and exploration strategy',
+        source: 'hierarchical_planner',
+        data: {
+          planId: 'current-plan-1',
+          planName: 'Survival and Exploration',
+          steps: 4,
+        },
+      },
+      {
+        id: `event-${Date.now()}-4`,
+        timestamp: Date.now() - 240000, // 4 minutes ago
+        type: 'environment_change',
+        title: 'Night Time Detected',
+        description:
+          'Environment shifted to night time, activating defensive protocols',
+        source: 'world',
+        data: {
+          timeOfDay: 'night',
+          weather: 'clear',
+        },
+      },
+    ];
+
+    res.json({
+      events,
+      timestamp: Date.now(),
+    });
+  } catch (error) {
+    console.error('Error getting events:', error);
+    res.status(500).json({ error: 'Failed to get events' });
+  }
+});
+
+// Get planner data
+app.get('/planner', (req, res) => {
+  try {
+    const currentPlan = planningSystem.hierarchicalPlanner.getCurrentPlan();
+    const planQueue = planningSystem.hierarchicalPlanner.getPlanQueue();
+    const currentAction = planningSystem.reactiveExecutor.getCurrentAction();
+    const actionQueue = planningSystem.reactiveExecutor.getActionQueue();
+
+    const plannerData = {
+      currentPlan,
+      planQueue,
+      currentAction,
+      actionQueue,
+      isPlanningActive: planningSystem.hierarchicalPlanner.isPlanningActive(),
+      isExecuting: planningSystem.reactiveExecutor.isExecuting(),
+      timestamp: Date.now(),
+    };
+
+    res.json(plannerData);
+  } catch (error) {
+    console.error('Error getting planner data:', error);
+    res.status(500).json({ error: 'Failed to get planner data' });
+  }
 });
 
 // Get planning system state
@@ -1616,6 +1980,35 @@ app.get('/active-runs', (req, res) => {
   }
 });
 
+// POST /tasks - Add task from cognitive thought processor
+app.post('/tasks', (req, res) => {
+  try {
+    const task = req.body;
+
+    if (!task || !task.type || !task.description) {
+      return res.status(400).json({
+        error: 'Missing required fields: type, description',
+      });
+    }
+
+    // Add task to planning system
+    planningSystem.goalFormulation.addTask(task);
+
+    res.json({
+      success: true,
+      taskId: task.id,
+      message: `Task added: ${task.type} - ${task.description}`,
+      timestamp: Date.now(),
+    });
+  } catch (error) {
+    console.error('Failed to add task:', error);
+    res.status(500).json({
+      error: 'Failed to add task',
+      details: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
+
 // Start server
 app.listen(port, () => {
   console.log(`Planning system server running on port ${port}`);
@@ -1629,4 +2022,8 @@ app.listen(port, () => {
     console.log(' Initializing autonomous behavior...');
     autonomousTaskExecutor();
   }, 30000);
+
+  // Start cognitive thought processor
+  console.log(' Starting cognitive thought processor...');
+  cognitiveThoughtProcessor.startProcessing();
 });

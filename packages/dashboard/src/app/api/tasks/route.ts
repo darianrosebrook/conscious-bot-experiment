@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import type { Task } from '@/types';
-import { 
-  parseTaskDescription, 
-  parseStepDescription, 
-  parseGoalDescription, 
-  parseCurrentAction
+import {
+  parseTaskDescription,
+  parseStepDescription,
+  parseGoalDescription,
+  parseCurrentAction,
 } from '@/lib/message-parser';
 
 /**
@@ -30,9 +30,19 @@ export async function GET(_request: NextRequest) {
     const stateData = await stateRes.json();
     const tasks: Task[] = [];
 
-    // Convert planning tasks to dashboard tasks
+    // Convert planning tasks to dashboard tasks with deduplication
     if (tasksData.tasks && Array.isArray(tasksData.tasks)) {
+      const seenTasks = new Set<string>();
+
       for (const task of tasksData.tasks) {
+        const taskKey = `${task.type}-${task.description}`;
+
+        // Skip if we've already seen this task
+        if (seenTasks.has(taskKey)) {
+          continue;
+        }
+        seenTasks.add(taskKey);
+
         tasks.push({
           id: task.id || `task-${Date.now()}`,
           title: parseTaskDescription(task),
@@ -45,7 +55,7 @@ export async function GET(_request: NextRequest) {
               label: parseStepDescription({
                 action: task.type,
                 parameters: task.parameters,
-                description: task.description
+                description: task.description,
               }),
               done: task.status === 'completed',
             },
@@ -75,7 +85,9 @@ export async function GET(_request: NextRequest) {
 
     // Add current action as a task if executing
     if (stateData.reactiveExecutor?.currentAction) {
-      const actionDescription = parseCurrentAction(stateData.reactiveExecutor.currentAction);
+      const actionDescription = parseCurrentAction(
+        stateData.reactiveExecutor.currentAction
+      );
       tasks.push({
         id: 'current-action',
         title: `Executing: ${actionDescription}`,

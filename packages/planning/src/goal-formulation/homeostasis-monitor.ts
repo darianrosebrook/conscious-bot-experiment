@@ -7,7 +7,7 @@
  * Author: @darianrosebrook
  */
 
-import { HomeostasisState } from '@/types';
+import { HomeostasisState } from '../types';
 
 /**
  * Return a safe default homeostasis snapshot.

@@ -15,7 +15,7 @@ import {
   Precondition,
   Effect,
   Resource,
-} from '@/types';
+} from '../types';
 
 export interface CandidateGoal {
   id: string;
@@ -331,11 +331,13 @@ export class GoalGenerator {
           prerequisites: tradeOption.requiredItems,
           requiresMovement: true,
           targetLocation: tradeOption.location,
-          resourceRequirements: tradeOption.requiredItems.map((item: string) => ({
-            resourceType: item,
-            quantity: 1,
-            optional: false,
-          })),
+          resourceRequirements: tradeOption.requiredItems.map(
+            (item: string) => ({
+              resourceType: item,
+              quantity: 1,
+              optional: false,
+            })
+          ),
         });
       }
     }

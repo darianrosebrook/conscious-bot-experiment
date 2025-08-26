@@ -15,7 +15,11 @@ import {
   PerformanceMonitor,
   DEFAULT_PERFORMANCE_CONFIG,
 } from './performance-monitor';
-import { AdvancedNeedGenerator } from './advanced-need-generator';
+import {
+  AdvancedNeedGenerator,
+  NeedType,
+  TrendDirection,
+} from './advanced-need-generator';
 import { GoalTemplateManager } from './goal-template-manager';
 import {
   AdvancedSignalProcessor,
@@ -107,19 +111,21 @@ export class ReflexModule implements CognitiveModule {
   }
 
   canHandle(task: CognitiveTask, signature?: TaskSignature): boolean {
-    if (signature && signature.timeConstraint) {
+    if (signature?.timeConstraint) {
       return task.priority > 0.8 || signature.timeConstraint < 100;
     }
     return task.priority > 0.8;
   }
 
-  async process(task: CognitiveTask, budget: number): Promise<string> {
+  async process(task: CognitiveTask): Promise<string> {
     // Simulate immediate response
     await new Promise((resolve) => setTimeout(resolve, 10)); // 10ms processing
     return `reflex_response_${task.type}`;
   }
 
   estimateProcessingTime(task: CognitiveTask): number {
+    // TODO: Implement actual estimation logic
+    console.log('TODO: IMPLEMENT... estimateProcessingTime', task);
     return 15; // Very fast reflex responses
   }
 }
@@ -262,8 +268,9 @@ export class Arbiter extends EventEmitter<SystemEvents> {
             }))
           );
 
-        // Enhanced needs generated - could be used for further processing
+        // TODO: Enhanced needs generated - could be used for further processing
         // Note: Signal processor needs are managed internally
+        console.log('TODO: IMPLEMENT... enhancedNeeds', enhancedNeeds);
       }
 
       // Track signal statistics
@@ -615,15 +622,15 @@ export class Arbiter extends EventEmitter<SystemEvents> {
     try {
       // Check for high-priority needs that require immediate action
       const currentNeeds = this.signalProcessor.getCurrentNeeds();
-      const urgentNeeds = currentNeeds.filter((need) => need.urgency > 0.7);
+      // TODO: const urgentNeeds = currentNeeds.filter((need) => need.urgency > 0.7);
 
       // Convert current needs to advanced need generator format
       const baseNeeds = currentNeeds.map((need) => ({
         id: uuidv4(),
-        type: need.type as any, // NeedType enum
+        type: need.type as NeedType, // NeedType enum
         intensity: need.urgency,
         urgency: need.urgency,
-        trend: 'stable' as any, // TrendDirection enum
+        trend: 'stable' as TrendDirection, // TrendDirection enum
         trendStrength: 0.5,
         context: this.getCurrentContext(),
         memoryInfluence: 0.5,
@@ -912,3 +919,7 @@ export class Arbiter extends EventEmitter<SystemEvents> {
     return this.priorityRanker;
   }
 }
+
+// Export types for hybrid HRM integration
+export type { CognitiveTask, TaskSignature };
+export { ModuleType };

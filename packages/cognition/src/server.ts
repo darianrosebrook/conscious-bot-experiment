@@ -40,6 +40,9 @@ const cognitionSystem = {
   socialCognition: { getAgentCount: () => 0, getRelationshipCount: () => 0 },
 };
 
+// Store cognitive thoughts for external access
+const cognitiveThoughts: any[] = [];
+
 // Health check endpoint
 app.get('/health', (req, res) => {
   res.json({
@@ -93,6 +96,28 @@ app.get('/state', (req, res) => {
   }
 });
 
+// Get cognitive thoughts
+app.get('/thoughts', (req, res) => {
+  try {
+    // Return recent thoughts (last 50)
+    const recentThoughts = cognitiveThoughts.slice(-50).map((thought) => ({
+      ...thought,
+      id:
+        thought.id ||
+        `thought-${thought.timestamp}-${Math.random().toString(36).substr(2, 9)}`,
+    }));
+
+    res.json({
+      thoughts: recentThoughts,
+      count: recentThoughts.length,
+      timestamp: Date.now(),
+    });
+  } catch (error) {
+    console.error('Error getting cognitive thoughts:', error);
+    res.status(500).json({ error: 'Failed to get cognitive thoughts' });
+  }
+});
+
 // Process cognitive task
 app.post('/process', async (req, res) => {
   try {
@@ -112,6 +137,45 @@ app.post('/process', async (req, res) => {
 
       // Log the intrusive thought
       console.log(`Intrusive thought received: "${content}"`);
+
+      // Send the intrusive thought to the cognitive stream
+      try {
+        const cognitiveStreamResponse = await fetch(
+          'http://localhost:3000/api/ws/cognitive-stream',
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              type: 'intrusive',
+              content: content,
+              attribution: 'intrusive',
+              context: {
+                emotionalState: metadata?.emotion || 'curious',
+                confidence: metadata?.strength || 0.8,
+              },
+              metadata: {
+                messageType: 'intrusion',
+                intent: 'external_suggestion',
+                tags: metadata?.tags || [],
+                strength: metadata?.strength || 0.8,
+              },
+            }),
+          }
+        );
+
+        if (cognitiveStreamResponse.ok) {
+          console.log('✅ Intrusive thought sent to cognitive stream');
+        } else {
+          console.error(
+            '❌ Failed to send intrusive thought to cognitive stream'
+          );
+        }
+      } catch (error) {
+        console.error(
+          '❌ Error sending intrusive thought to cognitive stream:',
+          error
+        );
+      }
 
       // If it's a goal-related thought, forward to planning system
       if (
@@ -145,10 +209,10 @@ app.post('/process', async (req, res) => {
           });
 
           if (planningResponse.ok) {
-            const planningResult = await planningResponse.json();
+            const planningResult = (await planningResponse.json()) as any;
             console.log(`Goal created from intrusive thought:`, planningResult);
-            thought.goalCreated = true;
-            thought.goalId = planningResult.goal?.id;
+            (thought as any).goalCreated = true;
+            (thought as any).goalId = planningResult.goal?.id;
           }
         } catch (error) {
           console.error('Failed to create goal from intrusive thought:', error);
@@ -183,7 +247,7 @@ app.post('/process', async (req, res) => {
               `Action executed from intrusive thought:`,
               minecraftResult
             );
-            thought.actionExecuted = true;
+            (thought as any).actionExecuted = true;
           }
         } catch (error) {
           console.error(
@@ -235,46 +299,132 @@ app.post('/generate-thoughts', async (req, res) => {
 
     // Generate thoughts based on the situation and context
     if (thoughtTypes.includes('reflection')) {
-      thoughts.push({
-        type: 'reflection',
-        content: `I'm reflecting on my current situation. ${situation}`,
-        emotionalState: 'contemplative',
-        confidence: 0.8,
-      });
+      const currentTasks = context.currentState?.currentTasks || [];
+      const currentGoals = context.currentGoals || [];
+      const inventory = context.currentState?.inventory || [];
+
+      if (inventory.length === 0) {
+        thoughts.push({
+          type: 'reflection',
+          content: `My inventory is completely empty. I need to gather wood first to craft basic tools, then I can mine stone and other resources.`,
+          emotionalState: 'determined',
+          confidence: 0.8,
+        });
+      } else if (inventory.some((item: any) => item.name?.includes('wood'))) {
+        thoughts.push({
+          type: 'reflection',
+          content: `I have some wood now. I should craft wooden planks and then make a wooden pickaxe so I can mine stone and other valuable resources.`,
+          emotionalState: 'focused',
+          confidence: 0.7,
+        });
+      } else if (inventory.some((item: any) => item.name?.includes('stone'))) {
+        thoughts.push({
+          type: 'reflection',
+          content: `I have stone now. I should look for a good location to build a shelter, or explore for more valuable resources like iron ore.`,
+          emotionalState: 'optimistic',
+          confidence: 0.6,
+        });
+      } else {
+        thoughts.push({
+          type: 'reflection',
+          content: `I'm making progress with my resources. I should continue gathering materials and start thinking about building a proper shelter for safety.`,
+          emotionalState: 'satisfied',
+          confidence: 0.5,
+        });
+      }
     }
 
     if (thoughtTypes.includes('observation')) {
-      const position = context.currentState?.position;
-      if (position) {
+      const health = context.currentState?.health || 100;
+      const isNight =
+        context.currentState?.timeOfDay > 13000 ||
+        context.currentState?.timeOfDay < 1000;
+
+      if (health < 50) {
         thoughts.push({
           type: 'observation',
-          content: `I notice I'm at position (${position.x}, ${position.y}, ${position.z}). The environment seems interesting.`,
-          emotionalState: 'curious',
+          content: `My health is getting low (${health}%). I need to find food or a safe place to rest before I get into more danger.`,
+          emotionalState: 'concerned',
           confidence: 0.9,
+        });
+      } else if (isNight) {
+        thoughts.push({
+          type: 'observation',
+          content: `It's night time now. I should find shelter quickly or place some light sources to avoid hostile mobs.`,
+          emotionalState: 'alert',
+          confidence: 0.8,
+        });
+      } else {
+        thoughts.push({
+          type: 'observation',
+          content: `The environment looks safe for now. I can focus on gathering resources and building up my capabilities.`,
+          emotionalState: 'calm',
+          confidence: 0.6,
         });
       }
     }
 
     if (thoughtTypes.includes('planning')) {
       const currentTasks = context.currentState?.currentTasks || [];
+      const currentGoals = context.currentGoals || [];
+      const inventory = context.currentState?.inventory || [];
+
       if (currentTasks.length > 0) {
+        const task = currentTasks[0];
         thoughts.push({
           type: 'planning',
-          content: `I'm currently working on: ${currentTasks[0].description}. I should focus on completing this task.`,
+          content: `I'm currently working on: "${task.description}". I should focus on completing this task efficiently and then move on to the next priority.`,
           emotionalState: 'determined',
           confidence: 0.7,
+        });
+      } else if (inventory.length === 0) {
+        thoughts.push({
+          type: 'planning',
+          content: `I need to gather wood from nearby trees first. Then I can craft basic tools and start mining stone for building materials.`,
+          emotionalState: 'focused',
+          confidence: 0.8,
+        });
+      } else if (
+        inventory.some((item: any) => item.name?.includes('wood')) &&
+        !inventory.some((item: any) => item.name?.includes('pickaxe'))
+      ) {
+        thoughts.push({
+          type: 'planning',
+          content: `I have wood now. My next priority should be crafting a wooden pickaxe so I can mine stone and other valuable resources.`,
+          emotionalState: 'determined',
+          confidence: 0.7,
+        });
+      } else if (
+        inventory.some((item: any) => item.name?.includes('pickaxe'))
+      ) {
+        thoughts.push({
+          type: 'planning',
+          content: `I have a pickaxe now. I should mine stone and cobblestone to build a shelter, and look for iron ore for better tools.`,
+          emotionalState: 'excited',
+          confidence: 0.6,
+        });
+      } else {
+        thoughts.push({
+          type: 'planning',
+          content: `I should explore the area to find new resources, or work on building a shelter to protect myself from the elements.`,
+          emotionalState: 'contemplative',
+          confidence: 0.5,
         });
       }
     }
 
-    // Add some contextual thoughts based on the current state
-    if (context.currentGoals?.length > 0) {
-      thoughts.push({
-        type: 'reflection',
-        content: `My current goals include: ${context.currentGoals.join(', ')}. I'm making progress toward these objectives.`,
-        emotionalState: 'satisfied',
-        confidence: 0.6,
+    // Store thoughts for external access
+    thoughts.forEach((thought) => {
+      cognitiveThoughts.push({
+        ...thought,
+        id: `thought-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        timestamp: Date.now(),
       });
+    });
+
+    // Keep only the last 100 thoughts to prevent memory leaks
+    if (cognitiveThoughts.length > 100) {
+      cognitiveThoughts.splice(0, cognitiveThoughts.length - 100);
     }
 
     const result = {
@@ -394,12 +544,19 @@ app.get('/telemetry', (req, res) => {
 // POST /reason - Execute a single ReAct reasoning step
 app.post('/reason', async (req, res) => {
   try {
-    const { snapshot, inventory, goalStack, memorySummaries, lastToolResult, reflexionHints } = req.body;
+    const {
+      snapshot,
+      inventory,
+      goalStack,
+      memorySummaries,
+      lastToolResult,
+      reflexionHints,
+    } = req.body;
 
     // Validate required fields
     if (!snapshot || !inventory || !goalStack) {
-      return res.status(400).json({ 
-        error: 'Missing required fields: snapshot, inventory, goalStack' 
+      return res.status(400).json({
+        error: 'Missing required fields: snapshot, inventory, goalStack',
       });
     }
 
@@ -413,7 +570,7 @@ app.post('/reason', async (req, res) => {
     };
 
     const step = await reactArbiter.reason(context);
-    
+
     res.json({
       success: true,
       step,
@@ -421,9 +578,9 @@ app.post('/reason', async (req, res) => {
     });
   } catch (error) {
     console.error('ReAct reasoning failed:', error);
-    res.status(500).json({ 
-      error: 'ReAct reasoning failed', 
-      details: error instanceof Error ? error.message : 'Unknown error' 
+    res.status(500).json({
+      error: 'ReAct reasoning failed',
+      details: error instanceof Error ? error.message : 'Unknown error',
     });
   }
 });
@@ -435,19 +592,23 @@ app.post('/reflect', async (req, res) => {
 
     // Validate required fields
     if (!episodeTrace || !outcome) {
-      return res.status(400).json({ 
-        error: 'Missing required fields: episodeTrace, outcome' 
+      return res.status(400).json({
+        error: 'Missing required fields: episodeTrace, outcome',
       });
     }
 
     if (!['success', 'failure'].includes(outcome)) {
-      return res.status(400).json({ 
-        error: 'Outcome must be either "success" or "failure"' 
+      return res.status(400).json({
+        error: 'Outcome must be either "success" or "failure"',
       });
     }
 
-    const reflection = await reactArbiter.reflect(episodeTrace, outcome, errors);
-    
+    const reflection = await reactArbiter.reflect(
+      episodeTrace,
+      outcome,
+      errors
+    );
+
     res.json({
       success: true,
       reflection,
@@ -455,9 +616,9 @@ app.post('/reflect', async (req, res) => {
     });
   } catch (error) {
     console.error('Reflection generation failed:', error);
-    res.status(500).json({ 
-      error: 'Reflection generation failed', 
-      details: error instanceof Error ? error.message : 'Unknown error' 
+    res.status(500).json({
+      error: 'Reflection generation failed',
+      details: error instanceof Error ? error.message : 'Unknown error',
     });
   }
 });

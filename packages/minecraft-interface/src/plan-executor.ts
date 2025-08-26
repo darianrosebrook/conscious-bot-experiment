@@ -497,14 +497,35 @@ export class PlanExecutor extends EventEmitter {
     this.botAdapter.on('error', (error) => {
       this.emit('error', error);
 
-      // Emergency stop execution on critical errors
-      if (this.isExecuting) {
-        this.emit('executionInterrupted', {
-          error: error.error,
+      // Check if this is a death error
+      if (error.error === 'Bot died') {
+        console.log('Bot died, pausing execution until respawn...');
+        this.isExecuting = false;
+        this.emit('executionPaused', {
+          reason: 'bot_death',
           timestamp: Date.now(),
         });
-        this.isExecuting = false;
+      } else {
+        // Emergency stop execution on critical errors
+        if (this.isExecuting) {
+          this.emit('executionInterrupted', {
+            error: error.error,
+            timestamp: Date.now(),
+          });
+          this.isExecuting = false;
+        }
       }
+    });
+
+    // Handle respawn events
+    this.botAdapter.on('respawned', (data) => {
+      console.log('Bot respawned, resuming execution...');
+      this.emit('executionResumed', {
+        reason: 'bot_respawned',
+        health: data.health,
+        food: data.food,
+        timestamp: Date.now(),
+      });
     });
   }
 

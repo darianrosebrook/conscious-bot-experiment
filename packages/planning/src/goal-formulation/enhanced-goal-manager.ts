@@ -14,7 +14,7 @@ import {
   Need,
   NeedType,
   Resource,
-} from '@/types';
+} from '../types';
 import {
   AdvancedSignalProcessor,
   InternalSignal,

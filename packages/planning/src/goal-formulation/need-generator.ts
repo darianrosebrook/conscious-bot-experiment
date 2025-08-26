@@ -7,7 +7,7 @@
  * Author: @darianrosebrook
  */
 
-import { HomeostasisState, Need, NeedType } from '@/types';
+import { HomeostasisState, Need, NeedType } from '../types';
 
 /**
  * Generate needs ordered by intensity and urgency.

@@ -13,6 +13,19 @@ export { SignalProcessor } from './signal-processor';
 export { PerformanceMonitor } from './performance-monitor';
 export type { TrackingSession } from './performance-monitor';
 
+// Hybrid HRM Integration
+export { HybridHRMArbiter } from './hybrid-hrm-arbiter';
+export type {
+  HRMSignal,
+  NeedScore,
+  HRMGoalTemplate,
+  HRMGoalCandidate,
+  HRMPerformanceBudgets,
+  CachedResult,
+  SignalBatch,
+  OptimizationStats,
+} from './hybrid-hrm-arbiter';
+
 // Advanced Components
 export { AdvancedNeedGenerator } from './advanced-need-generator';
 export { GoalTemplateManager } from './goal-template-manager';
@@ -22,6 +35,8 @@ export { PriorityRanker } from './priority-ranker';
 // MCP Capabilities
 export { CapabilityRegistry, ConstitutionalFilter } from './mcp-capabilities';
 export { CapabilityRateLimiter } from './mcp-capabilities/rate-limiter';
+export { createLeafContext } from './mcp-capabilities/leaf-contracts';
+export { LeafFactory } from './mcp-capabilities/leaf-factory';
 
 // Real-Time Performance Monitoring
 export {

@@ -62,12 +62,12 @@ async function generateThoughts(): Promise<CognitiveThought[]> {
   if (!state || !plan) return [];
 
   const context = {
-    goals: plan.goalFormulation?.currentGoals || [],
-    state: {
-      pos: state.data?.position,
+    currentGoals: plan.goalFormulation?.currentGoals || [],
+    currentState: {
+      position: state.data?.position,
       health: state.data?.vitals?.health,
       inventory: state.data?.inventory,
-      tasks: plan.goalFormulation?.currentTasks || [],
+      currentTasks: plan.goalFormulation?.currentTasks || [],
     },
     emotional: 'neutral',
     urgency: 0.3,
@@ -97,7 +97,7 @@ async function generateThoughts(): Promise<CognitiveThought[]> {
         content: t.content,
         attribution: 'self',
         context: {
-          currentTask: context.state.tasks[0]?.description,
+          currentTask: context.currentState.currentTasks[0]?.description,
           emotionalState: t.emotionalState,
           confidence: t.confidence,
           cognitiveSystem: 'llm-core',
@@ -139,29 +139,53 @@ export const GET = async (req: NextRequest) => {
         activeConnections.size
       );
 
+      // Send initial data with existing thoughts
+      const initialData = {
+        type: 'cognitive_stream_init',
+        timestamp: Date.now(),
+        data: { thoughts: thoughtHistory.slice(-50) },
+      };
+
+      console.log(
+        'Sending initial data with',
+        thoughtHistory.length,
+        'thoughts'
+      );
       controller.enqueue(
-        encoder.encode(
-          `data: ${JSON.stringify({ type: 'cognitive_stream_init', timestamp: Date.now(), data: { thoughts: thoughtHistory.slice(-50) } })}\n\n`
-        )
+        encoder.encode(`data: ${JSON.stringify(initialData)}\n\n`)
       );
 
       const sendUpdates = async () => {
-        const thoughts = (
-          Math.random() < 0.15 ? await generateThoughts() : []
-        ).concat(
-          await processExternalChat(), // assume refactored similarly
-          await processBotResponses()
-        );
-        if (thoughts.length) {
-          controller.enqueue(
-            encoder.encode(
-              `data: ${JSON.stringify({ type: 'cognitive_thoughts', timestamp: Date.now(), data: { thoughts } })}\n\n`
-            )
-          );
+        try {
+          const thoughts = (
+            Math.random() < 0.15 ? await generateThoughts() : []
+          ).concat(await processExternalChat(), await processBotResponses());
+
+          if (thoughts.length > 0) {
+            console.log(
+              'Sending',
+              thoughts.length,
+              'new thoughts to',
+              activeConnections.size,
+              'connections'
+            );
+            const updateData = {
+              type: 'cognitive_thoughts',
+              timestamp: Date.now(),
+              data: { thoughts },
+            };
+
+            controller.enqueue(
+              encoder.encode(`data: ${JSON.stringify(updateData)}\n\n`)
+            );
+          }
+        } catch (error) {
+          console.error('Error in sendUpdates:', error);
         }
       };
 
       const interval = setInterval(sendUpdates, 15000);
+
       req.signal.addEventListener('abort', () => {
         clearInterval(interval);
         activeConnections.delete(controller);

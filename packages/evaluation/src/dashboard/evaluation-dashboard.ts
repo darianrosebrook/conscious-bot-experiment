@@ -14,8 +14,8 @@ import {
   EvaluationSession,
   Scenario,
   AgentConfig,
-  BenchmarkSuiteResult,
 } from '../types';
+import { BenchmarkSuiteResult } from '../benchmarking/performance-benchmarker';
 import {
   RegressionDetection,
   MonitoringDashboard,

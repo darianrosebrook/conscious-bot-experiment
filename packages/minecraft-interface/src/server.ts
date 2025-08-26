@@ -16,7 +16,12 @@ import {
   PlanExecutor,
   BotAdapter,
   ObservationMapper,
+  MemoryIntegrationService,
 } from './index';
+import {
+  HybridArbiterIntegration,
+  HybridArbiterConfig,
+} from './hybrid-arbiter-integration';
 import { createIntegratedPlanningCoordinator } from '@conscious-bot/planning';
 import { mineflayer as startMineflayerViewer } from 'prismarine-viewer';
 
@@ -39,6 +44,11 @@ const botConfig: BotConfig = {
   username: process.env.MINECRAFT_USERNAME || 'ConsciousBot',
   version: process.env.MINECRAFT_VERSION || '1.21.4',
   auth: 'offline',
+
+  // World configuration for memory versioning
+  worldSeed: process.env.WORLD_SEED,
+  worldName: process.env.WORLD_NAME,
+
   pathfindingTimeout: 30000,
   actionTimeout: 10000,
   observationRadius: 32,
@@ -54,6 +64,7 @@ let minecraftInterface: {
   planExecutor: PlanExecutor;
 } | null = null;
 let planningCoordinator: any = null;
+let memoryIntegration: MemoryIntegrationService | null = null;
 let isConnecting = false;
 let viewerActive = false;
 let autoConnectInterval: NodeJS.Timeout | null = null;
@@ -63,17 +74,28 @@ app.get('/health', (req, res) => {
   const botStatus = minecraftInterface?.botAdapter.getStatus();
   const executionStatus = minecraftInterface?.planExecutor.getExecutionStatus();
 
-  // Use execution status if available, otherwise fall back to bot adapter status
+  // Check if bot is connected and spawned
   const isConnected =
     (executionStatus && executionStatus.bot && executionStatus.bot.connected) ||
     (botStatus?.connected && botStatus?.connectionState === 'spawned');
+
+  // Check if bot is alive (health > 0)
+  const isAlive = botStatus?.health && botStatus.health > 0;
 
   // Check if viewer can be started
   const viewerCheck = minecraftInterface?.botAdapter.canStartViewer();
   const canStartViewer = viewerCheck?.canStart || false;
 
+  // Determine overall status
+  let status = 'disconnected';
+  if (isConnected && isAlive) {
+    status = 'connected';
+  } else if (isConnected && !isAlive) {
+    status = 'dead';
+  }
+
   res.json({
-    status: isConnected ? 'connected' : 'disconnected',
+    status,
     system: 'minecraft-bot',
     timestamp: Date.now(),
     version: '0.1.0',
@@ -92,86 +114,63 @@ app.get('/health', (req, res) => {
     botStatus: botStatus,
     executionStatus: executionStatus,
     connectionState: minecraftInterface?.botAdapter.getConnectionState(),
+    isAlive,
   });
 });
 
 // Connect to Minecraft server
 app.post('/connect', async (req, res) => {
+  if (isConnecting) {
+    return res.status(400).json({
+      success: false,
+      message: 'Connection already in progress',
+    });
+  }
+
+  isConnecting = true;
+
   try {
-    if (minecraftInterface?.botAdapter.getStatus()?.connected) {
-      return res.json({
-        success: true,
-        message: 'Already connected',
-        status: 'connected',
-      });
+    console.log('🔄 Connecting to Minecraft server...');
+
+    // Initialize memory integration service
+    memoryIntegration = new MemoryIntegrationService(botConfig, {
+      autoActivateNamespaces: true,
+    });
+
+    // Activate memory namespace for this world
+    const memoryActivated = await memoryIntegration.activateWorldMemory();
+    if (memoryActivated) {
+      console.log('✅ Memory namespace activated for world');
+    } else {
+      console.warn(
+        '⚠️ Failed to activate memory namespace, continuing without memory integration'
+      );
     }
 
-    if (isConnecting) {
-      return res.status(409).json({
-        success: false,
-        message: 'Connection already in progress',
-        status: 'connecting',
-      });
-    }
+    // Create minecraft interface
+    minecraftInterface = await createMinecraftInterface(botConfig);
 
-    isConnecting = true;
-    console.log(' Connecting to Minecraft server...');
+    // Initialize planning coordinator
+    planningCoordinator = createIntegratedPlanningCoordinator();
 
-    // Create planning coordinator
-    planningCoordinator = createIntegratedPlanningCoordinator({
-      coordinatorConfig: {
-        routingStrategy: 'adaptive',
-        fallbackTimeout: 30000,
-        enablePlanMerging: true,
-        enableCrossValidation: false,
-      },
-    });
-
-    // Create full minecraft interface
-    minecraftInterface = await createMinecraftInterfaceWithoutConnect(
-      botConfig,
-      planningCoordinator
-    );
-
-    // Manually initialize the plan executor to connect to Minecraft
-    await minecraftInterface.planExecutor.initialize();
-
-    // Set up event listeners
-    minecraftInterface.planExecutor.on('initialized', (event) => {
-      console.log(' Bot connected to Minecraft server');
-      // Start Prismarine viewer on first connect
-      try {
-        const bot = minecraftInterface?.botAdapter.getBot();
-        if (bot && !viewerActive) {
-          startViewerSafely(bot, viewerPort);
-        }
-      } catch (err) {
-        console.error('Failed to start Prismarine viewer:', err);
-        viewerActive = false;
-      }
-    });
-
-    minecraftInterface.planExecutor.on('shutdown', () => {
-      console.log(' Bot disconnected');
-      minecraftInterface = null;
-      viewerActive = false;
-    });
-
-    isConnecting = false;
+    console.log('✅ Connected to Minecraft server');
+    console.log('✅ Memory integration initialized');
+    console.log('✅ Planning coordinator initialized');
 
     res.json({
       success: true,
       message: 'Connected to Minecraft server',
-      status: 'connected',
+      memoryIntegration: memoryActivated,
     });
   } catch (error) {
-    isConnecting = false;
-    console.error(' Connection failed:', error);
+    console.error('❌ Failed to connect:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to connect to Minecraft server',
       error: error instanceof Error ? error.message : 'Unknown error',
     });
+  } finally {
+    isConnecting = false;
   }
 });
 
@@ -205,7 +204,7 @@ async function attemptAutoConnect() {
     await minecraftInterface.planExecutor.initialize();
 
     // Set up event listeners
-    minecraftInterface.planExecutor.on('initialized', () => {
+    minecraftInterface.planExecutor.on('initialized', (event) => {
       console.log(' Bot auto-connected to Minecraft server');
       // Start Prismarine viewer on first connect
       try {
@@ -435,12 +434,15 @@ app.get('/state', async (req, res) => {
     const executionStatus =
       minecraftInterface?.planExecutor.getExecutionStatus();
 
-    // Use execution status if available, otherwise fall back to bot adapter status
+    // Check if bot is connected and spawned
     const isConnected =
       (executionStatus &&
         executionStatus.bot &&
         executionStatus.bot.connected) ||
       (botStatus?.connected && botStatus?.connectionState === 'spawned');
+
+    // Check if bot is alive
+    const isAlive = botStatus?.health && botStatus.health > 0;
 
     if (!isConnected) {
       return res.status(503).json({
@@ -495,8 +497,9 @@ app.get('/state', async (req, res) => {
 
       return res.json({
         success: true,
-        status: 'connected',
+        status: isAlive ? 'connected' : 'dead',
         data: basicState,
+        isAlive,
       });
     }
 
@@ -507,8 +510,9 @@ app.get('/state', async (req, res) => {
 
     res.json({
       success: true,
-      status: 'connected',
+      status: isAlive ? 'connected' : 'dead',
       data: gameState,
+      isAlive,
     });
   } catch (error) {
     console.error(' Failed to get bot state:', error);
@@ -1073,4 +1077,127 @@ app.listen(port, () => {
       console.error('Failed to check bot status for auto-start viewer:', err);
     }
   }, 5000); // Wait 5 seconds for bot to connect
+});
+
+// Get memory integration status
+app.get('/memory/status', async (req, res) => {
+  try {
+    if (!memoryIntegration) {
+      return res.json({
+        success: false,
+        message: 'Memory integration not initialized',
+        data: null,
+      });
+    }
+
+    const namespace = await memoryIntegration.getActiveNamespace();
+    const stats = await memoryIntegration.getMemoryStats();
+    const context = memoryIntegration.getWorldContext();
+
+    res.json({
+      success: true,
+      data: {
+        connected: memoryIntegration.isMemoryConnected(),
+        namespace,
+        stats,
+        context,
+        sessionId: memoryIntegration.getSessionId(),
+      },
+    });
+  } catch (error) {
+    console.error('Failed to get memory status:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to get memory status',
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
+
+// Get memory namespace information
+app.get('/memory/namespace', async (req, res) => {
+  try {
+    if (!memoryIntegration) {
+      return res.json({
+        success: false,
+        message: 'Memory integration not initialized',
+        data: null,
+      });
+    }
+
+    const namespace = await memoryIntegration.getActiveNamespace();
+    const context = memoryIntegration.getWorldContext();
+
+    res.json({
+      success: true,
+      data: {
+        namespace,
+        context,
+        sessionId: memoryIntegration.getSessionId(),
+      },
+    });
+  } catch (error) {
+    console.error('Failed to get memory namespace:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to get memory namespace',
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
+
+// Store a memory
+app.post('/memory/store', async (req, res) => {
+  try {
+    if (!memoryIntegration) {
+      return res.status(400).json({
+        success: false,
+        message: 'Memory integration not initialized',
+      });
+    }
+
+    const memory = req.body;
+    const success = await memoryIntegration.storeMemory(memory);
+
+    res.json({
+      success,
+      message: success
+        ? 'Memory stored successfully'
+        : 'Failed to store memory',
+    });
+  } catch (error) {
+    console.error('Failed to store memory:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to store memory',
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
+
+// Retrieve memories
+app.post('/memory/retrieve', async (req, res) => {
+  try {
+    if (!memoryIntegration) {
+      return res.status(400).json({
+        success: false,
+        message: 'Memory integration not initialized',
+      });
+    }
+
+    const query = req.body;
+    const memories = await memoryIntegration.retrieveMemories(query);
+
+    res.json({
+      success: true,
+      data: memories,
+    });
+  } catch (error) {
+    console.error('Failed to retrieve memories:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to retrieve memories',
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
 });

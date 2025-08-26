@@ -7,6 +7,45 @@
 import { z } from 'zod';
 
 // ============================================================================
+// Memory Versioning Types
+// ============================================================================
+
+/**
+ * Memory context for versioning and isolation
+ */
+export interface MemoryContext {
+  worldSeed?: string; // World seed for memory isolation
+  worldName?: string; // World name for identification
+  sessionId: string; // Unique session identifier
+  timestamp: number; // Context creation timestamp
+  version: string; // Memory system version
+}
+
+/**
+ * Memory namespace for organizing memories by context
+ */
+export interface MemoryNamespace {
+  context: MemoryContext;
+  id: string; // Unique namespace identifier
+  createdAt: number;
+  lastAccessed: number;
+  memoryCount: number;
+  isActive: boolean;
+}
+
+/**
+ * Memory versioning configuration
+ */
+export interface MemoryVersioningConfig {
+  enableVersioning: boolean;
+  defaultNamespace: string;
+  autoCreateNamespaces: boolean;
+  namespaceCleanupInterval: number; // milliseconds
+  maxInactiveNamespaces: number;
+  seedBasedIsolation: boolean; // Use seed for memory isolation
+}
+
+// ============================================================================
 // Episodic Memory Types
 // ============================================================================
 

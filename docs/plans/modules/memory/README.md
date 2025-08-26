@@ -1,6 +1,6 @@
 # Memory Systems
 
-Multi-store memory architecture with provenance tracking and GraphRAG-first retrieval.
+Multi-store memory architecture with provenance tracking, GraphRAG-first retrieval, and seed-based versioning.
 
 ## Modules
 
@@ -36,11 +36,57 @@ Multi-store memory architecture with provenance tracking and GraphRAG-first retr
 - Why() function for telemetry and debugging
 - **Key Files:** `justification_tracker.py`, `evidence_manager.py`, `audit_trail.py`, `explanation_generator.py`
 
+### Memory Versioning (`memory-versioning-manager.ts`)
+**Purpose:** Seed-based memory isolation and namespace management
+- Automatic namespace creation based on world seeds
+- Memory isolation between different Minecraft worlds
+- Active namespace switching and cleanup
+- Statistics and monitoring for memory usage
+- **Key Files:** `memory-versioning-manager.ts`, `memory-integration.ts`
+
 ## Implementation Notes
 
 - GraphRAG prioritized over vector similarity searches
 - Minimal vector use (narrative snippets and chat only)
 - Predictable retrieval latency requirements
 - Comprehensive provenance for all decisions
+- **Seed-based memory isolation** for world-specific learning
 
-Author: @darianrosebrook
+## Memory Versioning
+
+The memory system now supports automatic versioning based on Minecraft world seeds. This ensures that:
+
+- Each world maintains separate memory context
+- No cross-contamination between different seeds
+- Bot can learn world-specific knowledge
+- Memory isolation enables focused learning
+
+### Quick Start
+
+```bash
+# Set world seed for memory isolation
+export WORLD_SEED=12345
+export WORLD_NAME="My World"
+
+# Start memory service
+cd packages/memory && pnpm run dev:server
+
+# Start minecraft interface (will auto-activate memory namespace)
+cd packages/minecraft-interface && pnpm run dev:server
+```
+
+### Testing
+
+```bash
+# Test memory versioning
+cd packages/memory && pnpm test memory-versioning.test.ts
+
+# Run memory versioning demo
+cd packages/minecraft-interface && pnpm tsx bin/memory-versioning-demo.ts
+```
+
+For detailed documentation, see [Memory Versioning System](memory-versioning.md).
+
+---
+
+**Author**: @darianrosebrook

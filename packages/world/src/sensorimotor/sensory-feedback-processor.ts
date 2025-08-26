@@ -89,25 +89,25 @@ export class SensoryFeedbackProcessor
       this.feedbackBuffer.push(rawData);
       this.maintainBufferSize();
 
-      // Stage 1: Data preprocessing
+      // Data preprocessing
       const filteredData = this.filterNoise(rawData);
       const alignedData = this.temporalAlignment(filteredData, actionId);
 
-      // Stage 2: Feature extraction
+      // Feature extraction
       const relevantFeatures = this.extractRelevantFeatures(
         alignedData,
         actionId
       );
       const recognizedPatterns = this.recognizePatterns(relevantFeatures);
 
-      // Stage 3: Feedback interpretation
+      // Feedback interpretation
       const interpretation = this.interpretFeedback(
         relevantFeatures,
         recognizedPatterns,
         actionId
       );
 
-      // Stage 4: Learning signal generation
+      // Learning signal generation
       const learningSignal = this.generateLearningSignal(
         interpretation,
         actionId

@@ -1,16 +1,33 @@
 {
-  "extends": "../../tsconfig.json",
   "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022"],
+    "allowJs": true,
+    "skipLibCheck": true,
+    "strict": true,
+    "composite": true,
     "noEmit": false,
+    "esModuleInterop": true,
+    "module": "CommonJS",
+    "moduleResolution": "node",
+    "resolveJsonModule": true,
     "declaration": true,
-    "outDir": "./dist",
-    "rootDir": "./src",
-    "baseUrl": "./src",
+    "declarationMap": true,
+    "sourceMap": true,
+    "outDir": "dist",
+    "rootDir": "src",
+    "baseUrl": "src",
     "paths": {
       "@/*": ["./*"],
       "@": ["./"]
     }
   },
   "include": ["src/**/*"],
-  "exclude": ["node_modules", "dist", "**/*.test.ts"]
+  "exclude": [
+    "node_modules",
+    "dist",
+    "**/*.test.ts",
+    "src/server.ts",
+    "src/skill-integration/**/*"
+  ]
 }

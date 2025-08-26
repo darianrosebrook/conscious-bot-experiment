@@ -1,24 +1,21 @@
 /**
  * Memory System HTTP Server
  *
- * Provides HTTP API endpoints for the memory system.
+ * Provides HTTP API endpoints for the multi-store memory system.
+ * Supports episodic, semantic, working, and provenance memory.
  *
  * @author @darianrosebrook
  */
 
 import express from 'express';
 import cors from 'cors';
-import {
-  EventLogger,
-  SalienceScorer,
-  MemoryConsolidation,
-  EpisodicRetrieval,
-  NarrativeGenerator,
-} from './episodic';
-import { createWorkingMemory } from './working';
+import { EventLogger, SalienceScorer, MemoryConsolidation, EpisodicRetrieval, NarrativeGenerator } from './episodic';
 import { createSemanticMemory } from './semantic';
+import { createWorkingMemory } from './working';
 import { createProvenanceSystem } from './provenance';
-import { SkillRegistry } from './skills/SkillRegistry';
+import { SkillRegistry } from './skills';
+import { MemoryVersioningManager } from './memory-versioning-manager';
+import { MemoryContext } from './types';
 
 const app = express();
 const port = process.env.PORT ? parseInt(process.env.PORT) : 3001;
@@ -26,6 +23,13 @@ const port = process.env.PORT ? parseInt(process.env.PORT) : 3001;
 // Middleware
 app.use(cors());
 app.use(express.json());
+
+// Initialize memory versioning manager
+const memoryVersioningManager = new MemoryVersioningManager({
+  enableVersioning: true,
+  seedBasedIsolation: true,
+  autoCreateNamespaces: true,
+});
 
 // Initialize skill registry
 const skillRegistry = new SkillRegistry();
@@ -87,19 +91,14 @@ const memorySystem = {
   },
   skills: {
     registry: skillRegistry,
+  },
+  versioning: {
+    manager: memoryVersioningManager,
 
     // Convenience methods
-    getSkill: (skillId: string) => skillRegistry.getSkill(skillId),
-    getAllSkills: () => skillRegistry.getAllSkills(),
-    findSkillsForPreconditions: (state: any) =>
-      skillRegistry.findSkillsForPreconditions(state),
-    recordSkillUsage: (skillId: string, success: boolean, duration: number) =>
-      skillRegistry.recordSkillUsage(skillId, success, duration),
-    getSkillReuseStats: () => skillRegistry.getSkillReuseStats(),
-    getNextCurriculumGoal: (completedSkills: string[]) =>
-      skillRegistry.getNextCurriculumGoal(completedSkills),
-    completeCurriculumGoal: (goalId: string) =>
-      skillRegistry.completeCurriculumGoal(goalId),
+    getActiveNamespace: () => memoryVersioningManager.getActiveNamespace(),
+    getAllNamespaces: () => memoryVersioningManager.getAllNamespaces(),
+    getStats: () => memoryVersioningManager.getStats(),
   },
 };
 
@@ -231,7 +230,7 @@ app.post('/control', (req, res) => {
 // GET /skills - Get all skills
 app.get('/skills', (req, res) => {
   try {
-    const skills = memorySystem.skills.getAllSkills();
+    const skills = memorySystem.skills.registry.getAllSkills();
 
     res.json({
       success: true,
@@ -250,7 +249,7 @@ app.get('/skills', (req, res) => {
 // GET /skills/stats - Get skill reuse statistics
 app.get('/skills/stats', (req, res) => {
   try {
-    const stats = memorySystem.skills.getSkillReuseStats();
+    const stats = memorySystem.skills.registry.getSkillReuseStats();
 
     res.json({
       success: true,
@@ -270,7 +269,7 @@ app.get('/skills/stats', (req, res) => {
 app.get('/skills/:id', (req, res) => {
   try {
     const { id } = req.params;
-    const skill = memorySystem.skills.getSkill(id);
+    const skill = memorySystem.skills.registry.getSkill(id);
 
     if (!skill) {
       return res.status(404).json({ error: 'Skill not found' });
@@ -325,7 +324,7 @@ app.post('/skills/usage', (req, res) => {
         .json({ error: 'Missing required fields: skillId, success, duration' });
     }
 
-    memorySystem.skills.recordSkillUsage(skillId, success, duration);
+    memorySystem.skills.registry.recordSkillUsage(skillId, success, duration);
 
     res.json({
       success: true,
@@ -350,7 +349,7 @@ app.get('/curriculum', (req, res) => {
       : [];
 
     const nextGoal =
-      memorySystem.skills.getNextCurriculumGoal(completedSkillsArray);
+      memorySystem.skills.registry.getNextCurriculumGoal(completedSkillsArray);
 
     res.json({
       success: true,
@@ -375,7 +374,7 @@ app.post('/curriculum/complete', (req, res) => {
       return res.status(400).json({ error: 'Missing required field: goalId' });
     }
 
-    memorySystem.skills.completeCurriculumGoal(goalId);
+    memorySystem.skills.registry.completeCurriculumGoal(goalId);
 
     res.json({
       success: true,
@@ -387,6 +386,127 @@ app.post('/curriculum/complete', (req, res) => {
     res.status(500).json({
       error: 'Failed to complete curriculum goal',
       details: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
+
+// Get memory system stats
+app.get('/stats', (req, res) => {
+  try {
+    const stats = {
+      episodic: memorySystem.episodic.getMemoryCount(),
+      semantic: {
+        entities: memorySystem.semantic.getEntityCount(),
+        relationships: memorySystem.semantic.getRelationshipCount(),
+      },
+      working: {
+        attentionLevel: memorySystem.working.getAttentionLevel(),
+        currentContext: memorySystem.working.getCurrentContext(),
+      },
+      provenance: memorySystem.provenance.getActionCount(),
+      versioning: memorySystem.versioning.getStats(),
+    };
+
+    res.json({
+      success: true,
+      data: stats,
+    });
+  } catch (error) {
+    console.error('Failed to get memory stats:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to get memory stats',
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
+
+// Memory versioning endpoints
+app.post('/versioning/activate', (req, res) => {
+  try {
+    const { worldSeed, worldName, sessionId } = req.body;
+    
+    const context: MemoryContext = {
+      worldSeed,
+      worldName,
+      sessionId: sessionId || `session_${Date.now()}`,
+      timestamp: Date.now(),
+      version: '1.0.0',
+    };
+
+    const namespace = memorySystem.versioning.manager.activateNamespace(context);
+
+    res.json({
+      success: true,
+      data: {
+        namespace,
+        message: `Activated namespace: ${namespace.id}`,
+      },
+    });
+  } catch (error) {
+    console.error('Failed to activate namespace:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to activate namespace',
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
+
+app.get('/versioning/namespaces', (req, res) => {
+  try {
+    const namespaces = memorySystem.versioning.getAllNamespaces();
+    const activeNamespace = memorySystem.versioning.getActiveNamespace();
+
+    res.json({
+      success: true,
+      data: {
+        namespaces,
+        activeNamespace,
+      },
+    });
+  } catch (error) {
+    console.error('Failed to get namespaces:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to get namespaces',
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
+
+app.get('/versioning/active', (req, res) => {
+  try {
+    const activeNamespace = memorySystem.versioning.getActiveNamespace();
+
+    res.json({
+      success: true,
+      data: activeNamespace,
+    });
+  } catch (error) {
+    console.error('Failed to get active namespace:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to get active namespace',
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
+
+app.get('/versioning/stats', (req, res) => {
+  try {
+    const stats = memorySystem.versioning.getStats();
+
+    res.json({
+      success: true,
+      data: stats,
+    });
+  } catch (error) {
+    console.error('Failed to get versioning stats:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to get versioning stats',
+      error: error instanceof Error ? error.message : 'Unknown error',
     });
   }
 });

@@ -340,6 +340,20 @@ export class BotAdapter extends EventEmitter {
       }
 
       this.emitBotEvent('error', deathData);
+
+      // Don't immediately attempt reconnection on death
+      // Let the server handle respawn naturally
+      console.log('Bot died, waiting for respawn...');
+    });
+
+    // Respawn handling
+    this.bot.on('respawn', () => {
+      console.log('Bot respawned successfully');
+      this.emitBotEvent('respawned', {
+        health: this.bot?.health || 20,
+        food: this.bot?.food || 20,
+        position: this.bot?.entity?.position?.clone(),
+      });
     });
 
     // Kicked handling

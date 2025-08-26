@@ -4,7 +4,7 @@
  * Author: @darianrosebrook
  */
 
-import { Goal, Plan } from '@/types';
+import { Goal, Plan } from '../types';
 
 export function decomposeToPlan(goal: Goal): Plan | undefined {
   if (!goal) return undefined;

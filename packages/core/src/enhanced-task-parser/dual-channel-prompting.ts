@@ -1,10 +1,10 @@
 /**
  * Dual-Channel Prompting System
- * 
+ *
  * Provides operational (low temperature) and expressive (high temperature) channels
  * for task parsing and user interaction, enabling both precise task execution
  * and creative, context-aware language generation.
- * 
+ *
  * @author @darianrosebrook
  */
 
@@ -71,7 +71,9 @@ export const ChannelSelectionCriteriaSchema = z.object({
   social_context: z.string(),
 });
 
-export type ChannelSelectionCriteria = z.infer<typeof ChannelSelectionCriteriaSchema>;
+export type ChannelSelectionCriteria = z.infer<
+  typeof ChannelSelectionCriteriaSchema
+>;
 
 /**
  * Prompt result with channel information
@@ -173,7 +175,7 @@ export const DEFAULT_DUAL_CHANNEL_CONFIG: DualChannelConfig = {
 
 /**
  * Dual-Channel Prompting System
- * 
+ *
  * Manages operational and expressive channels for task parsing and user interaction,
  * providing context-aware routing and automatic fallback mechanisms.
  */
@@ -251,13 +253,22 @@ export class DualChannelPrompting extends EventEmitter {
 
     try {
       const config = this.config[channel];
-      const prompt = this.buildPrompt(config, userInput, environmentalContext, additionalContext);
+      const prompt = this.buildPrompt(
+        config,
+        userInput,
+        environmentalContext,
+        additionalContext
+      );
 
       // Simulate LLM call (in real implementation, this would call the actual LLM)
       const response = await this.simulateLLMCall(channel, prompt, config);
 
       const processingTime = Date.now() - startTime;
-      const confidence = this.calculateConfidence(channel, response, environmentalContext);
+      const confidence = this.calculateConfidence(
+        channel,
+        response,
+        environmentalContext
+      );
 
       const result: PromptResult = {
         id: promptId,
@@ -280,15 +291,23 @@ export class DualChannelPrompting extends EventEmitter {
 
       this.emit('prompt_generated', result);
       return result;
-
     } catch (error) {
       const processingTime = Date.now() - startTime;
       this.updatePerformanceMetrics(channel, false, processingTime);
 
       // Handle fallback if enabled
       if (this.config.auto_fallback && channel === 'operational') {
-        this.emit('fallback_triggered', { from: channel, to: 'expressive', error });
-        return this.generatePrompt('expressive', userInput, environmentalContext, additionalContext);
+        this.emit('fallback_triggered', {
+          from: channel,
+          to: 'expressive',
+          error,
+        });
+        return this.generatePrompt(
+          'expressive',
+          userInput,
+          environmentalContext,
+          additionalContext
+        );
       }
 
       throw error;
@@ -314,16 +333,26 @@ export class DualChannelPrompting extends EventEmitter {
       const channel = this.selectChannel(userInput, environmentalContext);
 
       // Generate prompt and response
-      const promptResult = await this.generatePrompt(channel, userInput, environmentalContext);
+      const promptResult = await this.generatePrompt(
+        channel,
+        userInput,
+        environmentalContext
+      );
 
       // Parse the response into a task definition
-      const task = await this.parseResponseToTask(promptResult.response, channel);
+      const task = await this.parseResponseToTask(
+        promptResult.response,
+        channel
+      );
 
       // Validate the task
       const validation = await this.validateTask(task, environmentalContext);
 
       // Check feasibility
-      const feasibility = await this.checkFeasibility(task, environmentalContext);
+      const feasibility = await this.checkFeasibility(
+        task,
+        environmentalContext
+      );
 
       const parsingTime = Date.now() - startTime;
 
@@ -337,14 +366,17 @@ export class DualChannelPrompting extends EventEmitter {
 
       this.emit('task_parsed', { result, channel_used: channel });
       return result;
-
     } catch (error) {
       const parsingTime = Date.now() - startTime;
-      
+
       // If operational channel fails, try expressive channel
       if (this.config.auto_fallback) {
         this.emit('fallback_attempt', { error, retry_with: 'expressive' });
-        return this.parseUserInputWithChannel('expressive', userInput, environmentalContext);
+        return this.parseUserInputWithChannel(
+          'expressive',
+          userInput,
+          environmentalContext
+        );
       }
 
       throw error;
@@ -363,13 +395,22 @@ export class DualChannelPrompting extends EventEmitter {
 
     try {
       // Select channel based on target audience
-      const channel: ChannelType = targetAudience === 'user' ? 'expressive' : 'operational';
+      const channel: ChannelType =
+        targetAudience === 'user' ? 'expressive' : 'operational';
 
       // Create paraphrasing prompt
-      const prompt = this.buildParaphrasingPrompt(task, environmentalContext, targetAudience);
+      const prompt = this.buildParaphrasingPrompt(
+        task,
+        environmentalContext,
+        targetAudience
+      );
 
       // Generate paraphrase
-      const promptResult = await this.generatePrompt(channel, prompt, environmentalContext);
+      const promptResult = await this.generatePrompt(
+        channel,
+        prompt,
+        environmentalContext
+      );
 
       // Extract paraphrased task and reasoning
       const paraphraseData = this.extractParaphraseData(promptResult.response);
@@ -387,7 +428,6 @@ export class DualChannelPrompting extends EventEmitter {
 
       this.emit('task_paraphrased', result);
       return result;
-
     } catch (error) {
       const processingTime = Date.now() - startTime;
       this.emit('paraphrase_error', { error, task, processingTime });
@@ -423,18 +463,40 @@ export class DualChannelPrompting extends EventEmitter {
   /**
    * Analyze user intent from input text
    */
-  private analyzeUserIntent(userInput: string): ChannelSelectionCriteria['user_intent'] {
+  private analyzeUserIntent(
+    userInput: string
+  ): ChannelSelectionCriteria['user_intent'] {
     const lowerInput = userInput.toLowerCase();
 
-    if (lowerInput.includes('?') || lowerInput.includes('what') || lowerInput.includes('how')) {
+    if (
+      lowerInput.includes('?') ||
+      lowerInput.includes('what') ||
+      lowerInput.includes('how')
+    ) {
       return 'question';
-    } else if (lowerInput.includes('please') || lowerInput.includes('can you') || lowerInput.includes('help')) {
-      return 'request';
-    } else if (lowerInput.includes('hello') || lowerInput.includes('hi') || lowerInput.includes('greetings')) {
-      return 'greeting';
-    } else if (lowerInput.includes('build') || lowerInput.includes('gather') || lowerInput.includes('craft')) {
+    } else if (
+      lowerInput.includes('please') ||
+      lowerInput.includes('can you') ||
+      lowerInput.includes('help')
+    ) {
       return 'command';
-    } else if (lowerInput.includes('story') || lowerInput.includes('imagine') || lowerInput.includes('creative')) {
+    } else if (
+      lowerInput.includes('hello') ||
+      lowerInput.includes('hi') ||
+      lowerInput.includes('greetings')
+    ) {
+      return 'conversation';
+    } else if (
+      lowerInput.includes('build') ||
+      lowerInput.includes('gather') ||
+      lowerInput.includes('craft')
+    ) {
+      return 'command';
+    } else if (
+      lowerInput.includes('story') ||
+      lowerInput.includes('imagine') ||
+      lowerInput.includes('creative')
+    ) {
       return 'creative';
     } else {
       return 'command';
@@ -459,7 +521,11 @@ export class DualChannelPrompting extends EventEmitter {
     }
 
     // Add complexity for conditional logic
-    if (lowerInput.includes('if') || lowerInput.includes('when') || lowerInput.includes('unless')) {
+    if (
+      lowerInput.includes('if') ||
+      lowerInput.includes('when') ||
+      lowerInput.includes('unless')
+    ) {
       complexity += 0.2;
     }
 
@@ -478,11 +544,18 @@ export class DualChannelPrompting extends EventEmitter {
     const lowerInput = userInput.toLowerCase();
     let urgency = 0.5; // Base urgency
 
-    if (lowerInput.includes('urgent') || lowerInput.includes('immediately') || lowerInput.includes('now')) {
+    if (
+      lowerInput.includes('urgent') ||
+      lowerInput.includes('immediately') ||
+      lowerInput.includes('now')
+    ) {
       urgency = 0.9;
     } else if (lowerInput.includes('soon') || lowerInput.includes('quickly')) {
       urgency = 0.7;
-    } else if (lowerInput.includes('whenever') || lowerInput.includes('sometime')) {
+    } else if (
+      lowerInput.includes('whenever') ||
+      lowerInput.includes('sometime')
+    ) {
       urgency = 0.3;
     }
 
@@ -492,7 +565,9 @@ export class DualChannelPrompting extends EventEmitter {
   /**
    * Analyze environmental context for channel selection
    */
-  private analyzeEnvironmentalContext(environmentalContext: EnvironmentalContext): string {
+  private analyzeEnvironmentalContext(
+    environmentalContext: EnvironmentalContext
+  ): string {
     if (environmentalContext.threat_level > 0.8) {
       return 'dangerous';
     } else if (environmentalContext.threat_level > 0.5) {
@@ -509,14 +584,19 @@ export class DualChannelPrompting extends EventEmitter {
   /**
    * Context-aware channel selection
    */
-  private contextAwareChannelSelection(criteria: ChannelSelectionCriteria): ChannelType {
+  private contextAwareChannelSelection(
+    criteria: ChannelSelectionCriteria
+  ): ChannelType {
     // High complexity tasks -> operational
     if (criteria.task_complexity > 0.7) {
       return 'operational';
     }
 
     // Creative or conversational intent -> expressive
-    if (criteria.user_intent === 'creative' || criteria.user_intent === 'conversation') {
+    if (
+      criteria.user_intent === 'creative' ||
+      criteria.user_intent === 'conversation'
+    ) {
       return 'expressive';
     }
 
@@ -547,7 +627,9 @@ export class DualChannelPrompting extends EventEmitter {
   /**
    * Simple channel selection based on intent
    */
-  private simpleChannelSelection(criteria: ChannelSelectionCriteria): ChannelType {
+  private simpleChannelSelection(
+    criteria: ChannelSelectionCriteria
+  ): ChannelType {
     if (criteria.user_intent === 'command') {
       return 'operational';
     } else {
@@ -568,7 +650,10 @@ export class DualChannelPrompting extends EventEmitter {
 
     // Replace template variables
     prompt = prompt.replace('{user_input}', userInput);
-    prompt = prompt.replace('{environmental_context}', JSON.stringify(environmentalContext));
+    prompt = prompt.replace(
+      '{environmental_context}',
+      JSON.stringify(environmentalContext)
+    );
     prompt = prompt.replace('{timestamp}', Date.now().toString());
 
     if (additionalContext) {
@@ -608,10 +693,14 @@ Provide a structured, technical description for system execution.`;
   /**
    * Simulate LLM call (placeholder for actual implementation)
    */
-  private async simulateLLMCall(channel: ChannelType, prompt: string, config: PromptConfig): Promise<string> {
+  private async simulateLLMCall(
+    channel: ChannelType,
+    prompt: string,
+    config: PromptConfig
+  ): Promise<string> {
     // Simulate processing time based on temperature (much faster for testing)
     const processingTime = Math.random() * 50 + 10; // 10-60ms instead of 500-1500ms
-    await new Promise(resolve => setTimeout(resolve, processingTime));
+    await new Promise((resolve) => setTimeout(resolve, processingTime));
 
     // Analyze the prompt to determine task type
     const lowerPrompt = prompt.toLowerCase();
@@ -621,17 +710,32 @@ Provide a structured, technical description for system execution.`;
     let location = 'nearest_forest';
 
     // Look for crafting-related keywords
-    if (lowerPrompt.includes('craft') || lowerPrompt.includes('diamond pickaxe') || lowerPrompt.includes('pickaxe') || lowerPrompt.includes('crafting') || lowerPrompt.includes('diamond')) {
+    if (
+      lowerPrompt.includes('craft') ||
+      lowerPrompt.includes('diamond pickaxe') ||
+      lowerPrompt.includes('pickaxe') ||
+      lowerPrompt.includes('crafting') ||
+      lowerPrompt.includes('diamond')
+    ) {
       taskType = 'crafting';
       resource = 'diamond';
       quantity = 1;
       location = 'crafting_table';
-    } else if (lowerPrompt.includes('shelter') || lowerPrompt.includes('house') || lowerPrompt.includes('build') || lowerPrompt.includes('construction')) {
+    } else if (
+      lowerPrompt.includes('shelter') ||
+      lowerPrompt.includes('house') ||
+      lowerPrompt.includes('build') ||
+      lowerPrompt.includes('construction')
+    ) {
       taskType = 'building';
       resource = 'materials';
       quantity = 5;
       location = 'current_location';
-    } else if (lowerPrompt.includes('explore') || lowerPrompt.includes('search') || lowerPrompt.includes('find')) {
+    } else if (
+      lowerPrompt.includes('explore') ||
+      lowerPrompt.includes('search') ||
+      lowerPrompt.includes('find')
+    ) {
       taskType = 'exploration';
       resource = 'information';
       quantity = 1;
@@ -666,7 +770,11 @@ Provide a structured, technical description for system execution.`;
   /**
    * Calculate confidence score for the response
    */
-  private calculateConfidence(channel: ChannelType, response: string, environmentalContext: EnvironmentalContext): number {
+  private calculateConfidence(
+    channel: ChannelType,
+    response: string,
+    environmentalContext: EnvironmentalContext
+  ): number {
     let confidence = 0.8; // Base confidence
 
     // Adjust based on channel
@@ -698,7 +806,10 @@ Provide a structured, technical description for system execution.`;
   /**
    * Parse response to task definition
    */
-  private async parseResponseToTask(response: string, channel: ChannelType): Promise<TaskDefinition> {
+  private async parseResponseToTask(
+    response: string,
+    channel: ChannelType
+  ): Promise<TaskDefinition> {
     if (channel === 'operational') {
       try {
         const taskData = JSON.parse(response);
@@ -709,7 +820,9 @@ Provide a structured, technical description for system execution.`;
           updated_at: Date.now(),
         };
       } catch (error) {
-        throw new Error(`Failed to parse operational response as JSON: ${error}`);
+        throw new Error(
+          `Failed to parse operational response as JSON: ${error}`
+        );
       }
     } else {
       // For expressive channel, extract task information from natural language
@@ -723,26 +836,42 @@ Provide a structured, technical description for system execution.`;
   private extractTaskFromNaturalLanguage(response: string): TaskDefinition {
     // Enhanced extraction logic - in real implementation, this would be more sophisticated
     const lowerResponse = response.toLowerCase();
-    
+
     let type = 'exploration';
     const parameters: Record<string, any> = {};
 
     // Check for crafting first (before gathering, since crafting responses might mention gathering materials)
-    if (lowerResponse.includes('craft') || lowerResponse.includes('diamond pickaxe') || lowerResponse.includes('pickaxe') || lowerResponse.includes('crafting')) {
+    if (
+      lowerResponse.includes('craft') ||
+      lowerResponse.includes('diamond pickaxe') ||
+      lowerResponse.includes('pickaxe') ||
+      lowerResponse.includes('crafting')
+    ) {
       type = 'crafting';
       parameters.resource = 'diamond';
       parameters.tool = 'crafting_table';
-    } else if (lowerResponse.includes('build') || lowerResponse.includes('construct') || lowerResponse.includes('shelter')) {
+    } else if (
+      lowerResponse.includes('build') ||
+      lowerResponse.includes('construct') ||
+      lowerResponse.includes('shelter')
+    ) {
       type = 'building';
       parameters.material = 'building_materials';
       parameters.location = 'current_location';
-    } else if (lowerResponse.includes('gather') || lowerResponse.includes('collect')) {
+    } else if (
+      lowerResponse.includes('gather') ||
+      lowerResponse.includes('collect')
+    ) {
       type = 'gathering';
       const resourceMatch = lowerResponse.match(/(?:gather|collect)\s+(\w+)/);
       if (resourceMatch) {
         parameters.resource = resourceMatch[1];
       }
-    } else if (lowerResponse.includes('explore') || lowerResponse.includes('search') || lowerResponse.includes('find')) {
+    } else if (
+      lowerResponse.includes('explore') ||
+      lowerResponse.includes('search') ||
+      lowerResponse.includes('find')
+    ) {
       type = 'exploration';
       parameters.target = 'information';
       parameters.area = 'surrounding_area';
@@ -779,7 +908,10 @@ Provide a structured, technical description for system execution.`;
   /**
    * Validate task (placeholder - would integrate with existing validation)
    */
-  private async validateTask(task: TaskDefinition, environmentalContext: EnvironmentalContext): Promise<TaskValidationResult> {
+  private async validateTask(
+    task: TaskDefinition,
+    environmentalContext: EnvironmentalContext
+  ): Promise<TaskValidationResult> {
     // Placeholder implementation
     return {
       is_valid: true,
@@ -793,7 +925,10 @@ Provide a structured, technical description for system execution.`;
   /**
    * Check feasibility (placeholder - would integrate with existing feasibility)
    */
-  private async checkFeasibility(task: TaskDefinition, environmentalContext: EnvironmentalContext): Promise<TaskFeasibility> {
+  private async checkFeasibility(
+    task: TaskDefinition,
+    environmentalContext: EnvironmentalContext
+  ): Promise<TaskFeasibility> {
     // Placeholder implementation
     return {
       is_feasible: true,
@@ -818,7 +953,11 @@ Provide a structured, technical description for system execution.`;
     userInput: string,
     environmentalContext: EnvironmentalContext
   ): Promise<TaskParsingResult> {
-    const promptResult = await this.generatePrompt(channel, userInput, environmentalContext);
+    const promptResult = await this.generatePrompt(
+      channel,
+      userInput,
+      environmentalContext
+    );
     const task = await this.parseResponseToTask(promptResult.response, channel);
     const validation = await this.validateTask(task, environmentalContext);
     const feasibility = await this.checkFeasibility(task, environmentalContext);
@@ -858,17 +997,27 @@ Provide a structured, technical description for system execution.`;
   /**
    * Update performance metrics
    */
-  private updatePerformanceMetrics(channel: ChannelType, success: boolean, processingTime: number): void {
+  private updatePerformanceMetrics(
+    channel: ChannelType,
+    success: boolean,
+    processingTime: number
+  ): void {
     // Update success rates
     const totalPrompts = Array.from(this.promptHistory.values()).length;
     if (totalPrompts > 0) {
-      const successfulPrompts = Array.from(this.promptHistory.values()).filter(p => p.confidence > 0.5).length;
-      this.performanceMetrics.operational_success_rate = successfulPrompts / totalPrompts;
+      const successfulPrompts = Array.from(this.promptHistory.values()).filter(
+        (p) => p.confidence > 0.5
+      ).length;
+      this.performanceMetrics.operational_success_rate =
+        successfulPrompts / totalPrompts;
     }
 
     // Update average response time
-    const allTimes = Array.from(this.promptHistory.values()).map(p => p.processing_time);
-    this.performanceMetrics.average_response_time = allTimes.reduce((a, b) => a + b, 0) / allTimes.length;
+    const allTimes = Array.from(this.promptHistory.values()).map(
+      (p) => p.processing_time
+    );
+    this.performanceMetrics.average_response_time =
+      allTimes.reduce((a, b) => a + b, 0) / allTimes.length;
   }
 
   // ===== PUBLIC GETTERS =====

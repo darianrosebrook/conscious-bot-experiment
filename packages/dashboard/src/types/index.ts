@@ -96,6 +96,45 @@ export interface Environment {
   nearbyEntities: string[];
 }
 
+// Planner types
+export interface PlanStep {
+  id: string;
+  name: string;
+  status: 'pending' | 'in_progress' | 'completed';
+  priority: number;
+}
+
+export interface Plan {
+  id: string;
+  name: string;
+  description: string;
+  steps: PlanStep[];
+  progress: number;
+  estimatedDuration: number;
+  createdAt: number;
+}
+
+export interface Action {
+  id: string;
+  name: string;
+  type: string;
+  target?: string;
+  priority: number;
+  startedAt?: number;
+  estimatedDuration?: number;
+  progress?: number;
+}
+
+export interface PlannerData {
+  currentPlan: Plan | null;
+  planQueue: Omit<Plan, 'steps' | 'progress' | 'createdAt'>[];
+  currentAction: Action | null;
+  actionQueue: Action[];
+  isPlanningActive: boolean;
+  isExecuting: boolean;
+  timestamp: number;
+}
+
 // Inventory types
 export interface InventoryItem {
   type: string | number | null;
@@ -154,4 +193,5 @@ export interface DashboardState {
   environment: Environment | null;
   currentScreenshot: Screenshot | null;
   inventory: InventoryItem[];
+  plannerData: PlannerData | null;
 }

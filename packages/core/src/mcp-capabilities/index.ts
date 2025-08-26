@@ -11,6 +11,12 @@
 export { CapabilityRegistry } from './capability-registry';
 export { ConstitutionalFilter } from './constitutional-filter';
 
+// Hybrid HRM Integration
+export { HybridHRMRouter } from './hybrid-hrm-integration';
+
+// Leaf Contract System
+export { createLeafContext } from './leaf-contracts';
+
 // Capability specifications
 export {
   ALL_CAPABILITIES,

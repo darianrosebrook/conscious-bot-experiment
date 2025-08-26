@@ -352,7 +352,12 @@ export class SkillRegistry {
     skills: Skill[];
     compositions: SkillComposition[];
     curriculum: CurriculumGoal[];
-    usageHistory: typeof this.usageHistory;
+    usageHistory: Array<{
+      skillId: string;
+      timestamp: number;
+      success: boolean;
+      duration: number;
+    }>;
   } {
     return {
       skills: Array.from(this.skills.values()),

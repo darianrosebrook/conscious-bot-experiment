@@ -13,6 +13,8 @@ export async function GET(_request: NextRequest) {
   try {
     // Try to fetch inventory data from Minecraft bot server
     let inventory = [];
+    let botStatus = 'disconnected';
+    let isAlive = false;
 
     try {
       const response = await fetch('http://localhost:3005/state', {
@@ -27,6 +29,8 @@ export async function GET(_request: NextRequest) {
         if (data.success) {
           // The inventory is now at data.data.worldState.inventory.items
           inventory = data.data?.worldState?.inventory?.items || [];
+          botStatus = data.status || 'unknown';
+          isAlive = data.isAlive || false;
         }
       }
     } catch (error) {
@@ -125,6 +129,8 @@ export async function GET(_request: NextRequest) {
       success: true,
       inventory: transformedInventory,
       totalItems: transformedInventory.length,
+      botStatus,
+      isAlive,
       timestamp: Date.now(),
     });
   } catch (error) {
@@ -138,6 +144,8 @@ export async function GET(_request: NextRequest) {
         details: error instanceof Error ? error.message : 'Unknown error',
         inventory: [],
         totalItems: 0,
+        botStatus: 'error',
+        isAlive: false,
         timestamp: Date.now(),
       },
       { status: 500 }

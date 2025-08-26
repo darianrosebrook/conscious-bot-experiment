@@ -342,7 +342,7 @@ export class PerformanceBenchmarker extends EventEmitter {
           memoryUsages.push(session.memoryUsage || 0);
 
           // Collect metrics
-          result.metrics.forEach((metric) => {
+          result.metrics.forEach((metric: any) => {
             if (!metrics[metric.type]) {
               metrics[metric.type] = [];
             }

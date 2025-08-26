@@ -1,9 +1,9 @@
 /**
  * Creative Paraphrasing System
- * 
+ *
  * Provides context-aware task rephrasing and creative language generation
  * for improved user interaction and task understanding.
- * 
+ *
  * @author @darianrosebrook
  */
 
@@ -13,7 +13,9 @@ import { z } from 'zod';
 
 import {
   EnvironmentalContext,
+  EnvironmentalContextSchema,
   TaskDefinition,
+  TaskDefinitionSchema,
   ChatMessage,
   Command,
 } from './types';
@@ -71,14 +73,18 @@ export const CreativeParaphrasingConfigSchema = z.object({
   max_adaptation_attempts: z.number().nonnegative(),
 });
 
-export type CreativeParaphrasingConfig = z.infer<typeof CreativeParaphrasingConfigSchema>;
+export type CreativeParaphrasingConfig = z.infer<
+  typeof CreativeParaphrasingConfigSchema
+>;
 
 /**
  * Paraphrasing context
  */
 export const ParaphrasingContextSchema = z.object({
   user_personality: z.string().optional(),
-  user_expertise_level: z.enum(['beginner', 'intermediate', 'expert']).optional(),
+  user_expertise_level: z
+    .enum(['beginner', 'intermediate', 'expert'])
+    .optional(),
   user_preferred_style: ParaphrasingStyleSchema.optional(),
   cultural_context: z.string().optional(),
   emotional_state: z.string().optional(),
@@ -104,14 +110,16 @@ export const EnhancedParaphraseResultSchema = z.object({
   metadata: z.record(z.any()),
 });
 
-export type EnhancedParaphraseResult = z.infer<typeof EnhancedParaphraseResultSchema>;
+export type EnhancedParaphraseResult = z.infer<
+  typeof EnhancedParaphraseResultSchema
+>;
 
 /**
  * Language generation request
  */
 export const LanguageGenerationRequestSchema = z.object({
-  task: TaskDefinition,
-  environmental_context: EnvironmentalContext,
+  task: TaskDefinitionSchema,
+  environmental_context: EnvironmentalContextSchema,
   paraphrasing_context: z.any(), // Use any to avoid circular dependency
   target_style: z.any(), // Use any to avoid circular dependency
   target_length: z.number().positive().optional(),
@@ -119,7 +127,9 @@ export const LanguageGenerationRequestSchema = z.object({
   include_context: z.boolean().optional(),
 });
 
-export type LanguageGenerationRequest = z.infer<typeof LanguageGenerationRequestSchema> & {
+export type LanguageGenerationRequest = z.infer<
+  typeof LanguageGenerationRequestSchema
+> & {
   paraphrasing_context: ParaphrasingContext; // Override the any type
   target_style: ParaphrasingStyle; // Override the any type
 };
@@ -129,16 +139,17 @@ export type LanguageGenerationRequest = z.infer<typeof LanguageGenerationRequest
 /**
  * Default creative paraphrasing configuration
  */
-export const DEFAULT_CREATIVE_PARAPHRASING_CONFIG: CreativeParaphrasingConfig = {
-  enable_context_adaptation: true,
-  enable_style_matching: true,
-  enable_emotion_integration: true,
-  enable_cultural_adaptation: true,
-  max_paraphrase_length: 200,
-  min_confidence_threshold: 0.7,
-  enable_fallback_paraphrasing: true,
-  max_adaptation_attempts: 3,
-};
+export const DEFAULT_CREATIVE_PARAPHRASING_CONFIG: CreativeParaphrasingConfig =
+  {
+    enable_context_adaptation: true,
+    enable_style_matching: true,
+    enable_emotion_integration: true,
+    enable_cultural_adaptation: true,
+    max_paraphrase_length: 200,
+    min_confidence_threshold: 0.7,
+    enable_fallback_paraphrasing: true,
+    max_adaptation_attempts: 3,
+  };
 
 /**
  * Style-specific prompt templates
@@ -157,7 +168,7 @@ export const STYLE_PROMPT_TEMPLATES: Record<ParaphrasingStyle, string> = {
 
 /**
  * Creative Paraphrasing System
- * 
+ *
  * Provides advanced task rephrasing and language generation capabilities
  * with context-aware adaptations and style matching.
  */
@@ -180,9 +191,9 @@ export class CreativeParaphrasing extends EventEmitter {
     super();
     this.config = { ...DEFAULT_CREATIVE_PARAPHRASING_CONFIG, ...config };
     this.dualChannelPrompting = dualChannelPrompting;
-    
+
     // Initialize style performance stats
-    Object.values(ParaphrasingStyleSchema.enum).forEach(style => {
+    Object.values(ParaphrasingStyleSchema.enum).forEach((style) => {
       this.stylePerformanceStats.set(style, 0.5); // Default neutral score
     });
   }
@@ -200,14 +211,25 @@ export class CreativeParaphrasing extends EventEmitter {
     const paraphraseId = uuidv4();
 
     // Validate task type
-    const validTaskTypes = ['gathering', 'crafting', 'building', 'exploration', 'combat', 'social'];
+    const validTaskTypes = [
+      'gathering',
+      'crafting',
+      'building',
+      'exploration',
+      'combat',
+      'social',
+    ];
     if (!validTaskTypes.includes(task.type)) {
-      throw new Error(`Invalid task type: ${task.type}. Valid types are: ${validTaskTypes.join(', ')}`);
+      throw new Error(
+        `Invalid task type: ${task.type}. Valid types are: ${validTaskTypes.join(', ')}`
+      );
     }
 
     try {
       // Determine the best style to use
-      const style = targetStyle || this.selectOptimalStyle(paraphrasingContext, environmentalContext);
+      const style =
+        targetStyle ||
+        this.selectOptimalStyle(paraphrasingContext, environmentalContext);
 
       // Generate the paraphrase using dual-channel prompting
       const paraphraseResult = await this.dualChannelPrompting.paraphraseTask(
@@ -217,7 +239,10 @@ export class CreativeParaphrasing extends EventEmitter {
       );
 
       // Apply context adaptations
-      const adaptations = this.determineContextAdaptations(paraphrasingContext, environmentalContext);
+      const adaptations = this.determineContextAdaptations(
+        paraphrasingContext,
+        environmentalContext
+      );
       const adaptedParaphrase = await this.applyContextAdaptations(
         paraphraseResult.paraphrased_task,
         adaptations,
@@ -248,8 +273,14 @@ export class CreativeParaphrasing extends EventEmitter {
         style_used: style,
         adaptations_applied: adaptations,
         confidence,
-        reasoning: this.generateReasoning(task, styledParaphrase, style, adaptations),
-        context_adaptations: this.generateContextAdaptationDescriptions(adaptations),
+        reasoning: this.generateReasoning(
+          task,
+          styledParaphrase,
+          style,
+          adaptations
+        ),
+        context_adaptations:
+          this.generateContextAdaptationDescriptions(adaptations),
         metadata: {
           processing_time: processingTime,
           paraphrasing_context: paraphrasingContext,
@@ -264,14 +295,17 @@ export class CreativeParaphrasing extends EventEmitter {
 
       this.emit('paraphrase_generated', result);
       return result;
-
     } catch (error) {
       const processingTime = Date.now() - startTime;
-      
+
       // Handle fallback paraphrasing
       if (this.config.enable_fallback_paraphrasing) {
         this.emit('fallback_paraphrasing', { error, task, processingTime });
-        return this.generateFallbackParaphrase(task, environmentalContext, paraphrasingContext);
+        return this.generateFallbackParaphrase(
+          task,
+          environmentalContext,
+          paraphrasingContext
+        );
       }
 
       throw error;
@@ -284,8 +318,8 @@ export class CreativeParaphrasing extends EventEmitter {
   async generateLanguage(request: LanguageGenerationRequest): Promise<string> {
     try {
       const paraphraseResult = await this.generateCreativeParaphrase(
-        request.task,
-        request.environmental_context,
+        request.task as any,
+        request.environmental_context as any,
         request.paraphrasing_context,
         request.target_style
       );
@@ -310,11 +344,13 @@ export class CreativeParaphrasing extends EventEmitter {
 
       // Adjust length if specified
       if (request.target_length) {
-        finalLanguage = this.adjustLength(finalLanguage, request.target_length);
+        finalLanguage = this.adjustLength(
+          finalLanguage,
+          request.target_length || 100
+        );
       }
 
       return finalLanguage;
-
     } catch (error) {
       this.emit('language_generation_error', { error, request });
       throw error;
@@ -351,7 +387,9 @@ export class CreativeParaphrasing extends EventEmitter {
 
     // If all styles failed, throw an error
     if (results.length === 0 && errors.length > 0) {
-      throw new Error(`All paraphrasing styles failed: ${errors.map(e => e.message).join(', ')}`);
+      throw new Error(
+        `All paraphrasing styles failed: ${errors.map((e) => e.message).join(', ')}`
+      );
     }
 
     // Sort by confidence
@@ -364,18 +402,29 @@ export class CreativeParaphrasing extends EventEmitter {
   /**
    * Provide user feedback for paraphrase quality
    */
-  provideUserFeedback(paraphraseId: string, feedbackScore: number, feedback?: string): void {
+  provideUserFeedback(
+    paraphraseId: string,
+    feedbackScore: number,
+    feedback?: string
+  ): void {
     const paraphrase = this.paraphraseHistory.get(paraphraseId);
     if (paraphrase) {
       paraphrase.user_feedback_score = feedbackScore;
-      
+
       // Update style performance based on feedback
-      this.updateStylePerformanceFromFeedback(paraphrase.style_used, feedbackScore);
-      
+      this.updateStylePerformanceFromFeedback(
+        paraphrase.style_used,
+        feedbackScore
+      );
+
       // Update overall performance metrics
       this.updateUserSatisfactionMetrics(feedbackScore);
 
-      this.emit('user_feedback_received', { paraphraseId, feedbackScore, feedback });
+      this.emit('user_feedback_received', {
+        paraphraseId,
+        feedbackScore,
+        feedback,
+      });
     }
   }
 
@@ -406,7 +455,10 @@ export class CreativeParaphrasing extends EventEmitter {
     }
 
     // Consider urgency
-    if (paraphrasingContext.urgency_level && paraphrasingContext.urgency_level > 0.8) {
+    if (
+      paraphrasingContext.urgency_level &&
+      paraphrasingContext.urgency_level > 0.8
+    ) {
       return 'instructional'; // Clear instructions for urgent tasks
     }
 
@@ -441,7 +493,10 @@ export class CreativeParaphrasing extends EventEmitter {
     }
 
     // Include emotion for expressive users
-    if (paraphrasingContext.emotional_state && this.config.enable_emotion_integration) {
+    if (
+      paraphrasingContext.emotional_state &&
+      this.config.enable_emotion_integration
+    ) {
       adaptations.push('include_emotion');
     }
 
@@ -467,16 +522,28 @@ export class CreativeParaphrasing extends EventEmitter {
           adaptedParaphrase = this.simplifyLanguage(adaptedParaphrase);
           break;
         case 'add_context':
-          adaptedParaphrase = await this.addContextualInformation(adaptedParaphrase, paraphrasingContext);
+          adaptedParaphrase = await this.addContextualInformation(
+            adaptedParaphrase,
+            paraphrasingContext
+          );
           break;
         case 'adjust_tone':
-          adaptedParaphrase = this.adjustTone(adaptedParaphrase, paraphrasingContext);
+          adaptedParaphrase = this.adjustTone(
+            adaptedParaphrase,
+            paraphrasingContext
+          );
           break;
         case 'include_emotion':
-          adaptedParaphrase = await this.addEmotionalContext(adaptedParaphrase, paraphrasingContext);
+          adaptedParaphrase = await this.addEmotionalContext(
+            adaptedParaphrase,
+            paraphrasingContext
+          );
           break;
         case 'add_urgency':
-          adaptedParaphrase = this.addUrgency(adaptedParaphrase, paraphrasingContext);
+          adaptedParaphrase = this.addUrgency(
+            adaptedParaphrase,
+            paraphrasingContext
+          );
           break;
         case 'remove_complexity':
           adaptedParaphrase = this.removeComplexity(adaptedParaphrase);
@@ -499,7 +566,7 @@ export class CreativeParaphrasing extends EventEmitter {
     paraphrasingContext: ParaphrasingContext
   ): Promise<string> {
     const styleTemplate = STYLE_PROMPT_TEMPLATES[style];
-    
+
     // Use dual-channel prompting to apply style transformation
     const promptResult = await this.dualChannelPrompting.generatePrompt(
       'expressive',
@@ -525,11 +592,11 @@ export class CreativeParaphrasing extends EventEmitter {
     // Check if paraphrase contains key task elements
     const taskKeywords = this.extractTaskKeywords(originalTask);
     const paraphraseLower = paraphrase.toLowerCase();
-    
-    const keywordMatches = taskKeywords.filter(keyword => 
+
+    const keywordMatches = taskKeywords.filter((keyword) =>
       paraphraseLower.includes(keyword.toLowerCase())
     ).length;
-    
+
     confidence += (keywordMatches / taskKeywords.length) * 0.2;
 
     // Adjust based on style performance history
@@ -537,9 +604,15 @@ export class CreativeParaphrasing extends EventEmitter {
     confidence += stylePerformance * 0.1;
 
     // Adjust based on user expertise match
-    if (paraphrasingContext.user_expertise_level === 'beginner' && style === 'instructional') {
+    if (
+      paraphrasingContext.user_expertise_level === 'beginner' &&
+      style === 'instructional'
+    ) {
       confidence += 0.1;
-    } else if (paraphrasingContext.user_expertise_level === 'expert' && style === 'technical') {
+    } else if (
+      paraphrasingContext.user_expertise_level === 'expert' &&
+      style === 'technical'
+    ) {
       confidence += 0.1;
     }
 
@@ -575,7 +648,9 @@ export class CreativeParaphrasing extends EventEmitter {
   /**
    * Generate context adaptation descriptions
    */
-  private generateContextAdaptationDescriptions(adaptations: ContextAdaptation[]): string[] {
+  private generateContextAdaptationDescriptions(
+    adaptations: ContextAdaptation[]
+  ): string[] {
     const descriptions: Record<ContextAdaptation, string> = {
       simplify_language: 'Simplified technical terms for better understanding',
       add_context: 'Added environmental and situational context',
@@ -586,7 +661,7 @@ export class CreativeParaphrasing extends EventEmitter {
       enhance_clarity: 'Enhanced overall clarity and readability',
     };
 
-    return adaptations.map(adaptation => descriptions[adaptation]);
+    return adaptations.map((adaptation) => descriptions[adaptation]);
   }
 
   /**
@@ -595,14 +670,14 @@ export class CreativeParaphrasing extends EventEmitter {
   private simplifyLanguage(text: string): string {
     // Simple word replacement for common technical terms
     const replacements: Record<string, string> = {
-      'utilize': 'use',
-      'implement': 'do',
-      'execute': 'run',
-      'terminate': 'stop',
-      'initiate': 'start',
-      'facilitate': 'help',
-      'optimize': 'improve',
-      'synthesize': 'combine',
+      utilize: 'use',
+      implement: 'do',
+      execute: 'run',
+      terminate: 'stop',
+      initiate: 'start',
+      facilitate: 'help',
+      optimize: 'improve',
+      synthesize: 'combine',
     };
 
     let simplified = text;
@@ -635,15 +710,20 @@ export class CreativeParaphrasing extends EventEmitter {
   /**
    * Adjust tone based on user preferences
    */
-  private adjustTone(paraphrase: string, paraphrasingContext: ParaphrasingContext): string {
+  private adjustTone(
+    paraphrase: string,
+    paraphrasingContext: ParaphrasingContext
+  ): string {
     if (paraphrasingContext.user_personality?.includes('formal')) {
-      return paraphrase.replace(/gonna/g, 'going to')
-                      .replace(/wanna/g, 'want to')
-                      .replace(/gotta/g, 'got to');
+      return paraphrase
+        .replace(/gonna/g, 'going to')
+        .replace(/wanna/g, 'want to')
+        .replace(/gotta/g, 'got to');
     } else if (paraphrasingContext.user_personality?.includes('casual')) {
-      return paraphrase.replace(/utilize/g, 'use')
-                      .replace(/implement/g, 'do')
-                      .replace(/execute/g, 'run');
+      return paraphrase
+        .replace(/utilize/g, 'use')
+        .replace(/implement/g, 'do')
+        .replace(/execute/g, 'run');
     }
 
     return paraphrase;
@@ -659,14 +739,15 @@ export class CreativeParaphrasing extends EventEmitter {
   ): Promise<string> {
     if (paraphrasingContext.emotional_state) {
       const emotionalPrefixes: Record<string, string> = {
-        'excited': 'I\'m excited to help you with this! ',
-        'worried': 'I understand your concern. Let me help you with this: ',
-        'frustrated': 'I can see this is frustrating. Here\'s what we can do: ',
-        'curious': 'That\'s an interesting request! ',
-        'confident': 'Great! I\'m confident we can handle this: ',
+        excited: "I'm excited to help you with this! ",
+        worried: 'I understand your concern. Let me help you with this: ',
+        frustrated: "I can see this is frustrating. Here's what we can do: ",
+        curious: "That's an interesting request! ",
+        confident: "Great! I'm confident we can handle this: ",
       };
 
-      const prefix = emotionalPrefixes[paraphrasingContext.emotional_state] || '';
+      const prefix =
+        emotionalPrefixes[paraphrasingContext.emotional_state] || '';
       return prefix + paraphrase;
     }
 
@@ -685,7 +766,7 @@ export class CreativeParaphrasing extends EventEmitter {
     if (environmentalContext.threat_level > 0.7) {
       contextInfo = 'Given the current dangerous situation, ';
     } else if (environmentalContext.time_of_day === 'night') {
-      contextInfo = 'Since it\'s nighttime, ';
+      contextInfo = "Since it's nighttime, ";
     } else if (environmentalContext.weather === 'storm') {
       contextInfo = 'With the current storm conditions, ';
     }
@@ -696,8 +777,14 @@ export class CreativeParaphrasing extends EventEmitter {
   /**
    * Add urgency indicators
    */
-  private addUrgency(paraphrase: string, paraphrasingContext: ParaphrasingContext): string {
-    if (paraphrasingContext.urgency_level && paraphrasingContext.urgency_level > 0.7) {
+  private addUrgency(
+    paraphrase: string,
+    paraphrasingContext: ParaphrasingContext
+  ): string {
+    if (
+      paraphrasingContext.urgency_level &&
+      paraphrasingContext.urgency_level > 0.7
+    ) {
       return `This is urgent! ${paraphrase}`;
     }
     return paraphrase;
@@ -720,10 +807,7 @@ export class CreativeParaphrasing extends EventEmitter {
    */
   private enhanceClarity(paraphrase: string): string {
     // Add clarifying phrases
-    return paraphrase
-      .replace(/\./g, '. ')
-      .replace(/,/g, ', ')
-      .trim();
+    return paraphrase.replace(/\./g, '. ').replace(/,/g, ', ').trim();
   }
 
   /**
@@ -748,12 +832,12 @@ export class CreativeParaphrasing extends EventEmitter {
     keywords.push(task.type);
 
     // Add parameter keys
-    Object.keys(task.parameters).forEach(key => {
+    Object.keys(task.parameters).forEach((key) => {
       keywords.push(key);
     });
 
     // Add parameter values
-    Object.values(task.parameters).forEach(value => {
+    Object.values(task.parameters).forEach((value) => {
       if (typeof value === 'string') {
         keywords.push(value);
       }
@@ -771,7 +855,9 @@ export class CreativeParaphrasing extends EventEmitter {
     paraphrasingContext: ParaphrasingContext
   ): Promise<EnhancedParaphraseResult> {
     // Simple fallback using basic task description
-    const fallbackParaphrase = `I need to ${task.type} ${Object.entries(task.parameters)
+    const fallbackParaphrase = `I need to ${task.type} ${Object.entries(
+      task.parameters
+    )
       .map(([key, value]) => `${key}: ${value}`)
       .join(', ')}`;
 
@@ -806,7 +892,10 @@ export class CreativeParaphrasing extends EventEmitter {
   /**
    * Update style performance stats
    */
-  private updateStylePerformanceStats(style: ParaphrasingStyle, confidence: number): void {
+  private updateStylePerformanceStats(
+    style: ParaphrasingStyle,
+    confidence: number
+  ): void {
     const currentScore = this.stylePerformanceStats.get(style) || 0.5;
     const newScore = (currentScore + confidence) / 2;
     this.stylePerformanceStats.set(style, newScore);
@@ -815,7 +904,10 @@ export class CreativeParaphrasing extends EventEmitter {
   /**
    * Update style performance from user feedback
    */
-  private updateStylePerformanceFromFeedback(style: ParaphrasingStyle, feedbackScore: number): void {
+  private updateStylePerformanceFromFeedback(
+    style: ParaphrasingStyle,
+    feedbackScore: number
+  ): void {
     const currentScore = this.stylePerformanceStats.get(style) || 0.5;
     const newScore = (currentScore + feedbackScore) / 2;
     this.stylePerformanceStats.set(style, newScore);
@@ -826,18 +918,20 @@ export class CreativeParaphrasing extends EventEmitter {
    */
   private updatePerformanceMetrics(result: EnhancedParaphraseResult): void {
     const allResults = Array.from(this.paraphraseHistory.values());
-    
+
     if (allResults.length > 0) {
-      this.performanceMetrics.average_confidence = 
-        allResults.reduce((sum, r) => sum + r.confidence, 0) / allResults.length;
+      this.performanceMetrics.average_confidence =
+        allResults.reduce((sum, r) => sum + r.confidence, 0) /
+        allResults.length;
     }
 
     // Update style effectiveness
-    Object.values(ParaphrasingStyleSchema.enum).forEach(style => {
-      const styleResults = allResults.filter(r => r.style_used === style);
+    Object.values(ParaphrasingStyleSchema.enum).forEach((style) => {
+      const styleResults = allResults.filter((r) => r.style_used === style);
       if (styleResults.length > 0) {
-        this.performanceMetrics.style_effectiveness[style] = 
-          styleResults.reduce((sum, r) => sum + r.confidence, 0) / styleResults.length;
+        this.performanceMetrics.style_effectiveness[style] =
+          styleResults.reduce((sum, r) => sum + r.confidence, 0) /
+          styleResults.length;
       }
     });
   }
@@ -847,11 +941,16 @@ export class CreativeParaphrasing extends EventEmitter {
    */
   private updateUserSatisfactionMetrics(feedbackScore: number): void {
     const allResults = Array.from(this.paraphraseHistory.values());
-    const resultsWithFeedback = allResults.filter(r => r.user_feedback_score !== undefined);
-    
+    const resultsWithFeedback = allResults.filter(
+      (r) => r.user_feedback_score !== undefined
+    );
+
     if (resultsWithFeedback.length > 0) {
-      this.performanceMetrics.user_satisfaction_score = 
-        resultsWithFeedback.reduce((sum, r) => sum + (r.user_feedback_score || 0), 0) / resultsWithFeedback.length;
+      this.performanceMetrics.user_satisfaction_score =
+        resultsWithFeedback.reduce(
+          (sum, r) => sum + (r.user_feedback_score || 0),
+          0
+        ) / resultsWithFeedback.length;
     }
   }
 

@@ -42,6 +42,8 @@ export interface MinecraftWorldState {
     playerCount: number;
     difficulty: string;
     version: string;
+    worldSeed?: string; // World seed for memory versioning
+    worldName?: string; // World name for identification
   };
 }
 
@@ -76,6 +78,10 @@ export interface BotConfig {
   username: string;
   version: string;
   auth: 'mojang' | 'offline';
+
+  // World configuration for memory versioning
+  worldSeed?: string; // Optional world seed for memory isolation
+  worldName?: string; // Optional world name for identification
 
   // Behavior settings
   pathfindingTimeout: number;

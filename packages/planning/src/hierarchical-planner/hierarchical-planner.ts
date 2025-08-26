@@ -6,7 +6,7 @@
  * Author: @darianrosebrook
  */
 
-import { Goal, Plan } from '@/types';
+import { Goal, Plan } from '../types';
 
 export class HierarchicalPlanner {
   /**

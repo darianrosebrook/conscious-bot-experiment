@@ -1,0 +1,802 @@
+/**
+ * Enhanced Registry - Shadow runs, separate registration paths, and health checks
+ *
+ * Implements separate registration paths for leaves (signed human builds) vs options (LLM-authored),
+ * shadow promotion pipeline with CI gates, quota management, and health monitoring.
+ *
+ * @author @darianrosebrook
+ */
+
+import { performance } from 'node:perf_hooks';
+import { LeafFactory, LeafImpl, RegistrationResult } from './leaf-factory';
+import {
+  LeafContext,
+  LeafResult,
+  ExecError,
+  createExecError,
+} from './leaf-contracts';
+import { BTDSLParser, CompiledBTNode } from './bt-dsl-parser';
+
+// ============================================================================
+// Registry Status and Versioning (C0)
+// ============================================================================
+
+/**
+ * Registry status for leaves and options
+ */
+export type RegistryStatus = 'shadow' | 'active' | 'retired' | 'revoked';
+
+/**
+ * Provenance information for tracking authorship and lineage
+ */
+export interface Provenance {
+  author: string;
+  parentLineage?: string[]; // Chain of parent versions
+  codeHash: string; // SHA-256 of implementation
+  signature?: string; // Cryptographic signature
+  createdAt: string;
+  metadata?: Record<string, any>;
+}
+
+/**
+ * Enhanced leaf/option specification with governance
+ */
+export interface EnhancedSpec {
+  name: string;
+  version: string;
+  status: RegistryStatus;
+  provenance: Provenance;
+  permissions: string[];
+  rateLimitPerMin?: number;
+  maxConcurrent?: number;
+  healthCheck?: {
+    endpoint?: string;
+    timeoutMs?: number;
+    expectedResponse?: any;
+  };
+  shadowConfig?: {
+    successThreshold: number; // Success rate threshold (0-1)
+    maxShadowRuns: number; // Max runs before auto-promotion/retirement
+    failureThreshold: number; // Failure rate threshold (0-1)
+    minShadowRuns?: number; // Min runs before auto-promotion/retirement
+  };
+}
+
+// ============================================================================
+// Shadow Run Tracking
+// ============================================================================
+
+/**
+ * Shadow run result
+ */
+export interface ShadowRunResult {
+  id: string;
+  timestamp: number;
+  status: 'success' | 'failure' | 'timeout';
+  durationMs: number;
+  error?: ExecError;
+  metrics?: Record<string, number>;
+  context?: Record<string, any>;
+}
+
+/**
+ * Shadow run statistics
+ */
+export interface ShadowStats {
+  totalRuns: number;
+  successfulRuns: number;
+  failedRuns: number;
+  timeoutRuns: number;
+  averageDurationMs: number;
+  successRate: number;
+  lastRunTimestamp: number;
+}
+
+// ============================================================================
+// Enhanced Registry
+// ============================================================================
+
+/**
+ * Enhanced registry with shadow runs and governance
+ */
+export class EnhancedRegistry {
+  private leafFactory: LeafFactory;
+  private btParser: BTDSLParser;
+  private enhancedSpecs: Map<string, EnhancedSpec>; // key: name@version
+  private shadowRuns: Map<string, ShadowRunResult[]>; // key: name@version
+  private healthChecks: Map<string, () => Promise<boolean>>;
+  private quotas: Map<
+    string,
+    { used: number; limit: number; resetTime: number }
+  >;
+  // Critical fix #1: Store option definitions
+  private optionDefs = new Map<string, any>(); // id -> BT-DSL JSON
+  // Critical fix #2: Circuit breaker for bad shadows
+  private cb = new Map<string, number>(); // optionId -> resumeTimestamp
+  // Secondary improvement: Audit log
+  private audit: Array<{
+    ts: number;
+    op: string;
+    id: string;
+    who: string;
+    detail?: any;
+  }> = [];
+  // Secondary improvement: Compiled BT cache
+  private compiled = new Map<string, CompiledBTNode>();
+  // Secondary improvement: Veto list and global budget
+  private veto = new Set<string>();
+  private maxShadowActive = 10;
+
+  constructor() {
+    this.leafFactory = new LeafFactory();
+    this.btParser = new BTDSLParser();
+    this.enhancedSpecs = new Map();
+    this.shadowRuns = new Map();
+    this.healthChecks = new Map();
+    this.quotas = new Map();
+  }
+
+  // ============================================================================
+  // Leaf Registration (Signed Human Builds)
+  // ============================================================================
+
+  /**
+   * Register a leaf (signed human build) with provenance
+   */
+  registerLeaf(
+    leaf: LeafImpl,
+    provenance: Provenance,
+    status: RegistryStatus = 'active'
+  ): RegistrationResult {
+    // Validate provenance
+    if (!this.validateProvenance(provenance)) {
+      return { ok: false, error: 'invalid_provenance' };
+    }
+
+    // Register with leaf factory
+    const result = this.leafFactory.register(leaf);
+    if (!result.ok) {
+      return result;
+    }
+
+    const leafId = result.id!;
+
+    // Critical fix #2: Check if version already exists
+    if (this.enhancedSpecs.has(leafId)) {
+      return { ok: false, error: 'version_exists' };
+    }
+
+    // Create enhanced spec
+    const enhancedSpec: EnhancedSpec = {
+      name: leaf.spec.name,
+      version: leaf.spec.version,
+      status,
+      provenance,
+      permissions: leaf.spec.permissions,
+      rateLimitPerMin: leaf.spec.rateLimitPerMin,
+      maxConcurrent: leaf.spec.maxConcurrent,
+    };
+
+    this.enhancedSpecs.set(leafId, enhancedSpec);
+    this.shadowRuns.set(leafId, []);
+
+    // Secondary improvement: Audit logging
+    this.log('register_leaf', leafId, provenance.author, { status });
+
+    return result;
+  }
+
+  // ============================================================================
+  // Option Registration (LLM-authored with Pipeline)
+  // ============================================================================
+
+  /**
+   * Register an option (LLM-authored) with shadow configuration
+   */
+  registerOption(
+    btDslJson: any,
+    provenance: Provenance,
+    shadowConfig: {
+      successThreshold: number; // e.g., 0.8
+      maxShadowRuns: number; // e.g., 10
+      failureThreshold: number; // e.g., 0.3
+      minShadowRuns?: number; // e.g., 3
+    }
+  ): RegistrationResult {
+    // Parse and validate BT-DSL
+    const parseResult = this.btParser.parse(btDslJson, this.leafFactory);
+    if (!parseResult.valid) {
+      return {
+        ok: false,
+        error: 'invalid_bt_dsl',
+        detail: parseResult.errors?.join(', '),
+      };
+    }
+
+    const optionId = `${btDslJson.name}@${btDslJson.version}`;
+
+    // Critical fix #2: Check if option already exists
+    if (this.enhancedSpecs.has(optionId)) {
+      return { ok: false, error: 'version_exists' };
+    }
+
+    // Secondary improvement: Check veto list and global budget
+    if (this.veto.has(optionId)) {
+      return { ok: false, error: 'option_vetoed' };
+    }
+
+    if (this.getShadowOptions().length >= this.maxShadowActive) {
+      return { ok: false, error: 'max_shadow_active' };
+    }
+
+    // Critical fix #3: Compute real permissions from leaf composition
+    const permissions = this.computeOptionPermissions(parseResult.compiled!);
+
+    // Create enhanced spec with shadow configuration
+    const enhancedSpec: EnhancedSpec = {
+      name: btDslJson.name,
+      version: btDslJson.version,
+      status: 'shadow',
+      provenance,
+      permissions,
+      shadowConfig,
+    };
+
+    this.enhancedSpecs.set(optionId, enhancedSpec);
+    this.shadowRuns.set(optionId, []);
+    this.optionDefs.set(optionId, btDslJson); // Store definition
+
+    // Secondary improvement: Audit logging
+    this.log('register_option', optionId, provenance.author, {
+      status: 'shadow',
+      permissions,
+      shadowConfig,
+    });
+
+    return { ok: true, id: optionId };
+  }
+
+  // ============================================================================
+  // Shadow Run Execution
+  // ============================================================================
+
+  /**
+   * Execute a shadow run for an option
+   */
+  async executeShadowRun(
+    optionId: string,
+    leafContext: LeafContext,
+    abortSignal?: AbortSignal
+  ): Promise<ShadowRunResult> {
+    const spec = this.enhancedSpecs.get(optionId);
+    if (!spec || spec.status !== 'shadow') {
+      throw new Error(`Option ${optionId} not found or not in shadow status`);
+    }
+
+    // Critical fix #6: Quota enforcement on execution
+    if (!this.checkQuota(optionId)) {
+      return {
+        id: `${optionId}-${Date.now()}-quota`,
+        timestamp: Date.now(),
+        status: 'timeout',
+        durationMs: 0,
+        error: {
+          code: 'permission.denied',
+          detail: 'quota_exceeded',
+          retryable: true,
+        },
+      };
+    }
+
+    // Critical fix #5: Circuit breaker for bad shadows
+    if (this.inCooldown(optionId)) {
+      return {
+        id: `${optionId}-${Date.now()}-cooldown`,
+        timestamp: Date.now(),
+        status: 'timeout',
+        durationMs: 0,
+        error: {
+          code: 'unknown',
+          detail: 'circuit_open',
+          retryable: true,
+        },
+      };
+    }
+
+    const startTime = performance.now();
+    const runId = `${optionId}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
+    try {
+      // Secondary improvement: Use cached compiled BT
+      const compiled = this.ensureCompiled(optionId);
+
+      // Execute the behavior tree
+      const result = await this.btParser.execute(
+        compiled,
+        this.leafFactory,
+        leafContext,
+        abortSignal
+      );
+
+      const durationMs = performance.now() - startTime;
+      const shadowResult: ShadowRunResult = {
+        id: runId,
+        timestamp: Date.now(),
+        status: result.status === 'success' ? 'success' : 'failure',
+        durationMs,
+        error: result.error,
+        metrics: {
+          nodeExecutions: result.metrics?.nodeExecutions || 0,
+          leafExecutions: result.metrics?.leafExecutions || 0,
+        },
+      };
+
+      // Store shadow run result
+      const runs = this.shadowRuns.get(optionId) || [];
+      runs.push(shadowResult);
+      this.shadowRuns.set(optionId, runs);
+
+      // Critical fix #5: Check for failing streak and set cooldown
+      if (this.failingStreak(optionId)) {
+        this.cb.set(optionId, Date.now() + 5 * 60_000); // 5 min cooldown
+      }
+
+      // Check for auto-promotion/retirement
+      await this.checkShadowPromotion(optionId);
+
+      // Secondary improvement: Audit logging
+      this.log('shadow_run', optionId, 'system', {
+        runId,
+        status: shadowResult.status,
+        durationMs,
+      });
+
+      return shadowResult;
+    } catch (error) {
+      const durationMs = performance.now() - startTime;
+
+      // Critical fix #8: Consistent, structured errors in shadow results
+      const execErr =
+        error && typeof error === 'object' && 'code' in (error as any)
+          ? (error as ExecError)
+          : createExecError({
+              code: 'unknown',
+              detail: String(error),
+              retryable: false,
+            });
+
+      const shadowResult: ShadowRunResult = {
+        id: runId,
+        timestamp: Date.now(),
+        status: execErr.code === 'aborted' ? 'timeout' : 'failure',
+        durationMs,
+        error: execErr,
+      };
+
+      // Store shadow run result
+      const runs = this.shadowRuns.get(optionId) || [];
+      runs.push(shadowResult);
+      this.shadowRuns.set(optionId, runs);
+
+      // Critical fix #5: Check for failing streak and set cooldown
+      if (this.failingStreak(optionId)) {
+        this.cb.set(optionId, Date.now() + 5 * 60_000); // 5 min cooldown
+      }
+
+      // Check for auto-retirement
+      await this.checkShadowPromotion(optionId);
+
+      // Secondary improvement: Audit logging
+      this.log('shadow_run', optionId, 'system', {
+        runId,
+        status: shadowResult.status,
+        durationMs,
+        error: execErr.code,
+      });
+
+      return shadowResult;
+    }
+  }
+
+  // ============================================================================
+  // Shadow Promotion Pipeline
+  // ============================================================================
+
+  /**
+   * Check if an option should be promoted or retired based on shadow run statistics
+   */
+  private async checkShadowPromotion(optionId: string): Promise<void> {
+    const spec = this.enhancedSpecs.get(optionId);
+    if (!spec || spec.status !== 'shadow' || !spec.shadowConfig) {
+      return;
+    }
+
+    const stats = this.getShadowStats(optionId);
+    const {
+      successThreshold,
+      failureThreshold,
+      maxShadowRuns,
+      minShadowRuns = 3,
+    } = spec.shadowConfig;
+
+    // Critical fix #4: Use both success and failure thresholds explicitly
+    if (
+      stats.totalRuns >= minShadowRuns &&
+      stats.successRate >= successThreshold
+    ) {
+      await this.promoteOption(optionId, 'auto_promotion');
+    } else if (
+      stats.totalRuns >= maxShadowRuns &&
+      stats.successRate <= failureThreshold
+    ) {
+      await this.retireOption(optionId, 'auto_retirement');
+    }
+  }
+
+  /**
+   * Manually promote an option from shadow to active
+   */
+  async promoteOption(optionId: string, reason: string): Promise<boolean> {
+    const spec = this.enhancedSpecs.get(optionId);
+    if (!spec || spec.status !== 'shadow') {
+      return false;
+    }
+
+    // Critical fix #7: Gate promotion on a passing health check
+    const healthy = await this.performHealthCheck(optionId);
+    if (!healthy) {
+      return false;
+    }
+
+    // Critical fix #2: Enforce legal transitions
+    if (!this.legalTransition(spec.status, 'active')) {
+      return false;
+    }
+
+    // Update status
+    spec.status = 'active';
+    this.enhancedSpecs.set(optionId, spec);
+
+    // Secondary improvement: Audit logging
+    this.log('promote_option', optionId, 'system', { reason });
+
+    // Log promotion
+    console.log(`Option ${optionId} promoted to active: ${reason}`);
+    return true;
+  }
+
+  /**
+   * Retire an option
+   */
+  async retireOption(optionId: string, reason: string): Promise<boolean> {
+    const spec = this.enhancedSpecs.get(optionId);
+    if (!spec) {
+      return false;
+    }
+
+    // Critical fix #2: Enforce legal transitions
+    if (!this.legalTransition(spec.status, 'retired')) {
+      return false;
+    }
+
+    // Update status
+    spec.status = 'retired';
+    this.enhancedSpecs.set(optionId, spec);
+
+    // Secondary improvement: Audit logging
+    this.log('retire_option', optionId, 'system', { reason });
+
+    // Log retirement
+    console.log(`Option ${optionId} retired: ${reason}`);
+    return true;
+  }
+
+  // ============================================================================
+  // Health Checks and Quotas (S3.2)
+  // ============================================================================
+
+  /**
+   * Register a health check for an option
+   */
+  registerHealthCheck(optionId: string, checkFn: () => Promise<boolean>): void {
+    this.healthChecks.set(optionId, checkFn);
+  }
+
+  /**
+   * Perform health check for an option
+   */
+  async performHealthCheck(optionId: string): Promise<boolean> {
+    const checkFn = this.healthChecks.get(optionId);
+    if (!checkFn) {
+      return true; // No health check registered
+    }
+
+    try {
+      return await checkFn();
+    } catch (error) {
+      console.error(`Health check failed for ${optionId}:`, error);
+      return false;
+    }
+  }
+
+  /**
+   * Set quota for an option
+   */
+  setQuota(
+    optionId: string,
+    limit: number,
+    resetIntervalMs: number = 60000
+  ): void {
+    this.quotas.set(optionId, {
+      used: 0,
+      limit,
+      resetTime: Date.now() + resetIntervalMs,
+    });
+  }
+
+  /**
+   * Check and update quota
+   */
+  checkQuota(optionId: string): boolean {
+    const quota = this.quotas.get(optionId);
+    if (!quota) {
+      return true; // No quota set
+    }
+
+    // Reset quota if interval has passed
+    if (Date.now() > quota.resetTime) {
+      quota.used = 0;
+      quota.resetTime = Date.now() + 60000; // Reset to 1 minute from now
+    }
+
+    if (quota.used >= quota.limit) {
+      return false; // Quota exceeded
+    }
+
+    quota.used++;
+    return true;
+  }
+
+  // ============================================================================
+  // Statistics and Monitoring
+  // ============================================================================
+
+  /**
+   * Get shadow run statistics for an option
+   */
+  getShadowStats(optionId: string): ShadowStats {
+    const runs = this.shadowRuns.get(optionId) || [];
+    const totalRuns = runs.length;
+    const successfulRuns = runs.filter((r) => r.status === 'success').length;
+    const failedRuns = runs.filter((r) => r.status === 'failure').length;
+    const timeoutRuns = runs.filter((r) => r.status === 'timeout').length;
+    const averageDurationMs =
+      totalRuns > 0
+        ? runs.reduce((sum, r) => sum + r.durationMs, 0) / totalRuns
+        : 0;
+    const successRate = totalRuns > 0 ? successfulRuns / totalRuns : 0;
+    const lastRunTimestamp =
+      totalRuns > 0 ? Math.max(...runs.map((r) => r.timestamp)) : 0;
+
+    return {
+      totalRuns,
+      successfulRuns,
+      failedRuns,
+      timeoutRuns,
+      averageDurationMs,
+      successRate,
+      lastRunTimestamp,
+    };
+  }
+
+  /**
+   * Get all shadow options
+   */
+  getShadowOptions(): string[] {
+    return Array.from(this.enhancedSpecs.entries())
+      .filter(([_, spec]) => spec.status === 'shadow')
+      .map(([id, _]) => id);
+  }
+
+  /**
+   * Get all active options
+   */
+  getActiveOptions(): string[] {
+    return Array.from(this.enhancedSpecs.entries())
+      .filter(([_, spec]) => spec.status === 'active')
+      .map(([id, _]) => id);
+  }
+
+  /**
+   * Secondary improvement #13: Make status queries return structured objects
+   */
+  getActiveOptionsDetailed() {
+    return [...this.enhancedSpecs.entries()]
+      .filter(([_, spec]) => spec.status === 'active')
+      .map(([id, spec]) => ({ id, spec, stats: this.getShadowStats(id) }));
+  }
+
+  /**
+   * Secondary improvement #15: Revoke an option (sticky status)
+   */
+  async revokeOption(optionId: string, reason: string): Promise<boolean> {
+    const spec = this.enhancedSpecs.get(optionId);
+    if (!spec) {
+      return false;
+    }
+
+    // Critical fix #2: Enforce legal transitions
+    if (!this.legalTransition(spec.status, 'revoked')) {
+      return false;
+    }
+
+    // Update status
+    spec.status = 'revoked';
+    this.enhancedSpecs.set(optionId, spec);
+
+    // Secondary improvement #15: Clear compiled cache and definitions upon revoke
+    this.compiled.delete(optionId);
+    this.optionDefs.delete(optionId);
+
+    // Secondary improvement: Audit logging
+    this.log('revoke_option', optionId, 'system', { reason });
+
+    // Log revocation
+    console.log(`Option ${optionId} revoked: ${reason}`);
+    return true;
+  }
+
+  /**
+   * Secondary improvement: Add option to veto list
+   */
+  addToVetoList(optionId: string): void {
+    this.veto.add(optionId);
+    this.log('add_to_veto', optionId, 'system');
+  }
+
+  /**
+   * Secondary improvement: Remove option from veto list
+   */
+  removeFromVetoList(optionId: string): void {
+    this.veto.delete(optionId);
+    this.log('remove_from_veto', optionId, 'system');
+  }
+
+  /**
+   * Secondary improvement: Get audit log
+   */
+  getAuditLog(): Array<{
+    ts: number;
+    op: string;
+    id: string;
+    who: string;
+    detail?: any;
+  }> {
+    return [...this.audit];
+  }
+
+  // ============================================================================
+  // Utility Methods
+  // ============================================================================
+
+  /**
+   * Validate provenance information
+   */
+  private validateProvenance(provenance: Provenance): boolean {
+    return !!(provenance.author && provenance.codeHash && provenance.createdAt);
+  }
+
+  /**
+   * Critical fix #2: Enforce immutable versioning and legal status transitions
+   */
+  private legalTransition(from: RegistryStatus, to: RegistryStatus): boolean {
+    const allowed: Record<RegistryStatus, RegistryStatus[]> = {
+      shadow: ['active', 'retired', 'revoked'],
+      active: ['retired', 'revoked'],
+      retired: ['revoked'],
+      revoked: [],
+    };
+    return allowed[from].includes(to);
+  }
+
+  /**
+   * Secondary improvement: Audit logging
+   */
+  private log(op: string, id: string, who = 'system', detail?: any): void {
+    this.audit.push({ ts: Date.now(), op, id, who, detail });
+  }
+
+  /**
+   * Critical fix #2: Circuit breaker for failing streaks
+   */
+  private failingStreak(optionId: string, n = 3): boolean {
+    const runs = this.shadowRuns.get(optionId) || [];
+    if (runs.length < n) return false;
+    return runs.slice(-n).every((r) => r.status !== 'success');
+  }
+
+  /**
+   * Critical fix #2: Check if option is in cooldown
+   */
+  private inCooldown(optionId: string): boolean {
+    const until = this.cb.get(optionId) ?? 0;
+    return Date.now() < until;
+  }
+
+  /**
+   * Secondary improvement: Ensure compiled BT is cached
+   */
+  private ensureCompiled(optionId: string): CompiledBTNode {
+    let node = this.compiled.get(optionId);
+    if (node) return node;
+    const json = this.getOptionDefinition(optionId);
+    if (!json) {
+      throw new Error(`Option definition not found: ${optionId}`);
+    }
+    const parse = this.btParser.parse(json, this.leafFactory);
+    if (!parse.valid || !parse.compiled) {
+      throw new Error(parse.errors?.join(', '));
+    }
+    node = parse.compiled;
+    this.compiled.set(optionId, node);
+    return node;
+  }
+
+  /**
+   * Critical fix #3: Compute real permissions for an option based on its leaf composition
+   */
+  private computeOptionPermissions(rootNode: any): string[] {
+    const perms = new Set<string>();
+    const visit = (n: any) => {
+      if (!n) return;
+      if (n.type === 'Leaf' && n.name) {
+        // resolve "latest" is OK in shadow; in production pin version
+        const impl = this.leafFactory.get(n.name);
+        if (impl) {
+          impl.spec.permissions.forEach((p) => perms.add(p));
+        }
+      }
+      (n.children || []).forEach(visit);
+      if (n.child) visit(n.child);
+    };
+    visit(rootNode);
+    return [...perms];
+  }
+
+  /**
+   * Critical fix #1: Get option definition from stored definitions
+   */
+  private getOptionDefinition(optionId: string): any {
+    return this.optionDefs.get(optionId);
+  }
+
+  /**
+   * Get leaf factory for direct access
+   */
+  getLeafFactory(): LeafFactory {
+    return this.leafFactory;
+  }
+
+  /**
+   * Get BT parser for direct access
+   */
+  getBTParser(): BTDSLParser {
+    return this.btParser;
+  }
+
+  /**
+   * Clear all data (for testing)
+   */
+  clear(): void {
+    this.leafFactory.clear();
+    this.enhancedSpecs.clear();
+    this.shadowRuns.clear();
+    this.healthChecks.clear();
+    this.quotas.clear();
+    this.optionDefs.clear();
+    this.cb.clear();
+    this.audit = [];
+    this.compiled.clear();
+    this.veto.clear();
+  }
+}

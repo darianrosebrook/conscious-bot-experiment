@@ -68,12 +68,14 @@ export default function ConsciousMinecraftDashboard() {
     tasks,
     environment,
     inventory,
+    plannerData,
     setIsLive,
     setHud,
     addThought,
     setTasks,
     setEnvironment,
     setInventory,
+    setPlannerData,
   } = useDashboardStore();
 
   const [intrusion, setIntrusion] = useState('');
@@ -201,7 +203,11 @@ export default function ConsciousMinecraftDashboard() {
       console.log('Cognitive SSE received data:', data);
       if (data && typeof data === 'object' && 'type' in data) {
         if ((data as any).type === 'cognitive_stream_init') {
-          console.log('Processing cognitive_stream_init');
+          console.log(
+            'Processing cognitive_stream_init with',
+            (data as any).data.thoughts.length,
+            'thoughts'
+          );
           // Initialize with existing thoughts
           const existingThoughts = (data as any).data.thoughts.map(
             (thought: any) => ({
@@ -229,7 +235,11 @@ export default function ConsciousMinecraftDashboard() {
             addThought(thought);
           });
         } else if ((data as any).type === 'cognitive_thoughts') {
-          console.log('Processing cognitive_thoughts');
+          console.log(
+            'Processing cognitive_thoughts with',
+            (data as any).data.thoughts.length,
+            'thoughts'
+          );
           // Add new thoughts
           const newThoughts = (data as any).data.thoughts.map(
             (thought: any) => ({
@@ -376,6 +386,13 @@ export default function ConsciousMinecraftDashboard() {
           setTasks(tasksData.tasks || []);
         }
 
+        // Fetch planner data
+        const plannerRes = await fetch('http://localhost:3002/planner');
+        if (plannerRes.ok) {
+          const plannerData = await plannerRes.json();
+          setPlannerData(plannerData);
+        }
+
         // Fetch environment
         const worldRes = await fetch('/api/world');
         if (worldRes.ok) {
@@ -389,6 +406,60 @@ export default function ConsciousMinecraftDashboard() {
           const inventoryData = await inventoryRes.json();
           if (inventoryData.success) {
             setInventory(inventoryData.inventory);
+          }
+        }
+
+        // Fetch memories
+        const memoriesRes = await fetch('/api/memories');
+        if (memoriesRes.ok) {
+          const memoriesData = await memoriesRes.json();
+          // Store memories in dashboard store or local state
+          if (memoriesData.memories && Array.isArray(memoriesData.memories)) {
+            // Convert memories to thoughts for display
+            memoriesData.memories.forEach((memory: any) => {
+              addThought({
+                id: memory.id,
+                ts: memory.timestamp,
+                text: memory.content,
+                type: 'reflection',
+              });
+            });
+          }
+        }
+
+        // Fetch events
+        const eventsRes = await fetch('/api/events');
+        if (eventsRes.ok) {
+          const eventsData = await eventsRes.json();
+          // Store events in dashboard store or local state
+          if (eventsData.events && Array.isArray(eventsData.events)) {
+            // Convert events to thoughts for display
+            eventsData.events.forEach((event: any) => {
+              addThought({
+                id: event.id,
+                ts: event.timestamp,
+                text: event.content,
+                type: 'reflection',
+              });
+            });
+          }
+        }
+
+        // Fetch notes
+        const notesRes = await fetch('/api/notes');
+        if (notesRes.ok) {
+          const notesData = await notesRes.json();
+          // Store notes in dashboard store or local state
+          if (notesData.notes && Array.isArray(notesData.notes)) {
+            // Convert notes to thoughts for display
+            notesData.notes.forEach((note: any) => {
+              addThought({
+                id: note.id,
+                ts: note.timestamp,
+                text: note.content,
+                type: 'reflection',
+              });
+            });
           }
         }
 
@@ -447,7 +518,7 @@ export default function ConsciousMinecraftDashboard() {
     };
 
     fetchInitialData();
-  }, [setTasks, setEnvironment, setInventory]);
+  }, [setTasks, setEnvironment, setInventory, addThought]);
 
   // Periodic refresh of bot state and connection status
   useEffect(() => {
@@ -459,6 +530,70 @@ export default function ConsciousMinecraftDashboard() {
           const inventoryData = await inventoryRes.json();
           if (inventoryData.success) {
             setInventory(inventoryData.inventory);
+          }
+        }
+
+        // Fetch memories, events, and notes periodically
+        const [memoriesRes, eventsRes, notesRes] = await Promise.allSettled([
+          fetch('/api/memories'),
+          fetch('/api/events'),
+          fetch('/api/notes'),
+        ]);
+
+        // Process memories
+        if (memoriesRes.status === 'fulfilled' && memoriesRes.value.ok) {
+          const memoriesData = await memoriesRes.value.json();
+          if (memoriesData.memories && Array.isArray(memoriesData.memories)) {
+            // Only add new memories (check by ID to avoid duplicates)
+            const existingThoughtIds = new Set(thoughts.map((t) => t.id));
+            memoriesData.memories.forEach((memory: any) => {
+              if (!existingThoughtIds.has(memory.id)) {
+                addThought({
+                  id: memory.id,
+                  ts: memory.timestamp,
+                  text: memory.content,
+                  type: 'reflection',
+                });
+              }
+            });
+          }
+        }
+
+        // Process events
+        if (eventsRes.status === 'fulfilled' && eventsRes.value.ok) {
+          const eventsData = await eventsRes.value.json();
+          if (eventsData.events && Array.isArray(eventsData.events)) {
+            // Only add new events (check by ID to avoid duplicates)
+            const existingThoughtIds = new Set(thoughts.map((t) => t.id));
+            eventsData.events.forEach((event: any) => {
+              if (!existingThoughtIds.has(event.id)) {
+                addThought({
+                  id: event.id,
+                  ts: event.timestamp,
+                  text: event.content,
+                  type: 'reflection',
+                });
+              }
+            });
+          }
+        }
+
+        // Process notes
+        if (notesRes.status === 'fulfilled' && notesRes.value.ok) {
+          const notesData = await notesRes.value.json();
+          if (notesData.notes && Array.isArray(notesData.notes)) {
+            // Only add new notes (check by ID to avoid duplicates)
+            const existingThoughtIds = new Set(thoughts.map((t) => t.id));
+            notesData.notes.forEach((note: any) => {
+              if (!existingThoughtIds.has(note.id)) {
+                addThought({
+                  id: note.id,
+                  ts: note.timestamp,
+                  text: note.content,
+                  type: 'reflection',
+                });
+              }
+            });
           }
         }
 
@@ -767,12 +902,99 @@ export default function ConsciousMinecraftDashboard() {
           </Section>
 
           <Section title="Planner" icon={<Flag className="size-4" />} tight>
-            <EmptyState
-              icon={Flag}
-              title="No planner data"
-              description="Planner information will appear here when the bot is actively planning."
-              className="p-3"
-            />
+            {plannerData ? (
+              <div className="space-y-3">
+                {plannerData.currentPlan && (
+                  <div className="rounded-lg border border-zinc-800 bg-zinc-950 p-3">
+                    <div className="flex items-center justify-between mb-2">
+                      <h4 className="text-sm font-medium text-zinc-200">
+                        {plannerData.currentPlan.name}
+                      </h4>
+                      <span className="text-xs text-zinc-500">
+                        {Math.round(plannerData.currentPlan.progress * 100)}%
+                      </span>
+                    </div>
+                    <p className="text-xs text-zinc-400 mb-2">
+                      {plannerData.currentPlan.description}
+                    </p>
+                    <div className="space-y-1">
+                      {plannerData.currentPlan.steps.map((step) => (
+                        <div
+                          key={step.id}
+                          className="flex items-center gap-2 text-xs"
+                        >
+                          <div
+                            className={`w-2 h-2 rounded-full ${
+                              step.status === 'completed'
+                                ? 'bg-green-500'
+                                : step.status === 'in_progress'
+                                  ? 'bg-yellow-500'
+                                  : 'bg-zinc-600'
+                            }`}
+                          />
+                          <span
+                            className={
+                              step.status === 'completed'
+                                ? 'text-zinc-500 line-through'
+                                : 'text-zinc-300'
+                            }
+                          >
+                            {step.name}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {plannerData.currentAction && (
+                  <div className="rounded-lg border border-zinc-800 bg-zinc-950 p-3">
+                    <div className="flex items-center justify-between mb-2">
+                      <h4 className="text-sm font-medium text-zinc-200">
+                        Current Action
+                      </h4>
+                      <span className="text-xs text-zinc-500">
+                        {Math.round(
+                          (plannerData.currentAction.progress || 0) * 100
+                        )}
+                        %
+                      </span>
+                    </div>
+                    <p className="text-xs text-zinc-400">
+                      {plannerData.currentAction.name}
+                      {plannerData.currentAction.target && (
+                        <span className="text-zinc-500">
+                          {' '}
+                          → {plannerData.currentAction.target}
+                        </span>
+                      )}
+                    </p>
+                  </div>
+                )}
+
+                {plannerData.planQueue.length > 0 && (
+                  <div className="rounded-lg border border-zinc-800 bg-zinc-950 p-3">
+                    <h4 className="text-sm font-medium text-zinc-200 mb-2">
+                      Upcoming Plans
+                    </h4>
+                    <div className="space-y-1">
+                      {plannerData.planQueue.slice(0, 2).map((plan) => (
+                        <div key={plan.id} className="text-xs text-zinc-400">
+                          • {plan.name}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <EmptyState
+                icon={Flag}
+                title="No planner data"
+                description="Planner information will appear here when the bot is actively planning."
+                className="p-3"
+              />
+            )}
           </Section>
 
           <Section
@@ -1035,8 +1257,8 @@ export default function ConsciousMinecraftDashboard() {
             actions={<Pill>consciousness flow</Pill>}
           >
             {thoughts.length > 0 ? (
-              <ScrollArea className="max-h-[38vh]">
-                <div className="flex flex-col gap-2 pr-1">
+              <ScrollArea className="max-h-[38vh] flex flex-col-reverse gap-2 pr-1 overflow-y-auto">
+                <div className="flex flex-col-reverse gap-2 pr-1 overflow-y-auto">
                   {thoughts.map((thought) => {
                     // Determine styling based on thought type and attribution
                     const isIntrusive = thought.attribution === 'intrusive';

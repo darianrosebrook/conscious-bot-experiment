@@ -6,6 +6,11 @@ import { NextRequest } from 'next/server';
  *
  * @author @darianrosebrook
  */
+
+function orderByTs(a: any, b: any) {
+  return new Date(a.ts).getTime() - new Date(b.ts).getTime();
+}
+
 export const GET = async (req: NextRequest) => {
   try {
     // Check if the request is for SSE
@@ -41,7 +46,7 @@ export const GET = async (req: NextRequest) => {
             if (minecraftRes.ok) {
               const minecraftData = await minecraftRes.json();
               streamData.data.connected = minecraftData.success;
-              streamData.data.botState = minecraftData.data;
+              streamData.data.botState = minecraftData.data.sort(orderByTs);
             }
 
             const data = `data: ${JSON.stringify(streamData)}\n\n`;
@@ -76,4 +81,3 @@ export const GET = async (req: NextRequest) => {
     return new Response('Internal Server Error', { status: 500 });
   }
 };
-

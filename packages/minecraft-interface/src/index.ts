@@ -11,6 +11,18 @@ export { BotAdapter } from './bot-adapter';
 export { ObservationMapper } from './observation-mapper';
 export { ActionTranslator } from './action-translator';
 export { PlanExecutor } from './plan-executor';
+export { ChatProcessor } from './chat-processor';
+export { MemoryIntegrationService } from './memory-integration';
+export type {
+  BotConfig,
+  MinecraftWorldState,
+  MinecraftAction,
+  ActionResult,
+  BotEvent,
+  BotEventType,
+  SimulationConfig,
+  SimulationState,
+} from './types';
 
 // Standalone interface (no planning system dependency)
 export {
@@ -43,6 +55,21 @@ export * from './types';
 
 // Utility functions
 export { createDefaultBotConfig, validateBotConfig } from './utils';
+
+// Hybrid Arbiter Integration
+export {
+  HybridArbiterIntegration,
+  type HybridArbiterConfig,
+  type GameStateSnapshot,
+  type SignalGenerationResult,
+} from './hybrid-arbiter-integration';
+
+// Action Executor
+export {
+  ActionExecutor,
+  type ActionPlan,
+  type ExecutionResult,
+} from './action-executor';
 
 // Factory function for quick setup
 import { BotAdapter } from './bot-adapter';

@@ -487,28 +487,28 @@ interface SensoryFeedbackTypes {
 
 ```typescript
 interface FeedbackProcessingPipeline {
-  // Stage 1: Raw data collection
+  // Raw data collection
   dataCollection: {
     sensoryBuffering: (data: RawSensoryData) => BufferedData;
     temporalAlignment: (buffer: BufferedData) => AlignedData;
     noiseFiltering: (data: AlignedData) => FilteredData;
   };
   
-  // Stage 2: Feature extraction
+  // Feature extraction
   featureExtraction: {
     relevanceFiltering: (data: FilteredData) => RelevantFeatures;
     patternRecognition: (features: RelevantFeatures) => RecognizedPatterns;
     contextIntegration: (patterns: RecognizedPatterns) => ContextualizedFeatures;
   };
   
-  // Stage 3: Feedback interpretation
+  // Feedback interpretation
   feedbackInterpretation: {
     outcomeAssessment: (features: ContextualizedFeatures) => OutcomeAssessment;
     errorDetection: (assessment: OutcomeAssessment) => ErrorAnalysis;
     learningSignalGeneration: (errors: ErrorAnalysis) => LearningSignals;
   };
   
-  // Stage 4: Motor adjustment
+  // Motor adjustment
   motorAdjustment: {
     correctionCalculation: (signals: LearningSignals) => MotorCorrections;
     adaptationApplication: (corrections: MotorCorrections) => AdaptedMotorCommands;

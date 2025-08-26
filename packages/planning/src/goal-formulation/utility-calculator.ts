@@ -6,7 +6,7 @@
  * Author: @darianrosebrook
  */
 
-import { UtilityContext, UtilityFunction } from '@/types';
+import { UtilityContext, UtilityFunction } from '../types';
 
 export function createWeightedUtility(
   weights: Record<string, number>

@@ -7,7 +7,7 @@
  * Author: @darianrosebrook
  */
 
-import { Goal, GoalType, Need, NeedType, Resource } from '@/types';
+import { Goal, GoalType, Need, NeedType, Resource } from '../types';
 import { CandidateGoal, WorldState } from './goal-generator';
 
 export interface PlanningContext {

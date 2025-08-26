@@ -414,7 +414,7 @@ export class CognitiveIntegration extends EventEmitter {
     const insights: string[] = [];
 
     // Analyze all tasks of this type
-    for (const [taskId, history] of this.taskHistory.entries()) {
+    for (const [taskId, history] of Array.from(this.taskHistory.entries())) {
       const task = history[0]?.task;
       if (task?.type === taskType) {
         const stats = this.getTaskStats(taskId);

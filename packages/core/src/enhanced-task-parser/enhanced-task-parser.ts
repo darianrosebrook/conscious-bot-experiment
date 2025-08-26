@@ -1,10 +1,10 @@
 /**
  * Enhanced Task Parser - Unified Integration
- * 
+ *
  * Provides a unified, schema-first task parsing system that integrates
  * dual-channel prompting and creative paraphrasing for sophisticated
  * user interaction and task understanding.
- * 
+ *
  * @author @darianrosebrook
  */
 
@@ -117,7 +117,7 @@ export const DEFAULT_ENHANCED_TASK_PARSER_CONFIG: EnhancedTaskParserConfig = {
 
 /**
  * Enhanced Task Parser
- * 
+ *
  * Unified task parsing system that integrates dual-channel prompting,
  * creative paraphrasing, and schema-first validation for sophisticated
  * user interaction and task understanding.
@@ -127,7 +127,8 @@ export class EnhancedTaskParser extends EventEmitter {
   private dualChannelPrompting: DualChannelPrompting;
   private creativeParaphrasing: CreativeParaphrasing;
   private taskHistory: Map<string, EnhancedTaskParsingResult> = new Map();
-  private userInteractionHistory: Map<string, UserInteractionContext> = new Map();
+  private userInteractionHistory: Map<string, UserInteractionContext> =
+    new Map();
   private performanceMetrics: TaskPerformanceMetrics = {
     parsing_time: 0,
     validation_time: 0,
@@ -141,10 +142,12 @@ export class EnhancedTaskParser extends EventEmitter {
   constructor(config: Partial<EnhancedTaskParserConfig> = {}) {
     super();
     this.config = { ...DEFAULT_ENHANCED_TASK_PARSER_CONFIG, ...config };
-    
+
     // Initialize dual-channel prompting
-    this.dualChannelPrompting = new DualChannelPrompting(this.config.dual_channel);
-    
+    this.dualChannelPrompting = new DualChannelPrompting(
+      this.config.dual_channel
+    );
+
     // Initialize creative paraphrasing
     this.creativeParaphrasing = new CreativeParaphrasing(
       this.dualChannelPrompting,
@@ -174,7 +177,11 @@ export class EnhancedTaskParser extends EventEmitter {
       const channel = this.dualChannelPrompting.selectChannel(
         userInput,
         environmentalContext,
-        this.buildChannelSelectionCriteria(userInput, environmentalContext, interactionContext)
+        this.buildChannelSelectionCriteria(
+          userInput,
+          environmentalContext,
+          interactionContext
+        )
       );
 
       // Parse user input using dual-channel approach
@@ -192,10 +199,15 @@ export class EnhancedTaskParser extends EventEmitter {
       );
 
       // Select best paraphrase
-      const selectedParaphrase = this.selectBestParaphrase(paraphraseOptions, interactionContext);
+      const selectedParaphrase = this.selectBestParaphrase(
+        paraphraseOptions,
+        interactionContext
+      );
 
       // Validate schema compliance
-      const schemaValidation = await this.validateSchemaCompliance(baseParsingResult.task);
+      const schemaValidation = await this.validateSchemaCompliance(
+        baseParsingResult.task
+      );
 
       // Apply context adaptations
       const contextAdaptations = this.determineContextAdaptations(
@@ -228,14 +240,14 @@ export class EnhancedTaskParser extends EventEmitter {
 
       this.emit('enhanced_task_parsed', result);
       return result;
-
     } catch (error) {
       const parsingTime = Date.now() - startTime;
       this.updatePerformanceMetrics(parsingTime, false);
 
       const errorInfo: TaskParserErrorInfo = {
         type: TaskParserError.PARSING_ERROR,
-        message: error instanceof Error ? error.message : 'Enhanced parsing failed',
+        message:
+          error instanceof Error ? error.message : 'Enhanced parsing failed',
         context: { userInput, environmentalContext, userContext },
         timestamp: Date.now(),
       };
@@ -255,16 +267,19 @@ export class EnhancedTaskParser extends EventEmitter {
   ): Promise<string> {
     try {
       const interactionContext = this.getUserInteractionContext(userContext);
-      
+
       const response = await this.dualChannelPrompting.generateCreativeResponse(
         userInput,
         environmentalContext,
         this.buildBotPersonality(interactionContext)
       );
 
-      this.emit('creative_response_generated', { response, userInput, interactionContext });
+      this.emit('creative_response_generated', {
+        response,
+        userInput,
+        interactionContext,
+      });
       return response;
-
     } catch (error) {
       this.emit('creative_response_error', { error, userInput });
       throw error;
@@ -282,18 +297,23 @@ export class EnhancedTaskParser extends EventEmitter {
   ): Promise<EnhancedParaphraseResult[]> {
     try {
       const interactionContext = this.getUserInteractionContext(userContext);
-      const paraphrasingContext = this.buildParaphrasingContext(interactionContext);
+      const paraphrasingContext =
+        this.buildParaphrasingContext(interactionContext);
 
-      const options = await this.creativeParaphrasing.generateParaphrasingOptions(
+      const options =
+        await this.creativeParaphrasing.generateParaphrasingOptions(
+          task,
+          environmentalContext,
+          paraphrasingContext,
+          styles
+        );
+
+      this.emit('paraphrasing_options_generated', {
+        options,
         task,
-        environmentalContext,
-        paraphrasingContext,
-        styles
-      );
-
-      this.emit('paraphrasing_options_generated', { options, task, interactionContext });
+        interactionContext,
+      });
       return options;
-
     } catch (error) {
       this.emit('paraphrasing_options_error', { error, task });
       throw error;
@@ -317,25 +337,36 @@ export class EnhancedTaskParser extends EventEmitter {
 
       // Update paraphrase feedback if provided
       if (paraphraseId) {
-        this.creativeParaphrasing.provideUserFeedback(paraphraseId, feedbackScore, feedback);
+        this.creativeParaphrasing.provideUserFeedback(
+          paraphraseId,
+          feedbackScore,
+          feedback
+        );
       }
 
       // Update user interaction history
       this.updateUserFeedbackHistory(taskId, feedbackScore, feedback);
 
-      this.emit('user_feedback_received', { taskId, feedbackScore, feedback, paraphraseId });
+      this.emit('user_feedback_received', {
+        taskId,
+        feedbackScore,
+        feedback,
+        paraphraseId,
+      });
     }
   }
 
   /**
    * Get user interaction context
    */
-  getUserInteractionContext(userContext?: Partial<UserInteractionContext>): UserInteractionContext {
+  getUserInteractionContext(
+    userContext?: Partial<UserInteractionContext>
+  ): UserInteractionContext {
     const userId = userContext?.user_id || 'default_user';
     const sessionId = userContext?.session_id || uuidv4();
 
     let context = this.userInteractionHistory.get(userId);
-    
+
     if (!context) {
       context = {
         user_id: userId,
@@ -370,8 +401,12 @@ export class EnhancedTaskParser extends EventEmitter {
     if (context) {
       const updatedContext = { ...context, ...preferences };
       this.userInteractionHistory.set(userId, updatedContext);
-      
-      this.emit('user_preferences_updated', { userId, preferences, updatedContext });
+
+      this.emit('user_preferences_updated', {
+        userId,
+        preferences,
+        updatedContext,
+      });
     }
   }
 
@@ -391,9 +426,12 @@ export class EnhancedTaskParser extends EventEmitter {
     });
 
     // Creative paraphrasing events
-    this.creativeParaphrasing.on('paraphrase_generated', (result: EnhancedParaphraseResult) => {
-      this.emit('creative_paraphrase_generated', result);
-    });
+    this.creativeParaphrasing.on(
+      'paraphrase_generated',
+      (result: EnhancedParaphraseResult) => {
+        this.emit('creative_paraphrase_generated', result);
+      }
+    );
 
     this.creativeParaphrasing.on('user_feedback_received', (data) => {
       this.emit('creative_paraphrase_feedback', data);
@@ -411,7 +449,8 @@ export class EnhancedTaskParser extends EventEmitter {
     return {
       task_complexity: this.analyzeTaskComplexity(userInput),
       user_intent: this.analyzeUserIntent(userInput),
-      environmental_context: this.analyzeEnvironmentalContext(environmentalContext),
+      environmental_context:
+        this.analyzeEnvironmentalContext(environmentalContext),
       urgency: interactionContext.urgency_level,
       social_context: this.analyzeSocialContext(interactionContext),
     };
@@ -420,7 +459,9 @@ export class EnhancedTaskParser extends EventEmitter {
   /**
    * Build paraphrasing context
    */
-  private buildParaphrasingContext(interactionContext: UserInteractionContext): ParaphrasingContext {
+  private buildParaphrasingContext(
+    interactionContext: UserInteractionContext
+  ): ParaphrasingContext {
     return {
       user_personality: this.extractUserPersonality(interactionContext),
       user_expertise_level: interactionContext.expertise_level,
@@ -435,15 +476,17 @@ export class EnhancedTaskParser extends EventEmitter {
   /**
    * Build bot personality based on user context
    */
-  private buildBotPersonality(interactionContext: UserInteractionContext): string {
+  private buildBotPersonality(
+    interactionContext: UserInteractionContext
+  ): string {
     const basePersonality = 'friendly and helpful';
-    
+
     if (interactionContext.expertise_level === 'beginner') {
       return `${basePersonality}, patient and instructional`;
     } else if (interactionContext.expertise_level === 'expert') {
       return `${basePersonality}, efficient and technical`;
     }
-    
+
     return basePersonality;
   }
 
@@ -470,7 +513,7 @@ export class EnhancedTaskParser extends EventEmitter {
     );
 
     // Filter by confidence threshold
-    return options.filter(option => option.confidence >= confidenceThreshold);
+    return options.filter((option) => option.confidence >= confidenceThreshold);
   }
 
   /**
@@ -486,8 +529,8 @@ export class EnhancedTaskParser extends EventEmitter {
 
     // If user has a preferred style, prioritize it
     if (interactionContext.preferred_style) {
-      const preferredOption = options.find(option => 
-        option.style_used === interactionContext.preferred_style
+      const preferredOption = options.find(
+        (option) => option.style_used === interactionContext.preferred_style
       );
       if (preferredOption) {
         return preferredOption;
@@ -495,7 +538,7 @@ export class EnhancedTaskParser extends EventEmitter {
     }
 
     // Otherwise, select by highest confidence
-    return options.reduce((best, current) => 
+    return options.reduce((best, current) =>
       current.confidence > best.confidence ? current : best
     );
   }
@@ -503,7 +546,9 @@ export class EnhancedTaskParser extends EventEmitter {
   /**
    * Validate schema compliance
    */
-  private async validateSchemaCompliance(task: TaskDefinition): Promise<SchemaValidationResult> {
+  private async validateSchemaCompliance(
+    task: TaskDefinition
+  ): Promise<SchemaValidationResult> {
     if (!this.config.enable_schema_validation) {
       return {
         is_valid: true,
@@ -528,7 +573,10 @@ export class EnhancedTaskParser extends EventEmitter {
       complianceScore -= 0.2;
     }
 
-    if (task.priority !== undefined && (task.priority < 0 || task.priority > 1)) {
+    if (
+      task.priority !== undefined &&
+      (task.priority < 0 || task.priority > 1)
+    ) {
       errors.push('Task priority must be between 0 and 1');
       complianceScore -= 0.1;
     }
@@ -615,13 +663,22 @@ export class EnhancedTaskParser extends EventEmitter {
   /**
    * Analyze user intent
    */
-  private analyzeUserIntent(userInput: string): 'command' | 'question' | 'conversation' | 'creative' {
+  private analyzeUserIntent(
+    userInput: string
+  ): 'command' | 'question' | 'conversation' | 'creative' {
     const lowerInput = userInput.toLowerCase();
 
-    if (lowerInput.includes('?') || lowerInput.includes('what') || lowerInput.includes('how')) {
+    if (
+      lowerInput.includes('?') ||
+      lowerInput.includes('what') ||
+      lowerInput.includes('how')
+    ) {
       return 'question';
-    } else if (lowerInput.includes('please') || lowerInput.includes('can you')) {
-      return 'request';
+    } else if (
+      lowerInput.includes('please') ||
+      lowerInput.includes('can you')
+    ) {
+      return 'command';
     } else if (lowerInput.includes('hello') || lowerInput.includes('hi')) {
       return 'conversation';
     } else if (lowerInput.includes('story') || lowerInput.includes('imagine')) {
@@ -634,7 +691,9 @@ export class EnhancedTaskParser extends EventEmitter {
   /**
    * Analyze environmental context
    */
-  private analyzeEnvironmentalContext(environmentalContext: EnvironmentalContext): string {
+  private analyzeEnvironmentalContext(
+    environmentalContext: EnvironmentalContext
+  ): string {
     if (environmentalContext.threat_level > 0.8) {
       return 'dangerous';
     } else if (environmentalContext.threat_level > 0.5) {
@@ -649,7 +708,9 @@ export class EnhancedTaskParser extends EventEmitter {
   /**
    * Analyze social context
    */
-  private analyzeSocialContext(interactionContext: UserInteractionContext): string {
+  private analyzeSocialContext(
+    interactionContext: UserInteractionContext
+  ): string {
     if (interactionContext.expertise_level === 'expert') {
       return 'technical';
     } else if (interactionContext.expertise_level === 'beginner') {
@@ -662,7 +723,9 @@ export class EnhancedTaskParser extends EventEmitter {
   /**
    * Extract user personality from context
    */
-  private extractUserPersonality(interactionContext: UserInteractionContext): string {
+  private extractUserPersonality(
+    interactionContext: UserInteractionContext
+  ): string {
     if (interactionContext.user_preferences.personality) {
       return interactionContext.user_preferences.personality;
     }
@@ -701,10 +764,12 @@ export class EnhancedTaskParser extends EventEmitter {
     result: EnhancedTaskParsingResult
   ): void {
     if (interactionContext.user_id) {
-      const context = this.userInteractionHistory.get(interactionContext.user_id);
+      const context = this.userInteractionHistory.get(
+        interactionContext.user_id
+      );
       if (context) {
         context.interaction_history.push(userInput);
-        
+
         // Keep only last 50 interactions
         if (context.interaction_history.length > 50) {
           context.interaction_history = context.interaction_history.slice(-50);
@@ -732,16 +797,16 @@ export class EnhancedTaskParser extends EventEmitter {
     if (task && task.user_interaction_metadata.user_id) {
       const userId = task.user_interaction_metadata.user_id;
       const context = this.userInteractionHistory.get(userId);
-      
+
       if (context) {
         // Update user preferences based on feedback
         if (feedbackScore > 0.8) {
           // Positive feedback - reinforce current preferences
-          context.user_preferences.successful_interactions = 
+          context.user_preferences.successful_interactions =
             (context.user_preferences.successful_interactions || 0) + 1;
         } else if (feedbackScore < 0.4) {
           // Negative feedback - consider adjusting preferences
-          context.user_preferences.unsuccessful_interactions = 
+          context.user_preferences.unsuccessful_interactions =
             (context.user_preferences.unsuccessful_interactions || 0) + 1;
         }
 
@@ -753,16 +818,21 @@ export class EnhancedTaskParser extends EventEmitter {
   /**
    * Update performance metrics
    */
-  private updatePerformanceMetrics(parsingTime: number, success: boolean): void {
+  private updatePerformanceMetrics(
+    parsingTime: number,
+    success: boolean
+  ): void {
     this.performanceMetrics.parsing_time = parsingTime;
-    
+
     // Update success/error rates
     const totalTasks = this.taskHistory.size;
     if (totalTasks > 0) {
-      const successCount = Array.from(this.taskHistory.values())
-        .filter(t => t.user_interaction_metadata.feedback_score > 0.7).length;
+      const successCount = Array.from(this.taskHistory.values()).filter(
+        (t) => t.user_interaction_metadata.feedback_score > 0.7
+      ).length;
       this.performanceMetrics.success_rate = successCount / totalTasks;
-      this.performanceMetrics.error_rate = 1 - this.performanceMetrics.success_rate;
+      this.performanceMetrics.error_rate =
+        1 - this.performanceMetrics.success_rate;
     }
   }
 
@@ -815,10 +885,12 @@ export class EnhancedTaskParser extends EventEmitter {
    */
   updateConfig(newConfig: Partial<EnhancedTaskParserConfig>): void {
     this.config = { ...this.config, ...newConfig };
-    
+
     // Update sub-components
     this.dualChannelPrompting.updateConfig(newConfig.dual_channel || {});
-    this.creativeParaphrasing.updateConfig(newConfig.creative_paraphrasing || {});
+    this.creativeParaphrasing.updateConfig(
+      newConfig.creative_paraphrasing || {}
+    );
   }
 
   /**

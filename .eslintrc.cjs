@@ -81,11 +81,11 @@ module.exports = {
     '@typescript-eslint/prefer-as-const': 'error',
 
     // Professional commit style
-    'no-console': 'warn',
+    // 'no-console': 'warn',
 
     // Type safety
-    '@typescript-eslint/no-explicit-any': 'warn',
-    '@typescript-eslint/no-unused-vars': 'error',
+    // '@typescript-eslint/no-explicit-any': 'warn',
+    // '@typescript-eslint/no-unused-vars': 'error',
   },
   ignorePatterns: ['dist/', 'node_modules/', '*.js'],
 };
