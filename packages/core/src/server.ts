@@ -424,7 +424,7 @@ app.use('*', (req: express.Request, res: express.Response) => {
 });
 
 // Start server
-if (require.main === module) {
+if (import.meta.url === `file://${process.argv[1]}`) {
   app.listen(port, () => {
     console.log(`🚀 Core Capability Registry Server running on port ${port}`);
     console.log(`📊 Health check: http://localhost:${port}/health`);
