@@ -16,7 +16,7 @@ except ImportError:
     except ImportError:
         # Fallback to PyTorch native attention
         FLASH_ATTN_AVAILABLE = False
-        print("Warning: FlashAttention not available, using PyTorch native attention")
+        print("Info: FlashAttention not available (requires CUDA/NVIDIA GPU), using PyTorch native attention")
 
 from models.common import trunc_normal_init_
 

@@ -7,12 +7,31 @@ Provides a REST API for the Sapient HRM model to be used by the TypeScript consc
 
 import json
 import sys
-import torch
 import numpy as np
 from pathlib import Path
 from typing import Dict, Any, Optional
 from dataclasses import dataclass
 import time
+
+# Try to import torch, but handle gracefully if not available
+try:
+    import torch
+    TORCH_AVAILABLE = True
+except ImportError:
+    print("Warning: PyTorch not available, using mock tensors")
+    TORCH_AVAILABLE = False
+    # Create a mock torch for basic functionality
+    class MockTorch:
+        def randn(self, *args):
+            return MockTensor()
+        def tensor(self, *args):
+            return MockTensor()
+    class MockTensor:
+        def __init__(self):
+            pass
+        def to(self, device):
+            return self
+    torch = MockTorch()
 
 # Add the models directory to path
 sys.path.append(str(Path(__file__).parent / "models"))
