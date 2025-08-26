@@ -9,12 +9,7 @@
 
 import { performance } from 'node:perf_hooks';
 import { LeafFactory, LeafImpl, RegistrationResult } from './leaf-factory';
-import {
-  LeafContext,
-  LeafResult,
-  ExecError,
-  createExecError,
-} from './leaf-contracts';
+import { LeafContext, ExecError, createExecError } from './leaf-contracts';
 import { BTDSLParser, CompiledBTNode } from './bt-dsl-parser';
 
 // ============================================================================
@@ -159,7 +154,10 @@ export class EnhancedRegistry {
       return result;
     }
 
-    const leafId = result.id!;
+    const leafId = result.id;
+    if (!leafId) {
+      return { ok: false, error: 'missing_id' };
+    }
 
     // Critical fix #2: Check if version already exists
     if (this.enhancedSpecs.has(leafId)) {
@@ -230,7 +228,7 @@ export class EnhancedRegistry {
     }
 
     // Critical fix #3: Compute real permissions from leaf composition
-    const permissions = this.computeOptionPermissions(parseResult.compiled!);
+    const permissions = this.computeOptionPermissions(parseResult.compiled);
 
     // Create enhanced spec with shadow configuration
     const enhancedSpec: EnhancedSpec = {
@@ -304,7 +302,9 @@ export class EnhancedRegistry {
     }
 
     const startTime = performance.now();
-    const runId = `${optionId}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    const runId = `${optionId}-${Date.now()}-${Math.random()
+      .toString(36)
+      .substring(2, 9)}`;
 
     try {
       // Secondary improvement: Use cached compiled BT
@@ -594,8 +594,11 @@ export class EnhancedRegistry {
    */
   getShadowOptions(): string[] {
     return Array.from(this.enhancedSpecs.entries())
-      .filter(([_, spec]) => spec.status === 'shadow')
-      .map(([id, _]) => id);
+      .filter(([toBeNull, spec]) => {
+        console.log('toBeNull', toBeNull);
+        return spec.status === 'shadow';
+      })
+      .map(([id]) => id);
   }
 
   /**
@@ -603,8 +606,11 @@ export class EnhancedRegistry {
    */
   getActiveOptions(): string[] {
     return Array.from(this.enhancedSpecs.entries())
-      .filter(([_, spec]) => spec.status === 'active')
-      .map(([id, _]) => id);
+      .filter(([toBeNull, spec]) => {
+        console.log('toBeNull', toBeNull);
+        return spec.status === 'active';
+      })
+      .map(([id]) => id);
   }
 
   /**
@@ -612,7 +618,10 @@ export class EnhancedRegistry {
    */
   getActiveOptionsDetailed() {
     return [...this.enhancedSpecs.entries()]
-      .filter(([_, spec]) => spec.status === 'active')
+      .filter(([toBeNull, spec]) => {
+        console.log('toBeNull', toBeNull);
+        return spec.status === 'active';
+      })
       .map(([id, spec]) => ({ id, spec, stats: this.getShadowStats(id) }));
   }
 
@@ -798,5 +807,141 @@ export class EnhancedRegistry {
     this.audit = [];
     this.compiled.clear();
     this.veto.clear();
+  }
+
+  // ============================================================================
+  // Capability Management Methods (for API endpoints)
+  // ============================================================================
+
+  /**
+   * Promote a capability from shadow to active
+   */
+  async promoteCapability(capabilityId: string): Promise<{ success: boolean; error?: string }> {
+    const spec = this.enhancedSpecs.get(capabilityId);
+    if (!spec) {
+      return { success: false, error: 'Capability not found' };
+    }
+
+    if (spec.status !== 'shadow') {
+      return { success: false, error: 'Capability is not in shadow status' };
+    }
+
+    // Check if shadow runs meet promotion criteria
+    const runs = this.shadowRuns.get(capabilityId) || [];
+    if (runs.length < (spec.shadowConfig?.minShadowRuns || 3)) {
+      return { success: false, error: 'Insufficient shadow runs for promotion' };
+    }
+
+    const successRate = runs.filter(r => r.status === 'success').length / runs.length;
+    if (successRate < (spec.shadowConfig?.successThreshold || 0.7)) {
+      return { success: false, error: 'Success rate below threshold for promotion' };
+    }
+
+    // Promote to active
+    spec.status = 'active';
+    this.enhancedSpecs.set(capabilityId, spec);
+    this.log('promote_capability', capabilityId, 'system', { from: 'shadow', to: 'active' });
+
+    return { success: true };
+  }
+
+  /**
+   * Retire a capability
+   */
+  async retireCapability(capabilityId: string): Promise<{ success: boolean; error?: string }> {
+    const spec = this.enhancedSpecs.get(capabilityId);
+    if (!spec) {
+      return { success: false, error: 'Capability not found' };
+    }
+
+    spec.status = 'retired';
+    this.enhancedSpecs.set(capabilityId, spec);
+    this.log('retire_capability', capabilityId, 'system', { from: spec.status, to: 'retired' });
+
+    return { success: true };
+  }
+
+  /**
+   * Get capability details
+   */
+  async getCapability(capabilityId: string): Promise<any> {
+    const spec = this.enhancedSpecs.get(capabilityId);
+    if (!spec) {
+      return null;
+    }
+
+    const runs = this.shadowRuns.get(capabilityId) || [];
+    const successRate = runs.length > 0 
+      ? runs.filter(r => r.status === 'success').length / runs.length 
+      : 0;
+
+    return {
+      id: capabilityId,
+      name: spec.name,
+      version: spec.version,
+      status: spec.status,
+      provenance: spec.provenance,
+      permissions: spec.permissions,
+      shadowConfig: spec.shadowConfig,
+      shadowRuns: runs.length,
+      successRate,
+      lastRun: runs.length > 0 ? runs[runs.length - 1] : null,
+    };
+  }
+
+  /**
+   * List capabilities with optional filtering
+   */
+  async listCapabilities(filters?: { status?: string; type?: string }): Promise<any[]> {
+    const capabilities: any[] = [];
+
+    for (const [id, spec] of this.enhancedSpecs.entries()) {
+      if (filters?.status && spec.status !== filters.status) {
+        continue;
+      }
+
+      const runs = this.shadowRuns.get(id) || [];
+      const successRate = runs.length > 0 
+        ? runs.filter(r => r.status === 'success').length / runs.length 
+        : 0;
+
+      capabilities.push({
+        id,
+        name: spec.name,
+        version: spec.version,
+        status: spec.status,
+        permissions: spec.permissions,
+        shadowRuns: runs.length,
+        successRate,
+        lastRun: runs.length > 0 ? runs[runs.length - 1] : null,
+      });
+    }
+
+    return capabilities;
+  }
+
+  /**
+   * Get registry statistics
+   */
+  async getStatistics(): Promise<any> {
+    const totalCapabilities = this.enhancedSpecs.size;
+    const activeCapabilities = Array.from(this.enhancedSpecs.values()).filter(s => s.status === 'active').length;
+    const shadowCapabilities = Array.from(this.enhancedSpecs.values()).filter(s => s.status === 'shadow').length;
+    const retiredCapabilities = Array.from(this.enhancedSpecs.values()).filter(s => s.status === 'retired').length;
+
+    const totalShadowRuns = Array.from(this.shadowRuns.values()).reduce((sum, runs) => sum + runs.length, 0);
+    const successfulShadowRuns = Array.from(this.shadowRuns.values()).reduce((sum, runs) => 
+      sum + runs.filter(r => r.status === 'success').length, 0);
+
+    return {
+      totalCapabilities,
+      activeCapabilities,
+      shadowCapabilities,
+      retiredCapabilities,
+      totalShadowRuns,
+      successfulShadowRuns,
+      overallSuccessRate: totalShadowRuns > 0 ? successfulShadowRuns / totalShadowRuns : 0,
+      auditLogEntries: this.audit.length,
+    };
   }
 }

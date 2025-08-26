@@ -209,7 +209,7 @@ export class ObservationMapper {
                 positions: [],
                 properties: block.getProperties(),
                 hardness: block.hardness,
-                tool: this.getOptimalTool(block.name),
+                tool: this.getOptimalTool(block.name) || 'hand',
               });
             }
 

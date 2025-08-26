@@ -20,7 +20,6 @@ export type {
   ActionResult,
   BotEvent,
   BotEventType,
-  SimulationConfig,
   SimulationState,
 } from './types';
 

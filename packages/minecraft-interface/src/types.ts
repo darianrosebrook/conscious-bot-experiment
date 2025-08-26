@@ -65,6 +65,7 @@ export interface MinecraftBlock {
 export interface MinecraftEntity {
   id: number;
   type: string;
+  name?: string;
   position: Vec3;
   health?: number;
   isHostile?: boolean;
@@ -102,6 +103,7 @@ export type MinecraftActionType =
   | 'mine_block'
   | 'place_block'
   | 'craft_item'
+  | 'craft'
   | 'pickup_item'
   | 'drop_item'
   | 'use_item'
@@ -113,7 +115,9 @@ export type MinecraftActionType =
   | 'move_forward'
   | 'move_backward'
   | 'strafe_left'
-  | 'strafe_right';
+  | 'strafe_right'
+  | 'experiment_with_item'
+  | 'explore_item_properties';
 
 export interface MinecraftAction {
   type: MinecraftActionType;
@@ -174,6 +178,23 @@ export interface FindShelterAction extends MinecraftAction {
     shelter_type?: 'cave_or_house' | 'underground' | 'above_ground';
     light_sources?: boolean;
     search_radius?: number;
+  };
+}
+
+export interface ExperimentWithItemAction extends MinecraftAction {
+  type: 'experiment_with_item';
+  parameters: {
+    item_type: string;
+    experiment_type?: 'consume' | 'place' | 'craft';
+    position?: Vec3;
+  };
+}
+
+export interface ExploreItemPropertiesAction extends MinecraftAction {
+  type: 'explore_item_properties';
+  parameters: {
+    item_type: string;
+    properties_to_test?: string[];
   };
 }
 
@@ -267,6 +288,7 @@ export interface ScenarioTelemetry {
 export type BotEventType =
   | 'connected'
   | 'spawned'
+  | 'respawned'
   | 'disconnected'
   | 'error'
   | 'warning'

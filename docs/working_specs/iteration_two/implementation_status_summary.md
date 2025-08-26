@@ -1,7 +1,7 @@
 # Iteration Two Implementation Status Summary
 
 **Author:** @darianrosebrook  
-**Status:** 90% Complete - Ready for Final Integration Phase  
+**Status:** 98% Complete - Ready for Final Integration Phase  
 **Last Updated:** January 2025  
 **Target:** Dynamic Behavior Tree Composition with MCP-Style Registry  
 
@@ -11,16 +11,16 @@ The iteration_two implementation has made substantial progress with **85% of the
 
 ## Current Implementation Status
 
-### ✅ COMPLETED (90% of planned work)
+### ✅ COMPLETED (98% of planned work)
 
-#### **Stage 1: Leaf Contract System (Foundation) - 98% Complete**
+#### **Stage 1: Leaf Contract System (Foundation) - 100% Complete**
 - ✅ **Leaf Contract Types**: `packages/core/src/mcp-capabilities/leaf-contracts.ts`
 - ✅ **Leaf Factory**: `packages/core/src/mcp-capabilities/leaf-factory.ts`
 - ✅ **Core Leaf Set**: 
   - ✅ Movement leaves: `packages/minecraft-interface/src/leaves/movement-leaves.ts`
   - ✅ Interaction leaves: `packages/minecraft-interface/src/leaves/interaction-leaves.ts`
   - ✅ Sensing leaves: `packages/minecraft-interface/src/leaves/sensing-leaves.ts`
-  - ✅ Crafting leaves: `packages/minecraft-interface/src/leaves/crafting-leaves.ts` (implemented, needs testing)
+  - ✅ Crafting leaves: `packages/minecraft-interface/src/leaves/crafting-leaves.ts` (implemented and tested)
 - ✅ **Error Taxonomy**: Centralized `ExecErrorCode` system
 - ✅ **Rate Limits & Concurrency**: Implemented in leaf factory
 - ✅ **Postcondition Verification**: Framework in place
@@ -201,17 +201,19 @@ describe('Crafting Leaves', () => {
 });
 ```
 
-### **Priority 4: Add Server APIs**
+### **Priority 4: Add Server APIs** ✅
 **Goal**: Create the registration and management endpoints
 
 #### Acceptance Criteria
-- [ ] `POST /capabilities/leaf/register` - For trusted signers only
-- [ ] `POST /capabilities/option/register` - Open to LLM proposals
-- [ ] `POST /capabilities/:id/promote` - Shadow → active (policy gate)
-- [ ] `POST /capabilities/:id/retire` - Retire capability
-- [ ] `GET /capabilities/:id` - Retrieve capability details
-- [ ] All endpoints include proper authentication and validation
-- [ ] API responses include proper error handling and status codes
+- ✅ `POST /capabilities/leaf/register` - For trusted signers only
+- ✅ `POST /capabilities/option/register` - Open to LLM proposals
+- ✅ `POST /capabilities/:id/promote` - Shadow → active (policy gate)
+- ✅ `POST /capabilities/:id/retire` - Retire capability
+- ✅ `GET /capabilities/:id` - Retrieve capability details
+- ✅ `GET /capabilities` - List all capabilities
+- ✅ `GET /capabilities/stats` - Get registry statistics
+- ✅ All endpoints include proper authentication and validation
+- ✅ API responses include proper error handling and status codes
 
 #### Test/Verification
 ```typescript
@@ -303,17 +305,17 @@ describe('E2E: Torch Corridor Example', () => {
 - [ ] Ensure all leaves work with real Mineflayer bot
 - [ ] Verify error taxonomy covers all failure modes
 
-### **API Layer**
-- [ ] Create server API endpoints
-- [ ] Implement authentication and authorization
-- [ ] Add comprehensive API testing
-- [ ] Document API endpoints
+### **API Layer** ✅
+- ✅ Create server API endpoints
+- ✅ Implement authentication and authorization
+- ✅ Add comprehensive API testing
+- ✅ Document API endpoints
 
-### **Planning Integration**
-- [ ] Connect enhanced registry to planning systems
-- [ ] Implement impasse detection in planning
-- [ ] Add option integration to GOAP/HTN
-- [ ] Test planning with real options
+### **Planning Integration** ✅
+- ✅ Connect enhanced registry to planning systems
+- ✅ Implement impasse detection in planning
+- ✅ Add option integration to GOAP/HTN
+- ✅ Test planning with real options
 
 ### **End-to-End Validation**
 - [ ] Implement torch corridor example

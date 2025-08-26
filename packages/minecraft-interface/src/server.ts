@@ -147,11 +147,11 @@ app.post('/connect', async (req, res) => {
       );
     }
 
-    // Create minecraft interface
-    minecraftInterface = await createMinecraftInterface(botConfig);
-
     // Initialize planning coordinator
     planningCoordinator = createIntegratedPlanningCoordinator();
+
+    // Create minecraft interface
+    minecraftInterface = await createMinecraftInterface(botConfig, planningCoordinator);
 
     console.log('✅ Connected to Minecraft server');
     console.log('✅ Memory integration initialized');

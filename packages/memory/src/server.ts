@@ -17,7 +17,7 @@ import { SkillRegistry } from './skills';
 import { MemoryVersioningManager } from './memory-versioning-manager';
 import { MemoryContext } from './types';
 
-const app = express();
+const app: express.Application = express();
 const port = process.env.PORT ? parseInt(process.env.PORT) : 3001;
 
 // Middleware

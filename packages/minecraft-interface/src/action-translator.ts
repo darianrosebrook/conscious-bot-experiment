@@ -585,7 +585,7 @@ export class ActionTranslator {
 
       // Consume the first available food item
       const foodItem = foodItems[0];
-      await this.bot.consume(foodItem);
+      await this.bot.consume();
 
       return {
         success: true,
@@ -648,7 +648,10 @@ export class ActionTranslator {
 
           try {
             const targetPosition = new Vec3(x, y, z);
-            await this.bot.placeBlock(targetPosition, blockItem);
+            const targetBlock = this.bot.blockAt(targetPosition);
+            if (targetBlock) {
+              await this.bot.placeBlock(targetBlock, blockItem as any);
+            }
             blocksPlaced++;
           } catch (error) {
             // Continue trying other positions
@@ -738,7 +741,10 @@ export class ActionTranslator {
 
           if (torchItem) {
             try {
-              await this.bot.placeBlock(shelterPosition, torchItem);
+              const shelterBlock = this.bot.blockAt(shelterPosition);
+              if (shelterBlock) {
+                await this.bot.placeBlock(shelterBlock, torchItem as any);
+              }
             } catch (error) {
               // Continue even if torch placement fails
             }
@@ -846,7 +852,10 @@ export class ActionTranslator {
 
       for (const blockPos of shelterPositions) {
         try {
-          await this.bot.placeBlock(blockPos, blockItem);
+          const targetBlock = this.bot.blockAt(blockPos);
+          if (targetBlock) {
+            await this.bot.placeBlock(targetBlock, blockItem as any);
+          }
           blocksPlaced++;
         } catch (error) {
           // Continue building even if some blocks fail
@@ -1047,7 +1056,7 @@ export class ActionTranslator {
         );
 
         // Use the crafting table
-        await this.bot.useBlock(craftingTable);
+        await this.bot.activateBlock(craftingTable);
       }
 
       // Craft the item
@@ -1227,7 +1236,7 @@ export class ActionTranslator {
       switch (experimentAction) {
         case 'consume':
           try {
-            await this.bot.consume(itemToTest);
+            await this.bot.consume();
             experimentResult = {
               action: 'consume',
               success: true,
@@ -1246,7 +1255,10 @@ export class ActionTranslator {
         case 'place':
           try {
             const position = this.bot.entity.position.offset(0, 0, 1);
-            await this.bot.placeBlock(position, itemToTest);
+            const targetBlock = this.bot.blockAt(position);
+            if (targetBlock) {
+              await this.bot.placeBlock(targetBlock, itemToTest as any);
+            }
             experimentResult = {
               action: 'place',
               success: true,
@@ -1279,7 +1291,7 @@ export class ActionTranslator {
             isEdible:
               experimentAction === 'consume' &&
               experimentResult.success &&
-              experimentResult.healthChange > 0,
+              (experimentResult.healthChange ?? 0) > 0,
             isPlaceable:
               experimentAction === 'place' && experimentResult.success,
             healthEffect: experimentResult.healthChange || 0,
@@ -1332,7 +1344,7 @@ export class ActionTranslator {
           switch (property) {
             case 'edible':
               try {
-                await this.bot.consume(itemToTest);
+                await this.bot.consume();
                 discoveries.push({
                   property: 'edible',
                   result: true,
@@ -1352,7 +1364,10 @@ export class ActionTranslator {
             case 'placeable':
               try {
                 const position = this.bot.entity.position.offset(0, 0, 1);
-                await this.bot.placeBlock(position, itemToTest);
+                const targetBlock = this.bot.blockAt(position);
+                if (targetBlock) {
+                  await this.bot.placeBlock(targetBlock, itemToTest as any);
+                }
                 discoveries.push({
                   property: 'placeable',
                   result: true,

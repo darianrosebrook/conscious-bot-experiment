@@ -76,9 +76,7 @@ class HybridHRMArbiter extends arbiter_1.Arbiter {
             ...performanceBudgets,
         };
         // Initialize leaf factory
-        console.log('🔧 Initializing leaf factory...');
         this.leafFactory = new leaf_factory_1.LeafFactory();
-        console.log('✅ Leaf factory initialized:', this.leafFactory);
         // Register HRM cognitive module
         this.registerModule(new HRMCognitiveModule(this.hybridHRM));
         // Initialize goal templates
@@ -519,7 +517,7 @@ class HybridHRMArbiter extends arbiter_1.Arbiter {
                 };
             }
             // Execute the leaf
-            const result = await leaf.run(parameters, context);
+            const result = await leaf.run(context, parameters);
             return {
                 success: result.status === 'success',
                 error: result.error?.detail ||
