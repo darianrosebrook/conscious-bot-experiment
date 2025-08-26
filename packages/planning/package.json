@@ -3,7 +3,6 @@
   "version": "0.1.0",
   "description": "Planning and goal management system for conscious bot",
   "main": "dist/index.js",
-  "type": "module",
   "scripts": {
     "build": "tsc",
     "dev": "tsc --watch",

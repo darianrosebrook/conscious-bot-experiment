@@ -22,18 +22,114 @@ const port = process.env.PORT ? parseInt(process.env.PORT) : 3002;
 app.use(cors());
 app.use(express.json());
 
-// Initialize tool executor (mock for now)
+// Initialize tool executor that connects to Minecraft interface
 const toolExecutor = {
   async execute(tool: string, args: Record<string, any>) {
-    // TODO: Implement actual tool execution
     console.log(`Executing tool: ${tool} with args:`, args);
-    return {
-      ok: true,
-      data: { result: 'mock_success' },
-      environmentDeltas: {},
-    };
+
+    try {
+      // Map BT actions to Minecraft actions
+      const mappedAction = mapBTActionToMinecraft(tool, args);
+
+      // Execute the mapped action via Minecraft interface
+      const response = await fetch('http://localhost:3005/action', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(mappedAction),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Minecraft interface returned ${response.status}`);
+      }
+
+      const result = await response.json();
+
+      return {
+        ok: result.success,
+        data: result.result,
+        environmentDeltas: {},
+        error: result.error,
+      };
+    } catch (error) {
+      console.error(`Tool execution failed for ${tool}:`, error);
+      return {
+        ok: false,
+        data: null,
+        environmentDeltas: {},
+        error: error instanceof Error ? error.message : 'Unknown error',
+      };
+    }
   },
 };
+
+/**
+ * Map Behavior Tree actions to Minecraft actions
+ */
+function mapBTActionToMinecraft(tool: string, args: Record<string, any>) {
+  switch (tool) {
+    case 'scan_for_trees':
+      // Look around for trees
+      return {
+        type: 'wait',
+        parameters: {
+          duration: 2000,
+        },
+      };
+
+    case 'pathfind':
+      // Move towards target
+      return {
+        type: 'move_forward',
+        parameters: {
+          distance: args.distance || 1,
+        },
+      };
+
+    case 'scan_tree_structure':
+      // Look up to scan tree structure
+      return {
+        type: 'wait',
+        parameters: {
+          duration: 1000,
+        },
+      };
+
+    case 'dig_blocks':
+      // Mine blocks (tree logs)
+      return {
+        type: 'mine_block',
+        parameters: {
+          position: args.position || 'current',
+          tool: args.tool || 'axe',
+        },
+      };
+
+    case 'collect_items':
+      // Pick up items from ground
+      return {
+        type: 'pickup_item',
+        parameters: {
+          radius: args.radius || 3,
+        },
+      };
+
+    case 'wait':
+      // Wait action
+      return {
+        type: 'wait',
+        parameters: {
+          duration: args.duration || 2000,
+        },
+      };
+
+    default:
+      // Unknown action, try to execute as-is
+      return {
+        type: tool,
+        parameters: args,
+      };
+  }
+}
 
 // Initialize Behavior Tree Runner
 const btRunner = new BehaviorTreeRunner(toolExecutor);
@@ -893,21 +989,40 @@ async function executeTaskInMinecraft(task: any) {
         };
 
       case 'heal':
-        // Try to eat food to heal
-        const healResult = await fetch(`${minecraftUrl}/action`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            type: 'consume_food',
-            parameters: { food_type: task.parameters?.food_type || 'any' },
-          }),
-        }).then((res) => res.json());
+        // Execute healing using Behavior Tree skills
+        try {
+          console.log(`Executing heal task with parameters:`, task.parameters);
 
-        return {
-          ...healResult,
-          botStatus: botStatus,
-          defensive: true,
-        };
+          // Use food pipeline skill for healing
+          const btResult = await btRunner.runOption(
+            'opt.food_pipeline_starter',
+            {
+              food_type: task.parameters?.food_type || 'any',
+              amount: task.parameters?.amount || 1,
+            },
+            {
+              timeout: 15000,
+              maxRetries: 1,
+              enableGuards: true,
+              streamTicks: true,
+            }
+          );
+
+          return {
+            success: btResult.status === 'success',
+            action: 'opt.food_pipeline_starter',
+            result: btResult,
+            botStatus: botStatus,
+            defensive: true,
+          };
+        } catch (error) {
+          return {
+            success: false,
+            error: error instanceof Error ? error.message : 'Unknown error',
+            botStatus: botStatus,
+            defensive: true,
+          };
+        }
 
       case 'place_light':
         // Place torches to create light (deters phantoms)
@@ -1024,76 +1139,48 @@ async function executeTaskInMinecraft(task: any) {
         };
 
       case 'gather':
-        // Execute actual gathering instead of just sending chat messages
+        // Execute gathering using Behavior Tree skills
         const gatherResults = [];
 
         try {
-          // First, look for the specified resource
-          const searchResult = await fetch(`${minecraftUrl}/action`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              type: 'search_for_resource',
-              parameters: {
-                resource: task.parameters?.resource || 'any',
-                target: task.parameters?.target,
-                search_radius: task.parameters?.search_radius || 5,
-              },
-            }),
-          }).then((res) => res.json());
+          // Map task parameters to appropriate BT skill
+          let skillId = 'opt.chop_tree_safe'; // Default for wood gathering
+          let skillArgs = {
+            target: task.parameters?.target || 'oak_log',
+            amount: task.parameters?.amount || 1,
+          };
 
-          gatherResults.push(searchResult);
-
-          // If we found something, try to collect it
+          // Use appropriate skill based on resource type
           if (
-            (searchResult as any).success &&
-            (searchResult as any).foundResource
+            task.parameters?.resource === 'wood' ||
+            task.parameters?.target === 'tree'
           ) {
-            const collectResult = await fetch(`${minecraftUrl}/action`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                type: 'collect_resource',
-                parameters: {
-                  resource: (searchResult as any).resourceType,
-                  amount: task.parameters?.amount || 1,
-                  position: (searchResult as any).position,
-                },
-              }),
-            }).then((res) => res.json());
-
-            gatherResults.push(collectResult);
-
-            // Send a chat message about what we found
-            gatherResults.push(
-              await fetch(`${minecraftUrl}/action`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  type: 'chat',
-                  parameters: {
-                    message: (collectResult as any).success
-                      ? `Found and collected ${(searchResult as any).resourceType}!`
-                      : `Found ${(searchResult as any).resourceType} but couldn't collect it`,
-                  },
-                }),
-              }).then((res) => res.json())
-            );
-          } else {
-            // No resource found - send informative message
-            gatherResults.push(
-              await fetch(`${minecraftUrl}/action`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  type: 'chat',
-                  parameters: {
-                    message: `No ${task.parameters?.resource || 'resources'} found nearby`,
-                  },
-                }),
-              }).then((res) => res.json())
-            );
+            skillId = 'opt.chop_tree_safe';
+          } else if (
+            task.parameters?.resource === 'iron' ||
+            task.parameters?.target === 'iron_ore'
+          ) {
+            skillId = 'opt.ore_ladder_iron';
+          } else if (task.parameters?.resource === 'food') {
+            skillId = 'opt.food_pipeline_starter';
           }
+
+          console.log(`Executing BT skill: ${skillId} with args:`, skillArgs);
+
+          // Execute the skill via Behavior Tree
+          const btResult = await btRunner.runOption(skillId, skillArgs, {
+            timeout: 30000,
+            maxRetries: 2,
+            enableGuards: true,
+            streamTicks: true,
+          });
+
+          gatherResults.push({
+            success: btResult.status === 'success',
+            action: skillId,
+            result: btResult,
+            data: btResult.data,
+          });
 
           return {
             results: gatherResults,

@@ -1,9 +1,9 @@
 /**
  * Behavior Tree Runner - Implements robust execution with streaming telemetry
- * 
+ *
  * Executes options (skills) via Behavior Trees for robust control, retries, timeouts, and guards;
  * streams ticks/telemetry. BTs are widely used to make game agents stable under noise.
- * 
+ *
  * @author @darianrosebrook
  */
 
@@ -90,15 +90,15 @@ export class BehaviorTreeRunner extends EventEmitter {
    * Execute an option (skill) via Behavior Tree with streaming telemetry
    */
   async runOption(
-    optionId: string, 
-    args: Record<string, any>, 
+    optionId: string,
+    args: Record<string, any>,
     options: BTRunOptions = {}
   ): Promise<BTRunResult> {
     const runId = `${optionId}-${Date.now()}`;
     const run = new BTRun(runId, optionId, args, options, this.toolExecutor);
-    
+
     this.activeRuns.set(runId, run);
-    
+
     // Set up event listeners for streaming
     run.on('tick', (tick: BTTick) => {
       this.emit('tick', { runId, tick });
@@ -133,8 +133,12 @@ export class BehaviorTreeRunner extends EventEmitter {
   /**
    * Get status of active runs
    */
-  getActiveRuns(): Array<{ runId: string; optionId: string; status: BTNodeStatus }> {
-    return Array.from(this.activeRuns.values()).map(run => ({
+  getActiveRuns(): Array<{
+    runId: string;
+    optionId: string;
+    status: BTNodeStatus;
+  }> {
+    return Array.from(this.activeRuns.values()).map((run) => ({
       runId: run.runId,
       optionId: run.optionId,
       status: run.getStatus(),
@@ -179,23 +183,35 @@ class BTRun extends EventEmitter {
     this.args = args;
     this.options = options;
     this.toolExecutor = toolExecutor;
-    this.tree = this.loadBehaviorTree(optionId);
+    // Initialize with a placeholder tree, will be loaded in execute()
+    this.tree = {
+      id: optionId,
+      type: BTNodeType.ACTION,
+      name: optionId,
+      action: optionId,
+      args: this.args,
+      timeout: 8000,
+      retries: 2,
+    };
   }
 
   async execute(): Promise<BTRunResult> {
     this.startTime = Date.now();
-    
+
     try {
       // Check for abort signal
       if (this.abortController.signal.aborted) {
         throw new Error('Run was aborted');
       }
 
+      // Load the behavior tree definition
+      this.tree = await this.loadBehaviorTree(this.optionId);
+
       // Execute the behavior tree
       const result = await this.executeNode(this.tree, 0);
-      
+
       const duration = Date.now() - this.startTime;
-      
+
       return {
         success: result.status === BTNodeStatus.SUCCESS,
         status: result.status,
@@ -205,7 +221,7 @@ class BTRun extends EventEmitter {
       };
     } catch (error) {
       const duration = Date.now() - this.startTime;
-      
+
       return {
         success: false,
         status: BTNodeStatus.FAILURE,
@@ -229,7 +245,10 @@ class BTRun extends EventEmitter {
     return [...this.ticks];
   }
 
-  private async executeNode(node: BTNode, tick: number): Promise<{ status: BTNodeStatus; data?: any }> {
+  private async executeNode(
+    node: BTNode,
+    tick: number
+  ): Promise<{ status: BTNodeStatus; data?: any }> {
     const nodeStartTime = Date.now();
     let retries = 0;
     const maxRetries = node.retries ?? this.options.maxRetries ?? 2;
@@ -294,7 +313,7 @@ class BTRun extends EventEmitter {
       } catch (error) {
         retries++;
         const duration = Date.now() - nodeStartTime;
-        
+
         if (retries > maxRetries) {
           const tickData: BTTick = {
             tick,
@@ -308,14 +327,17 @@ class BTRun extends EventEmitter {
         }
 
         // Wait before retry
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        await new Promise((resolve) => setTimeout(resolve, 1000));
       }
     }
 
     throw new Error('Max retries exceeded');
   }
 
-  private async executeSequence(node: BTNode, tick: number): Promise<{ status: BTNodeStatus; data?: any }> {
+  private async executeSequence(
+    node: BTNode,
+    tick: number
+  ): Promise<{ status: BTNodeStatus; data?: any }> {
     if (!node.children) {
       return { status: BTNodeStatus.SUCCESS };
     }
@@ -330,14 +352,20 @@ class BTRun extends EventEmitter {
     return { status: BTNodeStatus.SUCCESS };
   }
 
-  private async executeSelector(node: BTNode, tick: number): Promise<{ status: BTNodeStatus; data?: any }> {
+  private async executeSelector(
+    node: BTNode,
+    tick: number
+  ): Promise<{ status: BTNodeStatus; data?: any }> {
     if (!node.children) {
       return { status: BTNodeStatus.FAILURE };
     }
 
     for (const child of node.children) {
       const result = await this.executeNode(child, tick + 1);
-      if (result.status === BTNodeStatus.SUCCESS || result.status === BTNodeStatus.RUNNING) {
+      if (
+        result.status === BTNodeStatus.SUCCESS ||
+        result.status === BTNodeStatus.RUNNING
+      ) {
         return result;
       }
     }
@@ -345,31 +373,47 @@ class BTRun extends EventEmitter {
     return { status: BTNodeStatus.FAILURE };
   }
 
-  private async executeParallel(node: BTNode, tick: number): Promise<{ status: BTNodeStatus; data?: any }> {
+  private async executeParallel(
+    node: BTNode,
+    tick: number
+  ): Promise<{ status: BTNodeStatus; data?: any }> {
     if (!node.children) {
       return { status: BTNodeStatus.SUCCESS };
     }
 
-    const promises = node.children.map(child => this.executeNode(child, tick + 1));
+    const promises = node.children.map((child) =>
+      this.executeNode(child, tick + 1)
+    );
     const results = await Promise.all(promises);
 
     // Parallel succeeds if all children succeed
-    const allSuccess = results.every(r => r.status === BTNodeStatus.SUCCESS);
-    return { 
+    const allSuccess = results.every((r) => r.status === BTNodeStatus.SUCCESS);
+    return {
       status: allSuccess ? BTNodeStatus.SUCCESS : BTNodeStatus.FAILURE,
-      data: results.map(r => r.data),
+      data: results.map((r) => r.data),
     };
   }
 
-  private async executeAction(node: BTNode, tick: number): Promise<{ status: BTNodeStatus; data?: any }> {
+  private async executeAction(
+    node: BTNode,
+    tick: number
+  ): Promise<{ status: BTNodeStatus; data?: any }> {
     if (!node.action) {
+      console.log(`No action defined for node: ${node.id}`);
       return { status: BTNodeStatus.FAILURE };
     }
+
+    console.log(`Executing action: ${node.action} with args:`, {
+      ...this.args,
+      ...node.args,
+    });
 
     const result = await this.toolExecutor.execute(node.action, {
       ...this.args,
       ...node.args,
     });
+
+    console.log(`Action result:`, result);
 
     return {
       status: result.ok ? BTNodeStatus.SUCCESS : BTNodeStatus.FAILURE,
@@ -377,7 +421,10 @@ class BTRun extends EventEmitter {
     };
   }
 
-  private async executeCondition(node: BTNode, tick: number): Promise<{ status: BTNodeStatus; data?: any }> {
+  private async executeCondition(
+    node: BTNode,
+    tick: number
+  ): Promise<{ status: BTNodeStatus; data?: any }> {
     if (!node.condition) {
       return { status: BTNodeStatus.FAILURE };
     }
@@ -400,18 +447,109 @@ class BTRun extends EventEmitter {
     return true;
   }
 
-  private loadBehaviorTree(optionId: string): BTNode {
-    // TODO: Load behavior tree from skill registry
-    // For now, return a simple action node
+  private async loadBehaviorTree(optionId: string): Promise<BTNode> {
+    try {
+      // Try to load the behavior tree definition from the skill registry
+      const fs = await import('fs/promises');
+      const path = await import('path');
+
+      // Look for the BT definition file
+      // Handle option IDs like "opt.chop_tree_safe" -> "chop_tree_safe.json"
+      const optionName = optionId.replace(/^opt\./, '');
+
+      // Use a relative path from the current working directory
+      const btDefinitionPath = path.join(
+        'src',
+        'behavior-trees',
+        'definitions',
+        `${optionName}.json`
+      );
+
+      console.log(`Loading BT definition from: ${btDefinitionPath}`);
+
+      try {
+        const btDefinitionContent = await fs.readFile(btDefinitionPath, 'utf8');
+        const btDefinition = JSON.parse(btDefinitionContent);
+        console.log(
+          `Loaded BT definition for ${optionId}:`,
+          JSON.stringify(btDefinition, null, 2)
+        );
+        return this.parseBTDefinition(btDefinition);
+      } catch (fileError) {
+        console.warn(
+          `BT definition not found for ${optionId}, using fallback action:`,
+          fileError
+        );
+        return {
+          id: optionId,
+          type: BTNodeType.ACTION,
+          name: optionId,
+          action: optionId,
+          args: this.args,
+          timeout: 8000,
+          retries: 2,
+        };
+      }
+    } catch (error) {
+      console.error(`Failed to load BT definition for ${optionId}:`, error);
+      // Fallback: return a simple action node
+      return {
+        id: optionId,
+        type: BTNodeType.ACTION,
+        name: optionId,
+        action: optionId,
+        args: this.args,
+        timeout: 8000,
+        retries: 2,
+      };
+    }
+  }
+
+  private parseBTDefinition(definition: any): BTNode {
+    const root = definition.root;
+
     return {
-      id: optionId,
-      type: BTNodeType.ACTION,
-      name: optionId,
-      action: optionId,
-      args: this.args,
-      timeout: 8000, // 8 seconds for most actions
-      retries: 2,
+      id: definition.id,
+      type: this.mapNodeType(root.type),
+      name: definition.name,
+      children: root.children?.map((child: any) => this.parseBTNode(child)),
+      action: root.action,
+      args: root.args || {},
+      condition: root.condition,
+      timeout: definition.metadata?.timeout || 8000,
+      retries: definition.metadata?.retries || 2,
     };
+  }
+
+  private parseBTNode(nodeDef: any): BTNode {
+    return {
+      id: nodeDef.name || nodeDef.type,
+      type: this.mapNodeType(nodeDef.type),
+      name: nodeDef.name,
+      children: nodeDef.children?.map((child: any) => this.parseBTNode(child)),
+      action: nodeDef.action,
+      args: nodeDef.args || {},
+      condition: nodeDef.condition,
+      timeout: nodeDef.timeout || 5000,
+      retries: nodeDef.retries || 1,
+    };
+  }
+
+  private mapNodeType(type: string): BTNodeType {
+    switch (type.toLowerCase()) {
+      case 'sequence':
+        return BTNodeType.SEQUENCE;
+      case 'selector':
+        return BTNodeType.SELECTOR;
+      case 'parallel':
+        return BTNodeType.PARALLEL;
+      case 'action':
+        return BTNodeType.ACTION;
+      case 'condition':
+        return BTNodeType.CONDITION;
+      default:
+        return BTNodeType.ACTION;
+    }
   }
 
   private recordTick(tick: BTTick): void {
@@ -426,7 +564,10 @@ class BTRun extends EventEmitter {
 // ============================================================================
 
 export interface ToolExecutor {
-  execute(tool: string, args: Record<string, any>): Promise<{
+  execute(
+    tool: string,
+    args: Record<string, any>
+  ): Promise<{
     ok: boolean;
     data?: any;
     error?: string;

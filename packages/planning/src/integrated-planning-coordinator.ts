@@ -661,7 +661,7 @@ export class IntegratedPlanningCoordinator extends EventEmitter {
     context: PlanningContext
   ): HomeostasisState {
     // Start with current state from context
-    const baseState = context.currentState || {};
+    const baseState = (context.currentState || {}) as Partial<HomeostasisState>;
 
     // Process signals to adjust homeostasis values
     const adjustments: Partial<HomeostasisState> = {};
