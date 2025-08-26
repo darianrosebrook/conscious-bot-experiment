@@ -101,7 +101,7 @@ const services = [
     command: 'bash',
     args: [
       '-c',
-      'cd sapient-hrm && source venv-hrm-py311/bin/activate && python hrm_bridge.py --port 5001',
+      'source venv-hrm-py311/bin/activate && python hrm_bridge.py --port 5001',
     ],
     port: 5001,
     healthUrl: 'http://localhost:5001/health',
@@ -399,7 +399,7 @@ async function main() {
     const child = spawn(service.command, service.args, {
       stdio: 'pipe',
       shell: true,
-      cwd: process.cwd(), // Ensure we're in the project root
+      cwd: service.name === 'Sapient HRM' ? `${process.cwd()}/sapient-hrm` : process.cwd(), // Set specific cwd for HRM
       env: { ...process.env, FORCE_COLOR: '1' },
     });
 
