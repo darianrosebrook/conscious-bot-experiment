@@ -2,7 +2,7 @@
 
 /**
  * Conscious Bot Startup Script
- * 
+ *
  * Single command to start the entire conscious bot system:
  * - Installs dependencies
  * - Builds all packages
@@ -46,7 +46,12 @@ const services = [
   {
     name: 'Minecraft Interface',
     command: 'pnpm',
-    args: ['--filter', '@conscious-bot/minecraft-interface', 'run', 'dev:server'],
+    args: [
+      '--filter',
+      '@conscious-bot/minecraft-interface',
+      'run',
+      'dev:server',
+    ],
     port: 3005,
     healthUrl: 'http://localhost:3005/health',
     description: 'Minecraft bot interface and control',
@@ -82,6 +87,14 @@ const services = [
     port: 3002,
     healthUrl: 'http://localhost:3002/health',
     description: 'Task planning and execution coordination',
+  },
+  {
+    name: 'Sapient HRM',
+    command: 'python3',
+    args: ['sapient-hrm/hrm_bridge.py', '--port', '5000'],
+    port: 5000,
+    healthUrl: 'http://localhost:5000/health',
+    description: 'Python HRM model for hierarchical reasoning',
   },
 ];
 
@@ -151,7 +164,10 @@ async function waitForService(url, serviceName, maxAttempts = 30) {
 
       req.on('error', () => {
         if (attempts < maxAttempts) {
-          log(` ⏳ Attempt ${attempts}/${maxAttempts} - ${serviceName} starting...`, colors.yellow);
+          log(
+            ` ⏳ Attempt ${attempts}/${maxAttempts} - ${serviceName} starting...`,
+            colors.yellow
+          );
           setTimeout(check, 2000);
         } else {
           log(` ⚠️  ${serviceName} health check timeout`, colors.yellow);
@@ -186,9 +202,12 @@ async function main() {
   log('🔍 Checking system requirements...', colors.cyan);
   const nodeVersion = process.version;
   const nodeMajor = parseInt(nodeVersion.slice(1).split('.')[0]);
-  
+
   if (nodeMajor < 18) {
-    log(` ❌ Node.js version ${nodeVersion} is not supported. Please use Node.js 18 or higher.`, colors.red);
+    log(
+      ` ❌ Node.js version ${nodeVersion} is not supported. Please use Node.js 18 or higher.`,
+      colors.red
+    );
     process.exit(1);
   }
   log(` ✅ Node.js ${nodeVersion} is supported`, colors.green);
@@ -198,19 +217,33 @@ async function main() {
     execSync('pnpm --version', { stdio: 'ignore' });
     log(' ✅ pnpm is available', colors.green);
   } catch {
-    log(' ❌ pnpm is not installed. Please install pnpm first: npm install -g pnpm', colors.red);
+    log(
+      ' ❌ pnpm is not installed. Please install pnpm first: npm install -g pnpm',
+      colors.red
+    );
+    process.exit(1);
+  }
+
+  // Step 2.5: Check if Python 3 is available
+  try {
+    execSync('python3 --version', { stdio: 'ignore' });
+    log(' ✅ Python 3 is available', colors.green);
+  } catch {
+    log(' ❌ Python 3 is not installed. Please install Python 3 first.', colors.red);
     process.exit(1);
   }
 
   // Step 3: Kill existing processes
   log('\n🔄 Cleaning up existing processes...', colors.cyan);
-  
+
   const processPatterns = [
     'tsx src/server.ts',
     'next dev',
     'node.*dev.js',
     'pnpm.*dev',
     'minecraft-interface',
+    'python3.*hrm_bridge.py',
+    'hrm_bridge.py',
   ];
 
   for (const pattern of processPatterns) {
@@ -226,18 +259,27 @@ async function main() {
   // Step 4: Check port availability
   log('\n🔍 Checking port availability...', colors.cyan);
   const portConflicts = [];
-  
+
   for (const service of services) {
     if (checkPort(service.port)) {
       portConflicts.push(service);
-      log(` ❌ Port ${service.port} is still in use for ${service.name}`, colors.red);
+      log(
+        ` ❌ Port ${service.port} is still in use for ${service.name}`,
+        colors.red
+      );
     } else {
-      log(` ✅ Port ${service.port} is available for ${service.name}`, colors.green);
+      log(
+        ` ✅ Port ${service.port} is available for ${service.name}`,
+        colors.green
+      );
     }
   }
 
   if (portConflicts.length > 0) {
-    log('\n⚠️  Some ports are still in use. Please stop the conflicting processes and try again.', colors.yellow);
+    log(
+      '\n⚠️  Some ports are still in use. Please stop the conflicting processes and try again.',
+      colors.yellow
+    );
     log('   You can use: pnpm kill', colors.cyan);
     process.exit(1);
   }
@@ -246,10 +288,19 @@ async function main() {
   log('\n📦 Installing dependencies...', colors.cyan);
   try {
     execSync('pnpm install', { stdio: 'inherit' });
-    log(' ✅ Dependencies installed', colors.green);
+    log(' ✅ Node.js dependencies installed', colors.green);
   } catch (error) {
-    log(' ❌ Failed to install dependencies', colors.red);
+    log(' ❌ Failed to install Node.js dependencies', colors.red);
     process.exit(1);
+  }
+
+  // Step 5.5: Install Python dependencies for sapient-hrm
+  log('\n🐍 Installing Python dependencies...', colors.cyan);
+  try {
+    execSync('cd sapient-hrm && pip install -r requirements.txt', { stdio: 'inherit' });
+    log(' ✅ Python dependencies installed', colors.green);
+  } catch (error) {
+    log(' ⚠️  Failed to install Python dependencies. Continuing anyway...', colors.yellow);
   }
 
   // Step 6: Build packages
@@ -269,7 +320,10 @@ async function main() {
   const processes = [];
 
   for (const service of services) {
-    log(` 🚀 Starting ${service.name} (port ${service.port})...`, colors.purple);
+    log(
+      ` 🚀 Starting ${service.name} (port ${service.port})...`,
+      colors.purple
+    );
     log(`    ${service.description}`, colors.reset);
 
     const child = spawn(service.command, service.args, {
@@ -324,23 +378,42 @@ async function main() {
       )
     );
   } catch (error) {
-    log(` ⚠️  Some services may not be fully ready: ${error.message}`, colors.yellow);
+    log(
+      ` ⚠️  Some services may not be fully ready: ${error.message}`,
+      colors.yellow
+    );
   }
 
   // Step 9: Display status and URLs
   log('\n🎉 Conscious Bot System is running!', colors.green);
   log('');
   log('📊 Service Status:', colors.blue);
-  
+
   for (const service of services) {
-    log(`  ${colors.cyan}${service.name}:${colors.reset}     http://localhost:${service.port}`, colors.reset);
+    log(
+      `  ${colors.cyan}${service.name}:${colors.reset}     http://localhost:${service.port}`,
+      colors.reset
+    );
   }
 
   log('');
   log('🔗 Quick Actions:', colors.blue);
-  log(`  ${colors.cyan}Dashboard:${colors.reset}     http://localhost:3000`, colors.reset);
-  log(`  ${colors.cyan}Minecraft Bot:${colors.reset}  http://localhost:3005`, colors.reset);
-  log(`  ${colors.cyan}Minecraft Viewer:${colors.reset} http://localhost:3006`, colors.reset);
+  log(
+    `  ${colors.cyan}Dashboard:${colors.reset}     http://localhost:3000`,
+    colors.reset
+  );
+  log(
+    `  ${colors.cyan}Minecraft Bot:${colors.reset}  http://localhost:3005`,
+    colors.reset
+  );
+  log(
+    `  ${colors.cyan}Minecraft Viewer:${colors.reset} http://localhost:3006`,
+    colors.reset
+  );
+  log(
+    `  ${colors.cyan}Sapient HRM:${colors.reset}    http://localhost:5000`,
+    colors.reset
+  );
   log('');
   log('🎮 Minecraft Commands:', colors.yellow);
   log('  Connect bot: curl -X POST http://localhost:3005/connect');
