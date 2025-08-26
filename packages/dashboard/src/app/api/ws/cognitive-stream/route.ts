@@ -125,19 +125,25 @@ export const GET = async (req: NextRequest) => {
     return new Response('Too many connections', { status: 429 });
   }
 
-  console.log(
-    'GET /api/ws/cognitive-stream: New connection, total connections:',
-    activeConnections.size
-  );
+  // Only log in development mode
+  if (process.env.NODE_ENV === 'development') {
+    console.log(
+      'GET /api/ws/cognitive-stream: New connection, total connections:',
+      activeConnections.size
+    );
+  }
 
   const encoder = new TextEncoder();
   const stream = new ReadableStream({
     async start(controller) {
       activeConnections.add(controller);
-      console.log(
-        'GET /api/ws/cognitive-stream: Connection added, total connections:',
-        activeConnections.size
-      );
+      // Only log in development mode
+      if (process.env.NODE_ENV === 'development') {
+        console.log(
+          'GET /api/ws/cognitive-stream: Connection added, total connections:',
+          activeConnections.size
+        );
+      }
 
       // Send initial data with existing thoughts
       const initialData = {
@@ -146,11 +152,14 @@ export const GET = async (req: NextRequest) => {
         data: { thoughts: thoughtHistory.slice(-50) },
       };
 
-      console.log(
-        'Sending initial data with',
-        thoughtHistory.length,
-        'thoughts'
-      );
+      // Only log in development mode
+      if (process.env.NODE_ENV === 'development') {
+        console.log(
+          'Sending initial data with',
+          thoughtHistory.length,
+          'thoughts'
+        );
+      }
       controller.enqueue(
         encoder.encode(`data: ${JSON.stringify(initialData)}\n\n`)
       );
@@ -162,13 +171,16 @@ export const GET = async (req: NextRequest) => {
           ).concat(await processExternalChat(), await processBotResponses());
 
           if (thoughts.length > 0) {
-            console.log(
-              'Sending',
-              thoughts.length,
-              'new thoughts to',
-              activeConnections.size,
-              'connections'
-            );
+            // Only log in development mode
+            if (process.env.NODE_ENV === 'development') {
+              console.log(
+                'Sending',
+                thoughts.length,
+                'new thoughts to',
+                activeConnections.size,
+                'connections'
+              );
+            }
             const updateData = {
               type: 'cognitive_thoughts',
               timestamp: Date.now(),
@@ -189,10 +201,13 @@ export const GET = async (req: NextRequest) => {
       req.signal.addEventListener('abort', () => {
         clearInterval(interval);
         activeConnections.delete(controller);
-        console.log(
-          'GET /api/ws/cognitive-stream: Connection removed, total connections:',
-          activeConnections.size
-        );
+        // Only log in development mode
+        if (process.env.NODE_ENV === 'development') {
+          console.log(
+            'GET /api/ws/cognitive-stream: Connection removed, total connections:',
+            activeConnections.size
+          );
+        }
         controller.close();
       });
     },
@@ -212,11 +227,14 @@ export const POST = async (req: NextRequest) => {
     const body = await req.json();
     const { type, content, attribution, context, metadata } = body;
 
-    console.log('POST /api/ws/cognitive-stream received:', {
-      type,
-      content,
-      attribution,
-    });
+    // Only log in development mode
+    if (process.env.NODE_ENV === 'development') {
+      console.log('POST /api/ws/cognitive-stream received:', {
+        type,
+        content,
+        attribution,
+      });
+    }
 
     if (!content || content.trim().length === 0) {
       return new Response('Thought content is required', { status: 400 });
@@ -234,7 +252,10 @@ export const POST = async (req: NextRequest) => {
       metadata: metadata || {},
     });
 
-    console.log('New thought added to history:', newThought);
+    // Only log in development mode
+    if (process.env.NODE_ENV === 'development') {
+      console.log('New thought added to history:', newThought);
+    }
 
     // Broadcast to all connected clients
     const message = JSON.stringify({
@@ -243,19 +264,28 @@ export const POST = async (req: NextRequest) => {
       data: { thoughts: [newThought] },
     });
 
-    console.log(
-      'Broadcasting message to',
-      activeConnections.size,
-      'connections:',
-      message
-    );
+    // Only log in development mode
+    if (process.env.NODE_ENV === 'development') {
+      console.log(
+        'Broadcasting message to',
+        activeConnections.size,
+        'connections:',
+        message
+      );
+    }
 
     activeConnections.forEach((controller) => {
       try {
         controller.enqueue(new TextEncoder().encode(`data: ${message}\n\n`));
-        console.log('Message sent to connection');
+        // Only log in development mode
+        if (process.env.NODE_ENV === 'development') {
+          console.log('Message sent to connection');
+        }
       } catch (error) {
-        console.log('Error sending to connection:', error);
+        // Only log errors in development mode
+        if (process.env.NODE_ENV === 'development') {
+          console.log('Error sending to connection:', error);
+        }
         // Remove dead connections
         activeConnections.delete(controller);
       }

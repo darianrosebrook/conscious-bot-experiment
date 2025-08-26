@@ -502,7 +502,10 @@ export class PlanExecutor extends EventEmitter {
 
       // Check if this is a death error
       if (error.error === 'Bot died') {
-        console.log('Bot died, pausing execution until respawn...');
+        // Only log bot death in development mode
+        if (process.env.NODE_ENV === 'development') {
+          console.log('Bot died, pausing execution until respawn...');
+        }
         this.isExecuting = false;
         this.emit('executionPaused', {
           reason: 'bot_death',
@@ -522,7 +525,10 @@ export class PlanExecutor extends EventEmitter {
 
     // Handle respawn events
     this.botAdapter.on('respawned', (data) => {
-      console.log('Bot respawned, resuming execution...');
+      // Only log bot respawn in development mode
+      if (process.env.NODE_ENV === 'development') {
+        console.log('Bot respawned, resuming execution...');
+      }
       this.emit('executionResumed', {
         reason: 'bot_respawned',
         health: data.health,

@@ -343,12 +343,18 @@ export class BotAdapter extends EventEmitter {
 
       // Don't immediately attempt reconnection on death
       // Let the server handle respawn naturally
-      console.log('Bot died, waiting for respawn...');
+      // Only log bot death in development mode
+      if (process.env.NODE_ENV === 'development') {
+        console.log('Bot died, waiting for respawn...');
+      }
     });
 
     // Respawn handling
     this.bot.on('respawn', () => {
-      console.log('Bot respawned successfully');
+      // Only log bot respawn in development mode
+      if (process.env.NODE_ENV === 'development') {
+        console.log('Bot respawned successfully');
+      }
       this.emitBotEvent('respawned', {
         health: this.bot?.health || 20,
         food: this.bot?.food || 20,

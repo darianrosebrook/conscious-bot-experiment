@@ -139,13 +139,16 @@ export const GET = async (req: NextRequest) => {
             return;
           }
           sendBotState();
-        }, 2000);
+        }, 5000); // Reduced from 2 seconds to 5 seconds to reduce load
 
         // Track this connection
         activeConnections.add(controller);
-        console.log(
-          `SSE connection established. Total connections: ${activeConnections.size}`
-        );
+        // Only log connection changes in development
+        if (process.env.NODE_ENV === 'development') {
+          console.log(
+            `SSE connection established. Total connections: ${activeConnections.size}`
+          );
+        }
 
         const sendBotState = async () => {
           if (!isConnected) return;
@@ -166,9 +169,13 @@ export const GET = async (req: NextRequest) => {
                 ? await minecraftResponse.json()
                 : null;
             } catch (minecraftError) {
-              console.log(
-                'Minecraft interface unavailable, using fallback state'
-              );
+              // Only log once per session to avoid spam
+              if (!global.minecraftUnavailableLogged) {
+                console.log(
+                  'Minecraft interface unavailable, using fallback state'
+                );
+                global.minecraftUnavailableLogged = true;
+              }
               minecraftData = {
                 success: false,
                 data: {
@@ -194,9 +201,13 @@ export const GET = async (req: NextRequest) => {
                 ? await cognitionResponse.json()
                 : null;
             } catch (cognitionError) {
-              console.log(
-                'Cognition service unavailable, using fallback state'
-              );
+              // Only log once per session to avoid spam
+              if (!global.cognitionUnavailableLogged) {
+                console.log(
+                  'Cognition service unavailable, using fallback state'
+                );
+                global.cognitionUnavailableLogged = true;
+              }
               cognitionData = { data: null };
             }
 
@@ -210,7 +221,11 @@ export const GET = async (req: NextRequest) => {
               });
               worldData = worldResponse.ok ? await worldResponse.json() : null;
             } catch (worldError) {
-              console.log('World service unavailable, using fallback state');
+              // Only log once per session to avoid spam
+              if (!global.worldUnavailableLogged) {
+                console.log('World service unavailable, using fallback state');
+                global.worldUnavailableLogged = true;
+              }
               worldData = { data: null };
             }
 

@@ -181,7 +181,10 @@ async function attemptAutoConnect() {
   }
 
   try {
-    console.log(' Auto-connecting to Minecraft server...');
+    // Only log auto-connect attempts in development mode
+    if (process.env.NODE_ENV === 'development') {
+      console.log(' Auto-connecting to Minecraft server...');
+    }
     isConnecting = true;
 
     // Create planning coordinator
@@ -205,7 +208,10 @@ async function attemptAutoConnect() {
 
     // Set up event listeners
     minecraftInterface.planExecutor.on('initialized', (event) => {
-      console.log(' Bot auto-connected to Minecraft server');
+      // Only log successful auto-connect in development mode
+      if (process.env.NODE_ENV === 'development') {
+        console.log(' Bot auto-connected to Minecraft server');
+      }
       // Start Prismarine viewer on first connect
       try {
         const bot = minecraftInterface?.botAdapter.getBot();
@@ -219,7 +225,10 @@ async function attemptAutoConnect() {
     });
 
     minecraftInterface.planExecutor.on('shutdown', () => {
-      console.log(' Bot disconnected');
+      // Only log disconnections in development mode
+      if (process.env.NODE_ENV === 'development') {
+        console.log(' Bot disconnected');
+      }
       minecraftInterface = null;
       viewerActive = false;
       // Attempt to reconnect after a delay
@@ -230,7 +239,7 @@ async function attemptAutoConnect() {
         ) {
           attemptAutoConnect();
         }
-      }, 5000);
+      }, 10000); // Increased from 5 to 10 seconds to reduce reconnection spam
     });
 
     isConnecting = false;
@@ -249,7 +258,7 @@ async function attemptAutoConnect() {
       return;
     }
 
-    // Retry after 30 seconds for other errors
+    // Retry after 60 seconds for other errors
     setTimeout(() => {
       if (
         !minecraftInterface?.botAdapter.getStatus()?.connected &&
@@ -257,14 +266,14 @@ async function attemptAutoConnect() {
       ) {
         attemptAutoConnect();
       }
-    }, 30000);
+    }, 60000); // Increased from 30 to 60 seconds to reduce reconnection spam
   }
 }
 
 // Start auto-connection when server starts
 setTimeout(() => {
   attemptAutoConnect();
-}, 2000); // Wait 2 seconds after server starts
+}, 5000); // Wait 5 seconds after server starts to reduce initial spam
 
 // Disconnect from server
 app.post('/disconnect', async (req, res) => {

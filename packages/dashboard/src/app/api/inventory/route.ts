@@ -37,8 +37,10 @@ export async function GET(_request: NextRequest) {
       console.log('Minecraft bot server not available, using mock data');
     }
 
-    // Show real inventory data (even if empty)
-    console.log('Real inventory from Mineflayer:', inventory);
+    // Show real inventory data (even if empty) - only in debug mode
+    if (process.env.NODE_ENV === 'development' && process.env.DEBUG_INVENTORY === 'true') {
+      console.log('Real inventory from Mineflayer:', inventory);
+    }
 
     // Transform Mineflayer inventory items to our format
     const transformedInventory = inventory.map((item: any) => {
