@@ -1158,10 +1158,10 @@ async function autonomousTaskExecutor() {
     // Step 2: Create planning context
     const context = await createPlanningContext();
 
-    // Step 3: Check if we have any goals, if not generate them proactively
-    const currentGoals = planningSystem.goalFormulation.getCurrentGoals();
-    if (!currentGoals || currentGoals.length === 0) {
-      console.log('🔄 No goals found, generating proactive goals...');
+    // Step 3: Check if we have any active goals, if not generate them proactively
+    const activeGoals = planningSystem.goalFormulation.getActiveGoals();
+    if (!activeGoals || activeGoals.length === 0) {
+      console.log('🔄 No active goals found, generating proactive goals...');
       const newGoals = await generateProactiveGoals(signals, context);
 
       if (newGoals && newGoals.length > 0) {
