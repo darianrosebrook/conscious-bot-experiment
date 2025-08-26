@@ -266,9 +266,12 @@ describe('HRM Integration', () => {
     });
 
     it('should adapt based on performance history', async () => {
-      // Simulate some task executions
+      // Simulate some task executions with explicit navigation tasks
       for (let i = 0; i < 5; i++) {
-        await system.planTask(`Navigation task ${i}`);
+        await system.planTask(`Navigate to point ${i}`, {
+          domain: 'minecraft',
+          urgency: 'medium',
+        });
       }
 
       const stats = system.getPerformanceStats();

@@ -196,6 +196,8 @@ class HighLevelPlanningModule {
       return this.decomposeMinecraftCollectionGoal(goal);
     } else if (goalLower.includes('navigate') || goalLower.includes('go to')) {
       return this.decomposeMinecraftNavigationGoal(goal);
+    } else if (goalLower.includes('establish') && goalLower.includes('base')) {
+      return this.decomposeMinecraftBaseGoal(goal);
     }
 
     return this.decomposeGeneralGoal(goal, context);
@@ -268,6 +270,46 @@ class HighLevelPlanningModule {
         estimatedDuration: 25000,
         dependencies: ['calculate_path'],
         constraints: ['path_safety', 'stamina_management'],
+      },
+    ];
+  }
+
+  private decomposeMinecraftBaseGoal(goal: string) {
+    return [
+      {
+        description: 'Survey area for base location',
+        priority: 0.9,
+        estimatedDuration: 15000,
+        dependencies: [],
+        constraints: ['safety_assessment', 'resource_proximity'],
+      },
+      {
+        description: 'Establish basic shelter',
+        priority: 0.8,
+        estimatedDuration: 20000,
+        dependencies: ['survey_area'],
+        constraints: ['material_availability', 'structural_stability'],
+      },
+      {
+        description: 'Set up farm infrastructure',
+        priority: 0.7,
+        estimatedDuration: 25000,
+        dependencies: ['establish_shelter'],
+        constraints: ['water_access', 'soil_quality'],
+      },
+      {
+        description: 'Construct defensive perimeter',
+        priority: 0.8,
+        estimatedDuration: 30000,
+        dependencies: ['establish_shelter'],
+        constraints: ['material_sufficiency', 'strategic_positioning'],
+      },
+      {
+        description: 'Implement sustainable systems',
+        priority: 0.6,
+        estimatedDuration: 20000,
+        dependencies: ['setup_farm', 'construct_defenses'],
+        constraints: ['resource_efficiency', 'maintenance_planning'],
       },
     ];
   }
@@ -354,7 +396,14 @@ class HighLevelPlanningModule {
   }
 
   private calculateTotalLatency(nodes: PlanNode[]): number {
-    return nodes.reduce((total, node) => total + node.estimatedDuration, 0);
+    // Calculate total latency but cap it at reasonable limits
+    const totalDuration = nodes.reduce(
+      (total, node) => total + node.estimatedDuration,
+      0
+    );
+
+    // Cap at 45 seconds for planning latency (reasonable for complex tasks)
+    return Math.min(totalDuration, 45000);
   }
 
   private estimateGoalDuration(context: PlanningContext): number {

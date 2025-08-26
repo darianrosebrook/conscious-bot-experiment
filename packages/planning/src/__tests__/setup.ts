@@ -7,16 +7,18 @@
  * @author @darianrosebrook
  */
 
+import { vi } from 'vitest';
+
 // Global test timeout
-jest.setTimeout(10000);
+vi.setConfig({ testTimeout: 10000 });
 
 // Mock console methods to reduce noise in tests
 const originalConsole = { ...console };
 beforeAll(() => {
   // Suppress console.log and console.error during tests unless explicitly needed
-  jest.spyOn(console, 'log').mockImplementation(() => {});
-  jest.spyOn(console, 'error').mockImplementation(() => {});
-  jest.spyOn(console, 'warn').mockImplementation(() => {});
+  vi.spyOn(console, 'log').mockImplementation(() => {});
+  vi.spyOn(console, 'error').mockImplementation(() => {});
+  vi.spyOn(console, 'warn').mockImplementation(() => {});
 });
 
 afterAll(() => {
@@ -27,21 +29,21 @@ afterAll(() => {
 });
 
 // Mock fetch for HTTP requests
-global.fetch = jest.fn();
+global.fetch = vi.fn();
 
 // Mock EventEmitter for cognitive integration
-jest.mock('events', () => {
-  const EventEmitter = jest.fn().mockImplementation(() => ({
-    on: jest.fn(),
-    emit: jest.fn(),
-    removeListener: jest.fn(),
+vi.mock('events', () => {
+  const EventEmitter = vi.fn().mockImplementation(() => ({
+    on: vi.fn(),
+    emit: vi.fn(),
+    removeListener: vi.fn(),
   }));
   return { EventEmitter };
 });
 
 // Mock Date.now for consistent timestamps in tests
 const mockDate = new Date('2024-01-01T00:00:00.000Z');
-jest.spyOn(Date, 'now').mockImplementation(() => mockDate.getTime());
+vi.spyOn(Date, 'now').mockImplementation(() => mockDate.getTime());
 
 // Global test utilities
 (global as any).testUtils = {

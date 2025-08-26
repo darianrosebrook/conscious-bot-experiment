@@ -44,6 +44,14 @@ const services = [
     description: 'Web dashboard for monitoring and control',
   },
   {
+    name: 'Core API',
+    command: 'pnpm',
+    args: ['--filter', '@conscious-bot/core', 'run', 'dev:server'],
+    port: 3007,
+    healthUrl: 'http://localhost:3007/health',
+    description: 'Core API and capability registry',
+  },
+  {
     name: 'Minecraft Interface',
     command: 'pnpm',
     args: [
@@ -90,10 +98,13 @@ const services = [
   },
   {
     name: 'Sapient HRM',
-    command: 'python3',
-    args: ['sapient-hrm/hrm_bridge.py', '--port', '5000'],
-    port: 5000,
-    healthUrl: 'http://localhost:5000/health',
+    command: 'bash',
+    args: [
+      '-c',
+      'cd sapient-hrm && source venv-hrm-py311/bin/activate && python hrm_bridge.py --port 5001',
+    ],
+    port: 5001,
+    healthUrl: 'http://localhost:5001/health',
     description: 'Python HRM model for hierarchical reasoning',
   },
 ];
@@ -194,6 +205,80 @@ function wait(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+async function setupPythonEnvironment() {
+  log('\n🐍 Setting up Python 3.11 environment for HRM...', colors.cyan);
+
+  const hrmDir = path.join(process.cwd(), 'sapient-hrm');
+  const venvPath = path.join(hrmDir, 'venv-hrm-py311');
+
+  // Check if Python 3.11 is available
+  try {
+    execSync('python3.11 --version', { stdio: 'ignore' });
+    log(' ✅ Python 3.11 is available', colors.green);
+  } catch {
+    log(
+      ' ❌ Python 3.11 is not available. Please install Python 3.11 first.',
+      colors.red
+    );
+    log('   On macOS: brew install python@3.11', colors.cyan);
+    process.exit(1);
+  }
+
+  // Create virtual environment if it doesn't exist
+  if (!fs.existsSync(venvPath)) {
+    log(' 📦 Creating Python 3.11 virtual environment...', colors.cyan);
+    try {
+      execSync(`cd ${hrmDir} && python3.11 -m venv venv-hrm-py311`, {
+        stdio: 'inherit',
+      });
+      log(' ✅ Virtual environment created', colors.green);
+    } catch (error) {
+      log(' ❌ Failed to create virtual environment', colors.red);
+      process.exit(1);
+    }
+  } else {
+    log(' ✅ Virtual environment already exists', colors.green);
+  }
+
+  // Install Python dependencies
+  log(' 📦 Installing Python dependencies...', colors.cyan);
+  try {
+    execSync(
+      `cd ${hrmDir} && source venv-hrm-py311/bin/activate && pip install --upgrade pip`,
+      {
+        stdio: 'inherit',
+        shell: true,
+      }
+    );
+    execSync(
+      `cd ${hrmDir} && source venv-hrm-py311/bin/activate && pip install -r requirements.txt`,
+      {
+        stdio: 'inherit',
+        shell: true,
+      }
+    );
+    log(' ✅ Python dependencies installed', colors.green);
+  } catch (error) {
+    log(' ❌ Failed to install Python dependencies', colors.red);
+    process.exit(1);
+  }
+
+  // Test HRM import
+  log(' 🔍 Testing HRM model import...', colors.cyan);
+  try {
+    execSync(
+      `cd ${hrmDir} && source venv-hrm-py311/bin/activate && python3.11 -c "from models.hrm.hrm_act_v1 import HierarchicalReasoningModel_ACTV1; print('HRM model import successful')"`,
+      {
+        stdio: 'inherit',
+        shell: true,
+      }
+    );
+    log(' ✅ HRM model import successful', colors.green);
+  } catch (error) {
+    log(' ⚠️  HRM model import failed, will use mock model', colors.yellow);
+  }
+}
+
 // Main function
 async function main() {
   logBanner();
@@ -224,16 +309,10 @@ async function main() {
     process.exit(1);
   }
 
-  // Step 2.5: Check if Python 3 is available
-  try {
-    execSync('python3 --version', { stdio: 'ignore' });
-    log(' ✅ Python 3 is available', colors.green);
-  } catch {
-    log(' ❌ Python 3 is not installed. Please install Python 3 first.', colors.red);
-    process.exit(1);
-  }
+  // Step 3: Setup Python environment
+  await setupPythonEnvironment();
 
-  // Step 3: Kill existing processes
+  // Step 4: Kill existing processes
   log('\n🔄 Cleaning up existing processes...', colors.cyan);
 
   const processPatterns = [
@@ -256,7 +335,7 @@ async function main() {
 
   await wait(2000);
 
-  // Step 4: Check port availability
+  // Step 5: Check port availability
   log('\n🔍 Checking port availability...', colors.cyan);
   const portConflicts = [];
 
@@ -284,8 +363,8 @@ async function main() {
     process.exit(1);
   }
 
-  // Step 5: Install dependencies
-  log('\n📦 Installing dependencies...', colors.cyan);
+  // Step 6: Install dependencies
+  log('\n📦 Installing Node.js dependencies...', colors.cyan);
   try {
     execSync('pnpm install', { stdio: 'inherit' });
     log(' ✅ Node.js dependencies installed', colors.green);
@@ -294,16 +373,7 @@ async function main() {
     process.exit(1);
   }
 
-  // Step 5.5: Install Python dependencies for sapient-hrm
-  log('\n🐍 Installing Python dependencies...', colors.cyan);
-  try {
-    execSync('cd sapient-hrm && pip install -r requirements.txt', { stdio: 'inherit' });
-    log(' ✅ Python dependencies installed', colors.green);
-  } catch (error) {
-    log(' ⚠️  Failed to install Python dependencies. Continuing anyway...', colors.yellow);
-  }
-
-  // Step 6: Build packages
+  // Step 7: Build packages
   log('\n🔨 Building packages...', colors.cyan);
   try {
     execSync('pnpm build', { stdio: 'inherit' });
@@ -313,7 +383,7 @@ async function main() {
     process.exit(1);
   }
 
-  // Step 7: Start all services
+  // Step 8: Start all services
   log('\n🚀 Starting all services...', colors.cyan);
   log('');
 
@@ -365,7 +435,7 @@ async function main() {
     await wait(1000);
   }
 
-  // Step 8: Wait for services to start and check health
+  // Step 9: Wait for services to start and check health
   log('\n⏳ Waiting for services to start...', colors.cyan);
   await wait(5000);
 
@@ -384,7 +454,7 @@ async function main() {
     );
   }
 
-  // Step 9: Display status and URLs
+  // Step 10: Display status and URLs
   log('\n🎉 Conscious Bot System is running!', colors.green);
   log('');
   log('📊 Service Status:', colors.blue);
@@ -403,15 +473,15 @@ async function main() {
     colors.reset
   );
   log(
+    `  ${colors.cyan}Core API:${colors.reset}      http://localhost:3007`,
+    colors.reset
+  );
+  log(
     `  ${colors.cyan}Minecraft Bot:${colors.reset}  http://localhost:3005`,
     colors.reset
   );
   log(
-    `  ${colors.cyan}Minecraft Viewer:${colors.reset} http://localhost:3006`,
-    colors.reset
-  );
-  log(
-    `  ${colors.cyan}Sapient HRM:${colors.reset}    http://localhost:5000`,
+    `  ${colors.cyan}Sapient HRM:${colors.reset}    http://localhost:5001`,
     colors.reset
   );
   log('');
@@ -420,11 +490,17 @@ async function main() {
   log('  Disconnect bot: curl -X POST http://localhost:3005/disconnect');
   log('  Get status: curl http://localhost:3005/status');
   log('');
+  log('🧠 HRM Commands:', colors.yellow);
+  log('  Health check: curl http://localhost:5001/health');
+  log(
+    '  Test reasoning: curl -X POST http://localhost:5001/reason -H "Content-Type: application/json" -d \'{"task": "test", "context": {}}\''
+  );
+  log('');
   log('🛑 To stop all services:', colors.yellow);
   log('  Press Ctrl+C or run: pnpm kill');
   log('');
 
-  // Step 10: Handle graceful shutdown
+  // Step 11: Handle graceful shutdown
   const cleanup = async () => {
     log('\n🛑 Shutting down Conscious Bot System...', colors.yellow);
 
