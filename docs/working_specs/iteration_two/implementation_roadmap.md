@@ -103,7 +103,7 @@ This roadmap transforms the conscious bot from a static capability system to a d
 #### Hybrid HRM Integration - 85% Complete
 - ✅ **Hybrid HRM Arbiter**: `packages/core/src/hybrid-hrm-arbiter.ts`
 - ✅ **Hybrid HRM Router**: `packages/core/src/mcp-capabilities/hybrid-hrm-integration.ts`
-- ✅ **Python HRM Bridge**: `sapient-hrm/hrm_bridge.py`
+- ✅ **Python HRM Bridge**: `packages/hrm-integration/hrm_bridge.py`
 - ✅ **LLM Integration**: Ollama integration with HRM principles
 - ✅ **Integration Bridge**: `packages/minecraft-interface/src/hybrid-arbiter-integration.ts`
 - ⚠️ **Missing**: Full integration with main Arbiter system

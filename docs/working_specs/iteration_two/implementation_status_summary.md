@@ -64,10 +64,10 @@ The iteration_two implementation has made substantial progress with **85% of the
 - ✅ **Shadow Runs**: A/B testing with auto-promotion
 - ✅ **Error Taxonomy**: Centralized error codes
 
-#### **Hybrid HRM Integration - 85% Complete**
+#### Hybrid HRM Integration - 85% Complete
 - ✅ **Hybrid HRM Arbiter**: `packages/core/src/hybrid-hrm-arbiter.ts`
 - ✅ **Hybrid HRM Router**: `packages/core/src/mcp-capabilities/hybrid-hrm-integration.ts`
-- ✅ **Python HRM Bridge**: `sapient-hrm/hrm_bridge.py`
+- ✅ **Python HRM Bridge**: `packages/hrm-integration/hrm_bridge.py`
 - ✅ **LLM Integration**: Ollama integration with HRM principles
 - ✅ **Integration Bridge**: `packages/minecraft-interface/src/hybrid-arbiter-integration.ts`
 - ⚠️ **Missing**: Full integration with main Arbiter system
