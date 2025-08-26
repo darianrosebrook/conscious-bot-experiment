@@ -50,7 +50,13 @@
     "test:planning:adaptive": "npx tsx bin/mc-integration-test.ts --strategy=adaptive --verbose",
     "demo:integration": "npx tsx src/quick-integration-demo.ts",
     "demo:quick": "npx tsx src/quick-integration-demo.ts",
-    "dev:server": "tsx src/server.ts"
+    "dev:server": "tsx src/server.ts",
+    "test:bot": "npx tsx bin/test-bot.ts",
+    "test:bot:save": "npx tsx bin/test-bot.ts --save",
+    "test:bot:all": "npx tsx bin/test-bot.ts --save --output=bot-test-results.json",
+    "test:manual": "npx tsx bin/test-manual.ts",
+    "test:curl": "./bin/test-curl.sh",
+    "test:curl:quick": "./bin/test-curl.sh --quick"
   },
   "dependencies": {
     "@conscious-bot/core": "workspace:*",

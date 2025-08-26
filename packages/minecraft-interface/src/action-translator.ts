@@ -163,6 +163,119 @@ export class ActionTranslator {
           timeout: 20000,
         };
 
+      // Add support for planning system actions
+      case 'analyze_biome_resources':
+      case 'scan_for_animals':
+      case 'scan_for_trees':
+      case 'scan_for_berries':
+        console.log(`Creating scan action: ${actionType}`);
+        return {
+          type: 'wait',
+          parameters: {
+            duration: 2000,
+          },
+          timeout: 2500,
+        };
+
+      case 'cook_food':
+      case 'eat_food':
+        console.log(`Creating food action: ${actionType}`);
+        return {
+          type: 'consume_food',
+          parameters: {
+            food_type: params.food_type || 'any',
+            amount: params.amount || 1,
+          },
+          timeout: 10000,
+        };
+
+      case 'scan_tree_structure':
+        console.log('Creating tree scan action');
+        return {
+          type: 'wait',
+          parameters: {
+            duration: 1000,
+          },
+          timeout: 1500,
+        };
+
+      case 'dig_blocks':
+        console.log('Creating dig action');
+        return {
+          type: 'mine_block',
+          parameters: {
+            position: params.position || 'current',
+            tool: params.tool || 'hand',
+          },
+          timeout: 15000,
+        };
+
+      case 'collect_items':
+        console.log('Creating collect items action');
+        return {
+          type: 'pickup_item',
+          parameters: {
+            radius: params.radius || 3,
+          },
+          timeout: 5000,
+        };
+
+      case 'attack_entity':
+        console.log('Creating attack action');
+        return {
+          type: 'attack_entity',
+          parameters: {
+            target: params.target || 'nearest',
+          },
+          timeout: 10000,
+        };
+
+      case 'harvest_crops':
+        console.log('Creating harvest action');
+        return {
+          type: 'mine_block',
+          parameters: {
+            position: params.position || 'current',
+            tool: 'hand',
+          },
+          timeout: 10000,
+        };
+
+      case 'craft_item':
+        console.log('Creating craft action');
+        return {
+          type: 'craft_item',
+          parameters: {
+            item: params.item || params.recipe,
+            quantity: params.amount || 1,
+          },
+          timeout: 20000,
+        };
+
+      case 'turn_left':
+        console.log('Creating turn left action');
+        return {
+          type: 'turn_left',
+          parameters: {},
+          timeout: 2000,
+        };
+
+      case 'turn_right':
+        console.log('Creating turn right action');
+        return {
+          type: 'turn_right',
+          parameters: {},
+          timeout: 2000,
+        };
+
+      case 'jump':
+        console.log('Creating jump action');
+        return {
+          type: 'jump',
+          parameters: {},
+          timeout: 1000,
+        };
+
       case 'chat':
       case 'say':
         console.log('Creating chat action');
@@ -471,6 +584,21 @@ export class ActionTranslator {
 
         case 'look_at':
           return await this.executeLookAt(action, timeout);
+
+        case 'chat':
+          return await this.executeChat(action, timeout);
+
+        case 'turn_left':
+          return await this.executeTurnLeft(action, timeout);
+
+        case 'turn_right':
+          return await this.executeTurnRight(action, timeout);
+
+        case 'jump':
+          return await this.executeJump(action, timeout);
+
+        case 'attack_entity':
+          return await this.executeAttackEntity(action, timeout);
 
         case 'wait':
           return await this.executeWait(action, timeout);
@@ -1160,22 +1288,201 @@ export class ActionTranslator {
     action: MinecraftAction,
     timeout: number
   ): Promise<{ success: boolean; data?: any; error?: string }> {
-    const { target } = action.parameters;
+    const { target, direction, duration } = action.parameters;
 
     try {
-      await this.bot.lookAt(target);
+      if (target) {
+        // Look at specific target
+        await this.bot.lookAt(target);
+        return {
+          success: true,
+          data: {
+            target: target.clone(),
+            yaw: this.bot.entity.yaw,
+            pitch: this.bot.entity.pitch,
+          },
+        };
+      } else if (direction) {
+        // Look in a specific direction
+        let yaw = 0;
+        let pitch = 0;
+
+        // Ensure bot entity is available
+        if (!this.bot.entity) {
+          return {
+            success: false,
+            error: 'Bot entity not available for look action',
+          };
+        }
+
+        switch (direction) {
+          case 'around':
+            yaw = Math.random() * 360;
+            break;
+          case 'up':
+            pitch = -90;
+            break;
+          case 'down':
+            pitch = 90;
+            break;
+          case 'left':
+            yaw = (this.bot.entity.yaw || 0) - 90;
+            break;
+          case 'right':
+            yaw = (this.bot.entity.yaw || 0) + 90;
+            break;
+          case 'forward':
+            yaw = this.bot.entity.yaw || 0;
+            break;
+          case 'backward':
+            yaw = (this.bot.entity.yaw || 0) + 180;
+            break;
+          default:
+            yaw = Math.random() * 360;
+        }
+
+        await this.bot.look(yaw, pitch);
+
+        // Wait for the specified duration
+        if (duration) {
+          await new Promise((resolve) => setTimeout(resolve, duration));
+        }
+
+        return {
+          success: true,
+          data: {
+            direction,
+            duration,
+            yaw: this.bot.entity?.yaw || 0,
+            pitch: this.bot.entity?.pitch || 0,
+          },
+        };
+      } else {
+        return {
+          success: false,
+          error: 'No target or direction specified for look_at action',
+        };
+      }
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : String(error),
+      };
+    }
+  }
+
+  /**
+   * Execute chat action
+   */
+  private async executeChat(
+    action: MinecraftAction,
+    timeout: number
+  ): Promise<{ success: boolean; data?: any; error?: string }> {
+    const { message } = action.parameters;
+
+    try {
+      await this.bot.chat(message);
+      return {
+        success: true,
+        data: { message },
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Chat failed',
+      };
+    }
+  }
+
+  /**
+   * Execute turn left action
+   */
+  private async executeTurnLeft(
+    action: MinecraftAction,
+    timeout: number
+  ): Promise<{ success: boolean; data?: any; error?: string }> {
+    try {
+      // Get current yaw
+      const currentYaw = this.bot.entity.yaw || 0;
+      const targetYaw = currentYaw - Math.PI / 2; // Turn 90 degrees left
+
+      // Turn to the target yaw
+      await this.bot.look(targetYaw, this.bot.entity.pitch || 0);
+
       return {
         success: true,
         data: {
-          target: target.clone(),
-          yaw: this.bot.entity.yaw,
-          pitch: this.bot.entity.pitch,
+          action: 'turn_left',
+          previousYaw: currentYaw,
+          newYaw: targetYaw,
+          degreesTurned: 90,
         },
       };
     } catch (error) {
       return {
         success: false,
-        error: error instanceof Error ? error.message : String(error),
+        error: error instanceof Error ? error.message : 'Turn left failed',
+      };
+    }
+  }
+
+  /**
+   * Execute turn right action
+   */
+  private async executeTurnRight(
+    action: MinecraftAction,
+    timeout: number
+  ): Promise<{ success: boolean; data?: any; error?: string }> {
+    try {
+      // Get current yaw
+      const currentYaw = this.bot.entity.yaw || 0;
+      const targetYaw = currentYaw + Math.PI / 2; // Turn 90 degrees right
+
+      // Turn to the target yaw
+      await this.bot.look(targetYaw, this.bot.entity.pitch || 0);
+
+      return {
+        success: true,
+        data: {
+          action: 'turn_right',
+          previousYaw: currentYaw,
+          newYaw: targetYaw,
+          degreesTurned: 90,
+        },
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Turn right failed',
+      };
+    }
+  }
+
+  /**
+   * Execute jump action
+   */
+  private async executeJump(
+    action: MinecraftAction,
+    timeout: number
+  ): Promise<{ success: boolean; data?: any; error?: string }> {
+    try {
+      // Set the jump control state
+      this.bot.setControlState('jump', true);
+
+      // Wait a short time
+      await new Promise((resolve) => setTimeout(resolve, 100));
+
+      // Release the jump control state
+      this.bot.setControlState('jump', false);
+
+      return {
+        success: true,
+        data: { action: 'jump' },
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Jump failed',
       };
     }
   }
@@ -1426,6 +1733,81 @@ export class ActionTranslator {
           error instanceof Error
             ? error.message
             : 'Unknown error during property exploration',
+      };
+    }
+  }
+
+  /**
+   * Execute attack entity action
+   */
+  private async executeAttackEntity(
+    action: any,
+    timeout: number
+  ): Promise<{ success: boolean; data?: any; error?: string }> {
+    try {
+      const { target = 'nearest' } = action.parameters;
+
+      // Find the nearest entity to attack
+      const entities = Object.values(this.bot.entities);
+      let targetEntity = null;
+
+      if (target === 'nearest') {
+        // Find the nearest entity that can be attacked
+        let nearestDistance = Infinity;
+        for (const entity of entities) {
+          if (entity.type === 'hostile' || entity.type === 'other') {
+            const distance = this.bot.entity.position.distanceTo(
+              entity.position
+            );
+            if (distance < nearestDistance) {
+              nearestDistance = distance;
+              targetEntity = entity;
+            }
+          }
+        }
+      } else {
+        // Find entity by type
+        targetEntity = entities.find(
+          (entity) => entity.type === target || entity.name === target
+        );
+      }
+
+      if (!targetEntity) {
+        return {
+          success: false,
+          error: `No target entity found for: ${target}`,
+        };
+      }
+
+      // Move towards the entity if it's not close enough
+      const distance = this.bot.entity.position.distanceTo(
+        targetEntity.position
+      );
+      if (distance > 3) {
+        await this.bot.pathfinder.goto(
+          new goals.GoalBlock(
+            targetEntity.position.x,
+            targetEntity.position.y,
+            targetEntity.position.z
+          )
+        );
+      }
+
+      // Attack the entity
+      await this.bot.attack(targetEntity);
+
+      return {
+        success: true,
+        data: {
+          target: targetEntity.name || targetEntity.type,
+          position: targetEntity.position,
+          distance: distance,
+        },
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Attack failed',
       };
     }
   }

@@ -116,6 +116,9 @@ export type MinecraftActionType =
   | 'move_backward'
   | 'strafe_left'
   | 'strafe_right'
+  | 'turn_left'
+  | 'turn_right'
+  | 'jump'
   | 'experiment_with_item'
   | 'explore_item_properties';
 
