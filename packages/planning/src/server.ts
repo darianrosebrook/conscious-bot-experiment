@@ -14,6 +14,7 @@ import {
   BTNodeStatus,
 } from './behavior-trees/BehaviorTreeRunner';
 import { CognitiveThoughtProcessor } from './cognitive-thought-processor';
+import { HomeostasisState } from './types';
 
 const app = express();
 const port = process.env.PORT ? parseInt(process.env.PORT) : 3002;
@@ -44,11 +45,12 @@ const toolExecutor = {
 
       const result = await response.json();
 
+      const typedResult = result as any;
       return {
-        ok: result.success,
-        data: result.result,
+        ok: typedResult.success,
+        data: typedResult.result,
         environmentDeltas: {},
-        error: result.error,
+        error: typedResult.error,
       };
     } catch (error) {
       console.error(`Tool execution failed for ${tool}:`, error);
@@ -151,282 +153,301 @@ const cognitiveThoughtProcessor = new CognitiveThoughtProcessor({
   cognitiveEndpoint: 'http://localhost:3003',
 });
 
-// Initialize planning system (simplified for now)
+// Initialize proper integrated planning system
+import { IntegratedPlanningCoordinator } from './integrated-planning-coordinator';
+import { EnhancedGoalManager } from './goal-formulation/enhanced-goal-manager';
+import { EnhancedReactiveExecutor } from './reactive-executor/enhanced-reactive-executor';
+import { Goal, GoalStatus } from './types';
+
+// Initialize the integrated planning coordinator
+const integratedPlanningCoordinator = new IntegratedPlanningCoordinator({
+  hrmConfig: {
+    hrmLatencyTarget: 100,
+    qualityThreshold: 0.7,
+    maxRefinements: 3,
+    enableIterativeRefinement: true,
+  },
+  plannerConfig: {
+    maxRefinements: 3,
+    qualityThreshold: 0.8,
+  },
+});
+
+// Initialize enhanced goal manager
+const enhancedGoalManager = new EnhancedGoalManager();
+
+// Initialize enhanced reactive executor
+const enhancedReactiveExecutor = new EnhancedReactiveExecutor();
+
+// Initialize planning system with proper integration
 const planningSystem = {
+  // Goal formulation with proper pipeline
   goalFormulation: {
-    getCurrentGoals: () => [],
-    getActiveGoals: () => [],
-    getGoalCount: () => 0,
-    getCurrentTasks: () => {
-      const tasks = planningSystem.goalFormulation._tasks || [];
-      return tasks.filter(
-        (t: any) => t.status === 'pending' || t.status === 'in_progress'
-      );
-    },
-    getCompletedTasks: () => {
-      const tasks = planningSystem.goalFormulation._tasks || [];
-      return tasks.filter(
-        (t: any) =>
-          t.status === 'completed' ||
-          t.status === 'failed' ||
-          t.status === 'abandoned'
-      );
-    },
+    getCurrentGoals: () => enhancedGoalManager.listGoals(),
+    getActiveGoals: () =>
+      enhancedGoalManager.getGoalsByStatus(GoalStatus.PENDING),
+    getGoalCount: () => enhancedGoalManager.listGoals().length,
+    getCurrentTasks: () =>
+      enhancedGoalManager
+        .listGoals()
+        .filter((g) => g.status === GoalStatus.PENDING),
+    getCompletedTasks: () =>
+      enhancedGoalManager.getGoalsByStatus(GoalStatus.COMPLETED),
     addTask: (task: any) => {
-      // Simple in-memory task storage
-      if (!planningSystem.goalFormulation._tasks) {
-        planningSystem.goalFormulation._tasks = [];
+      // Convert task to goal format and add to goal manager
+      const goal: Goal = {
+        id: task.id || `goal-${Date.now()}`,
+        type: task.type,
+        priority: task.priority || 0.5,
+        urgency: task.urgency || 0.5,
+        utility: task.priority || 0.5,
+        description: task.description,
+        preconditions: [],
+        effects: [],
+        status: GoalStatus.PENDING,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+        subGoals: [],
+      };
+      enhancedGoalManager.upsert(goal);
+    },
+    addGoal: async (goal: any) => {
+      // Add goal directly to goal manager
+      const enhancedGoal: Goal = {
+        id: goal.id || `goal-${Date.now()}`,
+        type: goal.type,
+        priority: goal.priority || 0.5,
+        urgency: goal.urgency || 0.5,
+        utility: goal.priority || 0.5,
+        description: goal.description,
+        preconditions: goal.preconditions || [],
+        effects: goal.effects || [],
+        status: GoalStatus.PENDING,
+        createdAt: goal.createdAt || Date.now(),
+        updatedAt: Date.now(),
+        subGoals: goal.subGoals || [],
+      };
+      enhancedGoalManager.upsert(enhancedGoal);
+      console.log(
+        `Added new goal: ${enhancedGoal.type} - ${enhancedGoal.description}`
+      );
+      return enhancedGoal;
+    },
+    updateGoalStatus: (goalId: string, status: string) => {
+      // Update goal status in goal manager
+      const goals = enhancedGoalManager.listGoals();
+      const goalIndex = goals.findIndex((g) => g.id === goalId);
+      if (goalIndex >= 0) {
+        const goal = goals[goalIndex];
+        goal.status = status as GoalStatus;
+        goal.updatedAt = Date.now();
+        enhancedGoalManager.upsert(goal);
+        console.log(`Updated goal status: ${goalId} -> ${status}`);
+      } else {
+        console.log(`Goal not found for status update: ${goalId}`);
       }
+    },
+    // Legacy properties for backward compatibility (will be removed in Phase 2)
+    _tasks: [] as any[],
+    _lastTaskExecution: 0,
+    _failedTaskCount: 0,
+    _maxConsecutiveFailures: 3,
+  },
 
-      // Check for duplicate tasks (same type and description within last 30 seconds)
-      const thirtySecondsAgo = Date.now() - 30000;
-      const isDuplicate = planningSystem.goalFormulation._tasks.some(
-        (existingTask: any) =>
-          existingTask.type === task.type &&
-          existingTask.description === task.description &&
-          existingTask.createdAt > thirtySecondsAgo
+  // Hierarchical planner with proper integration
+  hierarchicalPlanner: {
+    getCurrentPlan: () => null, // IntegratedPlanningCoordinator doesn't expose current plan
+    updatePlan: (plan: any) => {
+      // IntegratedPlanningCoordinator handles plan updates internally
+      console.log('Plan update requested:', plan);
+    },
+    getPlanStatus: () => 'idle', // Default status
+    getPlanQueue: () => [], // No exposed queue
+    isPlanningActive: () => false, // Default to inactive
+  },
+
+  // Reactive executor with proper integration
+  reactiveExecutor: {
+    isExecuting: () => enhancedReactiveExecutor.isExecuting(),
+    executeNextTask: async () => enhancedReactiveExecutor.executeNextTask(),
+    getCurrentAction: () => enhancedReactiveExecutor.getCurrentAction(),
+    getActionQueue: () => enhancedReactiveExecutor.getActionQueue(),
+    // Legacy method for backward compatibility (will be removed in Phase 2)
+    executeTask: async (task: any) => {
+      // Delegate to enhanced reactive executor
+      return enhancedReactiveExecutor.executeTask(task);
+    },
+  },
+
+  // Main planning pipeline method
+  planAndExecute: async (signals: any[], context: any) => {
+    try {
+      // Use the integrated planning coordinator for the full pipeline
+      const result = await integratedPlanningCoordinator.planAndExecute(
+        signals,
+        context
       );
 
-      if (isDuplicate) {
-        console.log(
-          ` Skipping duplicate task: ${task.type} - ${task.description}`
-        );
-        return;
-      }
+      // If a plan was generated, execute it
+      if (result.primaryPlan) {
+        // Create proper MCP bus for execution
+        const mcpBus = createMCPBus(context);
 
-      planningSystem.goalFormulation._tasks.push(task);
-      console.log(` Task added: ${task.type} - ${task.description}`);
-    },
-    _tasks: [] as any[],
-    _lastTaskExecution: 0, // Track when last task was executed
-    _failedTaskCount: 0, // Track failed tasks to prevent infinite loops
-    _maxConsecutiveFailures: 3, // Maximum consecutive failures before switching strategies
-  },
-  hierarchicalPlanner: {
-    getCurrentPlan: () => ({
-      id: 'current-plan-1',
-      name: 'Survival and Exploration',
-      description:
-        'Establish basic survival infrastructure and explore the environment',
-      steps: [
-        {
-          id: 'step-1',
-          name: 'Find shelter',
-          status: 'completed',
-          priority: 0.9,
-        },
-        {
-          id: 'step-2',
-          name: 'Gather resources',
-          status: 'in_progress',
-          priority: 0.8,
-        },
-        {
-          id: 'step-3',
-          name: 'Explore cave system',
-          status: 'pending',
-          priority: 0.6,
-        },
-        {
-          id: 'step-4',
-          name: 'Establish farming',
-          status: 'pending',
-          priority: 0.5,
-        },
-      ],
-      progress: 0.25,
-      estimatedDuration: 3600000, // 1 hour
-      createdAt: Date.now() - 1800000, // 30 minutes ago
-    }),
-    getPlanQueue: () => [
-      {
-        id: 'plan-2',
-        name: 'Resource Optimization',
-        description: 'Improve resource gathering efficiency and storage',
-        priority: 0.7,
-        estimatedDuration: 2400000, // 40 minutes
-      },
-      {
-        id: 'plan-3',
-        name: 'Defense Preparation',
-        description: 'Build defensive structures and prepare for threats',
-        priority: 0.6,
-        estimatedDuration: 1800000, // 30 minutes
-      },
-    ],
-    isPlanningActive: () => true,
-  },
-  reactiveExecutor: {
-    getCurrentAction: () => ({
-      id: 'action-1',
-      name: 'Gather Wood',
-      type: 'gather',
-      target: 'oak_log',
-      priority: 0.8,
-      startedAt: Date.now() - 30000, // 30 seconds ago
-      estimatedDuration: 120000, // 2 minutes
-      progress: 0.25,
-    }),
-    getActionQueue: () => [
-      {
-        id: 'action-2',
-        name: 'Craft Wooden Planks',
-        type: 'craft',
-        priority: 0.7,
-      },
-      {
-        id: 'action-3',
-        name: 'Build Basic Shelter',
-        type: 'build',
-        priority: 0.9,
-      },
-      {
-        id: 'action-4',
-        name: 'Explore Surroundings',
-        type: 'explore',
-        priority: 0.6,
-      },
-    ],
-    isExecuting: () => true,
-    executeNextTask: async () => {
-      // Simple task execution that sends commands to Minecraft bot
-      const tasks = planningSystem.goalFormulation._tasks || [];
-      if (tasks.length === 0) {
-        throw new Error('No tasks to execute');
-      }
-
-      // Find the first pending task
-      const taskIndex = tasks.findIndex((t: any) => t.status === 'pending');
-      if (taskIndex === -1) {
-        throw new Error('No pending tasks to execute');
-      }
-
-      const task = tasks[taskIndex];
-
-      // Mark task as in progress
-      task.status = 'in_progress';
-      task.startedAt = Date.now();
-      task.attempts = (task.attempts || 0) + 1;
-
-      try {
-        // Execute the task by sending commands to Minecraft bot
-        const result = await executeTaskInMinecraft(task);
-
-        // Validate task completion based on result
-        const taskCompleted = validateTaskCompletion(task, result);
-
-        // Process cognitive feedback
-        const cognitiveFeedback =
-          await cognitiveIntegration.processTaskCompletion(task, result, {
-            taskType: task.type,
-            goal: task.goal,
-            attempts: task.attempts,
-          });
-
-        if (taskCompleted) {
-          // Mark task as completed
-          task.status = 'completed';
-          task.completedAt = Date.now();
-          task.result = result;
-          task.cognitiveFeedback = cognitiveFeedback;
-
-          // Reset failure counter on success
-          planningSystem.goalFormulation._failedTaskCount = 0;
-
-          console.log(
-            ` Task completed successfully: ${task.type} - ${task.description}`
-          );
-          console.log(` Cognitive feedback: ${cognitiveFeedback.reasoning}`);
-        } else {
-          // Mark task as failed
-          task.status = 'failed';
-          task.failedAt = Date.now();
-          task.failureReason =
-            (result as any)?.error || 'Task validation failed';
-          task.result = result;
-          task.cognitiveFeedback = cognitiveFeedback;
-
-          // Increment failure counter
-          planningSystem.goalFormulation._failedTaskCount++;
-
-          console.log(
-            ` Task failed: ${task.type} - ${task.description} - Reason: ${task.failureReason}`
-          );
-          console.log(` Cognitive feedback: ${cognitiveFeedback.reasoning}`);
-        }
-
-        // Debug logging after status update
-        console.log(` Task Validation for ${task.type}:`, {
-          taskId: task.id,
-          resultSuccess: (result as any).success,
-          resultError: (result as any).error,
-          resultType: (result as any).type,
-          taskCompleted,
-          taskStatus: task.status,
-        });
-
-        // Check if task should be abandoned based on cognitive feedback (only for failed tasks)
-        if (!taskCompleted) {
-          if (cognitiveIntegration.shouldAbandonTask(task.id)) {
-            console.log(
-              ` Abandoning task ${task.id} based on cognitive feedback`
-            );
-            task.status = 'abandoned';
-            task.abandonedAt = Date.now();
-            task.abandonReason = 'Cognitive feedback suggests abandonment';
-
-            // Generate alternative suggestions from cognitive feedback
-            if (cognitiveFeedback.alternativeSuggestions.length > 0) {
-              console.log(
-                ` Alternative suggestions: ${cognitiveFeedback.alternativeSuggestions.join(', ')}`
-              );
-
-              // Create alternative tasks based on suggestions
-              const alternativeTask = generateTaskFromSuggestions(
-                cognitiveFeedback.alternativeSuggestions
-              );
-              if (alternativeTask) {
-                planningSystem.goalFormulation.addTask(alternativeTask);
-              }
-            }
-          } else if (
-            planningSystem.goalFormulation._failedTaskCount >=
-            planningSystem.goalFormulation._maxConsecutiveFailures
-          ) {
-            console.log(
-              `⚠️ Too many consecutive failures (${planningSystem.goalFormulation._failedTaskCount}), switching task strategy`
-            );
-            planningSystem.goalFormulation._failedTaskCount = 0;
-
-            // Generate a different type of task
-            const alternativeTask = generateAlternativeTask(task);
-            planningSystem.goalFormulation.addTask(alternativeTask);
-          }
-        }
-
-        // Update last execution time
-        planningSystem.goalFormulation._lastTaskExecution = Date.now();
-
-        return { task, result, completed: taskCompleted };
-      } catch (error) {
-        // Mark task as failed due to exception
-        task.status = 'failed';
-        task.failedAt = Date.now();
-        task.failureReason =
-          error instanceof Error ? error.message : String(error);
-
-        // Increment failure counter
-        planningSystem.goalFormulation._failedTaskCount++;
-
-        console.error(
-          ` Task execution error: ${task.type} - ${task.description} - Error: ${task.failureReason}`
+        const executionResult = await enhancedReactiveExecutor.execute(
+          result.primaryPlan,
+          context.worldState || {},
+          mcpBus
         );
 
-        throw error;
+        // Note: executionResult is not part of IntegratedPlanningResult type
+        // The result is returned separately
       }
-    },
+
+      return result;
+    } catch (error) {
+      console.error('Planning and execution failed:', error);
+      return {
+        primaryPlan: null,
+        alternativePlans: [],
+        routingDecision: { router: 'fallback', reasoning: 'Planning failed' },
+        planningApproach: 'fallback',
+        confidence: 0,
+        estimatedSuccess: 0,
+        planningLatency: 0,
+        goalFormulation: {
+          identifiedNeeds: [],
+          generatedGoals: [],
+          priorityRanking: [],
+        },
+        planGeneration: { selectedPlan: null, alternativePlans: [] },
+        qualityAssessment: { feasibilityScore: 0, optimalityScore: 0 },
+        executionResult: {
+          success: false,
+          error: error instanceof Error ? error.message : 'Unknown error',
+        },
+      };
+    }
   },
 };
+
+/**
+ * Create a proper MCP bus for plan execution
+ */
+function createMCPBus(context: any): any {
+  return {
+    executeAction: async (action: any) => {
+      try {
+        // Execute the action in Minecraft
+        const result = await executeTaskInMinecraft(action);
+
+        // Update context with execution results
+        if (result.success && result.data) {
+          // Update world state based on action results
+          updateWorldStateFromAction(context, action, result.data);
+        }
+
+        return result;
+      } catch (error) {
+        console.error('MCP bus action execution failed:', error);
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : 'Unknown error',
+        };
+      }
+    },
+
+    // Additional MCP bus methods for enhanced functionality
+    getWorldState: () => context.worldState || {},
+    getBotStatus: () => context.botStatus || {},
+    getInventory: () => context.worldState?.inventory || {},
+    getEnvironment: () => context.worldState?.environment || {},
+
+    // Signal processing methods
+    emitSignal: (signal: any) => {
+      // Add signal to context for processing
+      if (!context.signalHistory) {
+        context.signalHistory = [];
+      }
+      context.signalHistory.push({
+        ...signal,
+        timestamp: Date.now(),
+      });
+    },
+
+    // Planning coordination methods
+    updatePlan: (plan: any) => {
+      // Update the current plan in context
+      context.currentPlan = plan;
+    },
+
+    getPlanStatus: () => context.currentPlan?.status || 'unknown',
+  };
+}
+
+/**
+ * Update world state based on action execution results
+ */
+function updateWorldStateFromAction(
+  context: any,
+  action: any,
+  resultData: any
+): void {
+  if (!context.worldState) {
+    context.worldState = {};
+  }
+
+  // Update inventory if items were added/removed
+  if (resultData.inventoryChange) {
+    if (!context.worldState.inventory) {
+      context.worldState.inventory = { items: [] };
+    }
+
+    // Apply inventory changes
+    Object.entries(resultData.inventoryChange).forEach(([itemName, change]) => {
+      const existingItem = context.worldState.inventory.items.find(
+        (item: any) => item.name === itemName
+      );
+
+      if (existingItem) {
+        existingItem.count += change as number;
+        if (existingItem.count <= 0) {
+          context.worldState.inventory.items =
+            context.worldState.inventory.items.filter(
+              (item: any) => item.name !== itemName
+            );
+        }
+      } else if ((change as number) > 0) {
+        context.worldState.inventory.items.push({
+          name: itemName,
+          count: change as number,
+        });
+      }
+    });
+  }
+
+  // Update position if movement occurred
+  if (resultData.position) {
+    if (!context.worldState.botStatus) {
+      context.worldState.botStatus = {};
+    }
+    context.worldState.botStatus.position = resultData.position;
+  }
+
+  // Update health/food if changed
+  if (resultData.health !== undefined) {
+    if (!context.worldState.botStatus) {
+      context.worldState.botStatus = {};
+    }
+    context.worldState.botStatus.health = resultData.health;
+  }
+
+  if (resultData.food !== undefined) {
+    if (!context.worldState.botStatus) {
+      context.worldState.botStatus = {};
+    }
+    context.worldState.botStatus.food = resultData.food;
+  }
+}
 
 /**
  * Validate if a task was actually completed successfully
@@ -700,226 +721,981 @@ function generateAlternativeTask(failedTask: any): any {
   };
 }
 
-// Helper function to generate autonomous tasks based on goals
+// Goal-driven autonomous task generation using real planning system
 async function generateAutonomousTask() {
-  // Check current bot state for threats and health
-  let threatLevel = 0;
-  let healthLevel = 100;
-  let isNight = false;
-
   try {
-    const minecraftUrl = 'http://localhost:3005';
-    const botStatus = await fetch(`${minecraftUrl}/health`).then((res) =>
-      res.json()
-    );
+    // Use the real planning system to generate tasks based on current goals
+    const signals = await generateWorldSignals();
+    const context = await createPlanningContext();
 
-    if (botStatus.botStatus?.health) {
-      healthLevel = botStatus.botStatus.health;
+    // Get current goals from the planning system
+    const currentGoals = planningSystem.goalFormulation.getCurrentGoals();
+
+    // If we have active goals, generate a task from the highest priority goal
+    if (currentGoals && currentGoals.length > 0) {
+      const highestPriorityGoal = currentGoals.reduce(
+        (prev: any, current: any) =>
+          current.priority > prev.priority ? current : prev
+      );
+
+      // Generate task from goal using the planning system
+      const task = await generateTaskFromGoal(highestPriorityGoal, context);
+      if (task) {
+        return task;
+      }
     }
 
-    // Check if it's night time (phantoms spawn at night)
-    const worldState = await fetch(`${minecraftUrl}/state`).then((res) =>
-      res.json()
+    // If no goals exist, proactively generate goals based on current situation
+    console.log(
+      'No active goals found, generating new goals based on current situation...'
     );
-    if (worldState.data?.worldState?.environment?.timeOfDay) {
-      const timeOfDay = worldState.data.worldState.environment.timeOfDay;
-      isNight = timeOfDay > 13000 || timeOfDay < 1000; // Night time in Minecraft
+    const newGoals = await generateProactiveGoals(signals, context);
+
+    if (newGoals && newGoals.length > 0) {
+      // Add the new goals to the planning system
+      for (const goal of newGoals) {
+        await planningSystem.goalFormulation.addGoal(goal);
+      }
+
+      // Generate a task from the highest priority new goal
+      const highestPriorityGoal = newGoals.reduce((prev: any, current: any) =>
+        current.priority > prev.priority ? current : prev
+      );
+
+      const task = await generateTaskFromGoal(highestPriorityGoal, context);
+      if (task) {
+        return task;
+      }
     }
 
-    // Calculate threat level based on health and time
-    if (healthLevel < 90) threatLevel += 30; // Moderate threat if health is below 90%
-    if (healthLevel < 70) threatLevel += 40; // High threat if health is below 70%
-    if (healthLevel < 50) threatLevel += 50; // Very high threat if health is below 50%
-    if (healthLevel < 30) threatLevel += 60; // Critical threat if health is below 30%
-    if (isNight && healthLevel < 95) threatLevel += 30; // Night vulnerability
+    // If no goals or task generation failed, create a fallback task
+    return await generateFallbackTask(context);
   } catch (error) {
-    console.log(' Could not check bot state for threat assessment');
-  }
+    console.error('Error in goal-driven task generation:', error);
 
-  // If under threat, prioritize defensive tasks
-  if (threatLevel > 20) {
-    // Lowered from 30 to 20 for faster response
-    const defensiveTasks = [
-      {
-        type: 'flee',
-        description: 'Flee from immediate danger to a safe location',
-        parameters: { direction: 'away_from_threat', distance: 10 },
-        priority: 0.9,
-        urgency: 0.9,
-      },
-      {
-        type: 'seek_shelter',
-        description: 'Find or build shelter to protect from threats',
-        parameters: { shelter_type: 'cave_or_house', light_sources: true },
-        priority: 0.8,
-        urgency: 0.8,
-      },
-      {
-        type: 'heal',
-        description: 'Restore health by eating food or finding healing items',
-        parameters: { food_type: 'any', amount: 1 },
-        priority: 0.7,
-        urgency: 0.7,
-      },
-      {
-        type: 'place_light',
-        description:
-          'Place light sources to deter phantoms and other hostile mobs',
-        parameters: { light_type: 'torch', count: 3 },
-        priority: 0.6,
-        urgency: 0.6,
-      },
-    ];
-
-    // Select the most appropriate defensive task based on threat level
-    let selectedTask;
-    if (healthLevel < 20) {
-      // Critical health - flee immediately
-      selectedTask =
-        defensiveTasks.find((t) => t.type === 'flee') || defensiveTasks[0];
-    } else if (healthLevel < 30) {
-      // Very low health - heal first, then flee
-      selectedTask =
-        defensiveTasks.find((t) => t.type === 'heal') || defensiveTasks[0];
-    } else if (isNight) {
-      // Night time - seek shelter first, then place light
-      selectedTask =
-        defensiveTasks.find((t) => t.type === 'seek_shelter') ||
-        defensiveTasks.find((t) => t.type === 'place_light') ||
-        defensiveTasks[1];
-    } else {
-      // General threat - seek shelter first, then flee
-      selectedTask =
-        defensiveTasks.find((t) => t.type === 'seek_shelter') ||
-        defensiveTasks.find((t) => t.type === 'flee') ||
-        defensiveTasks[0];
-    }
-
+    // Emergency fallback - create a basic exploration task
     return {
-      id: `defense-task-${Date.now()}`,
-      type: selectedTask.type,
-      description: selectedTask.description,
-      priority: selectedTask.priority,
-      urgency: selectedTask.urgency,
-      parameters: selectedTask.parameters,
-      goal: 'survival_defense',
+      id: `fallback-task-${Date.now()}`,
+      type: 'explore',
+      description: 'Explore the area for resources and opportunities',
+      priority: 0.5,
+      urgency: 0.3,
+      parameters: { distance: 10, direction: 'forward' },
+      goal: 'exploration',
       status: 'pending',
       createdAt: Date.now(),
       completedAt: null,
       autonomous: true,
-      defensive: true, // Mark as defensive task
+      fallback: true,
+    };
+  }
+}
+
+// Generate task from a specific goal
+async function generateTaskFromGoal(goal: any, context: any) {
+  try {
+    console.log(
+      `🔧 Generating task for goal: ${goal.type} - ${goal.description}`
+    );
+
+    // Direct mapping of goal types to task types
+    let taskType = '';
+    let taskDescription = '';
+    let taskParameters = {};
+
+    switch (goal.type) {
+      case 'resource_tools':
+        taskType = 'craft';
+        taskDescription = 'Craft wooden pickaxe for resource gathering';
+        taskParameters = { item: 'wooden_pickaxe', quantity: 1 };
+        break;
+
+      case 'resource_gathering':
+        if (goal.parameters?.resource === 'wood') {
+          taskType = 'gather';
+          taskDescription = 'Gather wood from nearby trees';
+          taskParameters = { resource: 'wood', amount: 5, target: 'tree' };
+        } else if (goal.parameters?.resource === 'stone') {
+          taskType = 'gather';
+          taskDescription = 'Gather stone for tools and building';
+          taskParameters = {
+            resource: 'stone',
+            amount: 3,
+            target: 'stone_blocks',
+          };
+        } else {
+          taskType = 'gather';
+          taskDescription = goal.description;
+          taskParameters = goal.parameters || {};
+        }
+        break;
+
+      case 'exploration':
+        taskType = 'explore';
+        taskDescription = 'Explore the environment for resources';
+        taskParameters = { distance: 15, direction: 'forward' };
+        break;
+
+      case 'survival_safety':
+        taskType = 'move';
+        taskDescription = 'Find safe shelter for night';
+        taskParameters = { direction: 'forward', distance: 10 };
+        break;
+
+      case 'survival_healing':
+        taskType = 'gather';
+        taskDescription = 'Find food for healing';
+        taskParameters = { resource: 'food', target: 'apple_tree_or_animal' };
+        break;
+
+      case 'survival_food':
+        taskType = 'gather';
+        taskDescription = 'Find food to maintain hunger';
+        taskParameters = { resource: 'food', target: 'apple_tree_or_animal' };
+        break;
+
+      case 'defense_equipment':
+        taskType = 'craft';
+        taskDescription = 'Craft armor for protection';
+        taskParameters = { item: 'leather_helmet', quantity: 1 };
+        break;
+
+      default:
+        // Fallback to exploration for unknown goal types
+        taskType = 'explore';
+        taskDescription = 'Explore the environment';
+        taskParameters = { distance: 10, direction: 'forward' };
+        break;
+    }
+
+    const task = {
+      id: `goal-task-${Date.now()}`,
+      type: taskType,
+      description: taskDescription,
+      priority: goal.priority,
+      urgency: goal.urgency || 0.5,
+      parameters: taskParameters,
+      goal: goal.id,
+      status: 'pending',
+      createdAt: Date.now(),
+      completedAt: null,
+      autonomous: true,
+      goalDriven: true,
+      metadata: {
+        goalId: goal.id,
+        goalType: goal.type,
+      },
+    };
+
+    console.log(`✅ Generated task: ${task.type} - ${task.description}`);
+    return task;
+  } catch (error) {
+    console.error('Error generating task from goal:', error);
+    return null;
+  }
+}
+
+// Generate proactive goals based on current situation
+async function generateProactiveGoals(signals: any, context: any) {
+  const goals = [];
+  const worldState = context.worldState || {};
+  const botState = context.botState || {};
+  const inventory = worldState.inventory || {};
+  const environment = worldState.environment || {};
+
+  console.log('Analyzing current situation for goal generation...');
+  console.log('World state:', JSON.stringify(worldState, null, 2));
+  console.log('Bot state:', JSON.stringify(botState, null, 2));
+
+  // Check if it's night time (high priority for safety)
+  const isNight = environment.timeOfDay > 13000 || environment.timeOfDay < 1000;
+  if (isNight) {
+    goals.push({
+      id: `safety-night-${Date.now()}`,
+      type: 'survival_safety',
+      description: 'Find shelter and light sources for night safety',
+      priority: 0.95,
+      urgency: 0.9,
+      parameters: { shelter_type: 'cave_or_house', light_sources: true },
+      createdAt: Date.now(),
+      autonomous: true,
+    });
+  }
+
+  // Check health and hunger levels
+  const health = botState.health || 20;
+  const food = botState.food || 20;
+
+  if (health < 15) {
+    goals.push({
+      id: `heal-${Date.now()}`,
+      type: 'survival_healing',
+      description: 'Restore health by finding healing items or food',
+      priority: 0.9,
+      urgency: 0.8,
+      parameters: { target_health: 20, food_type: 'any' },
+      createdAt: Date.now(),
+      autonomous: true,
+    });
+  }
+
+  if (food < 15) {
+    goals.push({
+      id: `food-${Date.now()}`,
+      type: 'survival_food',
+      description: 'Find food to maintain hunger levels',
+      priority: 0.85,
+      urgency: 0.7,
+      parameters: { food_type: 'any', amount: 3 },
+      createdAt: Date.now(),
+      autonomous: true,
+    });
+  }
+
+  // Check inventory for basic resources
+  const hasWood = inventory.items?.some((item: any) =>
+    item.type?.includes('wood')
+  );
+  const hasStone = inventory.items?.some((item: any) =>
+    item.type?.includes('stone')
+  );
+  const hasTools = inventory.items?.some(
+    (item: any) =>
+      item.type?.includes('pickaxe') ||
+      item.type?.includes('axe') ||
+      item.type?.includes('sword')
+  );
+  const hasArmor = inventory.items?.some(
+    (item: any) =>
+      item.type?.includes('helmet') ||
+      item.type?.includes('chestplate') ||
+      item.type?.includes('leggings') ||
+      item.type?.includes('boots')
+  );
+
+  // If no tools, prioritize tool crafting
+  if (!hasTools) {
+    goals.push({
+      id: `tools-${Date.now()}`,
+      type: 'resource_tools',
+      description: 'Craft basic tools for resource gathering and defense',
+      priority: 0.8,
+      urgency: 0.6,
+      parameters: { tool_type: 'wooden_pickaxe', material: 'wood' },
+      createdAt: Date.now(),
+      autonomous: true,
+    });
+  }
+
+  // If no wood, gather wood (essential for crafting)
+  if (!hasWood) {
+    goals.push({
+      id: `wood-${Date.now()}`,
+      type: 'resource_gathering',
+      description: 'Gather wood for crafting and building',
+      priority: 0.75,
+      urgency: 0.5,
+      parameters: { resource: 'wood', amount: 5, target: 'tree' },
+      createdAt: Date.now(),
+      autonomous: true,
+    });
+  }
+
+  // If no stone, gather stone (for better tools)
+  if (!hasStone) {
+    goals.push({
+      id: `stone-${Date.now()}`,
+      type: 'resource_gathering',
+      description: 'Gather stone for better tools and building',
+      priority: 0.7,
+      urgency: 0.4,
+      parameters: { resource: 'stone', amount: 3, target: 'stone_blocks' },
+      createdAt: Date.now(),
+      autonomous: true,
+    });
+  }
+
+  // If no armor and we have resources, craft armor
+  if (!hasArmor && (hasWood || hasStone)) {
+    goals.push({
+      id: `armor-${Date.now()}`,
+      type: 'defense_equipment',
+      description: 'Craft armor for better protection',
+      priority: 0.65,
+      urgency: 0.3,
+      parameters: { armor_type: 'leather', material: 'leather_or_iron' },
+      createdAt: Date.now(),
+      autonomous: true,
+    });
+  }
+
+  // Always have an exploration goal as fallback
+  goals.push({
+    id: `explore-${Date.now()}`,
+    type: 'exploration',
+    description:
+      'Explore the environment to discover new resources and opportunities',
+    priority: 0.5,
+    urgency: 0.2,
+    parameters: { distance: 15, direction: 'forward' },
+    createdAt: Date.now(),
+    autonomous: true,
+  });
+
+  console.log(
+    `Generated ${goals.length} proactive goals:`,
+    goals.map((g) => `${g.type}: ${g.description}`)
+  );
+  return goals;
+}
+
+// Generate fallback task when no goals are available
+async function generateFallbackTask(context: any) {
+  // Analyze current world state to determine appropriate fallback
+  const worldState = context.worldState || {};
+  const inventory = worldState.inventory || {};
+
+  // Check what resources we have and what we might need
+  const hasWood = inventory.items?.some((item: any) =>
+    item.type?.includes('wood')
+  );
+  const hasStone = inventory.items?.some((item: any) =>
+    item.type?.includes('stone')
+  );
+  const hasFood = inventory.items?.some((item: any) =>
+    item.type?.includes('food')
+  );
+  const hasTools = inventory.items?.some(
+    (item: any) => item.type?.includes('pickaxe') || item.type?.includes('axe')
+  );
+
+  // Generate appropriate fallback task based on current state
+  if (!hasFood) {
+    return {
+      id: `fallback-food-${Date.now()}`,
+      type: 'gather',
+      description: 'Search for food to maintain health',
+      priority: 0.7,
+      urgency: 0.6,
+      parameters: { resource: 'food', target: 'apple_tree_or_animal' },
+      goal: 'survival_food',
+      status: 'pending',
+      createdAt: Date.now(),
+      completedAt: null,
+      autonomous: true,
+      fallback: true,
     };
   }
 
-  // Normal exploration tasks when not under threat
-  const taskTypes = [
-    {
+  if (!hasTools) {
+    return {
+      id: `fallback-tools-${Date.now()}`,
+      type: 'craft',
+      description: 'Craft basic tools for resource gathering',
+      priority: 0.6,
+      urgency: 0.5,
+      parameters: { item: 'wooden_pickaxe', quantity: 1 },
+      goal: 'survival_tools',
+      status: 'pending',
+      createdAt: Date.now(),
+      completedAt: null,
+      autonomous: true,
+      fallback: true,
+    };
+  }
+
+  if (!hasWood) {
+    return {
+      id: `fallback-wood-${Date.now()}`,
       type: 'gather',
-      description: 'Gather wood from nearby trees',
+      description: 'Gather wood for crafting and building',
+      priority: 0.5,
+      urgency: 0.4,
       parameters: { resource: 'wood', amount: 3, target: 'tree' },
-    },
-    {
-      type: 'mine',
-      description: 'Mine stone blocks for building',
-      parameters: { block: 'stone', amount: 5 },
-    },
-    {
-      type: 'explore',
-      description: 'Explore the area for resources',
-      parameters: {
-        distance: 10,
-        direction: 'forward',
-        search_pattern: 'spiral',
-      },
-    },
-    {
-      type: 'craft',
-      description: 'Craft wooden planks from gathered wood',
-      parameters: { item: 'planks', quantity: 4, require_materials: true },
-    },
-    {
-      type: 'craft',
-      description: 'Craft a wooden pickaxe',
-      parameters: {
-        item: 'wooden_pickaxe',
-        quantity: 1,
-        require_materials: true,
-      },
-    },
-    {
-      type: 'build',
-      description: 'Build a simple shelter or structure',
-      parameters: { structure: 'house', size: 'small' },
-    },
-    {
-      type: 'farm',
-      description: 'Start a small farm for food',
-      parameters: { crop: 'wheat', area: 3 },
-    },
-    {
-      type: 'mine',
-      description: 'Mine for valuable resources',
-      parameters: { depth: 5, resource: 'stone' },
-    },
-  ];
+      goal: 'resource_gathering',
+      status: 'pending',
+      createdAt: Date.now(),
+      completedAt: null,
+      autonomous: true,
+      fallback: true,
+    };
+  }
 
-  // Randomly select a task type
-  const taskType = taskTypes[Math.floor(Math.random() * taskTypes.length)];
-
+  // Default exploration task
   return {
-    id: `auto-task-${Date.now()}`,
-    type: taskType.type,
-    description: taskType.description,
-    priority: 0.6,
-    urgency: 0.5,
-    parameters: taskType.parameters,
-    goal: 'autonomous_exploration',
+    id: `fallback-explore-${Date.now()}`,
+    type: 'explore',
+    description: 'Explore the area for new opportunities',
+    priority: 0.4,
+    urgency: 0.3,
+    parameters: { distance: 15, direction: 'forward' },
+    goal: 'exploration',
     status: 'pending',
     createdAt: Date.now(),
     completedAt: null,
-    autonomous: true, // Mark as autonomously generated
+    autonomous: true,
+    fallback: true,
   };
 }
 
-// Autonomous task execution system
+// Continuous autonomous goal pursuit system
 async function autonomousTaskExecutor() {
   const now = Date.now();
-  const twoMinutes = 2 * 60 * 1000; // 2 minutes in milliseconds
+  const executionInterval = 5000; // 5 seconds between execution cycles
 
-  // Check if enough time has passed since last task execution
-  if (now - planningSystem.goalFormulation._lastTaskExecution < twoMinutes) {
+  // Check if enough time has passed since last execution
+  if (
+    now - planningSystem.goalFormulation._lastTaskExecution <
+    executionInterval
+  ) {
     return; // Not enough time has passed
   }
 
-  // Check if there are any pending tasks
-  const pendingTasks = planningSystem.goalFormulation._tasks.filter(
-    (task: any) => task.status === 'pending'
-  );
+  try {
+    // Step 1: Generate signals from current world state
+    const signals = await generateWorldSignals();
 
-  // If no pending tasks, generate a new autonomous task
-  if (pendingTasks.length === 0) {
-    console.log(' No tasks available, generating autonomous task...');
-    const newTask = await generateAutonomousTask();
-    planningSystem.goalFormulation.addTask(newTask);
+    // Step 2: Create planning context
+    const context = await createPlanningContext();
 
-    // Execute the task immediately
-    try {
-      await planningSystem.reactiveExecutor.executeNextTask();
-      planningSystem.goalFormulation._lastTaskExecution = now;
-      console.log(' Autonomous task executed successfully');
-    } catch (error) {
-      console.error(' Failed to execute autonomous task:', error);
+    // Step 3: Check if we have any goals, if not generate them proactively
+    const currentGoals = planningSystem.goalFormulation.getCurrentGoals();
+    if (!currentGoals || currentGoals.length === 0) {
+      console.log('🔄 No goals found, generating proactive goals...');
+      const newGoals = await generateProactiveGoals(signals, context);
+
+      if (newGoals && newGoals.length > 0) {
+        console.log(`📋 Generated ${newGoals.length} proactive goals`);
+        for (const goal of newGoals) {
+          await planningSystem.goalFormulation.addGoal(goal);
+        }
+      }
     }
-  } else {
-    // Execute the next pending task
-    try {
-      await planningSystem.reactiveExecutor.executeNextTask();
-      planningSystem.goalFormulation._lastTaskExecution = now;
-      console.log(' Pending task executed successfully');
-    } catch (error) {
-      console.error(' Failed to execute pending task:', error);
+
+    // Step 4: Get the highest priority goal and execute it directly
+    const availableGoals = planningSystem.goalFormulation.getCurrentGoals();
+    if (availableGoals && availableGoals.length > 0) {
+      // Get the highest priority goal
+      const highestPriorityGoal = availableGoals.reduce(
+        (prev: any, current: any) =>
+          current.priority > prev.priority ? current : prev
+      );
+
+      console.log(
+        `🎯 Executing highest priority goal: ${highestPriorityGoal.type} - ${highestPriorityGoal.description}`
+      );
+
+      // Generate a task from the goal
+      const task = await generateTaskFromGoal(highestPriorityGoal, context);
+
+      if (task) {
+        console.log(`📋 Generated task: ${task.type} - ${task.description}`);
+
+        // Execute the task directly using the reactive executor
+        const executionResult =
+          await planningSystem.reactiveExecutor.executeTask(task);
+
+        console.log(`✅ Task execution result:`, {
+          success: executionResult.success,
+          type: task.type,
+          description: task.description,
+        });
+
+        // If task was successful, mark the goal as completed
+        if (executionResult.success) {
+          planningSystem.goalFormulation.updateGoalStatus(
+            highestPriorityGoal.id,
+            'completed'
+          );
+          console.log(`✅ Goal completed: ${highestPriorityGoal.type}`);
+        } else {
+          console.log(
+            `❌ Task failed: ${task.type} - ${executionResult.error || 'Unknown error'}`
+          );
+        }
+      } else {
+        console.log(
+          `❌ Failed to generate task from goal: ${highestPriorityGoal.type}`
+        );
+      }
+    } else {
+      console.log('⚠️ No goals available for execution');
     }
+
+    // Step 5: Update execution timestamp
+    planningSystem.goalFormulation._lastTaskExecution = now;
+
+    // Log execution results
+    if (process.env.NODE_ENV === 'development') {
+      console.log('✅ Autonomous execution cycle completed:', {
+        currentGoals: planningSystem.goalFormulation.getCurrentGoals().length,
+        activeGoals: planningSystem.goalFormulation.getActiveGoals().length,
+        completedGoals:
+          planningSystem.goalFormulation.getCompletedTasks().length,
+      });
+    }
+  } catch (error) {
+    console.error('❌ Autonomous execution cycle failed:', error);
+    planningSystem.goalFormulation._lastTaskExecution = now;
   }
+}
+
+// Enhanced real-time signal processing with context-aware decision making
+async function generateWorldSignals(): Promise<any[]> {
+  const signals = [];
+  const signalHistory = getSignalHistory(); // Get recent signal history for context
+
+  try {
+    const minecraftUrl = 'http://localhost:3005';
+
+    // Get bot status with timeout
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 3000);
+
+    const [botStatus, worldState] = await Promise.allSettled([
+      fetch(`${minecraftUrl}/health`, { signal: controller.signal }).then(
+        (res) => res.json()
+      ),
+      fetch(`${minecraftUrl}/state`, { signal: controller.signal }).then(
+        (res) => res.json()
+      ),
+    ]);
+
+    clearTimeout(timeoutId);
+
+    if (botStatus.status === 'rejected' || worldState.status === 'rejected') {
+      throw new Error('Failed to fetch world state');
+    }
+
+    const botData = botStatus.value;
+    const worldData = worldState.value;
+
+    // Health signals with context-aware processing
+    const typedBotData = botData as any;
+    if (typedBotData.botStatus?.health !== undefined) {
+      const health = typedBotData.botStatus.health;
+      const healthSignal = {
+        type: 'health',
+        intensity: health < 50 ? 0.8 : health < 80 ? 0.4 : 0.1,
+        source: 'homeostasis',
+        timestamp: Date.now(),
+        metadata: { health, maxHealth: 20 },
+      };
+      signals.push(healthSignal);
+      addSignalToHistory(healthSignal);
+    }
+
+    // Inventory signals with context-aware processing
+    const typedWorldData = worldData as any;
+    if (typedWorldData.data?.worldState?.inventory?.items) {
+      const items = typedWorldData.data.worldState.inventory.items;
+      const hasFood = items.some(
+        (item: any) =>
+          item.type?.includes('food') || item.type?.includes('apple')
+      );
+      const hasTools = items.some(
+        (item: any) =>
+          item.type?.includes('pickaxe') || item.type?.includes('axe')
+      );
+      const hasWeapons = items.some(
+        (item: any) =>
+          item.type?.includes('sword') || item.type?.includes('bow')
+      );
+
+      if (!hasFood) {
+        signals.push({
+          type: 'hunger',
+          intensity: 0.7,
+          source: 'homeostasis',
+          timestamp: Date.now(),
+          metadata: { hasFood: false },
+        });
+      }
+
+      if (!hasTools) {
+        signals.push({
+          type: 'tool_need',
+          intensity: 0.6,
+          source: 'homeostasis',
+          timestamp: Date.now(),
+          metadata: { hasTools: false },
+        });
+      }
+
+      if (!hasWeapons) {
+        signals.push({
+          type: 'defense_need',
+          intensity: 0.5,
+          source: 'homeostasis',
+          timestamp: Date.now(),
+          metadata: { hasWeapons: false },
+        });
+      }
+    }
+
+    // Environment signals with context-aware processing
+    if (typedWorldData.data?.worldState?.environment) {
+      const env = typedWorldData.data.worldState.environment;
+
+      // Time of day signals
+      if (env.timeOfDay !== undefined) {
+        const isNight = env.timeOfDay > 13000 || env.timeOfDay < 1000;
+        if (isNight) {
+          signals.push({
+            type: 'night_vulnerability',
+            intensity: 0.6,
+            source: 'environment',
+            timestamp: Date.now(),
+            metadata: { timeOfDay: env.timeOfDay, isNight },
+          });
+        }
+      }
+
+      // Light level signals
+      if (env.lightLevel !== undefined) {
+        if (env.lightLevel < 8) {
+          signals.push({
+            type: 'low_light',
+            intensity: 0.5,
+            source: 'environment',
+            timestamp: Date.now(),
+            metadata: { lightLevel: env.lightLevel },
+          });
+        }
+      }
+
+      // Hostile entity signals
+      if (env.nearbyEntities) {
+        const hostiles = env.nearbyEntities.filter(
+          (entity: any) =>
+            entity.type === 'hostile' ||
+            [
+              'phantom',
+              'zombie',
+              'skeleton',
+              'creeper',
+              'spider',
+              'enderman',
+            ].includes(entity.name)
+        );
+
+        if (hostiles.length > 0) {
+          signals.push({
+            type: 'threat_detected',
+            intensity: Math.min(0.9, hostiles.length * 0.3),
+            source: 'environment',
+            timestamp: Date.now(),
+            metadata: {
+              hostileCount: hostiles.length,
+              nearestDistance: Math.min(
+                ...hostiles.map((h: any) => h.distance || 999)
+              ),
+            },
+          });
+        }
+      }
+    }
+
+    // Exploration signals (if no immediate needs)
+    if (signals.length === 0) {
+      signals.push({
+        type: 'exploration',
+        intensity: 0.3,
+        source: 'curiosity',
+        timestamp: Date.now(),
+        metadata: { reason: 'no_immediate_needs' },
+      });
+    }
+  } catch (error) {
+    console.error('Failed to generate world signals:', error);
+    // Fallback signal
+    signals.push({
+      type: 'exploration',
+      intensity: 0.4,
+      source: 'fallback',
+      timestamp: Date.now(),
+      metadata: { reason: 'signal_generation_failed' },
+    });
+  }
+
+  // Apply context-aware processing to all signals
+  const processedSignals = processSignalsWithContext(signals, signalHistory);
+
+  // Add all signals to history for future context
+  processedSignals.forEach((signal) => {
+    if (
+      !signalHistory.some(
+        (h) => h.timestamp === signal.timestamp && h.type === signal.type
+      )
+    ) {
+      addSignalToHistory(signal);
+    }
+  });
+
+  return processedSignals;
+}
+
+// Signal history tracking for context-aware decision making
+const signalHistory: Array<{
+  type: string;
+  intensity: number;
+  source: string;
+  timestamp: number;
+  metadata: any;
+}> = [];
+
+const MAX_SIGNAL_HISTORY = 50; // Keep last 50 signals for context
+
+function getSignalHistory() {
+  const now = Date.now();
+  const recentSignals = signalHistory.filter(
+    (signal) => now - signal.timestamp < 300000 // Last 5 minutes
+  );
+  return recentSignals;
+}
+
+function addSignalToHistory(signal: any) {
+  signalHistory.push({
+    type: signal.type,
+    intensity: signal.intensity,
+    source: signal.source,
+    timestamp: signal.timestamp,
+    metadata: signal.metadata,
+  });
+
+  // Keep only the most recent signals
+  if (signalHistory.length > MAX_SIGNAL_HISTORY) {
+    signalHistory.splice(0, signalHistory.length - MAX_SIGNAL_HISTORY);
+  }
+}
+
+// Context-aware signal processing
+function processSignalsWithContext(signals: any[], history: any[]) {
+  const processedSignals = [...signals];
+
+  // Analyze signal patterns for context
+  const recentThreatSignals = history.filter(
+    (s) => s.type === 'threat_detected'
+  );
+  const recentHealthSignals = history.filter((s) => s.type === 'health');
+  const recentFoodSignals = history.filter((s) => s.type === 'food_needed');
+
+  // Context-aware signal enhancement
+  processedSignals.forEach((signal) => {
+    // Enhance threat signals based on recent history
+    if (signal.type === 'threat_detected' && recentThreatSignals.length > 2) {
+      signal.intensity = Math.min(1.0, signal.intensity + 0.2); // Escalating threat
+      signal.metadata.escalating = true;
+      signal.metadata.recentThreats = recentThreatSignals.length;
+    }
+
+    // Enhance health signals if health has been declining
+    if (signal.type === 'health' && recentHealthSignals.length > 0) {
+      const healthTrend = analyzeHealthTrend(recentHealthSignals);
+      if (healthTrend === 'declining') {
+        signal.intensity = Math.min(1.0, signal.intensity + 0.3);
+        signal.metadata.trend = 'declining';
+      }
+    }
+
+    // Enhance food signals if consistently needed
+    if (signal.type === 'food_needed' && recentFoodSignals.length > 1) {
+      signal.intensity = Math.min(1.0, signal.intensity + 0.1);
+      signal.metadata.persistent = true;
+    }
+  });
+
+  return processedSignals;
+}
+
+// Analyze health trend from recent signals
+function analyzeHealthTrend(
+  healthSignals: any[]
+): 'stable' | 'declining' | 'improving' {
+  if (healthSignals.length < 2) return 'stable';
+
+  const recent = healthSignals.slice(-3); // Last 3 health signals
+  const intensities = recent.map((s) => s.intensity);
+
+  // Check if intensity is increasing (worse health) or decreasing (better health)
+  const trend = intensities.reduce((acc, curr, i) => {
+    if (i === 0) return 0;
+    return acc + (curr - intensities[i - 1]);
+  }, 0);
+
+  if (trend > 0.1) return 'declining';
+  if (trend < -0.1) return 'improving';
+  return 'stable';
+}
+
+// Enhanced planning context with real-time processing and signal analysis
+async function createPlanningContext(): Promise<any> {
+  try {
+    const minecraftUrl = 'http://localhost:3005';
+
+    // Get data with timeout and error handling
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 3000);
+
+    const [botStatus, worldState] = await Promise.allSettled([
+      fetch(`${minecraftUrl}/health`, { signal: controller.signal }).then(
+        (res) => res.json()
+      ),
+      fetch(`${minecraftUrl}/state`, { signal: controller.signal }).then(
+        (res) => res.json()
+      ),
+    ]);
+
+    clearTimeout(timeoutId);
+
+    if (botStatus.status === 'rejected' || worldState.status === 'rejected') {
+      throw new Error('Failed to fetch world state for context');
+    }
+
+    const botData = botStatus.value;
+    const worldData = worldState.value;
+
+    // Get signal history for context-aware planning
+    const recentSignals = getSignalHistory();
+    const signalAnalysis = analyzeSignalPatterns(recentSignals);
+
+    // Determine urgency based on signal analysis
+    const urgency =
+      signalAnalysis.threatLevel > 0.7
+        ? 'emergency'
+        : signalAnalysis.threatLevel > 0.4
+          ? 'high'
+          : signalAnalysis.urgencyScore > 0.5
+            ? 'medium'
+            : 'low';
+
+    return {
+      worldState: worldData.data?.worldState || {},
+      currentState: {
+        health: botData.botStatus?.health || 20,
+        hunger: botData.botStatus?.hunger || 20,
+        energy: botData.botStatus?.energy || 100,
+        safety: 1 - signalAnalysis.threatLevel,
+        curiosity: 0.5,
+        social: 0.3,
+        achievement: 0.4,
+        creativity: 0.3,
+        timestamp: Date.now(),
+      },
+      activeGoals: planningSystem.goalFormulation.getCurrentGoals() || [],
+      availableResources: extractResources(
+        worldData.data?.worldState?.inventory?.items || []
+      ),
+      timeConstraints: {
+        urgency: urgency as 'low' | 'medium' | 'high' | 'emergency',
+        maxPlanningTime: 5000, // 5 seconds
+      },
+      situationalFactors: {
+        threatLevel: signalAnalysis.threatLevel,
+        opportunityLevel: 1 - signalAnalysis.threatLevel,
+        socialContext: [],
+        environmentalFactors: signalAnalysis.environmentalHazards,
+      },
+    };
+  } catch (error) {
+    console.error('Failed to create planning context:', error);
+    return {
+      worldState: {},
+      currentState: {
+        health: 20,
+        hunger: 20,
+        energy: 100,
+        safety: 1.0,
+        curiosity: 0.5,
+        social: 0.3,
+        achievement: 0.4,
+        creativity: 0.3,
+        timestamp: Date.now(),
+      },
+      activeGoals: [],
+      availableResources: [],
+      timeConstraints: {
+        urgency: 'low' as const,
+        maxPlanningTime: 5000,
+      },
+      situationalFactors: {
+        threatLevel: 0,
+        opportunityLevel: 1.0,
+        socialContext: [],
+        environmentalFactors: [],
+      },
+    };
+  }
+}
+
+// Analyze signal patterns for context-aware planning
+function analyzeSignalPatterns(signals: any[]) {
+  const analysis = {
+    threatLevel: 0,
+    healthTrend: 'stable' as 'stable' | 'declining' | 'improving',
+    resourceNeeds: [] as string[],
+    environmentalHazards: [] as string[],
+    urgencyScore: 0,
+  };
+
+  // Analyze threat patterns
+  const threatSignals = signals.filter((s) => s.type === 'threat_detected');
+  analysis.threatLevel =
+    threatSignals.reduce((sum, s) => sum + s.intensity, 0) /
+    Math.max(threatSignals.length, 1);
+
+  // Analyze health trends
+  const healthSignals = signals.filter((s) => s.type === 'health');
+  analysis.healthTrend = analyzeHealthTrend(healthSignals);
+
+  // Analyze resource needs
+  const resourceSignals = signals.filter(
+    (s) =>
+      s.type === 'hunger' || s.type === 'tool_need' || s.type === 'defense_need'
+  );
+  analysis.resourceNeeds = resourceSignals.map((s) => s.type);
+
+  // Analyze environmental hazards
+  const envSignals = signals.filter(
+    (s) => s.type === 'night_vulnerability' || s.type === 'low_light'
+  );
+  analysis.environmentalHazards = envSignals.map((s) => s.type);
+
+  // Calculate overall urgency
+  analysis.urgencyScore =
+    signals.reduce((sum, s) => sum + s.intensity, 0) /
+    Math.max(signals.length, 1);
+
+  return analysis;
+}
+
+// Calculate context quality for planning decisions
+function calculateContextQuality(
+  botData: any,
+  worldData: any,
+  signals: any[]
+): 'high' | 'medium' | 'low' | 'degraded' {
+  let quality = 0;
+
+  // Check data completeness
+  if (botData.botStatus?.health !== undefined) quality += 25;
+  if (worldData.data?.worldState?.inventory) quality += 25;
+  if (worldData.data?.worldState?.environment) quality += 25;
+  if (signals.length > 0) quality += 25;
+
+  if (quality >= 90) return 'high';
+  if (quality >= 70) return 'medium';
+  if (quality >= 50) return 'low';
+  return 'degraded';
+}
+
+// Extract available resources from inventory
+function extractResources(items: any[]): any[] {
+  return items.map((item: any) => ({
+    type: item.type,
+    count: item.count || 1,
+    name: item.name || item.type,
+  }));
 }
 
 // Helper function to execute tasks in Minecraft
@@ -931,7 +1707,8 @@ async function executeTaskInMinecraft(task: any) {
     const botStatus = await fetch(`${minecraftUrl}/health`).then((res) =>
       res.json()
     );
-    if (!botStatus.executionStatus?.bot?.connected) {
+    const typedBotStatus = botStatus as any;
+    if (!typedBotStatus.executionStatus?.bot?.connected) {
       return {
         success: false,
         error: 'Bot not connected to Minecraft server',
@@ -952,8 +1729,8 @@ async function executeTaskInMinecraft(task: any) {
         }).then((res) => res.json());
 
         return {
-          ...result,
-          botStatus: botStatus,
+          ...(result as any),
+          botStatus: typedBotStatus,
         };
 
       case 'move_forward':
@@ -967,8 +1744,8 @@ async function executeTaskInMinecraft(task: any) {
         }).then((res) => res.json());
 
         return {
-          ...moveForwardResult,
-          botStatus: botStatus,
+          ...(moveForwardResult as any),
+          botStatus: typedBotStatus,
         };
 
       case 'flee':
@@ -983,8 +1760,28 @@ async function executeTaskInMinecraft(task: any) {
         }).then((res) => res.json());
 
         return {
-          ...fleeResult,
-          botStatus: botStatus,
+          ...(fleeResult as any),
+          botStatus: typedBotStatus,
+          defensive: true,
+        };
+
+      case 'attack_entity':
+        // Attack the nearest hostile entity
+        const attackResult = await fetch(`${minecraftUrl}/action`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            type: 'attack_entity',
+            parameters: {
+              target: task.parameters?.target || 'nearest',
+              weapon: task.parameters?.weapon || 'best_available',
+            },
+          }),
+        }).then((res) => res.json());
+
+        return {
+          ...(attackResult as any),
+          botStatus: typedBotStatus,
           defensive: true,
         };
 
@@ -1040,8 +1837,8 @@ async function executeTaskInMinecraft(task: any) {
         }).then((res) => res.json());
 
         return {
-          ...lightResult,
-          botStatus: botStatus,
+          ...(lightResult as any),
+          botStatus: typedBotStatus,
           defensive: true,
         };
 
@@ -1060,8 +1857,8 @@ async function executeTaskInMinecraft(task: any) {
         }).then((res) => res.json());
 
         return {
-          ...shelterResult,
-          botStatus: botStatus,
+          ...(shelterResult as any),
+          botStatus: typedBotStatus,
           defensive: true,
         };
 
@@ -1079,8 +1876,8 @@ async function executeTaskInMinecraft(task: any) {
         }).then((res) => res.json());
 
         return {
-          ...turnResult,
-          botStatus: botStatus,
+          ...(turnResult as any),
+          botStatus: typedBotStatus,
         };
 
       case 'chat':
@@ -1099,8 +1896,8 @@ async function executeTaskInMinecraft(task: any) {
         }).then((res) => res.json());
 
         return {
-          ...chatResult,
-          botStatus: botStatus,
+          ...(chatResult as any),
+          botStatus: typedBotStatus,
         };
 
       case 'explore':
@@ -1179,7 +1976,7 @@ async function executeTaskInMinecraft(task: any) {
             success: btResult.status === 'success',
             action: skillId,
             result: btResult,
-            data: btResult.data,
+            data: (btResult as any).data,
           });
 
           return {
@@ -1867,6 +2664,61 @@ app.post('/execute', async (req, res) => {
   }
 });
 
+// Execute specific task with enhanced verification
+app.post('/execute-task', async (req, res) => {
+  try {
+    const { type, description, parameters } = req.body;
+
+    if (!type) {
+      return res.status(400).json({
+        success: false,
+        message: 'Task type is required',
+      });
+    }
+
+    const task = {
+      id: `task-${Date.now()}`,
+      type,
+      description: description || `Execute ${type}`,
+      parameters: parameters || {},
+      priority: 0.5,
+      urgency: 0.4,
+      status: 'pending',
+      createdAt: Date.now(),
+    };
+
+    console.log(
+      `🔍 Executing task with enhanced verification: ${type} - ${description}`
+    );
+
+    // Execute the task directly using the enhanced verification system
+    const executionResult = await executeTaskInMinecraft(task);
+
+    console.log(`✅ Task execution result:`, {
+      success: executionResult.success,
+      type: task.type,
+      description: task.description,
+      error: executionResult.error,
+    });
+
+    res.json({
+      success: true,
+      task,
+      result: executionResult,
+      message: executionResult.success
+        ? 'Task executed successfully'
+        : 'Task execution failed',
+    });
+  } catch (error) {
+    console.error('Error executing specific task:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to execute specific task',
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
+
 // Trigger autonomous task execution
 app.post('/autonomous', async (req, res) => {
   try {
@@ -1880,6 +2732,61 @@ app.post('/autonomous', async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Failed to trigger autonomous execution',
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
+
+// Test endpoint for direct goal generation
+app.post('/test-goals', async (req, res) => {
+  try {
+    console.log('🧪 Testing direct goal generation...');
+
+    // Generate signals and context
+    const signals = await generateWorldSignals();
+    const context = await createPlanningContext();
+
+    console.log('Generated signals:', signals.length);
+    console.log('Context created:', !!context);
+
+    // Generate proactive goals
+    const newGoals = await generateProactiveGoals(signals, context);
+
+    console.log(
+      `Generated ${newGoals?.length || 0} goals:`,
+      newGoals?.map((g) => `${g.type}: ${g.description}`)
+    );
+
+    if (newGoals && newGoals.length > 0) {
+      // Add goals to the planning system
+      for (const goal of newGoals) {
+        await planningSystem.goalFormulation.addGoal(goal);
+      }
+
+      // Check current goals
+      const currentGoals = planningSystem.goalFormulation.getCurrentGoals();
+
+      res.json({
+        success: true,
+        message: `Generated and added ${newGoals.length} goals`,
+        goals: newGoals,
+        currentGoals: currentGoals,
+        goalCount: currentGoals.length,
+      });
+    } else {
+      res.json({
+        success: false,
+        message: 'No goals generated',
+        goals: [],
+        currentGoals: [],
+        goalCount: 0,
+      });
+    }
+  } catch (error) {
+    console.error('Error in test goal generation:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to test goal generation',
       error: error instanceof Error ? error.message : 'Unknown error',
     });
   }
@@ -2101,12 +3008,18 @@ app.listen(port, () => {
   console.log(`Planning system server running on port ${port}`);
 
   // Start autonomous task executor
-  console.log(' Starting autonomous task executor...');
+  // Only log in development mode
+  if (process.env.NODE_ENV === 'development') {
+    console.log(' Starting autonomous task executor...');
+  }
   setInterval(autonomousTaskExecutor, 120000); // Check every 2 minutes
 
   // Initial task generation after 30 seconds
   setTimeout(() => {
-    console.log(' Initializing autonomous behavior...');
+    // Only log in development mode
+    if (process.env.NODE_ENV === 'development') {
+      console.log(' Initializing autonomous behavior...');
+    }
     autonomousTaskExecutor();
   }, 30000);
 

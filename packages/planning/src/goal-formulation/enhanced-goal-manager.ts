@@ -455,6 +455,28 @@ export class EnhancedGoalManager {
   }
 
   /**
+   * Add or update a goal.
+   */
+  upsert(goal: Goal): void {
+    const existingIndex = this.goals.findIndex((g) => g.id === goal.id);
+    if (existingIndex >= 0) {
+      // Update existing goal
+      this.goals[existingIndex] = {
+        ...this.goals[existingIndex],
+        ...goal,
+        updatedAt: Date.now(),
+      };
+    } else {
+      // Add new goal
+      this.goals.push({
+        ...goal,
+        createdAt: goal.createdAt || Date.now(),
+        updatedAt: Date.now(),
+      });
+    }
+  }
+
+  /**
    * Get goals by status.
    */
   getGoalsByStatus(status: GoalStatus): Goal[] {

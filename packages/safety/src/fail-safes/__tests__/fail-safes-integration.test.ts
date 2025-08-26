@@ -55,7 +55,7 @@ describe('Fail-Safes Module Integration Tests', () => {
   describe('Fail-Safes System Integration', () => {
     test('should initialize with all components', async () => {
       const status = failSafesSystem.getSystemStatus();
-      
+
       expect(status.overallHealth).toBeDefined();
       expect(status.currentMode).toBe(OperationMode.FULL_CAPABILITY);
       expect(status.activeEmergencies).toEqual([]);
@@ -76,7 +76,7 @@ describe('Fail-Safes Module Integration Tests', () => {
       expect(registered).toBe(true);
 
       // Allow some time for monitoring to start
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await new Promise((resolve) => setTimeout(resolve, 100));
 
       const status = failSafesSystem.getSystemStatus();
       expect(status.componentStatuses).toHaveProperty('test_component');
@@ -198,7 +198,7 @@ describe('Fail-Safes Module Integration Tests', () => {
       watchdogManager.start();
 
       // Allow monitoring to run
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await new Promise((resolve) => setTimeout(resolve, 100));
 
       const health = watchdogManager.getComponentHealth('test_service');
       expect(health).toBeDefined();
@@ -227,7 +227,7 @@ describe('Fail-Safes Module Integration Tests', () => {
       watchdogManager.start();
 
       // Wait for failure detection
-      await new Promise(resolve => setTimeout(resolve, 200));
+      await new Promise((resolve) => setTimeout(resolve, 200));
 
       const health = watchdogManager.getComponentHealth('failing_service');
       expect(health).toBe(FailSafeHealthStatus.UNHEALTHY);
@@ -374,7 +374,8 @@ describe('Fail-Safes Module Integration Tests', () => {
       };
 
       // Start maintenance task
-      const maintenanceGrant = preemptionManager.requestExecution(maintenanceTask);
+      const maintenanceGrant =
+        preemptionManager.requestExecution(maintenanceTask);
       expect(maintenanceGrant.granted).toBe(true);
 
       // Normal task should preempt maintenance
@@ -385,11 +386,13 @@ describe('Fail-Safes Module Integration Tests', () => {
       preemptionManager.completeTask(normalTask.taskId);
 
       // Wait for restoration attempt
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await new Promise((resolve) => setTimeout(resolve, 100));
 
       const status = preemptionManager.getSystemStatus();
       // Maintenance task should be restored
-      expect(status.runningTasks.some(t => t.taskId === maintenanceTask.taskId)).toBe(true);
+      expect(
+        status.runningTasks.some((t) => t.taskId === maintenanceTask.taskId)
+      ).toBe(true);
     });
   });
 
@@ -438,7 +441,9 @@ describe('Fail-Safes Module Integration Tests', () => {
         'Performance degradation detected'
       );
 
-      const resolved = emergencyCoordinator.resolveEmergency(emergency.emergencyId);
+      const resolved = emergencyCoordinator.resolveEmergency(
+        emergency.emergencyId
+      );
       expect(resolved).toBe(true);
 
       const activeEmergencies = emergencyCoordinator.getActiveEmergencies();
@@ -456,7 +461,10 @@ describe('Fail-Safes Module Integration Tests', () => {
       expect(status.severity).toBe(SafeModeSeverity.STRICT);
 
       // Validate action in safe mode
-      const validation = safeModeManager.validateAction('test_action', 'attack');
+      const validation = safeModeManager.validateAction(
+        'test_action',
+        'attack'
+      );
       expect(validation.allowed).toBe(false);
       expect(validation.restrictions).toContain('forbidden_action');
 
@@ -475,6 +483,8 @@ describe('Fail-Safes Module Integration Tests', () => {
         endpoint: 'https://example.com/webhook',
         enabled: true,
         severityFilter: [EmergencySeverity.HIGH, EmergencySeverity.CRITICAL],
+        retryAttempts: 3,
+        timeoutMs: 30000,
       };
 
       emergencyCoordinator.registerNotificationChannel(channel);
@@ -562,18 +572,20 @@ describe('Fail-Safes Module Integration Tests', () => {
       failSafesSystem.registerComponent(config, unstableHealthChecker);
 
       // Let it fail initially
-      await new Promise(resolve => setTimeout(resolve, 200));
+      await new Promise((resolve) => setTimeout(resolve, 200));
 
       // Then recover
       shouldFail = false;
-      await new Promise(resolve => setTimeout(resolve, 200));
+      await new Promise((resolve) => setTimeout(resolve, 200));
 
       const status = failSafesSystem.getSystemStatus();
       expect(status.componentStatuses['unstable_component']).toBeDefined();
     });
 
     test('should handle emergency resolution of non-existent emergency', () => {
-      const resolved = failSafesSystem.resolveEmergency('non_existent_emergency');
+      const resolved = failSafesSystem.resolveEmergency(
+        'non_existent_emergency'
+      );
       expect(resolved).toBe(false);
     });
 
@@ -599,8 +611,8 @@ describe('Fail-Safes Module Integration Tests', () => {
         preemptable: true,
       }));
 
-      const results = tasks.map(task => failSafesSystem.submitTask(task));
-      const grantedCount = results.filter(r => r.granted).length;
+      const results = tasks.map((task) => failSafesSystem.submitTask(task));
+      const grantedCount = results.filter((r) => r.granted).length;
 
       expect(grantedCount).toBeGreaterThan(0);
       expect(grantedCount).toBeLessThanOrEqual(tasks.length);
@@ -623,10 +635,10 @@ describe('Fail-Safes Module Integration Tests', () => {
       expect(emergencyIds).toHaveLength(5);
 
       // Wait a moment for declarations to complete
-      await new Promise(resolve => setTimeout(resolve, 50));
+      await new Promise((resolve) => setTimeout(resolve, 50));
 
       // Resolve all emergencies
-      const resolutionResults = emergencyIds.map(id =>
+      const resolutionResults = emergencyIds.map((id) =>
         failSafesSystem.resolveEmergency(id)
       );
 
@@ -637,7 +649,7 @@ describe('Fail-Safes Module Integration Tests', () => {
         }
       });
 
-      expect(resolutionResults.every(result => result === true)).toBe(true);
+      expect(resolutionResults.every((result) => result === true)).toBe(true);
     });
 
     test('should maintain performance under heavy monitoring load', async () => {
@@ -659,7 +671,7 @@ describe('Fail-Safes Module Integration Tests', () => {
       const startTime = Date.now();
 
       // Let monitoring run for a short period
-      await new Promise(resolve => setTimeout(resolve, 500));
+      await new Promise((resolve) => setTimeout(resolve, 500));
 
       const endTime = Date.now();
       const duration = endTime - startTime;

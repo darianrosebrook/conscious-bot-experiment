@@ -471,30 +471,5 @@ export class DynamicCreationFlow {
   }
 }
 
-/**
- * Mock LLM interface for testing
- */
-export class MockLLMInterface implements LLMInterface {
-  async proposeOption(
-    request: OptionProposalRequest
-  ): Promise<OptionProposalResponse | null> {
-    // Mock implementation for testing
-    return {
-      name: 'mock_option',
-      version: '1.0.0',
-      btDsl: {
-        type: 'sequence',
-        children: [
-          {
-            type: 'leaf',
-            name: 'wait',
-            args: { durationMs: 100 }
-          }
-        ]
-      },
-      confidence: 0.8,
-      estimatedSuccessRate: 0.9,
-      reasoning: 'Mock option for testing'
-    };
-  }
-}
+// Mock LLM interface moved to test utilities
+// See packages/core/src/__tests__/test-utils.ts for MockLLMInterface

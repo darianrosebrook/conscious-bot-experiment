@@ -7,7 +7,7 @@
  * @author @darianrosebrook
  */
 
-import { Arbiter, SignalProcessor, ReflexModule } from '../index';
+import { Arbiter, SignalProcessor } from '../index';
 import {
   PerformanceTracker,
   BudgetEnforcer,
@@ -20,11 +20,15 @@ import {
   CognitiveTask,
   validateSignal,
   validateCognitiveTask,
-  Need,
   PerformanceMetrics,
-  CognitiveModule,
+  TaskSignature,
 } from '../types';
-import { PerformanceContext, BudgetConfig } from '../real-time/types';
+import { CognitiveModule, ReflexModule } from '../arbiter';
+import {
+  PerformanceContext,
+  BudgetConfig,
+  OperationType,
+} from '../real-time/types';
 
 describe('Module Contract Testing', () => {
   describe('Arbiter Interface Contract', () => {
@@ -121,11 +125,11 @@ describe('Module Contract Testing', () => {
       expect(metrics).toHaveProperty('lastCycleTime');
       expect(typeof metrics.lastCycleTime).toBe('number');
 
-      expect(metrics).toHaveProperty('averageCycleTime');
-      expect(typeof metrics.averageCycleTime).toBe('number');
+      expect(metrics).toHaveProperty('lastCycleTime');
+      expect(typeof metrics.lastCycleTime).toBe('number');
 
-      expect(metrics).toHaveProperty('totalCycles');
-      expect(typeof metrics.totalCycles).toBe('number');
+      expect(metrics).toHaveProperty('averageResponseTime');
+      expect(typeof metrics.averageResponseTime).toBe('number');
     });
 
     test('should process CognitiveTask with valid output', async () => {
@@ -257,7 +261,7 @@ describe('Module Contract Testing', () => {
   });
 
   describe('CognitiveModule Interface Contract', () => {
-    let reflexModule: CognitiveModule;
+    let reflexModule: ReflexModule;
 
     beforeEach(() => {
       reflexModule = new ReflexModule();
@@ -290,7 +294,16 @@ describe('Module Contract Testing', () => {
         context: { moduleTest: true },
       };
 
-      if (reflexModule.canHandle(testTask)) {
+      const signature: TaskSignature = {
+        symbolicPreconditions: 0.2,
+        socialContent: false,
+        ambiguousContext: false,
+        requiresPlanning: false,
+        timeConstraint: 50,
+        riskLevel: 'low',
+      };
+
+      if (reflexModule.canHandle(testTask, signature)) {
         const result = await reflexModule.process(testTask);
         expect(result).toBeDefined();
       }
@@ -358,7 +371,7 @@ describe('Module Contract Testing', () => {
     test('should provide valid performance tracking', () => {
       const mockOperation = {
         id: 'contract-test-op',
-        type: 'signal_processing' as const,
+        type: OperationType.SIGNAL_PROCESSING,
         name: 'test_operation',
         module: 'contract-test',
         priority: 0.5,
@@ -378,7 +391,7 @@ describe('Module Contract Testing', () => {
     test('should provide valid budget allocation', () => {
       const mockOperation = {
         id: 'budget-test-op',
-        type: 'CAPABILITY_EXECUTION' as const,
+        type: OperationType.CAPABILITY_EXECUTION,
         name: 'test_capability',
         module: 'contract-test',
         priority: 0.7,
@@ -422,7 +435,7 @@ describe('Module Contract Testing', () => {
         id: 'contract_test_capability',
         name: 'Contract Test',
         description: 'Test capability for contract validation',
-        category: 'test',
+        category: 'social' as const,
         preconditions: [],
         effects: [],
         costHint: 10,

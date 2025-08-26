@@ -1,0 +1,17 @@
+[2025-08-26 06:03:25][INFO] /0:0:0:0:0:0:0:1 "GET / HTTP/1.1" 200 OK
+[2025-08-26 06:03:41][INFO] /0:0:0:0:0:0:0:1 "GET /api/maps HTTP/1.1" 404 Not Found
+[2025-08-26 06:03:58][INFO] /0:0:0:0:0:0:0:1 "GET /api/status HTTP/1.1" 404 Not Found
+[2025-08-26 06:04:19][INFO] /0:0:0:0:0:0:0:1 "GET /api/maps HTTP/1.1" 404 Not Found
+[2025-08-26 09:52:59][INFO] /0:0:0:0:0:0:0:1 "GET /settings.json?48995 HTTP/1.1" 200 OK
+[2025-08-26 09:52:59][INFO] /0:0:0:0:0:0:0:1 "GET /maps/nether/settings.json?518266 HTTP/1.1" 404 Not Found
+[2025-08-26 09:52:59][INFO] /0:0:0:0:0:0:0:1 "GET /maps/end/settings.json?518266 HTTP/1.1" 404 Not Found
+[2025-08-26 09:52:59][INFO] /0:0:0:0:0:0:0:1 "GET /maps/overworld/settings.json?518266 HTTP/1.1" 404 Not Found
+[2025-08-26 09:52:59][INFO] /0:0:0:0:0:0:0:1 "GET /maps/nether/settings.json?518266 HTTP/1.1" 404 Not Found
+[2025-08-26 09:52:59][INFO] /0:0:0:0:0:0:0:1 "GET /maps/nether/textures.json?518266 HTTP/1.1" 404 Not Found
+[2025-08-26 09:53:06][INFO] /0:0:0:0:0:0:0:1 "GET / HTTP/1.1" 200 OK
+[2025-08-26 09:53:06][INFO] /0:0:0:0:0:0:0:1 "GET /settings.json?72312 HTTP/1.1" 200 OK
+[2025-08-26 09:53:07][INFO] /0:0:0:0:0:0:0:1 "GET /maps/nether/settings.json?497963 HTTP/1.1" 404 Not Found
+[2025-08-26 09:53:07][INFO] /0:0:0:0:0:0:0:1 "GET /maps/end/settings.json?497963 HTTP/1.1" 404 Not Found
+[2025-08-26 09:53:07][INFO] /0:0:0:0:0:0:0:1 "GET /maps/overworld/settings.json?497963 HTTP/1.1" 404 Not Found
+[2025-08-26 09:53:07][INFO] /0:0:0:0:0:0:0:1 "GET /maps/nether/settings.json?497963 HTTP/1.1" 404 Not Found
+[2025-08-26 09:53:07][INFO] /0:0:0:0:0:0:0:1 "GET /maps/nether/textures.json?497963 HTTP/1.1" 404 Not Found

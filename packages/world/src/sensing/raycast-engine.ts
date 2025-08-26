@@ -33,9 +33,9 @@ export interface RaycastEngineEvents {
 }
 
 /**
- * Mock bot interface for testing (will be replaced with actual Mineflayer bot)
+ * Bot interface for raycast operations
  */
-interface MockBot {
+interface BotInterface {
   entity: {
     position: Vec3;
     height: number;
@@ -62,11 +62,11 @@ export class RaycastEngine
 {
   private transparentBlocks = new Set<string>();
   private targetBlocks = new Set<string>();
-  private bot?: MockBot; // Will be actual Mineflayer bot in production
+  private bot?: BotInterface; // Bot interface for raycast operations
 
   constructor(
     private config: SensingConfig,
-    bot?: MockBot
+    bot?: BotInterface
   ) {
     super();
     this.bot = bot;
@@ -212,7 +212,7 @@ export class RaycastEngine
   /**
    * Update bot reference (for Mineflayer integration)
    */
-  setBot(bot: MockBot): void {
+  setBot(bot: BotInterface): void {
     this.bot = bot;
   }
 
@@ -542,7 +542,7 @@ export class RaycastEngine
       return this.bot.blockAt(position);
     }
 
-    // Mock implementation for testing
+    // Fallback implementation when bot is not available
     // In production, this would query the Minecraft world
     if (position.y < 0) return { name: 'minecraft:bedrock', type: 7 };
     if (position.y < 64) return { name: 'minecraft:stone', type: 1 };

@@ -87,5 +87,11 @@ module.exports = {
     // '@typescript-eslint/no-explicit-any': 'warn',
     // '@typescript-eslint/no-unused-vars': 'error',
   },
-  ignorePatterns: ['dist/', 'node_modules/', '*.js'],
+  ignorePatterns: [
+    'dist/',
+    'node_modules/',
+    '*.js',
+    '*.cjs',
+    'packages/*/dist/',
+  ],
 };

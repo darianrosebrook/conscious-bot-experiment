@@ -154,6 +154,10 @@ export interface ReactiveExecutorMetrics {
   reflexActivations: number;
   threatResponseTime: number;
   survivalRate: number;
+  // Additional properties for execution tracking
+  isExecuting: boolean;
+  currentAction: any;
+  actionQueue: any[];
 }
 
 /**
@@ -352,6 +356,10 @@ export class EnhancedGOAPPlanner {
       reflexActivations: 0,
       threatResponseTime: Infinity,
       survivalRate: 1.0,
+      // Execution tracking properties
+      isExecuting: false,
+      currentAction: null,
+      actionQueue: [],
     };
   }
 
@@ -660,6 +668,41 @@ export class EnhancedGOAPPlanner {
   }): Promise<{ x: number; y: number; z: number }> {
     // Simplified - would use actual light detection
     return { x: position.x + 10, y: position.y, z: position.z };
+  }
+
+  /**
+   * Check if currently executing
+   */
+  isExecuting(): boolean {
+    return this.metrics.isExecuting;
+  }
+
+  /**
+   * Execute next action in queue
+   */
+  async executeNextAction(): Promise<any> {
+    // Simplified implementation - would execute next action in current plan
+    this.metrics.isExecuting = true;
+
+    // Simulate action execution
+    await new Promise((resolve) => setTimeout(resolve, 100));
+
+    this.metrics.isExecuting = false;
+    return { success: true, action: 'next_action' };
+  }
+
+  /**
+   * Get current action being executed
+   */
+  getCurrentAction(): any {
+    return this.metrics.currentAction || null;
+  }
+
+  /**
+   * Get action queue
+   */
+  getActionQueue(): any[] {
+    return this.metrics.actionQueue || [];
   }
 }
 

@@ -10,7 +10,7 @@ import { describe, it, expect, beforeEach } from '@jest/globals';
 import { HomeostasisMonitor } from '../goal-formulation/homeostasis-monitor';
 import { generateNeeds } from '../goal-formulation/need-generator';
 import { GoalManager } from '../goal-formulation/goal-manager';
-import { GoalType, NeedType } from '../types';
+import { GoalType, NeedType, SignalType } from '../types';
 
 describe('M2 Planning Integration', () => {
   let homeostasisMonitor: HomeostasisMonitor;
@@ -40,13 +40,13 @@ describe('M2 Planning Integration', () => {
       expect(needs.length).toBeGreaterThan(0);
 
       // Should prioritize hunger and energy needs
-      const hungerNeed = needs.find(n => n.type === NeedType.HUNGER);
+      const nutritionNeed = needs.find(n => n.type === NeedType.SURVIVAL && n.description.includes('hunger'));
       const survivalNeed = needs.find(n => n.type === NeedType.SURVIVAL);
       
-      // Either hunger or survival need should be present
-      expect(hungerNeed || survivalNeed).toBeDefined();
-      if (hungerNeed) {
-        expect(hungerNeed.intensity).toBeGreaterThan(0.5);
+      // Either nutrition or survival need should be present
+      expect(nutritionNeed || survivalNeed).toBeDefined();
+      if (nutritionNeed) {
+        expect(nutritionNeed.intensity).toBeGreaterThan(0.5);
       }
       if (survivalNeed) {
         expect(survivalNeed.intensity).toBeGreaterThan(0.5);

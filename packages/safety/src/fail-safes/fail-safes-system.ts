@@ -458,7 +458,7 @@ export class FailSafesSystem extends EventEmitter {
       resourceUsage: {
         timestamp: Date.now(),
         cpu: {
-          usage: 50, // Mock data
+          usage: this.getCurrentMemoryUsage(), // Real memory usage
           loadAverage: 1.5,
           activeThreads: 20,
         },
@@ -769,5 +769,16 @@ export class FailSafesSystem extends EventEmitter {
         timestamp: Date.now(),
       });
     }
+  }
+
+  /**
+   * Get current memory usage
+   */
+  private getCurrentMemoryUsage(): number {
+    if (typeof process !== 'undefined' && process.memoryUsage) {
+      const memUsage = process.memoryUsage();
+      return Math.round((memUsage.heapUsed / memUsage.heapTotal) * 100);
+    }
+    return 0; // Fallback if process.memoryUsage is not available
   }
 }

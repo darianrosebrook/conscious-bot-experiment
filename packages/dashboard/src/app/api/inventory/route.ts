@@ -34,11 +34,14 @@ export async function GET(_request: NextRequest) {
         }
       }
     } catch (error) {
-      console.log('Minecraft bot server not available, using mock data');
+      console.log('Minecraft bot server not available, using fallback data');
     }
 
     // Show real inventory data (even if empty) - only in debug mode
-    if (process.env.NODE_ENV === 'development' && process.env.DEBUG_INVENTORY === 'true') {
+    if (
+      process.env.NODE_ENV === 'development' &&
+      process.env.DEBUG_INVENTORY === 'true'
+    ) {
       console.log('Real inventory from Mineflayer:', inventory);
     }
 
@@ -113,8 +116,8 @@ export async function GET(_request: NextRequest) {
         return mineflayerItem;
       } catch (error) {
         console.error('Error processing inventory item:', error, item);
-        // Return a safe fallback item
-        return {
+        // Enhanced graceful fallback item with better error handling
+        const fallbackItem = {
           type: item.type || item.id || null,
           count: typeof item.count === 'number' ? item.count : 1,
           slot: typeof item.slot === 'number' ? item.slot : 0,
@@ -123,7 +126,16 @@ export async function GET(_request: NextRequest) {
           name: item.name || null,
           durability: null,
           maxDurability: null,
+          fallback: true,
+          error:
+            error instanceof Error ? error.message : 'Item processing failed',
         };
+
+        console.warn(
+          `Using fallback item for slot ${item.slot}:`,
+          fallbackItem
+        );
+        return fallbackItem;
       }
     });
 
@@ -139,18 +151,50 @@ export async function GET(_request: NextRequest) {
     // eslint-disable-next-line no-console
     console.error('Failed to fetch inventory:', error);
 
+    // Enhanced graceful fallback for complete inventory failure
+    const isDevelopment = process.env.NODE_ENV === 'development';
+    const errorMessage =
+      error instanceof Error ? error.message : 'Unknown error';
+
+    if (isDevelopment) {
+      // Development mode: Provide detailed error information
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Failed to fetch inventory data',
+          details: errorMessage,
+          inventory: [],
+          totalItems: 0,
+          botStatus: 'error',
+          isAlive: false,
+          timestamp: Date.now(),
+          fallback: true,
+          debug: {
+            errorType:
+              error instanceof Error ? error.constructor.name : 'UnknownError',
+            stack: error instanceof Error ? error.stack : undefined,
+            timestamp: new Date().toISOString(),
+          },
+        },
+        { status: 500 }
+      );
+    }
+
+    // Production mode: Graceful degradation with minimal error exposure
     return NextResponse.json(
       {
         success: false,
-        error: 'Failed to fetch inventory data',
-        details: error instanceof Error ? error.message : 'Unknown error',
+        error: 'Inventory temporarily unavailable',
         inventory: [],
         totalItems: 0,
-        botStatus: 'error',
+        botStatus: 'maintenance',
         isAlive: false,
         timestamp: Date.now(),
+        fallback: true,
+        message:
+          'Inventory system is being restored. Please try again shortly.',
       },
-      { status: 500 }
+      { status: 503 } // Service Unavailable
     );
   }
 }

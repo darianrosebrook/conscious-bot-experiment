@@ -439,20 +439,40 @@ export class BotAdapter extends EventEmitter {
       };
     }
 
+    // Check if bot is fully initialized
+    if (!this.bot.game) {
+      return {
+        connected: true,
+        connectionState: this.connectionState,
+        reconnectAttempts: this.reconnectAttempts,
+        username: this.bot.username,
+        health: this.bot.health,
+        food: this.bot.food,
+        gameMode: 'initializing',
+        dimension: 'initializing',
+        server: {
+          host: this.config.host,
+          port: this.config.port,
+          version: this.bot.version,
+          difficulty: 'unknown',
+        },
+      };
+    }
+
     const status: any = {
       connected: true,
       connectionState: this.connectionState,
       reconnectAttempts: this.reconnectAttempts,
-      username: this.bot.username,
-      health: this.bot.health,
-      food: this.bot.food,
-      gameMode: this.bot.game.gameMode,
-      dimension: this.bot.game.dimension,
+      username: this.bot.username || 'unknown',
+      health: this.bot.health || 0,
+      food: this.bot.food || 0,
+      gameMode: this.bot.game?.gameMode || 'unknown',
+      dimension: this.bot.game?.dimension || 'unknown',
       server: {
         host: this.config.host,
         port: this.config.port,
-        version: this.bot.version,
-        difficulty: this.bot.game.difficulty,
+        version: this.bot.version || 'unknown',
+        difficulty: this.bot.game?.difficulty || 'unknown',
       },
     };
 

@@ -428,10 +428,35 @@ export function getItemCategory(itemName: string): string {
 }
 
 /**
- * Get default fallback sprite (SVG data URL)
+ * Get enhanced fallback sprite with better visual feedback
  */
-export function getFallbackSprite(): string {
-  return 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTYiIGhlaWdodD0iMTYiIHZpZXdCb3g9IjAgMCAxNiAxNiIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHJlY3Qgd2lkdGg9IjE2IiBoZWlnaHQ9IjE2IiBmaWxsPSIjNjM2NjZhIi8+CjxwYXRoIGQ9Ik04IDRMMTIgOEw4IDEyTDQgOEw4IDRaIiBmaWxsPSIjZjNmNGY2Ii8+Cjwvc3ZnPgo=';
+export function getFallbackSprite(itemName?: string): string {
+  // Create a more informative fallback sprite based on item type
+  const cleanName = itemName ? itemName.replace('minecraft:', '') : 'unknown';
+
+  // Generate different fallback sprites based on item category
+  const category = getItemCategory(cleanName);
+
+  switch (category) {
+    case 'tools':
+      return 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTYiIGhlaWdodD0iMTYiIHZpZXdCb3g9IjAgMCAxNiAxNiIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHJlY3Qgd2lkdGg9IjE2IiBoZWlnaHQ9IjE2IiBmaWxsPSIjOGM2OTNhIi8+CjxwYXRoIGQ9Ik0yIDJMMTQgMkwxNCAxNEwyIDE0WiIgZmlsbD0iI2Y5NzUwNyIvPgo8cGF0aCBkPSJNOCA0TDEyIDhMOCAxMkw0IDhMOCA0WiIgZmlsbD0iI2Y5NzUwNyIvPgo8L3N2Zz4K';
+
+    case 'armor':
+      return 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTYiIGhlaWdodD0iMTYiIHZpZXdCb3g9IjAgMCAxNiAxNiIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHJlY3Qgd2lkdGg9IjE2IiBoZWlnaHQ9IjE2IiBmaWxsPSIjMzQ5OGRiIi8+CjxwYXRoIGQ9Ik04IDJMMTIgMkwxMiA2TDggNloiIGZpbGw9IiNmZmYiLz4KPHBhdGggZD0iTTQgNkwxMiA2TDEyIDEwTDQgMTBaIiBmaWxsPSIjZmZmIi8+Cjwvc3ZnPgo=';
+
+    case 'food':
+      return 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTYiIGhlaWdodD0iMTYiIHZpZXdCb3g9IjAgMCAxNiAxNiIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHJlY3Qgd2lkdGg9IjE2IiBoZWlnaHQ9IjE2IiBmaWxsPSIjOGJjMzRhIi8+CjxjaXJjbGUgY3g9IjgiIGN5PSI4IiByPSI0IiBmaWxsPSIjZmY2YjNhIi8+Cjwvc3ZnPgo=';
+
+    case 'blocks':
+      return 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTYiIGhlaWdodD0iMTYiIHZpZXdCb3g9IjAgMCAxNiAxNiIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHJlY3Qgd2lkdGg9IjE2IiBoZWlnaHQ9IjE2IiBmaWxsPSIjOGM2OTNhIi8+CjxwYXRoIGQ9Ik0yIDJMMTQgMkwxNCAxNEwyIDE0WiIgZmlsbD0iI2E1NzU0NyIvPgo8L3N2Zz4K';
+
+    case 'agriculture':
+      return 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTYiIGhlaWdodD0iMTYiIHZpZXdCb3g9IjAgMCAxNiAxNiIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHJlY3Qgd2lkdGg9IjE2IiBoZWlnaHQ9IjE2IiBmaWxsPSIjOGJjMzRhIi8+CjxwYXRoIGQ9Ik04IDJMMTIgNkw4IDEwTDQgNkw4IDJaIiBmaWxsPSIjNGNhZjUwIi8+Cjwvc3ZnPgo=';
+
+    default:
+      // Default fallback with question mark
+      return 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTYiIGhlaWdodD0iMTYiIHZpZXdCb3g9IjAgMCAxNiAxNiIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHJlY3Qgd2lkdGg9IjE2IiBoZWlnaHQ9IjE2IiBmaWxsPSIjNjM2NjZhIi8+Cjx0ZXh0IHg9IjgiIHk9IjEyIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmaWxsPSIjZmZmIiBmb250LWZhbWlseT0ibW9ub3NwYWNlIiBmb250LXNpemU9IjEwIj4/PC90ZXh0Pgo8L3N2Zz4K';
+  }
 }
 
 /**

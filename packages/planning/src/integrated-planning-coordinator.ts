@@ -828,7 +828,10 @@ export class IntegratedPlanningCoordinator extends EventEmitter {
     // Base deadline calculation
     let baseTimeMs = 60000; // 1 minute default
 
-    switch (context.timeConstraints.urgency) {
+    // Safely access timeConstraints with fallback
+    const urgency = context.timeConstraints?.urgency || 'medium';
+
+    switch (urgency) {
       case 'emergency':
         baseTimeMs = 10000; // 10 seconds
         break;

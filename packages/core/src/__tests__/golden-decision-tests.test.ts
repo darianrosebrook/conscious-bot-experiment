@@ -418,7 +418,7 @@ describe('Golden Decision Tests', () => {
   });
 
   describe('Performance Consistency Tests', () => {
-    test('repeated identical inputs produce consistent outputs', () => {
+    test('repeated identical inputs produce consistent outputs', async () => {
       const testSignal: Signal = {
         type: 'health',
         intensity: 0.5,
@@ -444,10 +444,10 @@ describe('Golden Decision Tests', () => {
           context: { test: true },
         };
 
-        const result = arbiter.processCognitiveTask(task);
+        const result = await arbiter.processCognitiveTask(task);
         const timing = Date.now() - startTime;
 
-        results.push(result as string);
+        results.push(result);
         timings.push(timing);
       }
 

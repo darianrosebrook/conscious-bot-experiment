@@ -9,6 +9,8 @@
 
 import express from 'express';
 import cors from 'cors';
+import { createServer } from 'http';
+import { WebSocketServer, WebSocket } from 'ws';
 import {
   createMinecraftInterface,
   createMinecraftInterfaceWithoutConnect,
@@ -25,11 +27,37 @@ import {
 import { createIntegratedPlanningCoordinator } from '@conscious-bot/planning';
 import { mineflayer as startMineflayerViewer } from 'prismarine-viewer';
 
+// Import leaf implementations for registration
+import {
+  MoveToLeaf,
+  StepForwardSafelyLeaf,
+  FollowEntityLeaf,
+} from './leaves/movement-leaves';
+import {
+  DigBlockLeaf,
+  PlaceBlockLeaf,
+  PlaceTorchIfNeededLeaf,
+  RetreatAndBlockLeaf,
+  ConsumeFoodLeaf,
+} from './leaves/interaction-leaves';
+import {
+  SenseHostilesLeaf,
+  ChatLeaf,
+  WaitLeaf,
+  GetLightLevelLeaf,
+} from './leaves/sensing-leaves';
+import { CraftRecipeLeaf, SmeltLeaf } from './leaves/crafting-leaves';
+
 const app = express();
+const server = createServer(app);
 const port = process.env.PORT ? parseInt(process.env.PORT) : 3005;
 const viewerPort = process.env.VIEWER_PORT
   ? parseInt(process.env.VIEWER_PORT)
   : 3006;
+
+// WebSocket server for real-time updates
+const wss = new WebSocketServer({ server });
+const connectedClients = new Set<WebSocket>();
 
 // Middleware
 app.use(cors());
@@ -69,6 +97,111 @@ let isConnecting = false;
 let viewerActive = false;
 let autoConnectInterval: NodeJS.Timeout | null = null;
 
+/**
+ * Broadcast bot state updates to all connected WebSocket clients
+ */
+function broadcastBotStateUpdate(eventType: string, data: any) {
+  const message = JSON.stringify({
+    type: eventType,
+    timestamp: Date.now(),
+    data,
+  });
+
+  connectedClients.forEach((client) => {
+    if (client.readyState === 1) {
+      // WebSocket.OPEN
+      try {
+        client.send(message);
+      } catch (error) {
+        console.error('Failed to send message to WebSocket client:', error);
+      }
+    }
+  });
+}
+
+/**
+ * Setup WebSocket event handlers for bot state updates
+ */
+function setupBotStateWebSocket() {
+  if (!minecraftInterface) return;
+
+  // Listen to bot adapter events and broadcast them
+  minecraftInterface.botAdapter.on('health_changed', (data) => {
+    broadcastBotStateUpdate('health_changed', data);
+  });
+
+  minecraftInterface.botAdapter.on('inventory_changed', (data) => {
+    broadcastBotStateUpdate('inventory_changed', data);
+  });
+
+  minecraftInterface.botAdapter.on('position_changed', (data) => {
+    broadcastBotStateUpdate('position_changed', data);
+  });
+
+  minecraftInterface.botAdapter.on('block_broken', (data) => {
+    broadcastBotStateUpdate('block_broken', data);
+  });
+
+  minecraftInterface.botAdapter.on('block_placed', (data) => {
+    broadcastBotStateUpdate('block_placed', data);
+  });
+
+  minecraftInterface.botAdapter.on('connected', (data) => {
+    broadcastBotStateUpdate('connected', data);
+  });
+
+  minecraftInterface.botAdapter.on('disconnected', (data) => {
+    broadcastBotStateUpdate('disconnected', data);
+  });
+
+  minecraftInterface.botAdapter.on('spawned', (data) => {
+    broadcastBotStateUpdate('spawned', data);
+  });
+
+  minecraftInterface.botAdapter.on('warning', (data) => {
+    broadcastBotStateUpdate('warning', data);
+  });
+}
+
+// WebSocket connection handling
+wss.on('connection', (ws) => {
+  console.log('WebSocket client connected');
+  connectedClients.add(ws);
+
+  // Send initial bot state
+  if (minecraftInterface) {
+    try {
+      const botStatus = minecraftInterface.botAdapter.getStatus();
+      const executionStatus =
+        minecraftInterface.planExecutor.getExecutionStatus();
+
+      const initialState = {
+        type: 'initial_state',
+        timestamp: Date.now(),
+        data: {
+          botStatus,
+          executionStatus,
+          connected: botStatus?.connected || false,
+        },
+      };
+
+      ws.send(JSON.stringify(initialState));
+    } catch (error) {
+      console.error('Failed to send initial state:', error);
+    }
+  }
+
+  ws.on('close', () => {
+    console.log('WebSocket client disconnected');
+    connectedClients.delete(ws);
+  });
+
+  ws.on('error', (error) => {
+    console.error('WebSocket error:', error);
+    connectedClients.delete(ws);
+  });
+});
+
 // Health check endpoint
 app.get('/health', (req, res) => {
   const botStatus = minecraftInterface?.botAdapter.getStatus();
@@ -99,6 +232,11 @@ app.get('/health', (req, res) => {
     system: 'minecraft-bot',
     timestamp: Date.now(),
     version: '0.1.0',
+    websocket: {
+      active: true,
+      connectedClients: connectedClients.size,
+      endpoint: `ws://localhost:${port}`,
+    },
     viewer: {
       port: viewerPort,
       active: viewerActive,
@@ -151,11 +289,21 @@ app.post('/connect', async (req, res) => {
     planningCoordinator = createIntegratedPlanningCoordinator();
 
     // Create minecraft interface
-    minecraftInterface = await createMinecraftInterface(botConfig, planningCoordinator);
+    minecraftInterface = await createMinecraftInterface(
+      botConfig,
+      planningCoordinator
+    );
+
+    // Setup WebSocket event handlers for real-time updates
+    setupBotStateWebSocket();
+
+    // Register core leaves with the capability registry
+    await registerCoreLeaves();
 
     console.log('✅ Connected to Minecraft server');
     console.log('✅ Memory integration initialized');
     console.log('✅ Planning coordinator initialized');
+    console.log('✅ Core leaves registered');
 
     res.json({
       success: true,
@@ -173,6 +321,78 @@ app.post('/connect', async (req, res) => {
     isConnecting = false;
   }
 });
+
+/**
+ * Register core leaves with the local leaf factory
+ */
+async function registerCoreLeaves() {
+  try {
+    console.log('📝 Registering core leaves...');
+
+    // Import the LeafFactory from core
+    const { LeafFactory } = await import('@conscious-bot/core');
+
+    // Create a local leaf factory for the minecraft interface
+    const leafFactory = new LeafFactory();
+
+    // Register movement leaves
+    const movementLeaves = [
+      new MoveToLeaf(),
+      new StepForwardSafelyLeaf(),
+      new FollowEntityLeaf(),
+    ];
+
+    // Register interaction leaves
+    const interactionLeaves = [
+      new DigBlockLeaf(),
+      new PlaceBlockLeaf(),
+      new PlaceTorchIfNeededLeaf(),
+      new RetreatAndBlockLeaf(),
+      new ConsumeFoodLeaf(),
+    ];
+
+    // Register sensing leaves
+    const sensingLeaves = [
+      new SenseHostilesLeaf(),
+      new ChatLeaf(),
+      new WaitLeaf(),
+      new GetLightLevelLeaf(),
+    ];
+
+    // Register crafting leaves
+    const craftingLeaves = [new CraftRecipeLeaf(), new SmeltLeaf()];
+
+    const allLeaves = [
+      ...movementLeaves,
+      ...interactionLeaves,
+      ...sensingLeaves,
+      ...craftingLeaves,
+    ];
+
+    for (const leaf of allLeaves) {
+      const result = leafFactory.register(leaf);
+      if (result.ok) {
+        console.log(
+          `✅ Registered leaf: ${leaf.spec.name}@${leaf.spec.version}`
+        );
+      } else {
+        console.warn(
+          `⚠️ Failed to register leaf: ${leaf.spec.name}@${leaf.spec.version}: ${result.error}`
+        );
+      }
+    }
+
+    console.log(
+      `✅ Registered ${allLeaves.length} core leaves with local leaf factory`
+    );
+
+    // Store the leaf factory globally so it can be used by the action executor
+    (global as any).minecraftLeafFactory = leafFactory;
+  } catch (error) {
+    console.error('❌ Failed to register core leaves:', error);
+    throw error;
+  }
+}
 
 // Auto-connect function
 async function attemptAutoConnect() {
@@ -206,22 +426,47 @@ async function attemptAutoConnect() {
     // Manually initialize the plan executor to connect to Minecraft
     await minecraftInterface.planExecutor.initialize();
 
+    // Register core leaves with the capability registry
+    await registerCoreLeaves();
+
     // Set up event listeners
     minecraftInterface.planExecutor.on('initialized', (event) => {
       // Only log successful auto-connect in development mode
       if (process.env.NODE_ENV === 'development') {
         console.log(' Bot auto-connected to Minecraft server');
       }
-      // Start Prismarine viewer on first connect
-      try {
-        const bot = minecraftInterface?.botAdapter.getBot();
-        if (bot && !viewerActive) {
-          startViewerSafely(bot, viewerPort);
+      // Start Prismarine viewer on first connect with retry logic
+      const startViewerWithRetry = async (retryCount = 0) => {
+        try {
+          if (!minecraftInterface) {
+            return;
+          }
+          const bot = minecraftInterface.botAdapter.getBot();
+          if (bot && !viewerActive) {
+            const viewerCheck = minecraftInterface.botAdapter.canStartViewer();
+            if (viewerCheck.canStart) {
+              startViewerSafely(bot, viewerPort);
+            } else if (retryCount < 3) {
+              // Retry after 2 seconds if not ready
+              setTimeout(() => startViewerWithRetry(retryCount + 1), 2000);
+            } else {
+              console.log(
+                'Viewer auto-start failed after retries:',
+                viewerCheck.reason
+              );
+            }
+          }
+        } catch (err) {
+          console.error('Failed to start Prismarine viewer:', err);
+          viewerActive = false;
+          // Retry once more after error
+          if (retryCount < 1) {
+            setTimeout(() => startViewerWithRetry(retryCount + 1), 3000);
+          }
         }
-      } catch (err) {
-        console.error('Failed to start Prismarine viewer:', err);
-        viewerActive = false;
-      }
+      };
+
+      startViewerWithRetry();
     });
 
     minecraftInterface.planExecutor.on('shutdown', () => {
@@ -1044,8 +1289,37 @@ function startViewerSafely(bot: any, port: number) {
   }
 }
 
+// Stop viewer endpoint
+app.post('/stop-viewer', async (req, res) => {
+  try {
+    if (!viewerActive) {
+      return res.json({
+        success: true,
+        message: 'Viewer not active',
+      });
+    }
+
+    // Note: prismarine-viewer doesn't provide a direct stop method
+    // We can only mark it as inactive and let it be cleaned up
+    viewerActive = false;
+    console.log('🖥️ Prismarine viewer stopped');
+
+    res.json({
+      success: true,
+      message: 'Viewer stopped successfully',
+    });
+  } catch (error) {
+    console.error('Failed to stop viewer:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to stop viewer',
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
+
 // Start server
-app.listen(port, () => {
+server.listen(port, async () => {
   console.log(`Minecraft bot server running on port ${port}`);
   console.log(
     `Bot config: ${botConfig.username}@${botConfig.host}:${botConfig.port}`
@@ -1053,12 +1327,24 @@ app.listen(port, () => {
   console.log(`Use POST /connect to start the bot`);
   console.log(`Prismarine viewer port reserved at ${viewerPort}`);
 
+  // Register leaves on startup
+  try {
+    await registerCoreLeaves();
+  } catch (error) {
+    console.error('❌ Failed to register leaves on startup:', error);
+  }
+
   // Attempt to start viewer if bot is already connected
   setTimeout(() => {
     try {
-      const botStatus = minecraftInterface?.botAdapter.getStatus();
+      // Only check if minecraftInterface exists and is properly initialized
+      if (!minecraftInterface) {
+        return;
+      }
+
+      const botStatus = minecraftInterface.botAdapter.getStatus();
       const executionStatus =
-        minecraftInterface?.planExecutor.getExecutionStatus();
+        minecraftInterface.planExecutor.getExecutionStatus();
 
       // Use execution status if available, otherwise fall back to bot adapter status
       const isConnected =
@@ -1067,7 +1353,7 @@ app.listen(port, () => {
           executionStatus.bot.connected) ||
         (botStatus?.connected && botStatus?.connectionState === 'spawned');
 
-      if (isConnected && !viewerActive && minecraftInterface) {
+      if (isConnected && !viewerActive) {
         const viewerCheck = minecraftInterface.botAdapter.canStartViewer();
         if (viewerCheck.canStart) {
           try {
@@ -1079,13 +1365,55 @@ app.listen(port, () => {
             console.error('Failed to auto-start Prismarine viewer:', err);
           }
         } else {
-          console.log('Auto-start viewer skipped:', viewerCheck.reason);
+          // Only log in development mode
+          if (process.env.NODE_ENV === 'development') {
+            console.log('Auto-start viewer skipped:', viewerCheck.reason);
+          }
         }
       }
     } catch (err) {
-      console.error('Failed to check bot status for auto-start viewer:', err);
+      // Only log in development mode
+      if (process.env.NODE_ENV === 'development') {
+        console.error('Failed to check bot status for auto-start viewer:', err);
+      }
     }
   }, 5000); // Wait 5 seconds for bot to connect
+
+  // Periodic viewer health check and auto-restart
+  setInterval(() => {
+    try {
+      if (
+        !minecraftInterface ||
+        !minecraftInterface.botAdapter.getStatus()?.connected
+      ) {
+        return;
+      }
+
+      const botStatus = minecraftInterface.botAdapter.getStatus();
+      const isConnected =
+        botStatus?.connected && botStatus?.connectionState === 'spawned';
+
+      if (isConnected && !viewerActive) {
+        const viewerCheck = minecraftInterface.botAdapter.canStartViewer();
+        if (viewerCheck.canStart) {
+          try {
+            const bot = minecraftInterface.botAdapter.getBot();
+            if (bot) {
+              console.log('Auto-restarting viewer due to inactivity...');
+              startViewerSafely(bot, viewerPort);
+            }
+          } catch (err) {
+            console.error('Failed to auto-restart Prismarine viewer:', err);
+          }
+        }
+      }
+    } catch (err) {
+      // Only log in development mode
+      if (process.env.NODE_ENV === 'development') {
+        console.error('Failed to check viewer health:', err);
+      }
+    }
+  }, 30000); // Check every 30 seconds
 });
 
 // Get memory integration status

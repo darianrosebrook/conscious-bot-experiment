@@ -170,19 +170,46 @@ export const GET = async (req: NextRequest) => {
                 : null;
             } catch (minecraftError) {
               // Only log once per session to avoid spam
-              if (!global.minecraftUnavailableLogged) {
+              if (!(globalThis as any).minecraftUnavailableLogged) {
                 console.log(
-                  'Minecraft interface unavailable, using fallback state'
+                  'Minecraft interface unavailable, using graceful fallback state'
                 );
-                global.minecraftUnavailableLogged = true;
+                (globalThis as any).minecraftUnavailableLogged = true;
               }
+
+              // Enhanced graceful fallback with better state management
               minecraftData = {
                 success: false,
                 data: {
-                  inventory: { hotbar: [], main: [] },
-                  position: null,
-                  vitals: null,
+                  inventory: {
+                    hotbar: [],
+                    main: [],
+                    totalSlots: 36,
+                    freeSlots: 36,
+                    selectedSlot: 0,
+                  },
+                  position: { x: 0, y: 64, z: 0 }, // Default spawn position
+                  vitals: {
+                    health: 20,
+                    food: 20,
+                    hunger: 0,
+                    experience: 0,
+                    level: 0,
+                  },
+                  worldState: {
+                    time: 6000,
+                    weather: 'clear',
+                    biome: 'plains',
+                    lightLevel: 15,
+                    nearbyEntities: [],
+                    nearbyHostiles: [],
+                  },
                 },
+                error:
+                  minecraftError instanceof Error
+                    ? minecraftError.message
+                    : 'Minecraft interface unavailable',
+                fallback: true,
               };
             }
 
@@ -202,13 +229,41 @@ export const GET = async (req: NextRequest) => {
                 : null;
             } catch (cognitionError) {
               // Only log once per session to avoid spam
-              if (!global.cognitionUnavailableLogged) {
+              if (!(globalThis as any).cognitionUnavailableLogged) {
                 console.log(
-                  'Cognition service unavailable, using fallback state'
+                  'Cognition service unavailable, using graceful fallback state'
                 );
-                global.cognitionUnavailableLogged = true;
+                (globalThis as any).cognitionUnavailableLogged = true;
               }
-              cognitionData = { data: null };
+
+              // Enhanced graceful fallback for cognition service
+              cognitionData = {
+                data: {
+                  thoughts: [],
+                  memories: [],
+                  emotions: {
+                    happiness: 0.5,
+                    fear: 0.0,
+                    curiosity: 0.7,
+                    confidence: 0.6,
+                  },
+                  cognitiveLoad: 0.3,
+                  attention: {
+                    focus: 0.8,
+                    distractions: [],
+                  },
+                  decisionMaking: {
+                    currentProcess: 'idle',
+                    confidence: 0.5,
+                    alternatives: [],
+                  },
+                },
+                error:
+                  cognitionError instanceof Error
+                    ? cognitionError.message
+                    : 'Cognition service unavailable',
+                fallback: true,
+              };
             }
 
             // Fetch world state with fallback
@@ -222,11 +277,42 @@ export const GET = async (req: NextRequest) => {
               worldData = worldResponse.ok ? await worldResponse.json() : null;
             } catch (worldError) {
               // Only log once per session to avoid spam
-              if (!global.worldUnavailableLogged) {
-                console.log('World service unavailable, using fallback state');
-                global.worldUnavailableLogged = true;
+              if (!(globalThis as any).worldUnavailableLogged) {
+                console.log(
+                  'World service unavailable, using graceful fallback state'
+                );
+                (globalThis as any).worldUnavailableLogged = true;
               }
-              worldData = { data: null };
+
+              // Enhanced graceful fallback for world service
+              worldData = {
+                data: {
+                  environment: {
+                    time: 6000,
+                    weather: 'clear',
+                    biome: 'plains',
+                    lightLevel: 15,
+                    temperature: 20,
+                    humidity: 0.5,
+                  },
+                  nearbyEntities: [],
+                  nearbyHostiles: [],
+                  nearbyItems: [],
+                  structures: [],
+                  waypoints: [],
+                  dangerLevel: 0.0,
+                  accessibility: {
+                    walkable: true,
+                    swimmable: false,
+                    flyable: false,
+                  },
+                },
+                error:
+                  worldError instanceof Error
+                    ? worldError.message
+                    : 'World service unavailable',
+                fallback: true,
+              };
             }
 
             const botState = {
@@ -235,18 +321,23 @@ export const GET = async (req: NextRequest) => {
               data: {
                 connected: minecraftData?.success || false,
                 inventory:
-                  minecraftData?.data?.worldState?.inventory?.items || [],
+                  minecraftData?.data?.inventory?.main ||
+                  minecraftData?.data?.worldState?.inventory?.items ||
+                  [],
                 position:
-                  minecraftData?.data?.worldState?.playerPosition || null,
-                vitals: minecraftData?.data?.worldState
-                  ? {
-                      health: minecraftData.data.worldState.health || 0,
-                      food: minecraftData.data.worldState.hunger || 0,
-                      hunger: minecraftData.data.worldState.hunger || 0,
-                      stamina: 100, // Default stamina value
-                      sleep: 100, // Default sleep value
-                    }
-                  : null,
+                  minecraftData?.data?.position ||
+                  minecraftData?.data?.worldState?.playerPosition ||
+                  null,
+                vitals:
+                  minecraftData?.data?.vitals || minecraftData?.data?.worldState
+                    ? {
+                        health: minecraftData.data.worldState.health || 0,
+                        food: minecraftData.data.worldState.hunger || 0,
+                        hunger: minecraftData.data.worldState.hunger || 0,
+                        stamina: 100, // Default stamina value
+                        sleep: 100, // Default sleep value
+                      }
+                    : null,
                 environment: worldData || null,
                 cognition: {
                   ...cognitionData,

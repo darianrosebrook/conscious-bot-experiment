@@ -9,7 +9,7 @@
     "build": "tsc",
     "dev": "tsc --watch",
     "test": "jest --watchAll=false --forceExit",
-    "lint": "eslint src/",
+    "lint": "eslint src/**/*.ts",
     "type-check": "tsc --noEmit",
     "start": "node dist/server.js",
     "dev:server": "tsx src/server.ts"

@@ -358,6 +358,68 @@ const THOUGHT_TO_TASK_MAPPINGS: ThoughtToTaskMapping[] = [
     thoughtType: 'avoid danger',
     taskType: 'flee',
     priority: 0.8,
+    urgency: 0.7,
+    parameters: {
+      direction: 'away_from_threat',
+      distance: 15,
+      find_safe_spot: true,
+    },
+    description: 'Avoid dangerous situations',
+  },
+
+  // Combat tasks
+  {
+    thoughtType: 'attack enemy',
+    taskType: 'attack_entity',
+    priority: 0.8,
+    urgency: 0.8,
+    parameters: {
+      target: 'nearest',
+      weapon: 'best_available',
+      aggressive: true,
+    },
+    description: 'Attack the nearest hostile entity',
+  },
+  {
+    thoughtType: 'fight back',
+    taskType: 'attack_entity',
+    priority: 0.8,
+    urgency: 0.8,
+    parameters: {
+      target: 'nearest',
+      weapon: 'best_available',
+      defensive: true,
+    },
+    description: 'Fight back against threats',
+  },
+  {
+    thoughtType: 'defeat enemy',
+    taskType: 'attack_entity',
+    priority: 0.7,
+    urgency: 0.7,
+    parameters: {
+      target: 'nearest',
+      weapon: 'best_available',
+      persistent: true,
+    },
+    description: 'Defeat the enemy',
+  },
+  {
+    thoughtType: 'engage in combat',
+    taskType: 'attack_entity',
+    priority: 0.7,
+    urgency: 0.7,
+    parameters: {
+      target: 'nearest',
+      weapon: 'best_available',
+      tactical: true,
+    },
+    description: 'Engage in combat with enemies',
+  },
+  {
+    thoughtType: 'avoid danger',
+    taskType: 'flee',
+    priority: 0.9,
     urgency: 0.8,
     parameters: { direction: 'away_from_threat', distance: 10, stealth: true },
     description: 'Avoid immediate danger',
@@ -454,7 +516,10 @@ export class CognitiveThoughtProcessor extends EventEmitter {
         return;
       }
 
-      console.log(`Processing ${thoughts.length} cognitive thoughts`);
+      // Only log in development mode
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`Processing ${thoughts.length} cognitive thoughts`);
+      }
 
       // Process each thought
       for (const thought of thoughts.slice(
@@ -470,9 +535,12 @@ export class CognitiveThoughtProcessor extends EventEmitter {
           await this.submitTaskToPlanning(task);
           this.processedThoughts.add(thought.id);
 
-          console.log(
-            `Translated thought "${thought.content.substring(0, 50)}..." to task: ${task.type}`
-          );
+          // Only log in development mode
+          if (process.env.NODE_ENV === 'development') {
+            console.log(
+              `Translated thought "${thought.content.substring(0, 50)}..." to task: ${task.type}`
+            );
+          }
         }
       }
 

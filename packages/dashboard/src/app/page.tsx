@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   Activity,
   Brain,
@@ -18,7 +18,7 @@ import {
 } from 'lucide-react';
 
 import { useDashboardStore } from '@/stores/dashboard-store';
-import { useSSE } from '@/hooks/use-sse';
+import { useWebSocket } from '@/hooks/useWebSocket';
 import { formatTime } from '@/lib/utils';
 import { HudMeter } from '@/components/hud-meter';
 import { Section } from '@/components/section';
@@ -91,6 +91,7 @@ export default function ConsciousMinecraftDashboard() {
   const [viewerKey, setViewerKey] = useState(0);
   const [viewerStatus, setViewerStatus] = useState<{
     canStart: boolean;
+    viewerActive?: boolean;
     reason?: string;
     details?: any;
   } | null>(null);
@@ -111,238 +112,231 @@ export default function ConsciousMinecraftDashboard() {
     }
   };
 
-  // SSE connections for real-time data
-  const botStateSSE = useSSE({
-    url: '/api/ws/bot-state',
-    onMessage: (data) => {
-      // Handle centralized bot state data
-      if (
-        data &&
-        typeof data === 'object' &&
-        'type' in data &&
-        data.type === 'bot_state_update' &&
-        'data' in data
-      ) {
-        const botStateData = (data as any).data;
+  // Memoized WebSocket callbacks to prevent infinite reconnections
+  const handleWebSocketMessage = useCallback(
+    (message: any) => {
+      console.log('WebSocket message received:', message);
 
-        // Update HUD data
-        if (botStateData.vitals) {
+      // Handle different types of real-time updates
+      switch (message.type) {
+        case 'initial_state': {
+          // Handle initial state when connection is established
+          const initialState = message.data;
+          setBotConnections([
+            {
+              name: 'minecraft-bot',
+              connected: initialState.connected,
+              viewerActive: false,
+              viewerUrl: 'http://localhost:3006',
+            },
+          ]);
+          break;
+        }
+
+        case 'health_changed': {
+          // Update HUD with new health data
+          const healthData = message.data;
           setHud({
             ts: new Date().toISOString(),
-            vitals: botStateData.vitals,
-            intero: botStateData.cognition,
-            mood: botStateData.cognition?.mood || 'neutral',
+            vitals: {
+              health: healthData.health,
+              hunger: healthData.food,
+              stamina: 100, // Default value
+              sleep: 100, // Default value
+            },
+            intero: {
+              stress: 20, // Default value
+              focus: 80, // Default value
+              curiosity: 75, // Default value
+            },
+            mood: 'neutral', // Default value
           });
+
+          // Update bot state
+          setBotState((prevState) => ({
+            ...prevState,
+            health: healthData.health,
+            food: healthData.food,
+          }));
+          break;
         }
 
-        // Update inventory
-        if (botStateData.inventory) {
-          setInventory(
-            botStateData.inventory.hotbar.concat(botStateData.inventory.main)
-          );
+        case 'inventory_changed': {
+          // Update inventory with new items
+          const inventoryData = message.data;
+          const formattedInventory = inventoryData.items.map((item: any) => ({
+            name: item.name,
+            count: item.count,
+            displayName: item.name,
+          }));
+
+          setInventory(formattedInventory);
+          setBotState((prevState) => ({
+            ...prevState,
+            inventory: formattedInventory,
+          }));
+          break;
         }
 
-        // Update bot state
-        setBotState({
-          position: botStateData.position,
-          health: botStateData.vitals?.health,
-          food: botStateData.vitals?.hunger,
-          inventory: botStateData.inventory?.hotbar
-            .concat(botStateData.inventory.main)
-            .map((item: any) => ({
-              name: item.name || item.displayName,
-              count: item.count,
-              displayName: item.displayName,
-            })),
-          time: botStateData.environment?.time,
-          weather: botStateData.environment?.weather,
-        });
+        case 'position_changed': {
+          // Update position
+          const positionData = message.data;
+          setBotState((prevState) => ({
+            ...prevState,
+            position: {
+              x: positionData.position.x,
+              y: positionData.position.y,
+              z: positionData.position.z,
+            },
+          }));
+          break;
+        }
 
-        // Update connection status
-        setBotConnections([
-          {
-            name: 'minecraft-bot',
-            connected: botStateData.connected,
-            viewerActive: false, // Will be updated separately if needed
-            viewerUrl: 'http://localhost:3006',
-          },
-        ]);
+        case 'connected':
+        case 'disconnected':
+        case 'spawned':
+          // Update connection status
+          setBotConnections([
+            {
+              name: 'minecraft-bot',
+              connected:
+                message.type === 'connected' || message.type === 'spawned',
+              viewerActive: false,
+              viewerUrl: 'http://localhost:3006',
+            },
+          ]);
+          break;
 
-        // Add thoughts from events
-        if (botStateData.events && Array.isArray(botStateData.events)) {
-          botStateData.events.forEach((event: any) => {
-            if (event.type === 'state_change') {
-              addThought({
-                id: `event-${event.timestamp}-${Math.random().toString(36).substr(2, 9)}`,
-                ts: event.timestamp,
-                text: `State change detected: ${Object.keys(event.changes)
-                  .filter((k) => event.changes[k])
-                  .join(', ')}`,
-                type: 'reflection',
-              });
-            }
+        case 'warning': {
+          // Add warning as a thought
+          addThought({
+            id: `warning-${message.timestamp}-${Math.random().toString(36).substr(2, 9)}`,
+            ts: new Date(message.timestamp).toISOString(),
+            text: `Warning: ${message.data.message}`,
+            type: 'reflection',
           });
+          break;
         }
+
+        case 'block_broken':
+        case 'block_placed': {
+          // Add block interaction as a thought
+          const blockData = message.data;
+          addThought({
+            id: `block-${message.timestamp}-${Math.random().toString(36).substr(2, 9)}`,
+            ts: new Date(message.timestamp).toISOString(),
+            text: `${message.type === 'block_broken' ? 'Broke' : 'Placed'} ${blockData.blockType} at (${blockData.position.x.toFixed(1)}, ${blockData.position.y.toFixed(1)}, ${blockData.position.z.toFixed(1)})`,
+            type: 'self',
+          });
+          break;
+        }
+
+        default:
+          console.log('Unhandled WebSocket message type:', message.type);
       }
     },
-    onError: (error) => {
-      console.warn('Bot state SSE connection error:', error);
-    },
-    onOpen: () => {
-      console.log('Bot state SSE connection opened');
-    },
-    onClose: () => {
-      console.log('Bot state SSE connection closed');
-    },
+    [setHud, setInventory, setBotState, setBotConnections, addThought]
+  );
+
+  const handleWebSocketError = useCallback((error: Event) => {
+    console.warn('Bot state WebSocket connection error:', error);
+  }, []);
+
+  const handleWebSocketOpen = useCallback(() => {
+    console.log('Bot state WebSocket connection opened');
+  }, []);
+
+  const handleWebSocketClose = useCallback(() => {
+    console.log('Bot state WebSocket connection closed');
+  }, []);
+
+  // WebSocket connection for real-time bot state updates
+  const botStateWebSocket = useWebSocket({
+    url: 'ws://localhost:3005',
+    onMessage: handleWebSocketMessage,
+    onError: handleWebSocketError,
+    onOpen: handleWebSocketOpen,
+    onClose: handleWebSocketClose,
   });
 
-  // Cognitive stream for thoughts and consciousness
-  const cognitiveSSE = useSSE({
-    url: '/api/ws/cognitive-stream',
-    onMessage: (data) => {
-      console.log('Cognitive SSE received data:', data);
-      if (data && typeof data === 'object' && 'type' in data) {
-        if ((data as any).type === 'cognitive_stream_init') {
-          console.log(
-            'Processing cognitive_stream_init with',
-            (data as any).data.thoughts.length,
-            'thoughts'
-          );
-          // Initialize with existing thoughts
-          const existingThoughts = (data as any).data.thoughts.map(
-            (thought: any) => ({
-              id: thought.id,
-              ts: new Date(thought.timestamp).toISOString(),
-              text: thought.content,
-              type:
-                thought.attribution === 'intrusive'
-                  ? 'intrusion'
-                  : thought.type === 'external_chat_in'
-                    ? 'external'
-                    : thought.type === 'external_chat_out'
-                      ? 'self'
-                      : 'self',
-              attrHidden: thought.attribution !== 'intrusive',
-              sender: thought.sender,
-              thoughtType: thought.type,
-              attribution: thought.attribution,
-            })
-          );
-          console.log('Existing thoughts to add:', existingThoughts);
-          // Add each thought individually
-          existingThoughts.forEach((thought: any) => {
-            console.log('Adding existing thought:', thought);
-            addThought(thought);
-          });
-        } else if ((data as any).type === 'cognitive_thoughts') {
-          console.log(
-            'Processing cognitive_thoughts with',
-            (data as any).data.thoughts.length,
-            'thoughts'
-          );
-          // Add new thoughts
-          const newThoughts = (data as any).data.thoughts.map(
-            (thought: any) => ({
-              id: thought.id,
-              ts: new Date(thought.timestamp).toISOString(),
-              text: thought.content,
-              type:
-                thought.attribution === 'intrusive'
-                  ? 'intrusion'
-                  : thought.type === 'external_chat_in'
-                    ? 'external'
-                    : thought.type === 'external_chat_out'
-                      ? 'self'
-                      : 'self',
-              attrHidden: thought.attribution !== 'intrusive',
-              sender: thought.sender,
-              thoughtType: thought.type,
-              attribution: thought.attribution,
-            })
-          );
-          console.log('New thoughts to add:', newThoughts);
-          newThoughts.forEach((thought: any) => {
-            console.log('Adding new thought:', thought);
-            addThought(thought);
-          });
-        }
-      }
-    },
-    onError: (error) => {
-      console.warn('Cognitive SSE connection error:', error);
-    },
-    onOpen: () => {
-      console.log('Cognitive SSE connection opened');
-    },
-    onClose: () => {
-      console.log('Cognitive SSE connection closed');
-    },
-  });
-
-  // Polling fallback when SSE fails
+  // Polling fallback when WebSocket fails
   useEffect(() => {
     let pollInterval: NodeJS.Timeout;
 
-    // Only start polling if SSE is not connected and we have an error
-    if (!botStateSSE.isConnected && botStateSSE.error) {
+    // Only start polling if WebSocket is not connected and we have an error
+    if (!botStateWebSocket.isConnected && botStateWebSocket.error) {
       console.log('Starting polling fallback for bot state');
 
       const pollBotState = async () => {
         try {
-          const response = await fetch('/api/ws/bot-state', {
-            headers: {
-              Accept: 'application/json',
-            },
-            signal: AbortSignal.timeout(5000), // 5 second timeout
+          const response = await fetch('http://localhost:3005/state', {
+            signal: AbortSignal.timeout(10000), // 10 second timeout
           });
 
           if (response.ok) {
             const data = await response.json();
-            // Handle the data similar to SSE
-            if (
-              data &&
-              typeof data === 'object' &&
-              'type' in data &&
-              data.type === 'bot_state_update'
-            ) {
-              const botStateData = data.data;
+            if (data.success) {
+              const worldState = data.data?.worldState || data.data;
 
-              if (botStateData.vitals) {
+              // Update HUD with health data
+              if (
+                worldState.health !== undefined ||
+                worldState.hunger !== undefined
+              ) {
                 setHud({
                   ts: new Date().toISOString(),
-                  vitals: botStateData.vitals,
-                  intero: botStateData.cognition,
-                  mood: botStateData.cognition?.mood || 'neutral',
+                  vitals: {
+                    health: worldState.health || 20,
+                    hunger: worldState.hunger || 20,
+                    stamina: 100, // Default value
+                    sleep: 100, // Default value
+                  },
+                  intero: {
+                    stress: 20, // Default value
+                    focus: 80, // Default value
+                    curiosity: 75, // Default value
+                  },
+                  mood: 'neutral', // Default value
                 });
               }
 
-              if (botStateData.inventory) {
-                setInventory(
-                  botStateData.inventory.hotbar.concat(
-                    botStateData.inventory.main
-                  )
+              // Update inventory
+              if (worldState.inventory?.items) {
+                const formattedInventory = worldState.inventory.items.map(
+                  (item: any) => ({
+                    name: item.name || item.type,
+                    count: item.count,
+                    displayName: item.name || item.type,
+                  })
                 );
+                setInventory(formattedInventory);
               }
 
+              // Update bot state
               setBotState({
-                position: botStateData.position,
-                health: botStateData.vitals?.health,
-                food: botStateData.vitals?.hunger,
-                inventory: botStateData.inventory?.hotbar
-                  .concat(botStateData.inventory.main)
-                  .map((item: any) => ({
-                    name: item.name || item.displayName,
+                position: worldState.playerPosition
+                  ? {
+                      x: worldState.playerPosition[0],
+                      y: worldState.playerPosition[1],
+                      z: worldState.playerPosition[2],
+                    }
+                  : undefined,
+                health: worldState.health,
+                food: worldState.hunger,
+                inventory:
+                  worldState.inventory?.items?.map((item: any) => ({
+                    name: item.name || item.type,
                     count: item.count,
-                    displayName: item.displayName,
-                  })),
-                time: botStateData.environment?.time,
-                weather: botStateData.environment?.weather,
+                    displayName: item.name || item.type,
+                  })) || [],
+                time: worldState.timeOfDay,
+                weather: worldState.weather,
               });
 
               setBotConnections([
                 {
                   name: 'minecraft-bot',
-                  connected: botStateData.connected,
+                  connected: data.isAlive,
                   viewerActive: false,
                   viewerUrl: 'http://localhost:3006',
                 },
@@ -351,16 +345,14 @@ export default function ConsciousMinecraftDashboard() {
           }
         } catch (error) {
           console.error('Polling fallback error:', error);
-          // Don't throw the error, just log it and continue
-          // This prevents the component from crashing
         }
       };
 
       // Initial poll
       pollBotState();
 
-      // Poll every 5 seconds
-      pollInterval = setInterval(pollBotState, 5000);
+      // Poll every 10 seconds as fallback
+      pollInterval = setInterval(pollBotState, 10000);
     }
 
     return () => {
@@ -368,12 +360,58 @@ export default function ConsciousMinecraftDashboard() {
         clearInterval(pollInterval);
       }
     };
-  }, [botStateSSE.isConnected, botStateSSE.error]);
+  }, [botStateWebSocket.isConnected, botStateWebSocket.error]);
 
   // Auto-scroll to bottom of thoughts
   useEffect(() => {
     thoughtsEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [thoughts]);
+
+  // Periodic viewer status check and auto-start
+  useEffect(() => {
+    const checkAndStartViewer = async () => {
+      try {
+        await checkViewerStatus();
+
+        // If bot is connected but viewer is not active, try to start it
+        if (viewerStatus?.canStart && viewerStatus?.viewerActive !== true) {
+          console.log(
+            'Bot connected but viewer not active, attempting to start viewer...'
+          );
+          const response = await fetch('http://localhost:3005/start-viewer', {
+            method: 'POST',
+          });
+
+          if (response.ok) {
+            const result = await response.json();
+            if (result.success) {
+              console.log('Viewer started successfully');
+              // Update viewer status immediately
+              setBotConnections((prev) =>
+                prev.map((conn) =>
+                  conn.name === 'minecraft-bot'
+                    ? { ...conn, viewerActive: true }
+                    : conn
+                )
+              );
+              // Refresh viewer status
+              await checkViewerStatus();
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Error in viewer check/start:', error);
+      }
+    };
+
+    // Check every 10 seconds
+    const interval = setInterval(checkAndStartViewer, 10000);
+
+    // Initial check
+    checkAndStartViewer();
+
+    return () => clearInterval(interval);
+  }, [viewerStatus?.canStart, viewerStatus?.viewerActive]);
 
   // Fetch initial data from bot systems
   useEffect(() => {
@@ -465,8 +503,12 @@ export default function ConsciousMinecraftDashboard() {
 
         // Fetch bot state and health (includes viewer info)
         const [botRes, healthRes] = await Promise.allSettled([
-          fetch('http://localhost:3005/state'),
-          fetch('http://localhost:3005/health'),
+          fetch('http://localhost:3005/state', {
+            signal: AbortSignal.timeout(10000),
+          }),
+          fetch('http://localhost:3005/health', {
+            signal: AbortSignal.timeout(10000),
+          }),
         ]);
 
         if (botRes.status === 'fulfilled' && botRes.value.ok) {
@@ -514,6 +556,15 @@ export default function ConsciousMinecraftDashboard() {
       } catch (error) {
         console.warn('Initial data fetch error:', error);
         // Silently handle errors to prevent component crashes
+        // Set default states to prevent UI issues
+        setBotConnections([
+          {
+            name: 'minecraft-bot',
+            connected: false,
+            viewerActive: false,
+            viewerUrl: 'http://localhost:3006',
+          },
+        ]);
       }
     };
 
@@ -525,7 +576,9 @@ export default function ConsciousMinecraftDashboard() {
     const refreshBotState = async () => {
       try {
         // Fetch inventory
-        const inventoryRes = await fetch('/api/inventory');
+        const inventoryRes = await fetch('/api/inventory', {
+          signal: AbortSignal.timeout(10000),
+        });
         if (inventoryRes.ok) {
           const inventoryData = await inventoryRes.json();
           if (inventoryData.success) {
@@ -535,9 +588,9 @@ export default function ConsciousMinecraftDashboard() {
 
         // Fetch memories, events, and notes periodically
         const [memoriesRes, eventsRes, notesRes] = await Promise.allSettled([
-          fetch('/api/memories'),
-          fetch('/api/events'),
-          fetch('/api/notes'),
+          fetch('/api/memories', { signal: AbortSignal.timeout(10000) }),
+          fetch('/api/events', { signal: AbortSignal.timeout(10000) }),
+          fetch('/api/notes', { signal: AbortSignal.timeout(10000) }),
         ]);
 
         // Process memories
@@ -598,8 +651,12 @@ export default function ConsciousMinecraftDashboard() {
         }
 
         const [botRes, healthRes] = await Promise.allSettled([
-          fetch('http://localhost:3005/state'),
-          fetch('http://localhost:3005/health'),
+          fetch('http://localhost:3005/state', {
+            signal: AbortSignal.timeout(10000),
+          }),
+          fetch('http://localhost:3005/health', {
+            signal: AbortSignal.timeout(10000),
+          }),
         ]);
 
         if (botRes.status === 'fulfilled' && botRes.value.ok) {
@@ -655,6 +712,7 @@ export default function ConsciousMinecraftDashboard() {
           ]);
         }
       } catch (error) {
+        console.warn('Periodic refresh error:', error);
         // If any error occurs, mark as disconnected
         setBotConnections([
           {
@@ -667,10 +725,10 @@ export default function ConsciousMinecraftDashboard() {
       }
     };
 
-    // Refresh every 60 seconds (reduced to minimize API spam)
-    const interval = setInterval(refreshBotState, 60000);
+    // Refresh every 30 seconds for more responsive viewer status updates
+    const interval = setInterval(refreshBotState, 30000);
     return () => clearInterval(interval);
-  }, [setInventory]);
+  }, [setInventory, thoughts, addThought]);
 
   /**
    * Submit an intrusive thought to the bot
@@ -781,7 +839,7 @@ export default function ConsciousMinecraftDashboard() {
             className="bg-zinc-900 border-zinc-800 hover:bg-zinc-800/80"
             onClick={() => {
               // Refresh bot state data
-              botStateSSE.connect();
+              botStateWebSocket.reconnect();
               setViewerKey((prev) => prev + 1);
             }}
           >
@@ -790,13 +848,13 @@ export default function ConsciousMinecraftDashboard() {
           </Button>
           <div className="flex items-center gap-1 text-xs">
             <div
-              className={`size-2 rounded-full ${botStateSSE.isConnected ? 'bg-green-500' : botStateSSE.error ? 'bg-red-500' : 'bg-yellow-500'}`}
+              className={`size-2 rounded-full ${botStateWebSocket.isConnected ? 'bg-green-500' : botStateWebSocket.error ? 'bg-red-500' : 'bg-yellow-500'}`}
             />
             <span className="text-zinc-400">Bot State</span>
-            {botStateSSE.error && (
+            {botStateWebSocket.error && (
               <button
                 onClick={() => {
-                  botStateSSE.connect();
+                  botStateWebSocket.reconnect();
                 }}
                 className="ml-2 text-xs text-zinc-400 hover:text-zinc-200 underline"
               >
@@ -1071,11 +1129,16 @@ export default function ConsciousMinecraftDashboard() {
                     }
                     className="absolute inset-0 w-full h-full border-0"
                     title="Minecraft Bot View"
-                    sandbox="allow-scripts allow-same-origin"
+                    sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals"
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                   />
                   <div className="absolute right-3 top-3 flex items-center gap-2">
                     <button
-                      onClick={() => setViewerKey((prev) => prev + 1)}
+                      onClick={async () => {
+                        setViewerKey((prev) => prev + 1);
+                        // Also refresh viewer status
+                        await checkViewerStatus();
+                      }}
                       className="rounded-md bg-black/60 px-2 py-1 text-xs text-zinc-300 hover:bg-black/80"
                     >
                       Refresh Viewer
@@ -1091,6 +1154,36 @@ export default function ConsciousMinecraftDashboard() {
                       className="rounded-md bg-black/60 px-2 py-1 text-xs text-zinc-300 hover:bg-black/80"
                     >
                       Full Screen
+                    </button>
+                    <button
+                      onClick={async () => {
+                        try {
+                          const response = await fetch(
+                            'http://localhost:3005/stop-viewer',
+                            {
+                              method: 'POST',
+                            }
+                          );
+                          const result = await response.json();
+                          if (result.success) {
+                            // Update viewer status
+                            setBotConnections((prev) =>
+                              prev.map((conn) =>
+                                conn.name === 'minecraft-bot'
+                                  ? { ...conn, viewerActive: false }
+                                  : conn
+                              )
+                            );
+                            // Refresh viewer status
+                            await checkViewerStatus();
+                          }
+                        } catch (error) {
+                          console.error('Error stopping viewer:', error);
+                        }
+                      }}
+                      className="rounded-md bg-red-600/60 px-2 py-1 text-xs text-zinc-300 hover:bg-red-600/80"
+                    >
+                      Stop Viewer
                     </button>
                   </div>
                 </>
@@ -1134,7 +1227,7 @@ export default function ConsciousMinecraftDashboard() {
                             );
                             const result = await response.json();
                             if (result.success) {
-                              // Update viewer status
+                              // Update viewer status immediately for better UX
                               setBotConnections((prev) =>
                                 prev.map((conn) =>
                                   conn.name === 'minecraft-bot'
@@ -1142,8 +1235,9 @@ export default function ConsciousMinecraftDashboard() {
                                     : conn
                                 )
                               );
-                              // Refresh viewer status
+                              // Refresh viewer status and force a re-render
                               await checkViewerStatus();
+                              setViewerKey((prev) => prev + 1);
                             } else {
                               console.error(
                                 'Failed to start viewer:',
@@ -1229,15 +1323,7 @@ export default function ConsciousMinecraftDashboard() {
                         ?.connected
                     ? 'BOT CONNECTED'
                     : 'DISCONNECTED'}
-                <div
-                  className={`size-2 rounded-full ${
-                    cognitiveSSE.isConnected
-                      ? 'bg-green-500'
-                      : cognitiveSSE.error
-                        ? 'bg-red-500'
-                        : 'bg-yellow-500'
-                  }`}
-                />
+                <div className="size-2 rounded-full bg-zinc-600" />
                 <span className="text-zinc-400">COG</span>
               </div>
             </div>

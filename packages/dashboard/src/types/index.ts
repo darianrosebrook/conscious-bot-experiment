@@ -39,7 +39,12 @@ export interface Thought {
 }
 
 // Task types
-export type TaskSource = 'goal' | 'planner' | 'reflection' | 'intrusion';
+export type TaskSource =
+  | 'goal'
+  | 'planner'
+  | 'reflection'
+  | 'intrusion'
+  | 'system';
 
 export interface TaskStep {
   id: string;

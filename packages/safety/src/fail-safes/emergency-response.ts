@@ -16,7 +16,6 @@ import {
   SafeModeValidation,
   SafeModeEvent,
   SafeModeSeverity,
-  OperationMode,
   validateEmergencyDeclaration,
   validateSafeModeConfig,
 } from './types';
@@ -306,7 +305,7 @@ class SafeModeManager extends EventEmitter {
     this.blockedActions = [];
 
     // Cancel pending approvals
-    for (const [approvalId, approval] of this.pendingApprovals.entries()) {
+    for (const [, approval] of this.pendingApprovals.entries()) {
       clearTimeout(approval.timeout);
     }
     this.pendingApprovals.clear();
@@ -802,10 +801,11 @@ export class EmergencyResponseCoordinator extends EventEmitter {
         );
         break;
 
-      case 'notify_humans':
+      case 'notify_humans': {
         const message = `EMERGENCY: ${emergency.type} (${emergency.severity}) - ${emergency.description}`;
         await this.notificationManager.sendNotification(emergency, message);
         break;
+      }
 
       case 'increase_monitoring':
         this.emit('monitoring-increase-requested', {

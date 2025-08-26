@@ -96,7 +96,9 @@ export class HybridArbiterIntegration extends EventEmitter {
     );
 
     // Initialize action executor with leaf factory
-    const leafFactory = new LeafFactory();
+    // Use the global leaf factory if available, otherwise create a new one
+    const leafFactory =
+      (global as any).minecraftLeafFactory || new LeafFactory();
     this.actionExecutor = new ActionExecutor(leafFactory, botAdapter);
 
     this.setupEventHandlers();

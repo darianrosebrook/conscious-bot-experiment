@@ -82,12 +82,7 @@ describe('Core Server API', () => {
     MockLeafFactory.mockImplementation(() => mockLeafFactory);
 
     // Initialize the server with mocked components
-    initializeComponents(
-      mockRegistry,
-      mockDynamicFlow,
-      mockBtParser,
-      mockLeafFactory
-    );
+    initializeComponents(mockRegistry, mockDynamicFlow, mockLeafFactory);
   });
 
   describe('Health Check', () => {
@@ -129,7 +124,7 @@ describe('Core Server API', () => {
       // Set up environment variable for testing
       process.env.TRUSTED_SIGNER_API_KEY = 'test-api-key';
 
-      mockRegistry.registerLeaf.mockResolvedValue({
+      mockRegistry.registerLeaf.mockReturnValue({
         ok: true,
         id: 'leaf.test_leaf@1.0.0',
       });
@@ -196,7 +191,7 @@ describe('Core Server API', () => {
     it('should handle registration failure', async () => {
       process.env.TRUSTED_SIGNER_API_KEY = 'test-api-key';
 
-      mockRegistry.registerLeaf.mockResolvedValue({
+      mockRegistry.registerLeaf.mockReturnValue({
         ok: false,
         error: 'Registration failed',
       });
@@ -239,7 +234,7 @@ describe('Core Server API', () => {
         errors: [],
       });
 
-      mockRegistry.registerOption.mockResolvedValue({
+      mockRegistry.registerOption.mockReturnValue({
         ok: true,
         id: 'opt.test_option@1.0.0',
       });
@@ -318,7 +313,7 @@ describe('Core Server API', () => {
         errors: [],
       });
 
-      mockRegistry.registerOption.mockResolvedValue({
+      mockRegistry.registerOption.mockReturnValue({
         ok: false,
         error: 'Option registration failed',
       });

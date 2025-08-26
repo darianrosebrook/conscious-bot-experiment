@@ -171,6 +171,7 @@ describe('Privacy Module Integration Tests', () => {
         actionType: 'test_operation',
         limit: 2,
         windowMs: 60000, // 1 minute
+        adaptive: false,
       });
 
       const request = {
@@ -448,6 +449,7 @@ describe('Privacy Module Integration Tests', () => {
         actionType: 'test_action',
         limit: 3,
         windowMs: 1000, // 1 second
+        adaptive: false,
       };
 
       rateLimiter.configureLimits('test_action', config);
@@ -471,6 +473,7 @@ describe('Privacy Module Integration Tests', () => {
         limit: 10,
         windowMs: 60000, // 1 minute
         burstAllowance: 5,
+        adaptive: false,
       };
 
       rateLimiter.configureLimits('burst_action', config);

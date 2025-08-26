@@ -7,7 +7,15 @@
  * @author @darianrosebrook
  */
 
-import { Plan, PlanStep, PlanStatus, GoalType, GoalStatus } from '../types';
+import {
+  Plan,
+  PlanStep,
+  PlanStatus,
+  PlanStepStatus,
+  GoalType,
+  GoalStatus,
+  ActionType,
+} from '../types';
 import {
   EnhancedGOAPPlanner,
   GOAPPlan,
@@ -343,6 +351,10 @@ export class EnhancedReactiveExecutor {
       reflexActivations: 0,
       threatResponseTime: Infinity,
       survivalRate: 1.0,
+      // Execution tracking properties
+      isExecuting: false,
+      currentAction: null,
+      actionQueue: [],
     };
   }
 
@@ -373,6 +385,121 @@ export class EnhancedReactiveExecutor {
    */
   getPlanRepair(): EnhancedPlanRepair {
     return this.planRepair;
+  }
+
+  /**
+   * Check if currently executing
+   */
+  isExecuting(): boolean {
+    return this.goapPlanner.isExecuting();
+  }
+
+  /**
+   * Execute next task in queue
+   */
+  async executeNextTask(): Promise<any> {
+    return this.goapPlanner.executeNextAction();
+  }
+
+  /**
+   * Get current action being executed
+   */
+  getCurrentAction(): any {
+    return this.goapPlanner.getCurrentAction();
+  }
+
+  /**
+   * Get action queue
+   */
+  getActionQueue(): any[] {
+    return this.goapPlanner.getActionQueue();
+  }
+
+  /**
+   * Execute a specific task
+   */
+  async executeTask(task: any): Promise<any> {
+    // Convert task to plan and execute
+    const plan: Plan = {
+      id: `task-${task.id}`,
+      goalId: `goal-${task.id}`,
+      steps: [
+        {
+          id: `step-${task.id}`,
+          planId: `task-${task.id}`,
+          action: {
+            id: `action-${task.id}`,
+            name: task.type,
+            description: task.description || `Execute ${task.type}`,
+            type: ActionType.INTERACTION,
+            parameters: task.parameters || {},
+            preconditions: [],
+            effects: [],
+            cost: 1,
+            duration: 5000,
+            successProbability: 0.8,
+          },
+          preconditions: [],
+          effects: [],
+          status: PlanStepStatus.PENDING,
+          order: 1,
+          estimatedDuration: 5000,
+          dependencies: [],
+        },
+      ],
+      status: PlanStatus.EXECUTING,
+      priority: task.priority || 0.5,
+      estimatedDuration: 30000, // 30 seconds default
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+      successProbability: 0.8,
+    };
+
+    const worldState = this.createDefaultWorldState();
+    const mcpBus = this.createDefaultMCPBus();
+
+    return this.execute(plan, worldState, mcpBus);
+  }
+
+  /**
+   * Create default world state for task execution
+   */
+  private createDefaultWorldState(): WorldState {
+    return {
+      getHealth: () => 100,
+      getHunger: () => 100,
+      getEnergy: () => 100,
+      getPosition: () => ({ x: 0, y: 64, z: 0 }),
+      getLightLevel: () => 15,
+      getAir: () => 100,
+      getTimeOfDay: () => 'day',
+      hasItem: () => false,
+      distanceTo: () => 0,
+      getThreatLevel: () => 0,
+      getInventory: () => ({}),
+      getNearbyResources: () => [],
+      getNearbyHostiles: () => [],
+    };
+  }
+
+  /**
+   * Create default MCP bus for task execution
+   */
+  private createDefaultMCPBus(): MCPBus {
+    return {
+      mineflayer: {
+        consume: async () => ({ success: true }),
+        dig: async () => ({ success: true }),
+        pathfinder: {},
+      },
+      navigation: {
+        pathTo: async () => ({ success: true }),
+        swimToSurface: async () => ({ success: true }),
+      },
+      state: {
+        position: { x: 0, y: 64, z: 0 },
+      },
+    };
   }
 }
 

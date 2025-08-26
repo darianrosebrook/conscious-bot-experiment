@@ -1,10 +1,11 @@
 /**
  * Arbiter integration tests
- * 
+ *
  * @author @darianrosebrook
  */
 
-import { Arbiter, Signal, CognitiveTask } from '../index';
+import { Arbiter } from '../arbiter';
+import { Signal, CognitiveTask } from '../types';
 
 describe('Arbiter Integration Tests', () => {
   let arbiter: Arbiter;
@@ -42,7 +43,7 @@ describe('Arbiter Integration Tests', () => {
   test('should start and stop cleanly', () => {
     arbiter.start();
     expect(arbiter.getStatus().running).toBe(true);
-    
+
     arbiter.stop();
     expect(arbiter.getStatus().running).toBe(false);
   });
@@ -90,7 +91,7 @@ describe('Arbiter Integration Tests', () => {
     };
 
     await arbiter.processCognitiveTask(task);
-    
+
     const metrics = arbiter.getPerformanceMonitor().getCurrentMetrics();
     expect(metrics).toBeDefined();
     expect(metrics.latency).toBeDefined();
@@ -126,7 +127,7 @@ describe('Arbiter Integration Tests', () => {
     ];
 
     expect(() => {
-      signals.forEach(signal => arbiter.processSignal(signal));
+      signals.forEach((signal) => arbiter.processSignal(signal));
     }).not.toThrow();
 
     const needs = arbiter.getSignalProcessor().getCurrentNeeds();

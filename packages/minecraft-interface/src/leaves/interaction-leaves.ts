@@ -916,3 +916,216 @@ export class PlaceBlockLeaf implements LeafImpl {
     }
   }
 }
+
+// ============================================================================
+// Consume Food Leaf
+// ============================================================================
+
+/**
+ * Consume food from inventory to restore hunger
+ */
+export class ConsumeFoodLeaf implements LeafImpl {
+  spec: LeafSpec = {
+    name: 'consume_food',
+    version: '1.0.0',
+    description: 'Consume food from inventory to restore hunger',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        food_type: {
+          type: 'string',
+          default: 'any',
+          description: 'Type of food to consume (any, bread, meat, etc.)',
+        },
+        amount: {
+          type: 'number',
+          minimum: 1,
+          maximum: 64,
+          default: 1,
+          description: 'Amount of food to consume',
+        },
+        until_saturation: {
+          type: 'string',
+          default: 'target_level',
+          description: 'Consume until reaching target saturation level',
+        },
+      },
+    },
+    outputSchema: {
+      type: 'object',
+      properties: {
+        success: { type: 'boolean' },
+        foodConsumed: { type: 'string' },
+        hungerRestored: { type: 'number' },
+        saturationRestored: { type: 'number' },
+      },
+    },
+    timeoutMs: 10000,
+    retries: 2,
+    permissions: ['container.read'],
+  };
+
+  async run(ctx: LeafContext, args: any): Promise<LeafResult> {
+    const startTime = ctx.now();
+    const {
+      food_type = 'any',
+      amount = 1,
+      until_saturation = 'target_level',
+    } = args;
+
+    try {
+      const bot = ctx.bot;
+
+      // Get current hunger and saturation
+      const currentHunger = bot.food || 20;
+      const currentSaturation = bot.foodSaturation || 5;
+
+      // Find food items in inventory
+      const foodItems = bot.inventory
+        .items()
+        .filter((item: any) => {
+          if (food_type === 'any') {
+            return this.isFoodItem(item.name);
+          }
+          return item.name === food_type || item.name.includes(food_type);
+        })
+        .sort((a: any, b: any) => b.count - a.count); // Prefer items with more quantity
+
+      if (foodItems.length === 0) {
+        return {
+          status: 'failure',
+          error: {
+            code: 'inventory.missingItem',
+            retryable: false,
+            detail: `No food available in inventory`,
+          },
+          metrics: {
+            durationMs: ctx.now() - startTime,
+            retries: 0,
+            timeouts: 0,
+          },
+        };
+      }
+
+      // Consume food items
+      let foodConsumed = 0;
+      let hungerRestored = 0;
+      let saturationRestored = 0;
+      const consumedItems: string[] = [];
+
+      for (const foodItem of foodItems) {
+        if (foodConsumed >= amount) break;
+
+        try {
+          // Equip the food item
+          await bot.equip(foodItem, 'hand');
+
+          // Consume the food
+          await bot.consume();
+
+          foodConsumed++;
+          consumedItems.push(foodItem.name);
+
+          // Wait a moment for the consumption to register
+          await new Promise((resolve) => setTimeout(resolve, 500));
+
+          // Check if we've reached target saturation
+          if (until_saturation === 'target_level' && bot.food >= 20) {
+            break;
+          }
+        } catch (error) {
+          console.log(`Failed to consume ${foodItem.name}:`, error);
+          continue;
+        }
+      }
+
+      // Calculate restoration
+      const newHunger = bot.food || 20;
+      const newSaturation = bot.foodSaturation || 5;
+      hungerRestored = newHunger - currentHunger;
+      saturationRestored = newSaturation - currentSaturation;
+
+      const endTime = ctx.now();
+      const duration = endTime - startTime;
+
+      // Emit metrics
+      ctx.emitMetric('consume_food_duration', duration);
+      ctx.emitMetric('consume_food_items', foodConsumed);
+      ctx.emitMetric('consume_food_hunger_restored', hungerRestored);
+      ctx.emitMetric('consume_food_saturation_restored', saturationRestored);
+
+      return {
+        status: 'success',
+        result: {
+          success: true,
+          foodConsumed: consumedItems.join(', '),
+          hungerRestored,
+          saturationRestored,
+          itemsConsumed: foodConsumed,
+        },
+        metrics: {
+          durationMs: duration,
+          retries: 0,
+          timeouts: 0,
+        },
+      };
+    } catch (error) {
+      const endTime = ctx.now();
+      const duration = endTime - startTime;
+
+      return {
+        status: 'failure',
+        error: {
+          code: 'inventory.missingItem',
+          retryable: true,
+          detail:
+            error instanceof Error ? error.message : 'Unknown consume error',
+        },
+        metrics: {
+          durationMs: duration,
+          retries: 0,
+          timeouts: 0,
+        },
+      };
+    }
+  }
+
+  /**
+   * Check if an item is considered food
+   */
+  private isFoodItem(itemName: string): boolean {
+    const foodItems = [
+      'bread',
+      'cooked_beef',
+      'cooked_chicken',
+      'cooked_porkchop',
+      'cooked_rabbit',
+      'cooked_mutton',
+      'cooked_cod',
+      'cooked_salmon',
+      'baked_potato',
+      'carrot',
+      'apple',
+      'golden_apple',
+      'enchanted_golden_apple',
+      'melon_slice',
+      'sweet_berries',
+      'glow_berries',
+      'chorus_fruit',
+      'dried_kelp',
+      'beetroot',
+      'potato',
+      'pumpkin_pie',
+      'cookie',
+      'cake',
+      'mushroom_stew',
+      'beetroot_soup',
+      'rabbit_stew',
+      'suspicious_stew',
+      'honey_bottle',
+      'milk_bucket',
+    ];
+
+    return foodItems.some((food) => itemName.includes(food));
+  }
+}

@@ -10,7 +10,15 @@
 import { EnhancedReactiveExecutor } from '../reactive-executor/enhanced-reactive-executor';
 import { EnhancedGOAPPlanner } from '../reactive-executor/enhanced-goap-planner';
 import { EnhancedPlanRepair } from '../reactive-executor/enhanced-plan-repair';
-import { Plan, PlanStatus } from '../types';
+import { 
+  Plan, 
+  PlanStatus, 
+  Goal, 
+  GoalType, 
+  GoalStatus, 
+  ActionType, 
+  PlanStepStatus 
+} from '../types';
 
 // Mock world state for testing
 class MockWorldState {
@@ -144,9 +152,19 @@ describe('Enhanced Reactive Executor', () => {
         inventory: { food: 2 },
       });
 
-      const goal = {
+      const goal: Goal = {
         id: 'survive',
-        type: 'survive_threat' as const,
+        type: GoalType.SURVIVE_THREAT,
+        priority: 0.9,
+        urgency: 0.8,
+        utility: 0.7,
+        description: 'Survive immediate threat',
+        preconditions: [],
+        effects: [],
+        status: GoalStatus.PENDING,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+        subGoals: [],
       };
 
       const context = {
@@ -192,9 +210,19 @@ describe('Enhanced Reactive Executor', () => {
         threatLevel: 90,
       };
 
-      const goal = {
+      const goal: Goal = {
         id: 'survive',
-        type: 'survive_threat' as const,
+        type: GoalType.SURVIVE_THREAT,
+        priority: 0.9,
+        urgency: 0.8,
+        utility: 0.7,
+        description: 'Survive immediate threat',
+        preconditions: [],
+        effects: [],
+        status: GoalStatus.PENDING,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+        subGoals: [],
       };
 
       const lowThreatPlan = await goapPlanner.planTo(
@@ -231,10 +259,19 @@ describe('Enhanced Reactive Executor', () => {
         commitmentStrength: 0.5,
       };
 
-      const goal = {
+      const goal: Goal = {
         id: 'test',
-        type: 'reach_location' as const,
-        target: { x: 10, y: 64, z: 10 },
+        type: GoalType.REACH_LOCATION,
+        priority: 0.7,
+        urgency: 0.6,
+        utility: 0.5,
+        description: 'Reach target location',
+        preconditions: [],
+        effects: [],
+        status: GoalStatus.PENDING,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+        subGoals: [],
       };
 
       const plan1 = await goapPlanner.planTo(goal, state, context);
@@ -373,10 +410,19 @@ describe('Enhanced Reactive Executor', () => {
         commitmentStrength: 0.5,
       };
 
-      const goal = {
+      const goal: Goal = {
         id: 'test',
-        type: 'reach_location' as const,
-        target: { x: 10, y: 64, z: 10 },
+        type: GoalType.REACH_LOCATION,
+        priority: 0.7,
+        urgency: 0.6,
+        utility: 0.5,
+        description: 'Reach target location',
+        preconditions: [],
+        effects: [],
+        status: GoalStatus.PENDING,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+        subGoals: [],
       };
 
       const plan = await goapPlanner.planTo(goal, state, context);
@@ -416,10 +462,19 @@ describe('Enhanced Reactive Executor', () => {
         commitmentStrength: 0.5,
       };
 
-      const goal = {
+      const goal: Goal = {
         id: 'test',
-        type: 'reach_location' as const,
-        target: { x: 10, y: 64, z: 10 },
+        type: GoalType.REACH_LOCATION,
+        priority: 0.7,
+        urgency: 0.6,
+        utility: 0.5,
+        description: 'Reach target location',
+        preconditions: [],
+        effects: [],
+        status: GoalStatus.PENDING,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+        subGoals: [],
       };
 
       const plan = await goapPlanner.planTo(goal, state, context);
@@ -464,10 +519,19 @@ describe('Enhanced Reactive Executor', () => {
         commitmentStrength: 0.5,
       };
 
-      const goal = {
+      const goal: Goal = {
         id: 'test',
-        type: 'reach_location' as const,
-        target: { x: 10, y: 64, z: 10 },
+        type: GoalType.REACH_LOCATION,
+        priority: 0.7,
+        urgency: 0.6,
+        utility: 0.5,
+        description: 'Reach target location',
+        preconditions: [],
+        effects: [],
+        status: GoalStatus.PENDING,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+        subGoals: [],
       };
 
       const plan = await goapPlanner.planTo(goal, state, context);
@@ -500,10 +564,24 @@ describe('Enhanced Reactive Executor', () => {
         steps: [
           {
             id: 'step1',
-            action: { name: 'Move', type: 'movement' },
-            status: 'pending',
+            planId: 'test-plan',
+            action: { 
+              id: 'move-action',
+              name: 'Move', 
+              description: 'Move to target',
+              type: ActionType.MOVEMENT,
+              preconditions: [],
+              effects: [],
+              cost: 1,
+              duration: 1000,
+              successProbability: 0.9
+            },
+            preconditions: [],
+            effects: [],
+            status: PlanStepStatus.PENDING,
+            order: 1,
             estimatedDuration: 1000,
-            estimatedCost: 1,
+            dependencies: [],
           },
         ],
         status: PlanStatus.PENDING,
@@ -533,17 +611,45 @@ describe('Enhanced Reactive Executor', () => {
         steps: [
           {
             id: 'step1',
-            action: { name: 'Move', type: 'movement' },
-            status: 'pending',
+            planId: 'test-plan',
+            action: { 
+              id: 'move-action',
+              name: 'Move', 
+              description: 'Move to target',
+              type: ActionType.MOVEMENT,
+              preconditions: [],
+              effects: [],
+              cost: 1,
+              duration: 1000,
+              successProbability: 0.9
+            },
+            preconditions: [],
+            effects: [],
+            status: PlanStepStatus.PENDING,
+            order: 1,
             estimatedDuration: 1000,
-            estimatedCost: 1,
+            dependencies: [],
           },
           {
             id: 'step2',
-            action: { name: 'Mine', type: 'mining' },
-            status: 'pending',
+            planId: 'test-plan',
+            action: { 
+              id: 'mine-action',
+              name: 'Mine', 
+              description: 'Mine resources',
+              type: ActionType.CRAFTING,
+              preconditions: [],
+              effects: [],
+              cost: 2,
+              duration: 2000,
+              successProbability: 0.8
+            },
+            preconditions: [],
+            effects: [],
+            status: PlanStepStatus.PENDING,
+            order: 2,
             estimatedDuration: 2000,
-            estimatedCost: 2,
+            dependencies: [],
           },
         ],
         status: PlanStatus.PENDING,
@@ -572,10 +678,24 @@ describe('Enhanced Reactive Executor', () => {
         steps: [
           {
             id: 'step1',
-            action: { name: 'InvalidAction', type: 'invalid' },
-            status: 'pending',
+            planId: 'test-plan',
+            action: { 
+              id: 'invalid-action',
+              name: 'InvalidAction', 
+              description: 'Invalid action for testing',
+              type: ActionType.INTERACTION,
+              preconditions: [],
+              effects: [],
+              cost: 1,
+              duration: 1000,
+              successProbability: 0.1
+            },
+            preconditions: [],
+            effects: [],
+            status: PlanStepStatus.PENDING,
+            order: 1,
             estimatedDuration: 1000,
-            estimatedCost: 1,
+            dependencies: [],
           },
         ],
         status: PlanStatus.PENDING,
@@ -606,10 +726,24 @@ describe('Enhanced Reactive Executor', () => {
         steps: [
           {
             id: 'step1',
-            action: { name: 'Move', type: 'movement' },
-            status: 'pending',
+            planId: 'test-plan',
+            action: { 
+              id: 'move-action',
+              name: 'Move', 
+              description: 'Move to target',
+              type: ActionType.MOVEMENT,
+              preconditions: [],
+              effects: [],
+              cost: 1,
+              duration: 1000,
+              successProbability: 0.9
+            },
+            preconditions: [],
+            effects: [],
+            status: PlanStepStatus.PENDING,
+            order: 1,
             estimatedDuration: 1000,
-            estimatedCost: 1,
+            dependencies: [],
           },
         ],
         status: PlanStatus.PENDING,
@@ -642,10 +776,24 @@ describe('Enhanced Reactive Executor', () => {
         steps: [
           {
             id: 'step1',
-            action: { name: 'Move', type: 'movement' },
-            status: 'pending',
+            planId: 'test-plan',
+            action: { 
+              id: 'move-action',
+              name: 'Move', 
+              description: 'Move to target',
+              type: ActionType.MOVEMENT,
+              preconditions: [],
+              effects: [],
+              cost: 1,
+              duration: 1000,
+              successProbability: 0.9
+            },
+            preconditions: [],
+            effects: [],
+            status: PlanStepStatus.PENDING,
+            order: 1,
             estimatedDuration: 1000,
-            estimatedCost: 1,
+            dependencies: [],
           },
         ],
         status: PlanStatus.PENDING,
@@ -663,9 +811,18 @@ describe('Enhanced Reactive Executor', () => {
       const goapPlan = await goapPlanner.planTo(
         {
           id: 'test',
-          type: 'reach_location' as const,
-          target: { x: 10, y: 64, z: 10 },
-        },
+          type: GoalType.REACH_LOCATION,
+          priority: 0.7,
+          urgency: 0.6,
+          utility: 0.5,
+          description: 'Reach target location',
+          preconditions: [],
+          effects: [],
+          status: GoalStatus.PENDING,
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+          subGoals: [],
+        } as Goal,
         state,
         {
           threatLevel: 0,
@@ -724,10 +881,19 @@ describe('Enhanced Reactive Executor', () => {
         commitmentStrength: 0.5,
       };
 
-      const goal = {
+      const goal: Goal = {
         id: 'test',
-        type: 'reach_location' as const,
-        target: { x: 10, y: 64, z: 10 },
+        type: GoalType.REACH_LOCATION,
+        priority: 0.7,
+        urgency: 0.6,
+        utility: 0.5,
+        description: 'Reach target location',
+        preconditions: [],
+        effects: [],
+        status: GoalStatus.PENDING,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+        subGoals: [],
       };
 
       // Create initial plan
@@ -767,10 +933,19 @@ describe('Enhanced Reactive Executor', () => {
         commitmentStrength: 0.5,
       };
 
-      const goal = {
+      const goal: Goal = {
         id: 'test',
-        type: 'reach_location' as const,
-        target: { x: 10, y: 64, z: 10 },
+        type: GoalType.REACH_LOCATION,
+        priority: 0.7,
+        urgency: 0.6,
+        utility: 0.5,
+        description: 'Reach target location',
+        preconditions: [],
+        effects: [],
+        status: GoalStatus.PENDING,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+        subGoals: [],
       };
 
       const plan = await goapPlanner.planTo(goal, state, context);

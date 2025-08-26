@@ -101,6 +101,7 @@ export type MinecraftActionType =
   | 'navigate'
   | 'look_at'
   | 'mine_block'
+  | 'dig_block'
   | 'place_block'
   | 'craft_item'
   | 'craft'

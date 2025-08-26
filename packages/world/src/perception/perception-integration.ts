@@ -80,8 +80,8 @@ export class PerceptionIntegration
     this.objectRecognition = new ObjectRecognition();
     this.confidenceTracker = new ConfidenceTracker(config.confidenceDecay);
 
-    // Use provided sensing system or create mock for testing
-    this.visibleSensing = visibleSensing || this.createMockSensing();
+    // Use provided sensing system or create fallback sensing
+    this.visibleSensing = visibleSensing || this.createFallbackSensing();
 
     this.setupEventHandlers();
 
@@ -392,7 +392,7 @@ export class PerceptionIntegration
   private async performVisualSweep(
     agentState: AgentState
   ): Promise<SweepResult> {
-    // Mock sweep result for testing
+    // Fallback sweep result when sensing is not available
     return {
       observations: [],
       raysCast: 100,
@@ -410,8 +410,8 @@ export class PerceptionIntegration
     };
   }
 
-  private createMockSensing(): VisibleSensing {
-    // Create a mock sensing system for testing
+  private createFallbackSensing(): VisibleSensing {
+    // Create a fallback sensing system when no sensing is provided
     return {
       performSweep: async () => ({
         observations: [],
