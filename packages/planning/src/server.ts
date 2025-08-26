@@ -1708,7 +1708,7 @@ async function executeTaskInMinecraft(task: any) {
       res.json()
     );
     const typedBotStatus = botStatus as any;
-    
+
     // Enhanced verification: check both connection and health
     if (!typedBotStatus.executionStatus?.bot?.connected) {
       return {
@@ -1735,7 +1735,7 @@ async function executeTaskInMinecraft(task: any) {
       const stateCheck = await fetch(`${minecraftUrl}/state`, {
         signal: AbortSignal.timeout(2000), // 2 second timeout
       });
-      
+
       if (!stateCheck.ok) {
         return {
           success: false,
@@ -1818,15 +1818,18 @@ async function executeTaskInMinecraft(task: any) {
       try {
         const stateResponse = await fetch(`${minecraftUrl}/state`);
         const stateData = await stateResponse.json();
-        const nearbyBlocks = stateData.data?.worldState?._minecraftState?.environment?.nearbyBlocks || [];
-        
+        const nearbyBlocks =
+          stateData.data?.worldState?._minecraftState?.environment
+            ?.nearbyBlocks || [];
+
         // Find the block at the specified position
-        const block = nearbyBlocks.find((block: any) => 
-          block.position?.x === position.x &&
-          block.position?.y === position.y &&
-          block.position?.z === position.z
+        const block = nearbyBlocks.find(
+          (block: any) =>
+            block.position?.x === position.x &&
+            block.position?.y === position.y &&
+            block.position?.z === position.z
         );
-        
+
         return block || { type: 'air', position, properties: {} };
       } catch (error) {
         console.error('Failed to get block state:', error);
@@ -1840,12 +1843,14 @@ async function executeTaskInMinecraft(task: any) {
       if (before.type !== after.type) {
         return true;
       }
-      
+
       // Check if block properties changed
-      if (JSON.stringify(before.properties) !== JSON.stringify(after.properties)) {
+      if (
+        JSON.stringify(before.properties) !== JSON.stringify(after.properties)
+      ) {
         return true;
       }
-      
+
       return false;
     };
 
@@ -2395,7 +2400,11 @@ async function executeTaskInMinecraft(task: any) {
           .then((res) => res.json())
           .catch(() => ({ position: { x: 0, y: 64, z: 0 } }));
 
-        const buildBotPos = (buildGameState as any).position || { x: 0, y: 64, z: 0 };
+        const buildBotPos = (buildGameState as any).position || {
+          x: 0,
+          y: 64,
+          z: 0,
+        };
 
         // Define building positions (simple structure)
         const buildingPositions = [
@@ -2407,7 +2416,8 @@ async function executeTaskInMinecraft(task: any) {
         ];
 
         // Get block states before building
-        const beforeBuildBlockStates = await getMultipleBlockStates(buildingPositions);
+        const beforeBuildBlockStates =
+          await getMultipleBlockStates(buildingPositions);
         let successfulBuilding = false;
         let builtPosition = null;
         let beforeBuildBlockState = null;
@@ -2417,7 +2427,7 @@ async function executeTaskInMinecraft(task: any) {
         for (let i = 0; i < buildingPositions.length; i++) {
           const position = buildingPositions[i];
           const beforeState = beforeBuildBlockStates[i];
-          
+
           // Skip if block is already occupied (not air)
           if (beforeState.type !== 'air') {
             continue;
@@ -2442,10 +2452,10 @@ async function executeTaskInMinecraft(task: any) {
             if ((buildResult as any).success) {
               // Wait a moment for building to complete
               await new Promise((resolve) => setTimeout(resolve, 500));
-              
+
               // Get block state after building
               const afterState = await getBlockState(position);
-              
+
               // Verify the block actually changed (e.g., air -> stone)
               if (blockStateChanged(beforeState, afterState)) {
                 console.log(
@@ -2554,7 +2564,7 @@ async function executeTaskInMinecraft(task: any) {
         for (let i = 0; i < miningPositions.length; i++) {
           const position = miningPositions[i];
           const beforeState = beforeBlockStates[i];
-          
+
           // Skip if block is already air or unknown
           if (beforeState.type === 'air' || beforeState.type === 'unknown') {
             continue;
@@ -2579,10 +2589,10 @@ async function executeTaskInMinecraft(task: any) {
             if ((mineResult as any).success) {
               // Wait a moment for mining to complete
               await new Promise((resolve) => setTimeout(resolve, 500));
-              
+
               // Get block state after mining
               const afterState = await getBlockState(position);
-              
+
               // Verify the block actually changed (e.g., stone -> air)
               if (blockStateChanged(beforeState, afterState)) {
                 console.log(
@@ -3388,6 +3398,45 @@ app.post('/tasks', (req, res) => {
     console.error('Failed to add task:', error);
     res.status(500).json({
       error: 'Failed to add task',
+      details: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
+
+// POST /trigger-goals - Manually trigger goal execution for testing
+app.post('/trigger-goals', async (req, res) => {
+  try {
+    console.log('🚀 Manually triggering goal execution...');
+    
+    // Execute the autonomous task executor
+    await autonomousTaskExecutor();
+    
+    // Get current state after execution
+    const currentGoals = planningSystem.goalFormulation.getCurrentGoals();
+    const activeGoals = planningSystem.goalFormulation.getActiveGoals();
+    const completedGoals = planningSystem.goalFormulation.getCompletedTasks();
+    
+    res.json({
+      success: true,
+      message: 'Goal execution triggered successfully',
+      goals: {
+        total: currentGoals.length,
+        active: activeGoals.length,
+        completed: completedGoals.length,
+        activeGoals: activeGoals.map((g: any) => ({
+          id: g.id,
+          type: g.type,
+          description: g.description,
+          priority: g.priority,
+          status: g.status
+        }))
+      },
+      timestamp: Date.now(),
+    });
+  } catch (error) {
+    console.error('Failed to trigger goal execution:', error);
+    res.status(500).json({
+      error: 'Failed to trigger goal execution',
       details: error instanceof Error ? error.message : 'Unknown error',
     });
   }
