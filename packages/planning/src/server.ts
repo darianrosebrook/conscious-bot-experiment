@@ -1708,6 +1708,8 @@ async function executeTaskInMinecraft(task: any) {
       res.json()
     );
     const typedBotStatus = botStatus as any;
+    
+    // Enhanced verification: check both connection and health
     if (!typedBotStatus.executionStatus?.bot?.connected) {
       return {
         success: false,
@@ -1717,11 +1719,151 @@ async function executeTaskInMinecraft(task: any) {
       };
     }
 
+    // Critical: Check if bot is actually alive (health > 0)
+    if (!typedBotStatus.isAlive || typedBotStatus.botStatus?.health <= 0) {
+      return {
+        success: false,
+        error: 'Bot is dead and cannot execute actions',
+        botStatus: botStatus,
+        type: task.type,
+        botHealth: typedBotStatus.botStatus?.health || 0,
+      };
+    }
+
+    // Additional verification: check if bot is responsive
+    try {
+      const stateCheck = await fetch(`${minecraftUrl}/state`, {
+        signal: AbortSignal.timeout(2000), // 2 second timeout
+      });
+      
+      if (!stateCheck.ok) {
+        return {
+          success: false,
+          error: 'Bot is not responsive to state requests',
+          botStatus: botStatus,
+          type: task.type,
+        };
+      }
+    } catch (stateError) {
+      return {
+        success: false,
+        error: 'Bot state check failed - bot may be unresponsive',
+        botStatus: botStatus,
+        type: task.type,
+      };
+    }
+
+    // Helper function to get bot position
+    const getBotPosition = async () => {
+      try {
+        const stateResponse = await fetch(`${minecraftUrl}/state`);
+        const stateData = await stateResponse.json();
+        return (
+          stateData.data?.worldState?._minecraftState?.player?.position || {
+            x: 0,
+            y: 0,
+            z: 0,
+          }
+        );
+      } catch (error) {
+        console.error('Failed to get bot position:', error);
+        return { x: 0, y: 0, z: 0 };
+      }
+    };
+
+    // Helper function to get bot inventory
+    const getBotInventory = async () => {
+      try {
+        const stateResponse = await fetch(`${minecraftUrl}/state`);
+        const stateData = await stateResponse.json();
+        return stateData.data?.worldState?.inventory?.items || [];
+      } catch (error) {
+        console.error('Failed to get bot inventory:', error);
+        return [];
+      }
+    };
+
+    // Helper function to check if inventory changed
+    const inventoryChanged = (
+      before: any[],
+      after: any[],
+      targetItem?: string
+    ) => {
+      if (targetItem) {
+        // Check if specific item count changed
+        const beforeCount = before.filter(
+          (item) => item.name === targetItem
+        ).length;
+        const afterCount = after.filter(
+          (item) => item.name === targetItem
+        ).length;
+        return afterCount > beforeCount;
+      }
+      // Check if any items changed
+      return before.length !== after.length;
+    };
+
+    // Helper function to check if positions are different
+    const positionsAreDifferent = (pos1: any, pos2: any) => {
+      const tolerance = 0.1; // Small tolerance for floating point precision
+      return (
+        Math.abs(pos1.x - pos2.x) > tolerance ||
+        Math.abs(pos1.y - pos2.y) > tolerance ||
+        Math.abs(pos1.z - pos2.z) > tolerance
+      );
+    };
+
+    // Helper function to get block state at a specific position
+    const getBlockState = async (position: any) => {
+      try {
+        const stateResponse = await fetch(`${minecraftUrl}/state`);
+        const stateData = await stateResponse.json();
+        const nearbyBlocks = stateData.data?.worldState?._minecraftState?.environment?.nearbyBlocks || [];
+        
+        // Find the block at the specified position
+        const block = nearbyBlocks.find((block: any) => 
+          block.position?.x === position.x &&
+          block.position?.y === position.y &&
+          block.position?.z === position.z
+        );
+        
+        return block || { type: 'air', position, properties: {} };
+      } catch (error) {
+        console.error('Failed to get block state:', error);
+        return { type: 'unknown', position, properties: {} };
+      }
+    };
+
+    // Helper function to check if block state changed
+    const blockStateChanged = (before: any, after: any) => {
+      // Check if block type changed (e.g., stone -> air for mining, air -> stone for building)
+      if (before.type !== after.type) {
+        return true;
+      }
+      
+      // Check if block properties changed
+      if (JSON.stringify(before.properties) !== JSON.stringify(after.properties)) {
+        return true;
+      }
+      
+      return false;
+    };
+
+    // Helper function to get multiple block states
+    const getMultipleBlockStates = async (positions: any[]) => {
+      const blockStates = [];
+      for (const position of positions) {
+        const blockState = await getBlockState(position);
+        blockStates.push(blockState);
+      }
+      return blockStates;
+    };
+
     switch (task.type) {
       case 'move':
         // Get position before movement
         const beforePosition = await getBotPosition();
-        
+
         const result = await fetch(`${minecraftUrl}/action`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -1776,7 +1918,7 @@ async function executeTaskInMinecraft(task: any) {
       case 'move_forward':
         // Get position before movement
         const beforePositionForward = await getBotPosition();
-        
+
         const moveForwardResult = await fetch(`${minecraftUrl}/action`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -2231,8 +2373,10 @@ async function executeTaskInMinecraft(task: any) {
         }
 
       case 'build':
-        // Execute building by creating structures
+        // Execute building by creating structures with block change verification
         const buildResults = [];
+
+        // First, announce what we're doing
         buildResults.push(
           await fetch(`${minecraftUrl}/action`, {
             method: 'POST',
@@ -2246,11 +2390,100 @@ async function executeTaskInMinecraft(task: any) {
           }).then((res) => res.json())
         );
 
+        // Get current bot position for building
+        const buildGameState = await fetch(`${minecraftUrl}/state`)
+          .then((res) => res.json())
+          .catch(() => ({ position: { x: 0, y: 64, z: 0 } }));
+
+        const buildBotPos = (buildGameState as any).position || { x: 0, y: 64, z: 0 };
+
+        // Define building positions (simple structure)
+        const buildingPositions = [
+          { x: buildBotPos.x, y: buildBotPos.y + 1, z: buildBotPos.z }, // Block above
+          { x: buildBotPos.x + 1, y: buildBotPos.y, z: buildBotPos.z }, // Block to the right
+          { x: buildBotPos.x - 1, y: buildBotPos.y, z: buildBotPos.z }, // Block to the left
+          { x: buildBotPos.x, y: buildBotPos.y, z: buildBotPos.z + 1 }, // Block in front
+          { x: buildBotPos.x, y: buildBotPos.y, z: buildBotPos.z - 1 }, // Block behind
+        ];
+
+        // Get block states before building
+        const beforeBuildBlockStates = await getMultipleBlockStates(buildingPositions);
+        let successfulBuilding = false;
+        let builtPosition = null;
+        let beforeBuildBlockState = null;
+        let afterBuildBlockState = null;
+
+        // Try to build at each position
+        for (let i = 0; i < buildingPositions.length; i++) {
+          const position = buildingPositions[i];
+          const beforeState = beforeBuildBlockStates[i];
+          
+          // Skip if block is already occupied (not air)
+          if (beforeState.type !== 'air') {
+            continue;
+          }
+
+          try {
+            const buildResult = await fetch(`${minecraftUrl}/action`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                type: 'place_block',
+                parameters: {
+                  position,
+                  blockType: task.parameters?.blockType || 'stone',
+                },
+              }),
+            }).then((res) => res.json());
+
+            buildResults.push(buildResult);
+
+            // If building action reported success, verify block actually changed
+            if ((buildResult as any).success) {
+              // Wait a moment for building to complete
+              await new Promise((resolve) => setTimeout(resolve, 500));
+              
+              // Get block state after building
+              const afterState = await getBlockState(position);
+              
+              // Verify the block actually changed (e.g., air -> stone)
+              if (blockStateChanged(beforeState, afterState)) {
+                console.log(
+                  `✅ Successfully built block at ${JSON.stringify(position)}: ${beforeState.type} -> ${afterState.type}`
+                );
+                successfulBuilding = true;
+                builtPosition = position;
+                beforeBuildBlockState = beforeState;
+                afterBuildBlockState = afterState;
+                break;
+              } else {
+                console.log(
+                  `⚠️ Building reported success but block didn't change at ${JSON.stringify(position)}`
+                );
+              }
+            }
+          } catch (error) {
+            console.log(
+              `⚠️ Failed to build at ${JSON.stringify(position)}:`,
+              error
+            );
+          }
+        }
+
         return {
           results: buildResults,
           type: 'building',
-          success: true,
-          error: undefined,
+          success: successfulBuilding,
+          error: successfulBuilding
+            ? undefined
+            : 'No blocks were successfully placed or block states did not change',
+          verificationData: {
+            beforeBuildBlockStates,
+            builtPosition,
+            beforeBuildBlockState,
+            afterBuildBlockState,
+            totalPositionsChecked: buildingPositions.length,
+          },
         };
 
       case 'farm':
@@ -2277,7 +2510,7 @@ async function executeTaskInMinecraft(task: any) {
         };
 
       case 'mine':
-        // Execute mining by digging for resources
+        // Execute mining by digging for resources with block change verification
         const mineResults = [];
 
         // First, announce what we're doing
@@ -2310,8 +2543,23 @@ async function executeTaskInMinecraft(task: any) {
           { x: botPos.x, y: botPos.y, z: botPos.z - 1 }, // Block behind
         ];
 
+        // Get block states before mining
+        const beforeBlockStates = await getMultipleBlockStates(miningPositions);
+        let successfulMining = false;
+        let minedPosition = null;
+        let beforeBlockState = null;
+        let afterBlockState = null;
+
         // Try to mine each position
-        for (const position of miningPositions) {
+        for (let i = 0; i < miningPositions.length; i++) {
+          const position = miningPositions[i];
+          const beforeState = beforeBlockStates[i];
+          
+          // Skip if block is already air or unknown
+          if (beforeState.type === 'air' || beforeState.type === 'unknown') {
+            continue;
+          }
+
           try {
             const mineResult = await fetch(`${minecraftUrl}/action`, {
               method: 'POST',
@@ -2327,12 +2575,29 @@ async function executeTaskInMinecraft(task: any) {
 
             mineResults.push(mineResult);
 
-            // If mining was successful, break out of the loop
+            // If mining action reported success, verify block actually changed
             if ((mineResult as any).success) {
-              console.log(
-                ` Successfully mined block at ${JSON.stringify(position)}`
-              );
-              break;
+              // Wait a moment for mining to complete
+              await new Promise((resolve) => setTimeout(resolve, 500));
+              
+              // Get block state after mining
+              const afterState = await getBlockState(position);
+              
+              // Verify the block actually changed (e.g., stone -> air)
+              if (blockStateChanged(beforeState, afterState)) {
+                console.log(
+                  `✅ Successfully mined block at ${JSON.stringify(position)}: ${beforeState.type} -> ${afterState.type}`
+                );
+                successfulMining = true;
+                minedPosition = position;
+                beforeBlockState = beforeState;
+                afterBlockState = afterState;
+                break;
+              } else {
+                console.log(
+                  `⚠️ Mining reported success but block didn't change at ${JSON.stringify(position)}`
+                );
+              }
             }
           } catch (error) {
             console.log(
@@ -2342,21 +2607,20 @@ async function executeTaskInMinecraft(task: any) {
           }
         }
 
-        // Check if any mining was successful (exclude chat messages)
-        const miningActionResults = mineResults.filter(
-          (result: any) => result.action === 'mine_block'
-        );
-        const successfulMining = miningActionResults.some(
-          (result: any) => result.success === true
-        );
-
         return {
           results: mineResults,
           type: 'mining',
           success: successfulMining,
           error: successfulMining
             ? undefined
-            : 'No blocks were successfully mined',
+            : 'No blocks were successfully mined or block states did not change',
+          verificationData: {
+            beforeBlockStates,
+            minedPosition,
+            beforeBlockState,
+            afterBlockState,
+            totalPositionsChecked: miningPositions.length,
+          },
         };
 
       default:
