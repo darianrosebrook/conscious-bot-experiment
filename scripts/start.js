@@ -399,6 +399,7 @@ async function main() {
     const child = spawn(service.command, service.args, {
       stdio: 'pipe',
       shell: true,
+      cwd: process.cwd(), // Ensure we're in the project root
       env: { ...process.env, FORCE_COLOR: '1' },
     });
 
