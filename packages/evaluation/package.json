@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "description": "Evaluation framework for complex multi-step reasoning scenarios",
   "main": "dist/index.js",
+  "type": "module",
   "types": "dist/index.d.ts",
   "scripts": {
     "build": "tsc",
