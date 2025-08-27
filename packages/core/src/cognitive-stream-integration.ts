@@ -223,7 +223,7 @@ export class CognitiveStreamIntegration extends EventEmitter {
     this.initializeDefaultCapabilities();
   }
 
-    /**
+  /**
    * Register required leaves for the torch corridor capability
    */
   private async registerRequiredLeaves() {
