@@ -23,14 +23,14 @@ import {
   isRepeatUntilNode,
   isTimeoutDecoratorNode,
   isFailOnTrueDecoratorNode,
-} from './bt-dsl-schema';
+} from './bt-dsl-schema.js';
 import {
   LeafContext,
   LeafResult,
   ExecError,
   createExecError,
-} from './leaf-contracts';
-import { LeafFactory } from './leaf-factory';
+} from './leaf-contracts.js';
+import { LeafFactory } from './leaf-factory.js';
 
 // ============================================================================
 // Execution Status

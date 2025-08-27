@@ -157,9 +157,12 @@ export class EnhancedEnvironmentIntegration extends EventEmitter {
     try {
       const minecraftData = await this.fetchMinecraftData();
 
-      if (minecraftData?.inventory?.items) {
+      if (
+        minecraftData?.success &&
+        minecraftData?.data?.worldState?.inventory?.items
+      ) {
         this.currentInventory = this.processInventoryItems(
-          minecraftData.inventory.items
+          minecraftData.data.worldState.inventory.items
         );
       }
 
@@ -255,9 +258,17 @@ export class EnhancedEnvironmentIntegration extends EventEmitter {
     worldData: any,
     minecraftData: any
   ): EnvironmentData {
-    const position = minecraftData?.position || { x: 0, y: 64, z: 0 };
-    const time = minecraftData?.time || 0;
-    const weather = minecraftData?.weather || 'clear';
+    // Extract data from minecraft bot's rich structure
+    const worldState = minecraftData?.data?.worldState;
+    const playerPosition = worldState?.playerPosition ||
+      minecraftData?.data?.position || { x: 0, y: 64, z: 0 };
+    const time = worldState?.timeOfDay || minecraftData?.time || 0;
+    const weather = worldState?.weather || minecraftData?.weather || 'clear';
+
+    // Convert position array to object if needed
+    const position = Array.isArray(playerPosition)
+      ? { x: playerPosition[0], y: playerPosition[1], z: playerPosition[2] }
+      : playerPosition;
 
     // Determine biome based on position and world data
     const biome = this.determineBiome(position, worldData);
@@ -265,17 +276,18 @@ export class EnhancedEnvironmentIntegration extends EventEmitter {
     // Determine time of day
     const timeOfDay = this.determineTimeOfDay(time);
 
-    // Process nearby entities
+    // Process nearby entities from minecraft bot data
+    const minecraftEntities =
+      worldState?._minecraftState?.environment?.nearbyEntities || [];
     const nearbyEntities = this.processNearbyEntities(
-      minecraftData?.entities || [],
+      minecraftEntities,
       position
     );
 
-    // Process nearby blocks
-    const nearbyBlocks = this.processNearbyBlocks(
-      minecraftData?.blocks || [],
-      position
-    );
+    // Process nearby blocks from minecraft bot data
+    const minecraftBlocks =
+      worldState?._minecraftState?.environment?.nearbyBlocks || [];
+    const nearbyBlocks = this.processNearbyBlocks(minecraftBlocks, position);
 
     // Calculate light level and other environmental factors
     const lightLevel = this.calculateLightLevel(time, weather);
@@ -340,7 +352,7 @@ export class EnhancedEnvironmentIntegration extends EventEmitter {
         name: entity.name || entity.type || 'Unknown Entity',
         position: entity.position || { x: 0, y: 0, z: 0 },
         distance: this.calculateDistance(position, entity.position),
-        hostile: entity.hostile || false,
+        hostile: entity.isHostile || entity.hostile || false,
         health: entity.health,
         maxHealth: entity.maxHealth,
         metadata: entity.metadata || {},
@@ -389,6 +401,7 @@ export class EnhancedEnvironmentIntegration extends EventEmitter {
         ...item.metadata,
         originalSlot: item.slot,
         displayName: item.displayName,
+        metadata: item.metadata,
       },
     }));
   }

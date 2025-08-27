@@ -269,74 +269,65 @@ export default function ConsciousMinecraftDashboard() {
 
       const pollBotState = async () => {
         try {
-          const response = await fetch('http://localhost:3005/state', {
+          // Use the dashboard's bot state API which includes proper HUD data
+          const response = await fetch('/api/ws/bot-state', {
+            headers: { Accept: 'application/json' },
             signal: AbortSignal.timeout(10000), // 10 second timeout
           });
 
           if (response.ok) {
             const data = await response.json();
-            if (data.success) {
-              const worldState = data.data?.worldState || data.data;
+            if (data.data) {
+              const botStateData = data.data;
 
-              // Update HUD with health data
+              // Update HUD with complete data from bot state API
               if (
-                worldState.health !== undefined ||
-                worldState.hunger !== undefined
+                botStateData.vitals ||
+                botStateData.intero ||
+                botStateData.mood
               ) {
                 setHud({
                   ts: new Date().toISOString(),
-                  vitals: {
-                    health: worldState.health || 20,
-                    hunger: worldState.hunger || 20,
-                    stamina: 100, // Default value
-                    sleep: 100, // Default value
+                  vitals: botStateData.vitals || {
+                    health: 20,
+                    hunger: 20,
+                    stamina: 100,
+                    sleep: 100,
                   },
-                  intero: {
-                    stress: 20, // Default value
-                    focus: 80, // Default value
-                    curiosity: 75, // Default value
+                  intero: botStateData.intero || {
+                    stress: 20,
+                    focus: 80,
+                    curiosity: 75,
                   },
-                  mood: 'neutral', // Default value
+                  mood: botStateData.mood || 'neutral',
                 });
               }
 
               // Update inventory
-              if (worldState.inventory?.items) {
-                const formattedInventory = worldState.inventory.items.map(
-                  (item: any) => ({
-                    name: item.name || item.type,
-                    count: item.count,
-                    displayName: item.name || item.type,
-                  })
-                );
-                setInventory(formattedInventory);
+              if (botStateData.inventory) {
+                setInventory(botStateData.inventory);
               }
 
               // Update bot state
               setBotState({
-                position: worldState.playerPosition
+                position: botStateData.position
                   ? {
-                      x: worldState.playerPosition[0],
-                      y: worldState.playerPosition[1],
-                      z: worldState.playerPosition[2],
+                      x: botStateData.position[0],
+                      y: botStateData.position[1],
+                      z: botStateData.position[2],
                     }
                   : undefined,
-                health: worldState.health,
-                food: worldState.hunger,
-                inventory:
-                  worldState.inventory?.items?.map((item: any) => ({
-                    name: item.name || item.type,
-                    count: item.count,
-                    displayName: item.name || item.type,
-                  })) || [],
-                time: worldState.timeOfDay,
-                weather: worldState.weather,
+                health: botStateData.vitals?.health,
+                food: botStateData.vitals?.hunger,
+                inventory: botStateData.inventory || [],
+                time: undefined, // Not available in bot state API
+                weather: undefined, // Not available in bot state API
               });
 
               setBotConnections([
                 {
                   name: 'minecraft-bot',
-                  connected: data.isAlive,
+                  connected: botStateData.connected,
                   viewerActive: false,
                   viewerUrl: 'http://localhost:3006',
                 },

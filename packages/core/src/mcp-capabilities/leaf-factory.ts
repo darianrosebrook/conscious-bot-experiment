@@ -20,7 +20,7 @@ import {
   createExecError,
   ExecErrorCode,
   verifyPostconditions,
-} from './leaf-contracts';
+} from './leaf-contracts.js';
 
 /**
  * Enhanced Leaf Factory with AJV compilation and rate limiting
@@ -328,4 +328,4 @@ export class LeafFactory {
 }
 
 // Re-export types for convenience
-export type { LeafImpl, RegistrationResult } from './leaf-contracts';
+export type { LeafImpl, RegistrationResult } from './leaf-contracts.js';

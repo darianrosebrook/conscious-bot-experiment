@@ -3071,9 +3071,19 @@ app.get('/state', (req, res) => {
 app.get('/cognitive-insights', async (req, res) => {
   try {
     const taskType = req.query.taskType as string;
-    const insights = taskType
+    const insightStrings = taskType
       ? await cognitiveIntegration.getCognitiveInsights(taskType)
       : ['No specific task type requested for insights'];
+
+    // Convert string insights to proper insight objects
+    const insights = insightStrings.map((insight, index) => ({
+      id: `insight-${Date.now()}-${index}`,
+      title: 'Cognitive Insight',
+      content: insight,
+      description: insight,
+      timestamp: Date.now(),
+      confidence: 0.7,
+    }));
 
     res.json({
       success: true,

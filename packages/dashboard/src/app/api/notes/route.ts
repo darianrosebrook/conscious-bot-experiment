@@ -20,17 +20,19 @@ export async function GET(_request: NextRequest) {
         const cognitiveData = await cognitiveRes.json();
         if (cognitiveData.insights && Array.isArray(cognitiveData.insights)) {
           for (const insight of cognitiveData.insights) {
+            // Handle both string and object insights
+            const content = typeof insight === 'string' 
+              ? insight 
+              : (insight.content || insight.description || 'No content available');
+            
             notes.push({
-              id: insight.id || `insight-${Date.now()}`,
+              id: typeof insight === 'string' ? `insight-${Date.now()}` : (insight.id || `insight-${Date.now()}`),
               type: 'reflection',
-              title: insight.title || 'Cognitive Insight',
-              content:
-                insight.content ||
-                insight.description ||
-                'No content available',
-              timestamp: insight.timestamp || Date.now(),
+              title: typeof insight === 'string' ? 'Cognitive Insight' : (insight.title || 'Cognitive Insight'),
+              content: content,
+              timestamp: typeof insight === 'string' ? Date.now() : (insight.timestamp || Date.now()),
               source: 'cognition-system',
-              confidence: insight.confidence || 0.5,
+              confidence: typeof insight === 'string' ? 0.5 : (insight.confidence || 0.5),
             });
           }
         }

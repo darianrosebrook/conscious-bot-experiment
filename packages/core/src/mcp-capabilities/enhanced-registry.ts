@@ -8,9 +8,9 @@
  */
 
 import { performance } from 'node:perf_hooks';
-import { LeafFactory, LeafImpl, RegistrationResult } from './leaf-factory';
-import { LeafContext, ExecError, createExecError } from './leaf-contracts';
-import { BTDSLParser, CompiledBTNode } from './bt-dsl-parser';
+import { LeafFactory, LeafImpl, RegistrationResult } from './leaf-factory.js';
+import { LeafContext, ExecError, createExecError } from './leaf-contracts.js';
+import { BTDSLParser, CompiledBTNode } from './bt-dsl-parser.js';
 
 // ============================================================================
 // Registry Status and Versioning (C0)

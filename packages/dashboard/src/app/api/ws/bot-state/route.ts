@@ -60,6 +60,7 @@ export const GET = async (req: NextRequest) => {
         const minecraftData = minecraftResponse.ok
           ? await minecraftResponse.json()
           : null;
+
         const cognitionData = cognitionResponse.ok
           ? await cognitionResponse.json()
           : null;
@@ -75,12 +76,26 @@ export const GET = async (req: NextRequest) => {
             vitals: minecraftData?.data?.worldState
               ? {
                   health: minecraftData.data.worldState.health || 0,
-                  food: minecraftData.data.worldState.hunger || 0,
-                  hunger: minecraftData.data.worldState.hunger || 0, // Map hunger to hunger
+                  hunger: minecraftData.data.worldState.hunger || 0,
                   stamina: 100, // Default stamina value
                   sleep: 100, // Default sleep value
                 }
               : null,
+            intero:
+              cognitionData?.stress !== undefined &&
+              cognitionData?.focus !== undefined &&
+              cognitionData?.curiosity !== undefined
+                ? {
+                    stress: cognitionData.stress || 20,
+                    focus: cognitionData.focus || 80,
+                    curiosity: cognitionData.curiosity || 75,
+                  }
+                : {
+                    stress: 20, // Default stress level
+                    focus: 80, // Default focus level
+                    curiosity: 75, // Default curiosity level
+                  },
+            mood: cognitionData?.mood || 'neutral',
             environment: worldData || null,
             cognition: {
               ...cognitionData,
