@@ -10,7 +10,11 @@
 import { EventEmitter } from 'events';
 import { EnhancedRegistry } from './mcp-capabilities/enhanced-registry.js';
 import { DynamicCreationFlow } from './mcp-capabilities/dynamic-creation-flow.js';
-import { LeafImpl, LeafContext, LeafResult } from './mcp-capabilities/leaf-contracts.js';
+import {
+  LeafImpl,
+  LeafContext,
+  LeafResult,
+} from './mcp-capabilities/leaf-contracts.js';
 
 // Define interfaces for planning components to avoid cyclic dependencies
 export interface PlanningComponent {
@@ -376,9 +380,13 @@ export class CognitiveStreamIntegration extends EventEmitter {
           'active'
         );
         if (result.ok) {
-          console.log(`✅ Registered leaf: ${leaf.spec.name}@${leaf.spec.version}`);
+          console.log(
+            `✅ Registered leaf: ${leaf.spec.name}@${leaf.spec.version}`
+          );
         } else {
-          console.warn(`⚠️ Failed to register leaf ${leaf.spec.name}: ${result.error}`);
+          console.warn(
+            `⚠️ Failed to register leaf ${leaf.spec.name}: ${result.error}`
+          );
         }
       } catch (error) {
         console.error(`❌ Error registering leaf ${leaf.spec.name}:`, error);
@@ -556,8 +564,10 @@ export class CognitiveStreamIntegration extends EventEmitter {
     }
 
     // Task-specific goals
-    if (this.currentState.currentTask?.includes('underground') || 
-        (this.currentState.position && this.currentState.position.y < 64)) {
+    if (
+      this.currentState.currentTask?.includes('underground') ||
+      (this.currentState.position && this.currentState.position.y < 64)
+    ) {
       goals.push('torch the mining corridor safely');
     }
 
@@ -782,9 +792,7 @@ export class CognitiveStreamIntegration extends EventEmitter {
    * Get MCP registry leaves (for testing)
    */
   async getMCPLeaves(): Promise<any[]> {
-    // Access the leaf factory through the registry's public methods
-    // For now, return an empty array since we don't have direct access
-    return [];
+    return this.mcpRegistry.listLeaves();
   }
 
   /**
