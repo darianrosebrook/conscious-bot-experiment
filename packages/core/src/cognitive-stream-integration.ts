@@ -669,13 +669,6 @@ export class CognitiveStreamIntegration extends EventEmitter {
   /**
    * Get MCP registry for external access
    */
-  getMCPRegistry() {
-    return this.mcpRegistry;
-  }
-
-  /**
-   * Get MCP registry for external integration
-   */
   getMCPRegistry(): any {
     return this.mcpRegistry;
   }

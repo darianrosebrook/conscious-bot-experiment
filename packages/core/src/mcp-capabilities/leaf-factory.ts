@@ -92,6 +92,24 @@ export class LeafFactory {
   }
 
   /**
+   * List all registered leaves
+   */
+  listLeaves(): Array<{ name: string; version: string; spec: LeafSpec }> {
+    const leaves: Array<{ name: string; version: string; spec: LeafSpec }> = [];
+
+    for (const [key, leaf] of this.registry.entries()) {
+      const [name, version] = key.split('@');
+      leaves.push({
+        name,
+        version,
+        spec: leaf.spec,
+      });
+    }
+
+    return leaves;
+  }
+
+  /**
    * Execute a leaf with validation and rate limiting
    */
   async run(

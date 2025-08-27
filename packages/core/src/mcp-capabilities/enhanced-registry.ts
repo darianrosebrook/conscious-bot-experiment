@@ -947,11 +947,7 @@ export class EnhancedRegistry {
    */
   async listLeaves(): Promise<any[]> {
     // Access the leaf factory to get registered leaves
-    const leaves: any[] = [];
-
-    // Since leafFactory is private, we'll return a summary of what we know
-    // In a real implementation, this would access the leaf factory directly
-    return leaves;
+    return this.leafFactory.listLeaves();
   }
 
   /**
