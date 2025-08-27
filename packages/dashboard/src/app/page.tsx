@@ -38,6 +38,12 @@ interface BotState {
   };
   health?: number;
   food?: number;
+  energy?: number;
+  safety?: number;
+  social?: number;
+  achievement?: number;
+  curiosity?: number;
+  creativity?: number;
   inventory?: Array<{
     name: string;
     count: number;
@@ -263,8 +269,97 @@ export default function ConsciousMinecraftDashboard() {
   useEffect(() => {
     let pollInterval: NodeJS.Timeout;
 
-    // Only start polling if WebSocket is not connected and we have an error
-    if (!botStateWebSocket.isConnected && botStateWebSocket.error) {
+    // Start polling for bot state data
+    const pollBotState = async () => {
+      try {
+        // Fetch minecraft bot state directly
+        const response = await fetch('http://localhost:3005/state');
+        if (response.ok) {
+          const data = await response.json();
+          if (data.success && data.data) {
+            const botStateData = data.data;
+
+            // Update bot state with comprehensive data
+            setBotState({
+              position: botStateData.worldState?.playerPosition
+                ? {
+                    x: botStateData.worldState.playerPosition[0],
+                    y: botStateData.worldState.playerPosition[1],
+                    z: botStateData.worldState.playerPosition[2],
+                  }
+                : undefined,
+              health: botStateData.worldState?.health || botStateData.currentState?.health,
+              food: botStateData.worldState?.hunger || botStateData.currentState?.hunger,
+              energy: botStateData.currentState?.energy,
+              safety: botStateData.currentState?.safety,
+              social: botStateData.currentState?.social,
+              achievement: botStateData.currentState?.achievement,
+              curiosity: botStateData.currentState?.curiosity,
+              creativity: botStateData.currentState?.creativity,
+              inventory: botStateData.worldState?.inventory?.items || [],
+            });
+
+            // Update bot connections
+            setBotConnections([
+              {
+                name: 'minecraft-bot',
+                connected: data.isAlive,
+                viewerActive: false,
+                viewerUrl: 'http://localhost:3006',
+              },
+            ]);
+          }
+        }
+      } catch (error) {
+        console.error('Failed to fetch minecraft bot state:', error);
+      }
+
+      // Fetch environment data
+      try {
+        const envResponse = await fetch('/api/world');
+        if (envResponse.ok) {
+          const envData = await envResponse.json();
+          setEnvironment(envData.environment);
+        }
+      } catch (error) {
+        console.error('Failed to fetch environment data:', error);
+      }
+
+      // Fetch tasks data
+      try {
+        const tasksResponse = await fetch('/api/tasks');
+        if (tasksResponse.ok) {
+          const tasksData = await tasksResponse.json();
+          setTasks(tasksData.tasks || []);
+        }
+      } catch (error) {
+        console.error('Failed to fetch tasks data:', error);
+      }
+
+      // Fetch inventory data
+      try {
+        const inventoryResponse = await fetch('/api/inventory');
+        if (inventoryResponse.ok) {
+          const inventoryData = await inventoryResponse.json();
+          setInventory(inventoryData.inventory || []);
+        }
+      } catch (error) {
+        console.error('Failed to fetch inventory data:', error);
+      }
+    };
+
+    // Initial poll
+    pollBotState();
+
+    // Poll every 5 seconds
+    pollInterval = setInterval(pollBotState, 5000);
+
+    return () => {
+      if (pollInterval) {
+        clearInterval(pollInterval);
+      }
+    };
+  }, []);
       console.log('Starting polling fallback for bot state');
 
       const pollBotState = async () => {
@@ -308,7 +403,29 @@ export default function ConsciousMinecraftDashboard() {
                 setInventory(botStateData.inventory);
               }
 
-              // Update bot state
+              // Fetch and update environment data
+              try {
+                const envResponse = await fetch('/api/world');
+                if (envResponse.ok) {
+                  const envData = await envResponse.json();
+                  setEnvironment(envData.environment);
+                }
+              } catch (error) {
+                console.error('Failed to fetch environment data:', error);
+              }
+
+              // Fetch and update tasks data
+              try {
+                const tasksResponse = await fetch('/api/tasks');
+                if (tasksResponse.ok) {
+                  const tasksData = await tasksResponse.json();
+                  setTasks(tasksData.tasks || []);
+                }
+              } catch (error) {
+                console.error('Failed to fetch tasks data:', error);
+              }
+
+              // Update bot state with comprehensive data
               setBotState({
                 position: botStateData.position
                   ? {
@@ -317,8 +434,14 @@ export default function ConsciousMinecraftDashboard() {
                       z: botStateData.position[2],
                     }
                   : undefined,
-                health: botStateData.vitals?.health,
-                food: botStateData.vitals?.hunger,
+                health: botStateData.vitals?.health || botStateData.currentState?.health,
+                food: botStateData.vitals?.hunger || botStateData.currentState?.hunger,
+                energy: botStateData.currentState?.energy,
+                safety: botStateData.currentState?.safety,
+                social: botStateData.currentState?.social,
+                achievement: botStateData.currentState?.achievement,
+                curiosity: botStateData.currentState?.curiosity,
+                creativity: botStateData.currentState?.creativity,
                 inventory: botStateData.inventory || [],
                 time: undefined, // Not available in bot state API
                 weather: undefined, // Not available in bot state API
@@ -856,41 +979,120 @@ export default function ConsciousMinecraftDashboard() {
         </div>
       </header>
 
-      {/* HUD Bar */}
-      <div className="border-b border-zinc-900/80 bg-zinc-950/70 px-4 py-2 backdrop-blur supports-[backdrop-filter]:bg-zinc-950/50">
-        {hud ? (
-          <>
-            <div className="grid grid-cols-2 md:grid-cols-7 gap-3">
+      {/* Enhanced HUD Bar */}
+      <div className="border-b border-zinc-900/80 bg-zinc-950/70 px-4 py-3 backdrop-blur supports-[backdrop-filter]:bg-zinc-950/50">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          {/* Bot Vital Stats */}
+          <div className="space-y-2">
+            <h3 className="text-xs font-medium text-zinc-400 uppercase tracking-wide">Vital Stats</h3>
+            <div className="grid grid-cols-2 gap-2">
               <HudMeter
                 label="Health"
-                value={((hud.vitals.health || 0) / 20) * 100}
+                value={botState?.health ? (botState.health / 20) * 100 : 0}
+                color="red"
               />
               <HudMeter
                 label="Hunger"
-                value={((hud.vitals.hunger || 0) / 20) * 100}
+                value={botState?.food ? (botState.food / 20) * 100 : 0}
+                color="orange"
               />
-              <HudMeter label="Stamina" value={hud.vitals.stamina || 0} />
-              <HudMeter label="Sleep" value={hud.vitals.sleep || 0} />
               <HudMeter
-                label="Stress"
-                value={hud.intero.stress || 0}
-                hint="lower is better"
+                label="Energy"
+                value={botState?.energy ? botState.energy * 100 : 0}
+                color="yellow"
               />
-              <HudMeter label="Focus" value={hud.intero.focus || 0} />
-              <HudMeter label="Curiosity" value={hud.intero.curiosity || 0} />
-            </div>
-            <div className="mt-1 text-xs text-zinc-400">
-              Mood: <span className="text-zinc-200">{hud.mood}</span>
-            </div>
-          </>
-        ) : (
-          <div className="flex items-center justify-center py-4">
-            <div className="flex items-center gap-2 text-sm text-zinc-400">
-              <div className="size-2 rounded-full bg-zinc-600 animate-pulse" />
-              <span>Waiting for HUD data...</span>
+              <HudMeter
+                label="Safety"
+                value={botState?.safety ? botState.safety * 100 : 0}
+                color="green"
+              />
             </div>
           </div>
-        )}
+
+          {/* Cognitive State */}
+          <div className="space-y-2">
+            <h3 className="text-xs font-medium text-zinc-400 uppercase tracking-wide">Cognitive State</h3>
+            <div className="grid grid-cols-2 gap-2">
+              <HudMeter
+                label="Social"
+                value={botState?.social ? botState.social * 100 : 0}
+                color="blue"
+              />
+              <HudMeter
+                label="Achievement"
+                value={botState?.achievement ? botState.achievement * 100 : 0}
+                color="purple"
+              />
+              <HudMeter
+                label="Curiosity"
+                value={botState?.curiosity ? botState.curiosity * 100 : 0}
+                color="cyan"
+              />
+              <HudMeter
+                label="Creativity"
+                value={botState?.creativity ? botState.creativity * 100 : 0}
+                color="pink"
+              />
+            </div>
+          </div>
+
+          {/* Environment Info */}
+          <div className="space-y-2">
+            <h3 className="text-xs font-medium text-zinc-400 uppercase tracking-wide">Environment</h3>
+            <div className="space-y-1 text-xs">
+              <div className="flex justify-between">
+                <span className="text-zinc-400">Biome:</span>
+                <span className="text-zinc-200 font-medium">{environment?.biome || 'Unknown'}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-zinc-400">Weather:</span>
+                <span className="text-zinc-200 font-medium">{environment?.weather || 'Unknown'}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-zinc-400">Time:</span>
+                <span className="text-zinc-200 font-medium">{environment?.timeOfDay || 'Unknown'}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-zinc-400">Temp:</span>
+                <span className="text-zinc-200 font-medium">{environment?.temperature || 'Unknown'}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Position & Status */}
+          <div className="space-y-2">
+            <h3 className="text-xs font-medium text-zinc-400 uppercase tracking-wide">Status</h3>
+            <div className="space-y-1 text-xs">
+              <div className="flex justify-between">
+                <span className="text-zinc-400">Position:</span>
+                <span className="text-zinc-200 font-mono">
+                  {botState?.position ? 
+                    `${botState.position.x.toFixed(1)}, ${botState.position.y.toFixed(1)}, ${botState.position.z.toFixed(1)}` : 
+                    'Unknown'
+                  }
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-zinc-400">Connection:</span>
+                <span className={`font-medium ${botConnections[0]?.connected ? 'text-green-400' : 'text-red-400'}`}>
+                  {botConnections[0]?.connected ? 'Connected' : 'Disconnected'}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-zinc-400">Inventory:</span>
+                <span className="text-zinc-200 font-medium">
+                  {inventory?.length || 0} items
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-zinc-400">Tasks:</span>
+                <span className="text-zinc-200 font-medium">
+                  {tasks?.length || 0} active
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Main 3-column Layout */}

@@ -216,7 +216,7 @@ export class CognitiveStreamIntegration extends EventEmitter {
   private async registerRequiredLeaves() {
     console.log('🔧 Registering required leaves...');
 
-    const leaves = [
+    const leaves: LeafImpl[] = [
       {
         spec: {
           name: 'move_to',
@@ -249,7 +249,7 @@ export class CognitiveStreamIntegration extends EventEmitter {
           retries: 3,
           permissions: ['movement'],
         },
-        run: async (ctx: any, args: any) => ({
+        run: async (ctx: LeafContext, args: unknown): Promise<LeafResult> => ({
           status: 'success' as const,
           result: { success: true, distance: 0 },
         }),
@@ -275,9 +275,9 @@ export class CognitiveStreamIntegration extends EventEmitter {
           },
           timeoutMs: 5000,
           retries: 1,
-          permissions: ['sensing'],
+          permissions: ['sense'],
         },
-        run: async (ctx: any, args: any) => ({
+        run: async (ctx: LeafContext, args: unknown): Promise<LeafResult> => ({
           status: 'success' as const,
           result: { hostiles: [], count: 0 },
         }),
@@ -302,7 +302,7 @@ export class CognitiveStreamIntegration extends EventEmitter {
           retries: 2,
           permissions: ['movement', 'place'],
         },
-        run: async (ctx: any, args: any) => ({
+        run: async (ctx: LeafContext, args: unknown): Promise<LeafResult> => ({
           status: 'success' as const,
           result: { success: true, blocked: true },
         }),
@@ -330,7 +330,7 @@ export class CognitiveStreamIntegration extends EventEmitter {
           retries: 2,
           permissions: ['place'],
         },
-        run: async (ctx: any, args: any) => ({
+        run: async (ctx: LeafContext, args: unknown): Promise<LeafResult> => ({
           status: 'success' as const,
           result: { placed: true, lightLevel: 8 },
         }),
@@ -355,7 +355,7 @@ export class CognitiveStreamIntegration extends EventEmitter {
           retries: 2,
           permissions: ['movement'],
         },
-        run: async (ctx: any, args: any) => ({
+        run: async (ctx: LeafContext, args: unknown): Promise<LeafResult> => ({
           status: 'success' as const,
           result: { success: true, newPosition: { x: 0, y: 45, z: 1 } },
         }),
@@ -524,6 +524,14 @@ export class CognitiveStreamIntegration extends EventEmitter {
       metadata: { state: this.currentState },
     });
 
+    // Also emit observation event for cognitive stream
+    this.emit('observation', {
+      type: 'observation',
+      content: 'Bot state updated: Status refreshed',
+      timestamp: Date.now(),
+      metadata: { state: this.currentState },
+    });
+
     // Process current state for potential goals
     await this.processStateForGoals();
   }
@@ -534,15 +542,26 @@ export class CognitiveStreamIntegration extends EventEmitter {
   private async processStateForGoals(): Promise<void> {
     const goals: string[] = [];
 
-    // Analyze current state for potential goals
-    if (this.currentState.health && this.currentState.health < 10) {
+    // Safety and emergency goals (highest priority)
+    if (this.currentState.health && this.currentState.health < 5) {
+      goals.push('emergency health restoration');
+    } else if (this.currentState.health && this.currentState.health < 10) {
       goals.push('restore health safely');
     }
 
-    if (this.currentState.food && this.currentState.food < 10) {
+    if (this.currentState.food && this.currentState.food < 5) {
+      goals.push('emergency food acquisition');
+    } else if (this.currentState.food && this.currentState.food < 10) {
       goals.push('find food to eat');
     }
 
+    // Task-specific goals
+    if (this.currentState.currentTask?.includes('underground') || 
+        (this.currentState.position && this.currentState.position.y < 64)) {
+      goals.push('torch the mining corridor safely');
+    }
+
+    // Resource management goals
     if (
       this.currentState.inventory &&
       (!this.currentState.inventory.torch ||
@@ -551,15 +570,26 @@ export class CognitiveStreamIntegration extends EventEmitter {
       goals.push('craft more torches for safety');
     }
 
-    // Check if we're in a dark area
-    if (this.currentState.position && this.currentState.position.y < 64) {
-      goals.push('torch the mining corridor safely');
+    // Survival goals
+    if (this.currentState.currentTask?.includes('surviving')) {
+      goals.push('escape dangerous situation');
     }
 
     // Update active goals
     this.activeGoals = [...new Set([...this.activeGoals, ...goals])];
 
     if (goals.length > 0) {
+      // Emit individual goal identification events
+      for (const goal of goals) {
+        this.emit('goalIdentified', {
+          type: 'planning',
+          content: `Identified new goal: ${goal}`,
+          timestamp: Date.now(),
+          metadata: { goal },
+        });
+      }
+
+      // Also emit a summary event
       this.emit('goalsIdentified', {
         type: 'planning',
         content: `Identified ${goals.length} new goals: ${goals.join(', ')}`,
@@ -742,6 +772,22 @@ export class CognitiveStreamIntegration extends EventEmitter {
   }
 
   /**
+   * Get MCP registry capabilities (for testing)
+   */
+  async getMCPCapabilities(): Promise<any[]> {
+    return this.mcpRegistry.listCapabilities();
+  }
+
+  /**
+   * Get MCP registry leaves (for testing)
+   */
+  async getMCPLeaves(): Promise<any[]> {
+    // Access the leaf factory through the registry's public methods
+    // For now, return an empty array since we don't have direct access
+    return [];
+  }
+
+  /**
    * Add event to cognitive stream
    */
   private addEvent(event: CognitiveStreamEvent): void {
@@ -761,6 +807,8 @@ export class CognitiveStreamIntegration extends EventEmitter {
 
     // Set up event listeners to capture all events
     this.on('stateUpdated', (event) => this.addEvent(event));
+    this.on('observation', (event) => this.addEvent(event));
+    this.on('goalIdentified', (event) => this.addEvent(event));
     this.on('goalsIdentified', (event) => this.addEvent(event));
     this.on('planGenerated', (event) => this.addEvent(event));
     this.on('planExecuted', (event) => this.addEvent(event));

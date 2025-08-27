@@ -7,6 +7,7 @@ interface HudMeterProps {
   max?: number;
   hint?: string;
   className?: string;
+  color?: string;
 }
 
 /**
@@ -18,10 +19,11 @@ export function HudMeter({
   value, 
   max = 100, 
   hint, 
-  className 
+  className,
+  color 
 }: HudMeterProps) {
   const percentage = Math.max(0, Math.min(100, (100 * value) / max));
-  const colorClass = getHudColor(percentage, label.toLowerCase());
+  const colorClass = color ? `bg-${color}-500` : getHudColor(percentage, label.toLowerCase());
 
   return (
     <div className={cn("flex flex-col gap-1", className)}>
