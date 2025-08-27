@@ -41,6 +41,7 @@ export interface MCPCapabilityPlanningContext extends PlanningContext {
 }
 
 export interface MCPCapabilityPlan extends Plan {
+  planningApproach: 'mcp-capabilities';
   capabilityDecomposition: CapabilityDecomposition[];
   estimatedCapabilitySuccess: number;
   fallbackCapabilities: string[];
@@ -157,6 +158,7 @@ export class MCPCapabilitiesAdapter extends EventEmitter {
       refinementCount: 0,
       createdAt: Date.now(),
       lastRefinedAt: Date.now(),
+      planningApproach: 'mcp-capabilities',
       capabilityDecomposition,
       estimatedCapabilitySuccess: estimatedSuccess,
       fallbackCapabilities,

@@ -8,15 +8,17 @@
  */
 
 import {
-  Plan,
-  PlanStep,
-  PlanStatus,
-  Action,
+  // Plan,
+  // PlanStep,
+  // PlanStatus,
+  // Action,
   Resource,
   Goal,
-  ActionType,
-  PlanStepStatus,
+  // ActionType,
+  // PlanStepStatus,
   GoalType,
+  Precondition,
+  PreconditionType,
 } from '../types';
 
 export interface ExecutionContext {
@@ -38,7 +40,7 @@ export interface ExecutionContext {
 
 export interface AdvancedGOAPAction {
   name: string;
-  preconditions: Condition[];
+  preconditions: Precondition[];
   effects: Effect[];
   baseCost: number;
   dynamicCostFn: (state: WorldState, context: ExecutionContext) => number;
@@ -368,8 +370,18 @@ export class EnhancedGOAPPlanner {
     const eatAction: AdvancedGOAPAction = {
       name: 'Eat',
       preconditions: [
-        { predicate: 'Has', args: ['bot', 'food'], operator: '>=', value: 1 },
-        { predicate: 'Hunger', args: ['bot'], operator: '<', value: 60 },
+        {
+          id: 'has-food',
+          type: PreconditionType.INVENTORY,
+          condition: 'Has food',
+          isSatisfied: false,
+        },
+        {
+          id: 'hunger-low',
+          type: PreconditionType.HEALTH,
+          condition: 'Hunger < 60',
+          isSatisfied: false,
+        },
       ],
       effects: [
         { predicate: 'Hunger', args: ['bot'], operator: '=', value: 100 },
@@ -396,12 +408,17 @@ export class EnhancedGOAPPlanner {
     const fleeToLightAction: AdvancedGOAPAction = {
       name: 'FleeToLight',
       preconditions: [
-        { predicate: 'UnderThreat', args: ['bot'], operator: '=', value: true },
         {
-          predicate: 'NearDarkArea',
-          args: ['bot'],
-          operator: '=',
-          value: true,
+          id: 'under-threat',
+          type: PreconditionType.HEALTH,
+          condition: 'Under threat',
+          isSatisfied: false,
+        },
+        {
+          id: 'near-dark',
+          type: PreconditionType.LOCATION,
+          condition: 'Near dark area',
+          isSatisfied: false,
         },
       ],
       effects: [
@@ -432,17 +449,22 @@ export class EnhancedGOAPPlanner {
       name: 'OpportunisticMine',
       preconditions: [
         {
-          predicate: 'OnRouteTo',
-          args: ['bot', 'subgoal'],
-          operator: '=',
-          value: true,
+          id: 'on-route',
+          type: PreconditionType.LOCATION,
+          condition: 'On route to subgoal',
+          isSatisfied: false,
         },
-        { predicate: 'SeeResource', args: ['bot'], operator: '=', value: true },
         {
-          predicate: 'HasTool',
-          args: ['bot', 'pickaxe'],
-          operator: '=',
-          value: true,
+          id: 'see-resource',
+          type: PreconditionType.LOCATION,
+          condition: 'See resource',
+          isSatisfied: false,
+        },
+        {
+          id: 'has-tool',
+          type: PreconditionType.SKILL,
+          condition: 'Has pickaxe',
+          isSatisfied: false,
         },
       ],
       effects: [
@@ -485,52 +507,172 @@ export class EnhancedGOAPPlanner {
   }
 
   private heuristic(state: WorldState, goal: Goal): number {
-    // Domain-specific heuristics for Minecraft
+    // Validate goal structure
+    if (!goal || !goal.preconditions) {
+      return 0;
+    }
+
+    // Handle empty preconditions
+    if (goal.preconditions.length === 0) {
+      return this.getDefaultHeuristic(goal, state);
+    }
+
+    // Validate first precondition
+    const firstPrecondition = goal.preconditions[0];
+    if (!firstPrecondition?.condition) {
+      return this.getDefaultHeuristic(goal, state);
+    }
+
+    // Type-safe access with fallback
     switch (goal.type) {
       case GoalType.REACH_LOCATION:
-        return state.distanceTo(
-          goal.preconditions[0].condition as unknown as {
-            x: number;
-            y: number;
-            z: number;
-          }
-        );
+        return this.calculateLocationHeuristic(firstPrecondition, state);
       case GoalType.ACQUIRE_ITEM:
-        return state.hasItem(
-          goal.preconditions[0].condition as string,
-          goal.preconditions[1].condition as unknown as number
-        )
-          ? 0
-          : (goal.preconditions[1].condition as unknown as number);
+        return this.calculateItemHeuristic(firstPrecondition, state);
       case GoalType.SURVIVE_THREAT:
         return state.getThreatLevel();
       default:
-        return 0;
+        return this.getDefaultHeuristic(goal, state);
+    }
+  }
+
+  private calculateLocationHeuristic(
+    precondition: Precondition,
+    state: WorldState
+  ): number {
+    try {
+      // Extract location from condition
+      const location = precondition.condition as any;
+      if (
+        !location ||
+        typeof location.x !== 'number' ||
+        typeof location.y !== 'number' ||
+        typeof location.z !== 'number'
+      ) {
+        return 10; // Default distance estimate
+      }
+      return state.distanceTo(location);
+    } catch (error) {
+      console.warn('Failed to calculate location heuristic:', error);
+      return 10; // Default distance estimate
+    }
+  }
+
+  private calculateItemHeuristic(
+    precondition: Precondition,
+    state: WorldState
+  ): number {
+    try {
+      const itemType = precondition.condition as string;
+      if (!itemType || typeof itemType !== 'string') {
+        return 5; // Default collection effort
+      }
+
+      // Check if we have the item
+      if (state.hasItem(itemType, 1)) {
+        return 0; // Already have the item
+      }
+
+      return 5; // Default collection effort
+    } catch (error) {
+      console.warn('Failed to calculate item heuristic:', error);
+      return 5; // Default collection effort
+    }
+  }
+
+  private getDefaultHeuristic(goal: Goal, state: WorldState): number {
+    // Provide reasonable default heuristic based on goal type
+    switch (goal.type) {
+      case GoalType.REACH_LOCATION:
+        return 10; // Default distance estimate
+      case GoalType.ACQUIRE_ITEM:
+        return 5; // Default collection effort
+      case GoalType.SURVIVE_THREAT:
+        return state.getThreatLevel();
+      default:
+        return 1; // Minimal heuristic
     }
   }
 
   private satisfiesGoal(state: WorldState, goal: Goal): boolean {
+    // Validate goal structure
+    if (!goal || !goal.preconditions) {
+      return false;
+    }
+
+    // Handle empty preconditions
+    if (goal.preconditions.length === 0) {
+      return this.getDefaultGoalSatisfaction(goal, state);
+    }
+
+    // Validate first precondition
+    const firstPrecondition = goal.preconditions[0];
+    if (!firstPrecondition || !firstPrecondition.condition) {
+      return this.getDefaultGoalSatisfaction(goal, state);
+    }
+
+    // Type-safe access with fallback
     switch (goal.type) {
       case GoalType.REACH_LOCATION:
-        return (
-          state.distanceTo(
-            goal.preconditions[0].condition as unknown as {
-              x: number;
-              y: number;
-              z: number;
-            }
-          ) < 2
-        );
+        return this.checkLocationGoal(firstPrecondition, state);
       case GoalType.ACQUIRE_ITEM:
-        return state.hasItem(
-          goal.preconditions[0].condition as string,
-          goal.preconditions[1].condition as unknown as number
-        );
+        return this.checkItemGoal(firstPrecondition, state);
       case GoalType.SURVIVE_THREAT:
         return state.getThreatLevel() < 10;
       default:
         // For testing purposes, always return true for unknown goal types
         return true;
+    }
+  }
+
+  private checkLocationGoal(
+    precondition: Precondition,
+    state: WorldState
+  ): boolean {
+    try {
+      const location = precondition.condition as any;
+      if (
+        !location ||
+        typeof location.x !== 'number' ||
+        typeof location.y !== 'number' ||
+        typeof location.z !== 'number'
+      ) {
+        return false;
+      }
+      return state.distanceTo(location) < 2;
+    } catch (error) {
+      console.warn('Failed to check location goal:', error);
+      return false;
+    }
+  }
+
+  private checkItemGoal(
+    precondition: Precondition,
+    state: WorldState
+  ): boolean {
+    try {
+      const itemType = precondition.condition as string;
+      if (!itemType || typeof itemType !== 'string') {
+        return false;
+      }
+      return state.hasItem(itemType, 1);
+    } catch (error) {
+      console.warn('Failed to check item goal:', error);
+      return false;
+    }
+  }
+
+  private getDefaultGoalSatisfaction(goal: Goal, state: WorldState): boolean {
+    // Provide reasonable default satisfaction based on goal type
+    switch (goal.type) {
+      case GoalType.REACH_LOCATION:
+        return false; // Can't satisfy location goal without location
+      case GoalType.ACQUIRE_ITEM:
+        return false; // Can't satisfy item goal without item specification
+      case GoalType.SURVIVE_THREAT:
+        return state.getThreatLevel() < 10;
+      default:
+        return true; // Default to satisfied for unknown goal types
     }
   }
 

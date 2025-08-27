@@ -12,7 +12,7 @@
   "scripts": {
     "build": "tsc",
     "dev": "tsc --watch",
-    "test": "vitest",
+    "test": "vitest run",
     "test:run": "vitest run",
     "test:standalone": "vitest --run --reporter=verbose standalone.test.ts",
     "smoke:tier0": "npm run build && node dist/bin/mc-smoke.js --scenario=navigate",

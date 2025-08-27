@@ -221,6 +221,9 @@ export class IntegratedPlanningCoordinator extends EventEmitter {
         qualityAssessment,
       };
 
+      // Add to planning history
+      this.planningHistory.push(result);
+
       // Record performance metrics
       this.performanceMetrics.recordPlanningSession(result);
 

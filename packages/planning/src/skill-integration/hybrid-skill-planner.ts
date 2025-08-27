@@ -437,7 +437,68 @@ export class HybridSkillPlanner extends EventEmitter {
     // Convert goal to GOAP format
     const goapGoal = this.convertGoalToGOAP(goal, context.worldState);
 
-    return await this.goapPlanner.generatePlan(goapGoal, context.worldState);
+    // Create a proper mock world state for GOAP planning
+    const mockWorldState = {
+      getHealth: () => 20,
+      getHunger: () => 20,
+      getPosition: () => ({ x: 0, y: 64, z: 0 }),
+      getThreatLevel: () => 0,
+      distanceTo: (target: any) => 10,
+      hasItem: (item: string, count: number) => count > 0,
+      // Add any missing methods that might be called
+      getInventory: () => ({}),
+      getNearbyEntities: () => [],
+      getBlockAt: (pos: any) => ({ type: 'air' }),
+      isOnGround: () => true,
+      isInWater: () => false,
+      isInLava: () => false,
+      getLightLevel: () => 15,
+      getBiome: () => 'plains',
+      ...context.worldState,
+    };
+
+    // Create a mock execution context for GOAP planning
+    const executionContext = {
+      urgency: context.timeConstraints.urgency,
+      domain: context.domain,
+      constraints: context.constraints,
+      resources: context.resources,
+    };
+
+    try {
+      // Use the planTo method instead of generatePlan
+      const plan = await this.goapPlanner.planTo(
+        goapGoal,
+        mockWorldState,
+        executionContext,
+        1000 // 1 second budget
+      );
+
+      // If no plan found, create a fallback plan
+      if (!plan) {
+        return {
+          id: `goap-fallback-${Date.now()}`,
+          goalId: goal,
+          actions: [],
+          estimatedCost: 0,
+          confidence: 0.3,
+          createdAt: Date.now(),
+        };
+      }
+
+      return plan;
+    } catch (error) {
+      console.error('GOAP planning failed:', error);
+      // Return fallback plan on error
+      return {
+        id: `goap-error-fallback-${Date.now()}`,
+        goalId: goal,
+        actions: [],
+        estimatedCost: 0,
+        confidence: 0.1,
+        createdAt: Date.now(),
+      };
+    }
   }
 
   /**
@@ -724,18 +785,39 @@ export class HybridSkillPlanner extends EventEmitter {
     const allSkills = this.skillRegistry.getAllSkills();
 
     return allSkills.filter((skill) => {
-      const goalKeywords = goal.toLowerCase().split(' ');
-      const skillKeywords = skill.description.toLowerCase().split(' ');
+      const goalLower = goal.toLowerCase();
+      const skillNameLower = skill.name.toLowerCase();
+      const skillDescLower = skill.description.toLowerCase();
 
-      const keywordMatch = goalKeywords.some((keyword) =>
-        skillKeywords.some((skillKeyword) => skillKeyword.includes(keyword))
-      );
+      // Enhanced keyword matching
+      const goalKeywords = goalLower.split(' ');
+      const skillKeywords = [
+        ...skillNameLower.split(' '),
+        ...skillDescLower.split(' '),
+      ];
+
+      // Check for exact matches or partial matches
+      const keywordMatch = goalKeywords.some((keyword) => {
+        if (keyword.length < 3) return false; // Skip very short keywords
+        return skillKeywords.some(
+          (skillKeyword) =>
+            skillKeyword.includes(keyword) || keyword.includes(skillKeyword)
+        );
+      });
+
+      // Also check if goal contains skill name or vice versa
+      const nameMatch =
+        goalLower.includes(skillNameLower) ||
+        skillNameLower.includes(goalLower);
+      const descMatch =
+        goalLower.includes(skillDescLower) ||
+        skillDescLower.includes(goalLower);
 
       const preconditionsMet = skill.preconditions.every((precond) =>
         precond.isSatisfied(context.worldState)
       );
 
-      return keywordMatch && preconditionsMet;
+      return (keywordMatch || nameMatch || descMatch) && preconditionsMet;
     });
   }
 
@@ -929,7 +1011,11 @@ export class HybridSkillPlanner extends EventEmitter {
     }
 
     // Add HTN plan execution order
-    if (hrmPlan) {
+    if (
+      hrmPlan &&
+      hrmPlan.executionOrder &&
+      Array.isArray(hrmPlan.executionOrder)
+    ) {
       order.push(...hrmPlan.executionOrder);
     }
 

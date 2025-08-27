@@ -242,20 +242,40 @@ export class SkillPlannerAdapter extends EventEmitter {
 
     // Filter skills based on goal relevance
     return allSkills.filter((skill) => {
-      // Check if skill description matches goal
-      const goalKeywords = goal.toLowerCase().split(' ');
-      const skillKeywords = skill.description.toLowerCase().split(' ');
+      const goalLower = goal.toLowerCase();
+      const skillNameLower = skill.name.toLowerCase();
+      const skillDescLower = skill.description.toLowerCase();
 
-      const keywordMatch = goalKeywords.some((keyword) =>
-        skillKeywords.some((skillKeyword) => skillKeyword.includes(keyword))
-      );
+      // Enhanced keyword matching
+      const goalKeywords = goalLower.split(' ');
+      const skillKeywords = [
+        ...skillNameLower.split(' '),
+        ...skillDescLower.split(' '),
+      ];
+
+      // Check for exact matches or partial matches
+      const keywordMatch = goalKeywords.some((keyword) => {
+        if (keyword.length < 3) return false; // Skip very short keywords
+        return skillKeywords.some(
+          (skillKeyword) =>
+            skillKeyword.includes(keyword) || keyword.includes(skillKeyword)
+        );
+      });
+
+      // Also check if goal contains skill name or vice versa
+      const nameMatch =
+        goalLower.includes(skillNameLower) ||
+        skillNameLower.includes(goalLower);
+      const descMatch =
+        goalLower.includes(skillDescLower) ||
+        skillDescLower.includes(goalLower);
 
       // Check if preconditions are satisfied
       const preconditionsMet = skill.preconditions.every((precond) =>
         precond.isSatisfied(context.worldState)
       );
 
-      return keywordMatch && preconditionsMet;
+      return (keywordMatch || nameMatch || descMatch) && preconditionsMet;
     });
   }
 

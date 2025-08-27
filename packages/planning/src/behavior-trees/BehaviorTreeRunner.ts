@@ -217,6 +217,7 @@ class BTRun extends EventEmitter {
         status: result.status,
         ticks: this.ticks,
         finalData: result.data,
+        error: result.error,
         duration,
       };
     } catch (error) {
@@ -252,7 +253,7 @@ class BTRun extends EventEmitter {
     const nodeStartTime = Date.now();
     let retries = 0;
     const maxRetries = node.retries ?? this.options.maxRetries ?? 2;
-    const timeout = node.timeout ?? this.options.timeout ?? 5000;
+    const timeout = this.options.timeout ?? node.timeout ?? 5000;
 
     // Check guard conditions
     if (node.guard && this.options.enableGuards) {
@@ -277,38 +278,71 @@ class BTRun extends EventEmitter {
           throw new Error('Run was aborted');
         }
 
-        let result: { status: BTNodeStatus; data?: any };
+        // Create a timeout promise
+        const timeoutPromise = new Promise<never>((_, reject) => {
+          setTimeout(() => reject(new Error('Execution timeout')), timeout);
+        });
 
-        switch (node.type) {
-          case BTNodeType.SEQUENCE:
-            result = await this.executeSequence(node, tick);
-            break;
-          case BTNodeType.SELECTOR:
-            result = await this.executeSelector(node, tick);
-            break;
-          case BTNodeType.PARALLEL:
-            result = await this.executeParallel(node, tick);
-            break;
-          case BTNodeType.ACTION:
-            result = await this.executeAction(node, tick);
-            break;
-          case BTNodeType.CONDITION:
-            result = await this.executeCondition(node, tick);
-            break;
-          default:
-            throw new Error(`Unknown node type: ${node.type}`);
-        }
+        // Execute with timeout
+        const executionPromise = (async () => {
+          let result: { status: BTNodeStatus; data?: any; error?: string };
+
+          switch (node.type) {
+            case BTNodeType.SEQUENCE:
+              result = await this.executeSequence(node, tick);
+              break;
+            case BTNodeType.SELECTOR:
+              result = await this.executeSelector(node, tick);
+              break;
+            case BTNodeType.PARALLEL:
+              result = await this.executeParallel(node, tick);
+              break;
+            case BTNodeType.ACTION:
+              result = await this.executeAction(node, tick);
+              break;
+            case BTNodeType.CONDITION:
+              result = await this.executeCondition(node, tick);
+              break;
+            default:
+              throw new Error(`Unknown node type: ${node.type}`);
+          }
+
+          return result;
+        })();
+
+        const result = await Promise.race([executionPromise, timeoutPromise]);
 
         const duration = Date.now() - nodeStartTime;
+
+        if (result.status === BTNodeStatus.SUCCESS) {
+          const tickData: BTTick = {
+            tick,
+            node: node.id,
+            status: BTNodeStatus.SUCCESS,
+            metrics: { duration, retries, timeouts: 0 },
+            data: result.data,
+          };
+          this.recordTick(tickData);
+          return result;
+        }
+
+        // If we get here, the execution failed
+        retries++;
+        if (retries <= maxRetries) {
+          console.log(`Retrying ${node.id} (attempt ${retries}/${maxRetries})`);
+          await new Promise((resolve) => setTimeout(resolve, 1000));
+          continue;
+        }
+
+        // Max retries exceeded
         const tickData: BTTick = {
           tick,
           node: node.id,
-          status: result.status,
+          status: BTNodeStatus.FAILURE,
           metrics: { duration, retries, timeouts: 0 },
-          data: result.data,
+          error: result.error || 'Max retries exceeded',
         };
         this.recordTick(tickData);
-
         return result;
       } catch (error) {
         retries++;
@@ -397,10 +431,10 @@ class BTRun extends EventEmitter {
   private async executeAction(
     node: BTNode,
     tick: number
-  ): Promise<{ status: BTNodeStatus; data?: any }> {
+  ): Promise<{ status: BTNodeStatus; data?: any; error?: string }> {
     if (!node.action) {
       console.log(`No action defined for node: ${node.id}`);
-      return { status: BTNodeStatus.FAILURE };
+      return { status: BTNodeStatus.FAILURE, error: 'No action defined' };
     }
 
     console.log(`Executing action: ${node.action} with args:`, {
@@ -418,6 +452,7 @@ class BTRun extends EventEmitter {
     return {
       status: result.ok ? BTNodeStatus.SUCCESS : BTNodeStatus.FAILURE,
       data: result.data,
+      error: result.ok ? undefined : result.error,
     };
   }
 

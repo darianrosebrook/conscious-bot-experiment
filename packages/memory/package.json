@@ -9,7 +9,7 @@
     "dev": "tsc --watch",
     "start": "node dist/server.js",
     "dev:server": "tsx src/server.ts",
-    "test": "vitest",
+    "test": "vitest run",
     "test:run": "vitest run",
     "lint": "eslint src/**/*.ts",
     "type-check": "tsc --noEmit"

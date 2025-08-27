@@ -256,9 +256,11 @@ export class CognitiveIntegration extends EventEmitter {
   ): string[] {
     const alternatives: string[] = [];
 
+    // For stuck patterns or high failure rates, suggest different approaches
     if (
       analysis.isStuck ||
-      analysis.failureRate > this.config.failureThreshold
+      analysis.failureRate > this.config.failureThreshold ||
+      analysis.recentFailures >= 2 // Add this condition for stuck pattern detection
     ) {
       // Suggest different task types
       alternatives.push(`Try a different task type instead of ${task.type}`);
