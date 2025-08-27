@@ -16,6 +16,15 @@ import {
   LeafResult,
 } from './mcp-capabilities/leaf-contracts.js';
 
+// Import real leaf implementations
+import {
+  MoveToLeaf,
+  StepForwardSafelyLeaf,
+  PlaceTorchIfNeededLeaf,
+  RetreatAndBlockLeaf,
+  SenseHostilesLeaf,
+} from './leaves/index.js';
+
 // Define interfaces for planning components to avoid cyclic dependencies
 export interface PlanningComponent {
   plan(goal: string, context: any): Promise<any>;
@@ -214,156 +223,18 @@ export class CognitiveStreamIntegration extends EventEmitter {
     this.initializeDefaultCapabilities();
   }
 
-  /**
+    /**
    * Register required leaves for the torch corridor capability
    */
   private async registerRequiredLeaves() {
-    console.log('🔧 Registering required leaves...');
+    console.log('🔧 Registering real leaf implementations...');
 
     const leaves: LeafImpl[] = [
-      {
-        spec: {
-          name: 'move_to',
-          version: '1.0.0',
-          description: 'Move to a target position safely',
-          inputSchema: {
-            type: 'object',
-            properties: {
-              pos: {
-                type: 'object',
-                properties: {
-                  x: { type: 'number' },
-                  y: { type: 'number' },
-                  z: { type: 'number' },
-                },
-                required: ['x', 'y', 'z'],
-              },
-              safe: { type: 'boolean', default: true },
-            },
-            required: ['pos'],
-          },
-          outputSchema: {
-            type: 'object',
-            properties: {
-              success: { type: 'boolean' },
-              distance: { type: 'number' },
-            },
-          },
-          timeoutMs: 30000,
-          retries: 3,
-          permissions: ['movement'],
-        },
-        run: async (ctx: LeafContext, args: unknown): Promise<LeafResult> => ({
-          status: 'success' as const,
-          result: { success: true, distance: 0 },
-        }),
-      },
-      {
-        spec: {
-          name: 'sense_hostiles',
-          version: '1.0.0',
-          description: 'Sense for hostile entities in radius',
-          inputSchema: {
-            type: 'object',
-            properties: {
-              radius: { type: 'number', minimum: 1, maximum: 50 },
-            },
-            required: ['radius'],
-          },
-          outputSchema: {
-            type: 'object',
-            properties: {
-              hostiles: { type: 'array', items: { type: 'object' } },
-              count: { type: 'number' },
-            },
-          },
-          timeoutMs: 5000,
-          retries: 1,
-          permissions: ['sense'],
-        },
-        run: async (ctx: LeafContext, args: unknown): Promise<LeafResult> => ({
-          status: 'success' as const,
-          result: { hostiles: [], count: 0 },
-        }),
-      },
-      {
-        spec: {
-          name: 'retreat_and_block',
-          version: '1.0.0',
-          description: 'Retreat and block off area',
-          inputSchema: {
-            type: 'object',
-            properties: {},
-          },
-          outputSchema: {
-            type: 'object',
-            properties: {
-              success: { type: 'boolean' },
-              blocked: { type: 'boolean' },
-            },
-          },
-          timeoutMs: 15000,
-          retries: 2,
-          permissions: ['movement', 'place'],
-        },
-        run: async (ctx: LeafContext, args: unknown): Promise<LeafResult> => ({
-          status: 'success' as const,
-          result: { success: true, blocked: true },
-        }),
-      },
-      {
-        spec: {
-          name: 'place_torch_if_needed',
-          version: '1.0.0',
-          description: 'Place torch if light level is low',
-          inputSchema: {
-            type: 'object',
-            properties: {
-              interval: { type: 'number', minimum: 2, maximum: 10 },
-            },
-            required: ['interval'],
-          },
-          outputSchema: {
-            type: 'object',
-            properties: {
-              placed: { type: 'boolean' },
-              lightLevel: { type: 'number' },
-            },
-          },
-          timeoutMs: 10000,
-          retries: 2,
-          permissions: ['place'],
-        },
-        run: async (ctx: LeafContext, args: unknown): Promise<LeafResult> => ({
-          status: 'success' as const,
-          result: { placed: true, lightLevel: 8 },
-        }),
-      },
-      {
-        spec: {
-          name: 'step_forward_safely',
-          version: '1.0.0',
-          description: 'Step forward one block safely',
-          inputSchema: {
-            type: 'object',
-            properties: {},
-          },
-          outputSchema: {
-            type: 'object',
-            properties: {
-              success: { type: 'boolean' },
-              newPosition: { type: 'object' },
-            },
-          },
-          timeoutMs: 5000,
-          retries: 2,
-          permissions: ['movement'],
-        },
-        run: async (ctx: LeafContext, args: unknown): Promise<LeafResult> => ({
-          status: 'success' as const,
-          result: { success: true, newPosition: { x: 0, y: 45, z: 1 } },
-        }),
-      },
+      new MoveToLeaf(),
+      new StepForwardSafelyLeaf(),
+      new PlaceTorchIfNeededLeaf(),
+      new RetreatAndBlockLeaf(),
+      new SenseHostilesLeaf(),
     ];
 
     for (const leaf of leaves) {
@@ -793,6 +664,13 @@ export class CognitiveStreamIntegration extends EventEmitter {
    */
   async getMCPLeaves(): Promise<any[]> {
     return this.mcpRegistry.listLeaves();
+  }
+
+  /**
+   * Get MCP registry for external access
+   */
+  getMCPRegistry() {
+    return this.mcpRegistry;
   }
 
   /**
