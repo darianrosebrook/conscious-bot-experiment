@@ -4,14 +4,14 @@ import type { Environment } from '@/types';
 /**
  * World API
  * Provides environment and world state data
- * 
+ *
  * @author @darianrosebrook
  */
 export async function GET(_request: NextRequest) {
   try {
     // Fetch environment data from planning system
     const planningRes = await fetch('http://localhost:3002/environment');
-    
+
     if (!planningRes.ok) {
       return NextResponse.json(
         { error: 'Environment data unavailable' },
@@ -20,7 +20,7 @@ export async function GET(_request: NextRequest) {
     }
 
     const planningData = await planningRes.json();
-    
+
     if (!planningData.success || !planningData.environment) {
       return NextResponse.json(
         { error: 'No environment data available' },
@@ -29,7 +29,7 @@ export async function GET(_request: NextRequest) {
     }
 
     const envData = planningData.environment;
-    
+
     // Convert to dashboard format
     const environment: Environment = {
       biome: envData.biome || 'Unknown',
@@ -59,14 +59,15 @@ export async function GET(_request: NextRequest) {
     }
 
     if (envData.temperature !== undefined) {
-      environment.nearbyEntities.push(`Temperature: ${Math.round(envData.temperature)}°C`);
+      environment.nearbyEntities.push(
+        `Temperature: ${Math.round(envData.temperature)}°C`
+      );
     }
 
     return NextResponse.json({
       environment,
       timestamp: new Date().toISOString(),
     });
-
   } catch (error) {
     console.error('Error fetching environment data:', error);
     return NextResponse.json(

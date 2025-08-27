@@ -120,7 +120,7 @@ export class EnhancedEnvironmentIntegration extends EventEmitter {
   constructor(config: Partial<EnvironmentIntegrationConfig> = {}) {
     super();
     this.config = { ...DEFAULT_CONFIG, ...config };
-    
+
     if (this.config.enableRealTimeUpdates) {
       this.startPeriodicUpdates();
     }
@@ -133,13 +133,16 @@ export class EnhancedEnvironmentIntegration extends EventEmitter {
     try {
       // Fetch from world system
       const worldData = await this.fetchWorldSystemData();
-      
+
       // Fetch from minecraft bot
       const minecraftData = await this.fetchMinecraftData();
-      
+
       // Combine and process data
-      this.currentEnvironment = this.combineEnvironmentData(worldData, minecraftData);
-      
+      this.currentEnvironment = this.combineEnvironmentData(
+        worldData,
+        minecraftData
+      );
+
       return this.currentEnvironment;
     } catch (error) {
       console.error('Failed to get environment data:', error);
@@ -153,11 +156,13 @@ export class EnhancedEnvironmentIntegration extends EventEmitter {
   async getInventoryData(): Promise<InventoryItem[]> {
     try {
       const minecraftData = await this.fetchMinecraftData();
-      
+
       if (minecraftData?.inventory?.items) {
-        this.currentInventory = this.processInventoryItems(minecraftData.inventory.items);
+        this.currentInventory = this.processInventoryItems(
+          minecraftData.inventory.items
+        );
       }
-      
+
       return this.currentInventory;
     } catch (error) {
       console.error('Failed to get inventory data:', error);
@@ -172,11 +177,11 @@ export class EnhancedEnvironmentIntegration extends EventEmitter {
     try {
       const environment = await this.getEnvironmentData();
       const inventory = await this.getInventoryData();
-      
+
       if (!environment) {
         return null;
       }
-      
+
       this.resourceAssessment = this.assessResources(environment, inventory);
       return this.resourceAssessment;
     } catch (error) {
@@ -246,23 +251,32 @@ export class EnhancedEnvironmentIntegration extends EventEmitter {
   /**
    * Combine environment data from multiple sources
    */
-  private combineEnvironmentData(worldData: any, minecraftData: any): EnvironmentData {
+  private combineEnvironmentData(
+    worldData: any,
+    minecraftData: any
+  ): EnvironmentData {
     const position = minecraftData?.position || { x: 0, y: 64, z: 0 };
     const time = minecraftData?.time || 0;
     const weather = minecraftData?.weather || 'clear';
-    
+
     // Determine biome based on position and world data
     const biome = this.determineBiome(position, worldData);
-    
+
     // Determine time of day
     const timeOfDay = this.determineTimeOfDay(time);
-    
+
     // Process nearby entities
-    const nearbyEntities = this.processNearbyEntities(minecraftData?.entities || [], position);
-    
+    const nearbyEntities = this.processNearbyEntities(
+      minecraftData?.entities || [],
+      position
+    );
+
     // Process nearby blocks
-    const nearbyBlocks = this.processNearbyBlocks(minecraftData?.blocks || [], position);
-    
+    const nearbyBlocks = this.processNearbyBlocks(
+      minecraftData?.blocks || [],
+      position
+    );
+
     // Calculate light level and other environmental factors
     const lightLevel = this.calculateLightLevel(time, weather);
     const temperature = this.calculateTemperature(biome, time);
@@ -286,12 +300,12 @@ export class EnhancedEnvironmentIntegration extends EventEmitter {
    */
   private determineBiome(position: any, worldData: any): string {
     const y = position.y || 64;
-    
+
     // Use world system data if available
     if (worldData?.biome) {
       return worldData.biome;
     }
-    
+
     // Fallback biome determination based on height
     if (y > 80) return 'Mountains';
     if (y > 70) return 'Hills';
@@ -316,11 +330,11 @@ export class EnhancedEnvironmentIntegration extends EventEmitter {
    */
   private processNearbyEntities(entities: any[], position: any): Entity[] {
     return entities
-      .filter(entity => {
+      .filter((entity) => {
         const distance = this.calculateDistance(position, entity.position);
         return distance <= this.config.maxEntityDistance;
       })
-      .map(entity => ({
+      .map((entity) => ({
         id: entity.id || `entity-${Date.now()}`,
         type: entity.type || 'unknown',
         name: entity.name || entity.type || 'Unknown Entity',
@@ -339,11 +353,11 @@ export class EnhancedEnvironmentIntegration extends EventEmitter {
    */
   private processNearbyBlocks(blocks: any[], position: any): Block[] {
     return blocks
-      .filter(block => {
+      .filter((block) => {
         const distance = this.calculateDistance(position, block.position);
         return distance <= this.config.maxBlockDistance;
       })
-      .map(block => ({
+      .map((block) => ({
         id: block.id || `block-${Date.now()}`,
         type: block.type || 'unknown',
         position: block.position || { x: 0, y: 0, z: 0 },
@@ -352,14 +366,18 @@ export class EnhancedEnvironmentIntegration extends EventEmitter {
         harvestable: block.harvestable || false,
         toolRequired: block.toolRequired,
       }))
-      .sort((a, b) => this.calculateDistance(position, a.position) - this.calculateDistance(position, b.position));
+      .sort(
+        (a, b) =>
+          this.calculateDistance(position, a.position) -
+          this.calculateDistance(position, b.position)
+      );
   }
 
   /**
    * Process inventory items
    */
   private processInventoryItems(items: any[]): InventoryItem[] {
-    return items.map(item => ({
+    return items.map((item) => ({
       id: item.id || `item-${Date.now()}`,
       type: item.type || item.id || 'unknown',
       name: item.displayName || item.name || item.type || 'Unknown Item',
@@ -378,29 +396,81 @@ export class EnhancedEnvironmentIntegration extends EventEmitter {
   /**
    * Assess available resources
    */
-  private assessResources(environment: EnvironmentData, inventory: InventoryItem[]): ResourceAssessment {
+  private assessResources(
+    environment: EnvironmentData,
+    inventory: InventoryItem[]
+  ): ResourceAssessment {
     // Count inventory resources
     const availableResources = {
-      wood: this.countInventoryItems(inventory, ['oak_log', 'birch_log', 'spruce_log', 'jungle_log', 'acacia_log', 'dark_oak_log']),
-      stone: this.countInventoryItems(inventory, ['stone', 'cobblestone', 'granite', 'diorite', 'andesite']),
-      food: this.countInventoryItems(inventory, ['apple', 'bread', 'cooked_beef', 'cooked_chicken', 'cooked_porkchop', 'carrot', 'potato']),
-      tools: this.countInventoryItems(inventory, ['wooden_pickaxe', 'stone_pickaxe', 'iron_pickaxe', 'wooden_axe', 'stone_axe', 'iron_axe']),
-      materials: this.countInventoryItems(inventory, ['iron_ingot', 'gold_ingot', 'coal', 'flint', 'string', 'leather']),
+      wood: this.countInventoryItems(inventory, [
+        'oak_log',
+        'birch_log',
+        'spruce_log',
+        'jungle_log',
+        'acacia_log',
+        'dark_oak_log',
+      ]),
+      stone: this.countInventoryItems(inventory, [
+        'stone',
+        'cobblestone',
+        'granite',
+        'diorite',
+        'andesite',
+      ]),
+      food: this.countInventoryItems(inventory, [
+        'apple',
+        'bread',
+        'cooked_beef',
+        'cooked_chicken',
+        'cooked_porkchop',
+        'carrot',
+        'potato',
+      ]),
+      tools: this.countInventoryItems(inventory, [
+        'wooden_pickaxe',
+        'stone_pickaxe',
+        'iron_pickaxe',
+        'wooden_axe',
+        'stone_axe',
+        'iron_axe',
+      ]),
+      materials: this.countInventoryItems(inventory, [
+        'iron_ingot',
+        'gold_ingot',
+        'coal',
+        'flint',
+        'string',
+        'leather',
+      ]),
     };
 
     // Count nearby resources
     const nearbyResources = {
-      trees: environment.nearbyEntities.filter(e => e.type.includes('tree') || e.type.includes('log')).length,
-      stoneDeposits: environment.nearbyBlocks.filter(b => b.type.includes('stone') || b.type.includes('ore')).length,
-      animals: environment.nearbyEntities.filter(e => !e.hostile && e.type.includes('animal')).length,
-      waterSources: environment.nearbyBlocks.filter(b => b.type.includes('water')).length,
+      trees: environment.nearbyEntities.filter(
+        (e) => e.type.includes('tree') || e.type.includes('log')
+      ).length,
+      stoneDeposits: environment.nearbyBlocks.filter(
+        (b) => b.type.includes('stone') || b.type.includes('ore')
+      ).length,
+      animals: environment.nearbyEntities.filter(
+        (e) => !e.hostile && e.type.includes('animal')
+      ).length,
+      waterSources: environment.nearbyBlocks.filter((b) =>
+        b.type.includes('water')
+      ).length,
     };
 
     // Determine resource priorities
-    const resourcePriorities = this.determineResourcePriorities(availableResources, nearbyResources);
+    const resourcePriorities = this.determineResourcePriorities(
+      availableResources,
+      nearbyResources
+    );
 
     // Determine scarcity level
-    const scarcityLevel = this.determineScarcityLevel(availableResources, nearbyResources);
+    const scarcityLevel = this.determineScarcityLevel(
+      availableResources,
+      nearbyResources
+    );
 
     return {
       availableResources,
@@ -413,9 +483,12 @@ export class EnhancedEnvironmentIntegration extends EventEmitter {
   /**
    * Count inventory items by type
    */
-  private countInventoryItems(inventory: InventoryItem[], types: string[]): number {
+  private countInventoryItems(
+    inventory: InventoryItem[],
+    types: string[]
+  ): number {
     return inventory
-      .filter(item => types.some(type => item.type.includes(type)))
+      .filter((item) => types.some((type) => item.type.includes(type)))
       .reduce((total, item) => total + item.count, 0);
   }
 
@@ -424,28 +497,37 @@ export class EnhancedEnvironmentIntegration extends EventEmitter {
    */
   private determineResourcePriorities(available: any, nearby: any): string[] {
     const priorities = [];
-    
+
     // Check for critical shortages
     if (available.food < 5) priorities.push('food');
     if (available.tools < 2) priorities.push('tools');
     if (available.wood < 10) priorities.push('wood');
     if (available.stone < 5) priorities.push('stone');
-    
+
     // Check nearby resource availability
     if (nearby.trees > 0) priorities.push('gather_wood');
     if (nearby.stoneDeposits > 0) priorities.push('mine_stone');
     if (nearby.animals > 0) priorities.push('hunt_food');
-    
+
     return priorities;
   }
 
   /**
    * Determine scarcity level
    */
-  private determineScarcityLevel(available: any, nearby: any): 'low' | 'medium' | 'high' {
-    const totalAvailable = Object.values(available).reduce((sum: number, val: any) => sum + val, 0);
-    const totalNearby = Object.values(nearby).reduce((sum: number, val: any) => sum + val, 0);
-    
+  private determineScarcityLevel(
+    available: any,
+    nearby: any
+  ): 'low' | 'medium' | 'high' {
+    const totalAvailable = Object.values(available).reduce(
+      (sum: number, val: any) => sum + val,
+      0
+    );
+    const totalNearby = Object.values(nearby).reduce(
+      (sum: number, val: any) => sum + val,
+      0
+    );
+
     if (totalAvailable < 10 && totalNearby < 5) return 'high';
     if (totalAvailable < 20 && totalNearby < 10) return 'medium';
     return 'low';
@@ -467,17 +549,17 @@ export class EnhancedEnvironmentIntegration extends EventEmitter {
   private calculateLightLevel(time: number, weather: string): number {
     const hours = Math.floor(time / 1000);
     let baseLight = 15;
-    
+
     // Reduce light at night
     if (hours < 6 || hours >= 18) {
       baseLight = 5;
     }
-    
+
     // Reduce light in bad weather
     if (weather === 'rain' || weather === 'thunder') {
       baseLight = Math.max(3, baseLight - 3);
     }
-    
+
     return baseLight;
   }
 
@@ -486,21 +568,29 @@ export class EnhancedEnvironmentIntegration extends EventEmitter {
    */
   private calculateTemperature(biome: string, time: number): number {
     let baseTemp = 20; // Celsius
-    
+
     // Biome adjustments
     switch (biome.toLowerCase()) {
-      case 'desert': baseTemp += 10; break;
-      case 'mountains': baseTemp -= 5; break;
-      case 'underground': baseTemp += 5; break;
-      case 'caves': baseTemp += 3; break;
+      case 'desert':
+        baseTemp += 10;
+        break;
+      case 'mountains':
+        baseTemp -= 5;
+        break;
+      case 'underground':
+        baseTemp += 5;
+        break;
+      case 'caves':
+        baseTemp += 3;
+        break;
     }
-    
+
     // Time adjustments
     const hours = Math.floor(time / 1000);
     if (hours >= 22 || hours < 6) {
       baseTemp -= 5; // Night is colder
     }
-    
+
     return baseTemp;
   }
 
@@ -509,19 +599,25 @@ export class EnhancedEnvironmentIntegration extends EventEmitter {
    */
   private calculateHumidity(biome: string, weather: string): number {
     let humidity = 50; // Percentage
-    
+
     // Biome adjustments
     switch (biome.toLowerCase()) {
-      case 'desert': humidity -= 30; break;
-      case 'swamp': humidity += 20; break;
-      case 'ocean': humidity += 15; break;
+      case 'desert':
+        humidity -= 30;
+        break;
+      case 'swamp':
+        humidity += 20;
+        break;
+      case 'ocean':
+        humidity += 15;
+        break;
     }
-    
+
     // Weather adjustments
     if (weather === 'rain' || weather === 'thunder') {
       humidity += 30;
     }
-    
+
     return Math.max(0, Math.min(100, humidity));
   }
 
@@ -534,17 +630,17 @@ export class EnhancedEnvironmentIntegration extends EventEmitter {
         const environment = await this.getEnvironmentData();
         const inventory = await this.getInventoryData();
         const resources = await this.getResourceAssessment();
-        
+
         if (environment) {
           this.emit('environmentUpdated', environment);
           this.notifyDashboard('environmentUpdated', environment);
         }
-        
+
         if (inventory.length > 0) {
           this.emit('inventoryUpdated', inventory);
           this.notifyDashboard('inventoryUpdated', inventory);
         }
-        
+
         if (resources) {
           this.emit('resourcesUpdated', resources);
           this.notifyDashboard('resourcesUpdated', resources);
@@ -587,7 +683,7 @@ export class EnhancedEnvironmentIntegration extends EventEmitter {
    */
   updateConfig(newConfig: Partial<EnvironmentIntegrationConfig>): void {
     this.config = { ...this.config, ...newConfig };
-    
+
     // Restart updates if interval changed
     if (this.config.enableRealTimeUpdates && this.updateTimer) {
       this.stopPeriodicUpdates();

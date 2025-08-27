@@ -259,6 +259,7 @@ import { Goal, GoalStatus } from './types';
 import { EnhancedTaskIntegration } from './enhanced-task-integration';
 import { EnhancedMemoryIntegration } from './enhanced-memory-integration';
 import { EnhancedEnvironmentIntegration } from './enhanced-environment-integration';
+import { EnhancedLiveStreamIntegration } from './enhanced-live-stream-integration';
 
 // Initialize the integrated planning coordinator
 const integratedPlanningCoordinator = new IntegratedPlanningCoordinator({
@@ -316,6 +317,22 @@ const enhancedEnvironmentIntegration = new EnhancedEnvironmentIntegration({
   maxBlockDistance: 20,
 });
 
+// Initialize enhanced live stream integration system
+const enhancedLiveStreamIntegration = new EnhancedLiveStreamIntegration({
+  enableRealTimeUpdates: true,
+  enableActionLogging: true,
+  enableVisualFeedback: true,
+  enableMiniMap: true,
+  enableScreenshots: true,
+  dashboardEndpoint: 'http://localhost:3000',
+  minecraftEndpoint: 'http://localhost:3005',
+  screenshotEndpoint: 'http://localhost:3005/screenshots',
+  updateInterval: 2000,
+  maxActionLogs: 1000,
+  maxVisualFeedbacks: 100,
+  screenshotInterval: 10000,
+});
+
 // Set up event listeners for enhanced task integration
 enhancedTaskIntegration.on('taskAdded', (task) => {
   console.log('Task added to enhanced integration:', task.title);
@@ -358,6 +375,27 @@ enhancedEnvironmentIntegration.on('inventoryUpdated', (inventory) => {
 
 enhancedEnvironmentIntegration.on('resourcesUpdated', (resources) => {
   console.log('Resources updated:', resources.scarcityLevel, 'scarcity');
+});
+
+// Set up event listeners for enhanced live stream integration
+enhancedLiveStreamIntegration.on('liveStreamUpdated', (streamData) => {
+  console.log('Live stream updated:', streamData.status, streamData.connected);
+});
+
+enhancedLiveStreamIntegration.on('actionLogged', (actionLog) => {
+  console.log('Action logged:', actionLog.type, actionLog.action);
+});
+
+enhancedLiveStreamIntegration.on('visualFeedbackAdded', (feedback) => {
+  console.log('Visual feedback added:', feedback.type, feedback.severity);
+});
+
+enhancedLiveStreamIntegration.on('miniMapUpdated', (miniMapData) => {
+  console.log('Mini-map updated:', miniMapData.position);
+});
+
+enhancedLiveStreamIntegration.on('screenshotCaptured', (screenshot) => {
+  console.log('Screenshot captured:', screenshot.url);
 });
 
 // Add some initial tasks for testing
@@ -2999,8 +3037,18 @@ app.get('/state', (req, res) => {
       enhancedEnvironmentIntegration: {
         environment: enhancedEnvironmentIntegration.getCurrentEnvironment(),
         inventory: enhancedEnvironmentIntegration.getCurrentInventory(),
-        resources: enhancedEnvironmentIntegration.getCurrentResourceAssessment(),
-        totalInventoryItems: enhancedEnvironmentIntegration.getCurrentInventory().length,
+        resources:
+          enhancedEnvironmentIntegration.getCurrentResourceAssessment(),
+        totalInventoryItems:
+          enhancedEnvironmentIntegration.getCurrentInventory().length,
+      },
+      enhancedLiveStreamIntegration: {
+        liveStream: enhancedLiveStreamIntegration.getCurrentLiveStreamData(),
+        actionLogs: enhancedLiveStreamIntegration.getCurrentActionLogs().slice(0, 20),
+        visualFeedbacks: enhancedLiveStreamIntegration.getCurrentVisualFeedbacks().slice(0, 10),
+        miniMap: enhancedLiveStreamIntegration.getCurrentMiniMapData(),
+        totalActionLogs: enhancedLiveStreamIntegration.getCurrentActionLogs().length,
+        totalVisualFeedbacks: enhancedLiveStreamIntegration.getCurrentVisualFeedbacks().length,
       },
       lastTaskExecution: planningSystem.goalFormulation._lastTaskExecution,
       timestamp: Date.now(),
@@ -3102,7 +3150,7 @@ app.get('/memory-statistics', (req, res) => {
   try {
     const events = enhancedMemoryIntegration.getEvents();
     const notes = enhancedMemoryIntegration.getNotes();
-    
+
     const statistics = {
       totalEvents: events.length,
       totalNotes: notes.length,
@@ -3148,8 +3196,9 @@ app.get('/memory-statistics', (req, res) => {
 // Get environment data
 app.get('/environment', async (req, res) => {
   try {
-    const environment = await enhancedEnvironmentIntegration.getEnvironmentData();
-    
+    const environment =
+      await enhancedEnvironmentIntegration.getEnvironmentData();
+
     if (!environment) {
       return res.status(503).json({
         success: false,
@@ -3173,7 +3222,7 @@ app.get('/environment', async (req, res) => {
 app.get('/inventory', async (req, res) => {
   try {
     const inventory = await enhancedEnvironmentIntegration.getInventoryData();
-    
+
     res.json({
       success: true,
       inventory,
@@ -3189,8 +3238,9 @@ app.get('/inventory', async (req, res) => {
 // Get resource assessment
 app.get('/resources', async (req, res) => {
   try {
-    const resources = await enhancedEnvironmentIntegration.getResourceAssessment();
-    
+    const resources =
+      await enhancedEnvironmentIntegration.getResourceAssessment();
+
     if (!resources) {
       return res.status(503).json({
         success: false,
@@ -3214,7 +3264,7 @@ app.get('/resources', async (req, res) => {
 app.get('/entities', async (req, res) => {
   try {
     const entities = await enhancedEnvironmentIntegration.getNearbyEntities();
-    
+
     res.json({
       success: true,
       entities,
@@ -3241,6 +3291,190 @@ app.get('/blocks', async (req, res) => {
   } catch (error) {
     console.error('Error getting nearby blocks:', error);
     res.status(500).json({ error: 'Failed to get nearby blocks' });
+  }
+});
+
+// Get live stream data
+app.get('/live-stream', async (req, res) => {
+  try {
+    const streamData = await enhancedLiveStreamIntegration.getLiveStreamData();
+    
+    if (!streamData) {
+      return res.status(503).json({
+        success: false,
+        error: 'Live stream data unavailable',
+        timestamp: Date.now(),
+      });
+    }
+
+    res.json({
+      success: true,
+      streamData,
+      timestamp: Date.now(),
+    });
+  } catch (error) {
+    console.error('Error getting live stream data:', error);
+    res.status(500).json({ error: 'Failed to get live stream data' });
+  }
+});
+
+// Get action logs
+app.get('/action-logs', async (req, res) => {
+  try {
+    const { type, result, limit } = req.query;
+    const filters: any = {};
+    
+    if (type) filters.type = type as string;
+    if (result) filters.result = result as string;
+    if (limit) filters.limit = parseInt(limit as string);
+
+    const actionLogs = enhancedLiveStreamIntegration.getActionLogs(filters);
+    
+    res.json({
+      success: true,
+      actionLogs,
+      totalLogs: actionLogs.length,
+      timestamp: Date.now(),
+    });
+  } catch (error) {
+    console.error('Error getting action logs:', error);
+    res.status(500).json({ error: 'Failed to get action logs' });
+  }
+});
+
+// Get visual feedbacks
+app.get('/visual-feedbacks', async (req, res) => {
+  try {
+    const { type, severity, limit } = req.query;
+    const filters: any = {};
+    
+    if (type) filters.type = type as string;
+    if (severity) filters.severity = severity as string;
+    if (limit) filters.limit = parseInt(limit as string);
+
+    const feedbacks = enhancedLiveStreamIntegration.getVisualFeedbacks(filters);
+    
+    res.json({
+      success: true,
+      feedbacks,
+      totalFeedbacks: feedbacks.length,
+      timestamp: Date.now(),
+    });
+  } catch (error) {
+    console.error('Error getting visual feedbacks:', error);
+    res.status(500).json({ error: 'Failed to get visual feedbacks' });
+  }
+});
+
+// Get mini-map data
+app.get('/mini-map', async (req, res) => {
+  try {
+    const miniMapData = await enhancedLiveStreamIntegration.updateMiniMapData();
+    
+    if (!miniMapData) {
+      return res.status(503).json({
+        success: false,
+        error: 'Mini-map data unavailable',
+        timestamp: Date.now(),
+      });
+    }
+
+    res.json({
+      success: true,
+      miniMapData,
+      timestamp: Date.now(),
+    });
+  } catch (error) {
+    console.error('Error getting mini-map data:', error);
+    res.status(500).json({ error: 'Failed to get mini-map data' });
+  }
+});
+
+// Capture screenshot
+app.post('/screenshot', async (req, res) => {
+  try {
+    const screenshotUrl = await enhancedLiveStreamIntegration.captureScreenshot();
+    
+    if (!screenshotUrl) {
+      return res.status(503).json({
+        success: false,
+        error: 'Screenshot capture failed',
+        timestamp: Date.now(),
+      });
+    }
+
+    res.json({
+      success: true,
+      screenshotUrl,
+      timestamp: Date.now(),
+    });
+  } catch (error) {
+    console.error('Error capturing screenshot:', error);
+    res.status(500).json({ error: 'Failed to capture screenshot' });
+  }
+});
+
+// Add action log
+app.post('/action-log', (req, res) => {
+  try {
+    const { type, action, parameters, result, duration, metadata } = req.body;
+    
+    if (!type || !action) {
+      return res.status(400).json({
+        success: false,
+        message: 'Action type and action are required',
+      });
+    }
+
+    const actionLog = enhancedLiveStreamIntegration.addActionLog(
+      type,
+      action,
+      parameters || {},
+      result || 'pending',
+      duration || 0,
+      metadata || {}
+    );
+
+    res.json({
+      success: true,
+      actionLog,
+      timestamp: Date.now(),
+    });
+  } catch (error) {
+    console.error('Error adding action log:', error);
+    res.status(500).json({ error: 'Failed to add action log' });
+  }
+});
+
+// Add visual feedback
+app.post('/visual-feedback', (req, res) => {
+  try {
+    const { type, message, severity, position, duration, metadata } = req.body;
+    
+    if (!type || !message) {
+      return res.status(400).json({
+        success: false,
+        message: 'Feedback type and message are required',
+      });
+    }
+
+    const feedback = enhancedLiveStreamIntegration.addVisualFeedback(
+      type,
+      message,
+      severity || 'info',
+      position,
+      duration || 5000,
+      metadata || {}
+    );
+
+    res.json({
+      success: true,
+      feedback,
+      timestamp: Date.now(),
+    });
+  } catch (error) {
+    console.error('Error adding visual feedback:', error);
+    res.status(500).json({ error: 'Failed to add visual feedback' });
   }
 });
 

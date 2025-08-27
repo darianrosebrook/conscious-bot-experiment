@@ -177,40 +177,8 @@ export const GET = async (req: NextRequest) => {
                 (globalThis as any).minecraftUnavailableLogged = true;
               }
 
-              // Enhanced graceful fallback with better state management
-              minecraftData = {
-                success: false,
-                data: {
-                  inventory: {
-                    hotbar: [],
-                    main: [],
-                    totalSlots: 36,
-                    freeSlots: 36,
-                    selectedSlot: 0,
-                  },
-                  position: { x: 0, y: 64, z: 0 }, // Default spawn position
-                  vitals: {
-                    health: 20,
-                    food: 20,
-                    hunger: 0,
-                    experience: 0,
-                    level: 0,
-                  },
-                  worldState: {
-                    time: 6000,
-                    weather: 'clear',
-                    biome: 'plains',
-                    lightLevel: 15,
-                    nearbyEntities: [],
-                    nearbyHostiles: [],
-                  },
-                },
-                error:
-                  minecraftError instanceof Error
-                    ? minecraftError.message
-                    : 'Minecraft interface unavailable',
-                fallback: true,
-              };
+              // No fallback data - return null to indicate unavailability
+              minecraftData = null;
             }
 
             // Fetch cognition state with fallback
@@ -236,34 +204,8 @@ export const GET = async (req: NextRequest) => {
                 (globalThis as any).cognitionUnavailableLogged = true;
               }
 
-              // Enhanced graceful fallback for cognition service
-              cognitionData = {
-                data: {
-                  thoughts: [],
-                  memories: [],
-                  emotions: {
-                    happiness: 0.5,
-                    fear: 0.0,
-                    curiosity: 0.7,
-                    confidence: 0.6,
-                  },
-                  cognitiveLoad: 0.3,
-                  attention: {
-                    focus: 0.8,
-                    distractions: [],
-                  },
-                  decisionMaking: {
-                    currentProcess: 'idle',
-                    confidence: 0.5,
-                    alternatives: [],
-                  },
-                },
-                error:
-                  cognitionError instanceof Error
-                    ? cognitionError.message
-                    : 'Cognition service unavailable',
-                fallback: true,
-              };
+              // No fallback data - return null to indicate unavailability
+              cognitionData = null;
             }
 
             // Fetch world state with fallback
@@ -284,35 +226,8 @@ export const GET = async (req: NextRequest) => {
                 (globalThis as any).worldUnavailableLogged = true;
               }
 
-              // Enhanced graceful fallback for world service
-              worldData = {
-                data: {
-                  environment: {
-                    time: 6000,
-                    weather: 'clear',
-                    biome: 'plains',
-                    lightLevel: 15,
-                    temperature: 20,
-                    humidity: 0.5,
-                  },
-                  nearbyEntities: [],
-                  nearbyHostiles: [],
-                  nearbyItems: [],
-                  structures: [],
-                  waypoints: [],
-                  dangerLevel: 0.0,
-                  accessibility: {
-                    walkable: true,
-                    swimmable: false,
-                    flyable: false,
-                  },
-                },
-                error:
-                  worldError instanceof Error
-                    ? worldError.message
-                    : 'World service unavailable',
-                fallback: true,
-              };
+              // No fallback data - return null to indicate unavailability
+              worldData = null;
             }
 
             const botState = {
@@ -339,13 +254,9 @@ export const GET = async (req: NextRequest) => {
                       }
                     : null,
                 environment: worldData || null,
-                cognition: {
-                  ...cognitionData,
-                  // Add default interoceptive data
-                  stress: 20, // Default stress level (lower is better)
-                  focus: 80, // Default focus level
-                  curiosity: 75, // Default curiosity level
-                  mood: 'neutral', // Default mood
+                cognition: cognitionData || {
+                  // Only provide minimal fallback if no cognition data available
+                  error: 'Cognition service unavailable',
                 },
               },
             };

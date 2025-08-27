@@ -7,9 +7,7 @@ import { NextRequest } from 'next/server';
  * @author @darianrosebrook
  */
 
-function orderByTs(a: any, b: any) {
-  return new Date(a.ts).getTime() - new Date(b.ts).getTime();
-}
+// Removed unused orderByTs function
 
 export const GET = async (req: NextRequest) => {
   try {
@@ -27,32 +25,53 @@ export const GET = async (req: NextRequest) => {
       start(controller) {
         const sendStreamData = async () => {
           try {
-            // Fetch current bot state
-            const minecraftRes = await fetch('http://localhost:3005/state');
+            // Fetch live stream data from planning system
+            const planningRes = await fetch('http://localhost:3002/live-stream');
 
             const streamData = {
               ts: new Date().toISOString(),
               type: 'stream_update',
               data: {
                 connected: false,
-                placeholder: true,
-                message:
-                  'Prismarine viewer is disabled. Bot is connected and active.',
+                placeholder: false,
+                message: 'Live stream data unavailable',
                 botState: null,
+                streamData: null,
               },
             };
 
-            // Get bot state if available
-            if (minecraftRes.ok) {
-              const minecraftData = await minecraftRes.json();
-              streamData.data.connected = minecraftData.success;
-              streamData.data.botState = minecraftData.data.sort(orderByTs);
+            // Get live stream data if available
+            if (planningRes.ok) {
+              const planningData = await planningRes.json();
+              if (planningData.success && planningData.streamData) {
+                streamData.data.connected = planningData.streamData.connected;
+                streamData.data.placeholder = false;
+                streamData.data.message = planningData.streamData.status === 'active' 
+                  ? 'Live stream active' 
+                  : planningData.streamData.error || 'Stream inactive';
+                streamData.data.streamData = planningData.streamData;
+              }
             }
 
             const data = `data: ${JSON.stringify(streamData)}\n\n`;
             controller.enqueue(encoder.encode(data));
           } catch (error) {
-            // Silently handle errors
+            console.error('Error in stream data update:', error);
+            // Send error state
+            const errorData = {
+              ts: new Date().toISOString(),
+              type: 'stream_update',
+              data: {
+                connected: false,
+                placeholder: false,
+                message: 'Stream data error',
+                botState: null,
+                streamData: null,
+                error: error instanceof Error ? error.message : 'Unknown error',
+              },
+            };
+            const data = `data: ${JSON.stringify(errorData)}\n\n`;
+            controller.enqueue(encoder.encode(data));
           }
         };
 
@@ -78,6 +97,7 @@ export const GET = async (req: NextRequest) => {
       },
     });
   } catch (error) {
+    console.error('Failed to create stream:', error);
     return new Response('Internal Server Error', { status: 500 });
   }
 };

@@ -33,8 +33,10 @@ export async function GET(_request: NextRequest) {
         }
       }
     } catch (error) {
-      console.log('Planning system inventory not available, trying minecraft bot directly');
-      
+      console.log(
+        'Planning system inventory not available, trying minecraft bot directly'
+      );
+
       // Fallback to minecraft bot
       try {
         const minecraftResponse = await fetch('http://localhost:3005/state', {
