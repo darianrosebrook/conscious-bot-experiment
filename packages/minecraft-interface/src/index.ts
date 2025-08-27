@@ -52,6 +52,12 @@ export {
 // Types
 export * from './types';
 
+// Leaf implementations
+export * from './leaves/movement-leaves';
+export * from './leaves/interaction-leaves';
+export * from './leaves/sensing-leaves';
+export * from './leaves/crafting-leaves';
+
 // Utility functions
 export { createDefaultBotConfig, validateBotConfig } from './utils';
 
