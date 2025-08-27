@@ -38,6 +38,12 @@ export { CapabilityRateLimiter } from './mcp-capabilities/rate-limiter';
 export { createLeafContext } from './mcp-capabilities/leaf-contracts';
 export { LeafFactory } from './mcp-capabilities/leaf-factory';
 
+// Leaf Implementations
+export * from './leaves/movement-leaves';
+export * from './leaves/interaction-leaves';
+export * from './leaves/sensing-leaves';
+export * from './leaves/crafting-leaves';
+
 // Real-Time Performance Monitoring
 export {
   PerformanceTracker,

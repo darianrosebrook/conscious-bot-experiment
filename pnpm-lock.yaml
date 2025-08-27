@@ -106,9 +106,18 @@ importers:
       express:
         specifier: ^4.18.0
         version: 4.21.2
+      mineflayer:
+        specifier: ^4.32.0
+        version: 4.32.0
+      mineflayer-pathfinder:
+        specifier: ^2.4.1
+        version: 2.4.5
       uuid:
         specifier: ^9.0.1
         version: 9.0.1
+      vec3:
+        specifier: ^0.1.8
+        version: 0.1.10
       zod:
         specifier: ^3.25.76
         version: 3.25.76

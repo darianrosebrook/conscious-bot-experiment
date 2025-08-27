@@ -11,7 +11,7 @@ import { EventEmitter } from 'events';
 import { CognitiveStreamIntegration } from './cognitive-stream-integration.js';
 import { Bot } from 'mineflayer';
 
-// Import real leaf implementations from minecraft-interface
+// Import real leaf implementations from core
 import {
   MoveToLeaf,
   StepForwardSafelyLeaf,
@@ -23,7 +23,7 @@ import {
   SenseHostilesLeaf,
   GetLightLevelLeaf,
   CraftRecipeLeaf,
-} from '@conscious-bot/minecraft-interface';
+} from './leaves/index.js';
 
 export interface MinecraftCognitiveConfig {
   bot: Bot;
@@ -156,7 +156,7 @@ export class MinecraftCognitiveIntegration extends EventEmitter {
     });
 
     // Monitor food changes
-    this.config.bot.on('food', () => {
+    this.config.bot.on('playerCollect', () => {
       this.updateBotStateFromRealBot();
     });
 
