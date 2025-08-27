@@ -26,7 +26,9 @@ export const GET = async (req: NextRequest) => {
         const sendStreamData = async () => {
           try {
             // Fetch live stream data from planning system
-            const planningRes = await fetch('http://localhost:3002/live-stream');
+            const planningRes = await fetch(
+              'http://localhost:3002/live-stream'
+            );
 
             const streamData = {
               ts: new Date().toISOString(),
@@ -46,9 +48,10 @@ export const GET = async (req: NextRequest) => {
               if (planningData.success && planningData.streamData) {
                 streamData.data.connected = planningData.streamData.connected;
                 streamData.data.placeholder = false;
-                streamData.data.message = planningData.streamData.status === 'active' 
-                  ? 'Live stream active' 
-                  : planningData.streamData.error || 'Stream inactive';
+                streamData.data.message =
+                  planningData.streamData.status === 'active'
+                    ? 'Live stream active'
+                    : planningData.streamData.error || 'Stream inactive';
                 streamData.data.streamData = planningData.streamData;
               }
             }

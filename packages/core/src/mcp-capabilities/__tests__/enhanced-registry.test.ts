@@ -6,6 +6,7 @@
  * @author @darianrosebrook
  */
 
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { EnhancedRegistry } from '../enhanced-registry';
 import { LeafFactory, LeafImpl } from '../leaf-factory';
 import { LeafContext, LeafResult, LeafSpec } from '../leaf-contracts';

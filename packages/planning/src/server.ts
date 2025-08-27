@@ -3044,11 +3044,17 @@ app.get('/state', (req, res) => {
       },
       enhancedLiveStreamIntegration: {
         liveStream: enhancedLiveStreamIntegration.getCurrentLiveStreamData(),
-        actionLogs: enhancedLiveStreamIntegration.getCurrentActionLogs().slice(0, 20),
-        visualFeedbacks: enhancedLiveStreamIntegration.getCurrentVisualFeedbacks().slice(0, 10),
+        actionLogs: enhancedLiveStreamIntegration
+          .getCurrentActionLogs()
+          .slice(0, 20),
+        visualFeedbacks: enhancedLiveStreamIntegration
+          .getCurrentVisualFeedbacks()
+          .slice(0, 10),
         miniMap: enhancedLiveStreamIntegration.getCurrentMiniMapData(),
-        totalActionLogs: enhancedLiveStreamIntegration.getCurrentActionLogs().length,
-        totalVisualFeedbacks: enhancedLiveStreamIntegration.getCurrentVisualFeedbacks().length,
+        totalActionLogs:
+          enhancedLiveStreamIntegration.getCurrentActionLogs().length,
+        totalVisualFeedbacks:
+          enhancedLiveStreamIntegration.getCurrentVisualFeedbacks().length,
       },
       lastTaskExecution: planningSystem.goalFormulation._lastTaskExecution,
       timestamp: Date.now(),
@@ -3281,7 +3287,7 @@ app.get('/entities', async (req, res) => {
 app.get('/blocks', async (req, res) => {
   try {
     const blocks = await enhancedEnvironmentIntegration.getNearbyBlocks();
-    
+
     res.json({
       success: true,
       blocks,
@@ -3298,7 +3304,7 @@ app.get('/blocks', async (req, res) => {
 app.get('/live-stream', async (req, res) => {
   try {
     const streamData = await enhancedLiveStreamIntegration.getLiveStreamData();
-    
+
     if (!streamData) {
       return res.status(503).json({
         success: false,
@@ -3323,13 +3329,13 @@ app.get('/action-logs', async (req, res) => {
   try {
     const { type, result, limit } = req.query;
     const filters: any = {};
-    
+
     if (type) filters.type = type as string;
     if (result) filters.result = result as string;
     if (limit) filters.limit = parseInt(limit as string);
 
     const actionLogs = enhancedLiveStreamIntegration.getActionLogs(filters);
-    
+
     res.json({
       success: true,
       actionLogs,
@@ -3347,13 +3353,13 @@ app.get('/visual-feedbacks', async (req, res) => {
   try {
     const { type, severity, limit } = req.query;
     const filters: any = {};
-    
+
     if (type) filters.type = type as string;
     if (severity) filters.severity = severity as string;
     if (limit) filters.limit = parseInt(limit as string);
 
     const feedbacks = enhancedLiveStreamIntegration.getVisualFeedbacks(filters);
-    
+
     res.json({
       success: true,
       feedbacks,
@@ -3370,7 +3376,7 @@ app.get('/visual-feedbacks', async (req, res) => {
 app.get('/mini-map', async (req, res) => {
   try {
     const miniMapData = await enhancedLiveStreamIntegration.updateMiniMapData();
-    
+
     if (!miniMapData) {
       return res.status(503).json({
         success: false,
@@ -3393,8 +3399,9 @@ app.get('/mini-map', async (req, res) => {
 // Capture screenshot
 app.post('/screenshot', async (req, res) => {
   try {
-    const screenshotUrl = await enhancedLiveStreamIntegration.captureScreenshot();
-    
+    const screenshotUrl =
+      await enhancedLiveStreamIntegration.captureScreenshot();
+
     if (!screenshotUrl) {
       return res.status(503).json({
         success: false,
@@ -3418,7 +3425,7 @@ app.post('/screenshot', async (req, res) => {
 app.post('/action-log', (req, res) => {
   try {
     const { type, action, parameters, result, duration, metadata } = req.body;
-    
+
     if (!type || !action) {
       return res.status(400).json({
         success: false,
@@ -3450,7 +3457,7 @@ app.post('/action-log', (req, res) => {
 app.post('/visual-feedback', (req, res) => {
   try {
     const { type, message, severity, position, duration, metadata } = req.body;
-    
+
     if (!type || !message) {
       return res.status(400).json({
         success: false,

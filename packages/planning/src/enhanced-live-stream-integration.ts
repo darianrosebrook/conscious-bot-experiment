@@ -124,11 +124,11 @@ export class EnhancedLiveStreamIntegration extends EventEmitter {
   constructor(config: Partial<LiveStreamIntegrationConfig> = {}) {
     super();
     this.config = { ...DEFAULT_CONFIG, ...config };
-    
+
     if (this.config.enableRealTimeUpdates) {
       this.startPeriodicUpdates();
     }
-    
+
     if (this.config.enableScreenshots) {
       this.startScreenshotCapture();
     }
@@ -140,8 +140,10 @@ export class EnhancedLiveStreamIntegration extends EventEmitter {
   async getLiveStreamData(): Promise<LiveStreamData | null> {
     try {
       // Check if minecraft bot is connected and streaming
-      const minecraftRes = await fetch(`${this.config.minecraftEndpoint}/state`);
-      
+      const minecraftRes = await fetch(
+        `${this.config.minecraftEndpoint}/state`
+      );
+
       if (!minecraftRes.ok) {
         this.liveStreamData = {
           connected: false,
@@ -154,8 +156,8 @@ export class EnhancedLiveStreamIntegration extends EventEmitter {
         return this.liveStreamData;
       }
 
-      const minecraftData = await minecraftRes.json() as any;
-      
+      const minecraftData = (await minecraftRes.json()) as any;
+
       if (!minecraftData.success) {
         this.liveStreamData = {
           connected: false,
@@ -171,9 +173,11 @@ export class EnhancedLiveStreamIntegration extends EventEmitter {
       // Get screenshot if available
       let screenshotUrl: string | undefined;
       try {
-        const screenshotRes = await fetch(`${this.config.screenshotEndpoint}?limit=1`);
+        const screenshotRes = await fetch(
+          `${this.config.screenshotEndpoint}?limit=1`
+        );
         if (screenshotRes.ok) {
-          const screenshots = await screenshotRes.json() as any;
+          const screenshots = (await screenshotRes.json()) as any;
           if (screenshots.length > 0) {
             screenshotUrl = screenshots[0].url;
           }
@@ -272,7 +276,10 @@ export class EnhancedLiveStreamIntegration extends EventEmitter {
 
     // Keep only the most recent feedbacks
     if (this.visualFeedbacks.length > this.config.maxVisualFeedbacks) {
-      this.visualFeedbacks = this.visualFeedbacks.slice(0, this.config.maxVisualFeedbacks);
+      this.visualFeedbacks = this.visualFeedbacks.slice(
+        0,
+        this.config.maxVisualFeedbacks
+      );
     }
 
     this.emit('visualFeedbackAdded', feedback);
@@ -290,19 +297,22 @@ export class EnhancedLiveStreamIntegration extends EventEmitter {
   async updateMiniMapData(): Promise<MiniMapData | null> {
     try {
       // Get minecraft bot state for position and entities
-      const minecraftRes = await fetch(`${this.config.minecraftEndpoint}/state`);
-      
+      const minecraftRes = await fetch(
+        `${this.config.minecraftEndpoint}/state`
+      );
+
       if (!minecraftRes.ok) {
         return null;
       }
 
-      const minecraftData = await minecraftRes.json() as any;
-      
+      const minecraftData = (await minecraftRes.json()) as any;
+
       if (!minecraftData.success || !minecraftData.data) {
         return null;
       }
 
-      const position = minecraftData.data.position || minecraftData.data.worldState?.playerPosition || { x: 0, y: 64, z: 0 };
+      const position = minecraftData.data.position ||
+        minecraftData.data.worldState?.playerPosition || { x: 0, y: 64, z: 0 };
       const entities = minecraftData.data.worldState?.nearbyEntities || [];
       const blocks = minecraftData.data.worldState?.nearbyBlocks || [];
 
@@ -335,7 +345,11 @@ export class EnhancedLiveStreamIntegration extends EventEmitter {
         .sort((a: any, b: any) => a.distance - b.distance);
 
       // Generate waypoints based on current context
-      const waypoints = this.generateWaypoints(position, nearbyEntities, nearbyBlocks);
+      const waypoints = this.generateWaypoints(
+        position,
+        nearbyEntities,
+        nearbyBlocks
+      );
 
       // Generate explored area (simplified - in real implementation this would track actual exploration)
       const exploredArea = this.generateExploredArea(position);
@@ -382,7 +396,7 @@ export class EnhancedLiveStreamIntegration extends EventEmitter {
         return null;
       }
 
-      const result = await response.json() as any;
+      const result = (await response.json()) as any;
       return result.url || null;
     } catch (error) {
       console.error('Failed to capture screenshot:', error);
@@ -401,11 +415,11 @@ export class EnhancedLiveStreamIntegration extends EventEmitter {
     let logs = [...this.actionLogs];
 
     if (filters?.type) {
-      logs = logs.filter(log => log.type === filters.type);
+      logs = logs.filter((log) => log.type === filters.type);
     }
 
     if (filters?.result) {
-      logs = logs.filter(log => log.result === filters.result);
+      logs = logs.filter((log) => log.result === filters.result);
     }
 
     if (filters?.limit) {
@@ -426,11 +440,15 @@ export class EnhancedLiveStreamIntegration extends EventEmitter {
     let feedbacks = [...this.visualFeedbacks];
 
     if (filters?.type) {
-      feedbacks = feedbacks.filter(feedback => feedback.type === filters.type);
+      feedbacks = feedbacks.filter(
+        (feedback) => feedback.type === filters.type
+      );
     }
 
     if (filters?.severity) {
-      feedbacks = feedbacks.filter(feedback => feedback.severity === filters.severity);
+      feedbacks = feedbacks.filter(
+        (feedback) => feedback.severity === filters.severity
+      );
     }
 
     if (filters?.limit) {
@@ -460,7 +478,11 @@ export class EnhancedLiveStreamIntegration extends EventEmitter {
   /**
    * Generate waypoints based on current context
    */
-  private generateWaypoints(position: any, entities: any[], blocks: any[]): Array<{
+  private generateWaypoints(
+    position: any,
+    entities: any[],
+    blocks: any[]
+  ): Array<{
     id: string;
     name: string;
     position: { x: number; y: number; z: number };
@@ -477,10 +499,11 @@ export class EnhancedLiveStreamIntegration extends EventEmitter {
     });
 
     // Add resource waypoints based on nearby blocks
-    const resourceBlocks = blocks.filter(block => 
-      block.type.includes('tree') || 
-      block.type.includes('ore') || 
-      block.type.includes('stone')
+    const resourceBlocks = blocks.filter(
+      (block) =>
+        block.type.includes('tree') ||
+        block.type.includes('ore') ||
+        block.type.includes('stone')
     );
 
     resourceBlocks.slice(0, 3).forEach((block, index) => {
@@ -493,7 +516,7 @@ export class EnhancedLiveStreamIntegration extends EventEmitter {
     });
 
     // Add danger waypoints based on hostile entities
-    const hostileEntities = entities.filter(entity => entity.hostile);
+    const hostileEntities = entities.filter((entity) => entity.hostile);
     hostileEntities.slice(0, 2).forEach((entity, index) => {
       waypoints.push({
         id: `danger-${index}`,
@@ -563,8 +586,14 @@ export class EnhancedLiveStreamIntegration extends EventEmitter {
       try {
         const screenshotUrl = await this.captureScreenshot();
         if (screenshotUrl) {
-          this.emit('screenshotCaptured', { url: screenshotUrl, timestamp: Date.now() });
-          this.notifyDashboard('screenshotCaptured', { url: screenshotUrl, timestamp: Date.now() });
+          this.emit('screenshotCaptured', {
+            url: screenshotUrl,
+            timestamp: Date.now(),
+          });
+          this.notifyDashboard('screenshotCaptured', {
+            url: screenshotUrl,
+            timestamp: Date.now(),
+          });
         }
       } catch (error) {
         console.error('Error in screenshot capture:', error);
@@ -608,7 +637,7 @@ export class EnhancedLiveStreamIntegration extends EventEmitter {
    */
   updateConfig(newConfig: Partial<LiveStreamIntegrationConfig>): void {
     this.config = { ...this.config, ...newConfig };
-    
+
     // Restart updates if interval changed
     if (this.config.enableRealTimeUpdates && this.updateTimer) {
       this.stopPeriodicUpdates();
