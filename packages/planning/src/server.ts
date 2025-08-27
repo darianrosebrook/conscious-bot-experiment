@@ -258,6 +258,7 @@ import { EnhancedReactiveExecutor } from './reactive-executor/enhanced-reactive-
 import { Goal, GoalStatus } from './types';
 import { EnhancedTaskIntegration } from './enhanced-task-integration';
 import { EnhancedMemoryIntegration } from './enhanced-memory-integration';
+import { EnhancedEnvironmentIntegration } from './enhanced-environment-integration';
 
 // Initialize the integrated planning coordinator
 const integratedPlanningCoordinator = new IntegratedPlanningCoordinator({
@@ -301,6 +302,20 @@ const enhancedMemoryIntegration = new EnhancedMemoryIntegration({
   maxNotes: 50,
 });
 
+// Initialize enhanced environment integration system
+const enhancedEnvironmentIntegration = new EnhancedEnvironmentIntegration({
+  enableRealTimeUpdates: true,
+  enableEntityDetection: true,
+  enableInventoryTracking: true,
+  enableResourceAssessment: true,
+  dashboardEndpoint: 'http://localhost:3000',
+  worldSystemEndpoint: 'http://localhost:3004',
+  minecraftEndpoint: 'http://localhost:3005',
+  updateInterval: 5000,
+  maxEntityDistance: 50,
+  maxBlockDistance: 20,
+});
+
 // Set up event listeners for enhanced task integration
 enhancedTaskIntegration.on('taskAdded', (task) => {
   console.log('Task added to enhanced integration:', task.title);
@@ -330,6 +345,19 @@ enhancedMemoryIntegration.on('eventAdded', (event) => {
 
 enhancedMemoryIntegration.on('noteAdded', (note) => {
   console.log('Reflective note added:', note.title);
+});
+
+// Set up event listeners for enhanced environment integration
+enhancedEnvironmentIntegration.on('environmentUpdated', (environment) => {
+  console.log('Environment updated:', environment.biome, environment.timeOfDay);
+});
+
+enhancedEnvironmentIntegration.on('inventoryUpdated', (inventory) => {
+  console.log('Inventory updated:', inventory.length, 'items');
+});
+
+enhancedEnvironmentIntegration.on('resourcesUpdated', (resources) => {
+  console.log('Resources updated:', resources.scarcityLevel, 'scarcity');
 });
 
 // Add some initial tasks for testing
@@ -2854,13 +2882,14 @@ app.get('/notes', async (req, res) => {
   try {
     // Get notes from enhanced memory integration
     const localNotes = enhancedMemoryIntegration.getNotes();
-    
+
     // Get memories from memory system
-    const memoryNotes = await enhancedMemoryIntegration.getMemorySystemMemories();
-    
+    const memoryNotes =
+      await enhancedMemoryIntegration.getMemorySystemMemories();
+
     // Combine all notes
     const allNotes = [...localNotes, ...memoryNotes];
-    
+
     // Sort by timestamp (newest first)
     allNotes.sort((a, b) => b.timestamp - a.timestamp);
 
@@ -2879,13 +2908,14 @@ app.get('/events', async (req, res) => {
   try {
     // Get events from enhanced memory integration
     const localEvents = enhancedMemoryIntegration.getEvents();
-    
+
     // Get events from memory system
-    const memoryEvents = await enhancedMemoryIntegration.getMemorySystemEvents();
-    
+    const memoryEvents =
+      await enhancedMemoryIntegration.getMemorySystemEvents();
+
     // Combine all events
     const allEvents = [...localEvents, ...memoryEvents];
-    
+
     // Sort by timestamp (newest first)
     allEvents.sort((a, b) => b.timestamp - a.timestamp);
 
@@ -2966,6 +2996,12 @@ app.get('/state', (req, res) => {
         totalEvents: enhancedMemoryIntegration.getEvents().length,
         totalNotes: enhancedMemoryIntegration.getNotes().length,
       },
+      enhancedEnvironmentIntegration: {
+        environment: enhancedEnvironmentIntegration.getCurrentEnvironment(),
+        inventory: enhancedEnvironmentIntegration.getCurrentInventory(),
+        resources: enhancedEnvironmentIntegration.getCurrentResourceAssessment(),
+        totalInventoryItems: enhancedEnvironmentIntegration.getCurrentInventory().length,
+      },
       lastTaskExecution: planningSystem.goalFormulation._lastTaskExecution,
       timestamp: Date.now(),
     };
@@ -3001,7 +3037,7 @@ app.get('/cognitive-insights', async (req, res) => {
 app.post('/memory-events', (req, res) => {
   try {
     const { type, title, description, source, data, priority } = req.body;
-    
+
     if (!type || !title || !description || !source) {
       return res.status(400).json({
         success: false,
@@ -3033,7 +3069,7 @@ app.post('/memory-events', (req, res) => {
 app.post('/memory-notes', (req, res) => {
   try {
     const { type, title, content, insights, source, confidence } = req.body;
-    
+
     if (!type || !title || !content) {
       return res.status(400).json({
         success: false,
@@ -3075,21 +3111,27 @@ app.get('/memory-statistics', (req, res) => {
       eventsBySource: {},
       notesBySource: {},
       recentActivity: {
-        eventsLastHour: events.filter(e => Date.now() - e.timestamp < 3600000).length,
-        notesLastHour: notes.filter(n => Date.now() - n.timestamp < 3600000).length,
+        eventsLastHour: events.filter((e) => Date.now() - e.timestamp < 3600000)
+          .length,
+        notesLastHour: notes.filter((n) => Date.now() - n.timestamp < 3600000)
+          .length,
       },
     };
 
     // Count events by type
-    events.forEach(event => {
-      statistics.eventsByType[event.type] = (statistics.eventsByType[event.type] || 0) + 1;
-      statistics.eventsBySource[event.source] = (statistics.eventsBySource[event.source] || 0) + 1;
+    events.forEach((event) => {
+      statistics.eventsByType[event.type] =
+        (statistics.eventsByType[event.type] || 0) + 1;
+      statistics.eventsBySource[event.source] =
+        (statistics.eventsBySource[event.source] || 0) + 1;
     });
 
     // Count notes by type
-    notes.forEach(note => {
-      statistics.notesByType[note.type] = (statistics.notesByType[note.type] || 0) + 1;
-      statistics.notesBySource[note.source] = (statistics.notesBySource[note.source] || 0) + 1;
+    notes.forEach((note) => {
+      statistics.notesByType[note.type] =
+        (statistics.notesByType[note.type] || 0) + 1;
+      statistics.notesBySource[note.source] =
+        (statistics.notesBySource[note.source] || 0) + 1;
     });
 
     res.json({
@@ -3100,6 +3142,105 @@ app.get('/memory-statistics', (req, res) => {
   } catch (error) {
     console.error('Error getting memory statistics:', error);
     res.status(500).json({ error: 'Failed to get memory statistics' });
+  }
+});
+
+// Get environment data
+app.get('/environment', async (req, res) => {
+  try {
+    const environment = await enhancedEnvironmentIntegration.getEnvironmentData();
+    
+    if (!environment) {
+      return res.status(503).json({
+        success: false,
+        error: 'Environment data unavailable',
+        timestamp: Date.now(),
+      });
+    }
+
+    res.json({
+      success: true,
+      environment,
+      timestamp: Date.now(),
+    });
+  } catch (error) {
+    console.error('Error getting environment data:', error);
+    res.status(500).json({ error: 'Failed to get environment data' });
+  }
+});
+
+// Get inventory data
+app.get('/inventory', async (req, res) => {
+  try {
+    const inventory = await enhancedEnvironmentIntegration.getInventoryData();
+    
+    res.json({
+      success: true,
+      inventory,
+      totalItems: inventory.length,
+      timestamp: Date.now(),
+    });
+  } catch (error) {
+    console.error('Error getting inventory data:', error);
+    res.status(500).json({ error: 'Failed to get inventory data' });
+  }
+});
+
+// Get resource assessment
+app.get('/resources', async (req, res) => {
+  try {
+    const resources = await enhancedEnvironmentIntegration.getResourceAssessment();
+    
+    if (!resources) {
+      return res.status(503).json({
+        success: false,
+        error: 'Resource assessment unavailable',
+        timestamp: Date.now(),
+      });
+    }
+
+    res.json({
+      success: true,
+      resources,
+      timestamp: Date.now(),
+    });
+  } catch (error) {
+    console.error('Error getting resource assessment:', error);
+    res.status(500).json({ error: 'Failed to get resource assessment' });
+  }
+});
+
+// Get nearby entities
+app.get('/entities', async (req, res) => {
+  try {
+    const entities = await enhancedEnvironmentIntegration.getNearbyEntities();
+    
+    res.json({
+      success: true,
+      entities,
+      totalEntities: entities.length,
+      timestamp: Date.now(),
+    });
+  } catch (error) {
+    console.error('Error getting nearby entities:', error);
+    res.status(500).json({ error: 'Failed to get nearby entities' });
+  }
+});
+
+// Get nearby blocks
+app.get('/blocks', async (req, res) => {
+  try {
+    const blocks = await enhancedEnvironmentIntegration.getNearbyBlocks();
+    
+    res.json({
+      success: true,
+      blocks,
+      totalBlocks: blocks.length,
+      timestamp: Date.now(),
+    });
+  } catch (error) {
+    console.error('Error getting nearby blocks:', error);
+    res.status(500).json({ error: 'Failed to get nearby blocks' });
   }
 });
 

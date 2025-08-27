@@ -9,56 +9,57 @@ import type { Environment } from '@/types';
  */
 export async function GET(_request: NextRequest) {
   try {
-    // Fetch data from world and minecraft systems
-    const [worldRes, minecraftRes] = await Promise.allSettled([
-      fetch('http://localhost:3004/state'),
-      fetch('http://localhost:3005/state'),
-    ]);
+    // Fetch environment data from planning system
+    const planningRes = await fetch('http://localhost:3002/environment');
+    
+    if (!planningRes.ok) {
+      return NextResponse.json(
+        { error: 'Environment data unavailable' },
+        { status: 503 }
+      );
+    }
 
+    const planningData = await planningRes.json();
+    
+    if (!planningData.success || !planningData.environment) {
+      return NextResponse.json(
+        { error: 'No environment data available' },
+        { status: 503 }
+      );
+    }
+
+    const envData = planningData.environment;
+    
+    // Convert to dashboard format
     const environment: Environment = {
-      biome: 'Unknown',
-      weather: 'Unknown',
-      timeOfDay: 'Unknown',
+      biome: envData.biome || 'Unknown',
+      weather: envData.weather || 'Unknown',
+      timeOfDay: envData.timeOfDay || 'Unknown',
       nearbyEntities: [],
     };
 
-    // Get world system data
-    if (worldRes.status === 'fulfilled' && worldRes.value.ok) {
-      const worldData = await worldRes.value.json();
-      if (worldData.placeGraph?.knownPlaces?.length > 0) {
-        environment.nearbyEntities.push(`${worldData.placeGraph.knownPlaces.length} known places`);
-      }
-      if (worldData.perception?.visibleEntities?.length > 0) {
-        environment.nearbyEntities.push(`${worldData.perception.visibleEntities.length} visible entities`);
+    // Add nearby entities
+    if (envData.nearbyEntities && envData.nearbyEntities.length > 0) {
+      for (const entity of envData.nearbyEntities.slice(0, 10)) {
+        environment.nearbyEntities.push(
+          `${entity.name} (${Math.round(entity.distance)}m${entity.hostile ? ', hostile' : ''})`
+        );
       }
     }
 
-    // Get minecraft data
-    if (minecraftRes.status === 'fulfilled' && minecraftRes.value.ok) {
-      const minecraftData = await minecraftRes.value.json();
-      if (minecraftData.data) {
-        // Determine biome based on position (simplified)
-        const y = minecraftData.data.position?.y || 64;
-        if (y > 80) environment.biome = 'Mountains';
-        else if (y < 50) environment.biome = 'Underground';
-        else environment.biome = 'Plains';
+    // Add nearby blocks
+    if (envData.nearbyBlocks && envData.nearbyBlocks.length > 0) {
+      const blockTypes = new Set(envData.nearbyBlocks.map((b: any) => b.type));
+      environment.nearbyEntities.push(`${blockTypes.size} block types nearby`);
+    }
 
-        // Set weather
-        environment.weather = minecraftData.data.weather || 'Clear';
+    // Add environmental conditions
+    if (envData.lightLevel !== undefined) {
+      environment.nearbyEntities.push(`Light level: ${envData.lightLevel}/15`);
+    }
 
-        // Determine time of day
-        const time = minecraftData.data.time || 0;
-        const hours = Math.floor(time / 1000);
-        if (hours >= 6 && hours < 12) environment.timeOfDay = 'Morning';
-        else if (hours >= 12 && hours < 18) environment.timeOfDay = 'Afternoon';
-        else if (hours >= 18 && hours < 24) environment.timeOfDay = 'Evening';
-        else environment.timeOfDay = 'Night';
-
-        // Add inventory info
-        if (minecraftData.data.inventory?.length > 0) {
-          environment.nearbyEntities.push(`${minecraftData.data.inventory.length} items in inventory`);
-        }
-      }
+    if (envData.temperature !== undefined) {
+      environment.nearbyEntities.push(`Temperature: ${Math.round(envData.temperature)}°C`);
     }
 
     return NextResponse.json({
@@ -67,8 +68,9 @@ export async function GET(_request: NextRequest) {
     });
 
   } catch (error) {
+    console.error('Error fetching environment data:', error);
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { error: 'Failed to fetch environment data' },
       { status: 500 }
     );
   }

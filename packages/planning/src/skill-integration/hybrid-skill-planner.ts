@@ -18,6 +18,11 @@ import {
   SkillPlanningContext,
 } from './skill-planner-adapter';
 import {
+  MCPCapabilitiesAdapter,
+  MCPCapabilityPlan,
+  MCPCapabilityPlanningContext,
+} from './mcp-capabilities-adapter';
+import {
   HRMInspiredPlanner,
   Plan as HRMPlan,
 } from '../hierarchical-planner/hrm-inspired-planner';
@@ -29,6 +34,8 @@ import {
   Plan,
   PlanningContext,
 } from '../hierarchical-planner/hrm-inspired-planner';
+import { EnhancedRegistry } from '../../../../core/src/mcp-capabilities/enhanced-registry';
+import { DynamicCreationFlow } from '../../../../core/src/mcp-capabilities/dynamic-creation-flow';
 
 // ============================================================================
 // Types
@@ -36,6 +43,8 @@ import {
 
 export interface HybridPlanningContext extends PlanningContext {
   skillRegistry: SkillRegistry;
+  mcpRegistry?: EnhancedRegistry;
+  mcpDynamicFlow?: DynamicCreationFlow;
   worldState: Record<string, any>;
   availableResources: Record<string, number>;
   timeConstraints: {
@@ -45,6 +54,7 @@ export interface HybridPlanningContext extends PlanningContext {
   };
   planningPreferences: {
     preferSkills: boolean;
+    preferMCP: boolean;
     preferHTN: boolean;
     preferGOAP: boolean;
     allowHybrid: boolean;
@@ -52,8 +62,14 @@ export interface HybridPlanningContext extends PlanningContext {
 }
 
 export interface HybridPlan extends Plan {
-  planningApproach: 'skill-based' | 'htn' | 'goap' | 'hybrid';
+  planningApproach:
+    | 'skill-based'
+    | 'mcp-capabilities'
+    | 'htn'
+    | 'goap'
+    | 'hybrid';
   skillPlan?: SkillPlan;
+  mcpCapabilityPlan?: MCPCapabilityPlan;
   hrmPlan?: HRMPlan;
   goapPlan?: GOAPPlan;
   confidence: number;
@@ -62,7 +78,7 @@ export interface HybridPlan extends Plan {
 }
 
 export interface PlanningDecision {
-  approach: 'skill-based' | 'htn' | 'goap' | 'hybrid';
+  approach: 'skill-based' | 'mcp-capabilities' | 'htn' | 'goap' | 'hybrid';
   reasoning: string;
   confidence: number;
   estimatedLatency: number;
@@ -74,6 +90,7 @@ export interface PlanningDecision {
 
 export class HybridSkillPlanner extends EventEmitter {
   private skillPlanner: SkillPlannerAdapter;
+  private mcpCapabilitiesAdapter?: MCPCapabilitiesAdapter;
   private hrmPlanner: HRMInspiredPlanner;
   private goapPlanner: EnhancedGOAPPlanner;
   private skillRegistry: SkillRegistry;
@@ -83,7 +100,9 @@ export class HybridSkillPlanner extends EventEmitter {
     skillRegistry: SkillRegistry,
     btRunner: BehaviorTreeRunner,
     hrmPlanner: HRMInspiredPlanner,
-    goapPlanner: EnhancedGOAPPlanner
+    goapPlanner: EnhancedGOAPPlanner,
+    mcpRegistry?: EnhancedRegistry,
+    mcpDynamicFlow?: DynamicCreationFlow
   ) {
     super();
     this.skillRegistry = skillRegistry;
@@ -91,6 +110,14 @@ export class HybridSkillPlanner extends EventEmitter {
     this.hrmPlanner = hrmPlanner;
     this.goapPlanner = goapPlanner;
     this.skillPlanner = new SkillPlannerAdapter(skillRegistry, btRunner);
+
+    // Initialize MCP capabilities adapter if registry is provided
+    if (mcpRegistry && mcpDynamicFlow) {
+      this.mcpCapabilitiesAdapter = new MCPCapabilitiesAdapter(
+        mcpRegistry,
+        mcpDynamicFlow
+      );
+    }
   }
 
   /**
@@ -155,6 +182,8 @@ export class HybridSkillPlanner extends EventEmitter {
 
     try {
       switch (plan.planningApproach) {
+        case 'mcp-capabilities':
+          return await this.executeMCPCapabilityPlan(plan, context);
         case 'skill-based':
           return await this.executeSkillPlan(plan, context);
         case 'htn':
@@ -196,6 +225,9 @@ export class HybridSkillPlanner extends EventEmitter {
       goal
     );
 
+    // Check MCP capabilities suitability
+    const mcpConfidence = this.calculateMCPConfidence(goal, context);
+
     // Check HTN suitability
     const htnConfidence = this.calculateHTNConfidence(goal, context);
 
@@ -203,11 +235,27 @@ export class HybridSkillPlanner extends EventEmitter {
     const goapConfidence = this.calculateGOAPConfidence(goal, context);
 
     // Make decision based on confidence scores and preferences
-    let approach: 'skill-based' | 'htn' | 'goap' | 'hybrid';
+    let approach:
+      | 'skill-based'
+      | 'mcp-capabilities'
+      | 'htn'
+      | 'goap'
+      | 'hybrid';
     let reasoning: string;
     let confidence: number;
 
-    if (skillConfidence > 0.8 && context.planningPreferences.preferSkills) {
+    if (
+      mcpConfidence > 0.8 &&
+      context.planningPreferences.preferMCP &&
+      this.mcpCapabilitiesAdapter
+    ) {
+      approach = 'mcp-capabilities';
+      reasoning = `High MCP capabilities confidence (${mcpConfidence.toFixed(2)}) with dynamic capability creation available`;
+      confidence = mcpConfidence;
+    } else if (
+      skillConfidence > 0.8 &&
+      context.planningPreferences.preferSkills
+    ) {
       approach = 'skill-based';
       reasoning = `High skill confidence (${skillConfidence.toFixed(2)}) with ${applicableSkills.length} applicable skills`;
       confidence = skillConfidence;
@@ -221,11 +269,12 @@ export class HybridSkillPlanner extends EventEmitter {
       confidence = goapConfidence;
     } else if (
       context.planningPreferences.allowHybrid &&
-      (skillConfidence > 0.5 || htnConfidence > 0.5)
+      (skillConfidence > 0.5 || htnConfidence > 0.5 || mcpConfidence > 0.5)
     ) {
       approach = 'hybrid';
-      reasoning = `Hybrid approach combining skills (${skillConfidence.toFixed(2)}) and HTN (${htnConfidence.toFixed(2)})`;
-      confidence = Math.max(skillConfidence, htnConfidence) * 0.9; // Slight penalty for complexity
+      reasoning = `Hybrid approach combining skills (${skillConfidence.toFixed(2)}), MCP (${mcpConfidence.toFixed(2)}) and HTN (${htnConfidence.toFixed(2)})`;
+      confidence =
+        Math.max(skillConfidence, htnConfidence, mcpConfidence) * 0.9; // Slight penalty for complexity
     } else {
       // Default to GOAP for reactive planning
       approach = 'goap';
@@ -254,10 +303,31 @@ export class HybridSkillPlanner extends EventEmitter {
     const planId = `hybrid-plan-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
 
     let skillPlan: SkillPlan | undefined;
+    let mcpCapabilityPlan: MCPCapabilityPlan | undefined;
     let hrmPlan: HRMPlan | undefined;
     let goapPlan: GOAPPlan | undefined;
 
     switch (decision.approach) {
+      case 'mcp-capabilities':
+        if (
+          this.mcpCapabilitiesAdapter &&
+          context.mcpRegistry &&
+          context.mcpDynamicFlow
+        ) {
+          const mcpContext: MCPCapabilityPlanningContext = {
+            ...context,
+            leafContext: context.leafContext || ({} as any),
+            availableCapabilities: [],
+            registry: context.mcpRegistry,
+            dynamicFlow: context.mcpDynamicFlow,
+          };
+          mcpCapabilityPlan =
+            await this.mcpCapabilitiesAdapter.generateCapabilityPlan(
+              goal,
+              mcpContext
+            );
+        }
+        break;
       case 'skill-based':
         skillPlan = await this.generateSkillPlan(goal, context);
         break;
@@ -279,9 +349,15 @@ export class HybridSkillPlanner extends EventEmitter {
     const plan: HybridPlan = {
       id: planId,
       goalId: goal,
-      nodes: this.mergePlanNodes(skillPlan, hrmPlan, goapPlan),
+      nodes: this.mergePlanNodes(
+        skillPlan,
+        mcpCapabilityPlan,
+        hrmPlan,
+        goapPlan
+      ),
       executionOrder: this.calculateExecutionOrder(
         skillPlan,
+        mcpCapabilityPlan,
         hrmPlan,
         goapPlan
       ),
@@ -292,9 +368,15 @@ export class HybridSkillPlanner extends EventEmitter {
       lastRefinedAt: Date.now(),
       planningApproach: decision.approach,
       skillPlan,
+      mcpCapabilityPlan,
       hrmPlan,
       goapPlan,
-      estimatedSuccess: this.estimatePlanSuccess(skillPlan, hrmPlan, goapPlan),
+      estimatedSuccess: this.estimatePlanSuccess(
+        skillPlan,
+        mcpCapabilityPlan,
+        hrmPlan,
+        goapPlan
+      ),
       fallbackPlans: this.identifyFallbackPlans(decision.approach, context),
     };
 
@@ -760,6 +842,7 @@ export class HybridSkillPlanner extends EventEmitter {
 
   private mergePlanNodes(
     skillPlan?: SkillPlan,
+    mcpCapabilityPlan?: MCPCapabilityPlan,
     hrmPlan?: HRMPlan,
     goapPlan?: GOAPPlan
   ): any[] {
@@ -771,6 +854,16 @@ export class HybridSkillPlanner extends EventEmitter {
           ...node,
           source: 'skill',
           planId: skillPlan.id,
+        }))
+      );
+    }
+
+    if (mcpCapabilityPlan) {
+      nodes.push(
+        ...mcpCapabilityPlan.nodes.map((node) => ({
+          ...node,
+          source: 'mcp-capability',
+          planId: mcpCapabilityPlan.id,
         }))
       );
     }
@@ -811,6 +904,7 @@ export class HybridSkillPlanner extends EventEmitter {
 
   private calculateExecutionOrder(
     skillPlan?: SkillPlan,
+    mcpCapabilityPlan?: MCPCapabilityPlan,
     hrmPlan?: HRMPlan,
     goapPlan?: GOAPPlan
   ): string[] {
@@ -819,6 +913,11 @@ export class HybridSkillPlanner extends EventEmitter {
     // Add skill plan execution order
     if (skillPlan) {
       order.push(...skillPlan.executionOrder);
+    }
+
+    // Add MCP capability plan execution order
+    if (mcpCapabilityPlan) {
+      order.push(...mcpCapabilityPlan.executionOrder);
     }
 
     // Add HTN plan execution order
@@ -840,12 +939,15 @@ export class HybridSkillPlanner extends EventEmitter {
 
   private estimatePlanSuccess(
     skillPlan?: SkillPlan,
+    mcpCapabilityPlan?: MCPCapabilityPlan,
     hrmPlan?: HRMPlan,
     goapPlan?: GOAPPlan
   ): number {
     const estimates: number[] = [];
 
     if (skillPlan) estimates.push(skillPlan.estimatedSkillSuccess);
+    if (mcpCapabilityPlan)
+      estimates.push(mcpCapabilityPlan.estimatedCapabilitySuccess);
     if (hrmPlan) estimates.push(hrmPlan.confidence);
     if (goapPlan) estimates.push(0.7); // Default GOAP confidence
 
@@ -855,23 +957,26 @@ export class HybridSkillPlanner extends EventEmitter {
   }
 
   private identifyFallbackPlans(
-    approach: 'skill-based' | 'htn' | 'goap' | 'hybrid',
+    approach: 'skill-based' | 'mcp-capabilities' | 'htn' | 'goap' | 'hybrid',
     context: HybridPlanningContext
   ): string[] {
     const fallbacks: string[] = [];
 
     switch (approach) {
+      case 'mcp-capabilities':
+        fallbacks.push('skill-based', 'htn', 'goap');
+        break;
       case 'skill-based':
-        fallbacks.push('htn', 'goap');
+        fallbacks.push('mcp-capabilities', 'htn', 'goap');
         break;
       case 'htn':
-        fallbacks.push('skill-based', 'goap');
+        fallbacks.push('mcp-capabilities', 'skill-based', 'goap');
         break;
       case 'goap':
-        fallbacks.push('skill-based', 'htn');
+        fallbacks.push('mcp-capabilities', 'skill-based', 'htn');
         break;
       case 'hybrid':
-        fallbacks.push('goap', 'skill-based');
+        fallbacks.push('mcp-capabilities', 'goap', 'skill-based');
         break;
     }
 
@@ -914,6 +1019,79 @@ export class HybridSkillPlanner extends EventEmitter {
   }
 
   /**
+   * Calculate MCP capabilities confidence
+   */
+  private calculateMCPConfidence(
+    goal: string,
+    context: HybridPlanningContext
+  ): number {
+    if (!this.mcpCapabilitiesAdapter || !context.mcpRegistry) {
+      return 0.0;
+    }
+
+    // Simple confidence calculation based on goal keywords
+    const goalLower = goal.toLowerCase();
+    const mcpKeywords = [
+      'torch',
+      'corridor',
+      'light',
+      'safe',
+      'mining',
+      'explore',
+    ];
+    const matchingKeywords = mcpKeywords.filter((keyword) =>
+      goalLower.includes(keyword)
+    );
+
+    return Math.min(matchingKeywords.length / mcpKeywords.length, 1.0);
+  }
+
+  /**
+   * Execute MCP capability plan
+   */
+  private async executeMCPCapabilityPlan(
+    plan: HybridPlan,
+    context: HybridPlanningContext
+  ): Promise<{
+    success: boolean;
+    completedSteps: string[];
+    failedSteps: string[];
+    totalDuration: number;
+    worldStateChanges: Record<string, any>;
+  }> {
+    if (!plan.mcpCapabilityPlan || !this.mcpCapabilitiesAdapter) {
+      return {
+        success: false,
+        completedSteps: [],
+        failedSteps: ['no_mcp_plan'],
+        totalDuration: 0,
+        worldStateChanges: {},
+      };
+    }
+
+    const mcpContext: MCPCapabilityPlanningContext = {
+      ...context,
+      leafContext: context.leafContext || ({} as any),
+      availableCapabilities: [],
+      registry: context.mcpRegistry!,
+      dynamicFlow: context.mcpDynamicFlow!,
+    };
+
+    const result = await this.mcpCapabilitiesAdapter.executeCapabilityPlan(
+      plan.mcpCapabilityPlan,
+      mcpContext
+    );
+
+    return {
+      success: result.success,
+      completedSteps: result.completedCapabilities,
+      failedSteps: result.failedCapabilities,
+      totalDuration: result.totalDuration,
+      worldStateChanges: result.worldStateChanges,
+    };
+  }
+
+  /**
    * Get planning statistics
    */
   getPlanningStats(): {
@@ -927,6 +1105,7 @@ export class HybridSkillPlanner extends EventEmitter {
       totalPlans: 0,
       approachDistribution: {
         'skill-based': 0,
+        'mcp-capabilities': 0,
         htn: 0,
         goap: 0,
         hybrid: 0,

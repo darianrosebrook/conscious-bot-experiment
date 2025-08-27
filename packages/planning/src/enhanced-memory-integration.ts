@@ -213,7 +213,7 @@ export class EnhancedMemoryIntegration extends EventEmitter {
     confidence: number = 0.8
   ): ReflectiveNote {
     const insights = [insight];
-    
+
     return this.addReflectiveNote(
       'insight',
       'Cognitive Insight',
@@ -234,7 +234,7 @@ export class EnhancedMemoryIntegration extends EventEmitter {
   ): ReflectiveNote {
     const title = `${taskType} Task Learning`;
     const content = `Task ${outcome === 'success' ? 'completed successfully' : 'failed'}. Key lessons: ${lessons.join(', ')}`;
-    
+
     return this.addReflectiveNote(
       'learning',
       title,
@@ -255,7 +255,7 @@ export class EnhancedMemoryIntegration extends EventEmitter {
   ): ReflectiveNote {
     const title = 'Strategic Decision';
     const content = `Strategy: ${strategy}\n\nReasoning: ${reasoning}\n\nExpected Outcome: ${expectedOutcome}`;
-    
+
     return this.addReflectiveNote(
       'strategy',
       title,
@@ -277,11 +277,11 @@ export class EnhancedMemoryIntegration extends EventEmitter {
     let events = [...this.events];
 
     if (filters?.type) {
-      events = events.filter(event => event.type === filters.type);
+      events = events.filter((event) => event.type === filters.type);
     }
 
     if (filters?.source) {
-      events = events.filter(event => event.source === filters.source);
+      events = events.filter((event) => event.source === filters.source);
     }
 
     if (filters?.limit) {
@@ -302,11 +302,11 @@ export class EnhancedMemoryIntegration extends EventEmitter {
     let notes = [...this.notes];
 
     if (filters?.type) {
-      notes = notes.filter(note => note.type === filters.type);
+      notes = notes.filter((note) => note.type === filters.type);
     }
 
     if (filters?.source) {
-      notes = notes.filter(note => note.source === filters.source);
+      notes = notes.filter((note) => note.source === filters.source);
     }
 
     if (filters?.limit) {
@@ -321,12 +321,14 @@ export class EnhancedMemoryIntegration extends EventEmitter {
    */
   async getMemorySystemEvents(): Promise<MemoryEvent[]> {
     try {
-      const response = await fetch(`${this.config.memorySystemEndpoint}/telemetry`);
+      const response = await fetch(
+        `${this.config.memorySystemEndpoint}/telemetry`
+      );
       if (!response.ok) {
         return [];
       }
 
-      const data = await response.json() as any;
+      const data = (await response.json()) as any;
       const memoryEvents: MemoryEvent[] = [];
 
       if (data.events && Array.isArray(data.events)) {
@@ -335,7 +337,9 @@ export class EnhancedMemoryIntegration extends EventEmitter {
             id: event.id || `memory-${Date.now()}`,
             timestamp: event.timestamp || Date.now(),
             type: event.type,
-            title: event.type.replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase()),
+            title: event.type
+              .replace(/_/g, ' ')
+              .replace(/\b\w/g, (l: string) => l.toUpperCase()),
             description: event.data?.description || event.type,
             source: 'memory-system',
             data: event.data || {},
@@ -361,7 +365,7 @@ export class EnhancedMemoryIntegration extends EventEmitter {
         return [];
       }
 
-      const data = await response.json() as any;
+      const data = (await response.json()) as any;
       const memories: ReflectiveNote[] = [];
 
       // Convert episodic memories

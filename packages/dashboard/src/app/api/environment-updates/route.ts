@@ -1,6 +1,6 @@
 /**
- * Memory Updates API
- * Provides Server-Sent Events for real-time memory updates
+ * Environment Updates API
+ * Provides Server-Sent Events for real-time environment updates
  *
  * @author @darianrosebrook
  */
@@ -11,7 +11,7 @@ import { NextRequest, NextResponse } from 'next/server';
 const connections = new Set<ReadableStreamDefaultController>();
 
 /**
- * POST endpoint to receive memory updates from planning system
+ * POST endpoint to receive environment updates from planning system
  */
 export async function POST(request: NextRequest) {
   try {
@@ -33,7 +33,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error('Error processing memory update:', error);
+    console.error('Error processing environment update:', error);
     return NextResponse.json(
       { error: 'Failed to process update' },
       { status: 500 }
@@ -50,7 +50,7 @@ export async function GET() {
       // Send initial connection message
       controller.enqueue(
         new TextEncoder().encode(
-          `data: ${JSON.stringify({ event: 'connected', message: 'Memory updates connected', timestamp: Date.now() })}\n\n`
+          `data: ${JSON.stringify({ event: 'connected', message: 'Environment updates connected', timestamp: Date.now() })}\n\n`
         )
       );
 

@@ -11,13 +11,13 @@ import { getMineflayerItemDisplayName } from '@/lib/mineflayer-item-mapping';
 
 export async function GET(_request: NextRequest) {
   try {
-    // Try to fetch inventory data from Minecraft bot server
+    // Try to fetch inventory data from planning system
     let inventory = [];
     let botStatus = 'disconnected';
     let isAlive = false;
 
     try {
-      const response = await fetch('http://localhost:3005/state', {
+      const response = await fetch('http://localhost:3002/inventory', {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -27,14 +27,34 @@ export async function GET(_request: NextRequest) {
       if (response.ok) {
         const data = await response.json();
         if (data.success) {
-          // The inventory is now at data.data.worldState.inventory.items
-          inventory = data.data?.worldState?.inventory?.items || [];
-          botStatus = data.status || 'unknown';
-          isAlive = data.isAlive || false;
+          inventory = data.inventory || [];
+          botStatus = 'connected';
+          isAlive = true;
         }
       }
     } catch (error) {
-      console.log('Minecraft bot server not available, using fallback data');
+      console.log('Planning system inventory not available, trying minecraft bot directly');
+      
+      // Fallback to minecraft bot
+      try {
+        const minecraftResponse = await fetch('http://localhost:3005/state', {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        });
+
+        if (minecraftResponse.ok) {
+          const minecraftData = await minecraftResponse.json();
+          if (minecraftData.success) {
+            inventory = minecraftData.data?.worldState?.inventory?.items || [];
+            botStatus = minecraftData.status || 'unknown';
+            isAlive = minecraftData.isAlive || false;
+          }
+        }
+      } catch (minecraftError) {
+        console.log('Minecraft bot server also not available');
+      }
     }
 
     // Show real inventory data (even if empty) - only in debug mode
