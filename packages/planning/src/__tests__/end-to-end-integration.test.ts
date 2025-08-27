@@ -11,18 +11,18 @@ import { CognitiveIntegration } from '../cognitive-integration';
 import fetch from 'node-fetch';
 
 // Mock EventEmitter
-jest.mock('events', () => {
+vi.mock('events', () => {
   class MockEventEmitter {
-    on = jest.fn();
-    emit = jest.fn();
-    removeListener = jest.fn();
+    on = vi.fn();
+    emit = vi.fn();
+    removeListener = vi.fn();
   }
   return { EventEmitter: MockEventEmitter };
 });
 
 // Mock fetch but allow real HTTP calls to our mock server
-jest.mock('node-fetch');
-const mockFetch = fetch as jest.MockedFunction<typeof fetch>;
+vi.mock('node-fetch');
+const mockFetch = fetch as vi.MockedFunction<typeof fetch>;
 
 // Import mock server (we'll use the actual implementation in a real test)
 interface MockMinecraftServer {
@@ -36,18 +36,18 @@ interface MockMinecraftServer {
 
 // Mock the server for this test
 const createMockServer = (): MockMinecraftServer => ({
-  start: jest.fn().mockResolvedValue(undefined),
-  stop: jest.fn().mockResolvedValue(undefined),
-  getState: jest.fn(() => ({
+  start: vi.fn().mockResolvedValue(undefined),
+  stop: vi.fn().mockResolvedValue(undefined),
+  getState: vi.fn(() => ({
     position: { x: 0, y: 64, z: 0 },
     health: 20,
     food: 20,
     inventory: [{ name: 'oak_log', count: 5 }],
     connected: true,
   })),
-  setState: jest.fn(),
-  addBlock: jest.fn(),
-  getChatHistory: jest.fn(() => []),
+  setState: vi.fn(),
+  addBlock: vi.fn(),
+  getChatHistory: vi.fn(() => []),
 });
 
 describe('End-to-End Integration Tests', () => {
@@ -64,7 +64,7 @@ describe('End-to-End Integration Tests', () => {
   });
 
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
     cognitiveIntegration = new CognitiveIntegration({
       failureThreshold: 0.7,
       successThreshold: 0.8,

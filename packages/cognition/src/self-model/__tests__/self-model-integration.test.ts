@@ -7,7 +7,7 @@
  * @author @darianrosebrook
  */
 
-import { describe, it, expect, beforeEach } from '@jest/globals';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { IdentityTracker } from '../identity-tracker';
 import { NarrativeManager } from '../narrative-manager';
 import {

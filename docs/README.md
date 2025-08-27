@@ -6,10 +6,14 @@
 
 ## Overview
 
-This documentation provides a complete guide to the conscious bot project - an embodied artificial intelligence system designed to demonstrate consciousness-like behaviors through sophisticated cognitive architecture. The documentation is organized into two main categories:
+This documentation provides a complete guide to the conscious bot project - an embodied artificial intelligence system designed to demonstrate consciousness-like behaviors through sophisticated cognitive architecture. The documentation is organized into several main categories:
 
 - **Plans** (`/plans/`) - Detailed implementation specifications and technical designs
 - **Strategy** (`/strategy/`) - High-level strategic planning and project management
+- **Integration** (`/integration/`) - Cross-module integration and system coordination
+- **Testing** (`/testing/`) - Testing frameworks, results, and validation
+- **Solutions** (`/solutions/`) - Problem-solving approaches and implementations
+- **Working Specs** (`/working_specs/`) - Iterative development specifications
 
 ## Documentation Structure
 
@@ -21,6 +25,11 @@ docs/
 │   ├── hrm-integration-implementation.md # HRM integration detailed plan
 │   ├── integrating-hrm-into-our-cognitive-consious-experiment.md # HRM overview
 │   ├── testing-infrastructure.md       # Testing framework specifications
+│   ├── arbiter-hrm-architecture-evaluation.md # Arbiter-HRM architecture analysis
+│   ├── llm-performance-benchmarking-results.md # LLM performance analysis
+│   ├── sapient-hrm-integration-plan.md # Sapient HRM integration strategy
+│   ├── image.png                       # Supporting diagrams
+│   ├── image-2.png                     # Supporting diagrams
 │   └── modules/                        # Module-specific implementation plans
 │       ├── README.md                   # Module progress tracker and overview
 │       ├── core/                       # Core system modules
@@ -31,21 +40,40 @@ docs/
 │       ├── interfaces/                 # Interface and control modules
 │       ├── safety/                     # Safety and monitoring modules
 │       └── evaluation/                 # Evaluation and testing modules
-└── strategy/                           # Strategic planning documents
-    ├── README.md                       # Strategy overview and guidance
-    ├── project_status_update.md        # Current project status
-    ├── m1_completion_summary.md        # Milestone 1 completion report
-    ├── m1_critical_review.md           # M1 critical analysis
-    ├── m2_implementation_plan.md       # M2 implementation strategy
-    ├── m2_status_summary.md            # M2 completion status
-    ├── m2_m3_transition.md             # M2 to M3 transition planning
-    ├── m3_implementation_plan.md       # M3 implementation strategy
-    ├── m3_status_summary.md            # M3 current status
-    ├── hrm_integration_approach.md     # HRM integration strategy
-    ├── integration_strategy.md         # Cross-module integration
-    ├── risk_management.md              # Risk assessment and mitigation
-    ├── verification_framework.md       # Quality assurance methodology
-    └── future_enhancements.md          # Long-term development roadmap
+├── strategy/                           # Strategic planning documents
+│   ├── README.md                       # Strategy overview and guidance
+│   ├── PROJECT_STATUS_UPDATE.md        # Current project status
+│   ├── M1_COMPLETION_SUMMARY.md        # Milestone 1 completion report
+│   ├── m1_critical_review.md           # M1 critical analysis
+│   ├── M2_IMPLEMENTATION_PLAN.md       # M2 implementation strategy
+│   ├── m2_status_summary.md            # M2 completion status
+│   ├── M2_M3_TRANSITION.md             # M2 to M3 transition planning
+│   ├── M3_IMPLEMENTATION_PLAN.md       # M3 implementation strategy
+│   ├── M3_STATUS_SUMMARY.md            # M3 current status
+│   ├── HRM_INTEGRATION_APPROACH.md     # HRM integration strategy
+│   ├── integration_strategy.md         # Cross-module integration
+│   ├── risk_management.md              # Risk assessment and mitigation
+│   ├── verification_framework.md       # Quality assurance methodology
+│   └── future_enhancements.md          # Long-term development roadmap
+├── integration/                        # Integration and coordination
+│   ├── task-oriented-cognitive-integration.md # Task-oriented cognitive integration
+│   ├── vibe-coded-conscious-bot-integration.md # Vibe-coded integration approach
+│   └── renaming-summary.md             # Naming convention updates
+├── testing/                            # Testing and validation
+│   ├── integration-testing-suite.md    # Integration testing framework
+│   ├── HRM_TEST_SUMMARY.md             # HRM testing results
+│   ├── minecraft-integration-testing-summary.md # Minecraft integration tests
+│   ├── autonomous-task-execution-analysis.md # Autonomous task execution tests
+│   ├── vitest-migration-summary.md     # Vitest migration overview
+│   └── vitest-migration-test-results.md # Vitest migration results
+├── solutions/                          # Problem-solving approaches
+│   └── cognitive-integration-solution.md # Cognitive integration solution
+└── working_specs/                      # Iterative development specifications
+    ├── iteration_one/                  # First iteration specifications, focused on cohesive, higher-cognition
+    ├── iteration_two/                  # Second iteration specifications, focused on behavior-tree-based execution
+    ├── iteration_three/                # Third iteration specifications, focused on removing mock implementation and adding MCP-style capability bus
+    └── iteration_four/                 # Fourth iteration specifications, focused on hardening the status/dashboard APIs
+    ├── iteration_five/                 # Fifth iteration specifications, focused on completing the remaining integration gaps and achieving 100% implementation completeness
 ```
 
 ## Key Documents by Category
@@ -71,23 +99,40 @@ docs/
   - Integration patterns and hybrid reasoning strategies
   - **Status:** Planning Complete
 
+- **`plans/sapient-hrm-integration-plan.md`** - Sapient HRM integration strategy
+  - Advanced HRM integration approaches and methodologies
+  - **Status:** Planning Complete
+
+- **`plans/arbiter-hrm-architecture-evaluation.md`** - Arbiter-HRM architecture analysis
+  - Detailed evaluation of arbiter and HRM integration patterns
+  - **Status:** Analysis Complete
+
+#### Performance and Testing
+- **`plans/llm-performance-benchmarking-results.md`** - LLM performance analysis
+  - Performance benchmarking results and optimization strategies
+  - **Status:** Analysis Complete
+
+- **`plans/testing-infrastructure.md`** - Testing framework specifications
+  - Comprehensive testing infrastructure design and implementation
+  - **Status:** Implementation Ready
+
 ###  Strategic Planning Documents
 
 #### Project Management
-- **`strategy/project_status_update.md`** - Current project status and progress
+- **`strategy/PROJECT_STATUS_UPDATE.md`** - Current project status and progress
   - M1 and M2 completion status
   - M3 planning and preparation
   - Research objectives and achievements
   - **Status:** Current as of January 2025
 
 #### Milestone Planning
-- **`strategy/m2_implementation_plan.md`** - M2 implementation strategy
+- **`strategy/M2_IMPLEMENTATION_PLAN.md`** - M2 implementation strategy
   - Cognitive foundation implementation (Goal Formulation, Memory Systems)
   - 4-week implementation timeline with specific deliverables
   - Success criteria and validation requirements
   - **Status:** Implementation Complete
 
-- **`strategy/m3_implementation_plan.md`** - M3 implementation strategy
+- **`strategy/M3_IMPLEMENTATION_PLAN.md`** - M3 implementation strategy
   - Advanced planning capabilities (HTN/HRM, GOAP)
   - HRM integration and collaborative reasoning
   - 12-week implementation timeline
@@ -110,6 +155,66 @@ docs/
   - Technical, safety, and operational risks
   - Mitigation strategies and contingency planning
   - **Status:** Active Framework
+
+###  Integration and Coordination Documents
+
+#### System Integration
+- **`integration/task-oriented-cognitive-integration.md`** - Task-oriented cognitive integration
+  - Integration patterns for task-oriented cognitive systems
+  - **Status:** Implementation Ready
+
+- **`integration/vibe-coded-conscious-bot-integration.md`** - Vibe-coded integration approach
+  - Vibe-coded integration methodologies and patterns
+  - **Status:** Implementation Ready
+
+- **`integration/renaming-summary.md`** - Naming convention updates
+  - Summary of naming convention changes and updates
+  - **Status:** Complete
+
+###  Testing and Validation Documents
+
+#### Testing Frameworks
+- **`testing/integration-testing-suite.md`** - Integration testing framework
+  - Comprehensive integration testing suite and methodologies
+  - **Status:** Active Framework
+
+- **`testing/HRM_TEST_SUMMARY.md`** - HRM testing results
+  - Results and analysis of HRM integration testing
+  - **Status:** Testing Complete
+
+- **`testing/minecraft-integration-testing-summary.md`** - Minecraft integration tests
+  - Testing results for Minecraft integration features
+  - **Status:** Testing Complete
+
+- **`testing/autonomous-task-execution-analysis.md`** - Autonomous task execution tests
+  - Analysis of autonomous task execution capabilities
+  - **Status:** Analysis Complete
+
+#### Migration and Infrastructure
+- **`testing/vitest-migration-summary.md`** - Vitest migration overview
+  - Overview of migration from Jest to Vitest
+  - **Status:** Migration Complete
+
+- **`testing/vitest-migration-test-results.md`** - Vitest migration results
+  - Detailed results of Vitest migration testing
+  - **Status:** Migration Complete
+
+###  Problem-Solving Documents
+
+#### Solutions
+- **`solutions/cognitive-integration-solution.md`** - Cognitive integration solution
+  - Comprehensive solution for cognitive integration challenges
+  - **Status:** Solution Implemented
+
+###  Iterative Development Documents
+
+#### Working Specifications
+- **`working_specs/`** - Iterative development specifications
+  - **`iteration_one/`** - First iteration specifications
+  - **`iteration_two/`** - Second iteration specifications
+  - **`iteration_three/`** - Third iteration specifications
+  - **`iteration_four/`** - Fourth iteration specifications
+  - **Status:** Active Development
 
 ###  Module Implementation Plans
 
@@ -169,30 +274,60 @@ The documentation maintains clear separation of concerns:
 2. **HRM Integration Documents**: 
    - `plans/hrm-integration-implementation.md` - Detailed 12-week implementation plan with specific timelines, technical details, and validation strategy
    - `plans/integrating-hrm-into-our-cognitive-consious-experiment.md` - Research motivation and architectural approach for HRM integration
-   - `strategy/hrm_integration_approach.md` - Practical implementation strategy after environment setup, focusing on TypeScript adaptation
+   - `plans/sapient-hrm-integration-plan.md` - Advanced HRM integration approaches and methodologies
+   - `plans/arbiter-hrm-architecture-evaluation.md` - Detailed evaluation of arbiter and HRM integration patterns
+   - `strategy/HRM_INTEGRATION_APPROACH.md` - Practical implementation strategy after environment setup, focusing on TypeScript adaptation
 
-3. **Milestone Documents**:
+3. **Integration Documents**:
+   - `integration/task-oriented-cognitive-integration.md` - Task-oriented cognitive integration patterns
+   - `integration/vibe-coded-conscious-bot-integration.md` - Vibe-coded integration methodologies
+   - `integration/renaming-summary.md` - Naming convention updates and changes
+
+4. **Testing Documents**:
+   - `testing/integration-testing-suite.md` - Comprehensive integration testing framework
+   - `testing/HRM_TEST_SUMMARY.md` - HRM testing results and analysis
+   - `testing/minecraft-integration-testing-summary.md` - Minecraft integration test results
+   - `testing/vitest-migration-summary.md` - Testing infrastructure migration overview
+
+5. **Milestone Documents**:
    - Implementation plans focus on technical deliverables and timelines
    - Status summaries focus on progress tracking and achievements
    - Transition documents focus on handoff planning and dependencies
 
-4. **Module Documentation**:
+6. **Module Documentation**:
    - Module-specific plans contain detailed technical specifications
    - Progress tracker provides implementation status and dependencies
    - Strategy documents reference modules without duplicating technical details
 
+7. **Working Specifications**:
+   - Iterative development specifications organized by iteration
+   - Historical development patterns and evolution tracking
+
 ###  Minimal Overlap Areas
 
-1. **HRM Integration**: Three documents serve distinct purposes:
+1. **HRM Integration**: Multiple documents serve distinct purposes:
    - **Research Overview** (`integrating-hrm-into-our-cognitive-consious-experiment.md`) - Motivates the research and outlines architectural approach
    - **Detailed Implementation** (`hrm-integration-implementation.md`) - Provides comprehensive 12-week plan with specific milestones
-   - **Practical Strategy** (`hrm_integration_approach.md`) - Adapts the approach based on environment constraints and TypeScript architecture
+   - **Advanced Integration** (`sapient-hrm-integration-plan.md`) - Advanced HRM integration approaches and methodologies
+   - **Architecture Evaluation** (`arbiter-hrm-architecture-evaluation.md`) - Detailed evaluation of arbiter and HRM integration patterns
+   - **Practical Strategy** (`HRM_INTEGRATION_APPROACH.md`) - Adapts the approach based on environment constraints and TypeScript architecture
 
-2. **Progress Tracking**: Two complementary tracking systems:
+2. **Integration Approaches**: Multiple integration methodologies:
+   - **Task-Oriented Integration** (`task-oriented-cognitive-integration.md`) - Task-oriented cognitive integration patterns
+   - **Vibe-Coded Integration** (`vibe-coded-conscious-bot-integration.md`) - Vibe-coded integration methodologies
+   - **Naming Updates** (`renaming-summary.md`) - Naming convention updates and changes
+
+3. **Testing and Validation**: Comprehensive testing coverage:
+   - **Integration Testing** (`integration-testing-suite.md`) - Comprehensive integration testing framework
+   - **HRM Testing** (`HRM_TEST_SUMMARY.md`) - HRM testing results and analysis
+   - **Minecraft Testing** (`minecraft-integration-testing-summary.md`) - Minecraft integration test results
+   - **Migration Testing** (`vitest-migration-summary.md`) - Testing infrastructure migration overview
+
+4. **Progress Tracking**: Two complementary tracking systems:
    - **Detailed Tracker** (`plans/modules/README.md`) - Comprehensive module-by-module progress with dependencies and priorities
-   - **High-Level Status** (`strategy/project_status_update.md`) - Milestone-level progress and strategic overview
+   - **High-Level Status** (`strategy/PROJECT_STATUS_UPDATE.md`) - Milestone-level progress and strategic overview
 
-3. **Milestone Documentation**: Clear progression through implementation lifecycle:
+5. **Milestone Documentation**: Clear progression through implementation lifecycle:
    - **Implementation Plans** - Technical specifications and timelines
    - **Status Summaries** - Progress tracking and achievements
    - **Transition Documents** - Handoff planning and next steps
@@ -220,28 +355,39 @@ The documentation maintains clear separation of concerns:
 ## Navigation Guide
 
 ### For New Contributors
-1. Start with **`strategy/project_status_update.md`** for current project status
+1. Start with **`strategy/PROJECT_STATUS_UPDATE.md`** for current project status
 2. Review **`plans/modules/README.md`** for module overview and progress
 3. Read **`strategy/verification_framework.md`** for quality standards
-4. Focus on specific module plans in `plans/modules/` based on your area
+4. Check **`testing/integration-testing-suite.md`** for testing requirements
+5. Focus on specific module plans in `plans/modules/` based on your area
 
 ### For Researchers
 1. Review **`plans/integrating-hrm-into-our-cognitive-consious-experiment.md`** for research motivation
 2. Study **`plans/hrm-integration-implementation.md`** for detailed methodology
 3. Examine **`strategy/verification_framework.md`** for evaluation criteria
 4. Check **`strategy/future_enhancements.md`** for research opportunities
+5. Review **`testing/HRM_TEST_SUMMARY.md`** for testing results
 
 ### For Developers
 1. Begin with **`plans/configuration-management.md`** for system architecture
 2. Review **`strategy/integration_strategy.md`** for module interactions
 3. Check **`strategy/risk_management.md`** for technical risks
-4. Focus on specific module plans in `plans/modules/` for implementation details
+4. Review **`integration/`** documents for integration patterns
+5. Focus on specific module plans in `plans/modules/` for implementation details
 
 ### For Project Managers
-1. Start with **`strategy/project_status_update.md`** for current status
+1. Start with **`strategy/PROJECT_STATUS_UPDATE.md`** for current status
 2. Review milestone documents for planning and progress tracking
 3. Check **`strategy/risk_management.md`** for risk assessment
 4. Monitor progress through **`plans/modules/README.md`**
+5. Review **`testing/`** documents for validation status
+
+### For Testers and QA
+1. Start with **`testing/integration-testing-suite.md`** for testing framework
+2. Review **`testing/HRM_TEST_SUMMARY.md`** for HRM testing results
+3. Check **`testing/minecraft-integration-testing-summary.md`** for integration tests
+4. Review **`testing/vitest-migration-summary.md`** for testing infrastructure
+5. Examine **`strategy/verification_framework.md`** for quality standards
 
 ## Documentation Standards
 

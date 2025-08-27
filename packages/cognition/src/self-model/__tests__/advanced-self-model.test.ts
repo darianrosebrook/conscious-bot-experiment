@@ -7,7 +7,7 @@
  * @author @darianrosebrook
  */
 
-import { describe, it, expect, beforeEach } from '@jest/globals';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { AdvancedIdentityAnalyzer } from '../advanced-identity-analyzer';
 import { NarrativeIntelligence } from '../narrative-intelligence';
 import { ContractSystem } from '../contract-system';

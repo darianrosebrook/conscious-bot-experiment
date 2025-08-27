@@ -526,6 +526,7 @@ export class SignalProcessor extends EventEmitter<SystemEvents> {
         aggregated.push({
           type: validType,
           intensity: avgIntensity,
+          urgency: avgIntensity, // Use intensity as urgency for aggregated signals
           confidence: avgConfidence,
           trend: avgTrend,
           timestamp: latestTimestamp,

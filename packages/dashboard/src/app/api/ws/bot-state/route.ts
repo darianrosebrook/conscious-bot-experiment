@@ -80,7 +80,15 @@ export const GET = async (req: NextRequest) => {
                   stamina: 100, // Default stamina value
                   sleep: 100, // Default sleep value
                 }
-              : null,
+              : minecraftData?.data?.currentState
+                ? {
+                    health: (minecraftData.data.currentState.health || 0) * 20, // Convert from 0-1 to 0-20
+                    hunger: (minecraftData.data.currentState.hunger || 0) * 20, // Convert from 0-1 to 0-20
+                    stamina:
+                      (minecraftData.data.currentState.energy || 0) * 100, // Convert from 0-1 to 0-100
+                    sleep: 100, // Default sleep value
+                  }
+                : null,
             intero:
               cognitionData?.stress !== undefined &&
               cognitionData?.focus !== undefined &&
@@ -90,12 +98,29 @@ export const GET = async (req: NextRequest) => {
                     focus: cognitionData.focus || 80,
                     curiosity: cognitionData.curiosity || 75,
                   }
-                : {
-                    stress: 20, // Default stress level
-                    focus: 80, // Default focus level
-                    curiosity: 75, // Default curiosity level
-                  },
-            mood: cognitionData?.mood || 'neutral',
+                : minecraftData?.data?.currentState
+                  ? {
+                      stress:
+                        (1 - (minecraftData.data.currentState.safety || 0)) *
+                        100, // Convert safety to stress (inverted)
+                      focus:
+                        (minecraftData.data.currentState.curiosity || 0) * 100, // Use curiosity as focus proxy
+                      curiosity:
+                        (minecraftData.data.currentState.curiosity || 0) * 100, // Direct curiosity mapping
+                    }
+                  : {
+                      stress: 20, // Default stress level
+                      focus: 80, // Default focus level
+                      curiosity: 75, // Default curiosity level
+                    },
+            mood:
+              cognitionData?.mood ||
+              (minecraftData?.data?.currentState?.safety > 0.8
+                ? 'content'
+                : minecraftData?.data?.currentState?.safety > 0.5
+                  ? 'neutral'
+                  : 'concerned') ||
+              'neutral',
             environment: worldData || null,
             cognition: {
               ...cognitionData,

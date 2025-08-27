@@ -1,392 +1,484 @@
 /**
- * Core Capability Registration Server
+ * Server API for Dynamic Capability Registration
  *
- * Provides HTTP API endpoints for capability registration and management.
- * Implements the MCP-style registry with authentication and validation.
+ * Provides REST endpoints for dynamic capability registration, shadow runs,
+ * and promotion/retirement of capabilities.
  *
  * @author @darianrosebrook
  */
 
 import express from 'express';
-import cors from 'cors';
-import {
-  EnhancedRegistry,
-  EnhancedSpec,
-  ShadowRunResult,
-} from './mcp-capabilities/enhanced-registry';
+import { EnhancedRegistry } from './mcp-capabilities/enhanced-registry';
 import { DynamicCreationFlow } from './mcp-capabilities/dynamic-creation-flow';
-import { LeafFactory } from './mcp-capabilities/leaf-factory';
+import { LeafContext } from './mcp-capabilities/leaf-contracts';
 
 const app: express.Application = express();
-const port = process.env.CORE_PORT ? parseInt(process.env.CORE_PORT) : 3007;
-
-// Middleware
-app.use(cors());
 app.use(express.json());
 
-// Initialize core components (can be overridden for testing)
-let registry: EnhancedRegistry | null = null;
-let dynamicFlow: DynamicCreationFlow | null = null;
-let leafFactory: LeafFactory | null = null;
-
-// Function to initialize components (allows for dependency injection in tests)
-export function initializeComponents(
-  registryInstance?: EnhancedRegistry,
-  dynamicFlowInstance?: DynamicCreationFlow,
-  leafFactoryInstance?: LeafFactory
-) {
-  registry = registryInstance || new EnhancedRegistry();
-  dynamicFlow = dynamicFlowInstance || new DynamicCreationFlow(registry);
-  leafFactory = leafFactoryInstance || new LeafFactory();
-}
-
-// Lazy initialization function
-function getComponents() {
-  if (!registry || !dynamicFlow || !leafFactory) {
-    initializeComponents();
-  }
-  return {
-    registry: registry!,
-    dynamicFlow: dynamicFlow!,
-    leafFactory: leafFactory!,
-  };
-}
-
-// Authentication middleware for trusted signers
-const authenticateTrustedSigner = (
-  req: express.Request,
-  res: express.Response,
-  next: express.NextFunction
-) => {
-  const authHeader = req.headers.authorization;
-  const apiKey = process.env.TRUSTED_SIGNER_API_KEY;
-
-  if (!apiKey) {
-    return res.status(500).json({
-      success: false,
-      error: 'Server not configured with trusted signer authentication',
-    });
-  }
-
-  if (!authHeader || authHeader !== `Bearer ${apiKey}`) {
-    return res.status(401).json({
-      success: false,
-      error: 'Unauthorized: Requires trusted signer authentication',
-    });
-  }
-
-  next();
-};
-
-// Health check endpoint
-app.get('/health', (req: express.Request, res: express.Response) => {
-  res.json({
-    status: 'healthy',
-    system: 'core-capability-registry',
-    timestamp: Date.now(),
-    version: '1.0.0',
-    endpoints: {
-      leafRegistration: '/capabilities/leaf/register',
-      optionRegistration: '/capabilities/option/register',
-      capabilityPromotion: '/capabilities/:id/promote',
-      capabilityRetirement: '/capabilities/:id/retire',
-      capabilityDetails: '/capabilities/:id',
-      capabilityList: '/capabilities',
-    },
-  });
-});
+// Initialize MCP capabilities system
+const registry = new EnhancedRegistry();
+const dynamicFlow = new DynamicCreationFlow(registry);
 
 // ============================================================================
 // Capability Registration Endpoints
 // ============================================================================
 
 /**
- * POST /capabilities/leaf/register
- * Register a new leaf capability (trusted signers only)
+ * Register a new option (LLM-authored capability)
+ * POST /capabilities/option/register
  */
-app.post(
-  '/capabilities/leaf/register',
-  authenticateTrustedSigner,
-  async (req: express.Request, res: express.Response) => {
-    try {
-      const { spec, implementation } = req.body;
+app.post('/capabilities/option/register', async (req, res) => {
+  try {
+    // Check authentication
+    const authHeader = req.headers.authorization;
+    const expectedKey = process.env.TRUSTED_SIGNER_API_KEY;
 
-      if (!spec || !implementation) {
-        return res.status(400).json({
-          success: false,
-          error: 'Missing required fields: spec and implementation',
-        });
-      }
+    if (!authHeader || !expectedKey || authHeader !== `Bearer ${expectedKey}`) {
+      return res.status(401).json({
+        success: false,
+        error: 'Unauthorized: Requires trusted signer authentication',
+      });
+    }
 
-      // Validate leaf spec
-      if (!spec.name || !spec.version) {
-        return res.status(400).json({
-          success: false,
-          error: 'Invalid leaf spec: missing name or version',
-        });
-      }
+    const { btDsl, provenance, shadowConfig } = req.body;
 
-      // Register the leaf
-      const provenance = {
-        author: 'trusted-signer',
-        parentLineage: [],
-        codeHash: 'trusted-implementation',
-        createdAt: new Date().toISOString(),
-        metadata: { source: 'api-registration' },
-      };
+    if (!btDsl || !provenance) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid BT-DSL',
+        details: ['Invalid node type'],
+      });
+    }
 
-      // Create a leaf implementation object
-      const leafImpl = {
-        spec,
-        run: implementation.run,
-      };
+    const result = registry.registerOption(btDsl, provenance, shadowConfig);
 
-      const { registry } = getComponents();
-      const result = registry.registerLeaf(leafImpl, provenance, 'active');
+    if (result.ok) {
+      res.json({
+        success: true,
+        optionId: result.id,
+        message: 'Option capability registered successfully',
+      });
+    } else {
+      res.status(400).json({
+        success: false,
+        error: result.error,
+      });
+    }
+  } catch (error) {
+    console.error('Option registration failed:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Option registration failed',
+    });
+  }
+});
 
-      if (!result.ok) {
-        return res.status(400).json({
-          success: false,
-          error: result.error || 'Registration failed',
-        });
-      }
+/**
+ * Register a new leaf (signed human build)
+ * POST /capabilities/leaf/register
+ */
+app.post('/capabilities/leaf/register', async (req, res) => {
+  try {
+    // Check authentication
+    const authHeader = req.headers.authorization;
+    const expectedKey = process.env.TRUSTED_SIGNER_API_KEY;
 
-      res.status(200).json({
+    if (!authHeader || !expectedKey || authHeader !== `Bearer ${expectedKey}`) {
+      return res.status(401).json({
+        success: false,
+        error: 'Unauthorized: Requires trusted signer authentication',
+      });
+    }
+
+    const { spec, implementation } = req.body;
+
+    if (!spec || !implementation) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid leaf spec: missing name or version',
+      });
+    }
+
+    const result = registry.registerLeaf(implementation, {
+      author: 'trusted-signer',
+      codeHash: 'trusted-implementation',
+      createdAt: new Date().toISOString(),
+    });
+
+    if (result.ok) {
+      res.json({
         success: true,
         capabilityId: result.id,
         message: 'Leaf capability registered successfully',
       });
-    } catch (error) {
-      console.error('Error registering leaf capability:', error);
-      res.status(500).json({
+    } else {
+      res.status(400).json({
         success: false,
-        error: 'Internal server error during leaf registration',
+        error: result.error,
       });
     }
+  } catch (error) {
+    console.error('Leaf registration failed:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Registration failed',
+    });
   }
-);
-
-/**
- * POST /capabilities/option/register
- * Register a new option capability (open to LLM proposals)
- */
-app.post(
-  '/capabilities/option/register',
-  async (req: express.Request, res: express.Response) => {
-    try {
-      const { btDsl } = req.body;
-
-      if (!btDsl) {
-        return res.status(400).json({
-          success: false,
-          error: 'Missing required field: btDsl',
-        });
-      }
-
-      // Register the option with shadow configuration
-      const shadowConfig = {
-        successThreshold: 0.7,
-        failureThreshold: 0.3,
-        maxShadowRuns: 10,
-        minShadowRuns: 3,
-      };
-
-      const provenance = {
-        author: 'llm-proposal',
-        parentLineage: [],
-        codeHash: 'bt-dsl-generated',
-        createdAt: new Date().toISOString(),
-        metadata: { source: 'api-registration' },
-      };
-
-      const { registry } = getComponents();
-      const result = registry.registerOption(btDsl, provenance, shadowConfig);
-
-      if (!result.ok) {
-        return res.status(400).json({
-          success: false,
-          error: result.error || 'Option registration failed',
-        });
-      }
-
-      res.status(200).json({
-        success: true,
-        capabilityId: result.id,
-        message: 'Option capability registered successfully (shadow mode)',
-        shadowConfig,
-      });
-    } catch (error) {
-      console.error('Error registering option capability:', error);
-      res.status(500).json({
-        success: false,
-        error: 'Internal server error during option registration',
-      });
-    }
-  }
-);
-
-/**
- * POST /capabilities/:id/promote
- * Promote a capability from shadow to active
- */
-app.post(
-  '/capabilities/:id/promote',
-  authenticateTrustedSigner,
-  async (req: express.Request, res: express.Response) => {
-    try {
-      const { id } = req.params;
-
-      const { registry } = getComponents();
-      const result = await registry.promoteCapability(id);
-
-      if (!result) {
-        return res.status(400).json({
-          success: false,
-          error: 'Promotion failed',
-        });
-      }
-
-      res.status(200).json({
-        success: true,
-        message: `Capability ${id} promoted to active status`,
-      });
-    } catch (error) {
-      console.error('Error promoting capability:', error);
-      res.status(500).json({
-        success: false,
-        error: 'Internal server error during capability promotion',
-      });
-    }
-  }
-);
-
-/**
- * POST /capabilities/:id/retire
- * Retire a capability
- */
-app.post(
-  '/capabilities/:id/retire',
-  authenticateTrustedSigner,
-  async (req: express.Request, res: express.Response) => {
-    try {
-      const { id } = req.params;
-
-      const { registry } = getComponents();
-      const result = await registry.retireCapability(id);
-
-      if (!result) {
-        return res.status(400).json({
-          success: false,
-          error: 'Retirement failed',
-        });
-      }
-
-      res.status(200).json({
-        success: true,
-        message: `Capability ${id} retired successfully`,
-      });
-    } catch (error) {
-      console.error('Error retiring capability:', error);
-      res.status(500).json({
-        success: false,
-        error: 'Internal server error during capability retirement',
-      });
-    }
-  }
-);
-
-/**
- * GET /capabilities/stats
- * Get registry statistics
- */
-app.get(
-  '/capabilities/stats',
-  async (req: express.Request, res: express.Response) => {
-    try {
-      const { registry } = getComponents();
-      const stats = await registry.getStatistics();
-
-      res.status(200).json({
-        success: true,
-        stats,
-      });
-    } catch (error) {
-      console.error('Error retrieving registry statistics:', error);
-      res.status(500).json({
-        success: false,
-        error: 'Internal server error retrieving statistics',
-      });
-    }
-  }
-);
-
-/**
- * GET /capabilities
- * List all capabilities
- */
-app.get(
-  '/capabilities',
-  async (req: express.Request, res: express.Response) => {
-    try {
-      const { status, type } = req.query;
-
-      const { registry } = getComponents();
-      const capabilities = await registry.listCapabilities({
-        status: status as string,
-        type: type as string,
-      });
-
-      res.status(200).json({
-        success: true,
-        capabilities,
-        count: capabilities.length,
-      });
-    } catch (error) {
-      console.error('Error listing capabilities:', error);
-      res.status(500).json({
-        success: false,
-        error: 'Internal server error listing capabilities',
-      });
-    }
-  }
-);
-
-/**
- * GET /capabilities/:id
- * Get capability details
- */
-app.get(
-  '/capabilities/:id',
-  async (req: express.Request, res: express.Response) => {
-    try {
-      const { id } = req.params;
-
-      const { registry } = getComponents();
-      const capability = await registry.getCapability(id);
-
-      if (!capability) {
-        return res.status(404).json({
-          success: false,
-          error: 'Capability not found',
-        });
-      }
-
-      res.status(200).json({
-        success: true,
-        capability,
-      });
-    } catch (error) {
-      console.error('Error retrieving capability:', error);
-      res.status(500).json({
-        success: false,
-        error: 'Internal server error retrieving capability',
-      });
-    }
-  }
-);
+});
 
 // ============================================================================
-// Error handling middleware
+// Shadow Run Endpoints
+// ============================================================================
+
+/**
+ * Execute a shadow run for an option
+ * POST /capabilities/:id/shadow-run
+ */
+app.post('/capabilities/:id/shadow-run', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { leafContext, args } = req.body;
+
+    if (!leafContext) {
+      return res.status(400).json({
+        error: 'missing_leaf_context',
+        detail: 'leafContext is required',
+      });
+    }
+
+    const result = await registry.executeShadowRun(id, leafContext, undefined);
+    res.json(result);
+  } catch (error) {
+    console.error('Shadow run failed:', error);
+    res.status(500).json({
+      error: 'shadow_run_failed',
+      detail: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
+
+// ============================================================================
+// Capability Management Endpoints
+// ============================================================================
+
+/**
+ * Promote an option from shadow to active
+ * POST /capabilities/:id/promote
+ */
+app.post('/capabilities/:id/promote', async (req, res) => {
+  try {
+    // Check authentication
+    const authHeader = req.headers.authorization;
+    const expectedKey = process.env.TRUSTED_SIGNER_API_KEY;
+
+    if (!authHeader || !expectedKey || authHeader !== `Bearer ${expectedKey}`) {
+      return res.status(401).json({
+        success: false,
+        error: 'Unauthorized: Requires trusted signer authentication',
+      });
+    }
+
+    const { id } = req.params;
+    const { reason } = req.body;
+
+    const success = await registry.promoteCapability(id);
+    res.json({
+      success: true,
+      message: `Capability ${id} promoted to active status`,
+    });
+  } catch (error) {
+    console.error('Option promotion failed:', error);
+    res.status(500).json({
+      error: 'promotion_failed',
+      detail: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
+
+/**
+ * Retire an option
+ * POST /capabilities/:id/retire
+ */
+app.post('/capabilities/:id/retire', async (req, res) => {
+  try {
+    // Check authentication
+    const authHeader = req.headers.authorization;
+    const expectedKey = process.env.TRUSTED_SIGNER_API_KEY;
+
+    if (!authHeader || !expectedKey || authHeader !== `Bearer ${expectedKey}`) {
+      return res.status(401).json({
+        success: false,
+        error: 'Unauthorized: Requires trusted signer authentication',
+      });
+    }
+
+    const { id } = req.params;
+    const { reason } = req.body;
+
+    const success = await registry.retireCapability(id);
+    res.json({
+      success: true,
+      message: `Capability ${id} retired successfully`,
+    });
+  } catch (error) {
+    console.error('Option retirement failed:', error);
+    res.status(500).json({
+      error: 'retirement_failed',
+      detail: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
+
+// ============================================================================
+// Information Endpoints
+// ============================================================================
+
+/**
+ * Get capability information
+ * GET /capabilities/:id
+ */
+app.get('/capabilities/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const capability = await registry.getCapability(id);
+
+    if (!capability) {
+      return res.status(404).json({
+        success: false,
+        error: 'Capability not found',
+      });
+    }
+
+    res.json({
+      success: true,
+      capability: capability,
+    });
+  } catch (error) {
+    console.error('Get capability failed:', error);
+    res.status(500).json({
+      success: false,
+      error: 'get_capability_failed',
+    });
+  }
+});
+
+/**
+ * List all capabilities
+ * GET /capabilities
+ */
+app.get('/capabilities', async (req, res) => {
+  try {
+    const { status, type } = req.query;
+    const capabilities = await registry.listCapabilities({
+      status: status as string,
+      type: type as string,
+    });
+
+    res.json({
+      success: true,
+      capabilities: capabilities,
+      count: capabilities.length,
+    });
+  } catch (error) {
+    console.error('List capabilities failed:', error);
+    res.status(500).json({
+      success: false,
+      error: 'list_capabilities_failed',
+    });
+  }
+});
+
+/**
+ * Get shadow run statistics
+ * GET /capabilities/:id/shadow-stats
+ */
+app.get('/capabilities/:id/shadow-stats', (req, res) => {
+  try {
+    const { id } = req.params;
+    const stats = registry.getShadowStats(id);
+    res.json(stats);
+  } catch (error) {
+    console.error('Get shadow stats failed:', error);
+    res.status(500).json({
+      error: 'get_shadow_stats_failed',
+      detail: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
+
+/**
+ * Get registry statistics
+ * GET /capabilities/stats
+ */
+app.get('/capabilities/stats', async (req, res) => {
+  try {
+    const capabilities = await registry.listCapabilities();
+    const stats = {
+      totalCapabilities: capabilities.length,
+      activeCapabilities: capabilities.filter((c) => c.status === 'active')
+        .length,
+      shadowCapabilities: capabilities.filter((c) => c.status === 'shadow')
+        .length,
+      retiredCapabilities: capabilities.filter((c) => c.status === 'retired')
+        .length,
+    };
+
+    res.json({
+      success: true,
+      statistics: stats,
+    });
+  } catch (error) {
+    console.error('Get registry stats failed:', error);
+    res.status(500).json({
+      success: false,
+      error: 'get_registry_stats_failed',
+    });
+  }
+});
+
+// ============================================================================
+// Dynamic Creation Endpoints
+// ============================================================================
+
+/**
+ * Propose new capability for a goal
+ * POST /capabilities/propose
+ */
+app.post('/capabilities/propose', async (req, res) => {
+  try {
+    const { taskId, context, currentTask, recentFailures } = req.body;
+
+    if (!taskId || !context || !currentTask) {
+      return res.status(400).json({
+        error: 'missing_required_fields',
+        detail: 'taskId, context, and currentTask are required',
+      });
+    }
+
+    const proposal = await dynamicFlow.requestOptionProposal(
+      taskId,
+      context,
+      currentTask,
+      recentFailures || []
+    );
+
+    if (proposal) {
+      res.json({ ok: true, proposal });
+    } else {
+      res.json({ ok: false, error: 'no_proposal_generated' });
+    }
+  } catch (error) {
+    console.error('Capability proposal failed:', error);
+    res.status(500).json({
+      error: 'proposal_failed',
+      detail: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
+
+/**
+ * Register a proposed capability
+ * POST /capabilities/register-proposal
+ */
+app.post('/capabilities/register-proposal', async (req, res) => {
+  try {
+    const { proposal, author } = req.body;
+
+    if (!proposal || !author) {
+      return res.status(400).json({
+        error: 'missing_required_fields',
+        detail: 'proposal and author are required',
+      });
+    }
+
+    const result = await dynamicFlow.registerProposedOption(proposal, author);
+
+    if (result.success) {
+      res.json({ ok: true, optionId: result.optionId });
+    } else {
+      res.status(400).json({ ok: false, error: result.error });
+    }
+  } catch (error) {
+    console.error('Proposal registration failed:', error);
+    res.status(500).json({
+      error: 'registration_failed',
+      detail: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
+
+// ============================================================================
+// Health and Status Endpoints
+// ============================================================================
+
+/**
+ * Health check
+ * GET /health
+ */
+app.get('/health', async (req, res) => {
+  try {
+    const capabilities = await registry.listCapabilities();
+    const shadowOptions = registry.getShadowOptions();
+
+    res.json({
+      status: 'healthy',
+      system: 'core-capability-registry',
+      timestamp: Date.now(),
+      version: '1.0.0',
+      endpoints: {
+        leafRegistration: '/capabilities/leaf/register',
+        optionRegistration: '/capabilities/option/register',
+        capabilityPromotion: '/capabilities/:id/promote',
+        capabilityRetirement: '/capabilities/:id/retire',
+        capabilityDetails: '/capabilities/:id',
+        capabilityList: '/capabilities',
+      },
+    });
+  } catch (error) {
+    console.error('Health check failed:', error);
+    res.status(500).json({
+      error: 'health_check_failed',
+      detail: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
+
+/**
+ * Get system status
+ * GET /status
+ */
+app.get('/status', async (req, res) => {
+  try {
+    const capabilities = registry.listCapabilities();
+    const shadowOptions = registry.getShadowOptions();
+
+    res.json({
+      capabilities: {
+        total: (await capabilities).length,
+        active: (await capabilities).filter((c) => c.status === 'active')
+          .length,
+        shadow: shadowOptions.length,
+        retired: (await capabilities).filter((c) => c.status === 'retired')
+          .length,
+      },
+      dynamicFlow: {
+        enabled: true,
+        impasseDetection: true,
+        autoRetirement: true,
+      },
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error) {
+    console.error('Status check failed:', error);
+    res.status(500).json({
+      error: 'status_check_failed',
+      detail: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
+
+// ============================================================================
+// Error Handling Middleware
 // ============================================================================
 
 app.use(
@@ -398,40 +490,24 @@ app.use(
   ) => {
     console.error('Unhandled error:', error);
     res.status(500).json({
-      success: false,
-      error: 'Internal server error',
+      error: 'internal_server_error',
+      detail: error.message || 'Unknown error occurred',
     });
   }
 );
 
-// 404 handler
-app.use('*', (req: express.Request, res: express.Response) => {
-  res.status(404).json({
-    success: false,
-    error: 'Endpoint not found',
-    availableEndpoints: [
-      'GET /health',
-      'POST /capabilities/leaf/register',
-      'POST /capabilities/option/register',
-      'POST /capabilities/:id/promote',
-      'POST /capabilities/:id/retire',
-      'GET /capabilities/:id',
-      'GET /capabilities',
-      'GET /capabilities/stats',
-      'POST /impasse/detect',
-    ],
-  });
-});
+// ============================================================================
+// Export
+// ============================================================================
 
-// Start server
-if (import.meta.url === `file://${process.argv[1]}`) {
+export { app, registry, dynamicFlow };
+
+// Start server if this file is run directly
+if (require.main === module) {
+  const port = process.env.PORT || 3007;
   app.listen(port, () => {
-    console.log(`🚀 Core Capability Registry Server running on port ${port}`);
-    console.log(`📊 Health check: http://localhost:${port}/health`);
-    console.log(
-      `🔧 Capability registration: http://localhost:${port}/capabilities`
-    );
+    console.log(`Core API Server running on port ${port}`);
+    console.log(`Health check: http://localhost:${port}/health`);
+    console.log(`Status: http://localhost:${port}/status`);
   });
 }
-
-export default app;

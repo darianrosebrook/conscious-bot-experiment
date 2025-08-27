@@ -223,47 +223,49 @@ describe('Real-Time Performance Monitoring Integration', () => {
       expect(status.recommendedAction).toBeDefined();
     });
 
-    test('should trigger degradation on budget violation', (done) => {
-      // Create operation that will exceed budget
-      const operation: CognitiveOperation = {
-        id: 'violation_test',
-        type: OperationType.LLM_INFERENCE,
-        name: 'expensive_operation',
-        module: 'cognitive',
-        priority: 0.9,
-      };
+    test('should trigger degradation on budget violation', async () => {
+      return new Promise<void>((resolve) => {
+        // Create operation that will exceed budget
+        const operation: CognitiveOperation = {
+          id: 'violation_test',
+          type: OperationType.LLM_INFERENCE,
+          name: 'expensive_operation',
+          module: 'cognitive',
+          priority: 0.9,
+        };
 
-      const allocation = budgetEnforcer.allocateBudget(
-        operation,
-        PerformanceContext.EMERGENCY
-      );
+        const allocation = budgetEnforcer.allocateBudget(
+          operation,
+          PerformanceContext.EMERGENCY
+        );
 
-      // Create session with excessive duration to trigger violation
-      const session = performanceTracker.startTracking(
-        operation,
-        PerformanceContext.EMERGENCY
-      );
+        // Create session with excessive duration to trigger violation
+        const session = performanceTracker.startTracking(
+          operation,
+          PerformanceContext.EMERGENCY
+        );
 
-      // Simulate operation taking much longer than allocated budget
-      const excessiveDuration = allocation.allocatedBudget + 100;
+        // Simulate operation taking much longer than allocated budget
+        const excessiveDuration = allocation.allocatedBudget + 100;
 
-      // Manually create a violation by completing the operation with excessive time
-      const violationResult = {
-        success: false,
-        duration: excessiveDuration,
-        resourcesUsed: { cpu: 90, memory: 2048 },
-        errorCode: 'BUDGET_EXCEEDED',
-      };
+        // Manually create a violation by completing the operation with excessive time
+        const violationResult = {
+          success: false,
+          duration: excessiveDuration,
+          resourcesUsed: { cpu: 90, memory: 2048 },
+          errorCode: 'BUDGET_EXCEEDED',
+        };
 
-      // This should trigger the violation handling
-      performanceTracker.recordCompletion(session, violationResult);
+        // This should trigger the violation handling
+        performanceTracker.recordCompletion(session, violationResult);
 
-      // Verify violation was detected (simplified test)
-      const stats = budgetEnforcer.getBudgetStatistics();
-      expect(stats.activeBudgets).toBeGreaterThanOrEqual(0);
+        // Verify violation was detected (simplified test)
+        const stats = budgetEnforcer.getBudgetStatistics();
+        expect(stats.activeBudgets).toBeGreaterThanOrEqual(0);
 
-      done();
-    }, 10000); // Increase timeout for this test
+        resolve();
+      });
+    });
 
     test('should adapt budgets based on system load', () => {
       const operation: CognitiveOperation = {
@@ -460,88 +462,90 @@ describe('Real-Time Performance Monitoring Integration', () => {
       expect(errorEvaluation?.triggered).toBe(true);
     });
 
-    test('should manage alert lifecycle', (done) => {
+    test('should manage alert lifecycle', async () => {
       let alertTriggered = false;
 
-      alertingSystem.on('alert-triggered', (alert) => {
-        alertTriggered = true;
-        expect(alert.id).toBeDefined();
-        expect(alert.severity).toBeDefined();
+      return new Promise<void>((resolve) => {
+        alertingSystem.on('alert-triggered', (alert) => {
+          alertTriggered = true;
+          expect(alert.id).toBeDefined();
+          expect(alert.severity).toBeDefined();
 
-        // Acknowledge the alert
-        const acked = alertingSystem.acknowledgeAlert(
-          alert.id,
-          'test_user',
-          'Investigating'
-        );
-        expect(acked).toBe(true);
+          // Acknowledge the alert
+          const acked = alertingSystem.acknowledgeAlert(
+            alert.id,
+            'test_user',
+            'Investigating'
+          );
+          expect(acked).toBe(true);
 
-        // Resolve the alert
-        const resolved = alertingSystem.resolveAlert(
-          alert.id,
-          'Issue resolved'
-        );
-        expect(resolved).toBe(true);
+          // Resolve the alert
+          const resolved = alertingSystem.resolveAlert(
+            alert.id,
+            'Issue resolved'
+          );
+          expect(resolved).toBe(true);
 
-        const activeAlerts = alertingSystem.getActiveAlerts();
-        expect(activeAlerts.some((a) => a.id === alert.id)).toBe(false);
+          const activeAlerts = alertingSystem.getActiveAlerts();
+          expect(activeAlerts.some((a) => a.id === alert.id)).toBe(false);
 
-        done();
+          resolve();
+        });
+
+        // Trigger an alert with bad metrics
+        const badMetrics = {
+          latency: {
+            p50: 200,
+            p95: 400,
+            p99: 600,
+            max: 800,
+            mean: 300,
+            stddev: 100,
+            samples: 50,
+          },
+          throughput: {
+            operationsPerSecond: 0.5,
+            requestsProcessed: 30,
+            requestsDropped: 20,
+            queueDepth: 10,
+          },
+          resources: {
+            cpuUtilization: 0.95,
+            memoryUsage: 2048,
+            gcPressure: 0.8,
+            threadUtilization: 0.9,
+          },
+          quality: {
+            successRate: 0.7,
+            errorRate: 0.3,
+            timeoutRate: 0.15,
+            retryRate: 0.2,
+          },
+          timestamp: Date.now(),
+        };
+
+        const thresholds: AlertThreshold[] = [
+          {
+            name: 'critical_latency',
+            metric: 'latency.p95',
+            operator: '>',
+            value: 300,
+            window: 30000,
+            severity: 'critical',
+            enabled: true,
+          },
+        ];
+
+        alertingSystem.evaluateAlerts(badMetrics, thresholds);
+
+        // Wait a bit for async alert processing
+        setTimeout(() => {
+          // The alert should have been triggered by now
+          if (!alertTriggered) {
+            resolve();
+          }
+        }, 100);
       });
-
-      // Trigger an alert with bad metrics
-      const badMetrics = {
-        latency: {
-          p50: 200,
-          p95: 400,
-          p99: 600,
-          max: 800,
-          mean: 300,
-          stddev: 100,
-          samples: 50,
-        },
-        throughput: {
-          operationsPerSecond: 0.5,
-          requestsProcessed: 30,
-          requestsDropped: 20,
-          queueDepth: 10,
-        },
-        resources: {
-          cpuUtilization: 0.95,
-          memoryUsage: 2048,
-          gcPressure: 0.8,
-          threadUtilization: 0.9,
-        },
-        quality: {
-          successRate: 0.7,
-          errorRate: 0.3,
-          timeoutRate: 0.15,
-          retryRate: 0.2,
-        },
-        timestamp: Date.now(),
-      };
-
-      const thresholds: AlertThreshold[] = [
-        {
-          name: 'critical_latency',
-          metric: 'latency.p95',
-          operator: '>',
-          value: 300,
-          window: 30000,
-          severity: 'critical',
-          enabled: true,
-        },
-      ];
-
-      alertingSystem.evaluateAlerts(badMetrics, thresholds);
-
-      // Wait a bit for async alert processing
-      setTimeout(() => {
-        // The alert should have been triggered by now
-        if (!alertTriggered) {
-          done();
-        }
-      }, 100);
     });
 
     test('should generate health summary', () => {

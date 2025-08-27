@@ -33,15 +33,15 @@ const createMockBot = () => ({
       { name: 'coal', count: 10, type: 263 },
     ],
   },
-  blockAt: jest.fn(() => null),
-  recipesFor: jest.fn(() => [
+  blockAt: vi.fn(() => null),
+  recipesFor: vi.fn(() => [
     {
       id: 'oak_planks_recipe',
       result: { name: 'oak_planks', count: 4 },
       ingredients: [{ name: 'oak_log', count: 1 }],
     },
   ]),
-  craft: jest.fn((recipe, qty, callback) => {
+  craft: vi.fn((recipe, qty, callback) => {
     if (callback) {
       setTimeout(() => callback(null), 100);
     } else {
@@ -49,18 +49,18 @@ const createMockBot = () => ({
       return Promise.resolve();
     }
   }),
-  openFurnace: jest.fn(() => ({
-    putItem: jest.fn().mockResolvedValue(undefined),
-    takeOutput: jest.fn().mockResolvedValue(undefined),
-    close: jest.fn().mockResolvedValue(undefined),
-    outputItem: jest.fn(() => ({ name: 'iron_ingot', count: 1, type: 265 })),
-    on: jest.fn((event, callback) => {
+  openFurnace: vi.fn(() => ({
+    putItem: vi.fn().mockResolvedValue(undefined),
+    takeOutput: vi.fn().mockResolvedValue(undefined),
+    close: vi.fn().mockResolvedValue(undefined),
+    outputItem: vi.fn(() => ({ name: 'iron_ingot', count: 1, type: 265 })),
+    on: vi.fn((event, callback) => {
       // Simulate furnace update event immediately for tests
       if (event === 'update') {
         setTimeout(() => callback(), 10);
       }
     }),
-    removeListener: jest.fn(),
+    removeListener: vi.fn(),
   })),
   mcData: {
     itemsByName: {
@@ -103,7 +103,7 @@ const createMockContext = (bot: any): LeafContext => {
     bot,
     abortSignal: controller.signal,
     now: () => performance.now(),
-    snapshot: jest.fn().mockResolvedValue({
+    snapshot: vi.fn().mockResolvedValue({
       position: { x: 0, y: 64, z: 0 },
       biome: 'plains',
       time: 1000,
@@ -114,7 +114,7 @@ const createMockContext = (bot: any): LeafContext => {
       toolDurability: {},
       waypoints: [],
     }),
-    inventory: jest.fn().mockImplementation(() => {
+    inventory: vi.fn().mockImplementation(() => {
       // Simulate crafting by adding the crafted item
       const currentState = getInventoryState();
       if (currentState.items.some((item) => item.name === 'oak_planks')) {
@@ -138,8 +138,8 @@ const createMockContext = (bot: any): LeafContext => {
         return Promise.resolve(newState);
       }
     }),
-    emitMetric: jest.fn(),
-    emitError: jest.fn(),
+    emitMetric: vi.fn(),
+    emitError: vi.fn(),
   };
 };
 
@@ -221,18 +221,16 @@ describe('CraftRecipeLeaf', () => {
 
     it('should handle crafting timeouts', async () => {
       // Mock a slow craft operation that takes longer than the timeout
-      (mockBot.craft as jest.Mock).mockImplementation(
-        (recipe, qty, callback) => {
-          if (callback) {
-            // Don't call the callback, let it timeout
-            return;
-          } else {
-            return new Promise((resolve, reject) => {
-              // Don't resolve or reject, let it timeout
-            });
-          }
+      (mockBot.craft as vi.Mock).mockImplementation((recipe, qty, callback) => {
+        if (callback) {
+          // Don't call the callback, let it timeout
+          return;
+        } else {
+          return new Promise((resolve, reject) => {
+            // Don't resolve or reject, let it timeout
+          });
         }
-      );
+      });
 
       const result = await craftLeaf.run(mockContext, {
         recipe: 'oak_planks',
@@ -319,7 +317,7 @@ describe('SmeltLeaf', () => {
   describe('run', () => {
     it('should successfully smelt items', async () => {
       // Mock furnace block nearby
-      (mockBot.blockAt as jest.Mock).mockReturnValue({
+      (mockBot.blockAt as vi.Mock).mockReturnValue({
         name: 'furnace',
         position: { x: 1, y: 64, z: 0 },
       });
@@ -388,7 +386,7 @@ describe('SmeltLeaf', () => {
 
     it('should emit metrics on success', async () => {
       // Mock furnace block nearby
-      (mockBot.blockAt as jest.Mock).mockReturnValue({
+      (mockBot.blockAt as vi.Mock).mockReturnValue({
         name: 'furnace',
         position: { x: 1, y: 64, z: 0 },
       });

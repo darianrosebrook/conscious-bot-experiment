@@ -168,7 +168,7 @@ export class NavigationSystem extends EventEmitter<NavigationSystemEvents> {
         const directDistance = euclideanDistance(request.start, request.goal);
         const pathLength = this.calculatePathLength(dstarResult.path);
         const optimality =
-          directDistance > 0 ? directDistance / pathLength : 1.0;
+          directDistance > 0 ? Math.min(directDistance / pathLength, 1.0) : 1.0;
 
         const result: PathPlanningResult = {
           ...dstarResult,

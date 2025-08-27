@@ -5,16 +5,16 @@ export default defineConfig({
   test: {
     globals: true,
     environment: 'node',
-    setupFiles: ['./src/__tests__/setup.ts'],
     testTimeout: 30000,
     clearMocks: true,
     restoreMocks: true,
+    include: ['src/**/*.{test,spec}.ts'],
+    exclude: ['node_modules', 'dist'],
+    setupFiles: ['./src/__tests__/setup.ts'],
   },
   resolve: {
     alias: {
-      '@conscious-bot/core': path.resolve(__dirname, '../core/dist'),
-      '@conscious-bot/world': path.resolve(__dirname, '../world/dist'),
-      '@conscious-bot/memory': path.resolve(__dirname, '../memory/dist'),
+      '@': path.resolve(__dirname, './src'),
     },
   },
 });

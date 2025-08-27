@@ -22,15 +22,15 @@ const mockBot = {
     food: 20,
   },
   world: {
-    getLight: jest.fn().mockReturnValue(3),
-    getBiome: jest.fn().mockResolvedValue('cave'),
+    getLight: vi.fn().mockReturnValue(3),
+    getBiome: vi.fn().mockResolvedValue('cave'),
   },
   inventory: {
-    items: jest.fn().mockReturnValue([
+    items: vi.fn().mockReturnValue([
       { name: 'torch', count: 10, slot: 0 },
       { name: 'stone_pickaxe', count: 1, slot: 1 },
     ]),
-    emptySlotCount: jest.fn().mockReturnValue(34),
+    emptySlotCount: vi.fn().mockReturnValue(34),
     inventoryStart: 9,
     inventoryEnd: 44,
     slots: new Array(45),
@@ -38,7 +38,7 @@ const mockBot = {
   quickBarSlot: 0,
   entities: {},
   time: { timeOfDay: 18000 },
-  blockAt: jest.fn().mockReturnValue({ name: 'stone', boundingBox: 'block' }),
+  blockAt: vi.fn().mockReturnValue({ name: 'stone', boundingBox: 'block' }),
   health: 20,
   food: 20,
 } as any;

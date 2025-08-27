@@ -25,21 +25,21 @@ import {
 } from '@conscious-bot/core';
 
 // Mock dependencies
-jest.mock('../bot-adapter');
-jest.mock('../observation-mapper');
-jest.mock('../action-translator');
-jest.mock('@conscious-bot/core', () => ({
-  HybridHRMArbiter: jest.fn(),
-  createLeafContext: jest.fn(),
-  LeafFactory: jest.fn(),
+vi.mock('../bot-adapter');
+vi.mock('../observation-mapper');
+vi.mock('../action-translator');
+vi.mock('@conscious-bot/core', () => ({
+  HybridHRMArbiter: vi.fn(),
+  createLeafContext: vi.fn(),
+  LeafFactory: vi.fn(),
 }));
 
 describe('Goal Execution Tests', () => {
   let integration: HybridArbiterIntegration;
-  let mockBotAdapter: jest.Mocked<BotAdapter>;
-  let mockObservationMapper: jest.Mocked<ObservationMapper>;
-  let mockActionTranslator: jest.Mocked<ActionTranslator>;
-  let mockArbiter: jest.Mocked<HybridHRMArbiter>;
+  let mockBotAdapter: vi.Mocked<BotAdapter>;
+  let mockObservationMapper: vi.Mocked<ObservationMapper>;
+  let mockActionTranslator: vi.Mocked<ActionTranslator>;
+  let mockArbiter: vi.Mocked<HybridHRMArbiter>;
   let mockBot: any;
 
   const mockConfig: HybridArbiterConfig = {
@@ -55,7 +55,7 @@ describe('Goal Execution Tests', () => {
 
   beforeEach(() => {
     // Reset all mocks
-    jest.clearAllMocks();
+    vi.clearAllMocks();
 
     // Create mock bot
     mockBot = {
@@ -70,43 +70,43 @@ describe('Goal Execution Tests', () => {
       },
       entities: {},
       world: {
-        getBiome: jest.fn(() => 1), // plains biome
+        getBiome: vi.fn(() => 1), // plains biome
       },
       pathfinder: {
-        setMovements: jest.fn(),
-        setGoal: jest.fn(),
+        setMovements: vi.fn(),
+        setGoal: vi.fn(),
       },
     };
 
     // Setup mock bot adapter
     mockBotAdapter = {
-      getBot: jest.fn(() => mockBot),
-      connect: jest.fn(),
-      on: jest.fn(),
-      emit: jest.fn(),
+      getBot: vi.fn(() => mockBot),
+      connect: vi.fn(),
+      on: vi.fn(),
+      emit: vi.fn(),
     } as any;
 
     // Setup mock observation mapper
     mockObservationMapper = {
-      generateSignals: jest.fn(() => []),
-      getEnhancedHomeostasisState: jest.fn(() => ({})),
+      generateSignals: vi.fn(() => []),
+      getEnhancedHomeostasisState: vi.fn(() => ({})),
     } as any;
 
     // Setup mock action translator
     mockActionTranslator = {
-      executePlanStep: jest.fn(),
+      executePlanStep: vi.fn(),
     } as any;
 
     // Setup mock arbiter
     mockArbiter = {
-      initialize: jest.fn(() => Promise.resolve(true)),
-      processMultipleSignals: jest.fn(() => Promise.resolve([])),
-      processHRMSignal: jest.fn(() => Promise.resolve([])),
-      getOptimizationStats: jest.fn(() => ({})),
+      initialize: vi.fn(() => Promise.resolve(true)),
+      processMultipleSignals: vi.fn(() => Promise.resolve([])),
+      processHRMSignal: vi.fn(() => Promise.resolve([])),
+      getOptimizationStats: vi.fn(() => ({})),
     } as any;
 
     // Mock the HybridHRMArbiter constructor
-    (HybridHRMArbiter as unknown as jest.Mock).mockImplementation(
+    (HybridHRMArbiter as unknown as vi.Mock).mockImplementation(
       () => mockArbiter
     );
 
@@ -319,7 +319,7 @@ describe('Goal Execution Tests', () => {
 
       // Mock the action executor
       const mockActionExecutor = {
-        executeActionPlan: jest.fn(() =>
+        executeActionPlan: vi.fn(() =>
           Promise.resolve({
             success: true,
             durationMs: 100,
@@ -361,7 +361,7 @@ describe('Goal Execution Tests', () => {
       ];
 
       const mockActionExecutor = {
-        executeActionPlan: jest.fn(() =>
+        executeActionPlan: vi.fn(() =>
           Promise.resolve({
             success: false,
             error: 'Failed to move',
@@ -454,7 +454,7 @@ describe('Goal Execution Tests', () => {
     });
 
     it('should start and stop integration', () => {
-      const startSpy = jest.spyOn(integration, 'emit');
+      const startSpy = vi.spyOn(integration, 'emit');
 
       integration.start();
       expect(integration.getStatus().isRunning).toBe(true);
@@ -467,7 +467,7 @@ describe('Goal Execution Tests', () => {
 
     it('should not start if already running', () => {
       integration.start();
-      const startSpy = jest.spyOn(console, 'warn');
+      const startSpy = vi.spyOn(console, 'warn');
 
       integration.start();
       expect(startSpy).toHaveBeenCalledWith(
@@ -502,10 +502,10 @@ describe('Goal Execution Tests', () => {
         timestamp: Date.now(),
       };
 
-      const injectSpy = jest.spyOn(integration, 'emit');
+      const injectSpy = vi.spyOn(integration, 'emit');
 
       // Mock the processInjectedSignal method to avoid async issues
-      const processSpy = jest
+      const processSpy = vi
         .spyOn(integration as any, 'processInjectedSignal')
         .mockImplementation(() => Promise.resolve());
 
@@ -527,7 +527,7 @@ describe('Goal Execution Tests', () => {
         timestamp: Date.now(),
       };
 
-      const warnSpy = jest.spyOn(console, 'warn');
+      const warnSpy = vi.spyOn(console, 'warn');
 
       integration.injectSignal(mockSignal);
 
@@ -550,10 +550,10 @@ describe('Goal Execution Tests', () => {
       const processSignals = (integration as any).processGameSignals.bind(
         integration
       );
-      const errorSpy = jest.spyOn(integration, 'emit');
+      const errorSpy = vi.spyOn(integration, 'emit');
 
       // Mock getGameStateSnapshot to avoid bot dependency issues
-      jest.spyOn(integration as any, 'getGameStateSnapshot').mockResolvedValue({
+      vi.spyOn(integration as any, 'getGameStateSnapshot').mockResolvedValue({
         position: { x: 0, y: 64, z: 0 },
         health: 20,
         food: 20,
@@ -567,19 +567,20 @@ describe('Goal Execution Tests', () => {
       });
 
       // Mock generateSignalsFromGameState to return some signals so processMultipleSignals is called
-      jest
-        .spyOn(integration as any, 'generateSignalsFromGameState')
-        .mockReturnValue([
-          {
-            id: 'test-signal',
-            name: 'test',
-            value: 0.5,
-            trend: 0,
-            confidence: 0.8,
-            provenance: 'body',
-            timestamp: Date.now(),
-          },
-        ]);
+      vi.spyOn(
+        integration as any,
+        'generateSignalsFromGameState'
+      ).mockReturnValue([
+        {
+          id: 'test-signal',
+          name: 'test',
+          value: 0.5,
+          trend: 0,
+          confidence: 0.8,
+          provenance: 'body',
+          timestamp: Date.now(),
+        },
+      ]);
 
       await processSignals();
 
@@ -609,7 +610,7 @@ describe('Goal Execution Tests', () => {
       ];
 
       const mockActionExecutor = {
-        executeActionPlan: jest.fn(() =>
+        executeActionPlan: vi.fn(() =>
           Promise.reject(new Error('Execution failed'))
         ),
       };
@@ -619,7 +620,7 @@ describe('Goal Execution Tests', () => {
       const executeTopGoal = (integration as any).executeTopGoal.bind(
         integration
       );
-      const errorSpy = jest.spyOn(integration, 'emit');
+      const errorSpy = vi.spyOn(integration, 'emit');
 
       await executeTopGoal();
 

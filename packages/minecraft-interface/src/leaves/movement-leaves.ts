@@ -8,7 +8,9 @@
  */
 
 import { Bot } from 'mineflayer';
-import { pathfinder, goals } from 'mineflayer-pathfinder';
+import { pathfinder } from 'mineflayer-pathfinder';
+// Use require for goals since ES Module import doesn't work
+const { goals } = require('mineflayer-pathfinder');
 import { Vec3 } from 'vec3';
 import {
   LeafImpl,

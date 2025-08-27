@@ -15,8 +15,7 @@ import {
   LeafResult,
   LeafSpec,
 } from '../mcp-capabilities/leaf-contracts.js';
-import pkg from 'mineflayer-pathfinder';
-const { pathfinder, goals } = pkg;
+import { pathfinder, goals } from 'mineflayer-pathfinder';
 
 // Extend Bot type to include pathfinder
 interface BotWithPathfinder extends Bot {

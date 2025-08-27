@@ -4,7 +4,7 @@
   "description": "Core cognitive modules for conscious bot",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
-  "type": "module",
+  "type": "commonjs",
   "scripts": {
     "build": "tsc",
     "dev": "tsc --watch",

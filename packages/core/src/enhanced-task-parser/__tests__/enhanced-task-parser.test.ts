@@ -14,7 +14,6 @@ import { TaskType } from '../types';
 
 describe('Enhanced Task Parser', () => {
   // Increase timeout for all tests in this suite
-  jest.setTimeout(15000);
   let enhancedTaskParser: EnhancedTaskParser;
   let mockEnvironmentalContext: EnvironmentalContext;
 
@@ -521,7 +520,7 @@ describe('Enhanced Task Parser', () => {
   });
 
   describe('Event Emission', () => {
-    test('should emit events for task parsing', (done) => {
+    test('should emit events for task parsing', async () => {
       const userInput = 'gather wood';
       const userContext = {
         expertise_level: 'beginner' as const,
@@ -529,20 +528,22 @@ describe('Enhanced Task Parser', () => {
         urgency_level: 0.5,
       };
 
-      enhancedTaskParser.on('enhanced_task_parsed', (result) => {
-        expect(result.task).toBeDefined();
-        expect(result.paraphrase_options).toBeDefined();
-        done();
-      });
+      return new Promise<void>((resolve) => {
+        enhancedTaskParser.on('enhanced_task_parsed', (result) => {
+          expect(result.task).toBeDefined();
+          expect(result.paraphrase_options).toBeDefined();
+          resolve();
+        });
 
-      enhancedTaskParser.parseUserInput(
-        userInput,
-        mockEnvironmentalContext,
-        userContext
-      );
+        enhancedTaskParser.parseUserInput(
+          userInput,
+          mockEnvironmentalContext,
+          userContext
+        );
+      });
     });
 
-    test('should emit events for creative response generation', (done) => {
+    test('should emit events for creative response generation', async () => {
       const userInput = 'Hello there!';
       const userContext = {
         expertise_level: 'beginner' as const,
@@ -550,20 +551,22 @@ describe('Enhanced Task Parser', () => {
         urgency_level: 0.1,
       };
 
-      enhancedTaskParser.on('creative_response_generated', (data) => {
-        expect(data.response).toBeDefined();
-        expect(data.userInput).toBe(userInput);
-        done();
-      });
+      return new Promise<void>((resolve) => {
+        enhancedTaskParser.on('creative_response_generated', (data) => {
+          expect(data.response).toBeDefined();
+          expect(data.userInput).toBe(userInput);
+          resolve();
+        });
 
-      enhancedTaskParser.generateCreativeResponse(
-        userInput,
-        mockEnvironmentalContext,
-        userContext
-      );
+        enhancedTaskParser.generateCreativeResponse(
+          userInput,
+          mockEnvironmentalContext,
+          userContext
+        );
+      });
     });
 
-    test('should emit events for user feedback', (done) => {
+    test('should emit events for user feedback', async () => {
       const userInput = 'gather stone';
       const userContext = {
         user_id: 'test-user',
@@ -572,25 +575,27 @@ describe('Enhanced Task Parser', () => {
         urgency_level: 0.5,
       };
 
-      enhancedTaskParser.on('enhanced_task_parsed', (result) => {
-        enhancedTaskParser.on('user_feedback_received', (feedback) => {
-          expect(feedback.taskId).toBe(result.task.id);
-          expect(feedback.feedbackScore).toBe(0.8);
-          done();
+      return new Promise<void>((resolve) => {
+        enhancedTaskParser.on('enhanced_task_parsed', (result) => {
+          enhancedTaskParser.on('user_feedback_received', (feedback) => {
+            expect(feedback.taskId).toBe(result.task.id);
+            expect(feedback.feedbackScore).toBe(0.8);
+            resolve();
+          });
+
+          enhancedTaskParser.provideUserFeedback(
+            result.task.id,
+            0.8,
+            'Good job!'
+          );
         });
 
-        enhancedTaskParser.provideUserFeedback(
-          result.task.id,
-          0.8,
-          'Good job!'
+        enhancedTaskParser.parseUserInput(
+          userInput,
+          mockEnvironmentalContext,
+          userContext
         );
       });
-
-      enhancedTaskParser.parseUserInput(
-        userInput,
-        mockEnvironmentalContext,
-        userContext
-      );
     });
   });
 

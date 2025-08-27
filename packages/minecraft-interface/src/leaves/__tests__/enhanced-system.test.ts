@@ -8,9 +8,7 @@
  */
 
 import { EnhancedRegistry } from '../../../../core/src/mcp-capabilities/enhanced-registry';
-import {
-  DynamicCreationFlow,
-} from '../../../../core/src/mcp-capabilities/dynamic-creation-flow';
+import { DynamicCreationFlow } from '../../../../core/src/mcp-capabilities/dynamic-creation-flow';
 import { HRMLLMInterface } from '../../../../core/src/mcp-capabilities/llm-integration';
 import {
   createLeafContext,
@@ -32,21 +30,21 @@ class MockHRMLLMInterface extends HRMLLMInterface {
         maxTokens: 1000,
         temperature: 0.1,
         purpose: 'testing',
-        latency: 'fast'
+        latency: 'fast',
       },
       detailedExecutor: {
         model: 'mock-model',
         maxTokens: 1000,
         temperature: 0.1,
         purpose: 'testing',
-        latency: 'fast'
+        latency: 'fast',
       },
       refinementLoop: {
         maxIterations: 3,
         haltCondition: 'confidence_threshold',
         confidenceThreshold: 0.8,
-        timeBudgetMs: 5000
-      }
+        timeBudgetMs: 5000,
+      },
     });
   }
 
@@ -63,14 +61,14 @@ class MockHRMLLMInterface extends HRMLLMInterface {
             {
               type: 'Leaf',
               leafName: 'wait',
-              args: { durationMs: 100 }
-            }
-          ]
-        }
+              args: { durationMs: 100 },
+            },
+          ],
+        },
       },
       confidence: 0.8,
       estimatedSuccessRate: 0.9,
-      reasoning: 'Mock option for testing'
+      reasoning: 'Mock option for testing',
     };
   }
 }
@@ -106,12 +104,12 @@ const mockBot = {
     food: 20,
   },
   world: {
-    getLight: jest.fn().mockReturnValue(15),
-    getBiome: jest.fn().mockResolvedValue('plains'),
+    getLight: vi.fn().mockReturnValue(15),
+    getBiome: vi.fn().mockResolvedValue('plains'),
   },
   inventory: {
-    items: jest.fn().mockReturnValue([]),
-    emptySlotCount: jest.fn().mockReturnValue(36),
+    items: vi.fn().mockReturnValue([]),
+    emptySlotCount: vi.fn().mockReturnValue(36),
     inventoryStart: 9,
     inventoryEnd: 44,
     slots: new Array(45),
@@ -119,7 +117,7 @@ const mockBot = {
   quickBarSlot: 0,
   entities: {},
   time: { timeOfDay: 6000 },
-  blockAt: jest.fn().mockReturnValue({ name: 'air', boundingBox: 'empty' }),
+  blockAt: vi.fn().mockReturnValue({ name: 'air', boundingBox: 'empty' }),
   health: 20,
   food: 20,
 } as any;
@@ -165,11 +163,11 @@ describe('Enhanced System Integration', () => {
   afterEach(() => {
     registry.clear();
     dynamicFlow.clear();
-    jest.clearAllTimers();
+    vi.clearAllTimers();
   });
 
   afterAll(() => {
-    jest.clearAllTimers();
+    vi.clearAllTimers();
   });
 
   describe('Enhanced Registry', () => {
@@ -220,7 +218,7 @@ describe('Enhanced System Integration', () => {
         successThreshold: 0.8,
         maxShadowRuns: 10,
         failureThreshold: 0.3,
-        minShadowRuns: 3
+        minShadowRuns: 3,
       });
       expect(result.ok).toBe(true);
       expect(result.id).toBe('test_option@1.0.0');

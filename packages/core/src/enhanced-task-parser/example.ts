@@ -218,6 +218,6 @@ export async function enhancedTaskParserExample() {
 }
 
 // Run the example if this file is executed directly
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (require.main === module) {
   enhancedTaskParserExample().catch(console.error);
 }

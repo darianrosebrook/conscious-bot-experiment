@@ -35,6 +35,7 @@ describe('Signal Processing Properties (Simplified)', () => {
             // Create invalid signal to test normalization
             const invalidSignal = {
               ...validSignal,
+              urgency: validSignal.urgency || 0.5, // Ensure urgency is present
               intensity: Math.random() * 20 - 10, // -10 to 10
               confidence: Math.random() * 3 - 1, // -1 to 2
             };
@@ -58,6 +59,7 @@ describe('Signal Processing Properties (Simplified)', () => {
           fc.record({
             type: fc.constantFrom('health', 'hunger', 'threat'),
             intensity: fc.float({ min: 0, max: 1, noNaN: true }),
+            urgency: fc.float({ min: 0, max: 1, noNaN: true }),
             trend: fc.float({ min: -0.5, max: 0.5, noNaN: true }),
             confidence: fc.float({ min: 0, max: 1, noNaN: true }),
             timestamp: fc.integer({ min: 0 }),
@@ -88,6 +90,7 @@ describe('Signal Processing Properties (Simplified)', () => {
             fc.record({
               type: fc.constantFrom('health', 'hunger', 'threat'),
               intensity: fc.float({ min: 0, max: 1, noNaN: true }),
+              urgency: fc.float({ min: 0, max: 1, noNaN: true }),
               trend: fc.float({ min: -0.5, max: 0.5, noNaN: true }),
               confidence: fc.float({ min: 0, max: 1, noNaN: true }),
               timestamp: fc.integer({ min: 0 }),
@@ -122,6 +125,7 @@ describe('Signal Processing Properties (Simplified)', () => {
             fc.record({
               type: fc.constantFrom('health', 'hunger'),
               intensity: fc.float({ min: 0, max: 1, noNaN: true }),
+              urgency: fc.float({ min: 0, max: 1, noNaN: true }),
               trend: fc.float({ min: -0.5, max: 0.5, noNaN: true }),
               confidence: fc.float({ min: 0, max: 1, noNaN: true }),
               timestamp: fc.integer({ min: 0 }),

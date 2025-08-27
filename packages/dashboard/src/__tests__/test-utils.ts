@@ -228,19 +228,19 @@ export function createMockPlanningDataResponse(overrides: any = {}) {
  */
 export function createMockRouter(overrides: any = {}) {
   return {
-    push: jest.fn(),
-    replace: jest.fn(),
-    back: jest.fn(),
-    forward: jest.fn(),
-    refresh: jest.fn(),
-    prefetch: jest.fn(),
+    push: vi.fn(),
+    replace: vi.fn(),
+    back: vi.fn(),
+    forward: vi.fn(),
+    refresh: vi.fn(),
+    prefetch: vi.fn(),
     pathname: '/',
     query: {},
     asPath: '/',
     events: {
-      on: jest.fn(),
-      off: jest.fn(),
-      emit: jest.fn(),
+      on: vi.fn(),
+      off: vi.fn(),
+      emit: vi.fn(),
     },
     ...overrides,
   };
@@ -251,12 +251,12 @@ export function createMockRouter(overrides: any = {}) {
  */
 export function createMockNavigation(overrides: any = {}) {
   return {
-    push: jest.fn(),
-    replace: jest.fn(),
-    back: jest.fn(),
-    forward: jest.fn(),
-    refresh: jest.fn(),
-    prefetch: jest.fn(),
+    push: vi.fn(),
+    replace: vi.fn(),
+    back: vi.fn(),
+    forward: vi.fn(),
+    refresh: vi.fn(),
+    prefetch: vi.fn(),
     ...overrides,
   };
 }
@@ -271,11 +271,11 @@ export function createMockNavigation(overrides: any = {}) {
 export function createMockWebSocket(overrides: any = {}) {
   return {
     readyState: 1, // OPEN
-    send: jest.fn(),
-    close: jest.fn(),
-    addEventListener: jest.fn(),
-    removeEventListener: jest.fn(),
-    dispatchEvent: jest.fn(),
+    send: vi.fn(),
+    close: vi.fn(),
+    addEventListener: vi.fn(),
+    removeEventListener: vi.fn(),
+    dispatchEvent: vi.fn(),
     ...overrides,
   };
 }
@@ -304,8 +304,8 @@ export function createMockFetchResponse(data: any, overrides: any = {}) {
     ok: true,
     status: 200,
     statusText: 'OK',
-    json: jest.fn().mockResolvedValue(data),
-    text: jest.fn().mockResolvedValue(JSON.stringify(data)),
+    json: vi.fn().mockResolvedValue(data),
+    text: vi.fn().mockResolvedValue(JSON.stringify(data)),
     headers: new Headers(),
     ...overrides,
   };
@@ -322,8 +322,8 @@ export function createMockFetchErrorResponse(
     ok: false,
     status: 500,
     statusText: 'Internal Server Error',
-    json: jest.fn().mockRejectedValue(new Error(error)),
-    text: jest.fn().mockRejectedValue(new Error(error)),
+    json: vi.fn().mockRejectedValue(new Error(error)),
+    text: vi.fn().mockRejectedValue(new Error(error)),
     headers: new Headers(),
     ...overrides,
   };
@@ -337,7 +337,7 @@ export function createMockFetchErrorResponse(
  * Creates a mock React component for testing
  */
 export function createMockReactComponent(name: string, overrides: any = {}) {
-  const MockComponent = jest.fn((props: any) => {
+  const MockComponent = vi.fn((props: any) => {
     return { type: 'div', props: { 'data-testid': `mock-${name}`, ...props } };
   });
 
@@ -371,8 +371,8 @@ export function createMockDate(timestamp: number = 1640995200000): Date {
  * Resets all mocks and clears timers
  */
 export function resetTestEnvironment() {
-  jest.clearAllMocks();
-  jest.clearAllTimers();
+  vi.clearAllMocks();
+  vi.clearAllTimers();
 }
 
 /**
@@ -446,26 +446,26 @@ export const TEST_CONFIG = {
  */
 export function setupTestEnvironment() {
   // Mock Date.now for consistent timestamps
-  jest.spyOn(Date, 'now').mockImplementation(() => 1640995200000);
+  vi.spyOn(Date, 'now').mockImplementation(() => 1640995200000);
 
   // Mock console methods to reduce noise
-  jest.spyOn(console, 'log').mockImplementation(() => {});
-  jest.spyOn(console, 'warn').mockImplementation(() => {});
-  jest.spyOn(console, 'error').mockImplementation(() => {});
+  vi.spyOn(console, 'log').mockImplementation(() => {});
+  vi.spyOn(console, 'warn').mockImplementation(() => {});
+  vi.spyOn(console, 'error').mockImplementation(() => {});
 
   // Mock fetch globally
-  global.fetch = jest.fn();
+  global.fetch = vi.fn();
 
   // Mock WebSocket globally
-  global.WebSocket = jest.fn().mockImplementation(() => createMockWebSocket());
+  global.WebSocket = vi.fn().mockImplementation(() => createMockWebSocket());
 }
 
 /**
  * Test environment cleanup
  */
 export function cleanupTestEnvironment() {
-  jest.restoreAllMocks();
-  jest.clearAllTimers();
+  vi.restoreAllMocks();
+  vi.clearAllTimers();
 }
 
 // ============================================================================

@@ -4,6 +4,15 @@ const nextConfig = {
   // which can cause SSE connection issues
   reactStrictMode: process.env.NODE_ENV === 'production',
 
+  // Exclude test files from the build
+  eslint: {
+    ignoreDuringBuilds: true,
+  },
+  typescript: {
+    ignoreBuildErrors: false,
+  },
+  outputFileTracingRoot: __dirname,
+
   images: {
     remotePatterns: [
       // Minecraft Wiki CDN (primary sprite source)

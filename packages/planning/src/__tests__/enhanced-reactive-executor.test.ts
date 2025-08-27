@@ -10,14 +10,14 @@
 import { EnhancedReactiveExecutor } from '../reactive-executor/enhanced-reactive-executor';
 import { EnhancedGOAPPlanner } from '../reactive-executor/enhanced-goap-planner';
 import { EnhancedPlanRepair } from '../reactive-executor/enhanced-plan-repair';
-import { 
-  Plan, 
-  PlanStatus, 
-  Goal, 
-  GoalType, 
-  GoalStatus, 
-  ActionType, 
-  PlanStepStatus 
+import {
+  Plan,
+  PlanStatus,
+  Goal,
+  GoalType,
+  GoalStatus,
+  ActionType,
+  PlanStepStatus,
 } from '../types';
 
 // Mock world state for testing
@@ -118,13 +118,13 @@ class MockWorldState {
 // Mock MCP bus for testing
 class MockMCPBus {
   mineflayer = {
-    consume: jest.fn().mockResolvedValue({ success: true }),
-    dig: jest.fn().mockResolvedValue({ success: true }),
+    consume: vi.fn().mockResolvedValue({ success: true }),
+    dig: vi.fn().mockResolvedValue({ success: true }),
     pathfinder: {},
   };
   navigation = {
-    pathTo: jest.fn().mockResolvedValue({ success: true }),
-    swimToSurface: jest.fn().mockResolvedValue({ success: true }),
+    pathTo: vi.fn().mockResolvedValue({ success: true }),
+    swimToSurface: vi.fn().mockResolvedValue({ success: true }),
   };
   state = {
     position: { x: 0, y: 64, z: 0 },
@@ -565,16 +565,16 @@ describe('Enhanced Reactive Executor', () => {
           {
             id: 'step1',
             planId: 'test-plan',
-            action: { 
+            action: {
               id: 'move-action',
-              name: 'Move', 
+              name: 'Move',
               description: 'Move to target',
               type: ActionType.MOVEMENT,
               preconditions: [],
               effects: [],
               cost: 1,
               duration: 1000,
-              successProbability: 0.9
+              successProbability: 0.9,
             },
             preconditions: [],
             effects: [],
@@ -612,16 +612,16 @@ describe('Enhanced Reactive Executor', () => {
           {
             id: 'step1',
             planId: 'test-plan',
-            action: { 
+            action: {
               id: 'move-action',
-              name: 'Move', 
+              name: 'Move',
               description: 'Move to target',
               type: ActionType.MOVEMENT,
               preconditions: [],
               effects: [],
               cost: 1,
               duration: 1000,
-              successProbability: 0.9
+              successProbability: 0.9,
             },
             preconditions: [],
             effects: [],
@@ -633,16 +633,16 @@ describe('Enhanced Reactive Executor', () => {
           {
             id: 'step2',
             planId: 'test-plan',
-            action: { 
+            action: {
               id: 'mine-action',
-              name: 'Mine', 
+              name: 'Mine',
               description: 'Mine resources',
               type: ActionType.CRAFTING,
               preconditions: [],
               effects: [],
               cost: 2,
               duration: 2000,
-              successProbability: 0.8
+              successProbability: 0.8,
             },
             preconditions: [],
             effects: [],
@@ -679,16 +679,16 @@ describe('Enhanced Reactive Executor', () => {
           {
             id: 'step1',
             planId: 'test-plan',
-            action: { 
+            action: {
               id: 'invalid-action',
-              name: 'InvalidAction', 
+              name: 'InvalidAction',
               description: 'Invalid action for testing',
               type: ActionType.INTERACTION,
               preconditions: [],
               effects: [],
               cost: 1,
               duration: 1000,
-              successProbability: 0.1
+              successProbability: 0.1,
             },
             preconditions: [],
             effects: [],
@@ -727,16 +727,16 @@ describe('Enhanced Reactive Executor', () => {
           {
             id: 'step1',
             planId: 'test-plan',
-            action: { 
+            action: {
               id: 'move-action',
-              name: 'Move', 
+              name: 'Move',
               description: 'Move to target',
               type: ActionType.MOVEMENT,
               preconditions: [],
               effects: [],
               cost: 1,
               duration: 1000,
-              successProbability: 0.9
+              successProbability: 0.9,
             },
             preconditions: [],
             effects: [],
@@ -777,16 +777,16 @@ describe('Enhanced Reactive Executor', () => {
           {
             id: 'step1',
             planId: 'test-plan',
-            action: { 
+            action: {
               id: 'move-action',
-              name: 'Move', 
+              name: 'Move',
               description: 'Move to target',
               type: ActionType.MOVEMENT,
               preconditions: [],
               effects: [],
               cost: 1,
               duration: 1000,
-              successProbability: 0.9
+              successProbability: 0.9,
             },
             preconditions: [],
             effects: [],

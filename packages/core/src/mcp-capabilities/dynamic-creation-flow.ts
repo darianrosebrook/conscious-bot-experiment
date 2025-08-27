@@ -469,6 +469,115 @@ export class DynamicCreationFlow {
     this.impasseStates.clear();
     this.proposalHistory.clear();
   }
+
+  /**
+   * Propose a new capability using LLM integration
+   * This is the core method for dynamic capability creation
+   */
+  async proposeNewCapability(
+    taskId: string,
+    context: LeafContext,
+    currentTask: string,
+    recentFailures: ExecError[]
+  ): Promise<OptionProposalResponse | null> {
+    try {
+      // Check if we're in an impasse
+      const impasseResult = this.checkImpasse(
+        taskId,
+        recentFailures[0] || {
+          code: 'unknown',
+          detail: 'no_failure_data',
+          retryable: false,
+        }
+      );
+
+      if (!impasseResult.isImpasse) {
+        console.log(
+          `No impasse detected for task ${taskId}, skipping proposal`
+        );
+        return null;
+      }
+
+      // Create proposal request
+      const request: OptionProposalRequest = {
+        taskId,
+        context,
+        currentTask,
+        recentFailures,
+      };
+
+      // Get proposal from LLM
+      const proposal = await this.llmInterface.proposeOption(request);
+
+      if (!proposal) {
+        console.log(`LLM returned no proposal for task ${taskId}`);
+        return null;
+      }
+
+      // Validate the proposed BT-DSL
+      const parseResult = this.btParser.parse(
+        proposal.btDsl,
+        this.registry.getLeafFactory()
+      );
+      if (!parseResult.valid) {
+        console.warn(
+          `LLM proposed invalid BT-DSL for task ${taskId}:`,
+          parseResult.errors
+        );
+        return null;
+      }
+
+      // Register the option with the registry
+      const registrationResult = this.registry.registerOption(
+        proposal.btDsl,
+        {
+          author: 'llm',
+          createdAt: new Date().toISOString(),
+          codeHash: this.computeCodeHash(proposal.btDsl),
+        },
+        {
+          successThreshold: 0.8,
+          maxShadowRuns: 10,
+          failureThreshold: 0.3,
+          minShadowRuns: 3,
+        }
+      );
+
+      if (!registrationResult.ok) {
+        console.warn(
+          `Failed to register proposed option for task ${taskId}:`,
+          registrationResult.error
+        );
+        return null;
+      }
+
+      // Update proposal history
+      const history = this.proposalHistory.get(taskId) || [];
+      history.push({
+        timestamp: Date.now(),
+        proposal,
+      });
+      this.proposalHistory.set(taskId, history);
+
+      // Update impasse state
+      const state = this.impasseStates.get(taskId);
+      if (state) {
+        state.lastProposalTime = Date.now();
+        state.proposalCount++;
+      }
+
+      console.log(
+        `Successfully proposed new capability for task ${taskId}: ${proposal.name}`
+      );
+      return proposal;
+    } catch (error) {
+      console.error(
+        `Error proposing new capability for task ${taskId}:`,
+        error
+      );
+      return null;
+    }
+  }
 }
 
 // Mock LLM interface moved to test utilities

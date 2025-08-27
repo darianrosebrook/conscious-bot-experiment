@@ -1,0 +1,34 @@
+{
+  "name": "opt.torch_corridor",
+  "version": "1.0.0",
+  "description": "Safely torch a mining corridor with hostile detection",
+  "root": {
+    "type": "Sequence",
+    "children": [
+      {
+        "type": "Leaf",
+        "leafName": "move_to",
+        "args": { "pos": { "x": 10, "y": 64, "z": 10 }, "safe": true }
+      },
+      {
+        "type": "Repeat.Until",
+        "condition": { "name": "position_reached" },
+        "child": {
+          "type": "Sequence",
+          "children": [
+            {
+              "type": "Leaf",
+              "leafName": "step_forward_safely",
+              "args": {}
+            },
+            {
+              "type": "Leaf",
+              "leafName": "place_torch_if_needed",
+              "args": { "interval": 5 }
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

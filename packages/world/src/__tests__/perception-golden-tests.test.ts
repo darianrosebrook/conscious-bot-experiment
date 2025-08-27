@@ -22,18 +22,18 @@ import {
 
 describe('Perception Golden Tests', () => {
   let perceptionSystem: PerceptionIntegration;
-  let mockRaycastEngine: jest.Mocked<RaycastEngine>;
+  let mockRaycastEngine: vi.Mocked<RaycastEngine>;
 
   beforeEach(() => {
     mockRaycastEngine = {
-      castRay: jest.fn(),
-      castCone: jest.fn(),
-      castGrid: jest.fn(),
-      isBlockVisible: jest.fn(),
-      getVisibleBlocks: jest.fn(),
-      updateWorld: jest.fn(),
-      dispose: jest.fn(),
-    } as unknown as jest.Mocked<RaycastEngine>;
+      castRay: vi.fn(),
+      castCone: vi.fn(),
+      castGrid: vi.fn(),
+      isBlockVisible: vi.fn(),
+      getVisibleBlocks: vi.fn(),
+      updateWorld: vi.fn(),
+      dispose: vi.fn(),
+    } as unknown as vi.Mocked<RaycastEngine>;
 
     const config: PerceptionConfig = {
       fieldOfView: {
@@ -110,7 +110,7 @@ describe('Perception Golden Tests', () => {
 
     // Create a mock sensing system that can be injected
     const mockSensing = {
-      performSweep: jest.fn().mockResolvedValue({
+      performSweep: vi.fn().mockResolvedValue({
         observations: [],
         raysCast: 100,
         duration: 5,
@@ -125,10 +125,10 @@ describe('Perception Golden Tests', () => {
           hitRate: 0.3,
         },
       }),
-      getObservations: jest.fn().mockReturnValue([]),
-      findNearestResource: jest.fn().mockReturnValue(null),
-      updateConfig: jest.fn(),
-      getPerformanceMetrics: jest.fn().mockReturnValue({
+      getObservations: vi.fn().mockReturnValue([]),
+      findNearestResource: vi.fn().mockReturnValue(null),
+      updateConfig: vi.fn(),
+      getPerformanceMetrics: vi.fn().mockReturnValue({
         sweepsCompleted: 0,
         totalRaysCast: 0,
         averageSweepDuration: 0,
@@ -146,8 +146,8 @@ describe('Perception Golden Tests', () => {
           evictionsPerMinute: 0,
         },
       }),
-      startContinuousSensing: jest.fn(),
-      stopContinuousSensing: jest.fn(),
+      startContinuousSensing: vi.fn(),
+      stopContinuousSensing: vi.fn(),
     };
 
     perceptionSystem = new PerceptionIntegration(
@@ -340,7 +340,7 @@ describe('Perception Golden Tests', () => {
         );
 
         // Override the performVisualSweep method to return our mock observations
-        const mockSweep = jest.fn().mockResolvedValue({
+        const mockSweep = vi.fn().mockResolvedValue({
           observations: mockObservations,
           raysCast: 100,
           duration: 5,

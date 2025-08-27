@@ -11,15 +11,15 @@ import { CognitiveIntegration } from '../cognitive-integration';
 import fetch from 'node-fetch';
 
 // Mock fetch for HTTP requests
-jest.mock('node-fetch');
-const mockFetch = fetch as jest.MockedFunction<typeof fetch>;
+vi.mock('node-fetch');
+const mockFetch = fetch as vi.MockedFunction<typeof fetch>;
 
 // Mock EventEmitter to avoid issues
-jest.mock('events', () => {
+vi.mock('events', () => {
   class MockEventEmitter {
-    on = jest.fn();
-    emit = jest.fn();
-    removeListener = jest.fn();
+    on = vi.fn();
+    emit = vi.fn();
+    removeListener = vi.fn();
   }
   return { EventEmitter: MockEventEmitter };
 });
@@ -28,7 +28,7 @@ describe('Cognitive-Minecraft Integration Tests', () => {
   let cognitiveIntegration: CognitiveIntegration;
 
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
     cognitiveIntegration = new CognitiveIntegration({
       failureThreshold: 0.7,
       successThreshold: 0.8,

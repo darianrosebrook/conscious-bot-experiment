@@ -153,20 +153,22 @@ describe('Perception Integration System', () => {
       expect(stats.averageConfidence).toBeGreaterThanOrEqual(0);
     });
 
-    test('should emit perception events', (done) => {
+    test('should emit perception events', async () => {
       let eventsReceived = 0;
       const expectedEvents = 1;
 
-      perception.on('perception-updated', (update) => {
-        expect(update).toBeDefined();
-        eventsReceived++;
+      return new Promise<void>((resolve) => {
+        perception.on('perception-updated', (update) => {
+          expect(update).toBeDefined();
+          eventsReceived++;
 
-        if (eventsReceived >= expectedEvents) {
-          done();
-        }
+          if (eventsReceived >= expectedEvents) {
+            resolve();
+          }
+        });
+
+        perception.updatePerception(mockAgentState, defaultConfig);
       });
-
-      perception.updatePerception(mockAgentState, defaultConfig);
     });
   });
 
@@ -307,7 +309,7 @@ describe('Perception Integration System', () => {
       expect(result.performance.processingTimeMs).toBeGreaterThan(0);
     });
 
-    test('should emit performance warnings', (done) => {
+    test('should emit performance warnings', async () => {
       const strictConfig = {
         ...defaultConfig,
         performance: {
@@ -316,13 +318,15 @@ describe('Perception Integration System', () => {
         },
       };
 
-      perception.on('performance-warning', (warning) => {
-        expect(warning.metric).toBeDefined();
-        expect(warning.value).toBeGreaterThan(warning.threshold);
-        done();
-      });
+      return new Promise<void>((resolve) => {
+        perception.on('performance-warning', (warning) => {
+          expect(warning.metric).toBeDefined();
+          expect(warning.value).toBeGreaterThan(warning.threshold);
+          resolve();
+        });
 
-      perception.updatePerception(mockAgentState, strictConfig);
+        perception.updatePerception(mockAgentState, strictConfig);
+      });
     });
 
     test('should provide memory usage estimates', () => {
@@ -334,52 +338,58 @@ describe('Perception Integration System', () => {
   });
 
   describe('Event System', () => {
-    test('should emit object discovery events', (done) => {
-      perception.on('object-discovered', (obj) => {
-        expect(obj).toBeDefined();
-        expect(obj.id).toBeDefined();
-        expect(obj.type).toBeDefined();
-        expect(obj.position).toBeDefined();
-        done();
-      });
+    test('should emit object discovery events', async () => {
+      return new Promise<void>((resolve) => {
+        perception.on('object-discovered', (obj) => {
+          expect(obj).toBeDefined();
+          expect(obj.id).toBeDefined();
+          expect(obj.type).toBeDefined();
+          expect(obj.position).toBeDefined();
+          resolve();
+        });
 
-      // Trigger object discovery through update
-      perception.updatePerception(mockAgentState, defaultConfig);
+        // Trigger object discovery through update
+        perception.updatePerception(mockAgentState, defaultConfig);
 
-      // If no objects are discovered, complete test after timeout
-      setTimeout(() => {
-        done();
-      }, 100);
-    });
-
-    test('should emit object loss events', (done) => {
-      perception.on('object-lost', (objectId) => {
-        expect(typeof objectId).toBe('string');
-        done();
-      });
-
-      // Perform update and then wait for potential loss events
-      perception.updatePerception(mockAgentState, defaultConfig).then(() => {
-        // Complete test after short delay if no loss events
+        // If no objects are discovered, complete test after timeout
         setTimeout(() => {
-          done();
-        }, 50);
+          resolve();
+        }, 100);
       });
     });
 
-    test('should emit attention shift events', (done) => {
-      perception.on('attention-shift', (shift) => {
-        expect(shift.from).toBeDefined();
-        expect(shift.to).toBeDefined();
-        done();
-      });
+    test('should emit object loss events', async () => {
+      return new Promise<void>((resolve) => {
+        perception.on('object-lost', (objectId) => {
+          expect(typeof objectId).toBe('string');
+          resolve();
+        });
 
-      // Perform update that might trigger attention shift
-      perception.updatePerception(mockAgentState, defaultConfig).then(() => {
-        // Complete test after short delay if no attention shift
-        setTimeout(() => {
-          done();
-        }, 50);
+        // Perform update and then wait for potential loss events
+        perception.updatePerception(mockAgentState, defaultConfig).then(() => {
+          // Complete test after short delay if no loss events
+          setTimeout(() => {
+            resolve();
+          }, 50);
+        });
+      });
+    });
+
+    test('should emit attention shift events', async () => {
+      return new Promise<void>((resolve) => {
+        perception.on('attention-shift', (shift) => {
+          expect(shift.from).toBeDefined();
+          expect(shift.to).toBeDefined();
+          resolve();
+        });
+
+        // Perform update that might trigger attention shift
+        perception.updatePerception(mockAgentState, defaultConfig).then(() => {
+          // Complete test after short delay if no attention shift
+          setTimeout(() => {
+            resolve();
+          }, 50);
+        });
       });
     });
   });

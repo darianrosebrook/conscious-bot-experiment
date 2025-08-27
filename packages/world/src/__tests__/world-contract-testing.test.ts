@@ -324,27 +324,27 @@ describe('World Module Contract Testing', () => {
     mockCoreModule = {
       signals: new EventEmitter(),
       arbiter: {
-        requestExecution: jest
+        requestExecution: vi
           .fn()
           .mockResolvedValue({ approved: true, priority: 'normal' }),
-        reportStatus: jest.fn(),
+        reportStatus: vi.fn(),
       },
       performance: {
-        trackLatency: jest.fn(),
-        checkBudget: jest.fn().mockReturnValue(true),
+        trackLatency: vi.fn(),
+        checkBudget: vi.fn().mockReturnValue(true),
       },
     };
 
     mockMCPInterface = {
       capabilities: {
-        getAvailable: jest
+        getAvailable: vi
           .fn()
           .mockReturnValue(['move', 'look', 'interact', 'mine']),
-        execute: jest.fn().mockResolvedValue({ success: true }),
+        execute: vi.fn().mockResolvedValue({ success: true }),
       },
       constraints: {
-        checkPreconditions: jest.fn().mockReturnValue(true),
-        validateEffects: jest.fn().mockReturnValue(true),
+        checkPreconditions: vi.fn().mockReturnValue(true),
+        validateEffects: vi.fn().mockReturnValue(true),
       },
     };
 

@@ -10,8 +10,8 @@
 import fetch from 'node-fetch';
 
 // Mock fetch for HTTP requests
-jest.mock('node-fetch');
-const mockFetch = fetch as jest.MockedFunction<typeof fetch>;
+vi.mock('node-fetch');
+const mockFetch = fetch as vi.MockedFunction<typeof fetch>;
 
 // Import the function we want to test
 async function executeTaskInMinecraft(task: any) {
@@ -164,7 +164,7 @@ async function executeTaskInMinecraft(task: any) {
 
 describe('Minecraft HTTP Integration Tests', () => {
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
   });
 
   describe('HTTP Communication', () => {

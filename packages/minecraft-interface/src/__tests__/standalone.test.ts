@@ -13,8 +13,8 @@ import { ActionTranslator } from '../action-translator';
 import { BotConfig } from '../types';
 
 // Mock mineflayer for testing
-jest.mock('mineflayer', () => ({
-  createBot: jest.fn(() => ({
+vi.mock('mineflayer', () => ({
+  createBot: vi.fn(() => ({
     entity: {
       position: { x: 0, y: 64, z: 0, clone: () => ({ x: 0, y: 64, z: 0 }) },
       yaw: 0,
@@ -39,27 +39,27 @@ jest.mock('mineflayer', () => ({
     players: {},
     version: '1.21.4',
     username: 'TestBot',
-    loadPlugin: jest.fn(),
-    blockAt: jest.fn(() => null),
-    on: jest.fn(),
-    once: jest.fn(),
-    emit: jest.fn(),
-    quit: jest.fn(),
-    end: jest.fn(),
-    lookAt: jest.fn(),
-    dig: jest.fn(),
-    craft: jest.fn(),
-    equip: jest.fn(),
-    recipesFor: jest.fn(() => []),
-    canCraft: jest.fn(() => true),
+    loadPlugin: vi.fn(),
+    blockAt: vi.fn(() => null),
+    on: vi.fn(),
+    once: vi.fn(),
+    emit: vi.fn(),
+    quit: vi.fn(),
+    end: vi.fn(),
+    lookAt: vi.fn(),
+    dig: vi.fn(),
+    craft: vi.fn(),
+    equip: vi.fn(),
+    recipesFor: vi.fn(() => []),
+    canCraft: vi.fn(() => true),
     mcData: {
       itemsByName: {},
     },
     pathfinder: {
-      setMovements: jest.fn(),
-      setGoal: jest.fn(),
+      setMovements: vi.fn(),
+      setGoal: vi.fn(),
     },
-    setControlState: jest.fn(),
+    setControlState: vi.fn(),
     heldItem: null,
   })),
 }));

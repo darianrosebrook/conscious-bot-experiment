@@ -7,7 +7,7 @@
  * @author @darianrosebrook
  */
 
-import { describe, it, expect, beforeEach } from '@jest/globals';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { AgentModeler } from '../agent-modeler';
 import { TheoryOfMindEngine } from '../theory-of-mind-engine';
 import { SocialLearner } from '../social-learner';

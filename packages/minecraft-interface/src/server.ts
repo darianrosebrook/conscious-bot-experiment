@@ -60,7 +60,14 @@ const wss = new WebSocketServer({ server });
 const connectedClients = new Set<WebSocket>();
 
 // Middleware
-app.use(cors());
+app.use(
+  cors({
+    origin: ['http://localhost:3000', 'http://127.0.0.1:3000'],
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+  })
+);
 app.use(express.json());
 
 // Bot configuration
@@ -107,6 +114,8 @@ function broadcastBotStateUpdate(eventType: string, data: any) {
     data,
   });
 
+  console.log(`Broadcasting ${eventType} to ${connectedClients.size} clients`);
+
   connectedClients.forEach((client) => {
     if (client.readyState === 1) {
       // WebSocket.OPEN
@@ -115,6 +124,8 @@ function broadcastBotStateUpdate(eventType: string, data: any) {
       } catch (error) {
         console.error('Failed to send message to WebSocket client:', error);
       }
+    } else {
+      console.log(`Client not ready, state: ${client.readyState}`);
     }
   });
 }
@@ -161,6 +172,60 @@ function setupBotStateWebSocket() {
   minecraftInterface.botAdapter.on('warning', (data) => {
     broadcastBotStateUpdate('warning', data);
   });
+
+  // Handle bot death and respawn events
+  minecraftInterface.botAdapter.on('error', (data) => {
+    // Check if this is a death error
+    if (data.error === 'Bot died') {
+      // Broadcast health update with 0 health
+      broadcastBotStateUpdate('health_changed', {
+        health: 0,
+        food: data.food || 0,
+        saturation: 0,
+      });
+    }
+    broadcastBotStateUpdate('error', data);
+  });
+
+  minecraftInterface.botAdapter.on('respawned', (data) => {
+    // Broadcast health update with respawned health
+    broadcastBotStateUpdate('health_changed', {
+      health: data.health || 20,
+      food: data.food || 20,
+      saturation: 5.2,
+    });
+    broadcastBotStateUpdate('respawned', data);
+  });
+
+  // Send periodic HUD updates every 5 seconds
+  setInterval(() => {
+    if (minecraftInterface) {
+      try {
+        const state = minecraftInterface.botAdapter.getStatus();
+        if (state?.data?.worldState) {
+          const hudData = {
+            health: state.data.worldState.health || 0,
+            food: state.data.worldState.hunger || 0,
+            energy: state.data.currentState?.energy || 1,
+            safety: state.data.currentState?.safety || 0.9,
+            social: state.data.currentState?.social || 0.7,
+            achievement: state.data.currentState?.achievement || 0.4,
+            curiosity: state.data.currentState?.curiosity || 0.6,
+            creativity: state.data.currentState?.creativity || 0.5,
+          };
+
+          console.log('Sending periodic HUD update:', hudData);
+          broadcastBotStateUpdate('hud_update', hudData);
+        } else {
+          console.log('No world state available for HUD update');
+        }
+      } catch (error) {
+        console.error('Failed to send periodic HUD update:', error);
+      }
+    } else {
+      console.log('No minecraft interface available for HUD update');
+    }
+  }, 5000);
 }
 
 // WebSocket connection handling
@@ -1241,6 +1306,131 @@ app.post('/start-viewer', async (req, res) => {
   }
 });
 
+// Entity filter to handle unknown entity types
+function createEntityFilter() {
+  const knownEntityTypes = new Set([
+    'player',
+    'zombie',
+    'skeleton',
+    'spider',
+    'creeper',
+    'enderman',
+    'cow',
+    'pig',
+    'sheep',
+    'chicken',
+    'villager',
+    'iron_golem',
+    'snow_golem',
+    'wolf',
+    'cat',
+    'horse',
+    'donkey',
+    'mule',
+    'llama',
+    'trader_llama',
+    'rabbit',
+    'fox',
+    'panda',
+    'bee',
+    'dolphin',
+    'turtle',
+    'fish',
+    'squid',
+    'glow_squid',
+    'guardian',
+    'elder_guardian',
+    'shulker',
+    'endermite',
+    'silverfish',
+    'slime',
+    'magma_cube',
+    'ghast',
+    'blaze',
+    'wither_skeleton',
+    'zombie_villager',
+    'husk',
+    'stray',
+    'drowned',
+    'phantom',
+    'vex',
+    'evoker',
+    'vindicator',
+    'pillager',
+    'ravager',
+    'hoglin',
+    'zoglin',
+    'piglin',
+    'piglin_brute',
+    'strider',
+    'zombified_piglin',
+    'wither',
+    'ender_dragon',
+    'item',
+    'experience_orb',
+    'arrow',
+    'spectral_arrow',
+    'trident',
+    'snowball',
+    'egg',
+    'ender_pearl',
+    'eye_of_ender',
+    'firework_rocket',
+    'tnt',
+    'falling_block',
+    'boat',
+    'minecart',
+    'chest_minecart',
+    'furnace_minecart',
+    'hopper_minecart',
+    'tnt_minecart',
+    'command_block_minecart',
+    'spawner_minecart',
+    'furnace_minecart',
+    'hopper_minecart',
+    'area_effect_cloud',
+    'lightning_bolt',
+    'painting',
+    'item_frame',
+    'armor_stand',
+    'marker',
+    'tnt_minecart',
+    'command_block_minecart',
+    'spawner_minecart',
+    'furnace_minecart',
+    'hopper_minecart',
+    'area_effect_cloud',
+    'lightning_bolt',
+    'painting',
+    'item_frame',
+    'armor_stand',
+    'marker',
+    'text_display',
+    'block_display',
+    'interaction',
+  ]);
+
+  return function filterEntity(entity: any): boolean {
+    if (!entity || !entity.type) {
+      return false;
+    }
+
+    // Check if entity type is known
+    if (!knownEntityTypes.has(entity.type)) {
+      console.log(`Filtering out unknown entity type: ${entity.type}`);
+      return false;
+    }
+
+    // Additional filtering for problematic entities
+    if (entity.type === 'item' && (!entity.item || !entity.item.name)) {
+      console.log('Filtering out item entity without item data');
+      return false;
+    }
+
+    return true;
+  };
+}
+
 // Robust viewer startup function with error handling
 function startViewerSafely(bot: any, port: number) {
   if (viewerActive) {
@@ -1249,16 +1439,21 @@ function startViewerSafely(bot: any, port: number) {
   }
 
   try {
-    // Add error handling to prevent crashes from unknown entities
+    // Enhanced error handling to prevent crashes from unknown entities
     const originalConsoleError = console.error;
+    const originalConsoleWarn = console.warn;
     const errorMessages: string[] = [];
+    const warningMessages: string[] = [];
 
-    // Temporarily suppress unknown entity errors
+    // Temporarily suppress unknown entity errors and warnings
     console.error = (...args: any[]) => {
       const message = args.join(' ');
       if (
         message.includes('Unknown entity') ||
-        message.includes('Unknown entity type')
+        message.includes('Unknown entity type') ||
+        message.includes('trader_llama') ||
+        message.includes('glow_squid') ||
+        message.includes('Unknown entity item')
       ) {
         errorMessages.push(message);
         // Don't log these errors to avoid spam
@@ -1267,22 +1462,67 @@ function startViewerSafely(bot: any, port: number) {
       originalConsoleError(...args);
     };
 
+    console.warn = (...args: any[]) => {
+      const message = args.join(' ');
+      if (
+        message.includes('Unknown entity') ||
+        message.includes('Unknown entity type') ||
+        message.includes('trader_llama') ||
+        message.includes('glow_squid') ||
+        message.includes('Unknown entity item')
+      ) {
+        warningMessages.push(message);
+        // Don't log these warnings to avoid spam
+        return;
+      }
+      originalConsoleWarn(...args);
+    };
+
+    // Create a custom error handler for the bot to catch entity-related errors
+    const originalBotEmit = bot.emit;
+    bot.emit = function (event: string, ...args: any[]) {
+      // Filter out entity-related errors before they reach the viewer
+      if (event === 'error') {
+        const error = args[0];
+        if (error && typeof error.message === 'string') {
+          if (
+            error.message.includes('Unknown entity') ||
+            error.message.includes('Unknown entity type') ||
+            error.message.includes('trader_llama') ||
+            error.message.includes('glow_squid') ||
+            error.message.includes('Unknown entity item')
+          ) {
+            // Suppress these specific entity errors
+            return;
+          }
+        }
+      }
+      return originalBotEmit.apply(this, [event, ...args]);
+    };
+
     startMineflayerViewer(bot as any, {
       port: port,
       firstPerson: true,
     });
 
-    // Restore console.error
+    // Restore console methods
     console.error = originalConsoleError;
+    console.warn = originalConsoleWarn;
 
     viewerActive = true;
     console.log(`🖥️ Prismarine viewer started at http://localhost:${port}`);
 
-    if (errorMessages.length > 0) {
+    if (errorMessages.length > 0 || warningMessages.length > 0) {
       console.log(
-        `⚠️ Suppressed ${errorMessages.length} unknown entity errors during viewer startup`
+        `⚠️ Suppressed ${errorMessages.length} unknown entity errors and ${warningMessages.length} warnings during viewer startup`
       );
     }
+
+    // Set up periodic cleanup of suppressed messages
+    setInterval(() => {
+      errorMessages.length = 0;
+      warningMessages.length = 0;
+    }, 60000); // Clear every minute
   } catch (err) {
     console.error('Failed to start Prismarine viewer:', err);
     viewerActive = false;

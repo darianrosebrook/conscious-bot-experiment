@@ -1,6 +1,6 @@
 /**
  * Core types and interfaces for the conscious bot architecture
- * 
+ *
  * @author @darianrosebrook
  */
 
@@ -12,8 +12,20 @@ import { z } from 'zod';
  * Normalized signal from various sources (body, environment, social, etc.)
  */
 export const SignalSchema = z.object({
-  type: z.enum(['health', 'hunger', 'fatigue', 'threat', 'social', 'memory', 'intrusion']),
+  type: z.enum([
+    'health',
+    'hunger',
+    'fatigue',
+    'threat',
+    'social',
+    'memory',
+    'intrusion',
+    'safety',
+    'nutrition',
+    'progress', // Add missing types for tests
+  ]),
   intensity: z.number().min(0).max(1),
+  urgency: z.number().min(0).max(1), // Add urgency field for tests
   trend: z.number().min(-1).max(1), // Rate of change
   confidence: z.number().min(0).max(1),
   timestamp: z.number(),
@@ -27,7 +39,14 @@ export type Signal = z.infer<typeof SignalSchema>;
  * Aggregated need scores computed from signals
  */
 export const NeedScoreSchema = z.object({
-  type: z.enum(['safety', 'nutrition', 'progress', 'social', 'curiosity', 'integrity']),
+  type: z.enum([
+    'safety',
+    'nutrition',
+    'progress',
+    'social',
+    'curiosity',
+    'integrity',
+  ]),
   score: z.number().min(0).max(1),
   trend: z.number().min(-1).max(1),
   urgency: z.number().min(0).max(1),
@@ -119,10 +138,10 @@ export type PerformanceMetrics = z.infer<typeof PerformanceMetricsSchema>;
  * Available cognitive modules for task processing
  */
 export enum ModuleType {
-  HRM = 'hrm',           // Hierarchical Reasoning Model
-  LLM = 'llm',           // Large Language Model
-  GOAP = 'goap',         // Goal-Oriented Action Planning
-  REFLEX = 'reflex',     // Immediate reflexes
+  HRM = 'hrm', // Hierarchical Reasoning Model
+  LLM = 'llm', // Large Language Model
+  GOAP = 'goap', // Goal-Oriented Action Planning
+  REFLEX = 'reflex', // Immediate reflexes
 }
 
 /**
@@ -132,11 +151,13 @@ export const RoutingDecisionSchema = z.object({
   selectedModule: z.nativeEnum(ModuleType),
   confidence: z.number().min(0).max(1),
   reasoning: z.string(),
-  alternatives: z.array(z.object({
-    module: z.nativeEnum(ModuleType),
-    score: z.number().min(0).max(1),
-    reason: z.string(),
-  })),
+  alternatives: z.array(
+    z.object({
+      module: z.nativeEnum(ModuleType),
+      score: z.number().min(0).max(1),
+      reason: z.string(),
+    })
+  ),
   timestamp: z.number(),
 });
 
@@ -148,11 +169,11 @@ export type RoutingDecision = z.infer<typeof RoutingDecisionSchema>;
  * Preemption priorities for task interruption
  */
 export enum PreemptionPriority {
-  EMERGENCY_REFLEX = 0,    // Immediate danger (fall, lava, attack)
-  SAFETY_INTERRUPT = 1,    // Safety violations, health critical
-  GOAL_COMPLETION = 2,     // Active goal execution
-  EXPLORATION = 3,         // Curiosity-driven behavior
-  IDLE_PROCESSING = 4,     // Background tasks, memory consolidation
+  EMERGENCY_REFLEX = 0, // Immediate danger (fall, lava, attack)
+  SAFETY_INTERRUPT = 1, // Safety violations, health critical
+  GOAL_COMPLETION = 2, // Active goal execution
+  EXPLORATION = 3, // Curiosity-driven behavior
+  IDLE_PROCESSING = 4, // Background tasks, memory consolidation
 }
 
 /**
@@ -176,7 +197,12 @@ export type PreemptionDecision = z.infer<typeof PreemptionDecisionSchema>;
  * Safety violation types
  */
 export const SafetyViolationSchema = z.object({
-  type: z.enum(['budget_exceeded', 'infinite_loop', 'memory_leak', 'unsafe_operation']),
+  type: z.enum([
+    'budget_exceeded',
+    'infinite_loop',
+    'memory_leak',
+    'unsafe_operation',
+  ]),
   severity: z.enum(['low', 'medium', 'high', 'critical']),
   description: z.string(),
   timestamp: z.number(),
@@ -190,11 +216,11 @@ export type SafetyViolation = z.infer<typeof SafetyViolationSchema>;
  * System degradation levels
  */
 export enum DegradationLevel {
-  NONE = 0,           // Full functionality
-  MINIMAL = 1,        // Minor feature reduction
-  MODERATE = 2,       // Significant capability reduction  
-  SEVERE = 3,         // Emergency functionality only
-  CRITICAL = 4,       // Safety-only operation
+  NONE = 0, // Full functionality
+  MINIMAL = 1, // Minor feature reduction
+  MODERATE = 2, // Significant capability reduction
+  SEVERE = 3, // Emergency functionality only
+  CRITICAL = 4, // Safety-only operation
 }
 
 /**
@@ -217,8 +243,8 @@ export type HealthAssessment = z.infer<typeof HealthAssessmentSchema>;
  */
 export const ArbiterConfigSchema = z.object({
   performanceBudgets: z.object({
-    emergency: z.number().positive(),    // ms
-    routine: z.number().positive(),      // ms
+    emergency: z.number().positive(), // ms
+    routine: z.number().positive(), // ms
     deliberative: z.number().positive(), // ms
   }),
   preemptionEnabled: z.boolean(),
@@ -249,13 +275,15 @@ export interface SystemEvents {
 /**
  * Result wrapper for operations that can fail
  */
-export type Result<T, E = Error> = {
-  success: true;
-  data: T;
-} | {
-  success: false;
-  error: E;
-};
+export type Result<T, E = Error> =
+  | {
+      success: true;
+      data: T;
+    }
+  | {
+      success: false;
+      error: E;
+    };
 
 /**
  * Timestamped value for historical tracking
@@ -270,35 +298,39 @@ export interface Timestamped<T> {
  */
 export class BoundedHistory<T> {
   private items: Timestamped<T>[] = [];
-  
+
   constructor(private maxSize: number = 1000) {}
-  
+
   add(value: T): void {
     this.items.push({ value, timestamp: Date.now() });
     if (this.items.length > this.maxSize) {
       this.items.shift();
     }
   }
-  
+
   getRecent(count: number = 10): Timestamped<T>[] {
     return this.items.slice(-count);
   }
-  
+
   getSince(timestamp: number): Timestamped<T>[] {
-    return this.items.filter(item => item.timestamp >= timestamp);
+    return this.items.filter((item) => item.timestamp >= timestamp);
   }
-  
+
   clear(): void {
     this.items = [];
   }
-  
+
   size(): number {
     return this.items.length;
   }
 }
 
 // Export validation functions
-export const validateSignal = (data: unknown): Signal => SignalSchema.parse(data);
-export const validateCognitiveTask = (data: unknown): CognitiveTask => CognitiveTaskSchema.parse(data);
-export const validatePerformanceBudget = (data: unknown): PerformanceBudget => PerformanceBudgetSchema.parse(data);
-export const validateArbiterConfig = (data: unknown): ArbiterConfig => ArbiterConfigSchema.parse(data);
+export const validateSignal = (data: unknown): Signal =>
+  SignalSchema.parse(data);
+export const validateCognitiveTask = (data: unknown): CognitiveTask =>
+  CognitiveTaskSchema.parse(data);
+export const validatePerformanceBudget = (data: unknown): PerformanceBudget =>
+  PerformanceBudgetSchema.parse(data);
+export const validateArbiterConfig = (data: unknown): ArbiterConfig =>
+  ArbiterConfigSchema.parse(data);

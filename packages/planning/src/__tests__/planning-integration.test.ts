@@ -16,22 +16,22 @@ const mockPlanningSystem = {
     _maxConsecutiveFailures: 3,
     _lastTaskExecution: 0,
     _tasks: [],
-    addTask: jest.fn(),
-    getCompletedTasks: jest.fn(() => []),
+    addTask: vi.fn(),
+    getCompletedTasks: vi.fn(() => []),
   },
   reactiveExecutor: {
-    executeNextTask: jest.fn(),
+    executeNextTask: vi.fn(),
   },
 };
 
 // Mock the cognitive integration
-jest.mock('../cognitive-integration');
+vi.mock('../cognitive-integration');
 
 describe('Planning System Integration', () => {
   let cognitiveIntegration: CognitiveIntegration;
 
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
     cognitiveIntegration = new CognitiveIntegration();
 
     // Reset mock planning system state
@@ -349,9 +349,9 @@ describe('Planning System Integration', () => {
         timestamp: Date.now(),
       };
 
-      jest
-        .spyOn(cognitiveIntegration, 'processTaskCompletion')
-        .mockResolvedValue(mockFeedback);
+      vi.spyOn(cognitiveIntegration, 'processTaskCompletion').mockResolvedValue(
+        mockFeedback
+      );
 
       // Simulate task completion workflow
       const taskCompleted = true; // validateTaskCompletion would return true
@@ -397,9 +397,9 @@ describe('Planning System Integration', () => {
         timestamp: Date.now(),
       };
 
-      jest
-        .spyOn(cognitiveIntegration, 'processTaskCompletion')
-        .mockResolvedValue(mockFeedback);
+      vi.spyOn(cognitiveIntegration, 'processTaskCompletion').mockResolvedValue(
+        mockFeedback
+      );
 
       // Simulate task failure workflow
       const taskCompleted = false; // validateTaskCompletion would return false
@@ -451,12 +451,10 @@ describe('Planning System Integration', () => {
         timestamp: Date.now(),
       };
 
-      jest
-        .spyOn(cognitiveIntegration, 'processTaskCompletion')
-        .mockResolvedValue(mockFeedback);
-      jest
-        .spyOn(cognitiveIntegration, 'shouldAbandonTask')
-        .mockReturnValue(true);
+      vi.spyOn(cognitiveIntegration, 'processTaskCompletion').mockResolvedValue(
+        mockFeedback
+      );
+      vi.spyOn(cognitiveIntegration, 'shouldAbandonTask').mockReturnValue(true);
 
       // Simulate task abandonment workflow
       const taskCompleted = false;

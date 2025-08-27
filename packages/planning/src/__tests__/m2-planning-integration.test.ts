@@ -1,12 +1,12 @@
 /**
  * M2 Planning Integration Test
- * 
+ *
  * Tests planning components in isolation to verify goal generation works.
- * 
+ *
  * @author @darianrosebrook
  */
 
-import { describe, it, expect, beforeEach } from '@jest/globals';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { HomeostasisMonitor } from '../goal-formulation/homeostasis-monitor';
 import { generateNeeds } from '../goal-formulation/need-generator';
 import { GoalManager } from '../goal-formulation/goal-manager';
@@ -40,9 +40,11 @@ describe('M2 Planning Integration', () => {
       expect(needs.length).toBeGreaterThan(0);
 
       // Should prioritize hunger and energy needs
-      const nutritionNeed = needs.find(n => n.type === NeedType.SURVIVAL && n.description.includes('hunger'));
-      const survivalNeed = needs.find(n => n.type === NeedType.SURVIVAL);
-      
+      const nutritionNeed = needs.find(
+        (n) => n.type === NeedType.SURVIVAL && n.description.includes('hunger')
+      );
+      const survivalNeed = needs.find((n) => n.type === NeedType.SURVIVAL);
+
       // Either nutrition or survival need should be present
       expect(nutritionNeed || survivalNeed).toBeDefined();
       if (nutritionNeed) {
@@ -69,16 +71,18 @@ describe('M2 Planning Integration', () => {
 
       // Should have at least one need (exploration or other)
       expect(needs.length).toBeGreaterThan(0);
-      
+
       // Check for exploration or curiosity need
-      const explorationNeed = needs.find(n => n.type === NeedType.CURIOSITY || n.type === NeedType.EXPLORATION);
+      const explorationNeed = needs.find(
+        (n) => n.type === NeedType.CURIOSITY || n.type === NeedType.EXPLORATION
+      );
       expect(explorationNeed).toBeDefined();
     });
 
     it('should manage goal queue and selection', () => {
       const homeostasis = homeostasisMonitor.sample();
       const needs = generateNeeds(homeostasis);
-      
+
       // Create multiple goals
       const goal1 = goalManager.createFromNeeds(needs);
       const goal2 = goalManager.createFromNeeds(needs);

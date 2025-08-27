@@ -38,6 +38,25 @@ export { CapabilityRateLimiter } from './mcp-capabilities/rate-limiter';
 export { createLeafContext } from './mcp-capabilities/leaf-contracts';
 export { LeafFactory } from './mcp-capabilities/leaf-factory';
 
+// Leaf Contract Types
+export type {
+  LeafImpl,
+  LeafContext,
+  LeafResult,
+  LeafSpec,
+  LeafStatus,
+  LeafPermission,
+  LeafRunOptions,
+  RegistrationResult,
+  ExecError,
+  ExecErrorCode,
+  WorldSnapshot,
+  InventoryState,
+  InventoryItem,
+  Entity,
+  JSONSchema7,
+} from './mcp-capabilities/leaf-contracts';
+
 // Leaf Implementations
 export * from './leaves/movement-leaves';
 export * from './leaves/interaction-leaves';

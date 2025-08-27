@@ -77,19 +77,17 @@ describe('Sensorimotor System Integration', () => {
 
     // Mock action executor
     mockActionExecutor = {
-      executeMovement: jest
-        .fn()
-        .mockImplementation((actionType, parameters) => {
-          return Promise.resolve({
-            actionId: parameters.actionId || 'test_action',
-            success: true,
-            executionTime: 50,
-            achievedPrecision: 0.9,
-            errors: [],
-            warnings: [],
-          });
-        }),
-      executeManipulation: jest
+      executeMovement: vi.fn().mockImplementation((actionType, parameters) => {
+        return Promise.resolve({
+          actionId: parameters.actionId || 'test_action',
+          success: true,
+          executionTime: 50,
+          achievedPrecision: 0.9,
+          errors: [],
+          warnings: [],
+        });
+      }),
+      executeManipulation: vi
         .fn()
         .mockImplementation((actionType, parameters) => {
           return Promise.resolve({
@@ -101,7 +99,7 @@ describe('Sensorimotor System Integration', () => {
             warnings: [],
           });
         }),
-      executeCommunication: jest
+      executeCommunication: vi
         .fn()
         .mockImplementation((actionType, parameters) => {
           return Promise.resolve({
@@ -871,18 +869,16 @@ describe('Individual Sensorimotor Components', () => {
     };
 
     mockActionExecutor = {
-      executeMovement: jest
-        .fn()
-        .mockImplementation((actionType, parameters) => {
-          return Promise.resolve({
-            actionId: parameters.actionId || 'test',
-            success: true,
-            executionTime: 50,
-            errors: [],
-            warnings: [],
-          });
-        }),
-      executeManipulation: jest
+      executeMovement: vi.fn().mockImplementation((actionType, parameters) => {
+        return Promise.resolve({
+          actionId: parameters.actionId || 'test',
+          success: true,
+          executionTime: 50,
+          errors: [],
+          warnings: [],
+        });
+      }),
+      executeManipulation: vi
         .fn()
         .mockImplementation((actionType, parameters) => {
           return Promise.resolve({
@@ -893,7 +889,7 @@ describe('Individual Sensorimotor Components', () => {
             warnings: [],
           });
         }),
-      executeCommunication: jest
+      executeCommunication: vi
         .fn()
         .mockImplementation((actionType, parameters) => {
           return Promise.resolve({

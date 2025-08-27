@@ -136,7 +136,7 @@ export class HybridSkillPlanner extends EventEmitter {
 
     try {
       // Step 1: Analyze goal and decide planning approach
-      const decision = this.decidePlanningApproach(goal, context);
+      const decision = await this.decidePlanningApproach(goal, context);
 
       // Step 2: Generate plan using selected approach
       const plan = await this.generatePlan(goal, context, decision);
@@ -212,10 +212,10 @@ export class HybridSkillPlanner extends EventEmitter {
   /**
    * Decide which planning approach to use
    */
-  private decidePlanningApproach(
+  private async decidePlanningApproach(
     goal: string,
     context: HybridPlanningContext
-  ): PlanningDecision {
+  ): Promise<PlanningDecision> {
     const analysis = this.analyzeGoal(goal, context);
 
     // Check if we have applicable skills
@@ -226,7 +226,10 @@ export class HybridSkillPlanner extends EventEmitter {
     );
 
     // Check MCP capabilities suitability
-    const mcpConfidence = this.calculateMCPConfidence(goal, context);
+    const mcpConfidence = await this.calculateMCPConfidence(goal, context);
+
+    // Check for impasse and dynamic creation potential
+    const isImpasse = this.checkForImpasse(goal, context);
 
     // Check HTN suitability
     const htnConfidence = this.calculateHTNConfidence(goal, context);
@@ -245,13 +248,18 @@ export class HybridSkillPlanner extends EventEmitter {
     let confidence: number;
 
     if (
-      mcpConfidence > 0.8 &&
+      (mcpConfidence > 0.8 || isImpasse) &&
       context.planningPreferences.preferMCP &&
       this.mcpCapabilitiesAdapter
     ) {
       approach = 'mcp-capabilities';
-      reasoning = `High MCP capabilities confidence (${mcpConfidence.toFixed(2)}) with dynamic capability creation available`;
-      confidence = mcpConfidence;
+      if (isImpasse) {
+        reasoning = `Planning impasse detected - using MCP capabilities for dynamic behavior creation`;
+        confidence = 0.7; // High confidence in dynamic creation
+      } else {
+        reasoning = `High MCP capabilities confidence (${mcpConfidence.toFixed(2)}) with dynamic capability creation available`;
+        confidence = mcpConfidence;
+      }
     } else if (
       skillConfidence > 0.8 &&
       context.planningPreferences.preferSkills
@@ -1019,31 +1027,97 @@ export class HybridSkillPlanner extends EventEmitter {
   }
 
   /**
-   * Calculate MCP capabilities confidence
+   * Check for planning impasse and dynamic creation potential
    */
-  private calculateMCPConfidence(
+  private checkForImpasse(
     goal: string,
     context: HybridPlanningContext
-  ): number {
+  ): boolean {
+    if (!context.mcpDynamicFlow) return false;
+
+    try {
+      const impasseResult = context.mcpDynamicFlow.checkImpasse(goal, {
+        code: 'unknown',
+        detail: 'planning_analysis',
+        retryable: false,
+      });
+
+      return impasseResult.isImpasse;
+    } catch (error) {
+      console.warn('Error checking for impasse:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Calculate MCP capabilities confidence
+   */
+  private async calculateMCPConfidence(
+    goal: string,
+    context: HybridPlanningContext
+  ): Promise<number> {
     if (!this.mcpCapabilitiesAdapter || !context.mcpRegistry) {
       return 0.0;
     }
 
-    // Simple confidence calculation based on goal keywords
-    const goalLower = goal.toLowerCase();
-    const mcpKeywords = [
-      'torch',
-      'corridor',
-      'light',
-      'safe',
-      'mining',
-      'explore',
-    ];
-    const matchingKeywords = mcpKeywords.filter((keyword) =>
-      goalLower.includes(keyword)
-    );
+    try {
+      // Check for applicable MCP capabilities
+      const mcpContext: MCPCapabilityPlanningContext = {
+        ...context,
+        leafContext: context.leafContext || ({} as any),
+        availableCapabilities: [],
+        registry: context.mcpRegistry,
+        dynamicFlow: context.mcpDynamicFlow!,
+      };
 
-    return Math.min(matchingKeywords.length / mcpKeywords.length, 1.0);
+      const applicableCapabilities =
+        await this.mcpCapabilitiesAdapter.findApplicableCapabilities(
+          goal,
+          mcpContext
+        );
+
+      if (applicableCapabilities && applicableCapabilities.length > 0) {
+        // High confidence if we have applicable capabilities
+        return Math.min(0.8 + applicableCapabilities.length * 0.1, 1.0);
+      }
+
+      // Check for impasse and potential for dynamic creation
+      if (context.mcpDynamicFlow) {
+        const impasseResult = context.mcpDynamicFlow.checkImpasse(goal, {
+          code: 'unknown',
+          detail: 'planning_analysis',
+          retryable: false,
+        });
+
+        if (impasseResult.isImpasse) {
+          // Medium confidence if we can create new capabilities
+          return 0.6;
+        }
+      }
+
+      // Fallback to keyword-based confidence
+      const goalLower = goal.toLowerCase();
+      const mcpKeywords = [
+        'torch',
+        'corridor',
+        'light',
+        'safe',
+        'mining',
+        'explore',
+        'move',
+        'dig',
+        'place',
+        'craft',
+      ];
+      const matchingKeywords = mcpKeywords.filter((keyword) =>
+        goalLower.includes(keyword)
+      );
+
+      return Math.min(matchingKeywords.length / mcpKeywords.length, 0.5);
+    } catch (error) {
+      console.warn('Error calculating MCP confidence:', error);
+      return 0.0;
+    }
   }
 
   /**

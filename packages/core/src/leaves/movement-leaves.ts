@@ -8,8 +8,7 @@
  */
 
 import { Bot } from 'mineflayer';
-import pkg from 'mineflayer-pathfinder';
-const { pathfinder, goals } = pkg;
+import { pathfinder, goals } from 'mineflayer-pathfinder';
 import { Vec3 } from 'vec3';
 import {
   LeafImpl,

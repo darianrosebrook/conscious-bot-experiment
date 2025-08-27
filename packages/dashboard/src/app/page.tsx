@@ -167,6 +167,39 @@ export default function ConsciousMinecraftDashboard() {
           break;
         }
 
+        case 'hud_update': {
+          // Update HUD with comprehensive data from periodic updates
+          const hudData = message.data;
+          setHud({
+            ts: new Date().toISOString(),
+            vitals: {
+              health: hudData.health || 20,
+              hunger: hudData.food || 20,
+              stamina: (hudData.energy || 1) * 100, // Convert from 0-1 to 0-100
+              sleep: 100, // Default value
+            },
+            intero: {
+              stress: (1 - (hudData.safety || 0.9)) * 100, // Convert safety to stress (inverted)
+              focus: (hudData.curiosity || 0.6) * 100, // Use curiosity as focus proxy
+              curiosity: (hudData.curiosity || 0.6) * 100, // Direct curiosity mapping
+            },
+            mood:
+              (hudData.safety || 0.9) > 0.8
+                ? 'content'
+                : (hudData.safety || 0.9) > 0.5
+                  ? 'neutral'
+                  : 'concerned',
+          });
+
+          // Update bot state
+          setBotState((prevState) => ({
+            ...prevState,
+            health: hudData.health,
+            food: hudData.food,
+          }));
+          break;
+        }
+
         case 'inventory_changed': {
           // Update inventory with new items
           const inventoryData = message.data;
@@ -220,6 +253,83 @@ export default function ConsciousMinecraftDashboard() {
             ts: new Date(message.timestamp).toISOString(),
             text: `Warning: ${message.data.message}`,
             type: 'reflection',
+          });
+          break;
+        }
+
+        case 'error': {
+          // Handle bot errors, especially death
+          const errorData = message.data;
+          if (errorData.error === 'Bot died') {
+            // Update HUD to show 0 health when bot dies
+            setHud({
+              ts: new Date().toISOString(),
+              vitals: {
+                health: 0,
+                hunger: errorData.food || 0,
+                stamina: 0,
+                sleep: 100,
+              },
+              intero: {
+                stress: 100, // High stress when dead
+                focus: 0, // No focus when dead
+                curiosity: 0, // No curiosity when dead
+              },
+              mood: 'dead',
+            });
+
+            // Update bot state
+            setBotState((prevState) => ({
+              ...prevState,
+              health: 0,
+              food: errorData.food || 0,
+            }));
+          }
+
+          // Add error as a thought
+          addThought({
+            id: `error-${message.timestamp}-${Math.random().toString(36).substr(2, 9)}`,
+            ts: new Date(message.timestamp).toISOString(),
+            text: `Error: ${errorData.error}`,
+            type: 'reflection',
+          });
+          break;
+        }
+
+        case 'respawned': {
+          // Handle bot respawn
+          const respawnData = message.data;
+
+          // Update HUD with respawned health
+          setHud({
+            ts: new Date().toISOString(),
+            vitals: {
+              health: respawnData.health || 20,
+              hunger: respawnData.food || 20,
+              stamina: 100,
+              sleep: 100,
+            },
+            intero: {
+              stress: 20,
+              focus: 80,
+              curiosity: 75,
+            },
+            mood: 'neutral',
+          });
+
+          // Update bot state
+          setBotState((prevState) => ({
+            ...prevState,
+            health: respawnData.health || 20,
+            food: respawnData.food || 20,
+          }));
+
+          // Add respawn as a thought
+          addThought({
+            id: `respawned-${message.timestamp}-${Math.random().toString(36).substr(2, 9)}`,
+            ts: new Date(message.timestamp).toISOString(),
+            text: `Respawned with ${respawnData.health || 20} health`,
+            type: 'self',
           });
           break;
         }
@@ -441,6 +551,68 @@ export default function ConsciousMinecraftDashboard() {
           const inventoryData = await inventoryRes.json();
           if (inventoryData.success) {
             setInventory(inventoryData.inventory);
+          }
+        }
+
+        // Fetch initial HUD data from bot-state API
+        const botStateRes = await fetch('/api/ws/bot-state', {
+          headers: { Accept: 'application/json' },
+        });
+        if (botStateRes.ok) {
+          const botStateData = await botStateRes.json();
+          if (botStateData.data) {
+            // Update HUD with complete data from bot state API
+            if (
+              botStateData.data.vitals ||
+              botStateData.data.intero ||
+              botStateData.data.mood
+            ) {
+              setHud({
+                ts: new Date().toISOString(),
+                vitals: botStateData.data.vitals || {
+                  health: 20,
+                  hunger: 20,
+                  stamina: 100,
+                  sleep: 100,
+                },
+                intero: botStateData.data.intero || {
+                  stress: 20,
+                  focus: 80,
+                  curiosity: 75,
+                },
+                mood: botStateData.data.mood || 'neutral',
+              });
+            }
+
+            // Update inventory
+            if (botStateData.data.inventory) {
+              setInventory(botStateData.data.inventory);
+            }
+
+            // Update bot state
+            setBotState({
+              position: botStateData.data.position
+                ? {
+                    x: botStateData.data.position[0],
+                    y: botStateData.data.position[1],
+                    z: botStateData.data.position[2],
+                  }
+                : undefined,
+              health: botStateData.data.vitals?.health,
+              food: botStateData.data.vitals?.hunger,
+              inventory: botStateData.data.inventory || [],
+              time: undefined,
+              weather: undefined,
+            });
+
+            setBotConnections([
+              {
+                name: 'minecraft-bot',
+                connected: botStateData.data.connected,
+                viewerActive: false,
+                viewerUrl: 'http://localhost:3006',
+              },
+            ]);
           }
         }
 

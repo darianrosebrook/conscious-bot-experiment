@@ -1,6 +1,6 @@
 /**
  * Test setup file for minecraft-interface package
- * 
+ *
  * @author @darianrosebrook
  */
 
@@ -8,39 +8,39 @@
 beforeAll(() => {
   // Set up any global test configuration
   process.env.NODE_ENV = 'test';
-  
+
   // Mock console methods to reduce noise in tests
-  jest.spyOn(console, 'log').mockImplementation(() => {});
-  jest.spyOn(console, 'warn').mockImplementation(() => {});
-  jest.spyOn(console, 'error').mockImplementation(() => {});
+  vi.spyOn(console, 'log').mockImplementation(() => {});
+  vi.spyOn(console, 'warn').mockImplementation(() => {});
+  vi.spyOn(console, 'error').mockImplementation(() => {});
 });
 
 afterAll(() => {
   // Clean up global mocks
-  jest.restoreAllMocks();
+  vi.restoreAllMocks();
 });
 
 // Global test utilities
 export const createMockBot = () => ({
   entity: {
     position: { x: 0, y: 64, z: 0 },
-    on: jest.fn(),
-    once: jest.fn(),
+    on: vi.fn(),
+    once: vi.fn(),
   },
   inventory: {
     items: () => [],
     slots: () => [],
   },
-  blockAt: jest.fn().mockReturnValue(null),
-  findBlock: jest.fn().mockResolvedValue(null),
+  blockAt: vi.fn().mockReturnValue(null),
+  findBlock: vi.fn().mockResolvedValue(null),
   pathfinder: {
-    goto: jest.fn().mockResolvedValue({}),
-    stop: jest.fn(),
+    goto: vi.fn().mockResolvedValue({}),
+    stop: vi.fn(),
   },
-  chat: jest.fn(),
-  on: jest.fn(),
-  once: jest.fn(),
-  emit: jest.fn(),
+  chat: vi.fn(),
+  on: vi.fn(),
+  once: vi.fn(),
+  emit: vi.fn(),
 });
 
 export const createMockWorld = () => ({

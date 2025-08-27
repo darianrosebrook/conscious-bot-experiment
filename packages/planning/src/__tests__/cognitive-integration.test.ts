@@ -13,11 +13,11 @@ import {
 } from '../cognitive-integration';
 
 // Mock EventEmitter to avoid issues with the mock
-jest.mock('events', () => {
+vi.mock('events', () => {
   class MockEventEmitter {
-    on = jest.fn();
-    emit = jest.fn();
-    removeListener = jest.fn();
+    on = vi.fn();
+    emit = vi.fn();
+    removeListener = vi.fn();
   }
   return { EventEmitter: MockEventEmitter };
 });

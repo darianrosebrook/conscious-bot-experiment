@@ -10,8 +10,8 @@
 import fetch from 'node-fetch';
 
 // Mock fetch for HTTP requests
-jest.mock('node-fetch');
-const mockFetch = fetch as jest.MockedFunction<typeof fetch>;
+vi.mock('node-fetch');
+const mockFetch = fetch as vi.MockedFunction<typeof fetch>;
 
 // Import the actual validateTaskCompletion function from server.ts
 // We'll need to extract this function for testing
@@ -169,7 +169,7 @@ describe('Task Validation Integration Tests', () => {
   };
 
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
   });
 
   describe('Real-world Task Execution Scenarios', () => {

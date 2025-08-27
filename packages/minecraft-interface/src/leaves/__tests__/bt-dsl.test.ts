@@ -22,12 +22,12 @@ const mockBot = {
     food: 20,
   },
   world: {
-    getLight: jest.fn().mockReturnValue(15),
-    getBiome: jest.fn().mockResolvedValue('plains'),
+    getLight: vi.fn().mockReturnValue(15),
+    getBiome: vi.fn().mockResolvedValue('plains'),
   },
   inventory: {
-    items: jest.fn().mockReturnValue([]),
-    emptySlotCount: jest.fn().mockReturnValue(36),
+    items: vi.fn().mockReturnValue([]),
+    emptySlotCount: vi.fn().mockReturnValue(36),
     inventoryStart: 9,
     inventoryEnd: 44,
     slots: new Array(45),
@@ -35,7 +35,7 @@ const mockBot = {
   quickBarSlot: 0,
   entities: {},
   time: { timeOfDay: 6000 },
-  blockAt: jest.fn().mockReturnValue({ name: 'air', boundingBox: 'empty' }),
+  blockAt: vi.fn().mockReturnValue({ name: 'air', boundingBox: 'empty' }),
   health: 20,
   food: 20,
 } as any;
@@ -61,12 +61,12 @@ describe('BT-DSL Parser and Compiler', () => {
   afterEach(() => {
     factory.clear();
     // Clear any pending timeouts
-    jest.clearAllTimers();
+    vi.clearAllTimers();
   });
 
   afterAll(() => {
     // Ensure all timers are cleared
-    jest.clearAllTimers();
+    vi.clearAllTimers();
   });
 
   describe('Schema Validation', () => {
@@ -110,7 +110,11 @@ describe('BT-DSL Parser and Compiler', () => {
 
       const result = parser.parse(invalidBTDSL, factory);
       expect(result.valid).toBe(false);
-      expect(result.errors?.some(error => error.includes('must be equal to constant'))).toBe(true);
+      expect(
+        result.errors?.some((error) =>
+          error.includes('must be equal to constant')
+        )
+      ).toBe(true);
     });
 
     it('should reject BT-DSL with missing leaf', () => {
@@ -359,8 +363,8 @@ describe('BT-DSL Parser and Compiler', () => {
 
     it('should handle timeout decorator', async () => {
       // Use fake timers to prevent hanging
-      jest.useFakeTimers();
-      
+      vi.useFakeTimers();
+
       const btDsl = {
         name: 'timeout_execution',
         version: '1.0.0',
@@ -385,15 +389,15 @@ describe('BT-DSL Parser and Compiler', () => {
       );
 
       // Fast-forward time to trigger timeout
-      jest.advanceTimersByTime(150);
+      vi.advanceTimersByTime(150);
 
       const executionResult = await executionPromise;
 
       expect(executionResult.status).toBe('failure');
       expect(executionResult.error?.detail).toContain('Timeout');
-      
+
       // Restore real timers
-      jest.useRealTimers();
+      vi.useRealTimers();
     });
   });
 

@@ -131,6 +131,35 @@ export class EnhancedRegistry {
     this.quotas = new Map();
   }
 
+  /**
+   * Populate the registry's leaf factory with leaves
+   * This is required for BT-DSL parsing to work correctly
+   */
+  populateLeafFactory(leaves: LeafImpl[]): void {
+    for (const leaf of leaves) {
+      const result = this.leafFactory.register(leaf);
+      if (!result.ok) {
+        console.warn(
+          `Failed to register leaf ${leaf.spec.name}: ${result.error}`
+        );
+      }
+    }
+  }
+
+  /**
+   * Get the leaf factory for external access
+   */
+  getLeafFactory(): LeafFactory {
+    return this.leafFactory;
+  }
+
+  /**
+   * Get a leaf by ID
+   */
+  getLeaf(leafId: string): any {
+    return this.leafFactory.get(leafId);
+  }
+
   // ============================================================================
   // Leaf Registration (Signed Human Builds)
   // ============================================================================
@@ -777,13 +806,6 @@ export class EnhancedRegistry {
    */
   private getOptionDefinition(optionId: string): any {
     return this.optionDefs.get(optionId);
-  }
-
-  /**
-   * Get leaf factory for direct access
-   */
-  getLeafFactory(): LeafFactory {
-    return this.leafFactory;
   }
 
   /**

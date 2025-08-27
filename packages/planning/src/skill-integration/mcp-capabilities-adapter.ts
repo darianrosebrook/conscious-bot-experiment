@@ -294,7 +294,7 @@ export class MCPCapabilitiesAdapter extends EventEmitter {
   /**
    * Find applicable capabilities for a goal
    */
-  private async findApplicableCapabilities(
+  public async findApplicableCapabilities(
     goal: string,
     context: MCPCapabilityPlanningContext
   ): Promise<string[]> {

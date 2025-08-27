@@ -107,24 +107,26 @@ describe('Visible-Only Sensing Integration', () => {
       expect(focusedResult.raysCast).toBeGreaterThanOrEqual(0);
     });
 
-    test('should emit sweep events', (done) => {
+    test('should emit sweep events', async () => {
       let sweepStarted = false;
       let sweepCompleted = false;
 
-      sensing.on('sweep-started', () => {
-        sweepStarted = true;
+      return new Promise<void>((resolve) => {
+        sensing.on('sweep-started', () => {
+          sweepStarted = true;
+        });
+
+        sensing.on('sweep-completed', (result) => {
+          sweepCompleted = true;
+          expect(result).toBeDefined();
+
+          if (sweepStarted && sweepCompleted) {
+            resolve();
+          }
+        });
+
+        sensing.performSweep();
       });
-
-      sensing.on('sweep-completed', (result) => {
-        sweepCompleted = true;
-        expect(result).toBeDefined();
-
-        if (sweepStarted && sweepCompleted) {
-          done();
-        }
-      });
-
-      sensing.performSweep();
     });
   });
 
@@ -162,31 +164,33 @@ describe('Visible-Only Sensing Integration', () => {
       expect(Array.isArray(results)).toBe(true);
     });
 
-    test('should emit resource discovery events', (done) => {
+    test('should emit resource discovery events', async () => {
       let resourceDiscovered = false;
 
-      sensing.on('resource-discovered', (observation) => {
-        resourceDiscovered = true;
-        expect(observation).toBeDefined();
-        expect(observation.blockId).toBeDefined();
-        expect(observation.pos).toBeDefined();
-        done();
-      });
+      return new Promise<void>((resolve) => {
+        sensing.on('resource-discovered', (observation) => {
+          resourceDiscovered = true;
+          expect(observation).toBeDefined();
+          expect(observation.blockId).toBeDefined();
+          expect(observation.pos).toBeDefined();
+          resolve();
+        });
 
-      // Perform sweep - may or may not find resources, so set timeout
-      sensing.performSweep().catch(() => {
-        // If no resources found, that's also valid
-        if (!resourceDiscovered) {
-          done();
-        }
-      });
+        // Perform sweep - may or may not find resources, so set timeout
+        sensing.performSweep().catch(() => {
+          // If no resources found, that's also valid
+          if (!resourceDiscovered) {
+            resolve();
+          }
+        });
 
-      // Timeout if no discovery event
-      setTimeout(() => {
-        if (!resourceDiscovered) {
-          done();
-        }
-      }, 1000);
+        // Timeout if no discovery event
+        setTimeout(() => {
+          if (!resourceDiscovered) {
+            resolve();
+          }
+        }, 1000);
+      });
     });
   });
 
@@ -228,51 +232,55 @@ describe('Visible-Only Sensing Integration', () => {
   });
 
   describe('Continuous Sensing', () => {
-    test('should start and stop continuous sensing', (done) => {
+    test('should start and stop continuous sensing', async () => {
       let sweepCount = 0;
 
-      sensing.on('sweep-completed', () => {
-        sweepCount++;
+      return new Promise<void>((resolve) => {
+        sensing.on('sweep-completed', () => {
+          sweepCount++;
 
-        if (sweepCount >= 2) {
-          sensing.stopContinuousSensing();
+          if (sweepCount >= 2) {
+            sensing.stopContinuousSensing();
 
-          // Wait a bit to ensure no more sweeps
-          setTimeout(() => {
-            const finalCount = sweepCount;
-
+            // Wait a bit to ensure no more sweeps
             setTimeout(() => {
-              expect(sweepCount).toBe(finalCount); // No new sweeps
-              done();
-            }, 100);
-          }, 50);
-        }
-      });
+              const finalCount = sweepCount;
 
-      sensing.startContinuousSensing(50); // Very fast for testing
+              setTimeout(() => {
+                expect(sweepCount).toBe(finalCount); // No new sweeps
+                resolve();
+              }, 100);
+            }, 50);
+          }
+        });
+
+        sensing.startContinuousSensing(50); // Very fast for testing
+      });
     });
 
-    test('should handle errors in continuous sensing gracefully', (done) => {
+    test('should handle errors in continuous sensing gracefully', async () => {
       let errorHandled = false;
 
-      sensing.on('performance-warning', (warning) => {
-        if (warning.issue === 'continuous_sensing_failed') {
-          errorHandled = true;
-          sensing.stopContinuousSensing();
-          done();
-        }
+      return new Promise<void>((resolve) => {
+        sensing.on('performance-warning', (warning) => {
+          if (warning.issue === 'continuous_sensing_failed') {
+            errorHandled = true;
+            sensing.stopContinuousSensing();
+            resolve();
+          }
+        });
+
+        // Force error by corrupting internal state
+        sensing.startContinuousSensing(10);
+
+        // If no error occurs within reasonable time, that's also valid
+        setTimeout(() => {
+          if (!errorHandled) {
+            sensing.stopContinuousSensing();
+            resolve();
+          }
+        }, 200);
       });
-
-      // Force error by corrupting internal state
-      sensing.startContinuousSensing(10);
-
-      // If no error occurs within reasonable time, that's also valid
-      setTimeout(() => {
-        if (!errorHandled) {
-          sensing.stopContinuousSensing();
-          done();
-        }
-      }, 200);
     });
   });
 

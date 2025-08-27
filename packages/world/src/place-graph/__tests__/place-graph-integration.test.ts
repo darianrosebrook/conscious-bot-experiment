@@ -1,16 +1,16 @@
 /**
  * Place Graph Integration Test
- * 
+ *
  * Tests the integration of place graph core, place memory, and spatial navigator
  * components for spatial memory and navigation.
- * 
+ *
  * @author @darianrosebrook
  */
 
-import { describe, it, expect, beforeEach } from '@jest/globals';
-import { 
-  PlaceGraphCore, 
-  PlaceMemory, 
+import { describe, it, expect, beforeEach } from 'vitest';
+import {
+  PlaceGraphCore,
+  PlaceMemory,
   SpatialNavigator,
   PlaceType,
   BiomeCategory,
@@ -49,7 +49,7 @@ describe('Place Graph Integration', () => {
             description: 'A distinctive tall oak tree',
             visibility: 0.8,
             memorability: 0.7,
-          }
+          },
         ],
         resources: [
           {
@@ -59,7 +59,7 @@ describe('Place Graph Integration', () => {
             renewable: true,
             position: { x: 105, y: 64, z: 95 },
             description: 'Oak wood from nearby trees',
-          }
+          },
         ],
         tags: ['home', 'base', 'safe'],
         description: 'Main home base with crafting stations',
@@ -71,10 +71,10 @@ describe('Place Graph Integration', () => {
         memorability: 0.8,
         accessibility: 0.9,
       });
-      
+
       expect(place).toBeDefined();
       expect(place.id).toBeDefined();
-      
+
       const retrievedPlace = placeGraphCore.getPlace(place.id);
       expect(retrievedPlace).toBeDefined();
       expect(retrievedPlace?.name).toBe('Home Base');
@@ -101,7 +101,7 @@ describe('Place Graph Integration', () => {
         memorability: 0.6,
         accessibility: 0.7,
       });
-      
+
       // Create child place
       const areaPlace = placeGraphCore.addPlace({
         name: 'Forest Clearing',
@@ -123,7 +123,7 @@ describe('Place Graph Integration', () => {
         memorability: 0.5,
         accessibility: 0.8,
       });
-      
+
       // Create grandchild place
       const locationPlace = placeGraphCore.addPlace({
         name: 'Berry Bush',
@@ -141,7 +141,7 @@ describe('Place Graph Integration', () => {
             renewable: true,
             position: { x: 555, y: 64, z: 555 },
             description: 'Wild berries that can be harvested',
-          }
+          },
         ],
         tags: ['berries', 'food'],
         description: 'A bush with edible berries',
@@ -154,16 +154,16 @@ describe('Place Graph Integration', () => {
         memorability: 0.5,
         accessibility: 0.9,
       });
-      
+
       // Check parent-child relationships
       expect(regionPlace.children).toContain(areaPlace.id);
       expect(areaPlace.children).toContain(locationPlace.id);
-      
+
       // Get child places
       const regionChildren = placeGraphCore.getChildPlaces(regionPlace.id);
       expect(regionChildren).toHaveLength(1);
       expect(regionChildren[0].id).toBe(areaPlace.id);
-      
+
       const areaChildren = placeGraphCore.getChildPlaces(areaPlace.id);
       expect(areaChildren).toHaveLength(1);
       expect(areaChildren[0].id).toBe(locationPlace.id);
@@ -190,7 +190,7 @@ describe('Place Graph Integration', () => {
         memorability: 0.7,
         accessibility: 0.9,
       });
-      
+
       const place2 = placeGraphCore.addPlace({
         name: 'Mine',
         type: PlaceType.LOCATION,
@@ -210,7 +210,7 @@ describe('Place Graph Integration', () => {
         memorability: 0.8,
         accessibility: 0.4,
       });
-      
+
       // Connect them with an edge
       const edge = placeGraphCore.addEdge({
         source: place1.id,
@@ -229,21 +229,24 @@ describe('Place Graph Integration', () => {
           { x: 300, y: 40, z: 250 },
         ],
       });
-      
+
       expect(edge).toBeDefined();
       expect(edge.id).toBeDefined();
-      
+
       // Check edges for places
       const place1Edges = placeGraphCore.getEdgesForPlace(place1.id);
       expect(place1Edges).toHaveLength(1);
       expect(place1Edges[0].id).toBe(edge.id);
-      
+
       const place2Edges = placeGraphCore.getEdgesForPlace(place2.id);
       expect(place2Edges).toHaveLength(1);
       expect(place2Edges[0].id).toBe(edge.id);
-      
+
       // Check edge between places
-      const edgeBetween = placeGraphCore.getEdgeBetweenPlaces(place1.id, place2.id);
+      const edgeBetween = placeGraphCore.getEdgeBetweenPlaces(
+        place1.id,
+        place2.id
+      );
       expect(edgeBetween).toBeDefined();
       expect(edgeBetween?.id).toBe(edge.id);
     });
@@ -271,24 +274,25 @@ describe('Place Graph Integration', () => {
         memorability: 0.7,
         accessibility: 0.8,
       });
-      
+
       // Add a memory
       const memory = placeMemory.addMemory(place.id, {
         title: 'First Fishing Trip',
-        content: 'Caught five fish here during a sunny afternoon. The water was clear and calm.',
+        content:
+          'Caught five fish here during a sunny afternoon. The water was clear and calm.',
         importance: 0.7,
         emotionalValence: 0.8,
         tags: ['fishing', 'success'],
       });
-      
+
       expect(memory).toBeDefined();
       expect(memory?.id).toBeDefined();
-      
+
       // Retrieve memory
       const retrievedMemory = placeMemory.getMemory(memory!.id);
       expect(retrievedMemory).toBeDefined();
       expect(retrievedMemory?.title).toBe('First Fishing Trip');
-      
+
       // Get memories for place
       const placeMemories = placeMemory.getMemoriesForPlace(place.id);
       expect(placeMemories).toHaveLength(1);
@@ -316,7 +320,7 @@ describe('Place Graph Integration', () => {
         memorability: 0.5,
         accessibility: 0.9,
       });
-      
+
       const place2 = placeGraphCore.addPlace({
         name: 'Market',
         type: PlaceType.AREA,
@@ -336,26 +340,26 @@ describe('Place Graph Integration', () => {
         memorability: 0.6,
         accessibility: 0.9,
       });
-      
+
       // Add memories with common tag
       placeMemory.addMemory(place1.id, {
         title: 'Harvesting Wheat',
         content: 'Harvested wheat from the farm fields.',
         tags: ['harvest', 'wheat'],
       });
-      
+
       placeMemory.addMemory(place2.id, {
         title: 'Selling Wheat',
         content: 'Sold wheat at the market for a good price.',
         tags: ['trading', 'wheat'],
       });
-      
+
       // Recall by tag
       const wheatMemories = placeMemory.getMemoriesByTag(['wheat']);
       expect(wheatMemories).toHaveLength(2);
-      expect(wheatMemories.map(m => m.title)).toContain('Harvesting Wheat');
-      expect(wheatMemories.map(m => m.title)).toContain('Selling Wheat');
-      
+      expect(wheatMemories.map((m) => m.title)).toContain('Harvesting Wheat');
+      expect(wheatMemories.map((m) => m.title)).toContain('Selling Wheat');
+
       const tradingMemories = placeMemory.getMemoriesByTag(['trading']);
       expect(tradingMemories).toHaveLength(1);
       expect(tradingMemories[0].title).toBe('Selling Wheat');
@@ -379,7 +383,7 @@ describe('Place Graph Integration', () => {
             description: 'A distinctive stone at the summit',
             visibility: 0.9,
             memorability: 0.8,
-          }
+          },
         ],
         resources: [
           {
@@ -389,7 +393,7 @@ describe('Place Graph Integration', () => {
             renewable: true,
             position: { x: 800, y: 120, z: 800 },
             description: 'Panoramic view of the surrounding landscape',
-          }
+          },
         ],
         tags: ['mountain', 'peak', 'view'],
         description: 'The highest point in the region',
@@ -401,19 +405,20 @@ describe('Place Graph Integration', () => {
         memorability: 0.9,
         accessibility: 0.4,
       });
-      
+
       // Add memories
       placeMemory.addMemory(place.id, {
         title: 'First Summit',
-        content: 'Reached the mountain peak for the first time. The view was breathtaking.',
+        content:
+          'Reached the mountain peak for the first time. The view was breathtaking.',
         importance: 0.8,
         emotionalValence: 0.9,
         tags: ['achievement', 'view'],
       });
-      
+
       // Generate summary
       const summary = placeMemory.generatePlaceSummary(place.id);
-      
+
       expect(summary).toContain('Mountain Peak');
       expect(summary).toContain('Summit Stone');
       expect(summary).toContain('First Summit');
@@ -443,7 +448,7 @@ describe('Place Graph Integration', () => {
         memorability: 0.8,
         accessibility: 0.9,
       });
-      
+
       const forest = placeGraphCore.addPlace({
         name: 'Forest',
         type: PlaceType.AREA,
@@ -463,7 +468,7 @@ describe('Place Graph Integration', () => {
         memorability: 0.5,
         accessibility: 0.7,
       });
-      
+
       const cave = placeGraphCore.addPlace({
         name: 'Cave',
         type: PlaceType.LOCATION,
@@ -483,7 +488,7 @@ describe('Place Graph Integration', () => {
         memorability: 0.8,
         accessibility: 0.4,
       });
-      
+
       // Connect places
       placeGraphCore.addEdge({
         source: home.id,
@@ -498,7 +503,7 @@ describe('Place Graph Integration', () => {
         traversalCount: 5,
         waypoints: [home.position, forest.position],
       });
-      
+
       placeGraphCore.addEdge({
         source: forest.id,
         target: cave.id,
@@ -512,20 +517,20 @@ describe('Place Graph Integration', () => {
         traversalCount: 2,
         waypoints: [forest.position, cave.position],
       });
-      
+
       // Find path
       const path = spatialNavigator.findPath({
         start: home.id,
         goal: cave.id,
       });
-      
+
       expect(path).toBeDefined();
       expect(path?.places).toHaveLength(3);
       expect(path?.places[0]).toBe(home.id);
       expect(path?.places[1]).toBe(forest.id);
       expect(path?.places[2]).toBe(cave.id);
       expect(path?.edges).toHaveLength(2);
-      
+
       // Check instructions
       expect(path?.instructions).toBeDefined();
       expect(path?.instructions.length).toBeGreaterThan(0);
@@ -552,7 +557,7 @@ describe('Place Graph Integration', () => {
         memorability: 0.5,
         accessibility: 0.5,
       });
-      
+
       placeGraphCore.addPlace({
         name: 'Farm',
         type: PlaceType.AREA,
@@ -572,7 +577,7 @@ describe('Place Graph Integration', () => {
         memorability: 0.5,
         accessibility: 0.5,
       });
-      
+
       placeGraphCore.addPlace({
         name: 'Storage',
         type: PlaceType.LOCATION,
@@ -592,14 +597,14 @@ describe('Place Graph Integration', () => {
         memorability: 0.5,
         accessibility: 0.5,
       });
-      
+
       // Find nearest storage
       const currentPosition: Vector3 = { x: 120, y: 64, z: 120 };
       const nearestStorage = spatialNavigator.findNearestPlaceByFunction(
         currentPosition,
         PlaceFunction.STORAGE
       );
-      
+
       expect(nearestStorage).toBeDefined();
       expect(nearestStorage?.place.name).toBe('Storage');
       expect(nearestStorage?.place.function).toBe(PlaceFunction.STORAGE);
@@ -621,11 +626,11 @@ describe('Place Graph Integration', () => {
           tags: ['meadow', 'flowers'],
         }
       );
-      
+
       expect(discovery).toBeDefined();
       expect(discovery.isNew).toBe(true);
       expect(discovery.place.name).toBe('Meadow');
-      
+
       // Discover nearby place
       const discovery2 = placeGraphCore.discoverPlace(
         { x: 450, y: 64, z: 450 },
@@ -639,16 +644,16 @@ describe('Place Graph Integration', () => {
           tags: ['pond', 'water', 'fish'],
         }
       );
-      
+
       expect(discovery2).toBeDefined();
       expect(discovery2.isNew).toBe(true);
-      
+
       // Check if they were automatically connected
       const edges = placeGraphCore.getEdgeBetweenPlaces(
         discovery.place.id,
         discovery2.place.id
       );
-      
+
       expect(edges).toBeDefined();
     });
 
@@ -665,10 +670,10 @@ describe('Place Graph Integration', () => {
           description: 'A small hill',
         }
       );
-      
+
       const placeId = discovery.place.id;
       const initialVisitCount = discovery.place.visitCount;
-      
+
       // Rediscover the same place with updated info
       const rediscovery = placeGraphCore.discoverPlace(
         { x: 500, y: 64, z: 500 },
@@ -684,15 +689,17 @@ describe('Place Graph Integration', () => {
               description: 'A single tree at the top of the hill',
               visibility: 0.8,
               memorability: 0.7,
-            }
+            },
           ],
         }
       );
-      
+
       expect(rediscovery.isNew).toBe(false);
       expect(rediscovery.place.id).toBe(placeId);
       expect(rediscovery.place.visitCount).toBe(initialVisitCount + 1);
-      expect(rediscovery.place.description).toBe('A small hill with a great view');
+      expect(rediscovery.place.description).toBe(
+        'A small hill with a great view'
+      );
       expect(rediscovery.place.landmarks).toHaveLength(1);
       expect(rediscovery.place.landmarks[0].name).toBe('Lone Tree');
     });

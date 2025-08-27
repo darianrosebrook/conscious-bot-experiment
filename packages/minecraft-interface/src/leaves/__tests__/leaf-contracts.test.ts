@@ -32,23 +32,23 @@ const mockBot = {
     yaw: 0,
   },
   world: {
-    getLight: jest.fn().mockReturnValue(15),
-    getBiome: jest.fn().mockResolvedValue('plains'),
+    getLight: vi.fn().mockReturnValue(15),
+    getBiome: vi.fn().mockResolvedValue('plains'),
   },
   inventory: {
-    items: jest.fn().mockReturnValue([]),
-    emptySlotCount: jest.fn().mockReturnValue(36),
+    items: vi.fn().mockReturnValue([]),
+    emptySlotCount: vi.fn().mockReturnValue(36),
     inventoryStart: 9,
     inventoryEnd: 44,
   },
   quickBarSlot: 0,
   pathfinder: null,
-  loadPlugin: jest.fn(),
-  chat: jest.fn(),
-  dig: jest.fn(),
-  placeBlock: jest.fn(),
-  equip: jest.fn(),
-  blockAt: jest.fn().mockReturnValue({ name: 'air', boundingBox: 'empty' }),
+  loadPlugin: vi.fn(),
+  chat: vi.fn(),
+  dig: vi.fn(),
+  placeBlock: vi.fn(),
+  equip: vi.fn(),
+  blockAt: vi.fn().mockReturnValue({ name: 'air', boundingBox: 'empty' }),
   entities: {},
   time: { timeOfDay: 6000 },
 } as any;
@@ -136,7 +136,7 @@ describe('Leaf Contract System', () => {
           retries: 1,
           permissions: ['movement'],
         },
-        run: jest.fn().mockResolvedValue({ status: 'success' }),
+        run: vi.fn().mockResolvedValue({ status: 'success' }),
       };
 
       expect(() => validateLeafImpl(mockImpl)).not.toThrow();
@@ -144,7 +144,7 @@ describe('Leaf Contract System', () => {
 
     it('should reject leaf implementation without spec', () => {
       const invalidImpl: any = {
-        run: jest.fn().mockResolvedValue({ status: 'success' }),
+        run: vi.fn().mockResolvedValue({ status: 'success' }),
       };
 
       expect(() => validateLeafImpl(invalidImpl)).toThrow(
@@ -324,7 +324,7 @@ describe('Leaf Contract System', () => {
 
     it('should emit metrics', () => {
       const context = createLeafContext(mockBot);
-      const consoleSpy = jest.spyOn(console, 'log').mockImplementation();
+      const consoleSpy = vi.spyOn(console, 'log').mockImplementation();
 
       context.emitMetric('test_metric', 42, { tag: 'value' });
 
@@ -336,7 +336,7 @@ describe('Leaf Contract System', () => {
 
     it('should emit errors', () => {
       const context = createLeafContext(mockBot);
-      const consoleSpy = jest.spyOn(console, 'log').mockImplementation();
+      const consoleSpy = vi.spyOn(console, 'log').mockImplementation();
 
       context.emitError({
         code: 'path.unreachable',

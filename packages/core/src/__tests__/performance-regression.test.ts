@@ -83,6 +83,7 @@ describe('Performance Regression Tests', () => {
         validateSignal({
           type: ['health', 'hunger', 'threat'][i % 3],
           intensity: Math.random(),
+          urgency: Math.random(),
           trend: (Math.random() - 0.5) * 0.2,
           confidence: 0.8 + Math.random() * 0.2,
           timestamp: Date.now() + i,
@@ -138,6 +139,7 @@ describe('Performance Regression Tests', () => {
         const signal = validateSignal({
           type: 'health',
           intensity: Math.random(),
+          urgency: Math.random(),
           trend: 0,
           confidence: 1.0,
           timestamp: Date.now(),
@@ -252,6 +254,7 @@ describe('Performance Regression Tests', () => {
         const signal = validateSignal({
           type: 'memory',
           intensity: Math.random(),
+          urgency: Math.random(),
           trend: 0,
           confidence: 1.0,
           timestamp: Date.now(),
@@ -317,6 +320,7 @@ describe('Performance Regression Tests', () => {
         const emergencySignal = validateSignal({
           type: 'threat',
           intensity: 0.9,
+          urgency: 0.9,
           trend: 0.3,
           confidence: 0.95,
           timestamp: Date.now(),
@@ -357,6 +361,7 @@ describe('Performance Regression Tests', () => {
         const routineSignal = validateSignal({
           type: 'social',
           intensity: 0.5,
+          urgency: 0.4,
           trend: 0.1,
           confidence: 0.8,
           timestamp: Date.now(),

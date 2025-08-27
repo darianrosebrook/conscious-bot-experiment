@@ -7,6 +7,7 @@
  * @author @darianrosebrook
  */
 
+import { vi } from 'vitest';
 import {
   LeafSpec,
   LeafImpl,
@@ -146,12 +147,12 @@ export function createMockLeafContext(
         food: 20,
       },
       world: {
-        getLight: jest.fn().mockReturnValue(15),
-        getBiome: jest.fn().mockResolvedValue('plains'),
+        getLight: vi.fn().mockReturnValue(15),
+        getBiome: vi.fn().mockResolvedValue('plains'),
       },
       inventory: {
-        items: jest.fn().mockReturnValue([]),
-        emptySlotCount: jest.fn().mockReturnValue(36),
+        items: vi.fn().mockReturnValue([]),
+        emptySlotCount: vi.fn().mockReturnValue(36),
         inventoryStart: 9,
         inventoryEnd: 44,
         slots: new Array(45),
@@ -159,23 +160,23 @@ export function createMockLeafContext(
       quickBarSlot: 0,
       entities: {},
       time: { timeOfDay: 6000 },
-      blockAt: jest.fn().mockReturnValue({ name: 'air', boundingBox: 'empty' }),
+      blockAt: vi.fn().mockReturnValue({ name: 'air', boundingBox: 'empty' }),
       health: 20,
       food: 20,
-      chat: jest.fn(),
-      dig: jest.fn().mockResolvedValue(undefined),
-      placeBlock: jest.fn().mockResolvedValue(undefined),
-      equip: jest.fn().mockResolvedValue(undefined),
+      chat: vi.fn(),
+      dig: vi.fn().mockResolvedValue(undefined),
+      placeBlock: vi.fn().mockResolvedValue(undefined),
+      equip: vi.fn().mockResolvedValue(undefined),
       pathfinder: {
-        setMovements: jest.fn(),
-        setGoal: jest.fn(),
-        goto: jest.fn().mockResolvedValue({}),
-        stop: jest.fn(),
+        setMovements: vi.fn(),
+        setGoal: vi.fn(),
+        goto: vi.fn().mockResolvedValue({}),
+        stop: vi.fn(),
       },
     } as any,
     abortSignal: new AbortController().signal,
     now: () => Date.now(),
-    snapshot: jest.fn().mockResolvedValue({
+    snapshot: vi.fn().mockResolvedValue({
       position: { x: 0, y: 64, z: 0 },
       biome: 'plains',
       time: 6000,
@@ -186,14 +187,14 @@ export function createMockLeafContext(
       toolDurability: {},
       waypoints: [],
     }),
-    inventory: jest.fn().mockResolvedValue({
+    inventory: vi.fn().mockResolvedValue({
       items: [],
       selectedSlot: 0,
       totalSlots: 36,
       freeSlots: 36,
     }),
-    emitMetric: jest.fn(),
-    emitError: jest.fn(),
+    emitMetric: vi.fn(),
+    emitError: vi.fn(),
   };
 
   return {
@@ -209,60 +210,60 @@ export function createMockLeafContext(
 /**
  * Creates a mock enhanced registry for testing
  */
-export function createMockEnhancedRegistry(): jest.Mocked<EnhancedRegistry> {
+export function createMockEnhancedRegistry(): vi.Mocked<EnhancedRegistry> {
   return {
-    registerLeaf: jest
+    registerLeaf: vi
       .fn()
       .mockResolvedValue({ ok: true, id: 'mock_leaf@1.0.0' }),
-    registerOption: jest
+    registerOption: vi
       .fn()
       .mockResolvedValue({ ok: true, id: 'mock_option@1.0.0' }),
-    promoteCapability: jest.fn().mockResolvedValue({ success: true }),
-    retireCapability: jest.fn().mockResolvedValue({ success: true }),
-    getCapability: jest.fn().mockResolvedValue(null),
-    listCapabilities: jest.fn().mockResolvedValue([]),
-    getStatistics: jest.fn().mockResolvedValue({}),
-    getLeafFactory: jest.fn().mockReturnValue(createMockLeafFactory()),
-    clear: jest.fn(),
+    promoteCapability: vi.fn().mockResolvedValue({ success: true }),
+    retireCapability: vi.fn().mockResolvedValue({ success: true }),
+    getCapability: vi.fn().mockResolvedValue(null),
+    listCapabilities: vi.fn().mockResolvedValue([]),
+    getStatistics: vi.fn().mockResolvedValue({}),
+    getLeafFactory: vi.fn().mockReturnValue(createMockLeafFactory()),
+    clear: vi.fn(),
   } as any;
 }
 
 /**
  * Creates a mock leaf factory for testing
  */
-export function createMockLeafFactory(): jest.Mocked<LeafFactory> {
+export function createMockLeafFactory(): vi.Mocked<LeafFactory> {
   return {
-    register: jest.fn().mockReturnValue({ ok: true, id: 'mock_leaf@1.0.0' }),
-    get: jest.fn().mockReturnValue(createMockLeaf()),
-    clear: jest.fn(),
-    list: jest.fn().mockReturnValue([]),
-    has: jest.fn().mockReturnValue(false),
+    register: vi.fn().mockReturnValue({ ok: true, id: 'mock_leaf@1.0.0' }),
+    get: vi.fn().mockReturnValue(createMockLeaf()),
+    clear: vi.fn(),
+    list: vi.fn().mockReturnValue([]),
+    has: vi.fn().mockReturnValue(false),
   } as any;
 }
 
 /**
  * Creates a mock BT-DSL parser for testing
  */
-export function createMockBTDSLParser(): jest.Mocked<BTDSLParser> {
+export function createMockBTDSLParser(): vi.Mocked<BTDSLParser> {
   return {
-    parse: jest.fn().mockReturnValue({
+    parse: vi.fn().mockReturnValue({
       valid: true,
       errors: [],
       compiled: { type: 'Sequence', children: [] },
       treeHash: 'mock_hash',
     }),
-    validate: jest.fn().mockReturnValue({ valid: true, errors: [] }),
+    validate: vi.fn().mockReturnValue({ valid: true, errors: [] }),
   } as any;
 }
 
 /**
  * Creates a mock dynamic creation flow for testing
  */
-export function createMockDynamicCreationFlow(): jest.Mocked<DynamicCreationFlow> {
+export function createMockDynamicCreationFlow(): vi.Mocked<DynamicCreationFlow> {
   return {
-    detectImpasse: jest.fn().mockReturnValue(false),
-    requestOptionProposals: jest.fn().mockResolvedValue([]),
-    clear: jest.fn(),
+    detectImpasse: vi.fn().mockReturnValue(false),
+    requestOptionProposals: vi.fn().mockResolvedValue([]),
+    clear: vi.fn(),
   } as any;
 }
 
@@ -326,8 +327,8 @@ export function createMockDate(timestamp: number = 1640995200000): Date {
  * Resets all mocks and clears timers
  */
 export function resetTestEnvironment() {
-  jest.clearAllMocks();
-  jest.clearAllTimers();
+  vi.clearAllMocks();
+  vi.clearAllTimers();
 }
 
 /**
@@ -380,20 +381,20 @@ export const TEST_CONFIG = {
  */
 export function setupTestEnvironment() {
   // Mock Date.now for consistent timestamps
-  jest.spyOn(Date, 'now').mockImplementation(() => 1640995200000);
+  vi.spyOn(Date, 'now').mockImplementation(() => 1640995200000);
 
   // Mock console methods to reduce noise
-  jest.spyOn(console, 'log').mockImplementation(() => {});
-  jest.spyOn(console, 'warn').mockImplementation(() => {});
-  jest.spyOn(console, 'error').mockImplementation(() => {});
+  vi.spyOn(console, 'log').mockImplementation(() => {});
+  vi.spyOn(console, 'warn').mockImplementation(() => {});
+  vi.spyOn(console, 'error').mockImplementation(() => {});
 }
 
 /**
  * Test environment cleanup
  */
 export function cleanupTestEnvironment() {
-  jest.restoreAllMocks();
-  jest.clearAllTimers();
+  vi.restoreAllMocks();
+  vi.clearAllTimers();
 }
 
 // ============================================================================

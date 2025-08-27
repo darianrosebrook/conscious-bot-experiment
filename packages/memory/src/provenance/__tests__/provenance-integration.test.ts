@@ -7,7 +7,7 @@
  * @author @darianrosebrook
  */
 
-import { describe, it, expect, beforeEach } from '@jest/globals';
+import { describe, it, expect, beforeEach } from 'vitest';
 import {
   ProvenanceSystem,
   DecisionImportance,

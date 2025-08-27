@@ -10,12 +10,12 @@
 import fetch from 'node-fetch';
 
 // Mock fetch for HTTP requests
-jest.mock('node-fetch');
-const mockFetch = fetch as jest.MockedFunction<typeof fetch>;
+vi.mock('node-fetch');
+const mockFetch = fetch as vi.MockedFunction<typeof fetch>;
 
 describe('Server Autonomous Startup Tests', () => {
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
   });
 
   describe('Server Startup and Autonomous Execution', () => {

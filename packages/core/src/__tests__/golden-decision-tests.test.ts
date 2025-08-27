@@ -41,6 +41,7 @@ describe('Golden Decision Tests', () => {
             {
               type: 'threat',
               intensity: 0.9,
+              urgency: 0.9,
               trend: 0.3,
               confidence: 0.95,
               timestamp: 1000,
@@ -49,6 +50,7 @@ describe('Golden Decision Tests', () => {
             {
               type: 'health',
               intensity: 0.7,
+              urgency: 0.6,
               trend: -0.1,
               confidence: 0.9,
               timestamp: 1000,
@@ -78,6 +80,7 @@ describe('Golden Decision Tests', () => {
             {
               type: 'health',
               intensity: 0.15,
+              urgency: 0.1,
               trend: -0.2,
               confidence: 0.98,
               timestamp: 2000,
@@ -86,6 +89,7 @@ describe('Golden Decision Tests', () => {
             {
               type: 'health',
               intensity: 0.1,
+              urgency: 0.05,
               trend: 0.0,
               confidence: 0.9,
               timestamp: 2000,
@@ -115,6 +119,7 @@ describe('Golden Decision Tests', () => {
             {
               type: 'threat',
               intensity: 0.85,
+              urgency: 0.8,
               trend: 0.1,
               confidence: 0.92,
               timestamp: 3000,
@@ -123,6 +128,7 @@ describe('Golden Decision Tests', () => {
             {
               type: 'social',
               intensity: 0.6,
+              urgency: 0.5,
               trend: 0.05,
               confidence: 0.8,
               timestamp: 3000,
@@ -197,6 +203,7 @@ describe('Golden Decision Tests', () => {
             {
               type: 'social',
               intensity: 0.8,
+              urgency: 0.7,
               trend: 0.1,
               confidence: 0.7,
               timestamp: 4000,
@@ -205,6 +212,7 @@ describe('Golden Decision Tests', () => {
             {
               type: 'safety',
               intensity: 0.9,
+              urgency: 0.8,
               trend: 0.0,
               confidence: 0.95,
               timestamp: 4000,
@@ -235,6 +243,7 @@ describe('Golden Decision Tests', () => {
             {
               type: 'hunger',
               intensity: 0.6,
+              urgency: 0.5,
               trend: 0.05,
               confidence: 0.9,
               timestamp: 5000,
@@ -243,6 +252,7 @@ describe('Golden Decision Tests', () => {
             {
               type: 'social',
               intensity: 0.4,
+              urgency: 0.3,
               trend: 0.02,
               confidence: 0.8,
               timestamp: 5000,
@@ -308,6 +318,7 @@ describe('Golden Decision Tests', () => {
             {
               type: 'health',
               intensity: 0.3,
+              urgency: 0.2,
               trend: -0.1,
               confidence: 0.9,
               timestamp: 6000,
@@ -316,6 +327,7 @@ describe('Golden Decision Tests', () => {
             {
               type: 'hunger',
               intensity: 0.7,
+              urgency: 0.6,
               trend: 0.05,
               confidence: 0.85,
               timestamp: 6000,
@@ -324,6 +336,7 @@ describe('Golden Decision Tests', () => {
             {
               type: 'threat',
               intensity: 0.9,
+              urgency: 0.9,
               trend: 0.2,
               confidence: 0.95,
               timestamp: 6000,
@@ -336,7 +349,7 @@ describe('Golden Decision Tests', () => {
           },
         },
         expectedOutput: {
-          needOrder: ['Safety', 'Nutrition', 'Progress'],
+          needOrder: ['safety', 'nutrition', 'progress'],
           topNeedUrgency: '>0.8',
           needCount: 3,
           processingConsistency: true,
@@ -350,6 +363,7 @@ describe('Golden Decision Tests', () => {
             {
               type: 'social',
               intensity: 0.5,
+              urgency: 0.4,
               trend: 0.0,
               confidence: 0.8,
               timestamp: 7000,
@@ -358,6 +372,7 @@ describe('Golden Decision Tests', () => {
             {
               type: 'social',
               intensity: 0.6,
+              urgency: 0.5,
               trend: 0.1,
               confidence: 0.9,
               timestamp: 7000,
@@ -371,7 +386,7 @@ describe('Golden Decision Tests', () => {
           },
         },
         expectedOutput: {
-          needOrder: ['Social', 'Progress'],
+          needOrder: ['social', 'progress'],
           socialBoost: true,
           contextInfluence: '>0.1',
         },
@@ -422,6 +437,7 @@ describe('Golden Decision Tests', () => {
       const testSignal: Signal = {
         type: 'health',
         intensity: 0.5,
+        urgency: 0.5,
         trend: -0.1,
         confidence: 0.9,
         timestamp: 8000,
@@ -467,6 +483,7 @@ describe('Golden Decision Tests', () => {
         {
           type: 'health',
           intensity: 0.8,
+          urgency: 0.7,
           trend: 0.0,
           confidence: 0.9,
           timestamp: 9000,
@@ -475,6 +492,7 @@ describe('Golden Decision Tests', () => {
         {
           type: 'hunger',
           intensity: 0.3,
+          urgency: 0.2,
           trend: 0.1,
           confidence: 0.85,
           timestamp: 9000,
@@ -483,6 +501,7 @@ describe('Golden Decision Tests', () => {
         {
           type: 'progress',
           intensity: 0.6,
+          urgency: 0.5,
           trend: 0.05,
           confidence: 0.8,
           timestamp: 9000,

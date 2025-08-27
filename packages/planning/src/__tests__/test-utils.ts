@@ -26,28 +26,28 @@ import { EnhancedReactiveExecutor } from '../reactive-executor/enhanced-reactive
 /**
  * Creates a mock integrated planning coordinator for testing
  */
-export function createMockIntegratedPlanningCoordinator(): jest.Mocked<IntegratedPlanningCoordinator> {
+export function createMockIntegratedPlanningCoordinator(): vi.Mocked<IntegratedPlanningCoordinator> {
   return {
-    planAndExecute: jest.fn().mockResolvedValue({
+    planAndExecute: vi.fn().mockResolvedValue({
       primaryPlan: createMockPlan(),
       confidence: 0.8,
       alternatives: [],
     }),
-    getCurrentPlan: jest.fn().mockReturnValue(createMockPlan()),
-    updatePlan: jest.fn().mockResolvedValue(true),
-    getPlanStatus: jest.fn().mockReturnValue(PlanStatus.EXECUTING),
-    getPlanQueue: jest.fn().mockReturnValue([]),
-    isPlanningActive: jest.fn().mockReturnValue(true),
+    getCurrentPlan: vi.fn().mockReturnValue(createMockPlan()),
+    updatePlan: vi.fn().mockResolvedValue(true),
+    getPlanStatus: vi.fn().mockReturnValue(PlanStatus.EXECUTING),
+    getPlanQueue: vi.fn().mockReturnValue([]),
+    isPlanningActive: vi.fn().mockReturnValue(true),
   } as any;
 }
 
 /**
  * Creates a mock enhanced goal manager for testing
  */
-export function createMockEnhancedGoalManager(): jest.Mocked<EnhancedGoalManager> {
+export function createMockEnhancedGoalManager(): vi.Mocked<EnhancedGoalManager> {
   return {
     // Real methods from EnhancedGoalManager
-    formulateGoals: jest.fn().mockResolvedValue({
+    formulateGoals: vi.fn().mockResolvedValue({
       identifiedNeeds: [],
       generatedGoals: [],
       priorityRanking: [],
@@ -58,7 +58,7 @@ export function createMockEnhancedGoalManager(): jest.Mocked<EnhancedGoalManager
         priorityScoring: 0,
       },
     }),
-    processSignalType: jest.fn().mockResolvedValue({
+    processSignalType: vi.fn().mockResolvedValue({
       identifiedNeeds: [],
       generatedGoals: [],
       priorityRanking: [],
@@ -69,7 +69,7 @@ export function createMockEnhancedGoalManager(): jest.Mocked<EnhancedGoalManager
         priorityScoring: 0,
       },
     }),
-    generateGoalsForNeed: jest.fn().mockResolvedValue({
+    generateGoalsForNeed: vi.fn().mockResolvedValue({
       identifiedNeeds: [],
       generatedGoals: [],
       priorityRanking: [],
@@ -80,9 +80,9 @@ export function createMockEnhancedGoalManager(): jest.Mocked<EnhancedGoalManager
         priorityScoring: 0,
       },
     }),
-    getGoalAnalysis: jest.fn().mockReturnValue({}),
-    updateGoalStatus: jest.fn(),
-    getMetrics: jest.fn().mockReturnValue({
+    getGoalAnalysis: vi.fn().mockReturnValue({}),
+    updateGoalStatus: vi.fn(),
+    getMetrics: vi.fn().mockReturnValue({
       signalProcessingLatency: 0,
       goalGenerationLatency: 0,
       priorityScoringLatency: 0,
@@ -97,36 +97,36 @@ export function createMockEnhancedGoalManager(): jest.Mocked<EnhancedGoalManager
       adaptationSpeed: 0,
       resourceUtilizationRatio: 0,
     }),
-    getGoalHistory: jest.fn().mockReturnValue([]),
-    getNeedHistory: jest.fn().mockReturnValue([]),
-    resetMetrics: jest.fn(),
-    listGoals: jest.fn().mockReturnValue([]),
-    getGoalsByStatus: jest.fn().mockReturnValue([]),
-    getGoalsByType: jest.fn().mockReturnValue([]),
-    cleanupGoals: jest.fn(),
+    getGoalHistory: vi.fn().mockReturnValue([]),
+    getNeedHistory: vi.fn().mockReturnValue([]),
+    resetMetrics: vi.fn(),
+    listGoals: vi.fn().mockReturnValue([]),
+    getGoalsByStatus: vi.fn().mockReturnValue([]),
+    getGoalsByType: vi.fn().mockReturnValue([]),
+    cleanupGoals: vi.fn(),
 
     // Mock methods for backward compatibility with planning system
-    getCurrentGoals: jest.fn().mockReturnValue([]),
-    getActiveGoals: jest.fn().mockReturnValue([]),
-    getGoalCount: jest.fn().mockReturnValue(0),
-    getCurrentTasks: jest.fn().mockReturnValue([]),
-    getCompletedTasks: jest.fn().mockReturnValue([]),
-    addTask: jest.fn().mockResolvedValue(true),
+    getCurrentGoals: vi.fn().mockReturnValue([]),
+    getActiveGoals: vi.fn().mockReturnValue([]),
+    getGoalCount: vi.fn().mockReturnValue(0),
+    getCurrentTasks: vi.fn().mockReturnValue([]),
+    getCompletedTasks: vi.fn().mockReturnValue([]),
+    addTask: vi.fn().mockResolvedValue(true),
   } as any;
 }
 
 /**
  * Creates a mock enhanced reactive executor for testing
  */
-export function createMockEnhancedReactiveExecutor(): jest.Mocked<EnhancedReactiveExecutor> {
+export function createMockEnhancedReactiveExecutor(): vi.Mocked<EnhancedReactiveExecutor> {
   return {
-    isExecuting: jest.fn().mockReturnValue(false),
-    executeNextTask: jest.fn().mockResolvedValue({ success: true }),
-    getCurrentAction: jest.fn().mockReturnValue(null),
-    getActionQueue: jest.fn().mockReturnValue([]),
-    executeTask: jest.fn().mockResolvedValue({ success: true }),
-    executePlan: jest.fn().mockResolvedValue({ success: true }),
-    getMetrics: jest.fn().mockReturnValue({
+    isExecuting: vi.fn().mockReturnValue(false),
+    executeNextTask: vi.fn().mockResolvedValue({ success: true }),
+    getCurrentAction: vi.fn().mockReturnValue(null),
+    getActionQueue: vi.fn().mockReturnValue([]),
+    executeTask: vi.fn().mockResolvedValue({ success: true }),
+    executePlan: vi.fn().mockResolvedValue({ success: true }),
+    getMetrics: vi.fn().mockReturnValue({
       isExecuting: false,
       currentAction: null,
       actionQueue: [],
@@ -378,8 +378,8 @@ export function createMockDate(timestamp: number = 1640995200000): Date {
  * Resets all mocks and clears timers
  */
 export function resetTestEnvironment() {
-  jest.clearAllMocks();
-  jest.clearAllTimers();
+  vi.clearAllMocks();
+  vi.clearAllTimers();
 }
 
 /**
@@ -479,20 +479,20 @@ export const TEST_CONFIG = {
  */
 export function setupTestEnvironment() {
   // Mock Date.now for consistent timestamps
-  jest.spyOn(Date, 'now').mockImplementation(() => 1640995200000);
+  vi.spyOn(Date, 'now').mockImplementation(() => 1640995200000);
 
   // Mock console methods to reduce noise
-  jest.spyOn(console, 'log').mockImplementation(() => {});
-  jest.spyOn(console, 'warn').mockImplementation(() => {});
-  jest.spyOn(console, 'error').mockImplementation(() => {});
+  vi.spyOn(console, 'log').mockImplementation(() => {});
+  vi.spyOn(console, 'warn').mockImplementation(() => {});
+  vi.spyOn(console, 'error').mockImplementation(() => {});
 }
 
 /**
  * Test environment cleanup
  */
 export function cleanupTestEnvironment() {
-  jest.restoreAllMocks();
-  jest.clearAllTimers();
+  vi.restoreAllMocks();
+  vi.clearAllTimers();
 }
 
 // ============================================================================

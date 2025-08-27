@@ -20,12 +20,12 @@ import { Bot } from 'mineflayer';
 import { Vec3 } from 'vec3';
 
 // Mock mineflayer pathfinder
-jest.mock('mineflayer-pathfinder', () => ({
-  pathfinder: jest.fn(),
+vi.mock('mineflayer-pathfinder', () => ({
+  pathfinder: vi.fn(),
   goals: {
-    GoalBlock: jest.fn(),
-    GoalNear: jest.fn(),
-    GoalFollow: jest.fn(),
+    GoalBlock: vi.fn(),
+    GoalNear: vi.fn(),
+    GoalFollow: vi.fn(),
   },
 }));
 
@@ -44,20 +44,20 @@ const createMockBot = () =>
       },
     },
     pathfinder: {
-      setGoal: jest.fn(),
-      stop: jest.fn(),
-      setMovements: jest.fn(),
+      setGoal: vi.fn(),
+      stop: vi.fn(),
+      setMovements: vi.fn(),
     },
-    blockAt: jest.fn(() => ({
+    blockAt: vi.fn(() => ({
       boundingBox: 'empty',
       position: new Vec3(0, 64, 0),
     })),
     world: {
-      getLight: jest.fn(() => 15),
+      getLight: vi.fn(() => 15),
     },
-    on: jest.fn(),
-    removeListener: jest.fn(),
-    loadPlugin: jest.fn(),
+    on: vi.fn(),
+    removeListener: vi.fn(),
+    loadPlugin: vi.fn(),
   }) as any;
 
 // Mock leaf context
@@ -68,7 +68,7 @@ const createMockContext = (bot: any): LeafContext => {
     bot,
     abortSignal: controller.signal,
     now: () => performance.now(),
-    snapshot: jest.fn().mockResolvedValue({
+    snapshot: vi.fn().mockResolvedValue({
       position: { x: 0, y: 64, z: 0 },
       biome: 'plains',
       time: 1000,
@@ -79,9 +79,9 @@ const createMockContext = (bot: any): LeafContext => {
       toolDurability: {},
       waypoints: [],
     }),
-    inventory: jest.fn().mockResolvedValue({ items: [] }),
-    emitMetric: jest.fn(),
-    emitError: jest.fn(),
+    inventory: vi.fn().mockResolvedValue({ items: [] }),
+    emitMetric: vi.fn(),
+    emitError: vi.fn(),
   };
 };
 
@@ -139,7 +139,7 @@ describe('MoveToLeaf', () => {
       const mockPathfinder = mockBot.pathfinder as any;
       mockPathfinder.setGoal.mockImplementation(() => {
         // Simulate pathfinder emitting noPath immediately
-        const onPathUpdate = (mockBot.on as jest.Mock).mock.calls.find(
+        const onPathUpdate = (mockBot.on as vi.Mock).mock.calls.find(
           (call: any) => call[0] === 'path_update'
         )?.[1];
         if (onPathUpdate) {
@@ -161,7 +161,7 @@ describe('MoveToLeaf', () => {
       // Mock pathfinder to emit path_reset
       const mockPathfinder = mockBot.pathfinder as any;
       mockPathfinder.setGoal.mockImplementation(() => {
-        const onPathReset = (mockBot.on as jest.Mock).mock.calls.find(
+        const onPathReset = (mockBot.on as vi.Mock).mock.calls.find(
           (call: any) => call[0] === 'path_reset'
         )?.[1];
         if (onPathReset) {
@@ -205,7 +205,7 @@ describe('MoveToLeaf', () => {
       const mockPathfinder = mockBot.pathfinder as any;
       mockPathfinder.setGoal.mockImplementation(() => {
         setTimeout(() => {
-          const onGoalReached = (mockBot.on as jest.Mock).mock.calls.find(
+          const onGoalReached = (mockBot.on as vi.Mock).mock.calls.find(
             (call: any) => call[0] === 'goal_reached'
           )?.[1];
           if (onGoalReached) {
@@ -263,7 +263,7 @@ describe('StepForwardSafelyLeaf', () => {
     });
 
     it('should handle blocked target position', async () => {
-      (mockBot.blockAt as jest.Mock).mockReturnValue({
+      (mockBot.blockAt as vi.Mock).mockReturnValue({
         boundingBox: 'block',
         position: new Vec3(0, 64, 0),
       });
@@ -276,7 +276,7 @@ describe('StepForwardSafelyLeaf', () => {
     });
 
     it('should handle no headroom', async () => {
-      (mockBot.blockAt as jest.Mock)
+      (mockBot.blockAt as vi.Mock)
         .mockReturnValueOnce({ boundingBox: 'empty' }) // target
         .mockReturnValueOnce({ boundingBox: 'block' }) // head
         .mockReturnValueOnce({ boundingBox: 'block' }); // floor
@@ -289,7 +289,7 @@ describe('StepForwardSafelyLeaf', () => {
     });
 
     it('should handle no floor', async () => {
-      (mockBot.blockAt as jest.Mock)
+      (mockBot.blockAt as vi.Mock)
         .mockReturnValueOnce({ boundingBox: 'empty' }) // target
         .mockReturnValueOnce({ boundingBox: 'empty' }) // head
         .mockReturnValueOnce({ boundingBox: 'empty' }); // floor
@@ -303,12 +303,12 @@ describe('StepForwardSafelyLeaf', () => {
 
     it('should handle low light level', async () => {
       // Mock blockAt to return safe blocks but low light
-      (mockBot.blockAt as jest.Mock)
+      (mockBot.blockAt as vi.Mock)
         .mockReturnValueOnce({ boundingBox: 'empty' }) // target
         .mockReturnValueOnce({ boundingBox: 'empty' }) // head
         .mockReturnValueOnce({ boundingBox: 'block' }); // floor
 
-      ((mockBot.world as any).getLight as jest.Mock).mockReturnValue(5);
+      ((mockBot.world as any).getLight as vi.Mock).mockReturnValue(5);
 
       const result = await stepLeaf.run(mockContext, { checkLight: true });
 
@@ -319,7 +319,7 @@ describe('StepForwardSafelyLeaf', () => {
 
     it('should successfully step forward', async () => {
       // Mock blockAt to return safe blocks
-      (mockBot.blockAt as jest.Mock)
+      (mockBot.blockAt as vi.Mock)
         .mockReturnValueOnce({ boundingBox: 'empty' }) // target
         .mockReturnValueOnce({ boundingBox: 'empty' }) // head
         .mockReturnValueOnce({ boundingBox: 'block' }); // floor

@@ -10,8 +10,8 @@
 import fetch from 'node-fetch';
 
 // Mock fetch for HTTP requests
-jest.mock('node-fetch');
-const mockFetch = fetch as jest.MockedFunction<typeof fetch>;
+vi.mock('node-fetch');
+const mockFetch = fetch as vi.MockedFunction<typeof fetch>;
 
 // Mock the planning system
 const mockPlanningSystem = {
@@ -20,19 +20,19 @@ const mockPlanningSystem = {
     _lastTaskExecution: 0,
     _failedTaskCount: 0,
     _maxConsecutiveFailures: 3,
-    addTask: jest.fn((task: any) => {
+    addTask: vi.fn((task: any) => {
       mockPlanningSystem.goalFormulation._tasks.push(task);
     }),
-    getCurrentTasks: jest.fn(() => mockPlanningSystem.goalFormulation._tasks),
+    getCurrentTasks: vi.fn(() => mockPlanningSystem.goalFormulation._tasks),
   },
   reactiveExecutor: {
-    executeNextTask: jest.fn(),
+    executeNextTask: vi.fn(),
   },
 };
 
 describe('Autonomous Task Execution Tests', () => {
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
     mockPlanningSystem.goalFormulation._tasks = [];
     mockPlanningSystem.goalFormulation._lastTaskExecution = 0;
   });

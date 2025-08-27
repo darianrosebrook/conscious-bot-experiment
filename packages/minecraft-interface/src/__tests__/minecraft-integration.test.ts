@@ -14,8 +14,8 @@ import {
 import { EventEmitter } from 'events';
 
 // Mock mineflayer to avoid requiring actual Minecraft server
-jest.mock('mineflayer', () => ({
-  createBot: jest.fn(() => ({
+vi.mock('mineflayer', () => ({
+  createBot: vi.fn(() => ({
     entity: {
       position: {
         x: 0,
@@ -36,24 +36,24 @@ jest.mock('mineflayer', () => ({
     },
     time: { timeOfDay: 1000 },
     isRaining: false,
-    once: jest.fn((event, callback) => {
+    once: vi.fn((event, callback) => {
       if (event === 'spawn') {
         setTimeout(callback, 100); // Simulate spawn delay
       }
     }),
-    on: jest.fn(),
-    quit: jest.fn(),
-    setControlState: jest.fn(),
-    look: jest.fn().mockResolvedValue(undefined),
-    chat: jest.fn(),
-    recipesFor: jest.fn(() => [{ id: 'wooden_pickaxe_recipe' }]),
-    canCraft: jest.fn(() => true),
-    craft: jest.fn().mockResolvedValue(undefined),
-    blockAt: jest.fn(() => ({
+    on: vi.fn(),
+    quit: vi.fn(),
+    setControlState: vi.fn(),
+    look: vi.fn().mockResolvedValue(undefined),
+    chat: vi.fn(),
+    recipesFor: vi.fn(() => [{ id: 'wooden_pickaxe_recipe' }]),
+    canCraft: vi.fn(() => true),
+    craft: vi.fn().mockResolvedValue(undefined),
+    blockAt: vi.fn(() => ({
       name: 'stone',
       position: { x: 0, y: 63, z: 0 },
     })),
-    dig: jest.fn().mockResolvedValue(undefined),
+    dig: vi.fn().mockResolvedValue(undefined),
     mcData: {
       itemsByName: {
         wooden_pickaxe: { id: 270 },
@@ -82,7 +82,7 @@ describe('Minecraft Integration Tests', () => {
   };
 
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
     minecraftInterface = new SimpleMinecraftInterface(mockConfig);
   });
 
@@ -273,7 +273,7 @@ describe('Minecraft Integration Tests', () => {
 
       it('should handle insufficient materials for crafting', async () => {
         const mockBot = minecraftInterface.botInstance;
-        (mockBot as any).canCraft = jest.fn(() => false);
+        (mockBot as any).canCraft = vi.fn(() => false);
 
         const result = await minecraftInterface.executeAction({
           type: 'craft_item',
@@ -306,7 +306,7 @@ describe('Minecraft Integration Tests', () => {
 
       it('should handle mining non-existent blocks', async () => {
         const mockBot = minecraftInterface.botInstance;
-        (mockBot as any).blockAt = jest.fn(() => null);
+        (mockBot as any).blockAt = vi.fn(() => null);
 
         const result = await minecraftInterface.executeAction({
           type: 'mine_block',

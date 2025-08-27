@@ -29,6 +29,7 @@ describe('Arbiter Integration Tests', () => {
     const signal: Signal = {
       type: 'health',
       intensity: 0.3,
+      urgency: 0.3,
       trend: -0.1,
       confidence: 0.9,
       timestamp: Date.now(),
@@ -72,6 +73,7 @@ describe('Arbiter Integration Tests', () => {
     const signal: Signal = {
       type: 'threat',
       intensity: 0.7,
+      urgency: 0.7,
       trend: 0.1,
       confidence: 0.8,
       timestamp: Date.now(),
@@ -103,6 +105,7 @@ describe('Arbiter Integration Tests', () => {
       {
         type: 'health',
         intensity: 0.5,
+        urgency: 0.5,
         trend: 0,
         confidence: 0.9,
         timestamp: Date.now(),
@@ -111,6 +114,7 @@ describe('Arbiter Integration Tests', () => {
       {
         type: 'hunger',
         intensity: 0.6,
+        urgency: 0.6,
         trend: 0.1,
         confidence: 0.8,
         timestamp: Date.now(),
@@ -119,6 +123,7 @@ describe('Arbiter Integration Tests', () => {
       {
         type: 'social',
         intensity: 0.3,
+        urgency: 0.3,
         trend: -0.1,
         confidence: 0.7,
         timestamp: Date.now(),

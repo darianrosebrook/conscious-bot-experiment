@@ -15,7 +15,9 @@ import {
   LeafResult,
   LeafSpec,
 } from '@conscious-bot/core';
-import { pathfinder, goals } from 'mineflayer-pathfinder';
+import { pathfinder } from 'mineflayer-pathfinder';
+// Use require for goals since ES Module import doesn't work
+const { goals } = require('mineflayer-pathfinder');
 
 // Extend Bot type to include pathfinder
 interface BotWithPathfinder extends Bot {

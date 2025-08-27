@@ -674,6 +674,13 @@ export class CognitiveStreamIntegration extends EventEmitter {
   }
 
   /**
+   * Get dynamic creation flow for external access
+   */
+  getDynamicCreationFlow(): any {
+    return this.mcpDynamicFlow;
+  }
+
+  /**
    * Add event to cognitive stream
    */
   private addEvent(event: CognitiveStreamEvent): void {

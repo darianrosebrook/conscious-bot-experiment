@@ -322,25 +322,27 @@ describe('Navigation System Integration', () => {
       expect(result.changesProcessed).toBe(1);
     });
 
-    test('should emit path-updated events', (done) => {
-      navigationSystem.on('path-updated', (result) => {
-        expect(result).toBeDefined();
-        expect(result.changesProcessed).toBeGreaterThan(0);
-        done();
+    test('should emit path-updated events', async () => {
+      return new Promise<void>((resolve) => {
+        navigationSystem.on('path-updated', (result) => {
+          expect(result).toBeDefined();
+          expect(result.changesProcessed).toBeGreaterThan(0);
+          resolve();
+        });
+
+        const changes: WorldChange[] = [
+          {
+            position: { x: 8, y: 64, z: 8 },
+            changeType: 'block_added',
+            blockType: 'stone',
+            timestamp: Date.now(),
+            severity: 'medium',
+            affectsNavigation: true,
+          },
+        ];
+
+        navigationSystem.updateWorld(changes);
       });
-
-      const changes: WorldChange[] = [
-        {
-          position: { x: 8, y: 64, z: 8 },
-          changeType: 'block_added',
-          blockType: 'stone',
-          timestamp: Date.now(),
-          severity: 'medium',
-          affectsNavigation: true,
-        },
-      ];
-
-      navigationSystem.updateWorld(changes);
     });
   });
 
@@ -548,19 +550,21 @@ describe('Navigation System Integration', () => {
       expect(stats.costs.activeHazards).toBeGreaterThanOrEqual(0);
     });
 
-    test('should emit performance warnings', (done) => {
-      navigationSystem.on('performance-warning', (warning) => {
-        expect(warning.metric).toBeDefined();
-        expect(warning.value).toBeDefined();
-        expect(warning.threshold).toBeDefined();
-        done();
-      });
+    test('should emit performance warnings', async () => {
+      return new Promise<void>((resolve) => {
+        navigationSystem.on('performance-warning', (warning) => {
+          expect(warning.metric).toBeDefined();
+          expect(warning.value).toBeDefined();
+          expect(warning.threshold).toBeDefined();
+          resolve();
+        });
 
-      // This would be triggered by actual performance issues
-      // For testing, we can manually trigger warnings or just verify the system exists
-      setTimeout(() => {
-        done(); // Complete if no warning is emitted
-      }, 100);
+        // This would be triggered by actual performance issues
+        // For testing, we can manually trigger warnings or just verify the system exists
+        setTimeout(() => {
+          resolve(); // Complete if no warning is emitted
+        }, 100);
+      });
     });
 
     test('should handle navigation status tracking', async () => {

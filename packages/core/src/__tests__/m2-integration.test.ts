@@ -1,4 +1,4 @@
-import { describe, it, expect } from '@jest/globals';
+import { describe, it, expect } from 'vitest';
 
 // TODO: This test requires other packages to be built first
 describe.skip('M2 Foundation Integration', () => {
