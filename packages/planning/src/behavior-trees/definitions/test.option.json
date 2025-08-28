@@ -1,0 +1,23 @@
+{
+  "name": "test.option",
+  "description": "Test behavior tree for option testing",
+  "root": {
+    "type": "sequence",
+    "children": [
+      {
+        "type": "action",
+        "name": "test_action",
+        "description": "Test action node",
+        "parameters": {
+          "param": "value"
+        }
+      }
+    ]
+  },
+  "metadata": {
+    "version": "1.0.0",
+    "author": "@darianrosebrook",
+    "created": "2025-01-01",
+    "tags": ["test", "option"]
+  }
+}

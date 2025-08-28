@@ -1,0 +1,22 @@
+{
+  "name": "slow.option",
+  "description": "Slow behavior tree for timeout testing",
+  "root": {
+    "type": "sequence",
+    "children": [
+      {
+        "type": "action",
+        "name": "slow_action",
+        "description": "Slow action that takes time to complete",
+        "parameters": {},
+        "timeout": 3000
+      }
+    ]
+  },
+  "metadata": {
+    "version": "1.0.0",
+    "author": "@darianrosebrook",
+    "created": "2025-01-01",
+    "tags": ["test", "slow", "timeout"]
+  }
+}

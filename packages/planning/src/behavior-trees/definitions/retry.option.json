@@ -1,0 +1,23 @@
+{
+  "name": "retry.option",
+  "description": "Retry behavior tree for retry mechanism testing",
+  "root": {
+    "type": "sequence",
+    "children": [
+      {
+        "type": "action",
+        "name": "retry_action",
+        "description": "Action that may fail and need retrying",
+        "parameters": {},
+        "retries": 2,
+        "retryDelay": 100
+      }
+    ]
+  },
+  "metadata": {
+    "version": "1.0.0",
+    "author": "@darianrosebrook",
+    "created": "2025-01-01",
+    "tags": ["test", "retry", "failure"]
+  }
+}

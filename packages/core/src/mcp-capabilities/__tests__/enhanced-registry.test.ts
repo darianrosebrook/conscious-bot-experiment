@@ -83,12 +83,31 @@ describe('EnhancedRegistry', () => {
         createdAt: new Date().toISOString(),
       };
 
+      // Debug: Check if leaf is available before registering option
+      console.log('Before option registration:');
+      console.log(
+        '- Leaf factory has mock_leaf:',
+        registry.getLeafFactory().has('mock_leaf')
+      );
+      console.log(
+        '- Available leaves:',
+        registry
+          .getLeafFactory()
+          .listLeaves()
+          .map((l) => `${l.name}@${l.version}`)
+      );
+
       const result = registry.registerOption(btDslJson, provenance, {
         successThreshold: 0.8,
         maxShadowRuns: 10,
         failureThreshold: 0.3,
         minShadowRuns: 3,
       });
+
+      // Add debugging to see what the actual error is
+      if (!result.ok) {
+        console.log('Registration failed:', result.error, result.detail);
+      }
 
       expect(result.ok).toBe(true);
       expect(result.id).toBe('test_option@1.0.0');
