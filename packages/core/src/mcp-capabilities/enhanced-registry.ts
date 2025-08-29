@@ -8,9 +8,15 @@
  */
 
 import { performance } from 'node:perf_hooks';
-import { LeafFactory, LeafImpl, RegistrationResult } from './leaf-factory.js';
-import { LeafContext, ExecError, createExecError } from './leaf-contracts.js';
-import { BTDSLParser, CompiledBTNode } from './bt-dsl-parser.js';
+import { WorkingLeafFactory } from './working-leaf-factory';
+import {
+  LeafImpl,
+  RegistrationResult,
+  LeafContext,
+  ExecError,
+  createExecError,
+} from './leaf-contracts';
+import { BTDSLParser, CompiledBTNode } from './bt-dsl-parser';
 
 // ============================================================================
 // Registry Status and Versioning (C0)
@@ -91,11 +97,40 @@ export interface ShadowStats {
 // Enhanced Registry
 // ============================================================================
 
+// Public surface needed by the BT-DSL parser and callers. Avoids class nominal issues.
+interface LeafFactoryLike {
+  register(leaf: LeafImpl): RegistrationResult;
+  get(name: string, version?: string): LeafImpl | undefined;
+  listLeaves(): Array<{
+    name: string;
+    version: string;
+    spec: { name: string; version: string };
+  }>;
+  run(
+    name: string,
+    version: string,
+    ctx: LeafContext,
+    args: unknown,
+    opts?: unknown
+  ): Promise<any>;
+  clear(): void;
+  getNames(): string[];
+  remove(name: string, version?: string): number;
+  getRateLimitUsage(
+    name: string,
+    version: string
+  ): { used: number; limit: number };
+  validateArgs(name: string, version: string, args: unknown): boolean;
+  getAll(): LeafImpl[];
+  has(name: string, version?: string): boolean;
+  size(): number;
+}
+
 /**
  * Enhanced registry with shadow runs and governance
  */
 export class EnhancedRegistry {
-  private leafFactory: LeafFactory;
+  private leafFactory: WorkingLeafFactory;
   private btParser: BTDSLParser;
   private enhancedSpecs: Map<string, EnhancedSpec>; // key: name@version
   private shadowRuns: Map<string, ShadowRunResult[]>; // key: name@version
@@ -104,6 +139,8 @@ export class EnhancedRegistry {
     string,
     { used: number; limit: number; resetTime: number }
   >;
+  private compiled: Map<string, CompiledBTNode>;
+  private maxShadowActive = 100; // Max shadow options active at once
   // Critical fix #1: Store option definitions
   private optionDefs = new Map<string, any>(); // id -> BT-DSL JSON
   // Critical fix #2: Circuit breaker for bad shadows
@@ -116,19 +153,21 @@ export class EnhancedRegistry {
     who: string;
     detail?: any;
   }> = [];
-  // Secondary improvement: Compiled BT cache
-  private compiled = new Map<string, CompiledBTNode>();
   // Secondary improvement: Veto list and global budget
   private veto = new Set<string>();
-  private maxShadowActive = 10;
 
   constructor() {
-    this.leafFactory = new LeafFactory();
+    this.leafFactory = new WorkingLeafFactory();
     this.btParser = new BTDSLParser();
     this.enhancedSpecs = new Map();
     this.shadowRuns = new Map();
     this.healthChecks = new Map();
     this.quotas = new Map();
+    this.compiled = new Map();
+    this.optionDefs = new Map();
+    this.cb = new Map();
+    this.audit = [];
+    this.veto = new Set();
   }
 
   /**
@@ -147,17 +186,24 @@ export class EnhancedRegistry {
   }
 
   /**
-   * Get the leaf factory for external access
+   * Get the underlying leaf factory for BT-DSL parsing
    */
-  getLeafFactory(): LeafFactory {
+  getLeafFactory(): LeafFactoryLike {
     return this.leafFactory;
   }
 
   /**
-   * Get a leaf by ID
+   * Get a leaf by ID (name@version or just name for latest)
    */
-  getLeaf(leafId: string): any {
-    return this.leafFactory.get(leafId);
+  getLeaf(leafId: string): LeafImpl | undefined {
+    const at = leafId.lastIndexOf('@');
+    if (at < 0) {
+      // treat whole string as a name requesting "latest"
+      return this.leafFactory.get(leafId);
+    }
+    const name = leafId.slice(0, at);
+    const version = leafId.slice(at + 1);
+    return this.leafFactory.get(name, version);
   }
 
   // ============================================================================
@@ -230,8 +276,8 @@ export class EnhancedRegistry {
       minShadowRuns?: number; // e.g., 3
     }
   ): RegistrationResult {
-    // Parse and validate BT-DSL
-    const parseResult = this.btParser.parse(btDslJson, this.leafFactory);
+    // Parse and validate BT-DSL against the active leaf factory surface
+    const parseResult = this.btParser.parse(btDslJson, this.getLeafFactory());
     if (!parseResult.valid) {
       return {
         ok: false,
@@ -342,7 +388,7 @@ export class EnhancedRegistry {
       // Execute the behavior tree
       const result = await this.btParser.execute(
         compiled,
-        this.leafFactory,
+        this.getLeafFactory(),
         leafContext,
         abortSignal
       );
@@ -623,10 +669,7 @@ export class EnhancedRegistry {
    */
   getShadowOptions(): string[] {
     return Array.from(this.enhancedSpecs.entries())
-      .filter(([toBeNull, spec]) => {
-        console.log('toBeNull', toBeNull);
-        return spec.status === 'shadow';
-      })
+      .filter(([, spec]) => spec.status === 'shadow')
       .map(([id]) => id);
   }
 
@@ -635,10 +678,7 @@ export class EnhancedRegistry {
    */
   getActiveOptions(): string[] {
     return Array.from(this.enhancedSpecs.entries())
-      .filter(([toBeNull, spec]) => {
-        console.log('toBeNull', toBeNull);
-        return spec.status === 'active';
-      })
+      .filter(([, spec]) => spec.status === 'active')
       .map(([id]) => id);
   }
 
@@ -647,10 +687,7 @@ export class EnhancedRegistry {
    */
   getActiveOptionsDetailed() {
     return [...this.enhancedSpecs.entries()]
-      .filter(([toBeNull, spec]) => {
-        console.log('toBeNull', toBeNull);
-        return spec.status === 'active';
-      })
+      .filter(([, spec]) => spec.status === 'active')
       .map(([id, spec]) => ({ id, spec, stats: this.getShadowStats(id) }));
   }
 
@@ -771,7 +808,7 @@ export class EnhancedRegistry {
     if (!json) {
       throw new Error(`Option definition not found: ${optionId}`);
     }
-    const parse = this.btParser.parse(json, this.leafFactory);
+    const parse = this.btParser.parse(json, this.getLeafFactory());
     if (!parse.valid || !parse.compiled) {
       throw new Error(parse.errors?.join(', '));
     }

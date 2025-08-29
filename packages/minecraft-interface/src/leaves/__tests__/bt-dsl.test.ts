@@ -549,4 +549,46 @@ describe('BT-DSL Parser and Compiler', () => {
       expect(result.compiled).toBeDefined();
     });
   });
+
+  describe('Factory Registration', () => {
+    it('should register leaves correctly', () => {
+      expect(factory.size()).toBe(5);
+
+      // Debug: Check what keys are in the registry
+      const keys = Array.from((factory as any).registry.keys());
+      console.log('Registry keys:', keys);
+
+      // Debug: Check what happens when we call get
+      console.log('Calling factory.get("sense_hostiles")...');
+      const senseHostiles = factory.get('sense_hostiles');
+      console.log('factory.get("sense_hostiles"):', senseHostiles);
+
+      // Debug: Try calling the method directly
+      console.log('Calling get method directly...');
+      const getMethod = factory.get.bind(factory);
+      const senseHostiles2 = getMethod('sense_hostiles');
+      console.log('getMethod("sense_hostiles"):', senseHostiles2);
+
+      // Debug: Check the filtering logic
+      const filteredKeys = keys.filter((k) => k.startsWith('sense_hostiles@'));
+      console.log('Filtered keys for sense_hostiles:', filteredKeys);
+      console.log('Sorted filtered keys:', filteredKeys.sort());
+      console.log('Last key:', filteredKeys.sort()[filteredKeys.length - 1]);
+
+      // Debug: Check what's actually in the registry
+      const lastKey = filteredKeys.sort()[filteredKeys.length - 1];
+      console.log(
+        'Registry.get(lastKey):',
+        (factory as any).registry.get(lastKey)
+      );
+      console.log(
+        'Registry entries:',
+        Array.from((factory as any).registry.entries())
+      );
+
+      expect(factory.has('sense_hostiles')).toBe(true);
+      expect(factory.has('move_to')).toBe(true);
+      expect(factory.has('wait')).toBe(true);
+    });
+  });
 });

@@ -32,11 +32,16 @@ describe('Skill Behavior Tree Definitions', () => {
       const files = fs.readdirSync(definitionsDir);
       const jsonFiles = files.filter((file) => file.endsWith('.json'));
 
-      expect(jsonFiles).toHaveLength(10);
+      // Filter out test files (files ending with .option.json)
+      const skillFiles = jsonFiles.filter(
+        (file) => !file.endsWith('.option.json')
+      );
+
+      expect(skillFiles).toHaveLength(10);
 
       expectedSkills.forEach((skillId) => {
         const fileName = `${skillId.replace('opt.', '')}.json`;
-        expect(jsonFiles).toContain(fileName);
+        expect(skillFiles).toContain(fileName);
       });
     });
   });

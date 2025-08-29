@@ -43,7 +43,7 @@ export class MinecraftCognitiveIntegration extends EventEmitter {
   constructor(config: MinecraftCognitiveConfig) {
     super();
     this.config = config;
-    this.cognitiveStream = new CognitiveStreamIntegration();
+    this.cognitiveStream = new CognitiveStreamIntegration(config.bot);
 
     // Set up event forwarding
     this.setupEventForwarding();
@@ -305,6 +305,13 @@ export class MinecraftCognitiveIntegration extends EventEmitter {
    */
   async getMCPCapabilitiesStatus(): Promise<any> {
     return this.cognitiveStream.getMCPCapabilitiesStatus();
+  }
+
+  /**
+   * Get MCP registry for external access
+   */
+  getMCPRegistry(): any {
+    return this.cognitiveStream.getMCPRegistry();
   }
 
   /**

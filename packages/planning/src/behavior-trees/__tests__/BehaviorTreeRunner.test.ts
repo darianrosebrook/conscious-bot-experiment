@@ -63,7 +63,7 @@ describe('BehaviorTreeRunner', () => {
       expect(result.error).toBeDefined();
     });
 
-    it('should emit events during execution', (done) => {
+    it('should emit events during execution', async () => {
       let tickCount = 0;
       let statusCount = 0;
 
@@ -79,14 +79,10 @@ describe('BehaviorTreeRunner', () => {
         expect(data.status).toBeDefined();
       });
 
-      runner
-        .runOption('test.option', { param: 'value' })
-        .then(() => {
-          expect(tickCount).toBeGreaterThan(0);
-          expect(statusCount).toBeGreaterThan(0);
-          done();
-        })
-        .catch(done);
+      await runner.runOption('test.option', { param: 'value' });
+
+      expect(tickCount).toBeGreaterThan(0);
+      expect(statusCount).toBeGreaterThan(0);
     });
   });
 

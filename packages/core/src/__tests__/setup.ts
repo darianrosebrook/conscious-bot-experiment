@@ -21,15 +21,16 @@ afterAll(() => {
 // Mock console methods to reduce noise in tests
 const originalConsole = { ...console };
 beforeEach(() => {
-  console.log = vi.fn();
-  console.warn = vi.fn();
-  console.error = vi.fn();
+  // Temporarily disable console mocking for debugging
+  // console.log = vi.fn();
+  // console.warn = vi.fn();
+  // console.error = vi.fn();
 });
 
 afterEach(() => {
-  console.log = originalConsole.log;
-  console.warn = originalConsole.warn;
-  console.error = originalConsole.error;
+  // console.log = originalConsole.log;
+  // console.warn = originalConsole.warn;
+  // console.error = originalConsole.error;
 });
 
 // Global test utilities

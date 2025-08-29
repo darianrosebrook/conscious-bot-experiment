@@ -660,9 +660,9 @@ describe('Phase 5: MineDojo Scenario Validation', () => {
 });
 
 describe('Phase 5: System Integration', () => {
-  test('should integrate with existing evaluation framework', () => {
+  test('should integrate with existing evaluation framework', async () => {
     // Test that new components work with existing framework
-    const { createEvaluationFramework } = require('../index');
+    const { createEvaluationFramework } = await import('../index.js');
 
     expect(() => {
       const framework = createEvaluationFramework();
@@ -675,7 +675,7 @@ describe('Phase 5: System Integration', () => {
 
   test('should maintain backward compatibility', () => {
     // Test that existing functionality still works
-    const { quickEvaluate, batchEvaluate } = require('../index');
+    const { quickEvaluate, batchEvaluate } = await import('../index.js');
 
     expect(typeof quickEvaluate).toBe('function');
     expect(typeof batchEvaluate).toBe('function');

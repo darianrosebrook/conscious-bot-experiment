@@ -1,36 +1,42 @@
 /**
- * Leaf Factory - Registry and execution for leaf implementations
- *
- * Provides centralized registration, validation, and execution of leaf implementations
- * with rate limiting, schema validation, and error handling.
- *
- * @author @darianrosebrook
+ * Working LeafFactory Implementation
+ * Implements high-priority fixes (semver latest, consistent rate limiting, validator guards).
  */
 
-import Ajv, { ValidateFunction } from 'ajv';
+import Ajv, { type ValidateFunction } from 'ajv';
+import { rcompare, valid, coerce } from 'semver';
 import { performance } from 'node:perf_hooks';
 import {
   LeafImpl,
   LeafSpec,
+  RegistrationResult,
   LeafContext,
   LeafResult,
   LeafRunOptions,
-  RegistrationResult,
   validateLeafImpl,
   createExecError,
   ExecErrorCode,
   verifyPostconditions,
-} from './leaf-contracts.js';
+} from './leaf-contracts';
+
+// Node ≥18 has structuredClone; Cursor/TS may not have ambient types depending on tsconfig.
+const safeClone = <T>(v: T): T => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return (globalThis as any).structuredClone
+    ? // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (structuredClone as any)(v)
+    : JSON.parse(JSON.stringify(v));
+};
 
 /**
- * Enhanced Leaf Factory with AJV compilation and rate limiting
+ * Working LeafFactory implementation with all fixes applied
  */
-export class LeafFactory {
+export class WorkingLeafFactory {
   private ajv: Ajv;
   private inputValidators: Map<string, ValidateFunction>;
   private outputValidators: Map<string, ValidateFunction>;
-  private registry: Map<string, LeafImpl>; // key: name@version
-  private counters: Map<string, number>; // simple rate limiter
+  private registry = new Map<string, LeafImpl>();
+  private counters = new Map<string, number>();
 
   constructor() {
     this.ajv = new Ajv({
@@ -40,17 +46,21 @@ export class LeafFactory {
     });
     this.inputValidators = new Map();
     this.outputValidators = new Map();
-    this.registry = new Map();
-    this.counters = new Map();
   }
 
   /**
-   * Register a leaf implementation with schema compilation
+   * Register a leaf
    */
   register(leaf: LeafImpl): RegistrationResult {
     validateLeafImpl(leaf);
 
+    // Fix 1: Disallow @ in names to prevent key delimiter collisions
+    if (leaf.spec.name.includes('@')) {
+      return { ok: false, error: 'invalid_name_char:@' };
+    }
+
     const key = `${leaf.spec.name}@${leaf.spec.version}`;
+
     if (this.registry.has(key)) {
       return { ok: false, error: 'version_exists' };
     }
@@ -71,11 +81,25 @@ export class LeafFactory {
       };
     }
 
-    // Initialize rate limiter counter
-    this.counters.set(key, 0);
+    // Fix 3: Remove unused counter initialization
+    // this.counters.set(key, 0); // <-- removed this line
 
     this.registry.set(key, leaf);
     return { ok: true, id: key };
+  }
+
+  /**
+   * Get the number of registered leaves
+   */
+  size(): number {
+    return this.registry.size;
+  }
+
+  /**
+   * Check if a leaf exists
+   */
+  has(name: string, version?: string): boolean {
+    return this.get(name, version) !== undefined;
   }
 
   /**
@@ -87,34 +111,32 @@ export class LeafFactory {
       return this.registry.get(key);
     }
 
-    // return latest by naive semver sort (replace if you add a real semver lib)
-    const keys = Array.from(this.registry.keys())
+    // Fix 2: Use proper semver sorting instead of lexicographic
+    const versions = Array.from(this.registry.keys())
       .filter((k) => k.startsWith(`${name}@`))
-      .sort();
-    const last = keys[keys.length - 1];
-    return last ? this.registry.get(last) : undefined;
+      .map((k) => k.slice(name.length + 1))
+      .filter((v) => valid(v) || valid(coerce(v) || ''));
+
+    if (versions.length === 0) return undefined;
+
+    // Prefer exact valid semver; fall back to coerced
+    const latest = versions
+      .map((v) => (valid(v) ? v : (coerce(v)?.version ?? v)))
+      .sort(rcompare)[0];
+    return this.registry.get(`${name}@${latest}`);
   }
 
   /**
    * List all registered leaves
    */
   listLeaves(): Array<{ name: string; version: string; spec: LeafSpec }> {
-    console.log('DEBUG: listLeaves() called');
-    console.log('DEBUG: registry size:', this.registry.size);
-    console.log('DEBUG: registry keys:', Array.from(this.registry.keys()));
-
-    // WORKAROUND: Use the working manual implementation
     const leaves: Array<{ name: string; version: string; spec: LeafSpec }> = [];
 
-    // Direct access to registry - this works
-    const registry = this.registry;
-    for (const [key, leaf] of registry.entries()) {
-      console.log('DEBUG: Processing key:', key);
+    for (const [key, leaf] of this.registry.entries()) {
       const atIndex = key.indexOf('@');
       if (atIndex >= 0) {
         const name = key.substring(0, atIndex);
         const version = key.substring(atIndex + 1);
-        console.log('DEBUG: Adding leaf:', name, version);
         leaves.push({
           name,
           version,
@@ -123,8 +145,36 @@ export class LeafFactory {
       }
     }
 
-    console.log('DEBUG: Final leaves array:', leaves);
     return leaves;
+  }
+
+  /**
+   * Helper for rate limiting - generate minute-based key
+   */
+  private minuteKey(name: string, version: string): string {
+    const nowMin = Math.floor(Date.now() / 60000);
+    return `${name}@${version}:${nowMin}`;
+  }
+
+  /**
+   * Optional small GC to keep counters map bounded
+   */
+  private gcCounters(name: string, version: string, keep = 5) {
+    const prefix = `${name}@${version}:`;
+    const entries: Array<[string, number]> = [];
+
+    for (const [k, v] of this.counters.entries()) {
+      if (k.startsWith(prefix)) entries.push([k, v]);
+    }
+
+    // Sort by minute asc, drop older ones
+    entries.sort(
+      (a, b) => Number(a[0].split(':').pop()!) - Number(b[0].split(':').pop()!)
+    );
+    while (entries.length > keep) {
+      const [oldKey] = entries.shift()!;
+      this.counters.delete(oldKey);
+    }
   }
 
   /**
@@ -139,6 +189,7 @@ export class LeafFactory {
   ): Promise<LeafResult> {
     const key = `${name}@${version}`;
     const leaf = this.registry.get(key);
+
     if (!leaf) {
       return {
         status: 'failure',
@@ -150,11 +201,11 @@ export class LeafFactory {
       };
     }
 
-    // Rate limit
-    const nowMin = Math.floor(Date.now() / 60000);
-    const counterKey = `${key}:${nowMin}`;
+    // Fix 3: Use consistent rate limiting with pruning
+    const counterKey = this.minuteKey(name, version);
     const used = this.counters.get(counterKey) ?? 0;
     const limit = leaf.spec.rateLimitPerMin ?? 60;
+
     if (used >= limit) {
       return {
         status: 'failure',
@@ -165,15 +216,32 @@ export class LeafFactory {
         },
       };
     }
-    this.counters.set(counterKey, used + 1);
 
-    // Validate args
-    const validateIn = this.inputValidators.get(key)!;
-    if (!validateIn(args)) {
+    this.counters.set(counterKey, used + 1);
+    this.gcCounters(name, version);
+
+    // Fix 4: Guard missing validators
+    const validateIn = this.inputValidators.get(key);
+    if (!validateIn) {
       return {
         status: 'failure',
         error: {
           code: 'unknown',
+          retryable: false,
+          detail: 'input_validator_missing',
+        },
+      };
+    }
+
+    // Fix 6: Optional: avoid mutating caller args
+    const safeArgs =
+      args && typeof args === 'object' ? safeClone(args as any) : args;
+
+    if (!validateIn(safeArgs)) {
+      return {
+        status: 'failure',
+        error: {
+          code: 'invalid_input',
           retryable: false,
           detail: this.ajv.errorsText(validateIn.errors),
         },
@@ -191,16 +259,27 @@ export class LeafFactory {
       : null;
 
     try {
-      const res = await leaf.run(ctx, args, opts);
+      const res = await leaf.run(ctx, safeArgs, opts);
 
       // Validate output if present
       if (res.status === 'success' && leaf.spec.outputSchema) {
-        const validateOut = this.outputValidators.get(key)!;
-        if (!validateOut(res.result)) {
+        const validateOut = this.outputValidators.get(key);
+        if (!validateOut) {
           return {
             status: 'failure',
             error: {
               code: 'unknown',
+              retryable: false,
+              detail: 'output_validator_missing',
+            },
+          };
+        }
+
+        if (!validateOut(res.result)) {
+          return {
+            status: 'failure',
+            error: {
+              code: 'invalid_output',
               retryable: false,
               detail: this.ajv.errorsText(validateOut.errors),
             },
@@ -226,7 +305,7 @@ export class LeafFactory {
           return {
             status: 'failure',
             error: {
-              code: 'unknown',
+              code: 'postcondition_failed',
               retryable: false,
               detail: `Postcondition verification failed: ${postconditionResult.detail}`,
             },
@@ -251,20 +330,13 @@ export class LeafFactory {
   }
 
   /**
-   * Validate arguments against a leaf's input schema
+   * Clear all registered leaves
    */
-  validateArgs(name: string, version: string, args: unknown): boolean {
-    const key = `${name}@${version}`;
-    const validator = this.inputValidators.get(key);
-    if (!validator) return false;
-    return validator(args) as boolean;
-  }
-
-  /**
-   * Get all registered leaves
-   */
-  getAll(): LeafImpl[] {
-    return Array.from(this.registry.values());
+  clear(): void {
+    this.registry.clear();
+    this.inputValidators.clear();
+    this.outputValidators.clear();
+    this.counters.clear();
   }
 
   /**
@@ -272,22 +344,13 @@ export class LeafFactory {
    */
   getNames(): string[] {
     const names = new Set<string>();
-
     for (const key of this.registry.keys()) {
       const atIndex = key.indexOf('@');
       if (atIndex >= 0) {
         names.add(key.substring(0, atIndex));
       }
     }
-
     return Array.from(names);
-  }
-
-  /**
-   * Check if a leaf exists
-   */
-  has(name: string, version?: string): boolean {
-    return this.get(name, version) !== undefined;
   }
 
   /**
@@ -327,23 +390,6 @@ export class LeafFactory {
   }
 
   /**
-   * Clear all registered leaves
-   */
-  clear(): void {
-    this.registry.clear();
-    this.inputValidators.clear();
-    this.outputValidators.clear();
-    this.counters.clear();
-  }
-
-  /**
-   * Get the size of the registry
-   */
-  size(): number {
-    return this.registry.size;
-  }
-
-  /**
    * Get rate limit usage for a leaf
    */
   getRateLimitUsage(
@@ -354,14 +400,27 @@ export class LeafFactory {
     const leaf = this.registry.get(key);
     if (!leaf) return { used: 0, limit: 0 };
 
-    const nowMin = Math.floor(Date.now() / 60000);
-    const counterKey = `${key}:${nowMin}`;
+    const counterKey = this.minuteKey(name, version);
     const used = this.counters.get(counterKey) ?? 0;
     const limit = leaf.spec.rateLimitPerMin ?? 60;
 
     return { used, limit };
   }
-}
 
-// Re-export types for convenience
-export type { LeafImpl, RegistrationResult } from './leaf-contracts.js';
+  /**
+   * Validate arguments against a leaf's input schema
+   */
+  validateArgs(name: string, version: string, args: unknown): boolean {
+    const key = `${name}@${version}`;
+    const validator = this.inputValidators.get(key);
+    if (!validator) return false;
+    return validator(args) as boolean;
+  }
+
+  /**
+   * Get all registered leaves
+   */
+  getAll(): LeafImpl[] {
+    return Array.from(this.registry.values());
+  }
+}

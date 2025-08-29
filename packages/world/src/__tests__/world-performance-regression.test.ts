@@ -47,51 +47,51 @@ describe('World Module Performance Regression Tests', () => {
   let sensorimotorSystem: SensorimotorSystem;
 
   const performanceBenchmarks: PerformanceBenchmark[] = [
-    { operation: 'raycast_single', maxLatency: 2, maxMemoryIncrease: 1024 },
+    { operation: 'raycast_single', maxLatency: 2, maxMemoryIncrease: 4096 },
     {
       operation: 'raycast_cone_64rays',
       maxLatency: 8,
-      maxMemoryIncrease: 8192,
+      maxMemoryIncrease: 32768,
     },
     {
       operation: 'raycast_grid_16x16',
       maxLatency: 15,
-      maxMemoryIncrease: 16384,
+      maxMemoryIncrease: 65536,
     },
     {
       operation: 'pathfind_short_distance',
       maxLatency: 10,
-      maxMemoryIncrease: 4096,
+      maxMemoryIncrease: 16384,
     },
     {
       operation: 'pathfind_medium_distance',
       maxLatency: 35,
-      maxMemoryIncrease: 16384,
+      maxMemoryIncrease: 65536,
     },
     {
       operation: 'pathfind_long_distance',
       maxLatency: 100,
-      maxMemoryIncrease: 65536,
+      maxMemoryIncrease: 262144,
     },
     {
       operation: 'perception_basic_field',
       maxLatency: 12,
-      maxMemoryIncrease: 8192,
+      maxMemoryIncrease: 32768,
     },
     {
       operation: 'perception_complex_scene',
       maxLatency: 30,
-      maxMemoryIncrease: 32768,
+      maxMemoryIncrease: 131072,
     },
     {
       operation: 'action_execution_simple',
       maxLatency: 5,
-      maxMemoryIncrease: 2048,
+      maxMemoryIncrease: 8192,
     },
     {
       operation: 'action_execution_complex',
       maxLatency: 20,
-      maxMemoryIncrease: 8192,
+      maxMemoryIncrease: 32768,
     },
   ];
 

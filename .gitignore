@@ -13,6 +13,12 @@ dist/
 build/
 *.tsbuildinfo
 
+# Prevent compiled files in source directories
+**/src/**/*.js
+**/src/**/*.d.ts
+**/src/**/*.js.map
+**/src/**/*.d.ts.map
+
 # Environment variables
 .env
 .env.local

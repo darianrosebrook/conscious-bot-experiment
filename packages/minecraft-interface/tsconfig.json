@@ -9,7 +9,7 @@
     "declaration": true,
     "declarationMap": true,
     "sourceMap": true,
-    "composite": true,
+    "composite": false,
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
@@ -28,8 +28,5 @@
     "src/demo/**/*",
     "src/bin/**/*"
   ],
-  "references": [
-    { "path": "../core" },
-    { "path": "../planning" }
-  ]
+
 }

@@ -14,6 +14,7 @@ import {
   LeafImpl,
   LeafContext,
   LeafResult,
+  createLeafContext,
 } from './mcp-capabilities/leaf-contracts.js';
 
 // Import real leaf implementations
@@ -109,13 +110,17 @@ export class CognitiveStreamIntegration extends EventEmitter {
   private btRunner: BehaviorTreeRunnerInterface;
   private hrmPlanner: HRMPlannerInterface;
   private goapPlanner: GOAPPlannerInterface;
+  private bot: any; // Mineflayer bot instance
 
   private currentState: BotState = {};
   private activeGoals: string[] = [];
   private executionHistory: CognitiveStreamEvent[] = [];
 
-  constructor() {
+  constructor(bot?: any) {
     super();
+
+    // Store bot instance
+    this.bot = bot;
 
     // Initialize MCP capabilities system
     this.mcpRegistry = new EnhancedRegistry();
@@ -170,54 +175,268 @@ export class CognitiveStreamIntegration extends EventEmitter {
       }),
     };
 
-    // Create mock hybrid planner with MCP capabilities
+    // Create enhanced mock hybrid planner that actually executes MCP capabilities
     this.hybridPlanner = {
-      plan: async (goal: string, context: any) => ({
-        success: true,
-        decision: {
-          approach: 'mcp-capabilities',
-          reasoning: 'MCP capabilities available for this goal',
-          confidence: 0.85,
-          estimatedLatency: 150,
-        },
-        plan: {
-          planningApproach: 'mcp-capabilities',
-          mcpCapabilityPlan: {
-            capabilityDecomposition: [
-              {
-                capabilityId: 'opt.torch_corridor@1.0.0',
-                name: 'torch_corridor',
-                version: '1.0.0',
-                status: 'active',
-                preconditions: { 'has(item:torch)': 1 },
-                postconditions: { 'corridor.light': 8, 'reached(end)': true },
-                estimatedDuration: 5000,
-                priority: 1,
-                dependencies: [],
-                args: {
-                  end: { x: 0, y: 45, z: 10 },
-                  interval: 6,
-                  hostilesRadius: 10,
-                },
+      plan: async (goal: string, context: any) => {
+        console.log(`🎯 Planning for goal: ${goal}`);
+
+        // Check if we have MCP capabilities for this goal
+        const capabilities = await this.mcpRegistry.listCapabilities();
+        const applicableCapabilities = capabilities.filter((cap: any) => {
+          const goalLower = goal.toLowerCase();
+          const capName = cap.name.toLowerCase();
+
+          // More sophisticated matching
+          if (goalLower.includes(capName) || capName.includes(goalLower)) {
+            return true;
+          }
+
+          // Check for specific keyword matches
+          const goalKeywords = goalLower.split(' ');
+          const capKeywords = capName.split('_').join(' ').split(' ');
+
+          for (const goalKeyword of goalKeywords) {
+            for (const capKeyword of capKeywords) {
+              if (
+                goalKeyword.length > 2 &&
+                capKeyword.length > 2 &&
+                (goalKeyword.includes(capKeyword) ||
+                  capKeyword.includes(goalKeyword))
+              ) {
+                return true;
+              }
+            }
+          }
+
+          return false;
+        });
+
+        if (applicableCapabilities.length > 0) {
+          console.log(
+            `✅ Found ${applicableCapabilities.length} applicable capabilities:`
+          );
+          applicableCapabilities.forEach((cap: any) => {
+            console.log(`   - ${cap.name}@${cap.version} (${cap.status})`);
+          });
+          return {
+            success: true,
+            decision: {
+              approach: 'mcp-capabilities',
+              reasoning: `Found ${applicableCapabilities.length} applicable MCP capabilities`,
+              confidence: 0.85,
+              estimatedLatency: 150,
+            },
+            plan: {
+              planningApproach: 'mcp-capabilities',
+              mcpCapabilityPlan: {
+                capabilityDecomposition: applicableCapabilities.map(
+                  (cap: any) => ({
+                    capabilityId: cap.id,
+                    name: cap.name,
+                    version: cap.version,
+                    status: cap.status,
+                    preconditions: {},
+                    postconditions: {},
+                    estimatedDuration: 5000,
+                    priority: 1,
+                    dependencies: [],
+                    args: {},
+                  })
+                ),
+                estimatedCapabilitySuccess: 0.85,
+                fallbackCapabilities: [],
               },
-            ],
-            estimatedCapabilitySuccess: 0.85,
-            fallbackCapabilities: [],
+            },
+            latency: 150,
+          };
+        }
+
+        // Fallback to mock plan
+        console.log(`⚠️ No MCP capabilities found for goal: "${goal}"`);
+        console.log(
+          `   Available capabilities: ${capabilities.map((c: any) => c.name).join(', ')}`
+        );
+        return {
+          success: true,
+          decision: {
+            approach: 'goap',
+            reasoning: 'No MCP capabilities found, using fallback planning',
+            confidence: 0.5,
+            estimatedLatency: 200,
           },
-        },
-        latency: 150,
-      }),
-      executePlan: async (plan: any, context: any) => ({
-        success: true,
-        completedSteps: ['torch_corridor'],
-        failedSteps: [],
-        totalDuration: 5000,
-        worldStateChanges: {
-          'corridor.light': 8,
-          'reached(end)': true,
-          torch_count: 6,
-        },
-      }),
+          plan: {
+            planningApproach: 'goap',
+            actions: ['mock_action_1', 'mock_action_2'],
+            goal: goal,
+            estimatedCost: 10,
+            estimatedDuration: 2000,
+            successProbability: 0.7,
+          },
+          latency: 200,
+        };
+      },
+      executePlan: async (plan: any, context: any) => {
+        console.log(`⚡ Executing plan: ${plan.planningApproach}`);
+
+        if (
+          plan.planningApproach === 'mcp-capabilities' &&
+          plan.mcpCapabilityPlan
+        ) {
+          // Execute MCP capabilities
+          const results = [];
+          for (const capability of plan.mcpCapabilityPlan
+            .capabilityDecomposition) {
+            try {
+              console.log(`🔧 Executing capability: ${capability.name}`);
+
+              // Execute the capability using the appropriate method based on status
+              try {
+                console.log(
+                  `🔧 Executing capability: ${capability.name} with real bot actions`
+                );
+
+                // Create leaf context with the bot
+                const leafContext = this.bot
+                  ? createLeafContext(this.bot)
+                  : undefined;
+
+                if (!leafContext) {
+                  console.warn(
+                    `⚠️ No bot context available for capability: ${capability.name}`
+                  );
+                  results.push({
+                    capabilityId: capability.capabilityId,
+                    success: false,
+                  });
+                  continue;
+                }
+
+                let executionResult;
+
+                if (capability.status === 'shadow') {
+                  // Execute shadow capability using executeShadowRun
+                  executionResult = await this.mcpRegistry.executeShadowRun(
+                    capability.capabilityId,
+                    leafContext
+                  );
+                } else {
+                  // Execute active capability directly through leaf factory
+                  const leafFactory = this.mcpRegistry.getLeafFactory();
+                  const leaf = leafFactory.get(
+                    capability.name,
+                    capability.version
+                  );
+
+                  if (!leaf) {
+                    console.warn(
+                      `⚠️ Leaf not found for capability: ${capability.name}@${capability.version}`
+                    );
+                    results.push({
+                      capabilityId: capability.capabilityId,
+                      success: false,
+                    });
+                    continue;
+                  }
+
+                  // Execute the leaf directly with appropriate arguments
+                  const startTime = Date.now();
+
+                  // Provide appropriate arguments based on the leaf type
+                  let args = capability.args || {};
+                  if (capability.name === 'move_to' && !args.pos) {
+                    // For move_to, provide a nearby position if none specified
+                    const currentPos = leafContext.bot?.entity?.position;
+                    if (currentPos) {
+                      args = {
+                        pos: {
+                          x: Math.round(currentPos.x) + 2,
+                          y: Math.round(currentPos.y),
+                          z: Math.round(currentPos.z) + 2,
+                        },
+                        safe: true,
+                      };
+                    }
+                  }
+
+                  const leafResult = await leaf.run(leafContext, args);
+                  const durationMs = Date.now() - startTime;
+
+                  executionResult = {
+                    status:
+                      leafResult.status === 'success' ? 'success' : 'failure',
+                    durationMs,
+                    error: leafResult.error,
+                  };
+                }
+
+                console.log(
+                  `🔧 Capability ${capability.name} execution result: ${executionResult.status} (${executionResult.durationMs}ms)`
+                );
+
+                if (executionResult.error) {
+                  console.warn(
+                    `⚠️ Capability ${capability.name} execution error: ${executionResult.error.detail || executionResult.error}`
+                  );
+                }
+
+                results.push({
+                  capabilityId: capability.capabilityId,
+                  success: executionResult.status === 'success',
+                });
+              } catch (error) {
+                console.warn(
+                  `⚠️ Error executing capability ${capability.name}:`,
+                  error
+                );
+                results.push({
+                  capabilityId: capability.capabilityId,
+                  success: false,
+                });
+              }
+            } catch (error) {
+              console.error(
+                `❌ Error executing capability ${capability.name}:`,
+                error
+              );
+              results.push({
+                capabilityId: capability.capabilityId,
+                success: false,
+              });
+            }
+          }
+
+          const successCount = results.filter((r) => r.success).length;
+          console.log(
+            `✅ Executed ${successCount}/${results.length} capabilities successfully`
+          );
+
+          return {
+            success: successCount > 0,
+            completedSteps: results
+              .filter((r) => r.success)
+              .map((r) => r.capabilityId),
+            failedSteps: results
+              .filter((r) => !r.success)
+              .map((r) => r.capabilityId),
+            totalDuration: 5000,
+            worldStateChanges: {
+              capabilities_executed: successCount,
+              total_capabilities: results.length,
+            },
+          };
+        }
+
+        // Fallback execution
+        return {
+          success: true,
+          completedSteps: ['mock_step_1', 'mock_step_2'],
+          failedSteps: [],
+          totalDuration: 1000,
+          worldStateChanges: {
+            mock_execution: true,
+          },
+        };
+      },
     };
 
     this.initializeDefaultCapabilities();
@@ -487,6 +706,9 @@ export class CognitiveStreamIntegration extends EventEmitter {
     console.log(`🎯 Executing planning cycle for goal: ${goal}`);
 
     try {
+      // Create leaf context with bot if available
+      const leafContext = this.bot ? createLeafContext(this.bot) : undefined;
+
       // Create planning context
       const context: PlanningContext = {
         currentState: this.currentState,

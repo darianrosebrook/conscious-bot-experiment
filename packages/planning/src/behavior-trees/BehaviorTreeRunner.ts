@@ -249,7 +249,7 @@ class BTRun extends EventEmitter {
   private async executeNode(
     node: BTNode,
     tick: number
-  ): Promise<{ status: BTNodeStatus; data?: any }> {
+  ): Promise<{ status: BTNodeStatus; data?: any; error?: string }> {
     const nodeStartTime = Date.now();
     let retries = 0;
     const maxRetries = node.retries ?? this.options.maxRetries ?? 2;
@@ -371,7 +371,7 @@ class BTRun extends EventEmitter {
   private async executeSequence(
     node: BTNode,
     tick: number
-  ): Promise<{ status: BTNodeStatus; data?: any }> {
+  ): Promise<{ status: BTNodeStatus; data?: any; error?: string }> {
     if (!node.children) {
       return { status: BTNodeStatus.SUCCESS };
     }
@@ -389,7 +389,7 @@ class BTRun extends EventEmitter {
   private async executeSelector(
     node: BTNode,
     tick: number
-  ): Promise<{ status: BTNodeStatus; data?: any }> {
+  ): Promise<{ status: BTNodeStatus; data?: any; error?: string }> {
     if (!node.children) {
       return { status: BTNodeStatus.FAILURE };
     }
@@ -410,7 +410,7 @@ class BTRun extends EventEmitter {
   private async executeParallel(
     node: BTNode,
     tick: number
-  ): Promise<{ status: BTNodeStatus; data?: any }> {
+  ): Promise<{ status: BTNodeStatus; data?: any; error?: string }> {
     if (!node.children) {
       return { status: BTNodeStatus.SUCCESS };
     }

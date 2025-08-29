@@ -88,6 +88,9 @@ importers:
 
   packages/core:
     dependencies:
+      '@types/semver':
+        specifier: ^7.7.0
+        version: 7.7.0
       ajv:
         specifier: ^8.12.0
         version: 8.17.1
@@ -106,6 +109,9 @@ importers:
       mineflayer-pathfinder:
         specifier: ^2.4.1
         version: 2.4.5
+      semver:
+        specifier: ^7.7.2
+        version: 7.7.2
       uuid:
         specifier: ^9.0.1
         version: 9.0.1
@@ -2340,7 +2346,6 @@ packages:
 
   /@types/semver@7.7.0:
     resolution: {integrity: sha512-k107IF4+Xr7UHjwDc7Cfd6PRQfbdkiRabXGRjo07b4WyPahFBZCZ1sE+BNxYIJPPg73UkfOsVOLwqVc/6ETrIA==}
-    dev: true
 
   /@types/send@0.17.5:
     resolution: {integrity: sha512-z6F2D3cOStZvuk2SaP6YrwkNO65iTZcwA2ZkSABegdkAh/lf+Aa/YQndZVfmEXT5vgAp6zv06VQ3ejSVjAny4w==}

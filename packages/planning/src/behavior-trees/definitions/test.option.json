@@ -1,4 +1,5 @@
 {
+  "id": "test.option",
   "name": "test.option",
   "description": "Test behavior tree for option testing",
   "root": {
@@ -7,8 +8,9 @@
       {
         "type": "action",
         "name": "test_action",
+        "action": "test_action",
         "description": "Test action node",
-        "parameters": {
+        "args": {
           "param": "value"
         }
       }
@@ -18,6 +20,10 @@
     "version": "1.0.0",
     "author": "@darianrosebrook",
     "created": "2025-01-01",
-    "tags": ["test", "option"]
+    "tags": ["test", "option"],
+    "timeout": 5000,
+    "retries": 2,
+    "priority": "low",
+    "interruptible": true
   }
 }

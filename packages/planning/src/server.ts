@@ -16,6 +16,7 @@ import {
 import { CognitiveThoughtProcessor } from './cognitive-thought-processor';
 import { HomeostasisState } from './types';
 
+
 const app = express();
 const port = process.env.PORT ? parseInt(process.env.PORT) : 3002;
 
@@ -366,36 +367,60 @@ enhancedMemoryIntegration.on('noteAdded', (note) => {
 
 // Set up event listeners for enhanced environment integration
 enhancedEnvironmentIntegration.on('environmentUpdated', (environment) => {
-  console.log('Environment updated:', environment.biome, environment.timeOfDay);
+  // Only log if there's a significant change or in debug mode
+  if (process.env.NODE_ENV === 'development' && process.env.DEBUG_ENVIRONMENT === 'true') {
+    console.log('Environment updated:', environment.biome, environment.timeOfDay);
+  }
 });
 
 enhancedEnvironmentIntegration.on('inventoryUpdated', (inventory) => {
-  console.log('Inventory updated:', inventory.length, 'items');
+  // Only log if there's a significant change or in debug mode
+  if (process.env.NODE_ENV === 'development' && process.env.DEBUG_INVENTORY === 'true') {
+    console.log('Inventory updated:', inventory.length, 'items');
+  }
 });
 
 enhancedEnvironmentIntegration.on('resourcesUpdated', (resources) => {
-  console.log('Resources updated:', resources.scarcityLevel, 'scarcity');
+  // Only log if there's a significant change or in debug mode
+  if (process.env.NODE_ENV === 'development' && process.env.DEBUG_RESOURCES === 'true') {
+    console.log('Resources updated:', resources.scarcityLevel, 'scarcity');
+  }
 });
 
 // Set up event listeners for enhanced live stream integration
 enhancedLiveStreamIntegration.on('liveStreamUpdated', (streamData) => {
-  console.log('Live stream updated:', streamData.status, streamData.connected);
+  // Only log if there's a significant change or in debug mode
+  if (process.env.NODE_ENV === 'development' && process.env.DEBUG_LIVESTREAM === 'true') {
+    console.log('Live stream updated:', streamData.status, streamData.connected);
+  }
 });
 
 enhancedLiveStreamIntegration.on('actionLogged', (actionLog) => {
-  console.log('Action logged:', actionLog.type, actionLog.action);
+  // Only log if there's a significant change or in debug mode
+  if (process.env.NODE_ENV === 'development' && process.env.DEBUG_ACTIONS === 'true') {
+    console.log('Action logged:', actionLog.type, actionLog.action);
+  }
 });
 
 enhancedLiveStreamIntegration.on('visualFeedbackAdded', (feedback) => {
-  console.log('Visual feedback added:', feedback.type, feedback.severity);
+  // Only log if there's a significant change or in debug mode
+  if (process.env.NODE_ENV === 'development' && process.env.DEBUG_FEEDBACK === 'true') {
+    console.log('Visual feedback added:', feedback.type, feedback.severity);
+  }
 });
 
 enhancedLiveStreamIntegration.on('miniMapUpdated', (miniMapData) => {
-  console.log('Mini-map updated:', miniMapData.position);
+  // Only log if there's a significant change or in debug mode
+  if (process.env.NODE_ENV === 'development' && process.env.DEBUG_MINIMAP === 'true') {
+    console.log('Mini-map updated:', miniMapData.position);
+  }
 });
 
 enhancedLiveStreamIntegration.on('screenshotCaptured', (screenshot) => {
-  console.log('Screenshot captured:', screenshot.url);
+  // Only log if there's a significant change or in debug mode
+  if (process.env.NODE_ENV === 'development' && process.env.DEBUG_SCREENSHOTS === 'true') {
+    console.log('Screenshot captured:', screenshot.url);
+  }
 });
 
 // Add some initial tasks for testing

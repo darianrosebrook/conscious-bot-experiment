@@ -75,6 +75,9 @@ export {
 export * from './types';
 export * from './mcp-capabilities/types';
 
+// Logging configuration
+export * from './logging/config';
+
 // Advanced component types - explicit exports to avoid conflicts
 export type {
   Need,

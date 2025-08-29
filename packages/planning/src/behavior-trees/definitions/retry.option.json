@@ -1,4 +1,5 @@
 {
+  "id": "retry.option",
   "name": "retry.option",
   "description": "Retry behavior tree for retry mechanism testing",
   "root": {
@@ -7,8 +8,9 @@
       {
         "type": "action",
         "name": "retry_action",
+        "action": "retry_action",
         "description": "Action that may fail and need retrying",
-        "parameters": {},
+        "args": {},
         "retries": 2,
         "retryDelay": 100
       }
@@ -18,6 +20,10 @@
     "version": "1.0.0",
     "author": "@darianrosebrook",
     "created": "2025-01-01",
-    "tags": ["test", "retry", "failure"]
+    "tags": ["test", "retry", "failure"],
+    "timeout": 5000,
+    "retries": 2,
+    "priority": "low",
+    "interruptible": true
   }
 }

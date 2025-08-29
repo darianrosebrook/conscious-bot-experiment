@@ -155,6 +155,7 @@ async function waitForService(url, serviceName, maxAttempts = 30) {
     const client = url.startsWith('https') ? https.default : http.default;
 
     let attempts = 0;
+    let lastLogAttempt = 0;
 
     const check = () => {
       attempts++;
@@ -175,10 +176,14 @@ async function waitForService(url, serviceName, maxAttempts = 30) {
 
       req.on('error', () => {
         if (attempts < maxAttempts) {
-          log(
-            ` ⏳ Attempt ${attempts}/${maxAttempts} - ${serviceName} starting...`,
-            colors.yellow
-          );
+          // Only log every 5 attempts to reduce verbosity
+          if (attempts - lastLogAttempt >= 5 || attempts === 1) {
+            log(
+              ` ⏳ Attempt ${attempts}/${maxAttempts} - ${serviceName} starting...`,
+              colors.yellow
+            );
+            lastLogAttempt = attempts;
+          }
           setTimeout(check, 2000);
         } else {
           log(` ⚠️  ${serviceName} health check timeout`, colors.yellow);

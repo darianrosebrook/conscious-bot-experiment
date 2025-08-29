@@ -1,4 +1,5 @@
 {
+  "id": "slow.option",
   "name": "slow.option",
   "description": "Slow behavior tree for timeout testing",
   "root": {
@@ -7,8 +8,9 @@
       {
         "type": "action",
         "name": "slow_action",
+        "action": "slow_action",
         "description": "Slow action that takes time to complete",
-        "parameters": {},
+        "args": {},
         "timeout": 3000
       }
     ]
@@ -17,6 +19,10 @@
     "version": "1.0.0",
     "author": "@darianrosebrook",
     "created": "2025-01-01",
-    "tags": ["test", "slow", "timeout"]
+    "tags": ["test", "slow", "timeout"],
+    "timeout": 3000,
+    "retries": 1,
+    "priority": "low",
+    "interruptible": true
   }
 }

@@ -41,6 +41,9 @@ export type ExecErrorCode =
   | 'world.unloaded'
   | 'world.invalidPosition'
   | 'permission.denied'
+  | 'invalid_input'
+  | 'invalid_output'
+  | 'postcondition_failed'
   | 'aborted'
   | 'unknown';
 

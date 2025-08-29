@@ -96,13 +96,16 @@ class MockLLMInterface {
 
 // Mock Constitutional Filter
 class MockConstitutionalFilter {
-  async evaluateCompliance(request: any): Promise<any> {
+  async filterIntrusion(intrusion: any): Promise<any> {
     return {
-      compliant: true,
-      violations: [],
-      warnings: [],
-      explanation: 'Compliant with constitutional rules',
-      confidence: 0.9,
+      allowed: true,
+      result: {
+        decision: 'ALLOW',
+        confidence: 0.9,
+        explanation: 'Compliant with constitutional rules',
+        suggestedModifications: [],
+        warningFlags: [],
+      },
     };
   }
 }
@@ -435,7 +438,7 @@ describe('Intrusion Interface', () => {
       // Mock constitutional filter to throw error
       vi.spyOn(
         mockConstitutionalFilter,
-        'evaluateCompliance'
+        'filterIntrusion'
       ).mockRejectedValueOnce(new Error('Constitutional Error'));
 
       const rawContent = 'Test content';

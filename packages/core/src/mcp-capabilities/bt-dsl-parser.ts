@@ -1,11 +1,4 @@
-/**
- * BT-DSL Parser and Compiler - Deterministic compilation for reproducible results
- *
- * Parses BT-DSL JSON into executable behavior trees with deterministic compilation
- * and named sensor predicate evaluation.
- *
- * @author @darianrosebrook
- */
+/** BT-DSL Parser and Compiler — deterministic compilation, named sensor predicates. */
 
 import Ajv from 'ajv';
 import { performance } from 'node:perf_hooks';
@@ -23,14 +16,15 @@ import {
   isRepeatUntilNode,
   isTimeoutDecoratorNode,
   isFailOnTrueDecoratorNode,
-} from './bt-dsl-schema.js';
+} from './bt-dsl-schema';
 import {
   LeafContext,
   LeafResult,
   ExecError,
   createExecError,
-} from './leaf-contracts.js';
-import { LeafFactory } from './leaf-factory.js';
+  type LeafImpl,
+} from './leaf-contracts';
+// Do not import concrete LeafFactory class; we compile against an interface.
 
 // ============================================================================
 // Execution Status
@@ -69,10 +63,30 @@ export interface CompiledBTNode {
 }
 
 /**
+ * Leaf factory interface for BT-DSL parser
+ */
+export interface LeafFactoryInterface {
+  get(name: string, version?: string): LeafImpl | undefined;
+  run(
+    name: string,
+    version: string,
+    ctx: LeafContext,
+    args: unknown,
+    opts?: unknown
+  ): Promise<LeafResult>;
+  has(name: string, version?: string): boolean;
+  listLeaves(): Array<{
+    name: string;
+    version: string;
+    spec: { name: string; version: string };
+  }>;
+}
+
+/**
  * Execution context for BT nodes
  */
 export interface BTExecutionContext {
-  leafFactory: LeafFactory;
+  leafFactory: LeafFactoryInterface;
   leafContext: LeafContext;
   startTime: number;
   nodeExecutions: number;
@@ -128,7 +142,13 @@ export class SensorPredicateEvaluator {
     ctx: LeafContext
   ): Promise<boolean> {
     const { target, maxDistance = 5 } = params;
-    if (!target || !target.x || !target.y || !target.z) return false;
+    if (
+      !target ||
+      typeof target.x !== 'number' ||
+      typeof target.y !== 'number' ||
+      typeof target.z !== 'number'
+    )
+      return false;
 
     const botPos = ctx.bot.entity?.position;
     if (!botPos) return false;
@@ -148,10 +168,10 @@ export class SensorPredicateEvaluator {
   ): Promise<boolean> {
     const { maxDistance = 10 } = params;
     const snapshot = await ctx.snapshot();
-
-    return snapshot.nearbyHostiles.some(
-      (hostile) => hostile.distance <= maxDistance
-    );
+    const hostiles = Array.isArray(snapshot?.nearbyHostiles)
+      ? snapshot.nearbyHostiles
+      : [];
+    return hostiles.some((hostile) => hostile.distance <= maxDistance);
   }
 
   private async evaluateLightLevelSafe(
@@ -160,8 +180,8 @@ export class SensorPredicateEvaluator {
   ): Promise<boolean> {
     const { minLight = 8 } = params;
     const snapshot = await ctx.snapshot();
-
-    return snapshot.lightLevel >= minLight;
+    const level = snapshot?.lightLevel ?? 0;
+    return level >= minLight;
   }
 
   private async evaluateInventoryHasItem(
@@ -172,7 +192,8 @@ export class SensorPredicateEvaluator {
     if (!itemName) return false;
 
     const inventory = await ctx.inventory();
-    const item = inventory.items.find((i) => i.name === itemName);
+    const items = Array.isArray(inventory?.items) ? inventory.items : [];
+    const item = items.find((i: any) => i?.name === itemName);
 
     return item ? item.count >= minCount : false;
   }
@@ -182,7 +203,13 @@ export class SensorPredicateEvaluator {
     ctx: LeafContext
   ): Promise<boolean> {
     const { target, tolerance = 1 } = params;
-    if (!target) return false;
+    if (
+      !target ||
+      typeof target.x !== 'number' ||
+      typeof target.y !== 'number' ||
+      typeof target.z !== 'number'
+    )
+      return false;
 
     const botPos = ctx.bot.entity?.position;
     if (!botPos) return false;
@@ -201,7 +228,8 @@ export class SensorPredicateEvaluator {
     ctx: LeafContext
   ): Promise<boolean> {
     const { startTime, minElapsedMs } = params;
-    if (!startTime || !minElapsedMs) return false;
+    if (typeof startTime !== 'number' || typeof minElapsedMs !== 'number')
+      return false;
 
     const elapsed = ctx.now() - startTime;
     return elapsed >= minElapsedMs;
@@ -212,7 +240,7 @@ export class SensorPredicateEvaluator {
     ctx: LeafContext
   ): Promise<boolean> {
     const { threshold = 10 } = params;
-    const health = ctx.bot.health || 20;
+    const health = ctx.bot.health ?? 20;
 
     return health <= threshold;
   }
@@ -222,7 +250,7 @@ export class SensorPredicateEvaluator {
     ctx: LeafContext
   ): Promise<boolean> {
     const { threshold = 6 } = params;
-    const food = ctx.bot.food || 20;
+    const food = ctx.bot.food ?? 20;
 
     return food <= threshold;
   }
@@ -242,8 +270,9 @@ export class SensorPredicateEvaluator {
   ): Promise<boolean> {
     const { safeBiomes = ['plains', 'forest', 'desert'] } = params;
     const snapshot = await ctx.snapshot();
-
-    return safeBiomes.includes(snapshot.biome);
+    return Array.isArray(safeBiomes) && typeof snapshot?.biome === 'string'
+      ? safeBiomes.includes(snapshot.biome)
+      : false;
   }
 }
 
@@ -257,7 +286,7 @@ export class SensorPredicateEvaluator {
 class CompiledLeafNode implements CompiledBTNode {
   constructor(
     private node: LeafNode,
-    private leafFactory: LeafFactory
+    private leafFactory: LeafFactoryInterface
   ) {}
 
   get type() {
@@ -269,6 +298,12 @@ class CompiledLeafNode implements CompiledBTNode {
 
   async execute(ctx: BTExecutionContext): Promise<BTResult> {
     const startTime = performance.now();
+    if (ctx.abortSignal?.aborted) {
+      return {
+        status: 'failure',
+        error: { code: 'aborted', retryable: false, detail: 'aborted' },
+      };
+    }
     ctx.leafExecutions++;
 
     try {
@@ -287,9 +322,12 @@ class CompiledLeafNode implements CompiledBTNode {
         };
       }
 
+      // Use the resolved leaf's actual version if none was specified.
+      const versionToRun = this.node.leafVersion ?? leaf.spec.version;
+
       const result = await this.leafFactory.run(
         this.node.leafName,
-        this.node.leafVersion || '1.0.0',
+        versionToRun,
         ctx.leafContext,
         this.node.args || {},
         { traceId: `bt-${this.node.name || this.node.leafName}` }
@@ -337,9 +375,15 @@ class CompiledSequenceNode implements CompiledBTNode {
 
   async execute(ctx: BTExecutionContext): Promise<BTResult> {
     const startTime = performance.now();
+    if (ctx.abortSignal?.aborted) {
+      return {
+        status: 'failure',
+        error: { code: 'aborted', retryable: false, detail: 'aborted' },
+      };
+    }
     ctx.nodeExecutions++;
 
-    let totalNodeExecutions = 0;
+    let totalNodeExecutions = 1; // include self
     let totalLeafExecutions = 0;
 
     for (const child of this.children) {
@@ -347,6 +391,16 @@ class CompiledSequenceNode implements CompiledBTNode {
       totalNodeExecutions += result.metrics?.nodeExecutions || 0;
       totalLeafExecutions += result.metrics?.leafExecutions || 0;
 
+      if (result.status === 'running') {
+        return {
+          status: 'running',
+          metrics: {
+            durationMs: performance.now() - startTime,
+            nodeExecutions: totalNodeExecutions,
+            leafExecutions: totalLeafExecutions,
+          },
+        };
+      }
       if (result.status === 'failure') {
         return {
           status: 'failure',
@@ -389,9 +443,15 @@ class CompiledSelectorNode implements CompiledBTNode {
 
   async execute(ctx: BTExecutionContext): Promise<BTResult> {
     const startTime = performance.now();
+    if (ctx.abortSignal?.aborted) {
+      return {
+        status: 'failure',
+        error: { code: 'aborted', retryable: false, detail: 'aborted' },
+      };
+    }
     ctx.nodeExecutions++;
 
-    let totalNodeExecutions = 0;
+    let totalNodeExecutions = 1; // include self
     let totalLeafExecutions = 0;
     let lastError: ExecError | undefined;
 
@@ -400,6 +460,16 @@ class CompiledSelectorNode implements CompiledBTNode {
       totalNodeExecutions += result.metrics?.nodeExecutions || 0;
       totalLeafExecutions += result.metrics?.leafExecutions || 0;
 
+      if (result.status === 'running') {
+        return {
+          status: 'running',
+          metrics: {
+            durationMs: performance.now() - startTime,
+            nodeExecutions: totalNodeExecutions,
+            leafExecutions: totalLeafExecutions,
+          },
+        };
+      }
       if (result.status === 'success') {
         return {
           status: 'success',
@@ -453,14 +523,26 @@ class CompiledRepeatUntilNode implements CompiledBTNode {
 
   async execute(ctx: BTExecutionContext): Promise<BTResult> {
     const startTime = performance.now();
+    if (ctx.abortSignal?.aborted) {
+      return {
+        status: 'failure',
+        error: { code: 'aborted', retryable: false, detail: 'aborted' },
+      };
+    }
     ctx.nodeExecutions++;
 
-    let totalNodeExecutions = 0;
+    let totalNodeExecutions = 1; // include self
     let totalLeafExecutions = 0;
     const maxIterations = this.node.maxIterations || 100;
     let iterations = 0;
 
     while (iterations < maxIterations) {
+      if (ctx.abortSignal?.aborted) {
+        return {
+          status: 'failure',
+          error: { code: 'aborted', retryable: false, detail: 'aborted' },
+        };
+      }
       // Check condition first
       const conditionMet = await this.evaluator.evaluate(
         this.condition,
@@ -482,6 +564,16 @@ class CompiledRepeatUntilNode implements CompiledBTNode {
       totalNodeExecutions += result.metrics?.nodeExecutions || 0;
       totalLeafExecutions += result.metrics?.leafExecutions || 0;
 
+      if (result.status === 'running') {
+        return {
+          status: 'running',
+          metrics: {
+            durationMs: performance.now() - startTime,
+            nodeExecutions: totalNodeExecutions,
+            leafExecutions: totalLeafExecutions,
+          },
+        };
+      }
       if (result.status === 'failure') {
         return {
           status: 'failure',
@@ -531,19 +623,33 @@ class CompiledTimeoutDecoratorNode implements CompiledBTNode {
 
   async execute(ctx: BTExecutionContext): Promise<BTResult> {
     const startTime = performance.now();
+    if (ctx.abortSignal?.aborted) {
+      return {
+        status: 'failure',
+        error: { code: 'aborted', retryable: false, detail: 'aborted' },
+      };
+    }
     ctx.nodeExecutions++;
 
     try {
+      const ms =
+        typeof this.node.timeoutMs === 'number' ? this.node.timeoutMs : 0;
+      let timer: NodeJS.Timeout | undefined;
       const timeoutPromise = new Promise<BTResult>((_, reject) => {
-        setTimeout(() => {
-          reject(new Error(`Timeout after ${this.node.timeoutMs}ms`));
-        }, this.node.timeoutMs);
+        timer = setTimeout(() => {
+          reject({
+            code: 'deadline.exceeded',
+            detail: `Timeout after ${ms}ms`,
+            retryable: false,
+          });
+        }, ms);
       });
 
       const result = await Promise.race([
         this.child.execute(ctx),
         timeoutPromise,
       ]);
+      if (timer) clearTimeout(timer);
 
       return result;
     } catch (error) {
@@ -580,6 +686,12 @@ class CompiledFailOnTrueDecoratorNode implements CompiledBTNode {
 
   async execute(ctx: BTExecutionContext): Promise<BTResult> {
     const startTime = performance.now();
+    if (ctx.abortSignal?.aborted) {
+      return {
+        status: 'failure',
+        error: { code: 'aborted', retryable: false, detail: 'aborted' },
+      };
+    }
     ctx.nodeExecutions++;
 
     // Check condition first
@@ -640,13 +752,15 @@ export class BTDSLParser {
    */
   parse(
     btDslJson: any,
-    leafFactory: LeafFactory
+    leafFactory: LeafFactoryInterface
   ): {
     valid: boolean;
     errors?: string[];
     compiled?: CompiledBTNode;
     treeHash?: string;
   } {
+    // (quiet) Keep logging minimal; Cursor struggles with giant console noise.
+
     // Validate JSON schema
     if (!this.validate(btDslJson)) {
       return {
@@ -664,13 +778,28 @@ export class BTDSLParser {
       };
     }
 
-    // Check that all referenced leaves exist
-    const leafNames = getLeafNames(btDslJson.root);
-    const missingLeaves = leafNames.filter((name) => !leafFactory.has(name));
-    if (missingLeaves.length > 0) {
+    // Validate that required leaves (and versions, if specified) exist
+    const missingLeaves = new Set<string>();
+    const checkNode = (n: BTNode) => {
+      if (isLeafNode(n)) {
+        const id = n.leafVersion
+          ? `${n.leafName}@${n.leafVersion}`
+          : n.leafName;
+        const ok = n.leafVersion
+          ? leafFactory.has(n.leafName, n.leafVersion)
+          : leafFactory.has(n.leafName);
+        if (!ok) missingLeaves.add(id);
+      }
+      const kids: BTNode[] = (n as any).children || [];
+      kids.forEach(checkNode);
+      if ((n as any).child) checkNode((n as any).child);
+    };
+    checkNode(btDslJson.root);
+
+    if (missingLeaves.size > 0) {
       return {
         valid: false,
-        errors: [`Missing leaves: ${missingLeaves.join(', ')}`],
+        errors: [`Missing leaves: ${Array.from(missingLeaves).join(', ')}`],
       };
     }
 
@@ -685,6 +814,7 @@ export class BTDSLParser {
         treeHash,
       };
     } catch (error) {
+      console.log('BT-DSL Parser: Compilation failed:', error);
       return {
         valid: false,
         errors: [error instanceof Error ? error.message : 'Compilation failed'],
@@ -695,7 +825,10 @@ export class BTDSLParser {
   /**
    * Compile a BT node into executable form
    */
-  private compileNode(node: BTNode, leafFactory: LeafFactory): CompiledBTNode {
+  private compileNode(
+    node: BTNode,
+    leafFactory: LeafFactoryInterface
+  ): CompiledBTNode {
     if (isLeafNode(node)) {
       return new CompiledLeafNode(node, leafFactory);
     } else if (isSequenceNode(node)) {
@@ -768,7 +901,7 @@ export class BTDSLParser {
    */
   async execute(
     compiled: CompiledBTNode,
-    leafFactory: LeafFactory,
+    leafFactory: LeafFactoryInterface,
     leafContext: LeafContext,
     abortSignal?: AbortSignal
   ): Promise<BTResult> {

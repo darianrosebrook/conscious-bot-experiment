@@ -176,7 +176,7 @@ describe('Social Cognition Module', () => {
       expect(model).toBeDefined();
       expect(model.agentId).toBe('player_123');
       expect(model.name).toBe('Alex');
-      expect(model.capabilities.length).toBeGreaterThan(0);
+      expect(model.capabilities.domains.length).toBeGreaterThan(0);
       expect(model.personality).toBeDefined();
       expect(model.beliefs.length).toBeGreaterThan(0);
       expect(model.goals.length).toBeGreaterThan(0);
@@ -707,7 +707,7 @@ describe('Social Cognition Module', () => {
       expect(model).toBeDefined();
       expect(model.confidence).toBe(0);
       // Capabilities might be returned even with empty observations due to mock LLM
-      expect(model.capabilities.length).toBeGreaterThanOrEqual(0);
+      expect(model.capabilities.domains.length).toBeGreaterThanOrEqual(0);
     });
 
     it('should handle conflicting observations', async () => {
