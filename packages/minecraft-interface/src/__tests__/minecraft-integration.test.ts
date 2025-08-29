@@ -77,7 +77,7 @@ describe('Minecraft Integration Tests', () => {
     host: 'localhost',
     port: 25565,
     username: 'TestBot',
-    version: '1.21.4',
+    version: '1.20.1',
     auth: 'offline',
   };
 

@@ -21,6 +21,7 @@ const SERVER_PORTS = {
   memory: 3001,
   world: 3004,
   planning: 3002,
+  core: 3007,
 };
 
 // Process patterns to kill
@@ -139,6 +140,11 @@ async function main() {
       args: ['--filter', '@conscious-bot/dashboard', 'dev'],
     },
     {
+      name: 'core',
+      command: 'pnpm',
+      args: ['--filter', '@conscious-bot/core', 'run', 'dev:server'],
+    },
+    {
       name: 'minecraft',
       command: 'pnpm',
       args: [
@@ -221,6 +227,7 @@ async function main() {
   console.log('\n🎉 All services started!');
   console.log('\n📊 Service Status:');
   console.log('Dashboard: http://localhost:3000');
+  console.log('Core API: http://localhost:3007');
   console.log('Minecraft Interface: http://localhost:3005');
   console.log('Cognition: http://localhost:3003');
   console.log('Memory: http://localhost:3001');

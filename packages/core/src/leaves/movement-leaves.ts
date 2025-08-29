@@ -327,8 +327,16 @@ export class StepForwardSafelyLeaf implements LeafImpl {
       return fail('path.stuck', 'blocked');
     if (head && head.boundingBox === 'block')
       return fail('path.stuck', 'no headroom');
-    if (!floor || floor.boundingBox === 'empty')
-      return fail('path.stuck', 'no floor');
+
+    // More lenient floor check - allow any solid block or snow
+    const hasFloor =
+      floor &&
+      (floor.boundingBox === 'block' ||
+        floor.name === 'snow' ||
+        floor.name === 'grass_block' ||
+        floor.name === 'dirt' ||
+        floor.name === 'stone');
+    if (!hasFloor) return fail('path.stuck', 'no floor');
 
     // Lighting (optional guard)
     if (checkLight) {

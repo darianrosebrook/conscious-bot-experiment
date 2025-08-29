@@ -34,7 +34,7 @@ export function getItemSpriteUrl(itemName: string): string {
   }
 
   // Fallback to PrismarineJS data
-  return `https://raw.githubusercontent.com/PrismarineJS/minecraft-data/master/data/pc/1.21.4/items/${cleanName}.png`;
+  return `https://raw.githubusercontent.com/PrismarineJS/minecraft-data/master/data/pc/1.20.1/items/${cleanName}.png`;
 }
 
 /**

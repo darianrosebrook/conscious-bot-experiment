@@ -253,7 +253,7 @@ Bot Configuration:
   --host <host>         Server host (default: localhost)
   --port <port>         Server port (default: 58879)
   --username <name>     Bot username (default: ConsciousBot)
-  --version <version>   Minecraft version (default: 1.21.4)
+  --version <version>   Minecraft version (default: 1.20.1)
   --auth <type>         Auth type: offline|mojang (default: offline)
   --timeout <ms>        Operation timeout (default: 30000)
   --radius <blocks>     Observation radius (default: 16)

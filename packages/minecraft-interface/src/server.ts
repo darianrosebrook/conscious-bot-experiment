@@ -77,7 +77,7 @@ const botConfig: BotConfig = {
     ? parseInt(process.env.MINECRAFT_PORT)
     : 25565,
   username: process.env.MINECRAFT_USERNAME || 'ConsciousBot',
-  version: process.env.MINECRAFT_VERSION || '1.21.4',
+  version: process.env.MINECRAFT_VERSION || '1.20.1',
   auth: 'offline',
 
   // World configuration for memory versioning
@@ -798,7 +798,7 @@ app.get('/state', async (req, res) => {
           server: {
             playerCount: 1,
             difficulty: executionStatus?.bot?.server?.difficulty || 'normal',
-            version: executionStatus?.bot?.server?.version || '1.21.4',
+            version: executionStatus?.bot?.server?.version || '1.20.1',
           },
         },
         planningContext: {
@@ -949,7 +949,15 @@ app.post('/action', async (req, res) => {
 
     const planExecutor = minecraftInterface.planExecutor;
     const actionTranslator = (planExecutor as any).actionTranslator;
-    const result = await actionTranslator.executePlanStep(planStep);
+    
+    // Execute the action directly instead of as a plan step
+    const action = {
+      type: type as any,
+      parameters: parameters || {},
+      timeout: 15000,
+    };
+    
+    const result = await actionTranslator.executeAction(action);
 
     res.json({
       success: true,

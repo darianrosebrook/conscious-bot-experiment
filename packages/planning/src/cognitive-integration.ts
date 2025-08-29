@@ -358,20 +358,21 @@ export class CognitiveIntegration extends EventEmitter {
     if (!this.config.memoryEndpoint) return;
 
     try {
-      await fetch(`${this.config.memoryEndpoint}/episodic`, {
+      await fetch(`${this.config.memoryEndpoint}/action`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          type: 'task_reflection',
-          content: feedback.reasoning,
-          metadata: {
+          action: 'store_episodic',
+          parameters: {
+            type: 'task_reflection',
+            description: feedback.reasoning,
             taskId: feedback.taskId,
             success: feedback.success,
             confidence: feedback.confidence,
             emotionalImpact: feedback.emotionalImpact,
             alternatives: feedback.alternativeSuggestions,
+            timestamp: feedback.timestamp,
           },
-          timestamp: feedback.timestamp,
         }),
       });
     } catch (error) {

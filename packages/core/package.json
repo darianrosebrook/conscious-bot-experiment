@@ -18,7 +18,8 @@
     "demo:bot-connection": "node dist/test-bot-connection.js",
     "demo:action-execution": "node dist/test-action-execution.js",
     "demo:real-capability": "node dist/test-real-capability-execution.js",
-    "demo:full-system": "node dist/demo-full-system-capabilities.js"
+    "demo:full-system": "node dist/demo-full-system-capabilities.js",
+    "demo:simple-actions": "node dist/test-simple-actions.js"
   },
   "dependencies": {
     "@types/semver": "^7.7.0",

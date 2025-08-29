@@ -9,10 +9,10 @@
  */
 
 import { performance } from 'node:perf_hooks';
-import { EnhancedRegistry, Provenance } from './enhanced-registry.js';
-import { BTDSLParser } from './bt-dsl-parser.js';
-import { LeafContext, ExecError } from './leaf-contracts.js';
-import { HRMLLMInterface } from './llm-integration.js';
+import { EnhancedRegistry, Provenance } from './enhanced-registry';
+import { BTDSLParser } from './bt-dsl-parser';
+import { LeafContext, ExecError } from './leaf-contracts';
+import { HRMLLMInterface } from './llm-integration';
 
 // ============================================================================
 // Impasse Detection (S4.1)

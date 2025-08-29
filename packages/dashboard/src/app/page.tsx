@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   Activity,
+  BarChart3,
   Brain,
   FileText,
   Flag,
@@ -14,6 +15,7 @@ import {
   PlayCircle,
   RefreshCw,
   Search,
+  TrendingUp,
   UploadCloud,
 } from 'lucide-react';
 
@@ -25,8 +27,9 @@ import { Section } from '@/components/section';
 import { Pill } from '@/components/pill';
 import { EmptyState } from '@/components/empty-state';
 import { InventoryDisplay } from '@/components/inventory-display';
+import { EvaluationPanel } from '@/components/evaluation-panel';
 import { Button } from '@/components/ui/button';
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import type {} from '@/types';
 
@@ -967,6 +970,9 @@ export default function ConsciousMinecraftDashboard() {
                 <TabsTrigger value="live" className="hover:text-zinc-100">
                   Live
                 </TabsTrigger>
+                <TabsTrigger value="evaluation" className="hover:text-zinc-100">
+                  Evaluation
+                </TabsTrigger>
                 <TabsTrigger value="memories" className="hover:text-zinc-100">
                   Memories
                 </TabsTrigger>
@@ -1071,554 +1077,684 @@ export default function ConsciousMinecraftDashboard() {
         )}
       </div>
 
-      {/* Main 3-column Layout */}
-      <div className="grid h-[calc(100vh-136px)] grid-cols-12 gap-3 p-3">
-        {/* Left: Tasks, Planner, Reflective Notes, Environment, Events, Memories */}
-        <aside className="col-span-12 md:col-span-3 flex flex-col gap-3 overflow-auto">
-          <Section title="Tasks" icon={<ListChecks className="size-4" />}>
-            {tasks.length > 0 ? (
-              <div className="flex flex-col gap-3">
-                {tasks.map((task) => (
-                  <div
-                    key={task.id}
-                    className="rounded-xl border border-zinc-800 bg-zinc-950 p-3"
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="font-medium text-zinc-200">
-                        {task.title}
-                      </div>
-                      <Pill>{task.source}</Pill>
-                    </div>
-                    <div className="mt-2 h-1.5 w-full rounded bg-zinc-800">
-                      <div
-                        className="h-1.5 rounded bg-sky-500 transition-all duration-300"
-                        style={{ width: `${Math.round(task.progress * 100)}%` }}
-                      />
-                    </div>
-                    {task.steps && (
-                      <ul className="mt-2 space-y-1 text-sm text-zinc-300">
-                        {task.steps.map((step) => (
-                          <li key={step.id} className="flex items-center gap-2">
-                            <input
-                              type="checkbox"
-                              checked={step.done}
-                              onChange={() => {}}
-                              className="size-3"
+      {/* Main Content with Tabs */}
+      <div className="h-[calc(100vh-136px)]">
+        <Tabs defaultValue="live" className="h-full">
+          <TabsContent value="live" className="h-full mt-0">
+            <div className="grid h-full grid-cols-12 gap-3 p-3">
+              {/* Left: Tasks, Planner, Reflective Notes, Environment, Events, Memories */}
+              <aside className="col-span-12 md:col-span-3 flex flex-col gap-3 overflow-auto">
+                <Section title="Tasks" icon={<ListChecks className="size-4" />}>
+                  {tasks.length > 0 ? (
+                    <div className="flex flex-col gap-3">
+                      {tasks.map((task) => (
+                        <div
+                          key={task.id}
+                          className="rounded-xl border border-zinc-800 bg-zinc-950 p-3"
+                        >
+                          <div className="flex items-center justify-between">
+                            <div className="font-medium text-zinc-200">
+                              {task.title}
+                            </div>
+                            <Pill>{task.source}</Pill>
+                          </div>
+                          <div className="mt-2 h-1.5 w-full rounded bg-zinc-800">
+                            <div
+                              className="h-1.5 rounded bg-sky-500 transition-all duration-300"
+                              style={{
+                                width: `${Math.round(task.progress * 100)}%`,
+                              }}
                             />
-                            <span
-                              className={
-                                step.done ? 'line-through text-zinc-500' : ''
+                          </div>
+                          {task.steps && (
+                            <ul className="mt-2 space-y-1 text-sm text-zinc-300">
+                              {task.steps.map((step) => (
+                                <li
+                                  key={step.id}
+                                  className="flex items-center gap-2"
+                                >
+                                  <input
+                                    type="checkbox"
+                                    checked={step.done}
+                                    onChange={() => {}}
+                                    className="size-3"
+                                  />
+                                  <span
+                                    className={
+                                      step.done
+                                        ? 'line-through text-zinc-500'
+                                        : ''
+                                    }
+                                  >
+                                    {step.label}
+                                  </span>
+                                </li>
+                              ))}
+                            </ul>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <EmptyState
+                      icon={ListChecks}
+                      title="No tasks available"
+                      description="Tasks will appear here when the bot is actively planning or executing goals."
+                    />
+                  )}
+                </Section>
+
+                <Section
+                  title="Planner"
+                  icon={<Flag className="size-4" />}
+                  tight
+                >
+                  {plannerData ? (
+                    <div className="space-y-3">
+                      {plannerData.currentPlan && (
+                        <div className="rounded-lg border border-zinc-800 bg-zinc-950 p-3">
+                          <div className="flex items-center justify-between mb-2">
+                            <h4 className="text-sm font-medium text-zinc-200">
+                              {plannerData.currentPlan.name}
+                            </h4>
+                            <span className="text-xs text-zinc-500">
+                              {Math.round(
+                                plannerData.currentPlan.progress * 100
+                              )}
+                              %
+                            </span>
+                          </div>
+                          <p className="text-xs text-zinc-400 mb-2">
+                            {plannerData.currentPlan.description}
+                          </p>
+                          <div className="space-y-1">
+                            {plannerData.currentPlan.steps.map((step) => (
+                              <div
+                                key={step.id}
+                                className="flex items-center gap-2 text-xs"
+                              >
+                                <div
+                                  className={`w-2 h-2 rounded-full ${
+                                    step.status === 'completed'
+                                      ? 'bg-green-500'
+                                      : step.status === 'in_progress'
+                                        ? 'bg-yellow-500'
+                                        : 'bg-zinc-600'
+                                  }`}
+                                />
+                                <span
+                                  className={
+                                    step.status === 'completed'
+                                      ? 'text-zinc-500 line-through'
+                                      : 'text-zinc-300'
+                                  }
+                                >
+                                  {step.name}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {plannerData.currentAction && (
+                        <div className="rounded-lg border border-zinc-800 bg-zinc-950 p-3">
+                          <div className="flex items-center justify-between mb-2">
+                            <h4 className="text-sm font-medium text-zinc-200">
+                              Current Action
+                            </h4>
+                            <span className="text-xs text-zinc-500">
+                              {Math.round(
+                                (plannerData.currentAction.progress || 0) * 100
+                              )}
+                              %
+                            </span>
+                          </div>
+                          <p className="text-xs text-zinc-400">
+                            {plannerData.currentAction.name}
+                            {plannerData.currentAction.target && (
+                              <span className="text-zinc-500">
+                                {' '}
+                                → {plannerData.currentAction.target}
+                              </span>
+                            )}
+                          </p>
+                        </div>
+                      )}
+
+                      {plannerData.planQueue.length > 0 && (
+                        <div className="rounded-lg border border-zinc-800 bg-zinc-950 p-3">
+                          <h4 className="text-sm font-medium text-zinc-200 mb-2">
+                            Upcoming Plans
+                          </h4>
+                          <div className="space-y-1">
+                            {plannerData.planQueue.slice(0, 2).map((plan) => (
+                              <div
+                                key={plan.id}
+                                className="text-xs text-zinc-400"
+                              >
+                                • {plan.name}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <EmptyState
+                      icon={Flag}
+                      title="No planner data"
+                      description="Planner information will appear here when the bot is actively planning."
+                      className="p-3"
+                    />
+                  )}
+                </Section>
+
+                <Section
+                  title="Reflective Notes"
+                  icon={<FileText className="size-4" />}
+                  tight
+                >
+                  <EmptyState
+                    icon={FileText}
+                    title="No reflective notes"
+                    description="Reflective insights will appear here as the bot processes experiences."
+                    className="p-3"
+                  />
+                </Section>
+
+                <Section title="Environment" icon={<Map className="size-4" />}>
+                  {environment ? (
+                    <div className="grid grid-cols-2 gap-2 text-sm text-zinc-300">
+                      <div className="rounded-lg border border-zinc-800 bg-zinc-950 p-2">
+                        <span className="text-zinc-500">Biome</span>
+                        <div>{environment.biome}</div>
+                      </div>
+                      <div className="rounded-lg border border-zinc-800 bg-zinc-950 p-2">
+                        <span className="text-zinc-500">Weather</span>
+                        <div>{environment.weather}</div>
+                      </div>
+                      <div className="rounded-lg border border-zinc-800 bg-zinc-950 p-2">
+                        <span className="text-zinc-500">Time</span>
+                        <div>{environment.timeOfDay}</div>
+                      </div>
+                      <div className="rounded-lg border border-zinc-800 bg-zinc-950 p-2">
+                        <span className="text-zinc-500">Nearby</span>
+                        <div>{environment.nearbyEntities.join(', ')}</div>
+                      </div>
+                    </div>
+                  ) : (
+                    <EmptyState
+                      icon={Map}
+                      title="No environment data"
+                      description="Environment information will appear here when the bot is connected to the world."
+                    />
+                  )}
+                </Section>
+
+                <Section title="Events" icon={<History className="size-4" />}>
+                  <EmptyState
+                    icon={History}
+                    title="No events recorded"
+                    description="Events will appear here as the bot interacts with the world."
+                  />
+                </Section>
+
+                <Section title="Memories" icon={<Brain className="size-4" />}>
+                  <EmptyState
+                    icon={Brain}
+                    title="No memories available"
+                    description="Memories will appear here as the bot forms and recalls experiences."
+                  />
+                </Section>
+              </aside>
+
+              {/* Center: Live Stream + Inventory */}
+              <main className="col-span-12 md:col-span-6 flex flex-col gap-3 overflow-hidden">
+                <Section
+                  title="Live Stream"
+                  icon={<Activity className="size-4" />}
+                >
+                  <div className="relative aspect-video w-full overflow-hidden rounded-xl border border-zinc-800 bg-zinc-900">
+                    {botConnections.find((c) => c.name === 'minecraft-bot')
+                      ?.viewerActive ? (
+                      <>
+                        <iframe
+                          key={viewerKey}
+                          src={
+                            botConnections.find(
+                              (c) => c.name === 'minecraft-bot'
+                            )?.viewerUrl || 'http://localhost:3006'
+                          }
+                          className="absolute inset-0 w-full h-full border-0"
+                          title="Minecraft Bot View"
+                          sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals"
+                          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                        />
+                        <div className="absolute right-3 top-3 flex items-center gap-2">
+                          <button
+                            onClick={async () => {
+                              setViewerKey((prev) => prev + 1);
+                              // Also refresh viewer status
+                              await checkViewerStatus();
+                            }}
+                            className="rounded-md bg-black/60 px-2 py-1 text-xs text-zinc-300 hover:bg-black/80"
+                          >
+                            Refresh Viewer
+                          </button>
+                          <button
+                            onClick={() => {
+                              window.open(
+                                botConnections.find(
+                                  (c) => c.name === 'minecraft-bot'
+                                )?.viewerUrl || 'http://localhost:3006',
+                                '_blank'
+                              );
+                            }}
+                            className="rounded-md bg-black/60 px-2 py-1 text-xs text-zinc-300 hover:bg-black/80"
+                          >
+                            Full Screen
+                          </button>
+                          <button
+                            onClick={async () => {
+                              try {
+                                const response = await fetch(
+                                  'http://localhost:3005/stop-viewer',
+                                  {
+                                    method: 'POST',
+                                  }
+                                );
+                                const result = await response.json();
+                                if (result.success) {
+                                  // Update viewer status
+                                  setBotConnections((prev) =>
+                                    prev.map((conn) =>
+                                      conn.name === 'minecraft-bot'
+                                        ? { ...conn, viewerActive: false }
+                                        : conn
+                                    )
+                                  );
+                                  // Refresh viewer status
+                                  await checkViewerStatus();
+                                }
+                              } catch (error) {
+                                console.error('Error stopping viewer:', error);
+                              }
+                            }}
+                            className="rounded-md bg-red-600/60 px-2 py-1 text-xs text-zinc-300 hover:bg-red-600/80"
+                          >
+                            Stop Viewer
+                          </button>
+                        </div>
+                      </>
+                    ) : (
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <div className="text-center p-6">
+                          <div className="mb-4 rounded-full bg-zinc-800/50 p-3 inline-block">
+                            <Activity className="size-6 text-zinc-400" />
+                          </div>
+                          <h3 className="text-sm font-medium text-zinc-200 mb-2">
+                            Bot Status
+                          </h3>
+                          <p className="text-xs text-zinc-400 mb-4">
+                            {botConnections.find(
+                              (c) => c.name === 'minecraft-bot'
+                            )?.connected
+                              ? 'Bot connected, starting viewer...'
+                              : 'Waiting for Minecraft bot to connect...'}
+                          </p>
+                          {botConnections.find(
+                            (c) => c.name === 'minecraft-bot'
+                          )?.connected && (
+                            <button
+                              onClick={async () => {
+                                try {
+                                  // Check viewer status first
+                                  await checkViewerStatus();
+
+                                  if (!viewerStatus?.canStart) {
+                                    console.error(
+                                      'Cannot start viewer:',
+                                      viewerStatus?.reason
+                                    );
+                                    return;
+                                  }
+
+                                  // Start the viewer
+                                  const response = await fetch(
+                                    'http://localhost:3005/start-viewer',
+                                    {
+                                      method: 'POST',
+                                    }
+                                  );
+                                  const result = await response.json();
+                                  if (result.success) {
+                                    // Update viewer status immediately for better UX
+                                    setBotConnections((prev) =>
+                                      prev.map((conn) =>
+                                        conn.name === 'minecraft-bot'
+                                          ? { ...conn, viewerActive: true }
+                                          : conn
+                                      )
+                                    );
+                                    // Refresh viewer status and force a re-render
+                                    await checkViewerStatus();
+                                    setViewerKey((prev) => prev + 1);
+                                  } else {
+                                    console.error(
+                                      'Failed to start viewer:',
+                                      result.message
+                                    );
+                                    if (result.details) {
+                                      console.error('Details:', result.details);
+                                    }
+                                  }
+                                } catch (error) {
+                                  console.error(
+                                    'Error starting viewer:',
+                                    error
+                                  );
+                                }
+                              }}
+                              className={`rounded-md px-3 py-1 text-xs ${
+                                viewerStatus?.canStart
+                                  ? 'bg-sky-600 text-white hover:bg-sky-700'
+                                  : 'bg-gray-400 text-gray-200 cursor-not-allowed'
+                              }`}
+                              disabled={!viewerStatus?.canStart}
+                              title={
+                                viewerStatus?.reason || 'Start Minecraft viewer'
                               }
                             >
-                              {step.label}
-                            </span>
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <EmptyState
-                icon={ListChecks}
-                title="No tasks available"
-                description="Tasks will appear here when the bot is actively planning or executing goals."
-              />
-            )}
-          </Section>
-
-          <Section title="Planner" icon={<Flag className="size-4" />} tight>
-            {plannerData ? (
-              <div className="space-y-3">
-                {plannerData.currentPlan && (
-                  <div className="rounded-lg border border-zinc-800 bg-zinc-950 p-3">
-                    <div className="flex items-center justify-between mb-2">
-                      <h4 className="text-sm font-medium text-zinc-200">
-                        {plannerData.currentPlan.name}
-                      </h4>
-                      <span className="text-xs text-zinc-500">
-                        {Math.round(plannerData.currentPlan.progress * 100)}%
-                      </span>
-                    </div>
-                    <p className="text-xs text-zinc-400 mb-2">
-                      {plannerData.currentPlan.description}
-                    </p>
-                    <div className="space-y-1">
-                      {plannerData.currentPlan.steps.map((step) => (
-                        <div
-                          key={step.id}
-                          className="flex items-center gap-2 text-xs"
-                        >
-                          <div
-                            className={`w-2 h-2 rounded-full ${
-                              step.status === 'completed'
-                                ? 'bg-green-500'
-                                : step.status === 'in_progress'
-                                  ? 'bg-yellow-500'
-                                  : 'bg-zinc-600'
-                            }`}
-                          />
-                          <span
-                            className={
-                              step.status === 'completed'
-                                ? 'text-zinc-500 line-through'
-                                : 'text-zinc-300'
-                            }
-                          >
-                            {step.name}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {plannerData.currentAction && (
-                  <div className="rounded-lg border border-zinc-800 bg-zinc-950 p-3">
-                    <div className="flex items-center justify-between mb-2">
-                      <h4 className="text-sm font-medium text-zinc-200">
-                        Current Action
-                      </h4>
-                      <span className="text-xs text-zinc-500">
-                        {Math.round(
-                          (plannerData.currentAction.progress || 0) * 100
-                        )}
-                        %
-                      </span>
-                    </div>
-                    <p className="text-xs text-zinc-400">
-                      {plannerData.currentAction.name}
-                      {plannerData.currentAction.target && (
-                        <span className="text-zinc-500">
-                          {' '}
-                          → {plannerData.currentAction.target}
-                        </span>
-                      )}
-                    </p>
-                  </div>
-                )}
-
-                {plannerData.planQueue.length > 0 && (
-                  <div className="rounded-lg border border-zinc-800 bg-zinc-950 p-3">
-                    <h4 className="text-sm font-medium text-zinc-200 mb-2">
-                      Upcoming Plans
-                    </h4>
-                    <div className="space-y-1">
-                      {plannerData.planQueue.slice(0, 2).map((plan) => (
-                        <div key={plan.id} className="text-xs text-zinc-400">
-                          • {plan.name}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            ) : (
-              <EmptyState
-                icon={Flag}
-                title="No planner data"
-                description="Planner information will appear here when the bot is actively planning."
-                className="p-3"
-              />
-            )}
-          </Section>
-
-          <Section
-            title="Reflective Notes"
-            icon={<FileText className="size-4" />}
-            tight
-          >
-            <EmptyState
-              icon={FileText}
-              title="No reflective notes"
-              description="Reflective insights will appear here as the bot processes experiences."
-              className="p-3"
-            />
-          </Section>
-
-          <Section title="Environment" icon={<Map className="size-4" />}>
-            {environment ? (
-              <div className="grid grid-cols-2 gap-2 text-sm text-zinc-300">
-                <div className="rounded-lg border border-zinc-800 bg-zinc-950 p-2">
-                  <span className="text-zinc-500">Biome</span>
-                  <div>{environment.biome}</div>
-                </div>
-                <div className="rounded-lg border border-zinc-800 bg-zinc-950 p-2">
-                  <span className="text-zinc-500">Weather</span>
-                  <div>{environment.weather}</div>
-                </div>
-                <div className="rounded-lg border border-zinc-800 bg-zinc-950 p-2">
-                  <span className="text-zinc-500">Time</span>
-                  <div>{environment.timeOfDay}</div>
-                </div>
-                <div className="rounded-lg border border-zinc-800 bg-zinc-950 p-2">
-                  <span className="text-zinc-500">Nearby</span>
-                  <div>{environment.nearbyEntities.join(', ')}</div>
-                </div>
-              </div>
-            ) : (
-              <EmptyState
-                icon={Map}
-                title="No environment data"
-                description="Environment information will appear here when the bot is connected to the world."
-              />
-            )}
-          </Section>
-
-          <Section title="Events" icon={<History className="size-4" />}>
-            <EmptyState
-              icon={History}
-              title="No events recorded"
-              description="Events will appear here as the bot interacts with the world."
-            />
-          </Section>
-
-          <Section title="Memories" icon={<Brain className="size-4" />}>
-            <EmptyState
-              icon={Brain}
-              title="No memories available"
-              description="Memories will appear here as the bot forms and recalls experiences."
-            />
-          </Section>
-        </aside>
-
-        {/* Center: Live Stream + Inventory */}
-        <main className="col-span-12 md:col-span-6 flex flex-col gap-3 overflow-hidden">
-          <Section title="Live Stream" icon={<Activity className="size-4" />}>
-            <div className="relative aspect-video w-full overflow-hidden rounded-xl border border-zinc-800 bg-zinc-900">
-              {botConnections.find((c) => c.name === 'minecraft-bot')
-                ?.viewerActive ? (
-                <>
-                  <iframe
-                    key={viewerKey}
-                    src={
-                      botConnections.find((c) => c.name === 'minecraft-bot')
-                        ?.viewerUrl || 'http://localhost:3006'
-                    }
-                    className="absolute inset-0 w-full h-full border-0"
-                    title="Minecraft Bot View"
-                    sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals"
-                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                  />
-                  <div className="absolute right-3 top-3 flex items-center gap-2">
-                    <button
-                      onClick={async () => {
-                        setViewerKey((prev) => prev + 1);
-                        // Also refresh viewer status
-                        await checkViewerStatus();
-                      }}
-                      className="rounded-md bg-black/60 px-2 py-1 text-xs text-zinc-300 hover:bg-black/80"
-                    >
-                      Refresh Viewer
-                    </button>
-                    <button
-                      onClick={() => {
-                        window.open(
-                          botConnections.find((c) => c.name === 'minecraft-bot')
-                            ?.viewerUrl || 'http://localhost:3006',
-                          '_blank'
-                        );
-                      }}
-                      className="rounded-md bg-black/60 px-2 py-1 text-xs text-zinc-300 hover:bg-black/80"
-                    >
-                      Full Screen
-                    </button>
-                    <button
-                      onClick={async () => {
-                        try {
-                          const response = await fetch(
-                            'http://localhost:3005/stop-viewer',
-                            {
-                              method: 'POST',
-                            }
-                          );
-                          const result = await response.json();
-                          if (result.success) {
-                            // Update viewer status
-                            setBotConnections((prev) =>
-                              prev.map((conn) =>
-                                conn.name === 'minecraft-bot'
-                                  ? { ...conn, viewerActive: false }
-                                  : conn
-                              )
-                            );
-                            // Refresh viewer status
-                            await checkViewerStatus();
-                          }
-                        } catch (error) {
-                          console.error('Error stopping viewer:', error);
-                        }
-                      }}
-                      className="rounded-md bg-red-600/60 px-2 py-1 text-xs text-zinc-300 hover:bg-red-600/80"
-                    >
-                      Stop Viewer
-                    </button>
-                  </div>
-                </>
-              ) : (
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <div className="text-center p-6">
-                    <div className="mb-4 rounded-full bg-zinc-800/50 p-3 inline-block">
-                      <Activity className="size-6 text-zinc-400" />
-                    </div>
-                    <h3 className="text-sm font-medium text-zinc-200 mb-2">
-                      Bot Status
-                    </h3>
-                    <p className="text-xs text-zinc-400 mb-4">
-                      {botConnections.find((c) => c.name === 'minecraft-bot')
-                        ?.connected
-                        ? 'Bot connected, starting viewer...'
-                        : 'Waiting for Minecraft bot to connect...'}
-                    </p>
-                    {botConnections.find((c) => c.name === 'minecraft-bot')
-                      ?.connected && (
-                      <button
-                        onClick={async () => {
-                          try {
-                            // Check viewer status first
-                            await checkViewerStatus();
-
-                            if (!viewerStatus?.canStart) {
-                              console.error(
-                                'Cannot start viewer:',
-                                viewerStatus?.reason
-                              );
-                              return;
-                            }
-
-                            // Start the viewer
-                            const response = await fetch(
-                              'http://localhost:3005/start-viewer',
-                              {
-                                method: 'POST',
-                              }
-                            );
-                            const result = await response.json();
-                            if (result.success) {
-                              // Update viewer status immediately for better UX
-                              setBotConnections((prev) =>
-                                prev.map((conn) =>
-                                  conn.name === 'minecraft-bot'
-                                    ? { ...conn, viewerActive: true }
-                                    : conn
-                                )
-                              );
-                              // Refresh viewer status and force a re-render
-                              await checkViewerStatus();
-                              setViewerKey((prev) => prev + 1);
-                            } else {
-                              console.error(
-                                'Failed to start viewer:',
-                                result.message
-                              );
-                              if (result.details) {
-                                console.error('Details:', result.details);
-                              }
-                            }
-                          } catch (error) {
-                            console.error('Error starting viewer:', error);
-                          }
-                        }}
-                        className={`rounded-md px-3 py-1 text-xs ${
-                          viewerStatus?.canStart
-                            ? 'bg-sky-600 text-white hover:bg-sky-700'
-                            : 'bg-gray-400 text-gray-200 cursor-not-allowed'
-                        }`}
-                        disabled={!viewerStatus?.canStart}
-                        title={viewerStatus?.reason || 'Start Minecraft viewer'}
-                      >
-                        {viewerStatus?.canStart
-                          ? 'Start Viewer'
-                          : 'Viewer Not Ready'}
-                      </button>
-                    )}
-                    <div className="text-xs text-zinc-500 space-y-1">
-                      {botState ? (
-                        <>
-                          <div>
-                            Position: X: {botState.position?.x || 0}, Y:{' '}
-                            {botState.position?.y || 0}, Z:{' '}
-                            {botState.position?.z || 0}
-                          </div>
-                          <div>
-                            Health: {botState.health || 0}/20 | Food:{' '}
-                            {botState.food || 0}/20
-                          </div>
-                          <div>
-                            Time: Day{' '}
-                            {Math.floor((botState.time || 0) / 24000) + 1},{' '}
-                            {Math.floor(((botState.time || 0) % 24000) / 1000)}:
-                            {(Math.floor((botState.time || 0) % 1000) / 16.67)
-                              .toString()
-                              .padStart(2, '0')}
-                          </div>
-                          <div>Weather: {botState.weather || 'Unknown'}</div>
-                          {botState.inventory &&
-                            botState.inventory.length > 0 && (
-                              <div>
-                                Inventory: {botState.inventory.length} items
-                              </div>
+                              {viewerStatus?.canStart
+                                ? 'Start Viewer'
+                                : 'Viewer Not Ready'}
+                            </button>
+                          )}
+                          <div className="text-xs text-zinc-500 space-y-1">
+                            {botState ? (
+                              <>
+                                <div>
+                                  Position: X: {botState.position?.x || 0}, Y:{' '}
+                                  {botState.position?.y || 0}, Z:{' '}
+                                  {botState.position?.z || 0}
+                                </div>
+                                <div>
+                                  Health: {botState.health || 0}/20 | Food:{' '}
+                                  {botState.food || 0}/20
+                                </div>
+                                <div>
+                                  Time: Day{' '}
+                                  {Math.floor((botState.time || 0) / 24000) + 1}
+                                  ,{' '}
+                                  {Math.floor(
+                                    ((botState.time || 0) % 24000) / 1000
+                                  )}
+                                  :
+                                  {(
+                                    Math.floor((botState.time || 0) % 1000) /
+                                    16.67
+                                  )
+                                    .toString()
+                                    .padStart(2, '0')}
+                                </div>
+                                <div>
+                                  Weather: {botState.weather || 'Unknown'}
+                                </div>
+                                {botState.inventory &&
+                                  botState.inventory.length > 0 && (
+                                    <div>
+                                      Inventory: {botState.inventory.length}{' '}
+                                      items
+                                    </div>
+                                  )}
+                              </>
+                            ) : (
+                              <>
+                                <div>Position: X: 0, Y: 0, Z: 0</div>
+                                <div>Health: 0/20 | Food: 0/20</div>
+                                <div>Time: Day 1, 0:00</div>
+                                <div>Weather: Unknown</div>
+                              </>
                             )}
-                        </>
-                      ) : (
-                        <>
-                          <div>Position: X: 0, Y: 0, Z: 0</div>
-                          <div>Health: 0/20 | Food: 0/20</div>
-                          <div>Time: Day 1, 0:00</div>
-                          <div>Weather: Unknown</div>
-                        </>
-                      )}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                    <div className="absolute left-3 top-3 flex items-center gap-2 rounded-md bg-black/60 px-2 py-1 text-xs">
+                      <div
+                        className={`size-2 rounded-full ${
+                          botConnections.find((c) => c.name === 'minecraft-bot')
+                            ?.viewerActive
+                            ? 'bg-green-500 animate-pulse'
+                            : botConnections.find(
+                                  (c) => c.name === 'minecraft-bot'
+                                )?.connected
+                              ? 'bg-yellow-500'
+                              : 'bg-red-500'
+                        }`}
+                      />
+                      {botConnections.find((c) => c.name === 'minecraft-bot')
+                        ?.viewerActive
+                        ? 'VIEWER LIVE'
+                        : botConnections.find((c) => c.name === 'minecraft-bot')
+                              ?.connected
+                          ? 'BOT CONNECTED'
+                          : 'DISCONNECTED'}
+                      <div className="size-2 rounded-full bg-zinc-600" />
+                      <span className="text-zinc-400">COG</span>
                     </div>
                   </div>
-                </div>
-              )}
-              <div className="absolute left-3 top-3 flex items-center gap-2 rounded-md bg-black/60 px-2 py-1 text-xs">
-                <div
-                  className={`size-2 rounded-full ${
-                    botConnections.find((c) => c.name === 'minecraft-bot')
-                      ?.viewerActive
-                      ? 'bg-green-500 animate-pulse'
-                      : botConnections.find((c) => c.name === 'minecraft-bot')
-                            ?.connected
-                        ? 'bg-yellow-500'
-                        : 'bg-red-500'
-                  }`}
+                </Section>
+
+                <InventoryDisplay
+                  inventory={inventory}
+                  selectedSlot={botState?.selectedSlot || 0}
                 />
-                {botConnections.find((c) => c.name === 'minecraft-bot')
-                  ?.viewerActive
-                  ? 'VIEWER LIVE'
-                  : botConnections.find((c) => c.name === 'minecraft-bot')
-                        ?.connected
-                    ? 'BOT CONNECTED'
-                    : 'DISCONNECTED'}
-                <div className="size-2 rounded-full bg-zinc-600" />
-                <span className="text-zinc-400">COG</span>
-              </div>
-            </div>
-          </Section>
+              </main>
 
-          <InventoryDisplay
-            inventory={inventory}
-            selectedSlot={botState?.selectedSlot || 0}
-          />
-        </main>
+              {/* Right: Cognitive Stream + Thought Input */}
+              <aside className="col-span-12 md:col-span-3 flex flex-col gap-3 overflow-auto">
+                <Section
+                  title="Cognitive Stream"
+                  icon={<MessageSquare className="size-4" />}
+                  actions={<Pill>consciousness flow</Pill>}
+                >
+                  {thoughts.length > 0 ? (
+                    <ScrollArea className="max-h-[38vh] flex flex-col-reverse gap-2 pr-1 overflow-y-auto">
+                      <div className="flex flex-col-reverse gap-2 pr-1 overflow-y-auto">
+                        {thoughts.map((thought) => {
+                          // Determine styling based on thought type and attribution
+                          const isIntrusive =
+                            thought.attribution === 'intrusive';
+                          const isExternalChat =
+                            thought.thoughtType === 'external_chat_in';
+                          const isBotResponse =
+                            thought.thoughtType === 'external_chat_out';
+                          const isSocial = thought.thoughtType === 'social';
+                          const isInternal =
+                            thought.thoughtType === 'internal' ||
+                            thought.thoughtType === 'reflection' ||
+                            thought.thoughtType === 'observation' ||
+                            thought.thoughtType === 'planning';
 
-        {/* Right: Cognitive Stream + Thought Input */}
-        <aside className="col-span-12 md:col-span-3 flex flex-col gap-3 overflow-auto">
-          <Section
-            title="Cognitive Stream"
-            icon={<MessageSquare className="size-4" />}
-            actions={<Pill>consciousness flow</Pill>}
-          >
-            {thoughts.length > 0 ? (
-              <ScrollArea className="max-h-[38vh] flex flex-col-reverse gap-2 pr-1 overflow-y-auto">
-                <div className="flex flex-col-reverse gap-2 pr-1 overflow-y-auto">
-                  {thoughts.map((thought) => {
-                    // Determine styling based on thought type and attribution
-                    const isIntrusive = thought.attribution === 'intrusive';
-                    const isExternalChat =
-                      thought.thoughtType === 'external_chat_in';
-                    const isBotResponse =
-                      thought.thoughtType === 'external_chat_out';
-                    const isSocial = thought.thoughtType === 'social';
-                    const isInternal =
-                      thought.thoughtType === 'internal' ||
-                      thought.thoughtType === 'reflection' ||
-                      thought.thoughtType === 'observation' ||
-                      thought.thoughtType === 'planning';
+                          let borderColor = 'border-zinc-800';
+                          let bgColor = 'bg-zinc-950';
+                          let prefix = '';
+                          let typeLabel = thought.thoughtType || thought.type;
 
-                    let borderColor = 'border-zinc-800';
-                    let bgColor = 'bg-zinc-950';
-                    let prefix = '';
-                    let typeLabel = thought.thoughtType || thought.type;
+                          if (isIntrusive) {
+                            borderColor = 'border-purple-600/50';
+                            bgColor = 'bg-purple-950/20';
+                            prefix = ' ';
+                            typeLabel = 'intrusive';
+                          } else if (isExternalChat) {
+                            borderColor = 'border-blue-600/50';
+                            bgColor = 'bg-blue-950/20';
+                            prefix = ` ${thought.sender}: `;
+                            typeLabel = 'chat_in';
+                          } else if (isBotResponse) {
+                            borderColor = 'border-green-600/50';
+                            bgColor = 'bg-green-950/20';
+                            prefix = ' ';
+                            typeLabel = 'chat_out';
+                          } else if (isSocial) {
+                            borderColor = 'border-orange-600/50';
+                            bgColor = 'bg-orange-950/20';
+                            prefix = ' ';
+                            typeLabel = 'social';
+                          } else if (isInternal) {
+                            borderColor = 'border-yellow-600/50';
+                            bgColor = 'bg-yellow-950/20';
+                            prefix = ' ';
+                            typeLabel = 'internal';
+                          }
 
-                    if (isIntrusive) {
-                      borderColor = 'border-purple-600/50';
-                      bgColor = 'bg-purple-950/20';
-                      prefix = ' ';
-                      typeLabel = 'intrusive';
-                    } else if (isExternalChat) {
-                      borderColor = 'border-blue-600/50';
-                      bgColor = 'bg-blue-950/20';
-                      prefix = ` ${thought.sender}: `;
-                      typeLabel = 'chat_in';
-                    } else if (isBotResponse) {
-                      borderColor = 'border-green-600/50';
-                      bgColor = 'bg-green-950/20';
-                      prefix = ' ';
-                      typeLabel = 'chat_out';
-                    } else if (isSocial) {
-                      borderColor = 'border-orange-600/50';
-                      bgColor = 'bg-orange-950/20';
-                      prefix = ' ';
-                      typeLabel = 'social';
-                    } else if (isInternal) {
-                      borderColor = 'border-yellow-600/50';
-                      bgColor = 'bg-yellow-950/20';
-                      prefix = ' ';
-                      typeLabel = 'internal';
-                    }
-
-                    return (
-                      <div
-                        key={thought.id}
-                        className={`rounded-xl border ${borderColor} ${bgColor} p-2.5`}
-                      >
-                        <div className="flex items-center justify-between text-[11px] text-zinc-400">
-                          <span className="uppercase tracking-wide">
-                            {typeLabel}
-                          </span>
-                          <time className="tabular-nums">
-                            {formatTime(thought.ts)}
-                          </time>
-                        </div>
-                        <p className="mt-1 text-sm text-zinc-200">
-                          {prefix}
-                          {thought.text}
-                        </p>
+                          return (
+                            <div
+                              key={thought.id}
+                              className={`rounded-xl border ${borderColor} ${bgColor} p-2.5`}
+                            >
+                              <div className="flex items-center justify-between text-[11px] text-zinc-400">
+                                <span className="uppercase tracking-wide">
+                                  {typeLabel}
+                                </span>
+                                <time className="tabular-nums">
+                                  {formatTime(thought.ts)}
+                                </time>
+                              </div>
+                              <p className="mt-1 text-sm text-zinc-200">
+                                {prefix}
+                                {thought.text}
+                              </p>
+                            </div>
+                          );
+                        })}
+                        <div ref={thoughtsEndRef} />
                       </div>
-                    );
-                  })}
-                  <div ref={thoughtsEndRef} />
-                </div>
-              </ScrollArea>
-            ) : (
-              <EmptyState
-                icon={MessageSquare}
-                title="No thoughts yet"
-                description="Cognitive thoughts will appear here as the bot processes and reflects."
-              />
-            )}
-          </Section>
+                    </ScrollArea>
+                  ) : (
+                    <EmptyState
+                      icon={MessageSquare}
+                      title="No thoughts yet"
+                      description="Cognitive thoughts will appear here as the bot processes and reflects."
+                    />
+                  )}
+                </Section>
 
-          {/* Intrusive Thought Input */}
-          <div className="rounded-2xl border border-zinc-800 bg-zinc-950 p-2">
-            <div className="flex items-center gap-2">
-              <input
-                value={intrusion}
-                onChange={(e) => setIntrusion(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') handleSubmitIntrusion();
-                }}
-                placeholder="Enter an intrusive thought… (appears as bot's own idea)"
-                className="flex-1 rounded-xl bg-zinc-900 px-3 py-2 text-sm outline-none placeholder:text-zinc-600"
-              />
-              <Button
-                onClick={handleSubmitIntrusion}
-                className="bg-emerald-600/90 hover:bg-emerald-600 border-zinc-800"
-              >
-                <UploadCloud className="size-4 mr-2" />
-                Inject
-              </Button>
+                {/* Intrusive Thought Input */}
+                <div className="rounded-2xl border border-zinc-800 bg-zinc-950 p-2">
+                  <div className="flex items-center gap-2">
+                    <input
+                      value={intrusion}
+                      onChange={(e) => setIntrusion(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') handleSubmitIntrusion();
+                      }}
+                      placeholder="Enter an intrusive thought… (appears as bot's own idea)"
+                      className="flex-1 rounded-xl bg-zinc-900 px-3 py-2 text-sm outline-none placeholder:text-zinc-600"
+                    />
+                    <Button
+                      onClick={handleSubmitIntrusion}
+                      className="bg-emerald-600/90 hover:bg-emerald-600 border-zinc-800"
+                    >
+                      <UploadCloud className="size-4 mr-2" />
+                      Inject
+                    </Button>
+                  </div>
+                  <div className="mt-1 text-[11px] text-zinc-500">
+                    Try: &quot;craft a wooden pickaxe&quot;, &quot;mine some
+                    stone&quot;, &quot;explore the area&quot;, &quot;build a
+                    house&quot;
+                  </div>
+                </div>
+              </aside>
             </div>
-            <div className="mt-1 text-[11px] text-zinc-500">
-              Try: &quot;craft a wooden pickaxe&quot;, &quot;mine some
-              stone&quot;, &quot;explore the area&quot;, &quot;build a
-              house&quot;
+          </TabsContent>
+
+          {/* Evaluation Tab Content */}
+          <TabsContent value="evaluation" className="h-full mt-0">
+            <div className="grid h-full grid-cols-12 gap-3 p-3">
+              {/* Left: Evaluation Panel */}
+              <aside className="col-span-12 md:col-span-4 flex flex-col gap-3 overflow-auto">
+                <EvaluationPanel />
+              </aside>
+
+              {/* Center: Evaluation Charts and Details */}
+              <main className="col-span-12 md:col-span-8 flex flex-col gap-3 overflow-hidden">
+                <Section
+                  title="Evaluation Overview"
+                  icon={<BarChart3 className="size-4" />}
+                >
+                  <div className="rounded-xl border border-zinc-800 bg-zinc-950 p-6">
+                    <div className="text-center">
+                      <BarChart3 className="size-12 text-zinc-600 mx-auto mb-4" />
+                      <h3 className="text-lg font-semibold text-zinc-200 mb-2">
+                        Evaluation Dashboard
+                      </h3>
+                      <p className="text-sm text-zinc-400 mb-4">
+                        Real-time monitoring of evaluation metrics, performance
+                        benchmarks, and system health.
+                      </p>
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <div className="text-center">
+                          <div className="text-2xl font-bold text-green-500">
+                            87.5%
+                          </div>
+                          <div className="text-xs text-zinc-500">
+                            Overall Score
+                          </div>
+                        </div>
+                        <div className="text-center">
+                          <div className="text-2xl font-bold text-blue-500">
+                            92.3%
+                          </div>
+                          <div className="text-xs text-zinc-500">
+                            Success Rate
+                          </div>
+                        </div>
+                        <div className="text-center">
+                          <div className="text-2xl font-bold text-orange-500">
+                            2.4s
+                          </div>
+                          <div className="text-xs text-zinc-500">
+                            Avg Planning
+                          </div>
+                        </div>
+                        <div className="text-center">
+                          <div className="text-2xl font-bold text-purple-500">
+                            1.8s
+                          </div>
+                          <div className="text-xs text-zinc-500">
+                            Avg Execution
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </Section>
+
+                <Section
+                  title="Performance Trends"
+                  icon={<TrendingUp className="size-4" />}
+                >
+                  <div className="rounded-xl border border-zinc-800 bg-zinc-950 p-6">
+                    <div className="text-center">
+                      <TrendingUp className="size-12 text-zinc-600 mx-auto mb-4" />
+                      <h3 className="text-lg font-semibold text-zinc-200 mb-2">
+                        Performance Analytics
+                      </h3>
+                      <p className="text-sm text-zinc-400">
+                        Historical performance data and trend analysis will be
+                        displayed here.
+                      </p>
+                    </div>
+                  </div>
+                </Section>
+              </main>
             </div>
-          </div>
-        </aside>
+          </TabsContent>
+        </Tabs>
       </div>
     </div>
   );

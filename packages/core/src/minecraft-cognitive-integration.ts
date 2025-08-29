@@ -72,10 +72,8 @@ export class MinecraftCognitiveIntegration extends EventEmitter {
     }
 
     // Initialize cognitive stream with real bot context
+    // This already registers all required leaves, so we don't need to register them again
     await this.cognitiveStream.initialize();
-
-    // Register real leaf implementations
-    await this.registerRealLeaves();
 
     // Set up real bot state monitoring
     this.setupBotStateMonitoring();
@@ -86,54 +84,14 @@ export class MinecraftCognitiveIntegration extends EventEmitter {
 
   /**
    * Register real leaf implementations that connect to the actual bot
+   * NOTE: This method is deprecated - leaves are now registered by CognitiveStreamIntegration
    */
   private async registerRealLeaves(): Promise<void> {
-    console.log('🔧 Registering real leaf implementations...');
-
-    const realLeaves = [
-      new MoveToLeaf(),
-      new StepForwardSafelyLeaf(),
-      new DigBlockLeaf(),
-      new PlaceBlockLeaf(),
-      new PlaceTorchIfNeededLeaf(),
-      new RetreatAndBlockLeaf(),
-      new ConsumeFoodLeaf(),
-      new SenseHostilesLeaf(),
-      new GetLightLevelLeaf(),
-      new CraftRecipeLeaf(),
-    ];
-
-    for (const leaf of realLeaves) {
-      try {
-        // Register with the cognitive stream's MCP registry
-        const result = this.cognitiveStream.getMCPRegistry().registerLeaf(
-          leaf,
-          {
-            author: 'minecraft-integration',
-            parentLineage: [],
-            codeHash: `real-${leaf.spec.name}`,
-            createdAt: new Date().toISOString(),
-            metadata: { source: 'real-mineflayer-leaf' },
-          },
-          'active'
-        );
-
-        if (result.ok) {
-          console.log(
-            `✅ Registered real leaf: ${leaf.spec.name}@${leaf.spec.version}`
-          );
-        } else {
-          console.warn(
-            `⚠️ Failed to register real leaf ${leaf.spec.name}: ${result.error}`
-          );
-        }
-      } catch (error) {
-        console.error(
-          `❌ Error registering real leaf ${leaf.spec.name}:`,
-          error
-        );
-      }
-    }
+    console.log(
+      '🔧 Skipping duplicate leaf registration - leaves already registered by CognitiveStreamIntegration'
+    );
+    // Leaves are already registered by CognitiveStreamIntegration.initialize()
+    // No need to register them again to avoid "version_exists" errors
   }
 
   /**

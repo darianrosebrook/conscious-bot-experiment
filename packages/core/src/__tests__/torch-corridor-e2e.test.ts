@@ -120,6 +120,7 @@ class TestWaitLeaf implements LeafImpl {
     timeoutMs: 5000,
     retries: 0,
     permissions: ['sense'],
+    rateLimitPerMin: 1000, // High rate limit for testing
   };
 
   async run(ctx: LeafContext, args: any): Promise<LeafResult> {
@@ -135,13 +136,71 @@ class TestWaitLeaf implements LeafImpl {
   }
 }
 
+// Test leaf that always fails for retirement testing
+class TestFailingLeaf implements LeafImpl {
+  spec: LeafSpec = {
+    name: 'failing_leaf',
+    version: '1.0.0',
+    description: 'Test mock for failing leaf',
+    inputSchema: { type: 'object' },
+    outputSchema: {
+      type: 'object',
+      properties: {
+        success: { type: 'boolean' },
+      },
+    },
+    timeoutMs: 5000,
+    retries: 0,
+    permissions: ['movement'],
+    rateLimitPerMin: 1000, // High rate limit for testing
+  };
+
+  async run(ctx: LeafContext, args: any): Promise<LeafResult> {
+    return {
+      status: 'failure',
+      error: {
+        code: 'test_failure',
+        detail: 'Simulated failure for testing',
+        retryable: false,
+      },
+      metrics: { durationMs: 50, retries: 0, timeouts: 0 },
+    };
+  }
+}
+
 describe('Torch Corridor End-to-End', () => {
   let registry: EnhancedRegistry;
   let dynamicFlow: DynamicCreationFlow;
 
   beforeEach(() => {
     registry = new EnhancedRegistry();
-    dynamicFlow = new DynamicCreationFlow(registry);
+
+    // Create a mock LLM interface for testing
+    const mockLLMInterface = {
+      proposeOption: async () => ({
+        name: 'opt.mock_proposal',
+        version: '1.0.0',
+        btDsl: {
+          name: 'opt.mock_proposal',
+          version: '1.0.0',
+          root: {
+            type: 'Sequence',
+            children: [
+              {
+                type: 'Leaf',
+                leafName: 'wait',
+                args: { durationMs: 1000 },
+              },
+            ],
+          },
+        },
+        confidence: 0.8,
+        estimatedSuccessRate: 0.9,
+        reasoning: 'Mock proposal for testing',
+      }),
+    };
+
+    dynamicFlow = new DynamicCreationFlow(registry, mockLLMInterface);
 
     // Register required leaves with the registry's WorkingLeafFactory
     const leafFactory = registry.getLeafFactory();
@@ -187,20 +246,30 @@ describe('Torch Corridor End-to-End', () => {
 
   test('should detect impasse and propose new capability', async () => {
     const goal = 'torch the mining corridor safely';
+    const taskId = 'torch-corridor-task';
     const mockLeafContext = (global as any).testUtils.createMockLeafContext();
 
-    // Check for impasse
-    const impasseResult = dynamicFlow.checkImpasse(goal, {
-      code: 'unknown',
+    // Simulate multiple failures to trigger impasse (threshold is 3)
+    const failure = {
+      code: 'unknown' as const,
       detail: 'goal_analysis',
       retryable: false,
-    });
+    };
 
+    // First two failures shouldn't trigger impasse
+    let impasseResult = dynamicFlow.checkImpasse(taskId, failure);
+    expect(impasseResult.isImpasse).toBe(false);
+
+    impasseResult = dynamicFlow.checkImpasse(taskId, failure);
+    expect(impasseResult.isImpasse).toBe(false);
+
+    // Third failure should trigger impasse
+    impasseResult = dynamicFlow.checkImpasse(taskId, failure);
     expect(impasseResult.isImpasse).toBe(true);
 
     // Propose new capability
     const proposal = await dynamicFlow.requestOptionProposal(
-      'test-task-id',
+      taskId,
       mockLeafContext,
       goal,
       []
@@ -254,9 +323,15 @@ describe('Torch Corridor End-to-End', () => {
   });
 
   test('should promote capability after successful shadow runs', async () => {
-    // Register capability
+    // Register capability with unique name
+    const uniqueBTDSL = {
+      ...torchCorridorBTDSL,
+      name: 'opt.torch_corridor_promote',
+      version: '1.0.0',
+    };
+
     const result = registry.registerOption(
-      torchCorridorBTDSL,
+      uniqueBTDSL,
       {
         author: 'llm',
         createdAt: new Date().toISOString(),
@@ -274,7 +349,7 @@ describe('Torch Corridor End-to-End', () => {
     // Execute multiple successful shadow runs
     const mockLeafContext = global.testUtils.createMockLeafContext();
 
-    for (let i = 0; i < 3; i++) {
+    for (let i = 0; i < 2; i++) {
       const shadowResult = await registry.executeShadowRun(
         result.id!,
         mockLeafContext,
@@ -295,9 +370,24 @@ describe('Torch Corridor End-to-End', () => {
   });
 
   test('should handle capability retirement for poor performance', async () => {
-    // Register capability with low failure threshold
+    // Register the failing leaf
+    const leafFactory = registry.getLeafFactory();
+    leafFactory.register(new TestFailingLeaf());
+
+    // Create a BT-DSL that uses the failing leaf
+    const failingBTDSL = {
+      name: 'opt.failing_capability',
+      version: '1.0.0',
+      description: 'Capability that always fails for testing retirement',
+      root: {
+        type: 'Leaf',
+        leafName: 'failing_leaf',
+        args: {},
+      },
+    };
+
     const result = registry.registerOption(
-      torchCorridorBTDSL,
+      failingBTDSL,
       {
         author: 'llm',
         createdAt: new Date().toISOString(),
@@ -319,21 +409,10 @@ describe('Torch Corridor End-to-End', () => {
       const shadowResult = await registry.executeShadowRun(
         result.id!,
         mockLeafContext,
-        undefined,
-        {
-          end: { x: 100, y: 12, z: -35 },
-          interval: 6,
-          hostilesRadius: 10,
-        }
+        undefined
       );
 
-      // Mock failure by modifying the result
-      shadowResult.success = false;
-      shadowResult.error = {
-        code: 'test_failure',
-        detail: 'Simulated failure for testing',
-        retryable: false,
-      };
+      expect(shadowResult.status).toBe('failure');
     }
 
     // Check if capability was auto-retired

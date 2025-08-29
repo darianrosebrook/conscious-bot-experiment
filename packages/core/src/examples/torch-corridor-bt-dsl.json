@@ -12,7 +12,10 @@
       },
       {
         "type": "Repeat.Until",
-        "condition": { "name": "position_reached" },
+        "condition": { 
+          "name": "position_reached",
+          "parameters": { "target": { "x": 10, "y": 64, "z": 10 }, "tolerance": 2 }
+        },
         "child": {
           "type": "Sequence",
           "children": [

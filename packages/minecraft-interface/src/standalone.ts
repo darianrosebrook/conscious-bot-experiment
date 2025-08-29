@@ -209,7 +209,7 @@ export const DEFAULT_STANDALONE_CONFIG: BotConfig = {
   host: 'localhost',
   port: 25565,
   username: 'StandaloneBot',
-  version: '1.21.4',
+  version: '1.20.1',
   auth: 'offline',
   pathfindingTimeout: 30000,
   actionTimeout: 10000,

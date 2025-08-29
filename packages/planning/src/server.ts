@@ -16,7 +16,6 @@ import {
 import { CognitiveThoughtProcessor } from './cognitive-thought-processor';
 import { HomeostasisState } from './types';
 
-
 const app = express();
 const port = process.env.PORT ? parseInt(process.env.PORT) : 3002;
 
@@ -33,26 +32,8 @@ const toolExecutor = {
       // Map BT actions to Minecraft actions
       const mappedAction = mapBTActionToMinecraft(tool, args);
 
-      // Execute the mapped action via Minecraft interface
-      const response = await fetch('http://localhost:3005/action', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(mappedAction),
-      });
-
-      if (!response.ok) {
-        throw new Error(`Minecraft interface returned ${response.status}`);
-      }
-
-      const result = await response.json();
-
-      const typedResult = result as any;
-      return {
-        ok: typedResult.success,
-        data: typedResult.result,
-        environmentDeltas: {},
-        error: typedResult.error,
-      };
+      // Use the bot connection check for Minecraft actions
+      return await executeActionWithBotCheck(mappedAction);
     } catch (error) {
       console.error(`Tool execution failed for ${tool}:`, error);
       return {
@@ -105,9 +86,9 @@ function mapBTActionToMinecraft(tool: string, args: Record<string, any>) {
     case 'dig_blocks':
       // Mine blocks (tree logs)
       return {
-        type: 'mine_block',
+        type: 'dig_block',
         parameters: {
-          position: args.position || 'current',
+          pos: args.position || 'current',
           tool: args.tool || 'axe',
         },
       };
@@ -368,21 +349,34 @@ enhancedMemoryIntegration.on('noteAdded', (note) => {
 // Set up event listeners for enhanced environment integration
 enhancedEnvironmentIntegration.on('environmentUpdated', (environment) => {
   // Only log if there's a significant change or in debug mode
-  if (process.env.NODE_ENV === 'development' && process.env.DEBUG_ENVIRONMENT === 'true') {
-    console.log('Environment updated:', environment.biome, environment.timeOfDay);
+  if (
+    process.env.NODE_ENV === 'development' &&
+    process.env.DEBUG_ENVIRONMENT === 'true'
+  ) {
+    console.log(
+      'Environment updated:',
+      environment.biome,
+      environment.timeOfDay
+    );
   }
 });
 
 enhancedEnvironmentIntegration.on('inventoryUpdated', (inventory) => {
   // Only log if there's a significant change or in debug mode
-  if (process.env.NODE_ENV === 'development' && process.env.DEBUG_INVENTORY === 'true') {
+  if (
+    process.env.NODE_ENV === 'development' &&
+    process.env.DEBUG_INVENTORY === 'true'
+  ) {
     console.log('Inventory updated:', inventory.length, 'items');
   }
 });
 
 enhancedEnvironmentIntegration.on('resourcesUpdated', (resources) => {
   // Only log if there's a significant change or in debug mode
-  if (process.env.NODE_ENV === 'development' && process.env.DEBUG_RESOURCES === 'true') {
+  if (
+    process.env.NODE_ENV === 'development' &&
+    process.env.DEBUG_RESOURCES === 'true'
+  ) {
     console.log('Resources updated:', resources.scarcityLevel, 'scarcity');
   }
 });
@@ -390,42 +384,69 @@ enhancedEnvironmentIntegration.on('resourcesUpdated', (resources) => {
 // Set up event listeners for enhanced live stream integration
 enhancedLiveStreamIntegration.on('liveStreamUpdated', (streamData) => {
   // Only log if there's a significant change or in debug mode
-  if (process.env.NODE_ENV === 'development' && process.env.DEBUG_LIVESTREAM === 'true') {
-    console.log('Live stream updated:', streamData.status, streamData.connected);
+  if (
+    process.env.NODE_ENV === 'development' &&
+    process.env.DEBUG_LIVESTREAM === 'true'
+  ) {
+    console.log(
+      'Live stream updated:',
+      streamData.status,
+      streamData.connected
+    );
   }
 });
 
 enhancedLiveStreamIntegration.on('actionLogged', (actionLog) => {
   // Only log if there's a significant change or in debug mode
-  if (process.env.NODE_ENV === 'development' && process.env.DEBUG_ACTIONS === 'true') {
+  if (
+    process.env.NODE_ENV === 'development' &&
+    process.env.DEBUG_ACTIONS === 'true'
+  ) {
     console.log('Action logged:', actionLog.type, actionLog.action);
   }
 });
 
 enhancedLiveStreamIntegration.on('visualFeedbackAdded', (feedback) => {
   // Only log if there's a significant change or in debug mode
-  if (process.env.NODE_ENV === 'development' && process.env.DEBUG_FEEDBACK === 'true') {
+  if (
+    process.env.NODE_ENV === 'development' &&
+    process.env.DEBUG_FEEDBACK === 'true'
+  ) {
     console.log('Visual feedback added:', feedback.type, feedback.severity);
   }
 });
 
 enhancedLiveStreamIntegration.on('miniMapUpdated', (miniMapData) => {
   // Only log if there's a significant change or in debug mode
-  if (process.env.NODE_ENV === 'development' && process.env.DEBUG_MINIMAP === 'true') {
+  if (
+    process.env.NODE_ENV === 'development' &&
+    process.env.DEBUG_MINIMAP === 'true'
+  ) {
     console.log('Mini-map updated:', miniMapData.position);
   }
 });
 
 enhancedLiveStreamIntegration.on('screenshotCaptured', (screenshot) => {
   // Only log if there's a significant change or in debug mode
-  if (process.env.NODE_ENV === 'development' && process.env.DEBUG_SCREENSHOTS === 'true') {
+  if (
+    process.env.NODE_ENV === 'development' &&
+    process.env.DEBUG_SCREENSHOTS === 'true'
+  ) {
     console.log('Screenshot captured:', screenshot.url);
   }
 });
 
-// Add some initial tasks for testing
-setTimeout(() => {
+// Add some initial tasks for testing - with longer delay to allow bot connection
+setTimeout(async () => {
   console.log('Adding initial tasks for testing...');
+
+  // Wait for bot connection before adding tasks that require Minecraft actions
+  const botConnected = await waitForBotConnection(10000); // 10 second timeout
+  if (!botConnected) {
+    console.log(
+      '⚠️ Bot not connected - tasks will be queued but may not execute immediately'
+    );
+  }
 
   enhancedTaskIntegration.addTask({
     title: 'Gather Wood',
@@ -1986,6 +2007,85 @@ function extractResources(items: any[]): any[] {
   }));
 }
 
+/**
+ * Check if the Minecraft bot is connected and ready
+ */
+async function waitForBotConnection(maxWaitTime = 30000): Promise<boolean> {
+  const startTime = Date.now();
+  const checkInterval = 2000; // Check every 2 seconds
+
+  while (Date.now() - startTime < maxWaitTime) {
+    try {
+      const response = await fetch(`${minecraftUrl}/status`);
+      if (response.ok) {
+        const status = await response.json();
+        if (status.connected && status.connectionState === 'spawned') {
+          console.log('✅ Bot is connected and ready');
+          return true;
+        }
+      }
+    } catch (error) {
+      console.log('⏳ Waiting for bot connection...');
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, checkInterval));
+  }
+
+  console.log('⚠️ Bot connection timeout - proceeding without bot');
+  return false;
+}
+
+/**
+ * Execute action with bot connection check
+ */
+async function executeActionWithBotCheck(action: any): Promise<any> {
+  // Check if this is a Minecraft action that requires bot connection
+  const minecraftActions = [
+    'scan_for_trees',
+    'pathfind',
+    'scan_tree_structure',
+    'dig_blocks',
+    'collect_items',
+    'mine_block',
+    'move_forward',
+    'pickup_item',
+  ];
+
+  if (minecraftActions.includes(action.type)) {
+    const botConnected = await waitForBotConnection();
+    if (!botConnected) {
+      console.log(`⏳ Skipping ${action.type} - bot not connected`);
+      return {
+        ok: false,
+        data: null,
+        environmentDeltas: {},
+        error: 'Bot not connected - cannot execute Minecraft action',
+      };
+    }
+  }
+
+  // Execute the action via Minecraft interface
+  const response = await fetch('http://localhost:3005/action', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(action),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Minecraft interface returned ${response.status}`);
+  }
+
+  const result = await response.json();
+
+  const typedResult = result as any;
+  return {
+    ok: typedResult.success,
+    data: typedResult.result,
+    environmentDeltas: {},
+    error: typedResult.error,
+  };
+}
+
 // Helper function to execute tasks in Minecraft
 async function executeTaskInMinecraft(task: any) {
   try {
@@ -2152,7 +2252,21 @@ async function executeTaskInMinecraft(task: any) {
       return blockStates;
     };
 
-    switch (task.type) {
+    // Map task types to their execution types
+    let executionTask = { ...task };
+    if (task.type === 'resource_gathering') {
+      executionTask = {
+        ...task,
+        type: 'gather',
+        parameters: {
+          resource: task.parameters?.resource || 'wood',
+          target: task.parameters?.target || 'tree',
+          amount: task.parameters?.amount || 1,
+        },
+      };
+    }
+
+    switch (executionTask.type) {
       case 'move':
         // Get position before movement
         const beforePosition = await getBotPosition();
@@ -2922,7 +3036,7 @@ async function executeTaskInMinecraft(task: any) {
         };
 
       default:
-        throw new Error(`Unknown task type: ${task.type}`);
+        throw new Error(`Unknown task type: ${executionTask.type}`);
     }
   } catch (error) {
     console.error('Error executing task in Minecraft:', error);

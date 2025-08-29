@@ -50,6 +50,17 @@ export {
   plan as quickPlan,
 } from './hierarchical-planner';
 
+// Behavior Trees
+export {
+  BehaviorTreeRunner,
+  BTNodeStatus,
+  BTNodeType,
+  type BTNode,
+  type BTTick,
+  type BTRunResult,
+  type BTRunOptions,
+} from './behavior-trees/BehaviorTreeRunner';
+
 // Reactive Execution
 export * from './reactive-executor/reactive-executor';
 export * from './reactive-executor/goap-planner';

@@ -173,8 +173,40 @@ export class MockMinecraftServer {
   }
 
   private moveForward(distance: number): any {
-    this.state.position.z += distance;
-    return { success: true, distance, newPosition: { ...this.state.position } };
+    // Validate distance
+    if (distance <= 0) {
+      return {
+        success: false,
+        error: 'Distance must be positive',
+        distance: 0,
+      };
+    }
+
+    // Check if movement is blocked
+    const newPosition = {
+      ...this.state.position,
+      z: this.state.position.z + distance,
+    };
+    const blockKey = `${newPosition.x},${newPosition.y},${newPosition.z}`;
+    const blockingBlock = this.world.get(blockKey);
+
+    if (blockingBlock && blockingBlock.type !== 'air') {
+      return {
+        success: false,
+        error: `Movement blocked by ${blockingBlock.type}`,
+        distance: 0,
+        blockedBy: blockingBlock.type,
+      };
+    }
+
+    // Update position
+    this.state.position = newPosition;
+    return {
+      success: true,
+      distance,
+      newPosition: { ...this.state.position },
+      message: `Moved forward ${distance} blocks`,
+    };
   }
 
   private turnLeft(angle: number): any {
@@ -340,6 +372,27 @@ export class MockMinecraftServer {
     position: { x: number; y: number; z: number },
     blockType: string
   ): any {
+    // Validate position
+    if (
+      !position ||
+      typeof position.x !== 'number' ||
+      typeof position.y !== 'number' ||
+      typeof position.z !== 'number'
+    ) {
+      return {
+        success: false,
+        error: 'Invalid position provided',
+      };
+    }
+
+    // Validate block type
+    if (!blockType || typeof blockType !== 'string') {
+      return {
+        success: false,
+        error: 'Invalid block type provided',
+      };
+    }
+
     // Check if we have the block in inventory
     const inventoryItem = this.state.inventory.find(
       (item) => item.name === blockType
@@ -348,15 +401,20 @@ export class MockMinecraftServer {
       return {
         success: false,
         error: `No ${blockType} found in inventory`,
+        required: blockType,
+        available: this.state.inventory.map((item) => item.name),
       };
     }
 
     // Check if position is already occupied
     const key = `${position.x},${position.y},${position.z}`;
     if (this.world.has(key)) {
+      const existingBlock = this.world.get(key);
       return {
         success: false,
-        error: `Position ${position.x}, ${position.y}, ${position.z} is already occupied`,
+        error: `Position ${position.x}, ${position.y}, ${position.z} is already occupied by ${existingBlock?.type}`,
+        position,
+        existingBlock: existingBlock?.type,
       };
     }
 
@@ -380,6 +438,7 @@ export class MockMinecraftServer {
       block: blockType,
       position,
       placed: true,
+      message: `Placed ${blockType} at ${position.x}, ${position.y}, ${position.z}`,
     };
   }
 

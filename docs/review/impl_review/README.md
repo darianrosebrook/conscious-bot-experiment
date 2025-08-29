@@ -2,235 +2,394 @@
 
 **Author:** @darianrosebrook  
 **Date:** January 2025  
-**Purpose:** Comprehensive system for reviewing actual code implementation against documented specifications
+**Purpose:** Comprehensive system for reviewing and auditing the cognitive architecture implementation against documented specifications
 
 ## Overview
 
-The Implementation Review System provides a structured approach to verify that our actual code implementation aligns with our documented specifications. This system helps identify gaps, improvements, and areas where the implementation has evolved beyond the documentation.
+The Implementation Review System provides a systematic approach to verify that the actual code implementation matches the documented cognitive architecture. This includes the Mermaid chart from the README and ensures all components, connections, and flows are properly implemented and integrated.
 
-## System Components
+## Mermaid Architecture Audit
 
-### **Core Documents**
+### What It Does
 
-1. **[Implementation Review Todo](implementation-review-todo.md)** - Master todo list for all implementation reviews
-2. **[Implementation Review Summary](implementation-review-summary.md)** - Executive summary of all findings
-3. **[Implementation Scoring Breakdown](implementation-scoring-breakdown.md)** - Detailed scoring and metrics
-4. **[README](README.md)** - This overview document
+The Mermaid Architecture Audit system verifies that all components and connections documented in the README's Mermaid chart are properly implemented in the codebase. It provides:
 
-### **Review Categories**
+- **Component Validation**: Checks that all 14 cognitive components exist and are properly implemented
+- **Connection Verification**: Validates all 17 documented connections between components
+- **Flow Testing**: Tests the 5 primary cognitive flows end-to-end
+- **Performance Monitoring**: Ensures latency and throughput requirements are met
+- **Integration Testing**: Runs comprehensive integration tests across all modules
 
-#### **Working Specifications Reviews**
-- **Iteration One** - ReAct, Voyager, BT, GOAP/HTN patterns
-- **Iteration Two** - Dynamic capability creation, MCP-style registry
-- **Iteration Three** - Mock eradication, real component integration
-- **Iteration Five** - Critical integration fixes, completion plans
+### Components Audited
 
-#### **Core Module Reviews**
-- **Cognition Module** - ReAct arbiter, reasoning loops
-- **Planning Module** - HTN/GOAP, Behavior Trees, skill integration
-- **World Module** - Perception, state management, grounding
-- **Memory Module** - Skill registry, episodic memory, Reflexion
-- **Core Module** - Task parsing, dual-channel prompting
+The audit system validates these components from the Mermaid chart:
 
-#### **Integration Reviews**
-- **Minecraft Interface** - Mineflayer integration, movement, interaction
-- **Server Management** - Process management, health monitoring
-- **Testing Infrastructure** - Test frameworks, coverage, CI/CD
+| Component | Package | Purpose |
+|-----------|---------|---------|
+| ENV | minecraft-interface | Environment interface |
+| SMI | world | Sensorimotor Interface |
+| WM | world | World Model / Place Graph |
+| HM | core | Homeostasis Monitor |
+| EM | memory | Episodic Memory / Semantic Memory |
+| SM | cognition | Self-Model / Identity |
+| SNG | core | Signals → Needs → Goals |
+| TPGM | planning | Task Planning & Goal Management |
+| ITI | cognition | Intrusive Thought Interface |
+| CC | cognition | Cognitive Core (LLM) |
+| HP | planning | Hierarchical Planner (HRM/HTN) |
+| RE | planning | Reactive Executor (GOAP) |
+| ACT | minecraft-interface | Actions (Mineflayer API) |
+| OA | world | Other agents |
 
-## Review Methodology
+### Connections Verified
 
-### **Scoring Rubric (100 points total)**
+The audit validates these connections from the Mermaid chart:
 
-#### **Code Location & Structure (20 points)**
-- **File Organization** (5 points): Files located where docs specify
-- **Module Structure** (5 points): Code follows documented module contracts
-- **API Compliance** (5 points): Endpoints match documented interfaces
-- **Data Schemas** (5 points): Implementations match documented data structures
+- `ENV <--> SMI` (bidirectional)
+- `OA --> ENV` (unidirectional)
+- `SMI --> WM` (unidirectional)
+- `SMI --> HM` (unidirectional)
+- `WM --> EM` (unidirectional)
+- `SM --> EM` (unidirectional)
+- `HM --> SNG` (unidirectional)
+- `SNG --> TPGM` (unidirectional)
+- `EM -.-> TPGM` (optional)
+- `ITI --> CC` (unidirectional)
+- `TPGM --> CC` (unidirectional)
+- `CC <--> SM` (bidirectional)
+- `CC --> HP` (unidirectional)
+- `HP --> RE` (unidirectional)
+- `RE --> ACT` (unidirectional)
+- `ACT --> ENV` (unidirectional)
+- `SM -.-> ACT` (optional)
 
-#### **Testing Coverage (25 points)**
-- **Unit Tests** (10 points): Core functions properly unit tested
-- **Integration Tests** (10 points): Module interactions tested
-- **End-to-End Tests** (5 points): Complete workflows tested
+### Cognitive Flows Tested
 
-#### **Implementation Quality (25 points)**
-- **Code Quality** (10 points): TypeScript compliance, error handling, documentation
-- **Performance** (5 points): Meets documented performance targets
-- **Safety & Reliability** (5 points): Implements documented safety mechanisms
-- **Architecture Alignment** (5 points): Follows documented design patterns
+The audit tests these primary cognitive flows:
 
-#### **Documentation Alignment (20 points)**
-- **Feature Completeness** (10 points): All documented features implemented
-- **API Accuracy** (5 points): Actual APIs match documented contracts
-- **Behavior Consistency** (5 points): Implementation behavior matches docs
+1. **Perception Loop**: `ENV → SMI → WM → EM` (≤50ms)
+2. **Drive Loop**: `SMI → HM → SNG → TPGM` (≤100ms)
+3. **Planning Loop**: `TPGM → CC → HP → RE → ACT` (≤500ms)
+4. **Action Loop**: `ACT → ENV` (≤50ms)
+5. **Reflection Loop**: `EM → CC ↔ SM` (≤200ms)
 
-#### **Evolution Assessment (10 points)**
-- **Implementation vs Documentation** (5 points): Code more/less robust than docs
-- **Workflow Improvements** (5 points): Implementation evolved beyond docs
+## Usage
 
-### **Critical Findings Categories**
+### Running the Audit
 
-#### **Strengths**
-- ✅ **Exceeds Documentation**: Implementation is more robust than documented
-- ✅ **Excellent Testing**: Comprehensive test coverage
-- ✅ **Clean Architecture**: Well-structured, maintainable code
-- ✅ **Performance Excellence**: Meets or exceeds performance targets
-- ✅ **Innovation**: Novel solutions not documented
+```bash
+# Run complete audit (architecture + integration)
+pnpm audit
 
-#### **Weaknesses**
-- ❌ **Missing Implementation**: Documented features not implemented
-- ❌ **Poor Testing**: Insufficient test coverage
-- ❌ **Code Quality Issues**: TypeScript errors, poor error handling
-- ❌ **Performance Problems**: Fails to meet documented targets
-- ❌ **Architecture Mismatch**: Doesn't follow documented patterns
+# Run architecture validation only
+pnpm audit:architecture
 
-#### **Code Issues**
-- 🔧 **Duplicated Code**: Multiple implementations of same functionality
-- 🔧 **Outdated Code**: Deprecated or unused implementations
-- 🔧 **Unused Code**: Dead code that should be removed
-- 🔧 **Inconsistent Patterns**: Mixed coding styles or approaches
-- 🔧 **Missing Dependencies**: Required packages not installed
+# Run integration tests only
+pnpm audit:integration
 
-#### **Documentation Gaps**
-- 📝 **Outdated Docs**: Documentation doesn't reflect current implementation
-- 📝 **Missing Examples**: No code examples for documented features
-- 📝 **Incomplete APIs**: API documentation missing parameters or responses
-- 📝 **Workflow Gaps**: Missing documentation for actual workflows
+# Run complete audit (alternative)
+pnpm audit:complete
+```
 
-## Review Process
+### Direct Script Usage
 
-### **Completed Review Process**
-The implementation review process has been **successfully completed** for all major categories:
+```bash
+# Run complete audit
+node scripts/audit-architecture.js
 
-1. **Working Specifications Reviews** ✅
-   - Iteration One: ReAct, Voyager, BT, GOAP/HTN patterns (7.6/10)
-   - Iteration Two: Dynamic capability creation, MCP-style registry (4.2/10)
-   - Iteration Three: Mock eradication, real component integration (6.8/10)
-   - Iteration Five: Critical integration fixes, completion plans (5.2/10)
+# Run specific audit types
+node scripts/audit-architecture.js architecture
+node scripts/audit-architecture.js integration
+node scripts/audit-architecture.js complete
 
-2. **Core Module Reviews** ✅
-   - Cognition Module: ReAct arbiter, reasoning loops (7.2/10)
-   - Planning Module: HTN/GOAP, Behavior Trees, skill integration (7.5/10)
-   - World Module: Perception, state management, grounding (6.8/10)
-   - Memory Module: Skill registry, episodic memory, Reflexion (9.5/10)
-   - Safety Module: Privacy, monitoring, fail-safes (9.8/10)
+# Get help
+node scripts/audit-architecture.js help
+```
 
-3. **Integration Reviews** ✅
-   - Minecraft Interface: Mineflayer integration, movement, interaction (3.2/10)
-   - Server Management: Process management, health monitoring (6.5/10)
-   - Testing Infrastructure: Test frameworks, coverage, CI/CD (4.7/10)
+### Programmatic Usage
 
-### **Review Outcomes**
-- **Overall Implementation Completeness**: 73%
-- **Total Reviews Completed**: 12 major review categories
-- **Critical Issues Identified**: System-wide integration problems
-- **Recommendations**: Focus on integration fixes and service coordination
+```typescript
+import { AuditRunner } from '@conscious-bot/evaluation/src/audit-runner';
 
-### **Next Steps**
-The implementation review system is now complete. Focus should shift to:
-1. Addressing critical integration issues identified
-2. Implementing recommended fixes
-3. Conducting follow-up reviews after improvements
+const runner = new AuditRunner();
 
-## Review Output Format
+// Run complete audit
+const report = await runner.runCompleteAudit();
 
-Each implementation review produces:
+// Run specific audits
+const archReport = await runner.runArchitectureAudit();
+const testReport = await runner.runIntegrationTests();
+```
 
-### **Summary Report**
-- **Overall Score**: X/100
-- **Implementation Status**: Complete/Partial/Missing
-- **Documentation Alignment**: Accurate/Outdated/Incomplete
-- **Critical Findings**: Key strengths and weaknesses
-- **Recommendations**: Next steps for improvement
+## Output
 
-### **Detailed Findings**
-- **Code Location Issues**: Files not where expected
-- **Missing Implementations**: Documented features not found
-- **Testing Gaps**: Insufficient test coverage
-- **Performance Issues**: Fails to meet targets
-- **Code Quality Problems**: Technical debt and issues
-- **Evolution Assessment**: Implementation vs documentation
+The audit system generates comprehensive reports in the `audit-reports/` directory:
 
-### **Action Items**
-- **Documentation Updates**: What docs need updating
-- **Code Improvements**: What code needs fixing
-- **Testing Additions**: What tests need writing
-- **Architecture Changes**: What design needs updating
+### Report Files
 
-## Success Criteria
+- **`complete-audit-YYYY-MM-DD.json`**: Complete audit report with all results
+- **`architecture-audit-YYYY-MM-DD.json`**: Architecture validation results only
+- **`integration-tests-YYYY-MM-DD.json`**: Integration test results only
+- **`audit-summary-YYYY-MM-DD.md`**: Human-readable summary report
 
-### **Implementation Review Success**
-- ✅ All documented features have corresponding implementations
-- ✅ Code quality meets project standards
-- ✅ Testing coverage exceeds 80%
-- ✅ Performance targets are met
-- ✅ Documentation accurately reflects implementation
-- ✅ No critical security or stability issues
+### Report Structure
 
-### **Quality Metrics**
-- **Implementation Completeness**: ≥ 95% of documented features implemented
-- **Code Quality**: ≤ 5 TypeScript errors, ≤ 10 linting warnings
-- **Test Coverage**: ≥ 80% line coverage, ≥ 70% branch coverage
-- **Performance**: All documented latency targets met
-- **Documentation Accuracy**: ≥ 90% alignment between docs and code
+```typescript
+interface CompleteAuditReport {
+  timestamp: string;
+  architectureAudit: {
+    summary: {
+      totalComponents: number;
+      passedComponents: number;
+      failedComponents: number;
+      totalConnections: number;
+      passedConnections: number;
+      failedConnections: number;
+      totalFlows: number;
+      passedFlows: number;
+      failedFlows: number;
+    };
+    componentResults: ValidationResult[];
+    connectionResults: ConnectionResult[];
+    flowResults: FlowResult[];
+    recommendations: string[];
+  };
+  integrationTests: {
+    testResults: {
+      componentResults: ComponentTestResult[];
+      connectionResults: ConnectionTestResult[];
+      flowResults: FlowTestResult[];
+      summary: {
+        totalTests: number;
+        passedTests: number;
+        failedTests: number;
+        skippedTests: number;
+        totalDuration: number;
+      };
+    };
+    endToEndResults: {
+      scenarioResults: TestResult[];
+      systemHealth: {
+        allServicesRunning: boolean;
+        memoryUsage: number;
+        cpuUsage: number;
+        networkLatency: number;
+      };
+      summary: {
+        totalScenarios: number;
+        passedScenarios: number;
+        failedScenarios: number;
+      };
+    };
+    recommendations: string[];
+  };
+  summary: {
+    overallStatus: 'pass' | 'fail' | 'partial';
+    architectureScore: number; // 0-100
+    integrationScore: number; // 0-100
+    totalIssues: number;
+    criticalIssues: number;
+    recommendations: string[];
+  };
+}
+```
 
-## Evolution Assessment
+### Sample Output
 
-### **Key Questions for Each Review**
+```
+🚀 Starting Complete Architecture Audit...
 
-1. **Implementation vs Documentation**
-   - Is the implementation more robust than documented?
-   - Are there features implemented that aren't documented?
-   - Does the implementation follow a different approach than documented?
+📋 Step 1: Validating Architecture Components and Connections...
+✅ Architecture validation complete. Found 2 failed components, 1 failed connections.
 
-2. **Workflow Improvements**
-   - Has the implementation evolved beyond the documented workflow?
-   - Are there better patterns or approaches being used?
-   - Should the documentation be updated to reflect improvements?
+🧪 Step 2: Running Integration Tests...
+✅ Integration testing complete. 45/50 tests passed.
 
-3. **Architecture Evolution**
-   - Has the architecture evolved from the documented design?
-   - Are there new patterns or technologies being used?
-   - Should the documentation be updated to reflect current architecture?
+📊 Step 3: Generating Summary Report...
 
-## Getting Started
+💾 Step 4: Saving Reports...
+📄 Complete audit report: audit-reports/complete-audit-2025-01-15.json
+📄 Architecture audit report: audit-reports/architecture-audit-2025-01-15.json
+📄 Integration test report: audit-reports/integration-tests-2025-01-15.json
+📄 Summary report: audit-reports/audit-summary-2025-01-15.md
 
-### **For New Reviews**
+📈 Audit Summary:
+============================================================
+🏆 AUDIT SUMMARY
+============================================================
+Overall Status: ⚠️ PARTIAL
+Architecture Score: 85/100
+Integration Score: 90/100
+Total Issues: 8
+Critical Issues: 0
+============================================================
 
-1. **Select Review Target**: Choose from the todo list in `implementation-review-todo.md`
-2. **Review Documentation**: Read the relevant documentation thoroughly
-3. **Map Implementation**: Identify where the documented features should be implemented
-4. **Assess Code**: Review the actual implementation against documentation
-5. **Score Implementation**: Use the rubric to score each dimension
-6. **Document Findings**: Record strengths, weaknesses, and recommendations
-7. **Update Tracking**: Update the summary and scoring breakdown documents
+📋 RECOMMENDATIONS:
+1. Fix failed components: ENV, ACT
+2. Fix failed connections: ENV ↔ SMI
+3. Address failing integration tests: 5 tests failed
+4. Optimize performance for Planning Loop
+============================================================
+```
 
-### **For Ongoing Reviews**
+## Scoring System
 
-1. **Check Progress**: Review the current status in `implementation-review-summary.md`
-2. **Focus on Gaps**: Prioritize reviews with the most critical gaps
-3. **Track Improvements**: Monitor progress on identified issues
-4. **Update Documentation**: Keep documentation in sync with implementation
+### Architecture Score (0-100)
 
-## Integration with Documentation Review
+- **Components (40%)**: Percentage of components that pass validation
+- **Connections (40%)**: Percentage of connections that pass validation
+- **Flows (20%)**: Percentage of flows that pass validation
 
-This implementation review system complements the [Documentation Review System](../doc_review/) by:
+### Integration Score (0-100)
 
-- **Verifying Accuracy**: Ensuring documentation reflects actual implementation
-- **Identifying Gaps**: Finding where documentation exceeds or falls short of implementation
-- **Tracking Evolution**: Monitoring how implementation evolves beyond documentation
-- **Quality Assurance**: Ensuring both documentation and implementation meet quality standards
+- **Test Pass Rate**: Percentage of integration tests that pass
+- **End-to-End Scenarios**: All scenarios must pass for full score
+- **System Health**: Services running, resource usage within limits
+
+### Overall Status
+
+- **PASS**: Architecture score ≥90 AND Integration score ≥90 AND No critical issues
+- **PARTIAL**: Architecture score ≥70 AND Integration score ≥70 AND No critical issues
+- **FAIL**: Any critical issues OR scores below thresholds
+
+## Critical Issues
+
+The following are considered critical and will cause a FAIL status:
+
+### Critical Components
+- **ENV** (Environment): Required for all interactions
+- **SMI** (Sensorimotor Interface): Required for perception and action
+- **CC** (Cognitive Core): Required for reasoning
+- **ACT** (Actions): Required for execution
+
+### Critical Connections
+- **ENV ↔ SMI**: Core perception-action loop
+- **CC → HP**: Cognitive to planning flow
+- **RE → ACT**: Planning to execution flow
+- **ACT → ENV**: Action to environment feedback
+
+## Testing
+
+### Running Tests
+
+```bash
+# Run audit system tests
+pnpm --filter @conscious-bot/evaluation test
+
+# Run specific test file
+pnpm --filter @conscious-bot/evaluation test audit-runner.test.ts
+```
+
+### Test Coverage
+
+The audit system includes comprehensive tests for:
+
+- Component validation logic
+- Connection verification
+- Flow testing
+- Score calculation
+- Report generation
+- Error handling
+- File output
+
+## Integration with CI/CD
+
+### GitHub Actions
+
+Add this to your workflow:
+
+```yaml
+- name: Run Architecture Audit
+  run: |
+    pnpm audit
+    # Check for critical issues
+    if grep -q '"criticalIssues": [1-9]' audit-reports/complete-audit-*.json; then
+      echo "Critical issues found in architecture audit"
+      exit 1
+    fi
+```
+
+### Pre-commit Hook
+
+Add to `.husky/pre-commit`:
+
+```bash
+#!/bin/sh
+pnpm audit:architecture
+```
+
+## Troubleshooting
+
+### Common Issues
+
+1. **Missing Components**: Ensure all packages are built and dependencies installed
+2. **Connection Failures**: Check import/export statements between modules
+3. **Performance Issues**: Verify latency requirements are met
+4. **Test Failures**: Check that all services are running
+
+### Debug Mode
+
+```bash
+# Run with verbose output
+DEBUG=audit:* pnpm audit
+
+# Run specific component validation
+DEBUG=audit:component pnpm audit:architecture
+```
+
+### Manual Verification
+
+If the audit fails, you can manually verify components:
+
+```bash
+# Check if component exists
+ls packages/[package-name]/src/[component-path]
+
+# Check if connection is implemented
+grep -r "import.*from.*[source-package]" packages/[target-package]/
+```
 
 ## Contributing
 
-When contributing to implementation reviews:
+### Adding New Components
 
-1. **Follow the Rubric**: Use the established scoring methodology
-2. **Be Thorough**: Check all documented features and APIs
-3. **Document Findings**: Record detailed findings with specific examples
-4. **Update Tracking**: Keep the summary and scoring documents current
-5. **Provide Recommendations**: Suggest specific improvements and next steps
+1. Update `ARCHITECTURE_COMPONENTS` in `architecture-validator.ts`
+2. Add component to Mermaid chart in README
+3. Update connection definitions
+4. Add integration tests
+5. Run audit to verify
 
----
+### Adding New Connections
 
-*Implementation review system created by @darianrosebrook*
-*Date: January 2025*
+1. Update `ARCHITECTURE_CONNECTIONS` in `architecture-validator.ts`
+2. Add connection to Mermaid chart in README
+3. Implement the connection in code
+4. Add integration tests
+5. Run audit to verify
+
+### Modifying Flows
+
+1. Update `COGNITIVE_FLOWS` in `architecture-validator.ts`
+2. Update flow description in README
+3. Adjust performance requirements if needed
+4. Update integration tests
+5. Run audit to verify
+
+## Future Enhancements
+
+- **Real-time Monitoring**: Continuous audit during development
+- **Visual Dashboard**: Web interface for audit results
+- **Performance Profiling**: Detailed performance analysis
+- **Automated Fixes**: Suggest fixes for common issues
+- **Historical Tracking**: Track audit results over time
+- **Custom Rules**: Allow custom validation rules
+- **Plugin System**: Extensible audit framework
+
+## References
+
+- [Implementation Review Todo](implementation-review-todo.md)
+- [Mermaid Architecture Audit](mermaid-architecture-audit.md)
+- [README Mermaid Chart](../../../readme.md#cognitive-architecture-overview)
+- [Architecture Validator](../../../packages/evaluation/src/architecture-validator.ts)
+- [Integration Test Runner](../../../packages/evaluation/src/integration-test-runner.ts)
+- [Audit Runner](../../../packages/evaluation/src/audit-runner.ts)

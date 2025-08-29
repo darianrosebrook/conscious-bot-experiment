@@ -360,4 +360,15 @@ const registry = new EnhancedRegistry();
 const dynamicFlow = new DynamicCreationFlow(registry);
 const app = createServer(registry, dynamicFlow);
 
+// Start the server if this file is run directly
+if (require.main === module) {
+  const port = process.env.PORT || 3007;
+
+  app.listen(port, () => {
+    console.log(`✅ Core API server ready on port ${port}`);
+    console.log(`📊 Health check: http://localhost:${port}/health`);
+    console.log(`🔧 Capability registry endpoints available`);
+  });
+}
+
 export default app;

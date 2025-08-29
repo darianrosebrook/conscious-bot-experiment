@@ -37,7 +37,7 @@ vi.mock('mineflayer', () => ({
     },
     entities: {},
     players: {},
-    version: '1.21.4',
+    version: '1.20.1',
     username: 'TestBot',
     loadPlugin: vi.fn(),
     blockAt: vi.fn(() => null),
@@ -75,7 +75,7 @@ describe('Minecraft Interface - Standalone Tests', () => {
       host: 'localhost',
       port: 25565,
       username: 'TestBot',
-      version: '1.21.4',
+      version: '1.20.1',
       auth: 'offline',
       viewDistance: 'tiny',
       chatLengthLimit: 100,
@@ -91,7 +91,7 @@ describe('Minecraft Interface - Standalone Tests', () => {
       hideErrors: false,
       client: {
         username: 'TestBot',
-        version: '1.21.4',
+        version: '1.20.1',
         protocol: 763,
       },
     };

@@ -246,15 +246,43 @@ export class SimpleMinecraftInterface extends EventEmitter {
   private async moveForward(distance: number): Promise<any> {
     if (!this.bot) throw new Error('Bot not connected');
 
-    const startPos = this.bot.entity.position.clone();
-    const targetPos = startPos.offset(0, 0, distance);
+    try {
+      const startPos = this.bot.entity.position.clone();
+      const targetPos = startPos.offset(0, 0, distance);
 
-    // Simple movement using control state
-    this.bot.setControlState('forward', true);
-    await new Promise((resolve) => setTimeout(resolve, distance * 1000));
-    this.bot.setControlState('forward', false);
+      // Check if movement is possible
+      const blockAhead = this.bot.blockAt(targetPos);
+      if (blockAhead && blockAhead.boundingBox === 'block') {
+        return {
+          success: false,
+          error: `Cannot move forward: blocked by ${blockAhead.name}`,
+          distance: 0,
+        };
+      }
 
-    return { success: true, distance };
+      // Simple movement using control state
+      this.bot.setControlState('forward', true);
+      await new Promise((resolve) => setTimeout(resolve, distance * 1000));
+      this.bot.setControlState('forward', false);
+
+      // Check if we actually moved
+      const endPos = this.bot.entity.position;
+      const actualDistance = startPos.distanceTo(endPos);
+
+      return {
+        success: actualDistance > 0,
+        distance: actualDistance,
+        moved: actualDistance > 0,
+        startPosition: { x: startPos.x, y: startPos.y, z: startPos.z },
+        endPosition: { x: endPos.x, y: endPos.y, z: endPos.z },
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: `Movement failed: ${error instanceof Error ? error.message : String(error)}`,
+        distance: 0,
+      };
+    }
   }
 
   /**
@@ -263,13 +291,31 @@ export class SimpleMinecraftInterface extends EventEmitter {
   private async turnLeft(angle: number): Promise<any> {
     if (!this.bot) throw new Error('Bot not connected');
 
-    const currentYaw = this.bot.entity.yaw;
-    const targetYaw = currentYaw + (angle * Math.PI) / 180;
+    try {
+      const currentYaw = this.bot.entity.yaw;
+      const targetYaw = currentYaw + (angle * Math.PI) / 180;
 
-    await this.bot.look(currentYaw, this.bot.entity.pitch);
-    await this.bot.look(targetYaw, this.bot.entity.pitch);
+      await this.bot.look(currentYaw, this.bot.entity.pitch);
+      await this.bot.look(targetYaw, this.bot.entity.pitch);
 
-    return { success: true, angle };
+      // Verify the turn actually happened
+      const newYaw = this.bot.entity.yaw;
+      const actualAngle = ((newYaw - currentYaw) * 180) / Math.PI;
+
+      return {
+        success: Math.abs(actualAngle) > 0,
+        angle: actualAngle,
+        turned: Math.abs(actualAngle) > 0,
+        startYaw: currentYaw,
+        endYaw: newYaw,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: `Turn failed: ${error instanceof Error ? error.message : String(error)}`,
+        angle: 0,
+      };
+    }
   }
 
   /**
@@ -278,13 +324,31 @@ export class SimpleMinecraftInterface extends EventEmitter {
   private async turnRight(angle: number): Promise<any> {
     if (!this.bot) throw new Error('Bot not connected');
 
-    const currentYaw = this.bot.entity.yaw;
-    const targetYaw = currentYaw - (angle * Math.PI) / 180;
+    try {
+      const currentYaw = this.bot.entity.yaw;
+      const targetYaw = currentYaw - (angle * Math.PI) / 180;
 
-    await this.bot.look(currentYaw, this.bot.entity.pitch);
-    await this.bot.look(targetYaw, this.bot.entity.pitch);
+      await this.bot.look(currentYaw, this.bot.entity.pitch);
+      await this.bot.look(targetYaw, this.bot.entity.pitch);
 
-    return { success: true, angle };
+      // Verify the turn actually happened
+      const newYaw = this.bot.entity.yaw;
+      const actualAngle = ((newYaw - currentYaw) * 180) / Math.PI;
+
+      return {
+        success: Math.abs(actualAngle) > 0,
+        angle: actualAngle,
+        turned: Math.abs(actualAngle) > 0,
+        startYaw: currentYaw,
+        endYaw: newYaw,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: `Turn failed: ${error instanceof Error ? error.message : String(error)}`,
+        angle: 0,
+      };
+    }
   }
 
   /**
@@ -293,11 +357,30 @@ export class SimpleMinecraftInterface extends EventEmitter {
   private async jump(): Promise<any> {
     if (!this.bot) throw new Error('Bot not connected');
 
-    this.bot.setControlState('jump', true);
-    await new Promise((resolve) => setTimeout(resolve, 100));
-    this.bot.setControlState('jump', false);
+    try {
+      const startY = this.bot.entity.position.y;
 
-    return { success: true };
+      this.bot.setControlState('jump', true);
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      this.bot.setControlState('jump', false);
+
+      // Check if we actually jumped
+      const endY = this.bot.entity.position.y;
+      const jumped = endY > startY;
+
+      return {
+        success: jumped,
+        jumped,
+        startY,
+        endY,
+        heightGained: endY - startY,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: `Jump failed: ${error instanceof Error ? error.message : String(error)}`,
+      };
+    }
   }
 
   /**
@@ -506,14 +589,42 @@ export class SimpleMinecraftInterface extends EventEmitter {
         };
       }
 
-      // For now, just return success without actually placing the block
-      // TODO: Implement proper block placement when API is confirmed
-      return {
-        success: true,
-        block: blockType,
-        position,
-        message: `Would place ${blockType} at ${position.x}, ${position.y}, ${position.z}`,
-      };
+      // Attempt to place the block
+      try {
+        const block = this.bot.blockAt(
+          new Vec3(position.x, position.y, position.z)
+        );
+        if (!block) {
+          return {
+            success: false,
+            error: `No block found at position ${position.x}, ${position.y}, ${position.z}`,
+          };
+        }
+
+        // Check if the block can be placed
+        const canPlace = this.bot.canDigBlock(block);
+        if (!canPlace) {
+          return {
+            success: false,
+            error: `Cannot place ${blockType} at position ${position.x}, ${position.y}, ${position.z}`,
+          };
+        }
+
+        // Actually place the block
+        await this.bot.placeBlock(block, item as any);
+
+        return {
+          success: true,
+          block: blockType,
+          position,
+          message: `Placed ${blockType} at ${position.x}, ${position.y}, ${position.z}`,
+        };
+      } catch (error) {
+        return {
+          success: false,
+          error: `Failed to place block: ${error instanceof Error ? error.message : String(error)}`,
+        };
+      }
     } catch (error) {
       return {
         success: false,
@@ -578,7 +689,15 @@ export class SimpleMinecraftInterface extends EventEmitter {
         }
       }
 
-      return { success: true, movedItems };
+      return {
+        success: movedItems.length > 0,
+        movedItems,
+        itemsMoved: movedItems.length,
+        message:
+          movedItems.length > 0
+            ? `Moved ${movedItems.length} items to hotbar`
+            : 'No items moved to hotbar',
+      };
     } catch (error) {
       return {
         success: false,

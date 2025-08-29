@@ -419,46 +419,239 @@ export class EnhancedReactiveExecutor {
    * Execute a specific task
    */
   async executeTask(task: any): Promise<any> {
-    // Convert task to plan and execute
-    const plan: Plan = {
-      id: `task-${task.id}`,
-      goalId: `goal-${task.id}`,
-      steps: [
-        {
-          id: `step-${task.id}`,
-          planId: `task-${task.id}`,
-          action: {
-            id: `action-${task.id}`,
-            name: task.type,
-            description: task.description || `Execute ${task.type}`,
-            type: ActionType.INTERACTION,
-            parameters: task.parameters || {},
-            preconditions: [],
-            effects: [],
-            cost: 1,
-            duration: 5000,
-            successProbability: 0.8,
-          },
-          preconditions: [],
-          effects: [],
-          status: PlanStepStatus.PENDING,
-          order: 1,
-          estimatedDuration: 5000,
-          dependencies: [],
+    try {
+      // Use the executeTaskInMinecraft function directly for proper task execution
+      const result = await this.executeTaskInMinecraft(task);
+
+      // Return result in the expected format
+      return {
+        success: result.success,
+        planExecuted: true,
+        safetyReflexActivated: false,
+        planRepaired: false,
+        duration: 0, // Will be calculated if needed
+        actionsCompleted: result.success ? 1 : 0,
+        error: result.error,
+        data: result,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        planExecuted: false,
+        safetyReflexActivated: false,
+        planRepaired: false,
+        duration: 0,
+        actionsCompleted: 0,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      };
+    }
+  }
+
+  /**
+   * Execute task in Minecraft using the proper implementation
+   */
+  private async executeTaskInMinecraft(task: any) {
+    try {
+      const minecraftUrl = 'http://localhost:3005';
+
+      // Check if the bot is connected first
+      let botStatus;
+      try {
+        botStatus = await fetch(`${minecraftUrl}/health`).then((res) =>
+          res.json()
+        );
+      } catch (error) {
+        // If we can't connect to the Minecraft server, return failure
+        return {
+          success: false,
+          error: 'Cannot connect to Minecraft server',
+          type: task.type,
+        };
+      }
+
+      const typedBotStatus = botStatus as any;
+
+      // Enhanced verification: check both connection and health
+      if (!typedBotStatus.executionStatus?.bot?.connected) {
+        return {
+          success: false,
+          error: 'Bot not connected to Minecraft server',
+          botStatus: botStatus,
+          type: task.type,
+        };
+      }
+
+      // Critical: Check if bot is actually alive (health > 0)
+      if (!typedBotStatus.isAlive || typedBotStatus.botStatus?.health <= 0) {
+        return {
+          success: false,
+          error: 'Bot is dead and cannot execute actions',
+          botStatus: botStatus,
+          type: task.type,
+          botHealth: typedBotStatus.botStatus?.health || 0,
+        };
+      }
+
+      // Execute the task based on type
+      switch (task.type) {
+        case 'craft':
+          return await this.executeCraftTask(task, minecraftUrl);
+        case 'move':
+        case 'move_forward':
+          return await this.executeMoveTask(task, minecraftUrl);
+        case 'gather':
+          return await this.executeGatherTask(task, minecraftUrl);
+        case 'explore':
+          return await this.executeExploreTask(task, minecraftUrl);
+        default:
+          // For unknown task types, return failure since we can't execute them
+          return {
+            success: false,
+            error: `Unknown task type: ${task.type}`,
+            type: task.type,
+          };
+      }
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+        type: task.type,
+      };
+    }
+  }
+
+  /**
+   * Execute crafting task with proper validation
+   */
+  private async executeCraftTask(task: any, minecraftUrl: string) {
+    const itemToCraft = task.parameters?.item || 'item';
+
+    // Check if we can actually craft the item
+    const canCraft = await fetch(`${minecraftUrl}/action`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        type: 'can_craft',
+        parameters: { item: itemToCraft },
+      }),
+    }).then((res) => res.json());
+
+    if (!(canCraft as any).success || !(canCraft as any).canCraft) {
+      return {
+        success: false,
+        error: (canCraft as any).error || 'Cannot craft item',
+        item: itemToCraft,
+        type: 'craft',
+      };
+    }
+
+    // Actually attempt to craft the item
+    const craftResult = await fetch(`${minecraftUrl}/action`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        type: 'craft_item',
+        parameters: {
+          item: itemToCraft,
+          quantity: task.parameters?.quantity || 1,
         },
-      ],
-      status: PlanStatus.EXECUTING,
-      priority: task.priority || 0.5,
-      estimatedDuration: 30000, // 30 seconds default
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
-      successProbability: 0.8,
+      }),
+    }).then((res) => res.json());
+
+    return {
+      success: (craftResult as any).success,
+      error: (craftResult as any).error,
+      item: itemToCraft,
+      type: 'craft',
+      data: craftResult,
     };
+  }
 
-    const worldState = this.createDefaultWorldState();
-    const mcpBus = this.createDefaultMCPBus();
+  /**
+   * Execute movement task with proper validation
+   */
+  private async executeMoveTask(task: any, minecraftUrl: string) {
+    try {
+      const result = await fetch(`${minecraftUrl}/action`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'move_forward',
+          parameters: { distance: task.parameters?.distance || 1 },
+        }),
+      }).then((res) => res.json());
 
-    return this.execute(plan, worldState, mcpBus);
+      return {
+        success: (result as any).success,
+        error: (result as any).error,
+        type: 'move',
+        data: result,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: `Failed to execute move task: ${error}`,
+        type: 'move',
+      };
+    }
+  }
+
+  /**
+   * Execute gathering task
+   */
+  private async executeGatherTask(task: any, minecraftUrl: string) {
+    try {
+      const result = await fetch(`${minecraftUrl}/action`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'gather',
+          parameters: task.parameters || {},
+        }),
+      }).then((res) => res.json());
+
+      return {
+        success: (result as any).success,
+        error: (result as any).error,
+        type: 'gather',
+        data: result,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: `Failed to execute gather task: ${error}`,
+        type: 'gather',
+      };
+    }
+  }
+
+  /**
+   * Execute exploration task
+   */
+  private async executeExploreTask(task: any, minecraftUrl: string) {
+    try {
+      const result = await fetch(`${minecraftUrl}/action`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'explore',
+          parameters: task.parameters || {},
+        }),
+      }).then((res) => res.json());
+
+      return {
+        success: (result as any).success,
+        error: (result as any).error,
+        type: 'explore',
+        data: result,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: `Failed to execute explore task: ${error}`,
+        type: 'explore',
+      };
+    }
   }
 
   /**
@@ -466,19 +659,112 @@ export class EnhancedReactiveExecutor {
    */
   private createDefaultWorldState(): WorldState {
     return {
-      getHealth: () => 100,
-      getHunger: () => 100,
-      getEnergy: () => 100,
-      getPosition: () => ({ x: 0, y: 64, z: 0 }),
-      getLightLevel: () => 15,
-      getAir: () => 100,
-      getTimeOfDay: () => 'day',
-      hasItem: () => false,
-      distanceTo: () => 0,
-      getThreatLevel: () => 0,
-      getInventory: () => ({}),
-      getNearbyResources: () => [],
-      getNearbyHostiles: () => [],
+      getHealth: () => {
+        // Try to get real bot health, fallback to 0 if not connected
+        try {
+          // This would need to be connected to the actual bot instance
+          // For now, return 0 to indicate no connection
+          return 0;
+        } catch (error) {
+          return 0;
+        }
+      },
+      getHunger: () => {
+        try {
+          // Connect to real bot hunger level
+          return 0;
+        } catch (error) {
+          return 0;
+        }
+      },
+      getEnergy: () => {
+        try {
+          // Connect to real bot energy level
+          return 0;
+        } catch (error) {
+          return 0;
+        }
+      },
+      getPosition: () => {
+        try {
+          // Connect to real bot position
+          return { x: 0, y: 0, z: 0 };
+        } catch (error) {
+          return { x: 0, y: 0, z: 0 };
+        }
+      },
+      getLightLevel: () => {
+        try {
+          // Connect to real light level
+          return 0;
+        } catch (error) {
+          return 0;
+        }
+      },
+      getAir: () => {
+        try {
+          // Connect to real air level
+          return 0;
+        } catch (error) {
+          return 0;
+        }
+      },
+      getTimeOfDay: () => {
+        try {
+          // Connect to real time of day
+          return 'day'; // Default to day, would be determined by real world state
+        } catch (error) {
+          return 'day';
+        }
+      },
+      hasItem: (itemName: string, quantity: number = 1) => {
+        try {
+          // Connect to real bot inventory
+          return false;
+        } catch (error) {
+          return false;
+        }
+      },
+      distanceTo: (target: any) => {
+        try {
+          // Calculate real distance to target
+          return Infinity;
+        } catch (error) {
+          return Infinity;
+        }
+      },
+      getThreatLevel: () => {
+        try {
+          // Connect to real threat assessment
+          return 0;
+        } catch (error) {
+          return 0;
+        }
+      },
+      getInventory: () => {
+        try {
+          // Connect to real bot inventory
+          return {}; // Empty inventory record
+        } catch (error) {
+          return {};
+        }
+      },
+      getNearbyResources: () => {
+        try {
+          // Connect to real resource detection
+          return [];
+        } catch (error) {
+          return [];
+        }
+      },
+      getNearbyHostiles: () => {
+        try {
+          // Connect to real hostile detection
+          return [];
+        } catch (error) {
+          return [];
+        }
+      },
     };
   }
 
@@ -488,16 +774,45 @@ export class EnhancedReactiveExecutor {
   private createDefaultMCPBus(): MCPBus {
     return {
       mineflayer: {
-        consume: async () => ({ success: true }),
-        dig: async () => ({ success: true }),
+        consume: async (foodType: string) => {
+          // This should connect to real mineflayer bot
+          // For now, return failure to indicate no connection
+          return {
+            success: false,
+            error: 'No mineflayer bot connection available',
+            foodType,
+          };
+        },
+        dig: async (block: any) => {
+          // This should connect to real mineflayer bot
+          return {
+            success: false,
+            error: 'No mineflayer bot connection available',
+            block,
+          };
+        },
         pathfinder: {},
       },
       navigation: {
-        pathTo: async () => ({ success: true }),
-        swimToSurface: async () => ({ success: true }),
+        pathTo: async (position: any, options?: any) => {
+          // This should connect to real navigation system
+          return {
+            success: false,
+            error: 'No navigation system connection available',
+            position,
+            options,
+          };
+        },
+        swimToSurface: async () => {
+          // This should connect to real navigation system
+          return {
+            success: false,
+            error: 'No navigation system connection available',
+          };
+        },
       },
       state: {
-        position: { x: 0, y: 64, z: 0 },
+        position: { x: 0, y: 0, z: 0 }, // Empty state
       },
     };
   }
@@ -511,20 +826,31 @@ class DefaultExecutionContextBuilder implements ExecutionContextBuilder {
     worldState: WorldState,
     currentPlan?: GOAPPlan
   ): ExecutionContext {
-    return {
+    // Real context building would analyze world state and plan
+    // For now, use basic values from world state with empty defaults
+    const context: ExecutionContext = {
       threatLevel: worldState.getThreatLevel(),
       hostileCount: worldState.getNearbyHostiles().length,
-      nearLava: false, // Would be determined by world state
-      lavaDistance: 100,
-      resourceValue: 0,
-      detourDistance: 0,
+      nearLava: false, // Would be determined by world state analysis
+      lavaDistance: Infinity, // Would be calculated from world state
+      resourceValue: 0, // Would be calculated from nearby resources
+      detourDistance: 0, // Would be calculated from path analysis
       subgoalUrgency: currentPlan ? 0.5 : 0,
       estimatedTimeToSubgoal: currentPlan ? currentPlan.estimatedDuration : 0,
-      commitmentStrength: 0.5,
+      commitmentStrength: 0.5, // Would be calculated from plan confidence
       timeOfDay: worldState.getTimeOfDay(),
       lightLevel: worldState.getLightLevel(),
       airLevel: worldState.getAir(),
     };
+
+    // Log when using default context
+    if (context.threatLevel === 0 && context.hostileCount === 0) {
+      console.log(
+        '🌍 Context building: Using default values - no real world analysis available'
+      );
+    }
+
+    return context;
   }
 }
 
@@ -533,31 +859,27 @@ class DefaultExecutionContextBuilder implements ExecutionContextBuilder {
  */
 class DefaultRealTimeAdapter implements RealTimeAdapter {
   adaptToOpportunities(context: ExecutionContext): any[] {
-    // Simplified opportunity detection
-    const opportunities = [];
-
-    if (context.nearestResource && context.resourceValue > 10) {
-      opportunities.push({
-        type: 'resource_gathering',
-        value: context.resourceValue,
-        distance: context.detourDistance,
-      });
-    }
-
-    return opportunities;
+    // Real opportunity detection would analyze world state
+    // For now, return empty array to indicate no opportunities detected
+    console.log('🔍 Opportunity detection: No real-time analysis available');
+    return [];
   }
 
   respondToThreats(threats: any[]): any[] {
-    // Simplified threat response
-    return threats.map((threat) => ({
-      type: 'evasion',
-      priority: threat.dangerLevel,
-      action: 'flee',
-    }));
+    // Real threat response would analyze threats and generate appropriate responses
+    // For now, return empty array to indicate no threat responses available
+    if (threats.length > 0) {
+      console.warn(
+        `⚠️ Threat detection: ${threats.length} threats detected but no response system available`
+      );
+    }
+    return [];
   }
 
   optimizeExecution(plan: GOAPPlan, context: ExecutionContext): GOAPPlan {
-    // Simplified optimization - would implement more sophisticated logic
+    // Real optimization would analyze context and modify plan accordingly
+    // For now, return plan unchanged to indicate no optimization available
+    console.log('⚡ Plan optimization: No real-time optimization available');
     return plan;
   }
 }

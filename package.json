@@ -26,7 +26,11 @@
     "agent:dev": "pnpm --filter @conscious-bot/agent dev",
     "core:dev": "pnpm --filter @conscious-bot/core dev",
     "hrm:train": "cd sapient-hrm && python pretrain.py",
-    "hrm:eval": "cd sapient-hrm && python evaluate.py"
+    "hrm:eval": "cd sapient-hrm && python evaluate.py",
+    "audit": "node scripts/audit-architecture.js",
+    "audit:architecture": "node scripts/audit-architecture.js architecture",
+    "audit:integration": "node scripts/audit-architecture.js integration",
+    "audit:complete": "node scripts/audit-architecture.js complete"
   },
   "workspaces": [
     "packages/*",

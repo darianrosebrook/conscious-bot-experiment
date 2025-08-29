@@ -111,7 +111,7 @@ export class ActionTranslator {
         return {
           type: 'dig_block',
           parameters: {
-            pos: params.position,
+            pos: params.pos || params.position || 'current',
             tool: params.tool,
           },
           timeout: 15000,
@@ -305,10 +305,21 @@ export class ActionTranslator {
 
       case 'dig_blocks':
         console.log('Creating dig action');
+        // Handle pattern-based digging (like tree_logs_top_down)
+        if (params.pattern === 'tree_logs_top_down') {
+          return {
+            type: 'dig_block',
+            parameters: {
+              pos: 'current', // Start with current position for tree chopping
+              tool: params.tool || 'hand',
+            },
+            timeout: 15000,
+          };
+        }
         return {
           type: 'dig_block',
           parameters: {
-            pos: params.position || 'current',
+            pos: params.position || params.pos || 'current',
             tool: params.tool || 'hand',
           },
           timeout: 15000,
@@ -639,12 +650,14 @@ export class ActionTranslator {
   /**
    * Execute a Minecraft action
    */
-  private async executeAction(
+  async executeAction(
     action: MinecraftAction
   ): Promise<{ success: boolean; data?: any; error?: string }> {
+    console.log('🔧 executeAction called with:', action);
     const timeout = action.timeout || this.config.actionTimeout;
 
     try {
+      console.log('🔧 About to switch on action type:', action.type);
       switch (action.type) {
         case 'navigate':
           return await this.executeNavigate(action as NavigateAction, timeout);
@@ -692,6 +705,7 @@ export class ActionTranslator {
           );
 
         case 'dig_block':
+          console.log('🔧 Executing dig_block action:', action);
           return await this.executeDigBlock(action, timeout);
 
         case 'craft_item':
@@ -808,9 +822,11 @@ export class ActionTranslator {
     action: MinecraftAction,
     timeout: number
   ): Promise<{ success: boolean; data?: any; error?: string }> {
+    console.log('🔧 executeDigBlock called with:', action);
     try {
       // Get the global leaf factory
       const leafFactory = (global as any).minecraftLeafFactory;
+      console.log('🔧 Leaf factory available:', !!leafFactory);
       if (!leafFactory) {
         return {
           success: false,
@@ -861,8 +877,19 @@ export class ActionTranslator {
         },
       };
 
+      // Handle "current" position case
+      let parameters = { ...action.parameters };
+      if (parameters.pos === 'current') {
+        const botPos = this.bot.entity.position;
+        parameters.pos = {
+          x: Math.floor(botPos.x),
+          y: Math.floor(botPos.y),
+          z: Math.floor(botPos.z),
+        };
+      }
+
       // Execute the dig block leaf
-      const result = await digBlockLeaf.run(context, action.parameters);
+      const result = await digBlockLeaf.run(context, parameters);
 
       return {
         success: result.status === 'success',

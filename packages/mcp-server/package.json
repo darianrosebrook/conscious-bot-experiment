@@ -1,0 +1,36 @@
+{
+  "name": "@conscious-bot/mcp-server",
+  "version": "0.1.0",
+  "description": "MCP Server for Conscious Bot - Standardized integration layer",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "test": "vitest",
+    "start": "node dist/mcp-server.js",
+    "start:server": "node dist/mcp-server.js",
+    "test:client": "node dist/test-client.js"
+  },
+  "dependencies": {
+    "@conscious-bot/core": "workspace:*",
+    "@conscious-bot/minecraft-interface": "workspace:*",
+    "@conscious-bot/planning": "workspace:*",
+    "@modelcontextprotocol/sdk": "^0.4.0",
+    "ajv": "^8.12.0",
+    "cors": "^2.8.5",
+    "express": "^4.18.2"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.0.0",
+    "vitest": "^1.0.0"
+  },
+  "keywords": [
+    "mcp",
+    "minecraft",
+    "ai",
+    "conscious-bot"
+  ],
+  "author": "@darianrosebrook"
+}

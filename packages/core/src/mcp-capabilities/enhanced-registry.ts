@@ -1002,6 +1002,13 @@ export class EnhancedRegistry {
   }
 
   /**
+   * Get all capabilities (alias for listCapabilities)
+   */
+  async getAllCapabilities(): Promise<any[]> {
+    return this.listCapabilities();
+  }
+
+  /**
    * List registered leaves (for testing and validation)
    */
   async listLeaves(): Promise<any[]> {

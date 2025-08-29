@@ -33,13 +33,40 @@ const mockBot = {
   quickBarSlot: 0,
   // Add mock methods for leaf operations
   pathfinder: {
-    goto: async () => ({ success: true }),
+    goto: async (target: any) => ({
+      success: true,
+      distance: 5.0,
+      target: target,
+      message: 'Mock pathfinding completed',
+    }),
   },
-  moveTo: async () => ({ success: true }),
-  dig: async () => ({ success: true }),
-  placeBlock: async () => ({ success: true }),
-  chat: async () => ({ success: true }),
-  wait: async () => ({ success: true }),
+  moveTo: async (target: any) => ({
+    success: true,
+    distance: 5.0,
+    target: target,
+    message: 'Mock movement completed',
+  }),
+  dig: async (block: any) => ({
+    success: true,
+    block: block?.name || 'unknown',
+    message: 'Mock digging completed',
+  }),
+  placeBlock: async (block: any, item: any) => ({
+    success: true,
+    block: block?.name || 'unknown',
+    item: item?.name || 'unknown',
+    message: 'Mock block placement completed',
+  }),
+  chat: async (message: string) => ({
+    success: true,
+    message: message,
+    timestamp: Date.now(),
+  }),
+  wait: async (duration: number) => ({
+    success: true,
+    duration: duration,
+    message: 'Mock wait completed',
+  }),
   getLight: () => 15,
   getBiome: () => ({ name: 'plains' }),
 };

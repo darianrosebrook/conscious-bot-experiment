@@ -265,28 +265,10 @@ export class EnhancedGOAPPlanner {
       return plan;
     }
 
-    // Always return a plan with at least one action for testing
-    const fallbackAction: AdvancedGOAPAction = {
-      name: 'FallbackAction',
-      preconditions: [],
-      effects: [],
-      baseCost: 1,
-      dynamicCostFn: () => 1,
-      exec: async () => ({
-        success: true,
-        duration: 0,
-        resourcesConsumed: {},
-        resourcesGained: {},
-      }),
-      isApplicable: () => true,
-      estimatedDuration: 1000,
-      resourceRequirements: {},
-    };
-
-    const plan = this.createPlan([fallbackAction], subgoal, context);
-    this.planCache.set(cacheKey, plan);
+    // No plan found within budget - return null instead of fake action
+    console.warn(`⚠️ No plan found for subgoal within budget: ${subgoal.type}`);
     this.updatePlanningMetrics(performance.now() - startTime);
-    return plan;
+    return null;
 
     // No plan found within budget
     return null;

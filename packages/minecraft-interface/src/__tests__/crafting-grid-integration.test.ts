@@ -29,7 +29,7 @@ describe('Crafting Grid Integration Tests', () => {
         host: 'localhost',
         port: 25565,
         username: 'IntegrationTester',
-        version: '1.21.4',
+        version: '1.20.1',
         auth: 'offline' as const,
       });
 
@@ -276,7 +276,7 @@ export async function checkServerAvailability(): Promise<boolean> {
       host: 'localhost',
       port: 25565,
       username: 'ServerCheck',
-      version: '1.21.4',
+      version: '1.20.1',
       auth: 'offline' as const,
     });
 
