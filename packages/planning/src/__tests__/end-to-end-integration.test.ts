@@ -1,3 +1,5 @@
+/// <reference types="vitest/globals" />
+
 /**
  * End-to-End Integration Test Suite
  *
@@ -22,7 +24,7 @@ vi.mock('events', () => {
 
 // Mock fetch but allow real HTTP calls to our mock server
 vi.mock('node-fetch');
-const mockFetch = fetch as vi.MockedFunction<typeof fetch>;
+const mockFetch = fetch as any;
 
 // Import mock server (we'll use the actual implementation in a real test)
 interface MockMinecraftServer {

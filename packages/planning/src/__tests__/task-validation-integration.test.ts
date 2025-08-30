@@ -11,7 +11,7 @@ import fetch from 'node-fetch';
 
 // Mock fetch for HTTP requests
 vi.mock('node-fetch');
-const mockFetch = fetch as vi.MockedFunction<typeof fetch>;
+const mockFetch = fetch as any;
 
 // Import the actual validateTaskCompletion function from server.ts
 // We'll need to extract this function for testing

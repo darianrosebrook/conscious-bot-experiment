@@ -6,7 +6,7 @@
  * @author @darianrosebrook
  */
 
-import { SkillRegistry } from '../../../../memory/src/skills/SkillRegistry';
+import { SkillRegistry } from '@conscious-bot/memory';
 import { BehaviorTreeRunner } from '../../behavior-trees/BehaviorTreeRunner';
 
 // Mock tool executor for testing

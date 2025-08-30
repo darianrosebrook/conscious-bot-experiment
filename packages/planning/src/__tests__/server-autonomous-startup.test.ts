@@ -7,11 +7,12 @@
  * @author @darianrosebrook
  */
 
+import { vi } from 'vitest';
 import fetch from 'node-fetch';
 
 // Mock fetch for HTTP requests
 vi.mock('node-fetch');
-const mockFetch = fetch as vi.MockedFunction<typeof fetch>;
+const mockFetch = fetch as any;
 
 describe('Server Autonomous Startup Tests', () => {
   beforeEach(() => {
@@ -360,7 +361,7 @@ describe('Server Autonomous Startup Tests', () => {
               (h) => h.taskType === type
             );
             const successful = typeExecutions.filter((h) => h.success).length;
-            this.taskTypeSuccessRates[type] =
+            this.taskTypeSuccessRates[type as string] =
               successful / typeExecutions.length;
           });
         },

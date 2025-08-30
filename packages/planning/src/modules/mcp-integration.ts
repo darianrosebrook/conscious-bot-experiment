@@ -1,0 +1,287 @@
+/**
+ * MCP Integration Module
+ *
+ * Handles integration between the planning server and the MCP server.
+ * Provides a clean interface for MCP operations and manages the connection.
+ *
+ * @author @darianrosebrook
+ */
+
+import { LeafFactory, createLeafContext } from '@conscious-bot/core';
+import {
+  ConsciousBotMCPServer,
+  MCPServerDependencies,
+} from '@conscious-bot/mcp-server';
+
+// Use the imported interface from MCP server
+
+export interface MCPIntegrationConfig {
+  mcpServerPort?: number;
+  enableMCP?: boolean;
+  registryEndpoint?: string;
+  botEndpoint?: string;
+}
+
+export interface MCPToolResult {
+  success: boolean;
+  data?: any;
+  error?: string;
+  metrics?: Record<string, any>;
+}
+
+export interface MCPOptionRegistration {
+  id: string;
+  name: string;
+  description: string;
+  btDefinition: any;
+  permissions?: string[];
+}
+
+export class MCPIntegration {
+  private mcpServer: ConsciousBotMCPServer | null = null;
+  private leafFactory: LeafFactory;
+  private config: MCPIntegrationConfig;
+  private isInitialized = false;
+
+  constructor(config: MCPIntegrationConfig = {}) {
+    this.config = {
+      enableMCP: true,
+      mcpServerPort: 3006,
+      ...config,
+    };
+
+    // Initialize leaf factory
+    this.leafFactory = new LeafFactory();
+  }
+
+  /**
+   * Initialize the MCP integration
+   */
+  async initialize(bot?: any, registry?: any): Promise<void> {
+    if (!this.config.enableMCP) {
+      console.log('[MCP] Integration disabled by configuration');
+      return;
+    }
+
+    try {
+      const deps: MCPServerDependencies = {
+        leafFactory: this.leafFactory,
+        registry,
+        bot,
+        policyBuckets: {
+          Tactical: { maxMs: 60_000, checkpointEveryMs: 15_000 },
+          Short: { maxMs: 240_000, checkpointEveryMs: 60_000 },
+          Standard: { maxMs: 600_000, checkpointEveryMs: 60_000 },
+          Long: { maxMs: 1_500_000, checkpointEveryMs: 90_000 },
+          Expedition: { maxMs: 3_000_000, checkpointEveryMs: 120_000 },
+        },
+      };
+
+      this.mcpServer = new ConsciousBotMCPServer(deps);
+      this.isInitialized = true;
+
+      console.log('[MCP] Integration initialized successfully');
+    } catch (error) {
+      console.error('[MCP] Failed to initialize integration:', error);
+      // Don't throw - allow server to start without MCP
+      this.isInitialized = false;
+    }
+  }
+
+  /**
+   * Register a leaf with the MCP server
+   */
+  async registerLeaf(leaf: any): Promise<boolean> {
+    if (!this.isInitialized) {
+      console.warn('[MCP] Integration not initialized');
+      return false;
+    }
+
+    try {
+      const result = this.leafFactory.register(leaf);
+      return result.ok;
+    } catch (error) {
+      console.error('[MCP] Failed to register leaf:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Register a BT option via MCP
+   */
+  async registerOption(option: MCPOptionRegistration): Promise<MCPToolResult> {
+    if (!this.isInitialized || !this.mcpServer) {
+      return {
+        success: false,
+        error: 'MCP integration not initialized',
+      };
+    }
+
+    try {
+      const result = await (this.mcpServer as any).handleRegisterOption({
+        id: option.id,
+        name: option.name,
+        description: option.description,
+        btDefinition: option.btDefinition,
+        permissions: option.permissions || [],
+      });
+
+      return {
+        success: result.status === 'success',
+        data: result.optionId,
+        error: result.status === 'failure' ? result.error?.detail : undefined,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      };
+    }
+  }
+
+  /**
+   * Execute a tool via MCP
+   */
+  async executeTool(
+    toolName: string,
+    args: Record<string, any>
+  ): Promise<MCPToolResult> {
+    if (!this.isInitialized || !this.mcpServer) {
+      return {
+        success: false,
+        error: 'MCP integration not initialized',
+      };
+    }
+
+    try {
+      const result = await (this.mcpServer as any).executeTool(toolName, args);
+
+      return {
+        success: true,
+        data: result,
+      };
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error.message || 'Tool execution failed',
+        data: error.data,
+      };
+    }
+  }
+
+  /**
+   * List available tools from MCP
+   */
+  async listTools(): Promise<string[]> {
+    if (!this.isInitialized || !this.mcpServer) {
+      return [];
+    }
+
+    try {
+      // For now, return an empty array since we can't access private tools
+      // In a real implementation, we'd need to expose this via a public method
+      return [];
+    } catch (error) {
+      console.error('[MCP] Failed to list tools:', error);
+      return [];
+    }
+  }
+
+  /**
+   * List available options from MCP
+   */
+  async listOptions(status: string = 'all'): Promise<any[]> {
+    if (!this.isInitialized || !this.mcpServer) {
+      return [];
+    }
+
+    try {
+      const result = await (this.mcpServer as any).handleListOptions({
+        status,
+      });
+      return result.options || [];
+    } catch (error) {
+      console.error('[MCP] Failed to list options:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Promote an option via MCP
+   */
+  async promoteOption(optionId: string): Promise<MCPToolResult> {
+    if (!this.isInitialized || !this.mcpServer) {
+      return {
+        success: false,
+        error: 'MCP integration not initialized',
+      };
+    }
+
+    try {
+      const result = await (this.mcpServer as any).handlePromoteOption({
+        optionId,
+      });
+
+      return {
+        success: result.status === 'success',
+        data: result.optionId,
+        error: result.status === 'failure' ? result.error?.detail : undefined,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      };
+    }
+  }
+
+  /**
+   * Run an option via MCP
+   */
+  async runOption(
+    optionId: string,
+    args?: Record<string, any>
+  ): Promise<MCPToolResult> {
+    if (!this.isInitialized || !this.mcpServer) {
+      return {
+        success: false,
+        error: 'MCP integration not initialized',
+      };
+    }
+
+    try {
+      const result = await (this.mcpServer as any).executeTool('run_option', {
+        id: optionId,
+        args: args || {},
+      });
+
+      return {
+        success: true,
+        data: result,
+      };
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error.message || 'Option execution failed',
+        data: error.data,
+      };
+    }
+  }
+
+  /**
+   * Get MCP server status
+   */
+  getStatus(): { initialized: boolean; enabled: boolean } {
+    return {
+      initialized: this.isInitialized,
+      enabled: this.config.enableMCP || false,
+    };
+  }
+
+  /**
+   * Get the underlying MCP server instance
+   */
+  getMCPServer(): ConsciousBotMCPServer | null {
+    return this.mcpServer;
+  }
+}

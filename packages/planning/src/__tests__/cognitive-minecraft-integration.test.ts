@@ -1,3 +1,5 @@
+/// <reference types="vitest/globals" />
+
 /**
  * Cognitive-Minecraft Integration Test Suite
  *
@@ -12,7 +14,7 @@ import fetch from 'node-fetch';
 
 // Mock fetch for HTTP requests
 vi.mock('node-fetch');
-const mockFetch = fetch as vi.MockedFunction<typeof fetch>;
+const mockFetch = fetch as any;
 
 // Mock EventEmitter to avoid issues
 vi.mock('events', () => {

@@ -7,6 +7,7 @@
  * @author @darianrosebrook
  */
 
+import { vi } from 'vitest';
 import {
   Plan,
   PlanStep,

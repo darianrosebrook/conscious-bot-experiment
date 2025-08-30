@@ -77,3 +77,6 @@ export {
 
 // Types
 export * from './types';
+
+// Additional exports for minecraft-interface compatibility
+export type { PlanStep, HomeostasisState } from './types';

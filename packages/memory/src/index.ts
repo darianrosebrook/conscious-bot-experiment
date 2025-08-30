@@ -23,6 +23,9 @@ export * from './semantic';
 // Provenance Memory
 export * from './provenance';
 
+// Skills
+export * from './skills';
+
 // Export only episodic memory types from base types
 export type { Experience, Outcome, EmotionalState } from './types';
 

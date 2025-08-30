@@ -9,11 +9,7 @@
  */
 
 import { EventEmitter } from 'events';
-import {
-  SkillRegistry,
-  Skill,
-  SkillMetadata,
-} from '../../../../memory/src/skills/SkillRegistry';
+import { SkillRegistry, Skill, SkillMetadata } from '@conscious-bot/memory';
 import {
   BehaviorTreeRunner,
   ToolExecutor,
@@ -181,14 +177,14 @@ export class SkillPlannerAdapter extends EventEmitter {
           Object.assign(context.worldState, result.worldStateChanges);
 
           // Record usage in skill registry
-          this.skillRegistry.recordUsage(
+          this.skillRegistry.recordSkillUsage(
             skillDecomp.skillId,
             true,
             result.duration
           );
         } else {
           failedSkills.push(skillDecomp.skillId);
-          this.skillRegistry.recordUsage(
+          this.skillRegistry.recordSkillUsage(
             skillDecomp.skillId,
             false,
             result.duration
@@ -359,8 +355,8 @@ export class SkillPlannerAdapter extends EventEmitter {
         skill.id,
         {}, // Default args for now
         {
-          timeout: skill.metadata.timeout || 30000,
-          maxRetries: skill.metadata.retries || 2,
+          timeout: 30000, // Default timeout
+          maxRetries: 2, // Default retries
           enableGuards: true,
           streamTicks: true,
         }
@@ -372,8 +368,8 @@ export class SkillPlannerAdapter extends EventEmitter {
         skillId: skill.id,
         success: result.status === 'success',
         duration,
-        worldStateChanges: result.data?.worldStateChanges || {},
-        telemetry: result.telemetry,
+        worldStateChanges: result.finalData?.worldStateChanges || {},
+        telemetry: result.ticks,
       };
     } catch (error) {
       const duration = Date.now() - startTime;
@@ -493,12 +489,32 @@ export class SkillPlannerAdapter extends EventEmitter {
   private selectBestSkill(skills: Skill[]): Skill {
     // Select skill with highest success rate and lowest complexity
     return skills.reduce((best, current) => {
-      const bestScore =
-        best.metadata.successRate * (1 - best.metadata.complexity);
+      const bestComplexityScore = this.getComplexityScore(
+        best.metadata.complexity
+      );
+      const currentComplexityScore = this.getComplexityScore(
+        current.metadata.complexity
+      );
+      const bestScore = best.metadata.successRate * (1 - bestComplexityScore);
       const currentScore =
-        current.metadata.successRate * (1 - current.metadata.complexity);
+        current.metadata.successRate * (1 - currentComplexityScore);
       return currentScore > bestScore ? current : best;
     });
+  }
+
+  private getComplexityScore(
+    complexity: 'simple' | 'moderate' | 'complex'
+  ): number {
+    switch (complexity) {
+      case 'simple':
+        return 0.2;
+      case 'moderate':
+        return 0.5;
+      case 'complex':
+        return 0.8;
+      default:
+        return 0.5;
+    }
   }
 
   private extractPreconditions(skill: Skill): Record<string, any> {
@@ -537,7 +553,8 @@ export class SkillPlannerAdapter extends EventEmitter {
   private estimateSkillDuration(skill: Skill): number {
     // Estimate duration based on skill complexity and metadata
     const baseDuration = skill.metadata.averageExecutionTime || 5000;
-    const complexityMultiplier = 1 + (skill.metadata.complexity || 0.5);
+    const complexityScore = this.getComplexityScore(skill.metadata.complexity);
+    const complexityMultiplier = 1 + complexityScore;
     return Math.round(baseDuration * complexityMultiplier);
   }
 
@@ -655,7 +672,7 @@ export class SkillPlannerAdapter extends EventEmitter {
       }
     });
 
-    return [...new Set(fallbacks)]; // Remove duplicates
+    return Array.from(new Set(fallbacks)); // Remove duplicates
   }
 
   private canSkillAchieveOutcome(

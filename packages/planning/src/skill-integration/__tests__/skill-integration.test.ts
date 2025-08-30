@@ -6,10 +6,13 @@
  * @author @darianrosebrook
  */
 
-import { SkillRegistry } from '../../../../memory/src/skills/SkillRegistry';
+import { SkillRegistry } from '@conscious-bot/memory';
 import { BehaviorTreeRunner } from '../../behavior-trees/BehaviorTreeRunner';
 import { SkillPlannerAdapter } from '../skill-planner-adapter';
-import { HybridSkillPlanner } from '../hybrid-skill-planner';
+import {
+  HybridSkillPlanner,
+  type HybridPlanningContext,
+} from '../hybrid-skill-planner';
 import { HRMInspiredPlanner } from '../../hierarchical-planner/hrm-inspired-planner';
 import { EnhancedGOAPPlanner } from '../../reactive-executor/enhanced-goap-planner';
 
@@ -25,6 +28,31 @@ const mockToolExecutor = {
 };
 
 describe('Skill Integration System', () => {
+  // Helper function to create properly typed contexts
+  const createTestContext = (
+    overrides: Partial<HybridPlanningContext> = {}
+  ): HybridPlanningContext => ({
+    skillRegistry,
+    worldState: {},
+    availableResources: {},
+    currentState: {},
+    resources: {},
+    timeConstraints: {
+      urgency: 'medium' as const,
+      maxPlanningTime: 5000,
+    },
+    planningPreferences: {
+      preferSkills: true,
+      preferMCP: false,
+      preferHTN: false,
+      preferGOAP: false,
+      allowHybrid: true,
+    },
+    constraints: [],
+    domain: 'minecraft',
+    ...overrides,
+  });
+
   let skillRegistry: SkillRegistry;
   let btRunner: BehaviorTreeRunner;
   let skillPlanner: SkillPlannerAdapter;

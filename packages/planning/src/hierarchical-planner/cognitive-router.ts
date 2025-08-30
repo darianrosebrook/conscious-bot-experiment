@@ -354,7 +354,7 @@ export class CognitiveTaskRouter {
     const avgLatencyByRouter: Record<string, number> = {};
 
     // Calculate accuracy by task type
-    for (const [key, metrics] of this.performanceMetrics.entries()) {
+    for (const [key, metrics] of Array.from(this.performanceMetrics.entries())) {
       accuracyByTaskType[key] =
         metrics.total > 0 ? metrics.success / metrics.total : 0;
     }

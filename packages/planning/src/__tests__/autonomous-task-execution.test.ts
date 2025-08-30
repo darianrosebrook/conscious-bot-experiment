@@ -1,3 +1,5 @@
+/// <reference types="vitest/globals" />
+
 /**
  * Autonomous Task Execution Test Suite
  *
@@ -11,7 +13,7 @@ import fetch from 'node-fetch';
 
 // Mock fetch for HTTP requests
 vi.mock('node-fetch');
-const mockFetch = fetch as vi.MockedFunction<typeof fetch>;
+const mockFetch = fetch as any;
 
 // Mock the planning system
 const mockPlanningSystem = {
@@ -175,8 +177,8 @@ describe('Autonomous Task Execution Tests', () => {
       const result = await autonomousTaskExecutor();
 
       expect(result).toBeDefined();
-      expect(result.type).toBe('explore');
-      expect(result.autonomous).toBe(true);
+      expect(result?.type).toBe('explore');
+      expect(result?.autonomous).toBe(true);
       expect(
         mockPlanningSystem.reactiveExecutor.executeNextTask
       ).toHaveBeenCalled();
@@ -219,8 +221,8 @@ describe('Autonomous Task Execution Tests', () => {
       const result = await autonomousTaskExecutor();
 
       expect(result).toBeDefined();
-      expect(result.id).toBe('pending-task-1');
-      expect(result.status).toBe('pending');
+      expect(result?.id).toBe('pending-task-1');
+      expect(result?.status).toBe('pending');
       expect(
         mockPlanningSystem.reactiveExecutor.executeNextTask
       ).toHaveBeenCalled();
@@ -308,8 +310,8 @@ describe('Autonomous Task Execution Tests', () => {
         }),
       });
 
-      expect(result.success).toBe(true);
-      expect(result.type).toBe('exploration');
+      expect(result?.success).toBe(true);
+      expect(result?.type).toBe('exploration');
     });
 
     it('should execute gather task in minecraft', async () => {
@@ -362,8 +364,8 @@ describe('Autonomous Task Execution Tests', () => {
       const result = await executeTaskInMinecraft(task);
 
       expect(mockFetch).toHaveBeenCalledTimes(2);
-      expect(result.success).toBe(true);
-      expect(result.type).toBe('gathering');
+      expect(result?.success).toBe(true);
+      expect(result?.type).toBe('gathering');
     });
 
     it('should handle task execution failures gracefully', async () => {
@@ -395,8 +397,8 @@ describe('Autonomous Task Execution Tests', () => {
 
       const result = await executeTaskInMinecraft(task);
 
-      expect(result.success).toBe(false);
-      expect(result.error).toBe('Network error');
+      expect(result?.success).toBe(false);
+      expect(result?.error).toBe('Network error');
     });
   });
 

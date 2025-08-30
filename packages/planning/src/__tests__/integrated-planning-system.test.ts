@@ -21,6 +21,7 @@ import {
   Need,
   NeedType,
   Resource,
+  ResourceType,
 } from '../types';
 
 describe('Integrated Planning System', () => {
@@ -56,16 +57,35 @@ describe('Integrated Planning System', () => {
       },
       currentState: {
         energy: 75,
-        mood: 60,
+        health: 80,
+        hunger: 60,
         safety: 85,
         social: 40,
         achievement: 50,
+        curiosity: 70,
+        creativity: 65,
         timestamp: Date.now(),
       },
       activeGoals: [],
       availableResources: [
-        { type: 'energy', amount: 75, availability: 'available' },
-        { type: 'time', amount: 1000, availability: 'limited' },
+        {
+          id: 'energy-1',
+          type: ResourceType.ENERGY,
+          name: 'Energy',
+          quantity: 75,
+          maxQuantity: 100,
+          unit: 'units',
+          value: 75,
+        },
+        {
+          id: 'time-1',
+          type: ResourceType.TIME,
+          name: 'Time',
+          quantity: 1000,
+          maxQuantity: 1000,
+          unit: 'ms',
+          value: 1000,
+        },
       ],
       timeConstraints: {
         urgency: 'medium',
@@ -391,8 +411,18 @@ describe('Integration with Planning Documentation', () => {
     // From planning docs: "Sub-100ms emergency response, <500ms standard planning"
 
     const coordinator = createIntegratedPlanningCoordinator({
-      hrmConfig: { hrmLatencyTarget: 50 },
-      coordinatorConfig: { fallbackTimeout: 100 },
+      hrmConfig: {
+        maxRefinements: 3,
+        qualityThreshold: 0.8,
+        hrmLatencyTarget: 50,
+        enableIterativeRefinement: true,
+      },
+      coordinatorConfig: {
+        routingStrategy: 'hybrid',
+        fallbackTimeout: 100,
+        enablePlanMerging: true,
+        enableCrossValidation: true,
+      },
     });
 
     const emergencySignals = [
@@ -411,16 +441,35 @@ describe('Integration with Planning Documentation', () => {
       },
       currentState: {
         energy: 75,
-        mood: 60,
+        health: 80,
+        hunger: 60,
         safety: 85,
         social: 40,
         achievement: 50,
+        curiosity: 70,
+        creativity: 65,
         timestamp: Date.now(),
       },
       activeGoals: [],
       availableResources: [
-        { type: 'energy', amount: 75, availability: 'available' },
-        { type: 'time', amount: 1000, availability: 'limited' },
+        {
+          id: 'energy-2',
+          type: ResourceType.ENERGY,
+          name: 'Energy',
+          quantity: 75,
+          maxQuantity: 100,
+          unit: 'units',
+          value: 75,
+        },
+        {
+          id: 'time-2',
+          type: ResourceType.TIME,
+          name: 'Time',
+          quantity: 1000,
+          maxQuantity: 1000,
+          unit: 'ms',
+          value: 1000,
+        },
       ],
       timeConstraints: {
         urgency: 'medium',

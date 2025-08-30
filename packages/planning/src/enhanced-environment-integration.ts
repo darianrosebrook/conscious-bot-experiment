@@ -533,16 +533,16 @@ export class EnhancedEnvironmentIntegration extends EventEmitter {
     nearby: any
   ): 'low' | 'medium' | 'high' {
     const totalAvailable = Object.values(available).reduce(
-      (sum: number, val: any) => sum + val,
+      (sum: number, val: any) => sum + (val as number),
       0
     );
     const totalNearby = Object.values(nearby).reduce(
-      (sum: number, val: any) => sum + val,
+      (sum: number, val: any) => sum + (val as number),
       0
     );
 
-    if (totalAvailable < 10 && totalNearby < 5) return 'high';
-    if (totalAvailable < 20 && totalNearby < 10) return 'medium';
+    if ((totalAvailable as number) < 10 && (totalNearby as number) < 5) return 'high';
+    if ((totalAvailable as number) < 20 && (totalNearby as number) < 10) return 'medium';
     return 'low';
   }
 

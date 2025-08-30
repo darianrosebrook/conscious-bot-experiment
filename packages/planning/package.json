@@ -11,10 +11,12 @@
     "test:run": "vitest run",
     "lint": "eslint src/**/*.ts",
     "type-check": "tsc --noEmit",
-    "dev:server": "tsx src/server.ts"
+    "dev": "tsx src/modular-server.ts",
+    "dev:modular": "tsx src/modular-server.ts"
   },
   "dependencies": {
     "@conscious-bot/core": "workspace:*",
+    "@conscious-bot/mcp-server": "workspace:*",
     "@conscious-bot/memory": "workspace:*",
     "@conscious-bot/world": "workspace:*",
     "cors": "^2.8.5",

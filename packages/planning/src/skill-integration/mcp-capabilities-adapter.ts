@@ -9,18 +9,9 @@
  */
 
 import { EventEmitter } from 'events';
-import {
-  EnhancedRegistry,
-  ShadowRunResult,
-} from '../../../../core/src/mcp-capabilities/enhanced-registry';
-import {
-  DynamicCreationFlow,
-  ImpasseResult,
-} from '../../../../core/src/mcp-capabilities/dynamic-creation-flow';
-import {
-  LeafContext,
-  ExecError,
-} from '../../../../core/src/mcp-capabilities/leaf-contracts';
+import { EnhancedRegistry, ShadowRunResult } from '@conscious-bot/core';
+import { DynamicCreationFlow, ImpasseResult } from '@conscious-bot/core';
+import { LeafContext, ExecError } from '@conscious-bot/core';
 import {
   Plan,
   PlanNode,
@@ -124,7 +115,7 @@ export class MCPCapabilitiesAdapter extends EventEmitter {
     }
 
     // Step 3: Decompose goal into capability sequence
-    const capabilityDecomposition = this.decomposeGoalIntoCapabilities(
+    const capabilityDecomposition = await this.decomposeGoalIntoCapabilities(
       goal,
       applicableCapabilities,
       context
@@ -327,16 +318,16 @@ export class MCPCapabilitiesAdapter extends EventEmitter {
   /**
    * Decompose goal into capability sequence
    */
-  private decomposeGoalIntoCapabilities(
+  private async decomposeGoalIntoCapabilities(
     goal: string,
     applicableCapabilities: string[],
     context: MCPCapabilityPlanningContext
-  ): CapabilityDecomposition[] {
+  ): Promise<CapabilityDecomposition[]> {
     const decomposition: CapabilityDecomposition[] = [];
 
     // Simple decomposition for now - can be enhanced with more sophisticated logic
     for (const capabilityId of applicableCapabilities) {
-      const capability = this.registry.getCapability(capabilityId);
+      const capability = await this.registry.getCapability(capabilityId);
       if (!capability) continue;
 
       decomposition.push({
@@ -365,18 +356,19 @@ export class MCPCapabilitiesAdapter extends EventEmitter {
   ): PlanNode[] {
     return decomposition.map((capability, index) => ({
       id: `${planId}-node-${index}`,
-      type: 'action',
-      name: capability.name,
+      type: 'action' as const,
+      status: 'pending' as const,
       description: `Execute capability: ${capability.name}`,
+      priority: capability.priority,
+      estimatedDuration: capability.estimatedDuration,
+      dependencies: capability.dependencies,
+      constraints: [],
       metadata: {
         capabilityId: capability.capabilityId,
         version: capability.version,
         status: capability.status,
         args: capability.args,
       },
-      estimatedDuration: capability.estimatedDuration,
-      priority: capability.priority,
-      dependencies: capability.dependencies,
     }));
   }
 
@@ -431,8 +423,9 @@ export class MCPCapabilitiesAdapter extends EventEmitter {
         capabilityId: capability.capabilityId,
         success: false,
         duration: Date.now() - startTime,
+        worldStateChanges: {},
         error: {
-          code: 'execution_failed',
+          code: 'unknown',
           detail: String(error),
           retryable: true,
         },

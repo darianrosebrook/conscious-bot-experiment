@@ -7,11 +7,12 @@
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+import type { HybridPlanningContext } from '../hybrid-skill-planner';
 import { HybridSkillPlanner } from '../hybrid-skill-planner';
 import { MCPCapabilitiesAdapter } from '../mcp-capabilities-adapter';
-import { EnhancedRegistry } from '../../../../core/src/mcp-capabilities/enhanced-registry';
-import { DynamicCreationFlow } from '../../../../core/src/mcp-capabilities/dynamic-creation-flow';
-import { SkillRegistry } from '../../../../memory/src/skills/SkillRegistry';
+import { EnhancedRegistry } from '@conscious-bot/core';
+import { DynamicCreationFlow } from '@conscious-bot/core';
+import { SkillRegistry } from '@conscious-bot/memory';
 import { BehaviorTreeRunner } from '../../behavior-trees/BehaviorTreeRunner';
 import { HRMInspiredPlanner } from '../../hierarchical-planner/hrm-inspired-planner';
 import { EnhancedGOAPPlanner } from '../../reactive-executor/enhanced-goap-planner';
@@ -25,6 +26,33 @@ vi.mock('../../hierarchical-planner/hrm-inspired-planner');
 vi.mock('../../reactive-executor/enhanced-goap-planner');
 
 describe('MCP Capabilities Integration', () => {
+  // Helper function to create properly typed contexts
+  const createTestContext = (
+    overrides: Partial<HybridPlanningContext> = {}
+  ): HybridPlanningContext => ({
+    skillRegistry: mockSkillRegistry,
+    mcpRegistry: mockRegistry,
+    mcpDynamicFlow: mockDynamicFlow,
+    worldState: {},
+    availableResources: {},
+    currentState: {},
+    resources: {},
+    timeConstraints: {
+      urgency: 'medium' as const,
+      maxPlanningTime: 5000,
+    },
+    planningPreferences: {
+      preferSkills: false,
+      preferMCP: true,
+      preferHTN: false,
+      preferGOAP: false,
+      allowHybrid: true,
+    },
+    constraints: [],
+    domain: 'minecraft',
+    ...overrides,
+  });
+
   let hybridPlanner: HybridSkillPlanner;
   let mockRegistry: EnhancedRegistry;
   let mockDynamicFlow: DynamicCreationFlow;
@@ -132,26 +160,12 @@ describe('MCP Capabilities Integration', () => {
   describe('MCP Capabilities Planning', () => {
     it('should prefer MCP capabilities for torch corridor goals', async () => {
       const goal = 'torch the mining corridor safely';
-      const context = {
-        skillRegistry: mockSkillRegistry,
-        mcpRegistry: mockRegistry,
-        mcpDynamicFlow: mockDynamicFlow,
-        worldState: {},
-        availableResources: {},
+      const context = createTestContext({
         timeConstraints: {
           urgency: 'medium' as const,
           maxPlanningTime: 10000,
         },
-        planningPreferences: {
-          preferSkills: false,
-          preferMCP: true,
-          preferHTN: false,
-          preferGOAP: false,
-          allowHybrid: true,
-        },
-        constraints: [],
-        domain: 'minecraft',
-      };
+      });
 
       const result = await hybridPlanner.plan(goal, context);
 
@@ -184,26 +198,12 @@ describe('MCP Capabilities Integration', () => {
       });
 
       const goal = 'mine safely in dark areas';
-      const context = {
-        skillRegistry: mockSkillRegistry,
-        mcpRegistry: mockRegistry,
-        mcpDynamicFlow: mockDynamicFlow,
-        worldState: {},
-        availableResources: {},
+      const context = createTestContext({
         timeConstraints: {
           urgency: 'high' as const,
           maxPlanningTime: 5000,
         },
-        planningPreferences: {
-          preferSkills: false,
-          preferMCP: true,
-          preferHTN: false,
-          preferGOAP: false,
-          allowHybrid: true,
-        },
-        constraints: [],
-        domain: 'minecraft',
-      };
+      });
 
       const result = await hybridPlanner.plan(goal, context);
 
@@ -217,26 +217,12 @@ describe('MCP Capabilities Integration', () => {
 
     it('should execute MCP capability plans', async () => {
       const goal = 'torch the corridor';
-      const context = {
-        skillRegistry: mockSkillRegistry,
-        mcpRegistry: mockRegistry,
-        mcpDynamicFlow: mockDynamicFlow,
-        worldState: {},
-        availableResources: {},
+      const context = createTestContext({
         timeConstraints: {
           urgency: 'medium' as const,
           maxPlanningTime: 10000,
         },
-        planningPreferences: {
-          preferSkills: false,
-          preferMCP: true,
-          preferHTN: false,
-          preferGOAP: false,
-          allowHybrid: true,
-        },
-        constraints: [],
-        domain: 'minecraft',
-      };
+      });
 
       const planResult = await hybridPlanner.plan(goal, context);
       expect(planResult.success).toBe(true);
@@ -254,12 +240,10 @@ describe('MCP Capabilities Integration', () => {
 
     it('should fallback to other approaches when MCP capabilities unavailable', async () => {
       const goal = 'build a house';
-      const context = {
-        skillRegistry: mockSkillRegistry,
+      const context = createTestContext({
         mcpRegistry: undefined, // No MCP registry
         mcpDynamicFlow: undefined,
         worldState: mockWorldState,
-        availableResources: {},
         timeConstraints: {
           urgency: 'low' as const,
           maxPlanningTime: 15000,
@@ -271,9 +255,7 @@ describe('MCP Capabilities Integration', () => {
           preferGOAP: true,
           allowHybrid: true,
         },
-        constraints: [],
-        domain: 'minecraft',
-      };
+      });
 
       const result = await hybridPlanner.plan(goal, context);
 

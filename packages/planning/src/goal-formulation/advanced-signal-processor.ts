@@ -179,7 +179,7 @@ export class AdvancedSignalProcessor {
 
     const fusedSignals: FusedSignal[] = [];
 
-    for (const [type, groupSignals] of signalGroups) {
+    for (const [type, groupSignals] of Array.from(signalGroups)) {
       if (groupSignals.length === 0) continue;
 
       // Calculate fused intensity (weighted average)

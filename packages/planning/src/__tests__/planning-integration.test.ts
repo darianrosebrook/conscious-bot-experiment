@@ -324,7 +324,7 @@ describe('Planning System Integration', () => {
 
   describe('Task Execution Workflow', () => {
     it('should handle successful task execution', async () => {
-      const task = {
+      const task: any = {
         id: 'test-task-1',
         type: 'mine',
         description: 'Mine for resources',
@@ -367,12 +367,12 @@ describe('Planning System Integration', () => {
       }
 
       expect(task.status).toBe('completed');
-      expect(task.cognitiveFeedback).toBe(mockFeedback);
+      expect((task as any).cognitiveFeedback).toBe(mockFeedback);
       expect(mockPlanningSystem.goalFormulation._failedTaskCount).toBe(0);
     });
 
     it('should handle failed task execution', async () => {
-      const task = {
+      const task: any = {
         id: 'test-task-2',
         type: 'craft',
         description: 'Craft wooden pickaxe',
@@ -416,13 +416,13 @@ describe('Planning System Integration', () => {
       }
 
       expect(task.status).toBe('failed');
-      expect(task.failureReason).toBe('Missing required materials');
-      expect(task.cognitiveFeedback).toBe(mockFeedback);
+      expect((task as any).failureReason).toBe('Missing required materials');
+      expect((task as any).cognitiveFeedback).toBe(mockFeedback);
       expect(mockPlanningSystem.goalFormulation._failedTaskCount).toBe(1);
     });
 
     it('should trigger task abandonment when failure threshold is reached', async () => {
-      const task = {
+      const task: any = {
         id: 'test-task-3',
         type: 'craft',
         description: 'Craft complex item',

@@ -10,6 +10,12 @@
 // Main classes
 export { CapabilityRegistry } from './capability-registry';
 export { ConstitutionalFilter } from './constitutional-filter';
+export { EnhancedRegistry } from './enhanced-registry';
+export { DynamicCreationFlow } from './dynamic-creation-flow';
+
+// Types
+export type { ShadowRunResult } from './enhanced-registry';
+export type { ImpasseResult } from './dynamic-creation-flow';
 
 // Hybrid HRM Integration
 export { HybridHRMRouter } from './hybrid-hrm-integration';

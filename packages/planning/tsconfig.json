@@ -1,7 +1,7 @@
 {
   "compilerOptions": {
-    "target": "ES2020",
-    "lib": ["ES2020"],
+    "target": "ES2022",
+    "lib": ["ES2022"],
     "module": "CommonJS",
     "moduleResolution": "node",
     "outDir": "./dist",
@@ -17,15 +17,23 @@
     "resolveJsonModule": true,
     "allowSyntheticDefaultImports": true,
     "noEmit": false,
-    "downlevelIteration": true
+    "downlevelIteration": true,
+    "baseUrl": ".",
+    "paths": {
+      "@conscious-bot/memory": ["../../memory/src"],
+      "@conscious-bot/core": ["../../core/src"],
+      "@conscious-bot/planning": ["./src"]
+    },
+    "types": ["vitest/globals"],
+    "typeRoots": ["./src/types", "./node_modules/@types"]
   },
-  "include": ["src/**/*"],
+  "include": [
+    "src/**/*.ts",
+    "src/**/*.tsx",
+    "src/types/*.d.ts"
+  ],
   "exclude": [
     "dist", 
-    "node_modules", 
-    "src/server.ts", 
-    "src/skill-integration/**/*",
-    "src/__tests__/**/*",
-    "src/behavior-trees/__tests__/**/*"
+    "node_modules"
   ]
 }

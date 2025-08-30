@@ -245,7 +245,7 @@ export class GOAPPlanner {
   ): GOAPNode[] {
     const successors: GOAPNode[] = [];
 
-    for (const action of this.availableActions.values()) {
+    for (const action of Array.from(this.availableActions.values())) {
       // Check if action is applicable
       if (!this.isActionApplicable(action, currentNode.worldState)) {
         continue;
