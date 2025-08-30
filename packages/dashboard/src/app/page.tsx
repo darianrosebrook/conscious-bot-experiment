@@ -31,6 +31,7 @@ import { EvaluationPanel } from '@/components/evaluation-panel';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { DashboardProvider } from '@/contexts/dashboard-context';
 import type {} from '@/types';
 
 interface BotState {
@@ -69,7 +70,7 @@ interface BotConnection {
  * Real-time monitoring interface for the conscious bot
  * @author @darianrosebrook
  */
-export default function ConsciousMinecraftDashboard() {
+function ConsciousMinecraftDashboardContent() {
   const {
     isLive,
     hud,
@@ -1725,5 +1726,13 @@ export default function ConsciousMinecraftDashboard() {
         </Tabs>
       </div>
     </div>
+  );
+}
+
+export default function ConsciousMinecraftDashboard() {
+  return (
+    <DashboardProvider>
+      <ConsciousMinecraftDashboardContent />
+    </DashboardProvider>
   );
 }

@@ -120,11 +120,27 @@ export class CognitiveTaskRouter {
     } = context;
     const inputLower = input.toLowerCase();
 
+    // Emergency detection takes highest precedence
+    if (this.isEmergencySituation(inputLower)) {
+      // Emergency situations should route to fastest available system
+      // Check if it's a navigation/action emergency vs communication emergency
+      if (
+        this.isEmergencyAction(inputLower) ||
+        inputLower.includes('falling') ||
+        inputLower.includes('lava') ||
+        inputLower.includes('hostile') ||
+        inputLower.includes('mobs')
+      ) {
+        return 'navigation'; // Route to HRM for fast action
+      }
+      // Communication emergencies still use LLM but with priority
+    }
+
     // Explicit creativity indicators take precedence
     if (this.isCreativeTask(inputLower) || requiresCreativity)
       return 'creative_task';
 
-    // Ethical decisions (check early as they use specific keywords)
+    // Enhanced ethical decisions detection (check early as they use specific keywords)
     if (this.isEthicalDecision(inputLower)) return 'ethical_decision';
 
     // Structured reasoning tasks (HRM candidates)
@@ -153,13 +169,24 @@ export class CognitiveTaskRouter {
     taskType: TaskType,
     context: TaskContext
   ): 'llm' | 'hrm_structured' | 'collaborative' {
-    // Emergency constraint: use fastest available (HRM preferred)
-    if (context.urgency === 'emergency') {
-      return ['navigation', 'logic_puzzle', 'spatial_reasoning'].includes(
-        taskType
-      )
-        ? 'hrm_structured'
-        : 'llm';
+    // Enhanced emergency constraint: use fastest available (HRM preferred)
+    if (
+      context.urgency === 'emergency' ||
+      this.isEmergencySituation(context.input.toLowerCase())
+    ) {
+      // For emergency situations, prioritize HRM for action-oriented tasks
+      if (
+        [
+          'navigation',
+          'logic_puzzle',
+          'spatial_reasoning',
+          'resource_optimization',
+        ].includes(taskType)
+      ) {
+        return 'hrm_structured';
+      }
+      // For communication emergencies, still use LLM but with reduced latency
+      return 'llm';
     }
 
     // Structured reasoning -> HRM (as per integration plan)
@@ -354,7 +381,9 @@ export class CognitiveTaskRouter {
     const avgLatencyByRouter: Record<string, number> = {};
 
     // Calculate accuracy by task type
-    for (const [key, metrics] of Array.from(this.performanceMetrics.entries())) {
+    for (const [key, metrics] of Array.from(
+      this.performanceMetrics.entries()
+    )) {
       accuracyByTaskType[key] =
         metrics.total > 0 ? metrics.success / metrics.total : 0;
     }
@@ -482,18 +511,165 @@ export class CognitiveTaskRouter {
   }
 
   private isEthicalDecision(input: string): boolean {
-    const ethicalKeywords = [
-      'should i',
-      'ethical',
-      'moral',
-      'right thing',
-      'wrong to',
-      'harm',
-      'help person',
-      'fair to',
-      'ethics',
+    // More specific ethical patterns to avoid false positives
+    const ethicalPatterns = [
+      /should i\b/i,
+      /is it right\b/i,
+      /is it wrong\b/i,
+      /is it ok\b/i,
+      /is it okay\b/i,
+      /should we\b/i,
+      /ought to\b/i,
+      /ethical\b/i,
+      /moral\b/i,
+      /right thing\b/i,
+      /wrong to\b/i,
+      /fair to\b/i,
+      /ethics\b/i,
+      /duty\b/i,
+      /responsibility\b/i,
+      /justice\b/i,
+      /fairness\b/i,
+      /good vs bad\b/i,
+      /right vs wrong\b/i,
+      /ethical dilemma\b/i,
+      /moral choice\b/i,
+      /ethical choice\b/i,
+      /what should\b/i,
+      /what would you do\b/i,
+      /what do you think\b/i,
+      /is this right\b/i,
+      /is this wrong\b/i,
+      /is this fair\b/i,
+      /is this just\b/i,
+      /is this ethical\b/i,
+      /is this moral\b/i,
+      /take from\b/i,
+      /steal\b/i,
+      /cheat\b/i,
+      /lie\b/i,
+      /truth\b/i,
+      /honesty\b/i,
+      /integrity\b/i,
+      /trust\b/i,
+      /betray\b/i,
+      /loyalty\b/i,
+      /friendship\b/i,
+      /helping others\b/i,
+      /selfish\b/i,
+      /selfless\b/i,
+      /altruistic\b/i,
+      /benefit\b/i,
+      /cost\b/i,
+      /trade-off\b/i,
+      /sacrifice\b/i,
+      /consequence\b/i,
+      /impact\b/i,
+      /effect on\b/i,
+      /hurt\b/i,
+      /support\b/i,
+      /oppose\b/i,
+      /agree\b/i,
+      /disagree\b/i,
+      /consent\b/i,
+      /permission\b/i,
+      /authority\b/i,
+      /power\b/i,
+      /influence\b/i,
+      /control\b/i,
+      /freedom\b/i,
+      /choice\b/i,
+      /decision\b/i,
+      /judgment\b/i,
+      /evaluate\b/i,
+      /assess\b/i,
+      /consider\b/i,
+      /think about\b/i,
+      /reflect on\b/i,
+      /ponder\b/i,
+      /debate\b/i,
+      /discuss\b/i,
+      /argue\b/i,
+      /reason\b/i,
+      /justify\b/i,
+      /explain why\b/i,
+      /why should\b/i,
+      /why would\b/i,
+      /what if\b/i,
+      /suppose\b/i,
+      /imagine if\b/i,
+      /consider if\b/i,
+      /think if\b/i,
     ];
-    return ethicalKeywords.some((keyword) => input.includes(keyword));
+
+    // Check for ethical patterns with word boundaries
+    const hasEthicalPattern = ethicalPatterns.some((pattern) =>
+      pattern.test(input)
+    );
+
+    // Additional context check: if it's a simple help request, don't classify as ethical
+    if (hasEthicalPattern && input.toLowerCase().includes('help')) {
+      // Only classify as ethical if it's clearly about moral/ethical help, not practical help
+      const moralHelpPatterns = [
+        /help.*moral/i,
+        /help.*ethical/i,
+        /help.*right/i,
+        /help.*wrong/i,
+        /help.*decision/i,
+        /help.*choice/i,
+        /should.*help/i, // "Should I help..." is ethical
+        /help.*player/i, // "help this player" in ethical context
+        /help.*person/i, // "help this person" in ethical context
+      ];
+      if (!moralHelpPatterns.some((pattern) => pattern.test(input))) {
+        return false; // It's practical help, not ethical help
+      }
+    }
+
+    return hasEthicalPattern;
+  }
+
+  private isEmergencySituation(input: string): boolean {
+    const emergencyKeywords = [
+      'urgent',
+      'critical',
+      'emergency',
+      'fast',
+      'now',
+      'immediately',
+      'hurry',
+      'speed',
+      'priority',
+    ];
+    return emergencyKeywords.some((keyword) => input.includes(keyword));
+  }
+
+  private isEmergencyAction(input: string): boolean {
+    const emergencyActionKeywords = [
+      'go',
+      'move',
+      'run',
+      'act',
+      'execute',
+      'perform',
+      'do it',
+      'do it now',
+      'do it fast',
+      'falling',
+      'lava',
+      'hostile',
+      'mobs',
+      'danger',
+      'attack',
+      'escape',
+      'flee',
+      'hide',
+      'defend',
+      'protect',
+      'save',
+      'rescue',
+    ];
+    return emergencyActionKeywords.some((keyword) => input.includes(keyword));
   }
 }
 

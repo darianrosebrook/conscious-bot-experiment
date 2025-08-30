@@ -351,7 +351,9 @@ export type BotEventType =
   | 'position_changed'
   | 'block_broken'
   | 'item_picked_up'
-  | 'chat_message';
+  | 'chat_message'
+  | 'safety_emergency'
+  | 'safety_emergency_failed';
 
 export interface BotEvent {
   type: BotEventType;

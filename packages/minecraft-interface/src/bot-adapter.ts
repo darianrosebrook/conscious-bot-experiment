@@ -10,6 +10,7 @@
 import { Bot, createBot } from 'mineflayer';
 import { EventEmitter } from 'events';
 import { BotConfig, BotEvent, BotEventType } from './types';
+import { AutomaticSafetyMonitor } from './automatic-safety-monitor';
 
 export class BotAdapter extends EventEmitter {
   private bot: Bot | null = null;
@@ -21,6 +22,8 @@ export class BotAdapter extends EventEmitter {
     | 'connecting'
     | 'connected'
     | 'spawned' = 'disconnected';
+  private safetyMonitor: AutomaticSafetyMonitor | null = null;
+  private actionTranslator: any = null;
 
   constructor(config: BotConfig) {
     super();
@@ -72,17 +75,17 @@ export class BotAdapter extends EventEmitter {
         this.connectionState = 'spawned';
 
         const spawnData: any = {
-          gameMode: this.bot!.game.gameMode,
-          dimension: this.bot!.game.dimension,
+          gameMode: this.bot?.game?.gameMode,
+          dimension: this.bot?.game?.dimension,
         };
 
         // Only include position if entity exists
-        if (this.bot && this.bot.entity && this.bot.entity.position) {
-          spawnData.position = this.bot.entity.position.clone();
+        if (this.bot?.entity && this.bot?.entity?.position) {
+          spawnData.position = this.bot?.entity?.position?.clone();
         }
 
         this.emitBotEvent('spawned', spawnData);
-        resolve(this.bot!);
+        resolve(this?.bot);
       });
 
       this.bot.once('error', (error) => {
@@ -168,6 +171,66 @@ export class BotAdapter extends EventEmitter {
   }
 
   /**
+   * Initialize safety monitor
+   */
+  private initializeSafetyMonitor(): void {
+    if (!this.bot) return;
+
+    try {
+      // Create action translator for safety monitor
+      const actionTranslator =
+        new (require('./action-translator').ActionTranslator)(this.bot, {
+          actionTimeout: 10000,
+          maxRetries: 3,
+        });
+
+      this.safetyMonitor = new AutomaticSafetyMonitor(
+        this.bot,
+        actionTranslator,
+        {
+          healthThreshold: 15,
+          checkInterval: 2000,
+          autoFleeEnabled: true,
+          autoShelterEnabled: true,
+          maxFleeDistance: 20,
+        }
+      );
+
+      // Start automatic safety monitoring
+      this.safetyMonitor.start();
+
+      console.log('🛡️ Automatic safety monitoring enabled');
+
+      // Set up safety monitor event handlers
+      this.safetyMonitor.on('emergency-response', (data) => {
+        console.log('🚨 Safety monitor emergency response:', data);
+        this.emitBotEvent('safety_emergency', data);
+      });
+
+      this.safetyMonitor.on('emergency-response-failed', (data) => {
+        console.error('❌ Safety monitor emergency response failed:', data);
+        this.emitBotEvent('safety_emergency_failed', data);
+      });
+    } catch (error) {
+      console.error('Failed to initialize safety monitor:', error);
+    }
+  }
+
+  /**
+   * Get safety monitor status
+   */
+  getSafetyStatus(): any {
+    if (!this.safetyMonitor) {
+      return { enabled: false };
+    }
+
+    return {
+      enabled: true,
+      ...this.safetyMonitor.getStatus(),
+    };
+  }
+
+  /**
    * Setup bot event handlers for monitoring
    */
   private setupBotEventHandlers(): void {
@@ -176,16 +239,16 @@ export class BotAdapter extends EventEmitter {
     // Health monitoring
     this.bot.on('health', () => {
       this.emitBotEvent('health_changed', {
-        health: this.bot!.health,
-        food: this.bot!.food,
-        saturation: this.bot!.foodSaturation,
+        health: this.bot?.health,
+        food: this.bot?.food,
+        saturation: this.bot?.foodSaturation,
       });
 
       // Log critical health but don't disconnect
-      if (this.bot!.health <= 2) {
+      if (this.bot?.health <= 2) {
         this.emitBotEvent('warning', {
           message: 'Critical health detected',
-          health: this.bot!.health,
+          health: this.bot?.health,
         });
       }
     });
@@ -199,7 +262,7 @@ export class BotAdapter extends EventEmitter {
       if (currentHash !== lastInventoryHash) {
         lastInventoryHash = currentHash;
         this.emitBotEvent('inventory_changed', {
-          items: this.bot!.inventory.items().map((item) => ({
+          items: this.bot?.inventory?.items().map((item) => ({
             name: item.name,
             count: item.count,
             slot: item.slot,
@@ -214,7 +277,7 @@ export class BotAdapter extends EventEmitter {
       if (currentHash !== lastInventoryHash) {
         lastInventoryHash = currentHash;
         this.emitBotEvent('inventory_changed', {
-          items: this.bot!.inventory.items().map((item) => ({
+          items: this.bot?.inventory?.items().map((item) => ({
             name: item.name,
             count: item.count,
             slot: item.slot,
@@ -229,7 +292,7 @@ export class BotAdapter extends EventEmitter {
       if (currentHash !== lastInventoryHash) {
         lastInventoryHash = currentHash;
         this.emitBotEvent('inventory_changed', {
-          items: this.bot!.inventory.items().map((item) => ({
+          items: this.bot?.inventory?.items().map((item) => ({
             name: item.name,
             count: item.count,
             slot: item.slot,
@@ -240,12 +303,15 @@ export class BotAdapter extends EventEmitter {
 
     // Position monitoring will be set up after bot spawns
     this.bot.once('spawn', () => {
+      // Initialize safety monitor after spawn
+      this.initializeSafetyMonitor();
+
       // Set up position monitoring after spawn
       let lastPosition: any = null;
       let positionCheckInterval: NodeJS.Timeout | null = null;
       let inventoryCheckInterval: NodeJS.Timeout | null = null;
 
-      if (this.bot && this.bot.entity && this.bot.entity.position) {
+      if (this.bot?.entity && this.bot?.entity?.position) {
         lastPosition = this.bot.entity.position.clone();
         positionCheckInterval = setInterval(() => {
           if (!this.bot || this.connectionState !== 'spawned') {
@@ -335,7 +401,7 @@ export class BotAdapter extends EventEmitter {
       };
 
       // Only include position if entity exists
-      if (this.bot && this.bot.entity && this.bot.entity.position) {
+      if (this.bot?.entity && this.bot?.entity?.position) {
         deathData.position = this.bot.entity.position.clone();
       }
 
@@ -477,7 +543,7 @@ export class BotAdapter extends EventEmitter {
     };
 
     // Only include position if bot is spawned
-    if (this.bot.entity && this.bot.entity.position) {
+    if (this.bot?.entity && this.bot?.entity?.position) {
       status.position = this.bot.entity.position.clone();
     }
 
@@ -512,5 +578,38 @@ export class BotAdapter extends EventEmitter {
    */
   getConfig(): BotConfig {
     return { ...this.config };
+  }
+
+  /**
+   * Initialize the bot with safety monitoring
+   */
+  private async initializeBot(): Promise<void> {
+    if (!this.bot) return;
+
+    // Initialize safety monitor
+    if (this.actionTranslator) {
+      const actionTranslator =
+        new (require('./action-translator').ActionTranslator)(this.bot, {
+          actionTimeout: 10000,
+          maxRetries: 3,
+        });
+
+      this.safetyMonitor = new AutomaticSafetyMonitor(
+        this.bot,
+        this.actionTranslator,
+        {
+          healthThreshold: 15,
+          checkInterval: 2000,
+          autoFleeEnabled: true,
+          autoShelterEnabled: true,
+          maxFleeDistance: 20,
+        }
+      );
+
+      // Start automatic safety monitoring
+      this.safetyMonitor.start();
+
+      console.log('🛡️ Automatic safety monitoring enabled');
+    }
   }
 }

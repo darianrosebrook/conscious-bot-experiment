@@ -552,7 +552,7 @@ async function startServer() {
       } catch (error) {
         console.warn('Autonomous task executor error (non-fatal):', error);
       }
-    }, 30000); // Check every 30 seconds
+    }, 60000); // Check every 60 seconds (reduced frequency to prevent spam)
 
     // Initial task generation after 30 seconds with error handling
     setTimeout(() => {

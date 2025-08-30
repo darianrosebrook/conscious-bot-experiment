@@ -141,7 +141,7 @@ describe('Real Component Integration', () => {
     await hybridRouter.initialize();
 
     registry = new EnhancedRegistry();
-    
+
     // Mock registry methods for MCP adapter
     vi.spyOn(registry, 'listCapabilities').mockResolvedValue([
       {
@@ -180,50 +180,52 @@ describe('Real Component Integration', () => {
         },
       },
     ]);
-    
-    vi.spyOn(registry, 'getCapability').mockImplementation(async (id: string) => {
-      if (id === 'opt.torch_corridor@1.0.0') {
-        return {
-          id: 'opt.torch_corridor@1.0.0',
-          name: 'opt.torch_corridor',
-          version: '1.0.0',
-          status: 'active',
-          btDsl: {
+
+    vi.spyOn(registry, 'getCapability').mockImplementation(
+      async (id: string) => {
+        if (id === 'opt.torch_corridor@1.0.0') {
+          return {
+            id: 'opt.torch_corridor@1.0.0',
             name: 'opt.torch_corridor',
             version: '1.0.0',
-            root: {
-              type: 'Sequence',
-              children: [
-                { type: 'Leaf', leafName: 'check_inventory', args: {} },
-                { type: 'Leaf', leafName: 'place_torch', args: {} },
-              ],
+            status: 'active',
+            btDsl: {
+              name: 'opt.torch_corridor',
+              version: '1.0.0',
+              root: {
+                type: 'Sequence',
+                children: [
+                  { type: 'Leaf', leafName: 'check_inventory', args: {} },
+                  { type: 'Leaf', leafName: 'place_torch', args: {} },
+                ],
+              },
             },
-          },
-        };
-      }
-      if (id === 'opt.automated_farming@1.0.0') {
-        return {
-          id: 'opt.automated_farming@1.0.0',
-          name: 'opt.automated_farming',
-          version: '1.0.0',
-          status: 'active',
-          btDsl: {
+          };
+        }
+        if (id === 'opt.automated_farming@1.0.0') {
+          return {
+            id: 'opt.automated_farming@1.0.0',
             name: 'opt.automated_farming',
             version: '1.0.0',
-            root: {
-              type: 'Sequence',
-              children: [
-                { type: 'Leaf', leafName: 'check_inventory', args: {} },
-                { type: 'Leaf', leafName: 'place_block', args: {} },
-                { type: 'Leaf', leafName: 'place_torch', args: {} },
-              ],
+            status: 'active',
+            btDsl: {
+              name: 'opt.automated_farming',
+              version: '1.0.0',
+              root: {
+                type: 'Sequence',
+                children: [
+                  { type: 'Leaf', leafName: 'check_inventory', args: {} },
+                  { type: 'Leaf', leafName: 'place_block', args: {} },
+                  { type: 'Leaf', leafName: 'place_torch', args: {} },
+                ],
+              },
             },
-          },
-        };
+          };
+        }
+        return null;
       }
-      return null;
-    });
-    
+    );
+
     dynamicFlow = new DynamicCreationFlow(registry, {
       isAvailable: () => serviceHealth.ollama,
       generate: async (prompt: string) => {

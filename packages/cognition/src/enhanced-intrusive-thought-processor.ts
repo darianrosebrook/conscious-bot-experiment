@@ -261,7 +261,7 @@ export class IntrusiveThoughtProcessor extends EventEmitter {
         task,
       };
     } catch (err) {
-      this.emit('processingError', { thought, err });
+      this.emit('processingError', { thought, error: err });
       const msg = err instanceof Error ? err.message : String(err);
       return {
         accepted: false,
@@ -421,6 +421,19 @@ export class IntrusiveThoughtProcessor extends EventEmitter {
         // This is illustrative; in production you'd use your scan leaves
       ];
     }
+
+    // Social actions
+    if (a.category === 'social') {
+      return [
+        {
+          name: 'minecraft.chat',
+          args: {
+            message: `Hello! ${a.type === 'ask' ? 'I wanted to ask: ' : ''}${a.target}`,
+          },
+        },
+      ];
+    }
+
     return null;
   }
 
@@ -512,7 +525,7 @@ export class IntrusiveThoughtProcessor extends EventEmitter {
     const steps: TaskStep[] = [];
     let title = '';
     if (plan.kind === 'option') {
-      title = `${action.type} ${action.target} (via ${plan.id})`;
+      title = `${this.generateTaskTitle(action)} (via ${plan.id})`;
       steps.push({
         id: `s1`,
         label: `Run option ${plan.id}`,
@@ -520,7 +533,7 @@ export class IntrusiveThoughtProcessor extends EventEmitter {
         order: 1,
       });
     } else if (plan.kind === 'sequence') {
-      title = `${action.type} ${action.target} (seq)`;
+      title = `${this.generateTaskTitle(action)} (seq)`;
       plan.leaves.forEach((l, i) =>
         steps.push({
           id: `s${i + 1}`,
@@ -530,7 +543,7 @@ export class IntrusiveThoughtProcessor extends EventEmitter {
         })
       );
     } else {
-      title = `${action.type} ${action.target} (proposal queued)`;
+      title = `${this.generateTaskTitle(action)} (proposal queued)`;
       steps.push({
         id: `s1`,
         label: `Await shadow option ${plan.ticket}`,
@@ -565,12 +578,7 @@ export class IntrusiveThoughtProcessor extends EventEmitter {
    * Parse actionable content from a thought
    */
   private parseActionFromThought(thought: string): Action | null {
-    // First check if it's a question that needs investigation
-    const questionAction = this.parseQuestionAsAction(thought);
-    if (questionAction) {
-      return questionAction;
-    }
-
+    // First check for clear action patterns
     const actionPatterns = {
       craft: {
         pattern: /craft\s+(.+)/i,
@@ -657,6 +665,46 @@ export class IntrusiveThoughtProcessor extends EventEmitter {
         priority: 'medium' as const,
         category: 'building',
       },
+      ask: {
+        pattern: /ask\s+(.+)/i,
+        priority: 'medium' as const,
+        category: 'social',
+      },
+      talk: {
+        pattern: /talk\s+(.+)/i,
+        priority: 'medium' as const,
+        category: 'social',
+      },
+      chat: {
+        pattern: /chat\s+(.+)/i,
+        priority: 'medium' as const,
+        category: 'social',
+      },
+      interact: {
+        pattern: /interact\s+(.+)/i,
+        priority: 'medium' as const,
+        category: 'social',
+      },
+      help: {
+        pattern: /help\s+(.+)/i,
+        priority: 'high' as const,
+        category: 'social',
+      },
+      shouldAsk: {
+        pattern: /should\s+ask\s+(.+)/i,
+        priority: 'medium' as const,
+        category: 'social',
+      },
+      needToAsk: {
+        pattern: /need\s+to\s+ask\s+(.+)/i,
+        priority: 'medium' as const,
+        category: 'social',
+      },
+      playerInteraction: {
+        pattern: /player.*(ask|talk|chat|interact)/i,
+        priority: 'medium' as const,
+        category: 'social',
+      },
     };
 
     for (const [actionType, config] of Object.entries(actionPatterns)) {
@@ -669,6 +717,12 @@ export class IntrusiveThoughtProcessor extends EventEmitter {
           category: config.category,
         };
       }
+    }
+
+    // If no clear action pattern found, check if it's a question that needs investigation
+    const questionAction = this.parseQuestionAsAction(thought);
+    if (questionAction) {
+      return questionAction;
     }
 
     return null;
@@ -757,6 +811,19 @@ export class IntrusiveThoughtProcessor extends EventEmitter {
       };
     }
 
+    // Player interaction questions
+    if (
+      lowerThought.includes('player') &&
+      (lowerThought.includes('ask') || lowerThought.includes('should'))
+    ) {
+      return {
+        type: 'ask',
+        target: 'player for resources or assistance',
+        priority: 'medium',
+        category: 'social',
+      };
+    }
+
     // General questions that need investigation
     if (
       lowerThought.includes('?') &&
@@ -830,6 +897,14 @@ export class IntrusiveThoughtProcessor extends EventEmitter {
       place: `Place ${action.target}`,
       put: `Put ${action.target}`,
       investigate: `Investigate ${action.target}`,
+      ask: `Ask ${action.target}`,
+      talk: `Talk to ${action.target}`,
+      chat: `Chat with ${action.target}`,
+      interact: `Interact with ${action.target}`,
+      help: `Help ${action.target}`,
+      shouldAsk: `Ask ${action.target}`,
+      needToAsk: `Ask ${action.target}`,
+      playerInteraction: `Interact with ${action.target}`,
     };
 
     return titles[action.type] || `Perform ${action.type} on ${action.target}`;
@@ -852,6 +927,11 @@ export class IntrusiveThoughtProcessor extends EventEmitter {
     // Special handling for investigate actions
     if (action.type === 'investigate') {
       return this.generateInvestigationSteps(action);
+    }
+
+    // Special handling for social actions
+    if (action.category === 'social') {
+      return this.generateSocialSteps(action);
     }
 
     const baseSteps = [
@@ -1066,6 +1146,71 @@ export class IntrusiveThoughtProcessor extends EventEmitter {
       {
         id: `step-${Date.now()}-4`,
         label: 'Report investigation results',
+        done: false,
+        order: 4,
+      },
+    ];
+  }
+
+  /**
+   * Generate specific steps for social interaction tasks
+   */
+  private generateSocialSteps(action: Action): TaskStep[] {
+    const lowerTarget = action.target.toLowerCase();
+
+    // Player interaction steps
+    if (lowerTarget.includes('player')) {
+      return [
+        {
+          id: `step-${Date.now()}-1`,
+          label: 'Locate nearby player',
+          done: false,
+          order: 1,
+        },
+        {
+          id: `step-${Date.now()}-2`,
+          label: 'Approach player safely',
+          done: false,
+          order: 2,
+        },
+        {
+          id: `step-${Date.now()}-3`,
+          label: `Initiate conversation: ${action.type} ${action.target}`,
+          done: false,
+          order: 3,
+        },
+        {
+          id: `step-${Date.now()}-4`,
+          label: 'Wait for player response',
+          done: false,
+          order: 4,
+        },
+      ];
+    }
+
+    // General social interaction steps
+    return [
+      {
+        id: `step-${Date.now()}-1`,
+        label: 'Prepare for social interaction',
+        done: false,
+        order: 1,
+      },
+      {
+        id: `step-${Date.now()}-2`,
+        label: `Locate target for ${action.type}`,
+        done: false,
+        order: 2,
+      },
+      {
+        id: `step-${Date.now()}-3`,
+        label: `Perform ${action.type} action`,
+        done: false,
+        order: 3,
+      },
+      {
+        id: `step-${Date.now()}-4`,
+        label: 'Complete social interaction',
         done: false,
         order: 4,
       },

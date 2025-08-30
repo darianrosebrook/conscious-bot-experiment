@@ -33,8 +33,8 @@ import { IntrusiveThoughtProcessor } from './enhanced-intrusive-thought-processo
 
 // Initialize enhanced thought generator
 const enhancedThoughtGenerator = new EnhancedThoughtGenerator({
-  thoughtInterval: 5000, // 5 seconds between thoughts for testing
-  maxThoughtsPerCycle: 3,
+  thoughtInterval: 30000, // 30 seconds between thoughts to prevent spam
+  maxThoughtsPerCycle: 1, // Reduced from 3 to 1
   enableIdleThoughts: true,
   enableContextualThoughts: true,
   enableEventDrivenThoughts: true,
@@ -547,6 +547,108 @@ app.post('/process', async (req, res) => {
         task: result.task,
         timestamp: Date.now(),
       });
+    } else if (type === 'external_chat') {
+      // Process external chat message
+      console.log('Processing external chat message:', { content, metadata });
+
+      try {
+        // Generate a response using the LLM
+        const response = await reactArbiter.reason({
+          snapshot: {
+            stateId: 'chat-response',
+            position: { x: 0, y: 64, z: 0 },
+            biome: 'unknown',
+            time: 6000,
+            light: 15,
+            hazards: ['none'],
+            nearbyEntities: [],
+            nearbyBlocks: [],
+            weather: 'clear',
+          },
+          inventory: {
+            stateId: 'chat-inventory',
+            items: [],
+            armor: [],
+            tools: [],
+          },
+          goalStack: [
+            {
+              id: 'chat-response-goal',
+              type: 'social',
+              description: 'Respond to player message',
+              priority: 0.8,
+              utility: 0.9,
+              source: 'user',
+            },
+          ],
+          memorySummaries: [],
+        });
+
+        // Extract response from the reasoning step
+        const responseText =
+          response.thoughts ||
+          `Hello ${metadata?.sender || 'Player'}! I received your message: "${content}". How can I help you in this Minecraft world?`;
+
+        // Generate cognitive thoughts about the interaction
+        const cognitiveThought = await enhancedThoughtGenerator.generateThought(
+          {
+            currentState: {
+              position: { x: 0, y: 64, z: 0 },
+              health: 20,
+              inventory: [],
+            },
+            currentTasks: [
+              {
+                id: 'chat-response',
+                title: 'Respond to player message',
+                progress: 0.5,
+                status: 'active',
+                type: 'social',
+              },
+            ],
+            recentEvents: [
+              {
+                id: 'chat-event',
+                type: 'player_message',
+                timestamp: Date.now(),
+                data: { sender: metadata?.sender, content },
+              },
+            ],
+            emotionalState: metadata?.emotion || 'neutral',
+            memoryContext: {},
+          }
+        );
+
+        const cognitiveThoughts = cognitiveThought ? [cognitiveThought] : [];
+
+        res.json({
+          processed: true,
+          type: 'external_chat',
+          response: responseText,
+          cognitiveThoughts: cognitiveThoughts,
+          metadata: {
+            sender: metadata?.sender,
+            messageType: metadata?.messageType,
+            intent: metadata?.intent,
+            emotion: metadata?.emotion,
+            requiresResponse: metadata?.requiresResponse,
+            responsePriority: metadata?.responsePriority,
+          },
+          timestamp: Date.now(),
+        });
+      } catch (error) {
+        console.error('Error processing external chat:', error);
+
+        // Fallback response
+        res.json({
+          processed: false,
+          type: 'external_chat',
+          response: `I received your message: "${content}". I'm having trouble processing it right now, but I'll try to help!`,
+          cognitiveThoughts: [],
+          error: error instanceof Error ? error.message : 'Unknown error',
+          timestamp: Date.now(),
+        });
+      }
     } else {
       // Handle other cognitive tasks
       const result = {
@@ -749,6 +851,83 @@ app.post('/reason', async (req, res) => {
     console.error('ReAct reasoning failed:', error);
     res.status(500).json({
       error: 'ReAct reasoning failed',
+      details: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
+
+// POST /generate-steps - Generate task steps from cognitive system
+app.post('/generate-steps', async (req, res) => {
+  try {
+    const { task, context } = req.body;
+
+    // Validate required fields
+    if (!task || !task.title) {
+      return res.status(400).json({
+        error: 'Missing required fields: task.title',
+      });
+    }
+
+    // Generate intelligent steps based on task type and content
+    const steps = [];
+    const taskType = task.type?.toLowerCase() || '';
+    const taskTitle = task.title.toLowerCase();
+
+    // Generic step generation based on task type
+    if (
+      taskType === 'gather' ||
+      taskTitle.includes('gather') ||
+      taskTitle.includes('collect')
+    ) {
+      steps.push(
+        { label: 'Locate nearby resources', estimatedDuration: 2000 },
+        { label: 'Move to resource location', estimatedDuration: 5000 },
+        { label: 'Collect resources safely', estimatedDuration: 2000 },
+        { label: 'Store collected items', estimatedDuration: 3000 }
+      );
+    } else if (
+      taskType === 'craft' ||
+      taskTitle.includes('craft') ||
+      taskTitle.includes('build')
+    ) {
+      steps.push(
+        { label: 'Check required materials', estimatedDuration: 1000 },
+        { label: 'Gather missing materials', estimatedDuration: 3000 },
+        { label: 'Prepare crafting area', estimatedDuration: 2000 },
+        { label: 'Execute crafting process', estimatedDuration: 5000 },
+        { label: 'Verify crafted item', estimatedDuration: 1000 }
+      );
+    } else if (
+      taskType === 'explore' ||
+      taskTitle.includes('explore') ||
+      taskTitle.includes('investigate')
+    ) {
+      steps.push(
+        { label: 'Scan immediate surroundings', estimatedDuration: 2000 },
+        { label: 'Identify points of interest', estimatedDuration: 3000 },
+        { label: 'Navigate to target location', estimatedDuration: 5000 },
+        { label: 'Analyze discovered area', estimatedDuration: 4000 },
+        { label: 'Record findings', estimatedDuration: 1000 }
+      );
+    } else {
+      // Default generic steps
+      steps.push(
+        { label: 'Prepare for task execution', estimatedDuration: 2000 },
+        { label: 'Execute primary task', estimatedDuration: 5000 },
+        { label: 'Verify task completion', estimatedDuration: 2000 },
+        { label: 'Clean up and organize', estimatedDuration: 1000 }
+      );
+    }
+
+    res.json({
+      success: true,
+      steps,
+      timestamp: Date.now(),
+    });
+  } catch (error) {
+    console.error('Step generation failed:', error);
+    res.status(500).json({
+      error: 'Step generation failed',
       details: error instanceof Error ? error.message : 'Unknown error',
     });
   }

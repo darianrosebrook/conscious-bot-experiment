@@ -24,15 +24,12 @@ import {
   HybridArbiterIntegration,
   HybridArbiterConfig,
 } from './hybrid-arbiter-integration';
-// Stub function to avoid circular dependency
-function createIntegratedPlanningCoordinator(): any {
-  return {
-    plan: async (goal: string, context: any) => ({ success: false, error: 'Planning not available' }),
-    executePlan: async (plan: any, context: any) => ({ success: false, error: 'Planning not available' }),
-    planAndExecute: async (goal: string | any[], context: any, signals?: any[]) => ({ success: false, error: 'Planning not available' })
-  };
-}
+// Import real planning coordinator
+import { createIntegratedPlanningCoordinator } from '@conscious-bot/planning';
 import { mineflayer as startMineflayerViewer } from 'prismarine-viewer';
+
+// Import viewer enhancements
+import { applyViewerEnhancements } from './viewer-enhancements';
 
 // Import leaf implementations for registration
 import {
@@ -357,8 +354,31 @@ app.post('/connect', async (req, res) => {
       );
     }
 
-    // Initialize planning coordinator
-    planningCoordinator = createIntegratedPlanningCoordinator();
+    // Initialize planning coordinator with proper configuration
+    planningCoordinator = createIntegratedPlanningCoordinator({
+      hrmConfig: {
+        maxRefinements: 3,
+        qualityThreshold: 0.7,
+        hrmLatencyTarget: 100,
+        enableIterativeRefinement: true,
+      },
+      htnConfig: {
+        maxDecompositionDepth: 5,
+        methodCacheSize: 100,
+        preferenceWeights: { gathering: 0.8, crafting: 0.9, exploration: 0.6 },
+      },
+      goapConfig: {
+        maxPlanLength: 10,
+        planningBudgetMs: 5000,
+        repairThreshold: 0.5,
+      },
+      coordinatorConfig: {
+        routingStrategy: 'hybrid',
+        fallbackTimeout: 3000,
+        enablePlanMerging: true,
+        enableCrossValidation: true,
+      },
+    });
 
     // Create minecraft interface
     minecraftInterface = await createMinecraftInterface(
@@ -479,8 +499,31 @@ async function attemptAutoConnect() {
     }
     isConnecting = true;
 
-    // Create planning coordinator
-    planningCoordinator = createIntegratedPlanningCoordinator();
+    // Create planning coordinator with proper configuration
+    planningCoordinator = createIntegratedPlanningCoordinator({
+      hrmConfig: {
+        maxRefinements: 3,
+        qualityThreshold: 0.7,
+        hrmLatencyTarget: 100,
+        enableIterativeRefinement: true,
+      },
+      htnConfig: {
+        maxDecompositionDepth: 5,
+        methodCacheSize: 100,
+        preferenceWeights: { gathering: 0.8, crafting: 0.9, exploration: 0.6 },
+      },
+      goapConfig: {
+        maxPlanLength: 10,
+        planningBudgetMs: 5000,
+        repairThreshold: 0.5,
+      },
+      coordinatorConfig: {
+        routingStrategy: 'hybrid',
+        fallbackTimeout: 3000,
+        enablePlanMerging: true,
+        enableCrossValidation: true,
+      },
+    });
 
     // Create full minecraft interface
     minecraftInterface = await createMinecraftInterfaceWithoutConnect(
@@ -689,6 +732,66 @@ app.get('/chat', (req, res) => {
   }
 });
 
+// Send chat message
+app.post('/chat', async (req, res) => {
+  try {
+    const { message, target } = req.body;
+
+    if (
+      !message ||
+      typeof message !== 'string' ||
+      message.trim().length === 0
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: 'Message is required and must be a non-empty string',
+      });
+    }
+
+    if (!minecraftInterface?.botAdapter.getStatus()?.connected) {
+      return res.status(503).json({
+        success: false,
+        message: 'Bot not connected',
+        status: 'disconnected',
+      });
+    }
+
+    const bot = minecraftInterface.botAdapter.getBot();
+    if (!bot) {
+      return res.status(503).json({
+        success: false,
+        message: 'Bot instance not available',
+        status: 'disconnected',
+      });
+    }
+
+    // Format message with target if specified
+    const formattedMessage = target ? `/msg ${target} ${message}` : message;
+
+    // Send the chat message
+    await bot.chat(formattedMessage);
+
+    console.log(`✅ Bot sent chat message: "${formattedMessage}"`);
+
+    res.json({
+      success: true,
+      message: 'Chat message sent successfully',
+      data: {
+        message: formattedMessage,
+        target: target || null,
+        timestamp: Date.now(),
+      },
+    });
+  } catch (error) {
+    console.error('❌ Failed to send chat message:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to send chat message',
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
+
 // Get player interactions
 app.get('/player-interactions', (req, res) => {
   try {
@@ -741,6 +844,25 @@ app.get('/processed-messages', (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Failed to get processed messages',
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
+
+// Get safety status
+app.get('/safety', (req, res) => {
+  try {
+    const safetyStatus = minecraftInterface?.botAdapter.getSafetyStatus();
+    res.json({
+      success: true,
+      safety: safetyStatus,
+      timestamp: Date.now(),
+    });
+  } catch (error) {
+    console.error('Failed to get safety status:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to get safety status',
       error: error instanceof Error ? error.message : 'Unknown error',
     });
   }
@@ -949,14 +1071,14 @@ app.post('/action', async (req, res) => {
 
     const planExecutor = minecraftInterface.planExecutor;
     const actionTranslator = (planExecutor as any).actionTranslator;
-    
+
     // Execute the action directly instead of as a plan step
     const action = {
       type: type as any,
       parameters: parameters || {},
       timeout: 15000,
     };
-    
+
     const result = await actionTranslator.executeAction(action);
 
     res.json({
@@ -1508,10 +1630,43 @@ function startViewerSafely(bot: any, port: number) {
       return originalBotEmit.apply(this, [event, ...args]);
     };
 
+    // Enhanced viewer configuration for better rendering
     startMineflayerViewer(bot as any, {
       port: port,
       firstPerson: true,
+      viewDistance: 8, // Increased from default 6 for better visibility
+      prefix: '', // No prefix for cleaner URLs
     });
+
+    // Apply enhanced viewer features for better entity rendering and lighting
+    try {
+      const enhancedViewer = applyViewerEnhancements(bot, {
+        enableEntityAnimation: true,
+        enableLightingUpdates: true,
+        enableTimeSync: true,
+        entityUpdateInterval: 100, // ms
+        lightingUpdateInterval: 1000, // ms
+        timeSyncInterval: 5000, // ms
+      });
+
+      // Log enhanced viewer status
+      enhancedViewer.on('started', () => {
+        console.log('✅ Enhanced viewer features activated');
+      });
+
+      enhancedViewer.on('error', (error) => {
+        // Only log non-critical errors
+        if (error.type !== 'entityUpdate') {
+          console.warn(
+            '⚠️ Enhanced viewer error:',
+            error.type,
+            error.error?.message
+          );
+        }
+      });
+    } catch (err) {
+      console.warn('⚠️ Failed to apply viewer enhancements:', err);
+    }
 
     // Restore console methods
     console.error = originalConsoleError;

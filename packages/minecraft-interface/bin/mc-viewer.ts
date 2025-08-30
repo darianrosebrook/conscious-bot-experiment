@@ -4,6 +4,9 @@ import mineflayer from 'mineflayer';
 import { createViewer } from 'prismarine-viewer';
 import { join } from 'path';
 
+// Import viewer enhancements
+import { applyViewerEnhancements } from '../src/viewer-enhancements';
+
 interface ViewerConfig {
   serverAddress: string;
   serverPort: number;
@@ -208,11 +211,45 @@ async function main() {
       console.log(' Bot spawned successfully');
       console.log(` Position: ${bot.entity.position}`);
 
-      // Start the viewer
+      // Start the viewer with enhanced configuration
       const viewer = createViewer(bot, {
         port: config.viewerPort,
+        firstPerson: true,
+        viewDistance: 8, // Increased from default 6 for better visibility
+        prefix: '', // No prefix for cleaner URLs
       });
       console.log(` Viewer started on port ${config.viewerPort}`);
+      console.log(`📊 Enhanced rendering enabled: viewDistance=8`);
+
+      // Apply enhanced viewer features for better entity rendering and lighting
+      try {
+        const enhancedViewer = applyViewerEnhancements(bot, {
+          enableEntityAnimation: true,
+          enableLightingUpdates: true,
+          enableTimeSync: true,
+          entityUpdateInterval: 100, // ms
+          lightingUpdateInterval: 1000, // ms
+          timeSyncInterval: 5000, // ms
+        });
+
+        // Log enhanced viewer status
+        enhancedViewer.on('started', () => {
+          console.log('✅ Enhanced viewer features activated');
+        });
+
+        enhancedViewer.on('error', (error) => {
+          // Only log non-critical errors
+          if (error.type !== 'entityUpdate') {
+            console.warn(
+              '⚠️ Enhanced viewer error:',
+              error.type,
+              error.error?.message
+            );
+          }
+        });
+      } catch (err) {
+        console.warn('⚠️ Failed to apply viewer enhancements:', err);
+      }
 
       // Log viewer URL
       console.log(

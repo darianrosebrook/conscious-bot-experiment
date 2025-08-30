@@ -22,7 +22,17 @@ interface CognitiveThought {
   metadata: {
     llmConfidence?: number;
     thoughtType?: string;
+    sender?: string;
+    messageType?: string;
+    intent?: string;
+    emotion?: string;
+    requiresResponse?: boolean;
+    responsePriority?: number;
+    originalMessageId?: string;
+    processingFailed?: boolean;
+    error?: string;
   };
+  processed?: boolean;
 }
 
 const thoughtHistory: CognitiveThought[] = [];
@@ -31,12 +41,13 @@ const activeConnections = new Set<ReadableStreamDefaultController>();
 const MAX_CONNECTIONS = 10;
 
 function addThought(
-  thought: Omit<CognitiveThought, 'id' | 'timestamp'>
+  thought: Omit<CognitiveThought, 'id' | 'timestamp' | 'processed'>
 ): CognitiveThought {
   const newThought = {
     ...thought,
     id: `thought-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
     timestamp: Date.now(),
+    processed: false,
   };
   thoughtHistory.push(newThought);
   if (thoughtHistory.length > MAX_THOUGHTS) {
@@ -81,7 +92,7 @@ async function generateThoughts(): Promise<CognitiveThought[]> {
       context,
       thoughtTypes: ['reflection', 'observation', 'planning'],
     }),
-    signal: AbortSignal.timeout(5000),
+    signal: AbortSignal.timeout(3000), // Reduced from 5s to 3s to prevent hanging
   });
 
   if (!resp.ok) return [];
@@ -109,9 +120,156 @@ async function generateThoughts(): Promise<CognitiveThought[]> {
 }
 
 async function processExternalChat(): Promise<CognitiveThought[]> {
-  // Placeholder for external chat processing
-  // In a full implementation, this would monitor chat channels
-  return [];
+  // Check for external chat messages in the thought history
+  const externalChatMessages = thoughtHistory.filter(
+    (thought) => thought.type === 'external_chat_in' && !thought.processed
+  );
+
+  if (externalChatMessages.length === 0) {
+    return [];
+  }
+
+  const processedThoughts: CognitiveThought[] = [];
+
+  for (const chatMessage of externalChatMessages) {
+    try {
+      // Mark as processed to avoid duplicate processing
+      chatMessage.processed = true;
+
+      // Send to cognitive core for processing
+      const cognitiveResponse = await fetch('http://localhost:3003/process', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'external_chat',
+          content: chatMessage.content,
+          metadata: {
+            sender: chatMessage.metadata?.sender,
+            messageType: chatMessage.metadata?.messageType,
+            intent: chatMessage.metadata?.intent,
+            emotion: chatMessage.metadata?.emotion,
+            requiresResponse: chatMessage.metadata?.requiresResponse,
+            responsePriority: chatMessage.metadata?.responsePriority,
+          },
+        }),
+        signal: AbortSignal.timeout(15000),
+      });
+
+      if (cognitiveResponse.ok) {
+        const response = await cognitiveResponse.json();
+
+        // Add the bot's response as a thought
+        if (response.response) {
+          const botResponseThought = addThought({
+            type: 'external_chat_out',
+            content: response.response,
+            attribution: 'self',
+            context: {
+              emotionalState: 'responsive',
+              confidence: 0.8,
+              cognitiveSystem: 'llm-core',
+            },
+            metadata: {
+              thoughtType: 'external_chat_out',
+              intent: 'response',
+              originalMessageId: chatMessage.id,
+            },
+          });
+          processedThoughts.push(botResponseThought);
+
+          // Send the response to the minecraft server
+          try {
+            const minecraftResponse = await fetch(
+              'http://localhost:3005/chat',
+              {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  message: response.response,
+                  target: chatMessage.metadata?.sender, // Optional: send as private message
+                }),
+                signal: AbortSignal.timeout(15000),
+              }
+            );
+
+            if (minecraftResponse.ok) {
+              console.log('✅ Bot response sent to minecraft server');
+            } else {
+              console.error(
+                '❌ Failed to send bot response to minecraft server'
+              );
+            }
+          } catch (error) {
+            console.error(
+              '❌ Error sending bot response to minecraft server:',
+              error
+            );
+          }
+        }
+
+        // Add any cognitive thoughts generated from the chat
+        if (response.cognitiveThoughts) {
+          for (const cognitiveThought of response.cognitiveThoughts) {
+            const thought = addThought({
+              type: 'reflection',
+              content: cognitiveThought.content,
+              attribution: 'self',
+              context: {
+                emotionalState: cognitiveThought.emotionalState || 'neutral',
+                confidence: cognitiveThought.confidence || 0.7,
+                cognitiveSystem: 'llm-core',
+              },
+              metadata: {
+                thoughtType: 'reflection',
+                originalMessageId: chatMessage.id,
+              },
+            });
+            processedThoughts.push(thought);
+          }
+        }
+      } else {
+        // If cognitive processing fails, add a simple acknowledgment thought
+        const acknowledgmentThought = addThought({
+          type: 'reflection',
+          content: `Received message from ${chatMessage.metadata?.sender || 'someone'}: "${chatMessage.content}"`,
+          attribution: 'self',
+          context: {
+            emotionalState: 'neutral',
+            confidence: 0.5,
+            cognitiveSystem: 'llm-core',
+          },
+          metadata: {
+            thoughtType: 'reflection',
+            originalMessageId: chatMessage.id,
+            processingFailed: true,
+          },
+        });
+        processedThoughts.push(acknowledgmentThought);
+      }
+    } catch (error) {
+      console.error('Error processing external chat message:', error);
+
+      // Add error acknowledgment thought
+      const errorThought = addThought({
+        type: 'reflection',
+        content: `Failed to process message: "${chatMessage.content}"`,
+        attribution: 'self',
+        context: {
+          emotionalState: 'confused',
+          confidence: 0.3,
+          cognitiveSystem: 'llm-core',
+        },
+        metadata: {
+          thoughtType: 'reflection',
+          originalMessageId: chatMessage.id,
+          error: error instanceof Error ? error.message : 'Unknown error',
+        },
+      });
+      processedThoughts.push(errorThought);
+    }
+  }
+
+  return processedThoughts;
 }
 
 async function processBotResponses(): Promise<CognitiveThought[]> {
@@ -167,8 +325,9 @@ export const GET = async (req: NextRequest) => {
       const sendUpdates = async () => {
         try {
           const thoughts = (
-            Math.random() < 0.15 ? await generateThoughts() : []
-          ).concat(await processExternalChat(), await processBotResponses());
+            Math.random() < 0.05 ? await generateThoughts() : []
+          ) // Reduced from 0.15 to 0.05 to prevent spam
+            .concat(await processExternalChat(), await processBotResponses());
 
           if (thoughts.length > 0) {
             // Only log in development mode
@@ -196,7 +355,7 @@ export const GET = async (req: NextRequest) => {
         }
       };
 
-      const interval = setInterval(sendUpdates, 15000);
+      const interval = setInterval(sendUpdates, 30000); // Reduced from 15s to 30s to prevent spam
 
       req.signal.addEventListener('abort', () => {
         clearInterval(interval);
@@ -249,7 +408,10 @@ export const POST = async (req: NextRequest) => {
         emotionalState: 'neutral',
         confidence: 0.5,
       },
-      metadata: metadata || {},
+      metadata: {
+        ...metadata,
+        thoughtType: type || 'intrusive', // Ensure thoughtType is set
+      },
     });
 
     // Only log in development mode
