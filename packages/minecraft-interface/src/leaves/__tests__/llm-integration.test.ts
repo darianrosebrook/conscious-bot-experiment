@@ -88,7 +88,7 @@ describe('LLM Integration', () => {
     it('should generate response from model', async () => {
       try {
         const response = await ollamaClient.generate(
-          'qwen3:8b',
+          'qwen2.5:7b',
           'Hello, how are you?',
           {
             maxTokens: 50,
@@ -118,8 +118,7 @@ describe('LLM Integration', () => {
 
       // Check for expected models
       const modelNames = models.map((m) => m.name);
-      expect(modelNames).toContain('deepseek-r1:14b');
-      expect(modelNames).toContain('qwen3:8b');
+      expect(modelNames).toContain('qwen2.5:7b');
 
       console.log(`✅ Available models: ${modelNames.join(', ')}`);
     });
@@ -224,7 +223,7 @@ describe('LLM Integration', () => {
 
       llmInterface.updateConfig({
         abstractPlanner: {
-          model: 'qwen3:8b',
+          model: 'qwen2.5:7b',
           maxTokens: 1024,
           temperature: 0.2,
           purpose: 'Test purpose',

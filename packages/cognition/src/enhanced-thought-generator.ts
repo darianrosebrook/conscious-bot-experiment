@@ -150,7 +150,7 @@ export class EnhancedThoughtGenerator extends EventEmitter {
 
     // Initialize LLM interface for dynamic thought generation
     this.llm = new LLMInterface({
-      model: 'qwen3:4b', // Optimal model from benchmark results
+      model: 'qwen2.5:7b', // Optimal model from benchmark results
       temperature: 0.8,
       maxTokens: 512,
       timeout: 60000, // Increased timeout for better reliability

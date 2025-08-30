@@ -22,7 +22,7 @@ export class LLMInterface {
   constructor(config: Partial<LLMConfig> = {}) {
     const defaultConfig: LLMConfig = {
       provider: 'ollama',
-      model: 'qwen3:4b',
+      model: 'qwen2.5:7b',
       fallbackModel: 'qwen3:4b',
       host: 'localhost',
       port: 11434,

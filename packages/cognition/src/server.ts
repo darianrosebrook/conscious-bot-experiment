@@ -20,7 +20,7 @@ app.use(express.json());
 // Initialize ReAct Arbiter
 const reactArbiter = new ReActArbiter({
   provider: 'ollama',
-  model: 'qwen3:4b', // Optimal model from benchmark results
+  model: 'qwen2.5:7b', // Optimal model from benchmark results
   maxTokens: 1000,
   temperature: 0.3,
   timeout: 30000,
