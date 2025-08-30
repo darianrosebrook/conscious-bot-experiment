@@ -727,123 +727,20 @@ export class EnhancedTaskIntegration extends EventEmitter {
    * Generate intelligent steps based on task type and content
    */
   private generateIntelligentSteps(taskData: Partial<Task>): TaskStep[] {
-    const taskType = taskData.type?.toLowerCase() || '';
-    const title = taskData.title?.toLowerCase() || '';
-    const description = taskData.description?.toLowerCase() || '';
-
-    // Define step templates for different task types
-    const stepTemplates: Record<string, string[]> = {
-      gather: [
-        'Locate nearby resources',
-        'Move to resource location',
-        'Collect resources safely',
-        'Store collected items',
-      ],
-      mine: [
-        'Find suitable mining location',
-        'Clear area for mining',
-        'Extract target blocks',
-        'Collect mined materials',
-      ],
-      craft: [
-        'Check required materials',
-        'Gather missing materials',
-        'Access crafting interface',
-        'Create the item',
-      ],
-      build: [
-        'Plan building layout',
-        'Gather building materials',
-        'Clear building area',
-        'Construct the structure',
-      ],
-      explore: [
-        'Choose exploration direction',
-        'Navigate to target area',
-        'Survey the environment',
-        'Document findings',
-      ],
-      move: [
-        'Determine destination',
-        'Plan safe route',
-        'Navigate to location',
-        'Confirm arrival',
-      ],
-      search: [
-        'Define search area',
-        'Systematically search',
-        'Identify targets',
-        'Collect findings',
-      ],
-      investigate: [
-        'Identify investigation target',
-        'Gather relevant information',
-        'Analyze findings',
-        'Report conclusions',
-      ],
+    // Instead of hardcoded templates, generate minimal dynamic steps
+    // This ensures the bot uses its own reasoning rather than predefined patterns
+    const taskTitle = taskData.title || 'Unknown Task';
+    
+    // Create a single dynamic step that encourages the bot to think about the task
+    const dynamicStep = {
+      id: `step-${Date.now()}-1`,
+      label: `Plan and execute: ${taskTitle}`,
+      done: false,
+      order: 1,
+      estimatedDuration: 5000,
     };
 
-    // Find the best matching template
-    let bestTemplate = 'general';
-    for (const [type, template] of Object.entries(stepTemplates)) {
-      if (
-        taskType.includes(type) ||
-        title.includes(type) ||
-        description.includes(type)
-      ) {
-        bestTemplate = type;
-        break;
-      }
-    }
-
-    // Use the template or create custom steps
-    const stepLabels = stepTemplates[bestTemplate] || [
-      'Prepare for task',
-      'Execute main action',
-      'Complete and verify',
-    ];
-
-    // Generate steps with appropriate timing
-    const durations = [2000, 5000, 2000]; // Default durations
-    return stepLabels.map((label, index) => ({
-      id: `step-${Date.now()}-${index + 1}`,
-      label: this.customizeStepLabel(label, taskData),
-      done: false,
-      order: index + 1,
-      estimatedDuration: durations[index] || 3000,
-    }));
-  }
-
-  /**
-   * Customize step labels based on task context
-   */
-  private customizeStepLabel(
-    baseLabel: string,
-    taskData: Partial<Task>
-  ): string {
-    const title = taskData.title || '';
-    const type = taskData.type || '';
-
-    // Replace generic terms with specific ones
-    let label = baseLabel;
-
-    if (title.includes('wood') || type.includes('gather')) {
-      label = label.replace('resources', 'wood').replace('materials', 'wood');
-    }
-    if (title.includes('stone') || title.includes('cobblestone')) {
-      label = label.replace('resources', 'stone').replace('materials', 'stone');
-    }
-    if (title.includes('pickaxe')) {
-      label = label.replace('item', 'pickaxe').replace('structure', 'pickaxe');
-    }
-    if (title.includes('cave')) {
-      label = label.replace('area', 'cave').replace('location', 'cave');
-    }
-    if (title.includes('shelter')) {
-      label = label.replace('structure', 'shelter').replace('item', 'shelter');
-    }
-
-    return label;
+    return [dynamicStep];
   }
 
   /**

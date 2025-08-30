@@ -369,6 +369,9 @@ importers:
       '@conscious-bot/planning':
         specifier: workspace:*
         version: link:../planning
+      '@conscious-bot/world':
+        specifier: workspace:*
+        version: link:../world
       '@types/three':
         specifier: ^0.179.0
         version: 0.179.0

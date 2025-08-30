@@ -24,11 +24,13 @@ import {
   PlaceBlockAction,
   FindShelterAction,
 } from './types';
+import { NavigationBridge } from './navigation-bridge';
 
 export class ActionTranslator {
   private bot: Bot;
   private config: BotConfig;
   private movements: Movements;
+  private navigationBridge: NavigationBridge;
 
   constructor(bot: Bot, config: BotConfig) {
     this.bot = bot;
@@ -46,6 +48,17 @@ export class ActionTranslator {
       this.movements.scafoldingBlocks = [];
       this.movements.canDig = false;
     }
+
+    // Initialize D* Lite navigation bridge
+    this.navigationBridge = new NavigationBridge(bot, {
+      maxRaycastDistance: 32,
+      pathfindingTimeout: 30000,
+      replanThreshold: 5,
+      obstacleDetectionRadius: 8,
+      enableDynamicReplanning: true,
+      useRaycasting: true,
+      usePathfinding: true,
+    });
   }
 
   /**
@@ -1299,7 +1312,7 @@ export class ActionTranslator {
   }
 
   /**
-   * Execute navigation action
+   * Execute navigation action using D* Lite pathfinding
    */
   private async executeNavigate(
     action: NavigateAction,
@@ -1307,57 +1320,81 @@ export class ActionTranslator {
   ): Promise<{ success: boolean; data?: any; error?: string }> {
     const { target, range, sprint } = action.parameters;
 
-    return new Promise((resolve) => {
-      const goal = new goals.GoalNear(target.x, target.y, target.z, range || 1);
+    try {
+      console.log(
+        `🧭 Using D* Lite navigation to target: ${target.x}, ${target.y}, ${target.z}`
+      );
 
-      this.bot.pathfinder.setMovements(this.movements);
-      this.bot.pathfinder.setGoal(goal);
+      // Use D* Lite navigation bridge for intelligent pathfinding
+      const navigationResult = await this.navigationBridge.navigateTo(target, {
+        timeout: timeout,
+        useRaycasting: true,
+        dynamicReplanning: true,
+      });
 
       if (sprint) {
         this.bot.setControlState('sprint', true);
       }
 
-      const timeoutId = setTimeout(() => {
-        this.bot.pathfinder.setGoal(null);
-        this.bot.setControlState('sprint', false);
-        resolve({
-          success: false,
-          error: 'Navigation timeout',
-          data: {
-            targetReached: false,
-            finalPosition: this.bot.entity.position.clone(),
-            distanceRemaining: this.bot.entity.position.distanceTo(target),
-          },
-        });
-      }, timeout);
+      if (navigationResult.success) {
+        console.log(
+          `✅ D* Lite navigation successful: ${navigationResult.pathLength} steps, ${navigationResult.replans} replans`
+        );
 
-      this.bot.once('goal_reached', () => {
-        clearTimeout(timeoutId);
-        this.bot.setControlState('sprint', false);
-        resolve({
+        if (sprint) {
+          this.bot.setControlState('sprint', false);
+        }
+
+        return {
           success: true,
           data: {
             targetReached: true,
-            finalPosition: this.bot.entity.position.clone(),
-            distanceRemaining: this.bot.entity.position.distanceTo(target),
+            finalPosition: navigationResult.finalPosition,
+            distanceRemaining: navigationResult.distanceToGoal,
+            pathLength: navigationResult.pathLength,
+            replans: navigationResult.replans,
+            obstaclesDetected: navigationResult.obstaclesDetected,
+            planningTime: navigationResult.data?.planningTime,
           },
-        });
-      });
+        };
+      } else {
+        console.log(`❌ D* Lite navigation failed: ${navigationResult.error}`);
 
-      (this.bot as any).once('path_error', (error: any) => {
-        clearTimeout(timeoutId);
-        this.bot.setControlState('sprint', false);
-        resolve({
+        if (sprint) {
+          this.bot.setControlState('sprint', false);
+        }
+
+        return {
           success: false,
-          error: `Pathfinding error: ${error}`,
+          error: navigationResult.error || 'Navigation failed',
           data: {
             targetReached: false,
-            finalPosition: this.bot.entity.position.clone(),
-            distanceRemaining: this.bot.entity.position.distanceTo(target),
+            finalPosition: navigationResult.finalPosition,
+            distanceRemaining: navigationResult.distanceToGoal,
+            pathLength: navigationResult.pathLength,
+            replans: navigationResult.replans,
+            obstaclesDetected: navigationResult.obstaclesDetected,
           },
-        });
-      });
-    });
+        };
+      }
+    } catch (error) {
+      console.error(`❌ D* Lite navigation error:`, error);
+
+      if (sprint) {
+        this.bot.setControlState('sprint', false);
+      }
+
+      return {
+        success: false,
+        error:
+          error instanceof Error ? error.message : 'Unknown navigation error',
+        data: {
+          targetReached: false,
+          finalPosition: this.bot.entity.position.clone(),
+          distanceRemaining: this.bot.entity.position.distanceTo(target),
+        },
+      };
+    }
   }
 
   /**

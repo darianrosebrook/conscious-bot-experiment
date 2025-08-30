@@ -249,8 +249,9 @@ async function autonomousTaskExecutor() {
   try {
     console.log('🤖 Running autonomous task executor...');
 
-    // Get active tasks and execute them
-    const activeTasks = enhancedTaskIntegration.getActiveTasks();
+    // Get active tasks from the planning system's actual task storage
+    const planningState = await fetch('http://localhost:3002/state').then(res => res.json());
+    const activeTasks = planningState.state?.tasks?.current || [];
 
     if (activeTasks.length === 0) {
       console.log('No active tasks to execute');
@@ -260,7 +261,7 @@ async function autonomousTaskExecutor() {
     // Execute the highest priority task
     const currentTask = activeTasks[0]; // Tasks are already sorted by priority
     console.log(
-      `🎯 Executing task: ${currentTask.title} (${currentTask.progress * 100}% complete)`
+      `🎯 Executing task: ${currentTask.title} (${(currentTask.progress || 0) * 100}% complete)`
     );
 
     // Check if bot is connected and can perform actions
@@ -309,12 +310,17 @@ async function autonomousTaskExecutor() {
           `✅ MCP option executed successfully: ${suitableOption.name}`
         );
         // Update task progress based on MCP execution result
-        const newProgress = Math.min(currentTask.progress + 0.25, 1.0);
-        enhancedTaskIntegration.updateTaskProgress(
-          currentTask.id,
-          newProgress,
-          newProgress >= 1.0 ? 'completed' : 'active'
-        );
+        const newProgress = Math.min((currentTask.progress || 0) + 0.25, 1.0);
+        
+        // Update task progress in the planning system
+        await fetch(`http://localhost:3002/task/${currentTask.id}/progress`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            progress: newProgress,
+            status: newProgress >= 1.0 ? 'completed' : 'active'
+          })
+        });
       } else {
         console.error(
           `❌ MCP option execution failed: ${suitableOption.name}`,
@@ -326,20 +332,24 @@ async function autonomousTaskExecutor() {
         const maxRetries = currentTask.metadata?.maxRetries || 3;
 
         if (retryCount >= maxRetries) {
-          enhancedTaskIntegration.updateTaskProgress(
-            currentTask.id,
-            currentTask.progress,
-            'failed'
-          );
+          // Update task status in the planning system
+          await fetch(`http://localhost:3002/task/${currentTask.id}/status`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ status: 'failed' })
+          });
           console.log(
             `❌ Task marked as failed after ${retryCount} retries: ${currentTask.title}`
           );
         } else {
           // Update retry count
-          enhancedTaskIntegration.updateTaskMetadata(currentTask.id, {
-            ...currentTask.metadata,
-            retryCount,
-            lastRetry: Date.now(),
+          await fetch(`http://localhost:3002/task/${currentTask.id}/metadata`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              retryCount,
+              lastRetry: Date.now(),
+            })
           });
           console.log(
             `🔄 Task will be retried (${retryCount}/${maxRetries}): ${currentTask.title}`
@@ -354,19 +364,23 @@ async function autonomousTaskExecutor() {
       try {
         console.log(`🚀 Starting execution of task: ${currentTask.title}`);
 
-        const executionResult =
-          await planningSystem.execution.executeTask(currentTask);
+        const executionResult = await planningSystem.execution.executeTask(currentTask);
 
         if (executionResult.success) {
           console.log(`✅ Task execution completed: ${currentTask.title}`);
 
           // Update task progress based on execution result
-          const newProgress = Math.min(currentTask.progress + 0.25, 1.0);
-          enhancedTaskIntegration.updateTaskProgress(
-            currentTask.id,
-            newProgress,
-            newProgress >= 1.0 ? 'completed' : 'active'
-          );
+          const newProgress = Math.min((currentTask.progress || 0) + 0.25, 1.0);
+          
+          // Update task progress in the planning system
+          await fetch(`http://localhost:3002/task/${currentTask.id}/progress`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              progress: newProgress,
+              status: newProgress >= 1.0 ? 'completed' : 'active'
+            })
+          });
         } else {
           console.error(
             `❌ Task execution failed: ${currentTask.title}`,
@@ -378,20 +392,24 @@ async function autonomousTaskExecutor() {
           const maxRetries = currentTask.metadata?.maxRetries || 3;
 
           if (retryCount >= maxRetries) {
-            enhancedTaskIntegration.updateTaskProgress(
-              currentTask.id,
-              currentTask.progress,
-              'failed'
-            );
+            // Update task status in the planning system
+            await fetch(`http://localhost:3002/task/${currentTask.id}/status`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ status: 'failed' })
+            });
             console.log(
               `❌ Task marked as failed after ${retryCount} retries: ${currentTask.title}`
             );
           } else {
             // Update retry count
-            enhancedTaskIntegration.updateTaskMetadata(currentTask.id, {
-              ...currentTask.metadata,
-              retryCount,
-              lastRetry: Date.now(),
+            await fetch(`http://localhost:3002/task/${currentTask.id}/metadata`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                retryCount,
+                lastRetry: Date.now(),
+              })
             });
             console.log(
               `🔄 Task will be retried (${retryCount}/${maxRetries}): ${currentTask.title}`
