@@ -38,34 +38,19 @@ export async function GET(_request: NextRequest) {
 
     // Convert enhanced task integration tasks to dashboard format
     if (tasksData.success && tasksData.tasks) {
-      for (const task of tasksData.tasks) {
-        tasks.push({
-          id: task.id,
-          title: task.title,
-          priority: task.priority,
-          progress: task.progress,
-          source: task.source as any,
-          steps:
-            task.steps?.map((step: any) => ({
-              id: step.id,
-              label: step.label,
-              done: step.done,
-            })) || [],
-        });
-      }
-    }
+      // Handle nested structure from planning service
+      const currentTasks = tasksData.tasks.current || tasksData.tasks;
+      const completedTasks = tasksData.tasks.completed || [];
 
-    // Add enhanced task integration data from state
-    if (stateData.enhancedTaskIntegration?.activeTasks) {
-      for (const task of stateData.enhancedTaskIntegration.activeTasks) {
-        // Avoid duplicates
-        if (!tasks.find((t) => t.id === task.id)) {
+      // Process current tasks
+      if (Array.isArray(currentTasks)) {
+        for (const task of currentTasks) {
           tasks.push({
             id: task.id,
             title: task.title,
-            priority: task.priority,
-            progress: task.progress,
-            source: task.source as any,
+            priority: task.priority || 0.5,
+            progress: task.progress || 0,
+            source: task.source || ('planner' as any),
             steps:
               task.steps?.map((step: any) => ({
                 id: step.id,
@@ -73,6 +58,50 @@ export async function GET(_request: NextRequest) {
                 done: step.done,
               })) || [],
           });
+        }
+      }
+
+      // Process completed tasks (optional)
+      if (Array.isArray(completedTasks)) {
+        for (const task of completedTasks) {
+          tasks.push({
+            id: task.id,
+            title: task.title,
+            priority: task.priority || 0.5,
+            progress: 1.0, // Completed tasks have 100% progress
+            source: task.source || ('planner' as any),
+            steps:
+              task.steps?.map((step: any) => ({
+                id: step.id,
+                label: step.label,
+                done: true, // All steps are done for completed tasks
+              })) || [],
+          });
+        }
+      }
+    }
+
+    // Add enhanced task integration data from state
+    if (stateData.enhancedTaskIntegration?.activeTasks) {
+      const activeTasks = stateData.enhancedTaskIntegration.activeTasks;
+      if (Array.isArray(activeTasks)) {
+        for (const task of activeTasks) {
+          // Avoid duplicates
+          if (!tasks.find((t) => t.id === task.id)) {
+            tasks.push({
+              id: task.id,
+              title: task.title,
+              priority: task.priority || 0.5,
+              progress: task.progress || 0,
+              source: task.source || ('planner' as any),
+              steps:
+                task.steps?.map((step: any) => ({
+                  id: step.id,
+                  label: step.label,
+                  done: step.done,
+                })) || [],
+            });
+          }
         }
       }
     }

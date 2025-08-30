@@ -6,6 +6,7 @@
   "scripts": {
     "build": "tsc",
     "dev": "tsx src/modular-server.ts",
+    "dev:server": "tsx src/modular-server.ts",
     "dev:watch": "tsc --watch",
     "test": "vitest run",
     "test:ui": "vitest --ui",

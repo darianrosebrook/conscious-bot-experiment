@@ -60,6 +60,7 @@ export interface LLMResponse {
     };
     reasoning?: string[];
     citations?: string[];
+    retryAttempt?: number;
   };
   timestamp: number;
 }

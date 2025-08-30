@@ -148,7 +148,7 @@ function killProcessesByPattern(pattern) {
   }
 }
 
-async function waitForService(url, serviceName, maxAttempts = 30) {
+async function waitForService(url, serviceName, maxAttempts = 60) {
   return new Promise(async (resolve, reject) => {
     const http = await import('http');
     const https = await import('https');
@@ -156,19 +156,25 @@ async function waitForService(url, serviceName, maxAttempts = 30) {
 
     let attempts = 0;
     let lastLogAttempt = 0;
+    const startTime = Date.now();
 
     const check = () => {
       attempts++;
 
       const req = client.get(url, (res) => {
         if (res.statusCode >= 200 && res.statusCode < 500) {
-          log(` ✅ ${serviceName} is ready!`, colors.green);
+          const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+          log(` ✅ ${serviceName} is ready! (${elapsed}s)`, colors.green);
           resolve();
         } else {
           if (attempts < maxAttempts) {
             setTimeout(check, 2000);
           } else {
-            log(` ⚠️  ${serviceName} health check failed`, colors.yellow);
+            const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+            log(
+              ` ⚠️  ${serviceName} health check failed after ${elapsed}s`,
+              colors.yellow
+            );
             resolve(); // Don't fail, just warn
           }
         }
@@ -176,27 +182,36 @@ async function waitForService(url, serviceName, maxAttempts = 30) {
 
       req.on('error', () => {
         if (attempts < maxAttempts) {
-          // Only log every 5 attempts to reduce verbosity
-          if (attempts - lastLogAttempt >= 5 || attempts === 1) {
+          // Only log every 10 attempts to reduce verbosity
+          if (attempts - lastLogAttempt >= 10 || attempts === 1) {
+            const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
             log(
-              ` ⏳ Attempt ${attempts}/${maxAttempts} - ${serviceName} starting...`,
+              ` ⏳ Attempt ${attempts}/${maxAttempts} - ${serviceName} starting... (${elapsed}s)`,
               colors.yellow
             );
             lastLogAttempt = attempts;
           }
           setTimeout(check, 2000);
         } else {
-          log(` ⚠️  ${serviceName} health check timeout`, colors.yellow);
+          const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+          log(
+            ` ⚠️  ${serviceName} health check timeout after ${elapsed}s`,
+            colors.yellow
+          );
           resolve(); // Don't fail, just warn
         }
       });
 
-      req.setTimeout(5000, () => {
+      req.setTimeout(10000, () => {
         req.destroy();
         if (attempts < maxAttempts) {
           setTimeout(check, 2000);
         } else {
-          log(` ⚠️  ${serviceName} health check timeout`, colors.yellow);
+          const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+          log(
+            ` ⚠️  ${serviceName} health check timeout after ${elapsed}s`,
+            colors.yellow
+          );
           resolve(); // Don't fail, just warn
         }
       });
@@ -446,16 +461,17 @@ async function main() {
 
   // Step 9: Wait for services to start and check health
   log('\n⏳ Waiting for services to start...', colors.cyan);
-  await wait(5000);
+  await wait(8000); // Increased from 5s to 8s to give services more time to initialize
 
   log('\n🔍 Checking service health...', colors.cyan);
 
   try {
-    await Promise.all(
-      processes.map(({ service }) =>
-        waitForService(service.healthUrl, service.name)
-      )
-    );
+    // Check services sequentially to avoid overwhelming them
+    for (const { service } of processes) {
+      await waitForService(service.healthUrl, service.name);
+      // Small delay between health checks
+      await wait(500);
+    }
   } catch (error) {
     log(
       ` ⚠️  Some services may not be fully ready: ${error.message}`,

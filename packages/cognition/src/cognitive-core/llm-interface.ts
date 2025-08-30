@@ -22,13 +22,13 @@ export class LLMInterface {
   constructor(config: Partial<LLMConfig> = {}) {
     const defaultConfig: LLMConfig = {
       provider: 'ollama',
-      model: 'deepseek-r1:14b',
-      fallbackModel: 'deepseek-r1:8b',
+      model: 'qwen3:4b',
+      fallbackModel: 'qwen3:4b',
       host: 'localhost',
       port: 11434,
       maxTokens: 2048,
       temperature: 0.7,
-      timeout: 30000,
+      timeout: 60000, // Increased from 30s to 60s for better reliability
       retries: 2,
     };
 
@@ -100,15 +100,62 @@ export class LLMInterface {
     } catch (error) {
       console.error('LLM generation failed:', error);
 
-      // Try fallback model if available
-      if (this.config.fallbackModel && model !== this.config.fallbackModel) {
-        console.log(
-          `Retrying with fallback model: ${this.config.fallbackModel}`
-        );
-        return this.generateResponse(prompt, context, {
-          ...options,
-          model: this.config.fallbackModel,
-        });
+      // Retry with exponential backoff
+      for (let attempt = 1; attempt <= this.config.retries; attempt++) {
+        try {
+          console.log(
+            `Retrying LLM generation (attempt ${attempt}/${this.config.retries})`
+          );
+
+          // Exponential backoff: wait 1s, 2s, 4s between retries
+          if (attempt > 1) {
+            const delay = Math.pow(2, attempt - 1) * 1000;
+            await new Promise((resolve) => setTimeout(resolve, delay));
+          }
+
+          const response = await this.callOllama(model, fullPrompt, {
+            temperature,
+            maxTokens,
+          });
+
+          const endTime = performance.now();
+
+          return {
+            id: `llm-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+            text: response.response,
+            model,
+            tokensUsed: response.eval_count || 0,
+            latency: endTime - startTime,
+            confidence: this.calculateConfidence(response),
+            metadata: {
+              finishReason: response.done ? 'stop' : 'length',
+              usage: {
+                promptTokens: response.prompt_eval_count || 0,
+                completionTokens: response.eval_count || 0,
+                totalTokens:
+                  (response.prompt_eval_count || 0) +
+                  (response.eval_count || 0),
+              },
+              retryAttempt: attempt,
+            },
+            timestamp: Date.now(),
+          };
+        } catch (retryError) {
+          console.error(`LLM retry attempt ${attempt} failed:`, retryError);
+
+          // If this was the last attempt, try fallback model
+          if (
+            attempt === this.config.retries &&
+            this.config.fallbackModel &&
+            model !== this.config.fallbackModel
+          ) {
+            console.log(`Trying fallback model: ${this.config.fallbackModel}`);
+            return this.generateResponse(prompt, context, {
+              ...options,
+              model: this.config.fallbackModel,
+            });
+          }
+        }
       }
 
       throw error;

@@ -213,13 +213,82 @@ async function waitForBotConnection(timeoutMs: number): Promise<boolean> {
 }
 
 /**
- * Autonomous task executor
+ * Check if bot is connected and ready for actions
+ */
+async function checkBotConnection(): Promise<boolean> {
+  try {
+    // Check if bot is connected to Minecraft
+    const response = await fetch('http://localhost:3001/bot/status', {
+      method: 'GET',
+      signal: AbortSignal.timeout(2000),
+    });
+
+    if (response.ok) {
+      const status = (await response.json()) as { connected?: boolean };
+      return status.connected === true;
+    }
+
+    return false;
+  } catch (error) {
+    console.warn('Bot connection check failed:', error);
+    return false;
+  }
+}
+
+/**
+ * Autonomous task executor - Real Action Based Progress
+ * Only updates progress when actual bot actions are performed
  */
 async function autonomousTaskExecutor() {
   try {
     console.log('🤖 Running autonomous task executor...');
 
-    // Get active goals and execute them
+    // Get active tasks and execute them
+    const activeTasks = enhancedTaskIntegration.getActiveTasks();
+
+    if (activeTasks.length === 0) {
+      console.log('No active tasks to execute');
+      return;
+    }
+
+    // Execute the highest priority task
+    const currentTask = activeTasks[0]; // Tasks are already sorted by priority
+    console.log(
+      `Monitoring task: ${currentTask.title} (${currentTask.progress * 100}% complete)`
+    );
+
+    // Check if bot is connected and can perform actions
+    const botConnected = await checkBotConnection();
+    if (!botConnected) {
+      console.log('⚠️ Bot not connected - cannot execute real actions');
+      return;
+    }
+
+    // Only update progress based on real actions, not fake increments
+    // Progress will be updated by the actual task execution system
+    console.log(
+      `📊 Task progress monitoring: ${currentTask.title} - ${Math.round(currentTask.progress * 100)}%`
+    );
+
+    // Check if task is actually complete based on real step completion
+    const completedSteps =
+      currentTask.steps?.filter((step) => step.done).length || 0;
+    const totalSteps = currentTask.steps?.length || 0;
+
+    if (totalSteps > 0 && completedSteps >= totalSteps) {
+      console.log(
+        `✅ Task completed through real actions: ${currentTask.title}`
+      );
+
+      // Mark task as completed only if all steps are actually done
+      enhancedTaskIntegration.updateTaskProgress(
+        currentTask.id,
+        1.0,
+        'completed'
+      );
+    }
+
+    // Get active goals and execute them (keep existing goal logic)
     const activeGoals = planningSystem.goalFormulation.getActiveGoals();
 
     for (const goal of activeGoals) {
@@ -290,7 +359,7 @@ const enhancedEnvironmentIntegration = new EnhancedEnvironmentIntegration({
   dashboardEndpoint: 'http://localhost:3000',
   worldSystemEndpoint: 'http://localhost:3004',
   minecraftEndpoint: 'http://localhost:3005',
-  updateInterval: 5000,
+  updateInterval: 15000, // Increased from 5000ms to 15000ms to reduce load
   maxEntityDistance: 50,
   maxBlockDistance: 20,
 });
@@ -304,10 +373,10 @@ const enhancedLiveStreamIntegration = new EnhancedLiveStreamIntegration({
   dashboardEndpoint: 'http://localhost:3000',
   minecraftEndpoint: 'http://localhost:3005',
   screenshotEndpoint: 'http://localhost:3005/screenshots',
-  updateInterval: 2000,
-  maxActionLogs: 1000,
-  maxVisualFeedbacks: 100,
-  screenshotInterval: 10000,
+  updateInterval: 10000, // Reduced from 2000ms to 10000ms to reduce load
+  maxActionLogs: 100, // Reduced from 1000 to 100 to save memory
+  maxVisualFeedbacks: 50, // Reduced from 100 to 50 to save memory
+  screenshotInterval: 30000, // Increased from 10000ms to 30000ms to reduce load
 });
 
 // Create planning system interface
@@ -317,9 +386,10 @@ const planningSystem: PlanningSystem = {
     getActiveGoals: () =>
       enhancedGoalManager.getGoalsByStatus(GoalStatus.PENDING),
     getGoalCount: () => enhancedGoalManager.listGoals().length,
-    getCurrentTasks: () => [], // Simplified for now
-    addTask: (task: any) => enhancedTaskIntegration.addTask(task),
-    getCompletedTasks: () => [], // Simplified for now
+    getCurrentTasks: () => enhancedTaskIntegration.getActiveTasks(),
+    addTask: async (task: any) => await enhancedTaskIntegration.addTask(task),
+    getCompletedTasks: () =>
+      enhancedTaskIntegration.getTasks({ status: 'completed' }),
   },
   execution: {
     executeGoal: async (goal: any) => {
@@ -385,13 +455,13 @@ setTimeout(async () => {
     );
   }
 
-  enhancedTaskIntegration.addTask({
+  const task1 = await enhancedTaskIntegration.addTask({
     title: 'Gather Wood',
     description: 'Collect wood from nearby trees for crafting',
     type: 'gathering',
     priority: 0.8,
     urgency: 0.7,
-    source: 'autonomous',
+    source: 'autonomous' as const,
     metadata: {
       category: 'survival',
       tags: ['wood', 'gathering', 'crafting'],
@@ -403,13 +473,19 @@ setTimeout(async () => {
     },
   });
 
-  enhancedTaskIntegration.addTask({
+  console.log('Task 1 added:', task1.id, task1.title);
+  console.log(
+    'Active tasks after task 1:',
+    enhancedTaskIntegration.getActiveTasks().length
+  );
+
+  await enhancedTaskIntegration.addTask({
     title: 'Craft Wooden Pickaxe',
     description: 'Create a wooden pickaxe for mining stone',
     type: 'crafting',
     priority: 0.9,
     urgency: 0.8,
-    source: 'autonomous',
+    source: 'autonomous' as const,
     metadata: {
       category: 'crafting',
       tags: ['pickaxe', 'wood', 'tools'],
@@ -421,13 +497,13 @@ setTimeout(async () => {
     },
   });
 
-  enhancedTaskIntegration.addTask({
+  await enhancedTaskIntegration.addTask({
     title: 'Explore Cave System',
     description: 'Search for valuable resources in nearby caves',
     type: 'exploration',
     priority: 0.6,
     urgency: 0.5,
-    source: 'autonomous',
+    source: 'autonomous' as const,
     metadata: {
       category: 'exploration',
       tags: ['cave', 'mining', 'resources'],
@@ -444,7 +520,14 @@ setTimeout(async () => {
 async function startServer() {
   try {
     // Initialize MCP integration (bot and registry would be passed here)
-    await serverConfig.initializeMCP();
+    try {
+      await serverConfig.initializeMCP();
+    } catch (error) {
+      console.warn(
+        '⚠️ MCP integration failed to initialize, continuing without it:',
+        error
+      );
+    }
 
     // Mount planning endpoints
     const planningRouter = createPlanningEndpoints(planningSystem);
@@ -456,23 +539,43 @@ async function startServer() {
     // Start the server
     await serverConfig.start();
 
-    // Start autonomous task executor
+    // Start autonomous task executor with error handling
     if (process.env.NODE_ENV === 'development') {
       console.log('Starting autonomous task executor...');
     }
-    setInterval(autonomousTaskExecutor, 120000); // Check every 2 minutes
 
-    // Initial task generation after 30 seconds
-    setTimeout(() => {
-      if (process.env.NODE_ENV === 'development') {
-        console.log('Initializing autonomous behavior...');
+    // Wrap the interval in error handling
+    setInterval(() => {
+      try {
+        console.log('🔄 Scheduled autonomous task executor running...');
+        autonomousTaskExecutor();
+      } catch (error) {
+        console.warn('Autonomous task executor error (non-fatal):', error);
       }
-      autonomousTaskExecutor();
+    }, 30000); // Check every 30 seconds
+
+    // Initial task generation after 30 seconds with error handling
+    setTimeout(() => {
+      try {
+        if (process.env.NODE_ENV === 'development') {
+          console.log('Initializing autonomous behavior...');
+        }
+        autonomousTaskExecutor();
+      } catch (error) {
+        console.warn('Initial autonomous behavior error (non-fatal):', error);
+      }
     }, 30000);
 
-    // Start cognitive thought processor
-    console.log('Starting cognitive thought processor...');
-    cognitiveThoughtProcessor.startProcessing();
+    // Start cognitive thought processor with error handling
+    try {
+      console.log('Starting cognitive thought processor...');
+      cognitiveThoughtProcessor.startProcessing();
+    } catch (error) {
+      console.warn(
+        '⚠️ Cognitive thought processor failed to start, continuing without it:',
+        error
+      );
+    }
 
     console.log('✅ Modular planning server started successfully');
   } catch (error) {

@@ -24,7 +24,7 @@
       "@conscious-bot/core": ["../../core/src"],
       "@conscious-bot/planning": ["./src"]
     },
-    "types": ["vitest/globals"],
+    "types": [],
     "typeRoots": ["./src/types", "./node_modules/@types"]
   },
   "include": [

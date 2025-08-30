@@ -406,10 +406,10 @@ describe('Autonomous Task Execution Tests', () => {
     it('should schedule autonomous task execution at regular intervals', () => {
       const scheduleAutonomousExecution = () => {
         // Simulate setInterval behavior
-        const interval = 120000; // 2 minutes
+        const interval = 30000; // 30 seconds
         const executions: number[] = [];
 
-        // Simulate 3 executions over 6 minutes
+        // Simulate 3 executions over 1.5 minutes
         for (let i = 0; i < 3; i++) {
           const executionTime = Date.now() + i * interval;
           executions.push(executionTime);
@@ -421,8 +421,8 @@ describe('Autonomous Task Execution Tests', () => {
       const executions = scheduleAutonomousExecution();
 
       expect(executions).toHaveLength(3);
-      expect(executions[1] - executions[0]).toBe(120000);
-      expect(executions[2] - executions[1]).toBe(120000);
+      expect(executions[1] - executions[0]).toBe(30000);
+      expect(executions[2] - executions[1]).toBe(30000);
     });
 
     it('should start autonomous execution immediately when bot joins', () => {
@@ -431,7 +431,7 @@ describe('Autonomous Task Execution Tests', () => {
         const immediateExecution = Date.now();
 
         // Scheduled interval execution
-        const intervalExecution = Date.now() + 120000;
+        const intervalExecution = Date.now() + 30000;
 
         return {
           immediate: immediateExecution,

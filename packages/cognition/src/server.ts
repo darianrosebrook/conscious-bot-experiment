@@ -20,7 +20,7 @@ app.use(express.json());
 // Initialize ReAct Arbiter
 const reactArbiter = new ReActArbiter({
   provider: 'ollama',
-  model: 'llama3.2',
+  model: 'qwen3:4b', // Optimal model from benchmark results
   maxTokens: 1000,
   temperature: 0.3,
   timeout: 30000,
@@ -33,7 +33,7 @@ import { IntrusiveThoughtProcessor } from './enhanced-intrusive-thought-processo
 
 // Initialize enhanced thought generator
 const enhancedThoughtGenerator = new EnhancedThoughtGenerator({
-  thoughtInterval: 30000, // 30 seconds between thoughts
+  thoughtInterval: 5000, // 5 seconds between thoughts for testing
   maxThoughtsPerCycle: 3,
   enableIdleThoughts: true,
   enableContextualThoughts: true,
@@ -66,26 +66,309 @@ const cognitionSystem = {
 // Store cognitive thoughts for external access
 const cognitiveThoughts: any[] = [];
 
+// Function to send thoughts to cognitive stream
+async function sendThoughtToCognitiveStream(thought: any) {
+  try {
+    const response = await fetch(
+      'http://localhost:3000/api/ws/cognitive-stream',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: thought.type || 'reflection',
+          content: thought.content,
+          attribution: 'self',
+          context: {
+            emotionalState: thought.context?.emotionalState || 'neutral',
+            confidence: thought.context?.confidence || 0.5,
+            cognitiveSystem:
+              thought.context?.cognitiveSystem || 'enhanced-generator',
+          },
+          metadata: {
+            thoughtType: thought.metadata?.thoughtType || thought.type,
+            ...thought.metadata,
+          },
+        }),
+      }
+    );
+
+    if (response.ok) {
+      console.log(
+        '✅ Thought sent to cognitive stream:',
+        thought.content.substring(0, 50) + '...'
+      );
+    } else {
+      console.error('❌ Failed to send thought to cognitive stream');
+    }
+  } catch (error) {
+    console.error('❌ Error sending thought to cognitive stream:', error);
+  }
+}
+
+// Start periodic thought generation
+let thoughtGenerationInterval: NodeJS.Timeout | null = null;
+
+function startThoughtGeneration() {
+  if (thoughtGenerationInterval) {
+    clearInterval(thoughtGenerationInterval);
+  }
+
+  // Generate initial thought
+  enhancedThoughtGenerator.generateThought({
+    currentState: {},
+    currentTasks: [],
+    recentEvents: [],
+    emotionalState: 'neutral',
+    memoryContext: {},
+  });
+
+  // Set up periodic thought generation every 30 seconds
+  thoughtGenerationInterval = setInterval(async () => {
+    try {
+      await enhancedThoughtGenerator.generateThought({
+        currentState: {},
+        currentTasks: [],
+        recentEvents: [],
+        emotionalState: 'neutral',
+        memoryContext: {},
+      });
+    } catch (error) {
+      console.error('Error generating periodic thought:', error);
+    }
+  }, 30000); // 30 seconds
+
+  console.log('✅ Enhanced thought generator started with 30-second intervals');
+}
+
+function stopThoughtGeneration() {
+  if (thoughtGenerationInterval) {
+    clearInterval(thoughtGenerationInterval);
+    thoughtGenerationInterval = null;
+    console.log('🛑 Enhanced thought generator stopped');
+  }
+}
+
 // Set up event listeners for enhanced components
 enhancedThoughtGenerator.on('thoughtGenerated', (thought) => {
   console.log('Enhanced thought generated:', thought.content);
   cognitiveThoughts.push(thought);
+
+  // Send the thought to the cognitive stream
+  sendThoughtToCognitiveStream(thought);
 });
 
-intrusiveThoughtProcessor.on('taskCreated', ({ thought, task, action }) => {
-  console.log('Task created from intrusive thought:', {
-    thought,
-    task,
-    action,
-  });
-});
+intrusiveThoughtProcessor.on(
+  'thoughtProcessingStarted',
+  ({ thought, timestamp }) => {
+    console.log('Started processing intrusive thought:', thought);
+
+    const processingThought = {
+      id: `processing-started-${timestamp}`,
+      type: 'reflection',
+      content: `Processing intrusive thought: "${thought}"`,
+      timestamp,
+      context: {
+        emotionalState: 'focused',
+        confidence: 0.6,
+        cognitiveSystem: 'intrusive-processor',
+      },
+      metadata: {
+        thoughtType: 'processing-start',
+        source: 'intrusive-thought',
+      },
+    };
+
+    sendThoughtToCognitiveStream(processingThought);
+  }
+);
+
+intrusiveThoughtProcessor.on(
+  'actionParsed',
+  ({ thought, action, timestamp }) => {
+    console.log('Action parsed from intrusive thought:', { thought, action });
+
+    const parsingThought = {
+      id: `action-parsed-${timestamp}`,
+      type: 'planning',
+      content: action
+        ? `Parsed action from thought: "${thought}" → ${action.type} ${action.target}`
+        : `No actionable content found in: "${thought}"`,
+      timestamp,
+      context: {
+        emotionalState: action ? 'focused' : 'neutral',
+        confidence: action ? 0.7 : 0.5,
+        cognitiveSystem: 'intrusive-processor',
+      },
+      metadata: {
+        thoughtType: 'action-parsing',
+        actionType: action?.type,
+        actionTarget: action?.target,
+        source: 'intrusive-thought',
+      },
+    };
+
+    sendThoughtToCognitiveStream(parsingThought);
+  }
+);
+
+intrusiveThoughtProcessor.on(
+  'taskCreationStarted',
+  ({ thought, action, timestamp }) => {
+    console.log('Started creating task from intrusive thought:', {
+      thought,
+      action,
+    });
+
+    const taskStartThought = {
+      id: `task-creation-started-${timestamp}`,
+      type: 'planning',
+      content: `Creating task from action: ${action.type} ${action.target}`,
+      timestamp,
+      context: {
+        emotionalState: 'focused',
+        confidence: 0.8,
+        cognitiveSystem: 'intrusive-processor',
+      },
+      metadata: {
+        thoughtType: 'task-creation-start',
+        actionType: action.type,
+        actionTarget: action.target,
+        source: 'intrusive-thought',
+      },
+    };
+
+    sendThoughtToCognitiveStream(taskStartThought);
+  }
+);
+
+intrusiveThoughtProcessor.on(
+  'taskCreated',
+  ({ thought, task, action, timestamp }) => {
+    console.log('Task created from intrusive thought:', {
+      thought,
+      task,
+      action,
+    });
+
+    // Send task creation thought to cognitive stream
+    const taskThought = {
+      id: `task-created-${timestamp}`,
+      type: 'planning',
+      content: `Created task from intrusive thought: "${thought}". Task: ${task.title}`,
+      timestamp,
+      context: {
+        emotionalState: 'focused',
+        confidence: 0.8,
+        cognitiveSystem: 'intrusive-processor',
+      },
+      metadata: {
+        thoughtType: 'task-creation',
+        taskId: task.id,
+        source: 'intrusive-thought',
+      },
+    };
+
+    sendThoughtToCognitiveStream(taskThought);
+  }
+);
+
+intrusiveThoughtProcessor.on(
+  'planningIntegrationStarted',
+  ({ task, timestamp }) => {
+    console.log('Started planning integration for task:', task.title);
+
+    const planningStartThought = {
+      id: `planning-integration-started-${timestamp}`,
+      type: 'planning',
+      content: `Integrating task into planning system: ${task.title}`,
+      timestamp,
+      context: {
+        emotionalState: 'focused',
+        confidence: 0.7,
+        cognitiveSystem: 'planning-integration',
+      },
+      metadata: {
+        thoughtType: 'planning-integration-start',
+        taskId: task.id,
+        source: 'intrusive-thought',
+      },
+    };
+
+    sendThoughtToCognitiveStream(planningStartThought);
+  }
+);
 
 intrusiveThoughtProcessor.on('planningSystemUpdated', ({ task, result }) => {
   console.log('Planning system updated with task:', { task, result });
+
+  // Send planning update thought to cognitive stream
+  const planningThought = {
+    id: `planning-update-${Date.now()}`,
+    type: 'planning',
+    content: `Planning system updated: ${task.title} - ${result.success ? 'Success' : 'Failed'}`,
+    timestamp: Date.now(),
+    context: {
+      emotionalState: 'focused',
+      confidence: 0.7,
+      cognitiveSystem: 'planning-integration',
+    },
+    metadata: {
+      thoughtType: 'planning-update',
+      taskId: task.id,
+      success: result.success,
+    },
+  };
+
+  sendThoughtToCognitiveStream(planningThought);
 });
+
+intrusiveThoughtProcessor.on(
+  'thoughtRecorded',
+  ({ thought, action, timestamp }) => {
+    console.log('Thought recorded (no action):', thought);
+
+    const recordedThought = {
+      id: `thought-recorded-${timestamp}`,
+      type: 'reflection',
+      content: `Recorded thought: "${thought}" (no immediate action required)`,
+      timestamp,
+      context: {
+        emotionalState: 'neutral',
+        confidence: 0.5,
+        cognitiveSystem: 'intrusive-processor',
+      },
+      metadata: {
+        thoughtType: 'thought-recording',
+        source: 'intrusive-thought',
+        hasAction: false,
+      },
+    };
+
+    sendThoughtToCognitiveStream(recordedThought);
+  }
+);
 
 intrusiveThoughtProcessor.on('processingError', ({ thought, error }) => {
   console.error('Error processing intrusive thought:', { thought, error });
+
+  // Send error thought to cognitive stream
+  const errorThought = {
+    id: `processing-error-${Date.now()}`,
+    type: 'reflection',
+    content: `Failed to process intrusive thought: "${thought}". Error: ${error}`,
+    timestamp: Date.now(),
+    context: {
+      emotionalState: 'concerned',
+      confidence: 0.3,
+      cognitiveSystem: 'intrusive-processor',
+    },
+    metadata: {
+      thoughtType: 'processing-error',
+      error: error,
+    },
+  };
+
+  sendThoughtToCognitiveStream(errorThought);
 });
 
 // Health check endpoint
@@ -95,6 +378,51 @@ app.get('/health', (req, res) => {
     system: 'cognition',
     timestamp: Date.now(),
     version: '0.1.0',
+  });
+});
+
+// Start thought generation endpoint
+app.post('/start-thoughts', (req, res) => {
+  try {
+    startThoughtGeneration();
+    res.json({
+      success: true,
+      message: 'Enhanced thought generator started',
+      timestamp: Date.now(),
+    });
+  } catch (error) {
+    console.error('Error starting thought generation:', error);
+    res.status(500).json({
+      error: 'Failed to start thought generation',
+      details: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
+
+// Stop thought generation endpoint
+app.post('/stop-thoughts', (req, res) => {
+  try {
+    stopThoughtGeneration();
+    res.json({
+      success: true,
+      message: 'Enhanced thought generator stopped',
+      timestamp: Date.now(),
+    });
+  } catch (error) {
+    console.error('Error stopping thought generation:', error);
+    res.status(500).json({
+      error: 'Failed to stop thought generation',
+      details: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
+
+// Get thought generation status endpoint
+app.get('/thoughts-status', (req, res) => {
+  res.json({
+    isRunning: thoughtGenerationInterval !== null,
+    interval: thoughtGenerationInterval ? 30000 : null,
+    timestamp: Date.now(),
   });
 });
 
@@ -467,4 +795,9 @@ app.post('/reflect', async (req, res) => {
 // Start server
 app.listen(port, () => {
   console.log(`Cognition system server running on port ${port}`);
+
+  // Start thought generation automatically
+  setTimeout(() => {
+    startThoughtGeneration();
+  }, 2000); // Start after 2 seconds to ensure everything is initialized
 });

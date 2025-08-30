@@ -100,6 +100,10 @@ export class StandaloneMinecraftInterface
       // Convert action to PlanStep format
       const planStep: PlanStep = {
         id: `action_${Date.now()}`,
+        type: 'action',
+        description: action.type,
+        status: 'pending' as any,
+        priority: 1,
         planId: 'standalone_plan',
         action: {
           id: action.type,
@@ -115,10 +119,10 @@ export class StandaloneMinecraftInterface
         },
         preconditions: [],
         effects: [],
-        status: 'pending' as any,
         order: 0,
         estimatedDuration: 1000,
         dependencies: [],
+        constraints: [],
       };
 
       const result = await this.actionTranslator.executePlanStep(planStep);

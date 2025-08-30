@@ -123,14 +123,14 @@ describe('Server Autonomous Startup Tests', () => {
       const scheduleAutonomousExecution = () => {
         const schedule = {
           immediate: false,
-          interval: 120000, // 2 minutes
+          interval: 30000, // 30 seconds
           scheduledExecutions: [] as number[],
         };
 
         // Simulate immediate execution
         schedule.immediate = true;
 
-        // Simulate scheduled executions over 10 minutes
+        // Simulate scheduled executions over 2.5 minutes
         for (let i = 1; i <= 5; i++) {
           const executionTime = Date.now() + i * schedule.interval;
           schedule.scheduledExecutions.push(executionTime);
@@ -142,11 +142,11 @@ describe('Server Autonomous Startup Tests', () => {
       const schedule = scheduleAutonomousExecution();
 
       expect(schedule.immediate).toBe(true);
-      expect(schedule.interval).toBe(120000);
+      expect(schedule.interval).toBe(30000);
       expect(schedule.scheduledExecutions).toHaveLength(5);
       expect(
         schedule.scheduledExecutions[1] - schedule.scheduledExecutions[0]
-      ).toBe(120000);
+      ).toBe(30000);
     });
 
     it('should handle startup when minecraft interface is not available', async () => {
@@ -197,7 +197,7 @@ describe('Server Autonomous Startup Tests', () => {
           description: `Autonomous ${taskType} task`,
           status: 'pending',
           autonomous: true,
-          createdAt: Date.now() + i * 120000, // 2 minutes apart
+          createdAt: Date.now() + i * 30000, // 30 seconds apart
         };
         generatedTasks.push(task);
       }
@@ -211,7 +211,7 @@ describe('Server Autonomous Startup Tests', () => {
       for (let i = 1; i < generatedTasks.length; i++) {
         const timeDiff =
           generatedTasks[i].createdAt - generatedTasks[i - 1].createdAt;
-        expect(timeDiff).toBe(120000); // 2 minutes
+        expect(timeDiff).toBe(30000); // 30 seconds
       }
     });
 

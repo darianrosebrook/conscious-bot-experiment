@@ -599,11 +599,18 @@ export class CognitiveThoughtProcessor extends EventEmitter {
       return null;
     }
 
-    // Create task from mapping
+    // Create task from mapping with improved title and description
+    const taskTitle = this.generateTaskTitle(thought.content, mapping);
+    const taskDescription = this.generateTaskDescription(
+      thought.content,
+      mapping
+    );
+
     const task = {
       id: `cognitive-task-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      title: taskTitle,
       type: mapping.taskType,
-      description: mapping.description,
+      description: taskDescription,
       priority: mapping.priority,
       urgency: mapping.urgency,
       parameters: mapping.parameters,
@@ -645,14 +652,13 @@ export class CognitiveThoughtProcessor extends EventEmitter {
    */
   private isGenericThought(content: string): boolean {
     const genericPatterns = [
-      'i should gather some resources',
-      'i could explore the environment',
       'i should plan my next actions',
       'what would be most beneficial',
       'the environment presents interesting challenges',
       'i should focus on completing this task',
-      'i should continue gathering materials',
-      'i can focus on gathering resources',
+      'processing current situation',
+      'no content available',
+      'status refreshed',
     ];
 
     return genericPatterns.some((pattern) =>
@@ -701,6 +707,99 @@ export class CognitiveThoughtProcessor extends EventEmitter {
   }
 
   /**
+   * Generate a descriptive task title from thought content and mapping
+   */
+  private generateTaskTitle(
+    content: string,
+    mapping: ThoughtToTaskMapping
+  ): string {
+    const contentLower = content.toLowerCase();
+
+    // Extract specific details from the thought content
+    if (contentLower.includes('wood')) {
+      return 'Gather Wood';
+    }
+    if (
+      contentLower.includes('stone') ||
+      contentLower.includes('cobblestone')
+    ) {
+      return 'Mine Stone';
+    }
+    if (contentLower.includes('pickaxe')) {
+      return 'Craft Wooden Pickaxe';
+    }
+    if (contentLower.includes('cave')) {
+      return 'Explore Cave System';
+    }
+    if (contentLower.includes('shelter')) {
+      return 'Build Shelter';
+    }
+    if (contentLower.includes('torch') || contentLower.includes('light')) {
+      return 'Place Torches';
+    }
+    if (contentLower.includes('food') || contentLower.includes('hunger')) {
+      return 'Find Food';
+    }
+    if (contentLower.includes('iron') || contentLower.includes('ore')) {
+      return 'Mine Iron Ore';
+    }
+    if (contentLower.includes('coal')) {
+      return 'Mine Coal';
+    }
+
+    // Fallback to mapping-based title
+    const action =
+      mapping.taskType.charAt(0).toUpperCase() + mapping.taskType.slice(1);
+    const target = mapping.description.split(' ').pop() || 'resources';
+    return `${action} ${target}`;
+  }
+
+  /**
+   * Generate a detailed task description from thought content and mapping
+   */
+  private generateTaskDescription(
+    content: string,
+    mapping: ThoughtToTaskMapping
+  ): string {
+    const contentLower = content.toLowerCase();
+
+    // Create specific descriptions based on content
+    if (contentLower.includes('wood')) {
+      return 'Collect wood from nearby trees for crafting and building';
+    }
+    if (
+      contentLower.includes('stone') ||
+      contentLower.includes('cobblestone')
+    ) {
+      return 'Mine stone blocks for building materials and tools';
+    }
+    if (contentLower.includes('pickaxe')) {
+      return 'Create a wooden pickaxe for mining stone and other materials';
+    }
+    if (contentLower.includes('cave')) {
+      return 'Search for valuable resources in nearby cave systems';
+    }
+    if (contentLower.includes('shelter')) {
+      return 'Build a safe shelter for protection and storage';
+    }
+    if (contentLower.includes('torch') || contentLower.includes('light')) {
+      return 'Place torches to light up dark areas and prevent mob spawning';
+    }
+    if (contentLower.includes('food') || contentLower.includes('hunger')) {
+      return 'Find food sources to maintain hunger levels';
+    }
+    if (contentLower.includes('iron') || contentLower.includes('ore')) {
+      return 'Mine iron ore for crafting better tools and equipment';
+    }
+    if (contentLower.includes('coal')) {
+      return 'Mine coal for fuel and torches';
+    }
+
+    // Fallback to mapping description
+    return mapping.description;
+  }
+
+  /**
    * Determine the goal category from the thought
    */
   private determineGoalFromThought(thought: CognitiveThought): string {
@@ -738,7 +837,7 @@ export class CognitiveThoughtProcessor extends EventEmitter {
    */
   private async submitTaskToPlanning(task: any): Promise<void> {
     try {
-      const response = await fetch(`${this.config.planningEndpoint}/tasks`, {
+      const response = await fetch(`${this.config.planningEndpoint}/task`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(task),

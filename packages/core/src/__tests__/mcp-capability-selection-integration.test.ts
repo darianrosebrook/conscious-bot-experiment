@@ -50,6 +50,12 @@ const createMockLeafFactory = () => ({
 // Mock LLM interface for capability creation
 const createMockCapabilityLLM = () => ({
   isAvailable: vi.fn().mockResolvedValue(true),
+  generate: vi.fn().mockImplementation(async (prompt) => {
+    return {
+      response: 'Mock LLM response for capability creation',
+      confidence: 0.8,
+    };
+  }),
   proposeOption: vi.fn().mockImplementation(async (request) => {
     const task = request.currentTask.toLowerCase();
 
@@ -212,6 +218,7 @@ describe('MCP Capability Selection Integration', () => {
     // Mock the internal interfaces
     (hybridRouter as any).pythonHRM = {
       initialize: vi.fn().mockResolvedValue(true),
+      isAvailable: vi.fn().mockResolvedValue(true),
       infer: vi.fn().mockResolvedValue({
         confidence: 0.8,
         execution_time: 0.1,

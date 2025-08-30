@@ -378,6 +378,40 @@ export default function ConsciousMinecraftDashboard() {
     onClose: handleWebSocketClose,
   });
 
+  // EventSource connection for cognitive stream
+  useEffect(() => {
+    const eventSource = new EventSource('/api/ws/cognitive-stream');
+
+    eventSource.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+
+        if (data.type === 'cognitive_thoughts' && data.data?.thoughts) {
+          data.data.thoughts.forEach((thought: any) => {
+            addThought({
+              id: thought.id,
+              ts: new Date(thought.timestamp).toISOString(),
+              text: thought.content,
+              type: thought.type || 'reflection',
+              attribution: thought.attribution || 'self',
+              thoughtType: thought.metadata?.thoughtType || thought.type,
+            });
+          });
+        }
+      } catch (error) {
+        console.error('Error parsing cognitive stream message:', error);
+      }
+    };
+
+    eventSource.onerror = (error) => {
+      console.error('Cognitive stream EventSource error:', error);
+    };
+
+    return () => {
+      eventSource.close();
+    };
+  }, [addThought]);
+
   // Polling fallback when WebSocket fails
   useEffect(() => {
     let pollInterval: NodeJS.Timeout;
@@ -619,59 +653,14 @@ export default function ConsciousMinecraftDashboard() {
           }
         }
 
-        // Fetch memories
-        const memoriesRes = await fetch('/api/memories');
-        if (memoriesRes.ok) {
-          const memoriesData = await memoriesRes.json();
-          // Store memories in dashboard store or local state
-          if (memoriesData.memories && Array.isArray(memoriesData.memories)) {
-            // Convert memories to thoughts for display
-            memoriesData.memories.forEach((memory: any) => {
-              addThought({
-                id: memory.id,
-                ts: memory.timestamp,
-                text: memory.content,
-                type: 'reflection',
-              });
-            });
-          }
-        }
+        // Note: Memories are no longer converted to thoughts
+        // The cognitive stream now shows actual cognitive thoughts from the cognition system
 
-        // Fetch events
-        const eventsRes = await fetch('/api/events');
-        if (eventsRes.ok) {
-          const eventsData = await eventsRes.json();
-          // Store events in dashboard store or local state
-          if (eventsData.events && Array.isArray(eventsData.events)) {
-            // Convert events to thoughts for display
-            eventsData.events.forEach((event: any) => {
-              addThought({
-                id: event.id,
-                ts: event.timestamp,
-                text: event.content,
-                type: 'reflection',
-              });
-            });
-          }
-        }
+        // Note: Events are no longer converted to thoughts
+        // The cognitive stream now shows actual cognitive thoughts from the cognition system
 
-        // Fetch notes
-        const notesRes = await fetch('/api/notes');
-        if (notesRes.ok) {
-          const notesData = await notesRes.json();
-          // Store notes in dashboard store or local state
-          if (notesData.notes && Array.isArray(notesData.notes)) {
-            // Convert notes to thoughts for display
-            notesData.notes.forEach((note: any) => {
-              addThought({
-                id: note.id,
-                ts: note.timestamp,
-                text: note.content,
-                type: 'reflection',
-              });
-            });
-          }
-        }
+        // Note: Notes are no longer converted to thoughts
+        // The cognitive stream now shows actual cognitive thoughts from the cognition system
 
         // Fetch bot state and health (includes viewer info)
         const [botRes, healthRes] = await Promise.allSettled([
@@ -765,14 +754,22 @@ export default function ConsciousMinecraftDashboard() {
           fetch('/api/notes', { signal: AbortSignal.timeout(10000) }),
         ]);
 
-        // Process memories
+        // Process memories - filter out system memories from cognitive stream
         if (memoriesRes.status === 'fulfilled' && memoriesRes.value.ok) {
           const memoriesData = await memoriesRes.value.json();
           if (memoriesData.memories && Array.isArray(memoriesData.memories)) {
             // Only add new memories (check by ID to avoid duplicates)
             const existingThoughtIds = new Set(thoughts.map((t) => t.id));
             memoriesData.memories.forEach((memory: any) => {
-              if (!existingThoughtIds.has(memory.id)) {
+              // Filter out system memories that shouldn't appear in cognitive stream
+              const isSystemMemory =
+                memory.content?.includes('Memory system updated') ||
+                memory.content?.includes('Bot state updated') ||
+                memory.content?.includes('Status refreshed') ||
+                memory.type === 'system' ||
+                memory.type === 'telemetry';
+
+              if (!existingThoughtIds.has(memory.id) && !isSystemMemory) {
                 addThought({
                   id: memory.id,
                   ts: memory.timestamp,
@@ -784,14 +781,22 @@ export default function ConsciousMinecraftDashboard() {
           }
         }
 
-        // Process events
+        // Process events - filter out system events from cognitive stream
         if (eventsRes.status === 'fulfilled' && eventsRes.value.ok) {
           const eventsData = await eventsRes.value.json();
           if (eventsData.events && Array.isArray(eventsData.events)) {
             // Only add new events (check by ID to avoid duplicates)
             const existingThoughtIds = new Set(thoughts.map((t) => t.id));
             eventsData.events.forEach((event: any) => {
-              if (!existingThoughtIds.has(event.id)) {
+              // Filter out system events that shouldn't appear in cognitive stream
+              const isSystemEvent =
+                event.type === 'memory_state' ||
+                event.type === 'bot_state' ||
+                event.content?.includes('Memory system updated') ||
+                event.content?.includes('Bot state updated') ||
+                event.content?.includes('Status refreshed');
+
+              if (!existingThoughtIds.has(event.id) && !isSystemEvent) {
                 addThought({
                   id: event.id,
                   ts: event.timestamp,
@@ -803,14 +808,22 @@ export default function ConsciousMinecraftDashboard() {
           }
         }
 
-        // Process notes
+        // Process notes - filter out system notes from cognitive stream
         if (notesRes.status === 'fulfilled' && notesRes.value.ok) {
           const notesData = await notesRes.value.json();
           if (notesData.notes && Array.isArray(notesData.notes)) {
             // Only add new notes (check by ID to avoid duplicates)
             const existingThoughtIds = new Set(thoughts.map((t) => t.id));
             notesData.notes.forEach((note: any) => {
-              if (!existingThoughtIds.has(note.id)) {
+              // Filter out system notes that shouldn't appear in cognitive stream
+              const isSystemNote =
+                note.content?.includes('Memory system updated') ||
+                note.content?.includes('Bot state updated') ||
+                note.content?.includes('Status refreshed') ||
+                note.type === 'system' ||
+                note.type === 'telemetry';
+
+              if (!existingThoughtIds.has(note.id) && !isSystemNote) {
                 addThought({
                   id: note.id,
                   ts: note.timestamp,
@@ -956,7 +969,7 @@ export default function ConsciousMinecraftDashboard() {
   };
 
   return (
-    <div className="h-screen w-screen bg-gradient-to-b from-zinc-950 via-zinc-950 to-black text-zinc-100 overflow-hidden">
+    <div className="h-screen w-screen bg-gradient-to-b from-zinc-950 via-zinc-950 to-black text-zinc-100 overflow-hidden h-full">
       {/* Top Navigation */}
       <header className="flex items-center justify-between border-b border-zinc-900/80 bg-zinc-950/80 px-4 py-3 backdrop-blur supports-[backdrop-filter]:bg-zinc-950/60">
         <div className="flex items-center gap-3">
@@ -1145,58 +1158,12 @@ export default function ConsciousMinecraftDashboard() {
                 </Section>
 
                 <Section
-                  title="Planner"
-                  icon={<Flag className="size-4" />}
+                  title="Current Status"
+                  icon={<Activity className="size-4" />}
                   tight
                 >
                   {plannerData ? (
                     <div className="space-y-3">
-                      {plannerData.currentPlan && (
-                        <div className="rounded-lg border border-zinc-800 bg-zinc-950 p-3">
-                          <div className="flex items-center justify-between mb-2">
-                            <h4 className="text-sm font-medium text-zinc-200">
-                              {plannerData.currentPlan.name}
-                            </h4>
-                            <span className="text-xs text-zinc-500">
-                              {Math.round(
-                                plannerData.currentPlan.progress * 100
-                              )}
-                              %
-                            </span>
-                          </div>
-                          <p className="text-xs text-zinc-400 mb-2">
-                            {plannerData.currentPlan.description}
-                          </p>
-                          <div className="space-y-1">
-                            {plannerData.currentPlan.steps.map((step) => (
-                              <div
-                                key={step.id}
-                                className="flex items-center gap-2 text-xs"
-                              >
-                                <div
-                                  className={`w-2 h-2 rounded-full ${
-                                    step.status === 'completed'
-                                      ? 'bg-green-500'
-                                      : step.status === 'in_progress'
-                                        ? 'bg-yellow-500'
-                                        : 'bg-zinc-600'
-                                  }`}
-                                />
-                                <span
-                                  className={
-                                    step.status === 'completed'
-                                      ? 'text-zinc-500 line-through'
-                                      : 'text-zinc-300'
-                                  }
-                                >
-                                  {step.name}
-                                </span>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-
                       {plannerData.currentAction && (
                         <div className="rounded-lg border border-zinc-800 bg-zinc-950 p-3">
                           <div className="flex items-center justify-between mb-2">
@@ -1242,9 +1209,9 @@ export default function ConsciousMinecraftDashboard() {
                     </div>
                   ) : (
                     <EmptyState
-                      icon={Flag}
-                      title="No planner data"
-                      description="Planner information will appear here when the bot is actively planning."
+                      icon={Activity}
+                      title="No status data"
+                      description="Status information will appear here when the bot is active."
                       className="p-3"
                     />
                   )}
@@ -1554,11 +1521,12 @@ export default function ConsciousMinecraftDashboard() {
               </main>
 
               {/* Right: Cognitive Stream + Thought Input */}
-              <aside className="col-span-12 md:col-span-3 flex flex-col gap-3 overflow-auto">
+              <aside className="col-span-12 md:col-span-3 flex  flex-col gap-3 overflow-auto">
                 <Section
                   title="Cognitive Stream"
                   icon={<MessageSquare className="size-4" />}
                   actions={<Pill>consciousness flow</Pill>}
+                  className="h-full"
                 >
                   {thoughts.length > 0 ? (
                     <ScrollArea className="max-h-[38vh] flex flex-col-reverse gap-2 pr-1 overflow-y-auto">

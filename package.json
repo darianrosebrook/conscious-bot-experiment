@@ -19,6 +19,7 @@
     "dev:planning": "pnpm --filter @conscious-bot/planning run dev:server",
     "kill": "node scripts/kill-servers.js",
     "status": "node scripts/status.js",
+    "health": "node scripts/health-check-diagnostic.js",
     "lint": "turbo lint",
     "test": "turbo test",
     "clean": "turbo clean",

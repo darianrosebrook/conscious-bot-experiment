@@ -8,6 +8,7 @@
  */
 
 import { EventEmitter } from 'events';
+import { LLMInterface } from './cognitive-core/llm-interface';
 
 export interface ThoughtContext {
   currentState?: {
@@ -98,6 +99,9 @@ export interface CognitiveThought {
     purpose?: string;
     biomeType?: string;
     eventType?: string;
+    llmConfidence?: number;
+    model?: string;
+    error?: string;
   };
   category?:
     | 'task-related'
@@ -122,7 +126,7 @@ export interface EnhancedThoughtGeneratorConfig {
 }
 
 const DEFAULT_CONFIG: EnhancedThoughtGeneratorConfig = {
-  thoughtInterval: 30000, // 30 seconds between thoughts
+  thoughtInterval: 5000, // 5 seconds between thoughts for testing
   maxThoughtsPerCycle: 3,
   enableIdleThoughts: true,
   enableContextualThoughts: true,
@@ -135,13 +139,23 @@ const DEFAULT_CONFIG: EnhancedThoughtGeneratorConfig = {
  */
 export class EnhancedThoughtGenerator extends EventEmitter {
   private config: EnhancedThoughtGeneratorConfig;
-  private lastThoughtTime: number = 0;
   private thoughtHistory: CognitiveThought[] = [];
+  private lastThoughtTime: number = Date.now() - 10000; // Initialize to 10 seconds ago
   private isGenerating: boolean = false;
+  private llm: LLMInterface;
 
   constructor(config: Partial<EnhancedThoughtGeneratorConfig> = {}) {
     super();
     this.config = { ...DEFAULT_CONFIG, ...config };
+
+    // Initialize LLM interface for dynamic thought generation
+    this.llm = new LLMInterface({
+      model: 'qwen3:4b', // Optimal model from benchmark results
+      temperature: 0.8,
+      maxTokens: 512,
+      timeout: 60000, // Increased timeout for better reliability
+      retries: 2,
+    });
   }
 
   /**
@@ -188,7 +202,7 @@ export class EnhancedThoughtGenerator extends EventEmitter {
           context
         );
       } else if (this.config.enableIdleThoughts) {
-        thought = this.generateIdleThought(context);
+        thought = await this.generateIdleThought(context);
       }
 
       if (thought) {
@@ -209,292 +223,415 @@ export class EnhancedThoughtGenerator extends EventEmitter {
   }
 
   /**
-   * Generate idle thoughts when no active tasks or events
+   * Generate idle thoughts when no active tasks or events using LLM
    */
-  private generateIdleThought(context: ThoughtContext): CognitiveThought {
-    const idleThoughts = [
-      'Monitoring environment for opportunities and potential threats...',
-      'Processing recent experiences and updating survival strategies...',
-      'Maintaining awareness of surroundings while conserving energy...',
-      'Consolidating memories and planning next exploration phase...',
-      'Evaluating current position and considering resource needs...',
-      'Scanning for nearby resources and safe locations...',
-      'Reflecting on recent decisions and their outcomes...',
-      'Preparing for potential encounters or environmental changes...',
-      'Analyzing current biome conditions and resource availability...',
-      'Considering long-term survival goals and immediate priorities...',
-      'Assessing current equipment and identifying improvement needs...',
-      'Planning efficient routes for future exploration and gathering...',
-      'Evaluating shelter options and defensive positioning...',
-      'Contemplating resource management and crafting priorities...',
-      'Monitoring health and energy levels for optimal performance...',
-    ];
+  private async generateIdleThought(
+    context: ThoughtContext
+  ): Promise<CognitiveThought> {
+    try {
+      const situation = this.buildIdleSituation(context);
 
-    const selectedThought =
-      idleThoughts[Math.floor(Math.random() * idleThoughts.length)];
+      // Add timeout wrapper to prevent hanging
+      const response = await Promise.race([
+        this.llm.generateInternalThought(situation, {
+          currentGoals: context.currentTasks?.map((task) => task.title) || [],
+          recentMemories:
+            context.recentEvents?.map((event) => ({ description: event })) ||
+            [],
+          agentState: context.currentState,
+        }),
+        new Promise<never>(
+          (_, reject) =>
+            setTimeout(() => reject(new Error('LLM timeout')), 45000) // 45s timeout
+        ),
+      ]);
 
-    return {
-      id: `thought-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-      type: 'reflection',
-      content: selectedThought,
-      timestamp: Date.now(),
-      context: {
-        emotionalState: context.emotionalState || 'neutral',
-        confidence: 0.6,
-        cognitiveSystem: 'idle-monitoring',
-        health: context.currentState?.health,
-        position: context.currentState?.position,
-        inventory: context.currentState?.inventory,
-      },
-      metadata: {
-        thoughtType: 'idle-reflection',
-        trigger: 'time-based',
-        context: 'environmental-monitoring',
-        intensity: 0.4,
-      },
-      category: 'idle',
-      tags: ['monitoring', 'environmental', 'survival'],
-      priority: 'low',
-    };
+      return {
+        id: `thought-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        type: 'reflection',
+        content: response.text.trim(),
+        timestamp: Date.now(),
+        context: {
+          emotionalState: context.emotionalState || 'neutral',
+          confidence: response.confidence,
+          cognitiveSystem: 'llm-core',
+          health: context.currentState?.health,
+          position: context.currentState?.position,
+          inventory: context.currentState?.inventory,
+        },
+        metadata: {
+          thoughtType: 'idle-reflection',
+          trigger: 'time-based',
+          context: 'environmental-monitoring',
+          intensity: 0.4,
+          llmConfidence: response.confidence,
+          model: response.model,
+        },
+        category: 'idle',
+        tags: ['monitoring', 'environmental', 'survival'],
+        priority: 'low',
+      };
+    } catch (error) {
+      console.error('Failed to generate idle thought with LLM:', error);
+
+      // Fallback to contextually aware thought if LLM fails
+      const fallbackContent = this.generateFallbackThought(context);
+
+      return {
+        id: `thought-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        type: 'reflection',
+        content: fallbackContent,
+        timestamp: Date.now(),
+        context: {
+          emotionalState: context.emotionalState || 'neutral',
+          confidence: 0.3,
+          cognitiveSystem: 'fallback',
+          health: context.currentState?.health,
+          position: context.currentState?.position,
+          inventory: context.currentState?.inventory,
+        },
+        metadata: {
+          thoughtType: 'idle-reflection',
+          trigger: 'time-based',
+          context: 'environmental-monitoring',
+          intensity: 0.2,
+          error: 'llm-generation-failed',
+        },
+        category: 'idle',
+        tags: ['monitoring', 'fallback'],
+        priority: 'low',
+      };
+    }
   }
 
   /**
-   * Generate task-related thoughts
+   * Build situation description for idle thought generation
+   */
+  private buildIdleSituation(context: ThoughtContext): string {
+    const health = context.currentState?.health || 20;
+    const position = context.currentState?.position;
+    const inventory = context.currentState?.inventory || [];
+
+    let situation = 'Currently idle with no active tasks. ';
+
+    if (health < 10) {
+      situation += `Health is low (${health}/20), need to prioritize survival. `;
+    } else if (health < 15) {
+      situation += `Health is moderate (${health}/20), should consider healing. `;
+    }
+
+    if (position) {
+      situation += `Located at position (${position.x}, ${position.y}, ${position.z}). `;
+    }
+
+    if (inventory.length > 0) {
+      const itemCount = inventory.length;
+      situation += `Carrying ${itemCount} different items. `;
+    } else {
+      situation += `Inventory is empty, need to gather resources. `;
+    }
+
+    if (context.recentEvents && context.recentEvents.length > 0) {
+      const recentEvent = context.recentEvents[context.recentEvents.length - 1];
+      situation += `Recently: ${recentEvent}. `;
+    }
+
+    situation += 'What should I focus on next?';
+
+    return situation;
+  }
+
+  /**
+   * Generate task-related thoughts using LLM
    */
   private async generateTaskThought(
     task: any,
     context: ThoughtContext
   ): Promise<CognitiveThought> {
-    const progress = task.progress || 0;
-    const steps = task.steps || [];
+    try {
+      const progress = task.progress || 0;
+      const steps = task.steps || [];
 
-    if (progress === 0) {
+      let situation = `Working on task: ${task.title}. `;
+
+      if (progress === 0) {
+        situation += `Just starting, need to break down into ${steps.length} steps. `;
+      } else if (progress === 1) {
+        situation += `Task completed successfully. `;
+      } else {
+        const completedSteps = steps.filter((s: any) => s.done).length;
+        const currentStep = steps.find((s: any) => !s.done);
+        situation += `Progress: ${Math.round(progress * 100)}% (${completedSteps}/${steps.length} steps). `;
+        if (currentStep) {
+          situation += `Current step: ${currentStep.label}. `;
+        }
+      }
+
+      situation += `Health: ${context.currentState?.health || 20}/20. `;
+
+      if (context.currentState?.position) {
+        const pos = context.currentState.position;
+        situation += `Position: (${pos.x}, ${pos.y}, ${pos.z}). `;
+      }
+
+      situation += 'What are my thoughts about this task progress?';
+
+      // Add timeout wrapper to prevent hanging
+      const response = await Promise.race([
+        this.llm.generateInternalThought(situation, {
+          currentGoals: context.currentTasks?.map((task) => task.title) || [],
+          recentMemories:
+            context.recentEvents?.map((event) => ({ description: event })) ||
+            [],
+          agentState: context.currentState,
+        }),
+        new Promise<never>(
+          (_, reject) =>
+            setTimeout(() => reject(new Error('LLM timeout')), 45000) // 45s timeout
+        ),
+      ]);
+
       return {
-        id: `thought-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-        type: 'planning',
-        content: `Starting task: ${task.title}. Breaking down into ${steps.length} steps.`,
+        id: `thought-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+        type:
+          progress === 0
+            ? 'planning'
+            : progress === 1
+              ? 'reflection'
+              : 'observation',
+        content: response.text.trim(),
         timestamp: Date.now(),
         context: {
           taskId: task.id,
-          step: 0,
-          emotionalState: context.emotionalState || 'focused',
-          confidence: 0.7,
+          step:
+            progress === 1
+              ? undefined
+              : steps.filter((s: any) => s.done).length,
+          completed: progress === 1,
+          emotionalState:
+            context.emotionalState ||
+            (progress === 1 ? 'satisfied' : 'focused'),
+          confidence: response.confidence,
           health: context.currentState?.health,
           position: context.currentState?.position,
         },
         metadata: {
-          thoughtType: 'task-initiation',
+          thoughtType:
+            progress === 0
+              ? 'task-initiation'
+              : progress === 1
+                ? 'task-completion'
+                : 'task-progress',
           taskType: task.type,
           priority: task.priority,
-          trigger: 'task-start',
+          trigger:
+            progress === 0
+              ? 'task-start'
+              : progress === 1
+                ? 'task-complete'
+                : 'task-progress',
+          llmConfidence: response.confidence,
+          model: response.model,
         },
         category: 'task-related',
-        tags: ['planning', 'task-start', task.type],
+        tags: [
+          progress === 0
+            ? 'planning'
+            : progress === 1
+              ? 'completion'
+              : 'progress',
+          'execution',
+          task.type,
+        ],
         priority: 'medium',
       };
-    }
+    } catch (error) {
+      console.error('Failed to generate task thought with LLM:', error);
 
-    if (progress === 1) {
+      // Fallback to basic task thought
+      const progress = task.progress || 0;
       return {
         id: `thought-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-        type: 'reflection',
-        content: `Completed task: ${task.title}. Evaluating results and planning next actions.`,
+        type:
+          progress === 0
+            ? 'planning'
+            : progress === 1
+              ? 'reflection'
+              : 'observation',
+        content:
+          progress === 0
+            ? `Starting task: ${task.title}`
+            : progress === 1
+              ? `Completed task: ${task.title}`
+              : `Working on task: ${task.title}`,
         timestamp: Date.now(),
         context: {
           taskId: task.id,
-          completed: true,
-          emotionalState: context.emotionalState || 'satisfied',
-          confidence: 0.8,
+          step:
+            progress === 1
+              ? undefined
+              : task.steps?.filter((s: any) => s.done).length || 0,
+          completed: progress === 1,
+          emotionalState:
+            context.emotionalState ||
+            (progress === 1 ? 'satisfied' : 'focused'),
+          confidence: 0.5,
           health: context.currentState?.health,
           position: context.currentState?.position,
         },
         metadata: {
-          thoughtType: 'task-completion',
+          thoughtType:
+            progress === 0
+              ? 'task-initiation'
+              : progress === 1
+                ? 'task-completion'
+                : 'task-progress',
           taskType: task.type,
-          duration: task.duration,
-          trigger: 'task-complete',
+          priority: task.priority,
+          trigger:
+            progress === 0
+              ? 'task-start'
+              : progress === 1
+                ? 'task-complete'
+                : 'task-progress',
+          error: 'llm-generation-failed',
         },
         category: 'task-related',
-        tags: ['completion', 'evaluation', task.type],
+        tags: [
+          progress === 0
+            ? 'planning'
+            : progress === 1
+              ? 'completion'
+              : 'progress',
+          'execution',
+          task.type,
+        ],
         priority: 'medium',
       };
     }
-
-    const currentStep = steps.find((s: any) => !s.done);
-    const completedSteps = steps.filter((s: any) => s.done).length;
-
-    return {
-      id: `thought-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-      type: 'observation',
-      content: `Working on: ${currentStep?.label || task.title}. Progress: ${Math.round(progress * 100)}% (${completedSteps}/${steps.length} steps)`,
-      timestamp: Date.now(),
-      context: {
-        taskId: task.id,
-        step: completedSteps,
-        emotionalState: context.emotionalState || 'focused',
-        confidence: 0.6,
-        health: context.currentState?.health,
-        position: context.currentState?.position,
-      },
-      metadata: {
-        thoughtType: 'task-progress',
-        taskType: task.type,
-        currentStep: currentStep?.id,
-        trigger: 'task-progress',
-      },
-      category: 'task-related',
-      tags: ['progress', 'execution', task.type],
-      priority: 'medium',
-    };
   }
 
   /**
-   * Generate event-related thoughts
+   * Generate event-related thoughts using LLM
    */
   private async generateEventThought(
     event: any,
     context: ThoughtContext
   ): Promise<CognitiveThought> {
-    const eventType = event.type;
-    const eventData = event.data;
+    try {
+      const eventType = event.type;
+      const eventData = event.data;
 
-    switch (eventType) {
-      case 'damage_taken':
-        return {
-          id: `thought-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-          type: 'reflection',
-          content: `Took damage from ${eventData.source}. Need to be more careful and find safety.`,
-          timestamp: Date.now(),
-          context: {
-            eventId: event.id,
-            emotionalState: 'cautious',
-            confidence: 0.8,
-            health: context.currentState?.health,
-          },
-          metadata: {
-            thoughtType: 'damage-reflection',
-            damageAmount: eventData.amount,
-            source: eventData.source,
-            trigger: 'damage-event',
-          },
-          category: 'survival',
-          tags: ['damage', 'safety', 'defense'],
-          priority: 'high',
-        };
+      let situation = `Experienced event: ${eventType}. `;
 
-      case 'resource_gathered':
-        return {
-          id: `thought-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-          type: 'observation',
-          content: `Gathered ${eventData.amount} ${eventData.resource}. This will be useful for ${eventData.usage || 'survival'}.`,
-          timestamp: Date.now(),
-          context: {
-            eventId: event.id,
-            emotionalState: 'satisfied',
-            confidence: 0.7,
-            inventory: context.currentState?.inventory,
-          },
-          metadata: {
-            thoughtType: 'resource-gathering',
-            resourceType: eventData.resource,
-            amount: eventData.amount,
-            trigger: 'gathering-event',
-          },
-          category: 'crafting',
-          tags: ['gathering', 'resources', eventData.resource],
-          priority: 'medium',
-        };
+      if (eventData) {
+        if (eventType === 'damage_taken') {
+          situation += `Took ${eventData.amount} damage from ${eventData.source}. `;
+        } else if (eventType === 'resource_gathered') {
+          situation += `Gathered ${eventData.amount} ${eventData.resource}. `;
+        } else if (eventType === 'entity_encountered') {
+          situation += `Encountered ${eventData.entityType} at distance ${eventData.distance}. `;
+          if (eventData.hostile) {
+            situation += `Entity is hostile. `;
+          }
+        } else {
+          situation += `Event data: ${JSON.stringify(eventData)}. `;
+        }
+      }
 
-      case 'entity_encountered':
-        return {
-          id: `thought-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-          type: 'observation',
-          content: `Encountered ${eventData.entityType} at distance ${eventData.distance}. ${eventData.hostile ? 'Need to be cautious.' : 'Could be useful.'}`,
-          timestamp: Date.now(),
-          context: {
-            eventId: event.id,
-            emotionalState: eventData.hostile ? 'alert' : 'curious',
-            confidence: 0.6,
-            position: context.currentState?.position,
-          },
-          metadata: {
-            thoughtType: 'entity-encounter',
-            entityType: eventData.entityType,
-            hostile: eventData.hostile,
-            distance: eventData.distance,
-            trigger: 'entity-event',
-          },
-          category: 'environmental',
-          tags: ['entity', 'encounter', eventData.entityType],
-          priority: eventData.hostile ? 'high' : 'medium',
-        };
+      situation += `Current health: ${context.currentState?.health || 20}/20. `;
 
-      case 'crafting_completed':
-        return {
-          id: `thought-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-          type: 'reflection',
-          content: `Successfully crafted ${eventData.item}. This improves my capabilities for ${eventData.purpose || 'survival'}.`,
-          timestamp: Date.now(),
-          context: {
-            eventId: event.id,
-            emotionalState: 'accomplished',
-            confidence: 0.8,
-            inventory: context.currentState?.inventory,
-          },
-          metadata: {
-            thoughtType: 'crafting-success',
-            itemType: eventData.item,
-            purpose: eventData.purpose,
-            trigger: 'crafting-event',
-          },
-          category: 'crafting',
-          tags: ['crafting', 'success', eventData.item],
-          priority: 'medium',
-        };
+      if (context.currentState?.position) {
+        const pos = context.currentState.position;
+        situation += `Position: (${pos.x}, ${pos.y}, ${pos.z}). `;
+      }
 
-      case 'biome_changed':
-        return {
-          id: `thought-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-          type: 'observation',
-          content: `Entered ${eventData.biome} biome. This environment offers different resources and challenges.`,
-          timestamp: Date.now(),
-          context: {
-            eventId: event.id,
-            emotionalState: 'curious',
-            confidence: 0.7,
-            position: context.currentState?.position,
-          },
-          metadata: {
-            thoughtType: 'biome-change',
-            biomeType: eventData.biome,
-            trigger: 'biome-event',
-          },
-          category: 'environmental',
-          tags: ['biome', 'exploration', eventData.biome],
-          priority: 'medium',
-        };
+      situation += 'How should I respond to this event?';
 
-      default:
-        return {
-          id: `thought-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-          type: 'observation',
-          content: `Noticed ${eventType}: ${eventData.description || 'Something happened'}.`,
-          timestamp: Date.now(),
-          context: {
-            eventId: event.id,
-            emotionalState: 'neutral',
-            confidence: 0.5,
-            position: context.currentState?.position,
-          },
-          metadata: {
-            thoughtType: 'general-event',
-            eventType: eventType,
-            trigger: 'general-event',
-          },
-          category: 'environmental',
-          tags: ['event', eventType],
-          priority: 'low',
-        };
+      // Add timeout wrapper to prevent hanging
+      const response = await Promise.race([
+        this.llm.generateInternalThought(situation, {
+          currentGoals: context.currentTasks?.map((task) => task.title) || [],
+          recentMemories:
+            context.recentEvents?.map((event) => ({ description: event })) ||
+            [],
+          agentState: context.currentState,
+        }),
+        new Promise<never>(
+          (_, reject) =>
+            setTimeout(() => reject(new Error('LLM timeout')), 45000) // 45s timeout
+        ),
+      ]);
+
+      return {
+        id: `thought-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        type: eventType === 'damage_taken' ? 'reflection' : 'observation',
+        content: response.text.trim(),
+        timestamp: Date.now(),
+        context: {
+          eventId: event.id,
+          emotionalState: eventType === 'damage_taken' ? 'cautious' : 'alert',
+          confidence: response.confidence,
+          health: context.currentState?.health,
+        },
+        metadata: {
+          thoughtType: `${eventType}-reflection`,
+          eventType,
+          trigger: 'event-occurred',
+          llmConfidence: response.confidence,
+          model: response.model,
+          ...eventData,
+        },
+        category: eventType === 'damage_taken' ? 'survival' : 'environmental',
+        tags: [
+          eventType,
+          eventType === 'damage_taken' ? 'safety' : 'observation',
+        ],
+        priority: eventType === 'damage_taken' ? 'high' : 'medium',
+      };
+    } catch (error) {
+      console.error('Failed to generate event thought with LLM:', error);
+
+      // Fallback to basic event thought
+      const eventType = event.type;
+      const eventData = event.data;
+
+      let content = `Event: ${eventType}`;
+      if (eventData) {
+        if (eventType === 'damage_taken') {
+          content = `Took damage from ${eventData.source}. Need to be more careful.`;
+        } else if (eventType === 'resource_gathered') {
+          content = `Gathered ${eventData.amount} ${eventData.resource}.`;
+        } else if (eventType === 'entity_encountered') {
+          content = `Encountered ${eventData.entityType}.`;
+        }
+      }
+
+      return {
+        id: `thought-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        type: eventType === 'damage_taken' ? 'reflection' : 'observation',
+        content,
+        timestamp: Date.now(),
+        context: {
+          eventId: event.id,
+          emotionalState: eventType === 'damage_taken' ? 'cautious' : 'alert',
+          confidence: 0.6,
+          health: context.currentState?.health,
+        },
+        metadata: {
+          thoughtType: `${eventType}-reflection`,
+          eventType,
+          trigger: 'event-occurred',
+          error: 'llm-generation-failed',
+          ...eventData,
+        },
+        category: eventType === 'damage_taken' ? 'survival' : 'environmental',
+        tags: [
+          eventType,
+          eventType === 'damage_taken' ? 'safety' : 'observation',
+        ],
+        priority: eventType === 'damage_taken' ? 'high' : 'medium',
+      };
     }
   }
 
@@ -517,6 +654,46 @@ export class EnhancedThoughtGenerator extends EventEmitter {
    */
   updateConfig(newConfig: Partial<EnhancedThoughtGeneratorConfig>): void {
     this.config = { ...this.config, ...newConfig };
+  }
+
+  /**
+   * Generate fallback thought when LLM fails
+   */
+  private generateFallbackThought(context: ThoughtContext): string {
+    const health = context.currentState?.health || 20;
+    const position = context.currentState?.position;
+    const inventory = context.currentState?.inventory || [];
+    const currentTasks = context.currentTasks || [];
+
+    let thought = 'Processing current situation...';
+
+    // Health-based thoughts
+    if (health < 10) {
+      thought =
+        'Health is critically low. Need to prioritize survival and healing.';
+    } else if (health < 15) {
+      thought =
+        'Health is moderate. Should consider finding food or healing items.';
+    }
+
+    // Task-based thoughts
+    if (currentTasks.length > 0) {
+      const task = currentTasks[0];
+      thought = `Currently working on: ${task.title}. Focusing on task completion.`;
+    }
+
+    // Position-based thoughts
+    if (position) {
+      thought += ` Located at (${position.x.toFixed(1)}, ${position.y.toFixed(1)}, ${position.z.toFixed(1)}).`;
+    }
+
+    // Inventory-based thoughts
+    if (inventory.length > 0) {
+      const itemCount = inventory.length;
+      thought += ` Carrying ${itemCount} different items.`;
+    }
+
+    return thought;
   }
 
   /**

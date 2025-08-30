@@ -19,6 +19,9 @@ export { ContextOptimizer } from './cognitive-core/context-optimizer';
 // Constitutional Filter
 export { ConstitutionalFilter } from './constitutional-filter';
 
+// Enhanced Thought Generator
+export { EnhancedThoughtGenerator } from './enhanced-thought-generator';
+
 // Self-Model
 export {
   IdentityTracker,

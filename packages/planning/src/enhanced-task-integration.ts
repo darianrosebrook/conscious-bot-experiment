@@ -70,6 +70,16 @@ export interface TaskStatistics {
   tasksBySource: Record<string, number>;
 }
 
+export interface ActionVerification {
+  taskId: string;
+  stepId: string;
+  actionType: string;
+  expectedResult: any;
+  actualResult?: any;
+  verified: boolean;
+  timestamp: number;
+}
+
 export interface EnhancedTaskIntegrationConfig {
   enableRealTimeUpdates: boolean;
   enableProgressTracking: boolean;
@@ -78,6 +88,8 @@ export interface EnhancedTaskIntegrationConfig {
   maxTaskHistory: number;
   progressUpdateInterval: number;
   dashboardEndpoint: string;
+  enableActionVerification: boolean; // New: Enable action verification
+  actionVerificationTimeout: number; // New: Timeout for action verification
 }
 
 const DEFAULT_CONFIG: EnhancedTaskIntegrationConfig = {
@@ -88,6 +100,8 @@ const DEFAULT_CONFIG: EnhancedTaskIntegrationConfig = {
   maxTaskHistory: 1000,
   progressUpdateInterval: 5000, // 5 seconds
   dashboardEndpoint: 'http://localhost:3000',
+  enableActionVerification: true, // New: Enable by default
+  actionVerificationTimeout: 10000, // New: 10 second timeout
 };
 
 /**
@@ -99,6 +113,7 @@ export class EnhancedTaskIntegration extends EventEmitter {
   private tasks: Map<string, Task> = new Map();
   private taskHistory: Task[] = [];
   private progressTracker: Map<string, TaskProgress> = new Map();
+  private actionVerifications: Map<string, ActionVerification> = new Map();
   private statistics: TaskStatistics = {
     totalTasks: 0,
     activeTasks: 0,
@@ -122,7 +137,19 @@ export class EnhancedTaskIntegration extends EventEmitter {
   /**
    * Add a new task to the system
    */
-  addTask(taskData: Partial<Task>): Task {
+  async addTask(taskData: Partial<Task>): Promise<Task> {
+    // Check for duplicate tasks
+    const existingTask = this.findSimilarTask(taskData);
+    if (existingTask) {
+      console.log(
+        `Task already exists: ${taskData.title} (${existingTask.id})`
+      );
+      return existingTask;
+    }
+
+    // Generate dynamic steps for the task
+    const steps = await this.generateDynamicSteps(taskData);
+
     const task: Task = {
       id:
         taskData.id ||
@@ -135,7 +162,7 @@ export class EnhancedTaskIntegration extends EventEmitter {
       progress: 0,
       status: 'pending',
       source: taskData.source || 'manual',
-      steps: taskData.steps || this.generateDefaultSteps(taskData),
+      steps: taskData.steps || steps,
       parameters: taskData.parameters || {},
       metadata: {
         createdAt: Date.now(),
@@ -157,6 +184,55 @@ export class EnhancedTaskIntegration extends EventEmitter {
     }
 
     return task;
+  }
+
+  /**
+   * Find similar existing tasks to prevent duplicates
+   */
+  private findSimilarTask(taskData: Partial<Task>): Task | null {
+    const title = taskData.title?.toLowerCase() || '';
+    const type = taskData.type?.toLowerCase() || '';
+    const source = taskData.source || '';
+
+    // Check for exact title matches
+    for (const task of this.tasks.values()) {
+      if (task.title.toLowerCase() === title && task.status === 'pending') {
+        return task;
+      }
+    }
+
+    // Check for similar tasks of the same type and source
+    for (const task of this.tasks.values()) {
+      if (
+        task.type.toLowerCase() === type &&
+        task.source === source &&
+        task.status === 'pending'
+      ) {
+        // Check if titles are similar (simple similarity check)
+        const taskTitle = task.title.toLowerCase();
+        const similarity = this.calculateTitleSimilarity(title, taskTitle);
+
+        if (similarity > 0.7) {
+          // 70% similarity threshold
+          return task;
+        }
+      }
+    }
+
+    return null;
+  }
+
+  /**
+   * Calculate similarity between two task titles
+   */
+  private calculateTitleSimilarity(title1: string, title2: string): number {
+    const words1 = title1.split(/\s+/);
+    const words2 = title2.split(/\s+/);
+
+    const commonWords = words1.filter((word) => words2.includes(word));
+    const totalWords = Math.max(words1.length, words2.length);
+
+    return totalWords > 0 ? commonWords.length / totalWords : 0;
   }
 
   /**
@@ -220,7 +296,7 @@ export class EnhancedTaskIntegration extends EventEmitter {
   }
 
   /**
-   * Complete a task step
+   * Complete a task step with action verification
    */
   completeTaskStep(taskId: string, stepId: string): boolean {
     const task = this.tasks.get(taskId);
@@ -231,6 +307,18 @@ export class EnhancedTaskIntegration extends EventEmitter {
     const step = task.steps.find((s) => s.id === stepId);
     if (!step) {
       return false;
+    }
+
+    // Verify action was actually performed if verification is enabled
+    if (this.config.enableActionVerification) {
+      const verification = this.verifyActionCompletion(taskId, stepId, step);
+      if (!verification.verified) {
+        console.warn(
+          `⚠️ Step completion rejected - action not verified: ${step.label}`
+        );
+        return false;
+      }
+      console.log(`✅ Action verified for step: ${step.label}`);
     }
 
     step.done = true;
@@ -258,6 +346,185 @@ export class EnhancedTaskIntegration extends EventEmitter {
     }
 
     return true;
+  }
+
+  /**
+   * Verify that an action was actually completed
+   */
+  private verifyActionCompletion(
+    taskId: string,
+    stepId: string,
+    step: TaskStep
+  ): ActionVerification {
+    const verification: ActionVerification = {
+      taskId,
+      stepId,
+      actionType: step.label.toLowerCase(),
+      expectedResult: this.getExpectedResultForStep(step),
+      verified: false,
+      timestamp: Date.now(),
+    };
+
+    try {
+      // Check if bot is connected and can perform actions
+      if (!this.isBotConnected()) {
+        verification.verified = false;
+        verification.actualResult = { error: 'Bot not connected' };
+        return verification;
+      }
+
+      // Verify based on step type
+      switch (step.label.toLowerCase()) {
+        case 'locate nearby wood':
+        case 'locate nearby resources':
+          verification.verified = this.verifyResourceLocation('wood');
+          break;
+        case 'move to resource location':
+        case 'move to location':
+          verification.verified = this.verifyMovement();
+          break;
+        case 'collect wood safely':
+        case 'collect resources safely':
+          verification.verified = this.verifyResourceCollection('wood');
+          break;
+        case 'store collected items':
+          verification.verified = this.verifyItemStorage();
+          break;
+        case 'check required materials':
+          verification.verified = this.verifyMaterialCheck();
+          break;
+        case 'gather missing materials':
+          verification.verified = this.verifyMaterialGathering();
+          break;
+        case 'access crafting interface':
+          verification.verified = this.verifyCraftingAccess();
+          break;
+        case 'create the item':
+          verification.verified = this.verifyItemCreation();
+          break;
+        default:
+          // For unknown steps, require manual verification
+          verification.verified = false;
+          verification.actualResult = {
+            error: 'Unknown step type - requires manual verification',
+          };
+      }
+
+      this.actionVerifications.set(`${taskId}-${stepId}`, verification);
+      return verification;
+    } catch (error) {
+      verification.verified = false;
+      verification.actualResult = {
+        error: error instanceof Error ? error.message : 'Unknown error',
+      };
+      return verification;
+    }
+  }
+
+  /**
+   * Get expected result for a step
+   */
+  private getExpectedResultForStep(step: TaskStep): any {
+    const stepType = step.label.toLowerCase();
+
+    if (stepType.includes('locate') || stepType.includes('find')) {
+      return { found: true, location: 'nearby' };
+    }
+    if (stepType.includes('move') || stepType.includes('navigate')) {
+      return { moved: true, distance: '>0' };
+    }
+    if (stepType.includes('collect') || stepType.includes('gather')) {
+      return { collected: true, amount: '>0' };
+    }
+    if (stepType.includes('store') || stepType.includes('inventory')) {
+      return { stored: true, inventory_updated: true };
+    }
+    if (stepType.includes('craft') || stepType.includes('create')) {
+      return { crafted: true, item_created: true };
+    }
+
+    return { completed: true };
+  }
+
+  /**
+   * Check if bot is connected
+   */
+  private isBotConnected(): boolean {
+    // This would check the actual bot connection
+    // For now, return true to allow testing
+    return true;
+  }
+
+  /**
+   * Verify resource location
+   */
+  private verifyResourceLocation(resourceType: string): boolean {
+    // This would check if the bot actually found the resource
+    // For now, return false to prevent fake progress
+    return false;
+  }
+
+  /**
+   * Verify movement
+   */
+  private verifyMovement(): boolean {
+    // This would check if the bot actually moved
+    // For now, return false to prevent fake progress
+    return false;
+  }
+
+  /**
+   * Verify resource collection
+   */
+  private verifyResourceCollection(resourceType: string): boolean {
+    // This would check if the bot actually collected resources
+    // For now, return false to prevent fake progress
+    return false;
+  }
+
+  /**
+   * Verify item storage
+   */
+  private verifyItemStorage(): boolean {
+    // This would check if items were actually stored
+    // For now, return false to prevent fake progress
+    return false;
+  }
+
+  /**
+   * Verify material check
+   */
+  private verifyMaterialCheck(): boolean {
+    // This would check if materials were actually checked
+    // For now, return false to prevent fake progress
+    return false;
+  }
+
+  /**
+   * Verify material gathering
+   */
+  private verifyMaterialGathering(): boolean {
+    // This would check if materials were actually gathered
+    // For now, return false to prevent fake progress
+    return false;
+  }
+
+  /**
+   * Verify crafting access
+   */
+  private verifyCraftingAccess(): boolean {
+    // This would check if crafting interface was accessed
+    // For now, return false to prevent fake progress
+    return false;
+  }
+
+  /**
+   * Verify item creation
+   */
+  private verifyItemCreation(): boolean {
+    // This would check if item was actually created
+    // For now, return false to prevent fake progress
+    return false;
   }
 
   /**
@@ -359,34 +626,203 @@ export class EnhancedTaskIntegration extends EventEmitter {
   }
 
   /**
-   * Generate default steps for a task
+   * Generate dynamic steps for a task using LLM
    */
-  private generateDefaultSteps(taskData: Partial<Task>): TaskStep[] {
-    const steps: TaskStep[] = [
-      {
-        id: `step-${Date.now()}-1`,
-        label: `Prepare for ${taskData.type || 'task'}`,
-        done: false,
-        order: 1,
-        estimatedDuration: 2000,
-      },
-      {
-        id: `step-${Date.now()}-2`,
-        label: `Execute ${taskData.type || 'task'}`,
-        done: false,
-        order: 2,
-        estimatedDuration: 5000,
-      },
-      {
-        id: `step-${Date.now()}-3`,
-        label: `Complete ${taskData.type || 'task'}`,
-        done: false,
-        order: 3,
-        estimatedDuration: 1000,
-      },
+  private async generateDynamicSteps(
+    taskData: Partial<Task>
+  ): Promise<TaskStep[]> {
+    try {
+      // Try to get steps from cognitive system first
+      const steps = await this.generateStepsFromCognitive(taskData);
+      if (steps && steps.length > 0) {
+        return steps;
+      }
+    } catch (error) {
+      console.warn(
+        'Failed to generate steps from cognitive system, using fallback:',
+        error
+      );
+    }
+
+    // Fallback to intelligent step generation based on task type
+    return this.generateIntelligentSteps(taskData);
+  }
+
+  /**
+   * Generate steps from cognitive system
+   */
+  private async generateStepsFromCognitive(
+    taskData: Partial<Task>
+  ): Promise<TaskStep[]> {
+    try {
+      const response = await fetch('http://localhost:3003/generate-steps', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          task: {
+            title: taskData.title,
+            type: taskData.type,
+            description: taskData.description,
+            priority: taskData.priority,
+            category: taskData.metadata?.category,
+          },
+          context: {
+            currentState: (taskData.metadata as any)?.currentState,
+            environment: (taskData.metadata as any)?.environment,
+          },
+        }),
+        signal: AbortSignal.timeout(5000),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Cognitive system responded with ${response.status}`);
+      }
+
+      const data = (await response.json()) as any;
+      if (data.steps && Array.isArray(data.steps)) {
+        return data.steps.map((step: any, index: number) => ({
+          id: `step-${Date.now()}-${index + 1}`,
+          label: step.label,
+          done: false,
+          order: index + 1,
+          estimatedDuration: step.estimatedDuration || 3000,
+        }));
+      }
+    } catch (error) {
+      console.warn('Failed to generate steps from cognitive system:', error);
+    }
+
+    return [];
+  }
+
+  /**
+   * Generate intelligent steps based on task type and content
+   */
+  private generateIntelligentSteps(taskData: Partial<Task>): TaskStep[] {
+    const taskType = taskData.type?.toLowerCase() || '';
+    const title = taskData.title?.toLowerCase() || '';
+    const description = taskData.description?.toLowerCase() || '';
+
+    // Define step templates for different task types
+    const stepTemplates: Record<string, string[]> = {
+      gather: [
+        'Locate nearby resources',
+        'Move to resource location',
+        'Collect resources safely',
+        'Store collected items',
+      ],
+      mine: [
+        'Find suitable mining location',
+        'Clear area for mining',
+        'Extract target blocks',
+        'Collect mined materials',
+      ],
+      craft: [
+        'Check required materials',
+        'Gather missing materials',
+        'Access crafting interface',
+        'Create the item',
+      ],
+      build: [
+        'Plan building layout',
+        'Gather building materials',
+        'Clear building area',
+        'Construct the structure',
+      ],
+      explore: [
+        'Choose exploration direction',
+        'Navigate to target area',
+        'Survey the environment',
+        'Document findings',
+      ],
+      move: [
+        'Determine destination',
+        'Plan safe route',
+        'Navigate to location',
+        'Confirm arrival',
+      ],
+      search: [
+        'Define search area',
+        'Systematically search',
+        'Identify targets',
+        'Collect findings',
+      ],
+      investigate: [
+        'Identify investigation target',
+        'Gather relevant information',
+        'Analyze findings',
+        'Report conclusions',
+      ],
+    };
+
+    // Find the best matching template
+    let bestTemplate = 'general';
+    for (const [type, template] of Object.entries(stepTemplates)) {
+      if (
+        taskType.includes(type) ||
+        title.includes(type) ||
+        description.includes(type)
+      ) {
+        bestTemplate = type;
+        break;
+      }
+    }
+
+    // Use the template or create custom steps
+    const stepLabels = stepTemplates[bestTemplate] || [
+      'Prepare for task',
+      'Execute main action',
+      'Complete and verify',
     ];
 
-    return steps;
+    // Generate steps with appropriate timing
+    const durations = [2000, 5000, 2000]; // Default durations
+    return stepLabels.map((label, index) => ({
+      id: `step-${Date.now()}-${index + 1}`,
+      label: this.customizeStepLabel(label, taskData),
+      done: false,
+      order: index + 1,
+      estimatedDuration: durations[index] || 3000,
+    }));
+  }
+
+  /**
+   * Customize step labels based on task context
+   */
+  private customizeStepLabel(
+    baseLabel: string,
+    taskData: Partial<Task>
+  ): string {
+    const title = taskData.title || '';
+    const type = taskData.type || '';
+
+    // Replace generic terms with specific ones
+    let label = baseLabel;
+
+    if (title.includes('wood') || type.includes('gather')) {
+      label = label.replace('resources', 'wood').replace('materials', 'wood');
+    }
+    if (title.includes('stone') || title.includes('cobblestone')) {
+      label = label.replace('resources', 'stone').replace('materials', 'stone');
+    }
+    if (title.includes('pickaxe')) {
+      label = label.replace('item', 'pickaxe').replace('structure', 'pickaxe');
+    }
+    if (title.includes('cave')) {
+      label = label.replace('area', 'cave').replace('location', 'cave');
+    }
+    if (title.includes('shelter')) {
+      label = label.replace('structure', 'shelter').replace('item', 'shelter');
+    }
+
+    return label;
+  }
+
+  /**
+   * Generate default steps for a task (fallback)
+   */
+  private generateDefaultSteps(taskData: Partial<Task>): TaskStep[] {
+    return this.generateIntelligentSteps(taskData);
   }
 
   /**
@@ -451,14 +887,18 @@ export class EnhancedTaskIntegration extends EventEmitter {
       const activeTasks = this.getActiveTasks();
 
       activeTasks.forEach((task) => {
-        // Update progress based on step completion
+        // Only update progress based on step completion if no manual progress has been set
+        // This prevents overriding autonomous task executor progress updates
         const completedSteps = task.steps.filter((step) => step.done).length;
         const totalSteps = task.steps.length;
 
         if (totalSteps > 0) {
-          const newProgress = completedSteps / totalSteps;
-          if (Math.abs(newProgress - task.progress) > 0.01) {
-            this.updateTaskProgress(task.id, newProgress);
+          const stepBasedProgress = completedSteps / totalSteps;
+
+          // Only update if the step-based progress is significantly higher than current progress
+          // This allows manual progress updates to take precedence
+          if (stepBasedProgress > task.progress + 0.05) {
+            this.updateTaskProgress(task.id, stepBasedProgress);
           }
         }
       });

@@ -45,6 +45,9 @@ export interface PlanStep {
   dependencies: string[];
   constraints: string[];
   metadata?: Record<string, any>;
+  preconditions?: any[];
+  effects?: any[];
+  order?: number;
   action?: {
     id?: string;
     name?: string;

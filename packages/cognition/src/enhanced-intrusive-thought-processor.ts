@@ -32,6 +32,8 @@ export interface Task {
     originalThought: string;
     action: Action;
     confidence: number;
+    idempotencyKey?: string;
+    bucket?: string;
   };
 }
 
@@ -51,6 +53,71 @@ export interface BotResponse {
   error?: string;
 }
 
+// Plan types for MCP integration
+type Plan =
+  | { kind: 'option'; id: string; args?: any }
+  | { kind: 'sequence'; leaves: Array<{ name: string; args?: any }> }
+  | { kind: 'proposal'; ticket: string; status: 'shadow' };
+
+// MCP client interface for dependency injection
+interface MCPClient {
+  callTool<T = any>(name: string, args: any): Promise<T>;
+  listTools(): Promise<string[]>;
+  readResource<T = any>(uri: string): Promise<T>;
+}
+
+// Simple HTTP-based MCP client that connects to the planning server's MCP endpoints
+class PlanningMCPClient implements MCPClient {
+  constructor(private baseUrl: string = 'http://localhost:3002') {}
+
+  async callTool<T = any>(name: string, args: any): Promise<T> {
+    const response = await fetch(`${this.baseUrl}/mcp/tools/call`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, args }),
+      signal: AbortSignal.timeout(5000),
+    });
+
+    if (!response.ok) {
+      throw new Error(`MCP tool call failed: ${response.status}`);
+    }
+
+    const result = (await response.json()) as any;
+    return result.data || result;
+  }
+
+  async listTools(): Promise<string[]> {
+    const response = await fetch(`${this.baseUrl}/mcp/tools`, {
+      method: 'GET',
+      headers: { 'Content-Type': 'application/json' },
+      signal: AbortSignal.timeout(5000),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to list MCP tools: ${response.status}`);
+    }
+
+    const result = (await response.json()) as any;
+    return result.tools?.map((tool: any) => tool.name) || [];
+  }
+
+  async readResource<T = any>(uri: string): Promise<T> {
+    const response = await fetch(`${this.baseUrl}/mcp/resources/read`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ uri }),
+      signal: AbortSignal.timeout(5000),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to read MCP resource ${uri}: ${response.status}`);
+    }
+
+    const result = (await response.json()) as any;
+    return result.data || result;
+  }
+}
+
 export interface IntrusiveThoughtProcessorConfig {
   enableActionParsing: boolean;
   enableTaskCreation: boolean;
@@ -58,6 +125,8 @@ export interface IntrusiveThoughtProcessorConfig {
   enableMinecraftIntegration: boolean;
   planningEndpoint: string;
   minecraftEndpoint: string;
+  mcp?: MCPClient;
+  suppressionMs?: number;
 }
 
 const DEFAULT_CONFIG: IntrusiveThoughtProcessorConfig = {
@@ -67,6 +136,7 @@ const DEFAULT_CONFIG: IntrusiveThoughtProcessorConfig = {
   enableMinecraftIntegration: true,
   planningEndpoint: 'http://localhost:3002',
   minecraftEndpoint: 'http://localhost:3005',
+  suppressionMs: 8 * 60_000, // 8 min default
 };
 
 /**
@@ -75,68 +145,432 @@ const DEFAULT_CONFIG: IntrusiveThoughtProcessorConfig = {
  */
 export class IntrusiveThoughtProcessor extends EventEmitter {
   private config: IntrusiveThoughtProcessorConfig;
+  private recent: Map<string, number> = new Map(); // key -> lastTs
 
   constructor(config: Partial<IntrusiveThoughtProcessorConfig> = {}) {
     super();
     this.config = { ...DEFAULT_CONFIG, ...config };
+
+    // Auto-create MCP client if not provided and planning integration is enabled
+    if (!this.config.mcp && this.config.enablePlanningIntegration) {
+      this.config.mcp = new PlanningMCPClient(this.config.planningEndpoint);
+    }
+  }
+
+  /**
+   * Canonicalize thought for deduplication
+   */
+  private canonicalize(thought: string): string {
+    return thought.trim().toLowerCase().replace(/\s+/g, ' ');
+  }
+
+  /**
+   * Check if thought is suppressed due to recent processing
+   */
+  private suppressed(key: string): boolean {
+    const last = this.recent.get(key) ?? 0;
+    return Date.now() - last < (this.config.suppressionMs ?? 0);
   }
 
   /**
    * Process an intrusive thought and convert it to actionable content
+   * Enhanced pipeline with MCP integration, grounding, and safety
    */
   async processIntrusiveThought(thought: string): Promise<BotResponse> {
     try {
-      console.log(`Processing intrusive thought: "${thought}"`);
+      const canonical = this.canonicalize(thought);
+      this.emit('thoughtProcessingStarted', {
+        thought: canonical,
+        ts: Date.now(),
+      });
 
-      // Parse the thought for actionable content
-      const action = this.parseActionFromThought(thought);
-
-      if (action && this.config.enableTaskCreation) {
-        // Create a new task from the intrusive thought
-        const task = await this.createTaskFromThought(thought, action);
-
-        // Update the planning system
-        if (this.config.enablePlanningIntegration) {
-          await this.updatePlanningSystem(task);
-        }
-
-        this.emit('taskCreated', { thought, task, action });
-
+      // Quick suppression unless survival triggers override later
+      if (this.suppressed(canonical)) {
         return {
           accepted: true,
-          response: `Processing thought: "${thought}". Creating task: ${task.title}`,
-          taskId: task.id,
-          task: task,
+          response: `Suppressed duplicate thought: "${thought}"`,
+          recorded: true,
         };
       }
 
-      // Even if no action, record the thought
-      this.emit('thoughtRecorded', { thought, action: null });
+      // Parse → intent (keep your regex as a fallback)
+      const action = this.parseActionFromThought(canonical) ?? {
+        type: 'investigate',
+        target: 'current situation',
+        priority: 'medium',
+        category: 'general',
+      };
+
+      // Policy gate (deny or patch unsafe)
+      const safeAction = this.policyRewrite(action);
+      if (!safeAction) {
+        return {
+          accepted: false,
+          response: `Unsafe or disallowed: ${action.type} ${action.target}`,
+        };
+      }
+
+      // Grounding: world snapshot via MCP (fast, cached)
+      const snapshot = this.config.mcp
+        ? await this.config.mcp.readResource<any>('world://snapshot')
+        : null;
+
+      // Readiness & survival bump
+      const adjusted = this.adjustPriorityByGrounding(safeAction, snapshot);
+
+      // Choose plan: existing option? sequence of leaves? propose new option?
+      const plan = await this.choosePlan(adjusted, snapshot);
+
+      // Bucket selection + idempotency key
+      const bucket = await this.selectBucket(plan, snapshot);
+      const idem = this.computeIdempotencyKey(canonical, plan, snapshot);
+
+      // Build task (steps derived from plan)
+      const task = this.buildTaskFromPlan(
+        thought,
+        adjusted,
+        plan,
+        bucket,
+        idem
+      );
+
+      // Record suppression last
+      this.recent.set(canonical, Date.now());
+
+      // Send to planning system (reuse your existing updatePlanningSystem)
+      if (this.config.enablePlanningIntegration) {
+        await this.updatePlanningSystem(task);
+      }
+
+      // Optionally fire-and-forget tiny plans (Tactical bucket) immediately via MCP
+      if (plan.kind === 'option' && bucket.name === 'Tactical') {
+        try {
+          await this.config.mcp?.callTool('run_option', {
+            id: plan.id,
+            args: plan.args,
+          });
+        } catch {
+          /* ignore: planner will pick it up anyway */
+        }
+      }
 
       return {
         accepted: true,
-        response: `Thought recorded: "${thought}". No immediate action required.`,
-        recorded: true,
+        response: `Created task (${bucket.name}): ${task.title}`,
+        taskId: task.id,
+        task,
       };
-    } catch (error) {
-      console.error('Failed to process intrusive thought:', error);
-      this.emit('processingError', { thought, error });
-
-      const errorMessage =
-        error instanceof Error ? error.message : 'Unknown error';
-
+    } catch (err) {
+      this.emit('processingError', { thought, err });
+      const msg = err instanceof Error ? err.message : String(err);
       return {
         accepted: false,
-        response: `Failed to process thought: "${thought}". Error: ${errorMessage}`,
-        error: errorMessage,
+        response: `Failed to process: "${thought}" — ${msg}`,
+        error: msg,
       };
     }
+  }
+
+  /**
+   * Safety/policy rewrite - deny or patch unsafe actions
+   */
+  private policyRewrite(a: Action): Action | null {
+    const t = a.type.toLowerCase();
+    // Deny obvious footguns
+    if (t === 'dig' && /straight\s+down/.test(a.target)) return null;
+    if (
+      t === 'explore' &&
+      /lava|nether/.test(a.target) &&
+      a.priority !== 'high'
+    ) {
+      return {
+        ...a,
+        target: a.target.replace(/lava|nether/, 'nearby safe area'),
+        priority: 'medium',
+      };
+    }
+    return a;
+  }
+
+  /**
+   * Priority adjustment from grounding - survival and environmental factors
+   */
+  private adjustPriorityByGrounding(a: Action, snap?: any): Action {
+    if (!snap) return a;
+    const hungerLow = (snap.vitals?.food ?? 20) < 8;
+    const healthLow = (snap.vitals?.health ?? 20) < 8;
+    if (hungerLow && a.category !== 'survival')
+      return {
+        ...a,
+        priority: 'high',
+        category: 'survival',
+        type: 'investigate',
+        target: 'food inventory and sources',
+      };
+    if (healthLow && a.category !== 'survival')
+      return {
+        ...a,
+        priority: 'high',
+        category: 'survival',
+        type: 'investigate',
+        target: 'health status',
+      };
+    // Nighttime: prefer lighting before building/mining
+    const isNight = (snap.time ?? 0) > 12000;
+    if (isNight && (a.category === 'building' || a.category === 'mining')) {
+      return {
+        ...a,
+        priority: 'high',
+        type: 'place',
+        target: 'torches along path',
+        category: 'building',
+      };
+    }
+    return a;
+  }
+
+  /**
+   * Plan selection - use MCP options first, otherwise compose leaves, otherwise propose & register
+   */
+  private async choosePlan(a: Action, snap?: any): Promise<Plan> {
+    // 1) Try to map to an active option by simple name heuristics
+    const optionsResp = this.config.mcp
+      ? await this.config.mcp.callTool<{
+          options: Array<{ id: string; name: string; status: string }>;
+        }>('list_options', { status: 'active' })
+      : { options: [] };
+    const match = optionsResp.options.find((o) =>
+      this.optionMatches(a, o.name, o.id)
+    );
+    if (match)
+      return {
+        kind: 'option',
+        id: `${match.id}`,
+        args: this.buildArgsForOption(a, snap),
+      };
+
+    // 2) Try a sequence of leaves you already expose (move_to, dig_block, chat, etc.)
+    const seq = this.sequenceForAction(a, snap);
+    if (seq) return { kind: 'sequence', leaves: seq };
+
+    // 3) Propose/register BT via MCP prompts/registry (shadow)
+    const spec = await this.proposeBTOption(a, snap);
+    if (spec) {
+      const reg = await this.config.mcp
+        ?.callTool('register_option', spec)
+        .catch(() => null);
+      if (reg && (reg as any).status === 'success') {
+        return {
+          kind: 'option',
+          id: (reg as any).optionId,
+          args: this.buildArgsForOption(a, snap),
+        };
+      }
+      // Fallback: at least return a ticket for later
+      return {
+        kind: 'proposal',
+        ticket: spec.id + '@' + (spec.version ?? '1.0.0'),
+        status: 'shadow',
+      };
+    }
+
+    // Last resort
+    return {
+      kind: 'sequence',
+      leaves: [
+        {
+          name: 'chat',
+          args: { message: `I need help with: ${a.type} ${a.target}` },
+        },
+      ],
+    };
+  }
+
+  private optionMatches(a: Action, name: string, id: string): boolean {
+    const s = `${name} ${id}`.toLowerCase();
+    return (
+      s.includes(a.type) ||
+      s.includes(a.category) ||
+      s.includes(a.target.split(' ')[0])
+    );
+  }
+
+  private buildArgsForOption(a: Action, snap?: any): any {
+    // Keep it minimal and schema-safe
+    if (a.type === 'gather' && a.target.includes('wood'))
+      return { target_amount: 8, species: 'oak' };
+    if (a.type === 'investigate' && a.target.includes('inventory')) return {};
+    return {};
+  }
+
+  private sequenceForAction(
+    a: Action,
+    snap?: any
+  ): Array<{ name: string; args?: any }> | null {
+    if (a.type === 'gather' && /wood|logs/.test(a.target)) {
+      return [
+        {
+          name: 'minecraft.move_to',
+          args: {
+            x: snap?.position?.x ?? 0,
+            y: snap?.position?.y ?? 64,
+            z: (snap?.position?.z ?? 0) + 5,
+          },
+        },
+        { name: 'minecraft.chat', args: { message: 'Scanning for trees…' } },
+        // This is illustrative; in production you'd use your scan leaves
+      ];
+    }
+    return null;
+  }
+
+  private async proposeBTOption(a: Action, snap?: any): Promise<any | null> {
+    // Call your MCP prompt to propose a BT-DSL (server side fills it)
+    try {
+      const leaves = await this.config.mcp?.listTools(); // Names include leaf names
+      const args = {
+        failure_pattern: `repeated need for ${a.type} ${a.target}`,
+        available_leaves: (leaves ?? []).map((s) =>
+          s.split('@')[0].replace('minecraft.', '')
+        ),
+        pre: ['sense_tools', 'sense_inventory'],
+        post: ['sense_inventory'],
+      };
+      // Depending on your MCP host, you might call prompts using a separate API;
+      // if prompts aren't invokable here, just return a minimal spec to register.
+      return {
+        id: `opt.${a.type}_${a.target.replace(/\s+/g, '_')}`,
+        version: '1.0.0',
+        name: `Auto ${a.type} ${a.target}`,
+        description: `Auto-generated from intrusive thought`,
+        permissions: [],
+        btDefinition: {
+          id: `opt.${a.type}`,
+          name: `Auto ${a.type}`,
+          root: {
+            type: 'sequence',
+            children: [{ type: 'action', action: 'sense_inventory' }],
+          }, // Keep small; registry will lint
+        },
+      };
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Bucket selection and idempotency
+   */
+  private async selectBucket(
+    plan: Plan,
+    snap?: any
+  ): Promise<{ name: string; maxMs: number }> {
+    const policy = await this.config.mcp
+      ?.readResource<any>('policy://buckets')
+      .catch(() => null);
+    const buckets = policy ?? {
+      Tactical: { maxMs: 60_000 },
+      Short: { maxMs: 240_000 },
+      Standard: { maxMs: 600_000 },
+      Long: { maxMs: 1_500_000 },
+    };
+    // Simple heuristic
+    if (plan.kind === 'sequence' && plan.leaves.length <= 2)
+      return { name: 'Tactical', maxMs: buckets.Tactical.maxMs };
+    if (plan.kind === 'option')
+      return { name: 'Short', maxMs: buckets.Short.maxMs };
+    return { name: 'Standard', maxMs: buckets.Standard.maxMs };
+  }
+
+  private computeIdempotencyKey(
+    canonicalThought: string,
+    plan: Plan,
+    snap?: any
+  ): string {
+    const snapSig = snap
+      ? `${Math.round(snap.position?.x ?? 0)}:${Math.round(snap.position?.y ?? 0)}:${Math.round(snap.position?.z ?? 0)}:${snap.time ?? 0}`
+      : 'nosnap';
+    const planSig =
+      plan.kind === 'option'
+        ? plan.id
+        : plan.kind === 'sequence'
+          ? plan.leaves.map((l) => l.name).join('+')
+          : plan.ticket;
+    return `ith:${canonicalThought}:${planSig}:${snapSig}`;
+  }
+
+  /**
+   * Build task from plan (steps are executable)
+   */
+  private buildTaskFromPlan(
+    thought: string,
+    action: Action,
+    plan: Plan,
+    bucket: { name: string; maxMs: number },
+    idem: string
+  ): Task {
+    const steps: TaskStep[] = [];
+    let title = '';
+    if (plan.kind === 'option') {
+      title = `${action.type} ${action.target} (via ${plan.id})`;
+      steps.push({
+        id: `s1`,
+        label: `Run option ${plan.id}`,
+        done: false,
+        order: 1,
+      });
+    } else if (plan.kind === 'sequence') {
+      title = `${action.type} ${action.target} (seq)`;
+      plan.leaves.forEach((l, i) =>
+        steps.push({
+          id: `s${i + 1}`,
+          label: `Leaf: ${l.name}`,
+          done: false,
+          order: i + 1,
+        })
+      );
+    } else {
+      title = `${action.type} ${action.target} (proposal queued)`;
+      steps.push({
+        id: `s1`,
+        label: `Await shadow option ${plan.ticket}`,
+        done: false,
+        order: 1,
+      });
+    }
+
+    return {
+      id: `task-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      title,
+      description: `From thought "${thought}" — bucket ${bucket.name}, cap ${bucket.maxMs}ms.`,
+      type: action.category,
+      priority: action.priority,
+      source: 'intrusive-thought',
+      progress: 0,
+      status: 'active',
+      steps,
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+      metadata: {
+        originalThought: thought,
+        action,
+        confidence: 0.7,
+        idempotencyKey: idem,
+        bucket: bucket.name,
+      },
+    };
   }
 
   /**
    * Parse actionable content from a thought
    */
   private parseActionFromThought(thought: string): Action | null {
+    // First check if it's a question that needs investigation
+    const questionAction = this.parseQuestionAsAction(thought);
+    if (questionAction) {
+      return questionAction;
+    }
+
     const actionPatterns = {
       craft: {
         pattern: /craft\s+(.+)/i,
@@ -241,6 +675,107 @@ export class IntrusiveThoughtProcessor extends EventEmitter {
   }
 
   /**
+   * Parse questions and convert them to investigative actions
+   */
+  private parseQuestionAsAction(thought: string): Action | null {
+    const lowerThought = thought.toLowerCase();
+
+    // Food-related questions
+    if (
+      lowerThought.includes('food') ||
+      lowerThought.includes('hunger') ||
+      lowerThought.includes('eat')
+    ) {
+      if (
+        lowerThought.includes('have') ||
+        lowerThought.includes('got') ||
+        lowerThought.includes('any')
+      ) {
+        return {
+          type: 'investigate',
+          target: 'food inventory and sources',
+          priority: 'high',
+          category: 'survival',
+        };
+      }
+    }
+
+    // Health-related questions
+    if (
+      lowerThought.includes('health') ||
+      lowerThought.includes('hurt') ||
+      lowerThought.includes('damage')
+    ) {
+      return {
+        type: 'investigate',
+        target: 'health status',
+        priority: 'high',
+        category: 'survival',
+      };
+    }
+
+    // Inventory-related questions
+    if (
+      lowerThought.includes('inventory') ||
+      lowerThought.includes('items') ||
+      lowerThought.includes('stuff')
+    ) {
+      return {
+        type: 'investigate',
+        target: 'inventory contents',
+        priority: 'medium',
+        category: 'inventory',
+      };
+    }
+
+    // Location/environment questions
+    if (
+      lowerThought.includes('where') ||
+      lowerThought.includes('location') ||
+      lowerThought.includes('area')
+    ) {
+      return {
+        type: 'investigate',
+        target: 'current location and surroundings',
+        priority: 'medium',
+        category: 'exploration',
+      };
+    }
+
+    // Resource questions
+    if (
+      lowerThought.includes('wood') ||
+      lowerThought.includes('stone') ||
+      lowerThought.includes('iron') ||
+      lowerThought.includes('coal')
+    ) {
+      return {
+        type: 'investigate',
+        target: 'resource availability',
+        priority: 'medium',
+        category: 'gathering',
+      };
+    }
+
+    // General questions that need investigation
+    if (
+      lowerThought.includes('?') &&
+      (lowerThought.includes('do i') ||
+        lowerThought.includes('have i') ||
+        lowerThought.includes('am i'))
+    ) {
+      return {
+        type: 'investigate',
+        target: 'current situation',
+        priority: 'medium',
+        category: 'general',
+      };
+    }
+
+    return null;
+  }
+
+  /**
    * Create a task from an intrusive thought and action
    */
   private async createTaskFromThought(
@@ -294,6 +829,7 @@ export class IntrusiveThoughtProcessor extends EventEmitter {
       cut: `Cut ${action.target}`,
       place: `Place ${action.target}`,
       put: `Put ${action.target}`,
+      investigate: `Investigate ${action.target}`,
     };
 
     return titles[action.type] || `Perform ${action.type} on ${action.target}`;
@@ -313,6 +849,11 @@ export class IntrusiveThoughtProcessor extends EventEmitter {
    * Generate task steps for an action
    */
   private generateTaskSteps(action: Action): TaskStep[] {
+    // Special handling for investigate actions
+    if (action.type === 'investigate') {
+      return this.generateInvestigationSteps(action);
+    }
+
     const baseSteps = [
       {
         id: `step-${Date.now()}-1`,
@@ -344,11 +885,199 @@ export class IntrusiveThoughtProcessor extends EventEmitter {
   }
 
   /**
+   * Generate specific steps for investigation tasks
+   */
+  private generateInvestigationSteps(action: Action): TaskStep[] {
+    const lowerTarget = action.target.toLowerCase();
+
+    // Food investigation
+    if (lowerTarget.includes('food')) {
+      return [
+        {
+          id: `step-${Date.now()}-1`,
+          label: 'Check inventory for food items',
+          done: false,
+          order: 1,
+        },
+        {
+          id: `step-${Date.now()}-2`,
+          label: 'Scan surroundings for food sources',
+          done: false,
+          order: 2,
+        },
+        {
+          id: `step-${Date.now()}-3`,
+          label: 'Identify nearest food gathering opportunities',
+          done: false,
+          order: 3,
+        },
+        {
+          id: `step-${Date.now()}-4`,
+          label: 'Report food availability status',
+          done: false,
+          order: 4,
+        },
+      ];
+    }
+
+    // Health investigation
+    if (lowerTarget.includes('health')) {
+      return [
+        {
+          id: `step-${Date.now()}-1`,
+          label: 'Check current health status',
+          done: false,
+          order: 1,
+        },
+        {
+          id: `step-${Date.now()}-2`,
+          label: 'Assess any damage or injuries',
+          done: false,
+          order: 2,
+        },
+        {
+          id: `step-${Date.now()}-3`,
+          label: 'Evaluate need for healing',
+          done: false,
+          order: 3,
+        },
+        {
+          id: `step-${Date.now()}-4`,
+          label: 'Report health status',
+          done: false,
+          order: 4,
+        },
+      ];
+    }
+
+    // Inventory investigation
+    if (lowerTarget.includes('inventory')) {
+      return [
+        {
+          id: `step-${Date.now()}-1`,
+          label: 'Open inventory interface',
+          done: false,
+          order: 1,
+        },
+        {
+          id: `step-${Date.now()}-2`,
+          label: 'Count and categorize items',
+          done: false,
+          order: 2,
+        },
+        {
+          id: `step-${Date.now()}-3`,
+          label: 'Identify useful resources',
+          done: false,
+          order: 3,
+        },
+        {
+          id: `step-${Date.now()}-4`,
+          label: 'Report inventory contents',
+          done: false,
+          order: 4,
+        },
+      ];
+    }
+
+    // Location investigation
+    if (
+      lowerTarget.includes('location') ||
+      lowerTarget.includes('surroundings')
+    ) {
+      return [
+        {
+          id: `step-${Date.now()}-1`,
+          label: 'Determine current coordinates',
+          done: false,
+          order: 1,
+        },
+        {
+          id: `step-${Date.now()}-2`,
+          label: 'Scan immediate surroundings',
+          done: false,
+          order: 2,
+        },
+        {
+          id: `step-${Date.now()}-3`,
+          label: 'Identify nearby resources and threats',
+          done: false,
+          order: 3,
+        },
+        {
+          id: `step-${Date.now()}-4`,
+          label: 'Report location assessment',
+          done: false,
+          order: 4,
+        },
+      ];
+    }
+
+    // Resource investigation
+    if (lowerTarget.includes('resource')) {
+      return [
+        {
+          id: `step-${Date.now()}-1`,
+          label: 'Scan area for available resources',
+          done: false,
+          order: 1,
+        },
+        {
+          id: `step-${Date.now()}-2`,
+          label: 'Identify resource types and quantities',
+          done: false,
+          order: 2,
+        },
+        {
+          id: `step-${Date.now()}-3`,
+          label: 'Assess resource accessibility',
+          done: false,
+          order: 3,
+        },
+        {
+          id: `step-${Date.now()}-4`,
+          label: 'Report resource availability',
+          done: false,
+          order: 4,
+        },
+      ];
+    }
+
+    // General investigation
+    return [
+      {
+        id: `step-${Date.now()}-1`,
+        label: 'Prepare for investigation',
+        done: false,
+        order: 1,
+      },
+      {
+        id: `step-${Date.now()}-2`,
+        label: `Investigate ${action.target}`,
+        done: false,
+        order: 2,
+      },
+      {
+        id: `step-${Date.now()}-3`,
+        label: 'Analyze findings',
+        done: false,
+        order: 3,
+      },
+      {
+        id: `step-${Date.now()}-4`,
+        label: 'Report investigation results',
+        done: false,
+        order: 4,
+      },
+    ];
+  }
+
+  /**
    * Update the planning system with a new task
    */
   private async updatePlanningSystem(task: Task): Promise<void> {
     try {
-      const response = await fetch(`${this.config.planningEndpoint}/tasks`, {
+      const response = await fetch(`${this.config.planningEndpoint}/task`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
