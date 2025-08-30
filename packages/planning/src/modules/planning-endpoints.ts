@@ -8,6 +8,8 @@
  */
 
 import { Router, Request, Response } from 'express';
+import { MinecraftExecutor } from '../reactive-executor/minecraft-executor';
+import { PlanStatus, PlanStepStatus, ActionType } from '../types';
 
 export interface PlanningSystem {
   goalFormulation: {
@@ -319,6 +321,159 @@ export function createPlanningEndpoints(
       });
     }
   });
+
+  // POST /execute-plan - Execute a plan with Minecraft bot
+  router.post('/execute-plan', async (req: Request, res: Response) => {
+    try {
+      const { planId, taskId } = req.body;
+
+      if (!planId && !taskId) {
+        return res.status(400).json({
+          success: false,
+          error: 'Missing required fields: planId or taskId',
+        });
+      }
+
+      // Create Minecraft executor
+      const minecraftExecutor = new MinecraftExecutor();
+
+      // Check if Minecraft interface is available
+      const isConnected = await minecraftExecutor.checkConnection();
+      if (!isConnected) {
+        return res.status(503).json({
+          success: false,
+          error: 'Minecraft interface not available',
+        });
+      }
+
+      let plan;
+      if (planId) {
+        // Execute specific plan
+        plan = {
+          id: planId,
+          goalId: planId,
+          steps: [],
+          status: PlanStatus.PENDING,
+          priority: 0.5,
+          estimatedDuration: 30000,
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+          successProbability: 0.8,
+        }; // This would need to be fetched from storage
+      } else if (taskId) {
+        // Generate plan from task and execute
+        const task = planningSystem.goalFormulation
+          .getCurrentTasks()
+          .find((t: any) => t.id === taskId);
+
+        if (!task) {
+          return res.status(404).json({
+            success: false,
+            error: 'Task not found',
+          });
+        }
+
+        // Convert task to plan (simplified)
+        plan = {
+          id: `plan-${taskId}`,
+          goalId: taskId,
+          steps: [
+            {
+              id: `step-${taskId}-1`,
+              planId: `plan-${taskId}`,
+              action: {
+                id: `action-${taskId}-1`,
+                name: task.title,
+                description: task.title,
+                type: mapTaskTypeToAction(task.type) as any,
+                parameters: getActionParameters(task.type),
+                preconditions: [],
+                effects: [],
+                cost: 1,
+                duration: 30000,
+                successProbability: 0.8,
+              },
+              preconditions: [],
+              effects: [],
+              status: PlanStepStatus.PENDING,
+              order: 1,
+              estimatedDuration: 30000,
+              dependencies: [],
+            },
+          ],
+          status: PlanStatus.PENDING,
+          priority: task.priority || 0.5,
+          estimatedDuration: 30000,
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+          successProbability: 0.8,
+        };
+      }
+
+      if (!plan || plan.steps.length === 0) {
+        return res.status(400).json({
+          success: false,
+          error: 'No plan to execute',
+        });
+      }
+
+      console.log(
+        `🎮 Executing plan ${plan.id} with ${plan.steps.length} steps...`
+      );
+
+      // Execute the plan
+      const results = await minecraftExecutor.executePlan(plan);
+
+      const successCount = results.filter((r) => r.success).length;
+      const failureCount = results.filter((r) => !r.success).length;
+
+      res.json({
+        success: true,
+        planId: plan.id,
+        message: `Plan executed: ${successCount} successful, ${failureCount} failed`,
+        results,
+        summary: {
+          totalSteps: plan.steps.length,
+          successfulSteps: successCount,
+          failedSteps: failureCount,
+          successRate: successCount / plan.steps.length,
+        },
+        timestamp: Date.now(),
+      });
+    } catch (error) {
+      console.error('Failed to execute plan:', error);
+      res.status(500).json({
+        success: false,
+        error: 'Failed to execute plan',
+        details: error instanceof Error ? error.message : 'Unknown error',
+      });
+    }
+  });
+
+  // Helper functions for task-to-action mapping
+  function mapTaskTypeToAction(taskType: string): string {
+    const typeMap: Record<string, string> = {
+      gathering: 'navigate',
+      crafting: 'craft_item',
+      exploration: 'navigate',
+      mine: 'dig_block',
+      navigate: 'navigate',
+      build: 'place_block',
+    };
+    return typeMap[taskType] || 'navigate';
+  }
+
+  function getActionParameters(taskType: string): Record<string, any> {
+    const paramMap: Record<string, Record<string, any>> = {
+      gathering: { target: 'auto_detect', max_distance: 30 },
+      crafting: { item: 'auto_detect', materials: 'auto_collect' },
+      exploration: { target: 'auto_detect', max_distance: 25 },
+      mine: { pos: 'nearest_valuable', tool: 'auto_select' },
+      navigate: { target: 'auto_detect', max_distance: 50 },
+      build: { block_type: 'auto_select', position: 'optimal_location' },
+    };
+    return paramMap[taskType] || { target: 'auto_detect', max_distance: 15 };
+  }
 
   return router;
 }

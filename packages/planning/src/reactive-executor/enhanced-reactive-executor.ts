@@ -495,14 +495,21 @@ export class EnhancedReactiveExecutor {
       // Execute the task based on type
       switch (task.type) {
         case 'craft':
+        case 'crafting':
           return await this.executeCraftTask(task, minecraftUrl);
         case 'move':
         case 'move_forward':
+        case 'movement':
           return await this.executeMoveTask(task, minecraftUrl);
         case 'gather':
+        case 'gathering':
           return await this.executeGatherTask(task, minecraftUrl);
         case 'explore':
+        case 'exploration':
           return await this.executeExploreTask(task, minecraftUrl);
+        case 'mine':
+        case 'mining':
+          return await this.executeMineTask(task, minecraftUrl);
         default:
           // For unknown task types, return failure since we can't execute them
           return {
@@ -526,25 +533,9 @@ export class EnhancedReactiveExecutor {
   private async executeCraftTask(task: any, minecraftUrl: string) {
     const itemToCraft = task.parameters?.item || 'item';
 
-    // Check if we can actually craft the item
-    const canCraft = await fetch(`${minecraftUrl}/action`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        type: 'can_craft',
-        parameters: { item: itemToCraft },
-      }),
-    }).then((res) => res.json());
-
-    if (!(canCraft as any).success || !(canCraft as any).canCraft) {
-      return {
-        success: false,
-        error: (canCraft as any).error || 'Cannot craft item',
-        item: itemToCraft,
-        type: 'craft',
-      };
-    }
-
+    // Skip can_craft check since it's not supported by the Minecraft interface
+    // The Minecraft interface will handle validation internally
+    
     // Actually attempt to craft the item
     const craftResult = await fetch(`${minecraftUrl}/action`, {
       method: 'POST',
@@ -650,6 +641,49 @@ export class EnhancedReactiveExecutor {
         success: false,
         error: `Failed to execute explore task: ${error}`,
         type: 'explore',
+      };
+    }
+  }
+
+  /**
+   * Execute mining task
+   */
+  private async executeMineTask(task: any, minecraftUrl: string) {
+    try {
+      console.log(`⛏️ Executing mining task: ${task.title}`);
+
+      // Execute mining action
+      const response = await fetch(`${minecraftUrl}/action`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'dig_block',
+          parameters: {
+            block: task.parameters?.block || 'stone',
+            position: task.parameters?.position || 'current',
+          },
+        }),
+        signal: AbortSignal.timeout(30000),
+      });
+
+      if (!response.ok) {
+        throw new Error(
+          `Minecraft interface responded with ${response.status}`
+        );
+      }
+
+      const result = await response.json();
+      return {
+        success: (result as any).success,
+        error: (result as any).error,
+        type: 'mining',
+        data: (result as any).data,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+        type: 'mining',
       };
     }
   }

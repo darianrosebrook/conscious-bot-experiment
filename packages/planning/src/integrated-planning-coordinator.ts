@@ -1167,7 +1167,96 @@ export class IntegratedPlanningCoordinator extends EventEmitter {
     return [];
   }
   private convertHRMNodesToSteps(nodes: any[], goal: Goal): any[] {
-    return [];
+    if (!nodes || nodes.length === 0) {
+      return [];
+    }
+
+    // Convert HRM plan nodes to concrete steps
+    const steps = nodes
+      .filter((node) => node.type === 'subgoal' || node.type === 'action')
+      .map((node, index) => ({
+        id: `step-${Date.now()}-${index + 1}`,
+        name: node.description,
+        status: 'pending',
+        priority: node.priority || 0.5,
+        estimatedDuration: node.estimatedDuration || 10000,
+        dependencies: node.dependencies || [],
+        constraints: node.constraints || [],
+        action: this.mapNodeToAction(node, goal),
+      }));
+
+    return steps;
+  }
+
+  private mapNodeToAction(node: any, goal: Goal): any {
+    const description = node.description.toLowerCase();
+
+    // Map common Minecraft actions
+    if (description.includes('gather') || description.includes('collect')) {
+      return {
+        type: 'gather_resources',
+        parameters: {
+          resource_type: 'any',
+          radius: 10,
+          max_items: 10,
+        },
+      };
+    } else if (description.includes('locate') || description.includes('find')) {
+      return {
+        type: 'explore_area',
+        parameters: {
+          radius: 20,
+          target_type: 'resources',
+        },
+      };
+    } else if (
+      description.includes('navigate') ||
+      description.includes('move')
+    ) {
+      return {
+        type: 'navigate',
+        parameters: {
+          target: 'auto_detect',
+          max_distance: 50,
+        },
+      };
+    } else if (description.includes('mine') || description.includes('dig')) {
+      return {
+        type: 'dig_block',
+        parameters: {
+          pos: 'nearest_valuable',
+          tool: 'auto_select',
+        },
+      };
+    } else if (description.includes('craft')) {
+      return {
+        type: 'craft_item',
+        parameters: {
+          item: 'auto_detect',
+          materials: 'auto_collect',
+        },
+      };
+    } else if (
+      description.includes('build') ||
+      description.includes('construct')
+    ) {
+      return {
+        type: 'place_block',
+        parameters: {
+          block_type: 'auto_select',
+          position: 'optimal_location',
+        },
+      };
+    }
+
+    // Default action for unknown descriptions
+    return {
+      type: 'explore_environment',
+      parameters: {
+        duration: 5000,
+        radius: 10,
+      },
+    };
   }
   private convertHRMStatus(status: any): PlanStatus {
     return PlanStatus.PENDING;
