@@ -730,7 +730,7 @@ export class EnhancedTaskIntegration extends EventEmitter {
     // Instead of hardcoded templates, generate minimal dynamic steps
     // This ensures the bot uses its own reasoning rather than predefined patterns
     const taskTitle = taskData.title || 'Unknown Task';
-    
+
     // Create a single dynamic step that encourages the bot to think about the task
     const dynamicStep = {
       id: `step-${Date.now()}-1`,
