@@ -46,7 +46,7 @@ export interface ServerComponents {
 export class ServerConfiguration {
   private config: ServerConfig;
   private app: Application;
-  private mcpIntegration: MCPIntegration | null = null;
+  private _mcpIntegration: MCPIntegration | null = null;
 
   constructor(config: ServerConfig = {}) {
     this.config = {
@@ -91,11 +91,11 @@ export class ServerConfiguration {
     }
 
     try {
-      this.mcpIntegration = new MCPIntegration(this.config.mcpConfig);
-      await this.mcpIntegration.initialize(bot, registry);
+      this._mcpIntegration = new MCPIntegration(this.config.mcpConfig);
+      await this._mcpIntegration.initialize(bot, registry);
 
       // Mount MCP endpoints
-      const mcpRouter = createMCPEndpoints(this.mcpIntegration);
+      const mcpRouter = createMCPEndpoints(this._mcpIntegration);
       this.app.use('/mcp', mcpRouter);
 
       console.log('[Server] MCP integration initialized and mounted at /mcp');
@@ -166,8 +166,8 @@ export class ServerConfiguration {
           `[Server] Environment: ${process.env.NODE_ENV || 'development'}`
         );
 
-        if (this.mcpIntegration) {
-          const status = this.mcpIntegration.getStatus();
+        if (this._mcpIntegration) {
+          const status = this._mcpIntegration.getStatus();
           console.log(
             `[Server] MCP Integration: ${status.initialized ? '✅ Active' : '❌ Inactive'}`
           );
@@ -194,7 +194,7 @@ export class ServerConfiguration {
    * Get the MCP integration instance
    */
   getMCPIntegration(): MCPIntegration | null {
-    return this.mcpIntegration;
+    return this._mcpIntegration;
   }
 
   /**
@@ -203,7 +203,7 @@ export class ServerConfiguration {
   getComponents(): ServerComponents {
     return {
       app: this.app,
-      mcpIntegration: this.mcpIntegration,
+      mcpIntegration: this._mcpIntegration,
     };
   }
 

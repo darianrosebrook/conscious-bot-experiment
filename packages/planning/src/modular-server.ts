@@ -26,6 +26,7 @@ import { EnhancedMemoryIntegration } from './enhanced-memory-integration';
 import { EnhancedEnvironmentIntegration } from './enhanced-environment-integration';
 import { EnhancedLiveStreamIntegration } from './enhanced-live-stream-integration';
 import { GoalStatus } from './types';
+import { EnhancedRegistry } from '@conscious-bot/core';
 
 // Initialize tool executor that connects to Minecraft interface
 const toolExecutor = {
@@ -217,15 +218,20 @@ async function waitForBotConnection(timeoutMs: number): Promise<boolean> {
  */
 async function checkBotConnection(): Promise<boolean> {
   try {
-    // Check if bot is connected to Minecraft
-    const response = await fetch('http://localhost:3001/bot/status', {
+    // Check if bot is connected to Minecraft via the Minecraft interface
+    const response = await fetch('http://localhost:3005/health', {
       method: 'GET',
       signal: AbortSignal.timeout(2000),
     });
 
     if (response.ok) {
-      const status = (await response.json()) as { connected?: boolean };
-      return status.connected === true;
+      const status = (await response.json()) as {
+        status?: string;
+        botStatus?: { connected?: boolean };
+      };
+      return (
+        status.status === 'connected' || status.botStatus?.connected === true
+      );
     }
 
     return false;
@@ -254,7 +260,7 @@ async function autonomousTaskExecutor() {
     // Execute the highest priority task
     const currentTask = activeTasks[0]; // Tasks are already sorted by priority
     console.log(
-      `Monitoring task: ${currentTask.title} (${currentTask.progress * 100}% complete)`
+      `🎯 Executing task: ${currentTask.title} (${currentTask.progress * 100}% complete)`
     );
 
     // Check if bot is connected and can perform actions
@@ -264,28 +270,137 @@ async function autonomousTaskExecutor() {
       return;
     }
 
-    // Only update progress based on real actions, not fake increments
-    // Progress will be updated by the actual task execution system
-    console.log(
-      `📊 Task progress monitoring: ${currentTask.title} - ${Math.round(currentTask.progress * 100)}%`
+    // Try to find a suitable MCP option for this task type
+    const mcpOptions =
+      (await serverConfig.getMCPIntegration()?.listOptions('active')) || [];
+
+    // Map task types to MCP options
+    const taskTypeMapping: Record<string, string[]> = {
+      gathering: ['chop', 'tree', 'wood', 'collect', 'gather'],
+      crafting: ['craft', 'build', 'create'],
+      exploration: ['explore', 'search', 'find'],
+      mining: ['mine', 'dig', 'extract'],
+      farming: ['farm', 'plant', 'grow'],
+      combat: ['fight', 'attack', 'defend'],
+      navigation: ['move', 'navigate', 'travel'],
+    };
+
+    const searchTerms = taskTypeMapping[currentTask.type] || [currentTask.type];
+    const suitableOption = mcpOptions.find((option) =>
+      searchTerms.some(
+        (term) =>
+          option.name?.toLowerCase().includes(term) ||
+          option.description?.toLowerCase().includes(term)
+      )
     );
 
-    // Check if task is actually complete based on real step completion
-    const completedSteps =
-      currentTask.steps?.filter((step) => step.done).length || 0;
-    const totalSteps = currentTask.steps?.length || 0;
+    if (suitableOption) {
+      console.log(`✅ Found MCP option for task: ${suitableOption.name}`);
 
-    if (totalSteps > 0 && completedSteps >= totalSteps) {
-      console.log(
-        `✅ Task completed through real actions: ${currentTask.title}`
-      );
+      // Execute the MCP option
+      const mcpResult = await serverConfig
+        .getMCPIntegration()
+        ?.executeTool('run_option', {
+          id: suitableOption.id,
+        });
 
-      // Mark task as completed only if all steps are actually done
-      enhancedTaskIntegration.updateTaskProgress(
-        currentTask.id,
-        1.0,
-        'completed'
+      if (mcpResult?.success) {
+        console.log(
+          `✅ MCP option executed successfully: ${suitableOption.name}`
+        );
+        // Update task progress based on MCP execution result
+        const newProgress = Math.min(currentTask.progress + 0.25, 1.0);
+        enhancedTaskIntegration.updateTaskProgress(
+          currentTask.id,
+          newProgress,
+          newProgress >= 1.0 ? 'completed' : 'active'
+        );
+      } else {
+        console.error(
+          `❌ MCP option execution failed: ${suitableOption.name}`,
+          mcpResult?.error
+        );
+
+        // Mark task as failed if it's been retried too many times
+        const retryCount = (currentTask.metadata?.retryCount || 0) + 1;
+        const maxRetries = currentTask.metadata?.maxRetries || 3;
+
+        if (retryCount >= maxRetries) {
+          enhancedTaskIntegration.updateTaskProgress(
+            currentTask.id,
+            currentTask.progress,
+            'failed'
+          );
+          console.log(
+            `❌ Task marked as failed after ${retryCount} retries: ${currentTask.title}`
+          );
+        } else {
+          // Update retry count
+          enhancedTaskIntegration.updateTaskMetadata(currentTask.id, {
+            ...currentTask.metadata,
+            retryCount,
+            lastRetry: Date.now(),
+          });
+          console.log(
+            `🔄 Task will be retried (${retryCount}/${maxRetries}): ${currentTask.title}`
+          );
+        }
+      }
+    } else {
+      console.warn(
+        `⚠️ No suitable MCP option found for task: ${currentTask.title}. Falling back to planning system.`
       );
+      // If no MCP option, execute the task through the planning system
+      try {
+        console.log(`🚀 Starting execution of task: ${currentTask.title}`);
+
+        const executionResult =
+          await planningSystem.execution.executeTask(currentTask);
+
+        if (executionResult.success) {
+          console.log(`✅ Task execution completed: ${currentTask.title}`);
+
+          // Update task progress based on execution result
+          const newProgress = Math.min(currentTask.progress + 0.25, 1.0);
+          enhancedTaskIntegration.updateTaskProgress(
+            currentTask.id,
+            newProgress,
+            newProgress >= 1.0 ? 'completed' : 'active'
+          );
+        } else {
+          console.error(
+            `❌ Task execution failed: ${currentTask.title}`,
+            executionResult.message
+          );
+
+          // Mark task as failed if it's been retried too many times
+          const retryCount = (currentTask.metadata?.retryCount || 0) + 1;
+          const maxRetries = currentTask.metadata?.maxRetries || 3;
+
+          if (retryCount >= maxRetries) {
+            enhancedTaskIntegration.updateTaskProgress(
+              currentTask.id,
+              currentTask.progress,
+              'failed'
+            );
+            console.log(
+              `❌ Task marked as failed after ${retryCount} retries: ${currentTask.title}`
+            );
+          } else {
+            // Update retry count
+            enhancedTaskIntegration.updateTaskMetadata(currentTask.id, {
+              ...currentTask.metadata,
+              retryCount,
+              lastRetry: Date.now(),
+            });
+            console.log(
+              `🔄 Task will be retried (${retryCount}/${maxRetries}): ${currentTask.title}`
+            );
+          }
+        }
+      } catch (error) {
+        console.error(`❌ Task execution error: ${currentTask.title}`, error);
+      }
     }
 
     // Get active goals and execute them (keep existing goal logic)
@@ -393,10 +508,80 @@ const planningSystem: PlanningSystem = {
   },
   execution: {
     executeGoal: async (goal: any) => {
-      return { success: true, message: 'Goal execution simulated' };
+      try {
+        console.log(`🎯 Executing goal: ${goal.title || goal.id}`);
+
+        // Execute the goal through the enhanced reactive executor
+        const result = await enhancedReactiveExecutor.executeTask(goal);
+
+        if (result.success) {
+          console.log(
+            `✅ Goal executed successfully: ${goal.title || goal.id}`
+          );
+          return {
+            success: true,
+            message: 'Goal executed successfully',
+            result,
+          };
+        } else {
+          console.error(
+            `❌ Goal execution failed: ${goal.title || goal.id}`,
+            result.error
+          );
+          return {
+            success: false,
+            message: result.error || 'Goal execution failed',
+            result,
+          };
+        }
+      } catch (error) {
+        console.error(
+          `❌ Goal execution error: ${goal.title || goal.id}`,
+          error
+        );
+        return {
+          success: false,
+          message: error instanceof Error ? error.message : 'Unknown error',
+        };
+      }
     },
     executeTask: async (task: any) => {
-      return { success: true, message: 'Task execution simulated' };
+      try {
+        console.log(`🔄 Executing task: ${task.title || task.id}`);
+
+        // Execute the task through the enhanced reactive executor
+        const result = await enhancedReactiveExecutor.executeTask(task);
+
+        if (result.success) {
+          console.log(
+            `✅ Task executed successfully: ${task.title || task.id}`
+          );
+          return {
+            success: true,
+            message: 'Task executed successfully',
+            result,
+          };
+        } else {
+          console.error(
+            `❌ Task execution failed: ${task.title || task.id}`,
+            result.error
+          );
+          return {
+            success: false,
+            message: result.error || 'Task execution failed',
+            result,
+          };
+        }
+      } catch (error) {
+        console.error(
+          `❌ Task execution error: ${task.title || task.id}`,
+          error
+        );
+        return {
+          success: false,
+          message: error instanceof Error ? error.message : 'Unknown error',
+        };
+      }
     },
   },
 };
@@ -519,9 +704,12 @@ setTimeout(async () => {
 // Main server startup function
 async function startServer() {
   try {
-    // Initialize MCP integration (bot and registry would be passed here)
+    // Create an EnhancedRegistry for MCP integration
+    const registry = new EnhancedRegistry();
+
+    // Initialize MCP integration with the registry
     try {
-      await serverConfig.initializeMCP();
+      await serverConfig.initializeMCP(undefined, registry);
     } catch (error) {
       console.warn(
         '⚠️ MCP integration failed to initialize, continuing without it:',
@@ -552,9 +740,9 @@ async function startServer() {
       } catch (error) {
         console.warn('Autonomous task executor error (non-fatal):', error);
       }
-    }, 60000); // Check every 60 seconds (reduced frequency to prevent spam)
+    }, 10000); // Check every 10 seconds for more responsive execution
 
-    // Initial task generation after 30 seconds with error handling
+    // Initial task generation after 5 seconds with error handling
     setTimeout(() => {
       try {
         if (process.env.NODE_ENV === 'development') {
@@ -564,7 +752,7 @@ async function startServer() {
       } catch (error) {
         console.warn('Initial autonomous behavior error (non-fatal):', error);
       }
-    }, 30000);
+    }, 5000);
 
     // Start cognitive thought processor with error handling
     try {

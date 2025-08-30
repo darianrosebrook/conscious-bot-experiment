@@ -42,6 +42,7 @@ export interface Task {
     actualDuration?: number;
     retryCount: number;
     maxRetries: number;
+    lastRetry?: number;
     parentTaskId?: string;
     childTaskIds: string[];
     tags: string[];
@@ -233,6 +234,33 @@ export class EnhancedTaskIntegration extends EventEmitter {
     const totalWords = Math.max(words1.length, words2.length);
 
     return totalWords > 0 ? commonWords.length / totalWords : 0;
+  }
+
+  /**
+   * Update task metadata
+   */
+  updateTaskMetadata(
+    taskId: string,
+    metadata: Partial<Task['metadata']>
+  ): boolean {
+    const task = this.tasks.get(taskId);
+    if (!task) {
+      return false;
+    }
+
+    task.metadata = { ...task.metadata, ...metadata, updatedAt: Date.now() };
+
+    this.updateStatistics();
+    this.emit('taskMetadataUpdated', { task, metadata });
+
+    if (this.config.enableRealTimeUpdates) {
+      this.notifyDashboard('taskMetadataUpdated', {
+        task,
+        metadata,
+      });
+    }
+
+    return true;
   }
 
   /**
