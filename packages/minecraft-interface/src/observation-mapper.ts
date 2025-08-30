@@ -9,7 +9,22 @@
 
 import { Bot } from 'mineflayer';
 import { Vec3 } from 'vec3';
-import { PlanningContext, HomeostasisState } from '@conscious-bot/planning';
+import { PlanningContext } from './types';
+
+// Minimal type definition to avoid circular dependency
+export interface HomeostasisState {
+  health: number;
+  hunger: number;
+  energy: number;
+  safety: number;
+  social: number;
+  achievement: number;
+  curiosity: number;
+  creativity: number;
+  exploration: number;
+  timestamp: number;
+  [key: string]: number;
+}
 import {
   MinecraftWorldState,
   MinecraftItem,
@@ -43,8 +58,11 @@ export class ObservationMapper {
     const worldState = this.convertToGenericWorldState(minecraftWorldState);
 
     return {
+      goal: 'survive', // Default goal
       worldState: worldState,
       currentState: homeostasisState,
+      resources: {}, // Empty resources object
+      urgency: 'medium' as const, // Default urgency
       activeGoals: [], // Planning system will populate this
       availableResources: this.extractResources(minecraftWorldState),
       timeConstraints: this.assessTimeConstraints(minecraftWorldState),
@@ -458,6 +476,7 @@ export class ObservationMapper {
       achievement,
       curiosity,
       creativity: 0.5, // Default creativity level
+      exploration: 0.5, // Default exploration level
       timestamp: Date.now(),
     };
   }

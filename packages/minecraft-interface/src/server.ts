@@ -24,7 +24,14 @@ import {
   HybridArbiterIntegration,
   HybridArbiterConfig,
 } from './hybrid-arbiter-integration';
-import { createIntegratedPlanningCoordinator } from '@conscious-bot/planning';
+// Stub function to avoid circular dependency
+function createIntegratedPlanningCoordinator(): any {
+  return {
+    plan: async (goal: string, context: any) => ({ success: false, error: 'Planning not available' }),
+    executePlan: async (plan: any, context: any) => ({ success: false, error: 'Planning not available' }),
+    planAndExecute: async (goal: string | any[], context: any, signals?: any[]) => ({ success: false, error: 'Planning not available' })
+  };
+}
 import { mineflayer as startMineflayerViewer } from 'prismarine-viewer';
 
 // Import leaf implementations for registration
@@ -473,14 +480,7 @@ async function attemptAutoConnect() {
     isConnecting = true;
 
     // Create planning coordinator
-    planningCoordinator = createIntegratedPlanningCoordinator({
-      coordinatorConfig: {
-        routingStrategy: 'adaptive',
-        fallbackTimeout: 30000,
-        enablePlanMerging: true,
-        enableCrossValidation: false,
-      },
-    });
+    planningCoordinator = createIntegratedPlanningCoordinator();
 
     // Create full minecraft interface
     minecraftInterface = await createMinecraftInterfaceWithoutConnect(

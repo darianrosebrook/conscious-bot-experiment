@@ -12,7 +12,7 @@ import { pathfinder, Movements } from 'mineflayer-pathfinder';
 // Use require for goals since ES Module import doesn't work
 const { goals } = require('mineflayer-pathfinder');
 import { Vec3 } from 'vec3';
-import { PlanStep } from '@conscious-bot/planning';
+import { PlanStep } from './types';
 import {
   MinecraftAction,
   ActionResult,

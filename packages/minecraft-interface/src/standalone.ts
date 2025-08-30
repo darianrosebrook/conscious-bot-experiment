@@ -12,7 +12,7 @@ import { BotAdapter } from './bot-adapter';
 import { ObservationMapper } from './observation-mapper';
 import { ActionTranslator } from './action-translator';
 import { BotConfig } from './types';
-import { PlanStep } from '@conscious-bot/planning';
+import { PlanStep } from './types';
 
 export interface StandaloneMinecraftInterface {
   botAdapter: BotAdapter;

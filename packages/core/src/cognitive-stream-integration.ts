@@ -120,77 +120,47 @@ class NarrativeLLMInterface {
       [key: string]: any; // Allow additional properties
     }
   ): string {
-    const currentGoal = context.currentGoals?.[0] || 'surviving';
-    const health = context.currentState?.health || 20;
-    const food = context.currentState?.food || 20;
-    const position = context.currentState?.position;
-    const inventory = context.currentState?.inventory || {};
+    // Minimal fallback responses that don't contaminate consciousness testing
+    // These are generic system messages, not actual thoughts
 
-    // Generate contextual thoughts based on situation
     if (situation.includes('state_update')) {
-      if (health < 10) {
-        return `I notice my health has dropped to ${health}/20. I should be more cautious and look for healing resources.`;
-      } else if (food < 10) {
-        return `My food level is getting low (${food}/20). I need to find sustenance soon to maintain my energy.`;
-      } else {
-        return `My current status looks stable - health at ${health}/20, food at ${food}/20. I can continue with my objectives.`;
-      }
+      return 'Processing current situation...';
     }
 
     if (situation.includes('goal_identification')) {
-      const newGoals =
-        context.currentGoals?.filter((g) => g !== currentGoal) || [];
-      if (newGoals.length > 0) {
-        return `I've identified new priorities: ${newGoals.join(', ')}. These align with my survival needs and current situation.`;
-      } else {
-        return `My current goal of ${currentGoal} remains appropriate for my situation.`;
-      }
+      return 'Evaluating priorities...';
     }
 
     if (situation.includes('planning_initiation')) {
-      return `I'm starting to plan how to achieve my goal: ${currentGoal}. Let me consider the best approach given my current resources and situation.`;
+      return 'Formulating approach...';
     }
 
     if (situation.includes('plan_generation')) {
-      const approach = context.approach || 'standard';
-      return `I've formulated a plan using ${approach} approach. This should help me progress toward ${currentGoal} effectively.`;
+      return 'Developing strategy...';
     }
 
     if (situation.includes('plan_execution')) {
-      return `I'm now executing my plan to achieve ${currentGoal}. I'll monitor the results and adjust if needed.`;
+      return 'Executing current plan...';
     }
 
     if (situation.includes('execution_completion')) {
-      const success = context.success;
-      if (success) {
-        return `Successfully completed my plan! I've made progress toward ${currentGoal}.`;
-      } else {
-        return `The plan didn't work as expected. I need to reconsider my approach to ${currentGoal}.`;
-      }
+      return 'Assessing results...';
     }
 
     if (situation.includes('planning_failure')) {
-      return `My planning for ${currentGoal} encountered difficulties. I'll need to try a different strategy.`;
+      return 'Reconsidering approach...';
     }
 
     if (situation.includes('planning_error')) {
-      return `There was an error in my planning process. I need to reassess my approach to ${currentGoal}.`;
+      return 'Error in planning process...';
     }
 
     if (situation.includes('execution_error')) {
-      return `Something went wrong during execution. I need to be more careful and perhaps try a simpler approach.`;
+      return 'Execution encountered issues...';
     }
 
-    // Default reflective thought based on current state
-    if (health < 10) {
-      return `I'm concerned about my health (${health}/20). I should prioritize finding healing resources.`;
-    } else if (food < 10) {
-      return `I'm getting hungry (${food}/20). Finding food should be my next priority.`;
-    } else if (Object.keys(inventory).length === 0) {
-      return `My inventory is empty. I should gather some basic resources to be prepared.`;
-    } else {
-      return `I'm in a stable condition. My health is ${health}/20, food is ${food}/20, and I'm working toward ${currentGoal}. I can continue with my current objectives.`;
-    }
+    // Default minimal response
+    return 'Processing...';
   }
 }
 

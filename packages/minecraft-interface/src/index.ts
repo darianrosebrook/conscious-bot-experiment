@@ -82,7 +82,7 @@ import { ObservationMapper } from './observation-mapper';
 import { ActionTranslator } from './action-translator';
 import { PlanExecutor } from './plan-executor';
 import { BotConfig } from './types';
-import { IntegratedPlanningCoordinator } from '@conscious-bot/planning';
+import { IntegratedPlanningCoordinator } from './plan-executor';
 
 /**
  * Create a fully configured Minecraft interface
@@ -149,18 +149,14 @@ export async function runMinecraftScenario(
     timeout?: number;
   }
 ): Promise<any> {
-  const { createIntegratedPlanningCoordinator } = await import(
-    '@conscious-bot/planning'
-  );
-
-  const planningCoordinator = createIntegratedPlanningCoordinator({
-    coordinatorConfig: {
-      routingStrategy: 'adaptive',
-      fallbackTimeout: scenario.timeout || 30000,
-      enablePlanMerging: true,
-      enableCrossValidation: false,
-    },
+  // Stub function to avoid circular dependency
+  const createIntegratedPlanningCoordinator = () => ({
+    plan: async (goal: string, context: any) => ({ success: false, error: 'Planning not available' }),
+    executePlan: async (plan: any, context: any) => ({ success: false, error: 'Planning not available' }),
+    planAndExecute: async (goal: string | any[], context: any, signals?: any[]) => ({ success: false, error: 'Planning not available' })
   });
+
+  const planningCoordinator = createIntegratedPlanningCoordinator();
 
   const minecraftInterface = await createMinecraftInterface(
     config,

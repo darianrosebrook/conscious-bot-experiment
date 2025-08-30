@@ -6,12 +6,59 @@
 
 import { Bot } from 'mineflayer';
 import { Vec3 } from 'vec3';
-import {
-  PlanningContext,
-  IntegratedPlanningResult,
-  Plan,
-  PlanStep,
-} from '@conscious-bot/planning';
+// Minimal type definitions to avoid circular dependency with planning package
+export interface PlanningContext {
+  goal: string;
+  currentState: Record<string, any>;
+  resources: Record<string, any>;
+  urgency: 'low' | 'medium' | 'high' | 'emergency';
+  worldState?: Record<string, any>;
+  timeConstraints?: Record<string, any>;
+  activeGoals?: any[];
+  availableResources?: any[];
+  situationalFactors?: any;
+}
+
+export interface IntegratedPlanningResult {
+  success: boolean;
+  plan?: Plan;
+  error?: string;
+  metadata?: Record<string, any>;
+}
+
+export interface Plan {
+  id: string;
+  steps: PlanStep[];
+  metadata?: Record<string, any>;
+  goalId?: string;
+  status?: string;
+  updatedAt?: number;
+}
+
+export interface PlanStep {
+  id: string;
+  type: 'action' | 'goal' | 'subgoal' | 'condition';
+  description: string;
+  status: 'pending' | 'active' | 'completed' | 'failed' | 'blocked';
+  priority: number;
+  estimatedDuration: number;
+  dependencies: string[];
+  constraints: string[];
+  metadata?: Record<string, any>;
+  action?: {
+    id?: string;
+    name?: string;
+    type: string;
+    parameters?: Record<string, any>;
+    description?: string;
+    preconditions?: any[];
+    effects?: any[];
+    cost?: number;
+    duration?: number;
+    successProbability?: number;
+  };
+  planId?: string;
+}
 
 // ==================== Minecraft World State ====================
 

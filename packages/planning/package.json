@@ -5,13 +5,13 @@
   "main": "dist/index.js",
   "scripts": {
     "build": "tsc",
-    "dev": "tsc --watch",
+    "dev": "tsx src/modular-server.ts",
+    "dev:watch": "tsc --watch",
     "test": "vitest run",
     "test:ui": "vitest --ui",
     "test:run": "vitest run",
     "lint": "eslint src/**/*.ts",
     "type-check": "tsc --noEmit",
-    "dev": "tsx src/modular-server.ts",
     "dev:modular": "tsx src/modular-server.ts"
   },
   "dependencies": {

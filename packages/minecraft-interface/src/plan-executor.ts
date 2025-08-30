@@ -10,12 +10,25 @@
 import { EventEmitter } from 'events';
 import { Bot } from 'mineflayer';
 import {
-  IntegratedPlanningCoordinator,
   Plan,
   PlanStep,
-  PlanStatus,
   PlanningContext,
-} from '@conscious-bot/planning';
+} from './types';
+
+// Minimal type definitions to avoid circular dependency
+export interface IntegratedPlanningCoordinator {
+  plan(goal: string, context: PlanningContext): Promise<any>;
+  executePlan(plan: Plan, context: PlanningContext): Promise<any>;
+  planAndExecute(goal: string | any[], context: PlanningContext, signals?: any[]): Promise<any>;
+}
+
+export enum PlanStatus {
+  PENDING = 'pending',
+  ACTIVE = 'active',
+  COMPLETED = 'completed',
+  FAILED = 'failed',
+  BLOCKED = 'blocked'
+}
 import { BotAdapter } from './bot-adapter';
 import { ObservationMapper } from './observation-mapper';
 import { ActionTranslator } from './action-translator';

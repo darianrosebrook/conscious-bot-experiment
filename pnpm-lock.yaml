@@ -295,9 +295,6 @@ importers:
       '@conscious-bot/core':
         specifier: workspace:*
         version: link:../core
-      '@conscious-bot/minecraft-interface':
-        specifier: workspace:*
-        version: link:../minecraft-interface
       '@modelcontextprotocol/sdk':
         specifier: ^0.4.0
         version: 0.4.0
@@ -369,6 +366,9 @@ importers:
       '@conscious-bot/core':
         specifier: workspace:*
         version: link:../core
+      '@conscious-bot/planning':
+        specifier: workspace:*
+        version: link:../planning
       '@types/three':
         specifier: ^0.179.0
         version: 0.179.0
