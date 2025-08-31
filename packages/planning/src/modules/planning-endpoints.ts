@@ -20,6 +20,17 @@ export interface PlanningSystem {
     addGoal?: (goal: any) => Promise<any> | any;
     addTask: (task: any) => void;
     getCompletedTasks: () => any[];
+    reprioritizeGoal?: (
+      goalId: string,
+      priority?: number,
+      urgency?: number
+    ) => void;
+    cancelGoal?: (goalId: string, reason?: string) => void;
+    pauseGoal?: (goalId: string) => void;
+    resumeGoal?: (goalId: string) => void;
+    getGoalStatus?: (goalId: string) => any;
+    completeGoal?: (goalId: string) => void;
+    updateBotInstance?: (botInstance: any) => Promise<any>;
   };
   execution: {
     executeGoal: (goal: any) => Promise<any>;
@@ -174,8 +185,13 @@ export function createPlanningEndpoints(
   // POST /goal - Create a new goal (and optional tasks)
   router.post('/goal', async (req: Request, res: Response) => {
     try {
-      const { name, description, priority = 0.5, urgency = 0.5, tasks = [] } =
-        req.body || {};
+      const {
+        name,
+        description,
+        priority = 0.5,
+        urgency = 0.5,
+        tasks = [],
+      } = req.body || {};
 
       if (!description && !name) {
         return res.status(400).json({
@@ -211,7 +227,10 @@ export function createPlanningEndpoints(
             await planningSystem.goalFormulation.addTask({
               title: t.title || t.name || t.description || 'Untitled Task',
               description: t.description || t.title || '',
-              type: inferTaskType(t.type, t.description || t.title || name || ''),
+              type: inferTaskType(
+                t.type,
+                t.description || t.title || name || ''
+              ),
               priority: t.priority ?? priority,
               urgency: t.urgency ?? urgency,
               source: 'goal',
@@ -244,20 +263,114 @@ export function createPlanningEndpoints(
     }
   });
 
+  // PATCH /goal/:id - Update goal (priority/urgency/status)
+  router.patch('/goal/:id', async (req: Request, res: Response) => {
+    try {
+      const id = req.params.id;
+      const { priority, urgency, status } = req.body || {};
+      if (!id)
+        return res
+          .status(400)
+          .json({ success: false, error: 'Missing goal id' });
+
+      if ((planningSystem as any).goalFormulation?.reprioritizeGoal) {
+        (planningSystem as any).goalFormulation.reprioritizeGoal(
+          id,
+          priority,
+          urgency
+        );
+      }
+      if (status) {
+        const setStatus = (s: string) => {
+          const gf: any = (planningSystem as any).goalFormulation;
+          if (s === 'failed') return gf.cancelGoal?.(id, 'manually cancelled');
+          if (s === 'suspended') return gf.pauseGoal?.(id);
+          if (s === 'pending' || s === 'active') return gf.resumeGoal?.(id);
+          if (s === 'completed') return gf.completeGoal?.(id);
+        };
+        setStatus(String(status));
+      }
+
+      res.json({ success: true, goalId: id });
+    } catch (error) {
+      res.status(500).json({ success: false, error: 'Failed to update goal' });
+    }
+  });
+
+  // POST /goal/:id/cancel - Cancel a goal
+  router.post('/goal/:id/cancel', async (req: Request, res: Response) => {
+    try {
+      const id = req.params.id;
+      const reason = req.body?.reason;
+      if (!id)
+        return res
+          .status(400)
+          .json({ success: false, error: 'Missing goal id' });
+      const gf: any = (planningSystem as any).goalFormulation;
+      const ok = gf?.cancelGoal?.(id, reason);
+      res.json({ success: Boolean(ok), goalId: id });
+    } catch (error) {
+      res.status(500).json({ success: false, error: 'Failed to cancel goal' });
+    }
+  });
+
   function inferGoalType(text: string): string {
     const t = text.toLowerCase();
     if (/(explore|find|search|scout)/.test(t)) return 'exploration';
-    if (/(craft|build|create|make)/.test(t)) return 'achievement';
-    if (/(gather|collect|obtain|get)/.test(t)) return 'acquire_item';
-    if (/(mine|dig)/.test(t)) return 'achievement';
-    if (/(survive|avoid|threat|danger)/.test(t)) return 'survive_threat';
-    return 'curiosity';
+    if (/(craft|build|create|make)/.test(t)) return 'crafting';
+    if (/(gather|collect|obtain|get)/.test(t)) return 'gathering';
+    if (/(mine|dig)/.test(t)) return 'mining';
+    if (/(survive|avoid|threat|danger)/.test(t)) return 'survival';
+    if (/(place|put|set)/.test(t)) return 'building';
+    return 'general';
   }
 
-  function inferTaskType(explicitType: string | undefined, text: string): string {
+  function inferTaskType(
+    explicitType: string | undefined,
+    text: string
+  ): string {
     const t = (explicitType || '').toLowerCase();
     if (t && t !== 'autonomous' && t !== 'manual') return t;
+
     const s = (text || '').toLowerCase();
+
+    // Handle complex task descriptions with multiple actions
+    // Prioritize the primary goal: if the task mentions making/creating something, it's crafting
+    if (s.includes('make') && s.includes('tool')) {
+      return 'crafting'; // Primary action is crafting a tool
+    }
+    if (s.includes('crafting table') && s.includes('make')) {
+      return 'crafting'; // Primary action is crafting
+    }
+    if (
+      s.includes('place') &&
+      s.includes('crafting table') &&
+      s.includes('make')
+    ) {
+      return 'crafting'; // Primary goal is making something, placing table is just a step
+    }
+    if (
+      s.includes('place') &&
+      s.includes('crafting table') &&
+      s.includes('tool')
+    ) {
+      return 'crafting'; // Primary goal is making a tool, placing table is just a step
+    }
+    if (s.includes('place') && s.includes('down') && s.includes('make')) {
+      return 'crafting'; // Primary goal is making something
+    }
+
+    // Handle pure placement tasks
+    if (
+      s.includes('place') &&
+      s.includes('down') &&
+      !s.includes('make') &&
+      !s.includes('tool')
+    ) {
+      return 'building';
+    }
+
+    // Handle simple task types
     if (/(gather|collect|wood|log)/.test(s)) return 'gathering';
     if (/(craft|build|make|create|table|pickaxe|stick|plank)/.test(s))
       return 'crafting';
@@ -265,28 +378,19 @@ export function createPlanningEndpoints(
     if (/(explore|search|scout|look around)/.test(s)) return 'exploration';
     if (/(farm|plant|harvest)/.test(s)) return 'farming';
     if (/(move|go to|walk)/.test(s)) return 'navigation';
+    if (/(place|put|set)/.test(s)) return 'building';
+
     return 'gathering';
   }
 
   // POST /task - Add a new task
-  router.post('/task', async (req: Request, res: Response) => {
+  router.post('/task', (req: Request, res: Response) => {
     try {
-      const task = req.body;
-
-      if (!task || !task.type || !task.description) {
-        return res.status(400).json({
-          success: false,
-          error: 'Missing required fields: type, description',
-        });
-      }
-
-      // Add task to planning system
-      await planningSystem.goalFormulation.addTask(task);
-
+      const taskData = req.body;
+      planningSystem.goalFormulation.addTask(taskData);
       res.json({
         success: true,
-        taskId: task.id,
-        message: `Task added: ${task.type} - ${task.description}`,
+        message: `Task added: ${taskData.type} - ${taskData.description}`,
         timestamp: Date.now(),
       });
     } catch (error) {
@@ -294,6 +398,42 @@ export function createPlanningEndpoints(
       res.status(500).json({
         success: false,
         error: 'Failed to add task',
+        details: error instanceof Error ? error.message : 'Unknown error',
+      });
+    }
+  });
+
+  // POST /update-bot-instance - Update bot instance for MCP server
+  router.post('/update-bot-instance', async (req: Request, res: Response) => {
+    try {
+      const { botInstance } = req.body;
+
+      if (!botInstance) {
+        return res.status(400).json({
+          success: false,
+          error: 'Missing botInstance in request body',
+        });
+      }
+
+      if (planningSystem.goalFormulation.updateBotInstance) {
+        const result =
+          await planningSystem.goalFormulation.updateBotInstance(botInstance);
+        res.json({
+          success: result.success,
+          message: result.message || 'Bot instance updated successfully',
+          timestamp: Date.now(),
+        });
+      } else {
+        res.status(500).json({
+          success: false,
+          error: 'Bot instance update not available',
+        });
+      }
+    } catch (error) {
+      console.error('Failed to update bot instance:', error);
+      res.status(500).json({
+        success: false,
+        error: 'Failed to update bot instance',
         details: error instanceof Error ? error.message : 'Unknown error',
       });
     }

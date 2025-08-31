@@ -71,21 +71,26 @@ export interface CapabilityExecutionResult {
 // MCP Capabilities Adapter Implementation
 // ============================================================================
 
+type EffectSink = { applyEffects(effects: any[]): void };
+
 export class MCPCapabilitiesAdapter extends EventEmitter {
   private registry: EnhancedRegistry;
   private dynamicFlow: DynamicCreationFlow;
   private capabilityRegistry: CapabilityRegistry;
   private executionHistory: CapabilityExecutionResult[] = [];
+  private effectSink?: EffectSink;
 
   constructor(
     registry: EnhancedRegistry,
     dynamicFlow: DynamicCreationFlow,
-    capabilityRegistry?: CapabilityRegistry
+    capabilityRegistry?: CapabilityRegistry,
+    effectSink?: EffectSink
   ) {
     super();
     this.registry = registry;
     this.dynamicFlow = dynamicFlow;
     this.capabilityRegistry = capabilityRegistry || new CapabilityRegistry();
+    this.effectSink = effectSink;
   }
 
   /**
@@ -511,7 +516,7 @@ export class MCPCapabilitiesAdapter extends EventEmitter {
           execCtx
         );
 
-        return {
+        const execution = {
           capabilityId: capability.capabilityId,
           success: result.success,
           duration: result.duration,
@@ -522,6 +527,17 @@ export class MCPCapabilitiesAdapter extends EventEmitter {
             resultId: result.id,
           },
         };
+        // Apply effects to world state sink if provided
+        if (
+          result.success &&
+          Array.isArray(result.effects) &&
+          this.effectSink
+        ) {
+          try {
+            this.effectSink.applyEffects(result.effects);
+          } catch {}
+        }
+        return execution;
       } catch (err: any) {
         return {
           capabilityId: capability.capabilityId,

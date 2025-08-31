@@ -253,6 +253,46 @@ export class EnhancedMemoryIntegration extends EventEmitter {
   }
 
   /**
+   * Return completed/failed task events for a given day offset (0=today,1=yesterday)
+   */
+  getTaskLogByDay(daysBack: number = 0): MemoryEvent[] {
+    const now = new Date();
+    const d = new Date(
+      now.getFullYear(),
+      now.getMonth(),
+      now.getDate() - daysBack,
+      0,
+      0,
+      0,
+      0
+    ).getTime();
+    const next = d + 24 * 60 * 60 * 1000;
+    return this.events.filter(
+      (e) =>
+        (e.type === 'task_completed' || e.type === 'task_failed') &&
+        e.timestamp >= d &&
+        e.timestamp < next
+    );
+  }
+
+  /**
+   * Generate a daily summary note of completed actions
+   */
+  generateDailySummary(daysBack: number = 0): ReflectiveNote {
+    const list = this.getTaskLogByDay(daysBack);
+    const completed = list.filter((e) => e.type === 'task_completed');
+    const failed = list.filter((e) => e.type === 'task_failed');
+    const title = daysBack === 0 ? 'Today\'s Action Summary' : 'Yesterday\'s Action Summary';
+    const lines = [
+      `Completed: ${completed.length}`,
+      `Failed: ${failed.length}`,
+      '',
+      ...completed.slice(0, 20).map((e) => `✔ ${e.data?.taskType || 'task'}: ${e.data?.taskId}`),
+    ];
+    return this.addReflectiveNote('reflection', title, lines.join('\n'), [], 'planning-system', 0.7);
+  }
+
+  /**
    * Generate environment-related events
    */
   generateEnvironmentEvent(

@@ -92,13 +92,19 @@ export class WorldStateManager extends EventEmitter {
     }
   }
 
-  applyEffects(effects: Array<{ type: string; item?: string; quantity?: number }>): void {
+  applyEffects(
+    effects: Array<
+      { type: string; item?: string; quantity?: number; change?: string; metadata?: any } | any
+    >
+  ): void {
     if (!effects || effects.length === 0) return;
     let changed = false;
     for (const eff of effects) {
-      if (eff.type === 'inventory') {
-        const itemName = (eff.item || '').toLowerCase();
-        const qty = Number(eff.quantity || 0);
+      // Inventory effects from capability result
+      if (eff.type === 'inventory' || eff.change?.startsWith('inventory_')) {
+        const itemName = String(eff.item || eff.metadata?.item || '').toLowerCase();
+        const qtyRaw = Number(eff.quantity ?? eff.metadata?.quantity ?? 0);
+        const qty = eff.change === 'inventory_removed' ? -Math.abs(qtyRaw) : Math.abs(qtyRaw);
         if (!this.snapshot.inventory) this.snapshot.inventory = [];
         const idx = this.snapshot.inventory.findIndex((it) =>
           String(it.name || it.displayName || it.type || '')
@@ -128,4 +134,3 @@ export class WorldStateManager extends EventEmitter {
     return false;
   }
 }
-

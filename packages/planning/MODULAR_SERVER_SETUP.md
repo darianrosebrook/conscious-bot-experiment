@@ -169,6 +169,16 @@ const serverConfig = new ServerConfiguration({
 });
 ```
 
+## MCP Integration Configuration
+
+```typescript
+const mcpIntegration = new MCPIntegration({
+  enableMCP: true,
+  // Note: MCP server uses stdio transport, not network port
+  // mcpServerPort: 3006, // This was misleading - MCP doesn't bind to network ports
+});
+```
+
 ## Testing
 
 Run the modular server tests:

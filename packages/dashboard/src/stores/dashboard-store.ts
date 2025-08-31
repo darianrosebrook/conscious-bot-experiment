@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { devtools } from 'zustand/middleware';
+import { devtools, persist } from 'zustand/middleware';
 import { generateId } from '@/lib/utils';
 import type {
   DashboardState,
@@ -14,12 +14,18 @@ import type {
   PlannerData,
 } from '@/types';
 
+// =============================================================================
+// Types
+// =============================================================================
+
 interface DashboardStore extends DashboardState {
   // Actions
   setIsLive: (isLive: boolean) => void;
   setHud: (hud: HudData) => void;
   addThought: (thought: Thought) => void;
   setThoughts: (thoughts: Thought[]) => void;
+  clearThoughts: () => void;
+  loadThoughtsFromServer: () => Promise<void>;
   setTasks: (tasks: Task[]) => void;
   updateTask: (id: string, updates: Partial<Task>) => void;
   addEvent: (event: Event) => void;
@@ -32,6 +38,29 @@ interface DashboardStore extends DashboardState {
   setPlannerData: (plannerData: PlannerData) => void;
   reset: () => void;
 }
+
+// =============================================================================
+// Persistence Configuration
+// =============================================================================
+
+const PERSIST_CONFIG = {
+  name: 'conscious-bot-dashboard-state',
+  partialize: (state: DashboardStore) => ({
+    // Only persist thoughts and essential state
+    thoughts: state.thoughts,
+    isLive: state.isLive,
+    // Don't persist real-time data that should be fetched fresh
+    // hud: state.hud,
+    // tasks: state.tasks,
+    // environment: state.environment,
+    // inventory: state.inventory,
+    // plannerData: state.plannerData,
+  }),
+};
+
+// =============================================================================
+// Initial State
+// =============================================================================
 
 const initialState: DashboardState = {
   isLive: true,
@@ -46,92 +75,229 @@ const initialState: DashboardState = {
   plannerData: null,
 };
 
+// =============================================================================
+// Deep Equality Check
+// =============================================================================
+
+const isDeepEqual = (a: any, b: any): boolean => {
+  if (a === b) return true;
+  if (a == null || b == null) return false;
+  if (typeof a !== typeof b) return false;
+  if (typeof a !== 'object') return false;
+
+  if (Array.isArray(a) !== Array.isArray(b)) return false;
+  if (Array.isArray(a)) {
+    if (a.length !== b.length) return false;
+    for (let i = 0; i < a.length; i++) {
+      if (!isDeepEqual(a[i], b[i])) return false;
+    }
+    return true;
+  }
+
+  const keysA = Object.keys(a);
+  const keysB = Object.keys(b);
+  if (keysA.length !== keysB.length) return false;
+
+  for (const key of keysA) {
+    if (!keysB.includes(key)) return false;
+    if (!isDeepEqual(a[key], b[key])) return false;
+  }
+
+  return false;
+};
+
+// =============================================================================
+// Dashboard Store
+// =============================================================================
+
 /**
  * Dashboard state store using Zustand
  * Manages all real-time data for the conscious bot dashboard
+ * Optimized to prevent unnecessary state updates and rerenders
+ * Includes persistence for thoughts across page refreshes
  */
 export const useDashboardStore = create<DashboardStore>()(
   devtools(
-    (set, _get) => ({
-      ...initialState,
+    persist(
+      (set, get) => ({
+        ...initialState,
 
-      setIsLive: (isLive) => set({ isLive }),
-
-      setHud: (hud) => set({ hud }),
-
-      addThought: (thought) =>
-        set((state) => {
-          // Store: addThought called with thought
-          // Ensure thought has a unique ID
-          const thoughtWithId = {
-            ...thought,
-            id: thought.id || generateId(),
-          };
-
-          // Store: thoughtWithId processed
-
-          // Check if thought with same ID already exists
-          const existingThought = state.thoughts.find(
-            (t) => t.id === thoughtWithId.id
-          );
-          if (existingThought) {
-            // Store: Duplicate ID found, not adding
-            return state; // Don't add duplicate
+        setIsLive: (isLive) => {
+          const current = get().isLive;
+          if (current !== isLive) {
+            set({ isLive });
           }
+        },
 
-          // Also check for duplicate content within a short time window (5 seconds)
-          const fiveSecondsAgo = new Date(Date.now() - 5000).toISOString();
-          const recentDuplicate = state.thoughts.find(
-            (t) =>
-              t.text === thoughtWithId.text &&
-              t.type === thoughtWithId.type &&
-              t.ts > fiveSecondsAgo
-          );
-
-          if (recentDuplicate) {
-            // Store: Recent duplicate found, not adding
-            return state; // Don't add duplicate content
+        setHud: (hud) => {
+          const current = get().hud;
+          if (!isDeepEqual(current, hud)) {
+            set({ hud });
           }
+        },
 
-          const newThoughts = [...state.thoughts, thoughtWithId].slice(-100); // Keep last 100 thoughts
-          // Store: Adding thought, new thoughts count: ${newThoughts.length}
-          return {
-            thoughts: newThoughts,
-          };
-        }),
+        addThought: (thought) =>
+          set((state) => {
+            // Ensure thought has a unique ID
+            const thoughtWithId = {
+              ...thought,
+              id: thought.id || generateId(),
+            };
 
-      setThoughts: (thoughts) => set({ thoughts }),
+            // Check if thought with same ID already exists
+            const existingThought = state.thoughts.find(
+              (t) => t.id === thoughtWithId.id
+            );
+            if (existingThought) {
+              return state; // Don't add duplicate
+            }
 
-      setTasks: (tasks) => set({ tasks }),
+            // Also check for duplicate content within a short time window (5 seconds)
+            const fiveSecondsAgo = new Date(Date.now() - 5000).toISOString();
+            const recentDuplicate = state.thoughts.find(
+              (t) =>
+                t.text === thoughtWithId.text &&
+                t.type === thoughtWithId.type &&
+                t.ts > fiveSecondsAgo
+            );
 
-      updateTask: (id, updates) =>
-        set((state) => ({
-          tasks: state.tasks.map((task) =>
-            task.id === id ? { ...task, ...updates } : task
-          ),
-        })),
+            if (recentDuplicate) {
+              return state; // Don't add duplicate content
+            }
 
-      addEvent: (event) =>
-        set((state) => ({
-          events: [...state.events, event].slice(-50), // Keep last 50 events
-        })),
+            const newThoughts = [...state.thoughts, thoughtWithId].slice(-100); // Keep last 100 thoughts
+            return {
+              thoughts: newThoughts,
+            };
+          }),
 
-      setEvents: (events) => set({ events }),
+        setThoughts: (thoughts) => {
+          const current = get().thoughts;
+          if (!isDeepEqual(current, thoughts)) {
+            set({ thoughts });
+          }
+        },
 
-      setMemories: (memories) => set({ memories }),
+        // Clear thoughts (useful for debugging)
+        clearThoughts: () => {
+          set({ thoughts: [] });
+        },
 
-      setEnvironment: (environment) => set({ environment }),
+        // Load thoughts from server (for initial load)
+        loadThoughtsFromServer: async () => {
+          try {
+            const response = await fetch('/api/ws/cognitive-stream/history');
+            if (response.ok) {
+              const data = await response.json();
+              if (data.thoughts && Array.isArray(data.thoughts)) {
+                const serverThoughts = data.thoughts.map((thought: any) => ({
+                  id: thought.id,
+                  ts: new Date(thought.timestamp).toISOString(),
+                  text: thought.content,
+                  type: thought.type || 'reflection',
+                  attribution: thought.attribution || 'self',
+                  thoughtType: thought.metadata?.thoughtType || thought.type,
+                }));
+                set({ thoughts: serverThoughts });
+              }
+            }
+          } catch (error) {
+            console.warn('Failed to load thoughts from server:', error);
+          }
+        },
 
-      setCurrentScreenshot: (currentScreenshot) => set({ currentScreenshot }),
+        setTasks: (tasks) => {
+          const current = get().tasks;
+          if (!isDeepEqual(current, tasks)) {
+            set({ tasks });
+          }
+        },
 
-      setCurrentSession: (currentSession) => set({ currentSession }),
+        updateTask: (id, updates) =>
+          set((state) => {
+            const taskIndex = state.tasks.findIndex((t) => t.id === id);
+            if (taskIndex === -1) return state;
 
-      setInventory: (inventory) => set({ inventory }),
+            const updatedTask = { ...state.tasks[taskIndex], ...updates };
+            if (isDeepEqual(state.tasks[taskIndex], updatedTask)) {
+              return state; // No change, don't update
+            }
 
-      setPlannerData: (plannerData) => set({ plannerData }),
+            const newTasks = [...state.tasks];
+            newTasks[taskIndex] = updatedTask;
+            return { tasks: newTasks };
+          }),
 
-      reset: () => set(initialState),
-    }),
+        addEvent: (event) =>
+          set((state) => {
+            const eventWithId = {
+              ...event,
+              id: event.id || generateId(),
+            };
+
+            // Check for duplicate events
+            const existingEvent = state.events.find(
+              (e) => e.id === eventWithId.id
+            );
+            if (existingEvent) return state;
+
+            const newEvents = [...state.events, eventWithId].slice(-50); // Keep last 50 events
+            return { events: newEvents };
+          }),
+
+        setEvents: (events) => {
+          const current = get().events;
+          if (!isDeepEqual(current, events)) {
+            set({ events });
+          }
+        },
+
+        setMemories: (memories) => {
+          const current = get().memories;
+          if (!isDeepEqual(current, memories)) {
+            set({ memories });
+          }
+        },
+
+        setEnvironment: (environment) => {
+          const current = get().environment;
+          if (!isDeepEqual(current, environment)) {
+            set({ environment });
+          }
+        },
+
+        setCurrentScreenshot: (screenshot) => {
+          const current = get().currentScreenshot;
+          if (!isDeepEqual(current, screenshot)) {
+            set({ currentScreenshot: screenshot });
+          }
+        },
+
+        setCurrentSession: (sessionId) => {
+          const current = get().currentSession;
+          if (current !== sessionId) {
+            set({ currentSession: sessionId });
+          }
+        },
+
+        setInventory: (inventory) => {
+          const current = get().inventory;
+          if (!isDeepEqual(current, inventory)) {
+            set({ inventory });
+          }
+        },
+
+        setPlannerData: (plannerData) => {
+          const current = get().plannerData;
+          if (!isDeepEqual(current, plannerData)) {
+            set({ plannerData });
+          }
+        },
+
+        reset: () => set(initialState),
+      }),
+      PERSIST_CONFIG
+    ),
     {
       name: 'dashboard-store',
     }

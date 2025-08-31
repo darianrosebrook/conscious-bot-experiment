@@ -14,6 +14,53 @@ import { LLMInterface } from '../cognitive-core/llm-interface';
 // Types
 // ============================================================================
 
+// Missing type definitions
+interface Entity {
+  id: string;
+  type: string;
+  position: { x: number; y: number; z: number };
+  hostile: boolean;
+}
+
+interface Block {
+  id: string;
+  type: string;
+  position: { x: number; y: number; z: number };
+}
+
+interface InventoryItem {
+  id: string;
+  type: string;
+  count: number;
+}
+
+interface ArmorItem {
+  id: string;
+  type: string;
+  slot: string;
+}
+
+interface ToolItem {
+  id: string;
+  type: string;
+  durability: number;
+}
+
+interface ToolDefinition {
+  name: string;
+  description: string;
+  argsSchema: any;
+}
+
+interface LLMConfig {
+  provider: string;
+  model: string;
+  temperature: number;
+  maxTokens: number;
+  timeout: number;
+  retries: number;
+}
+
 export interface ReActStep {
   thoughts: string;
   selectedTool: string;
@@ -29,6 +76,7 @@ export interface ReActContext {
   memorySummaries: MemorySummary[];
   lastToolResult?: ToolResult;
   reflexionHints?: ReflexionHint[];
+  task?: { title: string; description: string; type: string };
 }
 
 export interface WorldSnapshot {
@@ -173,6 +221,179 @@ export class ReActArbiter {
       .slice(0, 3); // Return top 3 most relevant hints
   }
 
+  /**
+   * Generate task steps using LLM directly
+   * This is used for task decomposition outside of the ReAct loop
+   */
+  async generateTaskSteps(task: any): Promise<string> {
+    const prompt = `You are a Minecraft bot planning system. Generate specific, actionable steps for the following task:
+
+TASK: ${task.title}
+DESCRIPTION: ${task.description || 'No description provided'}
+TYPE: ${task.type || 'general'}
+
+Generate 3-6 specific steps that break down this task into actionable components. Each step should be:
+- Specific and actionable
+- In the order they should be performed
+- Realistic for a Minecraft bot to execute
+
+Format your response as a numbered list, like:
+1. First step description
+2. Second step description
+3. Third step description
+...etc.
+
+Focus on the actual actions needed, not generic planning steps.`;
+
+    try {
+      const response = await this.llm.generateResponse(prompt, undefined, {
+        temperature: 0.3,
+        maxTokens: 300,
+      });
+      return response.text;
+    } catch (error) {
+      console.error('Task step generation failed:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Call LLM with prompt and options
+   */
+  private async callLLM(prompt: string, options?: any): Promise<any> {
+    try {
+      const response = await this.llm.generateResponse(
+        prompt,
+        undefined,
+        options
+      );
+      return response;
+    } catch (error) {
+      console.error('LLM call failed:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Build reflection prompt for learning from experience
+   */
+  private buildReflectionPrompt(
+    episodeTrace: any[],
+    outcome: 'success' | 'failure',
+    errors?: string[]
+  ): string {
+    const traceSummary = episodeTrace
+      .map(
+        (step, i) =>
+          `${i + 1}. ${step.thoughts} -> ${step.selectedTool}(${JSON.stringify(step.args)})`
+      )
+      .join('\n');
+
+    const errorInfo = errors?.length
+      ? `\nErrors encountered:\n${errors.map((e) => `- ${e}`).join('\n')}`
+      : '';
+
+    return `You are a Minecraft bot reflecting on a completed episode.
+
+Episode Trace:
+${traceSummary}
+
+Outcome: ${outcome}${errorInfo}
+
+Please provide a brief reflection on what went well and what could be improved. Focus on:
+1. What worked effectively
+2. What could be done better next time
+3. Any important lessons learned
+
+Keep your reflection concise and actionable.`;
+  }
+
+  /**
+   * Parse ReAct response to extract thoughts and tool selection
+   */
+  private parseReActResponse(responseText: string): ReActStep {
+    // Simple parsing - in a real implementation, this would be more sophisticated
+    const lines = responseText.split('\n');
+    let thoughts = '';
+    let selectedTool = '';
+    let args: Record<string, any> = {};
+
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (
+        trimmed.toLowerCase().includes('tool:') ||
+        trimmed.toLowerCase().includes('action:')
+      ) {
+        selectedTool = trimmed.split(':')[1]?.trim() || '';
+      } else if (
+        trimmed.toLowerCase().includes('args:') ||
+        trimmed.toLowerCase().includes('parameters:')
+      ) {
+        try {
+          const argsText = trimmed.split(':')[1]?.trim() || '{}';
+          args = JSON.parse(argsText);
+        } catch (e) {
+          console.warn('Failed to parse args:', e);
+        }
+      } else if (trimmed && !selectedTool) {
+        thoughts += trimmed + ' ';
+      }
+    }
+
+    return {
+      thoughts: thoughts.trim(),
+      selectedTool,
+      args,
+    };
+  }
+
+  /**
+   * Parse reflection response to extract learning
+   */
+  private parseReflectionResponse(responseText: string): ReflexionHint {
+    return {
+      situation: 'general',
+      lesson: responseText.trim(),
+      relevance: 0.5,
+    };
+  }
+
+  /**
+   * Build ReAct prompt for reasoning
+   */
+  private buildReActPrompt(context: ReActContext): string {
+    const tools = Array.from(this.toolRegistry.values())
+      .map((tool) => `- ${tool.name}: ${tool.description}`)
+      .join('\n');
+
+    const reflexionHints = context.reflexionHints?.length
+      ? `\nReflexion Hints:\n${context.reflexionHints.map((h) => `- ${h.lesson}`).join('\n')}`
+      : '';
+
+    return `You are a Minecraft bot using ReAct reasoning to accomplish tasks.
+
+Available Tools:
+${tools}
+
+Current Task: ${context.task?.title || 'No task'}
+Task Description: ${context.task?.description || 'No description provided'}
+Task Type: ${context.task?.type || 'general'}
+
+Current Context:
+- Player Position: ${JSON.stringify(context.snapshot?.position || {})}
+- Inventory Items: ${context.inventory?.items?.length || 0} items
+- Nearby Blocks: ${context.snapshot?.nearbyBlocks?.length || 0} blocks
+- Hostile Entities: ${context.snapshot?.nearbyEntities?.filter((e) => e.hostile)?.length || 0} entities${reflexionHints}
+
+Instructions:
+1. Think step by step about what needs to be done
+2. Choose the most appropriate tool for the current situation
+3. Provide clear reasoning for your choice
+4. Execute the tool with proper parameters
+
+Let's start by analyzing the current situation and determining the next action.`;
+  }
+
   // ============================================================================
   // Private Methods
   // ============================================================================
@@ -273,215 +494,4 @@ export class ReActArbiter {
 
     return schemas[toolName] || z.object({});
   }
-
-  private buildReActPrompt(context: ReActContext): string {
-    const tools = Array.from(this.toolRegistry.values())
-      .map((tool) => `- ${tool.name}: ${tool.description}`)
-      .join('\n');
-
-    const reflexionHints = context.reflexionHints?.length
-      ? `\nReflexion Hints:\n${context.reflexionHints.map((h) => `- ${h.lesson}`).join('\n')}`
-      : '';
-
-    const lastResult = context.lastToolResult
-      ? `\nLast Tool Result: ${context.lastToolResult.ok ? 'SUCCESS' : 'FAILED'} - ${context.lastToolResult.error || JSON.stringify(context.lastToolResult.data)}`
-      : '';
-
-    return `You are a ReAct agent in Minecraft. You must reason step-by-step and choose exactly ONE tool to call.
-
-Current State:
-- Position: ${context.snapshot.position.x}, ${context.snapshot.position.y}, ${context.snapshot.position.z}
-- Biome: ${context.snapshot.biome}
-- Time: ${context.snapshot.time}
-- Light: ${context.snapshot.light}
-- Hazards: ${context.snapshot.hazards.join(', ')}
-- Nearby entities: ${context.snapshot.nearbyEntities.length}
-- Nearby blocks: ${context.snapshot.nearbyBlocks.length}
-- Weather: ${context.snapshot.weather}
-
-Inventory: ${context.inventory.items.map((i) => `${i.name}(${i.quantity})`).join(', ')}
-
-Active Goals: ${context.goalStack.map((g) => `${g.type}: ${g.description}`).join(', ')}
-
-Available Tools:
-${tools}${reflexionHints}${lastResult}
-
-Reason step-by-step about what to do next, then choose exactly one tool to call.
-
-Response format:
-THOUGHTS: [your reasoning]
-TOOL: [tool_name]
-ARGS: [JSON arguments]
-GUARDRAILS: [optional safety considerations]
-FOLLOWUP_GOAL: [optional next goal]`;
-  }
-
-  private buildReflectionPrompt(
-    episodeTrace: any[],
-    outcome: 'success' | 'failure',
-    errors?: string[]
-  ): string {
-    const trace = episodeTrace.slice(-5); // Last 5 steps
-    const errorInfo = errors?.length
-      ? `\nErrors encountered: ${errors.join(', ')}`
-      : '';
-
-    return `You are reflecting on a Minecraft episode that ended with ${outcome.toUpperCase()}.
-
-Episode trace (last 5 steps):
-${trace.map((step, i) => `${i + 1}. ${step.action} -> ${step.result}`).join('\n')}${errorInfo}
-
-Generate a reflection that includes:
-1. What situation you were in
-2. What went wrong (if failure) or what worked well (if success)
-3. A specific lesson learned
-4. Optional guardrails for future attempts
-
-Response format:
-SITUATION: [describe the context]
-FAILURE: [what went wrong, if applicable]
-LESSON: [specific actionable lesson]
-GUARDRAIL: [optional safety rule]`;
-  }
-
-  private async callLLM(
-    prompt: string,
-    options: { temperature: number; maxTokens: number }
-  ): Promise<{ text: string }> {
-    try {
-      const response = await this.llm.generateResponse(prompt, undefined, {
-        temperature: options.temperature,
-        maxTokens: options.maxTokens,
-      });
-
-      return {
-        text: response.text,
-      };
-    } catch (error) {
-      console.error('LLM call failed:', error);
-
-      // Fallback responses that parse correctly and don't contaminate consciousness testing
-      if (prompt.includes('reflecting on a Minecraft episode')) {
-        return {
-          text: 'SITUATION: general_situation\nFAILURE: unknown_error\nLESSON: learned_something\nGUARDRAIL: {"pre":"safety_first"}',
-        };
-      } else {
-        return {
-          text: 'THOUGHTS: Processing situation...\nTOOL: query_inventory\nARGS: {"filter": "tools"}\nGUARDRAILS: Stay alert\nFOLLOWUP_GOAL: Continue current objective',
-        };
-      }
-    }
-  }
-
-  private parseReActResponse(response: string): ReActStep {
-    const lines = response.split('\n');
-    const step: ReActStep = {
-      thoughts: '',
-      selectedTool: '',
-      args: {},
-    };
-
-    for (const line of lines) {
-      if (line.startsWith('THOUGHTS:')) {
-        step.thoughts = line.replace('THOUGHTS:', '').trim();
-      } else if (line.startsWith('TOOL:')) {
-        step.selectedTool = line.replace('TOOL:', '').trim();
-      } else if (line.startsWith('ARGS:')) {
-        try {
-          step.args = JSON.parse(line.replace('ARGS:', '').trim());
-        } catch (e) {
-          console.warn('Failed to parse tool args:', e);
-        }
-      } else if (line.startsWith('GUARDRAILS:')) {
-        step.guardrails = [line.replace('GUARDRAILS:', '').trim()];
-      } else if (line.startsWith('FOLLOWUP_GOAL:')) {
-        step.followupGoal = line.replace('FOLLOWUP_GOAL:', '').trim();
-      }
-    }
-
-    return step;
-  }
-
-  private parseReflectionResponse(response: string): ReflexionHint {
-    const lines = response.split('\n');
-    const hint: ReflexionHint = {
-      situation: '',
-      lesson: '',
-    };
-
-    for (const line of lines) {
-      if (line.startsWith('SITUATION:')) {
-        hint.situation = line.replace('SITUATION:', '').trim();
-      } else if (line.startsWith('FAILURE:')) {
-        hint.failure = line.replace('FAILURE:', '').trim();
-      } else if (line.startsWith('LESSON:')) {
-        hint.lesson = line.replace('LESSON:', '').trim();
-      } else if (line.startsWith('GUARDRAIL:')) {
-        try {
-          hint.guardrail = JSON.parse(line.replace('GUARDRAIL:', '').trim());
-        } catch (e) {
-          console.warn('Failed to parse guardrail:', e);
-        }
-      }
-    }
-
-    // Ensure we have at least situation and lesson
-    if (!hint.situation) {
-      hint.situation = 'general_situation';
-    }
-    if (!hint.lesson) {
-      hint.lesson = 'learned_something';
-    }
-
-    return hint;
-  }
-}
-
-// ============================================================================
-// Supporting Types
-// ============================================================================
-
-interface LLMConfig {
-  provider: 'ollama' | 'openai' | 'anthropic';
-  model: string;
-  maxTokens: number;
-  temperature: number;
-  timeout: number;
-  retries: number;
-}
-
-interface ToolDefinition {
-  name: string;
-  description: string;
-  argsSchema: any;
-}
-
-interface Entity {
-  id: string;
-  type: string;
-  position: { x: number; y: number; z: number };
-  hostile: boolean;
-}
-
-interface Block {
-  type: string;
-  position: { x: number; y: number; z: number };
-  hardness: number;
-}
-
-interface InventoryItem {
-  id: string;
-  name: string;
-  quantity: number;
-  durability?: number;
-}
-
-interface ArmorItem {
-  slot: string;
-  item: InventoryItem;
-}
-
-interface ToolItem {
-  type: string;
-  item: InventoryItem;
 }

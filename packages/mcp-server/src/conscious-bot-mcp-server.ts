@@ -207,7 +207,7 @@ class ConsciousBotMCPServer extends Server {
     }
     const leaves = this.leafFactory.listLeaves(); // => LeafImpl[]
     for (const leaf of leaves) {
-      const name = `minecraft.${leaf.name}@${leaf.version}`;
+      const name = `minecraft.${leaf.spec.name}@${leaf.spec.version}`;
       const def: MCPToolDefinition = {
         name,
         description: leaf.spec.description ?? leaf.spec.name,
@@ -614,6 +614,33 @@ class ConsciousBotMCPServer extends Server {
     return Array.from(this.prompts.values());
   }
 
+  /**
+   * Read a specific resource
+   */
+  async readResource(uri: string): Promise<any> {
+    const resource = this.resources.get(uri);
+    if (!resource) {
+      throw new Error(`Resource not found: ${uri}`);
+    }
+
+    // Handle dynamic resources
+    if (uri === 'world://snapshot') {
+      return await this.createWorldSnapshot();
+    }
+
+    if (uri === 'policy://buckets') {
+      return resource.metadata;
+    }
+
+    // For BT options, return the BT definition
+    if (uri.startsWith('mcp+bt://options/')) {
+      return resource.metadata.btDefinition;
+    }
+
+    // Default: return metadata
+    return resource.metadata;
+  }
+
   private async executeTool(name: string, args: any): Promise<any> {
     // Handle registry tools
     if (name === 'register_option') {
@@ -957,7 +984,9 @@ class ConsciousBotMCPServer extends Server {
         };
       }
       if (rawType === 'Sequence' || rawType === 'Selector') {
-        const children = (node.children || []).map((c: any) => this.normalizeBT(c));
+        const children = (node.children || []).map((c: any) =>
+          this.normalizeBT(c)
+        );
         return { type: rawType, children };
       }
       if (rawType === 'Repeat.Until') {
@@ -986,14 +1015,20 @@ class ConsciousBotMCPServer extends Server {
 
     // Lowercase/compact aliases
     if (t === 'sequence' || t === 'selector') {
-      const children = (node.children || []).map((c: any) => this.normalizeBT(c));
+      const children = (node.children || []).map((c: any) =>
+        this.normalizeBT(c)
+      );
       return {
         type: t[0].toUpperCase() + t.slice(1),
         children,
       };
     }
     if (t === 'action' || t === 'leaf') {
-      return { type: 'Leaf', leafName: node.leafName ?? node.action, args: node.args ?? {} };
+      return {
+        type: 'Leaf',
+        leafName: node.leafName ?? node.action,
+        args: node.args ?? {},
+      };
     }
     if (t === 'repeat.until' || t === 'repeat_until') {
       return {
@@ -1010,7 +1045,11 @@ class ConsciousBotMCPServer extends Server {
         timeoutMs: node.timeoutMs,
       };
     }
-    if (t === 'decorator.failontrue' || t === 'fail_on_true' || t === 'failontrue') {
+    if (
+      t === 'decorator.failontrue' ||
+      t === 'fail_on_true' ||
+      t === 'failontrue'
+    ) {
       return {
         type: 'Decorator.FailOnTrue',
         child: this.normalizeBT(node.child),
@@ -1028,17 +1067,57 @@ class ConsciousBotMCPServer extends Server {
       const ctx = createLeafContext(this.deps.bot);
       return ctx.snapshot();
     }
-    // demo fallback...
+
+    // Return actual world state from minecraft interface
+    try {
+      const response = await fetch('http://localhost:3005/state');
+      if (!response.ok) {
+        throw new Error(
+          `Minecraft interface responded with ${response.status}`
+        );
+      }
+      const data = (await response.json()) as any;
+
+      if (data.success && data.data?.worldState) {
+        return {
+          position: data.data.worldState.playerPosition,
+          biome: 'plains', // Default since not provided
+          time: data.data.worldState.timeOfDay,
+          lightLevel: 15, // Default since not provided
+          nearbyHostiles: data.data.worldState.nearbyHostiles || [],
+          weather: data.data.worldState.weather,
+          inventory: {
+            items: data.data.worldState.inventory.items || [],
+            selectedSlot: 0,
+            totalSlots: data.data.worldState.inventory.space?.total || 36,
+            freeSlots: data.data.worldState.inventory.space?.free || 36,
+          },
+          toolDurability: {},
+          waypoints: [],
+          health: data.data.worldState.health,
+          hunger: data.data.worldState.hunger,
+        };
+      }
+    } catch (error) {
+      console.warn(
+        '[MCP] Failed to fetch world state from minecraft interface:',
+        error
+      );
+    }
+
+    // Fallback to demo data
     return {
-      position: { x: 0, y: 64, z: 0 },
+      position: { x: 53.5, y: 66, z: -55.5 },
       biome: 'plains',
-      time: 12000,
+      time: 1239,
       lightLevel: 15,
       nearbyHostiles: [],
       weather: 'clear',
-      inventory: { items: [], selectedSlot: 0, totalSlots: 36, freeSlots: 36 },
+      inventory: { items: [], selectedSlot: 0, totalSlots: 36, freeSlots: 30 },
       toolDurability: {},
       waypoints: [],
+      health: 20,
+      hunger: 20,
     };
   }
 

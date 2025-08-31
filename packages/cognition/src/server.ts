@@ -892,6 +892,189 @@ app.post('/reason', async (req, res) => {
   }
 });
 
+/**
+ * Generate task-specific steps using LLM
+ */
+async function generateTaskSteps(task: any, context?: any): Promise<any[]> {
+  try {
+    // Use the ReAct Arbiter's new method for step generation
+    const responseText = await reactArbiter.generateTaskSteps(task);
+
+    // Parse the numbered list response
+    const steps = parseNumberedListResponse(responseText, task);
+
+    // If parsing failed, use intelligent fallback based on task type
+    if (steps.length === 0) {
+      return generateIntelligentFallbackSteps(task);
+    }
+
+    return steps;
+  } catch (error) {
+    console.warn('LLM step generation failed, using fallback:', error);
+    return generateIntelligentFallbackSteps(task);
+  }
+}
+
+/**
+ * Parse numbered list response from LLM
+ */
+function parseNumberedListResponse(text: string, task: any): any[] {
+  const steps: any[] = [];
+  const lines = text.split('\n');
+
+  for (const line of lines) {
+    const trimmedLine = line.trim();
+
+    // Look for numbered list items
+    const match = trimmedLine.match(/^(\d+)\.\s*(.+)$/);
+    if (match) {
+      const stepNumber = parseInt(match[1]);
+      const stepContent = match[2].trim();
+
+      // Estimate duration based on step content
+      let estimatedDuration = 3000; // Default 3 seconds
+      if (
+        stepContent.toLowerCase().includes('move') ||
+        stepContent.toLowerCase().includes('navigate')
+      ) {
+        estimatedDuration = 5000;
+      } else if (
+        stepContent.toLowerCase().includes('gather') ||
+        stepContent.toLowerCase().includes('collect')
+      ) {
+        estimatedDuration = 4000;
+      } else if (
+        stepContent.toLowerCase().includes('craft') ||
+        stepContent.toLowerCase().includes('build')
+      ) {
+        estimatedDuration = 6000;
+      } else if (
+        stepContent.toLowerCase().includes('analyze') ||
+        stepContent.toLowerCase().includes('plan')
+      ) {
+        estimatedDuration = 2000;
+      }
+
+      steps.push({
+        label: stepContent,
+        estimatedDuration,
+      });
+    }
+  }
+
+  return steps;
+}
+
+/**
+ * Generate intelligent fallback steps based on task type
+ */
+function generateIntelligentFallbackSteps(task: any): any[] {
+  const taskType = task.type || 'general';
+  const title = task.title.toLowerCase();
+
+  switch (taskType) {
+    case 'crafting':
+      if (title.includes('pickaxe')) {
+        return [
+          {
+            label: 'Check if crafting table is available',
+            estimatedDuration: 2000,
+          },
+          { label: 'Place crafting table if needed', estimatedDuration: 3000 },
+          {
+            label: 'Gather required materials (sticks, planks)',
+            estimatedDuration: 4000,
+          },
+          {
+            label: 'Craft wooden pickaxe at crafting table',
+            estimatedDuration: 5000,
+          },
+          {
+            label: 'Verify pickaxe was created successfully',
+            estimatedDuration: 2000,
+          },
+        ];
+      } else if (title.includes('crafting table')) {
+        return [
+          {
+            label: 'Gather oak logs from nearby trees',
+            estimatedDuration: 4000,
+          },
+          { label: 'Convert logs to oak planks', estimatedDuration: 3000 },
+          {
+            label: 'Craft crafting table from planks',
+            estimatedDuration: 3000,
+          },
+          {
+            label: 'Place crafting table in suitable location',
+            estimatedDuration: 3000,
+          },
+        ];
+      }
+      return [
+        { label: 'Gather required materials', estimatedDuration: 4000 },
+        { label: 'Set up crafting area', estimatedDuration: 3000 },
+        { label: 'Craft the requested item', estimatedDuration: 5000 },
+        { label: 'Verify crafting success', estimatedDuration: 2000 },
+      ];
+
+    case 'gathering':
+      if (title.includes('wood') || title.includes('log')) {
+        return [
+          { label: 'Locate nearby trees', estimatedDuration: 3000 },
+          { label: 'Move to tree location', estimatedDuration: 4000 },
+          {
+            label: 'Break tree blocks to collect logs',
+            estimatedDuration: 5000,
+          },
+          { label: 'Collect dropped items', estimatedDuration: 2000 },
+        ];
+      }
+      return [
+        { label: 'Search for target resources', estimatedDuration: 3000 },
+        { label: 'Navigate to resource location', estimatedDuration: 4000 },
+        { label: 'Extract or collect resources', estimatedDuration: 5000 },
+        { label: 'Verify collection success', estimatedDuration: 2000 },
+      ];
+
+    case 'mining':
+      return [
+        { label: 'Find suitable mining location', estimatedDuration: 3000 },
+        { label: 'Ensure proper tools are available', estimatedDuration: 2000 },
+        { label: 'Begin mining operation', estimatedDuration: 6000 },
+        { label: 'Collect mined resources', estimatedDuration: 3000 },
+      ];
+
+    case 'building':
+    case 'placement':
+      return [
+        { label: 'Select suitable building location', estimatedDuration: 3000 },
+        {
+          label: 'Gather required building materials',
+          estimatedDuration: 4000,
+        },
+        { label: 'Place blocks in desired pattern', estimatedDuration: 5000 },
+        { label: 'Verify structure completion', estimatedDuration: 2000 },
+      ];
+
+    case 'exploration':
+      return [
+        { label: 'Choose exploration direction', estimatedDuration: 2000 },
+        { label: 'Navigate to new area', estimatedDuration: 5000 },
+        { label: 'Survey surroundings for resources', estimatedDuration: 4000 },
+        { label: 'Document findings', estimatedDuration: 2000 },
+      ];
+
+    default:
+      return [
+        { label: 'Analyze task requirements', estimatedDuration: 2000 },
+        { label: 'Plan execution approach', estimatedDuration: 3000 },
+        { label: 'Execute task', estimatedDuration: 5000 },
+        { label: 'Verify completion', estimatedDuration: 2000 },
+      ];
+  }
+}
+
 // POST /generate-steps - Generate task steps from cognitive system
 app.post('/generate-steps', async (req, res) => {
   try {
@@ -906,62 +1089,15 @@ app.post('/generate-steps', async (req, res) => {
 
     console.log('Generating dynamic steps for task:', task.title);
 
-    // Use ReAct Arbiter to generate dynamic steps based on the bot's reasoning
-    const stepGenerationResult = await reactArbiter.reason({
-      snapshot: {
-        stateId: 'step-generation',
-        position: { x: 0, y: 64, z: 0 },
-        biome: 'unknown',
-        time: 6000,
-        light: 15,
-        hazards: ['none'],
-        nearbyEntities: [],
-        nearbyBlocks: [],
-        weather: 'clear',
-      },
-      inventory: {
-        stateId: 'step-generation-inventory',
-        items: [],
-        armor: [],
-        tools: [],
-      },
-      goalStack: [
-        {
-          id: 'step-generation-goal',
-          type: 'planning',
-          description: `Generate detailed steps for: ${task.title}`,
-          priority: 0.9,
-          utility: 0.9,
-          source: 'drive',
-        },
-      ],
-      memorySummaries: [],
-      lastToolResult: {
-        ok: true,
-        data: { task, context, request: 'generate-steps' },
-      },
-    });
-
-    // Parse the ReAct response to extract steps
-    const thoughts = stepGenerationResult.thoughts || '';
-    const steps = parseStepsFromReActResponse(thoughts, task);
-
-    // If ReAct didn't generate meaningful steps, use a minimal fallback
-    if (steps.length === 0) {
-      steps.push(
-        { label: 'Analyze task requirements', estimatedDuration: 2000 },
-        { label: 'Plan execution approach', estimatedDuration: 3000 },
-        { label: 'Execute task', estimatedDuration: 5000 },
-        { label: 'Verify completion', estimatedDuration: 2000 }
-      );
-    }
+    // Use the new method from ReAct Arbiter to generate task-specific steps
+    const steps = await generateTaskSteps(task, context);
 
     console.log('Generated dynamic steps:', steps);
 
     res.json({
       success: true,
       steps,
-      reasoning: thoughts,
+      reasoning: `Generated ${steps.length} steps for task: ${task.title}`,
       timestamp: Date.now(),
     });
   } catch (error) {
@@ -972,95 +1108,6 @@ app.post('/generate-steps', async (req, res) => {
     });
   }
 });
-
-/**
- * Parse steps from ReAct response using LLM reasoning
- */
-function parseStepsFromReActResponse(thoughts: string, task: any): any[] {
-  if (!thoughts || thoughts.length < 50) {
-    return [];
-  }
-
-  const steps: any[] = [];
-  const lines = thoughts.split('\n');
-  let currentStep = null;
-  let stepNumber = 1;
-
-  for (const line of lines) {
-    const trimmedLine = line.trim();
-
-    // Look for step indicators in the reasoning
-    if (
-      trimmedLine.toLowerCase().includes('step') ||
-      trimmedLine.toLowerCase().includes('first') ||
-      trimmedLine.toLowerCase().includes('next') ||
-      trimmedLine.toLowerCase().includes('then') ||
-      trimmedLine.toLowerCase().includes('finally') ||
-      trimmedLine.match(/^\d+\./) ||
-      trimmedLine.match(/^[a-z]\./)
-    ) {
-      // Extract step content
-      let stepContent = trimmedLine
-        .replace(/^\d+\.\s*/, '')
-        .replace(/^[a-z]\.\s*/, '')
-        .replace(/^step\s*\d*:?\s*/i, '')
-        .replace(/^first,?\s*/i, '')
-        .replace(/^next,?\s*/i, '')
-        .replace(/^then,?\s*/i, '')
-        .replace(/^finally,?\s*/i, '');
-
-      // Clean up the step content
-      stepContent = stepContent
-        .replace(/^I\s+would\s+/i, '')
-        .replace(/^I\s+should\s+/i, '')
-        .replace(/^I\s+need\s+to\s+/i, '')
-        .replace(/^I\s+will\s+/i, '')
-        .replace(/^I\s+can\s+/i, '')
-        .replace(/^The\s+bot\s+should\s+/i, '')
-        .replace(/^The\s+bot\s+needs\s+to\s+/i, '')
-        .replace(/^The\s+bot\s+will\s+/i, '');
-
-      // Capitalize first letter
-      stepContent = stepContent.charAt(0).toUpperCase() + stepContent.slice(1);
-
-      // Estimate duration based on step content
-      let estimatedDuration = 3000; // Default 3 seconds
-      if (
-        stepContent.toLowerCase().includes('move') ||
-        stepContent.toLowerCase().includes('navigate')
-      ) {
-        estimatedDuration = 5000; // Movement takes longer
-      } else if (
-        stepContent.toLowerCase().includes('gather') ||
-        stepContent.toLowerCase().includes('collect')
-      ) {
-        estimatedDuration = 4000; // Gathering takes time
-      } else if (
-        stepContent.toLowerCase().includes('craft') ||
-        stepContent.toLowerCase().includes('build')
-      ) {
-        estimatedDuration = 6000; // Crafting takes longer
-      } else if (
-        stepContent.toLowerCase().includes('analyze') ||
-        stepContent.toLowerCase().includes('plan')
-      ) {
-        estimatedDuration = 2000; // Planning is faster
-      }
-
-      // Only add meaningful steps
-      if (stepContent.length > 10 && stepContent.length < 100) {
-        steps.push({
-          label: stepContent,
-          estimatedDuration,
-        });
-        stepNumber++;
-      }
-    }
-  }
-
-  // Limit to reasonable number of steps
-  return steps.slice(0, 6);
-}
 
 // POST /reflect - Generate Reflexion-style verbal self-feedback
 app.post('/reflect', async (req, res) => {

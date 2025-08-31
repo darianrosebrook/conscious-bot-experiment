@@ -121,6 +121,7 @@ export class HybridSkillPlanner extends EventEmitter {
     // Initialize MCP capabilities adapter if registry is provided
     if (mcpRegistry && mcpDynamicFlow) {
       const capRegistry = new CapabilityRegistry();
+      // Optional: pass a world-state sink via context later if available
       this.mcpCapabilitiesAdapter = new MCPCapabilitiesAdapter(
         mcpRegistry,
         mcpDynamicFlow,

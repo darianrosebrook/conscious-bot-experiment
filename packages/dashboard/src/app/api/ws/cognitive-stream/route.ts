@@ -1,11 +1,21 @@
 /**
  * Cognitive Stream API
  * Streams genuine cognitive events (internal reflection, social analysis, observations).
+ * Includes persistence for thoughts across server restarts.
+ *
+ * @author @darianrosebrook
  */
 
 import { NextRequest } from 'next/server';
+import { promises as fs } from 'fs';
+import * as path from 'path';
+
 export const runtime = 'nodejs';
 export const maxDuration = 60;
+
+// =============================================================================
+// Types
+// =============================================================================
 
 interface CognitiveThought {
   id: string;
@@ -35,10 +45,77 @@ interface CognitiveThought {
   processed?: boolean;
 }
 
-const thoughtHistory: CognitiveThought[] = [];
+// =============================================================================
+// Persistence Configuration
+// =============================================================================
+
+const THOUGHTS_FILE_PATH = path.join(
+  process.cwd(),
+  'data',
+  'cognitive-thoughts.json'
+);
 const MAX_THOUGHTS = 1000;
 const activeConnections = new Set<ReadableStreamDefaultController>();
 const MAX_CONNECTIONS = 10;
+
+// =============================================================================
+// Persistence Functions
+// =============================================================================
+
+/**
+ * Ensure the data directory exists
+ */
+async function ensureDataDirectory(): Promise<void> {
+  const dataDir = path.dirname(THOUGHTS_FILE_PATH);
+  try {
+    await fs.access(dataDir);
+  } catch {
+    await fs.mkdir(dataDir, { recursive: true });
+  }
+}
+
+/**
+ * Load thoughts from persistent storage
+ */
+async function loadThoughts(): Promise<CognitiveThought[]> {
+  try {
+    await ensureDataDirectory();
+    const data = await fs.readFile(THOUGHTS_FILE_PATH, 'utf-8');
+    const thoughts = JSON.parse(data);
+    return Array.isArray(thoughts) ? thoughts : [];
+  } catch (error) {
+    // File doesn't exist or is invalid, start with empty array
+    console.log('No existing thoughts file found, starting fresh');
+    return [];
+  }
+}
+
+/**
+ * Save thoughts to persistent storage
+ */
+async function saveThoughts(thoughts: CognitiveThought[]): Promise<void> {
+  try {
+    await ensureDataDirectory();
+    await fs.writeFile(THOUGHTS_FILE_PATH, JSON.stringify(thoughts, null, 2));
+  } catch (error) {
+    console.error('Failed to save thoughts to file:', error);
+  }
+}
+
+// =============================================================================
+// Thought Management
+// =============================================================================
+
+// Initialize thought history from persistent storage
+let thoughtHistory: CognitiveThought[] = [];
+
+// Load thoughts on module initialization
+(async () => {
+  thoughtHistory = await loadThoughts();
+  console.log(
+    `Loaded ${thoughtHistory.length} thoughts from persistent storage`
+  );
+})();
 
 function addThought(
   thought: Omit<CognitiveThought, 'id' | 'timestamp' | 'processed'>
@@ -49,10 +126,19 @@ function addThought(
     timestamp: Date.now(),
     processed: false,
   };
+
   thoughtHistory.push(newThought);
+
+  // Keep only the last MAX_THOUGHTS
   if (thoughtHistory.length > MAX_THOUGHTS) {
-    thoughtHistory.splice(0, thoughtHistory.length - MAX_THOUGHTS);
+    thoughtHistory = thoughtHistory.slice(-MAX_THOUGHTS);
   }
+
+  // Save to persistent storage (async, don't await)
+  saveThoughts(thoughtHistory).catch((error) => {
+    console.error('Failed to persist thoughts:', error);
+  });
+
   return newThought;
 }
 
@@ -357,8 +443,23 @@ export const GET = async (req: NextRequest) => {
 
       const interval = setInterval(sendUpdates, 30000); // Reduced from 15s to 30s to prevent spam
 
+      // Send heartbeat every 10 seconds to keep connection alive
+      const heartbeat = setInterval(() => {
+        try {
+          controller.enqueue(
+            encoder.encode(
+              `data: ${JSON.stringify({ type: 'heartbeat', timestamp: Date.now() })}\n\n`
+            )
+          );
+        } catch (error) {
+          // Connection is dead, will be cleaned up on next broadcast
+          console.debug('Heartbeat failed, connection may be dead');
+        }
+      }, 10000);
+
       req.signal.addEventListener('abort', () => {
         clearInterval(interval);
+        clearInterval(heartbeat);
         activeConnections.delete(controller);
         // Only log in development mode
         if (process.env.NODE_ENV === 'development') {
@@ -375,8 +476,24 @@ export const GET = async (req: NextRequest) => {
   return new Response(stream, {
     headers: {
       'Content-Type': 'text/event-stream',
-      'Cache-Control': 'no-cache',
+      'Cache-Control': 'no-cache, no-store, must-revalidate',
+      Pragma: 'no-cache',
+      Expires: '0',
       Connection: 'keep-alive',
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type',
+    },
+  });
+};
+
+export const OPTIONS = async () => {
+  return new Response(null, {
+    status: 200,
+    headers: {
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type',
     },
   });
 };
@@ -436,9 +553,13 @@ export const POST = async (req: NextRequest) => {
       );
     }
 
+    let sentCount = 0;
+    const deadConnections: ReadableStreamDefaultController[] = [];
+
     activeConnections.forEach((controller) => {
       try {
         controller.enqueue(new TextEncoder().encode(`data: ${message}\n\n`));
+        sentCount++;
         // Only log in development mode
         if (process.env.NODE_ENV === 'development') {
           console.log('Message sent to connection');
@@ -448,10 +569,22 @@ export const POST = async (req: NextRequest) => {
         if (process.env.NODE_ENV === 'development') {
           console.log('Error sending to connection:', error);
         }
-        // Remove dead connections
-        activeConnections.delete(controller);
+        // Mark for removal
+        deadConnections.push(controller);
       }
     });
+
+    // Remove dead connections
+    deadConnections.forEach((controller) => {
+      activeConnections.delete(controller);
+    });
+
+    // Only log in development mode
+    if (process.env.NODE_ENV === 'development') {
+      console.log(
+        `Successfully sent message to ${sentCount} connections (${deadConnections.length} dead connections removed)`
+      );
+    }
 
     return new Response(
       JSON.stringify({ success: true, thought: newThought }),

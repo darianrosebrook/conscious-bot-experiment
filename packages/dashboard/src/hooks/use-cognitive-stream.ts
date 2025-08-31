@@ -82,57 +82,127 @@ export function useCognitiveStream() {
 
   const eventSourceRef = useRef<EventSource | null>(null);
   const isMounted = useRef(true);
+  const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     isMounted.current = true;
     return () => {
       isMounted.current = false;
+      // Clear any pending reconnection attempts
+      if (reconnectTimeoutRef.current) {
+        clearTimeout(reconnectTimeoutRef.current);
+        reconnectTimeoutRef.current = null;
+      }
     };
   }, []);
 
-  // Initialize SSE connection
+  // Initialize SSE connection with better error handling and reconnection
   useEffect(() => {
-    const url = config.routes.cognitiveStreamSSE();
-    const es = new EventSource(url);
-    eventSourceRef.current = es;
-
-    es.onmessage = (event) => {
-      if (!isMounted.current) return;
+    const connectEventSource = () => {
+      const url = config.routes.cognitiveStreamSSE();
+      console.log('Connecting to cognitive stream SSE:', url);
 
       try {
-        const payload: CognitiveStreamMessage = JSON.parse(event.data);
-
-        if (
-          payload?.type === 'cognitive_thoughts' &&
-          Array.isArray(payload.data?.thoughts)
-        ) {
-          const thoughts = payload.data.thoughts as CognitiveThought[];
-
-          for (const thought of thoughts) {
-            addThought({
-              id: thought.id,
-              ts: new Date(thought.timestamp).toISOString(),
-              text: thought.content,
-              type: mapThoughtType(thought.type),
-              attribution: mapAttribution(thought.attribution),
-              thoughtType: thought.metadata?.thoughtType || thought.type,
-            });
-          }
-        }
+        const es = new EventSource(url);
+        eventSourceRef.current = es;
+        console.log('EventSource created successfully');
       } catch (error) {
-        // Silent error handling - let browser retry
-        console.debug('Failed to parse cognitive stream message:', error);
+        console.error('Failed to create EventSource:', error);
+        return null;
       }
+
+      const es = eventSourceRef.current;
+      if (!es) return null;
+
+      es.onopen = () => {
+        console.log(
+          'Cognitive stream SSE connection opened, readyState:',
+          es.readyState
+        );
+        console.log('SSE URL:', es.url);
+      };
+
+      es.onmessage = (event) => {
+        if (!isMounted.current) return;
+
+        try {
+          const payload: CognitiveStreamMessage = JSON.parse(event.data);
+
+          if (
+            payload?.type === 'cognitive_thoughts' &&
+            Array.isArray(payload.data?.thoughts)
+          ) {
+            const thoughts = payload.data.thoughts as CognitiveThought[];
+
+            for (const thought of thoughts) {
+              addThought({
+                id: thought.id,
+                ts: new Date(thought.timestamp).toISOString(),
+                text: thought.content,
+                type: mapThoughtType(thought.type),
+                attribution: mapAttribution(thought.attribution),
+                thoughtType: thought.metadata?.thoughtType || thought.type,
+              });
+            }
+          }
+        } catch (error) {
+          console.error('Failed to parse cognitive stream message:', error);
+        }
+      };
+
+      es.onerror = (error) => {
+        console.log(
+          'Cognitive stream SSE error event, readyState:',
+          es.readyState
+        );
+
+        // Log more details about the error
+        if (es.readyState === EventSource.CONNECTING) {
+          console.log('SSE connection is connecting...');
+        } else if (es.readyState === EventSource.OPEN) {
+          console.log('SSE connection is open');
+        } else if (es.readyState === EventSource.CLOSED) {
+          console.log('SSE connection is closed');
+        }
+
+        // Only log the error if it's not a connection close
+        if (es.readyState !== EventSource.CLOSED) {
+          console.error('Cognitive stream SSE error:', error);
+          console.error('Error details:', {
+            readyState: es.readyState,
+            url: es.url,
+            withCredentials: es.withCredentials,
+          });
+        }
+
+        // Close the connection to trigger reconnection
+        es.close();
+        eventSourceRef.current = null;
+
+        // Attempt to reconnect after a delay
+        reconnectTimeoutRef.current = setTimeout(() => {
+          if (isMounted.current) {
+            console.log('Attempting to reconnect to cognitive stream...');
+            connectEventSource();
+          }
+        }, 5000);
+      };
+
+      return es || null;
     };
 
-    es.onerror = () => {
-      // Let browser handle retry logic
-      console.debug('Cognitive stream SSE error - browser will retry');
-    };
+    const es = connectEventSource();
 
     return () => {
-      es.close();
-      eventSourceRef.current = null;
+      if (es && es.readyState !== EventSource.CLOSED) {
+        es.close();
+        eventSourceRef.current = null;
+      }
+      // Clear any pending reconnection attempts
+      if (reconnectTimeoutRef.current) {
+        clearTimeout(reconnectTimeoutRef.current);
+        reconnectTimeoutRef.current = null;
+      }
     };
   }, [config.routes, addThought]);
 

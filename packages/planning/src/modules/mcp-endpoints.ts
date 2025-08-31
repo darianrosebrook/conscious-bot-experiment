@@ -52,6 +52,36 @@ export function createMCPEndpoints(mcpIntegration: MCPIntegration): Router {
     }
   });
 
+  // POST /mcp/tools/call - Execute a tool
+  router.post('/tools/call', async (req: Request, res: Response) => {
+    try {
+      const { name, args } = req.body;
+
+      if (!name) {
+        return res.status(400).json({
+          success: false,
+          error: 'Missing required field: name',
+        });
+      }
+
+      const result = await mcpIntegration.executeTool(name, args || {});
+      res.json({
+        success: result.success,
+        data: result.data,
+        error: result.error,
+        metrics: result.metrics,
+        timestamp: Date.now(),
+      });
+    } catch (error) {
+      console.error('[MCP] Failed to execute tool:', error);
+      res.status(500).json({
+        success: false,
+        error: 'Failed to execute tool',
+        details: error instanceof Error ? error.message : 'Unknown error',
+      });
+    }
+  });
+
   // GET /mcp/options - List available options
   router.get('/options', async (req: Request, res: Response) => {
     try {
@@ -69,6 +99,55 @@ export function createMCPEndpoints(mcpIntegration: MCPIntegration): Router {
       res.status(500).json({
         success: false,
         error: 'Failed to list options',
+        details: error instanceof Error ? error.message : 'Unknown error',
+      });
+    }
+  });
+
+  // GET /mcp/resources - List available resources
+  router.get('/resources', async (req: Request, res: Response) => {
+    try {
+      const resources = await mcpIntegration.listResources();
+      res.json({
+        success: true,
+        resources,
+        count: resources.length,
+        timestamp: Date.now(),
+      });
+    } catch (error) {
+      console.error('[MCP] Failed to list resources:', error);
+      res.status(500).json({
+        success: false,
+        error: 'Failed to list resources',
+        details: error instanceof Error ? error.message : 'Unknown error',
+      });
+    }
+  });
+
+  // POST /mcp/resources/read - Read a specific resource
+  router.post('/resources/read', async (req: Request, res: Response) => {
+    try {
+      const { uri } = req.body;
+
+      if (!uri) {
+        return res.status(400).json({
+          success: false,
+          error: 'Missing required field: uri',
+        });
+      }
+
+      const data = await mcpIntegration.readResource(uri);
+      res.json({
+        success: true,
+        data,
+        uri,
+        timestamp: Date.now(),
+      });
+    } catch (error) {
+      console.error('[MCP] Failed to read resource:', error);
+      res.status(500).json({
+        success: false,
+        error: 'Failed to read resource',
         details: error instanceof Error ? error.message : 'Unknown error',
       });
     }
@@ -266,6 +345,84 @@ export function createMCPEndpoints(mcpIntegration: MCPIntegration): Router {
       res.status(500).json({
         success: false,
         error: 'Failed to register leaf',
+        details: error instanceof Error ? error.message : 'Unknown error',
+      });
+    }
+  });
+
+  // POST /mcp/sync-minecraft-leaves - Sync all leaves from minecraft interface
+  router.post('/sync-minecraft-leaves', async (req: Request, res: Response) => {
+    try {
+      // Fetch leaves from minecraft interface
+      const response = await fetch('http://localhost:3005/leaves');
+      if (!response.ok) {
+        throw new Error(
+          `Minecraft interface responded with ${response.status}`
+        );
+      }
+
+      const data = (await response.json()) as any;
+      if (!data.success || !data.data) {
+        throw new Error('Failed to fetch leaves from minecraft interface');
+      }
+
+      const leaves = data.data;
+      const results = [];
+
+      // Register each leaf as an MCP option
+      for (const leaf of leaves) {
+        try {
+          const btDefinition = {
+            root: {
+              type: 'action',
+              action: leaf.name,
+              args: {},
+            },
+          };
+
+          const result = await mcpIntegration.registerOption({
+            id: `${leaf.name}@${leaf.version}`,
+            name: leaf.name,
+            description: leaf.description,
+            btDefinition,
+            permissions: leaf.permissions || [],
+          });
+
+          results.push({
+            name: leaf.name,
+            version: leaf.version,
+            success: result.success,
+            error: result.error,
+          });
+        } catch (error) {
+          results.push({
+            name: leaf.name,
+            version: leaf.version,
+            success: false,
+            error: error instanceof Error ? error.message : 'Unknown error',
+          });
+        }
+      }
+
+      const successCount = results.filter((r) => r.success).length;
+      const failureCount = results.filter((r) => !r.success).length;
+
+      res.json({
+        success: true,
+        message: `Synced ${successCount} leaves, ${failureCount} failed`,
+        results,
+        summary: {
+          total: leaves.length,
+          successful: successCount,
+          failed: failureCount,
+        },
+        timestamp: Date.now(),
+      });
+    } catch (error) {
+      console.error('[MCP] Failed to sync minecraft leaves:', error);
+      res.status(500).json({
+        success: false,
+        error: 'Failed to sync minecraft leaves',
         details: error instanceof Error ? error.message : 'Unknown error',
       });
     }

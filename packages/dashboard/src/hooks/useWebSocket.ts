@@ -3,6 +3,7 @@
  *
  * Provides real-time connection to the Minecraft bot server for instant
  * state updates including health, inventory, position, and events.
+ * Optimized to prevent constant reconnections and improve performance.
  *
  * @author @darianrosebrook
  */
@@ -52,6 +53,8 @@ export function useWebSocket({
   const shouldReconnectRef = useRef(true);
   const isMountedRef = useRef(true);
   const isConnectingRef = useRef(false);
+  const lastConnectionTimeRef = useRef(0);
+  const connectionStableRef = useRef(false);
 
   const connect = useCallback(() => {
     if (!isMountedRef.current || wsRef.current?.readyState === WebSocket.OPEN) {
@@ -65,10 +68,18 @@ export function useWebSocket({
       return;
     }
 
+    // Prevent rapid reconnection attempts (minimum 2 second gap)
+    const now = Date.now();
+    if (now - lastConnectionTimeRef.current < 2000) {
+      // WebSocket: Skipping connection - too soon after last attempt
+      return;
+    }
+
     // WebSocket: Attempting connection to ${url}
     isConnectingRef.current = true;
     setIsConnecting(true);
     setError(null);
+    lastConnectionTimeRef.current = now;
 
     try {
       const ws = new WebSocket(url);
@@ -83,6 +94,7 @@ export function useWebSocket({
         isConnectingRef.current = false;
         reconnectAttemptsRef.current = 0;
         setError(null);
+        connectionStableRef.current = true;
         onOpen?.();
       };
 

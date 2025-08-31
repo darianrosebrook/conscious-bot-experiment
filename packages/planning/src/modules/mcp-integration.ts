@@ -46,7 +46,8 @@ export class MCPIntegration {
   constructor(config: MCPIntegrationConfig = {}) {
     this.config = {
       enableMCP: true,
-      mcpServerPort: 3006,
+      // MCP server uses stdio transport, not network port
+      // mcpServerPort: 3006, // Removed - misleading configuration
       ...config,
     };
 
@@ -104,10 +105,32 @@ export class MCPIntegration {
 
     try {
       const result = this.leafFactory.register(leaf);
+
+      // Refresh the MCP server's tools after registering a leaf
+      if (result.ok && this.mcpServer) {
+        await this.refreshMCPServerTools();
+      }
+
       return result.ok;
     } catch (error) {
       console.error('[MCP] Failed to register leaf:', error);
       return false;
+    }
+  }
+
+  /**
+   * Refresh the MCP server's tools from the leaf factory
+   */
+  private async refreshMCPServerTools(): Promise<void> {
+    if (!this.mcpServer) return;
+
+    try {
+      // Clear existing tools and re-hydrate from leaf factory
+      (this.mcpServer as any).tools.clear();
+      (this.mcpServer as any).validators.clear();
+      (this.mcpServer as any).hydrateToolsFromLeafFactory();
+    } catch (error) {
+      console.error('[MCP] Failed to refresh tools:', error);
     }
   }
 
@@ -193,6 +216,60 @@ export class MCPIntegration {
     } catch (error) {
       console.error('[MCP] Failed to list tools:', error);
       return [];
+    }
+  }
+
+  /**
+   * List available resources from MCP
+   */
+  async listResources(): Promise<any[]> {
+    if (!this.isInitialized || !this.mcpServer) {
+      return [];
+    }
+
+    try {
+      // Use the new public method to get resources
+      const resources = this.mcpServer.getResources();
+      return resources;
+    } catch (error) {
+      console.error('[MCP] Failed to list resources:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Read a specific resource from MCP
+   */
+  async readResource(uri: string): Promise<any> {
+    if (!this.isInitialized || !this.mcpServer) {
+      throw new Error('MCP integration not initialized');
+    }
+
+    try {
+      // Use the new public method to read resources
+      const result = await this.mcpServer.readResource(uri);
+      return result;
+    } catch (error) {
+      console.error('[MCP] Failed to read resource:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Update the MCP server with the bot instance
+   */
+  async updateBotInstance(bot: any): Promise<void> {
+    if (!this.isInitialized || !this.mcpServer) {
+      console.warn('[MCP] Integration not initialized, cannot update bot instance');
+      return;
+    }
+
+    try {
+      // Update the bot instance in the MCP server
+      (this.mcpServer as any).deps.bot = bot;
+      console.log('[MCP] Bot instance updated successfully');
+    } catch (error) {
+      console.error('[MCP] Failed to update bot instance:', error);
     }
   }
 

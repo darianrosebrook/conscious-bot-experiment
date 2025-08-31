@@ -52,6 +52,57 @@ import {
 } from './leaves/sensing-leaves';
 import { CraftRecipeLeaf, SmeltLeaf } from './leaves/crafting-leaves';
 
+// =============================================================================
+// WebSocket Connection State Tracker
+// =============================================================================
+
+/**
+ * Tracks WebSocket connection state to reduce verbose logging
+ * @author @darianrosebrook
+ */
+class WebSocketStateTracker {
+  private connectionStates: Map<string, boolean> = new Map();
+  private lastLogTimes: Map<string, number> = new Map();
+  private readonly LOG_INTERVAL = 60000; // 1 minute between state change logs
+
+  /**
+   * Log connection state change only if it's actually changed
+   */
+  logConnectionState(clientId: string, isConnected: boolean): void {
+    const previousState = this.connectionStates.get(clientId);
+    const now = Date.now();
+    const lastLogTime = this.lastLogTimes.get(clientId) || 0;
+
+    // Only log if state actually changed or enough time has passed
+    if (
+      previousState !== isConnected ||
+      now - lastLogTime > this.LOG_INTERVAL
+    ) {
+      if (isConnected) {
+        console.log(`WebSocket client connected (${clientId})`);
+      } else {
+        console.log(`WebSocket client disconnected (${clientId})`);
+      }
+
+      this.connectionStates.set(clientId, isConnected);
+      this.lastLogTimes.set(clientId, now);
+    }
+  }
+
+  /**
+   * Get current connection count
+   */
+  getConnectionCount(): number {
+    return Array.from(this.connectionStates.values()).filter((state) => state)
+      .length;
+  }
+}
+
+// Global WebSocket state tracker
+const wsStateTracker = new WebSocketStateTracker();
+
+// =============================================================================
+
 const app = express();
 const server = createServer(app);
 const port = process.env.PORT ? parseInt(process.env.PORT) : 3005;
@@ -234,8 +285,8 @@ function setupBotStateWebSocket() {
 
 // WebSocket connection handling
 wss.on('connection', (ws) => {
-  console.log('WebSocket client connected');
   connectedClients.add(ws);
+  wsStateTracker.logConnectionState(ws.url || 'unknown', true);
 
   // Send initial bot state
   if (minecraftInterface) {
@@ -261,13 +312,14 @@ wss.on('connection', (ws) => {
   }
 
   ws.on('close', () => {
-    console.log('WebSocket client disconnected');
     connectedClients.delete(ws);
+    wsStateTracker.logConnectionState(ws.url || 'unknown', false);
   });
 
   ws.on('error', (error) => {
     console.error('WebSocket error:', error);
     connectedClients.delete(ws);
+    wsStateTracker.logConnectionState(ws.url || 'unknown', false);
   });
 });
 
@@ -303,7 +355,7 @@ app.get('/health', (req, res) => {
     version: '0.1.0',
     websocket: {
       active: true,
-      connectedClients: connectedClients.size,
+      connectedClients: wsStateTracker.getConnectionCount(),
       endpoint: `ws://localhost:${port}`,
     },
     viewer: {
@@ -1941,3 +1993,68 @@ app.post('/memory/retrieve', async (req, res) => {
     });
   }
 });
+
+// Get available leaves for MCP integration
+app.get('/leaves', (req, res) => {
+  try {
+    const leafFactory = (global as any).minecraftLeafFactory;
+    if (!leafFactory) {
+      return res.json({
+        success: false,
+        message: 'Leaf factory not initialized',
+        data: [],
+      });
+    }
+
+    const leaves = leafFactory.listLeaves();
+    const leafInfo = leaves.map((leaf: any) => ({
+      name: leaf.spec.name,
+      version: leaf.spec.version,
+      description: leaf.spec.description,
+      permissions: leaf.spec.permissions || [],
+      inputSchema: leaf.spec.inputSchema,
+      outputSchema: leaf.spec.outputSchema,
+    }));
+
+    res.json({
+      success: true,
+      data: leafInfo,
+      count: leafInfo.length,
+    });
+  } catch (error) {
+    console.error('Failed to get leaves:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to get leaves',
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
+
+// Auto-update bot instance in planning server when available
+async function updateBotInstanceInPlanningServer() {
+  try {
+    const bot = minecraftInterface.botAdapter.getBot();
+    if (bot) {
+      const response = await fetch(
+        'http://localhost:3002/update-bot-instance',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ botInstance: bot }),
+        }
+      );
+
+      if (response.ok) {
+        console.log('✅ Bot instance updated in planning server');
+      } else {
+        console.warn('⚠️ Failed to update bot instance in planning server');
+      }
+    }
+  } catch (error) {
+    console.warn('⚠️ Could not update bot instance in planning server:', error);
+  }
+}
+
+// Try to update bot instance periodically
+setInterval(updateBotInstanceInPlanningServer, 10000); // Every 10 seconds

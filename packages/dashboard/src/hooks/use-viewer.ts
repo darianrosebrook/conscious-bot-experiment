@@ -3,11 +3,12 @@
  *
  * Handles viewer status checking, starting/stopping viewer, and viewer state management.
  * Separates viewer-specific logic from the main dashboard component.
+ * Optimized to prevent unnecessary rerenders and state updates.
  *
  * @author @darianrosebrook
  */
 
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { useDashboardContext } from '@/contexts/dashboard-context';
 import { useApi } from '@/hooks/use-api';
 
@@ -43,31 +44,39 @@ export function useViewer() {
   });
 
   const isMounted = useRef(true);
+  const lastStatusRef = useRef<ViewerStatus | null>(null);
+  const statusCheckTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     isMounted.current = true;
     return () => {
       isMounted.current = false;
+      if (statusCheckTimeoutRef.current) {
+        clearTimeout(statusCheckTimeoutRef.current);
+      }
     };
   }, []);
 
-  // Check viewer status
+  // Memoized status check to prevent unnecessary API calls
   const checkStatus = useCallback(async (): Promise<ViewerStatus | null> => {
     try {
       const result = await api.get(config.routes.viewerStatus());
+      const newStatus = result.data || {
+        canStart: false,
+        reason: 'No data available',
+      };
 
-      if (isMounted.current) {
+      // Only update state if status actually changed
+      if (isMounted.current && JSON.stringify(newStatus) !== JSON.stringify(lastStatusRef.current)) {
+        lastStatusRef.current = newStatus;
         setState((prev) => ({
           ...prev,
-          status: result.data || {
-            canStart: false,
-            reason: 'No data available',
-          },
+          status: newStatus,
           error: null,
         }));
       }
 
-      return result.data || { canStart: false, reason: 'No data available' };
+      return newStatus;
     } catch (error) {
       const errorMessage =
         error instanceof Error
@@ -88,6 +97,17 @@ export function useViewer() {
       return null;
     }
   }, [api, config.routes]);
+
+  // Debounced status check to prevent rapid successive calls
+  const debouncedCheckStatus = useCallback(() => {
+    if (statusCheckTimeoutRef.current) {
+      clearTimeout(statusCheckTimeoutRef.current);
+    }
+    
+    statusCheckTimeoutRef.current = setTimeout(() => {
+      checkStatus();
+    }, 1000); // 1 second debounce
+  }, [checkStatus]);
 
   // Start viewer
   const startViewer = useCallback(async (): Promise<boolean> => {

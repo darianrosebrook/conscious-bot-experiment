@@ -198,6 +198,69 @@ const toolExecutor = {
 };
 
 /**
+ * Extract the target item name from a task description
+ */
+function extractItemFromTask(task: any): string {
+  const title = (task.title || '').toLowerCase();
+  const description = (task.description || '').toLowerCase();
+  const text = `${title} ${description}`;
+
+  // Check for specific tools first
+  if (text.includes('pickaxe')) {
+    return 'wooden_pickaxe';
+  }
+  if (text.includes('axe')) {
+    return 'wooden_axe';
+  }
+  if (text.includes('sword')) {
+    return 'wooden_sword';
+  }
+  if (text.includes('shovel')) {
+    return 'wooden_shovel';
+  }
+  if (text.includes('hoe')) {
+    return 'wooden_hoe';
+  }
+  if (text.includes('stick')) {
+    return 'stick';
+  }
+  if (text.includes('plank')) {
+    return 'oak_planks';
+  }
+  if (text.includes('crafting table')) {
+    return 'crafting_table';
+  }
+  if (text.includes('torch')) {
+    return 'torch';
+  }
+  if (text.includes('door')) {
+    return 'oak_door';
+  }
+  if (text.includes('fence')) {
+    return 'oak_fence';
+  }
+  if (text.includes('chest')) {
+    return 'chest';
+  }
+  if (text.includes('furnace')) {
+    return 'furnace';
+  }
+
+  // Check for generic crafting terms
+  if (text.includes('tool')) {
+    // Default to wooden pickaxe for generic tool requests
+    return 'wooden_pickaxe';
+  }
+  if (text.includes('item')) {
+    // Default to wooden planks for generic item requests
+    return 'oak_planks';
+  }
+
+  // Fallback to a basic craftable item
+  return 'oak_planks';
+}
+
+/**
  * Map task types to real Minecraft actions
  */
 function mapTaskTypeToMinecraftAction(task: any) {
@@ -235,9 +298,7 @@ function mapTaskTypeToMinecraftAction(task: any) {
       return {
         type: 'craft',
         parameters: {
-          item: task.title.toLowerCase().includes('pickaxe')
-            ? 'wooden_pickaxe'
-            : 'item',
+          item: extractItemFromTask(task),
           quantity: 1,
         },
         timeout: 15000,
@@ -276,8 +337,22 @@ function mapTaskTypeToMinecraftAction(task: any) {
         timeout: 15000,
       };
 
+    case 'building':
+      return {
+        type: 'place_block',
+        parameters: {
+          block_type: extractItemFromTask(task),
+          count: task.parameters?.quantity || 1,
+          placement: 'around_player',
+        },
+        timeout: 15000,
+      };
+
     default:
-      console.warn(`⚠️ No action mapping for task type: ${task.type}`);
+      logOptimizer.warn(
+        `⚠️ No action mapping for task type: ${task.type}`,
+        `no-action-mapping-${task.type}`
+      );
       return null;
   }
 }
@@ -809,7 +884,14 @@ export function resolveRequirement(task: any): TaskRequirement | null {
     const qty = parseRequiredQuantityFromTitle(task.title, 8);
     return {
       kind: 'collect',
-      patterns: ['oak_log', '_log', ' log'],
+      patterns: [
+        'oak_log',
+        'birch_log',
+        'spruce_log',
+        'jungle_log',
+        'acacia_log',
+        'dark_oak_log',
+      ],
       quantity: qty,
     };
   }
@@ -822,7 +904,14 @@ export function resolveRequirement(task: any): TaskRequirement | null {
     const qty = parseRequiredQuantityFromTitle(task.title, 8);
     return {
       kind: 'collect',
-      patterns: ['oak_log', '_log', ' log'],
+      patterns: [
+        'oak_log',
+        'birch_log',
+        'spruce_log',
+        'jungle_log',
+        'acacia_log',
+        'dark_oak_log',
+      ],
       quantity: qty,
     };
   }
@@ -942,14 +1031,24 @@ async function checkBotConnection(): Promise<boolean> {
 /**
  * Get bot position from Minecraft interface
  */
-async function getBotPosition(): Promise<{ x: number; y: number; z: number } | null> {
+async function getBotPosition(): Promise<{
+  x: number;
+  y: number;
+  z: number;
+} | null> {
   try {
     if (mcCircuitOpen()) return null;
     const res = await mcFetch('/health', { method: 'GET', timeoutMs: 2000 });
     if (!res.ok) return null;
     const status = (await res.json()) as any;
-    const p = status?.botStatus?.position || status?.executionStatus?.bot?.position;
-    if (p && typeof p.x === 'number' && typeof p.y === 'number' && typeof p.z === 'number') {
+    const p =
+      status?.botStatus?.position || status?.executionStatus?.bot?.position;
+    if (
+      p &&
+      typeof p.x === 'number' &&
+      typeof p.y === 'number' &&
+      typeof p.z === 'number'
+    ) {
       return { x: Math.floor(p.x), y: Math.floor(p.y), z: Math.floor(p.z) };
     }
   } catch (e) {
@@ -1357,13 +1456,16 @@ async function generateComplexCraftingSubtasks(task: any): Promise<void> {
  */
 async function autonomousTaskExecutor() {
   try {
-    console.log('🤖 Running autonomous task executor...');
+    logOptimizer.log(
+      '🤖 Running autonomous task executor...',
+      'autonomous-executor-running'
+    );
 
     // Get active tasks directly from the enhanced task integration
     const activeTasks = enhancedTaskIntegration.getActiveTasks();
 
     if (activeTasks.length === 0) {
-      console.log('No active tasks to execute');
+      logOptimizer.log('No active tasks to execute', 'no-active-tasks');
       return;
     }
 
@@ -1376,10 +1478,19 @@ async function autonomousTaskExecutor() {
 
     // If this is a prerequisite task, execute it immediately
     if (isPrerequisiteTask) {
-      console.log(`🔧 Executing prerequisite task: ${currentTask.title}`);
+      logOptimizer.log(
+        `🔧 Executing prerequisite task: ${currentTask.title}`,
+        `prerequisite-${currentTask.id}`
+      );
     }
-    console.log(
-      `🎯 Executing task: ${currentTask.title} (${(currentTask.progress || 0) * 100}% complete)`
+
+    // Only log task execution if progress has changed or it's a new task
+    const taskKey = `task-execution-${currentTask.id}`;
+    const currentProgress = Math.round((currentTask.progress || 0) * 100);
+
+    logOptimizer.log(
+      `🎯 Executing task: ${currentTask.title} (${currentProgress}% complete)`,
+      taskKey
     );
 
     // Check if bot is connected and can perform actions
@@ -1417,7 +1528,9 @@ async function autonomousTaskExecutor() {
     const taskTypeMapping: Record<string, string[]> = {
       gathering: ['chop', 'tree', 'wood', 'collect', 'gather'],
       gather: ['chop', 'tree', 'wood', 'collect', 'gather'],
+      mine: ['mine', 'dig', 'extract'],
       crafting: ['craft', 'build', 'create'],
+      build: ['build', 'place', 'create', 'construct'],
       exploration: ['explore', 'search', 'find'],
       mining: ['mine', 'dig', 'extract'],
       farming: ['farm', 'plant', 'grow'],
@@ -1453,6 +1566,20 @@ async function autonomousTaskExecutor() {
           requirement: snapshot,
         });
         if (clamped >= 1 && (requirement as any).quantity >= 1) {
+          // For crafting tasks, only mark as completed if the actual output item is present
+          if (requirement.kind === 'craft') {
+            const hasOutput = inv.some((it) =>
+              itemMatches(it, [requirement.outputPattern])
+            );
+            if (!hasOutput) {
+              // Don't mark as completed if we don't have the actual crafted item
+              console.log(
+                '⚠️ Crafting task has materials but not the crafted item - continuing execution'
+              );
+              return;
+            }
+          }
+
           // If already satisfied, mark completed and skip execution
           console.log(
             '✅ Requirement already satisfied from inventory; completing task.'
@@ -2007,8 +2134,9 @@ async function autonomousTaskExecutor() {
         }
       }
     } else {
-      console.warn(
-        `⚠️ No suitable MCP option found for task: ${currentTask.title}. Falling back to planning system.`
+      logOptimizer.warn(
+        `⚠️ No suitable MCP option found for task: ${currentTask.title}. Falling back to planning system.`,
+        `no-mcp-option-${currentTask.type}`
       );
       // If no MCP option, execute the task through the planning system
       try {
@@ -2211,10 +2339,26 @@ const planningSystem: PlanningSystem = {
         };
       }
     },
+    reprioritizeGoal: (goalId: string, p?: number, u?: number) =>
+      enhancedGoalManager.reprioritize(goalId, p, u),
+    cancelGoal: (goalId: string, reason?: string) =>
+      enhancedGoalManager.cancel(goalId, reason),
+    pauseGoal: (goalId: string) => enhancedGoalManager.pause(goalId),
+    resumeGoal: (goalId: string) => enhancedGoalManager.resume(goalId),
+    completeGoal: (goalId: string) => enhancedGoalManager.complete(goalId),
     getCurrentTasks: () => enhancedTaskIntegration.getActiveTasks(),
     addTask: async (task: any) => await enhancedTaskIntegration.addTask(task),
     getCompletedTasks: () =>
       enhancedTaskIntegration.getTasks({ status: 'completed' }),
+    updateBotInstance: async (botInstance: any) => {
+      const mcpIntegration = serverConfig.getMCPIntegration();
+      if (mcpIntegration) {
+        await mcpIntegration.updateBotInstance(botInstance);
+        return { success: true, message: 'Bot instance updated successfully' };
+      } else {
+        return { success: false, error: 'MCP integration not available' };
+      }
+    },
   },
   execution: {
     executeGoal: async (goal: any) => {
@@ -2318,6 +2462,55 @@ enhancedTaskIntegration.on(
     console.log(
       `Task progress updated: ${task.title} - ${Math.round(task.progress * 100)}% (${oldStatus} -> ${task.status})`
     );
+
+    try {
+      // Emit memory events for lifecycle transitions
+      if (oldStatus !== task.status) {
+        if (task.status === 'active' && oldStatus === 'pending') {
+          enhancedMemoryIntegration.generateTaskEvent(
+            task.id,
+            task.type,
+            'started',
+            { title: task.title }
+          );
+        }
+        if (task.status === 'completed') {
+          // Capture inventory + position snapshot
+          (async () => {
+            const inv = await fetchInventorySnapshot();
+            const pos = await getBotPosition();
+            enhancedMemoryIntegration.generateTaskEvent(
+              task.id,
+              task.type,
+              'completed',
+              { title: task.title, inventory: inv, position: pos }
+            );
+            // Add a reflective note tying state to outcome
+            const summary = `Completed ${task.type} task: ${task.title}.`;
+            const invCount = inv.reduce((s, it) => s + (it.count || 0), 0);
+            const content = `${summary}\nInventory items: ${invCount}$${pos ? `\nPosition: (${pos.x}, ${pos.y}, ${pos.z})` : ''}`;
+            enhancedMemoryIntegration.addReflectiveNote(
+              'reflection',
+              'Task Completion',
+              content,
+              [task.type, task.title],
+              'planning-system',
+              0.8
+            );
+          })();
+        }
+        if (task.status === 'failed') {
+          enhancedMemoryIntegration.generateTaskEvent(
+            task.id,
+            task.type,
+            'failed',
+            { title: task.title }
+          );
+        }
+      }
+    } catch (e) {
+      console.warn('Memory event logging failed:', e);
+    }
   }
 );
 
@@ -2634,6 +2827,22 @@ async function startServer() {
     const planningRouter = createPlanningEndpoints(planningSystem);
     serverConfig.mountRouter('/', planningRouter);
 
+    // Add logging status endpoint
+    const { Router } = await import('express');
+    const loggingRouter = Router();
+    loggingRouter.get('/logging-status', (req, res) => {
+      const status = logOptimizer.getStatus();
+      res.json({
+        status: 'ok',
+        data: {
+          suppressedMessages: status.suppressed,
+          throttledMessages: status.throttled,
+          timestamp: new Date().toISOString(),
+        },
+      });
+    });
+    serverConfig.mountRouter('/api', loggingRouter);
+
     // Mount MCP endpoints
     const { createMCPEndpoints } = await import('./modules/mcp-endpoints');
     const mcpIntegration = serverConfig.getMCPIntegration();
@@ -2674,7 +2883,10 @@ async function startServer() {
       }
       executorState.running = true;
       try {
-        console.log('🔄 Scheduled autonomous task executor running...');
+        logOptimizer.log(
+          '🔄 Scheduled autonomous task executor running...',
+          'scheduled-executor-running'
+        );
         await autonomousTaskExecutor();
       } catch (error) {
         console.warn('Autonomous task executor error (non-fatal):', error);
@@ -2743,6 +2955,33 @@ export {
 if (require.main === module) {
   startServer();
 
+  // Daily summary scheduler: generate yesterday's summary once per day
+  let lastSummaryDay: number | null = null;
+  setInterval(
+    () => {
+      try {
+        const now = new Date();
+        const dayKey = new Date(
+          now.getFullYear(),
+          now.getMonth(),
+          now.getDate()
+        ).getTime();
+        if (lastSummaryDay === null) {
+          lastSummaryDay = dayKey;
+          return;
+        }
+        if (dayKey !== lastSummaryDay) {
+          // New day rolled over; summarize yesterday
+          enhancedMemoryIntegration.generateDailySummary(1);
+          lastSummaryDay = dayKey;
+        }
+      } catch (e) {
+        console.warn('Daily summary generation failed:', e);
+      }
+    },
+    60 * 60 * 1000
+  ); // check hourly
+
   // Graceful shutdown
   const shutdown = async (signal: string) => {
     try {
@@ -2778,3 +3017,94 @@ if (require.main === module) {
   process.on('SIGINT', () => shutdown('SIGINT'));
   process.on('SIGTERM', () => shutdown('SIGTERM'));
 }
+
+// =============================================================================
+// Logging Optimization System
+// =============================================================================
+
+/**
+ * Logging optimization to reduce verbosity and repetitive messages
+ * @author @darianrosebrook
+ */
+class LoggingOptimizer {
+  private lastLogTimes: Map<string, number> = new Map();
+  private logCounts: Map<string, number> = new Map();
+  private suppressedMessages: Set<string> = new Set();
+  private readonly THROTTLE_INTERVAL = 30000; // 30 seconds
+  private readonly MAX_REPEATS = 3; // Max times to show same message
+
+  /**
+   * Log with throttling to prevent spam
+   */
+  log(
+    message: string,
+    throttleKey?: string,
+    maxInterval = this.THROTTLE_INTERVAL
+  ): void {
+    const key = throttleKey || message;
+    const now = Date.now();
+    const lastTime = this.lastLogTimes.get(key) || 0;
+    const count = this.logCounts.get(key) || 0;
+
+    // If we've shown this message too many times, suppress it
+    if (count >= this.MAX_REPEATS && !this.suppressedMessages.has(key)) {
+      this.suppressedMessages.add(key);
+      console.log(
+        `🔇 Suppressing repeated message: "${message}" (shown ${count} times)`
+      );
+      return;
+    }
+
+    // If enough time has passed, show the message
+    if (now - lastTime >= maxInterval) {
+      console.log(message);
+      this.lastLogTimes.set(key, now);
+      this.logCounts.set(key, count + 1);
+    }
+  }
+
+  /**
+   * Log warning with throttling
+   */
+  warn(message: string, throttleKey?: string): void {
+    const key = throttleKey || message;
+    const now = Date.now();
+    const lastTime = this.lastLogTimes.get(key) || 0;
+    const count = this.logCounts.get(key) || 0;
+
+    if (count >= this.MAX_REPEATS && !this.suppressedMessages.has(key)) {
+      this.suppressedMessages.add(key);
+      console.warn(
+        `🔇 Suppressing repeated warning: "${message}" (shown ${count} times)`
+      );
+      return;
+    }
+
+    if (now - lastTime >= this.THROTTLE_INTERVAL) {
+      console.warn(message);
+      this.lastLogTimes.set(key, now);
+      this.logCounts.set(key, count + 1);
+    }
+  }
+
+  /**
+   * Reset suppression for a specific message
+   */
+  resetSuppression(key: string): void {
+    this.suppressedMessages.delete(key);
+    this.logCounts.set(key, 0);
+  }
+
+  /**
+   * Get status of logging optimization
+   */
+  getStatus(): { suppressed: number; throttled: number } {
+    return {
+      suppressed: this.suppressedMessages.size,
+      throttled: this.logCounts.size,
+    };
+  }
+}
+
+// Global logging optimizer instance
+const logOptimizer = new LoggingOptimizer();

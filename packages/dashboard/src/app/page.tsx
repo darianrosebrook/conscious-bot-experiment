@@ -21,6 +21,7 @@ import {
 
 import { useDashboardStore } from '@/stores/dashboard-store';
 import { useWebSocket } from '@/hooks/useWebSocket';
+import { useCognitiveStream } from '@/hooks/use-cognitive-stream';
 import { formatTime } from '@/lib/utils';
 import { HudMeter } from '@/components/hud-meter';
 import { Section } from '@/components/section';
@@ -86,6 +87,7 @@ function ConsciousMinecraftDashboardContent() {
     setEnvironment,
     setInventory,
     setPlannerData,
+    loadThoughtsFromServer,
   } = useDashboardStore();
 
   const [intrusion, setIntrusion] = useState('');
@@ -106,9 +108,10 @@ function ConsciousMinecraftDashboardContent() {
     details?: any;
   } | null>(null);
   const thoughtsEndRef = useRef<HTMLDivElement>(null);
+  const scrollAreaRef = useRef<HTMLDivElement>(null);
 
   // Function to check viewer status
-  const checkViewerStatus = async () => {
+  const checkViewerStatus = useCallback(async () => {
     try {
       const response = await fetch('http://localhost:3005/viewer-status');
       const result = await response.json();
@@ -120,7 +123,7 @@ function ConsciousMinecraftDashboardContent() {
         reason: 'Failed to check viewer status',
       });
     }
-  };
+  }, []);
 
   // Memoized WebSocket callbacks to prevent infinite reconnections
   const handleWebSocketMessage = useCallback(
@@ -379,39 +382,8 @@ function ConsciousMinecraftDashboardContent() {
     onClose: handleWebSocketClose,
   });
 
-  // EventSource connection for cognitive stream
-  useEffect(() => {
-    const eventSource = new EventSource('/api/ws/cognitive-stream');
-
-    eventSource.onmessage = (event) => {
-      try {
-        const data = JSON.parse(event.data);
-
-        if (data.type === 'cognitive_thoughts' && data.data?.thoughts) {
-          data.data.thoughts.forEach((thought: any) => {
-            addThought({
-              id: thought.id,
-              ts: new Date(thought.timestamp).toISOString(),
-              text: thought.content,
-              type: thought.type || 'reflection',
-              attribution: thought.attribution || 'self',
-              thoughtType: thought.metadata?.thoughtType || thought.type,
-            });
-          });
-        }
-      } catch (error) {
-        console.error('Error parsing cognitive stream message:', error);
-      }
-    };
-
-    eventSource.onerror = (error) => {
-      console.error('Cognitive stream EventSource error:', error);
-    };
-
-    return () => {
-      eventSource.close();
-    };
-  }, [addThought]);
+  // Use the cognitive stream hook for proper SSE connection management
+  const { sendIntrusiveThought } = useCognitiveStream();
 
   // Polling fallback when WebSocket fails
   useEffect(() => {
@@ -509,19 +481,27 @@ function ConsciousMinecraftDashboardContent() {
 
   // Auto-scroll to bottom of thoughts
   useEffect(() => {
-    thoughtsEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    // Use a small delay to ensure the DOM has updated
+    const timeoutId = setTimeout(() => {
+      if (scrollAreaRef.current) {
+        // Scroll to the bottom of the scroll area
+        const scrollElement = scrollAreaRef.current.querySelector(
+          '[data-radix-scroll-area-viewport]'
+        );
+        if (scrollElement) {
+          scrollElement.scrollTop = scrollElement.scrollHeight;
+        }
+      } else {
+        // Fallback to scrollIntoView
+        thoughtsEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+      }
+    }, 100);
+
+    return () => clearTimeout(timeoutId);
   }, [thoughts]);
 
   // Periodic viewer status check only (auto-start handled by minecraft interface)
   useEffect(() => {
-    const checkViewerStatus = async () => {
-      try {
-        await checkViewerStatus();
-      } catch (error) {
-        console.error('Error checking viewer status:', error);
-      }
-    };
-
     // Check every 30 seconds (reduced frequency to prevent conflicts)
     const interval = setInterval(checkViewerStatus, 30000);
 
@@ -535,6 +515,9 @@ function ConsciousMinecraftDashboardContent() {
   useEffect(() => {
     const fetchInitialData = async () => {
       try {
+        // Load persisted thoughts from server first
+        await loadThoughtsFromServer();
+
         // Fetch tasks
         const tasksRes = await fetch('/api/tasks');
         if (tasksRes.ok) {
@@ -897,43 +880,15 @@ function ConsciousMinecraftDashboardContent() {
     if (!text) return;
 
     try {
-      // Submit to cognitive stream for immediate UI feedback
-      const response = await fetch('/api/ws/cognitive-stream', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          type: 'intrusive',
-          content: text,
-          attribution: 'intrusive',
-          context: {
-            emotionalState: 'curious',
-            confidence: 0.8,
-          },
-          metadata: {
-            messageType: 'intrusion',
-            intent: 'external_suggestion',
-          },
-        }),
+      // Use the cognitive stream hook for proper handling
+      const success = await sendIntrusiveThought(text, {
+        tags: ['external', 'intrusion'],
+        strength: 0.8,
       });
 
-      if (response.ok) {
+      if (success) {
         setIntrusion('');
         console.log('Intrusive thought submitted successfully');
-
-        // Also submit to intrusive API for processing
-        try {
-          await fetch('/api/intrusive', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              text: text,
-              tags: ['external', 'intrusion'],
-              strength: 0.8,
-            }),
-          });
-        } catch (error) {
-          console.warn('Failed to submit to intrusive API:', error);
-        }
       } else {
         console.error('Failed to submit intrusive thought');
       }
@@ -1576,93 +1531,95 @@ function ConsciousMinecraftDashboardContent() {
               </main>
 
               {/* Right: Cognitive Stream + Thought Input */}
-              <aside className="col-span-12 md:col-span-3 flex  flex-col gap-3 overflow-auto">
+              <aside className="col-span-12 md:col-span-3 flex flex-col gap-3 h-full">
                 <Section
                   title="Cognitive Stream"
                   icon={<MessageSquare className="size-4" />}
                   actions={<Pill>consciousness flow</Pill>}
-                  className="flex-1"
+                  className="flex-1 flex flex-col min-h-0"
                 >
-                  {thoughts.length > 0 ? (
-                    <ScrollArea className="flex-1 flex flex-col-reverse gap-2 pr-1 overflow-y-auto">
-                      <div className="flex flex-col-reverse gap-2 pr-1 overflow-y-auto">
-                        {thoughts.map((thought) => {
-                          // Determine styling based on thought type and attribution
-                          const isIntrusive =
-                            thought.attribution === 'intrusive';
-                          const isExternalChat =
-                            thought.thoughtType === 'external_chat_in';
-                          const isBotResponse =
-                            thought.thoughtType === 'external_chat_out';
-                          const isSocial = thought.thoughtType === 'social';
-                          const isInternal =
-                            thought.thoughtType === 'internal' ||
-                            thought.thoughtType === 'reflection' ||
-                            thought.thoughtType === 'observation' ||
-                            thought.thoughtType === 'planning';
+                  <div className="flex-1 min-h-0 flex flex-col">
+                    {thoughts.length > 0 ? (
+                      <ScrollArea className="flex-1" ref={scrollAreaRef}>
+                        <div className="flex flex-col gap-2 pr-1 pb-2">
+                          {thoughts.map((thought) => {
+                            // Determine styling based on thought type and attribution
+                            const isIntrusive =
+                              thought.attribution === 'intrusive';
+                            const isExternalChat =
+                              thought.thoughtType === 'external_chat_in';
+                            const isBotResponse =
+                              thought.thoughtType === 'external_chat_out';
+                            const isSocial = thought.thoughtType === 'social';
+                            const isInternal =
+                              thought.thoughtType === 'internal' ||
+                              thought.thoughtType === 'reflection' ||
+                              thought.thoughtType === 'observation' ||
+                              thought.thoughtType === 'planning';
 
-                          let borderColor = 'border-zinc-800';
-                          let bgColor = 'bg-zinc-950';
-                          let prefix = '';
-                          let typeLabel = thought.thoughtType || thought.type;
+                            let borderColor = 'border-zinc-800';
+                            let bgColor = 'bg-zinc-950';
+                            let prefix = '';
+                            let typeLabel = thought.thoughtType || thought.type;
 
-                          if (isIntrusive) {
-                            borderColor = 'border-purple-600/50';
-                            bgColor = 'bg-purple-950/20';
-                            prefix = ' ';
-                            typeLabel = 'intrusive';
-                          } else if (isExternalChat) {
-                            borderColor = 'border-blue-600/50';
-                            bgColor = 'bg-blue-950/20';
-                            prefix = ` ${thought.sender}: `;
-                            typeLabel = 'chat_in';
-                          } else if (isBotResponse) {
-                            borderColor = 'border-green-600/50';
-                            bgColor = 'bg-green-950/20';
-                            prefix = ' ';
-                            typeLabel = 'chat_out';
-                          } else if (isSocial) {
-                            borderColor = 'border-orange-600/50';
-                            bgColor = 'bg-orange-950/20';
-                            prefix = ' ';
-                            typeLabel = 'social';
-                          } else if (isInternal) {
-                            borderColor = 'border-yellow-600/50';
-                            bgColor = 'bg-yellow-950/20';
-                            prefix = ' ';
-                            typeLabel = 'internal';
-                          }
+                            if (isIntrusive) {
+                              borderColor = 'border-purple-600/50';
+                              bgColor = 'bg-purple-950/20';
+                              prefix = ' ';
+                              typeLabel = 'intrusive';
+                            } else if (isExternalChat) {
+                              borderColor = 'border-blue-600/50';
+                              bgColor = 'bg-blue-950/20';
+                              prefix = ` ${thought.sender}: `;
+                              typeLabel = 'chat_in';
+                            } else if (isBotResponse) {
+                              borderColor = 'border-green-600/50';
+                              bgColor = 'bg-green-950/20';
+                              prefix = ' ';
+                              typeLabel = 'chat_out';
+                            } else if (isSocial) {
+                              borderColor = 'border-orange-600/50';
+                              bgColor = 'bg-orange-950/20';
+                              prefix = ' ';
+                              typeLabel = 'social';
+                            } else if (isInternal) {
+                              borderColor = 'border-yellow-600/50';
+                              bgColor = 'bg-yellow-950/20';
+                              prefix = ' ';
+                              typeLabel = 'internal';
+                            }
 
-                          return (
-                            <div
-                              key={thought.id}
-                              className={`rounded-xl border ${borderColor} ${bgColor} p-2.5`}
-                            >
-                              <div className="flex items-center justify-between text-[11px] text-zinc-400">
-                                <span className="uppercase tracking-wide">
-                                  {typeLabel}
-                                </span>
-                                <time className="tabular-nums">
-                                  {formatTime(thought.ts)}
-                                </time>
+                            return (
+                              <div
+                                key={thought.id}
+                                className={`rounded-xl border ${borderColor} ${bgColor} p-2.5`}
+                              >
+                                <div className="flex items-center justify-between text-[11px] text-zinc-400">
+                                  <span className="uppercase tracking-wide">
+                                    {typeLabel}
+                                  </span>
+                                  <time className="tabular-nums">
+                                    {formatTime(thought.ts)}
+                                  </time>
+                                </div>
+                                <p className="mt-1 text-sm text-zinc-200">
+                                  {prefix}
+                                  {thought.text}
+                                </p>
                               </div>
-                              <p className="mt-1 text-sm text-zinc-200">
-                                {prefix}
-                                {thought.text}
-                              </p>
-                            </div>
-                          );
-                        })}
-                        <div ref={thoughtsEndRef} />
-                      </div>
-                    </ScrollArea>
-                  ) : (
-                    <EmptyState
-                      icon={MessageSquare}
-                      title="No thoughts yet"
-                      description="Cognitive thoughts will appear here as the bot processes and reflects."
-                    />
-                  )}
+                            );
+                          })}
+                          <div ref={thoughtsEndRef} />
+                        </div>
+                      </ScrollArea>
+                    ) : (
+                      <EmptyState
+                        icon={MessageSquare}
+                        title="No thoughts yet"
+                        description="Cognitive thoughts will appear here as the bot processes and reflects."
+                      />
+                    )}
+                  </div>
                 </Section>
 
                 {/* Intrusive Thought Input */}

@@ -2,6 +2,7 @@
  * Inventory API Route
  *
  * Fetches inventory data from the Minecraft bot server.
+ * Optimized to prevent redundant processing and logging.
  *
  * @author @darianrosebrook
  */
@@ -9,9 +10,37 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getMineflayerItemDisplayName } from '@/lib/mineflayer-item-mapping';
 
+// Cache for inventory data to prevent redundant processing
+let lastInventoryHash: string | null = null;
+let lastProcessedInventory: any[] = [];
+
+/**
+ * Generate a hash of inventory data for change detection
+ */
+function generateInventoryHash(inventory: any[]): string {
+  return JSON.stringify(inventory.map(item => ({
+    type: item.type,
+    count: item.count,
+    slot: item.slot,
+    name: item.name
+  })));
+}
+
+/**
+ * Check if inventory has actually changed
+ */
+function hasInventoryChanged(inventory: any[]): boolean {
+  const currentHash = generateInventoryHash(inventory);
+  if (currentHash === lastInventoryHash) {
+    return false;
+  }
+  lastInventoryHash = currentHash;
+  return true;
+}
+
 export async function GET(_request: NextRequest) {
   try {
-    // Try to fetch inventory data from planning system
+    // Try to fetch inventory data from the planning system
     let inventory = [];
     let botStatus = 'disconnected';
     let isAlive = false;
@@ -58,6 +87,20 @@ export async function GET(_request: NextRequest) {
       } catch (stateError) {
         console.log('Minecraft bot state server also not available');
       }
+    }
+
+    // Check if inventory has actually changed
+    if (!hasInventoryChanged(inventory)) {
+      // Return cached result if inventory hasn't changed
+      return NextResponse.json({
+        success: true,
+        inventory: lastProcessedInventory,
+        totalItems: lastProcessedInventory.length,
+        botStatus,
+        isAlive,
+        timestamp: Date.now(),
+        cached: true,
+      });
     }
 
     // Show real inventory data (even if empty) - only in debug mode
@@ -131,9 +174,12 @@ export async function GET(_request: NextRequest) {
             typeof item.maxDurability === 'number' ? item.maxDurability : null,
         };
 
-        console.log(
-          `Mapped item: ${displayName} from slot ${item.slot} to slot ${mappedSlot}`
-        );
+        // Only log mapping if it's actually different (e.g., armor slot mapping)
+        if (item.slot !== mappedSlot) {
+          console.log(
+            `Mapped item: ${displayName} from slot ${item.slot} to slot ${mappedSlot}`
+          );
+        }
 
         return mineflayerItem;
       } catch (error) {
@@ -160,6 +206,9 @@ export async function GET(_request: NextRequest) {
         return fallbackItem;
       }
     });
+
+    // Cache the processed inventory
+    lastProcessedInventory = transformedInventory;
 
     return NextResponse.json({
       success: true,

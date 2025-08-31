@@ -454,6 +454,11 @@ export class EnhancedGoalManager {
     return [...this.goals];
   }
 
+  /** Get a goal by ID */
+  getGoal(goalId: string): Goal | undefined {
+    return this.goals.find((g) => g.id === goalId);
+  }
+
   /**
    * Add or update a goal.
    */
@@ -474,6 +479,55 @@ export class EnhancedGoalManager {
         updatedAt: Date.now(),
       });
     }
+  }
+
+  /** Reprioritize a goal */
+  reprioritize(goalId: string, priority?: number, urgency?: number): boolean {
+    const g = this.getGoal(goalId);
+    if (!g) return false;
+    if (typeof priority === 'number') g.priority = priority;
+    if (typeof urgency === 'number') g.urgency = urgency;
+    g.updatedAt = Date.now();
+    return true;
+  }
+
+  /** Cancel (fail) a goal with optional reason */
+  cancel(goalId: string, reason?: string): boolean {
+    const g = this.getGoal(goalId);
+    if (!g) return false;
+    g.status = GoalStatus.FAILED;
+    g.updatedAt = Date.now();
+    if (reason) {
+      g.description = `${g.description} (cancelled: ${reason})`;
+    }
+    return true;
+  }
+
+  /** Pause a goal */
+  pause(goalId: string): boolean {
+    const g = this.getGoal(goalId);
+    if (!g) return false;
+    g.status = GoalStatus.SUSPENDED;
+    g.updatedAt = Date.now();
+    return true;
+  }
+
+  /** Resume a paused goal */
+  resume(goalId: string): boolean {
+    const g = this.getGoal(goalId);
+    if (!g) return false;
+    g.status = GoalStatus.PENDING;
+    g.updatedAt = Date.now();
+    return true;
+  }
+
+  /** Complete a goal */
+  complete(goalId: string): boolean {
+    const g = this.getGoal(goalId);
+    if (!g) return false;
+    g.status = GoalStatus.COMPLETED;
+    g.updatedAt = Date.now();
+    return true;
   }
 
   /**

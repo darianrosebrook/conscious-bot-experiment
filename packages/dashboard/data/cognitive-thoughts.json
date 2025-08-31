@@ -1,0 +1,23 @@
+[
+  {
+    "type": "reflection",
+    "content": "Gather some coal from the nearby ore, then craft a pickaxe to mine more resources. Safety is low due to night, so find shelter or build a fire for protection.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.7,
+      "cognitiveSystem": "llm-core"
+    },
+    "metadata": {
+      "thoughtType": "reflection",
+      "trigger": "time-based",
+      "context": "environmental-monitoring",
+      "intensity": 0.4,
+      "llmConfidence": 0.7,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1756614059431-jtz44t9kd",
+    "timestamp": 1756614059432,
+    "processed": false
+  }
+]
