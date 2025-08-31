@@ -2036,19 +2036,67 @@ async function updateBotInstanceInPlanningServer() {
   try {
     const bot = minecraftInterface.botAdapter.getBot();
     if (bot) {
+      // Send only essential bot data that can be serialized
+      const botData = {
+        entity: {
+          position: bot.entity?.position
+            ? {
+                x: bot.entity.position.x,
+                y: bot.entity.position.y,
+                z: bot.entity.position.z,
+              }
+            : null,
+          velocity: bot.entity?.velocity
+            ? {
+                x: bot.entity.velocity.x,
+                y: bot.entity.velocity.y,
+                z: bot.entity.velocity.z,
+              }
+            : null,
+          onGround: bot.entity?.onGround || false,
+        },
+        player: {
+          username: bot.player?.username || 'bot',
+          uuid: bot.player?.uuid || 'unknown',
+        },
+        health: bot.health || 20,
+        food: bot.food || 20,
+        experience: bot.experience || { level: 0, progress: 0, total: 0 },
+        game: {
+          gameMode: bot.game?.gameMode || 'unknown',
+          hardcore: bot.game?.hardcore || false,
+          dimension: bot.game?.dimension || 'unknown',
+        },
+        inventory: {
+          items: (bot.inventory?.items() || []).map((item) => ({
+            type: item.type,
+            slot: item.slot,
+            count: item.count,
+            metadata: item.metadata,
+          })),
+          slots: bot.inventory?.slots || [],
+          selectedSlot: (bot.inventory as any)?.selectedSlot || 0,
+        },
+        isConnected: (bot as any).isConnected || false,
+        version: (bot as any).version || 'unknown',
+      };
+
       const response = await fetch(
         'http://localhost:3002/update-bot-instance',
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ botInstance: bot }),
+          body: JSON.stringify({ botInstance: botData }),
         }
       );
 
       if (response.ok) {
         console.log('✅ Bot instance updated in planning server');
       } else {
-        console.warn('⚠️ Failed to update bot instance in planning server');
+        console.warn(
+          '⚠️ Failed to update bot instance in planning server:',
+          response.status
+        );
       }
     }
   } catch (error) {

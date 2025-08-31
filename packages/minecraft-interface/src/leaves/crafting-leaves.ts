@@ -584,7 +584,7 @@ export class IntrospectRecipeLeaf implements LeafImpl {
     },
     timeoutMs: 5000,
     retries: 0,
-    permissions: [],
+    permissions: ['sense'],
   };
 
   async run(ctx: LeafContext, args: any): Promise<LeafResult> {

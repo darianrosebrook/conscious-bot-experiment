@@ -13,6 +13,41 @@ import {
   PlanningSystem,
 } from './modules/planning-endpoints';
 import { MCPIntegration } from './modules/mcp-integration';
+import {
+  MC_ENDPOINT,
+  mcFetch,
+  mcPostJson,
+  checkBotConnection,
+  waitForBotConnection,
+  getBotPosition,
+} from './modules/mc-client';
+import {
+  extractItemFromTask,
+  mapTaskTypeToMinecraftAction,
+  mapBTActionToMinecraft,
+} from './modules/action-mapping';
+import {
+  InventoryItem,
+  itemMatches,
+  countItems,
+  hasPickaxe,
+  hasEnoughLogs,
+  hasStonePickaxe,
+  hasCraftingTableItem,
+  hasSticks,
+  hasPlanks,
+  hasCobblestone,
+  inferRecipeFromTitle,
+  inferBlockTypeFromTitle,
+} from './modules/inventory-helpers';
+import {
+  TaskRequirement,
+  parseRequiredQuantityFromTitle,
+  resolveRequirement,
+  computeProgressFromInventory,
+  computeRequirementSnapshot,
+} from './modules/requirements';
+import { logOptimizer } from './modules/logging';
 
 // Import existing components
 import { CognitiveIntegration } from './cognitive-integration';
@@ -31,7 +66,6 @@ import { WorldStateManager } from './world-state/world-state-manager';
 import { WorldKnowledgeIntegrator } from './world-state/world-knowledge-integrator';
 
 // Centralized Minecraft endpoint and resilient HTTP utilities
-const MC_ENDPOINT = process.env.MINECRAFT_ENDPOINT || 'http://localhost:3005';
 const worldStateManager = new WorldStateManager(MC_ENDPOINT);
 worldStateManager.startPolling(3000);
 const worldKnowledge = new WorldKnowledgeIntegrator(worldStateManager);
@@ -43,98 +77,7 @@ worldStateManager.on('updated', (snapshot) => {
   }
 });
 
-// Simple circuit breaker state for Minecraft interface calls
-let mcFailureCount = 0;
-let mcCircuitOpenUntil = 0; // epoch ms until which circuit is open
-
-function mcCircuitOpen(): boolean {
-  return Date.now() < mcCircuitOpenUntil;
-}
-
-function mcRecordFailure(): void {
-  mcFailureCount += 1;
-  if (mcFailureCount >= 3) {
-    // Open the circuit for 30s after 3 consecutive failures
-    mcCircuitOpenUntil = Date.now() + 30_000;
-  }
-}
-
-function mcRecordSuccess(): void {
-  mcFailureCount = 0;
-  mcCircuitOpenUntil = 0;
-}
-
-async function mcFetch(
-  path: string,
-  init: RequestInit & { timeoutMs?: number } = {}
-): Promise<Response> {
-  if (mcCircuitOpen()) {
-    throw new Error('Minecraft endpoint circuit open');
-  }
-  const url = `${MC_ENDPOINT}${path.startsWith('/') ? '' : '/'}${path}`;
-  const retries = 2;
-  const baseDelay = 300;
-  let lastErr: any;
-  for (let attempt = 0; attempt <= retries; attempt++) {
-    try {
-      const controller = new AbortController();
-      const timeout = setTimeout(
-        () => controller.abort(),
-        init.timeoutMs ?? 10_000
-      );
-      const res = await fetch(url, { ...init, signal: controller.signal });
-      clearTimeout(timeout);
-      if (res.ok) {
-        mcRecordSuccess();
-        return res;
-      }
-      // Retry on 5xx
-      if (res.status >= 500 && res.status < 600 && attempt < retries) {
-        const delay = baseDelay * Math.pow(2, attempt) + Math.random() * 100;
-        await new Promise((r) => setTimeout(r, delay));
-        continue;
-      }
-      // Non-retryable status
-      mcRecordFailure();
-      return res;
-    } catch (err: any) {
-      lastErr = err;
-      // Retry on network/abort errors
-      if (attempt < retries) {
-        const delay = baseDelay * Math.pow(2, attempt) + Math.random() * 100;
-        await new Promise((r) => setTimeout(r, delay));
-        continue;
-      }
-      mcRecordFailure();
-      throw err;
-    }
-  }
-  mcRecordFailure();
-  throw lastErr || new Error('Unknown mcFetch error');
-}
-
-async function mcPostJson<T = any>(
-  path: string,
-  body: any,
-  timeoutMs?: number
-): Promise<{ ok: boolean; data?: T; error?: string; raw?: Response }> {
-  try {
-    const res = await mcFetch(path, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-      timeoutMs,
-    });
-    if (!res.ok) {
-      const text = await res.text().catch(() => '');
-      return { ok: false, error: `HTTP ${res.status}: ${text}`, raw: res };
-    }
-    const json = (await res.json()) as T;
-    return { ok: true, data: json, raw: res };
-  } catch (e: any) {
-    return { ok: false, error: e?.message || 'Network error' };
-  }
-}
+// mc-fetch helpers are imported from modules/mc-client
 
 // Declare global properties used for scheduling to satisfy TS in ESM modules
 declare global {
@@ -200,300 +143,17 @@ const toolExecutor = {
 /**
  * Extract the target item name from a task description
  */
-function extractItemFromTask(task: any): string {
-  const title = (task.title || '').toLowerCase();
-  const description = (task.description || '').toLowerCase();
-  const text = `${title} ${description}`;
-
-  // Check for specific tools first
-  if (text.includes('pickaxe')) {
-    return 'wooden_pickaxe';
-  }
-  if (text.includes('axe')) {
-    return 'wooden_axe';
-  }
-  if (text.includes('sword')) {
-    return 'wooden_sword';
-  }
-  if (text.includes('shovel')) {
-    return 'wooden_shovel';
-  }
-  if (text.includes('hoe')) {
-    return 'wooden_hoe';
-  }
-  if (text.includes('stick')) {
-    return 'stick';
-  }
-  if (text.includes('plank')) {
-    return 'oak_planks';
-  }
-  if (text.includes('crafting table')) {
-    return 'crafting_table';
-  }
-  if (text.includes('torch')) {
-    return 'torch';
-  }
-  if (text.includes('door')) {
-    return 'oak_door';
-  }
-  if (text.includes('fence')) {
-    return 'oak_fence';
-  }
-  if (text.includes('chest')) {
-    return 'chest';
-  }
-  if (text.includes('furnace')) {
-    return 'furnace';
-  }
-
-  // Check for generic crafting terms
-  if (text.includes('tool')) {
-    // Default to wooden pickaxe for generic tool requests
-    return 'wooden_pickaxe';
-  }
-  if (text.includes('item')) {
-    // Default to wooden planks for generic item requests
-    return 'oak_planks';
-  }
-
-  // Fallback to a basic craftable item
-  return 'oak_planks';
-}
+// action mapping functions are imported from modules/action-mapping
 
 /**
  * Map task types to real Minecraft actions
  */
-function mapTaskTypeToMinecraftAction(task: any) {
-  console.log(`🔧 Mapping task type: ${task.type} for task: ${task.title}`);
-
-  switch (task.type) {
-    case 'gathering':
-      return {
-        type: 'gather',
-        parameters: {
-          resource: task.title.toLowerCase().includes('wood')
-            ? 'wood'
-            : 'resource',
-          amount: 3,
-          target: task.title.toLowerCase().includes('wood')
-            ? 'tree'
-            : 'resource',
-        },
-        timeout: 15000,
-      };
-    case 'gather':
-      return {
-        type: 'gather',
-        parameters: {
-          resource:
-            task.parameters?.resource ||
-            (task.title.toLowerCase().includes('wood') ? 'wood' : 'resource'),
-          amount: task.parameters?.amount || 3,
-          target: task.parameters?.target || 'tree',
-        },
-        timeout: 15000,
-      };
-
-    case 'crafting':
-      return {
-        type: 'craft',
-        parameters: {
-          item: extractItemFromTask(task),
-          quantity: 1,
-        },
-        timeout: 15000,
-      };
-
-    case 'mining':
-      return {
-        type: 'mine_block',
-        parameters: {
-          blockType: task.title.toLowerCase().includes('iron')
-            ? 'iron_ore'
-            : 'stone',
-          position: { x: 0, y: 0, z: 0 }, // Will be determined by bot
-        },
-        timeout: 15000,
-      };
-
-    case 'exploration':
-      return {
-        type: 'navigate',
-        parameters: {
-          target: 'exploration_target',
-          distance: 10,
-        },
-        timeout: 15000,
-      };
-
-    case 'placement':
-      return {
-        type: 'place_block',
-        parameters: {
-          block_type: task.parameters?.itemType || 'crafting_table',
-          count: task.parameters?.quantity || 1,
-          placement: 'around_player',
-        },
-        timeout: 15000,
-      };
-
-    case 'building':
-      return {
-        type: 'place_block',
-        parameters: {
-          block_type: extractItemFromTask(task),
-          count: task.parameters?.quantity || 1,
-          placement: 'around_player',
-        },
-        timeout: 15000,
-      };
-
-    default:
-      logOptimizer.warn(
-        `⚠️ No action mapping for task type: ${task.type}`,
-        `no-action-mapping-${task.type}`
-      );
-      return null;
-  }
-}
+// action mapping imported
 
 /**
  * Map Behavior Tree actions to Minecraft actions
  */
-function mapBTActionToMinecraft(tool: string, args: Record<string, any>) {
-  console.log(`🔧 Mapping BT action: ${tool} with args:`, args);
-
-  const debugInfo = { originalAction: tool, args: args };
-
-  switch (tool) {
-    case 'scan_for_trees':
-      return {
-        type: 'wait',
-        parameters: { duration: 2000 },
-      };
-
-    case 'pathfind':
-      return {
-        type: 'move_forward',
-        parameters: { distance: args.distance || 1 },
-      };
-
-    case 'scan_tree_structure':
-      return {
-        type: 'wait',
-        parameters: { duration: 1000 },
-      };
-
-    case 'dig_blocks':
-      return {
-        type: 'dig_block',
-        parameters: {
-          pos: args.position || 'current',
-          tool: args.tool || 'axe',
-        },
-      };
-
-    case 'collect_items':
-      return {
-        type: 'pickup_item',
-        parameters: { radius: args.radius || 3 },
-      };
-
-    case 'clear_3x3_area':
-      return {
-        type: 'mine_block',
-        parameters: {
-          position: args.position || 'current',
-          tool: args.tool || 'pickaxe',
-          area: { x: 3, y: 2, z: 3 },
-        },
-        debug: debugInfo,
-      };
-
-    case 'place_blocks':
-      const pattern = args.pattern || 'single';
-      const blockType = args.block || 'stone';
-
-      if (pattern === '3x3_floor') {
-        return {
-          type: 'place_block',
-          parameters: {
-            block_type: blockType,
-            count: 9,
-            placement: 'pattern_3x3_floor',
-          },
-        };
-      } else if (pattern === '3x3_walls_2_high') {
-        return {
-          type: 'place_block',
-          parameters: {
-            block_type: blockType,
-            count: 12,
-            placement: 'pattern_3x3_walls',
-          },
-        };
-      } else if (pattern === '3x3_roof') {
-        return {
-          type: 'place_block',
-          parameters: {
-            block_type: blockType,
-            count: 9,
-            placement: 'pattern_3x3_roof',
-          },
-        };
-      } else {
-        return {
-          type: 'place_block',
-          parameters: {
-            block_type: blockType,
-            count: 1,
-            placement: 'around_player',
-          },
-        };
-      }
-
-    case 'place_door':
-      return {
-        type: 'place_block',
-        parameters: {
-          block_type: 'oak_door',
-          count: 1,
-          placement: 'specific_position',
-          position: args.position || 'front_center',
-        },
-      };
-
-    case 'place_torch':
-      return {
-        type: 'place_block',
-        parameters: {
-          block_type: 'torch',
-          count: 1,
-          placement:
-            args.position === 'center_wall'
-              ? 'specific_position'
-              : 'around_player',
-          position: args.position || 'around_player',
-        },
-      };
-
-    case 'wait':
-      return {
-        type: 'wait',
-        parameters: { duration: args.duration || 2000 },
-      };
-
-    default:
-      console.log(
-        `⚠️ Unknown BT action: ${tool}, falling through to default case`
-      );
-      return {
-        type: tool,
-        parameters: args,
-        debug: debugInfo,
-      };
-  }
-}
+// action mapping imported
 
 /**
  * Execute action with bot connection check
@@ -564,20 +224,11 @@ async function executeActionWithBotCheck(action: any) {
 /**
  * Inventory utilities
  */
-export type InventoryItem = {
-  name?: string | null;
-  displayName?: string;
-  type?: string | number | null;
-  count?: number;
-  slot?: number;
-};
-
 async function fetchInventorySnapshot(): Promise<InventoryItem[]> {
   try {
     // Prefer cached inventory from world-state manager
     const cached = worldStateManager.getInventory();
     if (cached && cached.length) return cached as InventoryItem[];
-    if (mcCircuitOpen()) return [];
     const res = await mcFetch('/inventory', { method: 'GET', timeoutMs: 3000 });
     if (!res.ok) return [];
     const json = (await res.json()) as any;
@@ -586,74 +237,7 @@ async function fetchInventorySnapshot(): Promise<InventoryItem[]> {
     return [];
   }
 }
-
-function itemMatches(item: InventoryItem, patterns: string[]): boolean {
-  const s = (
-    item.name ||
-    item.displayName ||
-    (typeof item.type === 'string' ? item.type : '') ||
-    ''
-  )
-    .toString()
-    .toLowerCase();
-  return patterns.some((p) => s.includes(p));
-}
-
-function countItems(inv: InventoryItem[], patterns: string[]): number {
-  return inv.reduce(
-    (sum, it) => sum + (itemMatches(it, patterns) ? it.count || 1 : 0),
-    0
-  );
-}
-
-function hasPickaxe(inv: InventoryItem[]): boolean {
-  return inv.some((it) =>
-    itemMatches(it, ['wooden_pickaxe', 'wooden pickaxe'])
-  );
-}
-
-function hasEnoughLogs(inv: InventoryItem[], minLogs = 2): boolean {
-  const logs = countItems(inv, ['_log', ' log']);
-  return logs >= minLogs;
-}
-
-function hasStonePickaxe(inv: InventoryItem[]): boolean {
-  return inv.some((it) => itemMatches(it, ['stone_pickaxe', 'stone pickaxe']));
-}
-
-function hasCraftingTableItem(inv: InventoryItem[]): boolean {
-  return inv.some((it) => itemMatches(it, ['crafting_table']));
-}
-
-function hasSticks(inv: InventoryItem[], min = 2): boolean {
-  return countItems(inv, ['stick']) >= min;
-}
-
-function hasPlanks(inv: InventoryItem[], min = 5): boolean {
-  return countItems(inv, ['oak_planks', 'planks']) >= min;
-}
-
-function hasCobblestone(inv: InventoryItem[], min = 3): boolean {
-  return countItems(inv, ['cobblestone']) >= min;
-}
-
-function inferRecipeFromTitle(title: string): string | null {
-  const t = (title || '').toLowerCase();
-  if (t.includes('wooden pickaxe')) return 'wooden_pickaxe';
-  if (t.includes('stone pickaxe')) return 'stone_pickaxe';
-  if (t.includes('stick')) return 'stick';
-  if (t.includes('crafting table')) return 'crafting_table';
-  if (t.includes('plank')) return 'oak_planks';
-  return null;
-}
-
-function inferBlockTypeFromTitle(title: string): string | null {
-  const t = (title || '').toLowerCase();
-  if (t.includes('iron')) return 'iron_ore';
-  if (t.includes('wood') || t.includes('log')) return 'oak_log';
-  if (t.includes('stone') || t.includes('cobble')) return 'stone';
-  return null;
-}
+// helpers imported from modules/inventory-helpers
 
 // ---------- Dynamic acquisition planner ----------
 async function introspectRecipe(output: string): Promise<{
@@ -848,214 +432,15 @@ async function injectPrerequisiteTasksForMineIron(task: any): Promise<boolean> {
 
 /**
  * Requirement resolution and progress computation
+ * (types and helpers imported from modules/requirements)
  */
-type TaskRequirement =
-  | { kind: 'collect'; patterns: string[]; quantity: number }
-  | { kind: 'mine'; patterns: string[]; quantity: number }
-  | {
-      kind: 'craft';
-      outputPattern: string;
-      quantity: number;
-      proxyPatterns?: string[];
-    };
 
-export function parseRequiredQuantityFromTitle(
-  title: string | undefined,
-  fallback: number
-): number {
-  if (!title) return fallback;
-  const m = String(title).match(/(\d{1,3})/);
-  return m ? Math.max(1, parseInt(m[1], 10)) : fallback;
-}
-
-export function resolveRequirement(task: any): TaskRequirement | null {
-  const ttl = (task.title || '').toLowerCase();
-  // Prefer explicit crafting intent first
-  if (task.type === 'crafting' && /pickaxe/.test(ttl)) {
-    return {
-      kind: 'craft',
-      outputPattern: 'wooden_pickaxe',
-      quantity: 1,
-      proxyPatterns: ['oak_log', '_log', ' log', 'plank', 'stick'],
-    };
-  }
-  // Gathering/mining rules next
-  if (task.type === 'gathering' || /\bgather\b|\bcollect\b/.test(ttl)) {
-    const qty = parseRequiredQuantityFromTitle(task.title, 8);
-    return {
-      kind: 'collect',
-      patterns: [
-        'oak_log',
-        'birch_log',
-        'spruce_log',
-        'jungle_log',
-        'acacia_log',
-        'dark_oak_log',
-      ],
-      quantity: qty,
-    };
-  }
-  if (task.type === 'mining' || /\bmine\b|\biron\b/.test(ttl)) {
-    const qty = parseRequiredQuantityFromTitle(task.title, 3);
-    return { kind: 'mine', patterns: ['iron_ore'], quantity: qty };
-  }
-  // Titles that explicitly mention wood but aren't crafting
-  if (/\bwood\b/.test(ttl)) {
-    const qty = parseRequiredQuantityFromTitle(task.title, 8);
-    return {
-      kind: 'collect',
-      patterns: [
-        'oak_log',
-        'birch_log',
-        'spruce_log',
-        'jungle_log',
-        'acacia_log',
-        'dark_oak_log',
-      ],
-      quantity: qty,
-    };
-  }
-  return null;
-}
-
-export function computeProgressFromInventory(
-  inv: InventoryItem[],
-  req: TaskRequirement
-): number {
-  if (req.kind === 'collect' || req.kind === 'mine') {
-    const have = countItems(inv, req.patterns);
-    return Math.max(0, Math.min(1, have / req.quantity));
-  }
-  if (req.kind === 'craft') {
-    // If output item present, done
-    const hasOutput = inv.some((it) => itemMatches(it, [req.outputPattern]));
-    if (hasOutput) return 1;
-    // Otherwise estimate progress using proxy materials if available
-    const proxy = req.proxyPatterns || [];
-    if (proxy.length) {
-      const have = countItems(inv, proxy);
-      // Heuristic: assume 3 logs worth gets you near completion for a wooden pickaxe
-      const estimate = Math.max(0, Math.min(1, have / 3));
-      return estimate;
-    }
-    return 0;
-  }
-  return 0;
-}
-
-export function computeRequirementSnapshot(
-  inv: InventoryItem[],
-  req: TaskRequirement
-) {
-  if (req.kind === 'collect' || req.kind === 'mine') {
-    const have = countItems(inv, req.patterns);
-    return {
-      kind: req.kind,
-      quantity: req.quantity,
-      have,
-      needed: Math.max(0, req.quantity - have),
-      patterns: req.patterns,
-    };
-  }
-  if (req.kind === 'craft') {
-    const hasOutput = inv.some((it) => itemMatches(it, [req.outputPattern]));
-    if (hasOutput) {
-      return {
-        kind: req.kind,
-        quantity: req.quantity,
-        have: req.quantity,
-        needed: 0,
-        outputPattern: req.outputPattern,
-        proxyPatterns: req.proxyPatterns,
-      };
-    }
-    const proxy = req.proxyPatterns || [];
-    const haveProxy = proxy.length ? countItems(inv, proxy) : 0;
-    return {
-      kind: req.kind,
-      quantity: req.quantity,
-      have: Math.min(req.quantity, hasOutput ? req.quantity : 0),
-      needed: hasOutput ? 0 : req.quantity,
-      outputPattern: req.outputPattern,
-      proxyPatterns: req.proxyPatterns,
-      proxyHave: haveProxy,
-    } as any;
-  }
-  return { kind: (req as any).kind, quantity: (req as any).quantity } as any;
-}
+// requirement helpers imported from modules/requirements
 
 /**
  * Wait for bot connection by polling health until timeout
  */
-async function waitForBotConnection(timeoutMs: number): Promise<boolean> {
-  const start = Date.now();
-  const poll = async () => {
-    const ok = await checkBotConnection();
-    if (ok) return true;
-    if (Date.now() - start >= timeoutMs) return false;
-    await new Promise((r) => setTimeout(r, 500));
-    return poll();
-  };
-  return poll();
-}
-
-/**
- * Check if bot is connected and ready for actions
- */
-async function checkBotConnection(): Promise<boolean> {
-  try {
-    if (mcCircuitOpen()) return false;
-    // Check if bot is connected to Minecraft via the Minecraft interface
-    const response = await mcFetch('/health', {
-      method: 'GET',
-      timeoutMs: 2000,
-    });
-
-    if (response.ok) {
-      const status = (await response.json()) as {
-        status?: string;
-        botStatus?: { connected?: boolean };
-      };
-      return (
-        status.status === 'connected' || status.botStatus?.connected === true
-      );
-    }
-
-    return false;
-  } catch (error) {
-    console.warn('Bot connection check failed:', error);
-    return false;
-  }
-}
-
-/**
- * Get bot position from Minecraft interface
- */
-async function getBotPosition(): Promise<{
-  x: number;
-  y: number;
-  z: number;
-} | null> {
-  try {
-    if (mcCircuitOpen()) return null;
-    const res = await mcFetch('/health', { method: 'GET', timeoutMs: 2000 });
-    if (!res.ok) return null;
-    const status = (await res.json()) as any;
-    const p =
-      status?.botStatus?.position || status?.executionStatus?.bot?.position;
-    if (
-      p &&
-      typeof p.x === 'number' &&
-      typeof p.y === 'number' &&
-      typeof p.z === 'number'
-    ) {
-      return { x: Math.floor(p.x), y: Math.floor(p.y), z: Math.floor(p.z) };
-    }
-  } catch (e) {
-    console.warn('getBotPosition failed:', e);
-  }
-  return null;
-}
+// connection helpers imported from modules/mc-client
 
 /**
  * Check if crafting table is required and available for a task
@@ -1528,10 +913,12 @@ async function autonomousTaskExecutor() {
     const taskTypeMapping: Record<string, string[]> = {
       gathering: ['chop', 'tree', 'wood', 'collect', 'gather'],
       gather: ['chop', 'tree', 'wood', 'collect', 'gather'],
+      movement: ['move', 'navigate', 'travel', 'path', 'walk'],
       mine: ['mine', 'dig', 'extract'],
       crafting: ['craft', 'build', 'create'],
       build: ['build', 'place', 'create', 'construct'],
       exploration: ['explore', 'search', 'find'],
+      explore: ['explore', 'search', 'find', 'move'],
       mining: ['mine', 'dig', 'extract'],
       farming: ['farm', 'plant', 'grow'],
       combat: ['fight', 'attack', 'defend'],
@@ -1610,6 +997,21 @@ async function autonomousTaskExecutor() {
           }
         : undefined;
       const leafMapping: Record<string, { leafName: string; args: any }> = {
+        movement: {
+          leafName: 'move_to',
+          args: {
+            pos: currentTask.parameters?.pos || currentTask.parameters?.target,
+          },
+        },
+        explore: {
+          leafName: 'move_to',
+          args: {
+            pos:
+              currentTask.parameters?.pos ||
+              currentTask.parameters?.target ||
+              randomExplore,
+          },
+        },
         gathering: {
           leafName: 'dig_block',
           args: {
@@ -1619,6 +1021,14 @@ async function autonomousTaskExecutor() {
           },
         },
         gather: {
+          leafName: 'dig_block',
+          args: {
+            blockType:
+              currentTask.parameters?.blockType || inferredBlock || 'oak_log',
+            pos: currentTask.parameters?.pos,
+          },
+        },
+        search: {
           leafName: 'dig_block',
           args: {
             blockType:
@@ -2407,704 +1817,4 @@ const planningSystem: PlanningSystem = {
 
         if (result.success) {
           console.log(
-            `✅ Task executed successfully: ${task.title || task.id}`
-          );
-          return {
-            success: true,
-            message: 'Task executed successfully',
-            result,
-          };
-        }
-        console.error(
-          `❌ Task execution failed: ${task.title || task.id}`,
-          result.error
-        );
-        return {
-          success: false,
-          message: result.error || 'Task execution failed',
-          result,
-        };
-      } catch (error) {
-        console.error(
-          `❌ Task execution error: ${task.title || task.id}`,
-          error
-        );
-        return {
-          success: false,
-          message: error instanceof Error ? error.message : 'Unknown error',
-        };
-      }
-    },
-  },
-};
-
-// Initialize server configuration
-const serverConfig = new ServerConfiguration({
-  port: process.env.PORT ? parseInt(process.env.PORT) : 3002,
-  enableCORS: true,
-  enableMCP: true,
-  // Note: mcpServerPort currently unused (in-process). Kept for future.
-  mcpConfig: {
-    mcpServerPort: process.env.MCP_PORT ? parseInt(process.env.MCP_PORT) : 3010,
-    registryEndpoint: process.env.MEMORY_ENDPOINT || 'http://localhost:3001',
-    botEndpoint: process.env.MINECRAFT_ENDPOINT || 'http://localhost:3005',
-  },
-});
-
-// Setup event listeners
-enhancedTaskIntegration.on('taskAdded', (task) => {
-  console.log('Task added to enhanced integration:', task.title);
-});
-
-enhancedTaskIntegration.on(
-  'taskProgressUpdated',
-  ({ task, oldProgress, oldStatus }) => {
-    console.log(
-      `Task progress updated: ${task.title} - ${Math.round(task.progress * 100)}% (${oldStatus} -> ${task.status})`
-    );
-
-    try {
-      // Emit memory events for lifecycle transitions
-      if (oldStatus !== task.status) {
-        if (task.status === 'active' && oldStatus === 'pending') {
-          enhancedMemoryIntegration.generateTaskEvent(
-            task.id,
-            task.type,
-            'started',
-            { title: task.title }
-          );
-        }
-        if (task.status === 'completed') {
-          // Capture inventory + position snapshot
-          (async () => {
-            const inv = await fetchInventorySnapshot();
-            const pos = await getBotPosition();
-            enhancedMemoryIntegration.generateTaskEvent(
-              task.id,
-              task.type,
-              'completed',
-              { title: task.title, inventory: inv, position: pos }
-            );
-            // Add a reflective note tying state to outcome
-            const summary = `Completed ${task.type} task: ${task.title}.`;
-            const invCount = inv.reduce((s, it) => s + (it.count || 0), 0);
-            const content = `${summary}\nInventory items: ${invCount}$${pos ? `\nPosition: (${pos.x}, ${pos.y}, ${pos.z})` : ''}`;
-            enhancedMemoryIntegration.addReflectiveNote(
-              'reflection',
-              'Task Completion',
-              content,
-              [task.type, task.title],
-              'planning-system',
-              0.8
-            );
-          })();
-        }
-        if (task.status === 'failed') {
-          enhancedMemoryIntegration.generateTaskEvent(
-            task.id,
-            task.type,
-            'failed',
-            { title: task.title }
-          );
-        }
-      }
-    } catch (e) {
-      console.warn('Memory event logging failed:', e);
-    }
-  }
-);
-
-enhancedMemoryIntegration.on('eventAdded', (event) => {
-  console.log('Memory event added:', event.title);
-});
-
-enhancedEnvironmentIntegration.on('environmentUpdated', (environment) => {
-  if (
-    process.env.NODE_ENV === 'development' &&
-    process.env.DEBUG_ENVIRONMENT === 'true'
-  ) {
-    console.log(
-      'Environment updated:',
-      environment.biome,
-      environment.timeOfDay
-    );
-  }
-});
-
-// Add initial tasks for testing (dev-only)
-if (String(process.env.AUTO_SEED_TASKS || '').toLowerCase() === 'true') {
-  setTimeout(async () => {
-    console.log('Adding initial tasks for testing (AUTO_SEED_TASKS=true)...');
-
-    const botConnected = await waitForBotConnection(10000);
-    if (!botConnected) {
-      console.log(
-        '⚠️ Bot not connected - tasks will be queued but may not execute immediately'
-      );
-    }
-
-    const task1 = await enhancedTaskIntegration.addTask({
-      title: 'Gather Wood',
-      description: 'Collect wood from nearby trees for crafting',
-      type: 'gathering',
-      priority: 0.8,
-      urgency: 0.7,
-      source: 'autonomous' as const,
-      metadata: {
-        category: 'survival',
-        tags: ['wood', 'gathering', 'crafting'],
-        createdAt: Date.now(),
-        updatedAt: Date.now(),
-        retryCount: 0,
-        maxRetries: 3,
-        childTaskIds: [],
-      },
-    });
-
-    console.log('Task 1 added:', task1.id, task1.title);
-    console.log(
-      'Active tasks after task 1:',
-      enhancedTaskIntegration.getActiveTasks().length
-    );
-
-    await enhancedTaskIntegration.addTask({
-      title: 'Craft Wooden Pickaxe',
-      description: 'Create a wooden pickaxe for mining stone',
-      type: 'crafting',
-      priority: 0.9,
-      urgency: 0.8,
-      source: 'autonomous' as const,
-      metadata: {
-        category: 'crafting',
-        tags: ['pickaxe', 'wood', 'tools'],
-        createdAt: Date.now(),
-        updatedAt: Date.now(),
-        retryCount: 0,
-        maxRetries: 3,
-        childTaskIds: [],
-      },
-    });
-
-    await enhancedTaskIntegration.addTask({
-      title: 'Explore Cave System',
-      description: 'Search for valuable resources in nearby caves',
-      type: 'exploration',
-      priority: 0.6,
-      urgency: 0.5,
-      source: 'autonomous' as const,
-      metadata: {
-        category: 'exploration',
-        tags: ['cave', 'mining', 'resources'],
-        createdAt: Date.now(),
-        updatedAt: Date.now(),
-        retryCount: 0,
-        maxRetries: 3,
-        childTaskIds: [],
-      },
-    });
-  }, 2000);
-}
-
-// Main server startup function
-async function startServer() {
-  try {
-    // Create an EnhancedRegistry for MCP integration
-    const registry = new EnhancedRegistry();
-
-    // Initialize MCP integration with the registry
-    try {
-      await serverConfig.initializeMCP(undefined, registry);
-
-      // Register core leaves with the MCP integration
-      const mcpIntegration = serverConfig.getMCPIntegration();
-      if (mcpIntegration) {
-        console.log('📝 Registering core leaves with MCP integration...');
-
-        // Import leaves dynamically to avoid import issues
-        const {
-          MoveToLeaf,
-          StepForwardSafelyLeaf,
-          FollowEntityLeaf,
-          DigBlockLeaf,
-          PlaceBlockLeaf,
-          PlaceTorchIfNeededLeaf,
-          RetreatAndBlockLeaf,
-          ConsumeFoodLeaf,
-          SenseHostilesLeaf,
-          ChatLeaf,
-          WaitLeaf,
-          GetLightLevelLeaf,
-          CraftRecipeLeaf,
-          SmeltLeaf,
-          IntrospectRecipeLeaf,
-        } = await import('@conscious-bot/core');
-
-        const leaves = [
-          new MoveToLeaf(),
-          new StepForwardSafelyLeaf(),
-          new FollowEntityLeaf(),
-          new DigBlockLeaf(),
-          new PlaceBlockLeaf(),
-          new PlaceTorchIfNeededLeaf(),
-          new RetreatAndBlockLeaf(),
-          new ConsumeFoodLeaf(),
-          new SenseHostilesLeaf(),
-          new ChatLeaf(),
-          new WaitLeaf(),
-          new GetLightLevelLeaf(),
-          new CraftRecipeLeaf(),
-          new SmeltLeaf(),
-          new IntrospectRecipeLeaf(),
-        ];
-
-        for (const leaf of leaves) {
-          // Register with MCP integration
-          const result = await mcpIntegration.registerLeaf(leaf);
-          if (result) {
-            console.log(
-              `✅ Registered leaf: ${leaf.spec.name}@${leaf.spec.version}`
-            );
-          }
-
-          // Also register with the registry for MCP server access
-          const registryResult = registry.registerLeaf(
-            leaf,
-            {
-              author: 'system-init',
-              parentLineage: [],
-              codeHash: `default-${leaf.spec.name}`,
-              createdAt: new Date().toISOString(),
-              metadata: { source: 'default-leaf' },
-            },
-            'active'
-          );
-
-          if (registryResult.ok) {
-            console.log(
-              `✅ Registered leaf with registry: ${leaf.spec.name}@${leaf.spec.version}`
-            );
-          } else {
-            console.warn(
-              `⚠️ Failed to register leaf with registry: ${leaf.spec.name}@${leaf.spec.version}: ${registryResult.error}`
-            );
-          }
-        }
-
-        console.log(
-          `✅ Registered ${leaves.length} core leaves with MCP integration`
-        );
-
-        // Create BT options for common tasks
-        console.log('📝 Creating BT options for common tasks...');
-
-        const btOptions = [
-          {
-            id: 'mine_iron_ore',
-            name: 'Mine Iron Ore',
-            description: 'Mine iron ore blocks for crafting',
-            btDefinition: {
-              root: {
-                type: 'sequence',
-                children: [
-                  {
-                    type: 'action',
-                    action: 'dig_block',
-                    args: { blockType: 'iron_ore' },
-                  },
-                  {
-                    type: 'action',
-                    action: 'wait',
-                    args: { duration: 1000 },
-                  },
-                ],
-              },
-            },
-          },
-          {
-            id: 'gather_wood',
-            name: 'Gather Wood',
-            description: 'Collect wood from nearby trees',
-            btDefinition: {
-              root: {
-                type: 'sequence',
-                children: [
-                  {
-                    type: 'action',
-                    action: 'dig_block',
-                    args: { blockType: 'oak_log' },
-                  },
-                  {
-                    type: 'action',
-                    action: 'wait',
-                    args: { duration: 1000 },
-                  },
-                ],
-              },
-            },
-          },
-          {
-            id: 'craft_wooden_pickaxe',
-            name: 'Craft Wooden Pickaxe',
-            description: 'Craft a wooden pickaxe for mining',
-            btDefinition: {
-              root: {
-                type: 'sequence',
-                children: [
-                  {
-                    type: 'action',
-                    action: 'craft_recipe',
-                    args: { recipe: 'wooden_pickaxe' },
-                  },
-                  {
-                    type: 'action',
-                    action: 'wait',
-                    args: { duration: 1000 },
-                  },
-                ],
-              },
-            },
-          },
-          {
-            id: 'find_food',
-            name: 'Find Food',
-            description: 'Search for and collect food items',
-            btDefinition: {
-              root: {
-                type: 'sequence',
-                children: [
-                  {
-                    type: 'action',
-                    action: 'move_to',
-                    args: { target: 'food_source' },
-                  },
-                  {
-                    type: 'action',
-                    action: 'dig_block',
-                    args: { blockType: 'wheat' },
-                  },
-                  {
-                    type: 'action',
-                    action: 'wait',
-                    args: { duration: 1000 },
-                  },
-                ],
-              },
-            },
-          },
-        ];
-
-        for (const option of btOptions) {
-          try {
-            const result = await mcpIntegration.registerOption(option);
-            if (result?.success) {
-              console.log(`✅ Registered BT option: ${option.name}`);
-            } else {
-              console.warn(
-                `⚠️ Failed to register BT option: ${option.name}`,
-                result?.error
-              );
-            }
-          } catch (error) {
-            console.warn(
-              `⚠️ Error registering BT option ${option.name}:`,
-              error
-            );
-          }
-        }
-
-        console.log(
-          `✅ Created ${btOptions.length} BT options for task execution`
-        );
-      }
-    } catch (error) {
-      console.warn(
-        '⚠️ MCP integration failed to initialize, continuing without it:',
-        error
-      );
-    }
-
-    // Mount planning endpoints
-    const planningRouter = createPlanningEndpoints(planningSystem);
-    serverConfig.mountRouter('/', planningRouter);
-
-    // Add logging status endpoint
-    const { Router } = await import('express');
-    const loggingRouter = Router();
-    loggingRouter.get('/logging-status', (req, res) => {
-      const status = logOptimizer.getStatus();
-      res.json({
-        status: 'ok',
-        data: {
-          suppressedMessages: status.suppressed,
-          throttledMessages: status.throttled,
-          timestamp: new Date().toISOString(),
-        },
-      });
-    });
-    serverConfig.mountRouter('/api', loggingRouter);
-
-    // Mount MCP endpoints
-    const { createMCPEndpoints } = await import('./modules/mcp-endpoints');
-    const mcpIntegration = serverConfig.getMCPIntegration();
-    if (!mcpIntegration) {
-      throw new Error('MCP integration not found');
-    }
-    const mcpRouter = createMCPEndpoints(mcpIntegration);
-    serverConfig.mountRouter('/mcp', mcpRouter);
-
-    // Add error handling
-    serverConfig.addErrorHandling();
-
-    // Start the server
-    await serverConfig.start();
-
-    // Start autonomous task executor with error handling
-    if (process.env.NODE_ENV === 'development') {
-      console.log('Starting autonomous task executor...');
-    }
-
-    // Wrap the interval in error handling with reentrancy guard
-    // Keep handles for graceful shutdown
-    if (globalThis.__planningExecutorState === undefined) {
-      // @ts-ignore augment global in runtime only
-      globalThis.__planningExecutorState = { running: false };
-    }
-    // @ts-ignore
-    const executorState: { running: boolean } =
-      globalThis.__planningExecutorState;
-
-    // @ts-ignore
-    globalThis.__planningInterval = setInterval(async () => {
-      if (executorState.running) {
-        if (process.env.NODE_ENV === 'development') {
-          console.log('⏭️ Skipping executor tick (already running)');
-        }
-        return;
-      }
-      executorState.running = true;
-      try {
-        logOptimizer.log(
-          '🔄 Scheduled autonomous task executor running...',
-          'scheduled-executor-running'
-        );
-        await autonomousTaskExecutor();
-      } catch (error) {
-        console.warn('Autonomous task executor error (non-fatal):', error);
-      } finally {
-        executorState.running = false;
-      }
-    }, 10000); // Check every 10 seconds for more responsive execution
-
-    // Initial task generation after 5 seconds with error handling
-    // @ts-ignore
-    globalThis.__planningInitialKick = setTimeout(async () => {
-      try {
-        if (process.env.NODE_ENV === 'development') {
-          console.log('Initializing autonomous behavior...');
-        }
-        // Avoid racing with the interval tick
-        // @ts-ignore
-        const executorState = globalThis.__planningExecutorState as {
-          running: boolean;
-        };
-        if (!executorState.running) {
-          executorState.running = true;
-          try {
-            await autonomousTaskExecutor();
-          } finally {
-            executorState.running = false;
-          }
-        }
-      } catch (error) {
-        console.warn('Initial autonomous behavior error (non-fatal):', error);
-      }
-    }, 5000);
-
-    // Start cognitive thought processor with error handling
-    try {
-      console.log('Starting cognitive thought processor...');
-      cognitiveThoughtProcessor.startProcessing();
-    } catch (error) {
-      console.warn(
-        '⚠️ Cognitive thought processor failed to start, continuing without it:',
-        error
-      );
-    }
-
-    console.log('✅ Modular planning server started successfully');
-  } catch (error) {
-    console.error('❌ Failed to start modular planning server:', error);
-    process.exit(1);
-  }
-}
-
-// Export for testing and external use
-export {
-  serverConfig,
-  planningSystem,
-  startServer,
-  autonomousTaskExecutor,
-  cognitiveThoughtProcessor,
-  enhancedTaskIntegration,
-  enhancedMemoryIntegration,
-  enhancedEnvironmentIntegration,
-  enhancedLiveStreamIntegration,
-};
-
-// Start server if this file is run directly
-if (require.main === module) {
-  startServer();
-
-  // Daily summary scheduler: generate yesterday's summary once per day
-  let lastSummaryDay: number | null = null;
-  setInterval(
-    () => {
-      try {
-        const now = new Date();
-        const dayKey = new Date(
-          now.getFullYear(),
-          now.getMonth(),
-          now.getDate()
-        ).getTime();
-        if (lastSummaryDay === null) {
-          lastSummaryDay = dayKey;
-          return;
-        }
-        if (dayKey !== lastSummaryDay) {
-          // New day rolled over; summarize yesterday
-          enhancedMemoryIntegration.generateDailySummary(1);
-          lastSummaryDay = dayKey;
-        }
-      } catch (e) {
-        console.warn('Daily summary generation failed:', e);
-      }
-    },
-    60 * 60 * 1000
-  ); // check hourly
-
-  // Graceful shutdown
-  const shutdown = async (signal: string) => {
-    try {
-      console.log(`\nReceived ${signal}. Shutting down gracefully...`);
-      // Stop thought processor
-      try {
-        cognitiveThoughtProcessor.stopProcessing();
-      } catch (e) {
-        console.warn('Cognitive thought processor failed to stop:', e);
-      }
-      // Clear timers
-      try {
-        // @ts-ignore
-        if (globalThis.__planningInterval)
-          clearInterval(globalThis.__planningInterval);
-        // @ts-ignore
-        if (globalThis.__planningInitialKick)
-          clearTimeout(globalThis.__planningInitialKick);
-      } catch (e) {
-        console.warn('Timers failed to clear:', e);
-      }
-      // Stop HTTP server
-      try {
-        await serverConfig.stop();
-      } catch (e) {
-        console.warn('Server config failed to stop:', e);
-      }
-    } finally {
-      process.exit(0);
-    }
-  };
-
-  process.on('SIGINT', () => shutdown('SIGINT'));
-  process.on('SIGTERM', () => shutdown('SIGTERM'));
-}
-
-// =============================================================================
-// Logging Optimization System
-// =============================================================================
-
-/**
- * Logging optimization to reduce verbosity and repetitive messages
- * @author @darianrosebrook
- */
-class LoggingOptimizer {
-  private lastLogTimes: Map<string, number> = new Map();
-  private logCounts: Map<string, number> = new Map();
-  private suppressedMessages: Set<string> = new Set();
-  private readonly THROTTLE_INTERVAL = 30000; // 30 seconds
-  private readonly MAX_REPEATS = 3; // Max times to show same message
-
-  /**
-   * Log with throttling to prevent spam
-   */
-  log(
-    message: string,
-    throttleKey?: string,
-    maxInterval = this.THROTTLE_INTERVAL
-  ): void {
-    const key = throttleKey || message;
-    const now = Date.now();
-    const lastTime = this.lastLogTimes.get(key) || 0;
-    const count = this.logCounts.get(key) || 0;
-
-    // If we've shown this message too many times, suppress it
-    if (count >= this.MAX_REPEATS && !this.suppressedMessages.has(key)) {
-      this.suppressedMessages.add(key);
-      console.log(
-        `🔇 Suppressing repeated message: "${message}" (shown ${count} times)`
-      );
-      return;
-    }
-
-    // If enough time has passed, show the message
-    if (now - lastTime >= maxInterval) {
-      console.log(message);
-      this.lastLogTimes.set(key, now);
-      this.logCounts.set(key, count + 1);
-    }
-  }
-
-  /**
-   * Log warning with throttling
-   */
-  warn(message: string, throttleKey?: string): void {
-    const key = throttleKey || message;
-    const now = Date.now();
-    const lastTime = this.lastLogTimes.get(key) || 0;
-    const count = this.logCounts.get(key) || 0;
-
-    if (count >= this.MAX_REPEATS && !this.suppressedMessages.has(key)) {
-      this.suppressedMessages.add(key);
-      console.warn(
-        `🔇 Suppressing repeated warning: "${message}" (shown ${count} times)`
-      );
-      return;
-    }
-
-    if (now - lastTime >= this.THROTTLE_INTERVAL) {
-      console.warn(message);
-      this.lastLogTimes.set(key, now);
-      this.logCounts.set(key, count + 1);
-    }
-  }
-
-  /**
-   * Reset suppression for a specific message
-   */
-  resetSuppression(key: string): void {
-    this.suppressedMessages.delete(key);
-    this.logCounts.set(key, 0);
-  }
-
-  /**
-   * Get status of logging optimization
-   */
-  getStatus(): { suppressed: number; throttled: number } {
-    return {
-      suppressed: this.suppressedMessages.size,
-      throttled: this.logCounts.size,
-    };
-  }
-}
-
-// Global logging optimizer instance
-const logOptimizer = new LoggingOptimizer();
+            `

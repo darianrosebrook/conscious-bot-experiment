@@ -260,11 +260,17 @@ export class MCPIntegration {
    */
   async updateBotInstance(bot: any): Promise<void> {
     if (!this.isInitialized || !this.mcpServer) {
-      console.warn('[MCP] Integration not initialized, cannot update bot instance');
+      console.warn(
+        '[MCP] Integration not initialized, cannot update bot instance'
+      );
       return;
     }
 
     try {
+      console.log(
+        '[MCP] Updating bot instance with data:',
+        JSON.stringify(bot, null, 2)
+      );
       // Update the bot instance in the MCP server
       (this.mcpServer as any).deps.bot = bot;
       console.log('[MCP] Bot instance updated successfully');

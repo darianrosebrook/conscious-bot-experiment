@@ -107,6 +107,75 @@ const DEFAULT_CONFIG: EnhancedTaskIntegrationConfig = {
   actionVerificationTimeout: 10000, // New: 10 second timeout
 };
 
+// Requirement resolution functions
+function parseRequiredQuantityFromTitle(
+  title: string | undefined,
+  fallback: number
+): number {
+  if (!title) return fallback;
+  const m = String(title).match(/(\d{1,3})/);
+  return m ? Math.max(1, parseInt(m[1], 10)) : fallback;
+}
+
+function resolveRequirement(task: any): any {
+  const ttl = (task.title || '').toLowerCase();
+  // Prefer explicit crafting intent first
+  if (task.type === 'crafting' && /pickaxe/.test(ttl)) {
+    return {
+      kind: 'craft',
+      outputPattern: 'wooden_pickaxe',
+      quantity: 1,
+      proxyPatterns: [
+        'oak_log',
+        'birch_log',
+        'spruce_log',
+        'jungle_log',
+        'acacia_log',
+        'dark_oak_log',
+        'plank',
+        'stick',
+      ],
+    };
+  }
+  // Gathering/mining rules next
+  if (task.type === 'gathering' || /\bgather\b|\bcollect\b/.test(ttl)) {
+    const qty = parseRequiredQuantityFromTitle(task.title, 8);
+    return {
+      kind: 'collect',
+      patterns: [
+        'oak_log',
+        'birch_log',
+        'spruce_log',
+        'jungle_log',
+        'acacia_log',
+        'dark_oak_log',
+      ],
+      quantity: qty,
+    };
+  }
+  if (task.type === 'mining' || /\bmine\b|\biron\b/.test(ttl)) {
+    const qty = parseRequiredQuantityFromTitle(task.title, 3);
+    return { kind: 'mine', patterns: ['iron_ore'], quantity: qty };
+  }
+  // Titles that explicitly mention wood but aren't crafting
+  if (/\bwood\b/.test(ttl)) {
+    const qty = parseRequiredQuantityFromTitle(task.title, 8);
+    return {
+      kind: 'collect',
+      patterns: [
+        'oak_log',
+        'birch_log',
+        'spruce_log',
+        'jungle_log',
+        'acacia_log',
+        'dark_oak_log',
+      ],
+      quantity: qty,
+    };
+  }
+  return null;
+}
+
 /**
  * Enhanced task integration system for dashboard connectivity
  * @author @darianrosebrook
@@ -152,7 +221,6 @@ export class EnhancedTaskIntegration extends EventEmitter {
     const steps = await this.generateDynamicSteps(taskData);
 
     // Resolve requirements for the task
-    const { resolveRequirement } = await import('../modular-server');
     const requirement = resolveRequirement(taskData);
 
     const task: Task = {
@@ -350,30 +418,16 @@ export class EnhancedTaskIntegration extends EventEmitter {
 
     // Verify action was actually performed if verification is enabled
     if (this.config.enableActionVerification) {
-      // Temporarily disable verification to test step completion
-      console.log(`⚠️ Action verification disabled for testing: ${step.label}`);
-      const verification: ActionVerification = {
-        taskId,
-        stepId,
-        actionType: step.label.toLowerCase(),
-        expectedResult: this.getExpectedResultForStep(step),
-        verified: true, // Temporarily allow all steps to pass
-        timestamp: Date.now(),
-      };
-
-      // TODO: Re-enable proper verification once step completion is working
-      /*
       const verification = await this.verifyActionCompletion(
         taskId,
         stepId,
         step
       );
       if (!verification.verified) {
-        // Step completion rejected - action not verified: ${step.label}
+        // Step completion rejected - action not verified
+        console.warn(`⚠️ Step verification failed: ${step.label}`);
         return false;
       }
-      // Action verified for step: ${step.label}
-      */
     }
 
     step.done = true;
@@ -544,7 +598,8 @@ export class EnhancedTaskIntegration extends EventEmitter {
       }
 
       // Verify based on step type
-      switch (step.label.toLowerCase()) {
+      const stepLabel = step.label.toLowerCase();
+      switch (stepLabel) {
         case 'locate nearby wood':
         case 'locate nearby resources':
           verification.verified = await this.verifyResourceLocation('wood');
@@ -573,11 +628,28 @@ export class EnhancedTaskIntegration extends EventEmitter {
           verification.verified = await this.verifyItemCreation();
           break;
         default:
-          // For unknown steps, require manual verification
-          verification.verified = false;
-          verification.actualResult = {
-            error: 'Unknown step type - requires manual verification',
-          };
+          // Handle MCP leaf-labeled steps like "Leaf: minecraft.move_to"
+          if (stepLabel.startsWith('leaf: minecraft.')) {
+            const leaf = stepLabel.replace('leaf: minecraft.', '').trim();
+            if (leaf === 'move_to') {
+              verification.verified = await this.verifyMovement();
+            } else if (leaf === 'dig_block') {
+              // Heuristic: treat dig as gathering resource
+              verification.verified = await this.verifyResourceCollection('wood');
+            } else if (leaf === 'chat' || leaf === 'wait') {
+              // Consider these non-critical and pass
+              verification.verified = true;
+            } else {
+              verification.verified = false;
+              verification.actualResult = { error: `Unknown leaf: ${leaf}` };
+            }
+          } else {
+            // For unknown steps, require manual verification
+            verification.verified = false;
+            verification.actualResult = {
+              error: 'Unknown step type - requires manual verification',
+            };
+          }
       }
 
       this.actionVerifications.set(`${taskId}-${stepId}`, verification);
@@ -684,7 +756,7 @@ export class EnhancedTaskIntegration extends EventEmitter {
    */
   private async verifyMovement(): Promise<boolean> {
     try {
-      // Check bot position to see if it changed
+      // Check bot position to see if it changed from step start (if available)
       const response = await fetch('http://localhost:3005/health', {
         method: 'GET',
         headers: { 'Content-Type': 'application/json' },
@@ -695,13 +767,27 @@ export class EnhancedTaskIntegration extends EventEmitter {
 
       const data = (await response.json()) as any;
       const position = data.botStatus?.position;
+      if (!position) return false;
 
-      if (position) {
-        // Movement verification: bot at ${position.x}, ${position.y}, ${position.z}
-        // For now, assume any position means movement occurred
+      const map: Map<string, any> = (this as any)._stepStartPositions;
+      if (map && map.size > 0) {
+        // Use the most recent stored start position
+        const lastEntry = Array.from(map.entries()).pop();
+        if (lastEntry) {
+          const [, start] = lastEntry;
+          const dx = (position.x ?? 0) - start.x;
+          const dy = (position.y ?? 0) - start.y;
+          const dz = (position.z ?? 0) - start.z;
+          const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
+          map.delete(lastEntry[0]);
+          return dist >= 0.5;
+        }
+      }
+      // Fallback: require at least a non-zero velocity or position change can't be verified
+      const vel = data.botStatus?.velocity;
+      if (vel && (Math.abs(vel.x) + Math.abs(vel.y) + Math.abs(vel.z)) > 0) {
         return true;
       }
-
       return false;
     } catch (error) {
       // Failed to verify movement: ${error}
@@ -921,6 +1007,36 @@ export class EnhancedTaskIntegration extends EventEmitter {
     }
 
     step.startedAt = Date.now();
+
+    // Capture bot position at step start for movement verification
+    (async () => {
+      try {
+        const res = await fetch('http://localhost:3005/health', {
+          method: 'GET',
+          headers: { 'Content-Type': 'application/json' },
+          signal: AbortSignal.timeout(3000),
+        });
+        if (res.ok) {
+          const data = (await res.json()) as any;
+          const p = data?.botStatus?.position;
+          if (
+            p &&
+            typeof p.x === 'number' &&
+            typeof p.y === 'number' &&
+            typeof p.z === 'number'
+          ) {
+            // Store on the instance for later verification
+            (this as any)._stepStartPositions = (this as any)._stepStartPositions || new Map();
+            (this as any)._stepStartPositions.set(`${taskId}-${stepId}`, {
+              x: p.x,
+              y: p.y,
+              z: p.z,
+              ts: Date.now(),
+            });
+          }
+        }
+      } catch {}
+    })();
 
     // Update task status to active if it was pending
     if (task.status === 'pending') {

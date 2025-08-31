@@ -72,7 +72,7 @@ class ConsciousBotMCPServer extends Server {
   private prompts = new Map<string, MCPPromptDefinition>();
 
   // NEW: validators for input/output schemas
-  private ajv = new Ajv({ allErrors: true, useDefaults: true });
+  private ajv = new Ajv({ allErrors: true, useDefaults: true, coerceTypes: true });
   private validators = new Map<
     string,
     { in: ValidateFunction; out?: ValidateFunction }
@@ -641,6 +641,73 @@ class ConsciousBotMCPServer extends Server {
     return resource.metadata;
   }
 
+  // Best‑effort arg normalizer for common leaves to reduce schema friction
+  private normalizeArgsForLeaf(leafName: string, args: any): any {
+    try {
+      if (args == null) return args;
+      const a = typeof args === 'object' ? { ...args } : args;
+
+      // chat: allow a plain string or { text }
+      if (leafName === 'chat') {
+        if (typeof a === 'string') return { message: a };
+        if (a && typeof a === 'object') {
+          if (a.message == null && typeof a.text === 'string') a.message = a.text;
+          return a;
+        }
+        return { message: String(a) };
+      }
+
+      // move_to: allow top‑level x,y,z or { position }
+      if (leafName === 'move_to') {
+        if (Array.isArray(a) && a.length >= 3) {
+          return { pos: { x: Number(a[0]), y: Number(a[1]), z: Number(a[2]) } };
+        }
+        if (a && typeof a === 'object') {
+          const hasTopXYZ = ['x', 'y', 'z'].every((k) => typeof a[k] === 'number');
+          if (hasTopXYZ) {
+            const { x, y, z, ...rest } = a;
+            return { pos: { x, y, z }, ...rest };
+          }
+          if (a.position && typeof a.position === 'object') {
+            const { x, y, z } = a.position;
+            const rest = { ...a };
+            delete (rest as any).position;
+            return { pos: { x: Number(x), y: Number(y), z: Number(z) }, ...rest };
+          }
+        }
+        return a;
+      }
+
+      // get_light_level: allow top‑level x,y,z
+      if (leafName === 'get_light_level') {
+        if (a && typeof a === 'object') {
+          const hasTopXYZ = ['x', 'y', 'z'].every((k) => typeof a[k] === 'number');
+          if (hasTopXYZ) {
+            const { x, y, z, ...rest } = a;
+            return { position: { x, y, z }, ...rest };
+          }
+        }
+        return a;
+      }
+
+      // wait: allow seconds instead of ms, or a number directly
+      if (leafName === 'wait') {
+        if (typeof a === 'number') return { ms: a };
+        if (a && typeof a === 'object') {
+          if (typeof a.seconds === 'number' && a.ms == null) {
+            a.ms = Math.round(a.seconds * 1000);
+            delete (a as any).seconds;
+          }
+        }
+        return a;
+      }
+
+      return a;
+    } catch {
+      return args;
+    }
+  }
+
   private async executeTool(name: string, args: any): Promise<any> {
     // Handle registry tools
     if (name === 'register_option') {
@@ -716,9 +783,12 @@ class ConsciousBotMCPServer extends Server {
       });
     }
 
+    // Normalize inputs for common leaves before validation
+    const normArgs = this.normalizeArgsForLeaf(leafName, args);
+
     // Validate input
     const val = this.validators.get(key)!;
-    if (!val.in(args)) {
+    if (!val.in(normArgs)) {
       throw Object.assign(new Error('validation.failed'), {
         data: { detail: this.ajv.errorsText(val.in.errors) },
       });
@@ -732,7 +802,7 @@ class ConsciousBotMCPServer extends Server {
         data: { detail: 'Bot context not available' },
       });
     }
-    const res = await this.leafFactory.run(leafName, v, ctx, args, {
+    const res = await this.leafFactory.run(leafName, v, ctx, normArgs, {
       idempotencyKey: (args as any)?.idempotencyKey,
     });
 
@@ -1063,13 +1133,17 @@ class ConsciousBotMCPServer extends Server {
 
   // PATCH 6: replace createWorldSnapshot()
   private async createWorldSnapshot(): Promise<any> {
-    if (this.deps.bot) {
-      const ctx = createLeafContext(this.deps.bot);
-      return ctx.snapshot();
-    }
+    console.log('[MCP] createWorldSnapshot called');
+
+    // Always use the fallback method since bot context snapshot is failing
+    // if (this.deps.bot) {
+    //   const ctx = createLeafContext(this.deps.bot);
+    //   return ctx.snapshot();
+    // }
 
     // Return actual world state from minecraft interface
     try {
+      console.log('[MCP] Fetching world state from minecraft interface...');
       const response = await fetch('http://localhost:3005/state');
       if (!response.ok) {
         throw new Error(
@@ -1077,26 +1151,57 @@ class ConsciousBotMCPServer extends Server {
         );
       }
       const data = (await response.json()) as any;
+      console.log(
+        '[MCP] Received data from minecraft interface:',
+        JSON.stringify(data, null, 2)
+      );
 
       if (data.success && data.data?.worldState) {
-        return {
-          position: data.data.worldState.playerPosition,
-          biome: 'plains', // Default since not provided
-          time: data.data.worldState.timeOfDay,
-          lightLevel: 15, // Default since not provided
-          nearbyHostiles: data.data.worldState.nearbyHostiles || [],
-          weather: data.data.worldState.weather,
+        const worldState = data.data.worldState;
+        console.log('[MCP] Creating snapshot from world state...');
+        const invItems = Array.isArray(worldState.inventory?.items)
+          ? worldState.inventory.items
+          : [];
+        const normalizedItems = invItems.map((it: any) => ({
+          // normalize common fields used across the app
+          name: it.name ?? it.type ?? it.displayName ?? undefined,
+          type: it.type ?? it.name ?? undefined,
+          displayName: it.displayName ?? it.name ?? it.type ?? undefined,
+          count: typeof it.count === 'number' ? it.count : it.quantity ?? 1,
+          slot: it.slot,
+        }));
+
+        const totalSlots = worldState.inventory?.space?.total ?? 36;
+        const freeSlots = worldState.inventory?.space?.free ?? Math.max(0, totalSlots - normalizedItems.length);
+
+        const snapshot = {
+          position: worldState.playerPosition || worldState.agentPosition || { x: 0, y: 64, z: 0 },
+          biome: worldState.biome || 'plains',
+          time: worldState.timeOfDay ?? worldState.time ?? 0,
+          lightLevel: worldState.lightLevel ?? 15,
+          nearbyHostiles: Array.isArray(worldState.nearbyHostiles) ? worldState.nearbyHostiles : [],
+          weather: worldState.weather || 'clear',
           inventory: {
-            items: data.data.worldState.inventory.items || [],
-            selectedSlot: 0,
-            totalSlots: data.data.worldState.inventory.space?.total || 36,
-            freeSlots: data.data.worldState.inventory.space?.free || 36,
+            items: normalizedItems,
+            selectedSlot: worldState.inventory?.selectedSlot ?? 0,
+            totalSlots,
+            freeSlots,
           },
           toolDurability: {},
-          waypoints: [],
-          health: data.data.worldState.health,
-          hunger: data.data.worldState.hunger,
+          waypoints: Array.isArray(worldState.waypoints) ? worldState.waypoints : [],
+          vitals: {
+            health: worldState.vitals?.health ?? worldState.health ?? 20,
+            food: worldState.vitals?.food ?? worldState.hunger ?? 20,
+          },
+          // legacy top-level fields kept for compatibility
+          health: worldState.health ?? worldState.vitals?.health ?? 20,
+          hunger: worldState.hunger ?? worldState.vitals?.food ?? 20,
         };
+        console.log(
+          '[MCP] Snapshot created successfully:',
+          JSON.stringify(snapshot, null, 2)
+        );
+        return snapshot;
       }
     } catch (error) {
       console.warn(
@@ -1105,6 +1210,7 @@ class ConsciousBotMCPServer extends Server {
       );
     }
 
+    console.log('[MCP] Using fallback demo data');
     // Fallback to demo data
     return {
       position: { x: 53.5, y: 66, z: -55.5 },
@@ -1116,6 +1222,7 @@ class ConsciousBotMCPServer extends Server {
       inventory: { items: [], selectedSlot: 0, totalSlots: 36, freeSlots: 30 },
       toolDurability: {},
       waypoints: [],
+      vitals: { health: 20, food: 20 },
       health: 20,
       hunger: 20,
     };
