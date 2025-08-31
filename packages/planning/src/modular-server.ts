@@ -1817,4 +1817,139 @@ const planningSystem: PlanningSystem = {
 
         if (result.success) {
           console.log(
-            `
+            `✅ Task executed successfully: ${task.title || task.id}`
+          );
+          return {
+            success: true,
+            message: 'Task executed successfully',
+            result,
+          };
+        }
+        console.error(
+          `❌ Task execution failed: ${task.title || task.id}`,
+          result.error
+        );
+        return {
+          success: false,
+          message: result.error || 'Task execution failed',
+          result,
+        };
+      } catch (error) {
+        console.error(
+          `❌ Task execution error: ${task.title || task.id}`,
+          error
+        );
+        return {
+          success: false,
+          message: error instanceof Error ? error.message : 'Unknown error',
+        };
+      }
+    },
+  },
+};
+
+// Initialize server configuration
+const serverConfig = new ServerConfiguration({
+  port: process.env.PORT ? parseInt(process.env.PORT) : 3002,
+  enableCORS: true,
+  enableMCP: true,
+  mcpConfig: {
+    mcpServerPort: process.env.MCP_PORT ? parseInt(process.env.MCP_PORT) : 3010,
+    registryEndpoint: process.env.MEMORY_ENDPOINT || 'http://localhost:3001',
+    botEndpoint: process.env.MINECRAFT_ENDPOINT || 'http://localhost:3005',
+  },
+});
+
+// Setup event listeners
+enhancedTaskIntegration.on('taskAdded', (task) => {
+  console.log('Task added to enhanced integration:', task.title);
+});
+
+enhancedTaskIntegration.on(
+  'taskProgressUpdated',
+  ({ task, oldProgress, oldStatus }) => {
+    console.log(
+      `Task progress updated: ${task.title} - ${Math.round(task.progress * 100)}% (${oldStatus} -> ${task.status})`
+    );
+  }
+);
+
+// Main server startup function
+async function startServer() {
+  try {
+    // Create an EnhancedRegistry for MCP integration
+    const registry = new EnhancedRegistry();
+
+    // Initialize MCP integration with the registry
+    try {
+      await serverConfig.initializeMCP(undefined, registry);
+      console.log('✅ MCP integration initialized successfully');
+    } catch (error) {
+      console.warn(
+        '⚠️ MCP integration failed to initialize, continuing without it:',
+        error
+      );
+    }
+
+    // Mount planning endpoints
+    const planningRouter = createPlanningEndpoints(planningSystem);
+    serverConfig.mountRouter('/', planningRouter);
+
+    // Mount MCP endpoints
+    const { createMCPEndpoints } = await import('./modules/mcp-endpoints');
+    const mcpIntegration = serverConfig.getMCPIntegration();
+    if (mcpIntegration) {
+      const mcpRouter = createMCPEndpoints(mcpIntegration);
+      serverConfig.mountRouter('/mcp', mcpRouter);
+    }
+
+    // Add error handling
+    serverConfig.addErrorHandling();
+
+    // Start the server
+    await serverConfig.start();
+
+    // Start autonomous task executor
+    setInterval(async () => {
+      try {
+        await autonomousTaskExecutor();
+      } catch (error) {
+        console.warn('Autonomous task executor error (non-fatal):', error);
+      }
+    }, 10000);
+
+    // Start cognitive thought processor
+    try {
+      console.log('Starting cognitive thought processor...');
+      cognitiveThoughtProcessor.startProcessing();
+    } catch (error) {
+      console.warn(
+        '⚠️ Cognitive thought processor failed to start, continuing without it:',
+        error
+      );
+    }
+
+    console.log('✅ Modular planning server started successfully');
+  } catch (error) {
+    console.error('❌ Failed to start modular planning server:', error);
+    process.exit(1);
+  }
+}
+
+// Export for testing and external use
+export {
+  serverConfig,
+  planningSystem,
+  startServer,
+  autonomousTaskExecutor,
+  cognitiveThoughtProcessor,
+  enhancedTaskIntegration,
+  enhancedMemoryIntegration,
+  enhancedEnvironmentIntegration,
+  enhancedLiveStreamIntegration,
+};
+
+// Start server if this file is run directly
+if (require.main === module) {
+  startServer();
+}
