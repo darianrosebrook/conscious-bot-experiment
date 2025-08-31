@@ -16,6 +16,8 @@ import {
   Action,
   Location,
 } from '../types';
+import { promises as fs } from 'fs';
+import * as path from 'path';
 
 /**
  * Default emotional state for experiences
@@ -37,6 +39,7 @@ function getDefaultEmotionalState(): EmotionalState {
 export class EventLogger {
   private events: Experience[] = [];
   private maxEvents = 10000;
+  private autoSaveHandle?: NodeJS.Timeout;
 
   /**
    * Log a significant experience with safe defaults
@@ -199,7 +202,7 @@ export class EventLogger {
    * Calculate base salience score for experience type
    */
   private calculateBaseSalience(type: ExperienceType): number {
-    const baseSalience: Record<ExperienceType, number> = {
+    const baseSalience: Partial<Record<ExperienceType, number>> = {
       [ExperienceType.GOAL_ACHIEVEMENT]: 0.8,
       [ExperienceType.GOAL_FAILURE]: 0.7,
       [ExperienceType.DANGER_ENCOUNTER]: 0.9,
@@ -209,6 +212,7 @@ export class EventLogger {
       [ExperienceType.EXPLORATION]: 0.5,
       [ExperienceType.CREATIVE_ACTIVITY]: 0.6,
       [ExperienceType.ROUTINE_ACTION]: 0.2,
+      [ExperienceType.TASK_REFLECTION]: 0.6,
     };
 
     return baseSalience[type] ?? 0.5;
@@ -237,5 +241,52 @@ export class EventLogger {
         {} as Record<ExperienceType, number>
       ),
     };
+  }
+
+  // ============================================================================
+  // Persistence (Phase 1 - JSON files)
+  // ============================================================================
+
+  private episodicPaths(dir?: string) {
+    const base = dir || path.resolve(process.cwd(), 'memory-storage');
+    return { dir: base, file: path.join(base, 'episodic-log.json') };
+  }
+
+  async saveToDisk(dir?: string): Promise<void> {
+    const { dir: d, file } = this.episodicPaths(dir);
+    await fs.mkdir(d, { recursive: true });
+    await fs.writeFile(file, JSON.stringify({ version: 1, events: this.events }, null, 2), 'utf-8');
+  }
+
+  async loadFromDisk(dir?: string): Promise<void> {
+    const { file } = this.episodicPaths(dir);
+    try {
+      const txt = await fs.readFile(file, 'utf-8');
+      const json = JSON.parse(txt);
+      if (!json || !Array.isArray(json.events)) return;
+      const loaded: Experience[] = [];
+      for (const e of json.events) {
+        const v = ExperienceSchema.safeParse(e);
+        if (v.success) loaded.push(v.data);
+      }
+      // Keep within capacity
+      this.events = loaded.slice(-this.maxEvents);
+    } catch (err: any) {
+      if (err?.code !== 'ENOENT') throw err;
+    }
+  }
+
+  startAutoSave(intervalMs: number, dir?: string): void {
+    if (this.autoSaveHandle) clearInterval(this.autoSaveHandle);
+    this.autoSaveHandle = setInterval(() => {
+      this.saveToDisk(dir).catch((e) =>
+        console.warn('EventLogger autoSave failed:', e?.message)
+      );
+    }, Math.max(5_000, intervalMs));
+  }
+
+  stopAutoSave(): void {
+    if (this.autoSaveHandle) clearInterval(this.autoSaveHandle);
+    this.autoSaveHandle = undefined;
   }
 }

@@ -240,6 +240,11 @@ export class SpatialNavigator {
       const nextPlace = places[i + 1];
       const edge = edges[i];
 
+      // Defensive checks: skip if required data is missing
+      if (!currentPlace || !nextPlace || !edge) {
+        continue;
+      }
+
       // Determine direction
       const direction = this.calculateDirection(currentPlace.position, nextPlace.position);
       
@@ -413,10 +418,41 @@ export class SpatialNavigator {
       waypoints,
       instructions: [],
     };
-    
-    path.instructions = this.generateNavigationInstructions(path);
+
+    // Generate instructions with safety guard to prevent runtime failures
+    path.instructions = this.safeGenerateNavigationInstructions(
+      path,
+      startPlace,
+      goalPlace
+    );
 
     return path;
+  }
+
+  /**
+   * Safely generate navigation instructions; fall back to a minimal instruction
+   * if instruction generation encounters unexpected data issues.
+   */
+  private safeGenerateNavigationInstructions(
+    path: NavigationPath,
+    start: PlaceNode,
+    goal: PlaceNode
+  ): NavigationInstruction[] {
+    try {
+      const instr = this.generateNavigationInstructions(path);
+      if (Array.isArray(instr) && instr.length > 0) return instr;
+    } catch (err) {
+      // Swallow and fall through to fallback below
+    }
+
+    // Fallback: provide a simple high-level directive
+    return [
+      {
+        type: 'move',
+        target: goal?.name ?? 'destination',
+        description: `Travel to ${goal?.name ?? 'destination'}.`,
+      },
+    ];
   }
 
   /**

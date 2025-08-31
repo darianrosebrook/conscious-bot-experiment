@@ -544,3 +544,122 @@ export class SmeltLeaf implements LeafImpl {
     return map[input] ?? input; // fallback: no rename
   }
 }
+
+// ============================================================================
+// Introspect Recipe Leaf
+// ============================================================================
+
+/**
+ * Introspect a crafting recipe for an output item without performing crafting
+ */
+export class IntrospectRecipeLeaf implements LeafImpl {
+  spec: LeafSpec = {
+    name: 'introspect_recipe',
+    version: '1.0.0',
+    description: 'Return inputs and table requirement for a crafting output',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        output: { type: 'string' },
+      },
+      required: ['output'],
+    },
+    outputSchema: {
+      type: 'object',
+      properties: {
+        output: { type: 'string' },
+        requiresTable: { type: 'boolean' },
+        inputs: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              item: { type: 'string' },
+              count: { type: 'number' },
+            },
+          },
+        },
+      },
+      required: ['output', 'inputs'],
+    },
+    timeoutMs: 5000,
+    retries: 0,
+    permissions: [],
+  };
+
+  async run(ctx: LeafContext, args: any): Promise<LeafResult> {
+    const { output } = args || {};
+    const bot = ctx.bot as any;
+    const mcData = bot?.mcData;
+    if (!output || !mcData) {
+      return {
+        status: 'failure',
+        error: {
+          code: 'craft.missingInput',
+          retryable: false,
+          detail: !output ? 'Missing output' : 'mcData not available',
+        },
+        metrics: { durationMs: 0, retries: 0, timeouts: 0 },
+      };
+    }
+
+    const item = mcData.itemsByName[output];
+    if (!item) {
+      return {
+        status: 'failure',
+        error: {
+          code: 'craft.missingInput',
+          retryable: false,
+          detail: `Unknown item: ${output}`,
+        },
+        metrics: { durationMs: 0, retries: 0, timeouts: 0 },
+      };
+    }
+
+    try {
+      const recipes = (ctx.bot as any).recipesFor(item.id, null, null, null) || [];
+      if (!recipes.length) {
+        return {
+          status: 'success',
+          result: { output, requiresTable: false, inputs: [] },
+          metrics: { durationMs: 0, retries: 0, timeouts: 0 },
+        };
+      }
+
+      const r = recipes[0];
+      const counts: Record<string, number> = {};
+      const ingredients: any[] = (r.ingredients || r.inShape?.flat?.() || [])
+        .filter(Boolean);
+
+      for (const ing of ingredients) {
+        const ingId = typeof ing === 'number' ? ing : ing.id;
+        const count = (ing.count ?? 1) as number;
+        const name = mcData.items[ingId]?.name || mcData.blocks?.[ingId]?.name;
+        if (!name) continue;
+        counts[name] = (counts[name] || 0) + count;
+      }
+
+      const inputs = Object.entries(counts).map(([item, count]) => ({
+        item,
+        count,
+      }));
+      const requiresTable = Boolean((r as any).requiresTable || (r?.inShape && r.inShape.length > 2));
+
+      return {
+        status: 'success',
+        result: { output, requiresTable, inputs },
+        metrics: { durationMs: 0, retries: 0, timeouts: 0 },
+      };
+    } catch (e) {
+      return {
+        status: 'failure',
+        error: {
+          code: 'unknown',
+          retryable: false,
+          detail: e instanceof Error ? e.message : 'introspection failed',
+        },
+        metrics: { durationMs: 0, retries: 0, timeouts: 0 },
+      };
+    }
+  }
+}

@@ -77,14 +77,14 @@ class RunningTaskManager {
    * Get tasks by priority level
    */
   getTasksByPriority(priority: PreemptionPriority): Task[] {
-    return this.getAllTasks().filter(task => task.priority === priority);
+    return this.getAllTasks().filter((task) => task.priority === priority);
   }
 
   /**
    * Get tasks lower than priority
    */
   getTasksLowerThan(priority: PreemptionPriority): Task[] {
-    return this.getAllTasks().filter(task => task.priority > priority);
+    return this.getAllTasks().filter((task) => task.priority > priority);
   }
 
   /**
@@ -131,8 +131,10 @@ class RunningTaskManager {
     for (const task of this.runningTasks.values()) {
       this.resourceUsage.cpu += task.resourceRequirements.cpu;
       this.resourceUsage.memory += task.resourceRequirements.memory;
-      this.resourceUsage.network = this.resourceUsage.network || task.resourceRequirements.network;
-      this.resourceUsage.storage = this.resourceUsage.storage || task.resourceRequirements.storage;
+      this.resourceUsage.network =
+        this.resourceUsage.network || task.resourceRequirements.network;
+      this.resourceUsage.storage =
+        this.resourceUsage.storage || task.resourceRequirements.storage;
     }
   }
 
@@ -222,13 +224,21 @@ class PreemptionPolicy {
     }
 
     // For other tasks, check if overhead is reasonable
-    const estimatedBenefit = this.calculatePreemptionBenefit(incomingTask, preemptedTasks);
+    const estimatedBenefit = this.calculatePreemptionBenefit(
+      incomingTask,
+      preemptedTasks
+    );
     return estimatedBenefit > overhead;
   }
 
-  private calculatePreemptionBenefit(incomingTask: Task, preemptedTasks: Task[]): number {
+  private calculatePreemptionBenefit(
+    incomingTask: Task,
+    preemptedTasks: Task[]
+  ): number {
     // Simple heuristic: benefit is proportional to priority difference
-    const priorityGap = Math.max(...preemptedTasks.map(t => t.priority)) - incomingTask.priority;
+    const priorityGap =
+      Math.max(...preemptedTasks.map((t) => t.priority)) -
+      incomingTask.priority;
     return priorityGap * 10; // 10ms benefit per priority level
   }
 
@@ -245,7 +255,10 @@ class PreemptionPolicy {
  * Preempted task queue
  */
 class PreemptedTaskQueue {
-  private preemptedTasks: Map<string, { task: Task; grant: ExecutionGrant; preemptedAt: number }>;
+  private preemptedTasks: Map<
+    string,
+    { task: Task; grant: ExecutionGrant; preemptedAt: number }
+  >;
   private restorationQueue: string[];
 
   constructor() {
@@ -262,7 +275,7 @@ class PreemptedTaskQueue {
       grant,
       preemptedAt: Date.now(),
     });
-    
+
     // Add to restoration queue in priority order
     this.insertInRestorationOrder(task.taskId);
   }
@@ -272,15 +285,17 @@ class PreemptedTaskQueue {
    */
   getNextTaskForRestoration(): { task: Task; grant: ExecutionGrant } | null {
     while (this.restorationQueue.length > 0) {
-      const taskId = this.restorationQueue.shift()!;
+      const taskId = this.restorationQueue.shift();
+      if (!taskId) continue;
+
       const entry = this.preemptedTasks.get(taskId);
-      
+
       if (entry) {
         this.preemptedTasks.delete(taskId);
         return { task: entry.task, grant: entry.grant };
       }
     }
-    
+
     return null;
   }
 
@@ -290,11 +305,11 @@ class PreemptedTaskQueue {
   removePreemptedTask(taskId: string): boolean {
     const removed = this.preemptedTasks.delete(taskId);
     const queueIndex = this.restorationQueue.indexOf(taskId);
-    
+
     if (queueIndex >= 0) {
       this.restorationQueue.splice(queueIndex, 1);
     }
-    
+
     return removed;
   }
 
@@ -302,7 +317,7 @@ class PreemptedTaskQueue {
    * Get all preempted tasks
    */
   getAllPreemptedTasks(): Task[] {
-    return Array.from(this.preemptedTasks.values()).map(entry => entry.task);
+    return Array.from(this.preemptedTasks.values()).map((entry) => entry.task);
   }
 
   /**
@@ -319,18 +334,21 @@ class PreemptedTaskQueue {
 
     // Insert in priority order (higher priority first)
     let insertIndex = 0;
-    
+
     for (let i = 0; i < this.restorationQueue.length; i++) {
       const existingTaskId = this.restorationQueue[i];
       const existingEntry = this.preemptedTasks.get(existingTaskId);
-      
-      if (existingEntry && newEntry.task.priority < existingEntry.task.priority) {
+
+      if (
+        existingEntry &&
+        newEntry.task.priority < existingEntry.task.priority
+      ) {
         insertIndex = i;
         break;
       }
       insertIndex = i + 1;
     }
-    
+
     this.restorationQueue.splice(insertIndex, 0, taskId);
   }
 }
@@ -346,14 +364,16 @@ export class PreemptionManager extends EventEmitter {
   private enabled: boolean;
   private restorationTimer?: NodeJS.Timeout;
 
-  constructor(config: {
-    enabled?: boolean;
-    maxPreemptionDepth?: number;
-    overheadBudgetMs?: number;
-    restorationDelayMs?: number;
-  } = {}) {
+  constructor(
+    config: {
+      enabled?: boolean;
+      maxPreemptionDepth?: number;
+      overheadBudgetMs?: number;
+      restorationDelayMs?: number;
+    } = {}
+  ) {
     super();
-    
+
     this.enabled = config.enabled ?? true;
     this.runningTasks = new RunningTaskManager();
     this.preemptedTasks = new PreemptedTaskQueue();
@@ -363,7 +383,7 @@ export class PreemptionManager extends EventEmitter {
       config.restorationDelayMs
     );
     this.preemptionHistory = [];
-    
+
     this.startRestorationLoop();
   }
 
@@ -372,47 +392,57 @@ export class PreemptionManager extends EventEmitter {
    */
   requestExecution(task: Task): ExecutionGrant {
     const validatedTask = validateTask(task);
-    
+
     if (!this.enabled) {
       return this.createGrant(validatedTask, false, 'Preemption disabled');
     }
 
     // Check if resources are immediately available
-    if (this.runningTasks.canAllocateResources(validatedTask.resourceRequirements)) {
-      const grant = this.createGrant(validatedTask, true, 'Resources available');
+    if (
+      this.runningTasks.canAllocateResources(validatedTask.resourceRequirements)
+    ) {
+      const grant = this.createGrant(
+        validatedTask,
+        true,
+        'Resources available'
+      );
       this.runningTasks.addTask(validatedTask, grant);
-      
+
       this.emit('task-granted', {
         task: validatedTask,
         grant,
         timestamp: Date.now(),
       });
-      
+
       return grant;
     }
 
     // Check if preemption is possible
     const preemptionResult = this.evaluatePreemption(validatedTask);
-    
+
     if (preemptionResult.possible) {
       this.executePreemption(validatedTask, preemptionResult.tasksToPreempt);
-      const grant = this.createGrant(validatedTask, true, 'Granted via preemption');
+      const grant = this.createGrant(
+        validatedTask,
+        true,
+        'Granted via preemption'
+      );
       this.runningTasks.addTask(validatedTask, grant);
-      
+
       this.emit('task-granted', {
         task: validatedTask,
         grant,
-        preempted: preemptionResult.tasksToPreempt.map(t => t.taskId),
+        preempted: preemptionResult.tasksToPreempt.map((t) => t.taskId),
         timestamp: Date.now(),
       });
-      
+
       return grant;
     }
 
     // Cannot grant execution
     return this.createGrant(
-      validatedTask, 
-      false, 
+      validatedTask,
+      false,
       'Insufficient resources and cannot preempt'
     );
   }
@@ -422,19 +452,19 @@ export class PreemptionManager extends EventEmitter {
    */
   completeTask(taskId: string): boolean {
     const task = this.runningTasks.removeTask(taskId);
-    
+
     if (task) {
       this.emit('task-completed', {
         task,
         timestamp: Date.now(),
         duration: task.startedAt ? Date.now() - task.startedAt : 0,
       });
-      
+
       // Trigger restoration attempt
       this.attemptTaskRestoration();
       return true;
     }
-    
+
     return false;
   }
 
@@ -450,7 +480,7 @@ export class PreemptionManager extends EventEmitter {
         timestamp: Date.now(),
         source: 'running',
       });
-      
+
       this.attemptTaskRestoration();
       return true;
     }
@@ -490,7 +520,8 @@ export class PreemptionManager extends EventEmitter {
       preemptedTasks,
       resourceUsage: this.runningTasks.getCurrentResourceUsage(),
       preemptionCount: this.preemptionHistory.length,
-      averageWaitTime: preemptedTasks.length > 0 ? totalWaitTime / preemptedTasks.length : 0,
+      averageWaitTime:
+        preemptedTasks.length > 0 ? totalWaitTime / preemptedTasks.length : 0,
     };
   }
 
@@ -520,7 +551,7 @@ export class PreemptionManager extends EventEmitter {
     for (const event of this.preemptionHistory) {
       preemptionsByPriority[event.preemptingPriority]++;
       totalOverhead += event.overhead;
-      
+
       if (event.restorationTime) {
         restoredTasks++;
       }
@@ -529,8 +560,14 @@ export class PreemptionManager extends EventEmitter {
     return {
       totalPreemptions: this.preemptionHistory.length,
       preemptionsByPriority,
-      averageOverhead: this.preemptionHistory.length > 0 ? totalOverhead / this.preemptionHistory.length : 0,
-      restorationSuccessRate: this.preemptionHistory.length > 0 ? restoredTasks / this.preemptionHistory.length : 0,
+      averageOverhead:
+        this.preemptionHistory.length > 0
+          ? totalOverhead / this.preemptionHistory.length
+          : 0,
+      restorationSuccessRate:
+        this.preemptionHistory.length > 0
+          ? restoredTasks / this.preemptionHistory.length
+          : 0,
     };
   }
 
@@ -539,7 +576,7 @@ export class PreemptionManager extends EventEmitter {
    */
   setEnabled(enabled: boolean): void {
     this.enabled = enabled;
-    
+
     this.emit('preemption-config-changed', {
       enabled,
       timestamp: Date.now(),
@@ -552,20 +589,23 @@ export class PreemptionManager extends EventEmitter {
     estimatedOverhead: number;
   } {
     const tasksToPreempt: Task[] = [];
-    let availableResources = this.runningTasks.getCurrentResourceUsage();
+    const availableResources = this.runningTasks.getCurrentResourceUsage();
 
     // Find tasks that can be preempted
-    const candidateTasks = this.runningTasks.getTasksLowerThan(incomingTask.priority)
-      .filter(task => this.preemptionPolicy.canPreempt(task, incomingTask.priority))
+    const candidateTasks = this.runningTasks
+      .getTasksLowerThan(incomingTask.priority)
+      .filter((task) =>
+        this.preemptionPolicy.canPreempt(task, incomingTask.priority)
+      )
       .sort((a, b) => b.priority - a.priority); // Start with lowest priority
 
     for (const task of candidateTasks) {
       tasksToPreempt.push(task);
-      
+
       // Calculate what resources would be freed
       availableResources.cpu -= task.resourceRequirements.cpu;
       availableResources.memory -= task.resourceRequirements.memory;
-      
+
       if (task.resourceRequirements.network) {
         availableResources.network = false;
       }
@@ -574,11 +614,14 @@ export class PreemptionManager extends EventEmitter {
       }
 
       // Check if we now have enough resources
-      const wouldFitAfterPreemption = 
+      const wouldFitAfterPreemption =
         availableResources.cpu + incomingTask.resourceRequirements.cpu <= 1.0 &&
-        availableResources.memory + incomingTask.resourceRequirements.memory <= this.getMaxMemory() &&
-        (!incomingTask.resourceRequirements.network || !availableResources.network) &&
-        (!incomingTask.resourceRequirements.storage || !availableResources.storage);
+        availableResources.memory + incomingTask.resourceRequirements.memory <=
+          this.getMaxMemory() &&
+        (!incomingTask.resourceRequirements.network ||
+          !availableResources.network) &&
+        (!incomingTask.resourceRequirements.storage ||
+          !availableResources.storage);
 
       if (wouldFitAfterPreemption) {
         break;
@@ -590,9 +633,13 @@ export class PreemptionManager extends EventEmitter {
       incomingTask
     );
 
-    const possible = 
+    const possible =
       tasksToPreempt.length > 0 &&
-      this.preemptionPolicy.isPreemptionWorthwhile(incomingTask, tasksToPreempt, estimatedOverhead);
+      this.preemptionPolicy.isPreemptionWorthwhile(
+        incomingTask,
+        tasksToPreempt,
+        estimatedOverhead
+      );
 
     return {
       possible,
@@ -622,10 +669,13 @@ export class PreemptionManager extends EventEmitter {
         };
 
         this.preemptionHistory.push(preemptionEvent);
-        
+
         // Keep only last 1000 events
         if (this.preemptionHistory.length > 1000) {
-          this.preemptionHistory.splice(0, this.preemptionHistory.length - 1000);
+          this.preemptionHistory.splice(
+            0,
+            this.preemptionHistory.length - 1000
+          );
         }
 
         this.emit('task-preempted', {
@@ -638,7 +688,11 @@ export class PreemptionManager extends EventEmitter {
     }
   }
 
-  private createGrant(task: Task, granted: boolean, reason?: string): ExecutionGrant {
+  private createGrant(
+    task: Task,
+    granted: boolean,
+    reason?: string
+  ): ExecutionGrant {
     const grant: ExecutionGrant = {
       grantId: `grant_${task.taskId}_${Date.now()}`,
       taskId: task.taskId,
@@ -665,15 +719,19 @@ export class PreemptionManager extends EventEmitter {
 
   private attemptTaskRestoration(): void {
     const nextTask = this.preemptedTasks.getNextTaskForRestoration();
-    
-    if (nextTask && this.runningTasks.canAllocateResources(nextTask.task.resourceRequirements)) {
+
+    if (
+      nextTask &&
+      this.runningTasks.canAllocateResources(nextTask.task.resourceRequirements)
+    ) {
       this.runningTasks.addTask(nextTask.task, nextTask.grant);
-      
+
       // Update preemption history with restoration time
       const relevantEvent = this.preemptionHistory.find(
-        event => event.preemptedTask === nextTask.task.taskId && !event.restorationTime
+        (event) =>
+          event.preemptedTask === nextTask.task.taskId && !event.restorationTime
       );
-      
+
       if (relevantEvent) {
         relevantEvent.restorationTime = Date.now();
       }
@@ -700,7 +758,7 @@ export class PreemptionManager extends EventEmitter {
       clearTimeout(this.restorationTimer);
       this.restorationTimer = undefined;
     }
-    
+
     this.removeAllListeners();
   }
 }

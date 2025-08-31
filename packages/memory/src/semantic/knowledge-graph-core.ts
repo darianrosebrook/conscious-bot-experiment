@@ -27,6 +27,8 @@ import {
   EntitySchema,
   RelationshipSchema,
 } from './types';
+import { promises as fs } from 'fs';
+import * as path from 'path';
 
 /**
  * Default configuration for knowledge graph
@@ -48,10 +50,22 @@ export class KnowledgeGraphCore {
   private entitiesByType: Map<EntityType, Set<string>> = new Map(); // type -> entityIds
   private relationshipsByType: Map<RelationType, Set<string>> = new Map(); // type -> relationshipIds
   private config: KnowledgeGraphConfig;
+  private autoSaveHandle?: NodeJS.Timeout;
 
   constructor(config: Partial<KnowledgeGraphConfig> = {}) {
     this.config = { ...DEFAULT_CONFIG, ...config };
     this.initializeIndexes();
+
+    // Attempt to load from disk if persistence enabled
+    if (this.config.persistToStorage && this.config.storageDirectory) {
+      this.loadFromDisk().catch((err) =>
+        console.warn('KnowledgeGraphCore loadFromDisk failed:', err?.message)
+      );
+      // Start autosave if configured
+      if (this.config.autoSaveInterval && this.config.autoSaveInterval > 0) {
+        this.startAutoSave(this.config.autoSaveInterval);
+      }
+    }
   }
 
   /**
@@ -67,6 +81,96 @@ export class KnowledgeGraphCore {
     Object.values(RelationType).forEach((type) => {
       this.relationshipsByType.set(type as RelationType, new Set<string>());
     });
+  }
+
+  // ============================================================================
+  // Persistence (Phase 1 - JSON files)
+  // ============================================================================
+
+  private getStoragePaths() {
+    const dir = this.config.storageDirectory || path.resolve(process.cwd(), 'memory-storage');
+    const file = path.join(dir, 'knowledge-graph.json');
+    return { dir, file };
+    }
+
+  private toSerializable() {
+    return {
+      version: 1,
+      savedAt: Date.now(),
+      entities: Array.from(this.entities.values()),
+      relationships: Array.from(this.relationships.values()),
+    };
+  }
+
+  private fromSerializable(data: any) {
+    if (!data || !Array.isArray(data.entities) || !Array.isArray(data.relationships)) {
+      throw new Error('Invalid knowledge graph file format');
+    }
+
+    // Reset maps
+    this.entities.clear();
+    this.relationships.clear();
+    this.entityRelationships.clear();
+    this.entitiesByType.forEach((set) => set.clear());
+    this.relationshipsByType.forEach((set) => set.clear());
+
+    // Load entities
+    for (const e of data.entities) {
+      const validation = EntitySchema.safeParse(e);
+      if (!validation.success) continue;
+      const entity = validation.data;
+      this.entities.set(entity.id, entity);
+      this.entitiesByType.get(entity.type)?.add(entity.id);
+    }
+
+    // Load relationships
+    for (const r of data.relationships) {
+      const validation = RelationshipSchema.safeParse(r);
+      if (!validation.success) continue;
+      const rel = validation.data;
+      this.relationships.set(rel.id, rel);
+      this.relationshipsByType.get(rel.type)?.add(rel.id);
+      // Track adjacency
+      if (!this.entityRelationships.has(rel.sourceId)) this.entityRelationships.set(rel.sourceId, new Set());
+      if (!this.entityRelationships.has(rel.targetId)) this.entityRelationships.set(rel.targetId, new Set());
+      this.entityRelationships.get(rel.sourceId)!.add(rel.id);
+      this.entityRelationships.get(rel.targetId)!.add(rel.id);
+    }
+  }
+
+  async saveToDisk(): Promise<void> {
+    if (!this.config.persistToStorage) return;
+    const { dir, file } = this.getStoragePaths();
+    await fs.mkdir(dir, { recursive: true });
+    const data = this.toSerializable();
+    await fs.writeFile(file, JSON.stringify(data, null, 2), 'utf-8');
+  }
+
+  async loadFromDisk(): Promise<void> {
+    if (!this.config.persistToStorage) return;
+    const { file } = this.getStoragePaths();
+    try {
+      const txt = await fs.readFile(file, 'utf-8');
+      const json = JSON.parse(txt);
+      this.fromSerializable(json);
+    } catch (err: any) {
+      if (err?.code === 'ENOENT') return; // no file yet
+      throw err;
+    }
+  }
+
+  startAutoSave(intervalMs: number): void {
+    if (this.autoSaveHandle) clearInterval(this.autoSaveHandle);
+    this.autoSaveHandle = setInterval(() => {
+      this.saveToDisk().catch((e) =>
+        console.warn('KnowledgeGraphCore autoSave failed:', e?.message)
+      );
+    }, Math.max(5_000, intervalMs));
+  }
+
+  stopAutoSave(): void {
+    if (this.autoSaveHandle) clearInterval(this.autoSaveHandle);
+    this.autoSaveHandle = undefined;
   }
 
   /**

@@ -10,19 +10,19 @@ These documents provide the foundational frameworks for building a safe, effecti
 
 ### Core Strategy Documents
 
-- **[Integration Strategy](INTEGRATION_STRATEGY.md)** - Cross-module coordination and data flow validation
+- **[Integration Strategy](integration_strategy.md)** - Cross-module coordination and data flow validation
   - Module dependency management
   - Real-time performance coordination
   - Error handling and recovery protocols
   - Contract testing between modules
 
-- **[Risk Management](RISK_MANAGEMENT.md)** - Comprehensive risk assessment and mitigation strategies
+- **[Risk Management](risk_management.md)** - Comprehensive risk assessment and mitigation strategies
   - Technical risk identification and mitigation
   - Safety and security protocols
   - Operational risk management
   - Contingency planning
 
-- **[Verification Framework](VERIFICATION_FRAMEWORK.md)** - Quality assurance and testing methodology
+- **[Verification Framework](verification_framework.md)** - Quality assurance and testing methodology
   - Testing strategies for cognitive systems
   - Validation criteria for consciousness-like behaviors
   - Performance benchmarking

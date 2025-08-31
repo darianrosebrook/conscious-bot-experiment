@@ -59,6 +59,16 @@ export interface Task {
   progress: number; // 0..1
   source: TaskSource;
   steps?: TaskStep[];
+  requirement?: {
+    kind: 'collect' | 'mine' | 'craft';
+    quantity: number;
+    have: number;
+    needed: number;
+    patterns?: string[];
+    outputPattern?: string;
+    proxyPatterns?: string[];
+    proxyHave?: number;
+  };
 }
 
 // Event types

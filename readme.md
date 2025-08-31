@@ -32,7 +32,7 @@ cd conscious-bot
 # Install dependencies
 pnpm install
 
-# Start all services (dashboard, minecraft interface, cognitive systems)
+# Start all services (dashboard, core, minecraft interface, cognition, memory, world, planning, optional HRM)
 pnpm dev
 
 # Check server status
@@ -72,15 +72,15 @@ The project includes robust server management scripts to handle the multi-servic
 pnpm dev
 ```
 - Automatically kills any existing server processes
-- Frees up occupied ports (3000-3005)
-- Starts all 6 services in parallel
+- Frees up occupied ports (3000-3007, 5001)
+- Starts 7 core services (+ optional HRM) in parallel
 - Provides real-time logging with service identification
 
 #### **Check Server Status**
 ```bash
 pnpm status
 ```
-- Shows health status of all 6 servers
+- Shows health status of all services
 - Displays process information and port usage
 - Provides summary statistics
 - Checks server responsiveness
@@ -102,7 +102,28 @@ pnpm run dev:cognition      # Cognitive systems (port 3003)
 pnpm run dev:memory         # Memory systems (port 3001)
 pnpm run dev:world          # World perception (port 3004)
 pnpm run dev:planning       # Planning systems (port 3002)
+pnpm --filter @conscious-bot/core run dev:server   # Core API (port 3007)
+# Optional
+# Sapient HRM python bridge (port 5001) started by pnpm dev via scripts/start.js
 ```
+
+### Services & Ports
+
+- Dashboard: `http://localhost:3000`
+- Memory API: `http://localhost:3001`
+- Planning API: `http://localhost:3002` (exposes planning endpoints and embedded MCP under `/mcp`)
+- Cognition API: `http://localhost:3003`
+- World API: `http://localhost:3004`
+- Minecraft Interface: `http://localhost:3005`
+- MCP (embedded by Planning): `http://localhost:3002/mcp` (no separate process required)
+- Core API: `http://localhost:3007`
+- Sapient HRM (optional): `http://localhost:5001`
+
+### MCP Integration
+
+- The planning server embeds the MCP server and mounts MCP endpoints at `http://localhost:3002/mcp`.
+- Tasks can be executed using registered Behavior Tree options via MCP.
+- For development, planning uses an autonomous executor scheduled every ~10s to discover and execute tasks using MCP options.
 
 ### Architecture Overview
 The system is organized into 9 core packages:

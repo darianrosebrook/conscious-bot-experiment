@@ -150,12 +150,12 @@ export const InventoryDisplay: React.FC<InventoryDisplayProps> = ({
   selectedSlot = 0,
   className = '',
 }) => {
-  // Separate hotbar (slots 0-8) from main inventory
+  // Separate hotbar (slots 0-8) from main inventory (slots 9-35) and extended inventory (slots 36-44)
   const hotbarItems = inventory.filter(
     (item) => item.slot >= 0 && item.slot <= 8
   );
   const mainInventoryItems = inventory.filter(
-    (item) => item.slot >= 9 && item.slot <= 35
+    (item) => item.slot >= 9 && item.slot <= 44
   );
 
   return (
@@ -267,8 +267,8 @@ export const InventoryDisplay: React.FC<InventoryDisplayProps> = ({
               Main Inventory
             </h4>
             <div className="grid grid-cols-9 gap-1">
-              {Array.from({ length: 27 }, (_, index) => {
-                const actualSlot = index + 9; // Main inventory starts at slot 9
+              {Array.from({ length: 36 }, (_, index) => {
+                const actualSlot = index + 9; // Main inventory starts at slot 9, extended to slot 44
                 const item = mainInventoryItems.find(
                   (item) => item.slot === actualSlot
                 );

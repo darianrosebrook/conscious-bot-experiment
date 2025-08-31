@@ -78,6 +78,8 @@ export enum ExperienceType {
   SKILL_IMPROVEMENT = 'skill_improvement',
   CREATIVE_ACTIVITY = 'creative_activity',
   ROUTINE_ACTION = 'routine_action',
+  // Reflection on task/process outcomes and reasoning
+  TASK_REFLECTION = 'task_reflection',
 }
 
 export interface Outcome {

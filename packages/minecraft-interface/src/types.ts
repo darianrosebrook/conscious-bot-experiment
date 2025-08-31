@@ -171,7 +171,8 @@ export type MinecraftActionType =
   | 'turn_right'
   | 'jump'
   | 'experiment_with_item'
-  | 'explore_item_properties';
+  | 'explore_item_properties'
+  | 'gather';
 
 export interface MinecraftAction {
   type: MinecraftActionType;
@@ -241,6 +242,16 @@ export interface ExperimentWithItemAction extends MinecraftAction {
     item_type: string;
     experiment_type?: 'consume' | 'place' | 'craft';
     position?: Vec3;
+  };
+}
+
+export interface GatherAction extends MinecraftAction {
+  type: 'gather';
+  parameters: {
+    resource: string;
+    amount?: number;
+    target?: string;
+    radius?: number;
   };
 }
 

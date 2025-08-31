@@ -11,6 +11,7 @@ import { Bot, createBot } from 'mineflayer';
 import { EventEmitter } from 'events';
 import { BotConfig, BotEvent, BotEventType } from './types';
 import { AutomaticSafetyMonitor } from './automatic-safety-monitor';
+import mcData from 'minecraft-data';
 
 export class BotAdapter extends EventEmitter {
   private bot: Bot | null = null;
@@ -58,6 +59,12 @@ export class BotAdapter extends EventEmitter {
         version: this.config.version,
         auth: this.config.auth,
       });
+
+      // Add mcData to the bot for crafting support
+      if (this.bot) {
+        (this.bot as any).mcData = mcData(this.config.version);
+        console.log(`🔧 Added mcData for version ${this.config.version}`);
+      }
 
       this.setupBotEventHandlers();
 

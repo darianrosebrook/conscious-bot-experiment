@@ -55,19 +55,17 @@ export function useWebSocket({
 
   const connect = useCallback(() => {
     if (!isMountedRef.current || wsRef.current?.readyState === WebSocket.OPEN) {
-      console.log(
-        'WebSocket: Skipping connection - already connected or unmounted'
-      );
+      // WebSocket: Skipping connection - already connected or unmounted
       return;
     }
 
     // Prevent multiple simultaneous connection attempts
     if (isConnectingRef.current) {
-      console.log('WebSocket: Skipping connection - already connecting');
+      // WebSocket: Skipping connection - already connecting
       return;
     }
 
-    console.log('WebSocket: Attempting connection to', url);
+    // WebSocket: Attempting connection to ${url}
     isConnectingRef.current = true;
     setIsConnecting(true);
     setError(null);
@@ -79,7 +77,7 @@ export function useWebSocket({
       ws.onopen = () => {
         if (!isMountedRef.current) return;
 
-        console.log('WebSocket: Connection opened successfully');
+        // WebSocket: Connection opened successfully
         setIsConnected(true);
         setIsConnecting(false);
         isConnectingRef.current = false;
@@ -95,21 +93,14 @@ export function useWebSocket({
           const message: WebSocketMessage = JSON.parse(event.data);
           onMessage?.(message);
         } catch (parseError) {
-          console.error('Failed to parse WebSocket message:', parseError);
+          // Failed to parse WebSocket message: ${parseError}
         }
       };
 
       ws.onclose = (event) => {
         if (!isMountedRef.current) return;
 
-        console.log('WebSocket: Connection closed', {
-          code: event.code,
-          reason: event.reason,
-          wasClean: event.wasClean,
-          shouldReconnect: shouldReconnectRef.current,
-          reconnectAttempts: reconnectAttemptsRef.current,
-          maxAttempts: maxReconnectAttempts,
-        });
+        // WebSocket: Connection closed - code: ${event.code}, reason: ${event.reason}
 
         setIsConnected(false);
         setIsConnecting(false);
@@ -124,9 +115,7 @@ export function useWebSocket({
           !event.wasClean
         ) {
           reconnectAttemptsRef.current++;
-          console.log(
-            `WebSocket: Attempting reconnect ${reconnectAttemptsRef.current}/${maxReconnectAttempts} in ${reconnectInterval}ms`
-          );
+          // WebSocket: Attempting reconnect ${reconnectAttemptsRef.current}/${maxReconnectAttempts}
 
           // Clear any existing timeout
           if (reconnectTimeoutRef.current) {
@@ -139,10 +128,10 @@ export function useWebSocket({
             }
           }, reconnectInterval);
         } else if (reconnectAttemptsRef.current >= maxReconnectAttempts) {
-          console.log('WebSocket: Max reconnection attempts reached');
+          // WebSocket: Max reconnection attempts reached
           setError('Max reconnection attempts reached');
         } else {
-          console.log('WebSocket: Not reconnecting - conditions not met');
+          // WebSocket: Not reconnecting - conditions not met
         }
       };
 
@@ -150,13 +139,13 @@ export function useWebSocket({
         if (!isMountedRef.current) return;
 
         // Don't set error immediately on connection error, let onclose handle it
-        console.warn('WebSocket: Connection error:', event);
+        // WebSocket: Connection error occurred
         onError?.(event);
       };
     } catch (err) {
       if (!isMountedRef.current) return;
 
-      console.error('WebSocket: Failed to create connection:', err);
+      // WebSocket: Failed to create connection
       setIsConnecting(false);
       isConnectingRef.current = false;
       setError(
@@ -193,7 +182,7 @@ export function useWebSocket({
     if (wsRef.current?.readyState === WebSocket.OPEN) {
       wsRef.current.send(JSON.stringify(message));
     } else {
-      console.warn('WebSocket is not connected, cannot send message');
+      // WebSocket is not connected, cannot send message
     }
   }, []);
 

@@ -47,6 +47,7 @@ export class ServerConfiguration {
   private config: ServerConfig;
   private app: Application;
   private _mcpIntegration: MCPIntegration | null = null;
+  private httpServer: import('http').Server | null = null;
 
   constructor(config: ServerConfig = {}) {
     this.config = {
@@ -158,7 +159,7 @@ export class ServerConfiguration {
    */
   async start(): Promise<void> {
     return new Promise((resolve, reject) => {
-      const server = this.app.listen(this.config.port, () => {
+      this.httpServer = this.app.listen(this.config.port, () => {
         console.log(
           `[Server] Planning system server running on port ${this.config.port}`
         );
@@ -176,10 +177,22 @@ export class ServerConfiguration {
         resolve();
       });
 
-      server.on('error', (error) => {
+      this.httpServer.on('error', (error) => {
         console.error('[Server] Failed to start server:', error);
         reject(error);
       });
+    });
+  }
+
+  /**
+   * Stop the server (graceful shutdown)
+   */
+  async stop(): Promise<void> {
+    // Close MCP resources if needed in future
+    await new Promise<void>((resolve) => {
+      if (!this.httpServer) return resolve();
+      this.httpServer.close(() => resolve());
+      // Do not null immediately; leave for GC after close callback
     });
   }
 

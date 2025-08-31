@@ -698,73 +698,19 @@ Provide a structured, technical description for system execution.`;
     prompt: string,
     config: PromptConfig
   ): Promise<string> {
-    // Simulate processing time based on temperature (much faster for testing)
-    const processingTime = Math.random() * 50 + 10; // 10-60ms instead of 500-1500ms
-    await new Promise((resolve) => setTimeout(resolve, processingTime));
-
-    // Analyze the prompt to determine task type
-    const lowerPrompt = prompt.toLowerCase();
-    let taskType = 'gathering';
-    let resource = 'wood';
-    let quantity = 10;
-    let location = 'nearest_forest';
-
-    // Look for crafting-related keywords
-    if (
-      lowerPrompt.includes('craft') ||
-      lowerPrompt.includes('diamond pickaxe') ||
-      lowerPrompt.includes('pickaxe') ||
-      lowerPrompt.includes('crafting') ||
-      lowerPrompt.includes('diamond')
-    ) {
-      taskType = 'crafting';
-      resource = 'diamond';
-      quantity = 1;
-      location = 'crafting_table';
-    } else if (
-      lowerPrompt.includes('shelter') ||
-      lowerPrompt.includes('house') ||
-      lowerPrompt.includes('build') ||
-      lowerPrompt.includes('construction')
-    ) {
-      taskType = 'building';
-      resource = 'materials';
-      quantity = 5;
-      location = 'current_location';
-    } else if (
-      lowerPrompt.includes('explore') ||
-      lowerPrompt.includes('search') ||
-      lowerPrompt.includes('find')
-    ) {
-      taskType = 'exploration';
-      resource = 'information';
-      quantity = 1;
-      location = 'surrounding_area';
-    }
-
-    if (channel === 'operational') {
-      // Return structured task definition
-      return JSON.stringify({
-        type: taskType,
-        parameters: {
-          resource,
-          quantity,
-          location,
-        },
-        priority: 0.7,
-        safety_level: 'safe',
-        estimated_duration: 300000,
-      });
-    } else {
-      // Return natural language response
-      if (taskType === 'crafting') {
-        return `I understand you'd like me to help you craft a diamond pickaxe. I'll gather the necessary materials and use the crafting table to create it for you. This should be a safe task that will take me about 5 minutes to complete.`;
-      } else if (taskType === 'building') {
-        return `I understand you need shelter immediately. I'll gather building materials and construct a safe shelter for you right away. This is urgent and I'll prioritize your safety.`;
-      } else {
-        return `I understand you'd like me to gather some ${resource} for you. I'll head to the ${location} and collect about ${quantity} pieces. This should be a safe task that will take me about 5 minutes to complete. I'll make sure to stay alert for any potential dangers while I'm out there.`;
-      }
-    }
+    // Replace simulation with real Ollama call
+    const { OllamaClient } = await import('../llm/ollama-client');
+    const client = new OllamaClient();
+    const system =
+      channel === 'operational'
+        ? 'Return ONLY compact JSON for a Minecraft agent task. Keys: type, parameters, priority, safety_level, estimated_duration.'
+        : 'Paraphrase the task empathetically and clearly for a user.';
+    const text = await client.generate({
+      prompt,
+      system,
+      temperature: config.temperature,
+    });
+    return text;
   }
 
   /**

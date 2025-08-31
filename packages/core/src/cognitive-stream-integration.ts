@@ -342,28 +342,22 @@ export class CognitiveStreamIntegration extends EventEmitter {
           };
         }
 
-        // Fallback to mock plan
+        // No fallback mocks: return an explicit impasse requiring capability creation
         console.log(`⚠️ No MCP capabilities found for goal: "${goal}"`);
         console.log(
           `   Available capabilities: ${capabilities.map((c: any) => c.name).join(', ')}`
         );
         return {
-          success: true,
+          success: false,
           decision: {
-            approach: 'goap',
-            reasoning: 'No MCP capabilities found, using fallback planning',
-            confidence: 0.5,
-            estimatedLatency: 200,
+            approach: 'mcp-capabilities',
+            reasoning:
+              'No applicable MCP capabilities. Propose creation via DynamicCreationFlow or adjust goal.',
+            confidence: 0.2,
+            estimatedLatency: 100,
           },
-          plan: {
-            planningApproach: 'goap',
-            actions: ['mock_action_1', 'mock_action_2'],
-            goal: goal,
-            estimatedCost: 10,
-            estimatedDuration: 2000,
-            successProbability: 0.7,
-          },
-          latency: 200,
+          plan: null,
+          latency: 100,
         };
       },
       executePlan: async (plan: any, context: any) => {

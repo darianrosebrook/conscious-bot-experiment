@@ -61,21 +61,21 @@ export const useDashboardStore = create<DashboardStore>()(
 
       addThought: (thought) =>
         set((state) => {
-          console.log('Store: addThought called with:', thought);
+          // Store: addThought called with thought
           // Ensure thought has a unique ID
           const thoughtWithId = {
             ...thought,
             id: thought.id || generateId(),
           };
 
-          console.log('Store: thoughtWithId:', thoughtWithId);
+          // Store: thoughtWithId processed
 
           // Check if thought with same ID already exists
           const existingThought = state.thoughts.find(
             (t) => t.id === thoughtWithId.id
           );
           if (existingThought) {
-            console.log('Store: Duplicate ID found, not adding');
+            // Store: Duplicate ID found, not adding
             return state; // Don't add duplicate
           }
 
@@ -89,15 +89,12 @@ export const useDashboardStore = create<DashboardStore>()(
           );
 
           if (recentDuplicate) {
-            console.log('Store: Recent duplicate found, not adding');
+            // Store: Recent duplicate found, not adding
             return state; // Don't add duplicate content
           }
 
           const newThoughts = [...state.thoughts, thoughtWithId].slice(-100); // Keep last 100 thoughts
-          console.log(
-            'Store: Adding thought, new thoughts count:',
-            newThoughts.length
-          );
+          // Store: Adding thought, new thoughts count: ${newThoughts.length}
           return {
             thoughts: newThoughts,
           };

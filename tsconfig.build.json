@@ -1,0 +1,13 @@
+{
+  "files": [],
+  "references": [
+    { "path": "packages/core" },
+    { "path": "packages/world" },
+    { "path": "packages/memory" },
+    { "path": "packages/mcp-server" },
+    { "path": "packages/planning" },
+    { "path": "packages/cognition" },
+    { "path": "packages/evaluation" }
+  ]
+}
+

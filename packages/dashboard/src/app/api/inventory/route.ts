@@ -17,45 +17,46 @@ export async function GET(_request: NextRequest) {
     let isAlive = false;
 
     try {
-      const response = await fetch('http://localhost:3002/inventory', {
+      // Try to fetch inventory data from minecraft interface directly
+      const minecraftResponse = await fetch('http://localhost:3005/inventory', {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
         },
       });
 
-      if (response.ok) {
-        const data = await response.json();
-        if (data.success) {
-          inventory = data.inventory || [];
-          botStatus = 'connected';
+      if (minecraftResponse.ok) {
+        const minecraftData = await minecraftResponse.json();
+        if (minecraftData.success) {
+          inventory = minecraftData.data || [];
+          botStatus = minecraftData.status || 'connected';
           isAlive = true;
         }
       }
     } catch (error) {
       console.log(
-        'Planning system inventory not available, trying minecraft bot directly'
+        'Minecraft interface inventory not available, trying state endpoint'
       );
 
-      // Fallback to minecraft bot
+      // Fallback to minecraft bot state endpoint
       try {
-        const minecraftResponse = await fetch('http://localhost:3005/state', {
+        const stateResponse = await fetch('http://localhost:3005/state', {
           method: 'GET',
           headers: {
             'Content-Type': 'application/json',
           },
         });
 
-        if (minecraftResponse.ok) {
-          const minecraftData = await minecraftResponse.json();
-          if (minecraftData.success) {
-            inventory = minecraftData.data?.worldState?.inventory?.items || [];
-            botStatus = minecraftData.status || 'unknown';
-            isAlive = minecraftData.isAlive || false;
+        if (stateResponse.ok) {
+          const stateData = await stateResponse.json();
+          if (stateData.success) {
+            inventory = stateData.data?.worldState?.inventory?.items || [];
+            botStatus = stateData.status || 'unknown';
+            isAlive = stateData.isAlive || false;
           }
         }
-      } catch (minecraftError) {
-        console.log('Minecraft bot server also not available');
+      } catch (stateError) {
+        console.log('Minecraft bot state server also not available');
       }
     }
 
@@ -74,24 +75,23 @@ export async function GET(_request: NextRequest) {
         const itemType = item.type || item.id || null;
 
         // Mineflayer slot mapping:
-        // - Hotbar: slots 36-44 (maps to 0-8)
-        // - Main inventory: slots 9-35 (maps to 9-35)
+        // - Hotbar: slots 0-8 (standard Minecraft hotbar)
+        // - Main inventory: slots 9-35 (standard Minecraft main inventory)
+        // - Extended inventory: slots 36-44 (additional inventory slots)
         // - Armor: slots 5-8 (maps to 100-103)
         // - Offhand: slot 45 (maps to 104)
         let mappedSlot = item.slot;
 
         if (typeof item.slot === 'number') {
-          if (item.slot >= 36 && item.slot <= 44) {
-            // Hotbar items (36-44 -> 0-8)
-            mappedSlot = item.slot - 36;
-          } else if (item.slot >= 5 && item.slot <= 8) {
+          if (item.slot >= 5 && item.slot <= 8) {
             // Armor items (5-8 -> 100-103)
             mappedSlot = item.slot + 95;
           } else if (item.slot === 45) {
             // Offhand (45 -> 104)
             mappedSlot = 104;
           }
-          // Main inventory slots 9-35 stay the same
+          // All other slots (0-44) stay the same for proper display
+          // This includes hotbar (0-8), main inventory (9-35), and extended inventory (36-44)
         }
 
         // Safely get display name

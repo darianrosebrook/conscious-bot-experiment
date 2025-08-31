@@ -58,10 +58,76 @@ export class EnhancedMemoryIntegration extends EventEmitter {
   private notes: ReflectiveNote[] = [];
   private eventCounter = 0;
   private noteCounter = 0;
+  // Simple per-instance circuit breaker for memory system
+  private memFailureCount = 0;
+  private memCircuitOpenUntil = 0; // epoch ms until which circuit is open
 
   constructor(config: Partial<MemoryIntegrationConfig> = {}) {
     super();
     this.config = { ...DEFAULT_CONFIG, ...config };
+  }
+
+  private isMemCircuitOpen(): boolean {
+    return Date.now() < this.memCircuitOpenUntil;
+  }
+
+  private recordMemFailure(): void {
+    this.memFailureCount += 1;
+    if (this.memFailureCount >= 3) {
+      this.memCircuitOpenUntil = Date.now() + 30_000; // 30s cooldown
+    }
+  }
+
+  private recordMemSuccess(): void {
+    this.memFailureCount = 0;
+    this.memCircuitOpenUntil = 0;
+  }
+
+  private async memFetch(
+    path: string,
+    init: RequestInit & { timeoutMs?: number } = {}
+  ): Promise<Response> {
+    if (this.isMemCircuitOpen()) {
+      throw new Error('Memory endpoint circuit open');
+    }
+    const base = this.config.memorySystemEndpoint.replace(/\/$/, '');
+    const url = `${base}${path.startsWith('/') ? '' : '/'}${path}`;
+    const retries = 2;
+    const baseDelay = 300;
+    let lastErr: any;
+    for (let attempt = 0; attempt <= retries; attempt++) {
+      try {
+        const controller = new AbortController();
+        const timeout = setTimeout(
+          () => controller.abort(),
+          init.timeoutMs ?? 7_000
+        );
+        const res = await fetch(url, { ...init, signal: controller.signal });
+        clearTimeout(timeout);
+        if (res.ok) {
+          this.recordMemSuccess();
+          return res;
+        }
+        if (res.status >= 500 && res.status < 600 && attempt < retries) {
+          const delay = baseDelay * Math.pow(2, attempt) + Math.random() * 100;
+          await new Promise((r) => setTimeout(r, delay));
+          continue;
+        }
+        this.recordMemFailure();
+        return res;
+      } catch (err) {
+        lastErr = err;
+        if (attempt < retries) {
+          const delay = baseDelay * Math.pow(2, attempt) + Math.random() * 100;
+          await new Promise((r) => setTimeout(r, delay));
+          continue;
+        }
+        this.recordMemFailure();
+        throw err;
+      }
+    }
+    this.recordMemFailure();
+    throw lastErr || new Error('Unknown memFetch error');
   }
 
   /**
@@ -321,9 +387,8 @@ export class EnhancedMemoryIntegration extends EventEmitter {
    */
   async getMemorySystemEvents(): Promise<MemoryEvent[]> {
     try {
-      const response = await fetch(
-        `${this.config.memorySystemEndpoint}/telemetry`
-      );
+      if (this.isMemCircuitOpen()) return [];
+      const response = await this.memFetch('/telemetry', { method: 'GET', timeoutMs: 5_000 });
       if (!response.ok) {
         return [];
       }
@@ -360,7 +425,8 @@ export class EnhancedMemoryIntegration extends EventEmitter {
    */
   async getMemorySystemMemories(): Promise<ReflectiveNote[]> {
     try {
-      const response = await fetch(`${this.config.memorySystemEndpoint}/state`);
+      if (this.isMemCircuitOpen()) return [];
+      const response = await this.memFetch('/state', { method: 'GET', timeoutMs: 5_000 });
       if (!response.ok) {
         return [];
       }
@@ -412,13 +478,28 @@ export class EnhancedMemoryIntegration extends EventEmitter {
    */
   private async notifyDashboard(event: string, data: any): Promise<void> {
     try {
-      await fetch(`${this.config.dashboardEndpoint}/api/memory-updates`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ event, data }),
-      });
+      const url = `${this.config.dashboardEndpoint.replace(/\/$/, '')}/api/memory-updates`;
+      const retries = 2;
+      let ok = false;
+      for (let attempt = 0; attempt <= retries; attempt++) {
+        try {
+          const controller = new AbortController();
+          const t = setTimeout(() => controller.abort(), 5_000);
+          const res = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ event, data }),
+            signal: controller.signal,
+          });
+          clearTimeout(t);
+          if (res.ok) {
+            ok = true;
+            break;
+          }
+        } catch {}
+        await new Promise((r) => setTimeout(r, 200 + attempt * 200));
+      }
+      if (!ok) throw new Error('Failed to POST memory update');
     } catch (error) {
       console.error('Failed to notify dashboard:', error);
     }

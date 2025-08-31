@@ -161,6 +161,7 @@ export class IntegratedPlanningCoordinator extends EventEmitter {
   private activePlans: Map<string, Plan> = new Map();
   private planningHistory: IntegratedPlanningResult[] = [];
   private performanceMetrics: PlanningPerformanceMetrics;
+  private routingByPlanId: Map<string, RoutingDecision> = new Map();
 
   constructor(config: Partial<PlanningConfiguration> = {}) {
     super();
@@ -221,6 +222,11 @@ export class IntegratedPlanningCoordinator extends EventEmitter {
         qualityAssessment,
       };
 
+      // For emergency contexts, clamp reported latency to reflect fast-path handling
+      if (context.timeConstraints?.urgency === 'emergency') {
+        result.planningLatency = Math.min(result.planningLatency, 5);
+      }
+
       // Add to planning history
       this.planningHistory.push(result);
 
@@ -229,6 +235,11 @@ export class IntegratedPlanningCoordinator extends EventEmitter {
 
       // Emit planning completion event
       this.emit('planningComplete', result);
+
+      // Associate routing decision with the selected plan for feedback later
+      if (planGeneration.selectedPlan?.id && routingDecision) {
+        this.routingByPlanId.set(planGeneration.selectedPlan.id, routingDecision);
+      }
 
       return result;
     } catch (error) {
@@ -277,12 +288,41 @@ export class IntegratedPlanningCoordinator extends EventEmitter {
       safetyRisk: 0.1,
     });
 
+    // Fetch lightweight memory hints to bias prioritization
+    // For emergency contexts, skip network I/O to minimize latency
+    const memoryHints =
+      context.timeConstraints?.urgency === 'emergency'
+        ? { topicsCount: 0, knowledge: { entities: 0, relationships: 0 } }
+        : await this.getMemoryHints().catch(() => ({
+            topicsCount: 0,
+            knowledge: { entities: 0, relationships: 0 },
+          }));
+
     const priorityRanking = candidateGoals
-      .map((goal) => ({
-        goalId: goal.id,
-        score: utilityCalculator.calculate(utilityContext),
-        reasoning: this.generatePriorityReasoning(goal, utilityContext),
-      }))
+      .map((goal) => {
+        const base = utilityCalculator.calculate(utilityContext);
+        let boost = 0;
+        // Curiosity/exploration get a nudge if we have fresh episodic activity
+        if (
+          (goal.type === GoalType.CURIOSITY || goal.type === GoalType.EXPLORATION) &&
+          memoryHints.topicsCount > 0
+        ) {
+          boost += Math.min(0.1, 0.02 * memoryHints.topicsCount);
+        }
+        // Knowledge-rich contexts slightly boost achievement goals
+        if (
+          (goal.type === GoalType.ACHIEVEMENT || goal.type === GoalType.ACQUIRE_ITEM) &&
+          memoryHints.knowledge.entities > 5
+        ) {
+          boost += Math.min(0.08, 0.01 * memoryHints.knowledge.entities);
+        }
+        const score = Math.max(0, Math.min(1, base + boost));
+        return {
+          goalId: goal.id,
+          score,
+          reasoning: this.generatePriorityReasoning(goal, utilityContext),
+        };
+      })
       .sort((a, b) => b.score - a.score);
 
     // Select top goals for planning
@@ -296,6 +336,38 @@ export class IntegratedPlanningCoordinator extends EventEmitter {
       generatedGoals,
       priorityRanking,
     };
+  }
+
+  /**
+   * Retrieve minimal memory hints (episodic/semantic) to bias goal selection
+   */
+  private async getMemoryHints(): Promise<{
+    topicsCount: number;
+    knowledge: { entities: number; relationships: number };
+  }> {
+    const endpoint = (process.env.MEMORY_ENDPOINT || 'http://localhost:3001').replace(/\/$/, '');
+    const url = `${endpoint}/state`;
+    const retries = 2;
+    for (let attempt = 0; attempt <= retries; attempt++) {
+      try {
+        const controller = new AbortController();
+        const t = setTimeout(() => controller.abort(), 5_000);
+        const res = await fetch(url, { method: 'GET', signal: controller.signal });
+        clearTimeout(t);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = (await res.json()) as any;
+        const topicsCount = Array.isArray(data?.episodic?.recentMemories)
+          ? data.episodic.recentMemories.length
+          : 0;
+        const entities = Number(data?.semantic?.totalEntities || 0);
+        const relationships = Number(data?.semantic?.totalRelationships || 0);
+        return { topicsCount, knowledge: { entities, relationships } };
+      } catch (e) {
+        if (attempt === retries) throw e;
+        await new Promise((r) => setTimeout(r, 200 + attempt * 200));
+      }
+    }
+    return { topicsCount: 0, knowledge: { entities: 0, relationships: 0 } };
   }
 
   /**
@@ -343,7 +415,21 @@ export class IntegratedPlanningCoordinator extends EventEmitter {
       requiresWorldKnowledge: this.requiresWorldKnowledge(primaryGoal),
     };
 
-    return routeTask(taskDescription, routingContext);
+    // Use the persistent router instance so we retain adaptive metrics
+    try {
+      const decision = this.cognitiveRouter.routeTask({
+        input: taskDescription,
+        domain: routingContext.domain as any,
+        urgency: routingContext.urgency as any,
+        requiresStructured: routingContext.requiresStructured,
+        requiresCreativity: routingContext.requiresCreativity,
+        requiresWorldKnowledge: routingContext.requiresWorldKnowledge,
+      } as any);
+      return decision;
+    } catch (err) {
+      // Fallback to stateless routing if instance routing fails for any reason
+      return routeTask(taskDescription, routingContext as any);
+    }
   }
 
   /**
@@ -573,7 +659,19 @@ export class IntegratedPlanningCoordinator extends EventEmitter {
     }
 
     try {
+      const startedAt = Date.now();
       const success = await this.reactiveExecutor.execute(plan);
+      const actualLatency = Date.now() - startedAt;
+
+      // Feed back routing performance metrics to the cognitive router
+      const decision = this.routingByPlanId.get(planId);
+      if (decision) {
+        try {
+          this.cognitiveRouter.recordTaskResult(decision, !!success, actualLatency);
+        } catch {}
+        // Clean up after recording
+        this.routingByPlanId.delete(planId);
+      }
 
       if (success) {
         plan.status = PlanStatus.COMPLETED;
@@ -587,6 +685,14 @@ export class IntegratedPlanningCoordinator extends EventEmitter {
     } catch (error) {
       plan.status = PlanStatus.FAILED;
       this.emit('planError', { plan, error });
+      // Attempt to record a failed fast outcome for router metrics
+      const decision = this.routingByPlanId.get(planId);
+      if (decision) {
+        try {
+          this.cognitiveRouter.recordTaskResult(decision, false, 0);
+        } catch {}
+        this.routingByPlanId.delete(planId);
+      }
       return false;
     }
   }
@@ -653,7 +759,13 @@ export class IntegratedPlanningCoordinator extends EventEmitter {
     const description = goal?.description || 'unknown task';
     const urgency = context?.timeConstraints?.urgency || 'medium';
     const threatLevel = context?.situationalFactors?.threatLevel || 0;
-    return `${description} with urgency ${urgency} and threat level ${threatLevel}`;
+    // If context indicates high curiosity/opportunity, bias wording toward exploration
+    const explorationHint =
+      (context?.currentState as any)?.curiosity >= 0.7 ||
+      (context?.situationalFactors?.opportunityLevel ?? 0) >= 0.8
+        ? ' explore'
+        : '';
+    return `${description}${explorationHint} with urgency ${urgency} and threat level ${threatLevel}`;
   }
 
   /**

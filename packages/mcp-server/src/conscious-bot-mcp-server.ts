@@ -581,6 +581,39 @@ class ConsciousBotMCPServer extends Server {
     });
   }
 
+  /**
+   * Get the list of available tools
+   */
+  getTools(): Array<{
+    name: string;
+    description: string;
+    inputSchema: any;
+    outputSchema: any;
+    metadata: any;
+  }> {
+    return Array.from(this.tools.values());
+  }
+
+  /**
+   * Get the list of available resources
+   */
+  getResources(): Array<{
+    uri: string;
+    name: string;
+    description: string;
+    mimeType: string;
+    metadata: any;
+  }> {
+    return Array.from(this.resources.values());
+  }
+
+  /**
+   * Get the list of available prompts
+   */
+  getPrompts(): Array<{ name: string; description: string; arguments: any }> {
+    return Array.from(this.prompts.values());
+  }
+
   private async executeTool(name: string, args: any): Promise<any> {
     // Handle registry tools
     if (name === 'register_option') {
@@ -881,15 +914,17 @@ class ConsciousBotMCPServer extends Server {
 
   // PATCH 3: Compute option permissions from real leaves, not a hardcoded map
   private computeOptionPermissions(root: any): string[] {
+    // Traverse a normalized BT-DSL JSON node (not compiled) and collect permissions
     const perms = new Set<string>();
     const visit = (n: any) => {
-      if (!n) return;
-      if (n.type === 'Leaf' && n.name) {
-        const impl = this.leafFactory.get?.(n.name); // add .get(name, version?) to factory
-        if (!impl) throw new Error(`unknown leaf '${n.name}'`);
-        impl.spec.permissions.forEach((p) => perms.add(p));
+      if (!n || typeof n !== 'object') return;
+      if (n.type === 'Leaf' && n.leafName) {
+        const impl = this.leafFactory.get?.(n.leafName);
+        if (!impl) throw new Error(`unknown leaf '${n.leafName}'`);
+        (impl.spec.permissions || []).forEach((p: string) => perms.add(p));
       }
-      (n.children || []).forEach(visit);
+      const kids: any[] = Array.isArray(n.children) ? n.children : [];
+      kids.forEach(visit);
       if (n.child) visit(n.child);
     };
     visit(root);
@@ -898,20 +933,92 @@ class ConsciousBotMCPServer extends Server {
 
   // PATCH 8: harden normalizeBT
   private normalizeBT(node: any): any {
+    // Accept either canonical BT-DSL shapes or a lighter, lowercase variant and
+    // normalize to the canonical schema expected by the core parser.
     if (!node || typeof node !== 'object') return node;
-    const t = String(node.type || '').toLowerCase();
-    if (t === 'condition')
-      throw new Error('BT-DSL "condition" nodes are not supported.');
+    const rawType = String(node.type || '');
+    const t = rawType.toLowerCase();
+
+    // Canonical pass-through: if already a valid canonical type, shallowly normalize children
+    if (
+      rawType === 'Sequence' ||
+      rawType === 'Selector' ||
+      rawType === 'Repeat.Until' ||
+      rawType === 'Decorator.Timeout' ||
+      rawType === 'Decorator.FailOnTrue' ||
+      rawType === 'Leaf'
+    ) {
+      if (rawType === 'Leaf') {
+        return {
+          type: 'Leaf',
+          leafName: node.leafName ?? node.action, // support legacy 'action'
+          leafVersion: node.leafVersion,
+          args: node.args ?? {},
+        };
+      }
+      if (rawType === 'Sequence' || rawType === 'Selector') {
+        const children = (node.children || []).map((c: any) => this.normalizeBT(c));
+        return { type: rawType, children };
+      }
+      if (rawType === 'Repeat.Until') {
+        return {
+          type: 'Repeat.Until',
+          child: this.normalizeBT(node.child),
+          condition: node.condition,
+          maxIterations: node.maxIterations,
+        };
+      }
+      if (rawType === 'Decorator.Timeout') {
+        return {
+          type: 'Decorator.Timeout',
+          child: this.normalizeBT(node.child),
+          timeoutMs: node.timeoutMs,
+        };
+      }
+      if (rawType === 'Decorator.FailOnTrue') {
+        return {
+          type: 'Decorator.FailOnTrue',
+          child: this.normalizeBT(node.child),
+          condition: node.condition,
+        };
+      }
+    }
+
+    // Lowercase/compact aliases
     if (t === 'sequence' || t === 'selector') {
+      const children = (node.children || []).map((c: any) => this.normalizeBT(c));
       return {
         type: t[0].toUpperCase() + t.slice(1),
-        children: (node.children || []).map((c: any) => this.normalizeBT(c)),
+        children,
       };
     }
-    if (t === 'action')
-      return { type: 'Leaf', name: node.action, args: node.args ?? {} };
+    if (t === 'action' || t === 'leaf') {
+      return { type: 'Leaf', leafName: node.leafName ?? node.action, args: node.args ?? {} };
+    }
+    if (t === 'repeat.until' || t === 'repeat_until') {
+      return {
+        type: 'Repeat.Until',
+        child: this.normalizeBT(node.child),
+        condition: node.condition,
+        maxIterations: node.maxIterations,
+      };
+    }
+    if (t === 'decorator.timeout' || t === 'timeout') {
+      return {
+        type: 'Decorator.Timeout',
+        child: this.normalizeBT(node.child),
+        timeoutMs: node.timeoutMs,
+      };
+    }
+    if (t === 'decorator.failontrue' || t === 'fail_on_true' || t === 'failontrue') {
+      return {
+        type: 'Decorator.FailOnTrue',
+        child: this.normalizeBT(node.child),
+        condition: node.condition,
+      };
+    }
 
-    // Unknown node: reject
+    // Unsupported or unknown
     throw new Error(`BT-DSL node type not allowed: ${node.type}`);
   }
 

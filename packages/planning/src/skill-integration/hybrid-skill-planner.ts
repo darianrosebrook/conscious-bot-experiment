@@ -36,6 +36,7 @@ import {
 } from '../hierarchical-planner/hrm-inspired-planner';
 import { EnhancedRegistry } from '@conscious-bot/core';
 import { DynamicCreationFlow } from '@conscious-bot/core';
+import { CapabilityRegistry } from '@conscious-bot/core';
 import { Goal, GoalType, GoalStatus } from '../types';
 
 // ============================================================================
@@ -119,9 +120,11 @@ export class HybridSkillPlanner extends EventEmitter {
 
     // Initialize MCP capabilities adapter if registry is provided
     if (mcpRegistry && mcpDynamicFlow) {
+      const capRegistry = new CapabilityRegistry();
       this.mcpCapabilitiesAdapter = new MCPCapabilitiesAdapter(
         mcpRegistry,
-        mcpDynamicFlow
+        mcpDynamicFlow,
+        capRegistry
       );
     }
   }
@@ -1019,9 +1022,9 @@ export class HybridSkillPlanner extends EventEmitter {
     }
 
     if (goapPlan) {
-      // Convert GOAP actions to plan nodes
+      // Convert GOAP actions to plan nodes with deterministic IDs
       const goapNodes = goapPlan.actions.map((action, index) => ({
-        id: `goap-node-${Date.now()}-${index}`,
+        id: `goap-node-${(goapPlan as any).id ?? 'goap-plan'}-${index}`,
         type: 'action' as const,
         description: action.name,
         status: 'pending' as const,
@@ -1031,7 +1034,7 @@ export class HybridSkillPlanner extends EventEmitter {
         constraints: [],
         metadata: {
           source: 'goap',
-          planId: `goap-plan-${Date.now()}`,
+          planId: (goapPlan as any).id ?? 'goap-plan',
           action: action,
         },
       }));
@@ -1073,7 +1076,7 @@ export class HybridSkillPlanner extends EventEmitter {
     if (goapPlan) {
       order.push(
         ...goapPlan.actions.map(
-          (_, index) => `goap-node-${Date.now()}-${index}`
+          (_, index) => `goap-node-${(goapPlan as any).id ?? 'goap-plan'}-${index}`
         )
       );
     }

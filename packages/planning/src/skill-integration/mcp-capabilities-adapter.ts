@@ -13,6 +13,11 @@ import { EnhancedRegistry, ShadowRunResult } from '@conscious-bot/core';
 import { DynamicCreationFlow, ImpasseResult } from '@conscious-bot/core';
 import { LeafContext, ExecError } from '@conscious-bot/core';
 import {
+  CapabilityRegistry,
+  type ExecutionRequest,
+  type ExecutionContext,
+} from '@conscious-bot/core';
+import {
   Plan,
   PlanNode,
   PlanningContext,
@@ -69,12 +74,18 @@ export interface CapabilityExecutionResult {
 export class MCPCapabilitiesAdapter extends EventEmitter {
   private registry: EnhancedRegistry;
   private dynamicFlow: DynamicCreationFlow;
+  private capabilityRegistry: CapabilityRegistry;
   private executionHistory: CapabilityExecutionResult[] = [];
 
-  constructor(registry: EnhancedRegistry, dynamicFlow: DynamicCreationFlow) {
+  constructor(
+    registry: EnhancedRegistry,
+    dynamicFlow: DynamicCreationFlow,
+    capabilityRegistry?: CapabilityRegistry
+  ) {
     super();
     this.registry = registry;
     this.dynamicFlow = dynamicFlow;
+    this.capabilityRegistry = capabilityRegistry || new CapabilityRegistry();
   }
 
   /**
@@ -100,7 +111,7 @@ export class MCPCapabilitiesAdapter extends EventEmitter {
     });
 
     if (impasseResult.isImpasse) {
-      console.log(`🔍 Impasse detected for goal: ${goal}`);
+      // Impasse detected for goal: ${goal}
       const newCapability = await this.dynamicFlow.proposeNewCapability(
         goal,
         context.leafContext,
@@ -109,7 +120,7 @@ export class MCPCapabilitiesAdapter extends EventEmitter {
       );
 
       if (newCapability) {
-        console.log(`✨ Proposed new capability: ${newCapability.name}`);
+        // Proposed new capability: ${newCapability.name}
         applicableCapabilities.push(newCapability.name);
       }
     }
@@ -196,9 +207,7 @@ export class MCPCapabilitiesAdapter extends EventEmitter {
             context.worldState
           )
         ) {
-          console.warn(
-            `⚠️ Preconditions not met for capability: ${capabilityDecomp.capabilityId}`
-          );
+          // Preconditions not met for capability: ${capabilityDecomp.capabilityId}
           failedCapabilities.push(capabilityDecomp.capabilityId);
           continue;
         }
@@ -272,7 +281,7 @@ export class MCPCapabilitiesAdapter extends EventEmitter {
         shadowRunResults,
       };
     } catch (error) {
-      console.error('❌ Error executing capability plan:', error);
+      // Error executing capability plan: ${error}
       return {
         success: false,
         completedCapabilities,
@@ -325,26 +334,102 @@ export class MCPCapabilitiesAdapter extends EventEmitter {
   ): Promise<CapabilityDecomposition[]> {
     const decomposition: CapabilityDecomposition[] = [];
 
-    // Simple decomposition for now - can be enhanced with more sophisticated logic
+    // Dynamic acquisition intent: try to parse obtain/craft/mine targets
+    const parsed = this.parseAcquisitionIntent(goal);
+    if (parsed) {
+      const intro = await this.findCapByName('introspect_recipe');
+      if (intro) {
+        decomposition.push({
+          capabilityId: intro.id,
+          name: intro.name,
+          version: intro.version,
+          status: intro.status,
+          preconditions: {},
+          postconditions: {},
+          estimatedDuration: 1500,
+          priority: 1,
+          dependencies: [],
+          args: { output: parsed.item },
+        });
+      }
+      const craft = await this.findCapByName('craft_recipe');
+      if (craft) {
+        decomposition.push({
+          capabilityId: craft.id,
+          name: craft.name,
+          version: craft.version,
+          status: craft.status,
+          preconditions: {},
+          postconditions: {},
+          estimatedDuration: 5000,
+          priority: 1,
+          dependencies: intro ? [intro.id] : [],
+          args: { recipe: parsed.item, qty: parsed.qty },
+        });
+      }
+      const dig = await this.findCapByName('dig_block');
+      if (dig && /log|ore|stone|wood|block/.test(parsed.item)) {
+        decomposition.push({
+          capabilityId: dig.id,
+          name: dig.name,
+          version: dig.version,
+          status: dig.status,
+          preconditions: {},
+          postconditions: {},
+          estimatedDuration: 6000,
+          priority: 1,
+          dependencies: [],
+          args: { blockType: parsed.item },
+        });
+      }
+    }
+
+    // Include any directly applicable capabilities (keyword match fallback)
     for (const capabilityId of applicableCapabilities) {
       const capability = await this.registry.getCapability(capabilityId);
       if (!capability) continue;
-
+      if (decomposition.some((d) => d.capabilityId === capabilityId)) continue;
       decomposition.push({
         capabilityId,
         name: capability.name,
         version: capability.version,
         status: capability.status,
-        preconditions: {}, // Extract from capability spec
-        postconditions: {}, // Extract from capability spec
-        estimatedDuration: 5000, // Default 5 seconds
+        preconditions: {},
+        postconditions: {},
+        estimatedDuration: 5000,
         priority: 1,
         dependencies: [],
-        args: {}, // Extract from goal requirements
+        args: {},
       });
     }
 
     return decomposition;
+  }
+
+  private parseAcquisitionIntent(
+    goal: string
+  ): { item: string; qty: number } | null {
+    const t = (goal || '').toLowerCase();
+    const qtyMatch = t.match(/x\s?(\d+)/) || t.match(/(\d+)/);
+    const qty = qtyMatch ? Math.max(1, parseInt(qtyMatch[1], 10)) : 1;
+    const craftMatch = t.match(/craft\s+([a-z_]+)/);
+    const obtainMatch = t.match(/(obtain|get|acquire|gather)\s+([a-z_]+)/);
+    const mineMatch = t.match(/mine\s+([a-z_]+)/);
+    const item =
+      (craftMatch && craftMatch[1]) ||
+      (obtainMatch && obtainMatch[2]) ||
+      (mineMatch && mineMatch[1]);
+    if (!item) return null;
+    return { item, qty };
+  }
+
+  private async findCapByName(name: string): Promise<any | null> {
+    try {
+      const caps = await this.registry.listCapabilities();
+      return caps.find((c: any) => c.name === name) || null;
+    } catch {
+      return null;
+    }
   }
 
   /**
@@ -404,20 +489,53 @@ export class MCPCapabilitiesAdapter extends EventEmitter {
         };
       }
 
-      // For active capabilities, execute normally
-      // This would integrate with the actual execution system
-      const success = true; // Placeholder
-      const worldStateChanges = {}; // Placeholder
+      // Execute via core CapabilityRegistry
+      try {
+        const request: ExecutionRequest = {
+          id: `exec-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+          capabilityId: capability.capabilityId,
+          parameters: capability.args || {},
+          requestedBy: 'planner',
+          priority: Math.max(0, Math.min(1, capability.priority || 0.5)),
+          timeout: capability.estimatedDuration || 5000,
+          metadata: { planNode: capability },
+          timestamp: Date.now(),
+        };
 
-      return {
-        capabilityId: capability.capabilityId,
-        success,
-        duration: Date.now() - startTime,
-        worldStateChanges,
-        telemetry: {
-          status: 'active_execution',
-        },
-      };
+        const execCtx: ExecutionContext = this.buildExecutionContext(
+          context.worldState
+        );
+
+        const result = await this.capabilityRegistry.executeCapability(
+          request,
+          execCtx
+        );
+
+        return {
+          capabilityId: capability.capabilityId,
+          success: result.success,
+          duration: result.duration,
+          worldStateChanges: { effects: result.effects },
+          telemetry: {
+            status: 'active_execution',
+            requestId: result.requestId,
+            resultId: result.id,
+          },
+        };
+      } catch (err: any) {
+        return {
+          capabilityId: capability.capabilityId,
+          success: false,
+          duration: Date.now() - startTime,
+          worldStateChanges: {},
+          error: {
+            code: 'unknown',
+            detail: err?.message || String(err),
+            retryable: false,
+          },
+          telemetry: { status: 'active_execution_error' },
+        };
+      }
     } catch (error) {
       return {
         capabilityId: capability.capabilityId,
@@ -431,6 +549,47 @@ export class MCPCapabilitiesAdapter extends EventEmitter {
         },
       };
     }
+  }
+
+  private buildExecutionContext(
+    worldState: Record<string, any>
+  ): ExecutionContext {
+    const pos = worldState?.agentPosition ||
+      worldState?.position || {
+        x: 0,
+        y: 64,
+        z: 0,
+      };
+    const inventory = Array.isArray(worldState?.inventory)
+      ? worldState.inventory.map((it: any, idx: number) => ({
+          item: String(it?.name || it?.item || 'unknown'),
+          quantity: Number(it?.count || it?.quantity || 1),
+          slot: Number(it?.slot ?? idx),
+        }))
+      : [];
+    const entities = Array.isArray(worldState?.nearbyEntities)
+      ? worldState.nearbyEntities
+      : [];
+    return {
+      agentPosition: { x: Number(pos.x), y: Number(pos.y), z: Number(pos.z) },
+      agentHealth: Number(worldState?.agentHealth ?? 1),
+      inventory,
+      nearbyEntities: entities.map((e: any) => ({
+        type: String(e?.type || 'unknown'),
+        position: {
+          x: Number(e?.position?.x ?? 0),
+          y: Number(e?.position?.y ?? 0),
+          z: Number(e?.position?.z ?? 0),
+        },
+        distance: Number(e?.distance ?? 0),
+      })),
+      timeOfDay: Number(worldState?.timeOfDay ?? 0),
+      weather: (worldState?.weather as any) || 'clear',
+      dimension: String(worldState?.dimension || 'overworld'),
+      biome: String(worldState?.biome || 'plains'),
+      dangerLevel: Number(worldState?.dangerLevel ?? 0),
+      timestamp: Date.now(),
+    };
   }
 
   /**

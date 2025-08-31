@@ -76,6 +76,8 @@ export {
 // Types and interfaces
 export * from './types';
 export * from './mcp-capabilities/types';
+// LLM
+export { OllamaClient } from './llm/ollama-client';
 
 // Logging configuration
 export * from './logging/config';

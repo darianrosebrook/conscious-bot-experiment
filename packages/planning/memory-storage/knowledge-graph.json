@@ -1,0 +1,338 @@
+{
+  "version": 1,
+  "savedAt": 1756606976369,
+  "entities": [
+    {
+      "type": "resource",
+      "name": "oak_log",
+      "description": "Observed resource: oak_log",
+      "properties": {
+        "last_seen": {
+          "confidence": 0.8,
+          "timestamp": 1756606709176,
+          "type": "date",
+          "source": "observation",
+          "value": "2025-08-31T02:18:29.176Z"
+        },
+        "observed_quantity": {
+          "confidence": 0.6,
+          "timestamp": 1756606709176,
+          "type": "number",
+          "source": "observation",
+          "value": 6,
+          "unit": "items"
+        }
+      },
+      "tags": [
+        "resource",
+        "observed"
+      ],
+      "confidence": 0.6,
+      "source": "observation",
+      "id": "entity-1756606709177-s3c9piv",
+      "createdAt": 1756606709177,
+      "updatedAt": 1756606709177,
+      "lastAccessed": 1756606709177,
+      "accessCount": 1
+    },
+    {
+      "type": "place",
+      "name": "approx_0_64_0_r8",
+      "description": "Approximate observation area",
+      "properties": {},
+      "tags": [
+        "approximate"
+      ],
+      "confidence": 0.5,
+      "source": "inference",
+      "id": "entity-1756606709178-b74ztl9",
+      "createdAt": 1756606709178,
+      "updatedAt": 1756606709179,
+      "lastAccessed": 1756606709179,
+      "accessCount": 11
+    },
+    {
+      "type": "resource",
+      "name": "oak_planks",
+      "description": "Observed resource: oak_planks",
+      "properties": {
+        "last_seen": {
+          "confidence": 0.8,
+          "timestamp": 1756606709179,
+          "type": "date",
+          "source": "observation",
+          "value": "2025-08-31T02:18:29.179Z"
+        },
+        "observed_quantity": {
+          "confidence": 0.6,
+          "timestamp": 1756606709179,
+          "type": "number",
+          "source": "observation",
+          "value": 8,
+          "unit": "items"
+        }
+      },
+      "tags": [
+        "resource",
+        "observed"
+      ],
+      "confidence": 0.6,
+      "source": "observation",
+      "id": "entity-1756606709179-nosaj5o",
+      "createdAt": 1756606709179,
+      "updatedAt": 1756606709179,
+      "lastAccessed": 1756606709179,
+      "accessCount": 1
+    },
+    {
+      "type": "resource",
+      "name": "stick",
+      "description": "Observed resource: stick",
+      "properties": {
+        "last_seen": {
+          "confidence": 0.8,
+          "timestamp": 1756606709179,
+          "type": "date",
+          "source": "observation",
+          "value": "2025-08-31T02:18:29.179Z"
+        },
+        "observed_quantity": {
+          "confidence": 0.6,
+          "timestamp": 1756606709179,
+          "type": "number",
+          "source": "observation",
+          "value": 16,
+          "unit": "items"
+        }
+      },
+      "tags": [
+        "resource",
+        "observed"
+      ],
+      "confidence": 0.6,
+      "source": "observation",
+      "id": "entity-1756606709179-qcy7m56",
+      "createdAt": 1756606709179,
+      "updatedAt": 1756606709179,
+      "lastAccessed": 1756606709179,
+      "accessCount": 1
+    },
+    {
+      "type": "resource",
+      "name": "oak_sapling",
+      "description": "Observed resource: oak_sapling",
+      "properties": {
+        "last_seen": {
+          "confidence": 0.8,
+          "timestamp": 1756606709179,
+          "type": "date",
+          "source": "observation",
+          "value": "2025-08-31T02:18:29.179Z"
+        },
+        "observed_quantity": {
+          "confidence": 0.6,
+          "timestamp": 1756606709179,
+          "type": "number",
+          "source": "observation",
+          "value": 1,
+          "unit": "items"
+        }
+      },
+      "tags": [
+        "resource",
+        "observed"
+      ],
+      "confidence": 0.6,
+      "source": "observation",
+      "id": "entity-1756606709179-jysi1nn",
+      "createdAt": 1756606709179,
+      "updatedAt": 1756606709179,
+      "lastAccessed": 1756606709179,
+      "accessCount": 1
+    },
+    {
+      "type": "resource",
+      "name": "crafting_table",
+      "description": "Observed resource: crafting_table",
+      "properties": {
+        "last_seen": {
+          "confidence": 0.8,
+          "timestamp": 1756606709179,
+          "type": "date",
+          "source": "observation",
+          "value": "2025-08-31T02:18:29.179Z"
+        },
+        "observed_quantity": {
+          "confidence": 0.6,
+          "timestamp": 1756606709179,
+          "type": "number",
+          "source": "observation",
+          "value": 1,
+          "unit": "items"
+        }
+      },
+      "tags": [
+        "resource",
+        "observed"
+      ],
+      "confidence": 0.6,
+      "source": "observation",
+      "id": "entity-1756606709179-cbit8qh",
+      "createdAt": 1756606709179,
+      "updatedAt": 1756606709179,
+      "lastAccessed": 1756606709179,
+      "accessCount": 1
+    },
+    {
+      "type": "concept",
+      "name": "time_of_day_night",
+      "description": "Observed night conditions",
+      "properties": {
+        "last_observed": {
+          "confidence": 0.7,
+          "timestamp": 1756606709179,
+          "type": "date",
+          "source": "observation",
+          "value": "2025-08-31T02:18:29.179Z"
+        }
+      },
+      "tags": [
+        "environment",
+        "time_of_day"
+      ],
+      "confidence": 0.6,
+      "source": "observation",
+      "id": "entity-1756606709179-98hq41h",
+      "createdAt": 1756606709179,
+      "updatedAt": 1756606709179,
+      "lastAccessed": 1756606709179,
+      "accessCount": 1
+    }
+  ],
+  "relationships": [
+    {
+      "type": "near",
+      "sourceId": "entity-1756606709177-s3c9piv",
+      "targetId": "entity-1756606709178-b74ztl9",
+      "properties": {
+        "confidence_hint": {
+          "confidence": 0.6,
+          "timestamp": 1756606709176,
+          "type": "number",
+          "source": "inference",
+          "value": 0.6
+        }
+      },
+      "bidirectional": false,
+      "confidence": 0.6,
+      "source": "inference",
+      "id": "rel-1756606709178-2stfaep",
+      "createdAt": 1756606709178,
+      "updatedAt": 1756606709178,
+      "lastAccessed": 1756606709178,
+      "accessCount": 1
+    },
+    {
+      "type": "near",
+      "sourceId": "entity-1756606709179-nosaj5o",
+      "targetId": "entity-1756606709178-b74ztl9",
+      "properties": {
+        "confidence_hint": {
+          "confidence": 0.6,
+          "timestamp": 1756606709179,
+          "type": "number",
+          "source": "inference",
+          "value": 0.6
+        }
+      },
+      "bidirectional": false,
+      "confidence": 0.6,
+      "source": "inference",
+      "id": "rel-1756606709179-lqk6x0t",
+      "createdAt": 1756606709179,
+      "updatedAt": 1756606709179,
+      "lastAccessed": 1756606709179,
+      "accessCount": 1
+    },
+    {
+      "type": "near",
+      "sourceId": "entity-1756606709179-qcy7m56",
+      "targetId": "entity-1756606709178-b74ztl9",
+      "properties": {
+        "confidence_hint": {
+          "confidence": 0.6,
+          "timestamp": 1756606709179,
+          "type": "number",
+          "source": "inference",
+          "value": 0.6
+        }
+      },
+      "bidirectional": false,
+      "confidence": 0.6,
+      "source": "inference",
+      "id": "rel-1756606709179-vjh9ppo",
+      "createdAt": 1756606709179,
+      "updatedAt": 1756606709179,
+      "lastAccessed": 1756606709179,
+      "accessCount": 1
+    },
+    {
+      "type": "near",
+      "sourceId": "entity-1756606709179-jysi1nn",
+      "targetId": "entity-1756606709178-b74ztl9",
+      "properties": {
+        "confidence_hint": {
+          "confidence": 0.6,
+          "timestamp": 1756606709179,
+          "type": "number",
+          "source": "inference",
+          "value": 0.6
+        }
+      },
+      "bidirectional": false,
+      "confidence": 0.6,
+      "source": "inference",
+      "id": "rel-1756606709179-fralgbp",
+      "createdAt": 1756606709179,
+      "updatedAt": 1756606709179,
+      "lastAccessed": 1756606709179,
+      "accessCount": 1
+    },
+    {
+      "type": "near",
+      "sourceId": "entity-1756606709179-cbit8qh",
+      "targetId": "entity-1756606709178-b74ztl9",
+      "properties": {
+        "confidence_hint": {
+          "confidence": 0.6,
+          "timestamp": 1756606709179,
+          "type": "number",
+          "source": "inference",
+          "value": 0.6
+        }
+      },
+      "bidirectional": false,
+      "confidence": 0.6,
+      "source": "inference",
+      "id": "rel-1756606709179-eoobucf",
+      "createdAt": 1756606709179,
+      "updatedAt": 1756606709179,
+      "lastAccessed": 1756606709179,
+      "accessCount": 1
+    },
+    {
+      "type": "located_at",
+      "sourceId": "entity-1756606709179-98hq41h",
+      "targetId": "entity-1756606709178-b74ztl9",
+      "properties": {},
+      "bidirectional": false,
+      "confidence": 0.5,
+      "source": "observation",
+      "id": "rel-1756606709179-93ycv1h",
+      "createdAt": 1756606709179,
+      "updatedAt": 1756606709179,
+      "lastAccessed": 1756606709179,
+      "accessCount": 1
+    }
+  ]
+}

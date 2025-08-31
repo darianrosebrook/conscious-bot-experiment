@@ -17,12 +17,13 @@ import { KnowledgeGraphCore } from './knowledge-graph-core';
 import { GraphRAG } from './graph-rag';
 import { RelationshipExtractor } from './relationship-extractor';
 import { QueryEngine } from './query-engine';
+import { KnowledgeGraphConfig } from './types';
 
 /**
  * Create a complete semantic memory system
  */
-export function createSemanticMemory() {
-  const knowledgeGraphCore = new KnowledgeGraphCore();
+export function createSemanticMemory(config?: { knowledgeGraph?: Partial<KnowledgeGraphConfig> }) {
+  const knowledgeGraphCore = new KnowledgeGraphCore(config?.knowledgeGraph);
   const graphRAG = new GraphRAG(knowledgeGraphCore);
   const relationshipExtractor = new RelationshipExtractor(
     knowledgeGraphCore,

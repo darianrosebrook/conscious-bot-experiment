@@ -575,6 +575,11 @@ export class DigBlockLeaf implements LeafImpl {
           },
           required: ['x', 'y', 'z'],
         },
+        blockType: {
+          type: 'string',
+          description:
+            'If provided without pos, the leaf will target the nearest matching block',
+        },
         expect: {
           type: 'string',
           description: 'Expected block type',
@@ -584,7 +589,7 @@ export class DigBlockLeaf implements LeafImpl {
           description: 'Tool to use for digging',
         },
       },
-      required: ['pos'],
+      required: [],
     },
     outputSchema: {
       type: 'object',
@@ -609,24 +614,61 @@ export class DigBlockLeaf implements LeafImpl {
 
   async run(ctx: LeafContext, args: any): Promise<LeafResult> {
     const startTime = ctx.now();
-    const { pos, expect, tool } = args;
+    const { pos, expect, tool, blockType } = args || {};
 
     try {
       const bot = ctx.bot;
 
-      // Validate position
+      let resolvedPos: Vec3 | null = null;
+
+      // Resolve position: either explicit pos, or nearest block for provided blockType/expect
       if (
-        !pos ||
-        typeof pos.x !== 'number' ||
-        typeof pos.y !== 'number' ||
-        typeof pos.z !== 'number'
+        pos &&
+        typeof pos.x === 'number' &&
+        typeof pos.y === 'number' &&
+        typeof pos.z === 'number'
       ) {
+        resolvedPos = new Vec3(pos.x, pos.y, pos.z);
+      } else if (blockType || expect) {
+        const namePattern = String(blockType || expect);
+        const origin = bot.entity.position.clone();
+        outer: for (let r = 1; r <= 10; r++) {
+          for (let dx = -r; dx <= r; dx++) {
+            for (let dy = -r; dy <= r; dy++) {
+              for (let dz = -r; dz <= r; dz++) {
+                const p = origin.offset(dx, dy, dz);
+                const b = bot.blockAt(p);
+                if (b && b.name && b.name.includes(namePattern)) {
+                  resolvedPos = p;
+                  break outer;
+                }
+              }
+            }
+          }
+        }
+
+        if (!resolvedPos) {
+          return {
+            status: 'failure',
+            error: {
+              code: 'world.invalidPosition',
+              retryable: true,
+              detail: `No ${namePattern} found nearby`,
+            },
+            metrics: {
+              durationMs: ctx.now() - startTime,
+              retries: 0,
+              timeouts: 0,
+            },
+          };
+        }
+      } else {
         return {
           status: 'failure',
           error: {
             code: 'world.invalidPosition',
             retryable: false,
-            detail: 'Invalid position provided',
+            detail: 'Missing pos or blockType',
           },
           metrics: {
             durationMs: ctx.now() - startTime,
@@ -636,7 +678,7 @@ export class DigBlockLeaf implements LeafImpl {
         };
       }
 
-      const targetPos = new Vec3(pos.x, pos.y, pos.z);
+      const targetPos = resolvedPos;
       const block = bot.blockAt(targetPos);
 
       if (!block || block.name === 'air') {
@@ -838,28 +880,46 @@ export class PlaceBlockLeaf implements LeafImpl {
         };
       }
 
-      // Determine placement position
-      let placementPos: Vec3;
+      // Determine placement position (auto-select nearby if not provided)
+      let placementPos: Vec3 | null = null;
       if (pos) {
         placementPos = new Vec3(pos.x, pos.y, pos.z);
       } else if (against) {
-        // Place against the specified block
         const againstPos = new Vec3(against.x, against.y, against.z);
-        placementPos = againstPos.offset(1, 0, 0); // Simplified - would need proper face detection
+        placementPos = againstPos.offset(1, 0, 0);
       } else {
-        return {
-          status: 'failure',
-          error: {
-            code: 'world.invalidPosition',
-            retryable: false,
-            detail: 'Either pos or against must be specified',
-          },
-          metrics: {
-            durationMs: ctx.now() - startTime,
-            retries: 0,
-            timeouts: 0,
-          },
-        };
+        const origin = bot.entity.position.clone();
+        const candidates = [
+          origin.offset(1, 0, 0),
+          origin.offset(-1, 0, 0),
+          origin.offset(0, 0, 1),
+          origin.offset(0, 0, -1),
+          origin.offset(1, 0, 1),
+          origin.offset(-1, 0, -1),
+        ];
+        for (const c of candidates) {
+          const here = bot.blockAt(c);
+          const below = bot.blockAt(c.offset(0, -1, 0));
+          if (here && here.name === 'air' && below && below.boundingBox === 'block') {
+            placementPos = c;
+            break;
+          }
+        }
+        if (!placementPos) {
+          return {
+            status: 'failure',
+            error: {
+              code: 'place.invalidFace',
+              retryable: true,
+              detail: 'No suitable placement position nearby',
+            },
+            metrics: {
+              durationMs: ctx.now() - startTime,
+              retries: 0,
+              timeouts: 0,
+            },
+          };
+        }
       }
 
       // Place the block

@@ -358,23 +358,36 @@ export class CognitiveIntegration extends EventEmitter {
     if (!this.config.memoryEndpoint) return;
 
     try {
-      await fetch(`${this.config.memoryEndpoint}/action`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'store_episodic',
-          parameters: {
-            type: 'task_reflection',
-            description: feedback.reasoning,
-            taskId: feedback.taskId,
-            success: feedback.success,
-            confidence: feedback.confidence,
-            emotionalImpact: feedback.emotionalImpact,
-            alternatives: feedback.alternativeSuggestions,
-            timestamp: feedback.timestamp,
-          },
-        }),
-      });
+      const url = `${this.config.memoryEndpoint.replace(/\/$/, '')}/action`;
+      const retries = 2;
+      const payload = {
+        action: 'store_episodic',
+        parameters: {
+          type: 'task_reflection',
+          description: feedback.reasoning,
+          taskId: feedback.taskId,
+          success: feedback.success,
+          confidence: feedback.confidence,
+          emotionalImpact: feedback.emotionalImpact,
+          alternatives: feedback.alternativeSuggestions,
+          timestamp: feedback.timestamp,
+        },
+      };
+      for (let attempt = 0; attempt <= retries; attempt++) {
+        try {
+          const controller = new AbortController();
+          const t = setTimeout(() => controller.abort(), 5_000);
+          const res = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+            signal: controller.signal,
+          });
+          clearTimeout(t);
+          if (res.ok) break;
+        } catch {}
+        await new Promise((r) => setTimeout(r, 250 + attempt * 250));
+      }
     } catch (error) {
       console.warn('Failed to store cognitive feedback in memory:', error);
     }

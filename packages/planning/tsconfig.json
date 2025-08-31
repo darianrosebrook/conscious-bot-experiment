@@ -9,7 +9,7 @@
     "declaration": true,
     "declarationMap": true,
     "sourceMap": true,
-    "composite": false,
+    "composite": true,
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
@@ -19,11 +19,6 @@
     "noEmit": false,
     "downlevelIteration": true,
     "baseUrl": ".",
-    "paths": {
-      "@conscious-bot/memory": ["../../memory/src"],
-      "@conscious-bot/core": ["../../core/src"],
-      "@conscious-bot/planning": ["./src"]
-    },
     "types": [],
     "typeRoots": ["./src/types", "./node_modules/@types"]
   },
@@ -31,6 +26,12 @@
     "src/**/*.ts",
     "src/**/*.tsx",
     "src/types/*.d.ts"
+  ],
+  "references": [
+    { "path": "../core" },
+    { "path": "../memory" },
+    { "path": "../world" },
+    { "path": "../mcp-server" }
   ],
   "exclude": [
     "dist", 

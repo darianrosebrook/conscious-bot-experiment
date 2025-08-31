@@ -14,13 +14,13 @@ import {
   EvaluationEvent,
   StressTestConfig,
 } from '../types';
-// import { IntegratedPlanningSystem } from '@conscious-bot/planning';
+import {
+  IntegratedPlanningSystem,
+  createIntegratedPlanningSystem,
+} from '@conscious-bot/planning';
 import { EventEmitter } from 'events';
 
-// Temporary interface for planning system until planning module is available
-interface IntegratedPlanningSystem {
-  planTask(input: any, options?: any): Promise<any>;
-}
+// Use real integrated planning system
 
 export interface ScenarioExecutionContext {
   scenario: Scenario;
@@ -83,8 +83,10 @@ export class ScenarioManager extends EventEmitter {
     }
 
     // Create planning system with agent configuration
-    // TODO: Replace with actual planning system when available
-    const planningSystem = {} as IntegratedPlanningSystem;
+    const planningSystem: IntegratedPlanningSystem = createIntegratedPlanningSystem({
+      routerConfig: {},
+      plannerConfig: {},
+    });
 
     // Initialize evaluation session
     const session: EvaluationSession = {

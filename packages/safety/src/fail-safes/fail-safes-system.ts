@@ -19,8 +19,6 @@ import {
   FailureType,
   ComponentWatchdogConfig,
   Task,
-  NotificationChannel,
-  SafeModeConfig,
   validateFailSafeConfig,
 } from './types';
 
@@ -201,7 +199,7 @@ class RecoveryCoordinator extends EventEmitter {
   private async executeRecoveryStrategy(
     componentName: string,
     strategy: string,
-    context: Record<string, any>
+    _context: Record<string, any>
   ): Promise<{ success: boolean; message: string }> {
     try {
       switch (strategy) {
@@ -322,9 +320,7 @@ export class FailSafesSystem extends EventEmitter {
 
     try {
       // Register watchdogs
-      for (const [componentName, watchdogConfig] of Object.entries(
-        this.config.watchdogs
-      )) {
+      for (const [, watchdogConfig] of Object.entries(this.config.watchdogs)) {
         this.watchdogManager.registerComponent(watchdogConfig);
       }
 
@@ -442,10 +438,9 @@ export class FailSafesSystem extends EventEmitter {
   getSystemStatus(): SystemStatus {
     const systemHealth = this.watchdogManager.getSystemHealth();
     const preemptionStatus = this.preemptionManager.getSystemStatus();
-    const emergencyStats = this.emergencyCoordinator.getEmergencyStatistics();
-    const safeModeStatus = this.emergencyCoordinator
-      .getSafeModeManager()
-      .getStatus();
+    // Note: emergencyStats and safeModeStatus are calculated but not used in current implementation
+    // this.emergencyCoordinator.getEmergencyStatistics();
+    // this.emergencyCoordinator.getSafeModeManager().getStatus();
 
     return {
       timestamp: Date.now(),
@@ -775,8 +770,8 @@ export class FailSafesSystem extends EventEmitter {
    * Get current memory usage
    */
   private getCurrentMemoryUsage(): number {
-    if (typeof process !== 'undefined' && process.memoryUsage) {
-      const memUsage = process.memoryUsage();
+    const memUsage = (globalThis as any)?.process?.memoryUsage?.();
+    if (memUsage?.heapTotal) {
       return Math.round((memUsage.heapUsed / memUsage.heapTotal) * 100);
     }
     return 0; // Fallback if process.memoryUsage is not available

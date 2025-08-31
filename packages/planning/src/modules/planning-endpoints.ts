@@ -17,6 +17,7 @@ export interface PlanningSystem {
     getActiveGoals: () => any[];
     getGoalCount: () => number;
     getCurrentTasks: () => any[];
+    addGoal?: (goal: any) => Promise<any> | any;
     addTask: (task: any) => void;
     getCompletedTasks: () => any[];
   };
@@ -153,6 +154,7 @@ export function createPlanningEndpoints(
               type: t.type,
               status: t.status,
               progress: t.progress,
+              requirement: t.metadata?.requirement,
             })),
             completed: completedTasks.length,
           },
@@ -168,6 +170,103 @@ export function createPlanningEndpoints(
       });
     }
   });
+
+  // POST /goal - Create a new goal (and optional tasks)
+  router.post('/goal', async (req: Request, res: Response) => {
+    try {
+      const { name, description, priority = 0.5, urgency = 0.5, tasks = [] } =
+        req.body || {};
+
+      if (!description && !name) {
+        return res.status(400).json({
+          success: false,
+          error: 'Missing goal description or name',
+        });
+      }
+
+      // Create minimal goal record via planning system if available
+      const goal = {
+        id: `goal-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+        type: inferGoalType(description || name || ''),
+        priority,
+        urgency,
+        utility: (priority + urgency) / 2,
+        description: description || name,
+        preconditions: [],
+        effects: [],
+        status: 'pending',
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+        subGoals: [],
+      };
+
+      if (planningSystem.goalFormulation.addGoal) {
+        await planningSystem.goalFormulation.addGoal(goal);
+      }
+
+      // Optionally add associated tasks into the queue
+      if (Array.isArray(tasks)) {
+        for (const t of tasks) {
+          try {
+            await planningSystem.goalFormulation.addTask({
+              title: t.title || t.name || t.description || 'Untitled Task',
+              description: t.description || t.title || '',
+              type: inferTaskType(t.type, t.description || t.title || name || ''),
+              priority: t.priority ?? priority,
+              urgency: t.urgency ?? urgency,
+              source: 'goal',
+              parameters: t.parameters || {},
+              metadata: {
+                category: t.category || 'general',
+                tags: t.tags || [],
+                createdAt: Date.now(),
+                updatedAt: Date.now(),
+                retryCount: 0,
+                maxRetries: 3,
+                parentGoalId: goal.id,
+                childTaskIds: [],
+              },
+            });
+          } catch (e) {
+            // Continue; one bad task shouldn't block goal creation
+          }
+        }
+      }
+
+      return res.json({ success: true, goalId: goal.id, goal });
+    } catch (error) {
+      console.error('Failed to create goal:', error);
+      res.status(500).json({
+        success: false,
+        error: 'Failed to create goal',
+        details: error instanceof Error ? error.message : 'Unknown error',
+      });
+    }
+  });
+
+  function inferGoalType(text: string): string {
+    const t = text.toLowerCase();
+    if (/(explore|find|search|scout)/.test(t)) return 'exploration';
+    if (/(craft|build|create|make)/.test(t)) return 'achievement';
+    if (/(gather|collect|obtain|get)/.test(t)) return 'acquire_item';
+    if (/(mine|dig)/.test(t)) return 'achievement';
+    if (/(survive|avoid|threat|danger)/.test(t)) return 'survive_threat';
+    return 'curiosity';
+  }
+
+  function inferTaskType(explicitType: string | undefined, text: string): string {
+    const t = (explicitType || '').toLowerCase();
+    if (t && t !== 'autonomous' && t !== 'manual') return t;
+    const s = (text || '').toLowerCase();
+    if (/(gather|collect|wood|log)/.test(s)) return 'gathering';
+    if (/(craft|build|make|create|table|pickaxe|stick|plank)/.test(s))
+      return 'crafting';
+    if (/(mine|iron|stone|ore|dig)/.test(s)) return 'mining';
+    if (/(explore|search|scout|look around)/.test(s)) return 'exploration';
+    if (/(farm|plant|harvest)/.test(s)) return 'farming';
+    if (/(move|go to|walk)/.test(s)) return 'navigation';
+    return 'gathering';
+  }
 
   // POST /task - Add a new task
   router.post('/task', async (req: Request, res: Response) => {

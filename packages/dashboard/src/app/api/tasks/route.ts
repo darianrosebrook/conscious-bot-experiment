@@ -57,6 +57,7 @@ export async function GET(_request: NextRequest) {
                 label: step.label,
                 done: step.done,
               })) || [],
+            requirement: task.metadata?.requirement || task.requirement,
           });
         }
       }
@@ -100,6 +101,7 @@ export async function GET(_request: NextRequest) {
                   label: step.label,
                   done: step.done,
                 })) || [],
+              requirement: task.metadata?.requirement || task.requirement,
             });
           }
         }

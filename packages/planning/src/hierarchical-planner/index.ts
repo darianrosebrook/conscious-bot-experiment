@@ -49,6 +49,7 @@ import {
   PlanningContext,
   Plan,
 } from './hrm-inspired-planner';
+import { OllamaClient } from '@conscious-bot/core';
 
 export class IntegratedPlanningSystem {
   private cognitiveRouter: CognitiveTaskRouter;
@@ -206,18 +207,42 @@ export class IntegratedPlanningSystem {
   }
 
   /**
-   * Execute LLM-based reasoning (placeholder for actual LLM integration)
+   * Execute LLM-based reasoning (production-guarded)
    */
   private async executeLLMReasoning(
     input: string,
     context: any
   ): Promise<string> {
-    // This would integrate with our cognitive core LLM interface
-    // For now, return a simulated response
-    const latency = context.urgency === 'emergency' ? 50 : 200; // Faster for emergency
-    await new Promise((resolve) => setTimeout(resolve, latency));
+    // Block simulated LLM use in production unless explicitly allowed
+    if (
+      process.env.NODE_ENV === 'production' &&
+      process.env.ALLOW_SIMULATED_LLM !== 'true'
+    ) {
+      throw new Error(
+        'LLM reasoning disabled in production (set ALLOW_SIMULATED_LLM=true to enable)'
+      );
+    }
 
-    return `LLM reasoning response for: ${input}. This would be processed by our DeepSeek-R1 model through the cognitive core interface.`;
+    // Integrate with on-device Ollama LLM
+    const client = new OllamaClient();
+    const system =
+      'You are the planning co-pilot for a Minecraft agent. ' +
+      'Given a goal and partial world context, reason step-by-step to propose a concise, actionable plan. ' +
+      'Use clear steps, avoid assumptions that contradict provided context. ' +
+      'Output a short narrative plan; the HRM module will refine into actions.';
+    const prompt = `Goal: ${input}\n\nContext: ${JSON.stringify(
+      {
+        domain: context.domain,
+        urgency: context.urgency,
+        constraints: context.constraints,
+        resources: context.resources,
+        currentState: context.currentState,
+      },
+      null,
+      2
+    )}\n\nProvide a brief plan (3-7 steps).`;
+    const text = await client.generate({ prompt, system, temperature: 0.2 });
+    return text.trim();
   }
 
   /**

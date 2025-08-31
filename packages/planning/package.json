@@ -4,10 +4,12 @@
   "description": "Planning and goal management system for conscious bot",
   "main": "dist/index.js",
   "scripts": {
-    "build": "tsc",
+    "build": "tsc -p tsconfig.build.json",
     "dev": "tsx src/modular-server.ts",
     "dev:server": "tsx src/modular-server.ts",
     "dev:watch": "tsc --watch",
+    "smoke": "pnpm run build && node scripts/run-smoke.mjs",
+    "smoke:ts": "tsx scripts/run-smoke.ts",
     "test": "vitest run",
     "test:ui": "vitest --ui",
     "test:run": "vitest run",

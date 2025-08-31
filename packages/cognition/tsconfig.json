@@ -9,7 +9,7 @@
     "declaration": true,
     "declarationMap": true,
     "sourceMap": true,
-    "composite": false,
+    "composite": true,
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
@@ -20,5 +20,10 @@
     "downlevelIteration": true
   },
   "include": ["src/**/*"],
+  "references": [
+    { "path": "../core" },
+    { "path": "../memory" },
+    { "path": "../planning" }
+  ],
   "exclude": ["dist", "node_modules", "**/*.test.ts", "**/*.spec.ts"]
 }

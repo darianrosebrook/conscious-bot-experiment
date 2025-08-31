@@ -8,7 +8,7 @@
  */
 
 import { LeafFactory, createLeafContext } from '@conscious-bot/core';
-import {
+import type {
   ConsciousBotMCPServer,
   MCPServerDependencies,
 } from '@conscious-bot/mcp-server';
@@ -77,7 +77,12 @@ export class MCPIntegration {
         },
       };
 
-      this.mcpServer = new ConsciousBotMCPServer(deps);
+      // Dynamically import ESM MCP server to support both ESM/CJS consumers
+      const m = (await import('@conscious-bot/mcp-server')) as any;
+      const ServerCtor = (m.ConsciousBotMCPServer || m.default || m) as {
+        new (deps: MCPServerDependencies): ConsciousBotMCPServer;
+      };
+      this.mcpServer = new ServerCtor(deps);
       this.isInitialized = true;
 
       console.log('[MCP] Integration initialized successfully');
@@ -118,13 +123,17 @@ export class MCPIntegration {
     }
 
     try {
-      const result = await (this.mcpServer as any).handleRegisterOption({
-        id: option.id,
-        name: option.name,
-        description: option.description,
-        btDefinition: option.btDefinition,
-        permissions: option.permissions || [],
-      });
+      // Use the executeTool method to call register_option
+      const result = await (this.mcpServer as any).executeTool(
+        'register_option',
+        {
+          id: option.id,
+          name: option.name,
+          description: option.description,
+          btDefinition: option.btDefinition,
+          permissions: option.permissions || [],
+        }
+      );
 
       return {
         success: result.status === 'success',
@@ -178,9 +187,9 @@ export class MCPIntegration {
     }
 
     try {
-      // For now, return an empty array since we can't access private tools
-      // In a real implementation, we'd need to expose this via a public method
-      return [];
+      // Use the new public method to get tools
+      const tools = this.mcpServer.getTools();
+      return tools.map((tool) => tool.name);
     } catch (error) {
       console.error('[MCP] Failed to list tools:', error);
       return [];
@@ -236,7 +245,7 @@ export class MCPIntegration {
   }
 
   /**
-   * Run an option via MCP
+   * Run an option via MCP with version resolution
    */
   async runOption(
     optionId: string,
@@ -250,8 +259,11 @@ export class MCPIntegration {
     }
 
     try {
+      // First, try to resolve the option ID to a stable version
+      const resolvedOptionId = await this.resolveOptionVersion(optionId);
+
       const result = await (this.mcpServer as any).executeTool('run_option', {
-        id: optionId,
+        id: resolvedOptionId,
         args: args || {},
       });
 
@@ -266,6 +278,35 @@ export class MCPIntegration {
         data: error.data,
       };
     }
+  }
+
+  /**
+   * Resolve option version to a stable call signature
+   */
+  private async resolveOptionVersion(optionId: string): Promise<string> {
+    // If optionId already has a version, return it
+    if (optionId.includes('@')) {
+      return optionId;
+    }
+
+    // Try to find the latest version of this option
+    try {
+      const options = await this.listOptions('active');
+      const matchingOptions = options.filter(
+        (opt: any) =>
+          opt.name === optionId || opt.id?.startsWith(optionId + '@')
+      );
+
+      if (matchingOptions.length > 0) {
+        // Return the first available option with version
+        return matchingOptions[0].id || optionId;
+      }
+    } catch (error) {
+      console.warn('[MCP] Failed to resolve option version:', error);
+    }
+
+    // Fallback: return the original optionId
+    return optionId;
   }
 
   /**

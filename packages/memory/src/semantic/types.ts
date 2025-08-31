@@ -50,12 +50,12 @@ export interface Relationship {
  * Property value with metadata
  */
 export interface PropertyValue {
-  value: any;
-  type: PropertyType;
-  unit?: string;
   confidence: number; // 0-1
-  source: KnowledgeSource;
   timestamp: number;
+  type: PropertyType;
+  source: KnowledgeSource;
+  value?: any;
+  unit?: string;
 }
 
 /**
@@ -302,12 +302,12 @@ export interface KnowledgeGraphConfig {
 // ============================================================================
 
 export const PropertyValueSchema = z.object({
-  value: z.any(),
-  type: z.nativeEnum(PropertyType),
-  unit: z.string().optional(),
   confidence: z.number().min(0).max(1),
-  source: z.nativeEnum(KnowledgeSource),
   timestamp: z.number(),
+  type: z.nativeEnum(PropertyType),
+  source: z.nativeEnum(KnowledgeSource),
+  value: z.any().optional(),
+  unit: z.string().optional(),
 });
 
 export const EntitySchema = z.object({

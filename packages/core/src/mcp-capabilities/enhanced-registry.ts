@@ -302,8 +302,8 @@ export class EnhancedRegistry {
       return { ok: false, error: 'max_shadow_active' };
     }
 
-    // Critical fix #3: Compute real permissions from leaf composition
-    const permissions = this.computeOptionPermissions(parseResult.compiled);
+    // Critical fix #3: Compute real permissions from leaf composition (use JSON AST)
+    const permissions = this.computeOptionPermissions(btDslJson.root);
 
     // Create enhanced spec with shadow configuration
     const enhancedSpec: EnhancedSpec = {
@@ -692,6 +692,15 @@ export class EnhancedRegistry {
   }
 
   /**
+   * Get shadow options with detailed information
+   */
+  getShadowOptionsDetailed() {
+    return [...this.enhancedSpecs.entries()]
+      .filter(([, spec]) => spec.status === 'shadow')
+      .map(([id, spec]) => ({ id, spec, stats: this.getShadowStats(id) }));
+  }
+
+  /**
    * Secondary improvement #15: Revoke an option (sticky status)
    */
   async revokeOption(optionId: string, reason: string): Promise<boolean> {
@@ -821,17 +830,18 @@ export class EnhancedRegistry {
    * Critical fix #3: Compute real permissions for an option based on its leaf composition
    */
   private computeOptionPermissions(rootNode: any): string[] {
+    // Traverse the BT-DSL JSON AST and aggregate permissions from referenced leaves
     const perms = new Set<string>();
     const visit = (n: any) => {
-      if (!n) return;
-      if (n.type === 'Leaf' && n.name) {
-        // resolve "latest" is OK in shadow; in production pin version
-        const impl = this.leafFactory.get(n.name);
-        if (impl) {
+      if (!n || typeof n !== 'object') return;
+      if (n.type === 'Leaf' && n.leafName) {
+        const impl = this.leafFactory.get(n.leafName, n.leafVersion);
+        if (impl && Array.isArray(impl.spec.permissions)) {
           impl.spec.permissions.forEach((p) => perms.add(p));
         }
       }
-      (n.children || []).forEach(visit);
+      const kids: any[] = Array.isArray(n.children) ? n.children : [];
+      kids.forEach(visit);
       if (n.child) visit(n.child);
     };
     visit(rootNode);

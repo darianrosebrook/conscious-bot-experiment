@@ -21,7 +21,8 @@ import { createWorkingMemory } from './working';
 import { createProvenanceSystem } from './provenance';
 import { SkillRegistry } from './skills';
 import { MemoryVersioningManager } from './memory-versioning-manager';
-import { MemoryContext } from './types';
+import { MemoryContext, ExperienceType } from './types';
+import { normalizeExperienceType } from './utils/experience-normalizer';
 
 const app: express.Application = express();
 const port = process.env.PORT ? parseInt(process.env.PORT) : 3001;
@@ -56,12 +57,23 @@ const memorySystem = {
       memorySystem.episodic.eventLogger
         .getRecentExperiences(3600000)
         .slice(0, count),
-    storeMemory: (memory: any) =>
-      memorySystem.episodic.eventLogger.logExperience(
-        memory.type,
-        memory.description,
-        memory
-      ),
+    storeMemory: (memory: any) => {
+      const { type, note } = normalizeExperienceType(memory?.type);
+      const parameters = {
+        ...memory,
+        type,
+        metadata: {
+          ...(memory?.metadata || {}),
+          originalType: memory?.type,
+          normalizationNote: note,
+        },
+      };
+      return memorySystem.episodic.eventLogger.logExperience(
+        type as ExperienceType,
+        parameters.description,
+        parameters
+      );
+    },
     retrieveMemories: (query: any) =>
       memorySystem.episodic.retrieval.retrieveByContext(query, {}),
   },

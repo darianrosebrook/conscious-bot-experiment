@@ -67,6 +67,7 @@
     "cors": "^2.8.5",
     "express": "^4.21.2",
     "js-yaml": "^4.1.0",
+    "minecraft-data": "^3.97.0",
     "mineflayer": "^4.32.0",
     "mineflayer-pathfinder": "^2.4.5",
     "prismarine-viewer": "^1.33.0",

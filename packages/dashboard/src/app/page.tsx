@@ -512,51 +512,24 @@ function ConsciousMinecraftDashboardContent() {
     thoughtsEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [thoughts]);
 
-  // Periodic viewer status check and auto-start
+  // Periodic viewer status check only (auto-start handled by minecraft interface)
   useEffect(() => {
-    const checkAndStartViewer = async () => {
+    const checkViewerStatus = async () => {
       try {
         await checkViewerStatus();
-
-        // If bot is connected but viewer is not active, try to start it
-        if (viewerStatus?.canStart && viewerStatus?.viewerActive !== true) {
-          console.log(
-            'Bot connected but viewer not active, attempting to start viewer...'
-          );
-          const response = await fetch('http://localhost:3005/start-viewer', {
-            method: 'POST',
-          });
-
-          if (response.ok) {
-            const result = await response.json();
-            if (result.success) {
-              console.log('Viewer started successfully');
-              // Update viewer status immediately
-              setBotConnections((prev) =>
-                prev.map((conn) =>
-                  conn.name === 'minecraft-bot'
-                    ? { ...conn, viewerActive: true }
-                    : conn
-                )
-              );
-              // Refresh viewer status
-              await checkViewerStatus();
-            }
-          }
-        }
       } catch (error) {
-        console.error('Error in viewer check/start:', error);
+        console.error('Error checking viewer status:', error);
       }
     };
 
-    // Check every 10 seconds
-    const interval = setInterval(checkAndStartViewer, 10000);
+    // Check every 30 seconds (reduced frequency to prevent conflicts)
+    const interval = setInterval(checkViewerStatus, 30000);
 
     // Initial check
-    checkAndStartViewer();
+    checkViewerStatus();
 
     return () => clearInterval(interval);
-  }, [viewerStatus?.canStart, viewerStatus?.viewerActive]);
+  }, [checkViewerStatus]);
 
   // Fetch initial data from bot systems
   useEffect(() => {
@@ -1120,6 +1093,87 @@ function ConsciousMinecraftDashboardContent() {
                               }}
                             />
                           </div>
+                          {task.requirement && (
+                            <div className="mt-2 text-xs text-zinc-400">
+                              <div className="flex items-center justify-between">
+                                <span className="font-medium text-zinc-300">
+                                  Requirement
+                                </span>
+                                {task.requirement?.kind === 'craft' &&
+                                task.requirement?.outputPattern ? (
+                                  <span>
+                                    Output: {task.requirement.outputPattern}
+                                    {task.requirement.have >=
+                                    (task.requirement.quantity || 1)
+                                      ? ' • Crafted'
+                                      : task.requirement.proxyHave !== undefined
+                                        ? ` • Materials ~${task.requirement.proxyHave}`
+                                        : ''}
+                                  </span>
+                                ) : (
+                                  <span>
+                                    Have {task.requirement?.have ?? 0}/
+                                    {task.requirement?.quantity ?? 0}
+                                    {typeof task.requirement?.needed ===
+                                    'number'
+                                      ? ` • Need ${task.requirement.needed}`
+                                      : ''}
+                                  </span>
+                                )}
+                              </div>
+                              {Array.isArray(task.requirement?.patterns) &&
+                              task.requirement?.patterns?.length ? (
+                                <div className="mt-1 truncate text-zinc-500">
+                                  Items: {task.requirement.patterns.join(', ')}
+                                </div>
+                              ) : null}
+                              {/* Mini requirement progress bar */}
+                              {(() => {
+                                const req = task.requirement as any;
+                                if (!req) return null;
+                                let reqProgress = 0;
+                                if (
+                                  req.kind === 'collect' ||
+                                  req.kind === 'mine'
+                                ) {
+                                  const total = Math.max(1, req.quantity || 0);
+                                  reqProgress = Math.max(
+                                    0,
+                                    Math.min(1, (req.have || 0) / total)
+                                  );
+                                } else if (req.kind === 'craft') {
+                                  const q = Math.max(1, req.quantity || 1);
+                                  if ((req.have || 0) >= q) reqProgress = 1;
+                                  else if (typeof req.proxyHave === 'number') {
+                                    // mirror server heuristic (3 logs ~ ready)
+                                    reqProgress = Math.max(
+                                      0,
+                                      Math.min(1, req.proxyHave / 3)
+                                    );
+                                  } else reqProgress = 0;
+                                }
+                                const pct = Math.round(reqProgress * 100);
+                                return (
+                                  <div className="mt-2">
+                                    <div className="flex items-center justify-between mb-1">
+                                      <span className="text-[10px] uppercase tracking-wide text-zinc-500">
+                                        Requirement Progress
+                                      </span>
+                                      <span className="text-[10px] text-zinc-400">
+                                        {pct}%
+                                      </span>
+                                    </div>
+                                    <div className="h-1 w-full rounded bg-zinc-800">
+                                      <div
+                                        className="h-1 rounded bg-emerald-500 transition-all duration-300"
+                                        style={{ width: `${pct}%` }}
+                                      />
+                                    </div>
+                                  </div>
+                                );
+                              })()}
+                            </div>
+                          )}
                           {task.steps && (
                             <ul className="mt-2 space-y-1 text-sm text-zinc-300">
                               {task.steps.map((step) => (
@@ -1527,10 +1581,10 @@ function ConsciousMinecraftDashboardContent() {
                   title="Cognitive Stream"
                   icon={<MessageSquare className="size-4" />}
                   actions={<Pill>consciousness flow</Pill>}
-                  className="h-full"
+                  className="flex-1"
                 >
                   {thoughts.length > 0 ? (
-                    <ScrollArea className="max-h-[38vh] flex flex-col-reverse gap-2 pr-1 overflow-y-auto">
+                    <ScrollArea className="flex-1 flex flex-col-reverse gap-2 pr-1 overflow-y-auto">
                       <div className="flex flex-col-reverse gap-2 pr-1 overflow-y-auto">
                         {thoughts.map((thought) => {
                           // Determine styling based on thought type and attribution

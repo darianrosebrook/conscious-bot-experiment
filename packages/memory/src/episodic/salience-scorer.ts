@@ -214,7 +214,7 @@ export class SalienceScorer {
    * Calculate learning value potential
    */
   private calculateLearningValue(experience: Experience): number {
-    const learningTypeBonus: Record<ExperienceType, number> = {
+    const learningTypeBonus: Partial<Record<ExperienceType, number>> = {
       [ExperienceType.GOAL_FAILURE]: 0.8, // Failures teach valuable lessons
       [ExperienceType.LEARNING]: 0.9, // Explicit learning experiences
       [ExperienceType.SKILL_IMPROVEMENT]: 0.95, // Skill improvement is high-value learning
@@ -224,6 +224,7 @@ export class SalienceScorer {
       [ExperienceType.GOAL_ACHIEVEMENT]: 0.4, // Success reinforces strategies
       [ExperienceType.SOCIAL_INTERACTION]: 0.4, // Social learning
       [ExperienceType.ROUTINE_ACTION]: 0.1, // Limited learning from routine
+      [ExperienceType.TASK_REFLECTION]: 0.85, // Reflections consolidate learning from tasks
     };
 
     return learningTypeBonus[experience.type] ?? 0.3;

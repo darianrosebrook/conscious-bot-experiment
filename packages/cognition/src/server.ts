@@ -33,8 +33,8 @@ import { IntrusiveThoughtProcessor } from './enhanced-intrusive-thought-processo
 
 // Initialize enhanced thought generator
 const enhancedThoughtGenerator = new EnhancedThoughtGenerator({
-  thoughtInterval: 30000, // 30 seconds between thoughts to prevent spam
-  maxThoughtsPerCycle: 1, // Reduced from 3 to 1
+  thoughtInterval: 60000, // 60 seconds between thoughts to reduce spam
+  maxThoughtsPerCycle: 1,
   enableIdleThoughts: true,
   enableContextualThoughts: true,
   enableEventDrivenThoughts: true,
@@ -122,22 +122,36 @@ function startThoughtGeneration() {
     memoryContext: {},
   });
 
-  // Set up periodic thought generation every 30 seconds
+  // Set up periodic thought generation every 60 seconds
   thoughtGenerationInterval = setInterval(async () => {
     try {
+      // Fetch real bot state and planning data
+      const [botState, planningState] = await Promise.all([
+        fetch('http://localhost:3005/state')
+          .then((res) => res.json())
+          .catch(() => null),
+        fetch('http://localhost:3002/state')
+          .then((res) => res.json())
+          .catch(() => null),
+      ]);
+
+      const currentState = (botState as any)?.data || {};
+      const currentTasks = (planningState as any)?.state?.tasks?.current || [];
+      const recentEvents = (botState as any)?.data?.recentEvents || [];
+
       await enhancedThoughtGenerator.generateThought({
-        currentState: {},
-        currentTasks: [],
-        recentEvents: [],
+        currentState,
+        currentTasks,
+        recentEvents,
         emotionalState: 'neutral',
         memoryContext: {},
       });
     } catch (error) {
       console.error('Error generating periodic thought:', error);
     }
-  }, 30000); // 30 seconds
+  }, 60000); // 60 seconds
 
-  console.log('✅ Enhanced thought generator started with 30-second intervals');
+  console.log('✅ Enhanced thought generator started with 60-second intervals');
 }
 
 function stopThoughtGeneration() {
@@ -737,7 +751,12 @@ app.post('/process-social', async (req, res) => {
       message,
     });
 
-    // Mock social cognition system for now
+    // Mock social cognition system (dev-only)
+    if (process.env.ALLOW_COGNITION_MOCKS !== 'true') {
+      return res.status(503).json({
+        error: 'Social cognition not configured (mocks disabled)',
+      });
+    }
     // In a real implementation, this would use the actual TheoryOfMindEngine
     const thoughts = [];
 
@@ -913,14 +932,13 @@ app.post('/generate-steps', async (req, res) => {
           description: `Generate detailed steps for: ${task.title}`,
           priority: 0.9,
           utility: 0.9,
-          source: 'system',
+          source: 'drive',
         },
       ],
       memorySummaries: [],
       lastToolResult: {
-        task: task,
-        context: context,
-        request: 'generate-steps',
+        ok: true,
+        data: { task, context, request: 'generate-steps' },
       },
     });
 
@@ -970,7 +988,7 @@ function parseStepsFromReActResponse(thoughts: string, task: any): any[] {
 
   for (const line of lines) {
     const trimmedLine = line.trim();
-    
+
     // Look for step indicators in the reasoning
     if (
       trimmedLine.toLowerCase().includes('step') ||
@@ -1007,13 +1025,25 @@ function parseStepsFromReActResponse(thoughts: string, task: any): any[] {
 
       // Estimate duration based on step content
       let estimatedDuration = 3000; // Default 3 seconds
-      if (stepContent.toLowerCase().includes('move') || stepContent.toLowerCase().includes('navigate')) {
+      if (
+        stepContent.toLowerCase().includes('move') ||
+        stepContent.toLowerCase().includes('navigate')
+      ) {
         estimatedDuration = 5000; // Movement takes longer
-      } else if (stepContent.toLowerCase().includes('gather') || stepContent.toLowerCase().includes('collect')) {
+      } else if (
+        stepContent.toLowerCase().includes('gather') ||
+        stepContent.toLowerCase().includes('collect')
+      ) {
         estimatedDuration = 4000; // Gathering takes time
-      } else if (stepContent.toLowerCase().includes('craft') || stepContent.toLowerCase().includes('build')) {
+      } else if (
+        stepContent.toLowerCase().includes('craft') ||
+        stepContent.toLowerCase().includes('build')
+      ) {
         estimatedDuration = 6000; // Crafting takes longer
-      } else if (stepContent.toLowerCase().includes('analyze') || stepContent.toLowerCase().includes('plan')) {
+      } else if (
+        stepContent.toLowerCase().includes('analyze') ||
+        stepContent.toLowerCase().includes('plan')
+      ) {
         estimatedDuration = 2000; // Planning is faster
       }
 

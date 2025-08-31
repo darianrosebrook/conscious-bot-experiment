@@ -10,6 +10,48 @@
 import { EventEmitter } from 'events';
 import { LLMInterface } from './cognitive-core/llm-interface';
 
+/**
+ * Thought Deduplicator - Prevents repetitive thoughts to improve performance
+ * @author @darianrosebrook
+ */
+class ThoughtDeduplicator {
+  private recentThoughts: Map<string, number> = new Map();
+  private cooldownMs: number;
+  private maxRecentThoughts: number;
+
+  constructor(config: { cooldownMs: number; maxRecentThoughts: number }) {
+    this.cooldownMs = config.cooldownMs;
+    this.maxRecentThoughts = config.maxRecentThoughts;
+  }
+
+  shouldGenerateThought(content: string): boolean {
+    const hash = this.hashContent(content);
+    const lastGenerated = this.recentThoughts.get(hash);
+    const now = Date.now();
+
+    if (!lastGenerated || now - lastGenerated > this.cooldownMs) {
+      this.recentThoughts.set(hash, now);
+
+      // Clean up old entries to prevent memory leaks
+      if (this.recentThoughts.size > this.maxRecentThoughts) {
+        const oldestEntries = Array.from(this.recentThoughts.entries())
+          .sort(([, a], [, b]) => a - b)
+          .slice(0, this.recentThoughts.size - this.maxRecentThoughts);
+
+        oldestEntries.forEach(([key]) => this.recentThoughts.delete(key));
+      }
+
+      return true;
+    }
+    return false;
+  }
+
+  private hashContent(content: string): string {
+    // Simple hash function for thought content
+    return content.toLowerCase().replace(/\s+/g, ' ').trim();
+  }
+}
+
 export interface ThoughtContext {
   currentState?: {
     position?: { x: number; y: number; z: number };
@@ -123,11 +165,12 @@ export interface EnhancedThoughtGeneratorConfig {
   enableIdleThoughts: boolean;
   enableContextualThoughts: boolean;
   enableEventDrivenThoughts: boolean;
+  thoughtDeduplicationCooldown?: number; // Cooldown period for similar thoughts in milliseconds
 }
 
 const DEFAULT_CONFIG: EnhancedThoughtGeneratorConfig = {
-  thoughtInterval: 5000, // 5 seconds between thoughts for testing
-  maxThoughtsPerCycle: 3,
+  thoughtInterval: 60000, // 60 seconds between thoughts to reduce spam
+  maxThoughtsPerCycle: 1,
   enableIdleThoughts: true,
   enableContextualThoughts: true,
   enableEventDrivenThoughts: true,
@@ -143,6 +186,7 @@ export class EnhancedThoughtGenerator extends EventEmitter {
   private lastThoughtTime: number = Date.now() - 10000; // Initialize to 10 seconds ago
   private isGenerating: boolean = false;
   private llm: LLMInterface;
+  private thoughtDeduplicator: ThoughtDeduplicator;
 
   constructor(config: Partial<EnhancedThoughtGeneratorConfig> = {}) {
     super();
@@ -155,6 +199,12 @@ export class EnhancedThoughtGenerator extends EventEmitter {
       maxTokens: 512,
       timeout: 60000, // Increased timeout for better reliability
       retries: 2,
+    });
+
+    // Initialize thought deduplicator to prevent repetitive thoughts
+    this.thoughtDeduplicator = new ThoughtDeduplicator({
+      cooldownMs: this.config.thoughtDeduplicationCooldown || 30000, // 30 seconds default
+      maxRecentThoughts: 50,
     });
   }
 
@@ -206,6 +256,15 @@ export class EnhancedThoughtGenerator extends EventEmitter {
       }
 
       if (thought) {
+        // Check if this thought is too similar to recent thoughts
+        if (!this.thoughtDeduplicator.shouldGenerateThought(thought.content)) {
+          console.log(
+            '🚫 Skipping repetitive thought:',
+            thought.content.substring(0, 50) + '...'
+          );
+          return null;
+        }
+
         this.thoughtHistory.push(thought);
 
         // Keep only last 100 thoughts to prevent memory leaks
@@ -309,36 +368,49 @@ export class EnhancedThoughtGenerator extends EventEmitter {
    */
   private buildIdleSituation(context: ThoughtContext): string {
     const health = context.currentState?.health || 20;
-    const position = context.currentState?.position;
     const inventory = context.currentState?.inventory || [];
+    const position = context.currentState?.position;
+    const biome = context.currentState?.biome || 'unknown';
+    const timeOfDay = context.currentState?.timeOfDay || 0;
 
-    let situation = 'Currently idle with no active tasks. ';
+    let situation = '';
 
+    // Health status
     if (health < 10) {
-      situation += `Health is low (${health}/20), need to prioritize survival. `;
+      situation += `Low health (${health}/20). `;
     } else if (health < 15) {
-      situation += `Health is moderate (${health}/20), should consider healing. `;
+      situation += `Moderate health (${health}/20). `;
     }
 
-    if (position) {
-      situation += `Located at position (${position.x}, ${position.y}, ${position.z}). `;
-    }
-
-    if (inventory.length > 0) {
-      const itemCount = inventory.length;
-      situation += `Carrying ${itemCount} different items. `;
+    // Inventory status
+    if (inventory.length === 0) {
+      situation += `Empty inventory. `;
     } else {
-      situation += `Inventory is empty, need to gather resources. `;
+      const itemCount = inventory.length;
+      situation += `Carrying ${itemCount} items. `;
     }
 
+    // Environmental context
+    if (biome !== 'unknown') {
+      situation += `In ${biome} biome. `;
+    }
+
+    if (timeOfDay < 12000 || timeOfDay > 24000) {
+      situation += `Night time. `;
+    }
+
+    // Recent events
     if (context.recentEvents && context.recentEvents.length > 0) {
       const recentEvent = context.recentEvents[context.recentEvents.length - 1];
       situation += `Recently: ${recentEvent}. `;
     }
 
-    situation += 'What should I focus on next?';
+    // Position if available
+    if (position) {
+      situation += `At (${Math.round(position.x)}, ${Math.round(position.y)}, ${Math.round(position.z)}). `;
+    }
 
-    return situation;
+    return situation || 'Idle with no clear context.';
   }
 
   /**
@@ -367,14 +439,21 @@ export class EnhancedThoughtGenerator extends EventEmitter {
         }
       }
 
-      situation += `Health: ${context.currentState?.health || 20}/20. `;
+      const health = context.currentState?.health || 20;
+      situation += `Health: ${health}/20. `;
 
       if (context.currentState?.position) {
         const pos = context.currentState.position;
-        situation += `Position: (${pos.x}, ${pos.y}, ${pos.z}). `;
+        situation += `Position: (${Math.round(pos.x)}, ${Math.round(pos.y)}, ${Math.round(pos.z)}). `;
       }
 
-      situation += 'What are my thoughts about this task progress?';
+      // Add environmental context for task thoughts
+      const biome = context.currentState?.biome;
+      if (biome) {
+        situation += `In ${biome} biome. `;
+      }
+
+      situation += 'What should I focus on for this task?';
 
       // Add timeout wrapper to prevent hanging
       const response = await Promise.race([

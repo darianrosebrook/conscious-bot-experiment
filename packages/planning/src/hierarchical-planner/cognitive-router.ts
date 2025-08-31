@@ -506,6 +506,15 @@ export class CognitiveTaskRouter {
       'creative',
       'art',
       'tell me a story',
+      // Exploration/curiosity intents should route to creative-style approaches
+      'explore',
+      'exploration',
+      'unexplored',
+      'brainstorm',
+      'idea',
+      'innovate',
+      'discover',
+      'investigate',
     ];
     return creativeKeywords.some((keyword) => input.includes(keyword));
   }
@@ -521,7 +530,9 @@ export class CognitiveTaskRouter {
       /should we\b/i,
       /ought to\b/i,
       /ethical\b/i,
+      /ethically\b/i,
       /moral\b/i,
+      /morally\b/i,
       /right thing\b/i,
       /wrong to\b/i,
       /fair to\b/i,
@@ -600,6 +611,8 @@ export class CognitiveTaskRouter {
       /imagine if\b/i,
       /consider if\b/i,
       /think if\b/i,
+      /morally right/i,
+      /morally wrong/i,
     ];
 
     // Check for ethical patterns with word boundaries

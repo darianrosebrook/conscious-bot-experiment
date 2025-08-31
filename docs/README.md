@@ -14,75 +14,120 @@ This documentation provides a complete guide to the conscious bot project - an e
 - **Testing** (`/testing/`) - Testing frameworks, results, and validation
 - **Solutions** (`/solutions/`) - Problem-solving approaches and implementations
 - **Working Specs** (`/working_specs/`) - Iterative development specifications
+- **Review** (`/review/`) - Implementation reviews, evaluations, and assessments
 - **Documentation Review** (`/doc_review/`) - Documentation quality assessment and verification
 
 ## Documentation Structure
 
 ```
 docs/
-├── README.md                           # This file - Documentation overview
-├── doc_review/                         # Documentation review and assessment files
-│   ├── README.md                       # Documentation review overview
-│   ├── documentation-review-todo.md    # Master review todo list
-│   ├── documentation-scoring-breakdown.md # Scoring methodology and results
-│   ├── implementation-verification-report.md # Implementation verification
-│   ├── implementation-verification-summary.md # Verification summary
-│   ├── documentation-alignment-review.md # Alignment assessment
-│   └── documentation-review-summary.md # Review summary
-├── plans/                              # Implementation specifications
-│   ├── configuration-management.md     # System-wide configuration architecture
-│   ├── hrm-integration-implementation.md # HRM integration detailed plan
-│   ├── integrating-hrm-into-our-cognitive-consious-experiment.md # HRM overview
-│   ├── testing-infrastructure.md       # Testing framework specifications
-│   ├── arbiter-hrm-architecture-evaluation.md # Arbiter-HRM architecture analysis
-│   ├── llm-performance-benchmarking-results.md # LLM performance analysis
-│   ├── sapient-hrm-integration-plan.md # Sapient HRM integration strategy
-│   ├── image.png                       # Supporting diagrams
-│   ├── image-2.png                     # Supporting diagrams
-│   └── modules/                        # Module-specific implementation plans
-│       ├── README.md                   # Module progress tracker and overview
-│       ├── core/                       # Core system modules
-│       ├── world/                      # World interaction modules
-│       ├── memory/                     # Memory system modules
-│       ├── planning/                   # Planning system modules
-│       ├── cognition/                  # Cognitive processing modules
-│       ├── interfaces/                 # Interface and control modules
-│       ├── safety/                     # Safety and monitoring modules
-│       └── evaluation/                 # Evaluation and testing modules
-├── strategy/                           # Strategic planning documents
-│   ├── README.md                       # Strategy overview and guidance
-│   ├── PROJECT_STATUS_UPDATE.md        # Current project status
-│   ├── M1_COMPLETION_SUMMARY.md        # Milestone 1 completion report
-│   ├── m1_critical_review.md           # M1 critical analysis
-│   ├── M2_IMPLEMENTATION_PLAN.md       # M2 implementation strategy
-│   ├── m2_status_summary.md            # M2 completion status
-│   ├── M2_M3_TRANSITION.md             # M2 to M3 transition planning
-│   ├── M3_IMPLEMENTATION_PLAN.md       # M3 implementation strategy
-│   ├── M3_STATUS_SUMMARY.md            # M3 current status
-│   ├── HRM_INTEGRATION_APPROACH.md     # HRM integration strategy
-│   ├── integration_strategy.md         # Cross-module integration
-│   ├── risk_management.md              # Risk assessment and mitigation
-│   ├── verification_framework.md       # Quality assurance methodology
-│   └── future_enhancements.md          # Long-term development roadmap
-├── integration/                        # Integration and coordination
+├── README.md                                    # This file - Documentation overview
+├── environment-controls.md                      # Environment variable controls
+├── health-check-improvements.md                 # Health check improvements
+├── logging-configuration.md                     # Logging configuration
+├── documentation-review-todo.md                 # Documentation review tasks
+├── DOCUMENTATION_REORGANIZATION_SUMMARY.md     # Documentation cleanup summary
+│
+├── working_specs/                              # Working specifications by iteration
+│   ├── iteration_one/                          # First iteration specifications
+│   ├── iteration_two/                          # Second iteration specifications
+│   ├── iteration_three/                        # Third iteration specifications
+│   ├── iteration_four/                         # Fourth iteration specifications
+│   ├── iteration_five/                         # Fifth iteration specifications
+│   ├── iteration_six/                          # Sixth iteration specifications
+│   └── iteration_seven/                        # Seventh iteration specifications
+│       ├── README.md                           # Iteration seven overview
+│       ├── ITERATION_SEVEN_VERIFICATION_REPORT.md
+│       └── ITERATION_SEVEN_COMPLETION_SUMMARY.md # Comprehensive completion summary
+│
+├── strategy/                                   # Strategic planning documents
+│   ├── README.md                              # Strategy overview and guidance
+│   ├── PROJECT_STATUS_UPDATE.md               # Current project status
+│   ├── PROJECT_EVALUATION_SUMMARY.md          # Overall project evaluation
+│   ├── PERFORMANCE_IMPROVEMENTS_COMPLETED.md  # Performance optimization completion
+│   ├── PERFORMANCE_IMPROVEMENTS_SUMMARY.md    # Performance improvements overview
+│   ├── IMPLEMENTATION_COMPLETION_SUMMARY.md   # Implementation completion status
+│   ├── M1_COMPLETION_SUMMARY.md               # Milestone 1 completion report
+│   ├── m1_critical_review.md                  # M1 critical analysis
+│   ├── M2_IMPLEMENTATION_PLAN.md              # M2 implementation strategy
+│   ├── m2_status_summary.md                   # M2 completion status
+│   ├── M2_M3_TRANSITION.md                    # M2 to M3 transition planning
+│   ├── M3_IMPLEMENTATION_PLAN.md              # M3 implementation strategy
+│   ├── M3_STATUS_SUMMARY.md                   # M3 current status
+│   ├── HRM_INTEGRATION_APPROACH.md            # HRM integration strategy
+│   ├── integration_strategy.md                # Cross-module integration
+│   ├── risk_management.md                     # Risk assessment and mitigation
+│   ├── verification_framework.md              # Quality assurance methodology
+│   └── future_enhancements.md                 # Long-term development roadmap
+│
+├── integration/                                # Integration and coordination
+│   ├── MCP_INTEGRATION_AND_TASK_DISCOVERY_SUMMARY.md # MCP integration and task discovery
+│   ├── MCP_INTEGRATION_FINAL_SUCCESS.md       # Final MCP integration success
+│   ├── MCP_HRM_LLM_E2E_VERIFICATION_SUMMARY.md # MCP-HRM-LLM end-to-end verification
+│   ├── MCP_HRM_LLM_EXECUTION_SUCCESS_SUMMARY.md # MCP-HRM-LLM execution success
 │   ├── task-oriented-cognitive-integration.md # Task-oriented cognitive integration
 │   ├── vibe-coded-conscious-bot-integration.md # Vibe-coded integration approach
-│   └── renaming-summary.md             # Naming convention updates
-├── testing/                            # Testing and validation
-│   ├── integration-testing-suite.md    # Integration testing framework
-│   ├── HRM_TEST_SUMMARY.md             # HRM testing results
+│   └── renaming-summary.md                    # Naming convention updates
+│
+├── review/                                     # Review and evaluation documentation
+│   ├── COMPREHENSIVE_REVIEW_SUMMARY.md        # Comprehensive review summary
+│   ├── REVIEW_ALIGNMENT_ANALYSIS.md           # Review alignment analysis
+│   ├── REVIEW_CROSS_REFERENCE_INDEX.md        # Cross-reference index
+│   ├── ITERATION_SIX_EVALUATION_AGAINST_VISION.md # Iteration six evaluation
+│   ├── BOT_EXECUTION_ANALYSIS.md              # Bot execution analysis
+│   ├── E2E_TEST_EVALUATION_SUMMARY.md         # End-to-end test evaluation
+│   ├── ACTUAL_BOT_VERIFICATION_SUMMARY.md     # Actual bot verification
+│   ├── impl_review/                           # Implementation reviews
+│   │   ├── README.md                          # Implementation review overview
+│   │   ├── MOCK_BEHAVIOR_REMOVAL_SUMMARY.md  # Mock behavior removal summary
+│   │   ├── ENHANCED_INTRUSIVE_THOUGHT_PROCESSOR_SUMMARY.md # Enhanced intrusive thought processor
+│   │   ├── COGNITIVE_STREAM_FILTERING_FIX.md  # Cognitive stream filtering fixes
+│   │   ├── implementation-*.md                # Implementation review files
+│   │   ├── ITERATION_*_REVIEW_SUMMARY.md     # Iteration review summaries
+│   │   ├── CORE_MODULE_REVIEW_SUMMARY.md     # Core module reviews
+│   │   └── INTEGRATION_REVIEW_SUMMARY.md     # Integration reviews
+│   └── doc_review/                            # Documentation reviews
+│       ├── README.md                          # Documentation review overview
+│       ├── documentation-review-todo.md       # Master review todo list
+│       ├── documentation-scoring-breakdown.md # Scoring methodology and results
+│       ├── implementation-verification-report.md # Implementation verification
+│       ├── implementation-verification-summary.md # Verification summary
+│       ├── documentation-alignment-review.md  # Alignment assessment
+│       └── documentation-review-summary.md    # Review summary
+│
+├── plans/                                      # Implementation specifications
+│   ├── configuration-management.md             # System-wide configuration architecture
+│   ├── hrm-integration-implementation.md       # HRM integration detailed plan
+│   ├── integrating-hrm-into-our-cognitive-consious-experiment.md # HRM overview
+│   ├── testing-infrastructure.md               # Testing framework specifications
+│   ├── arbiter-hrm-architecture-evaluation.md # Arbiter-HRM architecture analysis
+│   ├── llm-performance-benchmarking-results.md # LLM performance analysis
+│   ├── sapient-hrm-integration-plan.md        # Sapient HRM integration strategy
+│   ├── image.png                              # Supporting diagrams
+│   ├── image-2.png                            # Supporting diagrams
+│   └── modules/                               # Module-specific implementation plans
+│       ├── README.md                           # Module progress tracker and overview
+│       ├── PATHFINDING_AND_EXECUTION_STATUS.md # Pathfinding and execution status
+│       ├── D_STAR_LITE_INTEGRATION_SUCCESS.md  # D* Lite integration success
+│       ├── core/                               # Core system modules
+│       ├── world/                              # World interaction modules
+│       ├── memory/                             # Memory system modules
+│       ├── planning/                           # Planning system modules
+│       ├── cognition/                          # Cognitive processing modules
+│       ├── interfaces/                         # Interface and control modules
+│       ├── safety/                             # Safety and monitoring modules
+│       └── evaluation/                         # Evaluation and testing modules
+│
+├── testing/                                    # Testing and validation
+│   ├── integration-testing-suite.md            # Integration testing framework
+│   ├── HRM_TEST_SUMMARY.md                    # HRM testing results
 │   ├── minecraft-integration-testing-summary.md # Minecraft integration tests
-│   ├── autonomous-task-execution-analysis.md # Autonomous task execution tests
-│   ├── vitest-migration-summary.md     # Vitest migration overview
-│   └── vitest-migration-test-results.md # Vitest migration results
-├── solutions/                          # Problem-solving approaches
-│   └── cognitive-integration-solution.md # Cognitive integration solution
-└── working_specs/                      # Iterative development specifications
-    ├── iteration_one/                  # First iteration specifications, focused on cohesive, higher-cognition
-    ├── iteration_two/                  # Second iteration specifications, focused on behavior-tree-based execution
-    ├── iteration_three/                # Third iteration specifications, focused on removing mock implementation and adding MCP-style capability bus
-    └── iteration_four/                 # Fourth iteration specifications, focused on hardening the status/dashboard APIs
-    ├── iteration_five/                 # Fifth iteration specifications, focused on completing the remaining integration gaps and achieving 100% implementation completeness
+│   ├── autonomous-task-execution-analysis.md   # Autonomous task execution tests
+│   ├── vitest-migration-summary.md             # Vitest migration overview
+│   └── vitest-migration-test-results.md       # Vitest migration results
+│
+└── solutions/                                  # Problem-solving approaches
+    └── cognitive-integration-solution.md       # Cognitive integration solution
 ```
 
 ## Key Documents by Category

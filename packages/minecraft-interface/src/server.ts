@@ -1737,86 +1737,86 @@ server.listen(port, async () => {
     console.error('❌ Failed to register leaves on startup:', error);
   }
 
-  // Attempt to start viewer if bot is already connected
-  setTimeout(() => {
-    try {
-      // Only check if minecraftInterface exists and is properly initialized
-      if (!minecraftInterface) {
-        return;
-      }
+  // Attempt to start viewer if bot is already connected - DISABLED to prevent conflicts
+  // setTimeout(() => {
+  //   try {
+  //     // Only check if minecraftInterface exists and is properly initialized
+  //     if (!minecraftInterface) {
+  //       return;
+  //     }
 
-      const botStatus = minecraftInterface.botAdapter.getStatus();
-      const executionStatus =
-        minecraftInterface.planExecutor.getExecutionStatus();
+  //     const botStatus = minecraftInterface.botAdapter.getStatus();
+  //     const executionStatus =
+  //       minecraftInterface.planExecutor.getExecutionStatus();
 
-      // Use execution status if available, otherwise fall back to bot adapter status
-      const isConnected =
-        (executionStatus &&
-          executionStatus.bot &&
-          executionStatus.bot.connected) ||
-        (botStatus?.connected && botStatus?.connectionState === 'spawned');
+  //     // Use execution status if available, otherwise fall back to bot adapter status
+  //     const isConnected =
+  //       (executionStatus &&
+  //         executionStatus.bot &&
+  //         executionStatus.bot.connected) ||
+  //       (botStatus?.connected && botStatus?.connectionState === 'spawned');
 
-      if (isConnected && !viewerActive) {
-        const viewerCheck = minecraftInterface.botAdapter.canStartViewer();
-        if (viewerCheck.canStart) {
-          try {
-            const bot = minecraftInterface.botAdapter.getBot();
-            if (bot) {
-              startViewerSafely(bot, viewerPort);
-            }
-          } catch (err) {
-            console.error('Failed to auto-start Prismarine viewer:', err);
-          }
-        } else {
-          // Only log in development mode
-          if (process.env.NODE_ENV === 'development') {
-            console.log('Auto-start viewer skipped:', viewerCheck.reason);
-          }
-        }
-      }
-    } catch (err) {
-      // Only log in development mode
-      if (process.env.NODE_ENV === 'development') {
-        console.error('Failed to check bot status for auto-start viewer:', err);
-      }
-    }
-  }, 5000); // Wait 5 seconds for bot to connect
+  //     if (isConnected && !viewerActive) {
+  //       const viewerCheck = minecraftInterface.botAdapter.canStartViewer();
+  //       if (viewerCheck.canStart) {
+  //         try {
+  //           const bot = minecraftInterface.botAdapter.getBot();
+  //           if (bot) {
+  //           startViewerSafely(bot, viewerPort);
+  //           }
+  //         } catch (err) {
+  //           console.error('Failed to auto-start Prismarine viewer:', err);
+  //         }
+  //       } else {
+  //         // Only log in development mode
+  //         if (process.env.NODE_ENV === 'development') {
+  //           console.log('Auto-start viewer skipped:', viewerCheck.reason);
+  //         }
+  //       }
+  //     }
+  //   } catch (err) {
+  //     // Only log in development mode
+  //     if (process.env.NODE_ENV === 'development') {
+  //       console.error('Failed to check bot status for auto-start viewer:', err);
+  //     }
+  //   }
+  // }, 5000); // Wait 5 seconds for bot to connect
 
-  // Periodic viewer health check and auto-restart
-  setInterval(() => {
-    try {
-      if (
-        !minecraftInterface ||
-        !minecraftInterface.botAdapter.getStatus()?.connected
-      ) {
-        return;
-      }
+  // Periodic viewer health check and auto-restart - DISABLED to prevent constant restarts
+  // setInterval(() => {
+  //   try {
+  //     if (
+  //       !minecraftInterface ||
+  //       !minecraftInterface.botAdapter.getStatus()?.connected
+  //     ) {
+  //       return;
+  //     }
 
-      const botStatus = minecraftInterface.botAdapter.getStatus();
-      const isConnected =
-        botStatus?.connected && botStatus?.connectionState === 'spawned';
+  //     const botStatus = minecraftInterface.botAdapter.getStatus();
+  //     const isConnected =
+  //       botStatus?.connected && botStatus?.connectionState === 'spawned';
 
-      if (isConnected && !viewerActive) {
-        const viewerCheck = minecraftInterface.botAdapter.canStartViewer();
-        if (viewerCheck.canStart) {
-          try {
-            const bot = minecraftInterface.botAdapter.getBot();
-            if (bot) {
-              console.log('Auto-restarting viewer due to inactivity...');
-              startViewerSafely(bot, viewerPort);
-            }
-          } catch (err) {
-            console.error('Failed to auto-restart Prismarine viewer:', err);
-          }
-        }
-      }
-    } catch (err) {
-      // Only log in development mode
-      if (process.env.NODE_ENV === 'development') {
-        console.error('Failed to check viewer health:', err);
-      }
-    }
-  }, 30000); // Check every 30 seconds
+  //     if (isConnected && !viewerActive) {
+  //       const viewerCheck = minecraftInterface.botAdapter.canStartViewer();
+  //       if (viewerCheck.canStart) {
+  //         try {
+  //           const bot = minecraftInterface.botAdapter.getBot();
+  //           if (bot) {
+  //           console.log('Auto-restarting viewer due to inactivity...');
+  //           startViewerSafely(bot, viewerPort);
+  //           }
+  //         } catch (err) {
+  //           console.error('Failed to auto-restart Prismarine viewer:', err);
+  //         }
+  //       }
+  //     }
+  //   } catch (err) {
+  //     // Only log in development mode
+  //     if (process.env.NODE_ENV === 'development') {
+  //       console.error('Failed to check viewer health:', err);
+  //     }
+  //   }
+  // }, 30000); // Check every 30 seconds
 });
 
 // Get memory integration status
