@@ -49,11 +49,14 @@ interface CognitiveThought {
 // Persistence Configuration
 // =============================================================================
 
-const THOUGHTS_FILE_PATH = path.join(
+// Thoughts file is now scoped by active world seed (via memory namespace).
+// Fallbacks to a global file if the memory service/namespace is unavailable.
+const DEFAULT_THOUGHTS_FILE_PATH = path.join(
   process.cwd(),
   'data',
   'cognitive-thoughts.json'
 );
+let currentThoughtsPath: string | null = null;
 const MAX_THOUGHTS = 1000;
 const activeConnections = new Set<ReadableStreamDefaultController>();
 const MAX_CONNECTIONS = 10;
@@ -65,8 +68,8 @@ const MAX_CONNECTIONS = 10;
 /**
  * Ensure the data directory exists
  */
-async function ensureDataDirectory(): Promise<void> {
-  const dataDir = path.dirname(THOUGHTS_FILE_PATH);
+async function ensureDataDirectory(targetPath: string): Promise<void> {
+  const dataDir = path.dirname(targetPath);
   try {
     await fs.access(dataDir);
   } catch {
@@ -79,8 +82,9 @@ async function ensureDataDirectory(): Promise<void> {
  */
 async function loadThoughts(): Promise<CognitiveThought[]> {
   try {
-    await ensureDataDirectory();
-    const data = await fs.readFile(THOUGHTS_FILE_PATH, 'utf-8');
+    const targetPath = await resolveThoughtsFilePath();
+    await ensureDataDirectory(targetPath);
+    const data = await fs.readFile(targetPath, 'utf-8');
     const thoughts = JSON.parse(data);
     return Array.isArray(thoughts) ? thoughts : [];
   } catch (error) {
@@ -95,8 +99,9 @@ async function loadThoughts(): Promise<CognitiveThought[]> {
  */
 async function saveThoughts(thoughts: CognitiveThought[]): Promise<void> {
   try {
-    await ensureDataDirectory();
-    await fs.writeFile(THOUGHTS_FILE_PATH, JSON.stringify(thoughts, null, 2));
+    const targetPath = await resolveThoughtsFilePath();
+    await ensureDataDirectory(targetPath);
+    await fs.writeFile(targetPath, JSON.stringify(thoughts, null, 2));
   } catch (error) {
     console.error('Failed to save thoughts to file:', error);
   }
@@ -111,7 +116,7 @@ let thoughtHistory: CognitiveThought[] = [];
 
 // Load thoughts on module initialization
 (async () => {
-  thoughtHistory = await loadThoughts();
+  await maybeReloadThoughtStore();
   console.log(
     `Loaded ${thoughtHistory.length} thoughts from persistent storage`
   );
@@ -140,6 +145,66 @@ function addThought(
   });
 
   return newThought;
+}
+
+// =============================================================================
+// Seed-Scoped Persistence Resolution
+// =============================================================================
+
+async function fetchActiveNamespace(): Promise<
+  | { id: string; context?: { worldSeed?: string; worldName?: string; sessionId?: string } }
+  | null
+> {
+  try {
+    const res = await fetch('http://localhost:3001/versioning/active', {
+      headers: { 'Content-Type': 'application/json' },
+      signal: AbortSignal.timeout(2000),
+    });
+    if (!res.ok) return null;
+    const body = (await res.json()) as any;
+    return body?.success ? (body.data as any) : null;
+  } catch {
+    return null;
+  }
+}
+
+function computePathForNamespace(ns: {
+  id: string;
+  context?: { worldSeed?: string; worldName?: string; sessionId?: string };
+} | null): string {
+  if (!ns) return DEFAULT_THOUGHTS_FILE_PATH;
+  const seed = ns.context?.worldSeed;
+  const world = ns.context?.worldName;
+  if (seed) {
+    return path.join(process.cwd(), 'data', 'thoughts', `seed-${seed}`, 'cognitive-thoughts.json');
+  }
+  if (world) {
+    return path.join(process.cwd(), 'data', 'thoughts', `world-${world}`, 'cognitive-thoughts.json');
+  }
+  // As a last resort, bucket by namespace id
+  if (ns.id) {
+    return path.join(process.cwd(), 'data', 'thoughts', `ns-${ns.id}`, 'cognitive-thoughts.json');
+  }
+  return DEFAULT_THOUGHTS_FILE_PATH;
+}
+
+async function resolveThoughtsFilePath(): Promise<string> {
+  const ns = await fetchActiveNamespace();
+  const target = computePathForNamespace(ns);
+  if (!currentThoughtsPath) currentThoughtsPath = target;
+  return target;
+}
+
+async function maybeReloadThoughtStore(): Promise<void> {
+  const target = await resolveThoughtsFilePath();
+  if (currentThoughtsPath !== target) {
+    // Namespace changed — load the correct store
+    currentThoughtsPath = target;
+    thoughtHistory = await loadThoughts();
+  } else if (!thoughtHistory.length) {
+    // Initial load
+    thoughtHistory = await loadThoughts();
+  }
 }
 
 async function fetchState(path: string): Promise<any> {
@@ -365,6 +430,7 @@ async function processBotResponses(): Promise<CognitiveThought[]> {
 }
 
 export const GET = async (req: NextRequest) => {
+  await maybeReloadThoughtStore();
   if (activeConnections.size >= MAX_CONNECTIONS) {
     return new Response('Too many connections', { status: 429 });
   }
@@ -500,6 +566,7 @@ export const OPTIONS = async () => {
 
 export const POST = async (req: NextRequest) => {
   try {
+    await maybeReloadThoughtStore();
     const body = await req.json();
     const { type, content, attribution, context, metadata } = body;
 

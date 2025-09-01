@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "savedAt": 1756663414043,
+  "savedAt": 1756696251109,
   "entities": [
     {
       "id": "entity-1756606709177-s3c9piv",
@@ -10,17 +10,17 @@
       "properties": {
         "last_seen": {
           "confidence": 0.8,
-          "timestamp": 1756612726785,
+          "timestamp": 1756695972354,
           "type": "date",
           "source": "observation",
-          "value": "2025-08-31T03:58:46.785Z"
+          "value": "2025-09-01T03:06:12.354Z"
         },
         "observed_quantity": {
           "confidence": 0.6,
-          "timestamp": 1756612726785,
+          "timestamp": 1756695972354,
           "type": "number",
           "source": "observation",
-          "value": 8,
+          "value": 4,
           "unit": "items"
         }
       },
@@ -31,9 +31,9 @@
       "confidence": 0.6,
       "source": "observation",
       "createdAt": 1756606709177,
-      "updatedAt": 1756612726785,
-      "lastAccessed": 1756612726785,
-      "accessCount": 27
+      "updatedAt": 1756695972354,
+      "lastAccessed": 1756695972354,
+      "accessCount": 31
     },
     {
       "id": "entity-1756606709178-b74ztl9",
@@ -47,9 +47,9 @@
       "confidence": 0.5,
       "source": "inference",
       "createdAt": 1756606709178,
-      "updatedAt": 1756662607027,
-      "lastAccessed": 1756662607027,
-      "accessCount": 299
+      "updatedAt": 1756696038356,
+      "lastAccessed": 1756696038356,
+      "accessCount": 321
     },
     {
       "id": "entity-1756606709179-nosaj5o",
@@ -191,10 +191,10 @@
       "properties": {
         "last_observed": {
           "confidence": 0.7,
-          "timestamp": 1756662108651,
+          "timestamp": 1756696038355,
           "type": "date",
           "source": "observation",
-          "value": "2025-08-31T17:41:48.651Z"
+          "value": "2025-09-01T03:07:18.355Z"
         }
       },
       "tags": [
@@ -204,9 +204,9 @@
       "confidence": 0.6,
       "source": "observation",
       "createdAt": 1756606709179,
-      "updatedAt": 1756662108651,
-      "lastAccessed": 1756662108651,
-      "accessCount": 101
+      "updatedAt": 1756696038355,
+      "lastAccessed": 1756696038355,
+      "accessCount": 113
     },
     {
       "id": "entity-1756607886553-8mjx8ei",
@@ -249,10 +249,10 @@
       "properties": {
         "last_observed": {
           "confidence": 0.7,
-          "timestamp": 1756662607027,
+          "timestamp": 1756695186053,
           "type": "date",
           "source": "observation",
-          "value": "2025-08-31T17:50:07.027Z"
+          "value": "2025-09-01T02:53:06.053Z"
         }
       },
       "tags": [
@@ -262,9 +262,9 @@
       "confidence": 0.6,
       "source": "observation",
       "createdAt": 1756608505482,
-      "updatedAt": 1756662607027,
-      "lastAccessed": 1756662607027,
-      "accessCount": 31
+      "updatedAt": 1756695186053,
+      "lastAccessed": 1756695186053,
+      "accessCount": 37
     }
   ],
   "relationships": [
@@ -276,7 +276,7 @@
       "properties": {
         "confidence_hint": {
           "confidence": 0.6,
-          "timestamp": 1756612726785,
+          "timestamp": 1756695972354,
           "type": "number",
           "source": "inference",
           "value": 0.6
@@ -286,9 +286,9 @@
       "confidence": 0.6,
       "source": "inference",
       "createdAt": 1756606709178,
-      "updatedAt": 1756612726785,
-      "lastAccessed": 1756612726785,
-      "accessCount": 27
+      "updatedAt": 1756695972354,
+      "lastAccessed": 1756695972354,
+      "accessCount": 31
     },
     {
       "id": "rel-1756606709179-lqk6x0t",
@@ -388,9 +388,9 @@
       "confidence": 0.5,
       "source": "observation",
       "createdAt": 1756606709179,
-      "updatedAt": 1756662108651,
-      "lastAccessed": 1756662108651,
-      "accessCount": 101
+      "updatedAt": 1756696038356,
+      "lastAccessed": 1756696038356,
+      "accessCount": 113
     },
     {
       "id": "rel-1756607886554-17hlh8r",
@@ -424,9 +424,9 @@
       "confidence": 0.5,
       "source": "observation",
       "createdAt": 1756608505482,
-      "updatedAt": 1756662607027,
-      "lastAccessed": 1756662607027,
-      "accessCount": 31
+      "updatedAt": 1756695186053,
+      "lastAccessed": 1756695186053,
+      "accessCount": 37
     }
   ]
 }

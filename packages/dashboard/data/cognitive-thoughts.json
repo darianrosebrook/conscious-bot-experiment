@@ -1,7 +1,7 @@
 [
   {
     "type": "planning",
-    "content": "Gather wooden pickaxe. Observing nearby stone wall and coal ore; prioritize coal as it’s closer. Plan to craft pickaxe using available resources.",
+    "content": "Gather oak logs from nearby trees and craft a wooden axe. Then, explore the area to find more resources and potential threats.",
     "attribution": "self",
     "context": {
       "emotionalState": "neutral",
@@ -10,13 +10,253 @@
     },
     "metadata": {
       "thoughtType": "planning",
-      "taskType": "explore",
+      "taskType": "general",
       "trigger": "task-start",
       "llmConfidence": 0.7,
       "model": "qwen2.5:7b"
     },
-    "id": "thought-1756663386247-uud756g8z",
-    "timestamp": 1756663386247,
+    "id": "thought-1756695249270-ypyc6dmnl",
+    "timestamp": 1756695249270,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Gather wood from nearby trees. There are 12 tree trunks within reach, start with those.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.6,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "general",
+      "trigger": "task-start",
+      "llmConfidence": 0.6,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1756695311764-34jz7dswf",
+    "timestamp": 1756695311764,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Start by examining the surroundings for potential resources or threats. Look for trees to gather wood and ensure there are no nearby hostile mobs.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.7,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "general",
+      "trigger": "task-start",
+      "llmConfidence": 0.7,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1756695371818-umbjwdg1k",
+    "timestamp": 1756695371818,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Scan surroundings for nearby trees to gather wood. Prepare to craft tools if needed.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.6,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "general",
+      "trigger": "task-start",
+      "llmConfidence": 0.6,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1756695489710-cafffz56p",
+    "timestamp": 1756695489710,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Start by checking the nearby area for more logs. There's one coal ore nearby, but prioritize gathering wood first.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.7,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "general",
+      "trigger": "task-start",
+      "llmConfidence": 0.7,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1756695548502-igya01d4n",
+    "timestamp": 1756695548502,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Observe surroundings; check nearby blocks for resources, then gather wood from trees if available.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.6,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "general",
+      "trigger": "task-start",
+      "llmConfidence": 0.6,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1756695608163-cpnmf50wl",
+    "timestamp": 1756695608163,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Start by examining the nearby blocks and entities. Look for any potential resources or threats in the immediate area before moving to gather wood.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.7,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "general",
+      "trigger": "task-start",
+      "llmConfidence": 0.7,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1756695668102-fkgtetcy2",
+    "timestamp": 1756695668102,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Begin by breaking down the investigation into smaller tasks and gather wood from nearby trees. There are no immediate threats, but keep an eye out for resources.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.7,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "general",
+      "trigger": "task-start",
+      "llmConfidence": 0.7,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1756695728196-gkdggx7h6",
+    "timestamp": 1756695728196,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Start by breaking the investigation into specific steps. Look around for nearby trees to gather wood. Safety first, so ensure there are no immediate threats before moving closer to potential resources.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.8,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "general",
+      "trigger": "task-start",
+      "llmConfidence": 0.8,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1756695848322-139yft65b",
+    "timestamp": 1756695848322,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Observe surroundings for resources and potential threats. Focus on gathering wood from nearby trees.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.6,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "general",
+      "trigger": "task-start",
+      "llmConfidence": 0.6,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1756695907901-hma2bz0lg",
+    "timestamp": 1756695907901,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Start by exploring the immediate area to find logs for wood gathering. Observations indicate nearby trees and coal ores, which are essential resources. Plan to move towards the nearest tree and begin cutting it down with your hands or any available tools.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.8,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "general",
+      "trigger": "task-start",
+      "llmConfidence": 0.8,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1756695968780-w9qquxdq1",
+    "timestamp": 1756695968780,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Survey the area for nearby logs to gather wood. Safety first; check for nearby hostiles before proceeding.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.7,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "general",
+      "trigger": "task-start",
+      "llmConfidence": 0.7,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1756696031125-gkfesxflf",
+    "timestamp": 1756696031125,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Scan the area for nearby logs; there are none detected, so head towards the tree trunks to gather wood.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.7,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "general",
+      "trigger": "task-start",
+      "llmConfidence": 0.7,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1756696154019-jx1smv09d",
+    "timestamp": 1756696154019,
     "processed": false
   }
 ]

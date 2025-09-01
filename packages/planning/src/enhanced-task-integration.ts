@@ -186,6 +186,133 @@ export class EnhancedTaskIntegration extends EventEmitter {
   private taskHistory: Task[] = [];
   private progressTracker: Map<string, TaskProgress> = new Map();
   private actionVerifications: Map<string, ActionVerification> = new Map();
+  // Ephemeral per-step snapshot to compare before/after state
+  private _stepStartSnapshots: Map<string, {
+    position?: { x: number; y: number; z: number };
+    food?: number;
+    health?: number;
+    inventoryTotal?: number;
+    ts: number;
+  }> = new Map();
+
+  /**
+   * Update the current (first incomplete) step label to include a leaf and its parameters
+   */
+  annotateCurrentStepWithLeaf(
+    taskId: string,
+    leafName: string,
+    args: Record<string, any> = {}
+  ): boolean {
+    const task = this.tasks.get(taskId);
+    if (!task || !Array.isArray(task.steps) || task.steps.length === 0) return false;
+    const idx = task.steps.findIndex((s) => !s.done);
+    if (idx < 0) return false;
+    const step = task.steps[idx];
+
+    // Pick a small, useful subset of params to include in label
+    const keys = [
+      'blockType',
+      'block_type',
+      'item',
+      'recipe',
+      'qty',
+      'quantity',
+      'count',
+      'pos',
+      'position',
+      'target',
+      'distance',
+      'radius',
+      'area',
+      'tool',
+      'placement',
+      'pattern',
+      'direction',
+      'speed',
+      'timeout',
+    ];
+    const picked: Record<string, any> = {};
+    for (const k of keys) if (args[k] !== undefined) picked[k] = args[k];
+    const paramStr = Object.keys(picked).length
+      ? ` (${Object.entries(picked)
+          .map(([k, v]) => `${k}=${typeof v === 'object' ? JSON.stringify(v) : v}`)
+          .join(', ')})`
+      : '';
+
+    step.label = `Leaf: minecraft.${leafName}${paramStr}`;
+    task.metadata.updatedAt = Date.now();
+    this.emit('taskMetadataUpdated', { task, metadata: task.metadata });
+    if (this.config.enableRealTimeUpdates) {
+      this.notifyDashboard('taskMetadataUpdated', { task, metadata: task.metadata });
+    }
+    return true;
+  }
+
+  /**
+   * Update the current (first incomplete) step label to include MCP option and parameters
+   */
+  annotateCurrentStepWithOption(
+    taskId: string,
+    optionName: string,
+    args: Record<string, any> = {}
+  ): boolean {
+    const task = this.tasks.get(taskId);
+    if (!task || !Array.isArray(task.steps) || task.steps.length === 0) return false;
+    const idx = task.steps.findIndex((s) => !s.done);
+    if (idx < 0) return false;
+    const step = task.steps[idx];
+
+    const keys = [
+      'blockType',
+      'block_type',
+      'item',
+      'recipe',
+      'qty',
+      'quantity',
+      'count',
+      'pos',
+      'position',
+      'target',
+      'distance',
+      'radius',
+      'area',
+      'tool',
+      'placement',
+      'pattern',
+      'direction',
+      'speed',
+      'timeout',
+    ];
+    const picked: Record<string, any> = {};
+    for (const k of keys) if (args[k] !== undefined) picked[k] = args[k];
+    const paramStr = Object.keys(picked).length
+      ? ` (${Object.entries(picked)
+          .map(([k, v]) => `${k}=${typeof v === 'object' ? JSON.stringify(v) : v}`)
+          .join(', ')})`
+      : '';
+
+    step.label = `Option: ${optionName}${paramStr}`;
+    task.metadata.updatedAt = Date.now();
+    this.emit('taskMetadataUpdated', { task, metadata: task.metadata });
+    if (this.config.enableRealTimeUpdates) {
+      this.notifyDashboard('taskMetadataUpdated', { task, metadata: task.metadata });
+    }
+    return true;
+  }
+
+  /**
+   * Extract a parameter from a leaf-annotated step label: "Leaf: minecraft.X (key=value, ...)"
+   */
+  private getLeafParamFromLabel(label: string, key: string): string | undefined {
+    const m = label.match(/\((.*)\)$/);
+    if (!m) return undefined;
+    const parts = m[1].split(',').map((s) => s.trim());
+    for (const p of parts) {
+      const [k, ...rest] = p.split('=');
+      if (k?.trim() === key) return rest.join('=').trim().replace(/^"|"$/g, '');
+    }
+    return undefined;
+  }
   private statistics: TaskStatistics = {
     totalTasks: 0,
     activeTasks: 0,
@@ -633,11 +760,38 @@ export class EnhancedTaskIntegration extends EventEmitter {
             const leaf = stepLabel.replace('leaf: minecraft.', '').trim();
             if (leaf === 'move_to') {
               verification.verified = await this.verifyMovement();
+            } else if (leaf === 'step_forward_safely' || leaf === 'follow_entity') {
+              verification.verified = await this.verifyMovement();
             } else if (leaf === 'dig_block') {
-              // Heuristic: treat dig as gathering resource
-              verification.verified = await this.verifyResourceCollection('wood');
-            } else if (leaf === 'chat' || leaf === 'wait') {
+              // Prefer blockType/item in label when available
+              const bt = this.getLeafParamFromLabel(stepLabel, 'blockType') || this.getLeafParamFromLabel(stepLabel, 'item');
+              const resource = bt ? String(bt) : 'wood';
+              verification.verified = await this.verifyResourceCollection(resource);
+            } else if (leaf === 'pickup_item') {
+              verification.verified = await this.verifyPickupFromInventoryDelta(taskId, stepId);
+            } else if (leaf === 'place_block') {
+              const bt = this.getLeafParamFromLabel(stepLabel, 'blockType') || this.getLeafParamFromLabel(stepLabel, 'item');
+              verification.verified = await this.verifyNearbyBlock(bt);
+            } else if (leaf === 'place_torch_if_needed') {
+              verification.verified = await this.verifyNearbyBlock('torch');
+            } else if (leaf === 'retreat_and_block') {
+              const moved = await this.verifyMovement();
+              const placed = await this.verifyNearbyBlock();
+              verification.verified = moved || placed;
+            } else if (leaf === 'consume_food') {
+              verification.verified = await this.verifyConsumeFood(taskId, stepId);
+            } else if (leaf === 'sense_hostiles') {
+              verification.verified = true;
+            } else if (leaf === 'get_light_level') {
+              verification.verified = await this.verifyLightLevel();
+            } else if (leaf === 'chat' || leaf === 'wait' || leaf === 'look_at' || leaf === 'turn_left' || leaf === 'turn_right' || leaf === 'jump') {
               // Consider these non-critical and pass
+              verification.verified = true;
+            } else if (leaf === 'craft_recipe') {
+              verification.verified = await this.verifyItemCreation();
+            } else if (leaf === 'smelt') {
+              verification.verified = await this.verifySmeltedItem();
+            } else if (leaf === 'introspect_recipe') {
               verification.verified = true;
             } else {
               verification.verified = false;
@@ -769,18 +923,18 @@ export class EnhancedTaskIntegration extends EventEmitter {
       const position = data.botStatus?.position;
       if (!position) return false;
 
-      const map: Map<string, any> = (this as any)._stepStartPositions;
-      if (map && map.size > 0) {
-        // Use the most recent stored start position
-        const lastEntry = Array.from(map.entries()).pop();
+      if (this._stepStartSnapshots.size > 0) {
+        const lastEntry = Array.from(this._stepStartSnapshots.entries()).pop();
         if (lastEntry) {
-          const [, start] = lastEntry;
-          const dx = (position.x ?? 0) - start.x;
-          const dy = (position.y ?? 0) - start.y;
-          const dz = (position.z ?? 0) - start.z;
-          const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
-          map.delete(lastEntry[0]);
-          return dist >= 0.5;
+          const [key, start] = lastEntry as [string, any];
+          if (start?.position) {
+            const dx = (position.x ?? 0) - start.position.x;
+            const dy = (position.y ?? 0) - start.position.y;
+            const dz = (position.z ?? 0) - start.position.z;
+            const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
+            this._stepStartSnapshots.delete(key);
+            return dist >= 0.5;
+          }
         }
       }
       // Fallback: require at least a non-zero velocity or position change can't be verified
@@ -791,6 +945,123 @@ export class EnhancedTaskIntegration extends EventEmitter {
       return false;
     } catch (error) {
       // Failed to verify movement: ${error}
+      return false;
+    }
+  }
+
+  /**
+   * Verify a pickup by checking if inventory total increased since step start
+   */
+  private async verifyPickupFromInventoryDelta(taskId: string, stepId: string): Promise<boolean> {
+    try {
+      const start = this._stepStartSnapshots.get(`${taskId}-${stepId}`) as any;
+      const res = await fetch('http://localhost:3005/inventory', {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json' },
+        signal: AbortSignal.timeout(4000),
+      });
+      if (!res.ok) return false;
+      const data = (await res.json()) as any;
+      const inventory = data?.data || [];
+      const total = Array.isArray(inventory)
+        ? inventory.reduce((s: number, it: any) => s + (it?.count || 0), 0)
+        : 0;
+      if (start && typeof start.inventoryTotal === 'number') {
+        return total > start.inventoryTotal;
+      }
+      // No baseline; accept if any items present
+      return total > 0;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Verify that a block is present nearby (optionally matching a pattern)
+   */
+  private async verifyNearbyBlock(pattern?: string): Promise<boolean> {
+    try {
+      const res = await fetch('http://localhost:3005/state', {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json' },
+        signal: AbortSignal.timeout(5000),
+      });
+      if (!res.ok) return false;
+      const data = (await res.json()) as any;
+      const blocks: any[] = data?.data?.worldState?.environment?.nearbyBlocks || [];
+      if (!Array.isArray(blocks)) return false;
+      if (!pattern) {
+        return blocks.length > 0; // some block visible nearby
+      }
+      const p = pattern.toLowerCase();
+      return blocks.some((b: any) => String(b?.type || b?.name || '').toLowerCase().includes(p));
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Verify that food level increased since step start (consume_food)
+   */
+  private async verifyConsumeFood(taskId: string, stepId: string): Promise<boolean> {
+    try {
+      const start = this._stepStartSnapshots.get(`${taskId}-${stepId}`) as any;
+      const res = await fetch('http://localhost:3005/health', {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json' },
+        signal: AbortSignal.timeout(4000),
+      });
+      if (!res.ok) return false;
+      const data = (await res.json()) as any;
+      const food = data?.botStatus?.food;
+      if (typeof food !== 'number') return false;
+      if (start && typeof start.food === 'number') {
+        return food > start.food;
+      }
+      return food > 0;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Verify we can read a light level (for get_light_level leaf)
+   */
+  private async verifyLightLevel(): Promise<boolean> {
+    try {
+      const res = await fetch('http://localhost:3005/state', {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json' },
+        signal: AbortSignal.timeout(4000),
+      });
+      if (!res.ok) return false;
+      const data = (await res.json()) as any;
+      const time = data?.data?.worldState?.environment?.timeOfDay;
+      return typeof time === 'number';
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Verify smelted item presence (heuristic: iron ingot or similar)
+   */
+  private async verifySmeltedItem(): Promise<boolean> {
+    try {
+      const res = await fetch('http://localhost:3005/inventory', {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json' },
+        signal: AbortSignal.timeout(5000),
+      });
+      if (!res.ok) return false;
+      const data = (await res.json()) as any;
+      const inventory = data?.data || [];
+      const patterns = ['iron_ingot', 'cooked_', 'charcoal'];
+      return inventory.some((it: any) => {
+        const name = String(it?.type || it?.name || '').toLowerCase();
+        return patterns.some((p) => name.includes(p));
+      });
+    } catch {
       return false;
     }
   }
@@ -1008,33 +1279,42 @@ export class EnhancedTaskIntegration extends EventEmitter {
 
     step.startedAt = Date.now();
 
-    // Capture bot position at step start for movement verification
+    // Capture bot snapshot at step start for verification
     (async () => {
       try {
-        const res = await fetch('http://localhost:3005/health', {
-          method: 'GET',
-          headers: { 'Content-Type': 'application/json' },
-          signal: AbortSignal.timeout(3000),
-        });
-        if (res.ok) {
-          const data = (await res.json()) as any;
+        const [healthRes, invRes] = await Promise.all([
+          fetch('http://localhost:3005/health', {
+            method: 'GET',
+            headers: { 'Content-Type': 'application/json' },
+            signal: AbortSignal.timeout(3000),
+          }),
+          fetch('http://localhost:3005/inventory', {
+            method: 'GET',
+            headers: { 'Content-Type': 'application/json' },
+            signal: AbortSignal.timeout(3000),
+          }),
+        ]);
+
+        const snap: any = { ts: Date.now() };
+        if (healthRes.ok) {
+          const data = (await healthRes.json()) as any;
           const p = data?.botStatus?.position;
-          if (
-            p &&
-            typeof p.x === 'number' &&
-            typeof p.y === 'number' &&
-            typeof p.z === 'number'
-          ) {
-            // Store on the instance for later verification
-            (this as any)._stepStartPositions = (this as any)._stepStartPositions || new Map();
-            (this as any)._stepStartPositions.set(`${taskId}-${stepId}`, {
-              x: p.x,
-              y: p.y,
-              z: p.z,
-              ts: Date.now(),
-            });
+          if (p && typeof p.x === 'number' && typeof p.y === 'number' && typeof p.z === 'number') {
+            snap.position = { x: p.x, y: p.y, z: p.z };
           }
+          const food = data?.botStatus?.food;
+          if (typeof food === 'number') snap.food = food;
+          const health = data?.botStatus?.health;
+          if (typeof health === 'number') snap.health = health;
         }
+        if (invRes.ok) {
+          const invData = (await invRes.json()) as any;
+          const inventory = invData?.data || [];
+          snap.inventoryTotal = Array.isArray(inventory)
+            ? inventory.reduce((s: number, it: any) => s + (it?.count || 0), 0)
+            : 0;
+        }
+        this._stepStartSnapshots.set(`${taskId}-${stepId}`, snap);
       } catch {}
     })();
 

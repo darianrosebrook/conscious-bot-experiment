@@ -194,11 +194,12 @@ export class IntrusiveThoughtProcessor extends EventEmitter {
       }
 
       // Parse → intent (keep your regex as a fallback)
+      // If parsing fails, default to a safe clarification request rather than a vague investigation
       const action = this.parseActionFromThought(canonical) ?? {
-        type: 'investigate',
-        target: 'current situation',
-        priority: 'medium',
-        category: 'general',
+        type: 'ask',
+        target: 'for clarification on next step',
+        priority: 'low',
+        category: 'social',
       };
 
       // Policy gate (deny or patch unsafe)
@@ -219,7 +220,15 @@ export class IntrusiveThoughtProcessor extends EventEmitter {
       const adjusted = this.adjustPriorityByGrounding(safeAction, snapshot);
 
       // Choose plan: existing option? sequence of leaves? propose new option?
-      const plan = await this.choosePlan(adjusted, snapshot);
+      let plan = await this.choosePlan(adjusted, snapshot);
+
+      // Preflight: ensure sequence leaves are available; if not, fall back to a status report
+      if (plan.kind === 'sequence') {
+        const ok = await this.sequenceLeavesAvailable(plan.leaves.map((l) => l.name));
+        if (!ok) {
+          plan = this.buildStatusReportPlan(snapshot);
+        }
+      }
 
       // Bucket selection + idempotency key
       const bucket = await this.selectBucket(plan, snapshot);
@@ -395,6 +404,40 @@ export class IntrusiveThoughtProcessor extends EventEmitter {
     );
   }
 
+  /**
+   * Verify that all requested leaves are available via MCP tool list
+   */
+  private async sequenceLeavesAvailable(names: string[]): Promise<boolean> {
+    try {
+      if (!this.config.mcp) return true; // assume ok if no MCP integration
+      const toolNames = await this.config.mcp.listTools();
+      const available = new Set(
+        (toolNames || []).map((s) => s.split('@')[0].replace('minecraft.', ''))
+      );
+      return names.every((n) => available.has(n));
+    } catch {
+      return true; // fail-open to avoid blocking execution
+    }
+  }
+
+  /**
+   * Build a conservative status-report sequence using widely available leaves
+   */
+  private buildStatusReportPlan(snap?: any): Plan {
+    const health = snap?.vitals?.health ?? 'unknown';
+    const food = snap?.vitals?.food ?? 'unknown';
+    const time = snap?.time ?? 'unknown';
+    const msg = `Status — health:${health} food:${food} time:${time}`;
+    return {
+      kind: 'sequence',
+      leaves: [
+        { name: 'sense_hostiles' },
+        { name: 'get_light_level' },
+        { name: 'chat', args: { message: msg } },
+      ],
+    };
+  }
+
   private buildArgsForOption(a: Action, snap?: any): any {
     // Keep it minimal and schema-safe
     if (a.type === 'gather' && a.target.includes('wood'))
@@ -417,7 +460,7 @@ export class IntrusiveThoughtProcessor extends EventEmitter {
             z: (snap?.position?.z ?? 0) + 5,
           },
         },
-        { name: 'minecraft.chat', args: { message: 'Scanning for trees…' } },
+        { name: 'chat', args: { message: 'Scanning for trees…' } },
         // This is illustrative; in production you'd use your scan leaves
       ];
     }
@@ -426,7 +469,7 @@ export class IntrusiveThoughtProcessor extends EventEmitter {
     if (a.category === 'social') {
       return [
         {
-          name: 'minecraft.chat',
+          name: 'chat',
           args: {
             message: `Hello! ${a.type === 'ask' ? 'I wanted to ask: ' : ''}${a.target}`,
           },
@@ -824,7 +867,7 @@ export class IntrusiveThoughtProcessor extends EventEmitter {
       };
     }
 
-    // General questions that need investigation
+    // General questions — prefer asking for clarification rather than vague investigate
     if (
       lowerThought.includes('?') &&
       (lowerThought.includes('do i') ||
@@ -832,10 +875,10 @@ export class IntrusiveThoughtProcessor extends EventEmitter {
         lowerThought.includes('am i'))
     ) {
       return {
-        type: 'investigate',
-        target: 'current situation',
-        priority: 'medium',
-        category: 'general',
+        type: 'ask',
+        target: 'for clarification on next step',
+        priority: 'low',
+        category: 'social',
       };
     }
 

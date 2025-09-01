@@ -79,6 +79,23 @@ worldStateManager.on('updated', (snapshot) => {
 
 // mc-fetch helpers are imported from modules/mc-client
 
+/**
+ * Query MCP for available minecraft leaves/tools
+ */
+async function getAvailableLeaves(): Promise<Set<string>> {
+  try {
+    const mcp = serverConfig.getMCPIntegration();
+    if (!mcp) return new Set();
+    const tools = await mcp.listTools();
+    const leaves = tools
+      .filter((t) => t.startsWith('minecraft.'))
+      .map((t) => t.replace(/^minecraft\./, ''));
+    return new Set(leaves);
+  } catch {
+    return new Set();
+  }
+}
+
 // Declare global properties used for scheduling to satisfy TS in ESM modules
 declare global {
   // Reentrancy guard state for the autonomous executor
@@ -907,7 +924,7 @@ async function autonomousTaskExecutor() {
 
     // Try to find a suitable MCP option for this task type
     const mcpOptions =
-      (await serverConfig.getMCPIntegration()!.listOptions('active')) || [];
+      (await serverConfig.getMCPIntegration()!.listOptions('all')) || [];
 
     // Map task types to MCP options
     const taskTypeMapping: Record<string, string[]> = {
@@ -917,6 +934,7 @@ async function autonomousTaskExecutor() {
       mine: ['mine', 'dig', 'extract'],
       crafting: ['craft', 'build', 'create'],
       build: ['build', 'place', 'create', 'construct'],
+      building: ['build', 'place', 'create', 'construct'],
       exploration: ['explore', 'search', 'find'],
       explore: ['explore', 'search', 'find', 'move'],
       mining: ['mine', 'dig', 'extract'],
@@ -989,14 +1007,27 @@ async function autonomousTaskExecutor() {
       const inferredRecipe = inferRecipeFromTitle(currentTask.title);
       const inferredBlock = inferBlockTypeFromTitle(currentTask.title);
       const botPos = await getBotPosition();
+      // Expand search radius with retries to emulate a simple flood-fill
+      const attempt = currentTask.metadata?.retryCount || 0;
+      const radius = 8 + Math.min(32, attempt * 6);
       const randomExplore = botPos
         ? {
-            x: botPos.x + Math.floor(Math.random() * 20 - 10),
+            x: botPos.x + Math.floor(Math.random() * (radius * 2) - radius),
             y: botPos.y,
-            z: botPos.z + Math.floor(Math.random() * 20 - 10),
+            z: botPos.z + Math.floor(Math.random() * (radius * 2) - radius),
           }
         : undefined;
       const leafMapping: Record<string, { leafName: string; args: any }> = {
+        general: {
+          // Default to exploration step so we keep moving when unsure
+          leafName: 'move_to',
+          args: {
+            pos:
+              currentTask.parameters?.pos ||
+              currentTask.parameters?.target ||
+              randomExplore,
+          },
+        },
         movement: {
           leafName: 'move_to',
           args: {
@@ -1044,6 +1075,14 @@ async function autonomousTaskExecutor() {
             pos: currentTask.parameters?.pos,
           },
         },
+        mine: {
+          leafName: 'dig_block',
+          args: {
+            blockType:
+              currentTask.parameters?.blockType || inferredBlock || 'iron_ore',
+            pos: currentTask.parameters?.pos,
+          },
+        },
         crafting: {
           leafName: 'craft_recipe',
           args: {
@@ -1077,11 +1116,89 @@ async function autonomousTaskExecutor() {
             target: currentTask.parameters?.target || 'navigation_target',
           },
         },
+        build: {
+          leafName: 'place_block',
+          args: {
+            item: currentTask.parameters?.item || 'crafting_table',
+            pos: currentTask.parameters?.pos,
+          },
+        },
+        combat: {
+          leafName: 'sense_hostiles',
+          args: {},
+        },
+        building: {
+          leafName: 'place_block',
+          args: {
+            item: currentTask.parameters?.item || 'crafting_table',
+            pos: currentTask.parameters?.pos,
+          },
+        },
       };
 
+      const availableLeaves = await getAvailableLeaves();
       const leafConfig = leafMapping[currentTask.type];
-      if (leafConfig) {
-        console.log(`✅ Found suitable leaf for task: ${leafConfig.leafName}`);
+      // Build HRM/LLM-inspired candidate set based on intent + inventory
+      const intent = `${(currentTask.title || '').toLowerCase()} ${(
+        currentTask.description || ''
+      ).toLowerCase()}`;
+      const invForDecision = await fetchInventorySnapshot();
+      const haveLogs = hasEnoughLogs(invForDecision, 1);
+      const needPlanks = intent.includes('plank') || intent.includes('planks');
+      const candidates: Array<{ leafName: string; args: any; reason: string }> =
+        [];
+      if (needPlanks && availableLeaves.has('craft_recipe')) {
+        candidates.push({
+          leafName: 'craft_recipe',
+          args: { recipe: 'oak_planks', qty: 4 },
+          reason: 'Intent mentions planks; try crafting directly',
+        });
+      }
+      if (haveLogs && availableLeaves.has('craft_recipe')) {
+        candidates.push({
+          leafName: 'craft_recipe',
+          args: { recipe: 'oak_planks', qty: 4 },
+          reason: 'Logs available in inventory; craft planks',
+        });
+      }
+      if (availableLeaves.has('dig_block')) {
+        const blockType =
+          currentTask.parameters?.blockType || inferredBlock || 'oak_log';
+        candidates.push({
+          leafName: 'dig_block',
+          args: { blockType, pos: currentTask.parameters?.pos },
+          reason: 'Gather base resource via digging',
+        });
+      }
+      if (availableLeaves.has('move_to')) {
+        candidates.push({
+          leafName: 'move_to',
+          args: {
+            pos:
+              currentTask.parameters?.pos ||
+              currentTask.parameters?.target ||
+              randomExplore,
+          },
+          reason: 'Explore to unblock if resource not found',
+        });
+      }
+
+      // Prefer explicit mapping if available, else pick first viable candidate
+      let selectedLeaf =
+        leafConfig && availableLeaves.has(leafConfig.leafName)
+          ? { ...leafConfig, reason: 'Mapped by task type' }
+          : candidates.find((c) => availableLeaves.has(c.leafName));
+      if (!selectedLeaf && leafConfig)
+        selectedLeaf = {
+          ...leafConfig,
+          reason: 'Mapped by task type (not verified)',
+        } as any;
+      if (selectedLeaf) {
+        console.log(
+          `✅ Selected leaf for task: ${selectedLeaf.leafName} — ${
+            (selectedLeaf as any).reason || 'heuristic'
+          }`
+        );
 
         // Check retry count to prevent infinite loops
         const retryCount = currentTask.metadata?.retryCount || 0;
@@ -1105,7 +1222,7 @@ async function autonomousTaskExecutor() {
 
         // Pre-check prerequisites for crafting leaf
         if (
-          leafConfig.leafName === 'craft_recipe' &&
+          selectedLeaf.leafName === 'craft_recipe' &&
           /pickaxe/i.test(currentTask.title || '')
         ) {
           const preInv = await fetchInventorySnapshot();
@@ -1122,13 +1239,27 @@ async function autonomousTaskExecutor() {
           }
         }
 
+        // Annotate current step with leaf and parameters for verification clarity
+        try {
+          enhancedTaskIntegration.annotateCurrentStepWithLeaf(
+            currentTask.id,
+            selectedLeaf.leafName,
+            selectedLeaf.args
+          );
+        } catch {}
+
         // Execute the leaf directly
         const mcpResult = await serverConfig
           .getMCPIntegration()
-          ?.executeTool(`minecraft.${leafConfig.leafName}`, leafConfig.args);
+          ?.executeTool(
+            `minecraft.${selectedLeaf.leafName}`,
+            selectedLeaf.args
+          );
 
         if (mcpResult?.success) {
-          console.log(`✅ Leaf executed successfully: ${leafConfig.leafName}`);
+          console.log(
+            `✅ Leaf executed successfully: ${selectedLeaf.leafName}`
+          );
 
           // After execution, recompute inventory-based progress and gate completion
           try {
@@ -1148,7 +1279,7 @@ async function autonomousTaskExecutor() {
 
           // Post-check inventory for crafting outcomes
           if (
-            leafConfig.leafName === 'craft_recipe' &&
+            selectedLeaf.leafName === 'craft_recipe' &&
             /pickaxe/i.test(currentTask.title || '')
           ) {
             const postInv = await fetchInventorySnapshot();
@@ -1215,7 +1346,7 @@ async function autonomousTaskExecutor() {
           return; // Exit early since we successfully executed the leaf
         }
         console.error(
-          `❌ Leaf execution failed: ${leafConfig.leafName} ${mcpResult?.error}`
+          `❌ Leaf execution failed: ${selectedLeaf.leafName} ${mcpResult?.error}`
         );
 
         // Increment retry count
@@ -1223,7 +1354,7 @@ async function autonomousTaskExecutor() {
 
         // If resource not found for dig_block, inject exploration step instead of spinning
         if (
-          leafConfig.leafName === 'dig_block' &&
+          selectedLeaf.leafName === 'dig_block' &&
           typeof mcpResult?.error === 'string' &&
           /no .*found/i.test(mcpResult.error)
         ) {
@@ -1361,6 +1492,20 @@ async function autonomousTaskExecutor() {
         (currentTask.title.toLowerCase().includes('iron')
           ? 'iron_ore'
           : 'oak_log');
+
+      // Annotate step with MCP option and resolved parameters
+      try {
+        enhancedTaskIntegration.annotateCurrentStepWithOption(
+          currentTask.id,
+          suitableOption.name,
+          {
+            recipe: desiredRecipe,
+            qty: currentTask.parameters?.qty,
+            blockType: desiredBlock,
+            pos: currentTask.parameters?.pos,
+          }
+        );
+      } catch {}
 
       const mcpResult = await serverConfig
         .getMCPIntegration()
@@ -1901,6 +2046,88 @@ async function startServer() {
     if (mcpIntegration) {
       const mcpRouter = createMCPEndpoints(mcpIntegration);
       serverConfig.mountRouter('/mcp', mcpRouter);
+
+      // Seed a few default MCP options so lookups succeed on fresh start
+      try {
+        const defaultOptions = [
+          {
+            id: 'gather_wood@1',
+            name: 'gather_wood',
+            description: 'Gather wood by digging oak_log and picking up drops',
+            btDefinition: {
+              root: {
+                type: 'sequence',
+                children: [
+                  {
+                    type: 'action',
+                    action: 'dig_block',
+                    args: { blockType: 'oak_log' },
+                  },
+                  {
+                    type: 'action',
+                    action: 'pickup_item',
+                    args: { radius: 3 },
+                  },
+                ],
+              },
+            },
+          },
+          {
+            id: 'craft_wooden_pickaxe@1',
+            name: 'craft_wooden_pickaxe',
+            description: 'Craft a wooden pickaxe from available materials',
+            btDefinition: {
+              root: {
+                type: 'sequence',
+                children: [
+                  {
+                    type: 'action',
+                    action: 'craft_recipe',
+                    args: { recipe: 'wooden_pickaxe', qty: 1 },
+                  },
+                ],
+              },
+            },
+          },
+          {
+            id: 'explore_move@1',
+            name: 'explore_move',
+            description: 'Explore by moving to a target or random nearby point',
+            btDefinition: {
+              root: {
+                type: 'sequence',
+                children: [{ type: 'action', action: 'move_to', args: {} }],
+              },
+            },
+          },
+        ];
+
+        for (const opt of defaultOptions) {
+          const reg = await mcpIntegration.registerOption(opt);
+          if (reg.success) {
+            console.log(`✅ Registered MCP option: ${opt.name}`);
+            try {
+              const id = (reg.data as string) || opt.id;
+              const promo = await mcpIntegration.promoteOption(id);
+              if (promo.success) {
+                console.log(`🚀 Promoted MCP option to active: ${id}`);
+              } else {
+                console.warn(
+                  `⚠️ MCP option promotion failed for ${id}: ${promo.error}`
+                );
+              }
+            } catch (e) {
+              console.warn(`⚠️ MCP option promotion error for ${opt.name}:`, e);
+            }
+          } else {
+            console.warn(
+              `⚠️ MCP option registration failed for ${opt.name}: ${reg.error}`
+            );
+          }
+        }
+      } catch (e) {
+        console.warn('⚠️ Seeding default MCP options failed:', e);
+      }
     }
 
     // Add error handling

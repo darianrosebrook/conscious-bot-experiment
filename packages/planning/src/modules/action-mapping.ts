@@ -25,6 +25,48 @@ export function extractItemFromTask(task: any): string {
 
 export function mapTaskTypeToMinecraftAction(task: any) {
   switch (task.type) {
+    case 'social': {
+      const message =
+        task.parameters?.message ||
+        (task.description || task.title || 'Hello').slice(0, 256);
+      return {
+        type: 'chat',
+        parameters: { message },
+        timeout: 5000,
+      };
+    }
+    case 'general': {
+      const title = (task.title || '').toLowerCase();
+      const desc = (task.description || '').toLowerCase();
+      const text = `${title} ${desc}`;
+      // Heuristic mapping so we don't stall on unknown types
+      if (text.includes('craft') || text.includes('plank')) {
+        return {
+          type: 'craft',
+          parameters: { item: extractItemFromTask(task) || 'oak_planks', quantity: 1 },
+          timeout: 15000,
+        };
+      }
+      if (
+        text.includes('wood') ||
+        text.includes('log') ||
+        text.includes('tree') ||
+        text.includes('gather') ||
+        text.includes('collect')
+      ) {
+        return {
+          type: 'gather',
+          parameters: { resource: 'wood', amount: 3, target: 'tree' },
+          timeout: 15000,
+        };
+      }
+      // Default to exploration to emulate a flood-fill reposition
+      return {
+        type: 'navigate',
+        parameters: { target: task.parameters?.target || 'exploration_target', distance: task.parameters?.distance || 10 },
+        timeout: 15000,
+      };
+    }
     case 'movement':
       return {
         type: 'move_to',
