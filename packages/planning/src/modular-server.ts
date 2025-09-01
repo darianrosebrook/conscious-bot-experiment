@@ -1249,12 +1249,23 @@ async function autonomousTaskExecutor() {
         } catch {}
 
         // Execute the leaf directly
-        const mcpResult = await serverConfig
-          .getMCPIntegration()
-          ?.executeTool(
-            `minecraft.${selectedLeaf.leafName}`,
-            selectedLeaf.args
-          );
+                  // Try to execute the tool directly, then with minecraft prefix as fallback
+          let mcpResult;
+          try {
+            mcpResult = await serverConfig
+              .getMCPIntegration()
+              ?.executeTool(selectedLeaf.leafName, selectedLeaf.args);
+          } catch (error) {
+            // Fallback to minecraft prefix if direct execution fails
+            try {
+              mcpResult = await serverConfig
+                .getMCPIntegration()
+                ?.executeTool(`minecraft.${selectedLeaf.leafName}`, selectedLeaf.args);
+            } catch (fallbackError) {
+              console.warn(`⚠️ Tool execution failed for ${selectedLeaf.leafName}:`, fallbackError);
+              mcpResult = { success: false, error: fallbackError };
+            }
+          }
 
         if (mcpResult?.success) {
           console.log(
@@ -2047,8 +2058,42 @@ async function startServer() {
       const mcpRouter = createMCPEndpoints(mcpIntegration);
       serverConfig.mountRouter('/mcp', mcpRouter);
 
-      // Seed a few default MCP options so lookups succeed on fresh start
+      // First, ensure the leaf factory has the core leaves
       try {
+        console.log('📝 Registering core leaves with MCP integration...');
+        
+        // Register core leaves that match what the Minecraft interface has
+        const coreLeaves = [
+          { name: 'move_to', version: '1.0.0', permissions: ['movement'] },
+          { name: 'step_forward_safely', version: '1.0.0', permissions: ['movement'] },
+          { name: 'follow_entity', version: '1.0.0', permissions: ['movement'] },
+          { name: 'dig_block', version: '1.0.0', permissions: ['gathering'] },
+          { name: 'place_block', version: '1.0.0', permissions: ['building'] },
+          { name: 'place_torch_if_needed', version: '1.0.0', permissions: ['building'] },
+          { name: 'retreat_and_block', version: '1.0.0', permissions: ['combat'] },
+          { name: 'consume_food', version: '1.0.0', permissions: ['survival'] },
+          { name: 'sense_hostiles', version: '1.0.0', permissions: ['combat'] },
+          { name: 'chat', version: '1.0.0', permissions: ['communication'] },
+          { name: 'wait', version: '1.0.0', permissions: ['utility'] },
+          { name: 'get_light_level', version: '1.0.0', permissions: ['environment'] },
+          { name: 'craft_recipe', version: '1.1.0', permissions: ['crafting'] },
+          { name: 'smelt', version: '1.1.0', permissions: ['crafting'] },
+        ];
+
+        for (const leaf of coreLeaves) {
+          try {
+            const result = await mcpIntegration.registerLeaf(leaf);
+            if (result) {
+              console.log(`✅ Registered leaf: ${leaf.name}@${leaf.version}`);
+            } else {
+              console.warn(`⚠️ Failed to register leaf: ${leaf.name}@${leaf.version}`);
+            }
+          } catch (error) {
+            console.warn(`⚠️ Error registering leaf ${leaf.name}:`, error);
+          }
+        }
+
+        // Now seed MCP options that use the registered leaves
         const defaultOptions = [
           {
             id: 'gather_wood@1',
@@ -2062,11 +2107,6 @@ async function startServer() {
                     type: 'action',
                     action: 'dig_block',
                     args: { blockType: 'oak_log' },
-                  },
-                  {
-                    type: 'action',
-                    action: 'pickup_item',
-                    args: { radius: 3 },
                   },
                 ],
               },
@@ -2103,26 +2143,33 @@ async function startServer() {
         ];
 
         for (const opt of defaultOptions) {
-          const reg = await mcpIntegration.registerOption(opt);
-          if (reg.success) {
-            console.log(`✅ Registered MCP option: ${opt.name}`);
-            try {
-              const id = (reg.data as string) || opt.id;
-              const promo = await mcpIntegration.promoteOption(id);
-              if (promo.success) {
-                console.log(`🚀 Promoted MCP option to active: ${id}`);
-              } else {
-                console.warn(
-                  `⚠️ MCP option promotion failed for ${id}: ${promo.error}`
-                );
+          try {
+            const reg = await mcpIntegration.registerOption(opt);
+            if (reg.success) {
+              console.log(`✅ Registered MCP option: ${opt.name}`);
+              try {
+                const id = (reg.data as string) || opt.id;
+                const promo = await mcpIntegration.promoteOption(id);
+                if (promo.success) {
+                  console.log(`🚀 Promoted MCP option to active: ${id}`);
+                } else {
+                  console.warn(
+                    `⚠️ MCP option promotion failed for ${id}: ${promo.error}`
+                  );
+                }
+              } catch (e) {
+                console.warn(`⚠️ MCP option promotion error for ${opt.name}:`, e);
               }
-            } catch (e) {
-              console.warn(`⚠️ MCP option promotion error for ${opt.name}:`, e);
+            } else {
+              console.warn(
+                `⚠️ MCP option registration failed for ${opt.name}: ${reg.error}`
+              );
+              // Log more details about the failure
+              console.warn(`  - Option ID: ${opt.id}`);
+              console.warn(`  - Action: ${opt.btDefinition?.root?.children?.[0]?.action || 'unknown'}`);
             }
-          } else {
-            console.warn(
-              `⚠️ MCP option registration failed for ${opt.name}: ${reg.error}`
-            );
+          } catch (error) {
+            console.error(`❌ Error during MCP option registration for ${opt.name}:`, error);
           }
         }
       } catch (e) {

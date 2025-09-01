@@ -267,10 +267,6 @@ export class MCPIntegration {
     }
 
     try {
-      console.log(
-        '[MCP] Updating bot instance with data:',
-        JSON.stringify(bot, null, 2)
-      );
       // Update the bot instance in the MCP server
       (this.mcpServer as any).deps.bot = bot;
       console.log('[MCP] Bot instance updated successfully');
