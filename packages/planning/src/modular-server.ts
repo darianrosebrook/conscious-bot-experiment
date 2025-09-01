@@ -944,7 +944,9 @@ async function autonomousTaskExecutor() {
       (await serverConfig.getMCPIntegration()!.listOptions('all')) || [];
 
     // Filter out leaf registrations that appear as options in the registry
-    mcpOptions = mcpOptions.filter((opt: any) => !KNOWN_LEAF_NAMES.has(opt.name));
+    mcpOptions = mcpOptions.filter(
+      (opt: any) => !KNOWN_LEAF_NAMES.has(opt.name)
+    );
 
     // Map task types to MCP options
     const taskTypeMapping: Record<string, string[]> = {
@@ -2060,14 +2062,17 @@ async function startServer() {
       const mcpIntegration = serverConfig.getMCPIntegration();
       if (mcpIntegration) {
         console.log('🔗 Connecting MCP integration to behavior tree runner...');
-        
+
         // Add the behavior tree runner to the MCP integration so it can execute options
         (mcpIntegration as any).btRunner = btRunner;
-        
+
         console.log('✅ MCP integration connected to behavior tree runner');
       }
     } catch (error) {
-      console.warn('⚠️ Failed to connect MCP integration to behavior tree runner:', error);
+      console.warn(
+        '⚠️ Failed to connect MCP integration to behavior tree runner:',
+        error
+      );
     }
 
     // Register placeholder Minecraft leaves with both the EnhancedRegistry and MCP
@@ -2081,7 +2086,16 @@ async function startServer() {
         const makePlaceholder = (
           name: string,
           version: string,
-          permissions: Array<'movement' | 'dig' | 'place' | 'craft' | 'sense' | 'container.read' | 'container.write' | 'chat'>,
+          permissions: Array<
+            | 'movement'
+            | 'dig'
+            | 'place'
+            | 'craft'
+            | 'sense'
+            | 'container.read'
+            | 'container.write'
+            | 'chat'
+          >,
           inputSchema: any = { type: 'object', additionalProperties: true }
         ): any => ({
           spec: {
@@ -2096,7 +2110,11 @@ async function startServer() {
           async run() {
             return {
               status: 'failure',
-              error: { code: 'unknown', retryable: false, detail: 'placeholder' },
+              error: {
+                code: 'unknown',
+                retryable: false,
+                detail: 'placeholder',
+              },
               metrics: { durationMs: 0, retries: 0, timeouts: 0 },
             } as any;
           },
@@ -2165,7 +2183,7 @@ async function startServer() {
       // Seed MCP options (permissions inferred by MCP server when possible)
       try {
         console.log('📝 Seeding default MCP options...');
-        
+
         // Now seed MCP options that use the expected leaves
         const defaultOptions = [
           {
@@ -2220,17 +2238,23 @@ async function startServer() {
             const reg = await mcpIntegration.registerOption(opt);
             if (reg.success) {
               console.log(`✅ Registered MCP option: ${opt.name}`);
-              
+
               // Also register the option with the behavior tree runner
               try {
                 if ((mcpIntegration as any).btRunner) {
-                  console.log(`🔗 Adding MCP option ${opt.name} to behavior tree runner`);
-                  // The behavior tree runner should now be able to execute this option
+                  console.log(
+                    `🔗 Adding MCP option ${opt.name} to behavior tree runner`
+                  );
+                  // Store the inline behavior tree definition in the behavior tree runner
+                  (mcpIntegration as any).btRunner.storeInlineDefinition(opt.id, opt.btDefinition);
                 }
               } catch (btError) {
-                console.warn(`⚠️ Failed to connect option ${opt.name} to behavior tree runner:`, btError);
+                console.warn(
+                  `⚠️ Failed to connect option ${opt.name} to behavior tree runner:`,
+                  btError
+                );
               }
-              
+
               try {
                 const id = (reg.data as string) || opt.id;
                 const promo = await mcpIntegration.promoteOption(id);

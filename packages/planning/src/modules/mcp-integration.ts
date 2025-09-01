@@ -343,16 +343,24 @@ export class MCPIntegration {
 
       // Check if we have a behavior tree runner connected
       if ((this as any).btRunner) {
-        console.log(`[MCP] Executing option ${resolvedOptionId} via behavior tree runner`);
-        
+        console.log(
+          `[MCP] Executing option ${resolvedOptionId} via behavior tree runner`
+        );
+
         try {
-          const result = await (this as any).btRunner.runOption(resolvedOptionId, args || {});
+          const result = await (this as any).btRunner.runOption(
+            resolvedOptionId,
+            args || {}
+          );
           return {
             success: true,
             data: result,
           };
         } catch (btError: any) {
-          console.warn(`[MCP] Behavior tree execution failed for ${resolvedOptionId}:`, btError);
+          console.warn(
+            `[MCP] Behavior tree execution failed for ${resolvedOptionId}:`,
+            btError
+          );
           return {
             success: false,
             error: btError.message || 'Behavior tree execution failed',
@@ -362,7 +370,9 @@ export class MCPIntegration {
       }
 
       // Fallback to MCP server tool execution
-      console.log(`[MCP] Executing option ${resolvedOptionId} via MCP server tool`);
+      console.log(
+        `[MCP] Executing option ${resolvedOptionId} via MCP server tool`
+      );
       const result = await (this.mcpServer as any).executeTool('run_option', {
         id: resolvedOptionId,
         args: args || {},

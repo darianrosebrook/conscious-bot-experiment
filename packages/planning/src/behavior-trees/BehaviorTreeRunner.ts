@@ -152,6 +152,17 @@ export class BehaviorTreeRunner extends EventEmitter {
     const run = this.activeRuns.get(runId);
     return run ? run.getTicks() : null;
   }
+
+  /**
+   * Store inline behavior tree definitions from MCP options
+   */
+  storeInlineDefinition(optionId: string, definition: any): void {
+    if (!(this as any).inlineDefinitions) {
+      (this as any).inlineDefinitions = new Map();
+    }
+    (this as any).inlineDefinitions.set(optionId, definition);
+    console.log(`📝 Stored inline BT definition for ${optionId}`);
+  }
 }
 
 // ============================================================================
@@ -484,6 +495,13 @@ class BTRun extends EventEmitter {
 
   private async loadBehaviorTree(optionId: string): Promise<BTNode> {
     try {
+      // First, check if we have an inline definition from MCP options
+      if ((this as any).inlineDefinitions && (this as any).inlineDefinitions.has(optionId)) {
+        const inlineDefinition = (this as any).inlineDefinitions.get(optionId);
+        console.log(`Using inline BT definition for ${optionId}:`, JSON.stringify(inlineDefinition, null, 2));
+        return this.parseBTDefinition(inlineDefinition);
+      }
+
       // Try to load the behavior tree definition from the skill registry
       const fs = await import('fs/promises');
       const path = await import('path');

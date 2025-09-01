@@ -15176,5 +15176,122 @@
     "id": "thought-1756752249362-rttzkcetn",
     "timestamp": 1756752249362,
     "processed": false
+  },
+  {
+    "type": "reflection",
+    "content": "Gather wood from nearby birch trees. Need to craft a pickaxe and build shelter before nightfall.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.6,
+      "cognitiveSystem": "llm-core"
+    },
+    "metadata": {
+      "thoughtType": "reflection",
+      "trigger": "time-based",
+      "context": "environmental-monitoring",
+      "intensity": 0.4,
+      "llmConfidence": 0.6,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1756752465183-o51lb968z",
+    "timestamp": 1756752465183,
+    "processed": false
+  },
+  {
+    "type": "intrusive",
+    "content": "Find a suitable location for building",
+    "attribution": "intrusive",
+    "context": {
+      "emotionalState": "curious",
+      "confidence": 0.8
+    },
+    "metadata": {
+      "messageType": "intrusion",
+      "intent": "external_suggestion",
+      "thoughtType": "intrusive"
+    },
+    "id": "thought-1756752503279-dwxk7fx9o",
+    "timestamp": 1756752503279,
+    "processed": false
+  },
+  {
+    "type": "reflection",
+    "content": "Processing intrusive thought: \"find a suitable location for building\"",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "focused",
+      "confidence": 0.6,
+      "cognitiveSystem": "intrusive-processor"
+    },
+    "metadata": {
+      "thoughtType": "reflection",
+      "source": "intrusive-thought"
+    },
+    "id": "thought-1756752503562-kgmt40njn",
+    "timestamp": 1756752503562,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Planning system updated: Find a suitable location for building (via step_forward_safely@1.0.0) - Success",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "focused",
+      "confidence": 0.7,
+      "cognitiveSystem": "planning-integration"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskId": "task-1756752503555-rfqwzx",
+      "success": true
+    },
+    "id": "thought-1756752503576-l3vd5t9ch",
+    "timestamp": 1756752503576,
+    "processed": false
+  },
+  {
+    "type": "intrusive",
+    "content": "Find a suitable location for building",
+    "attribution": "external",
+    "context": {
+      "emotionalState": "curious",
+      "confidence": 0.8
+    },
+    "metadata": {
+      "messageType": "intrusion",
+      "intent": "external_suggestion",
+      "tags": [
+        "external",
+        "intrusion"
+      ],
+      "strength": 0.8,
+      "processed": true,
+      "taskId": "task-1756752503555-rfqwzx",
+      "thoughtType": "intrusive"
+    },
+    "id": "thought-1756752503583-6n4frjgwk",
+    "timestamp": 1756752503583,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Gather birch logs from nearby trees. Use axe to chop them down.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.6,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "gather",
+      "trigger": "task-start",
+      "llmConfidence": 0.6,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1756752645046-bbr3echtc",
+    "timestamp": 1756752645046,
+    "processed": false
   }
 ]
