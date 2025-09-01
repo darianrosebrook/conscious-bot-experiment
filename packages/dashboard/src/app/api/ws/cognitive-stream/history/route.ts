@@ -67,15 +67,25 @@ async function loadThoughts(): Promise<CognitiveThought[]> {
 // API Endpoint
 // =============================================================================
 
-export async function GET(_req: NextRequest) {
+export async function GET(req: NextRequest) {
   try {
     const thoughts = await loadThoughts();
+
+    // Optional query params: ?limit=100 (default 200)
+    const url = new URL(req.url);
+    const limitParam = url.searchParams.get('limit');
+    const limit = Math.max(
+      1,
+      Math.min(1000, Number.isFinite(Number(limitParam)) ? Number(limitParam) : 200)
+    );
+    const sliced = thoughts.slice(-limit);
 
     return new Response(
       JSON.stringify({
         success: true,
-        thoughts: thoughts,
-        count: thoughts.length,
+        thoughts: sliced,
+        count: sliced.length,
+        total: thoughts.length,
         timestamp: Date.now(),
       }),
       {

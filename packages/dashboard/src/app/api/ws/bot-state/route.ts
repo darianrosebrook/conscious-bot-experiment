@@ -29,10 +29,6 @@ export const GET = async (req: NextRequest) => {
     const isSSE = accept?.includes('text/event-stream');
     const isJSON = accept?.includes('application/json');
 
-    console.log(
-      `Bot state request - SSE: ${isSSE}, JSON: ${isJSON}, Accept: ${accept}`
-    );
-
     // If it's a JSON request, return a single response
     if (isJSON) {
       try {
@@ -166,7 +162,6 @@ export const GET = async (req: NextRequest) => {
       return new Response('Too many connections', { status: 429 });
     }
 
-    console.log('Creating SSE stream for bot state');
     const encoder = new TextEncoder();
 
     const stream = new ReadableStream({

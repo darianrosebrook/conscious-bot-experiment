@@ -151,10 +151,10 @@ function addThought(
 // Seed-Scoped Persistence Resolution
 // =============================================================================
 
-async function fetchActiveNamespace(): Promise<
-  | { id: string; context?: { worldSeed?: string; worldName?: string; sessionId?: string } }
-  | null
-> {
+async function fetchActiveNamespace(): Promise<{
+  id: string;
+  context?: { worldSeed?: string; worldName?: string; sessionId?: string };
+} | null> {
   try {
     const res = await fetch('http://localhost:3001/versioning/active', {
       headers: { 'Content-Type': 'application/json' },
@@ -168,22 +168,42 @@ async function fetchActiveNamespace(): Promise<
   }
 }
 
-function computePathForNamespace(ns: {
-  id: string;
-  context?: { worldSeed?: string; worldName?: string; sessionId?: string };
-} | null): string {
+function computePathForNamespace(
+  ns: {
+    id: string;
+    context?: { worldSeed?: string; worldName?: string; sessionId?: string };
+  } | null
+): string {
   if (!ns) return DEFAULT_THOUGHTS_FILE_PATH;
   const seed = ns.context?.worldSeed;
   const world = ns.context?.worldName;
   if (seed) {
-    return path.join(process.cwd(), 'data', 'thoughts', `seed-${seed}`, 'cognitive-thoughts.json');
+    return path.join(
+      process.cwd(),
+      'data',
+      'thoughts',
+      `seed-${seed}`,
+      'cognitive-thoughts.json'
+    );
   }
   if (world) {
-    return path.join(process.cwd(), 'data', 'thoughts', `world-${world}`, 'cognitive-thoughts.json');
+    return path.join(
+      process.cwd(),
+      'data',
+      'thoughts',
+      `world-${world}`,
+      'cognitive-thoughts.json'
+    );
   }
   // As a last resort, bucket by namespace id
   if (ns.id) {
-    return path.join(process.cwd(), 'data', 'thoughts', `ns-${ns.id}`, 'cognitive-thoughts.json');
+    return path.join(
+      process.cwd(),
+      'data',
+      'thoughts',
+      `ns-${ns.id}`,
+      'cognitive-thoughts.json'
+    );
   }
   return DEFAULT_THOUGHTS_FILE_PATH;
 }
@@ -455,11 +475,20 @@ export const GET = async (req: NextRequest) => {
         );
       }
 
-      // Send initial data with existing thoughts
+      // Send initial data with existing thoughts (support ?limit)
+      const url = new URL(req.url);
+      const initLimitParam = url.searchParams.get('limit');
+      const initLimit = Math.max(
+        1,
+        Math.min(
+          1000,
+          Number.isFinite(Number(initLimitParam)) ? Number(initLimitParam) : 50
+        )
+      );
       const initialData = {
         type: 'cognitive_stream_init',
         timestamp: Date.now(),
-        data: { thoughts: thoughtHistory.slice(-50) },
+        data: { thoughts: thoughtHistory.slice(-initLimit) },
       };
 
       // Only log in development mode

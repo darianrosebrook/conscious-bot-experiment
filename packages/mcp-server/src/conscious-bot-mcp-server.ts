@@ -72,7 +72,11 @@ class ConsciousBotMCPServer extends Server {
   private prompts = new Map<string, MCPPromptDefinition>();
 
   // NEW: validators for input/output schemas
-  private ajv = new Ajv({ allErrors: true, useDefaults: true, coerceTypes: true });
+  private ajv = new Ajv({
+    allErrors: true,
+    useDefaults: true,
+    coerceTypes: true,
+  });
   private validators = new Map<
     string,
     { in: ValidateFunction; out?: ValidateFunction }
@@ -651,7 +655,8 @@ class ConsciousBotMCPServer extends Server {
       if (leafName === 'chat') {
         if (typeof a === 'string') return { message: a };
         if (a && typeof a === 'object') {
-          if (a.message == null && typeof a.text === 'string') a.message = a.text;
+          if (a.message == null && typeof a.text === 'string')
+            a.message = a.text;
           return a;
         }
         return { message: String(a) };
@@ -663,7 +668,9 @@ class ConsciousBotMCPServer extends Server {
           return { pos: { x: Number(a[0]), y: Number(a[1]), z: Number(a[2]) } };
         }
         if (a && typeof a === 'object') {
-          const hasTopXYZ = ['x', 'y', 'z'].every((k) => typeof a[k] === 'number');
+          const hasTopXYZ = ['x', 'y', 'z'].every(
+            (k) => typeof a[k] === 'number'
+          );
           if (hasTopXYZ) {
             const { x, y, z, ...rest } = a;
             return { pos: { x, y, z }, ...rest };
@@ -672,7 +679,10 @@ class ConsciousBotMCPServer extends Server {
             const { x, y, z } = a.position;
             const rest = { ...a };
             delete (rest as any).position;
-            return { pos: { x: Number(x), y: Number(y), z: Number(z) }, ...rest };
+            return {
+              pos: { x: Number(x), y: Number(y), z: Number(z) },
+              ...rest,
+            };
           }
         }
         return a;
@@ -681,7 +691,9 @@ class ConsciousBotMCPServer extends Server {
       // get_light_level: allow top‑level x,y,z
       if (leafName === 'get_light_level') {
         if (a && typeof a === 'object') {
-          const hasTopXYZ = ['x', 'y', 'z'].every((k) => typeof a[k] === 'number');
+          const hasTopXYZ = ['x', 'y', 'z'].every(
+            (k) => typeof a[k] === 'number'
+          );
           if (hasTopXYZ) {
             const { x, y, z, ...rest } = a;
             return { position: { x, y, z }, ...rest };
@@ -1009,16 +1021,49 @@ class ConsciousBotMCPServer extends Server {
     return true;
   }
 
-  // PATCH 3: Compute option permissions from real leaves, not a hardcoded map
+  // PATCH 3: Compute option permissions from real leaves, with graceful fallback
   private computeOptionPermissions(root: any): string[] {
     // Traverse a normalized BT-DSL JSON node (not compiled) and collect permissions
     const perms = new Set<string>();
+
+    const inferPermsFromName = (leafName: string): string[] => {
+      // Heuristic mapping when leaf implementations are not yet registered in-process
+      const name = String(leafName).toLowerCase();
+      if (['move_to', 'step_forward_safely', 'follow_entity'].includes(name)) {
+        return ['movement'];
+      }
+      if (name === 'dig_block') return ['dig'];
+      if (
+        ['place_block', 'place_torch_if_needed', 'retreat_and_block'].includes(
+          name
+        )
+      ) {
+        return ['place'];
+      }
+      if (['sense_hostiles', 'get_light_level'].includes(name))
+        return ['sense'];
+      if (name === 'chat') return ['chat'];
+      if (['craft_recipe', 'smelt'].includes(name)) return ['craft'];
+      // wait / consume_food or unknown → no explicit permissions
+      return [];
+    };
+
     const visit = (n: any) => {
       if (!n || typeof n !== 'object') return;
       if (n.type === 'Leaf' && n.leafName) {
         const impl = this.leafFactory.get?.(n.leafName);
-        if (!impl) throw new Error(`unknown leaf '${n.leafName}'`);
-        (impl.spec.permissions || []).forEach((p: string) => perms.add(p));
+        if (impl) {
+          (impl.spec.permissions || []).forEach((p: string) => perms.add(p));
+        } else {
+          // Gracefully handle unknown leaves by inferring a safe minimal set
+          const inferred = inferPermsFromName(n.leafName);
+          inferred.forEach((p) => perms.add(p));
+          if (process.env.NODE_ENV !== 'production') {
+            console.warn(
+              `[MCP] Permission inference: unknown leaf '${n.leafName}', inferred perms: ${inferred.join(',')}`
+            );
+          }
+        }
       }
       const kids: any[] = Array.isArray(n.children) ? n.children : [];
       kids.forEach(visit);
@@ -1167,19 +1212,24 @@ class ConsciousBotMCPServer extends Server {
           name: it.name ?? it.type ?? it.displayName ?? undefined,
           type: it.type ?? it.name ?? undefined,
           displayName: it.displayName ?? it.name ?? it.type ?? undefined,
-          count: typeof it.count === 'number' ? it.count : it.quantity ?? 1,
+          count: typeof it.count === 'number' ? it.count : (it.quantity ?? 1),
           slot: it.slot,
         }));
 
         const totalSlots = worldState.inventory?.space?.total ?? 36;
-        const freeSlots = worldState.inventory?.space?.free ?? Math.max(0, totalSlots - normalizedItems.length);
+        const freeSlots =
+          worldState.inventory?.space?.free ??
+          Math.max(0, totalSlots - normalizedItems.length);
 
         const snapshot = {
-          position: worldState.playerPosition || worldState.agentPosition || { x: 0, y: 64, z: 0 },
+          position: worldState.playerPosition ||
+            worldState.agentPosition || { x: 0, y: 64, z: 0 },
           biome: worldState.biome || 'plains',
           time: worldState.timeOfDay ?? worldState.time ?? 0,
           lightLevel: worldState.lightLevel ?? 15,
-          nearbyHostiles: Array.isArray(worldState.nearbyHostiles) ? worldState.nearbyHostiles : [],
+          nearbyHostiles: Array.isArray(worldState.nearbyHostiles)
+            ? worldState.nearbyHostiles
+            : [],
           weather: worldState.weather || 'clear',
           inventory: {
             items: normalizedItems,
@@ -1188,7 +1238,9 @@ class ConsciousBotMCPServer extends Server {
             freeSlots,
           },
           toolDurability: {},
-          waypoints: Array.isArray(worldState.waypoints) ? worldState.waypoints : [],
+          waypoints: Array.isArray(worldState.waypoints)
+            ? worldState.waypoints
+            : [],
           vitals: {
             health: worldState.vitals?.health ?? worldState.health ?? 20,
             food: worldState.vitals?.food ?? worldState.hunger ?? 20,

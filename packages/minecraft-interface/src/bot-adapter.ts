@@ -210,7 +210,6 @@ export class BotAdapter extends EventEmitter {
 
       // Set up safety monitor event handlers
       this.safetyMonitor.on('emergency-response', (data) => {
-        console.log('🚨 Safety monitor emergency response:', data);
         this.emitBotEvent('safety_emergency', data);
       });
 

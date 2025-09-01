@@ -8,25 +8,30 @@ interface SectionProps {
   children: React.ReactNode;
   tight?: boolean;
   className?: string;
+  fullHeight?: boolean;
 }
 
 /**
  * Section component for organizing dashboard panels
  * Provides consistent styling for different dashboard sections
  */
-export function Section({ 
-  title, 
-  icon, 
-  actions, 
-  children, 
+export function Section({
+  title,
+  icon,
+  actions,
+  children,
   tight = false,
-  className 
+  className,
+  fullHeight = false,
 }: SectionProps) {
   return (
-    <section className={cn(
-      "rounded-2xl border border-zinc-800 bg-zinc-950/60 shadow-sm",
-      className
-    )}>
+    <section
+      className={cn(
+        "rounded-2xl border border-zinc-800 bg-zinc-950/60 shadow-sm",
+        fullHeight && "flex h-full flex-col overflow-hidden",
+        className
+      )}
+    >
       <header className="flex items-center justify-between px-3 py-2 border-b border-zinc-800/80">
         <div className="flex items-center gap-2 text-zinc-200">
           {icon}
@@ -34,7 +39,13 @@ export function Section({
         </div>
         {actions}
       </header>
-      <div className={cn("px-3", tight ? "py-2" : "py-3")}>
+      <div
+        className={cn(
+          "px-3",
+          tight ? "py-2" : "py-3",
+          fullHeight && "flex-1 overflow-hidden"
+        )}
+      >
         {children}
       </div>
     </section>

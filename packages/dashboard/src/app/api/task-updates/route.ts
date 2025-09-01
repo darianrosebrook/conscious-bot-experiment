@@ -19,7 +19,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { event, data, timestamp } = body;
 
-    console.log(`Received task update: ${event}`, data);
+    // console.log(`Received task update: ${event}`, data);
 
     // Broadcast to all connected clients
     const message = JSON.stringify({
