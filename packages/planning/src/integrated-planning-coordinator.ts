@@ -979,6 +979,7 @@ export class IntegratedPlanningCoordinator extends EventEmitter {
       [GoalType.REACH_LOCATION]: 'spatial',
       [GoalType.ACQUIRE_ITEM]: 'logical',
       [GoalType.SURVIVE_THREAT]: 'safety',
+      [GoalType.RESOURCE_GATHERING]: 'logical',
     };
     return mapping[goalType] || 'general';
   }

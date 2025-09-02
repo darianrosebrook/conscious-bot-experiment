@@ -607,6 +607,7 @@ export class DigBlockLeaf implements LeafImpl {
           },
         },
         toolUsed: { type: 'string' },
+        itemsCollected: { type: 'number' },
       },
     },
     timeoutMs: 10000,
@@ -732,12 +733,24 @@ export class DigBlockLeaf implements LeafImpl {
       // Dig the block
       await bot.dig(block);
 
+      // Wait for the block to break and collect items
+      // Mineflayer automatically collects items when digging, but we should wait for completion
+      const startInventory = bot.inventory.items().length;
+
+      // Wait a bit for items to be collected
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+
+      // Check if items were collected
+      const endInventory = bot.inventory.items().length;
+      const itemsCollected = endInventory - startInventory;
+
       const endTime = ctx.now();
       const duration = endTime - startTime;
 
       // Emit metrics
       ctx.emitMetric('dig_block_duration', duration);
       ctx.emitMetric('dig_block_type_hash', block.name.length); // Use hash of name instead of string
+      ctx.emitMetric('items_collected', itemsCollected);
 
       return {
         status: 'success',
@@ -750,6 +763,7 @@ export class DigBlockLeaf implements LeafImpl {
             z: targetPos.z,
           },
           toolUsed,
+          itemsCollected,
         },
         metrics: {
           durationMs: duration,
@@ -904,7 +918,12 @@ export class PlaceBlockLeaf implements LeafImpl {
         for (const c of candidates) {
           const here = bot.blockAt(c);
           const below = bot.blockAt(c.offset(0, -1, 0));
-          if (here && here.name === 'air' && below && below.boundingBox === 'block') {
+          if (
+            here &&
+            here.name === 'air' &&
+            below &&
+            below.boundingBox === 'block'
+          ) {
             placementPos = c;
             break;
           }

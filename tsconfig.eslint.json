@@ -1,9 +1,12 @@
 {
   "extends": "./tsconfig.json",
   "include": [
-    "packages/**/*.{ts,tsx}",
-    "packages/**/__tests__/**/*.{ts,tsx}",
-    "packages/**/*.test.{ts,tsx}"
+    "packages/*/src/**/*.ts",
+    "packages/*/src/**/*.tsx",
+    "packages/*/src/**/*.test.ts",
+    "packages/*/src/**/*.test.tsx",
+    "packages/*/__tests__/**/*.ts",
+    "packages/*/__tests__/**/*.tsx"
   ]
 }
 

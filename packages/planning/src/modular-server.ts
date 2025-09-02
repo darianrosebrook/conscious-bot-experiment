@@ -77,6 +77,45 @@ worldStateManager.on('updated', (snapshot) => {
   }
 });
 
+// simple low-discrepancy sampler for exploration (deterministic per tick)
+function halton(index: number, base: number) {
+  let f = 1,
+    r = 0;
+  while (index > 0) {
+    f = f / base;
+    r = r + f * (index % base);
+    index = Math.floor(index / base);
+  }
+  return r;
+}
+
+function explorePointNear(
+  pos: { x: number; y: number; z: number } | undefined,
+  attempt: number,
+  baseRadius = 8
+) {
+  if (!pos) return undefined;
+  const radius = baseRadius + Math.min(32, attempt * 6);
+  const dx = Math.floor((halton(attempt + 1, 2) - 0.5) * 2 * radius);
+  const dz = Math.floor((halton(attempt + 1, 3) - 0.5) * 2 * radius);
+  return { x: pos.x + dx, y: pos.y, z: pos.z + dz };
+}
+
+function resolvedRecipe(task: any) {
+  return (
+    task.parameters?.recipe ||
+    inferRecipeFromTitle(task.title) ||
+    (/pickaxe/i.test(task.title || '') ? 'wooden_pickaxe' : undefined)
+  );
+}
+function resolvedBlock(task: any) {
+  return (
+    task.parameters?.blockType ||
+    inferBlockTypeFromTitle(task.title) ||
+    (/iron/i.test(task.title || '') ? 'iron_ore' : 'oak_log')
+  );
+}
+
 // Known leaf names (shared across services)
 const KNOWN_LEAF_NAMES = new Set([
   'move_to',
@@ -100,13 +139,23 @@ const KNOWN_LEAF_NAMES = new Set([
  * Query MCP for available minecraft leaves/tools
  */
 async function getAvailableLeaves(): Promise<Set<string>> {
+  const now = Date.now();
+  const ttl = 10_000;
+  if (
+    (getAvailableLeaves as any).__cache &&
+    now - (getAvailableLeaves as any).__ts < ttl
+  ) {
+    return new Set((getAvailableLeaves as any).__cache);
+  }
   try {
     const mcp = serverConfig.getMCPIntegration();
     if (!mcp) return new Set();
     const tools = await mcp.listTools();
     const leaves = tools
-      .filter((t) => t.startsWith('minecraft.'))
-      .map((t) => t.replace(/^minecraft\./, ''));
+      .filter((t: string) => t.startsWith('minecraft.'))
+      .map((t: string) => t.replace(/^minecraft\./, ''));
+    (getAvailableLeaves as any).__cache = leaves;
+    (getAvailableLeaves as any).__ts = now;
     return new Set(leaves);
   } catch {
     return new Set();
@@ -117,7 +166,14 @@ async function getAvailableLeaves(): Promise<Set<string>> {
 declare global {
   // Reentrancy guard state for the autonomous executor
   // eslint-disable-next-line no-var
-  var __planningExecutorState: { running: boolean } | undefined;
+  var __planningExecutorState:
+    | {
+        running: boolean;
+        failures: number;
+        lastAttempt: number;
+        breaker: 'closed' | 'open' | 'half-open';
+      }
+    | undefined;
   // Interval handle for executor loop
   // eslint-disable-next-line no-var
   var __planningInterval: NodeJS.Timeout | undefined;
@@ -126,14 +182,33 @@ declare global {
   var __planningInitialKick: NodeJS.Timeout | undefined;
 }
 
+const EXECUTOR_POLL_MS = Number(process.env.EXECUTOR_POLL_MS || 10_000);
+const EXECUTOR_MAX_BACKOFF_MS = Number(
+  process.env.EXECUTOR_MAX_BACKOFF_MS || 60_000
+);
+const BOT_BREAKER_OPEN_MS = Number(process.env.BOT_BREAKER_OPEN_MS || 15_000);
+
 // Initialize tool executor that connects to Minecraft interface
 // If MCP_ONLY env var is set ("true"), skip direct /action fallback in favor of MCP tools
 const MCP_ONLY = String(process.env.MCP_ONLY || '').toLowerCase() === 'true';
 
 const toolExecutor = {
-  async execute(tool: string, args: Record<string, any>) {
+  async execute(tool: string, args: Record<string, any>, signal?: AbortSignal) {
+    if (!tool.startsWith('minecraft.')) {
+      return {
+        ok: false,
+        data: null,
+        environmentDeltas: {},
+        error: 'Unsupported tool namespace',
+        confidence: 0,
+        cost: 1,
+        duration: 0,
+        metadata: { reason: 'unsupported_namespace' },
+      };
+    }
     console.log(`Executing tool: ${tool} with args:`, args);
 
+    const startTime = Date.now();
     try {
       // Map BT actions to Minecraft actions
       const mappedAction = mapBTActionToMinecraft(tool, args);
@@ -144,6 +219,10 @@ const toolExecutor = {
           data: null,
           environmentDeltas: {},
           error: 'No mapped action',
+          confidence: 0,
+          cost: 1,
+          duration: Date.now() - startTime,
+          metadata: { reason: 'no_mapped_action' },
         };
       }
 
@@ -157,18 +236,44 @@ const toolExecutor = {
           data: null,
           environmentDeltas: {},
           error: 'Direct action disabled (MCP_ONLY) — use MCP option execution',
+          confidence: 0,
+          cost: 1,
+          duration: Date.now() - startTime,
+          metadata: { reason: 'mcp_only_disabled' },
         };
       }
 
       // Use the bot connection check for Minecraft actions
-      return await executeActionWithBotCheck(mappedAction);
+      const result = await executeActionWithBotCheck(mappedAction, signal);
+      const duration = Date.now() - startTime;
+
+      // Enhance result with metrics
+      return {
+        ...result,
+        confidence: result.ok ? 0.8 : 0.2, // Basic confidence based on success
+        cost: 1, // Base cost for all actions
+        duration,
+        metadata: {
+          tool,
+          args,
+          mappedAction: mappedAction.type,
+        },
+      };
     } catch (error) {
+      const duration = Date.now() - startTime;
       console.error(`Tool execution failed for ${tool}:`, error);
       return {
         ok: false,
         data: null,
         environmentDeltas: {},
         error: error instanceof Error ? error.message : 'Unknown error',
+        confidence: 0,
+        cost: 1,
+        duration,
+        metadata: {
+          reason: 'execution_error',
+          error: error instanceof Error ? error.message : 'Unknown error',
+        },
       };
     }
   },
@@ -192,7 +297,7 @@ const toolExecutor = {
 /**
  * Execute action with bot connection check
  */
-async function executeActionWithBotCheck(action: any) {
+async function executeActionWithBotCheck(action: any, signal?: AbortSignal) {
   try {
     if (!action) {
       return {
@@ -289,7 +394,9 @@ async function introspectRecipe(output: string): Promise<{
         inputs: Array.isArray(payload?.inputs) ? payload.inputs : [],
       };
     }
-  } catch {}
+  } catch (e) {
+    console.error('[Introspect Recipe] Failed to introspect recipe:', e);
+  }
   return null;
 }
 
@@ -472,6 +579,48 @@ async function injectPrerequisiteTasksForMineIron(task: any): Promise<boolean> {
 // requirement helpers imported from modules/requirements
 
 /**
+ * DRY progress recompute and gated completion helper
+ */
+async function recomputeProgressAndMaybeComplete(task: any) {
+  try {
+    const requirement = resolveRequirement(task);
+    if (!requirement) return;
+    const inv = await fetchInventorySnapshot();
+    const p = computeProgressFromInventory(inv, requirement);
+    const clamped = Math.max(0, Math.min(1, p));
+    const snapshot = computeRequirementSnapshot(inv, requirement);
+    enhancedTaskIntegration.updateTaskMetadata(task.id, {
+      requirement: snapshot,
+    });
+    const status = task.status === 'pending' ? 'active' : task.status;
+    enhancedTaskIntegration.updateTaskProgress(task.id, clamped, status);
+    // Crafting may finish all materials but not produce output; gate finalization.
+    let canComplete = clamped >= 1;
+    if (canComplete && (requirement as any)?.kind === 'craft') {
+      const hasOutput = inv.some((it) =>
+        itemMatches(it, [(requirement as any).outputPattern])
+      );
+      if (!hasOutput) canComplete = false;
+    }
+    if (!task.steps || !Array.isArray(task.steps)) {
+      if (canComplete) {
+        enhancedTaskIntegration.updateTaskProgress(task.id, 1, 'completed');
+      }
+      return;
+    }
+    const currentStep = task.steps.find((s: any) => !s.done);
+    if (currentStep)
+      await enhancedTaskIntegration.completeTaskStep(task.id, currentStep.id);
+    const allStepsComplete = task.steps.every((s: any) => s.done);
+    if (canComplete && allStepsComplete) {
+      enhancedTaskIntegration.updateTaskProgress(task.id, 1, 'completed');
+    }
+  } catch (e) {
+    console.warn('Progress recompute failed:', e);
+  }
+}
+
+/**
  * Wait for bot connection by polling health until timeout
  */
 // connection helpers imported from modules/mc-client
@@ -497,19 +646,7 @@ async function checkCraftingTablePrerequisite(task: any): Promise<boolean> {
     console.log(`🔍 Checking crafting table prerequisite for: ${task.title}`);
 
     // Check if we have a crafting table in inventory
-    const response = await fetch('http://localhost:3005/inventory', {
-      method: 'GET',
-      headers: { 'Content-Type': 'application/json' },
-      signal: AbortSignal.timeout(5000),
-    });
-
-    if (!response.ok) {
-      console.warn('Failed to check inventory for crafting table');
-      return false;
-    }
-
-    const data = (await response.json()) as any;
-    const inventory = data.data || [];
+    const inventory = await fetchInventorySnapshot();
 
     const hasCraftingTable = inventory.some((item: any) =>
       item.type?.toLowerCase().includes('crafting_table')
@@ -678,19 +815,7 @@ async function generateComplexCraftingSubtasks(task: any): Promise<void> {
       console.log(`🔧 Generating complex crafting subtasks for: ${task.title}`);
 
       // Check current inventory for required materials
-      const response = await fetch('http://localhost:3005/inventory', {
-        method: 'GET',
-        headers: { 'Content-Type': 'application/json' },
-        signal: AbortSignal.timeout(5000),
-      });
-
-      if (!response.ok) {
-        console.warn('Failed to check inventory for complex crafting');
-        return;
-      }
-
-      const data = (await response.json()) as any;
-      const inventory = data.data || [];
+      const inventory = await fetchInventorySnapshot();
 
       // Create subtasks based on what's needed
       const subtasks = [];
@@ -875,6 +1000,19 @@ async function generateComplexCraftingSubtasks(task: any): Promise<void> {
  */
 async function autonomousTaskExecutor() {
   try {
+    // singleton guard
+    if (!global.__planningExecutorState) {
+      global.__planningExecutorState = {
+        running: false,
+        failures: 0,
+        lastAttempt: 0,
+        breaker: 'closed',
+      };
+    }
+    if (global.__planningExecutorState.running) return;
+    global.__planningExecutorState.running = true;
+    const startTs = Date.now();
+
     logOptimizer.log(
       '🤖 Running autonomous task executor...',
       'autonomous-executor-running'
@@ -912,11 +1050,23 @@ async function autonomousTaskExecutor() {
       taskKey
     );
 
-    // Check if bot is connected and can perform actions
+    // Circuit breaker around bot health
     const botConnected = await checkBotConnection();
     if (!botConnected) {
-      console.log('⚠️ Bot not connected - cannot execute real actions');
+      const st = global.__planningExecutorState;
+      if (st.breaker === 'closed') {
+        st.breaker = 'open';
+        console.warn('⛔ Bot unavailable — opening circuit');
+      }
+      // schedule half-open probe next tick
       return;
+    } else {
+      const st = global.__planningExecutorState;
+      if (st.breaker !== 'closed') {
+        console.log('✅ Bot reachable — closing circuit');
+        st.breaker = 'closed';
+        st.failures = 0;
+      }
     }
 
     // Check crafting table prerequisite for crafting tasks
@@ -949,6 +1099,23 @@ async function autonomousTaskExecutor() {
     );
 
     // Map task types to MCP options
+    const leafMapping: Record<string, string> = {
+      gathering: 'gather_wood@1',
+      crafting: 'craft_wooden_pickaxe@1',
+      exploration: 'explore_move@1',
+      mine: 'gather_wood@1', // Mining falls back to gathering
+      movement: 'explore_move@1', // Movement tasks use exploration
+      build: 'craft_wooden_pickaxe@1', // Building requires tools
+      combat: 'sense_hostiles@1.0.0', // Combat uses hostile detection
+      building: 'craft_wooden_pickaxe@1', // Building tasks
+      survival: 'survival_check@1', // Survival tasks use survival check
+      investigation: 'survival_check@1', // Investigation uses survival check
+      health: 'health_monitor@1', // Health tasks use health monitor
+      resource: 'gather_wood@1', // Resource tasks use gathering
+      tool: 'craft_wooden_pickaxe@1', // Tool tasks use crafting
+      search: 'explore_move@1', // Search tasks use exploration
+    };
+
     const taskTypeMapping: Record<string, string[]> = {
       gathering: ['chop', 'tree', 'wood', 'collect', 'gather'],
       gather: ['chop', 'tree', 'wood', 'collect', 'gather'],
@@ -965,14 +1132,26 @@ async function autonomousTaskExecutor() {
       navigation: ['move', 'navigate', 'travel'],
     };
 
-    const searchTerms = taskTypeMapping[currentTask.type] || [currentTask.type];
-    const suitableOption = mcpOptions.find((option) =>
-      searchTerms.some(
+    // Try to find a suitable MCP option based on task type
+    const suitableOption = mcpOptions.find((option) => {
+      // First try exact match with leafMapping
+      if (
+        leafMapping[currentTask.type] &&
+        option.id === leafMapping[currentTask.type]
+      ) {
+        return true;
+      }
+
+      // Fallback to name/description matching
+      const searchTerms = taskTypeMapping[currentTask.type] || [
+        currentTask.type,
+      ];
+      return searchTerms.some(
         (term) =>
           option.name?.toLowerCase().includes(term) ||
           option.description?.toLowerCase().includes(term)
-      )
-    );
+      );
+    });
 
     // Inventory-based progress estimation before attempting execution
     try {
@@ -1023,22 +1202,22 @@ async function autonomousTaskExecutor() {
       console.warn('Inventory progress estimation failed:', e);
     }
 
+    // Execute MCP option if found (temporarily disabled due to crash)
+    if (suitableOption) {
+      console.log(
+        `🎯 Found MCP option: ${suitableOption.name} (${suitableOption.id}) - execution temporarily disabled`
+      );
+      // TODO: Re-enable MCP execution after fixing the crash
+    }
+
     // If no BT option found, try to use individual leaves directly
     if (!suitableOption) {
       // Map task types to individual leaves
-      const inferredRecipe = inferRecipeFromTitle(currentTask.title);
-      const inferredBlock = inferBlockTypeFromTitle(currentTask.title);
+      const inferredRecipe = resolvedRecipe(currentTask);
+      const inferredBlock = resolvedBlock(currentTask);
       const botPos = await getBotPosition();
-      // Expand search radius with retries to emulate a simple flood-fill
       const attempt = currentTask.metadata?.retryCount || 0;
-      const radius = 8 + Math.min(32, attempt * 6);
-      const randomExplore = botPos
-        ? {
-            x: botPos.x + Math.floor(Math.random() * (radius * 2) - radius),
-            y: botPos.y,
-            z: botPos.z + Math.floor(Math.random() * (radius * 2) - radius),
-          }
-        : undefined;
+      const randomExplore = explorePointNear(botPos as any, attempt, 8);
       const leafMapping: Record<string, { leafName: string; args: any }> = {
         general: {
           // Default to exploration step so we keep moving when unsure
@@ -1268,7 +1447,9 @@ async function autonomousTaskExecutor() {
             selectedLeaf.leafName,
             selectedLeaf.args
           );
-        } catch {}
+        } catch (e) {
+          console.error('[MCP] Failed to annotate current step with leaf:', e);
+        }
 
         // Execute the leaf via the Minecraft Interface action API
         const actionTool = `minecraft.${selectedLeaf.leafName}`;
@@ -1282,23 +1463,7 @@ async function autonomousTaskExecutor() {
             `✅ Leaf executed successfully: ${selectedLeaf.leafName}`
           );
 
-          // After execution, recompute inventory-based progress and gate completion
-          try {
-            const requirement = resolveRequirement(currentTask);
-            if (requirement) {
-              const inv = await fetchInventorySnapshot();
-              const p = computeProgressFromInventory(inv, requirement);
-              enhancedTaskIntegration.updateTaskProgress(
-                currentTask.id,
-                Math.max(0, Math.min(1, p)),
-                'active'
-              );
-            }
-          } catch (e) {
-            console.warn('Inventory progress estimation failed:', e);
-          }
-
-          // Post-check inventory for crafting outcomes
+          // Post-check: if crafting pickaxe reported success but no pickaxe, inject acquisition step
           if (
             selectedLeaf.leafName === 'craft_recipe' &&
             /pickaxe/i.test(currentTask.title || '')
@@ -1306,63 +1471,13 @@ async function autonomousTaskExecutor() {
             const postInv = await fetchInventorySnapshot();
             if (!hasPickaxe(postInv)) {
               console.warn(
-                '⚠️ Crafting (leaf) reported success but pickaxe not found. Planning next acquisition step.'
+                '⚠️ Craft reported success but pickaxe not found; planning next acquisition step.'
               );
               const injected = await injectDynamicPrereqForCraft(currentTask);
               if (injected) return;
             }
           }
-
-          // Complete the current step instead of artificially incrementing progress
-          if (currentTask.steps && Array.isArray(currentTask.steps)) {
-            const currentStep = currentTask.steps.find(
-              (step: any) => !step.done
-            );
-            if (currentStep) {
-              await enhancedTaskIntegration.completeTaskStep(
-                currentTask.id,
-                currentStep.id
-              );
-              console.log(`✅ Completed step: ${currentStep.label}`);
-            }
-
-            // Check if all steps are complete
-            const allStepsComplete = currentTask.steps.every(
-              (step: any) => step.done
-            );
-            // Only mark as completed if inventory requirement satisfied
-            let canComplete = allStepsComplete;
-            try {
-              const requirement = resolveRequirement(currentTask);
-              if (requirement) {
-                const inv = await fetchInventorySnapshot();
-                const p = computeProgressFromInventory(inv, requirement);
-                const snapshot = computeRequirementSnapshot(inv, requirement);
-                enhancedTaskIntegration.updateTaskMetadata(currentTask.id, {
-                  requirement: snapshot,
-                });
-                canComplete = p >= 1;
-              }
-            } catch (e) {
-              console.warn('Inventory progress estimation failed:', e);
-            }
-            if (canComplete) {
-              enhancedTaskIntegration.updateTaskProgress(
-                currentTask.id,
-                1.0,
-                'completed'
-              );
-              console.log(`🎉 Task completed: ${currentTask.title}`);
-            }
-          } else {
-            // If no steps defined, mark task as completed directly
-            enhancedTaskIntegration.updateTaskProgress(
-              currentTask.id,
-              1.0,
-              'completed'
-            );
-            console.log(`🎉 Task completed (no steps): ${currentTask.title}`);
-          }
+          await recomputeProgressAndMaybeComplete(currentTask);
 
           return; // Exit early since we successfully executed the leaf
         }
@@ -1500,19 +1615,11 @@ async function autonomousTaskExecutor() {
 
       // Execute the MCP option using inferred/explicit parameters
       const desiredRecipe =
-        currentTask.parameters?.recipe ||
-        inferRecipeFromTitle(currentTask.title) ||
-        (currentTask.title.toLowerCase().includes('pickaxe')
-          ? 'wooden_pickaxe'
-          : currentTask.title.toLowerCase().includes('crafting_table')
-            ? 'crafting_table'
-            : undefined);
-      const desiredBlock =
-        currentTask.parameters?.blockType ||
-        inferBlockTypeFromTitle(currentTask.title) ||
-        (currentTask.title.toLowerCase().includes('iron')
-          ? 'iron_ore'
-          : 'oak_log');
+        resolvedRecipe(currentTask) ??
+        (/(crafting[_ ]table)/i.test(currentTask.title || '')
+          ? 'crafting_table'
+          : undefined);
+      const desiredBlock = resolvedBlock(currentTask);
 
       // Annotate step with MCP option and resolved parameters
       try {
@@ -1526,7 +1633,9 @@ async function autonomousTaskExecutor() {
             pos: currentTask.parameters?.pos,
           }
         );
-      } catch {}
+      } catch (e) {
+        console.error('[MCP] Failed to annotate current step with option:', e);
+      }
 
       const mcpResult = await serverConfig
         .getMCPIntegration()
@@ -1542,7 +1651,6 @@ async function autonomousTaskExecutor() {
           `✅ MCP option executed successfully: ${suitableOption.name}`
         );
 
-        // Post-check inventory for crafting outcomes
         if (
           currentTask.type === 'crafting' &&
           /pickaxe/i.test(currentTask.title || '')
@@ -1550,99 +1658,13 @@ async function autonomousTaskExecutor() {
           const postInv = await fetchInventorySnapshot();
           if (!hasPickaxe(postInv)) {
             console.warn(
-              '⚠️ Crafting reported success but pickaxe not found in inventory. Planning next acquisition step.'
+              '⚠️ Craft reported success but pickaxe not found; planning next acquisition step.'
             );
             const injected = await injectDynamicPrereqForCraft(currentTask);
-            if (injected) return; // allow newly injected tasks to run first
+            if (injected) return;
           }
         }
-
-        // After execution, recompute inventory-based progress and gate completion
-        try {
-          const requirement = resolveRequirement(currentTask);
-          if (requirement) {
-            const inv = await fetchInventorySnapshot();
-            const p = computeProgressFromInventory(inv, requirement);
-            enhancedTaskIntegration.updateTaskProgress(
-              currentTask.id,
-              Math.max(0, Math.min(1, p)),
-              'active'
-            );
-            const snapshot = computeRequirementSnapshot(inv, requirement);
-            enhancedTaskIntegration.updateTaskMetadata(currentTask.id, {
-              requirement: snapshot,
-            });
-          }
-        } catch (e) {
-          console.warn('Inventory progress estimation failed:', e);
-        }
-
-        // Complete the current step instead of artificially incrementing progress
-        if (currentTask.steps && Array.isArray(currentTask.steps)) {
-          const currentStep = currentTask.steps.find((step: any) => !step.done);
-          if (currentStep) {
-            await enhancedTaskIntegration.completeTaskStep(
-              currentTask.id,
-              currentStep.id
-            );
-            console.log(`✅ Completed step: ${currentStep.label}`);
-          }
-
-          // Check if all steps are complete
-          const allStepsComplete = currentTask.steps.every(
-            (step: any) => step.done
-          );
-          // Only mark as completed if inventory requirement satisfied
-          let canComplete = allStepsComplete;
-          try {
-            const requirement = resolveRequirement(currentTask);
-            if (requirement) {
-              const inv = await fetchInventorySnapshot();
-              const p = computeProgressFromInventory(inv, requirement);
-              const snapshot = computeRequirementSnapshot(inv, requirement);
-              enhancedTaskIntegration.updateTaskMetadata(currentTask.id, {
-                requirement: snapshot,
-              });
-              canComplete = p >= 1;
-            }
-          } catch (e) {
-            console.warn('Inventory progress estimation failed:', e);
-          }
-          if (canComplete) {
-            enhancedTaskIntegration.updateTaskProgress(
-              currentTask.id,
-              1.0,
-              'completed'
-            );
-            console.log(`🎉 Task completed: ${currentTask.title}`);
-          }
-        } else {
-          // If no steps defined, mark task as completed directly
-          // Only complete if inventory requirement satisfied
-          let canComplete = true;
-          try {
-            const requirement = resolveRequirement(currentTask);
-            if (requirement) {
-              const inv = await fetchInventorySnapshot();
-              const p = computeProgressFromInventory(inv, requirement);
-              const snapshot = computeRequirementSnapshot(inv, requirement);
-              enhancedTaskIntegration.updateTaskMetadata(currentTask.id, {
-                requirement: snapshot,
-              });
-              canComplete = p >= 1;
-            }
-          } catch (e) {
-            console.warn('Inventory progress estimation failed:', e);
-          }
-          if (canComplete) {
-            enhancedTaskIntegration.updateTaskProgress(
-              currentTask.id,
-              1.0,
-              'completed'
-            );
-            console.log(`🎉 Task completed (no steps): ${currentTask.title}`);
-          }
-        }
+        await recomputeProgressAndMaybeComplete(currentTask);
       } else {
         console.error(
           `❌ MCP option execution failed: ${suitableOption.name} ${mcpResult?.error}`
@@ -1730,40 +1752,7 @@ async function autonomousTaskExecutor() {
           if (actionResult.ok) {
             console.log(`✅ Task executed successfully: ${currentTask.title}`);
 
-            // Complete the current step since we actually did the work
-            if (currentTask.steps && Array.isArray(currentTask.steps)) {
-              const currentStep = currentTask.steps.find(
-                (step: any) => !step.done
-              );
-              if (currentStep) {
-                await enhancedTaskIntegration.completeTaskStep(
-                  currentTask.id,
-                  currentStep.id
-                );
-                console.log(`✅ Completed step: ${currentStep.label}`);
-              }
-
-              // Check if all steps are complete
-              const allStepsComplete = currentTask.steps.every(
-                (step: any) => step.done
-              );
-              if (allStepsComplete) {
-                enhancedTaskIntegration.updateTaskProgress(
-                  currentTask.id,
-                  1.0,
-                  'completed'
-                );
-                console.log(`🎉 Task completed: ${currentTask.title}`);
-              }
-            } else {
-              // If no steps defined, mark task as completed directly
-              enhancedTaskIntegration.updateTaskProgress(
-                currentTask.id,
-                1.0,
-                'completed'
-              );
-              console.log(`🎉 Task completed (no steps): ${currentTask.title}`);
-            }
+            await recomputeProgressAndMaybeComplete(currentTask);
           } else {
             console.error(
               `❌ Task execution failed: ${currentTask.title}`,
@@ -1816,6 +1805,11 @@ async function autonomousTaskExecutor() {
     }
   } catch (error) {
     console.error('Autonomous task executor failed:', error);
+  } finally {
+    if (global.__planningExecutorState) {
+      global.__planningExecutorState.running = false;
+      global.__planningExecutorState.lastAttempt = Date.now();
+    }
   }
 }
 
@@ -1834,6 +1828,21 @@ const cognitiveThoughtProcessor = new CognitiveThoughtProcessor({
   maxThoughtsPerBatch: 5,
   planningEndpoint: 'http://localhost:3002',
   cognitiveEndpoint: 'http://localhost:3003',
+});
+
+// Connect cognitive thought processor to world state
+worldStateManager.on('updated', (snapshot) => {
+  try {
+    // Update cognitive processor with world state
+    if (cognitiveThoughtProcessor.updateWorldState) {
+      cognitiveThoughtProcessor.updateWorldState(snapshot);
+    }
+  } catch (e) {
+    console.warn(
+      'Cognitive processor world state update failed:',
+      (e as any)?.message
+    );
+  }
 });
 
 const integratedPlanningCoordinator = new IntegratedPlanningCoordinator({
@@ -2049,6 +2058,9 @@ async function startServer() {
     // Initialize MCP integration with the registry
     try {
       await serverConfig.initializeMCP(undefined, registry);
+      // invalidate leaf cache
+      (getAvailableLeaves as any).__cache = undefined;
+      (getAvailableLeaves as any).__ts = 0;
       console.log('✅ MCP integration initialized successfully');
     } catch (error) {
       console.warn(
@@ -2177,6 +2189,15 @@ async function startServer() {
     const { createMCPEndpoints } = await import('./modules/mcp-endpoints');
     const mcpIntegration = serverConfig.getMCPIntegration();
     if (mcpIntegration) {
+      // Expose btRunner to MCP integration so it can execute options locally
+      try {
+        (mcpIntegration as any).btRunner = btRunner;
+      } catch (e) {
+        console.error(
+          '[MCP] Failed to connect MCP integration to behavior tree runner:',
+          e
+        );
+      }
       const mcpRouter = createMCPEndpoints(mcpIntegration);
       serverConfig.mountRouter('/mcp', mcpRouter);
 
@@ -2191,13 +2212,34 @@ async function startServer() {
             name: 'gather_wood',
             description: 'Gather wood by digging oak_log and picking up drops',
             btDefinition: {
+              id: 'gather_wood@1',
+              name: 'Gather Wood',
+              description: 'Gather wood logs from nearby trees',
+              metadata: {
+                timeout: 30000,
+                retries: 3,
+                category: 'gathering',
+              },
               root: {
                 type: 'sequence',
+                name: 'gather_wood_sequence',
                 children: [
                   {
                     type: 'action',
+                    name: 'find_wood_blocks',
                     action: 'dig_block',
-                    args: { blockType: 'oak_log' },
+                    args: {
+                      blockType: 'log', // Use generic 'log' to find any wood type
+                      tool: 'axe',
+                    },
+                  },
+                  {
+                    type: 'action',
+                    name: 'collect_wood_items',
+                    action: 'wait',
+                    args: {
+                      duration: 2000, // Wait for items to drop
+                    },
                   },
                 ],
               },
@@ -2208,15 +2250,25 @@ async function startServer() {
             name: 'craft_wooden_pickaxe',
             description: 'Craft a wooden pickaxe from available materials',
             btDefinition: {
+              id: 'craft_wooden_pickaxe@1',
+              name: 'Craft Wooden Pickaxe',
+              description: 'Craft a wooden pickaxe from available materials',
               root: {
                 type: 'sequence',
                 children: [
                   {
                     type: 'action',
+                    name: 'craft_pickaxe',
                     action: 'craft_recipe',
                     args: { recipe: 'wooden_pickaxe', qty: 1 },
                   },
                 ],
+              },
+              metadata: {
+                timeout: 45000,
+                retries: 2,
+                priority: 'medium',
+                interruptible: true,
               },
             },
           },
@@ -2225,9 +2277,26 @@ async function startServer() {
             name: 'explore_move',
             description: 'Explore by moving to a target or random nearby point',
             btDefinition: {
+              id: 'explore_move@1',
+              name: 'Explore and Move',
+              description:
+                'Explore by moving to a target or random nearby point',
               root: {
                 type: 'sequence',
-                children: [{ type: 'action', action: 'move_to', args: {} }],
+                children: [
+                  {
+                    type: 'action',
+                    name: 'move_to_target',
+                    action: 'move_to',
+                    args: {},
+                  },
+                ],
+              },
+              metadata: {
+                timeout: 30000,
+                retries: 2,
+                priority: 'medium',
+                interruptible: true,
               },
             },
           },
@@ -2241,13 +2310,10 @@ async function startServer() {
 
               // Also register the option with the behavior tree runner
               try {
-                if ((mcpIntegration as any).btRunner) {
-                  console.log(
-                    `🔗 Adding MCP option ${opt.name} to behavior tree runner`
-                  );
-                  // Store the inline behavior tree definition in the behavior tree runner
-                  (mcpIntegration as any).btRunner.storeInlineDefinition(opt.id, opt.btDefinition);
-                }
+                console.log(
+                  `🔗 Adding MCP option ${opt.name} to behavior tree runner`
+                );
+                btRunner.storeInlineDefinition(opt.id, opt.btDefinition);
               } catch (btError) {
                 console.warn(
                   `⚠️ Failed to connect option ${opt.name} to behavior tree runner:`,
@@ -2299,14 +2365,35 @@ async function startServer() {
     // Start the server
     await serverConfig.start();
 
-    // Start autonomous task executor
-    setInterval(async () => {
+    // Start autonomous task executor (singleton; supports hot-reload)
+    if (global.__planningInterval) clearInterval(global.__planningInterval);
+    global.__planningInterval = setInterval(async () => {
       try {
-        await autonomousTaskExecutor();
+        const st = global.__planningExecutorState!;
+        // exponential backoff while breaker is open
+        if (st?.breaker === 'open') {
+          const elapsed = Date.now() - (st.lastAttempt || 0);
+          if (elapsed < BOT_BREAKER_OPEN_MS) return;
+          st.breaker = 'half-open';
+        }
+        try {
+          await autonomousTaskExecutor();
+        } catch (error) {
+          const s = global.__planningExecutorState!;
+          s.failures = Math.min(s.failures + 1, 100);
+          const backoff = Math.min(
+            2 ** s.failures * 250,
+            EXECUTOR_MAX_BACKOFF_MS
+          );
+          console.warn(
+            `Autonomous executor error (${s.failures}); backoff ${backoff}ms`
+          );
+          await new Promise((r) => setTimeout(r, backoff));
+        }
       } catch (error) {
-        console.warn('Autonomous task executor error (non-fatal):', error);
+        console.error('[MCP] Failed to start autonomous task executor:', error);
       }
-    }, 10000);
+    }, EXECUTOR_POLL_MS);
 
     // Start cognitive thought processor
     try {

@@ -3,6 +3,7 @@
  *
  * Implements sensing-related leaves including hostile detection, chat, and waiting
  * with proper error handling, timeouts, and Mineflayer integration.
+ * Enhanced with skill composition capabilities for Voyager-inspired autonomous learning.
  *
  * @author @darianrosebrook
  */
@@ -17,6 +18,24 @@ import {
 } from '@conscious-bot/core';
 
 // ============================================================================
+// Enhanced Leaf Spec with Composition Support
+// ============================================================================
+
+/**
+ * Extended leaf spec that supports skill composition
+ */
+export interface ComposableLeafSpec extends LeafSpec {
+  composition: {
+    inputTypes: string[]; // What this leaf needs from environment/other skills
+    outputTypes: string[]; // What this leaf produces for other skills
+    combinableWith: string[]; // Other leaf types this can combine with
+    complexity: number; // Difficulty level (1-10)
+    prerequisites: string[]; // Required conditions or skills
+    sideEffects: string[]; // Environmental changes this leaf causes
+  };
+}
+
+// ============================================================================
 // Sense Hostiles Leaf
 // ============================================================================
 
@@ -24,7 +43,7 @@ import {
  * Sense hostile entities within a specified radius
  */
 export class SenseHostilesLeaf implements LeafImpl {
-  spec: LeafSpec = {
+  spec: ComposableLeafSpec = {
     name: 'sense_hostiles',
     version: '1.0.0',
     description: 'Detect hostile entities within a specified radius',
@@ -73,7 +92,15 @@ export class SenseHostilesLeaf implements LeafImpl {
     },
     timeoutMs: 2000,
     retries: 0,
-    permissions: ['sense'], // Use sense permission instead of chat
+    permissions: ['sense'],
+    composition: {
+      inputTypes: ['world_state', 'bot_position', 'entity_data'],
+      outputTypes: ['threat_assessment', 'entity_locations', 'safety_status'],
+      combinableWith: ['movement_leaves', 'combat_leaves', 'navigation_leaves'],
+      complexity: 3,
+      prerequisites: ['bot_spawned', 'world_loaded'],
+      sideEffects: ['none'],
+    },
   };
 
   async run(ctx: LeafContext, args: any): Promise<LeafResult> {
@@ -241,7 +268,7 @@ export class SenseHostilesLeaf implements LeafImpl {
  * Send a chat message
  */
 export class ChatLeaf implements LeafImpl {
-  spec: LeafSpec = {
+  spec: ComposableLeafSpec = {
     name: 'chat',
     version: '1.0.0',
     description: 'Send a chat message',
@@ -271,6 +298,14 @@ export class ChatLeaf implements LeafImpl {
     timeoutMs: 1000,
     retries: 0,
     permissions: ['chat'],
+    composition: {
+      inputTypes: ['message_content', 'target_player', 'chat_permission'],
+      outputTypes: ['communication_result', 'social_interaction'],
+      combinableWith: ['sensing_leaves', 'interaction_leaves'],
+      complexity: 1,
+      prerequisites: ['chat_enabled', 'bot_authenticated'],
+      sideEffects: ['chat_message_sent'],
+    },
   };
 
   async run(ctx: LeafContext, args: any): Promise<LeafResult> {
@@ -352,7 +387,7 @@ export class ChatLeaf implements LeafImpl {
  * Wait for a specified duration
  */
 export class WaitLeaf implements LeafImpl {
-  spec: LeafSpec = {
+  spec: ComposableLeafSpec = {
     name: 'wait',
     version: '1.0.0',
     description: 'Wait for a specified duration (abortable)',
@@ -376,12 +411,20 @@ export class WaitLeaf implements LeafImpl {
       properties: {
         success: { type: 'boolean' },
         waitedMs: { type: 'number' },
-        aborted: { type: 'boolean' },
+        aborted: { type: 'number' },
       },
     },
     timeoutMs: 300000, // 5 minutes
     retries: 0,
-    permissions: ['sense'], // Use sense permission instead of chat
+    permissions: ['sense'],
+    composition: {
+      inputTypes: ['time_duration', 'abort_signal'],
+      outputTypes: ['time_elapsed', 'abort_status'],
+      combinableWith: ['all_leaf_types'],
+      complexity: 1,
+      prerequisites: ['time_system_available'],
+      sideEffects: ['none'],
+    },
   };
 
   async run(ctx: LeafContext, args: any): Promise<LeafResult> {
@@ -488,7 +531,7 @@ export class WaitLeaf implements LeafImpl {
  * Get light level at current or specified position
  */
 export class GetLightLevelLeaf implements LeafImpl {
-  spec: LeafSpec = {
+  spec: ComposableLeafSpec = {
     name: 'get_light_level',
     version: '1.0.0',
     description: 'Get light level at current or specified position',
@@ -523,7 +566,15 @@ export class GetLightLevelLeaf implements LeafImpl {
     },
     timeoutMs: 1000,
     retries: 0,
-    permissions: ['sense'], // Use sense permission instead of chat
+    permissions: ['sense'],
+    composition: {
+      inputTypes: ['position_data', 'world_lighting'],
+      outputTypes: ['light_level', 'safety_assessment', 'position_info'],
+      combinableWith: ['movement_leaves', 'navigation_leaves', 'safety_leaves'],
+      complexity: 2,
+      prerequisites: ['world_loaded', 'lighting_system_available'],
+      sideEffects: ['none'],
+    },
   };
 
   async run(ctx: LeafContext, args: any): Promise<LeafResult> {

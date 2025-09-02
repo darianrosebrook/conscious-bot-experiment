@@ -38,6 +38,7 @@ export enum GoalType {
   REACH_LOCATION = 'reach_location',
   ACQUIRE_ITEM = 'acquire_item',
   SURVIVE_THREAT = 'survive_threat',
+  RESOURCE_GATHERING = 'resource_gathering',
 }
 
 export enum GoalStatus {

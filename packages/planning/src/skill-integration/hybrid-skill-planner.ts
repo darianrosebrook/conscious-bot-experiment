@@ -38,6 +38,7 @@ import { EnhancedRegistry } from '@conscious-bot/core';
 import { DynamicCreationFlow } from '@conscious-bot/core';
 import { CapabilityRegistry } from '@conscious-bot/core';
 import { Goal, GoalType, GoalStatus } from '../types';
+import { SkillComposerAdapter } from './skill-composer-adapter';
 
 // ============================================================================
 // Types
@@ -60,6 +61,7 @@ export interface HybridPlanningContext extends PlanningContext {
     preferHTN: boolean;
     preferGOAP: boolean;
     allowHybrid: boolean;
+    preferSimple: boolean;
   };
   leafContext?: any;
   goalRequirements?: Record<string, any>;
@@ -102,6 +104,7 @@ export class HybridSkillPlanner extends EventEmitter {
   private goapPlanner: EnhancedGOAPPlanner;
   private skillRegistry: SkillRegistry;
   private btRunner: BehaviorTreeRunner;
+  private skillComposerAdapter?: SkillComposerAdapter;
 
   constructor(
     skillRegistry: SkillRegistry,
@@ -109,7 +112,8 @@ export class HybridSkillPlanner extends EventEmitter {
     hrmPlanner: HRMInspiredPlanner,
     goapPlanner: EnhancedGOAPPlanner,
     mcpRegistry?: EnhancedRegistry,
-    mcpDynamicFlow?: DynamicCreationFlow
+    mcpDynamicFlow?: DynamicCreationFlow,
+    skillComposerAdapter?: SkillComposerAdapter
   ) {
     super();
     this.skillRegistry = skillRegistry;
@@ -128,6 +132,34 @@ export class HybridSkillPlanner extends EventEmitter {
         capRegistry
       );
     }
+
+    // Initialize skill composer adapter if provided
+    if (skillComposerAdapter) {
+      this.skillComposerAdapter = skillComposerAdapter;
+      this.setupSkillComposerEvents();
+    }
+  }
+
+  /**
+   * Set up event handlers for skill composer integration
+   */
+  private setupSkillComposerEvents(): void {
+    if (!this.skillComposerAdapter) return;
+
+    this.skillComposerAdapter.on('skillComposed', (skill) => {
+      this.emit('skillComposed', skill);
+      console.log(`🎯 New skill composed and integrated: ${skill.name}`);
+    });
+
+    this.skillComposerAdapter.on('skillRegistered', (skillAdapter) => {
+      this.emit('skillRegistered', skillAdapter);
+      console.log(`📚 Composed skill registered: ${skillAdapter.name}`);
+    });
+
+    this.skillComposerAdapter.on('compositionError', (error) => {
+      this.emit('compositionError', error);
+      console.error(`❌ Skill composition error: ${error.message}`);
+    });
   }
 
   /**
@@ -171,6 +203,74 @@ export class HybridSkillPlanner extends EventEmitter {
         },
         success: false,
         latency: Date.now() - startTime,
+      };
+    }
+  }
+
+  /**
+   * Attempt dynamic skill composition for a goal
+   */
+  async attemptDynamicSkillComposition(
+    goal: Goal,
+    context: HybridPlanningContext
+  ): Promise<{
+    success: boolean;
+    composedSkill?: any;
+    fallbackSkills?: string[];
+    reasoning: string;
+  }> {
+    if (!this.skillComposerAdapter) {
+      return {
+        success: false,
+        reasoning: 'Skill composer adapter not available',
+      };
+    }
+
+    try {
+      // Convert context to skill composition context
+      const compositionContext = {
+        worldState: context.worldState,
+        availableResources: context.resources,
+        timeConstraints: context.timeConstraints,
+        botCapabilities: {
+          availableLeaves: context.leafContext?.availableLeaves || [],
+          currentHealth: context.currentState.health || 100,
+          currentPosition: context.currentState.position || [0, 0, 0],
+        },
+      };
+
+      const result = await this.skillComposerAdapter.composeSkillsForGoal({
+        goal,
+        context: compositionContext,
+        preferences: {
+          maxComplexity: context.planningPreferences.preferSimple ? 5 : 8,
+          preferSimple: context.planningPreferences.preferSimple,
+          allowFallbacks: true,
+        },
+      });
+
+      if (result.success && result.composedSkill) {
+        console.log(
+          `🎯 Successfully composed skill: ${result.composedSkill.name}`
+        );
+        return {
+          success: true,
+          composedSkill: result.composedSkill,
+          reasoning: result.reasoning,
+        };
+      } else {
+        console.log(`⚠️ Skill composition failed: ${result.reasoning}`);
+        return {
+          success: false,
+          fallbackSkills: result.fallbackSkills,
+          reasoning: result.reasoning,
+        };
+      }
+    } catch (error) {
+      console.error('Dynamic skill composition error:', error);
+      return {
+        success: false,
+        reasoning: `Composition error: ${error}`,
       };
     }
   }
@@ -1077,7 +1177,8 @@ export class HybridSkillPlanner extends EventEmitter {
     if (goapPlan) {
       order.push(
         ...goapPlan.actions.map(
-          (_, index) => `goap-node-${(goapPlan as any).id ?? 'goap-plan'}-${index}`
+          (_, index) =>
+            `goap-node-${(goapPlan as any).id ?? 'goap-plan'}-${index}`
         )
       );
     }

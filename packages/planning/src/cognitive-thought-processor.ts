@@ -45,6 +45,76 @@ const DEFAULT_CONFIG: CognitiveThoughtProcessorConfig = {
   cognitiveEndpoint: 'http://localhost:3003',
 };
 
+// -----------------------------------------------------------------------------
+// Lightweight clients to decouple HTTP details
+// -----------------------------------------------------------------------------
+interface PlanningClient {
+  addTask(task: any): Promise<{ ok: boolean; id?: string; error?: string }>;
+}
+
+class HttpPlanningClient implements PlanningClient {
+  constructor(private base: string) {}
+  async addTask(
+    task: any
+  ): Promise<{ ok: boolean; id?: string; error?: string }> {
+    const res = await fetch(`${this.base}/task`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(task),
+      signal: AbortSignal.timeout(5000),
+    }).catch(
+      (e) =>
+        ({
+          ok: false,
+          status: 0,
+          json: async () => ({ error: String(e) }),
+        }) as any
+    );
+    if (!('ok' in res) || !res.ok) {
+      return { ok: false, error: `HTTP ${(res as any).status || 0}` };
+    }
+    const json = await (res as any).json().catch(() => ({}));
+    return { ok: true, id: json?.id };
+  }
+}
+
+interface CognitiveClient {
+  fetchRecentThoughts(
+    sinceTs?: number,
+    etag?: string
+  ): Promise<{ thoughts: CognitiveThought[]; etag?: string }>;
+}
+
+class HttpCognitiveClient implements CognitiveClient {
+  constructor(private base: string) {}
+  async fetchRecentThoughts(
+    sinceTs?: number,
+    etag?: string
+  ): Promise<{ thoughts: CognitiveThought[]; etag?: string }> {
+    const url = new URL(`${this.base}/thoughts`);
+    if (sinceTs) url.searchParams.set('since', String(sinceTs));
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
+    if (etag) headers['If-None-Match'] = etag;
+    const res = await fetch(url.toString(), {
+      method: 'GET',
+      headers,
+      signal: AbortSignal.timeout(5000),
+    }).catch(() => null);
+    if (!res) return { thoughts: [] };
+    if (res.status === 304) {
+      return { thoughts: [], etag };
+    }
+    if (!res.ok) return { thoughts: [] };
+    const data = (await res.json().catch(() => ({}))) as any;
+    return {
+      thoughts: data.thoughts || [],
+      etag: res.headers.get('ETag') || undefined,
+    };
+  }
+}
+
 /**
  * Maps cognitive thoughts to executable tasks
  */
@@ -73,6 +143,53 @@ const THOUGHT_TO_TASK_MAPPINGS: ThoughtToTaskMapping[] = [
     urgency: 0.6,
     parameters: { resource: 'wood', amount: 3, target: 'tree' },
     description: 'Gather wood for crafting',
+  },
+  {
+    thoughtType: 'gather resources quickly',
+    taskType: 'gather',
+    priority: 0.9,
+    urgency: 0.8,
+    parameters: {
+      resource: 'wood',
+      amount: 3,
+      target: 'tree',
+      priority: 'urgent',
+    },
+    description: 'Gather wood and other resources quickly before nightfall',
+  },
+  {
+    thoughtType: 'find some logs',
+    taskType: 'gather',
+    priority: 0.8,
+    urgency: 0.7,
+    parameters: { resource: 'wood', amount: 3, target: 'log' },
+    description: 'Find and collect logs for crafting tools',
+  },
+  {
+    thoughtType: 'craft tools',
+    taskType: 'gather',
+    priority: 0.8,
+    urgency: 0.7,
+    parameters: {
+      resource: 'wood',
+      amount: 4,
+      target: 'tree',
+      purpose: 'tools',
+    },
+    description: 'Gather wood to craft tools',
+  },
+  {
+    thoughtType: 'start a fire',
+    taskType: 'gather',
+    priority: 0.7,
+    urgency: 0.6,
+    parameters: {
+      resource: 'wood',
+      amount: 2,
+      target: 'tree',
+      purpose: 'fire',
+    },
+    description: 'Gather wood to start a fire',
   },
   {
     thoughtType: 'gather stone',
@@ -471,10 +588,141 @@ export class CognitiveThoughtProcessor extends EventEmitter {
   private config: CognitiveThoughtProcessorConfig;
   private processedThoughts: Set<string> = new Set();
   private processingInterval: NodeJS.Timeout | null = null;
+  private worldState: any = null; // Store current world state
+  private lastWorldStateUpdate: number = 0;
+  // IO clients
+  private planning: PlanningClient;
+  private cognitive: CognitiveClient;
+  // fetch cursors / dedupe
+  private lastEtag?: string;
+  private lastSeenTs: number = 0;
+  private recentTaskKeys: Map<string, number> = new Map(); // key -> ts
+  private recentTaskTTLms: number = 30_000; // de-dupe window
 
   constructor(config: Partial<CognitiveThoughtProcessorConfig> = {}) {
     super();
     this.config = { ...DEFAULT_CONFIG, ...config };
+    this.planning = new HttpPlanningClient(this.config.planningEndpoint);
+    this.cognitive = new HttpCognitiveClient(this.config.cognitiveEndpoint);
+  }
+
+  /**
+   * Update world state from external source
+   */
+  updateWorldState(worldState: any): void {
+    this.worldState = worldState;
+    this.lastWorldStateUpdate = Date.now();
+  }
+
+  /**
+   * Get current world state
+   */
+  getWorldState(): any {
+    return this.worldState;
+  }
+
+  /**
+   * Check if world state is available and recent
+   */
+  private isWorldStateAvailable(): boolean {
+    return this.worldState && Date.now() - this.lastWorldStateUpdate < 30000; // 30 seconds
+  }
+
+  /**
+   * Get available resources from world state
+   */
+  private getAvailableResources(): string[] {
+    if (!this.isWorldStateAvailable()) {
+      return [];
+    }
+
+    const resources: string[] = [];
+
+    // Extract nearby blocks
+    if (this.worldState.nearbyBlocks) {
+      this.worldState.nearbyBlocks.forEach((block: any) => {
+        if (block.type) {
+          resources.push(block.type);
+        }
+      });
+    }
+
+    // Extract nearby entities
+    if (this.worldState.nearbyEntities) {
+      this.worldState.nearbyEntities.forEach((entity: any) => {
+        if (entity.type) {
+          resources.push(entity.type);
+        }
+      });
+    }
+
+    return resources;
+  }
+
+  /**
+   * Check if a resource is available in the world
+   */
+  private isResourceAvailable(resourceType: string): boolean {
+    const availableResources = this.getAvailableResources();
+    return availableResources.some(
+      (resource) =>
+        resource.toLowerCase().includes(resourceType.toLowerCase()) ||
+        resourceType.toLowerCase().includes(resource.toLowerCase())
+    );
+  }
+
+  private worldAwareAdjustTask(task: any): any {
+    // If we have world state, adjust feasibility
+    const hasWorld = this.isWorldStateAvailable();
+    if (!hasWorld) return task;
+    const ttype = task.type;
+
+    // Gathering wood but no tree-like blocks visible -> add exploration hint instead of changing type
+    if (ttype === 'gathering' && task.parameters?.blockType === 'oak_log') {
+      if (
+        !this.isResourceAvailable('log') &&
+        !this.isResourceAvailable('tree') &&
+        !this.isResourceAvailable('oak')
+      ) {
+        // Instead of changing the task type, add metadata hints for the planner
+        task.metadata = {
+          ...task.metadata,
+          worldAwareHints: {
+            resourceScarce: true,
+            suggestedPrerequisites: [
+              {
+                type: 'exploration',
+                title: 'Explore for Trees',
+                description:
+                  'Explore nearby area to find trees before gathering wood',
+                parameters: { distance: 12, search_pattern: 'spiral' },
+                priority: 'high',
+              },
+            ],
+            originalIntent: 'gathering',
+            resourceType: 'oak_log',
+          },
+        };
+      }
+    }
+
+    // Mining iron requires tool readiness; annotate prerequisite if likely missing
+    if (ttype === 'mining' && /iron/i.test(task.title || '')) {
+      // we don't have inventory here; leave a hint for the planner
+      task.metadata = {
+        ...task.metadata,
+        prerequisites: [{ type: 'crafting', recipe: 'stone_pickaxe', qty: 1 }],
+      };
+    }
+
+    // Placement torches: if no torches in sight, planner will craft—annotate intent
+    if (ttype === 'placement' && task.parameters?.item === 'torch') {
+      task.metadata = {
+        ...task.metadata,
+        mayRequire: [{ craft: 'torch', qty: task.parameters?.count || 3 }],
+      };
+    }
+    return task;
   }
 
   /**
@@ -484,10 +732,13 @@ export class CognitiveThoughtProcessor extends EventEmitter {
     if (this.processingInterval) {
       clearInterval(this.processingInterval);
     }
-
+    const base = this.config.thoughtProcessingInterval;
+    const jitter = Math.floor(Math.random() * Math.min(5000, base * 0.2));
+    // immediate kick once (after jitter), then steady interval
+    setTimeout(() => this.processThoughts(), jitter);
     this.processingInterval = setInterval(
       () => this.processThoughts(),
-      this.config.thoughtProcessingInterval
+      base + jitter
     );
 
     console.log('Cognitive thought processor started');
@@ -509,8 +760,12 @@ export class CognitiveThoughtProcessor extends EventEmitter {
    */
   private async processThoughts(): Promise<void> {
     try {
-      // Fetch recent thoughts from cognitive system
-      const thoughts = await this.fetchRecentThoughts();
+      // Fetch recent thoughts using cursor/etag
+      const { thoughts, etag } = await this.cognitive.fetchRecentThoughts(
+        this.lastSeenTs,
+        this.lastEtag
+      );
+      if (etag) this.lastEtag = etag;
 
       if (thoughts.length === 0) {
         return;
@@ -521,18 +776,37 @@ export class CognitiveThoughtProcessor extends EventEmitter {
         console.log(`Processing ${thoughts.length} cognitive thoughts`);
       }
 
-      // Process each thought
-      for (const thought of thoughts.slice(
-        0,
-        this.config.maxThoughtsPerBatch
-      )) {
+      // Process newest-first within the batch (stable behavior)
+      const batch = thoughts
+        .sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0))
+        .slice(0, this.config.maxThoughtsPerBatch);
+
+      for (const thought of batch) {
         if (this.processedThoughts.has(thought.id)) {
+          this.emit('skippedThought', {
+            reason: 'alreadyProcessed',
+            thoughtId: thought.id,
+          });
           continue; // Skip already processed thoughts
         }
 
         const task = this.translateThoughtToTask(thought);
         if (task) {
-          await this.submitTaskToPlanning(task);
+          // de-dupe near-identical tasks in a short TTL window
+          const key = this.taskKey(task);
+          const now = Date.now();
+          const prev = this.recentTaskKeys.get(key);
+          if (prev && now - prev < this.recentTaskTTLms) {
+            this.emit('skippedThought', {
+              reason: 'duplicateTask',
+              thoughtId: thought.id,
+              key,
+            });
+          } else {
+            this.emit('taskCandidate', { task, thoughtId: thought.id });
+            await this.submitTaskToPlanning(task);
+            this.recentTaskKeys.set(key, now);
+          }
           this.processedThoughts.add(thought.id);
 
           // Only log in development mode
@@ -542,38 +816,13 @@ export class CognitiveThoughtProcessor extends EventEmitter {
             );
           }
         }
+        this.lastSeenTs = Math.max(this.lastSeenTs, thought.timestamp || 0);
       }
 
       // Clean up old processed thought IDs
       this.cleanupProcessedThoughts();
     } catch (error) {
       console.error('Error processing cognitive thoughts:', error);
-    }
-  }
-
-  /**
-   * Fetch recent thoughts from cognitive system
-   */
-  private async fetchRecentThoughts(): Promise<CognitiveThought[]> {
-    try {
-      const response = await fetch(
-        `${this.config.cognitiveEndpoint}/thoughts`,
-        {
-          method: 'GET',
-          headers: { 'Content-Type': 'application/json' },
-          signal: AbortSignal.timeout(5000),
-        }
-      );
-
-      if (!response.ok) {
-        return [];
-      }
-
-      const data = (await response.json()) as any;
-      return data.thoughts || [];
-    } catch (error) {
-      console.error('Failed to fetch thoughts from cognitive system:', error);
-      return [];
     }
   }
 
@@ -585,19 +834,33 @@ export class CognitiveThoughtProcessor extends EventEmitter {
 
     // Skip thoughts that are just status updates or system messages
     if (this.isSystemThought(content)) {
+      this.emit('skippedThought', { reason: 'system', thoughtId: thought.id });
+      return null;
+    }
+
+    // Skip internal/intrusive by default
+    if (thought.type === 'internal' || thought.type === 'intrusive') {
+      this.emit('skippedThought', {
+        reason: 'internalOrIntrusive',
+        thoughtId: thought.id,
+      });
       return null;
     }
 
     // Skip thoughts that are too generic
     if (this.isGenericThought(content)) {
+      this.emit('skippedThought', { reason: 'generic', thoughtId: thought.id });
       return null;
     }
 
-    // Find matching task mapping
-    const mapping = this.findBestTaskMapping(content);
+    // Find matching task mapping (synonym-aware)
+    const mapping = this.findBestTaskMapping(this.normalizeContent(content));
     if (!mapping) {
       return null;
     }
+
+    // Extract slots from the content to refine parameters
+    const slots = this.extractSlots(content);
 
     // Create task from mapping with improved title and description
     const taskTitle = this.generateTaskTitle(thought.content, mapping);
@@ -606,14 +869,17 @@ export class CognitiveThoughtProcessor extends EventEmitter {
       mapping
     );
 
-    const task = {
-      id: `cognitive-task-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+    let task = {
+      id: `cognitive-task-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
       title: taskTitle,
-      type: mapping.taskType,
+      type: this.canonicalTaskType(mapping.taskType),
       description: taskDescription,
-      priority: mapping.priority,
-      urgency: mapping.urgency,
-      parameters: mapping.parameters,
+      priority: this.calibratePriority(mapping.priority, thought),
+      urgency: this.calibrateUrgency(mapping.urgency, thought),
+      parameters: this.normalizeParameters(mapping.taskType, {
+        ...mapping.parameters,
+        ...slots,
+      }),
       goal: this.determineGoalFromThought(thought),
       status: 'pending',
       createdAt: Date.now(),
@@ -622,8 +888,15 @@ export class CognitiveThoughtProcessor extends EventEmitter {
       source: 'cognitive_thought',
       originalThought: thought.content,
       cognitiveContext: thought.context,
+      metadata: {
+        origin: { thoughtId: thought.id, attribution: thought.attribution },
+        worldSeenAt: this.lastWorldStateUpdate || null,
+        confidence: this.estimateConfidence(content, mapping),
+      },
     };
 
+    // World-aware gating / prerequisites
+    task = this.worldAwareAdjustTask(task);
     return task;
   }
 
@@ -672,38 +945,171 @@ export class CognitiveThoughtProcessor extends EventEmitter {
   private findBestTaskMapping(content: string): ThoughtToTaskMapping | null {
     let bestMatch: ThoughtToTaskMapping | null = null;
     let bestScore = 0;
-
     for (const mapping of THOUGHT_TO_TASK_MAPPINGS) {
-      const score = this.calculateMatchScore(content, mapping.thoughtType);
+      const score = this.calculateMatchScore(
+        content,
+        this.normalizeContent(mapping.thoughtType)
+      );
       if (score > bestScore) {
         bestScore = score;
         bestMatch = mapping;
       }
     }
-
-    // Only return matches with a reasonable score
-    return bestScore > 0.3 ? bestMatch : null;
+    return bestScore > 0.35 ? bestMatch : null;
   }
 
   /**
    * Calculate how well a thought matches a task mapping
    */
   private calculateMatchScore(content: string, thoughtType: string): number {
-    const words = content.split(/\s+/);
-    const targetWords = thoughtType.split(/\s+/);
+    const a = new Set(content.split(/\s+/));
+    const b = new Set(thoughtType.split(/\s+/));
+    let inter = 0;
+    b.forEach((w) => {
+      if (a.has(w)) inter++;
+    });
+    // Sørensen–Dice like score
+    return (2 * inter) / (a.size + b.size || 1);
+  }
 
-    let matches = 0;
-    for (const targetWord of targetWords) {
-      if (
-        words.some(
-          (word) => word.includes(targetWord) || targetWord.includes(word)
-        )
-      ) {
-        matches++;
-      }
+  private normalizeContent(s: string): string {
+    const t = s
+      .toLowerCase()
+      .replace(/[^\w\s]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+    return this.applySynonyms(t);
+  }
+
+  private applySynonyms(s: string): string {
+    const syn: Record<string, string> = {
+      logs: 'wood',
+      timber: 'wood',
+      planks: 'planks',
+      stick: 'sticks',
+      pick: 'pickaxe',
+      pickax: 'pickaxe',
+      ore: 'ore',
+      shelter: 'shelter',
+      cave: 'cave',
+      light: 'torch',
+      lights: 'torch',
+      torches: 'torch',
+      move: 'navigate',
+      walk: 'navigate',
+      go: 'navigate',
+      flee: 'flee',
+      run: 'flee',
+      fight: 'attack',
+    };
+    const tokens = s.split(' ');
+    const mapped = tokens.map((w) => syn[w] ?? w);
+    return mapped.join(' ');
+  }
+
+  private extractSlots(content: string): Record<string, any> {
+    const slots: Record<string, any> = {};
+    // amount like "get 4 logs", "mine 3 iron"
+    const numRes = content.match(
+      /(\d+)\s*(logs?|planks?|sticks?|stone|cobblestone|iron|coal|torches?|torch|blocks?)/
+    );
+    if (numRes) {
+      const n = parseInt(numRes[1], 10);
+      if (!isNaN(n)) slots.amount = n;
+      const unit = (numRes[2] || '').toLowerCase();
+      if (unit) slots.resource = unit.replace(/s$/, '');
     }
+    // distance like "move 10 blocks"
+    const dist = content.match(/(\d+)\s*(blocks?|meters?)/);
+    if (dist && !isNaN(parseInt(dist[1], 10))) {
+      slots.distance = parseInt(dist[1], 10);
+    }
+    // explicit resource mentions
+    if (/iron/.test(content)) slots.block = 'iron_ore';
+    if (/coal/.test(content)) slots.block = 'coal_ore';
+    if (/stone|cobblestone/.test(content)) slots.block = 'stone';
+    if (/wood|log/.test(content)) slots.resource = 'wood';
+    if (/torch|light/.test(content)) {
+      slots.item = 'torch';
+      slots.count = slots.amount || 3;
+    }
+    if (/pickaxe/.test(content)) {
+      slots.item = 'wooden_pickaxe';
+      slots.quantity = 1;
+    }
+    return slots;
+  }
 
-    return matches / targetWords.length;
+  private canonicalTaskType(t: string): string {
+    const m: Record<string, string> = {
+      gather: 'gathering',
+      mine: 'mining',
+      move: 'movement',
+      move_forward: 'movement',
+      explore: 'exploration',
+      craft: 'crafting',
+      build: 'building',
+      seek_shelter: 'exploration',
+      farm: 'farming',
+      place_light: 'placement',
+      attack_entity: 'combat',
+      flee: 'navigation', // treated as movement away from threat
+    };
+    return m[t] || t;
+  }
+
+  private normalizeParameters(
+    taskType: string,
+    p: Record<string, any>
+  ): Record<string, any> {
+    const out = { ...p };
+    // harmonize common fields used by planning/execution
+    if (taskType === 'gather' || taskType === 'gathering') {
+      if (out.resource === 'wood' && !out.blockType) out.blockType = 'oak_log';
+      if (out.amount && !out.qty) out.qty = out.amount;
+    }
+    if (taskType === 'mine' || taskType === 'mining') {
+      if (out.block && !out.blockType) out.blockType = out.block;
+      if (out.amount && !out.qty) out.qty = out.amount;
+    }
+    if (taskType === 'craft' || taskType === 'crafting') {
+      if (out.item && !out.recipe) out.recipe = out.item;
+      if (out.quantity && !out.qty) out.qty = out.quantity;
+      // common defaults
+      if (!out.qty) out.qty = 1;
+    }
+    if (taskType === 'place_light' || taskType === 'placement') {
+      if (out.item === 'torch') out.item = 'torch';
+      if (!out.count && out.qty) out.count = out.qty;
+    }
+    if (taskType === 'move' || taskType === 'movement') {
+      if (!out.distance) out.distance = 5;
+    }
+    return out;
+  }
+
+  private calibratePriority(base: number, thought: CognitiveThought): number {
+    // slight lift for 'urgency' words in content
+    const c = thought.content.toLowerCase();
+    const bump = /(now|quickly|before night|danger)/.test(c) ? 0.05 : 0;
+    return Math.max(0, Math.min(1, (base ?? 0.7) + bump));
+  }
+
+  private calibrateUrgency(base: number, thought: CognitiveThought): number {
+    const c = thought.content.toLowerCase();
+    const bump = /(danger|hunger|night|hostile)/.test(c) ? 0.1 : 0;
+    return Math.max(0, Math.min(1, (base ?? 0.6) + bump));
+  }
+
+  private estimateConfidence(
+    content: string,
+    mapping: ThoughtToTaskMapping
+  ): number {
+    const score = this.calculateMatchScore(
+      this.normalizeContent(content),
+      this.normalizeContent(mapping.thoughtType)
+    );
+    return Math.max(0.3, Math.min(0.99, score));
   }
 
   /**
@@ -827,9 +1233,8 @@ export class CognitiveThoughtProcessor extends EventEmitter {
       return 'crafting_building';
     } else if (content.includes('farm') || content.includes('agriculture')) {
       return 'farming';
-    } else {
-      return 'general_activity';
     }
+    return 'general_activity';
   }
 
   /**
@@ -837,21 +1242,13 @@ export class CognitiveThoughtProcessor extends EventEmitter {
    */
   private async submitTaskToPlanning(task: any): Promise<void> {
     try {
-      const response = await fetch(`${this.config.planningEndpoint}/task`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(task),
-        signal: AbortSignal.timeout(5000),
-      });
-
-      if (!response.ok) {
+      const result = await this.planning.addTask(task);
+      if (!result.ok) {
         console.error(
-          `Failed to submit task to planning system: ${response.status}`
+          `Failed to submit task to planning system: ${result.error || 'unknown'}`
         );
         return;
       }
-
-      const result = await response.json();
       console.log(
         `Task submitted successfully: ${task.type} - ${task.description}`
       );
@@ -879,6 +1276,13 @@ export class CognitiveThoughtProcessor extends EventEmitter {
         }
       }
     }
+  }
+
+  private taskKey(task: any): string {
+    const t = (task.title || '').toLowerCase();
+    const ty = (task.type || '').toLowerCase();
+    const p = JSON.stringify(task.parameters || {});
+    return `${ty}::${t}::${p}`;
   }
 
   /**

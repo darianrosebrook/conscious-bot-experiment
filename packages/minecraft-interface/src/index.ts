@@ -61,6 +61,9 @@ export * from './leaves/crafting-leaves';
 // Utility functions
 export { createDefaultBotConfig, validateBotConfig } from './utils';
 
+// Mineflayer Extensions Integration
+export * from './extensions';
+
 // Hybrid Arbiter Integration
 export {
   HybridArbiterIntegration,
@@ -151,9 +154,19 @@ export async function runMinecraftScenario(
 ): Promise<any> {
   // Stub function to avoid circular dependency
   const createIntegratedPlanningCoordinator = () => ({
-    plan: async (goal: string, context: any) => ({ success: false, error: 'Planning not available' }),
-    executePlan: async (plan: any, context: any) => ({ success: false, error: 'Planning not available' }),
-    planAndExecute: async (goal: string | any[], context: any, signals?: any[]) => ({ success: false, error: 'Planning not available' })
+    plan: async (goal: string, context: any) => ({
+      success: false,
+      error: 'Planning not available',
+    }),
+    executePlan: async (plan: any, context: any) => ({
+      success: false,
+      error: 'Planning not available',
+    }),
+    planAndExecute: async (
+      goal: string | any[],
+      context: any,
+      signals?: any[]
+    ) => ({ success: false, error: 'Planning not available' }),
   });
 
   const planningCoordinator = createIntegratedPlanningCoordinator();

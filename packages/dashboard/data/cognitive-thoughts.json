@@ -15293,5 +15293,3791 @@
     "id": "thought-1756752645046-bbr3echtc",
     "timestamp": 1756752645046,
     "processed": false
+  },
+  {
+    "type": "reflection",
+    "content": "Gather wood from the nearby trees to craft tools and build a shelter.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.6,
+      "cognitiveSystem": "llm-core"
+    },
+    "metadata": {
+      "thoughtType": "reflection",
+      "trigger": "time-based",
+      "context": "environmental-monitoring",
+      "intensity": 0.4,
+      "llmConfidence": 0.6,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1756752763390-22siv7pym",
+    "timestamp": 1756752763390,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Find an axe or gather wood using my hands to start the gathering process. There are nearby birch logs that can be chopped down.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.7,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "gathering",
+      "trigger": "task-start",
+      "llmConfidence": 0.7,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1756752883774-ysonpfxua",
+    "timestamp": 1756752883774,
+    "processed": false
+  },
+  {
+    "type": "reflection",
+    "content": "Gather some wood from nearby trees to craft tools and a shelter.",
+    "attribution": "self",
+    "context": {
+      "cognitiveSystem": "llm-core"
+    },
+    "metadata": {
+      "thoughtType": "reflection"
+    },
+    "id": "thought-1756753048145-ztu6mle8q",
+    "timestamp": 1756753048145,
+    "processed": false
+  },
+  {
+    "type": "reflection",
+    "content": "Gather some wood from nearby trees to craft tools and a shelter.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.6,
+      "cognitiveSystem": "llm-core"
+    },
+    "metadata": {
+      "thoughtType": "reflection",
+      "trigger": "time-based",
+      "context": "environmental-monitoring",
+      "intensity": 0.4,
+      "llmConfidence": 0.6,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1756753048167-9rxv6odk5",
+    "timestamp": 1756753048167,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Find a nearby tree and start chopping logs with an axe. If none available, craft one first.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.6,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "gather",
+      "trigger": "task-start",
+      "llmConfidence": 0.6,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1756753172836-w5vc1rcsw",
+    "timestamp": 1756753172836,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Gather birch logs from the nearby trees. Use an axe if you have one; otherwise, use your hands to break down the logs into wood pieces.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.7,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "gather",
+      "trigger": "task-start",
+      "llmConfidence": 0.7,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1756753232912-h0odyjsk6",
+    "timestamp": 1756753232912,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Gather birch logs from nearby trees. Use an axe if you have one; otherwise, use your hands. There are 3 logs available within reach.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.7,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "gather",
+      "trigger": "task-start",
+      "llmConfidence": 0.7,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1756753292079-n6vpttfhr",
+    "timestamp": 1756753292079,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Gather birch logs from nearby trees. Axe in hand, head towards the trees and start chopping.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.6,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "gather",
+      "trigger": "task-start",
+      "llmConfidence": 0.6,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1756753352515-imaes7p4g",
+    "timestamp": 1756753352515,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Gather birch logs from nearby trees. Use my hands to break down the logs into planks.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.6,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "gather",
+      "trigger": "task-start",
+      "llmConfidence": 0.6,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1756753411871-qho2pnyaa",
+    "timestamp": 1756753411871,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Find a nearby tree and start chopping it with my axe to gather wood.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.6,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "gather",
+      "trigger": "task-start",
+      "llmConfidence": 0.6,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1756753472282-2bkosdsm0",
+    "timestamp": 1756753472282,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Find a nearby tree and start chopping it with my axe to gather wood.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.6,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "gather",
+      "trigger": "task-start",
+      "llmConfidence": 0.6,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1756753531878-q4j8568qn",
+    "timestamp": 1756753531878,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Gather birch logs from the nearby trees. Axe in hand, head to the trees and chop down the logs.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.6,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "gather",
+      "trigger": "task-start",
+      "llmConfidence": 0.6,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1756753592307-mchr7jyr3",
+    "timestamp": 1756753592307,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Gather birch logs from nearby trees. Use an axe if you have one; otherwise, break the logs with your hands. There are three logs within reach.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.7,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "gather",
+      "trigger": "task-start",
+      "llmConfidence": 0.7,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1756753652612-sff7s6bts",
+    "timestamp": 1756753652612,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Gather birch logs from nearby trees using an axe.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.5,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "gather",
+      "trigger": "task-start",
+      "llmConfidence": 0.5,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1756753711943-vopv636ni",
+    "timestamp": 1756753711943,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Gather birch logs from nearby trees. Axe in hand, head to the trunk and start chopping.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.6,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "gather",
+      "trigger": "task-start",
+      "llmConfidence": 0.6,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1756753771856-s9hvdh00s",
+    "timestamp": 1756753771856,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Find a nearby birch log and use an axe to gather wood.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.6,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "gather",
+      "trigger": "task-start",
+      "llmConfidence": 0.6,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1756753955130-noxhdf8kv",
+    "timestamp": 1756753955130,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Gather birch logs from the nearby trees. Use an axe if you have one; otherwise, use your hands to break down the logs. Look for more logs in the area as they are plentiful.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.7,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "gather",
+      "trigger": "task-start",
+      "llmConfidence": 0.7,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1756754074444-9aoqvqtkt",
+    "timestamp": 1756754074444,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Gather birch logs from nearby trees. Use my axe to chop them down.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.6,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "gather",
+      "trigger": "task-start",
+      "llmConfidence": 0.6,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1756754132553-n2ye17d16",
+    "timestamp": 1756754132553,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Gather birch logs from the nearby trees. Use an axe if you have one; otherwise, use your hands to break down the trees into logs.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.7,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "gather",
+      "trigger": "task-start",
+      "llmConfidence": 0.7,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1756754192566-njvp53o98",
+    "timestamp": 1756754192566,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Find a nearby tree and start chopping it with my axe. Observing the logs around, there are three birch logs available. Next steps: approach the closest log at (-7.5, 91, 11.542).",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.7,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "gather",
+      "trigger": "task-start",
+      "llmConfidence": 0.7,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1756754255915-moa6nxoq0",
+    "timestamp": 1756754255915,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Gather birch logs from the nearby trees. Use my hands to chop them down and add to my inventory.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.6,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "gather",
+      "trigger": "task-start",
+      "llmConfidence": 0.6,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1756754314697-3y8bzkb4s",
+    "timestamp": 1756754314697,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Gather birch logs from nearby trees. Use my hands to chop down the trees and add the logs to my inventory.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.7,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "gather",
+      "trigger": "task-start",
+      "llmConfidence": 0.7,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1756754434328-vtnevsazh",
+    "timestamp": 1756754434328,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Gather birch logs from the nearby trees. Use an axe to chop them down efficiently.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.6,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "gather",
+      "trigger": "task-start",
+      "llmConfidence": 0.6,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1756754493494-6d9yxj5y3",
+    "timestamp": 1756754493494,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Gather birch logs from nearby trees. Use my axe to chop them down efficiently.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.6,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "gather",
+      "trigger": "task-start",
+      "llmConfidence": 0.6,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1756754555528-rp9s5kgtr",
+    "timestamp": 1756754555528,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Gather birch logs from the nearby trees. Use an axe if you have one; otherwise, use your hands to break down the tree.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.7,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "gather",
+      "trigger": "task-start",
+      "llmConfidence": 0.7,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1756754614651-4ad7fwsv9",
+    "timestamp": 1756754614651,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Gather birch logs from the nearby trees. Use an axe if you have one; otherwise, use your hand to break down the trees. Look for more logs as you go.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.7,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "gather",
+      "trigger": "task-start",
+      "llmConfidence": 0.7,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1756754735029-s5tbfk7iq",
+    "timestamp": 1756754735029,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Search for more logs nearby and start chopping with my axe. Need to gather at least three logs for now.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.7,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "gather",
+      "trigger": "task-start",
+      "llmConfidence": 0.7,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1756754793265-kjqq2ri3g",
+    "timestamp": 1756754793265,
+    "processed": false
+  },
+  {
+    "type": "reflection",
+    "content": "Gather wood from nearby birch logs to craft tools and build a shelter. Weather is rainy, so urgency is medium but building a roof is crucial.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.7,
+      "cognitiveSystem": "llm-core"
+    },
+    "metadata": {
+      "thoughtType": "reflection",
+      "trigger": "time-based",
+      "context": "environmental-monitoring",
+      "intensity": 0.4,
+      "llmConfidence": 0.7,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1756756999554-ajp7m8dn3",
+    "timestamp": 1756756999554,
+    "processed": false
+  },
+  {
+    "type": "reflection",
+    "content": "Gather some wood to craft a pickaxe and build a shelter. Observing the area for trees and safe spots.",
+    "attribution": "self",
+    "context": {
+      "cognitiveSystem": "llm-core"
+    },
+    "metadata": {
+      "thoughtType": "reflection"
+    },
+    "id": "thought-1756757109252-4ssazh8cj",
+    "timestamp": 1756757109252,
+    "processed": false
+  },
+  {
+    "type": "reflection",
+    "content": "Gather some wood to craft a pickaxe and build a shelter. Observing the area for trees and safe spots.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.7,
+      "cognitiveSystem": "llm-core"
+    },
+    "metadata": {
+      "thoughtType": "reflection",
+      "trigger": "time-based",
+      "context": "environmental-monitoring",
+      "intensity": 0.4,
+      "llmConfidence": 0.7,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1756757110218-160og9iu1",
+    "timestamp": 1756757110218,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Find a nearby tree and use an axe to gather wood.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.5,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "gather",
+      "trigger": "task-start",
+      "llmConfidence": 0.5,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1756757177478-cov1a3xmb",
+    "timestamp": 1756757177478,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Find and chop a nearby tree trunk using my hands or a stick.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.6,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "gather",
+      "trigger": "task-start",
+      "llmConfidence": 0.6,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1756757237166-g6dbh213x",
+    "timestamp": 1756757237166,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Gather wood from the nearby tree trunk at (-4.7, 87, 19.7). Use my axe to chop it down.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.6,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "gather",
+      "trigger": "task-start",
+      "llmConfidence": 0.6,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1756757298405-5cg0q2g07",
+    "timestamp": 1756757298405,
+    "processed": false
+  },
+  {
+    "type": "reflection",
+    "content": "Gather resources quickly before night falls. Head to the nearby coal ores and start mining.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.6,
+      "cognitiveSystem": "llm-core"
+    },
+    "metadata": {
+      "thoughtType": "reflection",
+      "trigger": "time-based",
+      "context": "environmental-monitoring",
+      "intensity": 0.4,
+      "llmConfidence": 0.6,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1756757357314-h54va1kmt",
+    "timestamp": 1756757357314,
+    "processed": false
+  },
+  {
+    "type": "intrusive",
+    "content": "I should test how far I can fall without taking damage",
+    "attribution": "intrusive",
+    "context": {
+      "emotionalState": "curious",
+      "confidence": 0.8
+    },
+    "metadata": {
+      "messageType": "intrusion",
+      "intent": "external_suggestion",
+      "thoughtType": "intrusive"
+    },
+    "id": "thought-1756757430927-9r9g5cwv1",
+    "timestamp": 1756757430927,
+    "processed": false
+  },
+  {
+    "type": "reflection",
+    "content": "Processing intrusive thought: \"i should test how far i can fall without taking damage\"",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "focused",
+      "confidence": 0.6,
+      "cognitiveSystem": "intrusive-processor"
+    },
+    "metadata": {
+      "thoughtType": "reflection",
+      "source": "intrusive-thought"
+    },
+    "id": "thought-1756757431305-po248qjhy",
+    "timestamp": 1756757431305,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Planning system updated: Investigate health status (seq) - Success",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "focused",
+      "confidence": 0.7,
+      "cognitiveSystem": "planning-integration"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskId": "task-1756757431310-cpatc6",
+      "success": true
+    },
+    "id": "thought-1756757431328-ozq3kmz5d",
+    "timestamp": 1756757431328,
+    "processed": false
+  },
+  {
+    "type": "intrusive",
+    "content": "I should test how far I can fall without taking damage",
+    "attribution": "external",
+    "context": {
+      "emotionalState": "curious",
+      "confidence": 0.8
+    },
+    "metadata": {
+      "messageType": "intrusion",
+      "intent": "external_suggestion",
+      "tags": [
+        "external",
+        "intrusion"
+      ],
+      "strength": 0.8,
+      "processed": true,
+      "taskId": "task-1756757431310-cpatc6",
+      "thoughtType": "intrusive"
+    },
+    "id": "thought-1756757431332-5m685b9u8",
+    "timestamp": 1756757431332,
+    "processed": false
+  },
+  {
+    "type": "reflection",
+    "content": "Gather wood from the nearby tree to craft tools and build a shelter before nightfall.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.6,
+      "cognitiveSystem": "llm-core"
+    },
+    "metadata": {
+      "thoughtType": "reflection",
+      "trigger": "time-based",
+      "context": "environmental-monitoring",
+      "intensity": 0.4,
+      "llmConfidence": 0.6,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1756757519450-vwneahy2g",
+    "timestamp": 1756757519450,
+    "processed": false
+  },
+  {
+    "type": "reflection",
+    "content": "Gather resources to craft basic tools and prepare for nightfall. Find some logs nearby to make a pickaxe.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.7,
+      "cognitiveSystem": "llm-core"
+    },
+    "metadata": {
+      "thoughtType": "reflection",
+      "trigger": "time-based",
+      "context": "environmental-monitoring",
+      "intensity": 0.4,
+      "llmConfidence": 0.7,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1756757579831-fywdcl7id",
+    "timestamp": 1756757579831,
+    "processed": false
+  },
+  {
+    "type": "reflection",
+    "content": "Craft a pickaxe to gather resources from nearby stone walls and coal ores.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.6,
+      "cognitiveSystem": "llm-core"
+    },
+    "metadata": {
+      "thoughtType": "reflection",
+      "trigger": "time-based",
+      "context": "environmental-monitoring",
+      "intensity": 0.4,
+      "llmConfidence": 0.6,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1756758114896-mkddgxlfc",
+    "timestamp": 1756758114896,
+    "processed": false
+  },
+  {
+    "type": "reflection",
+    "content": "Gather wood from the nearby tree to craft tools and improve safety.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.6,
+      "cognitiveSystem": "llm-core"
+    },
+    "metadata": {
+      "thoughtType": "reflection",
+      "trigger": "time-based",
+      "context": "environmental-monitoring",
+      "intensity": 0.4,
+      "llmConfidence": 0.6,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1756758313221-8tmkhmg2u",
+    "timestamp": 1756758313221,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Head to the tree trunk at position (-4.7, 87, 19.7) and start chopping wood with an axe.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.6,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "gather",
+      "trigger": "task-start",
+      "llmConfidence": 0.6,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1756758434870-punnexw55",
+    "timestamp": 1756758434870,
+    "processed": false
+  },
+  {
+    "type": "reflection",
+    "content": "Gather wood to craft tools and build a shelter for the night.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.6,
+      "cognitiveSystem": "llm-core"
+    },
+    "metadata": {
+      "thoughtType": "reflection",
+      "trigger": "time-based",
+      "context": "environmental-monitoring",
+      "intensity": 0.4,
+      "llmConfidence": 0.6,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1756758536571-8q91236cg",
+    "timestamp": 1756758536571,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Gather wood from nearby trees. Scan the area for logs.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.6,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "gather",
+      "trigger": "task-start",
+      "llmConfidence": 0.6,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1756758613528-8277gqtbm",
+    "timestamp": 1756758613528,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Scan surroundings for trees. Head to nearest tree block and start chopping wood.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.6,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "gather",
+      "trigger": "task-start",
+      "llmConfidence": 0.6,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1756758673498-316dlzox9",
+    "timestamp": 1756758673498,
+    "processed": false
+  },
+  {
+    "type": "intrusive",
+    "content": "I should get some oak and birch logs",
+    "attribution": "intrusive",
+    "context": {
+      "emotionalState": "curious",
+      "confidence": 0.8
+    },
+    "metadata": {
+      "messageType": "intrusion",
+      "intent": "external_suggestion",
+      "thoughtType": "intrusive"
+    },
+    "id": "thought-1756758735994-48bae0io0",
+    "timestamp": 1756758735994,
+    "processed": false
+  },
+  {
+    "type": "reflection",
+    "content": "Processing intrusive thought: \"i should get some oak and birch logs\"",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "focused",
+      "confidence": 0.6,
+      "cognitiveSystem": "intrusive-processor"
+    },
+    "metadata": {
+      "thoughtType": "reflection",
+      "source": "intrusive-thought"
+    },
+    "id": "thought-1756758736509-wf8krrq5j",
+    "timestamp": 1756758736509,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Planning system updated: Ask for clarification on next step (via step_forward_safely@1.0.0) - Success",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "focused",
+      "confidence": 0.7,
+      "cognitiveSystem": "planning-integration"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskId": "task-1756758736499-xbubjd",
+      "success": true
+    },
+    "id": "thought-1756758736523-1jozjtweb",
+    "timestamp": 1756758736523,
+    "processed": false
+  },
+  {
+    "type": "intrusive",
+    "content": "I should get some oak and birch logs",
+    "attribution": "external",
+    "context": {
+      "emotionalState": "curious",
+      "confidence": 0.8
+    },
+    "metadata": {
+      "messageType": "intrusion",
+      "intent": "external_suggestion",
+      "tags": [
+        "external",
+        "intrusion"
+      ],
+      "strength": 0.8,
+      "processed": true,
+      "taskId": "task-1756758736499-xbubjd",
+      "thoughtType": "intrusive"
+    },
+    "id": "thought-1756758736531-b3zflfkuo",
+    "timestamp": 1756758736531,
+    "processed": false
+  },
+  {
+    "type": "reflection",
+    "content": "Gather some wood from nearby trees to craft tools and build a shelter.",
+    "attribution": "self",
+    "context": {
+      "cognitiveSystem": "llm-core"
+    },
+    "metadata": {
+      "thoughtType": "reflection"
+    },
+    "id": "thought-1756759074390-bspuniwf3",
+    "timestamp": 1756759074390,
+    "processed": false
+  },
+  {
+    "type": "reflection",
+    "content": "Gather some wood from nearby trees to craft tools and build a shelter.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.6,
+      "cognitiveSystem": "llm-core"
+    },
+    "metadata": {
+      "thoughtType": "reflection",
+      "trigger": "time-based",
+      "context": "environmental-monitoring",
+      "intensity": 0.4,
+      "llmConfidence": 0.6,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1756759074429-r42gv9bia",
+    "timestamp": 1756759074429,
+    "processed": false
+  },
+  {
+    "type": "reflection",
+    "content": "Gather wood from nearby trees to build a shelter and reduce safety risk during the night.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.6,
+      "cognitiveSystem": "llm-core"
+    },
+    "metadata": {
+      "thoughtType": "reflection",
+      "trigger": "time-based",
+      "context": "environmental-monitoring",
+      "intensity": 0.4,
+      "llmConfidence": 0.6,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1756759245668-caqep1d5a",
+    "timestamp": 1756759245668,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Head north to the nearest tree cluster and start chopping wood with an empty hands.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.6,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "gather",
+      "trigger": "task-start",
+      "llmConfidence": 0.6,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1756759305960-xav6z5pbs",
+    "timestamp": 1756759305960,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Scan the area for nearby logs. If found, start chopping with my hand to gather wood.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.6,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "gather",
+      "trigger": "task-start",
+      "llmConfidence": 0.6,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1756759365431-ufdi6u818",
+    "timestamp": 1756759365431,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Search for trees nearby and start chopping wood with my hands.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.6,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "gather",
+      "trigger": "task-start",
+      "llmConfidence": 0.6,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1756759485164-d86y869qv",
+    "timestamp": 1756759485164,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Scan surroundings for nearby trees. Head towards the nearest log block and start chopping.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.6,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "gather",
+      "trigger": "task-start",
+      "llmConfidence": 0.6,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1756759545292-mdif0hhd5",
+    "timestamp": 1756759545292,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Find a nearby tree and start chopping wood with my hands.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.6,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "gather",
+      "trigger": "task-start",
+      "llmConfidence": 0.6,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1756759605157-ottyz1zy4",
+    "timestamp": 1756759605157,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Scan the area for nearby logs. If none are found, move east 5 blocks and search again. Equip a hand or simple tool if available.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.7,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "gather",
+      "trigger": "task-start",
+      "llmConfidence": 0.7,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1756759665762-ekdrcy6ja",
+    "timestamp": 1756759665762,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Search for trees nearby and start chopping wood with my hands.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.6,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "gather",
+      "trigger": "task-start",
+      "llmConfidence": 0.6,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1756759725170-f2bln4xym",
+    "timestamp": 1756759725170,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Scan the area for nearby logs. If found, use an axe to gather wood. If no logs are nearby, move to a different location to increase chances of finding them.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.7,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "gather",
+      "trigger": "task-start",
+      "llmConfidence": 0.7,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1756759785975-soo327ogz",
+    "timestamp": 1756759785975,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Scan surroundings for trees. Head to the nearest tree and start chopping wood with my hands.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.6,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "gather",
+      "trigger": "task-start",
+      "llmConfidence": 0.6,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1756759905366-8ey0l04e5",
+    "timestamp": 1756759905366,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Scan the area for nearby logs. If none found, move to a location with visible trees and start chopping.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.7,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "gather",
+      "trigger": "task-start",
+      "llmConfidence": 0.7,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1756759965587-uqmr0ak57",
+    "timestamp": 1756759965587,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Walk east to find some trees and start chopping wood.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.6,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "gather",
+      "trigger": "task-start",
+      "llmConfidence": 0.6,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1756760025212-1bulvt2rd",
+    "timestamp": 1756760025212,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Head east towards the nearby dirt ground; there should be some trees to gather wood.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.6,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "gather",
+      "trigger": "task-start",
+      "llmConfidence": 0.6,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1756760085660-4wczujtjv",
+    "timestamp": 1756760085660,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Head east towards the oak log and start chopping it with my axe.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.6,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "gather",
+      "trigger": "task-start",
+      "llmConfidence": 0.6,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1756760205032-krrw171o0",
+    "timestamp": 1756760205032,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Find an oak log and use an axe to chop it down.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.5,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "gather",
+      "trigger": "task-start",
+      "llmConfidence": 0.5,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1756760264855-n647gihby",
+    "timestamp": 1756760264855,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Start by using my hands to break the oak log into wooden planks. Safety is high, so focus on efficiency and progress.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.7,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "gather",
+      "trigger": "task-start",
+      "llmConfidence": 0.7,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1756760325257-3lz87cia1",
+    "timestamp": 1756760325257,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Head to the oak log near (-4.5, 87, 8.7) and use an axe to gather wood.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.6,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "gather",
+      "trigger": "task-start",
+      "llmConfidence": 0.6,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1756760445433-yybbsf0st",
+    "timestamp": 1756760445433,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Head east towards the log block at (-4.5, 87, 8.7) and use an axe to gather wood.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.6,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "gather",
+      "trigger": "task-start",
+      "llmConfidence": 0.6,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1756760505348-eol6egkx9",
+    "timestamp": 1756760505348,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Find an oak log and start chopping it with my axe to gather wood.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.6,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "gather",
+      "trigger": "task-start",
+      "llmConfidence": 0.6,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1756760565024-j4ktdq94j",
+    "timestamp": 1756760565024,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Head towards the oak log nearby at coordinates (-4.5, 87, 8.7) and start chopping it with an axe.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.6,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "gather",
+      "trigger": "task-start",
+      "llmConfidence": 0.6,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1756760625658-dy6o63vg2",
+    "timestamp": 1756760625658,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Find and chop a nearby oak log with my hands or look for an axe in my inventory. If no tools are available, start breaking down the log by hand.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.7,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "gather",
+      "trigger": "task-start",
+      "llmConfidence": 0.7,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1756760685643-ro9tmpsdt",
+    "timestamp": 1756760685643,
+    "processed": false
+  },
+  {
+    "type": "intrusive",
+    "content": "let's get to a river",
+    "attribution": "intrusive",
+    "context": {
+      "emotionalState": "curious",
+      "confidence": 0.8
+    },
+    "metadata": {
+      "messageType": "intrusion",
+      "intent": "external_suggestion",
+      "thoughtType": "intrusive"
+    },
+    "id": "thought-1756760719951-ggwtsmfuk",
+    "timestamp": 1756760719951,
+    "processed": false
+  },
+  {
+    "type": "intrusive",
+    "content": "let's get to a river",
+    "attribution": "external",
+    "context": {
+      "emotionalState": "curious",
+      "confidence": 0.8
+    },
+    "metadata": {
+      "messageType": "intrusion",
+      "intent": "external_suggestion",
+      "tags": [
+        "external",
+        "intrusion"
+      ],
+      "strength": 0.8,
+      "processed": true,
+      "taskId": "task-1756760720503-0avahb",
+      "thoughtType": "intrusive"
+    },
+    "id": "thought-1756760720625-ze2wods7w",
+    "timestamp": 1756760720625,
+    "processed": false
+  },
+  {
+    "type": "reflection",
+    "content": "Craft a shelter using surrounding resources. Scan the area for useful materials like wood.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.6,
+      "cognitiveSystem": "llm-core"
+    },
+    "metadata": {
+      "thoughtType": "reflection",
+      "trigger": "time-based",
+      "context": "environmental-monitoring",
+      "intensity": 0.4,
+      "llmConfidence": 0.6,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1756760870070-975cueibo",
+    "timestamp": 1756760870070,
+    "processed": false
+  },
+  {
+    "type": "reflection",
+    "content": "Gather resources quickly before night falls too much. Find some logs to craft tools and start a fire.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.7,
+      "cognitiveSystem": "llm-core"
+    },
+    "metadata": {
+      "thoughtType": "reflection",
+      "trigger": "time-based",
+      "context": "environmental-monitoring",
+      "intensity": 0.4,
+      "llmConfidence": 0.7,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1756761024523-up5b7kexw",
+    "timestamp": 1756761024523,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Gather some oak logs to craft a wooden pickaxe. Observing nearby blocks, find an iron ore vein and start mining. Planning to head towards the oak log near position (-4.5, 87, 8.7) first.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.7,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "mine",
+      "trigger": "task-start",
+      "llmConfidence": 0.7,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1756761266099-tgj3y5hdi",
+    "timestamp": 1756761266099,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Mine the oak log nearby to craft a wooden pickaxe. Then return here and start mining iron ore.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.6,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "mine",
+      "trigger": "task-start",
+      "llmConfidence": 0.6,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1756761385422-drkfvtkqx",
+    "timestamp": 1756761385422,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Craft a wooden pickaxe before mining iron ore to ensure you can effectively mine the ore. Look around for oak logs to gather wood.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.7,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "mine",
+      "trigger": "task-start",
+      "llmConfidence": 0.7,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1756761444852-qwnhlke6o",
+    "timestamp": 1756761444852,
+    "processed": false
+  },
+  {
+    "type": "reflection",
+    "content": "Gather wood from nearby trees to craft tools and build a shelter. Safety is my top priority in the evening.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.7,
+      "cognitiveSystem": "llm-core"
+    },
+    "metadata": {
+      "thoughtType": "reflection",
+      "trigger": "time-based",
+      "context": "environmental-monitoring",
+      "intensity": 0.4,
+      "llmConfidence": 0.7,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1756761727173-cu4toao6u",
+    "timestamp": 1756761727173,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Head towards the nearby oak logs at position (7.5,87-89,8.7) and start chopping them with an axe.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.6,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "gather",
+      "trigger": "task-start",
+      "llmConfidence": 0.6,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1756761848675-8465jfkci",
+    "timestamp": 1756761848675,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Gather wood from the nearby tree trunk using an axe. If none available, move to find more resources or a suitable location to start building.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.7,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "gather",
+      "trigger": "task-start",
+      "llmConfidence": 0.7,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1756761968608-3foj9lk92",
+    "timestamp": 1756761968608,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Move towards the nearby tree trunk at coordinates (-38.15, 87, 22.46) and use an axe to gather wood.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.6,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "gather",
+      "trigger": "task-start",
+      "llmConfidence": 0.6,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1756762029609-bs4ts3st0",
+    "timestamp": 1756762029609,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Find a nearby tree and use an axe to gather wood. There's a tree trunk near position (-38.15, 87, 22.46), start there.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.7,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "gather",
+      "trigger": "task-start",
+      "llmConfidence": 0.7,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1756762089355-c4vkfiva7",
+    "timestamp": 1756762089355,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Move towards the nearby tree trunk (x:-38.150302862940464, y:87, z:22.464391251843175) and start chopping it with an axe.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.7,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "gather",
+      "trigger": "task-start",
+      "llmConfidence": 0.7,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1756762150170-ftk76w6q3",
+    "timestamp": 1756762150170,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Move towards the tree near -38.150302862940464,-33.150302862940464 to start chopping wood with an axe.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.7,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "gather",
+      "trigger": "task-start",
+      "llmConfidence": 0.7,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1756762209057-8jgs3es2o",
+    "timestamp": 1756762209057,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Find a nearby tree and use an axe to gather wood. There's one close by at coordinates (-38.1503, 87, 22.4644).",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.7,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "gather",
+      "trigger": "task-start",
+      "llmConfidence": 0.7,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1756762268752-eag6qqo12",
+    "timestamp": 1756762268752,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Find and break down a nearby tree trunk using an axe. There's one nearby at position (-38, 87, 22).",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.6,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "gather",
+      "trigger": "task-start",
+      "llmConfidence": 0.6,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1756762327836-qudn22psm",
+    "timestamp": 1756762327836,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Find and chop some trees nearby. There are tree trunks present in the environment, so use an axe to gather wood.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.7,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "gather",
+      "trigger": "task-start",
+      "llmConfidence": 0.7,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1756762387402-7vs1ff4u2",
+    "timestamp": 1756762387402,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Head towards the nearby tree (position: -38.150302862940464, y: 87, z: 22.464391251843175) and start chopping it with an axe.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.7,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "gather",
+      "trigger": "task-start",
+      "llmConfidence": 0.7,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1756762449007-dqjdq1r4r",
+    "timestamp": 1756762449007,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Find and cut a nearby tree trunk using my axe.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.5,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "gather",
+      "trigger": "task-start",
+      "llmConfidence": 0.5,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1756762506462-siwd7ku5i",
+    "timestamp": 1756762506462,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Gather wood from the nearby tree trunk using an axe.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.6,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "gather",
+      "trigger": "task-start",
+      "llmConfidence": 0.6,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1756762567108-uwjh158pl",
+    "timestamp": 1756762567108,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Gather wood from the nearby tree trunk at (-38, 87, 22). Then move to a new location to continue gathering resources.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.7,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "gather",
+      "trigger": "task-start",
+      "llmConfidence": 0.7,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1756762627793-r5lg38opx",
+    "timestamp": 1756762627793,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Gather wood from the nearby tree trunks using an axe if available. If no axe, use hands to break down smaller branches. Move towards the nearest tree.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.7,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "gather",
+      "trigger": "task-start",
+      "llmConfidence": 0.7,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1756762688008-gu8wc41fn",
+    "timestamp": 1756762688008,
+    "processed": false
+  },
+  {
+    "type": "reflection",
+    "content": "Gather wood from nearby trees to craft tools and build a shelter.",
+    "attribution": "self",
+    "context": {
+      "cognitiveSystem": "llm-core"
+    },
+    "metadata": {
+      "thoughtType": "reflection"
+    },
+    "id": "thought-1756762778644-ij0h4d7mn",
+    "timestamp": 1756762778644,
+    "processed": false
+  },
+  {
+    "type": "reflection",
+    "content": "Gather wood from nearby trees to craft tools and build a shelter.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.6,
+      "cognitiveSystem": "llm-core"
+    },
+    "metadata": {
+      "thoughtType": "reflection",
+      "trigger": "time-based",
+      "context": "environmental-monitoring",
+      "intensity": 0.4,
+      "llmConfidence": 0.6,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1756762778655-vgwkvdn37",
+    "timestamp": 1756762778655,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Gather wood from the nearby tree trunk block at (-38, 87, 22).",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.6,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "gather",
+      "trigger": "task-start",
+      "llmConfidence": 0.6,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1756762867318-1lv8vomun",
+    "timestamp": 1756762867318,
+    "processed": false
+  },
+  {
+    "type": "intrusive",
+    "content": "Is there any trees around I can break down for wood?",
+    "attribution": "intrusive",
+    "context": {
+      "emotionalState": "curious",
+      "confidence": 0.8
+    },
+    "metadata": {
+      "messageType": "intrusion",
+      "intent": "external_suggestion",
+      "thoughtType": "intrusive"
+    },
+    "id": "thought-1756778393428-ix93lvbq8",
+    "timestamp": 1756778393428,
+    "processed": false
+  },
+  {
+    "type": "reflection",
+    "content": "Processing intrusive thought: \"is there any trees around i can break down for wood?\"",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "focused",
+      "confidence": 0.6,
+      "cognitiveSystem": "intrusive-processor"
+    },
+    "metadata": {
+      "thoughtType": "reflection",
+      "source": "intrusive-thought"
+    },
+    "id": "thought-1756778393834-i01usv644",
+    "timestamp": 1756778393834,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Planning system updated: Investigate resource availability (seq) - Success",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "focused",
+      "confidence": 0.7,
+      "cognitiveSystem": "planning-integration"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskId": "task-1756778393839-pkpbtx",
+      "success": true
+    },
+    "id": "thought-1756778393854-w8i41p7ze",
+    "timestamp": 1756778393854,
+    "processed": false
+  },
+  {
+    "type": "intrusive",
+    "content": "Is there any trees around I can break down for wood?",
+    "attribution": "external",
+    "context": {
+      "emotionalState": "curious",
+      "confidence": 0.8
+    },
+    "metadata": {
+      "messageType": "intrusion",
+      "intent": "external_suggestion",
+      "tags": [
+        "external",
+        "intrusion"
+      ],
+      "strength": 0.8,
+      "processed": true,
+      "taskId": "task-1756778393839-pkpbtx",
+      "thoughtType": "intrusive"
+    },
+    "id": "thought-1756778393863-ibw1czeb1",
+    "timestamp": 1756778393863,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Gather information about nearby resources. Look around and identify any trees or coal ores within a short distance.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.7,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "gathering",
+      "trigger": "task-start",
+      "llmConfidence": 0.7,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1756778478261-krhw895ck",
+    "timestamp": 1756778478261,
+    "processed": false
+  },
+  {
+    "type": "reflection",
+    "content": "Craft a pickaxe and gather some coal from the nearby ore. Then find some wood to build a shelter before night falls completely.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.7,
+      "cognitiveSystem": "llm-core"
+    },
+    "metadata": {
+      "thoughtType": "reflection",
+      "trigger": "time-based",
+      "context": "environmental-monitoring",
+      "intensity": 0.4,
+      "llmConfidence": 0.7,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1756778600727-og74trqal",
+    "timestamp": 1756778600727,
+    "processed": false
+  },
+  {
+    "type": "reflection",
+    "content": "Gather wood from nearby trees to craft tools and build a shelter.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.6,
+      "cognitiveSystem": "llm-core"
+    },
+    "metadata": {
+      "thoughtType": "reflection",
+      "trigger": "time-based",
+      "context": "environmental-monitoring",
+      "intensity": 0.4,
+      "llmConfidence": 0.6,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1756778720415-xr7fyfcvn",
+    "timestamp": 1756778720415,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Find a nearby tree and use an axe to gather wood. There's one tree trunk near position (-38, 87, 22).",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.7,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "building",
+      "trigger": "task-start",
+      "llmConfidence": 0.7,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1756778781290-u3e7h9sk3",
+    "timestamp": 1756778781290,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Find and break a nearby tree trunk with an axe to gather wood.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.6,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "building",
+      "trigger": "task-start",
+      "llmConfidence": 0.6,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1756778839111-2fiffl6pp",
+    "timestamp": 1756778839111,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Move towards the nearest tree trunk located at (-38.15, 87, 22.46). Use an axe to gather wood from it.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.7,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "building",
+      "trigger": "task-start",
+      "llmConfidence": 0.7,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1756778901206-yhtjw7y47",
+    "timestamp": 1756778901206,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Move towards the nearest tree trunk block (x:-38.150302862940464, y:87, z:22.464391251843175) and start chopping it with my axe to gather wood.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.7,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "building",
+      "trigger": "task-start",
+      "llmConfidence": 0.7,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1756778962113-89gq2w6dc",
+    "timestamp": 1756778962113,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Head towards the nearby tree trunk at (-38, 87, 22). Use an axe to gather wood.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.6,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "building",
+      "trigger": "task-start",
+      "llmConfidence": 0.6,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1756779019581-sx6youwod",
+    "timestamp": 1756779019581,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Move towards the nearby tree trunk at coordinates (-38.150302862940464, 87, 22.464391251843175) and start chopping it with an axe to gather wood.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.7,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "building",
+      "trigger": "task-start",
+      "llmConfidence": 0.7,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1756779141221-0ga5c0h3l",
+    "timestamp": 1756779141221,
+    "processed": false
+  },
+  {
+    "type": "reflection",
+    "content": "Find a nearby tree to gather wood for a shelter and tools.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.6,
+      "cognitiveSystem": "llm-core"
+    },
+    "metadata": {
+      "thoughtType": "reflection",
+      "trigger": "time-based",
+      "context": "environmental-monitoring",
+      "intensity": 0.4,
+      "llmConfidence": 0.6,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1756779212198-qa79qqrw0",
+    "timestamp": 1756779212198,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Move towards the tree trunk nearby and start chopping with my axe.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.6,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "building",
+      "trigger": "task-start",
+      "llmConfidence": 0.6,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1756779319157-1k2ty9kay",
+    "timestamp": 1756779319157,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Find a nearby tree and start chopping wood with my axe.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.6,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "building",
+      "trigger": "task-start",
+      "llmConfidence": 0.6,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1756779378677-aifsgcoau",
+    "timestamp": 1756779378677,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Head towards the nearby tree trunk at (-38.15, 87, 22.46) and use an axe to gather wood.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.6,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "building",
+      "trigger": "task-start",
+      "llmConfidence": 0.6,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1756779499628-kxuc421sp",
+    "timestamp": 1756779499628,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Find a nearby tree and use an axe (if you have one) or your hands to start chopping wood.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.6,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "building",
+      "trigger": "task-start",
+      "llmConfidence": 0.6,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1756779619096-zokjxg3jq",
+    "timestamp": 1756779619096,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Head to the nearby tree (type \"tree_trunk\" at position -38.150302862940464,90,22.464391251843175) and use an axe to gather wood.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.7,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "building",
+      "trigger": "task-start",
+      "llmConfidence": 0.7,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1756779680464-1xhok12f5",
+    "timestamp": 1756779680464,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Find and chop a nearby tree trunk using an axe. There's one within reach.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.6,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "building",
+      "trigger": "task-start",
+      "llmConfidence": 0.6,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1756779738983-e6f0c3ag2",
+    "timestamp": 1756779738983,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Move towards the nearby tree trunk at position (-38.150302862940464, 87, 22.464391251843175) and start chopping it with an axe to gather wood.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.7,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "building",
+      "trigger": "task-start",
+      "llmConfidence": 0.7,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1756779861074-u7atb0ibn",
+    "timestamp": 1756779861074,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Move towards the nearest tree trunk (position: -38.150302862940464, 87, 22.464391251843175) and start chopping it with an axe to gather wood.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.7,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "building",
+      "trigger": "task-start",
+      "llmConfidence": 0.7,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1756779920921-1h6i0qgrp",
+    "timestamp": 1756779920921,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Scan the area for nearby trees. If found, use an axe to gather wood. If no trees are visible, move closer to the nearest tree and start chopping.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.7,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "building",
+      "trigger": "task-start",
+      "llmConfidence": 0.7,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1756779979328-xzi0bhfyu",
+    "timestamp": 1756779979328,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Move towards the tree trunk block nearby (x:-38.150302862940464, y:87, z:22.464391251843175). Start chopping it with an axe to gather wood.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.7,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "building",
+      "trigger": "task-start",
+      "llmConfidence": 0.7,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1756780040989-iyyvr87m0",
+    "timestamp": 1756780040989,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Move towards the nearby tree trunk at (-38.150, 87, 22.464) and start chopping it with an axe to gather wood.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.7,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "building",
+      "trigger": "task-start",
+      "llmConfidence": 0.7,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1756780100198-9ci809jbv",
+    "timestamp": 1756780100198,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Head towards the nearby tree trunk at coordinates (-38.150302862940464, 87, 22.464391251843175) and use an axe to gather wood.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.7,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "building",
+      "trigger": "task-start",
+      "llmConfidence": 0.7,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1756780220392-hoiq0ouzq",
+    "timestamp": 1756780220392,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Move towards the nearby tree trunk at coordinates (-38.15, 87, 22.46) and start chopping it down with an axe.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.7,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "building",
+      "trigger": "task-start",
+      "llmConfidence": 0.7,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1756780279409-jy3oa2fm2",
+    "timestamp": 1756780279409,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Move towards the nearby tree trunk at -38.1503, 87, 22.464 to gather wood.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.6,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "building",
+      "trigger": "task-start",
+      "llmConfidence": 0.6,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1756780339548-gpi89xf9f",
+    "timestamp": 1756780339548,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Find a tree and use an axe to gather wood.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.5,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "building",
+      "trigger": "task-start",
+      "llmConfidence": 0.5,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1756780458945-z6xzyg567",
+    "timestamp": 1756780458945,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Move towards the nearby tree trunk at coordinates (-38, 87, 22). Use an axe to gather wood.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.6,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "building",
+      "trigger": "task-start",
+      "llmConfidence": 0.6,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1756780519348-mw1miqll8",
+    "timestamp": 1756780519348,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Scan the area for trees and use an axe to gather wood. Nearby is a tree trunk block; start chopping it down.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.7,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "building",
+      "trigger": "task-start",
+      "llmConfidence": 0.7,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1756780579178-7qfm5kwbr",
+    "timestamp": 1756780579178,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Find a nearby tree and use an axe to gather wood.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.5,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "building",
+      "trigger": "task-start",
+      "llmConfidence": 0.5,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1756780638828-se5lp2mi0",
+    "timestamp": 1756780638828,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Head north to find some trees and gather wood. There are a few tree trunks nearby that can be chopped down with an axe.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.7,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "building",
+      "trigger": "task-start",
+      "llmConfidence": 0.7,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1756780699512-td333aqn2",
+    "timestamp": 1756780699512,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Head towards the nearby tree trunk at -38.15, 87, 22.46 and start chopping wood with my axe.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.6,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "building",
+      "trigger": "task-start",
+      "llmConfidence": 0.6,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1756780759770-3eb41ads2",
+    "timestamp": 1756780759770,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Find and chop down a nearby tree trunk using my hands or a stone axe if available.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.6,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "building",
+      "trigger": "task-start",
+      "llmConfidence": 0.6,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1756780818977-831gywtay",
+    "timestamp": 1756780818977,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Find a nearby tree and use an axe to gather wood. There's one near position (-38.150302862940464, 87, 22.464391251843175).",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.7,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "building",
+      "trigger": "task-start",
+      "llmConfidence": 0.7,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1756780940961-djug2fr69",
+    "timestamp": 1756780940961,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Move towards the nearby tree trunk at (-38.15, 87, 22.46) and start chopping it down with my axe.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.6,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "building",
+      "trigger": "task-start",
+      "llmConfidence": 0.6,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1756780999891-1lbdgpat4",
+    "timestamp": 1756780999891,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Find and chop down a nearby tree trunk using an axe.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.6,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "building",
+      "trigger": "task-start",
+      "llmConfidence": 0.6,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1756781058813-54tuie46x",
+    "timestamp": 1756781058813,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Move towards the nearby tree trunk at (-38.15, 87, 22.46) and start chopping wood with my axe.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.6,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "building",
+      "trigger": "task-start",
+      "llmConfidence": 0.6,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1756781179474-xcyc2wcu4",
+    "timestamp": 1756781179474,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Scan the area for nearby trees. Target the closest tree trunk block and start chopping with an axe. If no axe, find or craft one first.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.7,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "building",
+      "trigger": "task-start",
+      "llmConfidence": 0.7,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1756781239466-dm03yv66a",
+    "timestamp": 1756781239466,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Move towards the nearby tree trunk at -38.150302862940464, 87, 22.464391251843175 and use an axe to gather wood.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.7,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "building",
+      "trigger": "task-start",
+      "llmConfidence": 0.7,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1756781301201-iwyrykq8r",
+    "timestamp": 1756781301201,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Find a nearby tree and start chopping wood with my axe.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.6,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "building",
+      "trigger": "task-start",
+      "llmConfidence": 0.6,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1756781358975-tfshfhtkz",
+    "timestamp": 1756781358975,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Move towards the nearest tree trunk at -38.150302862940464,-33.150302862940464,-22.15030286294046 and start chopping it with an axe.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.7,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "building",
+      "trigger": "task-start",
+      "llmConfidence": 0.7,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1756781420750-bgmzttwi5",
+    "timestamp": 1756781420750,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Find a nearby tree and start chopping wood with my axe.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.6,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "building",
+      "trigger": "task-start",
+      "llmConfidence": 0.6,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1756781538963-46ku1fu4v",
+    "timestamp": 1756781538963,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Move towards the nearby tree trunk at coordinates (-38.1503, 87, 22.4644) and use an axe to gather wood.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.7,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "building",
+      "trigger": "task-start",
+      "llmConfidence": 0.7,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1756781600326-06bb1utm1",
+    "timestamp": 1756781600326,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Find a tree and use an axe to gather wood.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.5,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "building",
+      "trigger": "task-start",
+      "llmConfidence": 0.5,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1756781659101-w4rb4o36k",
+    "timestamp": 1756781659101,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Find a nearby tree and use an axe (if you have one) or my hands to start chopping wood.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.6,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "building",
+      "trigger": "task-start",
+      "llmConfidence": 0.6,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1756781719167-io60czbj3",
+    "timestamp": 1756781719167,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Head towards the nearby tree trunk at coordinates (-38.1503, 87, 22.4644) and start chopping it with an axe to gather wood.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.7,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "building",
+      "trigger": "task-start",
+      "llmConfidence": 0.7,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1756781779719-d7kqal5yu",
+    "timestamp": 1756781779719,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Move towards the nearby tree trunk at (-38.15, 87, 22.46) and use an axe to gather wood.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.6,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "building",
+      "trigger": "task-start",
+      "llmConfidence": 0.6,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1756781839951-k6frzf0dc",
+    "timestamp": 1756781839951,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Head towards the nearby tree trunk at coordinates (-38.15, 87, 22.46) and start chopping wood with an axe.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.7,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "building",
+      "trigger": "task-start",
+      "llmConfidence": 0.7,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1756781960148-yc38tjwnt",
+    "timestamp": 1756781960148,
+    "processed": false
+  },
+  {
+    "type": "reflection",
+    "content": "Gather some wood to craft tools and build a shelter. Observing the area for trees and safe location.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.6,
+      "cognitiveSystem": "llm-core"
+    },
+    "metadata": {
+      "thoughtType": "reflection",
+      "trigger": "time-based",
+      "context": "environmental-monitoring",
+      "intensity": 0.4,
+      "llmConfidence": 0.6,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1756782062662-wqnejcltz",
+    "timestamp": 1756782062662,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Scan the area for trees. Find and cut down a nearby tree using my hands or look for an axe if available.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.7,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "building",
+      "trigger": "task-start",
+      "llmConfidence": 0.7,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1756782139779-c8bhhdh4z",
+    "timestamp": 1756782139779,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Scan the area for trees nearby. If none are visible, move east towards where a tree was last detected. Prepare to use an axe if found.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.7,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "building",
+      "trigger": "task-start",
+      "llmConfidence": 0.7,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1756782259787-b0iixw0as",
+    "timestamp": 1756782259787,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Scan the area for nearby trees. Target the nearest tree trunk block and start chopping with my axe.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.6,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "building",
+      "trigger": "task-start",
+      "llmConfidence": 0.6,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1756782319002-5mnp3r17z",
+    "timestamp": 1756782319002,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Find a nearby tree and use an axe to gather wood.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.5,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "building",
+      "trigger": "task-start",
+      "llmConfidence": 0.5,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1756782378885-w3pvfjku6",
+    "timestamp": 1756782378885,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Find a nearby tree and start chopping it with an axe. If no axe, gather resources to craft one first.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.7,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "building",
+      "trigger": "task-start",
+      "llmConfidence": 0.7,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1756782439370-i8dqjut4b",
+    "timestamp": 1756782439370,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Start by finding a nearby tree and use an axe if you have one. If not, gather some sticks to make an axe. Look around for logs.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.7,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "building",
+      "trigger": "task-start",
+      "llmConfidence": 0.7,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1756782500059-sx4nzlnmq",
+    "timestamp": 1756782500059,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Find a nearby tree and use an axe to gather wood. There's one near the coordinates (-38.150302862940464, 87, 22.464391251843175).",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.7,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "building",
+      "trigger": "task-start",
+      "llmConfidence": 0.7,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1756782561028-hsfdbo54m",
+    "timestamp": 1756782561028,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Head north to the nearby tree trunk block and use an axe to gather wood.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.6,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "building",
+      "trigger": "task-start",
+      "llmConfidence": 0.6,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1756782679371-q0a5akgje",
+    "timestamp": 1756782679371,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Move towards the nearby tree trunk at coordinates (-38.1503, 87, 22.4644) and start chopping it with an axe to gather wood.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.7,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "building",
+      "trigger": "task-start",
+      "llmConfidence": 0.7,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1756782800378-f9estt76t",
+    "timestamp": 1756782800378,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Move towards the nearest tree trunk block at (-38.15, 87, 22.46) and start chopping wood with an axe.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.7,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "building",
+      "trigger": "task-start",
+      "llmConfidence": 0.7,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1756782860037-ughc1nl05",
+    "timestamp": 1756782860037,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Move to the nearest tree trunk at (-38.15, 87, 22.46) and start chopping wood with an axe.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.6,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "building",
+      "trigger": "task-start",
+      "llmConfidence": 0.6,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1756782919549-3c8k6fn0a",
+    "timestamp": 1756782919549,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Move towards the nearby tree trunk at (-38.15, 87, 22.46) and start chopping wood with my axe.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.6,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "building",
+      "trigger": "task-start",
+      "llmConfidence": 0.6,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1756782979754-38e02lbks",
+    "timestamp": 1756782979754,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Head towards the nearby tree trunk at coordinates (-38.15, 87, 22.46) and use an axe to gather wood.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.6,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "building",
+      "trigger": "task-start",
+      "llmConfidence": 0.6,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1756783039882-omlazg91t",
+    "timestamp": 1756783039882,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Find and cut down a tree trunk using an axe if available; otherwise, gather any nearby logs to start gathering wood.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.7,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "building",
+      "trigger": "task-start",
+      "llmConfidence": 0.7,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1756783099599-3zhampks9",
+    "timestamp": 1756783099599,
+    "processed": false
+  },
+  {
+    "type": "reflection",
+    "content": "Gather some wood from nearby trees to craft tools and build a shelter.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.6,
+      "cognitiveSystem": "llm-core"
+    },
+    "metadata": {
+      "thoughtType": "reflection",
+      "trigger": "time-based",
+      "context": "environmental-monitoring",
+      "intensity": 0.4,
+      "llmConfidence": 0.6,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1756783202322-2o9tds0cp",
+    "timestamp": 1756783202322,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Move towards the nearest tree trunk block (position: -38.150302862940464, y: 87, z: 22.464391251843175) and start chopping it with an axe to gather wood.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.7,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "building",
+      "trigger": "task-start",
+      "llmConfidence": 0.7,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1756783281905-u35cehyve",
+    "timestamp": 1756783281905,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Find a nearby tree and use an axe (if available) or my hands to start chopping wood.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.6,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "building",
+      "trigger": "task-start",
+      "llmConfidence": 0.6,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1756783399369-dbplimfqb",
+    "timestamp": 1756783399369,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Find a nearby tree and start chopping with my axe.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.5,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "building",
+      "trigger": "task-start",
+      "llmConfidence": 0.5,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1756783518735-lu8rlu0jp",
+    "timestamp": 1756783518735,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Head towards the nearby tree (at position -38.1503, 87, 22.4644) and start chopping wood with my axe.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.7,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "building",
+      "trigger": "task-start",
+      "llmConfidence": 0.7,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1756783579877-sf3grmtpo",
+    "timestamp": 1756783579877,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Find a tree and start chopping wood with my axe.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.5,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "building",
+      "trigger": "task-start",
+      "llmConfidence": 0.5,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1756783638811-1mj2a8w02",
+    "timestamp": 1756783638811,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Head towards the nearby tree trunk at coordinates (-38.150302862940464, 87, 22.464391251843175). Use an axe to gather wood.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.7,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "building",
+      "trigger": "task-start",
+      "llmConfidence": 0.7,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1756783700911-dbyjkafta",
+    "timestamp": 1756783700911,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Head east towards the tree trunks near your current position. Use an axe to gather wood from the trees.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.7,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "building",
+      "trigger": "task-start",
+      "llmConfidence": 0.7,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1756783819186-xhoqt5gp8",
+    "timestamp": 1756783819186,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Move towards the tree trunk nearby and use an axe to gather wood.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.6,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "building",
+      "trigger": "task-start",
+      "llmConfidence": 0.6,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1756783878975-5bkboft4h",
+    "timestamp": 1756783878975,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Head towards the nearby tree trunk at coordinates (-38.1503, 87, 22.4644) and start chopping it with an axe to gather wood.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.7,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "building",
+      "trigger": "task-start",
+      "llmConfidence": 0.7,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1756784000421-e7sl0zmml",
+    "timestamp": 1756784000421,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Find a nearby tree and start chopping wood with an axe. If none available, craft one first.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.6,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "building",
+      "trigger": "task-start",
+      "llmConfidence": 0.6,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1756784119105-5t43cmyxm",
+    "timestamp": 1756784119105,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Head towards the nearest tree trunk block located at (-38, 87, 22). Use an axe to gather wood.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.6,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "building",
+      "trigger": "task-start",
+      "llmConfidence": 0.6,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1756784239709-uqyjw5zh3",
+    "timestamp": 1756784239709,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Find a nearby tree and use an axe to gather wood. There's one close by at coordinates (-38.15, 87, 22.46).",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.7,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "building",
+      "trigger": "task-start",
+      "llmConfidence": 0.7,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1756784300166-excwmji4v",
+    "timestamp": 1756784300166,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Move towards the nearest tree trunk block (position: -38.150302862940464, 87, 22.464391251843175). Use an axe to gather wood.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.7,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "building",
+      "trigger": "task-start",
+      "llmConfidence": 0.7,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1756784420533-dja8m3305",
+    "timestamp": 1756784420533,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Scan the area for nearby logs. If none found, move east towards the tree trunk block at -38,17 coordinates to gather wood.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.7,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "building",
+      "trigger": "task-start",
+      "llmConfidence": 0.7,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1756784479641-wsflmx22b",
+    "timestamp": 1756784479641,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Head towards the nearby tree trunk block at coordinates (-38.15, 87, 22.46) and start chopping it down with an axe.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.7,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "building",
+      "trigger": "task-start",
+      "llmConfidence": 0.7,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1756784540119-jajt3a4nv",
+    "timestamp": 1756784540119,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Find a nearby tree and use an axe to gather wood. There's a tree trunk block at position (-38.15030286294046, 87, 22.464391251843175).",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.7,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "building",
+      "trigger": "task-start",
+      "llmConfidence": 0.7,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1756784601390-ath6qfcl9",
+    "timestamp": 1756784601390,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Head towards the nearest tree trunk block (position: -38.1503, 87, 22.464) and use an axe to gather wood.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.7,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "building",
+      "trigger": "task-start",
+      "llmConfidence": 0.7,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1756784719633-hpjyvfhet",
+    "timestamp": 1756784719633,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Find and cut down a nearby tree trunk using an axe.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.6,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "building",
+      "trigger": "task-start",
+      "llmConfidence": 0.6,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1756784778946-igv828qw9",
+    "timestamp": 1756784778946,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Find a tree and use an axe to gather wood.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.5,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "building",
+      "trigger": "task-start",
+      "llmConfidence": 0.5,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1756784838907-co04sz826",
+    "timestamp": 1756784838907,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Move towards the nearest tree trunk located at (-38.1503, 87, 22.4644) and start chopping it with an axe.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.7,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "building",
+      "trigger": "task-start",
+      "llmConfidence": 0.7,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1756784959774-r698gig88",
+    "timestamp": 1756784959774,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Scan the area for nearby trees. Head towards the tree trunk block at -38.1503, 87, 22.464 to start chopping wood with my axe.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.7,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "building",
+      "trigger": "task-start",
+      "llmConfidence": 0.7,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1756785080126-l7njxxdlk",
+    "timestamp": 1756785080126,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Move towards the nearest tree trunk (position: -38.150302862940464, 87, 22.464391251843175) and use an axe to gather wood.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.7,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "building",
+      "trigger": "task-start",
+      "llmConfidence": 0.7,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1756785141209-w1eso5kvv",
+    "timestamp": 1756785141209,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Move towards the nearby tree trunk at -38.15, 87, 22.46 to start chopping wood with my axe.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.6,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "building",
+      "trigger": "task-start",
+      "llmConfidence": 0.6,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1756785200075-y1njp1led",
+    "timestamp": 1756785200075,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Move towards the tree trunk near position (-38, 87, 22). Use an axe to gather wood.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.6,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "building",
+      "trigger": "task-start",
+      "llmConfidence": 0.6,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1756785259492-jranbwbot",
+    "timestamp": 1756785259492,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Find and chop down a nearby tree to gather wood. Observing the environment, there are no immediate threats, but I need to act quickly as resources like logs are scarce.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.7,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "building",
+      "trigger": "task-start",
+      "llmConfidence": 0.7,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1756785319636-aoct4ik2z",
+    "timestamp": 1756785319636,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Find a nearby tree and use an axe to gather wood. There are two trees visible; start with the one closest to your current position.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.7,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "building",
+      "trigger": "task-start",
+      "llmConfidence": 0.7,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1756785379593-9x9u0cz6g",
+    "timestamp": 1756785379593,
+    "processed": false
   }
 ]

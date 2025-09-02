@@ -1,0 +1,231 @@
+/**
+ * Integration Example for Planning System
+ *
+ * Demonstrates basic integration between planning approaches
+ *
+ * @author @darianrosebrook
+ */
+
+import { EventEmitter } from 'events';
+import { Goal, GoalType, GoalStatus } from '../types';
+import { BehaviorTreeRunner } from '../behavior-trees/BehaviorTreeRunner';
+import { HybridSkillPlanner } from './hybrid-skill-planner';
+import { SkillRegistry } from '@conscious-bot/memory';
+import { EnhancedRegistry, DynamicCreationFlow } from '@conscious-bot/core';
+import { HRMInspiredPlanner } from '../hierarchical-planner/hrm-inspired-planner';
+import { EnhancedGOAPPlanner } from '../reactive-executor/enhanced-goap-planner';
+
+// Mock ToolExecutor for demonstration
+class MockToolExecutor {
+  async execute(tool: string, args: Record<string, any>): Promise<any> {
+    console.log(`Mock executing tool: ${tool} with args:`, args);
+    return { ok: true, data: { result: 'mock-success' } };
+  }
+}
+
+// Mock skill registry
+const mockSkillRegistry = new SkillRegistry();
+
+// Mock MCP registry
+const mockMCPRegistry = {
+  queryCapabilities: async () => [],
+  registerCapability: async () => true,
+  unregisterCapability: async () => true,
+} as unknown as EnhancedRegistry;
+
+// Mock dynamic flow
+const mockDynamicFlow = {
+  createCapability: async () => ({ id: 'mock-capability' }),
+  discoverCapabilities: async () => ({ capabilities: [] }),
+} as unknown as DynamicCreationFlow;
+
+// Mock planners
+const mockHRMPlanner = new HRMInspiredPlanner();
+const mockGOAPPlanner = new EnhancedGOAPPlanner();
+
+// Create behavior tree runner with mock tool executor
+const mockToolExecutor = new MockToolExecutor();
+const btRunner = new BehaviorTreeRunner(mockToolExecutor);
+
+// Create hybrid planner
+const hybridPlanner = new HybridSkillPlanner(
+  mockSkillRegistry,
+  btRunner,
+  mockHRMPlanner,
+  mockGOAPPlanner,
+  mockMCPRegistry,
+  mockDynamicFlow
+);
+
+/**
+ * Set up integrated planning system
+ */
+export async function setupIntegratedPlanningSystem() {
+  console.log('Setting up integrated planning system...');
+
+  // Initialize components
+  // Note: HybridSkillPlanner doesn't have an initialize method
+
+  console.log('Integrated planning system ready');
+  return hybridPlanner;
+}
+
+/**
+ * Handle goal with integrated planning approach
+ */
+export async function handleGoalWithIntegratedSystem(
+  goal: Goal,
+  context: any
+): Promise<any> {
+  console.log(`Handling goal: ${goal.description}`);
+
+  const planningResult = await hybridPlanner.plan(goal.description, {
+    goal: goal.description,
+    constraints: [],
+    domain: 'minecraft',
+    urgency: context.urgency || 'medium',
+    skillRegistry: mockSkillRegistry,
+    worldState: context.worldState || {},
+    availableResources: context.availableResources || {},
+    timeConstraints: {
+      urgency: context.urgency || 'medium',
+      maxPlanningTime: context.maxPlanningTime || 5000,
+    },
+    planningPreferences: {
+      preferSkills: true,
+      preferMCP: false,
+      preferHTN: true,
+      preferGOAP: true,
+      allowHybrid: true,
+      preferSimple: false,
+    },
+    currentState: context.currentState || {},
+    resources: context.resources || {},
+    leafContext: context.leafContext || {},
+  });
+
+  return planningResult;
+}
+
+/**
+ * Example survival goal
+ */
+export async function exampleSurvivalGoal() {
+  const survivalGoal: Goal = {
+    id: 'survival_goal_1',
+    type: GoalType.SURVIVAL,
+    priority: 9,
+    urgency: 8,
+    utility: 0.9,
+    description: 'Survive in hostile environment',
+    preconditions: [
+      {
+        id: 'precond_1',
+        type: 'inventory' as any,
+        condition: 'bot has basic tools',
+        isSatisfied: true,
+      },
+    ],
+    effects: [
+      {
+        id: 'effect_1',
+        type: 'health_change' as any,
+        description: 'Maintain health above critical level',
+        magnitude: 0.8,
+        duration: 3600000, // 1 hour
+      },
+    ],
+    status: GoalStatus.ACTIVE,
+    createdAt: Date.now(),
+    updatedAt: Date.now(),
+    subGoals: [],
+  };
+
+  const result = await handleGoalWithIntegratedSystem(survivalGoal, {
+    urgency: 'high',
+    maxPlanningTime: 5000,
+    worldState: { environment: 'hostile' },
+    availableResources: { tools: 3, food: 5 },
+    currentState: { health: 80 },
+    resources: { health: 80, energy: 60 },
+  });
+
+  console.log('Survival goal result:', {
+    success: result.success,
+    plan: result.plan,
+    decision: result.decision,
+  });
+
+  return result;
+}
+
+/**
+ * Example exploration goal
+ */
+export async function exampleExplorationGoal() {
+  const explorationGoal: Goal = {
+    id: 'exploration_goal_1',
+    type: GoalType.EXPLORATION,
+    priority: 7,
+    urgency: 5,
+    utility: 0.8,
+    description: 'Explore new territory and discover resources',
+    preconditions: [
+      {
+        id: 'precond_1',
+        type: 'skill' as any,
+        condition: 'bot has movement skills',
+        isSatisfied: true,
+      },
+    ],
+    effects: [
+      {
+        id: 'effect_1',
+        type: 'knowledge_gain' as any,
+        description: 'New territory knowledge',
+        magnitude: 0.7,
+        duration: 7200000, // 2 hours
+      },
+    ],
+    status: GoalStatus.ACTIVE,
+    createdAt: Date.now(),
+    updatedAt: Date.now(),
+    subGoals: [],
+  };
+
+  const result = await handleGoalWithIntegratedSystem(explorationGoal, {
+    urgency: 'medium',
+    maxPlanningTime: 3000,
+    worldState: { territory: 'unknown' },
+    availableResources: { energy: 100 },
+    currentState: { position: [0, 0, 0] },
+    resources: { energy: 100, tools: 2 },
+  });
+
+  console.log('Exploration goal result:', {
+    success: result.success,
+    plan: result.plan,
+    decision: result.decision,
+  });
+
+  return result;
+}
+
+/**
+ * Main integration example function
+ */
+export async function runIntegrationExample() {
+  console.log('Running Integration Example\n');
+
+  try {
+    // Run survival goal example
+    await exampleSurvivalGoal();
+
+    // Run exploration goal example
+    await exampleExplorationGoal();
+
+    console.log('\nIntegration example completed successfully!');
+  } catch (error) {
+    console.error('Integration example failed:', error);
+  }
+}

@@ -1,7 +1,7 @@
 #!/usr/bin/env tsx
 
-import mineflayer from 'mineflayer';
-import { createViewer } from 'prismarine-viewer';
+import { createBot } from 'mineflayer';
+import { mineflayer as createViewer } from 'prismarine-viewer';
 import { join } from 'path';
 
 // Import viewer enhancements
@@ -161,7 +161,7 @@ async function main() {
 
   try {
     // Create the bot
-    const bot = mineflayer({
+    const bot = createBot({
       host: config.serverAddress,
       port: config.serverPort,
       version: config.version,

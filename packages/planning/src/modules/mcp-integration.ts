@@ -7,7 +7,7 @@
  * @author @darianrosebrook
  */
 
-import { LeafFactory, createLeafContext } from '@conscious-bot/core';
+import { LeafFactory } from '@conscious-bot/core';
 import type {
   ConsciousBotMCPServer,
   MCPServerDependencies,
@@ -157,6 +157,20 @@ export class MCPIntegration {
           permissions: option.permissions || [],
         }
       );
+
+      // If we have a local BT runner, store inline definition for immediate use
+      try {
+        if ((this as any).btRunner && option.btDefinition) {
+          const optId =
+            (result?.optionId as string) || option.id || option.name;
+          (this as any).btRunner.storeInlineDefinition(
+            optId,
+            option.btDefinition
+          );
+        }
+      } catch (e) {
+        console.error('[MCP] Failed to store inline definition:', e);
+      }
 
       return {
         success: result.status === 'success',

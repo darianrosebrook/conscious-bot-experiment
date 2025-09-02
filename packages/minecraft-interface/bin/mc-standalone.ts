@@ -85,17 +85,17 @@ Examples:
 }
 
 async function runBasicScenario(
-  interface: any,
+  gameInterface: any,
   verbose: boolean = false
 ): Promise<void> {
   console.log(' Running basic scenario...');
 
   try {
     // Connect to server
-    await interface.connect();
+    await gameInterface.connect();
 
     // Get initial state
-    const initialState = await interface.getGameState();
+    const initialState = await gameInterface.getGameState();
     if (verbose) {
       console.log(
         ' Initial game state:',
@@ -111,7 +111,7 @@ async function runBasicScenario(
     };
 
     console.log(' Executing movement action...');
-    const movementResult = await interface.executeAction(movementAction);
+    const movementResult = await gameInterface.executeAction(movementAction);
 
     if (movementResult.success) {
       console.log(' Movement successful');
@@ -124,7 +124,7 @@ async function runBasicScenario(
     }
 
     // Get final state
-    const finalState = await interface.getGameState();
+    const finalState = await gameInterface.getGameState();
     if (verbose) {
       console.log(' Final game state:', JSON.stringify(finalState, null, 2));
     }
@@ -134,18 +134,18 @@ async function runBasicScenario(
     console.error(' Basic scenario failed:', error);
     throw error;
   } finally {
-    await interface.disconnect();
+    await gameInterface.disconnect();
   }
 }
 
 async function runNavigationScenario(
-  interface: any,
+  gameInterface: any,
   verbose: boolean = false
 ): Promise<void> {
   console.log(' Running navigation scenario...');
 
   try {
-    await interface.connect();
+    await gameInterface.connect();
 
     // Test different movement types
     const movements = [
@@ -157,7 +157,7 @@ async function runNavigationScenario(
 
     for (const movement of movements) {
       console.log(` Executing ${movement.type}...`);
-      const result = await interface.executeAction({
+      const result = await gameInterface.executeAction({
         ...movement,
         priority: 1,
       });
@@ -181,21 +181,21 @@ async function runNavigationScenario(
     console.error(' Navigation scenario failed:', error);
     throw error;
   } finally {
-    await interface.disconnect();
+    await gameInterface.disconnect();
   }
 }
 
 async function runInventoryScenario(
-  interface: any,
+  gameInterface: any,
   verbose: boolean = false
 ): Promise<void> {
   console.log(' Running inventory scenario...');
 
   try {
-    await interface.connect();
+    await gameInterface.connect();
 
     // Get current inventory
-    const gameState = await interface.getGameState();
+    const gameState = await gameInterface.getGameState();
     console.log(' Current inventory items:', gameState.inventory?.length || 0);
 
     if (verbose) {
@@ -212,7 +212,7 @@ async function runInventoryScenario(
       priority: 1,
     };
 
-    const result = await interface.executeAction(inventoryAction);
+    const result = await gameInterface.executeAction(inventoryAction);
 
     if (result.success) {
       console.log(' Inventory check successful');
@@ -225,18 +225,18 @@ async function runInventoryScenario(
     console.error(' Inventory scenario failed:', error);
     throw error;
   } finally {
-    await interface.disconnect();
+    await gameInterface.disconnect();
   }
 }
 
 async function runCraftingScenario(
-  interface: any,
+  gameInterface: any,
   verbose: boolean = false
 ): Promise<void> {
   console.log(' Running crafting scenario...');
 
   try {
-    await interface.connect();
+    await gameInterface.connect();
 
     // Test basic crafting
     const craftingAction = {
@@ -249,7 +249,7 @@ async function runCraftingScenario(
     };
 
     console.log(' Attempting to craft planks...');
-    const result = await interface.executeAction(craftingAction);
+    const result = await gameInterface.executeAction(craftingAction);
 
     if (result.success) {
       console.log(' Crafting successful');
@@ -266,7 +266,7 @@ async function runCraftingScenario(
     console.error(' Crafting scenario failed:', error);
     throw error;
   } finally {
-    await interface.disconnect();
+    await gameInterface.disconnect();
   }
 }
 
