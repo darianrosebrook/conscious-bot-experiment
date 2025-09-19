@@ -325,11 +325,6 @@ graph TD
     ACT --> ENV
     SM -.-> ACT
     
-    %% Styling
-    classDef core fill:#e1f5fe
-    classDef memory fill:#f3e5f5
-    classDef planning fill:#e8f5e8
-    classDef action fill:#fff3e0
     
     class CC,SM core
     class EM,WM memory
