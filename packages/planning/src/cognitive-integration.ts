@@ -80,7 +80,7 @@ export class CognitiveIntegration extends EventEmitter {
     if (!this.taskHistory.has(taskId)) {
       this.taskHistory.set(taskId, []);
     }
-    const history = this.taskHistory.get(taskId)!;
+    const history = this.taskHistory.get(taskId) || [];
     history.push({
       task,
       result,
@@ -123,7 +123,7 @@ export class CognitiveIntegration extends EventEmitter {
   private async generateCognitiveFeedback(
     task: any,
     result: any,
-    context: any
+    context: any = {}
   ): Promise<CognitiveFeedback> {
     const success = result.success === true && !result.error;
     const taskHistory = this.taskHistory.get(task.id) || [];
@@ -232,18 +232,15 @@ export class CognitiveIntegration extends EventEmitter {
     if (success) {
       if (analysis.totalAttempts === 1) {
         return `Successfully completed ${task.type} task on first attempt. The approach was effective.`;
-      } else {
-        return `Successfully completed ${task.type} task after ${analysis.totalAttempts} attempts. Persistence paid off.`;
       }
-    } else {
-      if (analysis.isStuck) {
-        return `Stuck in a loop with ${task.type} task. Failed ${analysis.recentFailures} times consecutively. Need to change approach.`;
-      } else if (analysis.failureRate > this.config.failureThreshold) {
-        return `High failure rate (${(analysis.failureRate * 100).toFixed(1)}%) for ${task.type} task. Current strategy may not be optimal.`;
-      } else {
-        return `Failed to complete ${task.type} task: ${result.error || 'Unknown error'}. May need different resources or approach.`;
-      }
+      return `Successfully completed ${task.type} task after ${analysis.totalAttempts} attempts. Persistence paid off.`;
     }
+    if (analysis.isStuck) {
+      return `Stuck in a loop with ${task.type} task. Failed ${analysis.recentFailures} times consecutively. Need to change approach.`;
+    } else if (analysis.failureRate > this.config.failureThreshold) {
+      return `High failure rate (${(analysis.failureRate * 100).toFixed(1)}%) for ${task.type} task. Current strategy may not be optimal.`;
+    }
+    return `Failed to complete ${task.type} task: ${result.error || 'Unknown error'}. May need different resources or approach.`;
   }
 
   /**
@@ -322,16 +319,14 @@ export class CognitiveIntegration extends EventEmitter {
     if (success) {
       // Higher confidence for consistent success
       return Math.min(0.9, 0.5 + analysis.successfulAttempts * 0.1);
-    } else {
-      // Lower confidence for repeated failures
-      if (analysis.isStuck) {
-        return 0.1; // Very low confidence when stuck
-      } else if (analysis.failureRate > this.config.failureThreshold) {
-        return 0.3; // Low confidence with high failure rate
-      } else {
-        return 0.5; // Moderate confidence for occasional failures
-      }
     }
+    // Lower confidence for repeated failures
+    if (analysis.isStuck) {
+      return 0.1; // Very low confidence when stuck
+    } else if (analysis.failureRate > this.config.failureThreshold) {
+      return 0.3; // Low confidence with high failure rate
+    }
+    return 0.5; // Moderate confidence for occasional failures
   }
 
   /**
@@ -385,7 +380,9 @@ export class CognitiveIntegration extends EventEmitter {
           });
           clearTimeout(t);
           if (res.ok) break;
-        } catch {}
+        } catch (e: any) {
+          console.warn('Failed to store cognitive feedback in memory:', e);
+        }
         await new Promise((r) => setTimeout(r, 250 + attempt * 250));
       }
     } catch (error) {

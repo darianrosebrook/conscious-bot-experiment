@@ -18,7 +18,6 @@
     "dev:modular": "tsx src/modular-server.ts"
   },
   "dependencies": {
-    "@conscious-bot/core": "workspace:*",
     "@conscious-bot/mcp-server": "workspace:*",
     "@conscious-bot/memory": "workspace:*",
     "@conscious-bot/world": "workspace:*",

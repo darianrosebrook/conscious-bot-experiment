@@ -9,16 +9,19 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { HomeostasisMonitor } from '../goal-formulation/homeostasis-monitor';
 import { generateNeeds } from '../goal-formulation/need-generator';
-import { GoalManager } from '../goal-formulation/goal-manager';
+import {
+  EnhancedEnhancedGoalManager,
+  EnhancedGoalManager,
+} from '../goal-formulation/enhanced-goal-manager';
 import { GoalType, NeedType, SignalType } from '../types';
 
 describe('M2 Planning Integration', () => {
   let homeostasisMonitor: HomeostasisMonitor;
-  let goalManager: GoalManager;
+  let goalManager: EnhancedGoalManager;
 
   beforeEach(() => {
     homeostasisMonitor = new HomeostasisMonitor();
-    goalManager = new GoalManager();
+    goalManager = new EnhancedGoalManager();
   });
 
   describe('Goal Generation Flow', () => {

@@ -1,5 +1,5 @@
 /**
- * Enhanced Intrusive Thought Processor
+ * Intrusive Thought Processor
  *
  * Processes intrusive thoughts and converts them into actionable tasks
  * that actually influence bot behavior through the planning system.
@@ -224,7 +224,9 @@ export class IntrusiveThoughtProcessor extends EventEmitter {
 
       // Preflight: ensure sequence leaves are available; if not, fall back to a status report
       if (plan.kind === 'sequence') {
-        const ok = await this.sequenceLeavesAvailable(plan.leaves.map((l) => l.name));
+        const ok = await this.sequenceLeavesAvailable(
+          plan.leaves.map((l) => l.name)
+        );
         if (!ok) {
           plan = this.buildStatusReportPlan(snapshot);
         }

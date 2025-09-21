@@ -1,32 +1,67 @@
 /**
- * Capability Registry - Central management of all available capabilities
+ * Enhanced Registry - Shadow runs, separate registration paths, and health checks
  *
- * Provides discovery, validation, execution coordination, and monitoring
- * for all registered capabilities in the MCP system.
+ * Implements separate registration paths for leaves (signed human builds) vs options (LLM-authored),
+ * shadow promotion pipeline with CI gates, quota management, and health monitoring.
  *
  * @author @darianrosebrook
  */
 
-import { EventEmitter } from 'events';
-import { v4 as uuidv4 } from 'uuid';
-
+import { performance } from 'node:perf_hooks';
+import { WorkingLeafFactory } from './working-leaf-factory';
 import {
-  CapabilitySpec,
-  CapabilityQuery,
-  CapabilityMatch,
-  ExecutionRequest,
-  ExecutionContext,
-  ExecutionResult,
-  ValidationResult,
+  LeafImpl,
   RegistrationResult,
-  CapabilityExecutor,
-  CapabilityValidator,
-  CapabilityMetrics,
-  RiskLevel,
-  validateCapabilitySpec,
-  validateExecutionRequest,
-  validateExecutionContext,
-} from './types';
+  LeafContext,
+  ExecError,
+  createExecError,
+} from './leaf-contracts';
+import { BTDSLParser, CompiledBTNode } from './bt-dsl-parser';
+
+// ============================================================================
+// Registry Status and Versioning (C0)
+// ============================================================================
+
+/**
+ * Registry status for leaves and options
+ */
+export type RegistryStatus = 'shadow' | 'active' | 'retired' | 'revoked';
+
+/**
+ * Provenance information for tracking authorship and lineage
+ */
+export interface Provenance {
+  author: string;
+  parentLineage?: string[]; // Chain of parent versions
+  codeHash: string; // SHA-256 of implementation
+  signature?: string; // Cryptographic signature
+  createdAt: string;
+  metadata?: Record<string, any>;
+}
+
+/**
+ * Enhanced leaf/option specification with governance
+ */
+export interface EnhancedSpec {
+  name: string;
+  version: string;
+  status: RegistryStatus;
+  provenance: Provenance;
+  permissions: string[];
+  rateLimitPerMin?: number;
+  maxConcurrent?: number;
+  healthCheck?: {
+    endpoint?: string;
+    timeoutMs?: number;
+    expectedResponse?: any;
+  };
+  shadowConfig?: {
+    successThreshold: number; // Success rate threshold (0-1)
+    maxShadowRuns: number; // Max runs before auto-promotion/retirement
+    failureThreshold: number; // Failure rate threshold (0-1)
+    minShadowRuns?: number; // Min runs before auto-promotion/retirement
+  };
+}
 
 import {
   ALL_CAPABILITIES,

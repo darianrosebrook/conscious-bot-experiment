@@ -513,3 +513,159 @@ describe('Minecraft Cognitive Integration End-to-End', () => {
     expect(testListener).not.toHaveBeenCalled();
   });
 });
+
+describe('Cognitive Thought to Behavior Tree Integration', () => {
+  let integration: MinecraftCognitiveIntegration;
+
+  beforeEach(() => {
+    integration = new MinecraftCognitiveIntegration({
+      enableThoughtToTaskTranslation: true,
+      thoughtProcessingInterval: 1000,
+      maxThoughtsPerBatch: 5,
+    });
+  });
+
+  afterEach(async () => {
+    await integration.disconnect();
+  });
+
+  test('should process cognitive thoughts and create behavior tree signals', async () => {
+    // Create a cognitive thought
+    const testThought = {
+      id: 'test-thought-1',
+      type: 'reflection' as const,
+      content:
+        'Craft a pickaxe to mine the coal ores. Safety is my priority in the dark.',
+      attribution: 'self',
+      context: {
+        emotionalState: 'neutral',
+        confidence: 0.6,
+        cognitiveSystem: 'enhanced-generator',
+      },
+      metadata: {
+        thoughtType: 'idle-reflection',
+        trigger: 'time-based',
+        context: 'environmental-monitoring',
+        intensity: 0.4,
+        llmConfidence: 0.6,
+        model: 'qwen2.5:7b',
+      },
+      category: 'idle' as const,
+      tags: ['monitoring', 'environmental', 'survival'],
+      priority: 'low' as const,
+      timestamp: Date.now(),
+    };
+
+    console.log('🧪 [TEST] Processing cognitive thought:', testThought.content);
+
+    // Process the thought
+    const result = await integration.processThought(testThought);
+
+    expect(result).toBeDefined();
+    expect(result?.type).toBe('cognitive_reflection');
+    expect(result?.parameters?.thoughtContent).toBe(testThought.content);
+    expect(result?.parameters?.signals).toBeDefined();
+    expect(result?.parameters?.signals.length).toBeGreaterThan(0);
+
+    console.log(
+      '🧪 [TEST] Generated signals:',
+      result?.parameters?.signals?.length
+    );
+    console.log('🧪 [TEST] Task created successfully:', result?.title);
+  });
+
+  test('should handle compound thoughts with multiple signals', async () => {
+    const compoundThought = {
+      id: 'test-thought-2',
+      type: 'planning' as const,
+      content:
+        'I need wood for crafting tools and also need to find coal for fuel. Safety first.',
+      attribution: 'self',
+      context: {
+        emotionalState: 'focused',
+        confidence: 0.7,
+        cognitiveSystem: 'enhanced-generator',
+      },
+      metadata: {
+        thoughtType: 'task-initiation',
+        trigger: 'task-start',
+        llmConfidence: 0.7,
+        model: 'qwen2.5:7b',
+      },
+      category: 'task-related' as const,
+      tags: ['planning', 'execution', 'crafting'],
+      priority: 'medium' as const,
+      timestamp: Date.now(),
+    };
+
+    console.log(
+      '🧪 [TEST] Processing compound thought:',
+      compoundThought.content
+    );
+
+    const result = await integration.processThought(compoundThought);
+
+    expect(result).toBeDefined();
+    expect(result?.type).toBe('cognitive_reflection');
+    expect(result?.parameters?.signals).toBeDefined();
+
+    const signals = result?.parameters?.signals || [];
+    expect(signals.length).toBeGreaterThan(1);
+
+    // Should extract multiple concepts
+    const signalTypes = signals.map((s: any) => s.type);
+    expect(signalTypes).toContain('resource_need');
+    expect(signalTypes).toContain('tool_need');
+    expect(signalTypes).toContain('safety_concern');
+
+    console.log('🧪 [TEST] Compound thought signals:', signalTypes);
+  });
+
+  test('should integrate with behavior tree runner', async () => {
+    const testThought = {
+      id: 'test-thought-3',
+      type: 'reflection' as const,
+      content: 'Need to find resources and stay safe from threats.',
+      attribution: 'self',
+      context: {
+        emotionalState: 'cautious',
+        confidence: 0.8,
+        cognitiveSystem: 'enhanced-generator',
+      },
+      metadata: {
+        thoughtType: 'idle-reflection',
+        trigger: 'time-based',
+        llmConfidence: 0.8,
+        model: 'qwen2.5:7b',
+      },
+      category: 'survival' as const,
+      tags: ['monitoring', 'safety', 'resources'],
+      priority: 'high' as const,
+      timestamp: Date.now(),
+    };
+
+    console.log(
+      '🧪 [TEST] Testing behavior tree integration:',
+      testThought.content
+    );
+
+    const task = await integration.processThought(testThought);
+    expect(task).toBeDefined();
+
+    // Verify the task can be executed by the behavior tree
+    const btNode = {
+      id: 'test-cognitive-node',
+      type: 'cognitive_reflection' as const,
+      name: 'Process Safety Reflection',
+      args: task?.parameters,
+    };
+
+    console.log('🧪 [TEST] Behavior tree node created:', btNode.name);
+    console.log('🧪 [TEST] Node args:', btNode.args);
+
+    // The behavior tree should be able to handle this node type
+    expect(btNode.type).toBe('cognitive_reflection');
+    expect(btNode.args?.thoughtContent).toBe(testThought.content);
+    expect(btNode.args?.signals).toBeDefined();
+  });
+});

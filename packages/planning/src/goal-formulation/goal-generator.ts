@@ -75,6 +75,17 @@ export interface WorldState {
   getWeapons(): string[];
   getLastMealTime(): number;
   getLastSafeTime(): number;
+  // New methods for primitive operations
+  hasContainer(): boolean;
+  hasFarmSupplies(): boolean;
+  hasRedstoneComponents(): boolean;
+  hasBuildingMaterials(quantity?: number): boolean;
+  hasCombatEquipment(): boolean;
+  getEnvironmentalComfort(): number;
+  getStructuralIntegrity(): number;
+  getMechanicalComplexity(): number;
+  getAgriculturalPotential(): number;
+  getDefensiveStrength(): number;
 }
 
 /**
@@ -532,6 +543,227 @@ export class GoalGenerator {
           resourceRequirements: [
             { resourceType: 'blocks', quantity: 10, optional: false },
           ],
+        }),
+      },
+    ]);
+
+    // Resource Management goal templates
+    this.goalTemplates.set(NeedType.RESOURCE_MANAGEMENT, [
+      {
+        name: 'organize_containers',
+        isApplicable: (need, worldState) =>
+          need.intensity > 0.4 && worldState.hasItem('chest', 1),
+        instantiate: (need, worldState) => ({
+          id: 'organize_containers_' + Date.now(),
+          type: GoalType.CONTAINER_MANAGEMENT,
+          description:
+            'Organize items in containers for better resource management',
+          targetState: [
+            { predicate: 'InventoryOrganized', args: ['bot'], value: true },
+            { predicate: 'ResourceEfficiency', args: ['bot'], value: 0.8 },
+          ],
+          priority: need.intensity,
+          source: need,
+          estimatedCost: 30,
+          estimatedTime: 15000,
+          prerequisites: [],
+          requiresMovement: true,
+          resourceRequirements: [
+            { resourceType: 'container_storage', quantity: 1, optional: false },
+          ],
+        }),
+      },
+    ]);
+
+    // Shelter Construction goal templates
+    this.goalTemplates.set(NeedType.SHELTER_CONSTRUCTION, [
+      {
+        name: 'build_house',
+        isApplicable: (need, worldState) =>
+          need.intensity > 0.5 && worldState.hasItem('cobblestone', 20),
+        instantiate: (need, worldState) => ({
+          id: 'build_house_' + Date.now(),
+          type: GoalType.STRUCTURE_CONSTRUCTION,
+          description: 'Build a house for shelter and safety',
+          targetState: [
+            { predicate: 'ShelterBuilt', args: ['bot'], value: true },
+            { predicate: 'SafetyLevel', args: ['bot'], value: 0.9 },
+          ],
+          priority: need.intensity,
+          source: need,
+          estimatedCost: 120,
+          estimatedTime: 90000,
+          prerequisites: ['gather_materials', 'find_building_location'],
+          requiresMovement: true,
+          resourceRequirements: [
+            {
+              resourceType: 'building_materials',
+              quantity: 50,
+              optional: false,
+            },
+          ],
+        }),
+      },
+    ]);
+
+    // Farm Maintenance goal templates
+    this.goalTemplates.set(NeedType.FARM_MAINTENANCE, [
+      {
+        name: 'maintain_farm',
+        isApplicable: (need, worldState) =>
+          need.intensity > 0.3 && worldState.hasItem('hoe', 1),
+        instantiate: (need, worldState) => ({
+          id: 'maintain_farm_' + Date.now(),
+          type: GoalType.FARMING,
+          description: 'Maintain and tend to the farm',
+          targetState: [
+            { predicate: 'FarmHealthy', args: ['bot'], value: true },
+            { predicate: 'FoodProduction', args: ['bot'], value: 0.8 },
+          ],
+          priority: need.intensity,
+          source: need,
+          estimatedCost: 40,
+          estimatedTime: 30000,
+          prerequisites: [],
+          requiresMovement: true,
+          resourceRequirements: [
+            { resourceType: 'farming_supplies', quantity: 1, optional: false },
+          ],
+        }),
+      },
+    ]);
+
+    // Inventory Organization goal templates
+    this.goalTemplates.set(NeedType.INVENTORY_ORGANIZATION, [
+      {
+        name: 'organize_inventory',
+        isApplicable: (need, worldState) =>
+          need.intensity > 0.5 && worldState.hasItem('any', 10),
+        instantiate: (need, worldState) => ({
+          id: 'organize_inventory_' + Date.now(),
+          type: GoalType.INVENTORY_ORGANIZATION,
+          description: 'Organize inventory for better resource management',
+          targetState: [
+            { predicate: 'InventoryOrganized', args: ['bot'], value: true },
+            { predicate: 'ResourceAccess', args: ['bot'], value: 0.9 },
+          ],
+          priority: need.intensity,
+          source: need,
+          estimatedCost: 15,
+          estimatedTime: 10000,
+          prerequisites: [],
+          requiresMovement: false,
+          resourceRequirements: [],
+        }),
+      },
+    ]);
+
+    // Defense Preparation goal templates
+    this.goalTemplates.set(NeedType.DEFENSE_PREPARATION, [
+      {
+        name: 'prepare_defenses',
+        isApplicable: (need, worldState) =>
+          need.intensity > 0.4 && worldState.getThreatLevel() > 0.3,
+        instantiate: (need, worldState) => ({
+          id: 'prepare_defenses_' + Date.now(),
+          type: GoalType.COMBAT_TRAINING,
+          description: 'Prepare defensive equipment and positions',
+          targetState: [
+            { predicate: 'DefenseReady', args: ['bot'], value: true },
+            { predicate: 'CombatPrepared', args: ['bot'], value: 0.8 },
+          ],
+          priority: need.intensity,
+          source: need,
+          estimatedCost: 60,
+          estimatedTime: 20000,
+          prerequisites: ['gather_weapons', 'find_defensive_position'],
+          requiresMovement: true,
+          resourceRequirements: [
+            { resourceType: 'combat_equipment', quantity: 1, optional: false },
+          ],
+        }),
+      },
+    ]);
+
+    // World Exploration goal templates
+    this.goalTemplates.set(NeedType.WORLD_EXPLORATION, [
+      {
+        name: 'explore_redstone',
+        isApplicable: (need, worldState) =>
+          need.intensity > 0.3 && worldState.getLightLevel() > 0.5,
+        instantiate: (need, worldState) => ({
+          id: 'explore_redstone_' + Date.now(),
+          type: GoalType.REDSTONE_AUTOMATION,
+          description: 'Explore and understand redstone mechanisms',
+          targetState: [
+            { predicate: 'RedstoneKnowledge', args: ['bot'], value: 0.7 },
+            { predicate: 'MechanicalUnderstanding', args: ['bot'], value: 0.6 },
+          ],
+          priority: need.intensity,
+          source: need,
+          estimatedCost: 25,
+          estimatedTime: 30000,
+          prerequisites: [],
+          requiresMovement: true,
+          resourceRequirements: [],
+        }),
+      },
+    ]);
+
+    // Redstone Automation goal templates
+    this.goalTemplates.set(NeedType.REDSTONE_AUTOMATION, [
+      {
+        name: 'build_automation',
+        isApplicable: (need, worldState) =>
+          need.intensity > 0.4 && worldState.hasItem('redstone', 5),
+        instantiate: (need, worldState) => ({
+          id: 'build_automation_' + Date.now(),
+          type: GoalType.MECHANISM_OPERATION,
+          description: 'Build redstone automation systems',
+          targetState: [
+            { predicate: 'AutomationBuilt', args: ['bot'], value: true },
+            { predicate: 'MechanicalEfficiency', args: ['bot'], value: 0.8 },
+          ],
+          priority: need.intensity,
+          source: need,
+          estimatedCost: 80,
+          estimatedTime: 60000,
+          prerequisites: [
+            'gather_redstone_components',
+            'find_automation_location',
+          ],
+          requiresMovement: true,
+          resourceRequirements: [
+            {
+              resourceType: 'redstone_components',
+              quantity: 10,
+              optional: false,
+            },
+          ],
+        }),
+      },
+    ]);
+
+    // Environmental Comfort goal templates
+    this.goalTemplates.set(NeedType.ENVIRONMENTAL_COMFORT, [
+      {
+        name: 'control_environment',
+        isApplicable: (need, worldState) => need.intensity > 0.4,
+        instantiate: (need, worldState) => ({
+          id: 'control_environment_' + Date.now(),
+          type: GoalType.ENVIRONMENTAL_CONTROL,
+          description: 'Control environmental factors for comfort',
+          targetState: [
+            { predicate: 'EnvironmentComfortable', args: ['bot'], value: true },
+            { predicate: 'WeatherControlled', args: ['bot'], value: 0.9 },
+          ],
+          priority: need.intensity,
+          source: need,
+          estimatedCost: 10,
+          estimatedTime: 5000,
+          prerequisites: [],
+          requiresMovement: false,
+          resourceRequirements: [],
         }),
       },
     ]);

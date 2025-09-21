@@ -11,22 +11,21 @@
 import { EventEmitter } from 'events';
 
 export interface CognitiveThought {
-  type: 'reflection' | 'observation' | 'planning' | 'internal' | 'intrusive';
+  type:
+    | 'reflection'
+    | 'observation'
+    | 'planning'
+    | 'internal'
+    | 'intrusive'
+    | 'decision';
   content: string;
   attribution: string;
   context?: any;
   metadata?: any;
+  category?: string;
+  priority?: 'low' | 'medium' | 'high';
   id: string;
   timestamp: number;
-}
-
-export interface ThoughtToTaskMapping {
-  thoughtType: string;
-  taskType: string;
-  priority: number;
-  urgency: number;
-  parameters: Record<string, any>;
-  description: string;
 }
 
 export interface CognitiveThoughtProcessorConfig {
@@ -116,468 +115,12 @@ class HttpCognitiveClient implements CognitiveClient {
 }
 
 /**
- * Maps cognitive thoughts to executable tasks
+ * Dynamic thought interpretation based on behavior tree context
+ *
+ * Instead of hardcoded mappings, we use the behavior tree to interpret
+ * thoughts contextually based on the bot's current state and needs.
+ * This allows for emergent, adaptive behavior rather than prescriptive responses.
  */
-const THOUGHT_TO_TASK_MAPPINGS: ThoughtToTaskMapping[] = [
-  // Specific gathering tasks
-  {
-    thoughtType: 'gather wood',
-    taskType: 'gather',
-    priority: 0.8,
-    urgency: 0.6,
-    parameters: { resource: 'wood', amount: 3, target: 'tree' },
-    description: 'Gather wood from nearby trees',
-  },
-  {
-    thoughtType: 'gather wood first',
-    taskType: 'gather',
-    priority: 0.9,
-    urgency: 0.7,
-    parameters: { resource: 'wood', amount: 4, target: 'tree' },
-    description: 'Gather wood as first priority',
-  },
-  {
-    thoughtType: 'need to gather wood',
-    taskType: 'gather',
-    priority: 0.8,
-    urgency: 0.6,
-    parameters: { resource: 'wood', amount: 3, target: 'tree' },
-    description: 'Gather wood for crafting',
-  },
-  {
-    thoughtType: 'gather resources quickly',
-    taskType: 'gather',
-    priority: 0.9,
-    urgency: 0.8,
-    parameters: {
-      resource: 'wood',
-      amount: 3,
-      target: 'tree',
-      priority: 'urgent',
-    },
-    description: 'Gather wood and other resources quickly before nightfall',
-  },
-  {
-    thoughtType: 'find some logs',
-    taskType: 'gather',
-    priority: 0.8,
-    urgency: 0.7,
-    parameters: { resource: 'wood', amount: 3, target: 'log' },
-    description: 'Find and collect logs for crafting tools',
-  },
-  {
-    thoughtType: 'craft tools',
-    taskType: 'gather',
-    priority: 0.8,
-    urgency: 0.7,
-    parameters: {
-      resource: 'wood',
-      amount: 4,
-      target: 'tree',
-      purpose: 'tools',
-    },
-    description: 'Gather wood to craft tools',
-  },
-  {
-    thoughtType: 'start a fire',
-    taskType: 'gather',
-    priority: 0.7,
-    urgency: 0.6,
-    parameters: {
-      resource: 'wood',
-      amount: 2,
-      target: 'tree',
-      purpose: 'fire',
-    },
-    description: 'Gather wood to start a fire',
-  },
-  {
-    thoughtType: 'gather stone',
-    taskType: 'mine',
-    priority: 0.8,
-    urgency: 0.7,
-    parameters: { block: 'stone', amount: 5 },
-    description: 'Mine stone blocks for building',
-  },
-  {
-    thoughtType: 'gather cobblestone',
-    taskType: 'mine',
-    priority: 0.8,
-    urgency: 0.7,
-    parameters: { block: 'cobblestone', amount: 8 },
-    description: 'Mine cobblestone for tools',
-  },
-  {
-    thoughtType: 'collect materials',
-    taskType: 'gather',
-    priority: 0.8,
-    urgency: 0.7,
-    parameters: { resource: 'any', amount: 2, search_radius: 10 },
-    description: 'Collect materials for crafting',
-  },
-
-  // Specific exploration tasks
-  {
-    thoughtType: 'explore cave',
-    taskType: 'explore',
-    priority: 0.7,
-    urgency: 0.6,
-    parameters: { target: 'cave', distance: 15, depth: 10 },
-    description: 'Explore cave systems for minerals',
-  },
-  {
-    thoughtType: 'explore area',
-    taskType: 'explore',
-    priority: 0.6,
-    urgency: 0.5,
-    parameters: {
-      distance: 12,
-      direction: 'forward',
-      search_pattern: 'spiral',
-    },
-    description: 'Explore the area for resources',
-  },
-  {
-    thoughtType: 'find shelter',
-    taskType: 'seek_shelter',
-    priority: 0.9,
-    urgency: 0.8,
-    parameters: {
-      shelter_type: 'cave_or_house',
-      light_sources: true,
-      search_radius: 20,
-    },
-    description: 'Find or build shelter',
-  },
-
-  // Specific crafting tasks
-  {
-    thoughtType: 'craft wooden pickaxe',
-    taskType: 'craft',
-    priority: 0.9,
-    urgency: 0.8,
-    parameters: {
-      item: 'wooden_pickaxe',
-      quantity: 1,
-      require_materials: true,
-    },
-    description: 'Craft a wooden pickaxe',
-  },
-  {
-    thoughtType: 'craft a wooden pickaxe',
-    taskType: 'craft',
-    priority: 0.9,
-    urgency: 0.8,
-    parameters: {
-      item: 'wooden_pickaxe',
-      quantity: 1,
-      require_materials: true,
-    },
-    description: 'Craft a wooden pickaxe',
-  },
-  {
-    thoughtType: 'make a wooden pickaxe',
-    taskType: 'craft',
-    priority: 0.9,
-    urgency: 0.8,
-    parameters: {
-      item: 'wooden_pickaxe',
-      quantity: 1,
-      require_materials: true,
-    },
-    description: 'Craft a wooden pickaxe',
-  },
-  {
-    thoughtType: 'craft wooden planks',
-    taskType: 'craft',
-    priority: 0.7,
-    urgency: 0.6,
-    parameters: { item: 'planks', quantity: 4, require_materials: true },
-    description: 'Craft wooden planks',
-  },
-  {
-    thoughtType: 'craft tools',
-    taskType: 'craft',
-    priority: 0.8,
-    urgency: 0.7,
-    parameters: { item: 'wooden_tools', quantity: 1, require_materials: true },
-    description: 'Craft basic tools',
-  },
-  {
-    thoughtType: 'craft planks',
-    taskType: 'craft',
-    priority: 0.7,
-    urgency: 0.6,
-    parameters: { item: 'planks', quantity: 4, require_materials: true },
-    description: 'Craft wooden planks',
-  },
-
-  // Specific building tasks
-  {
-    thoughtType: 'build shelter',
-    taskType: 'build',
-    priority: 0.8,
-    urgency: 0.7,
-    parameters: {
-      structure: 'shelter',
-      size: 'small',
-      materials: ['wood', 'stone'],
-    },
-    description: 'Build a basic shelter',
-  },
-  {
-    thoughtType: 'build a shelter',
-    taskType: 'build',
-    priority: 0.8,
-    urgency: 0.7,
-    parameters: {
-      structure: 'shelter',
-      size: 'small',
-      materials: ['wood', 'stone'],
-    },
-    description: 'Build a basic shelter',
-  },
-  {
-    thoughtType: 'build a proper shelter',
-    taskType: 'build',
-    priority: 0.8,
-    urgency: 0.7,
-    parameters: {
-      structure: 'shelter',
-      size: 'medium',
-      materials: ['wood', 'stone', 'cobblestone'],
-    },
-    description: 'Build a proper shelter',
-  },
-  {
-    thoughtType: 'look for a good location to build',
-    taskType: 'seek_shelter',
-    priority: 0.7,
-    urgency: 0.6,
-    parameters: {
-      shelter_type: 'cave_or_house',
-      light_sources: true,
-      search_radius: 20,
-    },
-    description: 'Find a good location for shelter',
-  },
-  {
-    thoughtType: 'build house',
-    taskType: 'build',
-    priority: 0.8,
-    urgency: 0.7,
-    parameters: {
-      structure: 'house',
-      size: 'medium',
-      materials: ['wood', 'stone', 'cobblestone'],
-    },
-    description: 'Build a house for shelter',
-  },
-
-  // Specific mining tasks
-  {
-    thoughtType: 'mine iron',
-    taskType: 'mine',
-    priority: 0.9,
-    urgency: 0.8,
-    parameters: { block: 'iron_ore', amount: 3, depth: 15 },
-    description: 'Mine iron ore for tools',
-  },
-  {
-    thoughtType: 'mine stone',
-    taskType: 'mine',
-    priority: 0.8,
-    urgency: 0.7,
-    parameters: { block: 'stone', amount: 5 },
-    description: 'Mine stone for building',
-  },
-  {
-    thoughtType: 'mine stone and cobblestone',
-    taskType: 'mine',
-    priority: 0.8,
-    urgency: 0.7,
-    parameters: { block: 'stone', amount: 8 },
-    description: 'Mine stone and cobblestone for building',
-  },
-  {
-    thoughtType: 'look for iron ore',
-    taskType: 'mine',
-    priority: 0.8,
-    urgency: 0.7,
-    parameters: { block: 'iron_ore', amount: 3, depth: 15 },
-    description: 'Search for iron ore',
-  },
-  {
-    thoughtType: 'mine coal',
-    taskType: 'mine',
-    priority: 0.7,
-    urgency: 0.6,
-    parameters: { block: 'coal_ore', amount: 5, depth: 10 },
-    description: 'Mine coal for fuel',
-  },
-
-  // Specific movement tasks
-  {
-    thoughtType: 'move to safety',
-    taskType: 'move',
-    priority: 0.9,
-    urgency: 0.9,
-    parameters: {
-      direction: 'away_from_threat',
-      distance: 15,
-      find_safe_spot: true,
-    },
-    description: 'Move to a safe location',
-  },
-  {
-    thoughtType: 'walk forward',
-    taskType: 'move_forward',
-    priority: 0.5,
-    urgency: 0.4,
-    parameters: { distance: 5, check_obstacles: true },
-    description: 'Walk forward carefully',
-  },
-  {
-    thoughtType: 'navigate',
-    taskType: 'move',
-    priority: 0.6,
-    urgency: 0.5,
-    parameters: { distance: 8, direction: 'forward', avoid_hazards: true },
-    description: 'Navigate to a location',
-  },
-
-  // Defensive tasks
-  {
-    thoughtType: 'flee',
-    taskType: 'flee',
-    priority: 0.9,
-    urgency: 0.9,
-    parameters: {
-      direction: 'away_from_threat',
-      distance: 20,
-      find_shelter: true,
-    },
-    description: 'Flee from immediate danger',
-  },
-  {
-    thoughtType: 'defend',
-    taskType: 'flee',
-    priority: 0.8,
-    urgency: 0.8,
-    parameters: {
-      direction: 'away_from_threat',
-      distance: 12,
-      find_cover: true,
-    },
-    description: 'Take defensive action',
-  },
-  {
-    thoughtType: 'avoid danger',
-    taskType: 'flee',
-    priority: 0.8,
-    urgency: 0.7,
-    parameters: {
-      direction: 'away_from_threat',
-      distance: 15,
-      find_safe_spot: true,
-    },
-    description: 'Avoid dangerous situations',
-  },
-
-  // Combat tasks
-  {
-    thoughtType: 'attack enemy',
-    taskType: 'attack_entity',
-    priority: 0.8,
-    urgency: 0.8,
-    parameters: {
-      target: 'nearest',
-      weapon: 'best_available',
-      aggressive: true,
-    },
-    description: 'Attack the nearest hostile entity',
-  },
-  {
-    thoughtType: 'fight back',
-    taskType: 'attack_entity',
-    priority: 0.8,
-    urgency: 0.8,
-    parameters: {
-      target: 'nearest',
-      weapon: 'best_available',
-      defensive: true,
-    },
-    description: 'Fight back against threats',
-  },
-  {
-    thoughtType: 'defeat enemy',
-    taskType: 'attack_entity',
-    priority: 0.7,
-    urgency: 0.7,
-    parameters: {
-      target: 'nearest',
-      weapon: 'best_available',
-      persistent: true,
-    },
-    description: 'Defeat the enemy',
-  },
-  {
-    thoughtType: 'engage in combat',
-    taskType: 'attack_entity',
-    priority: 0.7,
-    urgency: 0.7,
-    parameters: {
-      target: 'nearest',
-      weapon: 'best_available',
-      tactical: true,
-    },
-    description: 'Engage in combat with enemies',
-  },
-  {
-    thoughtType: 'avoid danger',
-    taskType: 'flee',
-    priority: 0.9,
-    urgency: 0.8,
-    parameters: { direction: 'away_from_threat', distance: 10, stealth: true },
-    description: 'Avoid immediate danger',
-  },
-
-  // Farming tasks
-  {
-    thoughtType: 'start farming',
-    taskType: 'farm',
-    priority: 0.6,
-    urgency: 0.5,
-    parameters: { crop: 'wheat', action: 'plant', area_size: 3 },
-    description: 'Start farming activities',
-  },
-  {
-    thoughtType: 'establish agriculture',
-    taskType: 'farm',
-    priority: 0.7,
-    urgency: 0.6,
-    parameters: { crop: 'wheat', action: 'establish', area_size: 5 },
-    description: 'Establish agriculture',
-  },
-
-  // Lighting tasks
-  {
-    thoughtType: 'place light',
-    taskType: 'place_light',
-    priority: 0.7,
-    urgency: 0.6,
-    parameters: { light_type: 'torch', count: 5, strategic_placement: true },
-    description: 'Place light sources strategically',
-  },
-  {
-    thoughtType: 'add lighting',
-    taskType: 'place_light',
-    priority: 0.6,
-    urgency: 0.5,
-    parameters: { light_type: 'torch', count: 3, around_shelter: true },
-    description: 'Add lighting around shelter',
-  },
-];
 
 /**
  * Cognitive Thought Processor
@@ -761,13 +304,23 @@ export class CognitiveThoughtProcessor extends EventEmitter {
   private async processThoughts(): Promise<void> {
     try {
       // Fetch recent thoughts using cursor/etag
+      console.log(
+        '🔄 [COGNITIVE THOUGHT PROCESSOR] Fetching recent thoughts...'
+      );
       const { thoughts, etag } = await this.cognitive.fetchRecentThoughts(
         this.lastSeenTs,
         this.lastEtag
       );
       if (etag) this.lastEtag = etag;
 
+      console.log(
+        `🔄 [COGNITIVE THOUGHT PROCESSOR] Found ${thoughts.length} thoughts`
+      );
+
       if (thoughts.length === 0) {
+        console.log(
+          '🔄 [COGNITIVE THOUGHT PROCESSOR] No thoughts found, skipping processing'
+        );
         return;
       }
 
@@ -790,31 +343,45 @@ export class CognitiveThoughtProcessor extends EventEmitter {
           continue; // Skip already processed thoughts
         }
 
+        console.log(
+          `🔄 [COGNITIVE THOUGHT PROCESSOR] Processing thought: "${thought.content.substring(0, 60)}..."`
+        );
+        console.log(
+          `🔄 [COGNITIVE THOUGHT PROCESSOR] Thought type: ${thought.type}, category: ${thought.category}`
+        );
+
         const task = this.translateThoughtToTask(thought);
         if (task) {
+          console.log(
+            `✅ [COGNITIVE THOUGHT PROCESSOR] Successfully translated to task: ${task.type} - ${task.title}`
+          );
+
           // de-dupe near-identical tasks in a short TTL window
           const key = this.taskKey(task);
           const now = Date.now();
           const prev = this.recentTaskKeys.get(key);
           if (prev && now - prev < this.recentTaskTTLms) {
+            console.log(
+              `⏭️ [COGNITIVE THOUGHT PROCESSOR] Skipping duplicate task: ${key}`
+            );
             this.emit('skippedThought', {
               reason: 'duplicateTask',
               thoughtId: thought.id,
               key,
             });
           } else {
+            console.log(
+              `📤 [COGNITIVE THOUGHT PROCESSOR] Submitting task to planning system: ${task.title}`
+            );
             this.emit('taskCandidate', { task, thoughtId: thought.id });
             await this.submitTaskToPlanning(task);
             this.recentTaskKeys.set(key, now);
           }
           this.processedThoughts.add(thought.id);
-
-          // Only log in development mode
-          if (process.env.NODE_ENV === 'development') {
-            console.log(
-              `Translated thought "${thought.content.substring(0, 50)}..." to task: ${task.type}`
-            );
-          }
+        } else {
+          console.log(
+            `❌ [COGNITIVE THOUGHT PROCESSOR] Failed to translate thought: "${thought.content.substring(0, 60)}..."`
+          );
         }
         this.lastSeenTs = Math.max(this.lastSeenTs, thought.timestamp || 0);
       }
@@ -827,7 +394,205 @@ export class CognitiveThoughtProcessor extends EventEmitter {
   }
 
   /**
-   * Translate a cognitive thought to an executable task
+   * Extract key concepts from thoughts and create signals for behavior tree interpretation
+   */
+  private extractThoughtSignals(thought: CognitiveThought): any[] {
+    const content = thought.content.toLowerCase();
+    const signals = [];
+
+    // Extract resource-related concepts
+    if (/wood|log|timber|planks|sticks/.test(content)) {
+      signals.push({
+        type: 'resource_need',
+        value: 0.7,
+        concept: 'wood',
+        context: 'crafting_or_building',
+        source: 'cognitive_thought',
+        thoughtId: thought.id,
+      });
+    }
+
+    if (/stone|cobblestone|rock/.test(content)) {
+      signals.push({
+        type: 'resource_need',
+        value: 0.7,
+        concept: 'stone',
+        context: 'building_or_tools',
+        source: 'cognitive_thought',
+        thoughtId: thought.id,
+      });
+    }
+
+    if (/iron|ore|metal/.test(content)) {
+      signals.push({
+        type: 'resource_need',
+        value: 0.8,
+        concept: 'iron',
+        context: 'advanced_tools',
+        source: 'cognitive_thought',
+        thoughtId: thought.id,
+      });
+    }
+
+    if (/coal|fuel/.test(content)) {
+      signals.push({
+        type: 'resource_need',
+        value: 0.6,
+        concept: 'coal',
+        context: 'fuel_or_lighting',
+        source: 'cognitive_thought',
+        thoughtId: thought.id,
+      });
+    }
+
+    // Extract tool-related concepts
+    if (/pickaxe|pick|mining/.test(content)) {
+      signals.push({
+        type: 'tool_need',
+        value: 0.8,
+        concept: 'pickaxe',
+        context: 'mining_activities',
+        source: 'cognitive_thought',
+        thoughtId: thought.id,
+      });
+    }
+
+    if (/craft|make|build/.test(content)) {
+      signals.push({
+        type: 'crafting_intent',
+        value: 0.7,
+        concept: 'crafting',
+        context: 'tool_or_item_creation',
+        source: 'cognitive_thought',
+        thoughtId: thought.id,
+      });
+    }
+
+    // Extract safety/survival concepts
+    if (/safety|safe|protect|shelter|dark|night/.test(content)) {
+      signals.push({
+        type: 'safety_concern',
+        value: 0.8,
+        concept: 'safety',
+        context: 'environmental_threats',
+        source: 'cognitive_thought',
+        thoughtId: thought.id,
+      });
+    }
+
+    if (/light|torch|lighting/.test(content)) {
+      signals.push({
+        type: 'safety_concern',
+        value: 0.6,
+        concept: 'lighting',
+        context: 'darkness_protection',
+        source: 'cognitive_thought',
+        thoughtId: thought.id,
+      });
+    }
+
+    // Extract urgency concepts
+    if (/urgent|quickly|now|immediate|danger/.test(content)) {
+      signals.push({
+        type: 'urgency_signal',
+        value: 0.8,
+        concept: 'urgency',
+        context: 'time_pressure',
+        source: 'cognitive_thought',
+        thoughtId: thought.id,
+      });
+    }
+
+    // Extract exploration concepts
+    if (/explore|search|find|look|discover/.test(content)) {
+      signals.push({
+        type: 'exploration_drive',
+        value: 0.6,
+        concept: 'exploration',
+        context: 'resource_discovery',
+        source: 'cognitive_thought',
+        thoughtId: thought.id,
+      });
+    }
+
+    return signals;
+  }
+
+  /**
+   * Create behavior tree signals from cognitive thoughts
+   */
+  private createBehaviorTreeSignals(thought: CognitiveThought): any[] {
+    const content = thought.content.toLowerCase();
+    const signals = [];
+
+    // Create signals that the behavior tree can interpret contextually
+    signals.push({
+      type: 'cognitive_reflection',
+      value: 0.6,
+      content: thought.content,
+      thoughtId: thought.id,
+      context: {
+        emotionalState: thought.context?.emotionalState || 'neutral',
+        confidence: thought.context?.confidence || 0.5,
+        cognitiveSystem: thought.context?.cognitiveSystem || 'unknown',
+      },
+      metadata: {
+        thoughtType: thought.metadata?.thoughtType,
+        category: thought.category,
+        priority: thought.priority,
+        timestamp: thought.timestamp,
+      },
+    });
+
+    return signals;
+  }
+
+  /**
+   * Calculate task priority based on thought characteristics
+   */
+  private calculateThoughtPriority(thought: CognitiveThought): number {
+    let priority = 0.5; // Base priority
+
+    // Adjust based on thought type
+    if (thought.type === 'planning') priority += 0.2;
+    if (thought.type === 'decision') priority += 0.1;
+
+    // Adjust based on content urgency
+    const content = thought.content.toLowerCase();
+    if (/urgent|immediate|danger|critical/.test(content)) priority += 0.2;
+    if (/safety|protect|survival/.test(content)) priority += 0.1;
+
+    // Adjust based on thought metadata
+    if (thought.metadata?.thoughtType === 'task-initiation') priority += 0.1;
+    if (thought.priority === 'high') priority += 0.2;
+    if (thought.priority === 'medium') priority += 0.1;
+
+    return Math.max(0, Math.min(1, priority));
+  }
+
+  /**
+   * Calculate task urgency based on thought characteristics
+   */
+  private calculateThoughtUrgency(thought: CognitiveThought): number {
+    let urgency = 0.4; // Base urgency
+
+    // Adjust based on content urgency
+    const content = thought.content.toLowerCase();
+    if (/now|immediate|urgent|quickly/.test(content)) urgency += 0.3;
+    if (/danger|threat|critical/.test(content)) urgency += 0.2;
+
+    // Adjust based on thought type
+    if (thought.type === 'decision') urgency += 0.1;
+
+    // Adjust based on emotional state
+    if (thought.context?.emotionalState === 'anxious') urgency += 0.1;
+    if (thought.context?.emotionalState === 'focused') urgency += 0.05;
+
+    return Math.max(0, Math.min(1, urgency));
+  }
+
+  /**
+   * Translate a cognitive thought to executable tasks (can return multiple tasks for compound thoughts)
    */
   private translateThoughtToTask(thought: CognitiveThought): any | null {
     const content = thought.content.toLowerCase();
@@ -853,50 +618,47 @@ export class CognitiveThoughtProcessor extends EventEmitter {
       return null;
     }
 
-    // Find matching task mapping (synonym-aware)
-    const mapping = this.findBestTaskMapping(this.normalizeContent(content));
-    if (!mapping) {
+    // Extract key concepts and create behavior tree signals instead of hardcoded mappings
+    const conceptSignals = this.extractThoughtSignals(thought);
+    const behaviorSignals = this.createBehaviorTreeSignals(thought);
+
+    if (conceptSignals.length === 0 && behaviorSignals.length === 0) {
       return null;
     }
 
-    // Extract slots from the content to refine parameters
-    const slots = this.extractSlots(content);
-
-    // Create task from mapping with improved title and description
-    const taskTitle = this.generateTaskTitle(thought.content, mapping);
-    const taskDescription = this.generateTaskDescription(
-      thought.content,
-      mapping
-    );
+    // Create a cognitive reflection task that the behavior tree can interpret
+    const taskTitle = `Interpret: ${thought.content.substring(0, 40)}...`;
+    const taskDescription = `Process cognitive thought about: ${thought.content}`;
 
     let task = {
-      id: `cognitive-task-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+      id: `cognitive-signal-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
       title: taskTitle,
-      type: this.canonicalTaskType(mapping.taskType),
+      type: 'cognitive_reflection',
       description: taskDescription,
-      priority: this.calibratePriority(mapping.priority, thought),
-      urgency: this.calibrateUrgency(mapping.urgency, thought),
-      parameters: this.normalizeParameters(mapping.taskType, {
-        ...mapping.parameters,
-        ...slots,
-      }),
-      goal: this.determineGoalFromThought(thought),
+      priority: this.calculateThoughtPriority(thought),
+      urgency: this.calculateThoughtUrgency(thought),
+      parameters: {
+        thoughtContent: thought.content,
+        thoughtType: thought.type,
+        signals: [...conceptSignals, ...behaviorSignals],
+        cognitiveContext: thought.context,
+      },
+      goal: 'interpret_cognitive_reflection',
       status: 'pending',
       createdAt: Date.now(),
       completedAt: null,
       autonomous: true,
       source: 'cognitive_thought',
       originalThought: thought.content,
-      cognitiveContext: thought.context,
       metadata: {
         origin: { thoughtId: thought.id, attribution: thought.attribution },
         worldSeenAt: this.lastWorldStateUpdate || null,
-        confidence: this.estimateConfidence(content, mapping),
+        signalsGenerated: conceptSignals.length + behaviorSignals.length,
+        thoughtCategory: thought.category,
+        thoughtPriority: thought.priority,
       },
     };
 
-    // World-aware gating / prerequisites
-    task = this.worldAwareAdjustTask(task);
     return task;
   }
 
@@ -940,322 +702,38 @@ export class CognitiveThoughtProcessor extends EventEmitter {
   }
 
   /**
-   * Find the best task mapping for a thought
-   */
-  private findBestTaskMapping(content: string): ThoughtToTaskMapping | null {
-    let bestMatch: ThoughtToTaskMapping | null = null;
-    let bestScore = 0;
-    for (const mapping of THOUGHT_TO_TASK_MAPPINGS) {
-      const score = this.calculateMatchScore(
-        content,
-        this.normalizeContent(mapping.thoughtType)
-      );
-      if (score > bestScore) {
-        bestScore = score;
-        bestMatch = mapping;
-      }
-    }
-    return bestScore > 0.35 ? bestMatch : null;
-  }
-
-  /**
-   * Calculate how well a thought matches a task mapping
-   */
-  private calculateMatchScore(content: string, thoughtType: string): number {
-    const a = new Set(content.split(/\s+/));
-    const b = new Set(thoughtType.split(/\s+/));
-    let inter = 0;
-    b.forEach((w) => {
-      if (a.has(w)) inter++;
-    });
-    // Sørensen–Dice like score
-    return (2 * inter) / (a.size + b.size || 1);
-  }
-
-  private normalizeContent(s: string): string {
-    const t = s
-      .toLowerCase()
-      .replace(/[^\w\s]/g, ' ')
-      .replace(/\s+/g, ' ')
-      .trim();
-    return this.applySynonyms(t);
-  }
-
-  private applySynonyms(s: string): string {
-    const syn: Record<string, string> = {
-      logs: 'wood',
-      timber: 'wood',
-      planks: 'planks',
-      stick: 'sticks',
-      pick: 'pickaxe',
-      pickax: 'pickaxe',
-      ore: 'ore',
-      shelter: 'shelter',
-      cave: 'cave',
-      light: 'torch',
-      lights: 'torch',
-      torches: 'torch',
-      move: 'navigate',
-      walk: 'navigate',
-      go: 'navigate',
-      flee: 'flee',
-      run: 'flee',
-      fight: 'attack',
-    };
-    const tokens = s.split(' ');
-    const mapped = tokens.map((w) => syn[w] ?? w);
-    return mapped.join(' ');
-  }
-
-  private extractSlots(content: string): Record<string, any> {
-    const slots: Record<string, any> = {};
-    // amount like "get 4 logs", "mine 3 iron"
-    const numRes = content.match(
-      /(\d+)\s*(logs?|planks?|sticks?|stone|cobblestone|iron|coal|torches?|torch|blocks?)/
-    );
-    if (numRes) {
-      const n = parseInt(numRes[1], 10);
-      if (!isNaN(n)) slots.amount = n;
-      const unit = (numRes[2] || '').toLowerCase();
-      if (unit) slots.resource = unit.replace(/s$/, '');
-    }
-    // distance like "move 10 blocks"
-    const dist = content.match(/(\d+)\s*(blocks?|meters?)/);
-    if (dist && !isNaN(parseInt(dist[1], 10))) {
-      slots.distance = parseInt(dist[1], 10);
-    }
-    // explicit resource mentions
-    if (/iron/.test(content)) slots.block = 'iron_ore';
-    if (/coal/.test(content)) slots.block = 'coal_ore';
-    if (/stone|cobblestone/.test(content)) slots.block = 'stone';
-    if (/wood|log/.test(content)) slots.resource = 'wood';
-    if (/torch|light/.test(content)) {
-      slots.item = 'torch';
-      slots.count = slots.amount || 3;
-    }
-    if (/pickaxe/.test(content)) {
-      slots.item = 'wooden_pickaxe';
-      slots.quantity = 1;
-    }
-    return slots;
-  }
-
-  private canonicalTaskType(t: string): string {
-    const m: Record<string, string> = {
-      gather: 'gathering',
-      mine: 'mining',
-      move: 'movement',
-      move_forward: 'movement',
-      explore: 'exploration',
-      craft: 'crafting',
-      build: 'building',
-      seek_shelter: 'exploration',
-      farm: 'farming',
-      place_light: 'placement',
-      attack_entity: 'combat',
-      flee: 'navigation', // treated as movement away from threat
-    };
-    return m[t] || t;
-  }
-
-  private normalizeParameters(
-    taskType: string,
-    p: Record<string, any>
-  ): Record<string, any> {
-    const out = { ...p };
-    // harmonize common fields used by planning/execution
-    if (taskType === 'gather' || taskType === 'gathering') {
-      if (out.resource === 'wood' && !out.blockType) out.blockType = 'oak_log';
-      if (out.amount && !out.qty) out.qty = out.amount;
-    }
-    if (taskType === 'mine' || taskType === 'mining') {
-      if (out.block && !out.blockType) out.blockType = out.block;
-      if (out.amount && !out.qty) out.qty = out.amount;
-    }
-    if (taskType === 'craft' || taskType === 'crafting') {
-      if (out.item && !out.recipe) out.recipe = out.item;
-      if (out.quantity && !out.qty) out.qty = out.quantity;
-      // common defaults
-      if (!out.qty) out.qty = 1;
-    }
-    if (taskType === 'place_light' || taskType === 'placement') {
-      if (out.item === 'torch') out.item = 'torch';
-      if (!out.count && out.qty) out.count = out.qty;
-    }
-    if (taskType === 'move' || taskType === 'movement') {
-      if (!out.distance) out.distance = 5;
-    }
-    return out;
-  }
-
-  private calibratePriority(base: number, thought: CognitiveThought): number {
-    // slight lift for 'urgency' words in content
-    const c = thought.content.toLowerCase();
-    const bump = /(now|quickly|before night|danger)/.test(c) ? 0.05 : 0;
-    return Math.max(0, Math.min(1, (base ?? 0.7) + bump));
-  }
-
-  private calibrateUrgency(base: number, thought: CognitiveThought): number {
-    const c = thought.content.toLowerCase();
-    const bump = /(danger|hunger|night|hostile)/.test(c) ? 0.1 : 0;
-    return Math.max(0, Math.min(1, (base ?? 0.6) + bump));
-  }
-
-  private estimateConfidence(
-    content: string,
-    mapping: ThoughtToTaskMapping
-  ): number {
-    const score = this.calculateMatchScore(
-      this.normalizeContent(content),
-      this.normalizeContent(mapping.thoughtType)
-    );
-    return Math.max(0.3, Math.min(0.99, score));
-  }
-
-  /**
-   * Generate a descriptive task title from thought content and mapping
-   */
-  private generateTaskTitle(
-    content: string,
-    mapping: ThoughtToTaskMapping
-  ): string {
-    const contentLower = content.toLowerCase();
-
-    // Extract specific details from the thought content
-    if (contentLower.includes('wood')) {
-      return 'Gather Wood';
-    }
-    if (
-      contentLower.includes('stone') ||
-      contentLower.includes('cobblestone')
-    ) {
-      return 'Mine Stone';
-    }
-    if (contentLower.includes('pickaxe')) {
-      return 'Craft Wooden Pickaxe';
-    }
-    if (contentLower.includes('cave')) {
-      return 'Explore Cave System';
-    }
-    if (contentLower.includes('shelter')) {
-      return 'Build Shelter';
-    }
-    if (contentLower.includes('torch') || contentLower.includes('light')) {
-      return 'Place Torches';
-    }
-    if (contentLower.includes('food') || contentLower.includes('hunger')) {
-      return 'Find Food';
-    }
-    if (contentLower.includes('iron') || contentLower.includes('ore')) {
-      return 'Mine Iron Ore';
-    }
-    if (contentLower.includes('coal')) {
-      return 'Mine Coal';
-    }
-
-    // Fallback to mapping-based title
-    const action =
-      mapping.taskType.charAt(0).toUpperCase() + mapping.taskType.slice(1);
-    const target = mapping.description.split(' ').pop() || 'resources';
-    return `${action} ${target}`;
-  }
-
-  /**
-   * Generate a detailed task description from thought content and mapping
-   */
-  private generateTaskDescription(
-    content: string,
-    mapping: ThoughtToTaskMapping
-  ): string {
-    const contentLower = content.toLowerCase();
-
-    // Create specific descriptions based on content
-    if (contentLower.includes('wood')) {
-      return 'Collect wood from nearby trees for crafting and building';
-    }
-    if (
-      contentLower.includes('stone') ||
-      contentLower.includes('cobblestone')
-    ) {
-      return 'Mine stone blocks for building materials and tools';
-    }
-    if (contentLower.includes('pickaxe')) {
-      return 'Create a wooden pickaxe for mining stone and other materials';
-    }
-    if (contentLower.includes('cave')) {
-      return 'Search for valuable resources in nearby cave systems';
-    }
-    if (contentLower.includes('shelter')) {
-      return 'Build a safe shelter for protection and storage';
-    }
-    if (contentLower.includes('torch') || contentLower.includes('light')) {
-      return 'Place torches to light up dark areas and prevent mob spawning';
-    }
-    if (contentLower.includes('food') || contentLower.includes('hunger')) {
-      return 'Find food sources to maintain hunger levels';
-    }
-    if (contentLower.includes('iron') || contentLower.includes('ore')) {
-      return 'Mine iron ore for crafting better tools and equipment';
-    }
-    if (contentLower.includes('coal')) {
-      return 'Mine coal for fuel and torches';
-    }
-
-    // Fallback to mapping description
-    return mapping.description;
-  }
-
-  /**
-   * Determine the goal category from the thought
-   */
-  private determineGoalFromThought(thought: CognitiveThought): string {
-    const content = thought.content.toLowerCase();
-
-    if (
-      content.includes('survival') ||
-      content.includes('defense') ||
-      content.includes('flee')
-    ) {
-      return 'survival_defense';
-    } else if (
-      content.includes('gather') ||
-      content.includes('collect') ||
-      content.includes('resource')
-    ) {
-      return 'resource_gathering';
-    } else if (content.includes('explore') || content.includes('discover')) {
-      return 'exploration';
-    } else if (
-      content.includes('craft') ||
-      content.includes('build') ||
-      content.includes('make')
-    ) {
-      return 'crafting_building';
-    } else if (content.includes('farm') || content.includes('agriculture')) {
-      return 'farming';
-    }
-    return 'general_activity';
-  }
-
-  /**
    * Submit task to planning system
    */
   private async submitTaskToPlanning(task: any): Promise<void> {
     try {
+      console.log(
+        `📤 [COGNITIVE THOUGHT PROCESSOR] Submitting task to planning: ${task.title}`
+      );
+      console.log(`📤 [COGNITIVE THOUGHT PROCESSOR] Task details:`, {
+        id: task.id,
+        type: task.type,
+        priority: task.priority,
+        urgency: task.urgency,
+        description: task.description,
+      });
+
       const result = await this.planning.addTask(task);
       if (!result.ok) {
         console.error(
-          `Failed to submit task to planning system: ${result.error || 'unknown'}`
+          `❌ [COGNITIVE THOUGHT PROCESSOR] Failed to submit task to planning system: ${result.error || 'unknown'}`
         );
         return;
       }
       console.log(
-        `Task submitted successfully: ${task.type} - ${task.description}`
+        `✅ [COGNITIVE THOUGHT PROCESSOR] Task submitted successfully: ${task.type} - ${task.description}`
       );
 
       this.emit('taskSubmitted', { task, result });
     } catch (error) {
-      console.error('Error submitting task to planning system:', error);
+      console.error(
+        '❌ [COGNITIVE THOUGHT PROCESSOR] Error submitting task to planning system:',
+        error
+      );
     }
   }
 

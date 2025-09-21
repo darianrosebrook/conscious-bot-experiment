@@ -149,19 +149,28 @@ export const useDashboardStore = create<DashboardStore>()(
               (t) => t.id === thoughtWithId.id
             );
             if (existingThought) {
+              // If it's an optimistic update being replaced by server response, allow it
+              if (existingThought.optimistic && !thoughtWithId.optimistic) {
+                const newThoughts = state.thoughts
+                  .map((t) => (t.id === thoughtWithId.id ? thoughtWithId : t))
+                  .slice(-100);
+                return { thoughts: newThoughts };
+              }
               return state; // Don't add duplicate
             }
 
             // Also check for duplicate content within a short time window (5 seconds)
+            // But allow optimistic updates to be replaced
             const fiveSecondsAgo = new Date(Date.now() - 5000).toISOString();
             const recentDuplicate = state.thoughts.find(
               (t) =>
                 t.text === thoughtWithId.text &&
                 t.type === thoughtWithId.type &&
-                t.ts > fiveSecondsAgo
+                t.ts > fiveSecondsAgo &&
+                !t.optimistic // Don't prevent optimistic updates from being replaced
             );
 
-            if (recentDuplicate) {
+            if (recentDuplicate && !thoughtWithId.optimistic) {
               return state; // Don't add duplicate content
             }
 

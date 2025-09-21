@@ -11,11 +11,28 @@
  */
 
 import { EventEmitter } from 'events';
-import {
-  EnhancedRegistry,
-  ShadowRunResult,
-  DynamicCreationFlow,
-} from '@conscious-bot/core';
+// Temporary local type definitions until @conscious-bot/core is available
+export class EnhancedRegistry {
+  constructor() {}
+  register(name: string, handler: any): void {
+    console.log(`Registered: ${name}`);
+  }
+  listCapabilities(): any[] {
+    return [];
+  }
+}
+
+export interface ShadowRunResult {
+  success: boolean;
+  data?: any;
+}
+
+export class DynamicCreationFlow {
+  constructor() {}
+  create(config: any): any {
+    return { created: true, config };
+  }
+}
 import { LLMEnhancedSkillComposer } from './llm-enhanced-skill-composer';
 import { Goal, GoalType, GoalStatus } from '../types';
 

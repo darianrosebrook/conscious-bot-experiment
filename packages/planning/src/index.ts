@@ -13,7 +13,7 @@
 // Goal Formulation
 export * from './goal-formulation/homeostasis-monitor';
 export * from './goal-formulation/need-generator';
-export * from './goal-formulation/goal-manager';
+export * from './goal-formulation/enhanced-goal-manager';
 export * from './goal-formulation/utility-calculator';
 
 // Hierarchical Planning (Legacy)
@@ -63,8 +63,8 @@ export {
 
 // Reactive Execution
 export * from './reactive-executor/reactive-executor';
-export * from './reactive-executor/goap-planner';
-export * from './reactive-executor/plan-repair';
+export * from './reactive-executor/enhanced-goap-planner';
+export * from './reactive-executor/enhanced-plan-repair';
 
 // Integrated Planning Coordinator (M3 - Full Integration)
 export {
@@ -77,6 +77,13 @@ export {
 
 // Types
 export * from './types';
+
+// Cognitive Thought Processing
+export {
+  CognitiveThoughtProcessor,
+  type CognitiveThought,
+  type CognitiveThoughtProcessorConfig,
+} from './cognitive-thought-processor';
 
 // Additional exports for minecraft-interface compatibility
 export type { PlanStep, HomeostasisState } from './types';

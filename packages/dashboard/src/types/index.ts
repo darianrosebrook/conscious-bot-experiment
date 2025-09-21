@@ -25,7 +25,7 @@ export interface HudData {
 }
 
 // Chain of Thought types
-export type ThoughtType = 'self' | 'reflection' | 'intrusion';
+export type ThoughtType = 'self' | 'reflection' | 'intrusion' | 'intrusive';
 
 export interface Thought {
   id: string;
@@ -36,6 +36,7 @@ export interface Thought {
   sender?: string; // For chat messages
   thoughtType?: string; // Internal thought type (internal, external_chat_in, external_chat_out, intrusive, reflection, observation)
   attribution?: 'self' | 'external' | 'intrusive'; // Source of the thought
+  optimistic?: boolean; // Whether this is an optimistic UI update
 }
 
 // Task types

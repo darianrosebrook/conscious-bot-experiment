@@ -23,6 +23,18 @@ export function getDefaultHomeostasis(): HomeostasisState {
     social: 0.3,
     achievement: 0.4,
     creativity: 0.6,
+    // New homeostasis states for primitive operations
+    resourceManagement: 0.5,
+    shelterStability: 0.7,
+    farmHealth: 0.6,
+    inventoryOrganization: 0.4,
+    worldKnowledge: 0.5,
+    redstoneProficiency: 0.3,
+    constructionSkill: 0.4,
+    environmentalComfort: 0.6,
+    mechanicalAptitude: 0.4,
+    agriculturalKnowledge: 0.5,
+    defensiveReadiness: 0.5,
     timestamp: now,
   };
 }
@@ -45,6 +57,25 @@ export class HomeostasisMonitor {
       social: partial?.social ?? base.social,
       achievement: partial?.achievement ?? base.achievement,
       creativity: partial?.creativity ?? base.creativity,
+      // New homeostasis states for primitive operations
+      resourceManagement:
+        partial?.resourceManagement ?? base.resourceManagement,
+      shelterStability: partial?.shelterStability ?? base.shelterStability,
+      farmHealth: partial?.farmHealth ?? base.farmHealth,
+      inventoryOrganization:
+        partial?.inventoryOrganization ?? base.inventoryOrganization,
+      worldKnowledge: partial?.worldKnowledge ?? base.worldKnowledge,
+      redstoneProficiency:
+        partial?.redstoneProficiency ?? base.redstoneProficiency,
+      constructionSkill: partial?.constructionSkill ?? base.constructionSkill,
+      environmentalComfort:
+        partial?.environmentalComfort ?? base.environmentalComfort,
+      mechanicalAptitude:
+        partial?.mechanicalAptitude ?? base.mechanicalAptitude,
+      agriculturalKnowledge:
+        partial?.agriculturalKnowledge ?? base.agriculturalKnowledge,
+      defensiveReadiness:
+        partial?.defensiveReadiness ?? base.defensiveReadiness,
       timestamp: Date.now(),
     };
   }

@@ -21,6 +21,7 @@ import {
   Resource,
   UtilityContext,
 } from './types';
+import { ExecutionContext } from './reactive-executor/enhanced-goap-planner';
 
 // Import our HRM-inspired components
 import {
@@ -44,13 +45,13 @@ import type {
 
 // Classical planning components
 import { HierarchicalPlanner } from './hierarchical-planner/hierarchical-planner';
-import { ReactiveExecutor } from './reactive-executor/reactive-executor';
-import { GOAPPlanner } from './reactive-executor/goap-planner';
+import { EnhancedReactiveExecutor } from './reactive-executor/enhanced-reactive-executor';
+import { EnhancedGOAPPlanner } from './reactive-executor/enhanced-goap-planner';
 
 // Goal formulation components
 import { HomeostasisMonitor } from './goal-formulation/homeostasis-monitor';
 import { generateNeeds } from './goal-formulation/need-generator';
-import { GoalManager } from './goal-formulation/goal-manager';
+import { EnhancedGoalManager } from './goal-formulation/enhanced-goal-manager';
 import { createWeightedUtility } from './goal-formulation/utility-calculator';
 
 export interface PlanningConfiguration {
@@ -150,12 +151,12 @@ export class IntegratedPlanningCoordinator extends EventEmitter {
 
   // Classical Components
   private htnPlanner!: HierarchicalPlanner;
-  private goapPlanner!: GOAPPlanner;
-  private reactiveExecutor!: ReactiveExecutor;
+  private goapPlanner!: EnhancedGOAPPlanner;
+  private reactiveExecutor!: EnhancedReactiveExecutor;
 
   // Goal Formulation Components
   private homeostasisMonitor!: HomeostasisMonitor;
-  private goalManager!: GoalManager;
+  private goalManager!: EnhancedGoalManager;
 
   // Planning State
   private activePlans: Map<string, Plan> = new Map();
@@ -238,7 +239,10 @@ export class IntegratedPlanningCoordinator extends EventEmitter {
 
       // Associate routing decision with the selected plan for feedback later
       if (planGeneration.selectedPlan?.id && routingDecision) {
-        this.routingByPlanId.set(planGeneration.selectedPlan.id, routingDecision);
+        this.routingByPlanId.set(
+          planGeneration.selectedPlan.id,
+          routingDecision
+        );
       }
 
       return result;
@@ -304,14 +308,16 @@ export class IntegratedPlanningCoordinator extends EventEmitter {
         let boost = 0;
         // Curiosity/exploration get a nudge if we have fresh episodic activity
         if (
-          (goal.type === GoalType.CURIOSITY || goal.type === GoalType.EXPLORATION) &&
+          (goal.type === GoalType.CURIOSITY ||
+            goal.type === GoalType.EXPLORATION) &&
           memoryHints.topicsCount > 0
         ) {
           boost += Math.min(0.1, 0.02 * memoryHints.topicsCount);
         }
         // Knowledge-rich contexts slightly boost achievement goals
         if (
-          (goal.type === GoalType.ACHIEVEMENT || goal.type === GoalType.ACQUIRE_ITEM) &&
+          (goal.type === GoalType.ACHIEVEMENT ||
+            goal.type === GoalType.ACQUIRE_ITEM) &&
           memoryHints.knowledge.entities > 5
         ) {
           boost += Math.min(0.08, 0.01 * memoryHints.knowledge.entities);
@@ -345,14 +351,19 @@ export class IntegratedPlanningCoordinator extends EventEmitter {
     topicsCount: number;
     knowledge: { entities: number; relationships: number };
   }> {
-    const endpoint = (process.env.MEMORY_ENDPOINT || 'http://localhost:3001').replace(/\/$/, '');
+    const endpoint = (
+      process.env.MEMORY_ENDPOINT || 'http://localhost:3001'
+    ).replace(/\/$/, '');
     const url = `${endpoint}/state`;
     const retries = 2;
     for (let attempt = 0; attempt <= retries; attempt++) {
       try {
         const controller = new AbortController();
         const t = setTimeout(() => controller.abort(), 5_000);
-        const res = await fetch(url, { method: 'GET', signal: controller.signal });
+        const res = await fetch(url, {
+          method: 'GET',
+          signal: controller.signal,
+        });
         clearTimeout(t);
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = (await res.json()) as any;
@@ -560,7 +571,8 @@ export class IntegratedPlanningCoordinator extends EventEmitter {
     const goapGoal = this.convertToGOAPGoal(goal);
     const worldState = this.convertToGOAPState(context.worldState);
 
-    return this.goapPlanner.plan(goapGoal, worldState);
+    const executionContext = this.convertPlanningContextToExecutionContext(context);
+    return this.goapPlanner.planTo(goapGoal, worldState, executionContext, 1000);
   }
 
   /**
@@ -667,7 +679,11 @@ export class IntegratedPlanningCoordinator extends EventEmitter {
       const decision = this.routingByPlanId.get(planId);
       if (decision) {
         try {
-          this.cognitiveRouter.recordTaskResult(decision, !!success, actualLatency);
+          this.cognitiveRouter.recordTaskResult(
+            decision,
+            !!success,
+            actualLatency
+          );
         } catch {}
         // Clean up after recording
         this.routingByPlanId.delete(planId);
@@ -681,7 +697,7 @@ export class IntegratedPlanningCoordinator extends EventEmitter {
         this.emit('planFailed', plan);
       }
 
-      return success;
+      return success.success;
     } catch (error) {
       plan.status = PlanStatus.FAILED;
       this.emit('planError', { plan, error });
@@ -746,12 +762,12 @@ export class IntegratedPlanningCoordinator extends EventEmitter {
 
     // Initialize classical components
     this.htnPlanner = new HierarchicalPlanner();
-    this.goapPlanner = new GOAPPlanner();
-    this.reactiveExecutor = new ReactiveExecutor();
+    this.goapPlanner = new EnhancedGOAPPlanner();
+    this.reactiveExecutor = new EnhancedReactiveExecutor();
 
     // Initialize goal formulation components
     this.homeostasisMonitor = new HomeostasisMonitor();
-    this.goalManager = new GoalManager();
+    this.goalManager = new EnhancedGoalManager();
   }
 
   // Utility methods for conversions and mappings
@@ -980,8 +996,38 @@ export class IntegratedPlanningCoordinator extends EventEmitter {
       [GoalType.ACQUIRE_ITEM]: 'logical',
       [GoalType.SURVIVE_THREAT]: 'safety',
       [GoalType.RESOURCE_GATHERING]: 'logical',
+      [GoalType.FARMING]: 'logical',
+      [GoalType.CONTAINER_MANAGEMENT]: 'logical',
+      [GoalType.WORLD_MANIPULATION]: 'spatial',
+      [GoalType.REDSTONE_AUTOMATION]: 'logical',
+      [GoalType.STRUCTURE_CONSTRUCTION]: 'spatial',
+      [GoalType.ENVIRONMENTAL_CONTROL]: 'spatial',
+      [GoalType.INVENTORY_ORGANIZATION]: 'logical',
+      [GoalType.MECHANISM_OPERATION]: 'logical',
+      [GoalType.COMBAT_TRAINING]: 'safety',
+      [GoalType.AGRICULTURE_DEVELOPMENT]: 'logical',
     };
     return mapping[goalType] || 'general';
+  }
+
+  /**
+   * Convert PlanningContext to ExecutionContext for GOAP planner
+   */
+  private convertPlanningContextToExecutionContext(context: PlanningContext): ExecutionContext {
+    return {
+      threatLevel: context.situationalFactors.threatLevel,
+      hostileCount: 0, // Default value
+      nearLava: false, // Default value
+      lavaDistance: 1000, // Default value
+      resourceValue: 0, // Default value
+      detourDistance: 0, // Default value
+      subgoalUrgency: context.timeConstraints.urgency === 'emergency' ? 1 : 0.5,
+      estimatedTimeToSubgoal: context.timeConstraints.maxPlanningTime,
+      commitmentStrength: 0.8, // Default value
+      timeOfDay: 'day', // Default value
+      lightLevel: 15, // Default value
+      airLevel: 20, // Default value
+    };
   }
 
   private requiresStructuredReasoning(goal: Goal): boolean {

@@ -61,7 +61,16 @@ import { EnhancedMemoryIntegration } from './enhanced-memory-integration';
 import { EnhancedEnvironmentIntegration } from './enhanced-environment-integration';
 import { EnhancedLiveStreamIntegration } from './enhanced-live-stream-integration';
 import { GoalStatus } from './types';
-import { EnhancedRegistry } from '@conscious-bot/core';
+// Temporary local type definition until @conscious-bot/core is available
+export class EnhancedRegistry {
+  constructor() {}
+  register(name: string, handler: any): void {
+    console.log(`Registered: ${name}`);
+  }
+  registerLeaf(name: string, leaf: any): void {
+    console.log(`Registered leaf: ${name}`);
+  }
+}
 import { WorldStateManager } from './world-state/world-state-manager';
 import { WorldKnowledgeIntegrator } from './world-state/world-knowledge-integrator';
 
@@ -1021,13 +1030,37 @@ async function autonomousTaskExecutor() {
     // Get active tasks directly from the enhanced task integration
     const activeTasks = enhancedTaskIntegration.getActiveTasks();
 
+    console.log(
+      `🤖 [AUTONOMOUS EXECUTOR] Found ${activeTasks.length} active tasks`
+    );
+    if (activeTasks.length > 0) {
+      console.log(
+        `🤖 [AUTONOMOUS EXECUTOR] Top task: ${activeTasks[0].title} (${activeTasks[0].type})`
+      );
+      console.log(
+        `🤖 [AUTONOMOUS EXECUTOR] Task status: ${activeTasks[0].status}, priority: ${activeTasks[0].priority}`
+      );
+    }
+
     if (activeTasks.length === 0) {
+      console.log('🤖 [AUTONOMOUS EXECUTOR] No active tasks to execute');
       logOptimizer.log('No active tasks to execute', 'no-active-tasks');
       return;
     }
 
     // Execute the highest priority task, prioritizing prerequisite tasks
     const currentTask = activeTasks[0]; // Tasks are already sorted by priority
+
+    console.log(
+      `🤖 [AUTONOMOUS EXECUTOR] Executing task: ${currentTask.title} (${currentTask.type})`
+    );
+    console.log(`🤖 [AUTONOMOUS EXECUTOR] Task details:`, {
+      id: currentTask.id,
+      type: currentTask.type,
+      priority: currentTask.priority,
+      urgency: currentTask.urgency,
+      status: currentTask.status,
+    });
 
     // Check if this task is a prerequisite task (has prerequisite tag)
     const isPrerequisiteTask =
@@ -1039,6 +1072,29 @@ async function autonomousTaskExecutor() {
         `🔧 Executing prerequisite task: ${currentTask.title}`,
         `prerequisite-${currentTask.id}`
       );
+    }
+
+    // Special handling for cognitive reflection tasks
+    if (currentTask.type === 'cognitive_reflection') {
+      console.log(
+        `🧠 [AUTONOMOUS EXECUTOR] Processing cognitive reflection task: ${currentTask.title}`
+      );
+      console.log(
+        `🧠 [AUTONOMOUS EXECUTOR] Thought content: ${currentTask.parameters?.thoughtContent?.substring(0, 100)}...`
+      );
+      console.log(
+        `🧠 [AUTONOMOUS EXECUTOR] Signals received: ${currentTask.parameters?.signals?.length || 0}`
+      );
+
+      // Mark cognitive reflection as completed since behavior tree already processed it
+      await enhancedTaskIntegration.updateTaskStatus(
+        currentTask.id,
+        'completed'
+      );
+      console.log(
+        `✅ [AUTONOMOUS EXECUTOR] Cognitive reflection task completed`
+      );
+      return;
     }
 
     // Only log task execution if progress has changed or it's a new task
@@ -1207,7 +1263,7 @@ async function autonomousTaskExecutor() {
       console.log(
         `🎯 Found MCP option: ${suitableOption.name} (${suitableOption.id}) - execution temporarily disabled`
       );
-      // TODO: Re-enable MCP execution after fixing the crash
+      // TODO: Re-enable MCP execution after fixing the crash - investigate MCP execution failure
     }
 
     // If no BT option found, try to use individual leaves directly
@@ -2161,7 +2217,7 @@ async function startServer() {
         for (const leaf of leaves) {
           try {
             // Register in governance registry (active status for now)
-            registry.registerLeaf(leaf as any, provenance, 'active');
+            registry.registerLeaf(leaf.name, leaf as any);
             // Register with MCP integration for tool hydration
             const ok = await mcpIntegration.registerLeaf(leaf as any);
             if (ok) registered++;

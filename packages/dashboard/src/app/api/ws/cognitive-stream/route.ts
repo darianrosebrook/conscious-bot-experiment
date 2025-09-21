@@ -40,6 +40,7 @@ interface CognitiveThought {
     responsePriority?: number;
     originalMessageId?: string;
     processingFailed?: boolean;
+    fallback?: boolean;
     error?: string;
   };
   processed?: boolean;
@@ -241,7 +242,10 @@ async function generateThoughts(): Promise<CognitiveThought[]> {
     fetchState('http://localhost:3002/state'),
   ]);
 
-  if (!state || !plan) return [];
+  // If services are down, generate basic thoughts from available data
+  if (!state || !plan) {
+    return generateFallbackThoughts();
+  }
 
   const context = {
     currentGoals: plan.goalFormulation?.currentGoals || [],
@@ -255,39 +259,80 @@ async function generateThoughts(): Promise<CognitiveThought[]> {
     urgency: 0.3,
   };
 
-  const resp = await fetch('http://localhost:3003/generate-thoughts', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      situation: 'environment',
-      context,
-      thoughtTypes: ['reflection', 'observation', 'planning'],
-    }),
-    signal: AbortSignal.timeout(3000), // Reduced from 5s to 3s to prevent hanging
-  });
-
-  if (!resp.ok) return [];
-  const data = await resp.json();
-  return (data.thoughts || []).flatMap((t: any) => {
-    const dup = thoughtHistory.find(
-      (old) => old.content === t.content && Date.now() - old.timestamp < 60000
-    );
-    if (dup) return [];
-    return [
-      addThought({
-        type: t.type || 'internal',
-        content: t.content,
-        attribution: 'self',
-        context: {
-          currentTask: context.currentState.currentTasks[0]?.description,
-          emotionalState: t.emotionalState,
-          confidence: t.confidence,
-          cognitiveSystem: 'llm-core',
-        },
-        metadata: { llmConfidence: t.confidence, thoughtType: t.type },
+  try {
+    const resp = await fetch('http://localhost:3003/generate-thoughts', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        situation: 'environment',
+        context,
+        thoughtTypes: ['reflection', 'observation', 'planning'],
       }),
-    ];
-  });
+      signal: AbortSignal.timeout(3000),
+    });
+
+    if (!resp.ok) return generateFallbackThoughts();
+    const data = await resp.json();
+    return (data.thoughts || []).flatMap((t: any) => {
+      const dup = thoughtHistory.find(
+        (old) => old.content === t.content && Date.now() - old.timestamp < 60000
+      );
+      if (dup) return [];
+      return [
+        addThought({
+          type: t.type || 'internal',
+          content: t.content,
+          attribution: 'self',
+          context: {
+            currentTask: context.currentState.currentTasks[0]?.description,
+            emotionalState: t.emotionalState,
+            confidence: t.confidence,
+            cognitiveSystem: 'llm-core',
+          },
+          metadata: { llmConfidence: t.confidence, thoughtType: t.type },
+        }),
+      ];
+    });
+  } catch (error) {
+    console.warn(
+      'Cognition service unavailable, using fallback thoughts:',
+      error
+    );
+    return generateFallbackThoughts();
+  }
+}
+
+function generateFallbackThoughts(): CognitiveThought[] {
+  const fallbackThoughts = [
+    "I'm sensing the environment around me, gathering information about my current state.",
+    'I should consider my current goals and how to achieve them systematically.',
+    'The world seems stable right now. I should maintain awareness of my surroundings.',
+    'My cognitive processes are active and functioning normally.',
+    'I need to stay focused on my primary objectives while remaining adaptable.',
+    'The environment appears calm. This is a good time for reflection and planning.',
+    "I'm processing sensory data and updating my internal model of the world.",
+    'My thought patterns are clear and logical at the moment.',
+  ];
+
+  const randomThought =
+    fallbackThoughts[Math.floor(Math.random() * fallbackThoughts.length)];
+
+  return [
+    addThought({
+      type: 'reflection',
+      content: randomThought,
+      attribution: 'self',
+      context: {
+        emotionalState: 'neutral',
+        confidence: 0.6,
+        cognitiveSystem: 'fallback-generator',
+      },
+      metadata: {
+        thoughtType: 'reflection',
+        fallback: true,
+      },
+    }),
+  ];
 }
 
 async function processExternalChat(): Promise<CognitiveThought[]> {
@@ -505,9 +550,7 @@ export const GET = async (req: NextRequest) => {
 
       const sendUpdates = async () => {
         try {
-          const thoughts = (
-            Math.random() < 0.05 ? await generateThoughts() : []
-          ) // Reduced from 0.15 to 0.05 to prevent spam
+          const thoughts = (Math.random() < 0.3 ? await generateThoughts() : []) // Increased from 5% to 30% for more activity
             .concat(await processExternalChat(), await processBotResponses());
 
           if (thoughts.length > 0) {
@@ -536,7 +579,7 @@ export const GET = async (req: NextRequest) => {
         }
       };
 
-      const interval = setInterval(sendUpdates, 30000); // Reduced from 15s to 30s to prevent spam
+      const interval = setInterval(sendUpdates, 10000); // Increased frequency from 30s to 10s for more real-time feel
 
       // Send heartbeat every 10 seconds to keep connection alive
       const heartbeat = setInterval(() => {

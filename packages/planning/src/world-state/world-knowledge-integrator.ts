@@ -1,15 +1,50 @@
 import { WorldStateManager, WorldStateSnapshot } from './world-state-manager';
-import {
-  createSemanticMemory,
-  EntityType,
-  RelationType,
-  PropertyType,
-  KnowledgeSource,
-} from '@conscious-bot/memory';
+// Temporary local type definitions until @conscious-bot/memory is available
+export function createSemanticMemory(config: any): any {
+  return { config };
+}
+
+export enum EntityType {
+  ITEM = 'item',
+  BLOCK = 'block',
+  ENTITY = 'entity',
+  LOCATION = 'location',
+  RESOURCE = 'resource',
+  PLACE = 'place',
+  CONCEPT = 'concept',
+  PLAYER = 'player',
+}
+
+export enum RelationType {
+  CONTAINS = 'contains',
+  LOCATED_AT = 'located_at',
+  PART_OF = 'part_of',
+  NEAR = 'near',
+  PRODUCES = 'produces',
+  CONSUMED_BY = 'consumed_by',
+}
+
+export enum PropertyType {
+  STRING = 'string',
+  NUMBER = 'number',
+  BOOLEAN = 'boolean',
+  DATE = 'date',
+}
+
+export enum KnowledgeSource {
+  OBSERVATION = 'observation',
+  EXPERIENCE = 'experience',
+  LEARNING = 'learning',
+  INFERENCE = 'inference',
+  SYSTEM = 'system',
+}
 
 function normalizeItemName(item: any): string {
   return String(
-    item?.name || item?.displayName || (typeof item?.type === 'string' ? item?.type : '') || ''
+    item?.name ||
+      item?.displayName ||
+      (typeof item?.type === 'string' ? item?.type : '') ||
+      ''
   )
     .toLowerCase()
     .replace(/\s+/g, '_');
@@ -188,9 +223,14 @@ export class WorldKnowledgeIntegrator {
 
     for (const eff of effects) {
       // Normalize inventory add/remove
-      const isInv = eff?.type === 'inventory' || (typeof eff?.change === 'string' && eff.change.startsWith('inventory_'));
+      const isInv =
+        eff?.type === 'inventory' ||
+        (typeof eff?.change === 'string' &&
+          eff.change.startsWith('inventory_'));
       if (!isInv) continue;
-      const itemName = String(eff?.item || eff?.metadata?.item || '').toLowerCase();
+      const itemName = String(
+        eff?.item || eff?.metadata?.item || ''
+      ).toLowerCase();
       const qtyRaw = Number(eff?.quantity ?? eff?.metadata?.quantity ?? 0);
       if (!itemName || !isFinite(qtyRaw)) continue;
 

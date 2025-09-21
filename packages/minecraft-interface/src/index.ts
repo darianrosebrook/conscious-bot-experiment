@@ -57,6 +57,10 @@ export * from './leaves/movement-leaves';
 export * from './leaves/interaction-leaves';
 export * from './leaves/sensing-leaves';
 export * from './leaves/crafting-leaves';
+export * from './leaves/container-leaves';
+export * from './leaves/combat-leaves';
+export * from './leaves/farming-leaves';
+export * from './leaves/world-interaction-leaves';
 
 // Utility functions
 export { createDefaultBotConfig, validateBotConfig } from './utils';

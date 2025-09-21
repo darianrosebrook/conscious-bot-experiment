@@ -1,1927 +1,6 @@
 [
   {
     "type": "planning",
-    "content": "Scan the area for more logs and ore deposits. Start with chopping down nearby oak logs to gather wood.",
-    "attribution": "self",
-    "context": {
-      "emotionalState": "neutral",
-      "confidence": 0.7,
-      "cognitiveSystem": "enhanced-generator"
-    },
-    "metadata": {
-      "thoughtType": "planning",
-      "taskType": "gathering",
-      "trigger": "task-start",
-      "llmConfidence": 0.7,
-      "model": "qwen2.5:7b"
-    },
-    "id": "thought-1756812444427-pxb112aji",
-    "timestamp": 1756812444427,
-    "processed": false
-  },
-  {
-    "type": "planning",
-    "content": "Scan the area for more resources. Look for nearby oak logs to gather and start crafting a wooden pickaxe.",
-    "attribution": "self",
-    "context": {
-      "emotionalState": "neutral",
-      "confidence": 0.7,
-      "cognitiveSystem": "enhanced-generator"
-    },
-    "metadata": {
-      "thoughtType": "planning",
-      "taskType": "gathering",
-      "trigger": "task-start",
-      "llmConfidence": 0.7,
-      "model": "qwen2.5:7b"
-    },
-    "id": "thought-1756812504450-f3zcekskz",
-    "timestamp": 1756812504450,
-    "processed": false
-  },
-  {
-    "type": "planning",
-    "content": "Gather nearby oak logs to craft a wooden pickaxe. Then, explore the area for more resources.",
-    "attribution": "self",
-    "context": {
-      "emotionalState": "neutral",
-      "confidence": 0.6,
-      "cognitiveSystem": "enhanced-generator"
-    },
-    "metadata": {
-      "thoughtType": "planning",
-      "taskType": "gathering",
-      "trigger": "task-start",
-      "llmConfidence": 0.6,
-      "model": "qwen2.5:7b"
-    },
-    "id": "thought-1756812564403-yvobfrrjo",
-    "timestamp": 1756812564403,
-    "processed": false
-  },
-  {
-    "type": "planning",
-    "content": "Scan the area for more logs and ore deposits. Gather any nearby resources to assess available materials.",
-    "attribution": "self",
-    "context": {
-      "emotionalState": "neutral",
-      "confidence": 0.7,
-      "cognitiveSystem": "enhanced-generator"
-    },
-    "metadata": {
-      "thoughtType": "planning",
-      "taskType": "gathering",
-      "trigger": "task-start",
-      "llmConfidence": 0.7,
-      "model": "qwen2.5:7b"
-    },
-    "id": "thought-1756812624380-g330kfjfx",
-    "timestamp": 1756812624380,
-    "processed": false
-  },
-  {
-    "type": "planning",
-    "content": "Scan the area for more logs and coal ore. Chop down nearby trees to gather wood, then mine the coal ore. This will help assess resource availability and prepare for further tasks.",
-    "attribution": "self",
-    "context": {
-      "emotionalState": "neutral",
-      "confidence": 0.7,
-      "cognitiveSystem": "enhanced-generator"
-    },
-    "metadata": {
-      "thoughtType": "planning",
-      "taskType": "gathering",
-      "trigger": "task-start",
-      "llmConfidence": 0.7,
-      "model": "qwen2.5:7b"
-    },
-    "id": "thought-1756812684797-nyq6l7k6c",
-    "timestamp": 1756812684797,
-    "processed": false
-  },
-  {
-    "type": "planning",
-    "content": "Scan surroundings for more logs and ores. Look for nearby trees to cut down and check the ground for coal. Plan to craft a wooden pickaxe once resources are gathered.",
-    "attribution": "self",
-    "context": {
-      "emotionalState": "neutral",
-      "confidence": 0.7,
-      "cognitiveSystem": "enhanced-generator"
-    },
-    "metadata": {
-      "thoughtType": "planning",
-      "taskType": "gathering",
-      "trigger": "task-start",
-      "llmConfidence": 0.7,
-      "model": "qwen2.5:7b"
-    },
-    "id": "thought-1756812744797-f1mnk5d4i",
-    "timestamp": 1756812744797,
-    "processed": false
-  },
-  {
-    "type": "planning",
-    "content": "Scan surroundings for resources; gather nearby oak logs to craft a wooden pickaxe.",
-    "attribution": "self",
-    "context": {
-      "emotionalState": "neutral",
-      "confidence": 0.6,
-      "cognitiveSystem": "enhanced-generator"
-    },
-    "metadata": {
-      "thoughtType": "planning",
-      "taskType": "gathering",
-      "trigger": "task-start",
-      "llmConfidence": 0.6,
-      "model": "qwen2.5:7b"
-    },
-    "id": "thought-1756812804253-md5uc6suj",
-    "timestamp": 1756812804253,
-    "processed": false
-  },
-  {
-    "type": "planning",
-    "content": "Gather nearby oak logs to start building a wooden pickaxe. Then explore slightly further to check for iron ore and other resources.",
-    "attribution": "self",
-    "context": {
-      "emotionalState": "neutral",
-      "confidence": 0.7,
-      "cognitiveSystem": "enhanced-generator"
-    },
-    "metadata": {
-      "thoughtType": "planning",
-      "taskType": "gathering",
-      "trigger": "task-start",
-      "llmConfidence": 0.7,
-      "model": "qwen2.5:7b"
-    },
-    "id": "thought-1756812864609-nh11nu2vm",
-    "timestamp": 1756812864609,
-    "processed": false
-  },
-  {
-    "type": "planning",
-    "content": "Scan the area for more logs and ores. There's iron ore nearby; that’s my priority after this step.",
-    "attribution": "self",
-    "context": {
-      "emotionalState": "neutral",
-      "confidence": 0.6,
-      "cognitiveSystem": "enhanced-generator"
-    },
-    "metadata": {
-      "thoughtType": "planning",
-      "taskType": "gathering",
-      "trigger": "task-start",
-      "llmConfidence": 0.6,
-      "model": "qwen2.5:7b"
-    },
-    "id": "thought-1756812924519-j2vh7zkkk",
-    "timestamp": 1756812924519,
-    "processed": false
-  },
-  {
-    "type": "planning",
-    "content": "Gather nearby oak logs to understand the forest resources. Check if there are more coal ores around before moving on.",
-    "attribution": "self",
-    "context": {
-      "emotionalState": "neutral",
-      "confidence": 0.7,
-      "cognitiveSystem": "enhanced-generator"
-    },
-    "metadata": {
-      "thoughtType": "planning",
-      "taskType": "gathering",
-      "trigger": "task-start",
-      "llmConfidence": 0.7,
-      "model": "qwen2.5:7b"
-    },
-    "id": "thought-1756812984493-a7nykr81u",
-    "timestamp": 1756812984493,
-    "processed": false
-  },
-  {
-    "type": "planning",
-    "content": "Gather nearby oak logs to craft a wooden pickaxe. Then return here to investigate further.",
-    "attribution": "self",
-    "context": {
-      "emotionalState": "neutral",
-      "confidence": 0.6,
-      "cognitiveSystem": "enhanced-generator"
-    },
-    "metadata": {
-      "thoughtType": "planning",
-      "taskType": "gathering",
-      "trigger": "task-start",
-      "llmConfidence": 0.6,
-      "model": "qwen2.5:7b"
-    },
-    "id": "thought-1756813104336-wih1yxvib",
-    "timestamp": 1756813104336,
-    "processed": false
-  },
-  {
-    "type": "planning",
-    "content": "Scan the area for more wood and ore. Start with chopping nearby logs to gather wood.",
-    "attribution": "self",
-    "context": {
-      "emotionalState": "neutral",
-      "confidence": 0.6,
-      "cognitiveSystem": "enhanced-generator"
-    },
-    "metadata": {
-      "thoughtType": "planning",
-      "taskType": "gathering",
-      "trigger": "task-start",
-      "llmConfidence": 0.6,
-      "model": "qwen2.5:7b"
-    },
-    "id": "thought-1756813164349-ifefc0i6h",
-    "timestamp": 1756813164349,
-    "processed": false
-  },
-  {
-    "type": "planning",
-    "content": "Observe surroundings for resources; start by checking for more logs and ores within a 20-block radius. If none found, plan to move to an area with better resource potential.",
-    "attribution": "self",
-    "context": {
-      "emotionalState": "neutral",
-      "confidence": 0.7,
-      "cognitiveSystem": "enhanced-generator"
-    },
-    "metadata": {
-      "thoughtType": "planning",
-      "taskType": "gathering",
-      "trigger": "task-start",
-      "llmConfidence": 0.7,
-      "model": "qwen2.5:7b"
-    },
-    "id": "thought-1756813224825-vv60oyqna",
-    "timestamp": 1756813224825,
-    "processed": false
-  },
-  {
-    "type": "planning",
-    "content": "Scan the area for more resources. Look for wood and coal first; then assess if there are any nearby iron ores.",
-    "attribution": "self",
-    "context": {
-      "emotionalState": "neutral",
-      "confidence": 0.7,
-      "cognitiveSystem": "enhanced-generator"
-    },
-    "metadata": {
-      "thoughtType": "planning",
-      "taskType": "gathering",
-      "trigger": "task-start",
-      "llmConfidence": 0.7,
-      "model": "qwen2.5:7b"
-    },
-    "id": "thought-1756813284482-ci84suv44",
-    "timestamp": 1756813284482,
-    "processed": false
-  },
-  {
-    "type": "planning",
-    "content": "Scan the area for more logs and ores. Axe nearby oak logs to gather wood and mine the coal ore. Planning to craft a wooden pickaxe afterward.",
-    "attribution": "self",
-    "context": {
-      "emotionalState": "neutral",
-      "confidence": 0.7,
-      "cognitiveSystem": "enhanced-generator"
-    },
-    "metadata": {
-      "thoughtType": "planning",
-      "taskType": "gathering",
-      "trigger": "task-start",
-      "llmConfidence": 0.7,
-      "model": "qwen2.5:7b"
-    },
-    "id": "thought-1756813344675-ilql830hr",
-    "timestamp": 1756813344675,
-    "processed": false
-  },
-  {
-    "type": "planning",
-    "content": "Start by gathering nearby oak logs to craft a wooden pickaxe. Then, return here and explore the area for more resources.",
-    "attribution": "self",
-    "context": {
-      "emotionalState": "neutral",
-      "confidence": 0.7,
-      "cognitiveSystem": "enhanced-generator"
-    },
-    "metadata": {
-      "thoughtType": "planning",
-      "taskType": "gathering",
-      "trigger": "task-start",
-      "llmConfidence": 0.7,
-      "model": "qwen2.5:7b"
-    },
-    "id": "thought-1756813464524-u7qb3xrl8",
-    "timestamp": 1756813464524,
-    "processed": false
-  },
-  {
-    "type": "planning",
-    "content": "Scan the area for more logs and ores. Start with nearby oak logs to gather wood. Plan to craft a wooden pickaxe once I have enough resources.",
-    "attribution": "self",
-    "context": {
-      "emotionalState": "neutral",
-      "confidence": 0.7,
-      "cognitiveSystem": "enhanced-generator"
-    },
-    "metadata": {
-      "thoughtType": "planning",
-      "taskType": "gathering",
-      "trigger": "task-start",
-      "llmConfidence": 0.7,
-      "model": "qwen2.5:7b"
-    },
-    "id": "thought-1756813524671-2khl4vrx7",
-    "timestamp": 1756813524671,
-    "processed": false
-  },
-  {
-    "type": "planning",
-    "content": "Scan the immediate area for more resources. Look for logs to gather and any nearby coal ores. Planning to craft a wooden pickaxe once I have enough logs.",
-    "attribution": "self",
-    "context": {
-      "emotionalState": "neutral",
-      "confidence": 0.7,
-      "cognitiveSystem": "enhanced-generator"
-    },
-    "metadata": {
-      "thoughtType": "planning",
-      "taskType": "gathering",
-      "trigger": "task-start",
-      "llmConfidence": 0.7,
-      "model": "qwen2.5:7b"
-    },
-    "id": "thought-1756813584720-94ktgqm98",
-    "timestamp": 1756813584720,
-    "processed": false
-  },
-  {
-    "type": "planning",
-    "content": "Scan the area for more logs and ores. Focus on finding a source of wood first.",
-    "attribution": "self",
-    "context": {
-      "emotionalState": "neutral",
-      "confidence": 0.6,
-      "cognitiveSystem": "enhanced-generator"
-    },
-    "metadata": {
-      "thoughtType": "planning",
-      "taskType": "gathering",
-      "trigger": "task-start",
-      "llmConfidence": 0.6,
-      "model": "qwen2.5:7b"
-    },
-    "id": "thought-1756813644411-w6qw7ba1k",
-    "timestamp": 1756813644411,
-    "processed": false
-  },
-  {
-    "type": "planning",
-    "content": "Observe surroundings for nearby resources and potential threats. Focus on finding more logs and coal ore for crafting materials.",
-    "attribution": "self",
-    "context": {
-      "emotionalState": "neutral",
-      "confidence": 0.7,
-      "cognitiveSystem": "enhanced-generator"
-    },
-    "metadata": {
-      "thoughtType": "planning",
-      "taskType": "gathering",
-      "trigger": "task-start",
-      "llmConfidence": 0.7,
-      "model": "qwen2.5:7b"
-    },
-    "id": "thought-1756813764514-8rgl21f6a",
-    "timestamp": 1756813764514,
-    "processed": false
-  },
-  {
-    "type": "planning",
-    "content": "Scan the area for more logs and ores. Identify potential mining spots near the oak logs and coal ore. Next steps: Collect nearby logs to craft a wooden pickaxe.",
-    "attribution": "self",
-    "context": {
-      "emotionalState": "neutral",
-      "confidence": 0.7,
-      "cognitiveSystem": "enhanced-generator"
-    },
-    "metadata": {
-      "thoughtType": "planning",
-      "taskType": "gathering",
-      "trigger": "task-start",
-      "llmConfidence": 0.7,
-      "model": "qwen2.5:7b"
-    },
-    "id": "thought-1756813824766-f33nun5qz",
-    "timestamp": 1756813824766,
-    "processed": false
-  },
-  {
-    "type": "planning",
-    "content": "Scan the area for more resources. Look for nearby oak logs to gather and craft a wooden pickaxe.",
-    "attribution": "self",
-    "context": {
-      "emotionalState": "neutral",
-      "confidence": 0.6,
-      "cognitiveSystem": "enhanced-generator"
-    },
-    "metadata": {
-      "thoughtType": "planning",
-      "taskType": "gathering",
-      "trigger": "task-start",
-      "llmConfidence": 0.6,
-      "model": "qwen2.5:7b"
-    },
-    "id": "thought-1756813884417-33djb0tjn",
-    "timestamp": 1756813884417,
-    "processed": false
-  },
-  {
-    "type": "planning",
-    "content": "Explore the area to find more logs and ores. Look around for trees and stone to gather resources needed for further tasks.",
-    "attribution": "self",
-    "context": {
-      "emotionalState": "neutral",
-      "confidence": 0.7,
-      "cognitiveSystem": "enhanced-generator"
-    },
-    "metadata": {
-      "thoughtType": "planning",
-      "taskType": "gathering",
-      "trigger": "task-start",
-      "llmConfidence": 0.7,
-      "model": "qwen2.5:7b"
-    },
-    "id": "thought-1756813944526-oxkh99erq",
-    "timestamp": 1756813944526,
-    "processed": false
-  },
-  {
-    "type": "planning",
-    "content": "Scan the area for more logs and ore. Look for nearby trees to chop down and stone deposits to mine. Planning to gather resources first before moving on to crafting.",
-    "attribution": "self",
-    "context": {
-      "emotionalState": "neutral",
-      "confidence": 0.7,
-      "cognitiveSystem": "enhanced-generator"
-    },
-    "metadata": {
-      "thoughtType": "planning",
-      "taskType": "gathering",
-      "trigger": "task-start",
-      "llmConfidence": 0.7,
-      "model": "qwen2.5:7b"
-    },
-    "id": "thought-1756814004750-okagdy98b",
-    "timestamp": 1756814004750,
-    "processed": false
-  },
-  {
-    "type": "planning",
-    "content": "Gather nearby logs to understand the wood type before crafting tools. Next, explore the area for more resources and potential threats.",
-    "attribution": "self",
-    "context": {
-      "emotionalState": "neutral",
-      "confidence": 0.7,
-      "cognitiveSystem": "enhanced-generator"
-    },
-    "metadata": {
-      "thoughtType": "planning",
-      "taskType": "gathering",
-      "trigger": "task-start",
-      "llmConfidence": 0.7,
-      "model": "qwen2.5:7b"
-    },
-    "id": "thought-1756814124569-kuzy061b4",
-    "timestamp": 1756814124569,
-    "processed": false
-  },
-  {
-    "type": "planning",
-    "content": "Inspect the nearby blocks to identify resources. Start with gathering oak logs for a wooden pickaxe.",
-    "attribution": "self",
-    "context": {
-      "emotionalState": "neutral",
-      "confidence": 0.6,
-      "cognitiveSystem": "enhanced-generator"
-    },
-    "metadata": {
-      "thoughtType": "planning",
-      "taskType": "gathering",
-      "trigger": "task-start",
-      "llmConfidence": 0.6,
-      "model": "qwen2.5:7b"
-    },
-    "id": "thought-1756814184388-6v5pllac6",
-    "timestamp": 1756814184388,
-    "processed": false
-  },
-  {
-    "type": "planning",
-    "content": "Scan the immediate area for more logs and ores. Start by chopping down nearby oak trees to gather wood.",
-    "attribution": "self",
-    "context": {
-      "emotionalState": "neutral",
-      "confidence": 0.7,
-      "cognitiveSystem": "enhanced-generator"
-    },
-    "metadata": {
-      "thoughtType": "planning",
-      "taskType": "gathering",
-      "trigger": "task-start",
-      "llmConfidence": 0.7,
-      "model": "qwen2.5:7b"
-    },
-    "id": "thought-1756814244708-c0bc1qq66",
-    "timestamp": 1756814244708,
-    "processed": false
-  },
-  {
-    "type": "planning",
-    "content": "Scan the area for more logs and coal ore. Chop down nearby trees to gather wood and mine the coal block. Next, craft a wooden pickaxe with the obtained wood and coal.",
-    "attribution": "self",
-    "context": {
-      "emotionalState": "neutral",
-      "confidence": 0.7,
-      "cognitiveSystem": "enhanced-generator"
-    },
-    "metadata": {
-      "thoughtType": "planning",
-      "taskType": "gathering",
-      "trigger": "task-start",
-      "llmConfidence": 0.7,
-      "model": "qwen2.5:7b"
-    },
-    "id": "thought-1756814364822-dz8l3gtvp",
-    "timestamp": 1756814364822,
-    "processed": false
-  },
-  {
-    "type": "planning",
-    "content": "Scan the area for more resources and potential hazards. Look for nearby logs to gather wood first.",
-    "attribution": "self",
-    "context": {
-      "emotionalState": "neutral",
-      "confidence": 0.6,
-      "cognitiveSystem": "enhanced-generator"
-    },
-    "metadata": {
-      "thoughtType": "planning",
-      "taskType": "gathering",
-      "trigger": "task-start",
-      "llmConfidence": 0.6,
-      "model": "qwen2.5:7b"
-    },
-    "id": "thought-1756814424351-2t83vjv1x",
-    "timestamp": 1756814424351,
-    "processed": false
-  },
-  {
-    "type": "planning",
-    "content": "Scan the area for more logs and ore patches. Look for nearby trees to gather wood first. Planning to move to a suitable log source next.",
-    "attribution": "self",
-    "context": {
-      "emotionalState": "neutral",
-      "confidence": 0.7,
-      "cognitiveSystem": "enhanced-generator"
-    },
-    "metadata": {
-      "thoughtType": "planning",
-      "taskType": "gathering",
-      "trigger": "task-start",
-      "llmConfidence": 0.7,
-      "model": "qwen2.5:7b"
-    },
-    "id": "thought-1756814544670-ptbqm679m",
-    "timestamp": 1756814544670,
-    "processed": false
-  },
-  {
-    "type": "planning",
-    "content": "Gather nearby oak logs to craft a wooden pickaxe. Then, explore the area for more resources.",
-    "attribution": "self",
-    "context": {
-      "emotionalState": "neutral",
-      "confidence": 0.6,
-      "cognitiveSystem": "enhanced-generator"
-    },
-    "metadata": {
-      "thoughtType": "planning",
-      "taskType": "gathering",
-      "trigger": "task-start",
-      "llmConfidence": 0.6,
-      "model": "qwen2.5:7b"
-    },
-    "id": "thought-1756814604414-ke7yv9x2p",
-    "timestamp": 1756814604414,
-    "processed": false
-  },
-  {
-    "type": "planning",
-    "content": "Gather oak logs around me to craft a wooden pickaxe. There are 3 nearby logs, so start chopping them down.",
-    "attribution": "self",
-    "context": {
-      "emotionalState": "neutral",
-      "confidence": 0.7,
-      "cognitiveSystem": "enhanced-generator"
-    },
-    "metadata": {
-      "thoughtType": "planning",
-      "taskType": "gathering",
-      "trigger": "task-start",
-      "llmConfidence": 0.7,
-      "model": "qwen2.5:7b"
-    },
-    "id": "thought-1756814664523-10ju7f839",
-    "timestamp": 1756814664523,
-    "processed": false
-  },
-  {
-    "type": "planning",
-    "content": "Scan the area for more wood and ores. Look around to find any nearby resources before moving on.",
-    "attribution": "self",
-    "context": {
-      "emotionalState": "neutral",
-      "confidence": 0.6,
-      "cognitiveSystem": "enhanced-generator"
-    },
-    "metadata": {
-      "thoughtType": "planning",
-      "taskType": "gathering",
-      "trigger": "task-start",
-      "llmConfidence": 0.6,
-      "model": "qwen2.5:7b"
-    },
-    "id": "thought-1756814724622-3m7kr7qqb",
-    "timestamp": 1756814724622,
-    "processed": false
-  },
-  {
-    "type": "planning",
-    "content": "Scan the area for resources. Look for more logs and ores within a 10-block radius. Focus on finding wood first, then explore further for iron ore.",
-    "attribution": "self",
-    "context": {
-      "emotionalState": "neutral",
-      "confidence": 0.7,
-      "cognitiveSystem": "enhanced-generator"
-    },
-    "metadata": {
-      "thoughtType": "planning",
-      "taskType": "gathering",
-      "trigger": "task-start",
-      "llmConfidence": 0.7,
-      "model": "qwen2.5:7b"
-    },
-    "id": "thought-1756814784977-7cm87jqwr",
-    "timestamp": 1756814784977,
-    "processed": false
-  },
-  {
-    "type": "planning",
-    "content": "Scan the area for more logs and ores. Start by breaking down nearby oak logs to gather wood.",
-    "attribution": "self",
-    "context": {
-      "emotionalState": "neutral",
-      "confidence": 0.6,
-      "cognitiveSystem": "enhanced-generator"
-    },
-    "metadata": {
-      "thoughtType": "planning",
-      "taskType": "gathering",
-      "trigger": "task-start",
-      "llmConfidence": 0.6,
-      "model": "qwen2.5:7b"
-    },
-    "id": "thought-1756814844462-3itfgjecg",
-    "timestamp": 1756814844462,
-    "processed": false
-  },
-  {
-    "type": "planning",
-    "content": "Scan the surroundings for more resources. Look for trees to gather wood and nearby coal ore patches. Next, craft a wooden pickaxe to mine deeper.",
-    "attribution": "self",
-    "context": {
-      "emotionalState": "neutral",
-      "confidence": 0.7,
-      "cognitiveSystem": "enhanced-generator"
-    },
-    "metadata": {
-      "thoughtType": "planning",
-      "taskType": "gathering",
-      "trigger": "task-start",
-      "llmConfidence": 0.7,
-      "model": "qwen2.5:7b"
-    },
-    "id": "thought-1756814964714-6xbg96sof",
-    "timestamp": 1756814964714,
-    "processed": false
-  },
-  {
-    "type": "planning",
-    "content": "Scan the area for more resources and identify nearby trees and stone walls. Begin by chopping down oak logs to gather wood.",
-    "attribution": "self",
-    "context": {
-      "emotionalState": "neutral",
-      "confidence": 0.7,
-      "cognitiveSystem": "enhanced-generator"
-    },
-    "metadata": {
-      "thoughtType": "planning",
-      "taskType": "gathering",
-      "trigger": "task-start",
-      "llmConfidence": 0.7,
-      "model": "qwen2.5:7b"
-    },
-    "id": "thought-1756815024600-zyojxii3g",
-    "timestamp": 1756815024600,
-    "processed": false
-  },
-  {
-    "type": "planning",
-    "content": "Scan the area for more logs and ores. Need to gather resources before moving on to mining iron ore.",
-    "attribution": "self",
-    "context": {
-      "emotionalState": "neutral",
-      "confidence": 0.6,
-      "cognitiveSystem": "enhanced-generator"
-    },
-    "metadata": {
-      "thoughtType": "planning",
-      "taskType": "gathering",
-      "trigger": "task-start",
-      "llmConfidence": 0.6,
-      "model": "qwen2.5:7b"
-    },
-    "id": "thought-1756815084574-ybg3urbj7",
-    "timestamp": 1756815084574,
-    "processed": false
-  },
-  {
-    "type": "planning",
-    "content": "Scan the surroundings for more logs and ores. Need at least one oak log to craft a wooden pickaxe.",
-    "attribution": "self",
-    "context": {
-      "emotionalState": "neutral",
-      "confidence": 0.6,
-      "cognitiveSystem": "enhanced-generator"
-    },
-    "metadata": {
-      "thoughtType": "planning",
-      "taskType": "gathering",
-      "trigger": "task-start",
-      "llmConfidence": 0.6,
-      "model": "qwen2.5:7b"
-    },
-    "id": "thought-1756815204515-k28z3mxr4",
-    "timestamp": 1756815204515,
-    "processed": false
-  },
-  {
-    "type": "planning",
-    "content": "Observe surroundings for more resources. Focus on nearby oak logs to gather wood first.",
-    "attribution": "self",
-    "context": {
-      "emotionalState": "neutral",
-      "confidence": 0.6,
-      "cognitiveSystem": "enhanced-generator"
-    },
-    "metadata": {
-      "thoughtType": "planning",
-      "taskType": "gathering",
-      "trigger": "task-start",
-      "llmConfidence": 0.6,
-      "model": "qwen2.5:7b"
-    },
-    "id": "thought-1756815264468-5t6x9ui7g",
-    "timestamp": 1756815264468,
-    "processed": false
-  },
-  {
-    "type": "planning",
-    "content": "Scan the area for more logs and ores. Look east and west for potential resources before moving on to mining iron ore.",
-    "attribution": "self",
-    "context": {
-      "emotionalState": "neutral",
-      "confidence": 0.7,
-      "cognitiveSystem": "enhanced-generator"
-    },
-    "metadata": {
-      "thoughtType": "planning",
-      "taskType": "gathering",
-      "trigger": "task-start",
-      "llmConfidence": 0.7,
-      "model": "qwen2.5:7b"
-    },
-    "id": "thought-1756815384594-qmphv9s0l",
-    "timestamp": 1756815384594,
-    "processed": false
-  },
-  {
-    "type": "planning",
-    "content": "Scan the area for more resources. Start by looking around for more oak logs and coal ore to assess the nearby environment.",
-    "attribution": "self",
-    "context": {
-      "emotionalState": "neutral",
-      "confidence": 0.7,
-      "cognitiveSystem": "enhanced-generator"
-    },
-    "metadata": {
-      "thoughtType": "planning",
-      "taskType": "gathering",
-      "trigger": "task-start",
-      "llmConfidence": 0.7,
-      "model": "qwen2.5:7b"
-    },
-    "id": "thought-1756815444693-t9sj51k1w",
-    "timestamp": 1756815444693,
-    "processed": false
-  },
-  {
-    "type": "planning",
-    "content": "Gather nearby oak logs to fulfill the investigation requirement. Axe will be needed for efficient collection.",
-    "attribution": "self",
-    "context": {
-      "emotionalState": "neutral",
-      "confidence": 0.7,
-      "cognitiveSystem": "enhanced-generator"
-    },
-    "metadata": {
-      "thoughtType": "planning",
-      "taskType": "gathering",
-      "trigger": "task-start",
-      "llmConfidence": 0.7,
-      "model": "qwen2.5:7b"
-    },
-    "id": "thought-1756815504427-oydvr8rcc",
-    "timestamp": 1756815504427,
-    "processed": false
-  },
-  {
-    "type": "planning",
-    "content": "Gather nearby oak logs to start constructing a simple shelter. Observing that there are 3 logs available, this is a good first step.",
-    "attribution": "self",
-    "context": {
-      "emotionalState": "neutral",
-      "confidence": 0.7,
-      "cognitiveSystem": "enhanced-generator"
-    },
-    "metadata": {
-      "thoughtType": "planning",
-      "taskType": "gathering",
-      "trigger": "task-start",
-      "llmConfidence": 0.7,
-      "model": "qwen2.5:7b"
-    },
-    "id": "thought-1756815624739-5p0jgvmhj",
-    "timestamp": 1756815624739,
-    "processed": false
-  },
-  {
-    "type": "planning",
-    "content": "Gather nearby oak logs to understand the forest resources. Then explore slightly further to check for other available resources and iron ore deposits.",
-    "attribution": "self",
-    "context": {
-      "emotionalState": "neutral",
-      "confidence": 0.7,
-      "cognitiveSystem": "enhanced-generator"
-    },
-    "metadata": {
-      "thoughtType": "planning",
-      "taskType": "gathering",
-      "trigger": "task-start",
-      "llmConfidence": 0.7,
-      "model": "qwen2.5:7b"
-    },
-    "id": "thought-1756815684625-t5xr9uh76",
-    "timestamp": 1756815684625,
-    "processed": false
-  },
-  {
-    "type": "planning",
-    "content": "Start by gathering nearby oak logs to craft a wooden axe. Then explore the area for more resources.",
-    "attribution": "self",
-    "context": {
-      "emotionalState": "neutral",
-      "confidence": 0.6,
-      "cognitiveSystem": "enhanced-generator"
-    },
-    "metadata": {
-      "thoughtType": "planning",
-      "taskType": "gathering",
-      "trigger": "task-start",
-      "llmConfidence": 0.6,
-      "model": "qwen2.5:7b"
-    },
-    "id": "thought-1756815744493-fqzyybbo4",
-    "timestamp": 1756815744493,
-    "processed": false
-  },
-  {
-    "type": "planning",
-    "content": "Gather nearby oak logs to start a basic wooden pickaxe. Observing resources, there are 3 logs available.",
-    "attribution": "self",
-    "context": {
-      "emotionalState": "neutral",
-      "confidence": 0.7,
-      "cognitiveSystem": "enhanced-generator"
-    },
-    "metadata": {
-      "thoughtType": "planning",
-      "taskType": "gathering",
-      "trigger": "task-start",
-      "llmConfidence": 0.7,
-      "model": "qwen2.5:7b"
-    },
-    "id": "thought-1756815804860-xriirkgp4",
-    "timestamp": 1756815804860,
-    "processed": false
-  },
-  {
-    "type": "planning",
-    "content": "Scan the area for more logs and ores. Start with nearby oak logs using my bare hands to gather wood resources.",
-    "attribution": "self",
-    "context": {
-      "emotionalState": "neutral",
-      "confidence": 0.7,
-      "cognitiveSystem": "enhanced-generator"
-    },
-    "metadata": {
-      "thoughtType": "planning",
-      "taskType": "gathering",
-      "trigger": "task-start",
-      "llmConfidence": 0.7,
-      "model": "qwen2.5:7b"
-    },
-    "id": "thought-1756815864586-lqikxi2re",
-    "timestamp": 1756815864586,
-    "processed": false
-  },
-  {
-    "type": "planning",
-    "content": "Scan the immediate area for more resources. Look for more oak logs and coal ore nearby to continue my investigation.",
-    "attribution": "self",
-    "context": {
-      "emotionalState": "neutral",
-      "confidence": 0.7,
-      "cognitiveSystem": "enhanced-generator"
-    },
-    "metadata": {
-      "thoughtType": "planning",
-      "taskType": "gathering",
-      "trigger": "task-start",
-      "llmConfidence": 0.7,
-      "model": "qwen2.5:7b"
-    },
-    "id": "thought-1756815924539-sidyu2fus",
-    "timestamp": 1756815924539,
-    "processed": false
-  },
-  {
-    "type": "planning",
-    "content": "Gather nearby oak logs to start building a shelter. There are 3 logs available in the immediate vicinity.",
-    "attribution": "self",
-    "context": {
-      "emotionalState": "neutral",
-      "confidence": 0.7,
-      "cognitiveSystem": "enhanced-generator"
-    },
-    "metadata": {
-      "thoughtType": "planning",
-      "taskType": "gathering",
-      "trigger": "task-start",
-      "llmConfidence": 0.7,
-      "model": "qwen2.5:7b"
-    },
-    "id": "thought-1756815984548-wiquugifh",
-    "timestamp": 1756815984548,
-    "processed": false
-  },
-  {
-    "type": "planning",
-    "content": "Gather nearby oak logs to fulfill the investigation step. There are 3 logs within reach.",
-    "attribution": "self",
-    "context": {
-      "emotionalState": "neutral",
-      "confidence": 0.6,
-      "cognitiveSystem": "enhanced-generator"
-    },
-    "metadata": {
-      "thoughtType": "planning",
-      "taskType": "gathering",
-      "trigger": "task-start",
-      "llmConfidence": 0.6,
-      "model": "qwen2.5:7b"
-    },
-    "id": "thought-1756816044428-g1z9xi2jx",
-    "timestamp": 1756816044428,
-    "processed": false
-  },
-  {
-    "type": "planning",
-    "content": "Gather nearby oak logs to craft a wooden pickaxe. Resources are available; let's start with the simplest task.",
-    "attribution": "self",
-    "context": {
-      "emotionalState": "neutral",
-      "confidence": 0.7,
-      "cognitiveSystem": "enhanced-generator"
-    },
-    "metadata": {
-      "thoughtType": "planning",
-      "taskType": "gathering",
-      "trigger": "task-start",
-      "llmConfidence": 0.7,
-      "model": "qwen2.5:7b"
-    },
-    "id": "thought-1756816164646-623cpo09v",
-    "timestamp": 1756816164646,
-    "processed": false
-  },
-  {
-    "type": "planning",
-    "content": "Explore the area to find more resources and assess surroundings. Look for wood near the oak logs and check for any nearby water sources.",
-    "attribution": "self",
-    "context": {
-      "emotionalState": "neutral",
-      "confidence": 0.7,
-      "cognitiveSystem": "enhanced-generator"
-    },
-    "metadata": {
-      "thoughtType": "planning",
-      "taskType": "gathering",
-      "trigger": "task-start",
-      "llmConfidence": 0.7,
-      "model": "qwen2.5:7b"
-    },
-    "id": "thought-1756816224739-mue13h04s",
-    "timestamp": 1756816224739,
-    "processed": false
-  },
-  {
-    "type": "planning",
-    "content": "Scan the area for more resources and potential dangers. Look for trees to gather wood and nearby ores for iron. Prepare to craft a wooden pickaxe once I find some logs.",
-    "attribution": "self",
-    "context": {
-      "emotionalState": "neutral",
-      "confidence": 0.7,
-      "cognitiveSystem": "enhanced-generator"
-    },
-    "metadata": {
-      "thoughtType": "planning",
-      "taskType": "gathering",
-      "trigger": "task-start",
-      "llmConfidence": 0.7,
-      "model": "qwen2.5:7b"
-    },
-    "id": "thought-1756816284930-k31qxqag8",
-    "timestamp": 1756816284930,
-    "processed": false
-  },
-  {
-    "type": "planning",
-    "content": "Scan surroundings for more logs and ores. Focus on finding wood to craft a pickaxe. Next steps: Chop down nearby oak logs.",
-    "attribution": "self",
-    "context": {
-      "emotionalState": "neutral",
-      "confidence": 0.7,
-      "cognitiveSystem": "enhanced-generator"
-    },
-    "metadata": {
-      "thoughtType": "planning",
-      "taskType": "gathering",
-      "trigger": "task-start",
-      "llmConfidence": 0.7,
-      "model": "qwen2.5:7b"
-    },
-    "id": "thought-1756816344695-rvvgztqgv",
-    "timestamp": 1756816344695,
-    "processed": false
-  },
-  {
-    "type": "planning",
-    "content": "Scan the surroundings for more logs and ores. Start with cutting down nearby oak trees to gather wood.",
-    "attribution": "self",
-    "context": {
-      "emotionalState": "neutral",
-      "confidence": 0.7,
-      "cognitiveSystem": "enhanced-generator"
-    },
-    "metadata": {
-      "thoughtType": "planning",
-      "taskType": "gathering",
-      "trigger": "task-start",
-      "llmConfidence": 0.7,
-      "model": "qwen2.5:7b"
-    },
-    "id": "thought-1756816404536-usy206nt1",
-    "timestamp": 1756816404536,
-    "processed": false
-  },
-  {
-    "type": "planning",
-    "content": "Gather nearby logs to craft a wooden pickaxe. There are 3 oak logs available.",
-    "attribution": "self",
-    "context": {
-      "emotionalState": "neutral",
-      "confidence": 0.6,
-      "cognitiveSystem": "enhanced-generator"
-    },
-    "metadata": {
-      "thoughtType": "planning",
-      "taskType": "gathering",
-      "trigger": "task-start",
-      "llmConfidence": 0.6,
-      "model": "qwen2.5:7b"
-    },
-    "id": "thought-1756816464468-p2qxx4f3o",
-    "timestamp": 1756816464468,
-    "processed": false
-  },
-  {
-    "type": "planning",
-    "content": "Gather nearby oak logs to craft a wooden pickaxe. Observing resources around; time to start gathering materials for tools and shelter.",
-    "attribution": "self",
-    "context": {
-      "emotionalState": "neutral",
-      "confidence": 0.7,
-      "cognitiveSystem": "enhanced-generator"
-    },
-    "metadata": {
-      "thoughtType": "planning",
-      "taskType": "gathering",
-      "trigger": "task-start",
-      "llmConfidence": 0.7,
-      "model": "qwen2.5:7b"
-    },
-    "id": "thought-1756816524696-bzi09rv39",
-    "timestamp": 1756816524696,
-    "processed": false
-  },
-  {
-    "type": "planning",
-    "content": "Gather nearby oak logs to start a crafting grid.",
-    "attribution": "self",
-    "context": {
-      "emotionalState": "neutral",
-      "confidence": 0.5,
-      "cognitiveSystem": "enhanced-generator"
-    },
-    "metadata": {
-      "thoughtType": "planning",
-      "taskType": "gathering",
-      "trigger": "task-start",
-      "llmConfidence": 0.5,
-      "model": "qwen2.5:7b"
-    },
-    "id": "thought-1756816584280-cu9bjlnl6",
-    "timestamp": 1756816584280,
-    "processed": false
-  },
-  {
-    "type": "planning",
-    "content": "Scan the area for more resources and potential dangers. Look for nearby logs to gather wood first.",
-    "attribution": "self",
-    "context": {
-      "emotionalState": "neutral",
-      "confidence": 0.6,
-      "cognitiveSystem": "enhanced-generator"
-    },
-    "metadata": {
-      "thoughtType": "planning",
-      "taskType": "gathering",
-      "trigger": "task-start",
-      "llmConfidence": 0.6,
-      "model": "qwen2.5:7b"
-    },
-    "id": "thought-1756816644437-5dds843wg",
-    "timestamp": 1756816644437,
-    "processed": false
-  },
-  {
-    "type": "planning",
-    "content": "Gather nearby oak logs to start crafting a wooden pickaxe. Observing that there are 3 logs within reach. Planning to craft the pickaxe after collecting these resources.",
-    "attribution": "self",
-    "context": {
-      "emotionalState": "neutral",
-      "confidence": 0.7,
-      "cognitiveSystem": "enhanced-generator"
-    },
-    "metadata": {
-      "thoughtType": "planning",
-      "taskType": "gathering",
-      "trigger": "task-start",
-      "llmConfidence": 0.7,
-      "model": "qwen2.5:7b"
-    },
-    "id": "thought-1756816704886-1sjh4xy8z",
-    "timestamp": 1756816704886,
-    "processed": false
-  },
-  {
-    "type": "planning",
-    "content": "Gather nearby oak logs to craft a wooden pickaxe. Then, investigate the area for more resources.",
-    "attribution": "self",
-    "context": {
-      "emotionalState": "neutral",
-      "confidence": 0.6,
-      "cognitiveSystem": "enhanced-generator"
-    },
-    "metadata": {
-      "thoughtType": "planning",
-      "taskType": "gathering",
-      "trigger": "task-start",
-      "llmConfidence": 0.6,
-      "model": "qwen2.5:7b"
-    },
-    "id": "thought-1756816764517-t7ovflviw",
-    "timestamp": 1756816764517,
-    "processed": false
-  },
-  {
-    "type": "planning",
-    "content": "Gather nearby oak logs to craft a wooden pickaxe. Then explore slightly deeper to find more resources and ensure safety.",
-    "attribution": "self",
-    "context": {
-      "emotionalState": "neutral",
-      "confidence": 0.7,
-      "cognitiveSystem": "enhanced-generator"
-    },
-    "metadata": {
-      "thoughtType": "planning",
-      "taskType": "gathering",
-      "trigger": "task-start",
-      "llmConfidence": 0.7,
-      "model": "qwen2.5:7b"
-    },
-    "id": "thought-1756816824620-ztmw6kkv4",
-    "timestamp": 1756816824620,
-    "processed": false
-  },
-  {
-    "type": "planning",
-    "content": "Scan nearby area for resources. Focus on gathering oak logs to craft a wooden pickaxe. Safety first; ensure no hostile entities are nearby.",
-    "attribution": "self",
-    "context": {
-      "emotionalState": "neutral",
-      "confidence": 0.7,
-      "cognitiveSystem": "enhanced-generator"
-    },
-    "metadata": {
-      "thoughtType": "planning",
-      "taskType": "gathering",
-      "trigger": "task-start",
-      "llmConfidence": 0.7,
-      "model": "qwen2.5:7b"
-    },
-    "id": "thought-1756816944759-pzxo61xq4",
-    "timestamp": 1756816944759,
-    "processed": false
-  },
-  {
-    "type": "planning",
-    "content": "Scan the surroundings for more logs and ores. Need to gather resources before moving on to mining iron ore.",
-    "attribution": "self",
-    "context": {
-      "emotionalState": "neutral",
-      "confidence": 0.7,
-      "cognitiveSystem": "enhanced-generator"
-    },
-    "metadata": {
-      "thoughtType": "planning",
-      "taskType": "gathering",
-      "trigger": "task-start",
-      "llmConfidence": 0.7,
-      "model": "qwen2.5:7b"
-    },
-    "id": "thought-1756817004566-wiohjsr16",
-    "timestamp": 1756817004566,
-    "processed": false
-  },
-  {
-    "type": "planning",
-    "content": "Scan the area for more resources and potential threats. Look around for more logs and ores before moving on to mining iron ore.",
-    "attribution": "self",
-    "context": {
-      "emotionalState": "neutral",
-      "confidence": 0.7,
-      "cognitiveSystem": "enhanced-generator"
-    },
-    "metadata": {
-      "thoughtType": "planning",
-      "taskType": "gathering",
-      "trigger": "task-start",
-      "llmConfidence": 0.7,
-      "model": "qwen2.5:7b"
-    },
-    "id": "thought-1756817064611-vpad6qbvx",
-    "timestamp": 1756817064611,
-    "processed": false
-  },
-  {
-    "type": "planning",
-    "content": "Gather nearby oak logs to craft a wooden pickaxe. Then return here to assess resources around coordinates 125, 74, 136.",
-    "attribution": "self",
-    "context": {
-      "emotionalState": "neutral",
-      "confidence": 0.7,
-      "cognitiveSystem": "enhanced-generator"
-    },
-    "metadata": {
-      "thoughtType": "planning",
-      "taskType": "gathering",
-      "trigger": "task-start",
-      "llmConfidence": 0.7,
-      "model": "qwen2.5:7b"
-    },
-    "id": "thought-1756817124873-cehnswbbx",
-    "timestamp": 1756817124873,
-    "processed": false
-  },
-  {
-    "type": "planning",
-    "content": "Scan the area for more resources. Look around for more oak logs and coal ore. Prepare to craft a wooden pickaxe once I find some coal.",
-    "attribution": "self",
-    "context": {
-      "emotionalState": "neutral",
-      "confidence": 0.7,
-      "cognitiveSystem": "enhanced-generator"
-    },
-    "metadata": {
-      "thoughtType": "planning",
-      "taskType": "gathering",
-      "trigger": "task-start",
-      "llmConfidence": 0.7,
-      "model": "qwen2.5:7b"
-    },
-    "id": "thought-1756817185013-jbsz33baq",
-    "timestamp": 1756817185013,
-    "processed": false
-  },
-  {
-    "type": "planning",
-    "content": "Scan the area for more resources. Look around for wood and ores within a 10-block radius. If found, gather them first.",
-    "attribution": "self",
-    "context": {
-      "emotionalState": "neutral",
-      "confidence": 0.7,
-      "cognitiveSystem": "enhanced-generator"
-    },
-    "metadata": {
-      "thoughtType": "planning",
-      "taskType": "gathering",
-      "trigger": "task-start",
-      "llmConfidence": 0.7,
-      "model": "qwen2.5:7b"
-    },
-    "id": "thought-1756817244821-6mx0qha2p",
-    "timestamp": 1756817244821,
-    "processed": false
-  },
-  {
-    "type": "planning",
-    "content": "Scan surroundings for more logs and ores. Start with cutting down nearby oak trees to gather wood.",
-    "attribution": "self",
-    "context": {
-      "emotionalState": "neutral",
-      "confidence": 0.6,
-      "cognitiveSystem": "enhanced-generator"
-    },
-    "metadata": {
-      "thoughtType": "planning",
-      "taskType": "gathering",
-      "trigger": "task-start",
-      "llmConfidence": 0.6,
-      "model": "qwen2.5:7b"
-    },
-    "id": "thought-1756817304552-3nrntok1u",
-    "timestamp": 1756817304552,
-    "processed": false
-  },
-  {
-    "type": "reflection",
-    "content": "Gather some wood from nearby trees to craft tools and build a shelter. Observing the area for resources and potential threats. Planning to head to a tree cluster first.",
-    "attribution": "self",
-    "context": {
-      "emotionalState": "neutral",
-      "confidence": 0.7,
-      "cognitiveSystem": "llm-core"
-    },
-    "metadata": {
-      "thoughtType": "reflection",
-      "trigger": "time-based",
-      "context": "environmental-monitoring",
-      "intensity": 0.4,
-      "llmConfidence": 0.7,
-      "model": "qwen2.5:7b"
-    },
-    "id": "thought-1756817392102-70bh16ync",
-    "timestamp": 1756817392102,
-    "processed": false
-  },
-  {
-    "type": "planning",
-    "content": "Scan surroundings for more logs and ores. Start by chopping down nearby oak trees to gather wood.",
-    "attribution": "self",
-    "context": {
-      "emotionalState": "neutral",
-      "confidence": 0.6,
-      "cognitiveSystem": "enhanced-generator"
-    },
-    "metadata": {
-      "thoughtType": "planning",
-      "taskType": "gathering",
-      "trigger": "task-start",
-      "llmConfidence": 0.6,
-      "model": "qwen2.5:7b"
-    },
-    "id": "thought-1756817484833-bu98d9fr4",
-    "timestamp": 1756817484833,
-    "processed": false
-  },
-  {
-    "type": "planning",
-    "content": "Scan the area for more resources. Look for wood and ore deposits nearby before moving on to mining.",
-    "attribution": "self",
-    "context": {
-      "emotionalState": "neutral",
-      "confidence": 0.6,
-      "cognitiveSystem": "enhanced-generator"
-    },
-    "metadata": {
-      "thoughtType": "planning",
-      "taskType": "gathering",
-      "trigger": "task-start",
-      "llmConfidence": 0.6,
-      "model": "qwen2.5:7b"
-    },
-    "id": "thought-1756817544575-0iieyau4i",
-    "timestamp": 1756817544575,
-    "processed": false
-  },
-  {
-    "type": "planning",
-    "content": "Gather nearby oak logs to start the wood collection. Look around for more resources and potential threats.",
-    "attribution": "self",
-    "context": {
-      "emotionalState": "neutral",
-      "confidence": 0.7,
-      "cognitiveSystem": "enhanced-generator"
-    },
-    "metadata": {
-      "thoughtType": "planning",
-      "taskType": "gathering",
-      "trigger": "task-start",
-      "llmConfidence": 0.7,
-      "model": "qwen2.5:7b"
-    },
-    "id": "thought-1756817604583-j1kkc91qa",
-    "timestamp": 1756817604583,
-    "processed": false
-  },
-  {
-    "type": "planning",
-    "content": "Scan the area for more resources. Look for wood and coal ores first. Need a wooden pickaxe to mine stone.",
-    "attribution": "self",
-    "context": {
-      "emotionalState": "neutral",
-      "confidence": 0.7,
-      "cognitiveSystem": "enhanced-generator"
-    },
-    "metadata": {
-      "thoughtType": "planning",
-      "taskType": "gathering",
-      "trigger": "task-start",
-      "llmConfidence": 0.7,
-      "model": "qwen2.5:7b"
-    },
-    "id": "thought-1756817724710-tl0buft45",
-    "timestamp": 1756817724710,
-    "processed": false
-  },
-  {
-    "type": "planning",
-    "content": "Scan the area for more logs and ores. Focus on finding and breaking down nearby oak logs to gather wood. Safety first in case threats emerge.",
-    "attribution": "self",
-    "context": {
-      "emotionalState": "neutral",
-      "confidence": 0.7,
-      "cognitiveSystem": "enhanced-generator"
-    },
-    "metadata": {
-      "thoughtType": "planning",
-      "taskType": "gathering",
-      "trigger": "task-start",
-      "llmConfidence": 0.7,
-      "model": "qwen2.5:7b"
-    },
-    "id": "thought-1756817784794-uezjulruh",
-    "timestamp": 1756817784794,
-    "processed": false
-  },
-  {
-    "type": "planning",
-    "content": "Scan the area for more logs and ores. Check 10 blocks around to find additional resources before moving on.",
-    "attribution": "self",
-    "context": {
-      "emotionalState": "neutral",
-      "confidence": 0.7,
-      "cognitiveSystem": "enhanced-generator"
-    },
-    "metadata": {
-      "thoughtType": "planning",
-      "taskType": "gathering",
-      "trigger": "task-start",
-      "llmConfidence": 0.7,
-      "model": "qwen2.5:7b"
-    },
-    "id": "thought-1756817844854-x8w3l0mry",
-    "timestamp": 1756817844854,
-    "processed": false
-  },
-  {
-    "type": "planning",
-    "content": "Scan nearby area for more logs and ores. Prepare to craft a wooden pickaxe once resources are gathered.",
-    "attribution": "self",
-    "context": {
-      "emotionalState": "neutral",
-      "confidence": 0.7,
-      "cognitiveSystem": "enhanced-generator"
-    },
-    "metadata": {
-      "thoughtType": "planning",
-      "taskType": "gathering",
-      "trigger": "task-start",
-      "llmConfidence": 0.7,
-      "model": "qwen2.5:7b"
-    },
-    "id": "thought-1756817904512-q81slvti0",
-    "timestamp": 1756817904512,
-    "processed": false
-  },
-  {
-    "type": "planning",
-    "content": "Scan the area for more logs and ore; there's one iron ore nearby. Start with gathering wood to craft a pickaxe.",
-    "attribution": "self",
-    "context": {
-      "emotionalState": "neutral",
-      "confidence": 0.7,
-      "cognitiveSystem": "enhanced-generator"
-    },
-    "metadata": {
-      "thoughtType": "planning",
-      "taskType": "gathering",
-      "trigger": "task-start",
-      "llmConfidence": 0.7,
-      "model": "qwen2.5:7b"
-    },
-    "id": "thought-1756817964731-yfs3sof76",
-    "timestamp": 1756817964731,
-    "processed": false
-  },
-  {
-    "type": "planning",
-    "content": "Start by looking around for more logs to gather. Observing the area could reveal additional resources nearby. Plan to craft a wooden pickaxe once you have enough wood.",
-    "attribution": "self",
-    "context": {
-      "emotionalState": "neutral",
-      "confidence": 0.7,
-      "cognitiveSystem": "enhanced-generator"
-    },
-    "metadata": {
-      "thoughtType": "planning",
-      "taskType": "gathering",
-      "trigger": "task-start",
-      "llmConfidence": 0.7,
-      "model": "qwen2.5:7b"
-    },
-    "id": "thought-1756818024902-r4dfzpg8a",
-    "timestamp": 1756818024902,
-    "processed": false
-  },
-  {
-    "type": "planning",
-    "content": "Explore the nearby area to find more resources and assess the surroundings. Look for more logs and ores within a 10-block radius.",
-    "attribution": "self",
-    "context": {
-      "emotionalState": "neutral",
-      "confidence": 0.7,
-      "cognitiveSystem": "enhanced-generator"
-    },
-    "metadata": {
-      "thoughtType": "planning",
-      "taskType": "gathering",
-      "trigger": "task-start",
-      "llmConfidence": 0.7,
-      "model": "qwen2.5:7b"
-    },
-    "id": "thought-1756818144784-g8v2m7h9p",
-    "timestamp": 1756818144784,
-    "processed": false
-  },
-  {
-    "type": "planning",
-    "content": "Gather nearby oak logs to gather resources and start crafting a wooden pickaxe.",
-    "attribution": "self",
-    "context": {
-      "emotionalState": "neutral",
-      "confidence": 0.6,
-      "cognitiveSystem": "enhanced-generator"
-    },
-    "metadata": {
-      "thoughtType": "planning",
-      "taskType": "gathering",
-      "trigger": "task-start",
-      "llmConfidence": 0.6,
-      "model": "qwen2.5:7b"
-    },
-    "id": "thought-1756818264513-8y3e0jr3c",
-    "timestamp": 1756818264513,
-    "processed": false
-  },
-  {
-    "type": "planning",
-    "content": "Gather oak logs to craft a wooden pickaxe. There are 3 nearby logs; start by chopping them down.",
-    "attribution": "self",
-    "context": {
-      "emotionalState": "neutral",
-      "confidence": 0.6,
-      "cognitiveSystem": "enhanced-generator"
-    },
-    "metadata": {
-      "thoughtType": "planning",
-      "taskType": "gathering",
-      "trigger": "task-start",
-      "llmConfidence": 0.6,
-      "model": "qwen2.5:7b"
-    },
-    "id": "thought-1756818324737-sa3s6kmtc",
-    "timestamp": 1756818324737,
-    "processed": false
-  },
-  {
-    "type": "planning",
-    "content": "Survey the area for more logs and ores. Look around for any signs of water or hostile mobs. Next, gather nearby oak logs to craft a wooden pickaxe.",
-    "attribution": "self",
-    "context": {
-      "emotionalState": "neutral",
-      "confidence": 0.7,
-      "cognitiveSystem": "enhanced-generator"
-    },
-    "metadata": {
-      "thoughtType": "planning",
-      "taskType": "gathering",
-      "trigger": "task-start",
-      "llmConfidence": 0.7,
-      "model": "qwen2.5:7b"
-    },
-    "id": "thought-1756818385074-btnrw272n",
-    "timestamp": 1756818385074,
-    "processed": false
-  },
-  {
-    "type": "planning",
-    "content": "Scan the area for more logs and ores. Check nearby blocks to identify potential resources quickly.",
-    "attribution": "self",
-    "context": {
-      "emotionalState": "neutral",
-      "confidence": 0.6,
-      "cognitiveSystem": "enhanced-generator"
-    },
-    "metadata": {
-      "thoughtType": "planning",
-      "taskType": "gathering",
-      "trigger": "task-start",
-      "llmConfidence": 0.6,
-      "model": "qwen2.5:7b"
-    },
-    "id": "thought-1756818444682-lau313a1u",
-    "timestamp": 1756818444682,
-    "processed": false
-  },
-  {
-    "type": "planning",
-    "content": "Scan the area for more resources and potential hazards. Focus on locating nearby oak logs to gather wood first.",
-    "attribution": "self",
-    "context": {
-      "emotionalState": "neutral",
-      "confidence": 0.7,
-      "cognitiveSystem": "enhanced-generator"
-    },
-    "metadata": {
-      "thoughtType": "planning",
-      "taskType": "gathering",
-      "trigger": "task-start",
-      "llmConfidence": 0.7,
-      "model": "qwen2.5:7b"
-    },
-    "id": "thought-1756818504684-964g59ajz",
-    "timestamp": 1756818504684,
-    "processed": false
-  },
-  {
-    "type": "planning",
-    "content": "Scan the area for more wood and minerals. Look around for any nearby logs or ores before moving to mine iron ore next.",
-    "attribution": "self",
-    "context": {
-      "emotionalState": "neutral",
-      "confidence": 0.7,
-      "cognitiveSystem": "enhanced-generator"
-    },
-    "metadata": {
-      "thoughtType": "planning",
-      "taskType": "gathering",
-      "trigger": "task-start",
-      "llmConfidence": 0.7,
-      "model": "qwen2.5:7b"
-    },
-    "id": "thought-1756818564876-t8y0x12r5",
-    "timestamp": 1756818564876,
-    "processed": false
-  },
-  {
-    "type": "planning",
-    "content": "Gather nearby oak logs to craft a wooden pickaxe. Resources are limited, and exploring with bare hands is too risky.",
-    "attribution": "self",
-    "context": {
-      "emotionalState": "neutral",
-      "confidence": 0.7,
-      "cognitiveSystem": "enhanced-generator"
-    },
-    "metadata": {
-      "thoughtType": "planning",
-      "taskType": "gathering",
-      "trigger": "task-start",
-      "llmConfidence": 0.7,
-      "model": "qwen2.5:7b"
-    },
-    "id": "thought-1756818624897-b5ahf110w",
-    "timestamp": 1756818624897,
-    "processed": false
-  },
-  {
-    "type": "planning",
-    "content": "Gather nearby oak logs to start building a shelter. Observing the environment for potential threats and opportunities.",
-    "attribution": "self",
-    "context": {
-      "emotionalState": "neutral",
-      "confidence": 0.7,
-      "cognitiveSystem": "enhanced-generator"
-    },
-    "metadata": {
-      "thoughtType": "planning",
-      "taskType": "gathering",
-      "trigger": "task-start",
-      "llmConfidence": 0.7,
-      "model": "qwen2.5:7b"
-    },
-    "id": "thought-1756818744738-8fb3kpyqi",
-    "timestamp": 1756818744738,
-    "processed": false
-  },
-  {
-    "type": "planning",
-    "content": "Scan the area for more resources and potential hazards. Look for nearby logs to gather wood and iron ore deposits to mine.",
-    "attribution": "self",
-    "context": {
-      "emotionalState": "neutral",
-      "confidence": 0.7,
-      "cognitiveSystem": "enhanced-generator"
-    },
-    "metadata": {
-      "thoughtType": "planning",
-      "taskType": "gathering",
-      "trigger": "task-start",
-      "llmConfidence": 0.7,
-      "model": "qwen2.5:7b"
-    },
-    "id": "thought-1756818804802-1zpatvbbv",
-    "timestamp": 1756818804802,
-    "processed": false
-  },
-  {
-    "type": "planning",
-    "content": "Observe surroundings and gather nearby oak logs to craft a wooden pickaxe. Then, return here and continue investigating for other resources.",
-    "attribution": "self",
-    "context": {
-      "emotionalState": "neutral",
-      "confidence": 0.7,
-      "cognitiveSystem": "enhanced-generator"
-    },
-    "metadata": {
-      "thoughtType": "planning",
-      "taskType": "gathering",
-      "trigger": "task-start",
-      "llmConfidence": 0.7,
-      "model": "qwen2.5:7b"
-    },
-    "id": "thought-1756818864831-itpirb82m",
-    "timestamp": 1756818864831,
-    "processed": false
-  },
-  {
-    "type": "planning",
-    "content": "Start by gathering nearby oak logs to craft a wooden pickaxe. Then, explore the area for more resources.",
-    "attribution": "self",
-    "context": {
-      "emotionalState": "neutral",
-      "confidence": 0.7,
-      "cognitiveSystem": "enhanced-generator"
-    },
-    "metadata": {
-      "thoughtType": "planning",
-      "taskType": "gathering",
-      "trigger": "task-start",
-      "llmConfidence": 0.7,
-      "model": "qwen2.5:7b"
-    },
-    "id": "thought-1756818924667-lpbbn9vvk",
-    "timestamp": 1756818924667,
-    "processed": false
-  },
-  {
-    "type": "planning",
-    "content": "Scan the area for more logs and ores. Look around for any iron ore before moving to gather wood. Nearby is a coal ore; prioritize that first.",
-    "attribution": "self",
-    "context": {
-      "emotionalState": "neutral",
-      "confidence": 0.7,
-      "cognitiveSystem": "enhanced-generator"
-    },
-    "metadata": {
-      "thoughtType": "planning",
-      "taskType": "gathering",
-      "trigger": "task-start",
-      "llmConfidence": 0.7,
-      "model": "qwen2.5:7b"
-    },
-    "id": "thought-1756818984909-f9zxqgtju",
-    "timestamp": 1756818984909,
-    "processed": false
-  },
-  {
-    "type": "planning",
-    "content": "Scan surroundings for wood and ore. Look for logs to gather before moving on to mining iron ore.",
-    "attribution": "self",
-    "context": {
-      "emotionalState": "neutral",
-      "confidence": 0.6,
-      "cognitiveSystem": "enhanced-generator"
-    },
-    "metadata": {
-      "thoughtType": "planning",
-      "taskType": "gathering",
-      "trigger": "task-start",
-      "llmConfidence": 0.6,
-      "model": "qwen2.5:7b"
-    },
-    "id": "thought-1756819044835-kk8hrfx36",
-    "timestamp": 1756819044835,
-    "processed": false
-  },
-  {
-    "type": "planning",
-    "content": "Scan the area for more resources and potential threats. Look for trees to gather logs and nearby coal ore patches. Plan to craft a wooden pickaxe once I have enough wood.",
-    "attribution": "self",
-    "context": {
-      "emotionalState": "neutral",
-      "confidence": 0.7,
-      "cognitiveSystem": "enhanced-generator"
-    },
-    "metadata": {
-      "thoughtType": "planning",
-      "taskType": "gathering",
-      "trigger": "task-start",
-      "llmConfidence": 0.7,
-      "model": "qwen2.5:7b"
-    },
-    "id": "thought-1756819164982-hdf6633g3",
-    "timestamp": 1756819164982,
-    "processed": false
-  },
-  {
-    "type": "planning",
-    "content": "Gather nearby oak logs to start crafting a wooden pickaxe. There are 3 logs nearby.",
-    "attribution": "self",
-    "context": {
-      "emotionalState": "neutral",
-      "confidence": 0.6,
-      "cognitiveSystem": "enhanced-generator"
-    },
-    "metadata": {
-      "thoughtType": "planning",
-      "taskType": "gathering",
-      "trigger": "task-start",
-      "llmConfidence": 0.6,
-      "model": "qwen2.5:7b"
-    },
-    "id": "thought-1756819224789-wuguhdalf",
-    "timestamp": 1756819224789,
-    "processed": false
-  },
-  {
-    "type": "planning",
     "content": "Scan the area for more resources and potential threats. Focus on locating nearby wood sources to gather before moving on to mining ores.",
     "attribution": "self",
     "context": {
@@ -20011,6 +18090,1877 @@
     },
     "id": "thought-1756881806933-9rg62nu77",
     "timestamp": 1756881806933,
+    "processed": false
+  },
+  {
+    "type": "reflection",
+    "content": "Gather some wood from nearby trees. Build a shelter to prepare for the night.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.6,
+      "cognitiveSystem": "llm-core"
+    },
+    "metadata": {
+      "thoughtType": "reflection",
+      "trigger": "time-based",
+      "context": "environmental-monitoring",
+      "intensity": 0.4,
+      "llmConfidence": 0.6,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1758479933891-onlyy174g",
+    "timestamp": 1758479933891,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Start by looking around for trees. Once spotted, begin chopping them with my existing tools or find a nearby one if needed.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.7,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "exploration",
+      "trigger": "task-start",
+      "llmConfidence": 0.7,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1758480177134-uvgttt2x8",
+    "timestamp": 1758480177134,
+    "processed": false
+  },
+  {
+    "type": "reflection",
+    "content": "Craft a pickaxe to mine the coal ores. Safety is my priority in the dark.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.6,
+      "cognitiveSystem": "llm-core"
+    },
+    "metadata": {
+      "thoughtType": "reflection",
+      "trigger": "time-based",
+      "context": "environmental-monitoring",
+      "intensity": 0.4,
+      "llmConfidence": 0.6,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1758480391598-50b5r7ln4",
+    "timestamp": 1758480391598,
+    "processed": false
+  },
+  {
+    "type": "reflection",
+    "content": "Craft a pickaxe and gather some wood from nearby trees. The coal ores are valuable but wait until morning to mine them safely.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.7,
+      "cognitiveSystem": "llm-core"
+    },
+    "metadata": {
+      "thoughtType": "reflection",
+      "trigger": "time-based",
+      "context": "environmental-monitoring",
+      "intensity": 0.4,
+      "llmConfidence": 0.7,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1758480511547-78qkbkbey",
+    "timestamp": 1758480511547,
+    "processed": false
+  },
+  {
+    "type": "intrusive",
+    "content": "I should move to the top of this hill.",
+    "attribution": "intrusive",
+    "context": {
+      "emotionalState": "curious",
+      "confidence": 0.8
+    },
+    "metadata": {
+      "messageType": "intrusion",
+      "intent": "external_suggestion",
+      "thoughtType": "intrusive"
+    },
+    "id": "thought-1758480537475-6xot2yrfc",
+    "timestamp": 1758480537475,
+    "processed": false
+  },
+  {
+    "type": "reflection",
+    "content": "Processing intrusive thought: \"i should move to the top of this hill.\"",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "focused",
+      "confidence": 0.6,
+      "cognitiveSystem": "intrusive-processor"
+    },
+    "metadata": {
+      "thoughtType": "reflection",
+      "source": "intrusive-thought"
+    },
+    "id": "thought-1758480537856-uw7v3ibal",
+    "timestamp": 1758480537856,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Planning system updated: Move to the top of this hill. (via move_to@1.0.0) - Success",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "focused",
+      "confidence": 0.7,
+      "cognitiveSystem": "planning-integration"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskId": "task-1758480537844-kxr9pk",
+      "success": true
+    },
+    "id": "thought-1758480537868-v02ozq2ca",
+    "timestamp": 1758480537868,
+    "processed": false
+  },
+  {
+    "type": "intrusive",
+    "content": "I should move to the top of this hill.",
+    "attribution": "external",
+    "context": {
+      "emotionalState": "curious",
+      "confidence": 0.8
+    },
+    "metadata": {
+      "messageType": "intrusion",
+      "intent": "external_suggestion",
+      "tags": [
+        "external",
+        "intrusion"
+      ],
+      "strength": 0.8,
+      "processed": true,
+      "taskId": "task-1758480537844-kxr9pk",
+      "thoughtType": "intrusive"
+    },
+    "id": "thought-1758480537876-ccb6bni99",
+    "timestamp": 1758480537876,
+    "processed": false
+  },
+  {
+    "type": "reflection",
+    "content": "Gather coal from nearby ores, then craft a torch to light my way and stay safe at night.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.6,
+      "cognitiveSystem": "llm-core"
+    },
+    "metadata": {
+      "thoughtType": "reflection",
+      "trigger": "time-based",
+      "context": "environmental-monitoring",
+      "intensity": 0.4,
+      "llmConfidence": 0.6,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1758480853473-ruydk6h1o",
+    "timestamp": 1758480853473,
+    "processed": false
+  },
+  {
+    "type": "reflection",
+    "content": "Gather some wood from the nearby trees to craft tools and build a shelter. Observing no immediate threats, but need to secure resources for safety.",
+    "attribution": "self",
+    "context": {
+      "cognitiveSystem": "llm-core"
+    },
+    "metadata": {
+      "thoughtType": "reflection"
+    },
+    "id": "thought-1758480941562-t2ykal0y6",
+    "timestamp": 1758480941562,
+    "processed": false
+  },
+  {
+    "type": "reflection",
+    "content": "Gather some wood from the nearby trees to craft tools and build a shelter. Observing no immediate threats, but need to secure resources for safety.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.7,
+      "cognitiveSystem": "llm-core"
+    },
+    "metadata": {
+      "thoughtType": "reflection",
+      "trigger": "time-based",
+      "context": "environmental-monitoring",
+      "intensity": 0.4,
+      "llmConfidence": 0.7,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1758480941576-vhlz9uubb",
+    "timestamp": 1758480941576,
+    "processed": false
+  },
+  {
+    "type": "intrusive",
+    "content": "This is a test intrusive thought",
+    "attribution": "intrusive",
+    "context": {
+      "emotionalState": "curious",
+      "confidence": 0.8
+    },
+    "metadata": {
+      "messageType": "intrusion",
+      "intent": "external_suggestion",
+      "thoughtType": "intrusive"
+    },
+    "id": "thought-1758480946279-vfxujtoim",
+    "timestamp": 1758480946279,
+    "processed": false
+  },
+  {
+    "type": "reflection",
+    "content": "Gather coal from nearby ores, then craft a torch to light the area and prevent mob spawning.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.6,
+      "cognitiveSystem": "llm-core"
+    },
+    "metadata": {
+      "thoughtType": "reflection",
+      "trigger": "time-based",
+      "context": "environmental-monitoring",
+      "intensity": 0.4,
+      "llmConfidence": 0.6,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1758482010578-3nz6i00o1",
+    "timestamp": 1758482010578,
+    "processed": false
+  },
+  {
+    "type": "reflection",
+    "content": "Gather some wood from nearby trees to craft tools and a shelter.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.6,
+      "cognitiveSystem": "llm-core"
+    },
+    "metadata": {
+      "thoughtType": "reflection",
+      "trigger": "time-based",
+      "context": "environmental-monitoring",
+      "intensity": 0.4,
+      "llmConfidence": 0.6,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1758482400286-q7m46pf1m",
+    "timestamp": 1758482400286,
+    "processed": false
+  },
+  {
+    "type": "reflection",
+    "content": "Gather wood from nearby trees to craft tools and build a shelter.",
+    "attribution": "self",
+    "context": {
+      "cognitiveSystem": "llm-core"
+    },
+    "metadata": {
+      "thoughtType": "reflection"
+    },
+    "id": "thought-1758482782424-b0mhqjci8",
+    "timestamp": 1758482782425,
+    "processed": false
+  },
+  {
+    "type": "reflection",
+    "content": "Gather wood from nearby trees to craft tools and build a shelter.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.6,
+      "cognitiveSystem": "llm-core"
+    },
+    "metadata": {
+      "thoughtType": "reflection",
+      "trigger": "time-based",
+      "context": "environmental-monitoring",
+      "intensity": 0.4,
+      "llmConfidence": 0.6,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1758482782455-xy7d20ohs",
+    "timestamp": 1758482782455,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Gather wood from nearby trees to craft tools. Trees are in the vicinity, start chopping.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.6,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "cognitive_reflection",
+      "trigger": "task-start",
+      "llmConfidence": 0.6,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1758482847250-zcxqvybwf",
+    "timestamp": 1758482847250,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Gather wood from nearby trees. Observing no immediate threats, prioritize resource collection.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.6,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "cognitive_reflection",
+      "trigger": "task-start",
+      "llmConfidence": 0.6,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1758482907448-2uiqb4jra",
+    "timestamp": 1758482907448,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Head towards the nearest tree, chop it down with my hands if necessary, and collect the logs.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.6,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "cognitive_reflection",
+      "trigger": "task-start",
+      "llmConfidence": 0.6,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1758482968176-qkpij11ls",
+    "timestamp": 1758482968176,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Head towards the nearest tree, chop it down, then gather the logs. Observing... No immediate threats, focus on resources.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.7,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "cognitive_reflection",
+      "trigger": "task-start",
+      "llmConfidence": 0.7,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1758483028196-hxehtqny0",
+    "timestamp": 1758483028196,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Head towards the nearest tree, chop it down and add the logs to my inventory.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.6,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "cognitive_reflection",
+      "trigger": "task-start",
+      "llmConfidence": 0.6,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1758483086546-gqefn4y9b",
+    "timestamp": 1758483086547,
+    "processed": false
+  },
+  {
+    "type": "reflection",
+    "content": "Find a nearby tree to gather wood for crafting tools and a shelter.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.6,
+      "cognitiveSystem": "llm-core"
+    },
+    "metadata": {
+      "thoughtType": "reflection",
+      "trigger": "time-based",
+      "context": "environmental-monitoring",
+      "intensity": 0.4,
+      "llmConfidence": 0.6,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1758483172464-ne0rffwmc",
+    "timestamp": 1758483172464,
+    "processed": false
+  },
+  {
+    "type": "reflection",
+    "content": "Find a safe spot to build a shelter and gather wood for materials.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.6,
+      "cognitiveSystem": "llm-core"
+    },
+    "metadata": {
+      "thoughtType": "reflection",
+      "trigger": "time-based",
+      "context": "environmental-monitoring",
+      "intensity": 0.4,
+      "llmConfidence": 0.6,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1758483232628-ivq6lz9ue",
+    "timestamp": 1758483232628,
+    "processed": false
+  },
+  {
+    "type": "reflection",
+    "content": "Gather some wood from nearby trees to craft tools and build a shelter. Observing the area for resources and threats, prioritize finding a safe spot away from mobs.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.7,
+      "cognitiveSystem": "llm-core"
+    },
+    "metadata": {
+      "thoughtType": "reflection",
+      "trigger": "time-based",
+      "context": "environmental-monitoring",
+      "intensity": 0.4,
+      "llmConfidence": 0.7,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1758483303045-2b0e26am5",
+    "timestamp": 1758483303045,
+    "processed": false
+  },
+  {
+    "type": "reflection",
+    "content": "Gather some wood to craft a pickaxe and build a shelter. Observing the surroundings for resources and potential threats. Planning to start with an axe to clear space quickly.",
+    "attribution": "self",
+    "context": {
+      "cognitiveSystem": "llm-core"
+    },
+    "metadata": {
+      "thoughtType": "reflection"
+    },
+    "id": "thought-1758483376165-kvt4fp80r",
+    "timestamp": 1758483376165,
+    "processed": false
+  },
+  {
+    "type": "reflection",
+    "content": "Gather some wood to craft a pickaxe and build a shelter. Observing the surroundings for resources and potential threats. Planning to start with an axe to clear space quickly.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.7,
+      "cognitiveSystem": "llm-core"
+    },
+    "metadata": {
+      "thoughtType": "reflection",
+      "trigger": "time-based",
+      "context": "environmental-monitoring",
+      "intensity": 0.4,
+      "llmConfidence": 0.7,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1758483376184-5kgyrd3bt",
+    "timestamp": 1758483376184,
+    "processed": false
+  },
+  {
+    "type": "reflection",
+    "content": "Gather some wood from nearby trees to craft tools. Stay alert for mobs.",
+    "attribution": "self",
+    "context": {
+      "cognitiveSystem": "llm-core"
+    },
+    "metadata": {
+      "thoughtType": "reflection"
+    },
+    "id": "thought-1758483435616-wgcqyt64n",
+    "timestamp": 1758483435616,
+    "processed": false
+  },
+  {
+    "type": "reflection",
+    "content": "Gather some wood from nearby trees to craft tools. Stay alert for mobs.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.6,
+      "cognitiveSystem": "llm-core"
+    },
+    "metadata": {
+      "thoughtType": "reflection",
+      "trigger": "time-based",
+      "context": "environmental-monitoring",
+      "intensity": 0.4,
+      "llmConfidence": 0.6,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1758483435628-ykxv7hw72",
+    "timestamp": 1758483435628,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Head towards the nearest tree, chop it down to gather wood. Observing that there are no nearby hostiles and the weather is clear, this task poses minimal risk.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.7,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "cognitive_reflection",
+      "trigger": "task-start",
+      "llmConfidence": 0.7,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1758483506054-55szqdf8r",
+    "timestamp": 1758483506054,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Head towards the nearest tree, chop it down. Observing...",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.6,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "cognitive_reflection",
+      "trigger": "task-start",
+      "llmConfidence": 0.6,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1758483564696-djgoittiy",
+    "timestamp": 1758483564696,
+    "processed": false
+  },
+  {
+    "type": "reflection",
+    "content": "Gather wood from nearby trees to craft tools and a shelter.",
+    "attribution": "self",
+    "context": {
+      "cognitiveSystem": "llm-core"
+    },
+    "metadata": {
+      "thoughtType": "reflection"
+    },
+    "id": "thought-1758483625377-40d03wbif",
+    "timestamp": 1758483625377,
+    "processed": false
+  },
+  {
+    "type": "reflection",
+    "content": "Gather wood from nearby trees to craft tools and a shelter.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.6,
+      "cognitiveSystem": "llm-core"
+    },
+    "metadata": {
+      "thoughtType": "reflection",
+      "trigger": "time-based",
+      "context": "environmental-monitoring",
+      "intensity": 0.4,
+      "llmConfidence": 0.6,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1758483625390-mcnep3bo4",
+    "timestamp": 1758483625390,
+    "processed": false
+  },
+  {
+    "type": "reflection",
+    "content": "Gather some wood from nearby trees to craft tools.",
+    "attribution": "self",
+    "context": {
+      "cognitiveSystem": "llm-core"
+    },
+    "metadata": {
+      "thoughtType": "reflection"
+    },
+    "id": "thought-1758483705150-ecgt1lbdw",
+    "timestamp": 1758483705150,
+    "processed": false
+  },
+  {
+    "type": "reflection",
+    "content": "Gather some wood from nearby trees to craft tools.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.5,
+      "cognitiveSystem": "llm-core"
+    },
+    "metadata": {
+      "thoughtType": "reflection",
+      "trigger": "time-based",
+      "context": "environmental-monitoring",
+      "intensity": 0.4,
+      "llmConfidence": 0.5,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1758483705163-xwfznshyk",
+    "timestamp": 1758483705163,
+    "processed": false
+  },
+  {
+    "type": "reflection",
+    "content": "Gather wood from nearby trees to craft tools and build a shelter.",
+    "attribution": "self",
+    "context": {
+      "cognitiveSystem": "llm-core"
+    },
+    "metadata": {
+      "thoughtType": "reflection"
+    },
+    "id": "thought-1758483765714-8qg78equb",
+    "timestamp": 1758483765714,
+    "processed": false
+  },
+  {
+    "type": "reflection",
+    "content": "Gather wood from nearby trees to craft tools and build a shelter.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.6,
+      "cognitiveSystem": "llm-core"
+    },
+    "metadata": {
+      "thoughtType": "reflection",
+      "trigger": "time-based",
+      "context": "environmental-monitoring",
+      "intensity": 0.4,
+      "llmConfidence": 0.6,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1758483765726-xy21o1gj7",
+    "timestamp": 1758483765726,
+    "processed": false
+  },
+  {
+    "type": "reflection",
+    "content": "Find some wood to craft a pickaxe and build a shelter for the night.",
+    "attribution": "self",
+    "context": {
+      "cognitiveSystem": "llm-core"
+    },
+    "metadata": {
+      "thoughtType": "reflection"
+    },
+    "id": "thought-1758483833874-izdd96w6c",
+    "timestamp": 1758483833874,
+    "processed": false
+  },
+  {
+    "type": "reflection",
+    "content": "Find some wood to craft a pickaxe and build a shelter for the night.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.6,
+      "cognitiveSystem": "llm-core"
+    },
+    "metadata": {
+      "thoughtType": "reflection",
+      "trigger": "time-based",
+      "context": "environmental-monitoring",
+      "intensity": 0.4,
+      "llmConfidence": 0.6,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1758483833888-3hen7vq7f",
+    "timestamp": 1758483833888,
+    "processed": false
+  },
+  {
+    "type": "reflection",
+    "content": "Gather some wood from nearby trees to craft tools and build a shelter.",
+    "attribution": "self",
+    "context": {
+      "cognitiveSystem": "llm-core"
+    },
+    "metadata": {
+      "thoughtType": "reflection"
+    },
+    "id": "thought-1758483893854-h0snf4gz9",
+    "timestamp": 1758483893854,
+    "processed": false
+  },
+  {
+    "type": "reflection",
+    "content": "Gather some wood from nearby trees to craft tools and build a shelter.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.6,
+      "cognitiveSystem": "llm-core"
+    },
+    "metadata": {
+      "thoughtType": "reflection",
+      "trigger": "time-based",
+      "context": "environmental-monitoring",
+      "intensity": 0.4,
+      "llmConfidence": 0.6,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1758483893867-90wj0zbci",
+    "timestamp": 1758483893867,
+    "processed": false
+  },
+  {
+    "type": "reflection",
+    "content": "Gather some wood from nearby trees to craft tools and build a shelter.",
+    "attribution": "self",
+    "context": {
+      "cognitiveSystem": "llm-core"
+    },
+    "metadata": {
+      "thoughtType": "reflection"
+    },
+    "id": "thought-1758483973888-pjt1d4drs",
+    "timestamp": 1758483973888,
+    "processed": false
+  },
+  {
+    "type": "reflection",
+    "content": "Gather some wood from nearby trees to craft tools and build a shelter.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.6,
+      "cognitiveSystem": "llm-core"
+    },
+    "metadata": {
+      "thoughtType": "reflection",
+      "trigger": "time-based",
+      "context": "environmental-monitoring",
+      "intensity": 0.4,
+      "llmConfidence": 0.6,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1758483973902-yzvbedou7",
+    "timestamp": 1758483973902,
+    "processed": false
+  },
+  {
+    "type": "intrusive",
+    "content": "I should cancel my plans since i'm not making progress on any of them.",
+    "attribution": "intrusive",
+    "context": {
+      "emotionalState": "curious",
+      "confidence": 0.8
+    },
+    "metadata": {
+      "messageType": "intrusion",
+      "intent": "external_suggestion",
+      "thoughtType": "intrusive"
+    },
+    "id": "thought-1758484005869-l0g8nxnjj",
+    "timestamp": 1758484005869,
+    "processed": false
+  },
+  {
+    "type": "reflection",
+    "content": "Processing intrusive thought: \"i should cancel my plans since i'm not making progress on any of them.\"",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "focused",
+      "confidence": 0.6,
+      "cognitiveSystem": "intrusive-processor"
+    },
+    "metadata": {
+      "thoughtType": "reflection",
+      "source": "intrusive-thought"
+    },
+    "id": "thought-1758484006345-ngnaw6fyc",
+    "timestamp": 1758484006345,
+    "processed": false
+  },
+  {
+    "type": "intrusive",
+    "content": "I should cancel my plans since i'm not making progress on any of them.",
+    "attribution": "external",
+    "context": {
+      "emotionalState": "curious",
+      "confidence": 0.8
+    },
+    "metadata": {
+      "messageType": "intrusion",
+      "intent": "external_suggestion",
+      "tags": [
+        "external",
+        "intrusion"
+      ],
+      "strength": 0.8,
+      "processed": true,
+      "taskId": "task-1758484006325-ar1ynn",
+      "thoughtType": "intrusive"
+    },
+    "id": "thought-1758484006359-2go4xua1z",
+    "timestamp": 1758484006359,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Planning system updated: Ask for clarification on next step (via step_forward_safely@1.0.0) - Success",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "focused",
+      "confidence": 0.7,
+      "cognitiveSystem": "planning-integration"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskId": "task-1758484006325-ar1ynn",
+      "success": true
+    },
+    "id": "thought-1758484006368-s0plck9sj",
+    "timestamp": 1758484006368,
+    "processed": false
+  },
+  {
+    "type": "reflection",
+    "content": "Gather some wood to craft tools and build a shelter before night falls again.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.6,
+      "cognitiveSystem": "llm-core"
+    },
+    "metadata": {
+      "thoughtType": "reflection",
+      "trigger": "time-based",
+      "context": "environmental-monitoring",
+      "intensity": 0.4,
+      "llmConfidence": 0.6,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1758484034258-szjublddw",
+    "timestamp": 1758484034258,
+    "processed": false
+  },
+  {
+    "type": "reflection",
+    "content": "Gather wood from nearby trees to craft tools and build a shelter.",
+    "attribution": "self",
+    "context": {
+      "cognitiveSystem": "llm-core"
+    },
+    "metadata": {
+      "thoughtType": "reflection"
+    },
+    "id": "thought-1758484171518-bv1nsmhwy",
+    "timestamp": 1758484171518,
+    "processed": false
+  },
+  {
+    "type": "reflection",
+    "content": "Gather wood from nearby trees to craft tools and build a shelter.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.6,
+      "cognitiveSystem": "llm-core"
+    },
+    "metadata": {
+      "thoughtType": "reflection",
+      "trigger": "time-based",
+      "context": "environmental-monitoring",
+      "intensity": 0.4,
+      "llmConfidence": 0.6,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1758484171531-jc8ia9mqg",
+    "timestamp": 1758484171531,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Head towards the nearest tree, chop it down, gather the logs.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.6,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "cognitive_reflection",
+      "trigger": "task-start",
+      "llmConfidence": 0.6,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1758484283570-8tv4ket0x",
+    "timestamp": 1758484283570,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Head towards the nearest tree, chop it down, then gather the logs.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.6,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "cognitive_reflection",
+      "trigger": "task-start",
+      "llmConfidence": 0.6,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1758484402747-w38gckq6s",
+    "timestamp": 1758484402747,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Head towards the nearest tree, chop it down to gather wood.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.6,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "cognitive_reflection",
+      "trigger": "task-start",
+      "llmConfidence": 0.6,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1758484462612-77i90zpcq",
+    "timestamp": 1758484462612,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Head towards the nearest tree, chop it down, then gather the logs.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.6,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "cognitive_reflection",
+      "trigger": "task-start",
+      "llmConfidence": 0.6,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1758484522622-922plief0",
+    "timestamp": 1758484522622,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Head towards the nearest tree, chop it down, and gather the logs.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.6,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "cognitive_reflection",
+      "trigger": "task-start",
+      "llmConfidence": 0.6,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1758484643139-loun8w3n4",
+    "timestamp": 1758484643139,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Head towards the nearest tree, chop it down, and gather the logs.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.6,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "cognitive_reflection",
+      "trigger": "task-start",
+      "llmConfidence": 0.6,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1758484762677-t5d1v93vp",
+    "timestamp": 1758484762677,
+    "processed": false
+  },
+  {
+    "type": "reflection",
+    "content": "Craft a shelter using nearby resources. Scan the area for potential threats and gather materials.",
+    "attribution": "self",
+    "context": {
+      "cognitiveSystem": "llm-core"
+    },
+    "metadata": {
+      "thoughtType": "reflection"
+    },
+    "id": "thought-1758484888109-fadxk7658",
+    "timestamp": 1758484888109,
+    "processed": false
+  },
+  {
+    "type": "reflection",
+    "content": "Craft a shelter using nearby resources. Scan the area for potential threats and gather materials.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.6,
+      "cognitiveSystem": "llm-core"
+    },
+    "metadata": {
+      "thoughtType": "reflection",
+      "trigger": "time-based",
+      "context": "environmental-monitoring",
+      "intensity": 0.4,
+      "llmConfidence": 0.6,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1758484888138-g5f1vorm6",
+    "timestamp": 1758484888138,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Gather wooden logs from the nearby trees. There are several saplings close by, perfect for crafting planks.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.7,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "cognitive_reflection",
+      "trigger": "task-start",
+      "llmConfidence": 0.7,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1758485017977-kqhn0o1m7",
+    "timestamp": 1758485017977,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Head to the nearest trees, chop down some logs.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.5,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "cognitive_reflection",
+      "trigger": "task-start",
+      "llmConfidence": 0.5,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1758485137839-3cxc4yd5r",
+    "timestamp": 1758485137839,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Head to the nearest trees and start chopping them down for logs.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.6,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "cognitive_reflection",
+      "trigger": "task-start",
+      "llmConfidence": 0.6,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1758485197060-e8q2e6n7v",
+    "timestamp": 1758485197060,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Head to the nearest trees and start chopping them down for logs.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.6,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "cognitive_reflection",
+      "trigger": "task-start",
+      "llmConfidence": 0.6,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1758485257885-3kp28hunr",
+    "timestamp": 1758485257885,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Head to the nearest trees and start chopping them down for logs.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.6,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "cognitive_reflection",
+      "trigger": "task-start",
+      "llmConfidence": 0.6,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1758485317077-ylwqp8b2g",
+    "timestamp": 1758485317077,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Head to the nearest trees and start chopping them down to gather wooden logs for crafting tools and later a shelter.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.7,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "cognitive_reflection",
+      "trigger": "task-start",
+      "llmConfidence": 0.7,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1758485437266-emdxgqn5v",
+    "timestamp": 1758485437266,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Head to the nearest trees and start chopping down some wood to gather logs for crafting a shelter.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.6,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "cognitive_reflection",
+      "trigger": "task-start",
+      "llmConfidence": 0.6,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1758485497208-8qhp3t0jp",
+    "timestamp": 1758485497208,
+    "processed": false
+  },
+  {
+    "type": "reflection",
+    "content": "Gather some wood to craft tools before night falls. Observing the area for trees.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.6,
+      "cognitiveSystem": "llm-core"
+    },
+    "metadata": {
+      "thoughtType": "reflection",
+      "trigger": "time-based",
+      "context": "environmental-monitoring",
+      "intensity": 0.4,
+      "llmConfidence": 0.6,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1758485588202-8kmzcgg40",
+    "timestamp": 1758485588202,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Head to the nearest trees and start chopping them down to gather logs.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.6,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "cognitive_reflection",
+      "trigger": "task-start",
+      "llmConfidence": 0.6,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1758485677963-u7m9lxsve",
+    "timestamp": 1758485677963,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Head to the nearest trees and start chopping them down for logs.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.6,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "cognitive_reflection",
+      "trigger": "task-start",
+      "llmConfidence": 0.6,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1758485737063-ql74cmjz2",
+    "timestamp": 1758485737063,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Head to the nearest trees and start chopping them down for logs.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.6,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "cognitive_reflection",
+      "trigger": "task-start",
+      "llmConfidence": 0.6,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1758485797063-u8zk2hloz",
+    "timestamp": 1758485797063,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Head to the nearest trees and start chopping them down to gather wooden logs.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.6,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "cognitive_reflection",
+      "trigger": "task-start",
+      "llmConfidence": 0.6,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1758485857102-uotv9vyij",
+    "timestamp": 1758485857102,
+    "processed": false
+  },
+  {
+    "type": "reflection",
+    "content": "Gather some wood from nearby trees to craft tools and build a shelter.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.6,
+      "cognitiveSystem": "llm-core"
+    },
+    "metadata": {
+      "thoughtType": "reflection",
+      "trigger": "time-based",
+      "context": "environmental-monitoring",
+      "intensity": 0.4,
+      "llmConfidence": 0.6,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1758485958167-k46c8fuhi",
+    "timestamp": 1758485958167,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Head to the nearest trees and start chopping down some logs.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.6,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "cognitive_reflection",
+      "trigger": "task-start",
+      "llmConfidence": 0.6,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1758486037986-cugjiwieo",
+    "timestamp": 1758486037986,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Head to the nearest trees and start chopping down some logs.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.6,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "cognitive_reflection",
+      "trigger": "task-start",
+      "llmConfidence": 0.6,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1758486097041-vzktx2n83",
+    "timestamp": 1758486097041,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Head to the nearest trees and start chopping down some logs.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.6,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "cognitive_reflection",
+      "trigger": "task-start",
+      "llmConfidence": 0.6,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1758486217039-73rx2epdt",
+    "timestamp": 1758486217039,
+    "processed": false
+  },
+  {
+    "type": "reflection",
+    "content": "Gather some wood from nearby trees to craft tools and a shelter.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.6,
+      "cognitiveSystem": "llm-core"
+    },
+    "metadata": {
+      "thoughtType": "reflection",
+      "trigger": "time-based",
+      "context": "environmental-monitoring",
+      "intensity": 0.4,
+      "llmConfidence": 0.6,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1758486288190-cluzgodqx",
+    "timestamp": 1758486288190,
+    "processed": false
+  },
+  {
+    "type": "reflection",
+    "content": "Gather some wood from nearby trees to craft tools and a shelter.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.6,
+      "cognitiveSystem": "llm-core"
+    },
+    "metadata": {
+      "thoughtType": "reflection",
+      "trigger": "time-based",
+      "context": "environmental-monitoring",
+      "intensity": 0.4,
+      "llmConfidence": 0.6,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1758486348044-5juvk3qu7",
+    "timestamp": 1758486348044,
+    "processed": false
+  },
+  {
+    "type": "reflection",
+    "content": "Gather some wood from nearby trees to craft tools and build a shelter. Observing the area for resources and potential threats. Planning to start with an axe for more efficient tree cutting.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.7,
+      "cognitiveSystem": "llm-core"
+    },
+    "metadata": {
+      "thoughtType": "reflection",
+      "trigger": "time-based",
+      "context": "environmental-monitoring",
+      "intensity": 0.4,
+      "llmConfidence": 0.7,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1758486428641-soaropesz",
+    "timestamp": 1758486428641,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Head to the nearest trees and start chopping down some logs.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.6,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "cognitive_reflection",
+      "trigger": "task-start",
+      "llmConfidence": 0.6,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1758486517736-ol9vy0own",
+    "timestamp": 1758486517736,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Head to the nearest trees and start chopping them down to gather logs. No immediate threats; focus on resource collection.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.7,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "cognitive_reflection",
+      "trigger": "task-start",
+      "llmConfidence": 0.7,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1758486577269-5yjoorm66",
+    "timestamp": 1758486577269,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Head to the nearest trees and start chopping them down for logs.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.6,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "cognitive_reflection",
+      "trigger": "task-start",
+      "llmConfidence": 0.6,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1758486637173-xrqm2el17",
+    "timestamp": 1758486637173,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Head to the nearest trees and start chopping down some logs.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.6,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "cognitive_reflection",
+      "trigger": "task-start",
+      "llmConfidence": 0.6,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1758486697074-6qumzubc9",
+    "timestamp": 1758486697074,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Head to the nearest trees and start chopping down some logs. No time like the present!",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.6,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "cognitive_reflection",
+      "trigger": "task-start",
+      "llmConfidence": 0.6,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1758486757216-zwe7iyj5u",
+    "timestamp": 1758486757216,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Head to the nearest trees and start chopping down some logs.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.6,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "cognitive_reflection",
+      "trigger": "task-start",
+      "llmConfidence": 0.6,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1758486817115-msrbrcufp",
+    "timestamp": 1758486817115,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Head to the nearest trees and start chopping down some logs.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.6,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "cognitive_reflection",
+      "trigger": "task-start",
+      "llmConfidence": 0.6,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1758486877082-2cuo5mbuq",
+    "timestamp": 1758486877082,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Head to the nearest trees and start chopping down some logs.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.6,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "cognitive_reflection",
+      "trigger": "task-start",
+      "llmConfidence": 0.6,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1758486937114-tisaqck0d",
+    "timestamp": 1758486937114,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Head to the nearest trees and start chopping them down to gather logs.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.6,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "cognitive_reflection",
+      "trigger": "task-start",
+      "llmConfidence": 0.6,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1758486997170-sz8qo1gqh",
+    "timestamp": 1758486997170,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Head to the nearest trees and start chopping down some logs.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.6,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "cognitive_reflection",
+      "trigger": "task-start",
+      "llmConfidence": 0.6,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1758487057104-lqpulwrt0",
+    "timestamp": 1758487057104,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Head to the nearest trees and start chopping down some logs.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.6,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "cognitive_reflection",
+      "trigger": "task-start",
+      "llmConfidence": 0.6,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1758487117602-6ruhf0jdw",
+    "timestamp": 1758487117602,
+    "processed": false
+  },
+  {
+    "type": "reflection",
+    "content": "Gather some wood to craft a basic shelter and tools before night falls. Observing the surroundings for trees and potential threats.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.7,
+      "cognitiveSystem": "llm-core"
+    },
+    "metadata": {
+      "thoughtType": "reflection",
+      "trigger": "time-based",
+      "context": "environmental-monitoring",
+      "intensity": 0.4,
+      "llmConfidence": 0.7,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1758487188526-qdo2lykqj",
+    "timestamp": 1758487188526,
+    "processed": false
+  },
+  {
+    "type": "reflection",
+    "content": "Gather some wood to craft a torch and build a shelter.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.6,
+      "cognitiveSystem": "llm-core"
+    },
+    "metadata": {
+      "thoughtType": "reflection",
+      "trigger": "time-based",
+      "context": "environmental-monitoring",
+      "intensity": 0.4,
+      "llmConfidence": 0.6,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1758487258463-q1brkeqrf",
+    "timestamp": 1758487258463,
+    "processed": false
+  },
+  {
+    "type": "reflection",
+    "content": "Gather some wood from nearby trees to craft tools and build a shelter.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.6,
+      "cognitiveSystem": "llm-core"
+    },
+    "metadata": {
+      "thoughtType": "reflection",
+      "trigger": "time-based",
+      "context": "environmental-monitoring",
+      "intensity": 0.4,
+      "llmConfidence": 0.6,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1758487318521-dz6klp8vn",
+    "timestamp": 1758487318521,
+    "processed": false
+  },
+  {
+    "type": "reflection",
+    "content": "Gather some wood to craft a pickaxe and build a shelter. Observing the area for resources, trees, and safe ground. Planning to start with finding and cutting down nearby trees.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.7,
+      "cognitiveSystem": "llm-core"
+    },
+    "metadata": {
+      "thoughtType": "reflection",
+      "trigger": "time-based",
+      "context": "environmental-monitoring",
+      "intensity": 0.4,
+      "llmConfidence": 0.7,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1758487388674-op6nolqcv",
+    "timestamp": 1758487388674,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Head to the nearest trees and start chopping down some logs.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.6,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "cognitive_reflection",
+      "trigger": "task-start",
+      "llmConfidence": 0.6,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1758487477941-kxwxe6xf3",
+    "timestamp": 1758487477941,
+    "processed": false
+  },
+  {
+    "type": "reflection",
+    "content": "Gather wood from nearby trees to craft tools and a shelter.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.6,
+      "cognitiveSystem": "llm-core"
+    },
+    "metadata": {
+      "thoughtType": "reflection",
+      "trigger": "time-based",
+      "context": "environmental-monitoring",
+      "intensity": 0.4,
+      "llmConfidence": 0.6,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1758487588311-ztrj5axu6",
+    "timestamp": 1758487588311,
+    "processed": false
+  },
+  {
+    "type": "reflection",
+    "content": "Gather some wood from nearby trees to craft tools. Watch for mobs as I move around.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.6,
+      "cognitiveSystem": "llm-core"
+    },
+    "metadata": {
+      "thoughtType": "reflection",
+      "trigger": "time-based",
+      "context": "environmental-monitoring",
+      "intensity": 0.4,
+      "llmConfidence": 0.6,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1758487648286-4oy7jef7i",
+    "timestamp": 1758487648286,
+    "processed": false
+  },
+  {
+    "type": "reflection",
+    "content": "Gather some wood to craft tools and build a shelter before night falls again. Observing the area for trees. Planning to start with an axe once I gather enough logs.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.7,
+      "cognitiveSystem": "llm-core"
+    },
+    "metadata": {
+      "thoughtType": "reflection",
+      "trigger": "time-based",
+      "context": "environmental-monitoring",
+      "intensity": 0.4,
+      "llmConfidence": 0.7,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1758487708678-johzyhds0",
+    "timestamp": 1758487708678,
+    "processed": false
+  },
+  {
+    "type": "planning",
+    "content": "Head to the nearest trees and start chopping down some logs.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.6,
+      "cognitiveSystem": "enhanced-generator"
+    },
+    "metadata": {
+      "thoughtType": "planning",
+      "taskType": "cognitive_reflection",
+      "trigger": "task-start",
+      "llmConfidence": 0.6,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1758487777943-17csskglt",
+    "timestamp": 1758487777943,
     "processed": false
   }
 ]

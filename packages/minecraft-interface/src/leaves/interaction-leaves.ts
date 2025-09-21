@@ -253,7 +253,7 @@ export class PlaceTorchIfNeededLeaf implements LeafImpl {
    * Get distance from last torch (simplified implementation)
    */
   private getDistanceFromLastTorch(botPos: Vec3): number {
-    // TODO: Implement proper tracking of last torch position
+    // TODO: Implement proper tracking of last torch position for optimal placement
     // For now, return a random value to simulate interval checking
     return Math.floor(Math.random() * 10) + 1;
   }

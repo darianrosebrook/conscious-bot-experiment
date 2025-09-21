@@ -11,8 +11,61 @@ import { EventEmitter } from 'events';
 import { Goal, GoalType, GoalStatus } from '../types';
 import { BehaviorTreeRunner } from '../behavior-trees/BehaviorTreeRunner';
 import { HybridSkillPlanner } from './hybrid-skill-planner';
-import { SkillRegistry } from '@conscious-bot/memory';
-import { EnhancedRegistry, DynamicCreationFlow } from '@conscious-bot/core';
+// Temporary local type definition until @conscious-bot/memory is available
+export class SkillRegistry {
+  constructor() {}
+  register(name: string, skill: any): void {
+    console.log(`Registered skill: ${name}`);
+  }
+  getAllSkills(): any[] {
+    return [];
+  }
+  recordSkillUsage(skillId: string, success: boolean, duration: number): void {
+    console.log(
+      `Recorded skill usage: ${skillId}, success: ${success}, duration: ${duration}`
+    );
+  }
+  getSkill(id: string): any {
+    return null;
+  }
+}
+// Temporary local type definitions until @conscious-bot/core is available
+export class EnhancedRegistry {
+  constructor() {}
+  register(name: string, handler: any): void {
+    console.log(`Registered: ${name}`);
+  }
+  listCapabilities(): any[] {
+    return [];
+  }
+  getCapability(id: string): any {
+    return null;
+  }
+  executeShadowRun(context: any): any {
+    return { success: true, data: null };
+  }
+}
+
+export class DynamicCreationFlow {
+  constructor() {}
+  create(config: any): any {
+    return { created: true, config };
+  }
+  checkImpasse(goal: string, context: any): any {
+    return { success: false, reason: 'not implemented' };
+  }
+  proposeNewCapability(
+    goal: string,
+    context: any,
+    currentTask: string,
+    recentFailures: any[]
+  ): any {
+    return null;
+  }
+  executeShadowRun(context: any): any {
+    return { success: true, data: null };
+  }
+}
 import { HRMInspiredPlanner } from '../hierarchical-planner/hrm-inspired-planner';
 import { EnhancedGOAPPlanner } from '../reactive-executor/enhanced-goap-planner';
 

@@ -7,7 +7,7 @@
  * @author @darianrosebrook
  */
 
-import { Plan, PlanStep } from '../types';
+import { Plan, PlanStep, ActionType } from '../types';
 
 export interface MinecraftAction {
   type: string;
@@ -113,7 +113,7 @@ export class MinecraftExecutor {
     // Check if step has an action property
     if (step.action && step.action.type) {
       return {
-        type: step.action.type,
+        type: this.mapActionTypeToLeaf(step.action.type),
         parameters: step.action.parameters || {},
       };
     }
@@ -121,9 +121,143 @@ export class MinecraftExecutor {
     // Try to infer action from step name
     const stepName = (step as any).name?.toLowerCase() || '';
 
+    // Container interaction actions
+    if (
+      stepName.includes('container') ||
+      stepName.includes('chest') ||
+      stepName.includes('storage')
+    ) {
+      if (stepName.includes('organize')) {
+        return {
+          type: 'manage_inventory',
+          parameters: { action: 'sort' },
+        };
+      } else if (stepName.includes('open')) {
+        return {
+          type: 'open_container',
+          parameters: { position: 'nearest' },
+        };
+      } else {
+        return {
+          type: 'interact_with_block',
+          parameters: { interactionType: 'use' },
+        };
+      }
+    }
+
+    // Farming actions
+    if (
+      stepName.includes('farm') ||
+      stepName.includes('crop') ||
+      stepName.includes('agriculture')
+    ) {
+      if (stepName.includes('till') || stepName.includes('prepare')) {
+        return {
+          type: 'till_soil',
+          parameters: { radius: 16 },
+        };
+      } else if (stepName.includes('plant') || stepName.includes('seed')) {
+        return {
+          type: 'plant_crop',
+          parameters: { cropType: 'wheat', radius: 16 },
+        };
+      } else if (stepName.includes('harvest') || stepName.includes('collect')) {
+        return {
+          type: 'harvest_crop',
+          parameters: { radius: 16 },
+        };
+      } else {
+        return {
+          type: 'manage_farm',
+          parameters: { action: 'maintain', maxOperations: 10 },
+        };
+      }
+    }
+
+    // Combat actions
+    if (
+      stepName.includes('combat') ||
+      stepName.includes('fight') ||
+      stepName.includes('attack')
+    ) {
+      if (stepName.includes('defend') || stepName.includes('protect')) {
+        return {
+          type: 'retreat_from_threat',
+          parameters: { retreatDistance: 10 },
+        };
+      } else if (stepName.includes('equip')) {
+        return {
+          type: 'equip_weapon',
+          parameters: { preferredType: 'sword' },
+        };
+      } else {
+        return {
+          type: 'attack_entity',
+          parameters: { radius: 16 },
+        };
+      }
+    }
+
+    // World interaction actions
+    if (
+      stepName.includes('redstone') ||
+      stepName.includes('mechanism') ||
+      stepName.includes('automation')
+    ) {
+      if (stepName.includes('piston')) {
+        return {
+          type: 'operate_piston',
+          parameters: { action: 'toggle', radius: 10 },
+        };
+      } else {
+        return {
+          type: 'control_redstone',
+          parameters: { action: 'toggle', radius: 10 },
+        };
+      }
+    }
+
+    if (
+      stepName.includes('build') ||
+      stepName.includes('construct') ||
+      stepName.includes('structure')
+    ) {
+      return {
+        type: 'build_structure',
+        parameters: {
+          structureType: 'house',
+          dimensions: { width: 5, height: 3, depth: 5 },
+          material: 'cobblestone',
+        },
+      };
+    }
+
+    if (
+      stepName.includes('environment') ||
+      stepName.includes('weather') ||
+      stepName.includes('time')
+    ) {
+      return {
+        type: 'control_environment',
+        parameters: { action: 'set_day' },
+      };
+    }
+
+    if (
+      stepName.includes('interact') ||
+      stepName.includes('use') ||
+      stepName.includes('activate')
+    ) {
+      return {
+        type: 'interact_with_block',
+        parameters: { interactionType: 'use' },
+      };
+    }
+
+    // Legacy action mappings
     if (stepName.includes('navigate') || stepName.includes('move')) {
       return {
-        type: 'navigate',
+        type: 'move_to',
         parameters: { target: 'auto_detect', max_distance: 50 },
       };
     } else if (
@@ -146,15 +280,15 @@ export class MinecraftExecutor {
       };
     } else if (stepName.includes('explore') || stepName.includes('scan')) {
       return {
-        type: 'explore_environment',
+        type: 'sense_environment',
         parameters: { duration: 10000, radius: 20 },
       };
     } else if (stepName.includes('craft')) {
       return {
-        type: 'craft_item',
+        type: 'craft_recipe',
         parameters: { item: 'auto_detect', materials: 'auto_collect' },
       };
-    } else if (stepName.includes('place') || stepName.includes('build')) {
+    } else if (stepName.includes('place')) {
       return {
         type: 'place_block',
         parameters: { block_type: 'auto_select', position: 'optimal_location' },
@@ -163,9 +297,35 @@ export class MinecraftExecutor {
 
     // Default action for unknown steps
     return {
-      type: 'explore_environment',
+      type: 'sense_environment',
       parameters: { duration: 5000, radius: 10 },
     };
+  }
+
+  /**
+   * Map ActionType to leaf name
+   */
+  private mapActionTypeToLeaf(actionType: string): string {
+    const actionMapping: Record<string, string> = {
+      [ActionType.MOVEMENT]: 'move_to',
+      [ActionType.INTERACTION]: 'interact_with_block',
+      [ActionType.CRAFTING]: 'craft_recipe',
+      [ActionType.COMBAT]: 'attack_entity',
+      [ActionType.SOCIAL]: 'chat',
+      [ActionType.EXPLORATION]: 'sense_environment',
+      // New primitive operation mappings
+      [ActionType.CONTAINER_INTERACTION]: 'interact_with_block',
+      [ActionType.FARMING]: 'manage_farm',
+      [ActionType.WORLD_INTERACTION]: 'interact_with_block',
+      [ActionType.REDSTONE_CONTROL]: 'control_redstone',
+      [ActionType.STRUCTURE_BUILDING]: 'build_structure',
+      [ActionType.ENVIRONMENT_CONTROL]: 'control_environment',
+      [ActionType.INVENTORY_MANAGEMENT]: 'manage_inventory',
+      [ActionType.AGRICULTURE]: 'manage_farm',
+      [ActionType.MECHANISM_OPERATION]: 'operate_piston',
+    };
+
+    return actionMapping[actionType] || 'sense_environment';
   }
 
   /**
@@ -194,7 +354,7 @@ export class MinecraftExecutor {
         };
       }
 
-      const result = await response.json() as any;
+      const result = (await response.json()) as any;
       return {
         success: result.success,
         data: result.result,
@@ -215,7 +375,7 @@ export class MinecraftExecutor {
     try {
       const response = await fetch(`${this.minecraftInterfaceUrl}/health`);
       if (response.ok) {
-        const health = await response.json() as any;
+        const health = (await response.json()) as any;
         return health.status === 'connected';
       }
       return false;

@@ -11,25 +11,31 @@
     "dev:server": "tsx src/server.ts",
     "test": "vitest run",
     "test:run": "vitest run",
+    "test:memory-integration": "vitest run src/__tests__/memory-llm-integration.test.ts",
+    "test:ollama-memory": "vitest run src/__tests__/ollama-memory-integration.test.ts",
+    "test:complete-flow": "vitest run src/__tests__/complete-cognitive-flow.test.ts",
     "lint": "eslint src/**/*.ts",
     "type-check": "tsc --noEmit"
   },
   "dependencies": {
-    "@conscious-bot/core": "workspace:*",
     "@conscious-bot/world": "workspace:*",
     "neo4j-driver": "^5.0.0",
     "zod": "^3.22.0",
     "rxjs": "^7.8.0",
     "express": "^4.18.0",
-    "cors": "^2.8.5"
+    "cors": "^2.8.5",
+    "pg": "^8.11.0",
+    "ollama": "^0.5.0"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
     "@types/express": "^4.17.0",
     "@types/cors": "^2.8.0",
+    "@types/pg": "^8.11.0",
     "typescript": "^5.0.0",
     "tsx": "^4.0.0",
-    "vitest": "^3.2.4"
+    "vitest": "^3.2.4",
+    "@faker-js/faker": "^8.0.0"
   },
   "keywords": [
     "memory",

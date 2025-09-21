@@ -20,7 +20,7 @@ export { ContextOptimizer } from './cognitive-core/context-optimizer';
 export { ConstitutionalFilter } from './constitutional-filter';
 
 // Enhanced Thought Generator
-export { EnhancedThoughtGenerator } from './enhanced-thought-generator';
+export { EnhancedThoughtGenerator } from './thought-generator';
 
 // Self-Model
 export {

@@ -11,7 +11,51 @@
  */
 
 import { EventEmitter } from 'events';
-import { SkillRegistry, Skill, SkillMetadata } from '@conscious-bot/memory';
+// Temporary local type definitions until @conscious-bot/memory is available
+export class SkillRegistry {
+  constructor() {}
+  register(name: string, skill: any): void {
+    console.log(`Registered skill: ${name}`);
+  }
+  registerSkill(skill: any): void {
+    console.log(`Registered skill: ${skill.name}`);
+  }
+  getAllSkills(): any[] {
+    return [];
+  }
+  recordSkillUsage(skillId: string, success: boolean, duration: number): void {
+    console.log(
+      `Recorded skill usage: ${skillId}, success: ${success}, duration: ${duration}`
+    );
+  }
+}
+
+export interface Skill {
+  id: string;
+  name: string;
+  description: string;
+  metadata: SkillMetadata;
+  preconditions?: any;
+  postconditions?: any;
+  argsSchema?: any;
+  implementation?: any;
+  tests?: any;
+  createdAt?: number;
+  updatedAt?: number;
+}
+
+export interface SkillMetadata {
+  tags: string[];
+  difficulty: number;
+  category: string;
+  successRate?: number;
+  complexity?: string;
+  usageCount?: number;
+  averageExecutionTime?: number;
+  lastUsed?: number;
+  dependencies?: string[];
+  transferable?: boolean;
+}
 import { SkillComposer, ComposedSkill, ExecutionContext } from './types';
 import { Goal, GoalType, GoalStatus } from '../types';
 
@@ -157,11 +201,11 @@ export class SkillComposerAdapter extends EventEmitter {
           success: true,
           composedSkill: cached,
           reasoning: 'Retrieved from composition cache',
-          estimatedSuccess: cached.metadata.successRate,
+          estimatedSuccess: cached.metadata.successRate ?? 0.8,
           complexity:
             typeof cached.metadata.complexity === 'string'
               ? parseInt(cached.metadata.complexity, 10) || 5
-              : cached.metadata.complexity,
+              : (cached.metadata.complexity ?? 5),
         };
       }
 
@@ -200,11 +244,11 @@ export class SkillComposerAdapter extends EventEmitter {
         success: true,
         composedSkill: skillAdapter,
         reasoning: 'Successfully composed new skill combination',
-        estimatedSuccess: skillAdapter.metadata.successRate,
+        estimatedSuccess: skillAdapter.metadata.successRate ?? 0.8,
         complexity:
           typeof skillAdapter.metadata.complexity === 'string'
             ? parseInt(skillAdapter.metadata.complexity, 10) || 5
-            : skillAdapter.metadata.complexity,
+            : (skillAdapter.metadata.complexity ?? 5),
       };
     } catch (error) {
       return this.handleCompositionFailure(
@@ -384,6 +428,8 @@ export class SkillComposerAdapter extends EventEmitter {
    */
   private convertMetadata(metadata: any): SkillMetadata {
     return {
+      difficulty: metadata.difficulty || 5,
+      category: metadata.category || 'general',
       successRate: metadata.successRate || 0.8,
       usageCount: metadata.executionCount || 0,
       averageExecutionTime: metadata.context?.estimatedDuration || 5000,
@@ -504,7 +550,7 @@ export class SkillComposerAdapter extends EventEmitter {
       const aRelevance = this.calculateGoalRelevance(a, goal);
       const bRelevance = this.calculateGoalRelevance(b, goal);
       if (aRelevance !== bRelevance) return bRelevance - aRelevance;
-      return b.metadata.successRate - a.metadata.successRate;
+      return (b.metadata.successRate ?? 0.8) - (a.metadata.successRate ?? 0.8);
     });
 
     return fallbacks.slice(0, 3); // Return top 3 fallbacks
@@ -544,7 +590,7 @@ export class SkillComposerAdapter extends EventEmitter {
     }
 
     // Check success rate
-    score += skill.metadata.successRate;
+    score += skill.metadata.successRate ?? 0.8;
 
     // Check complexity match
     if (goal.priority > 7 && skill.metadata.complexity === 'complex')

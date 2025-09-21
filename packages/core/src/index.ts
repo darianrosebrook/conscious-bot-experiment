@@ -37,8 +37,12 @@ export { CapabilityRegistry, ConstitutionalFilter } from './mcp-capabilities';
 export { CapabilityRateLimiter } from './mcp-capabilities/rate-limiter';
 export { createLeafContext } from './mcp-capabilities/leaf-contracts';
 export { LeafFactory } from './mcp-capabilities/leaf-factory';
-export { EnhancedRegistry, DynamicCreationFlow } from './mcp-capabilities';
-export type { ShadowRunResult, ImpasseResult } from './mcp-capabilities';
+export { DynamicCreationFlow } from './mcp-capabilities';
+export type {
+  ShadowRunResult,
+  ImpasseResult,
+  RegistryStatus,
+} from './mcp-capabilities';
 
 // Leaf Contract Types
 export type {

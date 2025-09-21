@@ -51,6 +51,31 @@ import {
   GetLightLevelLeaf,
 } from './leaves/sensing-leaves';
 import { CraftRecipeLeaf, SmeltLeaf } from './leaves/crafting-leaves';
+import {
+  OpenContainerLeaf,
+  TransferItemsLeaf,
+  CloseContainerLeaf,
+  InventoryManagementLeaf,
+} from './leaves/container-leaves';
+import {
+  AttackEntityLeaf,
+  EquipWeaponLeaf,
+  RetreatFromThreatLeaf,
+  UseItemLeaf,
+} from './leaves/combat-leaves';
+import {
+  TillSoilLeaf,
+  PlantCropLeaf,
+  HarvestCropLeaf,
+  ManageFarmLeaf,
+} from './leaves/farming-leaves';
+import {
+  InteractWithBlockLeaf,
+  OperatePistonLeaf,
+  ControlRedstoneLeaf,
+  BuildStructureLeaf,
+  EnvironmentalControlLeaf,
+} from './leaves/world-interaction-leaves';
 
 // =============================================================================
 // WebSocket Connection State Tracker
@@ -506,11 +531,48 @@ async function registerCoreLeaves() {
     // Register crafting leaves
     const craftingLeaves = [new CraftRecipeLeaf(), new SmeltLeaf()];
 
+    // Register container leaves
+    const containerLeaves = [
+      new OpenContainerLeaf(),
+      new TransferItemsLeaf(),
+      new CloseContainerLeaf(),
+      new InventoryManagementLeaf(),
+    ];
+
+    // Register combat leaves
+    const combatLeaves = [
+      new AttackEntityLeaf(),
+      new EquipWeaponLeaf(),
+      new RetreatFromThreatLeaf(),
+      new UseItemLeaf(),
+    ];
+
+    // Register farming leaves
+    const farmingLeaves = [
+      new TillSoilLeaf(),
+      new PlantCropLeaf(),
+      new HarvestCropLeaf(),
+      new ManageFarmLeaf(),
+    ];
+
+    // Register world interaction leaves
+    const worldInteractionLeaves = [
+      new InteractWithBlockLeaf(),
+      new OperatePistonLeaf(),
+      new ControlRedstoneLeaf(),
+      new BuildStructureLeaf(),
+      new EnvironmentalControlLeaf(),
+    ];
+
     const allLeaves = [
       ...movementLeaves,
       ...interactionLeaves,
       ...sensingLeaves,
       ...craftingLeaves,
+      ...containerLeaves,
+      ...combatLeaves,
+      ...farmingLeaves,
+      ...worldInteractionLeaves,
     ];
 
     for (const leaf of allLeaves) {
@@ -923,9 +985,22 @@ app.get('/safety', (req, res) => {
 // Get bot state
 app.get('/state', async (req, res) => {
   try {
+    console.log('🔍 [MINECRAFT INTERFACE] /state endpoint called');
+
     const botStatus = minecraftInterface?.botAdapter.getStatus();
     const executionStatus =
       minecraftInterface?.planExecutor.getExecutionStatus();
+
+    console.log('🔍 [MINECRAFT INTERFACE] Bot status:', {
+      connected: botStatus?.connected,
+      connectionState: botStatus?.connectionState,
+      isSpawned: botStatus?.isSpawned,
+      health: botStatus?.health,
+    });
+    console.log('🔍 [MINECRAFT INTERFACE] Execution status:', {
+      hasBot: !!executionStatus?.bot,
+      botConnected: executionStatus?.bot?.connected,
+    });
 
     // Check if bot is connected and spawned
     const isConnected =
@@ -934,10 +1009,13 @@ app.get('/state', async (req, res) => {
         executionStatus.bot.connected) ||
       (botStatus?.connected && botStatus?.connectionState === 'spawned');
 
+    console.log('🔍 [MINECRAFT INTERFACE] Is connected:', isConnected);
+
     // Check if bot is alive
     const isAlive = botStatus?.health && botStatus.health > 0;
 
     if (!isConnected) {
+      console.log('🔍 [MINECRAFT INTERFACE] Bot not connected, returning 503');
       return res.status(503).json({
         success: false,
         message: 'Bot not connected',
@@ -959,7 +1037,7 @@ app.get('/state', async (req, res) => {
             dimension: executionStatus?.bot?.dimension || 'overworld',
           },
           inventory: {
-            items: [],
+            items: [], // This will be populated with actual bot inventory items
             totalSlots: 36,
             usedSlots: 0,
           },
@@ -998,13 +1076,59 @@ app.get('/state', async (req, res) => {
 
     const bot = minecraftInterface.botAdapter.getBot();
 
+    console.log('🔍 [MINECRAFT INTERFACE] Got connected bot, mapping state...');
+
     const gameState =
       minecraftInterface.observationMapper.mapBotStateToPlanningContext(bot);
+
+    // Convert to format expected by cognition system
+    const convertedState = {
+      worldState: {
+        player: {
+          position: {
+            x: gameState.worldState.playerPosition[0],
+            y: gameState.worldState.playerPosition[1],
+            z: gameState.worldState.playerPosition[2],
+          },
+          health: gameState.worldState.health,
+          food: gameState.worldState.hunger,
+          experience: 0, // Not in the converted state
+          gameMode: 'survival', // Default
+          dimension: 'overworld', // Default
+        },
+        environment: {
+          timeOfDay:
+            gameState.timeConstraints?.urgency === 'night' ? 18000 : 6000,
+          weather: 'clear',
+          biome: 'plains',
+        },
+        nearbyEntities: [],
+        nearbyBlocks: [],
+      },
+      status: 'connected',
+      data: {
+        position: {
+          x: gameState.worldState.playerPosition[0],
+          y: gameState.worldState.playerPosition[1],
+          z: gameState.worldState.playerPosition[2],
+        },
+        health: gameState.worldState.health,
+        food: gameState.worldState.hunger,
+        inventory: [], // TODO: Fix inventory data from observation mapper - use ObservationMapper.extractInventoryState()
+      },
+      isAlive: gameState.worldState.health > 0,
+    };
+
+    console.log('🔍 [MINECRAFT INTERFACE] Converted state:', {
+      position: convertedState.data.position,
+      health: convertedState.data.health,
+      inventoryItems: convertedState.data.inventory?.length || 0,
+    });
 
     res.json({
       success: true,
       status: isAlive ? 'connected' : 'dead',
-      data: gameState,
+      data: convertedState,
       isAlive,
     });
   } catch (error) {
@@ -1020,9 +1144,17 @@ app.get('/state', async (req, res) => {
 // Get inventory
 app.get('/inventory', async (req, res) => {
   try {
+    console.log('🔍 [MINECRAFT INTERFACE] /inventory endpoint called');
+
     const botStatus = minecraftInterface?.botAdapter.getStatus();
     const executionStatus =
       minecraftInterface?.planExecutor.getExecutionStatus();
+
+    console.log('🔍 [MINECRAFT INTERFACE] Inventory - Bot status:', {
+      connected: botStatus?.connected,
+      connectionState: botStatus?.connectionState,
+      isSpawned: botStatus?.isSpawned,
+    });
 
     // Use execution status if available, otherwise fall back to bot adapter status
     const isConnected =
@@ -1031,7 +1163,15 @@ app.get('/inventory', async (req, res) => {
         executionStatus.bot.connected) ||
       (botStatus?.connected && botStatus?.connectionState === 'spawned');
 
+    console.log(
+      '🔍 [MINECRAFT INTERFACE] Inventory - Is connected:',
+      isConnected
+    );
+
     if (!isConnected) {
+      console.log(
+        '🔍 [MINECRAFT INTERFACE] Inventory - Bot not connected, returning 503'
+      );
       return res.status(503).json({
         success: false,
         message: 'Bot not connected',

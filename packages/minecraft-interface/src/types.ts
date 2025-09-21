@@ -172,7 +172,9 @@ export type MinecraftActionType =
   | 'jump'
   | 'experiment_with_item'
   | 'explore_item_properties'
-  | 'gather';
+  | 'gather'
+  | 'move_to'
+  | 'scan_environment';
 
 export interface MinecraftAction {
   type: MinecraftActionType;

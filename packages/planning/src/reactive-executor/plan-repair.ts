@@ -1,11 +1,13 @@
 /**
- * Plan repair (stub).
+ * Plan Repair - Legacy stub (DEPRECATED)
  *
- * Author: @darianrosebrook
+ * This file has been superseded by enhanced-plan-repair.ts
+ * which contains the full implementation with sophisticated repair algorithms.
+ *
+ * @deprecated Use EnhancedPlanRepair from enhanced-plan-repair.ts
+ * @author @darianrosebrook
  */
 
-import { Plan } from '../types';
-
-export function repairPlan(plan?: Plan): Plan | undefined {
-  return plan;
-}
+// This file is kept for compatibility but should not be used.
+// All imports should be updated to use EnhancedPlanRepair.
+export * from './enhanced-plan-repair';

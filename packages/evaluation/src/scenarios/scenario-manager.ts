@@ -19,6 +19,10 @@ import {
   createIntegratedPlanningSystem,
 } from '@conscious-bot/planning';
 import { EventEmitter } from 'events';
+import type {
+  EnhancedMemorySystem,
+  HybridSearchResult,
+} from '@conscious-bot/memory';
 
 // Use real integrated planning system
 
@@ -38,6 +42,10 @@ export interface ScenarioStep {
   timeLimit?: number;
 }
 
+export interface ScenarioManagerOptions {
+  memorySystem?: EnhancedMemorySystem;
+}
+
 /**
  * Manages execution and monitoring of evaluation scenarios
  */
@@ -46,9 +54,15 @@ export class ScenarioManager extends EventEmitter {
   private scenarioLibrary: Map<string, Scenario> = new Map();
   private executionQueue: ScenarioExecutionContext[] = [];
   private isProcessing = false;
+  private memorySystem?: EnhancedMemorySystem;
 
-  constructor() {
+  constructor(options: ScenarioManagerOptions = {}) {
     super();
+    this.memorySystem = options.memorySystem;
+  }
+
+  attachMemorySystem(memorySystem: EnhancedMemorySystem): void {
+    this.memorySystem = memorySystem;
   }
 
   /**
@@ -178,10 +192,32 @@ export class ScenarioManager extends EventEmitter {
       }
 
       try {
-        // Generate planning input based on current state
+        // Retrieve memory context when supported
+        let memoryResults: HybridSearchResult[] | undefined;
+        if (this.memorySystem && scenario.requiresMemory) {
+          memoryResults = await this.fetchMemoryContext(
+            scenario,
+            currentState
+          );
+
+          if (memoryResults.length > 0) {
+            currentState = {
+              ...currentState,
+              memoryContext: memoryResults.map((result) => ({
+                id: result.id,
+                content: result.content,
+                score: result.score,
+                metadata: result.metadata,
+              })),
+            };
+          }
+        }
+
+        // Generate planning input based on current state and memory hints
         const planningInput = this.generatePlanningInput(
           scenario,
-          currentState
+          currentState,
+          memoryResults
         );
 
         // Execute planning
@@ -198,8 +234,18 @@ export class ScenarioManager extends EventEmitter {
         const step = {
           timestamp: Date.now(),
           action: 'planning',
-          parameters: { input: planningInput },
-          result: planningResult,
+          parameters: {
+            input: planningInput,
+            memory: memoryResults?.map((result) => ({
+              id: result.id,
+              score: result.score,
+              content: result.content,
+            })),
+          },
+          result: {
+            ...planningResult,
+            memoryAccess: memoryResults?.length || 0,
+          },
           reasoning: planningResult.routingDecision.reasoning,
           confidence: planningResult.plan?.confidence,
         };
@@ -292,11 +338,51 @@ export class ScenarioManager extends EventEmitter {
   }
 
   /**
+   * Retrieve relevant memories to augment planning context
+   */
+  private async fetchMemoryContext(
+    scenario: Scenario,
+    currentState: Record<string, any>
+  ): Promise<HybridSearchResult[]> {
+    if (!this.memorySystem) {
+      return [];
+    }
+
+    const queryParts: string[] = [];
+
+    if (currentState.memoryQuery) queryParts.push(String(currentState.memoryQuery));
+    if (scenario.initialState?.memoryQuery)
+      queryParts.push(String(scenario.initialState.memoryQuery));
+
+    queryParts.push(scenario.name);
+    queryParts.push(...scenario.goalConditions.slice(0, 2));
+
+    const query = queryParts.filter(Boolean).join(' ').slice(0, 512) || scenario.id;
+
+    try {
+      const response = await this.memorySystem.searchMemories({
+        query,
+        types: ['knowledge', 'experience', 'thought'],
+        limit: 5,
+        smartMode: true,
+      });
+      return response.results;
+    } catch (error) {
+      console.warn(
+        `Memory retrieval failed for scenario ${scenario.id}:`,
+        error instanceof Error ? error.message : error
+      );
+      return [];
+    }
+  }
+
+  /**
    * Generate planning input based on scenario and current state
    */
   private generatePlanningInput(
     scenario: Scenario,
-    currentState: Record<string, any>
+    currentState: Record<string, any>,
+    memoryResults?: HybridSearchResult[]
   ): string {
     const unmetGoals = scenario.goalConditions.filter(
       (goal) => !this.isSpecificGoalMet(goal, currentState, scenario)
@@ -309,6 +395,16 @@ export class ScenarioManager extends EventEmitter {
     // Create contextual planning input
     const primaryGoal = unmetGoals[0];
     const contextInfo = this.extractRelevantContext(scenario, currentState);
+
+    if (memoryResults && memoryResults.length > 0) {
+      contextInfo.memoryHints = memoryResults
+        .slice(0, 3)
+        .map((result) => ({
+          id: result.id,
+          content: result.content,
+          score: result.score,
+        }));
+    }
 
     return `${primaryGoal} given current situation: ${JSON.stringify(contextInfo)}`;
   }
@@ -789,6 +885,7 @@ export class ScenarioManager extends EventEmitter {
       resources: state.resources,
       health: state.health,
       energy: state.energy,
+      memoryContext: state.memoryContext,
     };
   }
 

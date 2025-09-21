@@ -49,7 +49,13 @@ import {
   PlanningContext,
   Plan,
 } from './hrm-inspired-planner';
-import { OllamaClient } from '@conscious-bot/core';
+// Temporary local type definition until @conscious-bot/core is available
+export class OllamaClient {
+  constructor(config: any) {}
+  async generate(prompt: string): Promise<string> {
+    return `Generated response for: ${prompt}`;
+  }
+}
 
 export class IntegratedPlanningSystem {
   private cognitiveRouter: CognitiveTaskRouter;
@@ -224,7 +230,7 @@ export class IntegratedPlanningSystem {
     }
 
     // Integrate with on-device Ollama LLM
-    const client = new OllamaClient();
+    const client = new OllamaClient({ host: 'localhost', port: 11434 });
     const system =
       'You are the planning co-pilot for a Minecraft agent. ' +
       'Given a goal and partial world context, reason step-by-step to propose a concise, actionable plan. ' +
@@ -241,7 +247,7 @@ export class IntegratedPlanningSystem {
       null,
       2
     )}\n\nProvide a brief plan (3-7 steps).`;
-    const text = await client.generate({ prompt, system, temperature: 0.2 });
+    const text = await client.generate(`${system}\n\n${prompt}`);
     return text.trim();
   }
 

@@ -7,18 +7,18 @@
  * @author @darianrosebrook
  */
 
-import { EnhancedTaskParser } from '../enhanced-task-parser';
+import { TaskParser } from '../task-parser';
 import { EnvironmentalContext, TaskDefinition } from '../types';
 import { ParaphrasingStyle } from '../creative-paraphrasing';
 import { TaskType } from '../types';
 
-describe('Enhanced Task Parser', () => {
+describe('Task Parser', () => {
   // Increase timeout for all tests in this suite
-  let enhancedTaskParser: EnhancedTaskParser;
+  let taskParser: TaskParser;
   let mockEnvironmentalContext: EnvironmentalContext;
 
   beforeEach(() => {
-    enhancedTaskParser = new EnhancedTaskParser();
+    taskParser = new TaskParser();
 
     mockEnvironmentalContext = {
       time_of_day: 'day',
@@ -43,7 +43,7 @@ describe('Enhanced Task Parser', () => {
 
   describe('Initialization', () => {
     test('should initialize with default configuration', () => {
-      const config = enhancedTaskParser.getConfig();
+      const config = taskParser.getConfig();
       expect(config.enable_schema_validation).toBe(true);
       expect(config.enable_context_awareness).toBe(true);
       expect(config.enable_adaptive_learning).toBe(true);
@@ -51,14 +51,13 @@ describe('Enhanced Task Parser', () => {
     });
 
     test('should initialize dual-channel prompting', () => {
-      const dualChannelMetrics = enhancedTaskParser.getDualChannelMetrics();
+      const dualChannelMetrics = taskParser.getDualChannelMetrics();
       expect(dualChannelMetrics).toBeDefined();
       expect(typeof dualChannelMetrics.operational_success_rate).toBe('number');
     });
 
     test('should initialize creative paraphrasing', () => {
-      const paraphrasingMetrics =
-        enhancedTaskParser.getCreativeParaphrasingMetrics();
+      const paraphrasingMetrics = taskParser.getCreativeParaphrasingMetrics();
       expect(paraphrasingMetrics).toBeDefined();
       expect(typeof paraphrasingMetrics.average_confidence).toBe('number');
     });
@@ -73,7 +72,7 @@ describe('Enhanced Task Parser', () => {
         urgency_level: 0.5,
       };
 
-      const result = await enhancedTaskParser.parseUserInput(
+      const result = await taskParser.parseUserInput(
         userInput,
         mockEnvironmentalContext,
         userContext
@@ -96,7 +95,7 @@ describe('Enhanced Task Parser', () => {
         urgency_level: 0.7,
       };
 
-      const result = await enhancedTaskParser.parseUserInput(
+      const result = await taskParser.parseUserInput(
         userInput,
         mockEnvironmentalContext,
         userContext
@@ -115,7 +114,7 @@ describe('Enhanced Task Parser', () => {
         urgency_level: 0.3,
       };
 
-      const result = await enhancedTaskParser.parseUserInput(
+      const result = await taskParser.parseUserInput(
         userInput,
         mockEnvironmentalContext,
         userContext
@@ -133,7 +132,7 @@ describe('Enhanced Task Parser', () => {
         urgency_level: 0.9,
       };
 
-      const result = await enhancedTaskParser.parseUserInput(
+      const result = await taskParser.parseUserInput(
         userInput,
         mockEnvironmentalContext,
         userContext
@@ -153,7 +152,7 @@ describe('Enhanced Task Parser', () => {
         urgency_level: 0.1,
       };
 
-      const response = await enhancedTaskParser.generateCreativeResponse(
+      const response = await taskParser.generateCreativeResponse(
         userInput,
         mockEnvironmentalContext,
         userContext
@@ -172,7 +171,7 @@ describe('Enhanced Task Parser', () => {
         urgency_level: 0.6,
       };
 
-      const response = await enhancedTaskParser.generateCreativeResponse(
+      const response = await taskParser.generateCreativeResponse(
         userInput,
         mockEnvironmentalContext,
         userContext
@@ -202,7 +201,7 @@ describe('Enhanced Task Parser', () => {
         urgency_level: 0.5,
       };
 
-      const options = await enhancedTaskParser.generateParaphrasingOptions(
+      const options = await taskParser.generateParaphrasingOptions(
         task,
         mockEnvironmentalContext,
         userContext,
@@ -239,7 +238,7 @@ describe('Enhanced Task Parser', () => {
         urgency_level: 0.7,
       };
 
-      const options = await enhancedTaskParser.generateParaphrasingOptions(
+      const options = await taskParser.generateParaphrasingOptions(
         task,
         mockEnvironmentalContext,
         userContext
@@ -261,14 +260,14 @@ describe('Enhanced Task Parser', () => {
         urgency_level: 0.5,
       };
 
-      const result = await enhancedTaskParser.parseUserInput(
+      const result = await taskParser.parseUserInput(
         userInput,
         mockEnvironmentalContext,
         userContext
       );
 
       // Provide positive feedback
-      enhancedTaskParser.provideUserFeedback(
+      taskParser.provideUserFeedback(
         result.task.id,
         0.9,
         'Great job understanding my request!',
@@ -276,7 +275,7 @@ describe('Enhanced Task Parser', () => {
       );
 
       // Check that feedback was recorded
-      const taskHistory = enhancedTaskParser.getTaskHistory();
+      const taskHistory = taskParser.getTaskHistory();
       const task = taskHistory.find((t) => t.task.id === result.task.id);
       expect(task?.user_interaction_metadata.feedback_score).toBe(0.9);
     });
@@ -293,14 +292,14 @@ describe('Enhanced Task Parser', () => {
       const tasks = ['gather wood', 'build a house', 'craft tools'];
 
       for (const taskInput of tasks) {
-        const result = await enhancedTaskParser.parseUserInput(
+        const result = await taskParser.parseUserInput(
           taskInput,
           mockEnvironmentalContext,
           userContext
         );
 
         // Provide feedback
-        enhancedTaskParser.provideUserFeedback(
+        taskParser.provideUserFeedback(
           result.task.id,
           0.8,
           'Good understanding',
@@ -309,7 +308,7 @@ describe('Enhanced Task Parser', () => {
       }
 
       // Check user interaction history
-      const userHistory = enhancedTaskParser.getUserInteractionHistory();
+      const userHistory = taskParser.getUserInteractionHistory();
       const user = userHistory.get('learning-user');
       expect(user).toBeDefined();
       expect(user?.interaction_history).toHaveLength(3);
@@ -332,7 +331,7 @@ describe('Enhanced Task Parser', () => {
         urgency_level: 0.6,
       };
 
-      const result = await enhancedTaskParser.parseUserInput(
+      const result = await taskParser.parseUserInput(
         userInput,
         dangerousContext,
         userContext
@@ -354,7 +353,7 @@ describe('Enhanced Task Parser', () => {
         urgency_level: 0.4,
       };
 
-      const result = await enhancedTaskParser.parseUserInput(
+      const result = await taskParser.parseUserInput(
         userInput,
         mockEnvironmentalContext,
         userContext
@@ -375,20 +374,20 @@ describe('Enhanced Task Parser', () => {
         urgency_level: 0.5,
       };
 
-      await enhancedTaskParser.parseUserInput(
+      await taskParser.parseUserInput(
         userInput,
         mockEnvironmentalContext,
         userContext
       );
 
-      const metrics = enhancedTaskParser.getPerformanceMetrics();
+      const metrics = taskParser.getPerformanceMetrics();
       expect(metrics.parsing_time).toBeGreaterThan(0);
       expect(metrics.success_rate).toBeGreaterThanOrEqual(0);
       expect(metrics.error_rate).toBeGreaterThanOrEqual(0);
     });
 
     test('should track dual-channel metrics', () => {
-      const dualChannelMetrics = enhancedTaskParser.getDualChannelMetrics();
+      const dualChannelMetrics = taskParser.getDualChannelMetrics();
       expect(
         dualChannelMetrics.operational_success_rate
       ).toBeGreaterThanOrEqual(0);
@@ -401,8 +400,7 @@ describe('Enhanced Task Parser', () => {
     });
 
     test('should track creative paraphrasing metrics', () => {
-      const paraphrasingMetrics =
-        enhancedTaskParser.getCreativeParaphrasingMetrics();
+      const paraphrasingMetrics = taskParser.getCreativeParaphrasingMetrics();
       expect(paraphrasingMetrics.average_confidence).toBeGreaterThanOrEqual(0);
       expect(
         paraphrasingMetrics.user_satisfaction_score
@@ -418,8 +416,8 @@ describe('Enhanced Task Parser', () => {
         enable_schema_validation: false,
       };
 
-      enhancedTaskParser.updateConfig(newConfig);
-      const config = enhancedTaskParser.getConfig();
+      taskParser.updateConfig(newConfig);
+      const config = taskParser.getConfig();
 
       expect(config.max_paraphrase_options).toBe(5);
       expect(config.paraphrase_confidence_threshold).toBe(0.8);
@@ -464,8 +462,8 @@ describe('Enhanced Task Parser', () => {
         },
       };
 
-      enhancedTaskParser.updateConfig(newConfig);
-      const config = enhancedTaskParser.getConfig();
+      taskParser.updateConfig(newConfig);
+      const config = taskParser.getConfig();
 
       expect(config.dual_channel.context_aware_routing).toBe(false);
       expect(config.dual_channel.auto_fallback).toBe(false);
@@ -486,7 +484,7 @@ describe('Enhanced Task Parser', () => {
       };
 
       await expect(
-        enhancedTaskParser.parseUserInput(
+        taskParser.parseUserInput(
           invalidInput,
           mockEnvironmentalContext,
           userContext
@@ -510,7 +508,7 @@ describe('Enhanced Task Parser', () => {
       };
 
       await expect(
-        enhancedTaskParser.generateParaphrasingOptions(
+        taskParser.generateParaphrasingOptions(
           invalidTask,
           mockEnvironmentalContext,
           userContext
@@ -529,13 +527,13 @@ describe('Enhanced Task Parser', () => {
       };
 
       return new Promise<void>((resolve) => {
-        enhancedTaskParser.on('enhanced_task_parsed', (result) => {
+        taskParser.on('enhanced_task_parsed', (result) => {
           expect(result.task).toBeDefined();
           expect(result.paraphrase_options).toBeDefined();
           resolve();
         });
 
-        enhancedTaskParser.parseUserInput(
+        taskParser.parseUserInput(
           userInput,
           mockEnvironmentalContext,
           userContext
@@ -552,13 +550,13 @@ describe('Enhanced Task Parser', () => {
       };
 
       return new Promise<void>((resolve) => {
-        enhancedTaskParser.on('creative_response_generated', (data) => {
+        taskParser.on('creative_response_generated', (data) => {
           expect(data.response).toBeDefined();
           expect(data.userInput).toBe(userInput);
           resolve();
         });
 
-        enhancedTaskParser.generateCreativeResponse(
+        taskParser.generateCreativeResponse(
           userInput,
           mockEnvironmentalContext,
           userContext
@@ -576,21 +574,17 @@ describe('Enhanced Task Parser', () => {
       };
 
       return new Promise<void>((resolve) => {
-        enhancedTaskParser.on('enhanced_task_parsed', (result) => {
-          enhancedTaskParser.on('user_feedback_received', (feedback) => {
+        taskParser.on('enhanced_task_parsed', (result) => {
+          taskParser.on('user_feedback_received', (feedback) => {
             expect(feedback.taskId).toBe(result.task.id);
             expect(feedback.feedbackScore).toBe(0.8);
             resolve();
           });
 
-          enhancedTaskParser.provideUserFeedback(
-            result.task.id,
-            0.8,
-            'Good job!'
-          );
+          taskParser.provideUserFeedback(result.task.id, 0.8, 'Good job!');
         });
 
-        enhancedTaskParser.parseUserInput(
+        taskParser.parseUserInput(
           userInput,
           mockEnvironmentalContext,
           userContext
@@ -608,13 +602,13 @@ describe('Enhanced Task Parser', () => {
         urgency_level: 0.5,
       };
 
-      await enhancedTaskParser.parseUserInput(
+      await taskParser.parseUserInput(
         userInput,
         mockEnvironmentalContext,
         userContext
       );
 
-      const taskHistory = enhancedTaskParser.getTaskHistory();
+      const taskHistory = taskParser.getTaskHistory();
       expect(taskHistory.length).toBeGreaterThan(0);
       expect(taskHistory[0].task.type).toBe('gathering');
     });
@@ -627,24 +621,24 @@ describe('Enhanced Task Parser', () => {
         urgency_level: 0.5,
       };
 
-      await enhancedTaskParser.parseUserInput(
+      await taskParser.parseUserInput(
         'gather wood',
         mockEnvironmentalContext,
         userContext
       );
 
-      const userHistory = enhancedTaskParser.getUserInteractionHistory();
+      const userHistory = taskParser.getUserInteractionHistory();
       const user = userHistory.get('test-user');
       expect(user).toBeDefined();
       expect(user?.interaction_history.length).toBeGreaterThan(0);
     });
 
     test('should clear history', () => {
-      enhancedTaskParser.clearTaskHistory();
-      enhancedTaskParser.clearUserInteractionHistory();
+      taskParser.clearTaskHistory();
+      taskParser.clearUserInteractionHistory();
 
-      const taskHistory = enhancedTaskParser.getTaskHistory();
-      const userHistory = enhancedTaskParser.getUserInteractionHistory();
+      const taskHistory = taskParser.getTaskHistory();
+      const userHistory = taskParser.getUserInteractionHistory();
 
       expect(taskHistory).toHaveLength(0);
       expect(userHistory.size).toBe(0);

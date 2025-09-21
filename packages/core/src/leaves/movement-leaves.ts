@@ -148,13 +148,19 @@ export class MoveToLeaf implements LeafImpl {
     const cleanup = () => {
       try {
         bot.removeListener('goal_reached' as any, onGoalReached);
-      } catch {}
+      } catch {
+        // Ignore errors when removing listeners during cleanup
+      }
       try {
         bot.removeListener('path_update' as any, onPathUpdate);
-      } catch {}
+      } catch {
+        // Ignore errors when removing listeners during cleanup
+      }
       try {
         bot.removeListener('path_reset' as any, onPathReset);
-      } catch {}
+      } catch {
+        // Ignore errors when removing listeners during cleanup
+      }
       clearTimeout(timeoutId);
       ctx.abortSignal?.removeEventListener('abort', onCtxAbort as any);
     };
@@ -231,7 +237,9 @@ export class MoveToLeaf implements LeafImpl {
       const duration = ctx.now() - t0;
       try {
         bot.pathfinder?.stop();
-      } catch {}
+      } catch {
+        // Ignore errors when stopping pathfinder during cleanup
+      }
       cleanup();
       return {
         status: 'failure',
@@ -375,7 +383,9 @@ export class StepForwardSafelyLeaf implements LeafImpl {
     } catch (e: any) {
       try {
         bot.pathfinder?.stop();
-      } catch {}
+      } catch {
+        // Ignore errors when stopping pathfinder during cleanup
+      }
       return fail(
         ac.signal.aborted ? 'aborted' : 'path.stuck',
         String(e?.message ?? e),
@@ -510,7 +520,9 @@ export class FollowEntityLeaf implements LeafImpl {
       const duration = ctx.now() - t0;
       try {
         bot.pathfinder?.stop();
-      } catch {}
+      } catch {
+        // Ignore errors when stopping pathfinder during cleanup
+      }
       return {
         status: 'failure',
         error: {

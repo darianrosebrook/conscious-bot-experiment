@@ -251,7 +251,7 @@ export class PlaceTorchIfNeededLeaf implements LeafImpl {
    * Get distance from last torch (simplified implementation)
    */
   private getDistanceFromLastTorch(botPos: Vec3): number {
-    // TODO: Implement proper tracking of last torch position
+    // TODO: Implement proper tracking of last torch position for optimal placement
     // For now, return a random value to simulate interval checking
     return Math.floor(Math.random() * 10) + 1;
   }
@@ -900,7 +900,12 @@ export class PlaceBlockLeaf implements LeafImpl {
         for (const c of candidates) {
           const here = bot.blockAt(c);
           const below = bot.blockAt(c.offset(0, -1, 0));
-          if (here && here.name === 'air' && below && below.boundingBox === 'block') {
+          if (
+            here &&
+            here.name === 'air' &&
+            below &&
+            below.boundingBox === 'block'
+          ) {
             placementPos = c;
             break;
           }

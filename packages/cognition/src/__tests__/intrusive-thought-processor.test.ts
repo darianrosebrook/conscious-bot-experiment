@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { IntrusiveThoughtProcessor } from '../enhanced-intrusive-thought-processor';
+import { IntrusiveThoughtProcessor } from '../intrusive-thought-processor';
 
 /**
  * Test suite for IntrusiveThoughtProcessor

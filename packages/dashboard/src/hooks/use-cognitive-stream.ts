@@ -49,6 +49,7 @@ function mapThoughtType(type: string): ThoughtType {
     case 'self':
     case 'reflection':
     case 'intrusion':
+    case 'intrusive':
       return type as ThoughtType;
     case 'external_chat_in':
     case 'external_chat_out':
@@ -83,6 +84,9 @@ export function useCognitiveStream() {
   const eventSourceRef = useRef<EventSource | null>(null);
   const isMounted = useRef(true);
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const reconnectAttempts = useRef(0);
+  const maxReconnectAttempts = 10;
+  const baseReconnectDelay = 2000; // 2 seconds
 
   useEffect(() => {
     isMounted.current = true;
@@ -94,6 +98,13 @@ export function useCognitiveStream() {
         reconnectTimeoutRef.current = null;
       }
     };
+  }, []);
+
+  // Calculate exponential backoff delay
+  const getReconnectDelay = useCallback(() => {
+    const delay =
+      baseReconnectDelay * Math.pow(2, Math.min(reconnectAttempts.current, 5));
+    return Math.min(delay, 30000); // Cap at 30 seconds
   }, []);
 
   // Initialize SSE connection with better error handling and reconnection
@@ -151,7 +162,7 @@ export function useCognitiveStream() {
       };
 
       es.onerror = (error) => {
-        console.log(
+        console.warn(
           'Cognitive stream SSE error event, readyState:',
           es.readyState
         );
@@ -179,13 +190,25 @@ export function useCognitiveStream() {
         es.close();
         eventSourceRef.current = null;
 
-        // Attempt to reconnect after a delay
-        reconnectTimeoutRef.current = setTimeout(() => {
-          if (isMounted.current) {
-            console.log('Attempting to reconnect to cognitive stream...');
-            connectEventSource();
-          }
-        }, 5000);
+        // Implement exponential backoff for reconnection
+        reconnectAttempts.current++;
+
+        if (reconnectAttempts.current <= maxReconnectAttempts) {
+          const delay = getReconnectDelay();
+          console.log(
+            `Attempting to reconnect to cognitive stream in ${delay}ms (attempt ${reconnectAttempts.current}/${maxReconnectAttempts})...`
+          );
+
+          reconnectTimeoutRef.current = setTimeout(() => {
+            if (isMounted.current) {
+              connectEventSource();
+            }
+          }, delay);
+        } else {
+          console.error(
+            'Max reconnection attempts reached. Giving up on cognitive stream connection.'
+          );
+        }
       };
 
       return es || null;
@@ -204,9 +227,9 @@ export function useCognitiveStream() {
         reconnectTimeoutRef.current = null;
       }
     };
-  }, [config.routes, addThought]);
+  }, [config.routes, addThought, getReconnectDelay]);
 
-  // Send intrusive thought
+  // Send intrusive thought with optimistic UI update
   const sendIntrusiveThought = useCallback(
     async (
       text: string,
@@ -214,6 +237,20 @@ export function useCognitiveStream() {
     ): Promise<boolean> => {
       const trimmedText = text.trim();
       if (!trimmedText) return false;
+
+      // Optimistic UI update - immediately add the thought to the UI
+      const optimisticThought = {
+        id: `optimistic-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        ts: new Date().toISOString(),
+        text: trimmedText,
+        type: 'intrusive' as const,
+        attribution: 'intrusive' as const,
+        thoughtType: 'intrusive',
+        optimistic: true, // Mark as optimistic for UI feedback
+      };
+
+      // Add the optimistic thought immediately
+      addThought(optimisticThought);
 
       try {
         // Send to cognitive stream
@@ -240,10 +277,15 @@ export function useCognitiveStream() {
         return true;
       } catch (error) {
         console.error('Failed to send intrusive thought:', error);
+
+        // On error, remove the optimistic thought and show error state
+        // This would require additional state management to track optimistic updates
+        // For now, we'll just log the error
+
         return false;
       }
     },
-    [api, config.routes]
+    [api, config.routes, addThought]
   );
 
   return {

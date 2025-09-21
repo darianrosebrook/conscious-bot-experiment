@@ -15,6 +15,7 @@ import { Vec3 } from 'vec3';
 import { PlanStep } from './types';
 import {
   MinecraftAction,
+  MinecraftActionType,
   ActionResult,
   BotConfig,
   NavigateAction,
@@ -25,21 +26,35 @@ import {
   FindShelterAction,
 } from './types';
 import { NavigationBridge } from './navigation-bridge';
+import { StateMachineWrapper } from './extensions/state-machine-wrapper';
 
 export class ActionTranslator {
   private bot: Bot;
   private config: BotConfig;
   private movements: Movements;
   private navigationBridge: NavigationBridge;
+  private stateMachineWrapper?: StateMachineWrapper;
 
-  constructor(bot: Bot, config: BotConfig) {
+  constructor(
+    bot: Bot,
+    config: BotConfig,
+    stateMachineWrapper?: StateMachineWrapper
+  ) {
     this.bot = bot;
     this.config = config;
+    this.stateMachineWrapper = stateMachineWrapper;
 
     // Initialize pathfinder only if bot is spawned
     if (bot.entity && bot.entity.position) {
       bot.loadPlugin(pathfinder);
       this.movements = new Movements(bot);
+
+      console.log('🔧 ActionTranslator initialized', {
+        hasBot: !!bot,
+        botSpawned: !!bot.entity?.position,
+        hasStateMachine: !!stateMachineWrapper,
+        timestamp: Date.now(),
+      });
       this.movements.scafoldingBlocks = []; // Don't place blocks while pathfinding
       this.movements.canDig = false; // Don't break blocks while pathfinding initially
     } else {
@@ -68,6 +83,44 @@ export class ActionTranslator {
     const startTime = Date.now();
 
     try {
+      const actionType = step.action.type.toLowerCase();
+
+      // Check if this action type should be handled by state machine
+      const stateMachineActions = [
+        'craft',
+        'build',
+        'gather',
+        'explore',
+        'mine',
+      ];
+
+      if (
+        this.stateMachineWrapper &&
+        stateMachineActions.includes(actionType)
+      ) {
+        try {
+          // Route complex actions to state machine
+          const result = await this.stateMachineWrapper.executePlanStep(step);
+          return {
+            success: result.success,
+            action: {
+              type: step.action.type as MinecraftActionType,
+              parameters: step.action.parameters,
+            },
+            startTime,
+            endTime: Date.now(),
+            data: result.metadata,
+            error: result.error,
+          };
+        } catch (error) {
+          console.error(
+            `State machine failed for action ${actionType}:`,
+            error
+          );
+          // Fall through to regular action execution
+        }
+      }
+
       // Translate plan step to minecraft action
       const action = this.translatePlanStepToAction(step);
 
@@ -146,12 +199,23 @@ export class ActionTranslator {
       case 'craft':
       case 'make':
         return {
-          type: 'craft',
+          type: 'craft_item',
           parameters: {
             item: params.item,
-            amount: params.amount || 1,
+            quantity: params.amount || 1,
           },
           timeout: 20000,
+        };
+
+      case 'gather':
+        return {
+          type: 'gather',
+          parameters: {
+            resource: params.resource || 'wood',
+            amount: params.amount || 3,
+            target: params.target || 'tree',
+          },
+          timeout: 15000,
         };
 
       case 'consume_food':
@@ -428,17 +492,58 @@ export class ActionTranslator {
 
       default:
         // Unknown action type: ${actionType}, inferring from description
+        console.warn(
+          `Unknown action type: ${actionType}, inferring from description`
+        );
         // Try to infer action from description
         const description = step.action.description?.toLowerCase() || '';
 
-        if (description.includes('move') || description.includes('go')) {
+        if (
+          description.includes('move') ||
+          description.includes('go') ||
+          description.includes('navigate')
+        ) {
           return this.createNavigateAction(params);
         }
 
-        if (description.includes('mine') || description.includes('break')) {
+        if (
+          description.includes('mine') ||
+          description.includes('break') ||
+          description.includes('dig')
+        ) {
           return {
             type: 'mine_block',
             parameters: params,
+            timeout: 15000,
+          };
+        }
+
+        if (
+          description.includes('craft') ||
+          description.includes('make') ||
+          description.includes('build')
+        ) {
+          return {
+            type: 'craft_item',
+            parameters: {
+              item: params.item || 'oak_planks',
+              quantity: params.amount || 1,
+            },
+            timeout: 20000,
+          };
+        }
+
+        if (
+          description.includes('gather') ||
+          description.includes('collect') ||
+          description.includes('pick')
+        ) {
+          return {
+            type: 'gather',
+            parameters: {
+              resource: params.resource || 'wood',
+              amount: params.amount || 3,
+            },
             timeout: 15000,
           };
         }
@@ -467,7 +572,10 @@ export class ActionTranslator {
           };
         }
 
-        // Default to wait action
+        // Default to wait action with logging
+        console.warn(
+          `No mapping found for action ${actionType}, defaulting to wait`
+        );
         return {
           type: 'wait',
           parameters: {
@@ -673,6 +781,10 @@ export class ActionTranslator {
         case 'navigate':
           return await this.executeNavigate(action as NavigateAction, timeout);
 
+        case 'move_to':
+          // Treat move_to like navigate for now
+          return await this.executeNavigate(action as NavigateAction, timeout);
+
         case 'move_forward':
         case 'move_backward':
         case 'strafe_left':
@@ -750,6 +862,10 @@ export class ActionTranslator {
         case 'gather':
           return await this.executeGather(action, timeout);
 
+        case 'scan_environment':
+          // Treat scan as a wait with observation
+          return await this.executeWait(action, timeout);
+
         default:
           return {
             success: false,
@@ -765,7 +881,7 @@ export class ActionTranslator {
   }
 
   /**
-   * Execute craft item action using the leaf system
+   * Execute craft item action using the leaf system with fallback
    */
   private async executeCraftItem(
     action: MinecraftAction,
@@ -782,10 +898,10 @@ export class ActionTranslator {
       const leafFactory = (global as any).minecraftLeafFactory;
       console.log('🔧 Leaf factory available:', !!leafFactory);
       if (!leafFactory) {
-        return {
-          success: false,
-          error: 'Leaf factory not available',
-        };
+        console.warn(
+          'Leaf factory not available, falling back to basic crafting'
+        );
+        return await this.executeBasicCraftItem(action, timeout);
       }
 
       // Try to use the leaf system first
@@ -860,81 +976,88 @@ export class ActionTranslator {
       }
 
       // Fallback: Basic crafting without mcData
-      console.log(`🔧 Attempting basic crafting for ${quantity}x ${item}`);
-
-      // Check if we have the required materials
-      const inventory = this.bot.inventory.items();
-      console.log(
-        'Current inventory:',
-        inventory.map((item: any) => `${item.name} x${item.count}`)
-      );
-
-      // Simple recipe mapping for basic items
-      const basicRecipes: Record<
-        string,
-        { inputs: Record<string, number>; requiresTable: boolean }
-      > = {
-        oak_planks: { inputs: { oak_log: 1 }, requiresTable: false },
-        crafting_table: { inputs: { oak_planks: 4 }, requiresTable: false },
-        wooden_pickaxe: {
-          inputs: { oak_planks: 3, stick: 2 },
-          requiresTable: false,
-        },
-        stick: { inputs: { oak_planks: 2 }, requiresTable: false },
-      };
-
-      const recipe = basicRecipes[item];
-      if (!recipe) {
-        return {
-          success: false,
-          error: `No recipe available for ${item}`,
-        };
-      }
-
-      // Check if we have the required materials
-      const itemCounts: Record<string, number> = {};
-      inventory.forEach((invItem: any) => {
-        itemCounts[invItem.name] =
-          (itemCounts[invItem.name] || 0) + invItem.count;
-      });
-
-      for (const [requiredItem, requiredCount] of Object.entries(
-        recipe.inputs
-      )) {
-        const available = itemCounts[requiredItem] || 0;
-        const needed = requiredCount * quantity;
-        if (available < needed) {
-          return {
-            success: false,
-            error: `Insufficient ${requiredItem}: need ${needed}, have ${available}`,
-          };
-        }
-      }
-
-      // Simulate successful crafting (since we can't actually craft without mcData)
-      console.log(
-        `✅ Basic crafting simulation successful: ${quantity}x ${item}`
-      );
-      return {
-        success: true,
-        data: {
-          item,
-          quantity,
-          crafted: quantity,
-          note: 'Basic crafting simulation (mcData not available)',
-        },
-      };
+      return await this.executeBasicCraftItem(action, timeout);
     } catch (error) {
-      console.log('❌ Crafting error:', error);
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : String(error),
-      };
+      console.log('❌ Leaf crafting error:', error);
+      return await this.executeBasicCraftItem(action, timeout);
     }
   }
 
   /**
-   * Execute dig block action using leaf factory
+   * Execute basic crafting as fallback when leaf system is not available
+   */
+  private async executeBasicCraftItem(
+    action: MinecraftAction,
+    timeout: number
+  ): Promise<{ success: boolean; data?: any; error?: string }> {
+    const { item, quantity = 1 } = action.parameters;
+
+    console.log(`🔧 Attempting basic crafting for ${quantity}x ${item}`);
+
+    // Check if we have the required materials
+    const inventory = this.bot.inventory.items();
+    console.log(
+      'Current inventory:',
+      inventory.map((item: any) => `${item.name} x${item.count}`)
+    );
+
+    // Simple recipe mapping for basic items
+    const basicRecipes: Record<
+      string,
+      { inputs: Record<string, number>; requiresTable: boolean }
+    > = {
+      oak_planks: { inputs: { oak_log: 1 }, requiresTable: false },
+      crafting_table: { inputs: { oak_planks: 4 }, requiresTable: false },
+      wooden_pickaxe: {
+        inputs: { oak_planks: 3, stick: 2 },
+        requiresTable: false,
+      },
+      stick: { inputs: { oak_planks: 2 }, requiresTable: false },
+    };
+
+    const recipe = basicRecipes[item];
+    if (!recipe) {
+      return {
+        success: false,
+        error: `No recipe available for ${item}`,
+      };
+    }
+
+    // Check if we have the required materials
+    const itemCounts: Record<string, number> = {};
+    inventory.forEach((invItem: any) => {
+      itemCounts[invItem.name] =
+        (itemCounts[invItem.name] || 0) + invItem.count;
+    });
+
+    for (const [requiredItem, requiredCount] of Object.entries(recipe.inputs)) {
+      const available = itemCounts[requiredItem] || 0;
+      const needed = requiredCount * quantity;
+      if (available < needed) {
+        return {
+          success: false,
+          error: `Insufficient ${requiredItem}: need ${needed}, have ${available}`,
+        };
+      }
+    }
+
+    // Simulate successful crafting (since we can't actually craft without mcData)
+    console.log(
+      `✅ Basic crafting simulation successful: ${quantity}x ${item}`
+    );
+    return {
+      success: true,
+      data: {
+        item,
+        quantity,
+        crafted: quantity,
+        note: 'Basic crafting simulation (mcData not available)',
+      },
+    };
+  }
+
+  /**
+   * Execute dig block action using leaf factory with fallback
    */
   private async executeDigBlock(
     action: MinecraftAction,
@@ -946,10 +1069,10 @@ export class ActionTranslator {
       const leafFactory = (global as any).minecraftLeafFactory;
       console.log('🔧 Leaf factory available:', !!leafFactory);
       if (!leafFactory) {
-        return {
-          success: false,
-          error: 'Leaf factory not available',
-        };
+        console.warn(
+          'Leaf factory not available, falling back to basic digging'
+        );
+        return await this.executeBasicDigBlock(action, timeout);
       }
 
       // Get the dig_block leaf
@@ -1041,6 +1164,82 @@ export class ActionTranslator {
         success: result.status === 'success',
         data: result.result,
         error: result.error?.detail,
+      };
+    } catch (error) {
+      console.log(
+        '❌ Leaf digging failed, falling back to basic digging:',
+        error
+      );
+      return await this.executeBasicDigBlock(action, timeout);
+    }
+  }
+
+  /**
+   * Execute basic digging as fallback when leaf system is not available
+   */
+  private async executeBasicDigBlock(
+    action: MinecraftAction,
+    timeout: number
+  ): Promise<{ success: boolean; data?: any; error?: string }> {
+    const { pos, blockType, tool } = action.parameters;
+
+    try {
+      let position: Vec3;
+
+      if (pos && pos !== 'current') {
+        if (Array.isArray(pos)) {
+          position = new Vec3(pos[0], pos[1], pos[2]);
+        } else if (pos.x !== undefined) {
+          position = new Vec3(pos.x, pos.y, pos.z);
+        } else {
+          position = pos;
+        }
+      } else {
+        // Use current position
+        if (!this.bot.entity || !this.bot.entity.position) {
+          return {
+            success: false,
+            error: 'Bot not spawned - cannot access position',
+          };
+        }
+        position = this.bot.entity.position.clone();
+      }
+
+      const block = this.bot.blockAt(position);
+      if (!block || block.name === 'air') {
+        return {
+          success: false,
+          error: 'No block at specified position',
+        };
+      }
+
+      if (blockType && block.name !== blockType) {
+        return {
+          success: false,
+          error: `Expected ${blockType}, found ${block.name}`,
+        };
+      }
+
+      // Equip appropriate tool if specified
+      if (tool) {
+        const toolItem = this.bot.inventory
+          .items()
+          .find((item) => item.name.includes(tool));
+        if (toolItem) {
+          await this.bot.equip(toolItem, 'hand');
+        }
+      }
+
+      // Dig the block
+      await this.bot.dig(block);
+
+      return {
+        success: true,
+        data: {
+          blockType: block.name,
+          position: position.clone(),
+          toolUsed: this.bot.heldItem?.name,
+        },
       };
     } catch (error) {
       return {

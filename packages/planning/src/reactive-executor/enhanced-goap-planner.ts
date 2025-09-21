@@ -41,7 +41,7 @@ export interface ExecutionContext {
 export interface AdvancedGOAPAction {
   name: string;
   preconditions: Precondition[];
-  effects: Effect[];
+  effects: GOAPEffect[];
   baseCost: number;
   dynamicCostFn: (state: WorldState, context: ExecutionContext) => number;
   exec: (mcp: MCPBus, params: ActionParams) => Promise<ActionResult>;
@@ -57,7 +57,7 @@ export interface Condition {
   value: any;
 }
 
-export interface Effect {
+export interface GOAPEffect {
   predicate: string;
   args: string[];
   operator: '=' | '+=' | '-=' | '*=';

@@ -39,6 +39,17 @@ export enum GoalType {
   ACQUIRE_ITEM = 'acquire_item',
   SURVIVE_THREAT = 'survive_threat',
   RESOURCE_GATHERING = 'resource_gathering',
+  // New goal types for primitive operations
+  FARMING = 'farming',
+  CONTAINER_MANAGEMENT = 'container_management',
+  WORLD_MANIPULATION = 'world_manipulation',
+  REDSTONE_AUTOMATION = 'redstone_automation',
+  STRUCTURE_CONSTRUCTION = 'structure_construction',
+  ENVIRONMENTAL_CONTROL = 'environmental_control',
+  INVENTORY_ORGANIZATION = 'inventory_organization',
+  MECHANISM_OPERATION = 'mechanism_operation',
+  COMBAT_TRAINING = 'combat_training',
+  AGRICULTURE_DEVELOPMENT = 'agriculture_development',
 }
 
 export enum GoalStatus {
@@ -81,6 +92,19 @@ export enum EffectType {
   INVENTORY_CHANGE = 'inventory_change',
   KNOWLEDGE_GAIN = 'knowledge_gain',
   RELATIONSHIP_CHANGE = 'relationship_change',
+  // New effect types for primitive operations
+  RESOURCE_ACQUISITION = 'resource_acquisition',
+  SHELTER_IMPROVEMENT = 'shelter_improvement',
+  FARM_PRODUCTIVITY = 'farm_productivity',
+  INVENTORY_ORGANIZATION = 'inventory_organization',
+  SAFETY_ENHANCEMENT = 'safety_enhancement',
+  WORLD_MANIPULATION = 'world_manipulation',
+  REDSTONE_AUTOMATION = 'redstone_automation',
+  ENVIRONMENTAL_COMFORT = 'environmental_comfort',
+  STRUCTURAL_STABILITY = 'structural_stability',
+  MECHANICAL_ADVANCEMENT = 'mechanical_advancement',
+  AGRICULTURAL_GROWTH = 'agricultural_growth',
+  DEFENSIVE_CAPABILITY = 'defensive_capability',
 }
 
 // =========================================================================
@@ -96,6 +120,18 @@ export interface HomeostasisState {
   social: number;
   achievement: number;
   creativity: number;
+  // New homeostasis states for primitive operations
+  resourceManagement: number;
+  shelterStability: number;
+  farmHealth: number;
+  inventoryOrganization: number;
+  worldKnowledge: number;
+  redstoneProficiency: number;
+  constructionSkill: number;
+  environmentalComfort: number;
+  mechanicalAptitude: number;
+  agriculturalKnowledge: number;
+  defensiveReadiness: number;
   timestamp: number;
 }
 
@@ -118,6 +154,15 @@ export enum NeedType {
   ACHIEVEMENT = 'achievement',
   CREATIVITY = 'creativity',
   CURIOSITY = 'curiosity',
+  // New needs for primitive operations
+  RESOURCE_MANAGEMENT = 'resource_management',
+  SHELTER_CONSTRUCTION = 'shelter_construction',
+  FARM_MAINTENANCE = 'farm_maintenance',
+  INVENTORY_ORGANIZATION = 'inventory_organization',
+  DEFENSE_PREPARATION = 'defense_preparation',
+  WORLD_EXPLORATION = 'world_exploration',
+  REDSTONE_AUTOMATION = 'redstone_automation',
+  ENVIRONMENTAL_COMFORT = 'environmental_comfort',
 }
 
 export enum SignalType {
@@ -131,6 +176,17 @@ export enum SignalType {
   HEALTH_DECLINE = 'health_decline',
   ACHIEVEMENT_OPPORTUNITY = 'achievement_opportunity',
   CREATIVITY_DRIVE = 'creativity_drive',
+  // New signals for primitive operations
+  RESOURCE_SCARCITY = 'resource_scarcity',
+  INVENTORY_DISORGANIZATION = 'inventory_disorganization',
+  FARM_NEGLECT = 'farm_neglect',
+  SHELTER_VULNERABILITY = 'shelter_vulnerability',
+  REDSTONE_OPPORTUNITY = 'redstone_opportunity',
+  CONSTRUCTION_OPPORTUNITY = 'construction_opportunity',
+  ENVIRONMENTAL_DISCOMFORT = 'environmental_discomfort',
+  MECHANICAL_CHALLENGE = 'mechanical_challenge',
+  AGRICULTURAL_NEED = 'agricultural_need',
+  DEFENSE_REQUIREMENT = 'defense_requirement',
 }
 
 // =========================================================================
@@ -200,6 +256,16 @@ export enum ActionType {
   COMBAT = 'combat',
   SOCIAL = 'social',
   EXPLORATION = 'exploration',
+  // New primitive operations
+  CONTAINER_INTERACTION = 'container_interaction',
+  FARMING = 'farming',
+  WORLD_INTERACTION = 'world_interaction',
+  REDSTONE_CONTROL = 'redstone_control',
+  STRUCTURE_BUILDING = 'structure_building',
+  ENVIRONMENT_CONTROL = 'environment_control',
+  INVENTORY_MANAGEMENT = 'inventory_management',
+  AGRICULTURE = 'agriculture',
+  MECHANISM_OPERATION = 'mechanism_operation',
 }
 
 // =========================================================================
@@ -224,6 +290,17 @@ export enum ResourceType {
   TIME = 'time',
   KNOWLEDGE = 'knowledge',
   RELATIONSHIP = 'relationship',
+  // New resource types for primitive operations
+  BUILDING_MATERIALS = 'building_materials',
+  REDSTONE_COMPONENTS = 'redstone_components',
+  FARMING_SUPPLIES = 'farming_supplies',
+  COMBAT_EQUIPMENT = 'combat_equipment',
+  CONTAINER_STORAGE = 'container_storage',
+  ENVIRONMENTAL_COMFORT = 'environmental_comfort',
+  STRUCTURAL_INTEGRITY = 'structural_integrity',
+  MECHANICAL_RESOURCES = 'mechanical_resources',
+  AGRICULTURAL_RESOURCES = 'agricultural_resources',
+  DEFENSIVE_RESOURCES = 'defensive_resources',
 }
 
 export interface UtilityFunction {

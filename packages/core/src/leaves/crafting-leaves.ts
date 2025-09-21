@@ -426,7 +426,9 @@ export class SmeltLeaf implements LeafImpl {
         onAbort(() => {
           try {
             furnace.close();
-          } catch {}
+          } catch {
+            // Ignore errors when closing furnace during abort
+          }
         });
 
         // Load fuel/input as needed
@@ -617,7 +619,8 @@ export class IntrospectRecipeLeaf implements LeafImpl {
     }
 
     try {
-      const recipes = (ctx.bot as any).recipesFor(item.id, null, null, null) || [];
+      const recipes =
+        (ctx.bot as any).recipesFor(item.id, null, null, null) || [];
       if (!recipes.length) {
         return {
           status: 'success',
@@ -629,8 +632,11 @@ export class IntrospectRecipeLeaf implements LeafImpl {
       // Choose the first recipe and summarize inputs
       const r = recipes[0];
       const counts: Record<string, number> = {};
-      const ingredients: any[] = (r.ingredients || r.inShape?.flat?.() || [])
-        .filter(Boolean);
+      const ingredients: any[] = (
+        r.ingredients ||
+        r.inShape?.flat?.() ||
+        []
+      ).filter(Boolean);
 
       for (const ing of ingredients) {
         const ingId = typeof ing === 'number' ? ing : ing.id;
@@ -644,7 +650,9 @@ export class IntrospectRecipeLeaf implements LeafImpl {
         item,
         count,
       }));
-      const requiresTable = Boolean((r as any).requiresTable || (r?.inShape && r.inShape.length > 2));
+      const requiresTable = Boolean(
+        (r as any).requiresTable || (r?.inShape && r.inShape.length > 2)
+      );
 
       return {
         status: 'success',

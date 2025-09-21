@@ -26,6 +26,8 @@
   "devDependencies": {
     "@types/node": "^20.6.3",
     "@vitest/ui": "^3.2.4",
+    "@testcontainers/postgresql": "^10.9.0",
+    "testcontainers": "^10.9.0",
     "typescript": "^5.2.2",
     "vitest": "^3.2.4"
   },

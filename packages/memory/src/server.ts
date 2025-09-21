@@ -116,7 +116,7 @@ const memorySystem = {
         .totalDecisions,
     getRecentActions: (count: number) => {
       // Get all decisions and sort by timestamp (most recent first)
-      const allDecisions = memorySystem.provenance.system.decisionTracker.getAllDecisions()
+      const allDecisions = memorySystem.provenance.system.getAllDecisions()
         .sort((a, b) => b.timestamp - a.timestamp);
       
       // Extract actions from recent decisions

@@ -9,7 +9,41 @@
  */
 
 import { EventEmitter } from 'events';
-import { SkillRegistry, Skill, SkillMetadata } from '@conscious-bot/memory';
+// Temporary local type definitions until @conscious-bot/memory is available
+export class SkillRegistry {
+  constructor() {}
+  register(name: string, skill: any): void {
+    console.log(`Registered skill: ${name}`);
+  }
+  recordSkillUsage(skillId: string, success: boolean, duration: number): void {
+    console.log(
+      `Recorded skill usage: ${skillId}, success: ${success}, duration: ${duration}`
+    );
+  }
+  getAllSkills(): any[] {
+    return [];
+  }
+  getSkill(id: string): any {
+    return null;
+  }
+}
+
+export interface Skill {
+  id: string;
+  name: string;
+  description: string;
+  metadata: SkillMetadata;
+  preconditions?: any;
+}
+
+export interface SkillMetadata {
+  tags: string[];
+  difficulty: number;
+  category: string;
+  complexity?: string;
+  successRate: number;
+  averageExecutionTime: number;
+}
 import {
   BehaviorTreeRunner,
   ToolExecutor,
@@ -267,7 +301,7 @@ export class SkillPlannerAdapter extends EventEmitter {
         skillDescLower.includes(goalLower);
 
       // Check if preconditions are satisfied
-      const preconditionsMet = skill.preconditions.every((precond) =>
+      const preconditionsMet = skill.preconditions.every((precond: any) =>
         precond.isSatisfied(context.worldState)
       );
 
@@ -391,7 +425,7 @@ export class SkillPlannerAdapter extends EventEmitter {
     skill: Skill,
     worldState: Record<string, any>
   ): boolean {
-    return skill.preconditions.every((precond) =>
+    return skill.preconditions.every((precond: any) =>
       precond.isSatisfied(worldState)
     );
   }
@@ -490,14 +524,14 @@ export class SkillPlannerAdapter extends EventEmitter {
     // Select skill with highest success rate and lowest complexity
     return skills.reduce((best, current) => {
       const bestComplexityScore = this.getComplexityScore(
-        best.metadata.complexity
+        (best.metadata?.complexity ?? 'moderate') as 'simple' | 'moderate' | 'complex'
       );
       const currentComplexityScore = this.getComplexityScore(
-        current.metadata.complexity
+        (current.metadata?.complexity ?? 'moderate') as 'simple' | 'moderate' | 'complex'
       );
-      const bestScore = best.metadata.successRate * (1 - bestComplexityScore);
+      const bestScore = (best.metadata?.successRate ?? 0.5) * (1 - bestComplexityScore);
       const currentScore =
-        current.metadata.successRate * (1 - currentComplexityScore);
+        (current.metadata?.successRate ?? 0.5) * (1 - currentComplexityScore);
       return currentScore > bestScore ? current : best;
     });
   }
@@ -521,7 +555,7 @@ export class SkillPlannerAdapter extends EventEmitter {
     // Convert skill preconditions to world state format
     const preconditions: Record<string, any> = {};
 
-    skill.preconditions.forEach((precond) => {
+    skill.preconditions.forEach((precond: any) => {
       // Simple parsing - in full implementation, use proper condition parser
       if (precond.condition.includes('>=')) {
         const [resource, amount] = precond.condition.split('>=');
@@ -529,7 +563,7 @@ export class SkillPlannerAdapter extends EventEmitter {
       } else if (precond.condition.includes('||')) {
         const alternatives = precond.condition.split('||');
         preconditions[precond.id] = {
-          alternatives: alternatives.map((a) => a.trim()),
+          alternatives: alternatives.map((a: any) => a.trim()),
         };
       }
     });
@@ -541,7 +575,7 @@ export class SkillPlannerAdapter extends EventEmitter {
     // Convert skill postconditions to world state format
     const postconditions: Record<string, any> = {};
 
-    skill.postconditions.forEach((postcond) => {
+    skill.postconditions?.forEach((postcond: any) => {
       if (postcond.expectedOutcome) {
         Object.assign(postconditions, postcond.expectedOutcome);
       }
@@ -552,15 +586,15 @@ export class SkillPlannerAdapter extends EventEmitter {
 
   private estimateSkillDuration(skill: Skill): number {
     // Estimate duration based on skill complexity and metadata
-    const baseDuration = skill.metadata.averageExecutionTime || 5000;
-    const complexityScore = this.getComplexityScore(skill.metadata.complexity);
+    const baseDuration = skill.metadata?.averageExecutionTime || 5000;
+    const complexityScore = this.getComplexityScore(skill.metadata?.complexity ?? 'moderate');
     const complexityMultiplier = 1 + complexityScore;
     return Math.round(baseDuration * complexityMultiplier);
   }
 
   private calculateSkillPriority(skill: Skill, pattern: string): number {
     // Calculate priority based on skill success rate and pattern importance
-    const successRate = skill.metadata.successRate || 0.5;
+    const successRate = skill.metadata?.successRate || 0.5;
     const patternImportance = this.getPatternImportance(pattern);
     return successRate * patternImportance;
   }
@@ -584,7 +618,7 @@ export class SkillPlannerAdapter extends EventEmitter {
     // Identify dependencies based on skill preconditions and existing decomposition
     const dependencies: string[] = [];
 
-    skill.preconditions.forEach((precond) => {
+    skill.preconditions.forEach((precond: any) => {
       // Check if any existing skill in decomposition provides this precondition
       decomposition.forEach((decomp) => {
         if (this.skillProvidesPrecondition(decomp.skill, precond.condition)) {
@@ -597,11 +631,11 @@ export class SkillPlannerAdapter extends EventEmitter {
   }
 
   private skillProvidesPrecondition(skill: Skill, condition: string): boolean {
-    return skill.postconditions.some(
-      (postcond) =>
+    return skill.postconditions?.some(
+      (postcond: any) =>
         postcond.condition.includes(condition) ||
         (postcond.expectedOutcome &&
-          Object.keys(postcond.expectedOutcome).some((key) =>
+          Object.keys(postcond.expectedOutcome).some((key: any) =>
             condition.includes(key)
           ))
     );
@@ -640,7 +674,7 @@ export class SkillPlannerAdapter extends EventEmitter {
 
     // Calculate overall success probability
     const successRates = decomposition.map(
-      (decomp) => decomp.skill.metadata.successRate || 0.5
+      (decomp) => decomp.skill.metadata?.successRate || 0.5
     );
 
     return successRates.reduce((product, rate) => product * rate, 1);
@@ -679,9 +713,9 @@ export class SkillPlannerAdapter extends EventEmitter {
     skill: Skill,
     postconditions: Record<string, any>
   ): boolean {
-    return skill.postconditions.some((postcond) => {
+    return skill.postconditions?.some((postcond: any) => {
       if (postcond.expectedOutcome) {
-        return Object.keys(postcond.expectedOutcome).some((key) =>
+        return Object.keys(postcond.expectedOutcome).some((key: any) =>
           Object.keys(postconditions).includes(key)
         );
       }

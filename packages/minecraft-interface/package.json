@@ -4,6 +4,7 @@
   "description": "Minecraft integration layer for conscious bot planning system",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "type": "module",
   "bin": {
     "mc-smoke": "dist/bin/mc-smoke.js",
     "mc-standalone": "dist/bin/mc-standalone.js",

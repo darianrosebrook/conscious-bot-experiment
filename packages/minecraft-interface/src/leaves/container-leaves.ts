@@ -524,11 +524,56 @@ async function openContainerAtPosition(
     // Move bot close to container if needed
     const botPos = bot.entity?.position;
     if (botPos && botPos.distanceTo(position) > 2) {
-      // TODO: Implement pathfinding to container position
-      // For now, assume bot can reach the position
       console.log(
         `Moving bot to container at ${position.x}, ${position.y}, ${position.z}`
       );
+      
+      try {
+        // Use mineflayer pathfinding to move to container
+        const movements = new (require('mineflayer-pathfinder').Movements)(bot);
+        const goal = new (require('mineflayer-pathfinder').goals.GoalNear)(
+          position.x, 
+          position.y, 
+          position.z, 
+          1 // Within 1 block
+        );
+        
+        // Set pathfinder goal and wait for completion
+        bot.pathfinder.setMovements(movements);
+        bot.pathfinder.setGoal(goal);
+        
+        await new Promise<void>((resolve, reject) => {
+          const timeout = setTimeout(() => {
+            reject(new Error('Pathfinding timeout'));
+          }, 10000); // 10 second timeout
+          
+          const goalReached = () => {
+            clearTimeout(timeout);
+            bot.removeListener('goal_reached', goalReached);
+            bot.removeListener('path_stop', pathStopped);
+            resolve();
+          };
+          
+          const pathStopped = (reason: string) => {
+            clearTimeout(timeout);
+            bot.removeListener('goal_reached', goalReached);
+            bot.removeListener('path_stop', pathStopped);
+            if (reason === 'goal_reached') {
+              resolve();
+            } else {
+              reject(new Error(`Pathfinding failed: ${reason}`));
+            }
+          };
+          
+          bot.once('goal_reached', goalReached);
+          bot.once('path_stop', pathStopped);
+        });
+        
+        console.log(`✅ Bot reached container position`);
+      } catch (pathError) {
+        console.warn(`⚠️ Pathfinding failed, trying to proceed anyway:`, pathError);
+        // Continue attempting to open container even if pathfinding fails
+      }
     }
 
     // Try to open the container

@@ -27,6 +27,7 @@ export enum BTNodeType {
   DECORATOR = 'decorator',
   ACTION = 'action',
   CONDITION = 'condition',
+  COGNITIVE_REFLECTION = 'cognitive_reflection',
 }
 
 export interface BTNode {
@@ -679,6 +680,9 @@ class BTRun extends EventEmitter {
             case BTNodeType.CONDITION:
               result = await this.executeCondition(node, tick);
               break;
+            case BTNodeType.COGNITIVE_REFLECTION:
+              result = await this.executeCognitiveReflection(node, tick);
+              break;
             default:
               throw new Error(`Unknown node type: ${node.type}`);
           }
@@ -908,7 +912,9 @@ class BTRun extends EventEmitter {
     });
 
     // Prefix the action with "minecraft." since the tool executor expects this namespace
-    const toolName = node.action.startsWith('minecraft.') ? node.action : `minecraft.${node.action}`;
+    const toolName = node.action.startsWith('minecraft.')
+      ? node.action
+      : `minecraft.${node.action}`;
 
     const result = await this.toolExecutor.execute(
       toolName,
@@ -955,6 +961,140 @@ class BTRun extends EventEmitter {
 
   private async evaluateCondition(condition: string): Promise<boolean> {
     return await this.evaluator.evaluate(condition, this.context);
+  }
+
+  /**
+   * Execute cognitive reflection nodes
+   */
+  private async executeCognitiveReflection(
+    node: BTNode,
+    tick: number
+  ): Promise<{
+    status: BTNodeStatus;
+    data?: any;
+    confidence?: number;
+    cost?: number;
+    duration?: number;
+  }> {
+    const startTime = Date.now();
+
+    try {
+      console.log(
+        `🧠 [BEHAVIOR TREE] Executing cognitive reflection: ${node.name}`
+      );
+
+      // Extract the thought content from node arguments
+      const thoughtContent = node.args?.thoughtContent || '';
+      const signals = node.args?.signals || [];
+
+      if (!thoughtContent) {
+        console.log(
+          '❌ [BEHAVIOR TREE] No thought content provided to cognitive reflection node'
+        );
+        return {
+          status: BTNodeStatus.FAILURE,
+          confidence: 0,
+          cost: 0,
+          duration: Date.now() - startTime,
+        };
+      }
+
+      console.log(
+        `🧠 [BEHAVIOR TREE] Processing thought: "${thoughtContent.substring(0, 100)}..."`
+      );
+      console.log(`🧠 [BEHAVIOR TREE] Received ${signals.length} signals`);
+
+      // Analyze the signals to determine appropriate actions
+      const analysis = this.analyzeCognitiveSignals(signals);
+
+      console.log(`🧠 [BEHAVIOR TREE] Signal analysis:`, {
+        resourceNeeds: analysis.resourceNeeds.length,
+        toolNeeds: analysis.toolNeeds.length,
+        safetyConcerns: analysis.safetyConcerns.length,
+        urgencyLevel: analysis.urgencyLevel,
+      });
+
+      // For now, we'll mark this as successful since we processed the signals
+      // In a more sophisticated implementation, this would:
+      // 1. Update the bot's internal state based on the reflection
+      // 2. Generate appropriate goals or tasks
+      // 3. Adjust behavior tree priorities
+      const result = {
+        status: BTNodeStatus.SUCCESS,
+        data: {
+          thoughtContent,
+          signalsProcessed: signals.length,
+          analysis,
+          timestamp: Date.now(),
+        },
+        confidence: 0.8, // High confidence in signal processing
+        cost: 0.1, // Low cost for cognitive processing
+        duration: Date.now() - startTime,
+      };
+
+      console.log(
+        `✅ [BEHAVIOR TREE] Cognitive reflection completed successfully`
+      );
+      return result;
+    } catch (error) {
+      console.error(
+        '❌ [BEHAVIOR TREE] Error executing cognitive reflection:',
+        error
+      );
+      return {
+        status: BTNodeStatus.FAILURE,
+        confidence: 0,
+        cost: 0,
+        duration: Date.now() - startTime,
+      };
+    }
+  }
+
+  /**
+   * Analyze cognitive signals to extract actionable insights
+   */
+  private analyzeCognitiveSignals(signals: any[]): {
+    resourceNeeds: any[];
+    toolNeeds: any[];
+    safetyConcerns: any[];
+    urgencyLevel: number;
+  } {
+    const resourceNeeds: any[] = [];
+    const toolNeeds: any[] = [];
+    const safetyConcerns: any[] = [];
+    let urgencyLevel = 0;
+
+    signals.forEach((signal) => {
+      switch (signal.type) {
+        case 'resource_need':
+          resourceNeeds.push(signal);
+          if (signal.concept === 'wood' || signal.concept === 'iron') {
+            urgencyLevel = Math.max(urgencyLevel, 0.6);
+          }
+          break;
+        case 'tool_need':
+          toolNeeds.push(signal);
+          if (signal.concept === 'pickaxe') {
+            urgencyLevel = Math.max(urgencyLevel, 0.7);
+          }
+          break;
+        case 'safety_concern':
+          safetyConcerns.push(signal);
+          urgencyLevel = Math.max(urgencyLevel, 0.8);
+          break;
+        case 'urgency_signal':
+          urgencyLevel = Math.max(urgencyLevel, signal.value || 0.8);
+          break;
+        case 'crafting_intent':
+          urgencyLevel = Math.max(urgencyLevel, 0.5);
+          break;
+        case 'exploration_drive':
+          urgencyLevel = Math.max(urgencyLevel, 0.4);
+          break;
+      }
+    });
+
+    return { resourceNeeds, toolNeeds, safetyConcerns, urgencyLevel };
   }
 
   private async loadBehaviorTree(optionId: string): Promise<BTNode> {
@@ -1087,6 +1227,9 @@ class BTRun extends EventEmitter {
         return BTNodeType.ACTION;
       case 'condition':
         return BTNodeType.CONDITION;
+      case 'cognitive_reflection':
+      case 'cognitive-reflection':
+        return BTNodeType.COGNITIVE_REFLECTION;
       default:
         return BTNodeType.ACTION;
     }
