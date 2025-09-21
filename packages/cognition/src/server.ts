@@ -13,58 +13,8 @@ import { ReActArbiter } from './react-arbiter/ReActArbiter';
 const app = express();
 const port = process.env.PORT ? parseInt(process.env.PORT) : 3003;
 
-// Middleware
-app.use(cors());
-app.use(express.json());
-
-// Initialize ReAct Arbiter
-const reactArbiter = new ReActArbiter({
-  provider: 'ollama',
-  model: 'qwen2.5:7b', // Optimal model from benchmark results
-  maxTokens: 1000,
-  temperature: 0.3,
-  timeout: 30000,
-  retries: 3,
-});
-
-// Import enhanced components
-import { EnhancedThoughtGenerator } from './thought-generator';
-import { IntrusiveThoughtProcessor } from './intrusive-thought-processor';
-
-// Initialize enhanced thought generator
-const enhancedThoughtGenerator = new EnhancedThoughtGenerator({
-  thoughtInterval: 60000, // 60 seconds between thoughts to reduce spam
-  maxThoughtsPerCycle: 1,
-  enableIdleThoughts: true,
-  enableContextualThoughts: true,
-  enableEventDrivenThoughts: true,
-});
-
-// Initialize enhanced intrusive thought processor
-const intrusiveThoughtProcessor = new IntrusiveThoughtProcessor({
-  enableActionParsing: true,
-  enableTaskCreation: true,
-  enablePlanningIntegration: true,
-  enableMinecraftIntegration: true,
-  planningEndpoint: 'http://localhost:3002',
-  minecraftEndpoint: 'http://localhost:3005',
-});
-
-// Initialize cognition system (simplified for now)
-const cognitionSystem = {
-  cognitiveCore: {
-    contextOptimizer: { isActive: () => false },
-    conversationManager: { isActive: () => false },
-    creativeSolver: { isActive: () => false },
-  },
-  constitutionalFilter: { getRulesCount: () => 0 },
-  intrusionInterface: { isActive: () => false },
-  selfModel: { getIdentityCount: () => 0, getActiveIdentities: () => [] },
-  socialCognition: { getAgentCount: () => 0, getRelationshipCount: () => 0 },
-};
-
-// Store cognitive thoughts for external access
-const cognitiveThoughts: any[] = [];
+// Network request tracking
+let networkRequestCount = 0;
 
 // Cognitive metrics tracking
 class CognitiveMetricsTracker {
@@ -134,6 +84,290 @@ class CognitiveMetricsTracker {
 }
 
 const metricsTracker = new CognitiveMetricsTracker();
+
+// Enhanced cognitive state tracking
+class CognitiveStateTracker {
+  private activeConversations = new Set<string>();
+  private recentOperations: Array<{
+    type: string;
+    timestamp: number;
+    duration?: number;
+    success: boolean;
+  }> = [];
+  private cognitiveStates: Array<{
+    timestamp: number;
+    cognitiveLoad: number;
+    attentionLevel: number;
+    creativityLevel: number;
+    activeProcesses: number;
+  }> = [];
+
+  // Conversation tracking
+  startConversation(conversationId: string): void {
+    this.activeConversations.add(conversationId);
+    metricsTracker.incrementConversationCount();
+    this.recordOperation('conversation_start', true);
+  }
+
+  endConversation(conversationId: string): void {
+    this.activeConversations.delete(conversationId);
+    this.recordOperation('conversation_end', true);
+  }
+
+  getActiveConversationCount(): number {
+    return this.activeConversations.size;
+  }
+
+  // Operation tracking
+  recordOperation(type: string, success: boolean, startTime?: number): void {
+    const operation = {
+      type,
+      timestamp: Date.now(),
+      duration: startTime ? Date.now() - startTime : undefined,
+      success,
+    };
+
+    this.recentOperations.push(operation);
+
+    // Keep only last 100 operations
+    if (this.recentOperations.length > 100) {
+      this.recentOperations.shift();
+    }
+
+    // Update specific metrics based on operation type
+    switch (type) {
+      case 'optimization':
+        metricsTracker.incrementOptimizationCount();
+        break;
+      case 'solution_generation':
+        metricsTracker.incrementSolutionsGenerated();
+        break;
+      case 'violation_blocked':
+        metricsTracker.incrementViolationsBlocked();
+        break;
+      case 'intrusion_handled':
+        metricsTracker.incrementIntrusionsHandled();
+        break;
+    }
+  }
+
+  // Cognitive state tracking
+  recordCognitiveState(): void {
+    const state = {
+      timestamp: Date.now(),
+      cognitiveLoad: calculateCognitiveLoad(),
+      attentionLevel: calculateAttentionLevel(),
+      creativityLevel: calculateCreativityLevel(),
+      activeProcesses: getActiveProcessCount(),
+    };
+
+    this.cognitiveStates.push(state);
+
+    // Keep only last 1000 states (about 16 minutes at 1 per second)
+    if (this.cognitiveStates.length > 1000) {
+      this.cognitiveStates.shift();
+    }
+  }
+
+  // Analytics and insights
+  getOperationStats(timeWindow: number = 300000): {
+    // Default 5 minutes
+    total: number;
+    successful: number;
+    failed: number;
+    byType: Record<string, number>;
+    averageDuration: number;
+  } {
+    const cutoff = Date.now() - timeWindow;
+    const recentOps = this.recentOperations.filter(
+      (op) => op.timestamp > cutoff
+    );
+
+    const stats = {
+      total: recentOps.length,
+      successful: recentOps.filter((op) => op.success).length,
+      failed: recentOps.filter((op) => !op.success).length,
+      byType: {} as Record<string, number>,
+      averageDuration: 0,
+    };
+
+    // Group by type
+    recentOps.forEach((op) => {
+      stats.byType[op.type] = (stats.byType[op.type] || 0) + 1;
+    });
+
+    // Calculate average duration
+    const opsWithDuration = recentOps.filter((op) => op.duration !== undefined);
+    if (opsWithDuration.length > 0) {
+      stats.averageDuration =
+        opsWithDuration.reduce((sum, op) => sum + (op.duration || 0), 0) /
+        opsWithDuration.length;
+    }
+
+    return stats;
+  }
+
+  getCognitiveStateHistory(timeWindow: number = 300000): Array<{
+    timestamp: number;
+    cognitiveLoad: number;
+    attentionLevel: number;
+    creativityLevel: number;
+    activeProcesses: number;
+  }> {
+    const cutoff = Date.now() - timeWindow;
+    return this.cognitiveStates.filter((state) => state.timestamp > cutoff);
+  }
+
+  getHealthMetrics(): {
+    averageCognitiveLoad: number;
+    averageAttentionLevel: number;
+    averageCreativityLevel: number;
+    operationSuccessRate: number;
+    systemStability: number;
+  } {
+    const recentStates = this.getCognitiveStateHistory();
+    const recentStats = this.getOperationStats();
+
+    const averageCognitiveLoad =
+      recentStates.length > 0
+        ? recentStates.reduce((sum, state) => sum + state.cognitiveLoad, 0) /
+          recentStates.length
+        : 0;
+
+    const averageAttentionLevel =
+      recentStates.length > 0
+        ? recentStates.reduce((sum, state) => sum + state.attentionLevel, 0) /
+          recentStates.length
+        : 0;
+
+    const averageCreativityLevel =
+      recentStates.length > 0
+        ? recentStates.reduce((sum, state) => sum + state.creativityLevel, 0) /
+          recentStates.length
+        : 0;
+
+    const operationSuccessRate =
+      recentStats.total > 0 ? recentStats.successful / recentStats.total : 1;
+
+    // System stability based on variance in cognitive states
+    const cognitiveLoadVariance =
+      recentStates.length > 1
+        ? this.calculateVariance(recentStates.map((s) => s.cognitiveLoad))
+        : 0;
+
+    const systemStability = Math.max(0, 1 - cognitiveLoadVariance);
+
+    return {
+      averageCognitiveLoad,
+      averageAttentionLevel,
+      averageCreativityLevel,
+      operationSuccessRate,
+      systemStability,
+    };
+  }
+
+  private calculateVariance(values: number[]): number {
+    if (values.length < 2) return 0;
+
+    const mean = values.reduce((sum, val) => sum + val, 0) / values.length;
+    const squaredDiffs = values.map((val) => Math.pow(val - mean, 2));
+    return squaredDiffs.reduce((sum, val) => sum + val, 0) / values.length;
+  }
+
+  reset(): void {
+    this.activeConversations.clear();
+    this.recentOperations = [];
+    this.cognitiveStates = [];
+  }
+}
+
+const cognitiveStateTracker = new CognitiveStateTracker();
+
+// Middleware
+app.use(cors());
+app.use(express.json());
+
+// Middleware to track network requests
+app.use((req, res, next) => {
+  networkRequestCount++;
+
+  // Reset counter every minute to prevent overflow
+  if (networkRequestCount > 1000) {
+    networkRequestCount = networkRequestCount % 100; // Keep some history
+  }
+
+  const startTime = Date.now();
+
+  // Track successful operations
+  res.on('finish', () => {
+    const success = res.statusCode < 400;
+    const duration = Date.now() - startTime;
+
+    // Record operation based on endpoint
+    const operationType = req.path.includes('/chat')
+      ? 'conversation'
+      : req.path.includes('/optimize')
+        ? 'optimization'
+        : req.path.includes('/solve')
+          ? 'solution_generation'
+          : req.path.includes('/intrusion')
+            ? 'intrusion_handled'
+            : 'api_request';
+
+    cognitiveStateTracker.recordOperation(operationType, success, startTime);
+  });
+
+  next();
+});
+
+// Initialize ReAct Arbiter
+const reactArbiter = new ReActArbiter({
+  provider: 'ollama',
+  model: 'qwen2.5:7b', // Optimal model from benchmark results
+  maxTokens: 1000,
+  temperature: 0.3,
+  timeout: 30000,
+  retries: 3,
+});
+
+// Import enhanced components
+import { EnhancedThoughtGenerator } from './thought-generator';
+import { IntrusiveThoughtProcessor } from './intrusive-thought-processor';
+
+// Initialize enhanced thought generator
+const enhancedThoughtGenerator = new EnhancedThoughtGenerator({
+  thoughtInterval: 60000, // 60 seconds between thoughts to reduce spam
+  maxThoughtsPerCycle: 1,
+  enableIdleThoughts: true,
+  enableContextualThoughts: true,
+  enableEventDrivenThoughts: true,
+});
+
+// Initialize enhanced intrusive thought processor
+const intrusiveThoughtProcessor = new IntrusiveThoughtProcessor({
+  enableActionParsing: true,
+  enableTaskCreation: true,
+  enablePlanningIntegration: true,
+  enableMinecraftIntegration: true,
+  planningEndpoint: 'http://localhost:3002',
+  minecraftEndpoint: 'http://localhost:3005',
+});
+
+// Initialize cognition system (simplified for now)
+const cognitionSystem = {
+  cognitiveCore: {
+    contextOptimizer: { isActive: () => false },
+    conversationManager: { isActive: () => false },
+    creativeSolver: { isActive: () => false },
+  },
+  constitutionalFilter: { getRulesCount: () => 0 },
+  intrusionInterface: { isActive: () => false },
+  selfModel: { getIdentityCount: () => 0, getActiveIdentities: () => [] },
+  socialCognition: { getAgentCount: () => 0, getRelationshipCount: () => 0 },
+};
+
+// Store cognitive thoughts for external access
+const cognitiveThoughts: any[] = [];
 
 // Function to send thoughts to cognitive stream
 async function sendThoughtToCognitiveStream(thought: any) {
@@ -519,7 +753,8 @@ app.get('/state', (req, res) => {
           optimizationCount: metricsTracker.getOptimizationCount(),
         },
         conversationManager: {
-          activeConversations: 0, // TODO: Implement conversation tracking system
+          activeConversations:
+            cognitiveStateTracker.getActiveConversationCount(),
           totalConversations: metricsTracker.getConversationCount(),
         },
         creativeSolver: {
@@ -1368,8 +1603,319 @@ function getNetworkRequestCount(): number {
   return networkRequestCount || 0;
 }
 
-// Network request tracking
-let networkRequestCount = 0;
+// Enhanced cognitive state tracking
+class CognitiveStateTracker {
+  private activeConversations = new Set<string>();
+  private recentOperations: Array<{
+    type: string;
+    timestamp: number;
+    duration?: number;
+    success: boolean;
+  }> = [];
+  private cognitiveStates: Array<{
+    timestamp: number;
+    cognitiveLoad: number;
+    attentionLevel: number;
+    creativityLevel: number;
+    activeProcesses: number;
+  }> = [];
+
+  // Conversation tracking
+  startConversation(conversationId: string): void {
+    this.activeConversations.add(conversationId);
+    metricsTracker.incrementConversationCount();
+    this.recordOperation('conversation_start', true);
+  }
+
+  endConversation(conversationId: string): void {
+    this.activeConversations.delete(conversationId);
+    this.recordOperation('conversation_end', true);
+  }
+
+  getActiveConversationCount(): number {
+    return this.activeConversations.size;
+  }
+
+  // Operation tracking
+  recordOperation(type: string, success: boolean, startTime?: number): void {
+    const operation = {
+      type,
+      timestamp: Date.now(),
+      duration: startTime ? Date.now() - startTime : undefined,
+      success,
+    };
+
+    this.recentOperations.push(operation);
+
+    // Keep only last 100 operations
+    if (this.recentOperations.length > 100) {
+      this.recentOperations.shift();
+    }
+
+    // Update specific metrics based on operation type
+    switch (type) {
+      case 'optimization':
+        metricsTracker.incrementOptimizationCount();
+        break;
+      case 'solution_generation':
+        metricsTracker.incrementSolutionsGenerated();
+        break;
+      case 'violation_blocked':
+        metricsTracker.incrementViolationsBlocked();
+        break;
+      case 'intrusion_handled':
+        metricsTracker.incrementIntrusionsHandled();
+        break;
+    }
+  }
+
+  // Cognitive state tracking
+  recordCognitiveState(): void {
+    const state = {
+      timestamp: Date.now(),
+      cognitiveLoad: calculateCognitiveLoad(),
+      attentionLevel: calculateAttentionLevel(),
+      creativityLevel: calculateCreativityLevel(),
+      activeProcesses: getActiveProcessCount(),
+    };
+
+    this.cognitiveStates.push(state);
+
+    // Keep only last 1000 states (about 16 minutes at 1 per second)
+    if (this.cognitiveStates.length > 1000) {
+      this.cognitiveStates.shift();
+    }
+  }
+
+  // Analytics and insights
+  getOperationStats(timeWindow: number = 300000): {
+    // Default 5 minutes
+    total: number;
+    successful: number;
+    failed: number;
+    byType: Record<string, number>;
+    averageDuration: number;
+  } {
+    const cutoff = Date.now() - timeWindow;
+    const recentOps = this.recentOperations.filter(
+      (op) => op.timestamp > cutoff
+    );
+
+    const stats = {
+      total: recentOps.length,
+      successful: recentOps.filter((op) => op.success).length,
+      failed: recentOps.filter((op) => !op.success).length,
+      byType: {} as Record<string, number>,
+      averageDuration: 0,
+    };
+
+    // Group by type
+    recentOps.forEach((op) => {
+      stats.byType[op.type] = (stats.byType[op.type] || 0) + 1;
+    });
+
+    // Calculate average duration
+    const opsWithDuration = recentOps.filter((op) => op.duration !== undefined);
+    if (opsWithDuration.length > 0) {
+      stats.averageDuration =
+        opsWithDuration.reduce((sum, op) => sum + (op.duration || 0), 0) /
+        opsWithDuration.length;
+    }
+
+    return stats;
+  }
+
+  getCognitiveStateHistory(timeWindow: number = 300000): Array<{
+    timestamp: number;
+    cognitiveLoad: number;
+    attentionLevel: number;
+    creativityLevel: number;
+    activeProcesses: number;
+  }> {
+    const cutoff = Date.now() - timeWindow;
+    return this.cognitiveStates.filter((state) => state.timestamp > cutoff);
+  }
+
+  getHealthMetrics(): {
+    averageCognitiveLoad: number;
+    averageAttentionLevel: number;
+    averageCreativityLevel: number;
+    operationSuccessRate: number;
+    systemStability: number;
+  } {
+    const recentStates = this.getCognitiveStateHistory();
+    const recentStats = this.getOperationStats();
+
+    const averageCognitiveLoad =
+      recentStates.length > 0
+        ? recentStates.reduce((sum, state) => sum + state.cognitiveLoad, 0) /
+          recentStates.length
+        : 0;
+
+    const averageAttentionLevel =
+      recentStates.length > 0
+        ? recentStates.reduce((sum, state) => sum + state.attentionLevel, 0) /
+          recentStates.length
+        : 0;
+
+    const averageCreativityLevel =
+      recentStates.length > 0
+        ? recentStates.reduce((sum, state) => sum + state.creativityLevel, 0) /
+          recentStates.length
+        : 0;
+
+    const operationSuccessRate =
+      recentStats.total > 0 ? recentStats.successful / recentStats.total : 1;
+
+    // System stability based on variance in cognitive states
+    const cognitiveLoadVariance =
+      recentStates.length > 1
+        ? this.calculateVariance(recentStates.map((s) => s.cognitiveLoad))
+        : 0;
+
+    const systemStability = Math.max(0, 1 - cognitiveLoadVariance);
+
+    return {
+      averageCognitiveLoad,
+      averageAttentionLevel,
+      averageCreativityLevel,
+      operationSuccessRate,
+      systemStability,
+    };
+  }
+
+  private calculateVariance(values: number[]): number {
+    if (values.length < 2) return 0;
+
+    const mean = values.reduce((sum, val) => sum + val, 0) / values.length;
+    const squaredDiffs = values.map((val) => Math.pow(val - mean, 2));
+    return squaredDiffs.reduce((sum, val) => sum + val, 0) / values.length;
+  }
+
+  reset(): void {
+    this.activeConversations.clear();
+    this.recentOperations = [];
+    this.cognitiveStates = [];
+  }
+}
+
+const cognitiveStateTracker = new CognitiveStateTracker();
+
+// Enhanced cognitive metrics endpoints
+app.get('/metrics/operations', (req, res) => {
+  try {
+    const timeWindow = parseInt(req.query.timeWindow as string) || 300000; // Default 5 minutes
+    const stats = cognitiveStateTracker.getOperationStats(timeWindow);
+    res.json({
+      success: true,
+      data: stats,
+      timestamp: Date.now(),
+    });
+  } catch (error) {
+    console.error('Error getting operation stats:', error);
+    res.status(500).json({ error: 'Failed to get operation statistics' });
+  }
+});
+
+app.get('/metrics/cognitive-state', (req, res) => {
+  try {
+    const timeWindow = parseInt(req.query.timeWindow as string) || 300000; // Default 5 minutes
+    const history = cognitiveStateTracker.getCognitiveStateHistory(timeWindow);
+    res.json({
+      success: true,
+      data: history,
+      timestamp: Date.now(),
+    });
+  } catch (error) {
+    console.error('Error getting cognitive state history:', error);
+    res.status(500).json({ error: 'Failed to get cognitive state history' });
+  }
+});
+
+app.get('/metrics/health', (req, res) => {
+  try {
+    const healthMetrics = cognitiveStateTracker.getHealthMetrics();
+    res.json({
+      success: true,
+      data: healthMetrics,
+      timestamp: Date.now(),
+    });
+  } catch (error) {
+    console.error('Error getting health metrics:', error);
+    res.status(500).json({ error: 'Failed to get health metrics' });
+  }
+});
+
+app.post('/conversation/start', (req, res) => {
+  try {
+    const { conversationId } = req.body;
+    if (!conversationId) {
+      return res.status(400).json({ error: 'conversationId is required' });
+    }
+
+    cognitiveStateTracker.startConversation(conversationId);
+    res.json({
+      success: true,
+      message: 'Conversation started',
+      conversationId,
+      timestamp: Date.now(),
+    });
+  } catch (error) {
+    console.error('Error starting conversation:', error);
+    res.status(500).json({ error: 'Failed to start conversation tracking' });
+  }
+});
+
+app.post('/conversation/end', (req, res) => {
+  try {
+    const { conversationId } = req.body;
+    if (!conversationId) {
+      return res.status(400).json({ error: 'conversationId is required' });
+    }
+
+    cognitiveStateTracker.endConversation(conversationId);
+    res.json({
+      success: true,
+      message: 'Conversation ended',
+      conversationId,
+      timestamp: Date.now(),
+    });
+  } catch (error) {
+    console.error('Error ending conversation:', error);
+    res.status(500).json({ error: 'Failed to end conversation tracking' });
+  }
+});
+
+app.get('/metrics/summary', (req, res) => {
+  try {
+    const basicMetrics = metricsTracker.getAllMetrics();
+    const healthMetrics = cognitiveStateTracker.getHealthMetrics();
+    const operationStats = cognitiveStateTracker.getOperationStats();
+
+    const summary = {
+      basic: basicMetrics,
+      health: healthMetrics,
+      operations: operationStats,
+      activeConversations: cognitiveStateTracker.getActiveConversationCount(),
+      currentState: {
+        cognitiveLoad: calculateCognitiveLoad(),
+        attentionLevel: calculateAttentionLevel(),
+        creativityLevel: calculateCreativityLevel(),
+        activeProcesses: getActiveProcessCount(),
+        networkRequests: getNetworkRequestCount(),
+      },
+      timestamp: Date.now(),
+    };
+
+    res.json({
+      success: true,
+      data: summary,
+    });
+  } catch (error) {
+    console.error('Error getting metrics summary:', error);
+    res.status(500).json({ error: 'Failed to get metrics summary' });
+  }
+});
 
 // Start server
 app.listen(port, () => {
@@ -1379,4 +1925,9 @@ app.listen(port, () => {
   setTimeout(() => {
     startThoughtGeneration();
   }, 2000); // Start after 2 seconds to ensure everything is initialized
+
+  // Start periodic cognitive state recording
+  setInterval(() => {
+    cognitiveStateTracker.recordCognitiveState();
+  }, 5000); // Record state every 5 seconds
 });

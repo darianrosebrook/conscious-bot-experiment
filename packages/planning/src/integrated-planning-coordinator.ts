@@ -12,12 +12,14 @@ import {
   Goal,
   Plan,
   PlanStatus,
+  PlanStepStatus,
   HomeostasisState,
   Need,
   NeedType,
   GoalType,
   GoalStatus,
   Action,
+  ActionType,
   Resource,
   UtilityContext,
 } from './types';
@@ -163,6 +165,7 @@ export class IntegratedPlanningCoordinator extends EventEmitter {
   private planningHistory: IntegratedPlanningResult[] = [];
   private performanceMetrics: PlanningPerformanceMetrics;
   private routingByPlanId: Map<string, RoutingDecision> = new Map();
+  private mcpBus: any = {}; // Mock MCP bus for now
 
   constructor(config: Partial<PlanningConfiguration> = {}) {
     super();
@@ -571,8 +574,20 @@ export class IntegratedPlanningCoordinator extends EventEmitter {
     const goapGoal = this.convertToGOAPGoal(goal);
     const worldState = this.convertToGOAPState(context.worldState);
 
-    const executionContext = this.convertPlanningContextToExecutionContext(context);
-    return this.goapPlanner.planTo(goapGoal, worldState, executionContext, 1000);
+    const executionContext =
+      this.convertPlanningContextToExecutionContext(context);
+    const goapPlan = await this.goapPlanner.planTo(
+      goapGoal,
+      worldState,
+      executionContext,
+      1000
+    );
+
+    if (!goapPlan) {
+      throw new Error('Failed to generate GOAP plan');
+    }
+
+    return this.convertGOAPPlanToStandardPlan(goapPlan, goal);
   }
 
   /**
@@ -672,7 +687,30 @@ export class IntegratedPlanningCoordinator extends EventEmitter {
 
     try {
       const startedAt = Date.now();
-      const success = await this.reactiveExecutor.execute(plan);
+      // Create a mock world state for now - this should be passed from the planning context
+      const worldState = {
+        getHealth: () => 100,
+        getHunger: () => 20,
+        getEnergy: () => 80,
+        getPosition: () => ({ x: 0, y: 64, z: 0 }),
+        getInventory: () => ({}),
+        getNearbyEntities: () => [],
+        getBlockAt: () => null,
+        getLightLevel: () => 15,
+        getTimeOfDay: () => 'day',
+        getWeather: () => 'clear',
+        getBiome: () => 'plains',
+        getDifficulty: () => 'normal',
+        isDay: () => true,
+        isNight: () => false,
+        isRaining: () => false,
+        isThundering: () => false,
+      } as any;
+      const success = await this.reactiveExecutor.execute(
+        plan,
+        worldState,
+        this.mcpBus
+      );
       const actualLatency = Date.now() - startedAt;
 
       // Feed back routing performance metrics to the cognitive router
@@ -684,7 +722,9 @@ export class IntegratedPlanningCoordinator extends EventEmitter {
             !!success,
             actualLatency
           );
-        } catch {}
+        } catch (e) {
+          console.error('Failed to record task result:', e);
+        }
         // Clean up after recording
         this.routingByPlanId.delete(planId);
       }
@@ -706,7 +746,9 @@ export class IntegratedPlanningCoordinator extends EventEmitter {
       if (decision) {
         try {
           this.cognitiveRouter.recordTaskResult(decision, false, 0);
-        } catch {}
+        } catch (error) {
+          console.error('Failed to record task result:', error);
+        }
         this.routingByPlanId.delete(planId);
       }
       return false;
@@ -1013,7 +1055,9 @@ export class IntegratedPlanningCoordinator extends EventEmitter {
   /**
    * Convert PlanningContext to ExecutionContext for GOAP planner
    */
-  private convertPlanningContextToExecutionContext(context: PlanningContext): ExecutionContext {
+  private convertPlanningContextToExecutionContext(
+    context: PlanningContext
+  ): ExecutionContext {
     return {
       threatLevel: context.situationalFactors.threatLevel,
       hostileCount: 0, // Default value
@@ -1027,6 +1071,45 @@ export class IntegratedPlanningCoordinator extends EventEmitter {
       timeOfDay: 'day', // Default value
       lightLevel: 15, // Default value
       airLevel: 20, // Default value
+    };
+  }
+
+  /**
+   * Convert GOAPPlan to standard Plan format
+   */
+  private convertGOAPPlanToStandardPlan(goapPlan: any, goal: Goal): Plan {
+    return {
+      id: `goap-${Date.now()}`,
+      goalId: goal.id,
+      steps:
+        goapPlan.actions?.map((action: any, index: number) => ({
+          id: `step-${index}`,
+          planId: `goap-${Date.now()}`,
+          action: {
+            id: action.name,
+            name: action.name,
+            description: action.description || action.name,
+            type: ActionType.INTERACTION,
+            parameters: action.parameters || {},
+            preconditions: [],
+            effects: [],
+            cost: action.cost || 1,
+            duration: action.estimatedDuration || 1000,
+            successProbability: 0.8,
+          },
+          preconditions: [],
+          effects: [],
+          status: PlanStepStatus.PENDING,
+          order: index,
+          estimatedDuration: action.estimatedDuration || 1000,
+          dependencies: [],
+        })) || [],
+      status: PlanStatus.PENDING,
+      priority: goal.priority,
+      estimatedDuration: goapPlan.estimatedDuration || 5000,
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+      successProbability: 0.8,
     };
   }
 

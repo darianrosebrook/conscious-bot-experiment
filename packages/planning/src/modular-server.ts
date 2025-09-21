@@ -652,11 +652,12 @@ async function checkCraftingTablePrerequisite(task: any): Promise<boolean> {
       return true; // No crafting table needed
     }
 
-    console.log(`🔍 Checking crafting table prerequisite for: ${task.title}`);
+    console.log(`🔍 Intelligent crafting table analysis for: ${task.title}`);
 
-    // Check if we have a crafting table in inventory
+    // Get inventory and perform comprehensive analysis
     const inventory = await fetchInventorySnapshot();
 
+    // Step 1: Check if we have a crafting table in inventory
     const hasCraftingTable = inventory.some((item: any) =>
       item.type?.toLowerCase().includes('crafting_table')
     );
@@ -666,145 +667,353 @@ async function checkCraftingTablePrerequisite(task: any): Promise<boolean> {
       return true;
     }
 
-    // Check if we have the materials to craft a crafting table
-    const hasWood = inventory.some(
-      (item: any) =>
-        item.type?.toLowerCase().includes('log') ||
-        item.type?.toLowerCase().includes('wood')
-    );
-
-    if (hasWood) {
-      console.log(
-        '🔧 Crafting table needed but not available. Adding crafting table task...'
-      );
-
-      // Add a crafting table task before the current task
-      const craftingTableTask = {
-        id: `task-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-        title: 'Craft Crafting Table',
-        description:
-          'Create a crafting table to enable advanced crafting recipes',
-        type: 'crafting',
-        priority: task.priority + 1, // Higher priority than the current task
-        urgency: 0.8,
-        progress: 0,
-        status: 'pending' as const,
-        source: 'autonomous' as const,
-        parameters: {
-          itemType: 'crafting_table',
-          quantity: 1,
-          requiresWood: true,
-        },
-        steps: [
-          {
-            id: 'craft-table-step-1',
-            label: 'Check required materials',
-            done: false,
-            order: 1,
-            estimatedDuration: 2000,
-          },
-          {
-            id: 'craft-table-step-2',
-            label: 'Access crafting interface',
-            done: false,
-            order: 2,
-            estimatedDuration: 3000,
-          },
-          {
-            id: 'craft-table-step-3',
-            label: 'Create the item',
-            done: false,
-            order: 3,
-            estimatedDuration: 5000,
-          },
-        ],
-        metadata: {
-          createdAt: Date.now(),
-          updatedAt: Date.now(),
-          retryCount: 0,
-          maxRetries: 3,
-          childTaskIds: [],
-          tags: ['prerequisite', 'crafting'],
-          category: 'crafting',
-          requirement: {
-            type: 'crafting_table',
-            quantity: 1,
-          },
-        },
-      };
-
-      const result = await enhancedTaskIntegration.addTask(craftingTableTask);
-      if (result && result.id) {
-        console.log(`✅ Added crafting table prerequisite task: ${result.id}`);
-      } else {
-        console.log('Task already exists: Craft Crafting Table');
-      }
-
-      return false; // Current task should wait for crafting table
-    } else {
-      console.log(
-        '⚠️ Need wood to craft a crafting table. Adding wood gathering task...'
-      );
-
-      // Add a wood gathering task
-      const woodTask = {
-        id: `task-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-        title: 'Gather Wood for Crafting Table',
-        description: 'Collect wood logs to craft a crafting table',
-        type: 'gathering',
-        priority: task.priority + 2, // Even higher priority
-        urgency: 0.9,
-        progress: 0,
-        status: 'pending' as const,
-        source: 'autonomous' as const,
-        parameters: {
-          itemType: 'oak_log',
-          quantity: 4,
-          targetLocation: 'nearby_trees',
-        },
-        steps: [
-          {
-            id: 'gather-wood-step-1',
-            label: 'Locate nearby wood',
-            done: false,
-            order: 1,
-            estimatedDuration: 3000,
-          },
-          {
-            id: 'gather-wood-step-2',
-            label: 'Collect wood safely',
-            done: false,
-            order: 2,
-            estimatedDuration: 5000,
-          },
-        ],
-        metadata: {
-          createdAt: Date.now(),
-          updatedAt: Date.now(),
-          retryCount: 0,
-          maxRetries: 3,
-          childTaskIds: [],
-          tags: ['prerequisite', 'gathering'],
-          category: 'gathering',
-          requirement: {
-            type: 'oak_log',
-            quantity: 4, // Need 4 wood for crafting table
-          },
-        },
-      };
-
-      const result = await enhancedTaskIntegration.addTask(woodTask);
-      if (result && result.id) {
-        console.log(`✅ Added wood gathering prerequisite task: ${result.id}`);
-      } else {
-        console.log('Task already exists: Gather Wood for Crafting Table');
-      }
-
-      return false; // Current task should wait for wood
+    // Step 2: Analyze resources and options
+    const resourceAnalysis = await analyzeCraftingResources(inventory);
+    
+    // Step 3: Check for nearby crafting tables
+    const nearbyTables = await scanForNearbyCraftingTables();
+    
+    // Step 4: Make intelligent decision
+    const decision = await decideCraftingTableStrategy(resourceAnalysis, nearbyTables, task);
+    
+    if (decision.action === 'use_existing') {
+      console.log(`✅ Using existing crafting table at distance ${decision.details.distance}`);
+      return true;
+    } else if (decision.action === 'craft_new') {
+      console.log(`🔨 Crafting new table: ${decision.reasoning}`);
+      await addCraftingTableTask(task, decision.details);
+      return false; // Wait for crafting table task
+    } else if (decision.action === 'gather_resources') {
+      console.log(`🌳 Need to gather resources first: ${decision.reasoning}`);
+      await addResourceGatheringTask(task, decision.details);
+      return false; // Wait for resource gathering
     }
+
+    // Fallback case
+    console.log('⚠️ No viable crafting table strategy found');
+    return false;
   } catch (error) {
     console.error('Error checking crafting table prerequisite:', error);
     return false;
+  }
+}
+
+/**
+ * Analyze available crafting resources
+ */
+async function analyzeCraftingResources(inventory: any[]): Promise<{
+  canCraft: boolean;
+  hasWood: boolean;
+  woodCount: number;
+  needsGathering: boolean;
+  efficiency: number;
+}> {
+  try {
+    // Check for wood/planks in inventory
+    const woodItems = inventory.filter((item: any) => 
+      item.type?.toLowerCase().includes('log') ||
+      item.type?.toLowerCase().includes('wood') ||
+      item.type?.toLowerCase().includes('plank')
+    );
+
+    const woodCount = woodItems.reduce((total, item) => total + (item.count || 1), 0);
+    
+    // Check if we can convert logs to planks
+    const logItems = inventory.filter((item: any) =>
+      item.type?.toLowerCase().includes('log')
+    );
+    const logCount = logItems.reduce((total, item) => total + (item.count || 1), 0);
+    const totalWoodPotential = woodCount + (logCount * 4); // Each log = 4 planks
+
+    const canCraft = totalWoodPotential >= 4;
+    const hasWood = woodCount > 0 || logCount > 0;
+    const needsGathering = !canCraft;
+    const efficiency = Math.min(1.0, totalWoodPotential / 16); // Efficiency score
+
+    return {
+      canCraft,
+      hasWood,
+      woodCount: totalWoodPotential,
+      needsGathering,
+      efficiency,
+    };
+  } catch (error) {
+    console.error('Error analyzing crafting resources:', error);
+    return {
+      canCraft: false,
+      hasWood: false,
+      woodCount: 0,
+      needsGathering: true,
+      efficiency: 0,
+    };
+  }
+}
+
+/**
+ * Scan for nearby crafting tables
+ */
+async function scanForNearbyCraftingTables(): Promise<Array<{
+  position: any;
+  distance: number;
+}>> {
+  try {
+    // Get current bot position from world state
+    const worldStateResponse = await fetch('http://localhost:3005/state', {
+      method: 'GET',
+      headers: { 'Content-Type': 'application/json' },
+      signal: AbortSignal.timeout(3000),
+    });
+
+    if (!worldStateResponse.ok) return [];
+
+    const worldData = await worldStateResponse.json() as any;
+    const botPosition = worldData.data?.position;
+
+    if (!botPosition) return [];
+
+    // Query nearby blocks to find crafting tables
+    const nearbyBlocksResponse = await fetch(
+      'http://localhost:3005/nearby-blocks',
+      {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json' },
+        signal: AbortSignal.timeout(3000),
+      }
+    );
+
+    if (!nearbyBlocksResponse.ok) return [];
+
+    const nearbyBlocks = await nearbyBlocksResponse.json();
+    const craftingTables: Array<{ position: any; distance: number }> = [];
+
+    if (nearbyBlocks.data && Array.isArray(nearbyBlocks.data)) {
+      nearbyBlocks.data.forEach((block: any) => {
+        if (block.type?.toLowerCase().includes('crafting_table')) {
+          const distance = Math.sqrt(
+            Math.pow(block.position.x - botPosition.x, 2) +
+              Math.pow(block.position.y - botPosition.y, 2) +
+              Math.pow(block.position.z - botPosition.z, 2)
+          );
+
+          if (distance <= 20) {
+            craftingTables.push({
+              position: block.position,
+              distance: Math.round(distance * 100) / 100,
+            });
+          }
+        }
+      });
+    }
+
+    return craftingTables.sort((a, b) => a.distance - b.distance);
+  } catch (error) {
+    console.error('Error scanning for nearby crafting tables:', error);
+    return [];
+  }
+}
+
+/**
+ * Decide crafting table strategy based on analysis
+ */
+async function decideCraftingTableStrategy(
+  resourceAnalysis: any,
+  nearbyTables: any[],
+  task: any
+): Promise<{
+  action: 'use_existing' | 'craft_new' | 'gather_resources';
+  reasoning: string;
+  details: any;
+}> {
+  try {
+    // If we have nearby tables and limited resources, prefer using existing
+    if (nearbyTables.length > 0) {
+      const nearestTable = nearbyTables[0];
+      
+      // Calculate decision factors
+      const distanceFactor = Math.max(0, 1 - (nearestTable.distance / 15));
+      const resourceFactor = resourceAnalysis.efficiency;
+      const travelTime = nearestTable.distance * 1.5; // seconds
+      const craftingTime = resourceAnalysis.canCraft ? 8 : 45;
+      
+      // Score existing table option
+      const existingScore = distanceFactor * 0.6 + (travelTime < craftingTime ? 0.4 : 0);
+      
+      if (existingScore > 0.5 || !resourceAnalysis.canCraft) {
+        return {
+          action: 'use_existing',
+          reasoning: `Table ${nearestTable.distance}b away (score: ${existingScore.toFixed(2)})`,
+          details: { distance: nearestTable.distance, position: nearestTable.position }
+        };
+      }
+    }
+
+    // If we can craft and it's more efficient, craft new table
+    if (resourceAnalysis.canCraft) {
+      return {
+        action: 'craft_new',
+        reasoning: `Have ${resourceAnalysis.woodCount} wood units, efficient to craft new table`,
+        details: { hasResources: true, woodCount: resourceAnalysis.woodCount }
+      };
+    }
+
+    // Need to gather resources first
+    if (resourceAnalysis.needsGathering) {
+      return {
+        action: 'gather_resources',
+        reasoning: `Need ${4 - resourceAnalysis.woodCount} more wood units for crafting table`,
+        details: { 
+          neededWood: Math.max(0, 4 - resourceAnalysis.woodCount),
+          currentWood: resourceAnalysis.woodCount 
+        }
+      };
+    }
+
+    // Fallback
+    return {
+      action: 'craft_new',
+      reasoning: 'Default action when other options unavailable',
+      details: {}
+    };
+  } catch (error) {
+    console.error('Error deciding crafting table strategy:', error);
+    return {
+      action: 'gather_resources',
+      reasoning: 'Error in analysis, defaulting to resource gathering',
+      details: {}
+    };
+  }
+}
+
+/**
+ * Add crafting table task with proper configuration
+ */
+async function addCraftingTableTask(originalTask: any, details: any): Promise<void> {
+  const craftingTableTask = {
+    id: `task-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+    title: 'Craft Crafting Table',
+    description: 'Create a crafting table to enable advanced crafting recipes',
+    type: 'crafting',
+    priority: originalTask.priority + 1,
+    urgency: 0.8,
+    progress: 0,
+    status: 'pending' as const,
+    source: 'autonomous' as const,
+    parameters: {
+      itemType: 'crafting_table',
+      quantity: 1,
+      requiresWood: true,
+      analysis: details,
+    },
+    steps: [
+      {
+        id: 'craft-table-step-1',
+        label: 'Check required materials',
+        done: false,
+        order: 1,
+        estimatedDuration: 2000,
+      },
+      {
+        id: 'craft-table-step-2',
+        label: 'Access crafting interface',
+        done: false,
+        order: 2,
+        estimatedDuration: 3000,
+      },
+      {
+        id: 'craft-table-step-3',
+        label: 'Create the item',
+        done: false,
+        order: 3,
+        estimatedDuration: 5000,
+      },
+    ],
+    metadata: {
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+      retryCount: 0,
+      maxRetries: 3,
+      childTaskIds: [],
+      tags: ['prerequisite', 'crafting'],
+      category: 'crafting',
+      requirement: {
+        type: 'crafting_table',
+        quantity: 1,
+      },
+    },
+  };
+
+  const result = await enhancedTaskIntegration.addTask(craftingTableTask);
+  if (result && result.id) {
+    console.log(`✅ Added intelligent crafting table task: ${result.id}`);
+  } else {
+    console.log('Task already exists: Craft Crafting Table');
+  }
+}
+
+/**
+ * Add resource gathering task for crafting table materials
+ */
+async function addResourceGatheringTask(originalTask: any, details: any): Promise<void> {
+  const woodTask = {
+    id: `task-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+    title: 'Gather Wood for Crafting Table',
+    description: `Collect ${details.neededWood || 4} wood units to craft a crafting table`,
+    type: 'gathering',
+    priority: originalTask.priority + 2,
+    urgency: 0.9,
+    progress: 0,
+    status: 'pending' as const,
+    source: 'autonomous' as const,
+    parameters: {
+      resourceType: 'wood',
+      targetQuantity: details.neededWood || 4,
+      currentQuantity: details.currentWood || 0,
+      locations: ['forest', 'trees', 'logs'],
+      tools: ['axe'],
+    },
+    steps: [
+      {
+        id: 'gather-wood-step-1',
+        label: 'Locate wood sources',
+        done: false,
+        order: 1,
+        estimatedDuration: 5000,
+      },
+      {
+        id: 'gather-wood-step-2',
+        label: 'Gather wood materials',
+        done: false,
+        order: 2,
+        estimatedDuration: details.neededWood * 3000, // 3s per wood unit
+      },
+      {
+        id: 'gather-wood-step-3',
+        label: 'Convert logs to planks if needed',
+        done: false,
+        order: 3,
+        estimatedDuration: 2000,
+      },
+    ],
+    metadata: {
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+      retryCount: 0,
+      maxRetries: 5,
+      childTaskIds: [],
+      tags: ['prerequisite', 'gathering', 'wood'],
+      category: 'resource_gathering',
+      requirement: {
+        type: 'wood',
+        quantity: details.neededWood || 4,
+      },
+    },
+  };
+
+  const result = await enhancedTaskIntegration.addTask(woodTask);
+  if (result && result.id) {
+    console.log(`✅ Added intelligent wood gathering task: ${result.id}`);
+  } else {
+    console.log('Task already exists: Gather Wood for Crafting Table');
   }
 }
 

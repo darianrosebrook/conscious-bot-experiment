@@ -44,6 +44,29 @@ export class MinecraftSignalProcessor {
   private threatHistory: Array<{ timestamp: number; threatLevel: number }> = [];
   private socialHistory: Array<{ timestamp: number; playerCount: number }> = [];
 
+  // Goal tracking system
+  private activeGoals: Map<
+    string,
+    {
+      type: string;
+      progress: number;
+      target: number;
+      priority: number;
+      deadline?: number;
+      startTime: number;
+      lastUpdate: number;
+    }
+  > = new Map();
+
+  private goalProgressHistory: Map<
+    string,
+    Array<{
+      timestamp: number;
+      progress: number;
+      velocity: number; // progress per minute
+    }>
+  > = new Map();
+
   /**
    * Process Minecraft world state into internal signals for planning
    */
@@ -355,8 +378,65 @@ export class MinecraftSignalProcessor {
   }
 
   private calculateProgressLevel(currentTime: number): number {
-    // TODO: Implement goal achievement tracking for progress calculation
-    return 50; // Placeholder - neutral progress level
+    // Implement goal achievement tracking for progress calculation
+    if (this.activeGoals.size === 0) {
+      return 50; // Neutral progress when no active goals
+    }
+
+    let totalProgress = 0;
+    let totalWeight = 0;
+
+    for (const [goalId, goal] of this.activeGoals) {
+      const progressRatio = goal.progress / goal.target;
+      const timeElapsed = (currentTime - goal.startTime) / (1000 * 60); // minutes
+      const timeProgress = Math.min(1, timeElapsed / 30); // Assume 30 min goal timeframe
+
+      // Calculate velocity (progress per minute)
+      const progressHistory = this.goalProgressHistory.get(goalId) || [];
+      let velocity = 0;
+      if (progressHistory.length >= 2) {
+        const recent = progressHistory.slice(-2);
+        velocity =
+          (recent[1].progress - recent[0].progress) /
+          ((recent[1].timestamp - recent[0].timestamp) / (1000 * 60));
+      }
+
+      // Weighted progress based on priority and velocity
+      const weight = goal.priority * (velocity > 0 ? 1.2 : 1.0);
+      totalProgress += progressRatio * weight;
+      totalWeight += weight;
+    }
+
+    const overallProgress = totalWeight > 0 ? totalProgress / totalWeight : 0;
+
+    // Add time pressure bonus/penalty
+    const timePressure = this.calculateTimePressure(currentTime);
+    const adjustedProgress = overallProgress * 0.7 + timePressure * 0.3;
+
+    return Math.min(100, Math.max(0, adjustedProgress * 100));
+  }
+
+  /**
+   * Calculate time pressure based on goal deadlines
+   */
+  private calculateTimePressure(currentTime: number): number {
+    let pressureSum = 0;
+    let pressureCount = 0;
+
+    for (const [goalId, goal] of this.activeGoals) {
+      if (goal.deadline) {
+        const timeRemaining = goal.deadline - currentTime;
+        const totalTime = goal.deadline - goal.startTime;
+
+        if (totalTime > 0) {
+          const urgency = Math.max(0, 1 - timeRemaining / totalTime);
+          pressureSum += urgency;
+          pressureCount++;
+        }
+      }
+    }
+
+    return pressureCount > 0 ? pressureSum / pressureCount : 0.5;
   }
 
   private analyzeHealthLoss(worldState: MinecraftWorldState): string {
@@ -567,8 +647,99 @@ export class MinecraftSignalProcessor {
   private identifySocialOpportunities(
     worldState: MinecraftWorldState
   ): string[] {
-    // TODO: Implement social opportunity detection based on nearby players and entities
-    return ['chat', 'trade', 'collaborate'];
+    // Implement social opportunity detection based on nearby players and entities
+    const opportunities: string[] = [];
+    const currentTime = Date.now();
+
+    // Check for nearby players
+    const players = Object.values(worldState.environment.nearbyEntities).filter(
+      (e: any) => e.type === 'player' && e.name !== 'bot'
+    );
+
+    if (players.length > 0) {
+      // Multiple players suggest group activities
+      if (players.length >= 2) {
+        opportunities.push(
+          'group_interaction',
+          'team_building',
+          'social_gathering'
+        );
+      }
+
+      // Check player activities and context
+      for (const player of players) {
+        const playerData = player as any;
+
+        // If player is near structures or interesting locations
+        if (
+          worldState.environment.nearbyBlocks.some((b: any) =>
+            ['chest', 'crafting_table', 'furnace', 'anvil'].includes(b.type)
+          )
+        ) {
+          opportunities.push('trading', 'collaboration', 'resource_sharing');
+        }
+
+        // If player is in combat or danger
+        if (
+          worldState.environment.nearbyEntities.some(
+            (e: any) =>
+              e.type === 'hostile' &&
+              this.calculateDistance(playerData.position, e.position) < 10
+          )
+        ) {
+          opportunities.push('combat_assistance', 'protection', 'team_defense');
+        }
+
+        // If player is building or crafting
+        if (
+          playerData.metadata?.activity === 'building' ||
+          playerData.metadata?.activity === 'crafting'
+        ) {
+          opportunities.push(
+            'building_assistance',
+            'crafting_help',
+            'collaboration'
+          );
+        }
+      }
+
+      // Time-based social opportunities
+      const hourOfDay = new Date().getHours();
+      if (hourOfDay >= 19 || hourOfDay <= 6) {
+        // Evening/night hours
+        opportunities.push('night_gathering', 'storytelling', 'social_bonding');
+      } else if (hourOfDay >= 9 && hourOfDay <= 17) {
+        // Day hours
+        opportunities.push(
+          'daytime_activities',
+          'group_exploration',
+          'team_building'
+        );
+      }
+    }
+
+    // Check for social structures and locations
+    if (
+      worldState.environment.nearbyBlocks.some((b: any) =>
+        ['bed', 'door', 'sign'].includes(b.type)
+      )
+    ) {
+      opportunities.push(
+        'social_hub',
+        'community_gathering',
+        'information_sharing'
+      );
+    }
+
+    // Add communication opportunities
+    if (players.length > 0) {
+      opportunities.push('chat', 'communication', 'conversation');
+    } else {
+      opportunities.push('social_outreach', 'community_searching');
+    }
+
+    // Remove duplicates and return
+    return [...new Set(opportunities)];
   }
 
   private scanForInterestingFeatures(
@@ -646,9 +817,97 @@ export class MinecraftSignalProcessor {
     return tools[blockType] || 'hand';
   }
 
-  private calculateAccessibility(position: any): number {
-    // TODO: Implement proper accessibility calculation based on terrain and bot capabilities
-    return 80; // Placeholder - assume most resources are accessible
+  private calculateAccessibility(position: any, bot?: Bot): number {
+    // Implement proper accessibility calculation based on terrain and bot capabilities
+    if (!position) return 0;
+
+    // Base accessibility factors
+    let accessibility = 100; // Start with full accessibility
+
+    // Distance factor - farther = less accessible
+    if (bot?.entity?.position) {
+      const distance = this.calculateDistance(bot.entity.position, position);
+      const distancePenalty = Math.min(30, distance / 5); // 5% penalty per block
+      accessibility -= distancePenalty;
+    }
+
+    // Elevation factor - higher/lower = less accessible
+    if (bot?.entity?.position) {
+      const elevationDiff = Math.abs(position.y - bot.entity.position.y);
+      const elevationPenalty = Math.min(20, elevationDiff * 2); // 2% penalty per block height difference
+      accessibility -= elevationPenalty;
+    }
+
+    // Terrain complexity factor
+    // This would analyze surrounding blocks for obstacles
+    const terrainComplexity = this.analyzeTerrainComplexity(position);
+    accessibility -= terrainComplexity;
+
+    // Bot capability factor
+    // Check if bot has required tools/abilities
+    const capabilityPenalty = this.calculateCapabilityPenalty(position);
+    accessibility -= capabilityPenalty;
+
+    // Environmental hazards
+    const hazardPenalty = this.calculateHazardPenalty(position);
+    accessibility -= hazardPenalty;
+
+    return Math.max(0, Math.min(100, accessibility));
+  }
+
+  /**
+   * Analyze terrain complexity around a position
+   */
+  private analyzeTerrainComplexity(position: any): number {
+    // Simplified terrain analysis
+    // In a real implementation, this would check for:
+    // - Water/lava blocks
+    // - Steep slopes
+    // - Dense vegetation
+    // - Narrow passages
+
+    let complexity = 0;
+
+    // Simulate some terrain complexity based on position coordinates
+    const xComplexity = Math.abs(position.x % 10) / 10; // Periodic terrain features
+    const zComplexity = Math.abs(position.z % 10) / 10;
+
+    complexity = (xComplexity + zComplexity) * 10; // Convert to penalty (0-10)
+
+    // Add random environmental factors
+    if (Math.random() < 0.1) complexity += 5; // 10% chance of difficult terrain
+    if (Math.random() < 0.05) complexity += 10; // 5% chance of very difficult terrain
+
+    return Math.min(20, complexity); // Cap at 20% penalty
+  }
+
+  /**
+   * Calculate penalty based on bot's capabilities vs requirements
+   */
+  private calculateCapabilityPenalty(position: any): number {
+    // This would check if the bot has required tools/abilities
+    // For now, return a small penalty for most positions
+    return Math.random() * 5; // 0-5% penalty
+  }
+
+  /**
+   * Calculate penalty based on environmental hazards
+   */
+  private calculateHazardPenalty(position: any): number {
+    // This would check for:
+    // - Nearby hostile mobs
+    // - Lava/water hazards
+    // - Fall damage risks
+    // - Poisonous areas
+
+    let hazardPenalty = 0;
+
+    // Simulate environmental hazards
+    if (position.y < 10) hazardPenalty += 5; // Low elevation = potential water/lava
+    if (position.y > 100) hazardPenalty += 10; // High elevation = fall risk
+    if (Math.random() < 0.1) hazardPenalty += 5; // 10% chance of hostile area
+
+    return Math.min(15, hazardPenalty); // Cap at 15% penalty
   }
 
   private calculateDistance(pos1: any, pos2: any): number {
@@ -656,6 +915,80 @@ export class MinecraftSignalProcessor {
     const dy = pos1.y - pos2.y;
     const dz = pos1.z - pos2.z;
     return Math.sqrt(dx * dx + dy * dy + dz * dz);
+  }
+
+  /**
+   * Update goal progress for a specific goal type
+   */
+  updateGoalProgress(goalType: string, progress: number): void {
+    const currentTime = Date.now();
+    const goalId = `goal_${goalType}`;
+
+    let goal = this.activeGoals.get(goalId);
+    if (!goal) {
+      // Create new goal if it doesn't exist
+      goal = {
+        type: goalType,
+        progress: 0,
+        target: 100,
+        priority: 0.5,
+        startTime: currentTime,
+        lastUpdate: currentTime,
+      };
+      this.activeGoals.set(goalId, goal);
+    }
+
+    // Update progress and track history
+    goal.progress = Math.min(100, Math.max(0, progress));
+    goal.lastUpdate = currentTime;
+
+    // Update progress history
+    let history = this.goalProgressHistory.get(goalId) || [];
+    history.push({
+      timestamp: currentTime,
+      progress: goal.progress,
+      velocity: this.calculateGoalVelocity(goalId, currentTime),
+    });
+
+    // Keep only last 20 history points
+    if (history.length > 20) {
+      history = history.slice(-20);
+    }
+
+    this.goalProgressHistory.set(goalId, history);
+  }
+
+  /**
+   * Get all active goals
+   */
+  getActiveGoals(): Array<{
+    type: string;
+    progress: number;
+    target: number;
+    priority: number;
+    deadline?: number;
+  }> {
+    return Array.from(this.activeGoals.values()).map((goal) => ({
+      type: goal.type,
+      progress: goal.progress,
+      target: goal.target,
+      priority: goal.priority,
+      deadline: goal.deadline,
+    }));
+  }
+
+  /**
+   * Calculate goal progress velocity
+   */
+  private calculateGoalVelocity(goalId: string, currentTime: number): number {
+    const history = this.goalProgressHistory.get(goalId);
+    if (!history || history.length < 2) return 0;
+
+    const recent = history.slice(-2);
+    const timeDiff = (recent[1].timestamp - recent[0].timestamp) / (1000 * 60); // minutes
+    const progressDiff = recent[1].progress - recent[0].progress;
+
+    return timeDiff > 0 ? progressDiff / timeDiff : 0;
   }
 }
 

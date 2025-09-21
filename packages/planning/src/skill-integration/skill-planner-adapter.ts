@@ -34,6 +34,7 @@ export interface Skill {
   description: string;
   metadata: SkillMetadata;
   preconditions?: any;
+  postconditions?: any;
 }
 
 export interface SkillMetadata {
@@ -524,12 +525,19 @@ export class SkillPlannerAdapter extends EventEmitter {
     // Select skill with highest success rate and lowest complexity
     return skills.reduce((best, current) => {
       const bestComplexityScore = this.getComplexityScore(
-        (best.metadata?.complexity ?? 'moderate') as 'simple' | 'moderate' | 'complex'
+        (best.metadata?.complexity ?? 'moderate') as
+          | 'simple'
+          | 'moderate'
+          | 'complex'
       );
       const currentComplexityScore = this.getComplexityScore(
-        (current.metadata?.complexity ?? 'moderate') as 'simple' | 'moderate' | 'complex'
+        (current.metadata?.complexity ?? 'moderate') as
+          | 'simple'
+          | 'moderate'
+          | 'complex'
       );
-      const bestScore = (best.metadata?.successRate ?? 0.5) * (1 - bestComplexityScore);
+      const bestScore =
+        (best.metadata?.successRate ?? 0.5) * (1 - bestComplexityScore);
       const currentScore =
         (current.metadata?.successRate ?? 0.5) * (1 - currentComplexityScore);
       return currentScore > bestScore ? current : best;
@@ -587,7 +595,12 @@ export class SkillPlannerAdapter extends EventEmitter {
   private estimateSkillDuration(skill: Skill): number {
     // Estimate duration based on skill complexity and metadata
     const baseDuration = skill.metadata?.averageExecutionTime || 5000;
-    const complexityScore = this.getComplexityScore(skill.metadata?.complexity ?? 'moderate');
+    const complexityScore = this.getComplexityScore(
+      (skill.metadata?.complexity ?? 'moderate') as
+        | 'simple'
+        | 'moderate'
+        | 'complex'
+    );
     const complexityMultiplier = 1 + complexityScore;
     return Math.round(baseDuration * complexityMultiplier);
   }

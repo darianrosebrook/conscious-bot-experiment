@@ -351,73 +351,301 @@ function compactInventoryStacks(
 /**
  * Drop unwanted items from inventory
  */
-function dropUnwantedItems(
+async function dropUnwantedItems(
   bot: Bot,
   keepItems: string[] = []
-): { processed: number; dropped: number } {
+): Promise<{ processed: number; dropped: number }> {
   const items = bot.inventory.items();
   let dropped = 0;
 
-  // Define essential items that should never be dropped
-  const essentialItems = [
-    'diamond_sword',
-    'diamond_pickaxe',
-    'diamond_axe',
-    'diamond_shovel',
-    'iron_sword',
-    'iron_pickaxe',
-    'iron_axe',
-    'iron_shovel',
-    'golden_apple',
-    'enchanted_golden_apple',
-    'bread',
-    'cooked_beef',
-    'cooked_porkchop',
-    'cooked_chicken',
-    'diamond_helmet',
-    'diamond_chestplate',
-    'diamond_leggings',
-    'diamond_boots',
-    'iron_helmet',
-    'iron_chestplate',
-    'iron_leggings',
-    'iron_boots',
-  ];
+    // Define essential items that should never be dropped
+    const essentialItems = [
+      'diamond_sword',
+      'diamond_pickaxe',
+      'diamond_axe',
+      'diamond_shovel',
+      'iron_sword',
+      'iron_pickaxe',
+      'iron_axe',
+      'iron_shovel',
+      'golden_apple',
+      'enchanted_golden_apple',
+      'bread',
+      'cooked_beef',
+      'cooked_porkchop',
+      'cooked_chicken',
+      'diamond_helmet',
+      'diamond_chestplate',
+      'diamond_leggings',
+      'diamond_boots',
+      'iron_helmet',
+      'iron_chestplate',
+      'iron_leggings',
+      'iron_boots',
+    ];
+
+    // Advanced item valuation system
+    const itemValues = this.calculateItemValues(items, bot);
+    const craftingOpportunities = this.analyzeCraftingOpportunities(items, bot);
+    const storageOptimization = this.optimizeStorageLayout(items);
 
   // Combine keepItems with essential items
   const protectedItems = [...new Set([...keepItems, ...essentialItems])];
 
   for (const item of items) {
     // Skip protected items
-    if (protectedItems.some((protected) => item.name.includes(protected))) {
+    if (
+      protectedItems.some((protectedItem) => item.name.includes(protectedItem))
+    ) {
       continue;
     }
 
-    // Skip items with high value or usefulness
-    const valuableItems = [
-      'diamond',
-      'iron_ingot',
-      'gold_ingot',
-      'emerald',
-      'redstone',
-    ];
-    const isValuable = valuableItems.some((valuable) =>
-      item.name.includes(valuable)
-    );
+      // Enhanced value-based decision making
+      const itemValue = itemValues.get(item.name) || 0;
+      const isCraftable = craftingOpportunities.some((opp: any) =>
+        opp.requiredItems.some((req: any) => req.item === item.name)
+      );
 
-    if (isValuable && item.count <= 16) {
-      continue; // Keep small amounts of valuable materials
+      // Keep valuable items, craftable components, and essential items
+      if (
+        itemValue > 50 || // High value items
+        isCraftable || // Items needed for crafting
+        protectedItems.some((protected) => item.name.includes(protected))
+      ) {
+        continue;
+      }
+
+      // Keep small amounts of moderately valuable materials for crafting
+      const moderatelyValuableItems = ['iron_ingot', 'gold_ingot', 'redstone', 'lapis_lazuli'];
+      const isModeratelyValuable = moderatelyValuableItems.some((valuable) =>
+        item.name.includes(valuable)
+      );
+
+      if (isModeratelyValuable && item.count <= 8) {
+        continue; // Keep small amounts for potential crafting
+      }
+
+  // Drop the item
+  try {
+    await bot.toss(item.type, null, item.count);
+    dropped++;
+    console.log(`🗑️ Dropped ${item.count}x ${item.name} (value: ${itemValue || 0})`);
+  } catch (error) {
+    console.warn(`Failed to drop ${item.name}:`, error);
+  }
+
+  console.log(`🗑️ Inventory cleanup complete: dropped ${dropped} items, preserved ${items.length - dropped} valuable/craftable items`);
+  return { processed: items.length, dropped };
+}
+
+  /**
+   * Calculate item values for intelligent inventory management
+   */
+  private calculateItemValues(items: any[], bot: Bot): any {
+    const itemValues = new Map<string, number>();
+
+  // Base item values (rarity-based)
+  const baseValues: Record<string, number> = {
+    // Tools and weapons
+    'diamond_sword': 2000, 'diamond_pickaxe': 1800, 'diamond_axe': 1600, 'diamond_shovel': 1400,
+    'iron_sword': 500, 'iron_pickaxe': 450, 'iron_axe': 400, 'iron_shovel': 350,
+    'stone_sword': 50, 'stone_pickaxe': 45, 'stone_axe': 40, 'stone_shovel': 35,
+    'wooden_sword': 10, 'wooden_pickaxe': 8, 'wooden_axe': 6, 'wooden_shovel': 4,
+
+    // Armor
+    'diamond_helmet': 1600, 'diamond_chestplate': 2000, 'diamond_leggings': 1800, 'diamond_boots': 1400,
+    'iron_helmet': 400, 'iron_chestplate': 500, 'iron_leggings': 450, 'iron_boots': 350,
+    'chainmail_helmet': 150, 'chainmail_chestplate': 200, 'chainmail_leggings': 175, 'chainmail_boots': 125,
+    'leather_helmet': 50, 'leather_chestplate': 75, 'leather_leggings': 60, 'leather_boots': 40,
+
+    // Materials
+    'diamond': 100, 'iron_ingot': 25, 'gold_ingot': 30, 'emerald': 50, 'redstone': 5,
+    'lapis_lazuli': 8, 'coal': 3, 'quartz': 6, 'obsidian': 15, 'crying_obsidian': 20,
+
+    // Food
+    'golden_apple': 500, 'enchanted_golden_apple': 2000, 'cooked_beef': 15, 'cooked_porkchop': 15,
+    'cooked_chicken': 12, 'bread': 8, 'apple': 5, 'carrot': 3, 'potato': 3,
+
+    // Building blocks
+    'diamond_block': 900, 'iron_block': 225, 'gold_block': 270, 'obsidian': 135,
+  };
+
+  // Calculate values for all items
+  for (const item of items) {
+    let value = baseValues[item.name] || 1; // Default low value
+
+    // Enchantment bonus (simplified)
+    if (item.metadata?.enchanted) {
+      value *= 1.5;
     }
 
-    // Drop the item
-    try {
-      await bot.toss(item.type, null, item.count);
-      dropped++;
-      console.log(`🗑️ Dropped ${item.count}x ${item.name}`);
-    } catch (error) {
-      console.warn(`Failed to drop ${item.name}:`, error);
+    // Durability bonus (simplified)
+    if (item.metadata?.durability) {
+      const durabilityRatio = item.metadata.durability / 100;
+      value *= (0.5 + durabilityRatio * 0.5); // 50-100% of base value
+    }
+
+    // Stack size bonus
+    if (item.count > 1) {
+      value *= Math.min(2, item.count / 10); // Bonus for larger stacks
+    }
+
+    itemValues.set(item.name, Math.round(value));
+  }
+
+  return itemValues;
+}
+
+  /**
+   * Analyze crafting opportunities based on available materials
+   */
+  private analyzeCraftingOpportunities(items: any[], bot: Bot): any {
+  const opportunities: Array<{
+    recipe: string;
+    requiredItems: Array<{ item: string; count: number; available: number }>;
+    output: string;
+    priority: number;
+    value: number;
+  }> = [];
+
+  // Define basic crafting recipes
+  const recipes: Record<string, {
+    ingredients: Array<{ item: string; count: number }>;
+    output: string;
+    priority: number;
+    baseValue: number;
+  }> = {
+    'iron_sword': {
+      ingredients: [{ item: 'iron_ingot', count: 2 }, { item: 'stick', count: 1 }],
+      output: 'iron_sword',
+      priority: 8,
+      baseValue: 500,
+    },
+    'iron_pickaxe': {
+      ingredients: [{ item: 'iron_ingot', count: 3 }, { item: 'stick', count: 2 }],
+      output: 'iron_pickaxe',
+      priority: 8,
+      baseValue: 450,
+    },
+    'bread': {
+      ingredients: [{ item: 'wheat', count: 3 }],
+      output: 'bread',
+      priority: 6,
+      baseValue: 8,
+    },
+    'cooked_beef': {
+      ingredients: [{ item: 'raw_beef', count: 1 }],
+      output: 'cooked_beef',
+      priority: 7,
+      baseValue: 15,
+    },
+  };
+
+  // Analyze each recipe
+  for (const [recipeName, recipe] of Object.entries(recipes)) {
+    const requiredItems: Array<{ item: string; count: number; available: number }> = [];
+    let canCraft = true;
+
+    for (const ingredient of recipe.ingredients) {
+      const availableItem = items.find((item: any) =>
+        item.name.includes(ingredient.item.split('_')[0]) // Fuzzy matching
+      );
+      const availableCount = availableItem?.count || 0;
+
+      requiredItems.push({
+        item: ingredient.item,
+        count: ingredient.count,
+        available: availableCount,
+      });
+
+      if (availableCount < ingredient.count) {
+        canCraft = false;
+      }
+    }
+
+    if (canCraft) {
+      opportunities.push({
+        recipe: recipeName,
+        requiredItems,
+        output: recipe.output,
+        priority: recipe.priority,
+        value: recipe.baseValue,
+      });
     }
   }
+
+  // Sort by priority and value
+  opportunities.sort((a, b) => b.priority * b.value - a.priority * a.value);
+
+  console.log(`🔧 Found ${opportunities.length} crafting opportunities`);
+  return opportunities;
+}
+
+  /**
+   * Optimize storage layout for better organization
+   */
+  private optimizeStorageLayout(items: any[]): any {
+  const layout = {
+    hotbarItems: [] as string[],
+    mainInventoryLayout: {} as Record<number, string>,
+    recommendations: [] as string[],
+  };
+
+  // Prioritize items for hotbar (tools, weapons, food)
+  const hotbarPriority = [
+    'diamond_sword', 'iron_sword', 'diamond_pickaxe', 'iron_pickaxe',
+    'diamond_axe', 'iron_axe', 'golden_apple', 'cooked_beef', 'bread'
+  ];
+
+  const availableHotbarItems = items.filter((item: any) =>
+    hotbarPriority.some((priority) => item.name.includes(priority.split('_')[0]))
+  );
+
+  layout.hotbarItems = availableHotbarItems.slice(0, 9).map((item: any) => item.name);
+
+  // Suggest optimal main inventory layout
+  const remainingItems = items.filter((item: any) =>
+    !layout.hotbarItems.includes(item.name)
+  );
+
+  // Organize by category
+  const tools = remainingItems.filter((item: any) =>
+    item.name.includes('sword') || item.name.includes('pickaxe') ||
+    item.name.includes('axe') || item.name.includes('shovel')
+  );
+
+  const armor = remainingItems.filter((item: any) =>
+    item.name.includes('helmet') || item.name.includes('chestplate') ||
+    item.name.includes('leggings') || item.name.includes('boots')
+  );
+
+  const food = remainingItems.filter((item: any) =>
+    item.name.includes('apple') || item.name.includes('bread') ||
+    item.name.includes('beef') || item.name.includes('chicken') ||
+    item.name.includes('porkchop') || item.name.includes('carrot') ||
+    item.name.includes('potato')
+  );
+
+  const materials = remainingItems.filter((item: any) =>
+    !tools.includes(item) && !armor.includes(item) && !food.includes(item)
+  );
+
+  // Generate recommendations
+  if (tools.length > 10) {
+    layout.recommendations.push('Consider storing excess tools in chests');
+  }
+
+  if (materials.length > 20) {
+    layout.recommendations.push('Store excess materials in dedicated chests');
+  }
+
+  if (availableHotbarItems.length > 9) {
+    layout.recommendations.push('Multiple high-priority items available for hotbar');
+  }
+
+  console.log(`📦 Storage optimization: ${layout.hotbarItems.length} hotbar items, ${tools.length} tools, ${armor.length} armor, ${food.length} food, ${materials.length} materials`);
+
+  return layout;
 
   console.log(`🗑️ Inventory cleanup complete: dropped ${dropped} items`);
   return { processed: items.length, dropped };
@@ -426,11 +654,11 @@ function dropUnwantedItems(
 /**
  * Comprehensive inventory organization
  */
-function organizeInventory(
+async function organizeInventory(
   bot: Bot,
   keepItems: string[] = [],
   maxStackSize: number
-): { processed: number; compacted: number; dropped: number } {
+): Promise<{ processed: number; compacted: number; dropped: number }> {
   console.log('🧹 Starting comprehensive inventory organization...');
 
   const items = bot.inventory.items();
@@ -451,7 +679,7 @@ function organizeInventory(
 
     // Step 3: Drop unwanted items
     console.log('🗑️ Step 3: Cleaning up unwanted items...');
-    const dropResult = dropUnwantedItems(bot, keepItems);
+    const dropResult = await dropUnwantedItems(bot, keepItems);
     dropped = dropResult.dropped;
     console.log(`✅ Dropped ${dropped} unwanted items`);
 
@@ -527,51 +755,54 @@ async function openContainerAtPosition(
       console.log(
         `Moving bot to container at ${position.x}, ${position.y}, ${position.z}`
       );
-      
+
       try {
         // Use mineflayer pathfinding to move to container
         const movements = new (require('mineflayer-pathfinder').Movements)(bot);
         const goal = new (require('mineflayer-pathfinder').goals.GoalNear)(
-          position.x, 
-          position.y, 
-          position.z, 
+          position.x,
+          position.y,
+          position.z,
           1 // Within 1 block
         );
-        
+
         // Set pathfinder goal and wait for completion
         bot.pathfinder.setMovements(movements);
         bot.pathfinder.setGoal(goal);
-        
+
         await new Promise<void>((resolve, reject) => {
           const timeout = setTimeout(() => {
             reject(new Error('Pathfinding timeout'));
           }, 10000); // 10 second timeout
-          
+
           const goalReached = () => {
             clearTimeout(timeout);
             bot.removeListener('goal_reached', goalReached);
             bot.removeListener('path_stop', pathStopped);
             resolve();
           };
-          
-          const pathStopped = (reason: string) => {
+
+          const pathStopped = (reason?: string) => {
             clearTimeout(timeout);
             bot.removeListener('goal_reached', goalReached);
             bot.removeListener('path_stop', pathStopped);
             if (reason === 'goal_reached') {
               resolve();
             } else {
-              reject(new Error(`Pathfinding failed: ${reason}`));
+              reject(new Error(`Pathfinding failed: ${reason || 'unknown'}`));
             }
           };
-          
+
           bot.once('goal_reached', goalReached);
           bot.once('path_stop', pathStopped);
         });
-        
+
         console.log(`✅ Bot reached container position`);
       } catch (pathError) {
-        console.warn(`⚠️ Pathfinding failed, trying to proceed anyway:`, pathError);
+        console.warn(
+          `⚠️ Pathfinding failed, trying to proceed anyway:`,
+          pathError
+        );
         // Continue attempting to open container even if pathfinding fails
       }
     }
@@ -878,7 +1109,6 @@ export class OpenContainerLeaf implements LeafImpl {
       };
     }
   }
-}
 
 // ============================================================================
 // Transfer Items Leaf
@@ -999,32 +1229,44 @@ export class TransferItemsLeaf implements LeafImpl {
 
       // Implement actual item transfer logic
       let itemsTransferred = 0;
-      
+
       try {
         const sourceWindow = sourceContainer.window;
         const destWindow = destContainer.window;
-        
+
         if (!sourceWindow || !destWindow) {
           throw new Error('Container windows not available');
         }
 
         // Identify items to transfer based on mode
-        const itemsToTransfer: Array<{slot: number, item: any, count: number}> = [];
-        
+        const itemsToTransfer: Array<{
+          slot: number;
+          item: any;
+          count: number;
+        }> = [];
+
         if (mode.includes('all')) {
           // Transfer all items from source to destination
-          for (let slot = 0; slot < sourceWindow.inventoryStart + sourceWindow.inventoryEnd; slot++) {
+          for (
+            let slot = 0;
+            slot < sourceWindow.inventoryStart + sourceWindow.inventoryEnd;
+            slot++
+          ) {
             const item = sourceWindow.slots[slot];
             if (item) {
-              itemsToTransfer.push({slot, item, count: item.count});
+              itemsToTransfer.push({ slot, item, count: item.count });
             }
           }
         } else if (mode.includes('deposit')) {
           // Transfer from bot inventory to container
-          for (let slot = sourceWindow.inventoryStart; slot < sourceWindow.inventoryEnd; slot++) {
+          for (
+            let slot = sourceWindow.inventoryStart;
+            slot < sourceWindow.inventoryEnd;
+            slot++
+          ) {
             const item = sourceWindow.slots[slot];
             if (item) {
-              itemsToTransfer.push({slot, item, count: item.count});
+              itemsToTransfer.push({ slot, item, count: item.count });
             }
           }
         } else if (mode.includes('withdraw')) {
@@ -1032,15 +1274,19 @@ export class TransferItemsLeaf implements LeafImpl {
           for (let slot = 0; slot < sourceWindow.inventoryStart; slot++) {
             const item = sourceWindow.slots[slot];
             if (item) {
-              itemsToTransfer.push({slot, item, count: item.count});
+              itemsToTransfer.push({ slot, item, count: item.count });
             }
           }
         } else {
           // Custom transfer based on mode - look for specific item types
-          for (let slot = 0; slot < sourceWindow.inventoryStart + sourceWindow.inventoryEnd; slot++) {
+          for (
+            let slot = 0;
+            slot < sourceWindow.inventoryStart + sourceWindow.inventoryEnd;
+            slot++
+          ) {
             const item = sourceWindow.slots[slot];
-            if (item && mode.some(m => item.name.includes(m.toLowerCase()))) {
-              itemsToTransfer.push({slot, item, count: item.count});
+            if (item && mode.some((m) => item.name.includes(m.toLowerCase()))) {
+              itemsToTransfer.push({ slot, item, count: item.count });
             }
           }
         }
@@ -1050,39 +1296,46 @@ export class TransferItemsLeaf implements LeafImpl {
           try {
             // Find an empty slot in destination
             let emptySlot = -1;
-            const destSlots = mode.includes('withdraw') 
+            const destSlots = mode.includes('withdraw')
               ? destWindow.inventoryStart // Transfer to bot inventory
               : 0; // Transfer to container
             const destSlotsEnd = mode.includes('withdraw')
               ? destWindow.inventoryEnd
               : destWindow.inventoryStart;
-              
+
             for (let slot = destSlots; slot < destSlotsEnd; slot++) {
               if (!destWindow.slots[slot]) {
                 emptySlot = slot;
                 break;
               }
             }
-            
+
             if (emptySlot === -1) {
               console.warn(`No empty slot found for ${transfer.item.name}`);
               continue;
             }
 
             // Move the item
-            await sourceWindow.transferItem(transfer.slot, emptySlot, transfer.count);
+            await sourceWindow.transferItem(
+              transfer.slot,
+              emptySlot,
+              transfer.count
+            );
             itemsTransferred++;
-            
-            console.log(`✅ Transferred ${transfer.count}x ${transfer.item.name}`);
-            
+
+            console.log(
+              `✅ Transferred ${transfer.count}x ${transfer.item.name}`
+            );
+
             // Small delay to prevent overwhelming the server
-            await new Promise(resolve => setTimeout(resolve, 100));
-            
+            await new Promise((resolve) => setTimeout(resolve, 100));
           } catch (transferError) {
-            console.warn(`Failed to transfer ${transfer.item.name}:`, transferError);
+            console.warn(
+              `Failed to transfer ${transfer.item.name}:`,
+              transferError
+            );
           }
         }
-        
       } catch (transferError) {
         console.error('Item transfer logic error:', transferError);
       }
@@ -1130,7 +1383,6 @@ export class TransferItemsLeaf implements LeafImpl {
       };
     }
   }
-}
 
 // ============================================================================
 // Close Container Leaf
@@ -1263,7 +1515,6 @@ export class CloseContainerLeaf implements LeafImpl {
       };
     }
   }
-}
 
 // ============================================================================
 // Inventory Management Leaf
@@ -1363,14 +1614,18 @@ export class InventoryManagementLeaf implements LeafImpl {
 
           case 'drop':
             // Drop unwanted items
-            const dropped = dropUnwantedItems(bot, keepItems);
+            const dropped = await dropUnwantedItems(bot, keepItems);
             itemsProcessed = dropped.processed;
             itemsDropped = dropped.dropped;
             break;
 
           case 'organize':
             // Comprehensive organization: sort + compact + drop
-            const organized = organizeInventory(bot, keepItems, maxStackSize);
+            const organized = await organizeInventory(
+              bot,
+              keepItems,
+              maxStackSize
+            );
             itemsProcessed = organized.processed;
             stacksCompacted = organized.compacted;
             itemsDropped = organized.dropped;
@@ -1446,4 +1701,3 @@ export class InventoryManagementLeaf implements LeafImpl {
       };
     }
   }
-}

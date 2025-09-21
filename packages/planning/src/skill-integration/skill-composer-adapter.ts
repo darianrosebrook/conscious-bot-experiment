@@ -280,6 +280,16 @@ export class SkillComposerAdapter extends EventEmitter {
       [GoalType.SOCIAL]: 'interact with other entities',
       [GoalType.CURIOSITY]: 'investigate and learn',
       [GoalType.RESOURCE_GATHERING]: 'gather and collect resources',
+      [GoalType.FARMING]: 'cultivate and manage crops',
+      [GoalType.CONTAINER_MANAGEMENT]: 'organize and manage storage',
+      [GoalType.WORLD_MANIPULATION]: 'modify and interact with world blocks',
+      [GoalType.REDSTONE_AUTOMATION]: 'create and manage redstone systems',
+      [GoalType.STRUCTURE_CONSTRUCTION]: 'build and construct structures',
+      [GoalType.ENVIRONMENTAL_CONTROL]: 'control and modify environment',
+      [GoalType.INVENTORY_ORGANIZATION]: 'organize and manage inventory',
+      [GoalType.MECHANISM_OPERATION]: 'operate and control mechanisms',
+      [GoalType.COMBAT_TRAINING]: 'train and improve combat skills',
+      [GoalType.AGRICULTURE_DEVELOPMENT]: 'develop and expand agriculture',
     };
 
     return descriptions[goal.type] || 'complete general task';

@@ -192,6 +192,8 @@ export class Arbiter extends EventEmitter<SystemEvents> {
   private processLoopInterval?: NodeJS.Timeout;
   private totalSignalsProcessed = 0;
   private lastSignalTime = 0;
+  private taskQueue: CognitiveTask[] = [];
+  private isProcessing = false;
 
   constructor(options: ArbiterOptions = {}) {
     super();
@@ -768,6 +770,7 @@ export class Arbiter extends EventEmitter<SystemEvents> {
             | 'reactive'
             | 'exploration',
           priority: prioritizedTask.calculatedPriority,
+          urgency: prioritizedTask.urgency,
           complexity: prioritizedTask.complexity > 0.5 ? 'complex' : 'simple',
           context: {
             needType: prioritizedTask.name,
@@ -912,26 +915,6 @@ export class Arbiter extends EventEmitter<SystemEvents> {
   }
 
   /**
-   * Get current context for advanced components
-   */
-  private getCurrentContext() {
-    return {
-      timeOfDay: 'morning' as any, // TimeOfDay enum
-      location: 'village' as any, // LocationType enum
-      socialContext: 'alone' as any, // SocialContext enum
-      environmentalFactors: [],
-      recentEvents: [],
-      currentGoals: [],
-      availableResources: ['basic_tools', 'food'],
-      environment: 'village',
-      constraints: [],
-      opportunities: [],
-      energyLevel: 0.8,
-      stressLevel: 0.2,
-    };
-  }
-
-  /**
    * Map need type to task type
    */
   private mapNeedTypeToTaskType(needType: string): any {
@@ -1005,17 +988,30 @@ export class Arbiter extends EventEmitter<SystemEvents> {
       // For urgent needs, bypass normal processing and go straight to execution
       const urgentTask: CognitiveTask = {
         id: uuidv4(),
-        type: need.type,
+        type: need.type as
+          | 'planning'
+          | 'reasoning'
+          | 'social'
+          | 'reactive'
+          | 'exploration',
         priority: 0.9, // Very high priority
         urgency: need.urgency,
+        complexity: 'simple',
         deadline: Date.now() + 1000, // 1 second deadline
         context: this.getCurrentContext(),
-        requirements: [],
-        constraints: ['immediate_execution'],
       };
 
       // Execute immediately without queuing
-      const result = await this.executeTask(urgentTask);
+      const routing: RoutingDecision = {
+        selectedModule: urgentTask.type as ModuleType,
+        confidence: 1.0,
+        reasoning: 'urgent_task',
+        alternatives: [],
+        processingTime: 100,
+        riskAssessment: 'low',
+        timestamp: Date.now(),
+      };
+      const result = await this.executeTask(urgentTask, routing);
       console.log(`✅ Urgent need processed: ${need.type} -> ${result}`);
 
       // Emit event for monitoring
@@ -1048,13 +1044,17 @@ export class Arbiter extends EventEmitter<SystemEvents> {
       // Create high-priority task
       const highPriorityTask: CognitiveTask = {
         id: uuidv4(),
-        type: need.type,
+        type: need.type as
+          | 'planning'
+          | 'reasoning'
+          | 'social'
+          | 'reactive'
+          | 'exploration',
         priority: 0.7, // High priority
         urgency: need.urgency,
+        complexity: 'simple',
         deadline: Date.now() + 5000, // 5 second deadline
         context: this.getCurrentContext(),
-        requirements: [],
-        constraints: ['high_priority'],
       };
 
       // Add to front of processing queue
@@ -1098,6 +1098,40 @@ export class Arbiter extends EventEmitter<SystemEvents> {
     const memoryLoad = memoryUsage.heapUsed / memoryUsage.heapTotal;
 
     return Math.min(1.0, activeTasks * 0.1 + memoryLoad);
+  }
+
+  /**
+   * Process the next task in the queue
+   */
+  private async processNextTask(): Promise<void> {
+    if (this.taskQueue.length === 0) {
+      return;
+    }
+
+    this.isProcessing = true;
+    try {
+      const task = this.taskQueue.shift();
+      if (task) {
+        await this.processTask(task);
+      }
+    } finally {
+      this.isProcessing = false;
+    }
+  }
+
+  /**
+   * Process a single task
+   */
+  private async processTask(task: CognitiveTask): Promise<void> {
+    try {
+      // Find appropriate module for the task
+      const module = this.registeredModules.get(task.type as ModuleType);
+      if (module) {
+        await module.process(task, 1000); // 1 second budget
+      }
+    } catch (error) {
+      console.error('Error processing task:', error);
+    }
   }
 }
 

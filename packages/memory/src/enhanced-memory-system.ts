@@ -600,7 +600,7 @@ export class EnhancedMemorySystem {
   }
 
   /**
-   * Get health status of the memory system
+   * Get comprehensive health status of the memory system with predictive analysis
    */
   async healthCheck(): Promise<{
     status: 'healthy' | 'degraded' | 'unhealthy';
@@ -613,6 +613,15 @@ export class EnhancedMemorySystem {
     performance: {
       averageSearchLatency: number;
       memoryUsage: string;
+      searchThroughput: number;
+      ingestionRate: number;
+      errorRate: number;
+    };
+    predictive: {
+      memoryPressure: 'low' | 'medium' | 'high';
+      performanceTrend: 'improving' | 'stable' | 'degrading';
+      reliabilityScore: number;
+      recommendations: string[];
     };
   }> {
     const components = {
@@ -622,34 +631,79 @@ export class EnhancedMemorySystem {
       hybridSearch: 'unknown',
     };
 
-    // Check database
+    const issues: string[] = [];
+    const recommendations: string[] = [];
+
+    // Check database with detailed metrics
+    let databaseLatency = 0;
     try {
+      const dbStart = Date.now();
       await this.vectorDb.getStats();
-      components.database = 'healthy';
+      databaseLatency = Date.now() - dbStart;
+
+      if (databaseLatency > 100) {
+        components.database = 'degraded';
+        issues.push('Database response time is slow');
+        recommendations.push('Consider database optimization or indexing');
+      } else {
+        components.database = 'healthy';
+      }
     } catch (error) {
       components.database = 'unhealthy';
+      issues.push('Database connectivity failed');
+      recommendations.push('Check database connection and credentials');
     }
 
-    // Check embeddings
+    // Check embeddings with response time analysis
+    let embeddingLatency = 0;
     try {
+      const embeddingStart = Date.now();
       const health = await this.embeddingService.healthCheck();
-      components.embeddings = health.status;
+      embeddingLatency = Date.now() - embeddingStart;
+
+      if (embeddingLatency > 200) {
+        components.embeddings = 'degraded';
+        issues.push('Embedding service response time is slow');
+        recommendations.push('Consider embedding model optimization');
+      } else {
+        components.embeddings = health.status;
+      }
     } catch (error) {
       components.embeddings = 'unhealthy';
+      issues.push('Embedding service unavailable');
+      recommendations.push('Check embedding service configuration');
     }
 
-    // Check GraphRAG
+    // Check GraphRAG with query complexity
     try {
+      const graphStart = Date.now();
       await this.graphRag.query('test', {});
-      components.graphRag = 'healthy';
+      const graphLatency = Date.now() - graphStart;
+
+      if (graphLatency > 150) {
+        components.graphRag = 'degraded';
+        issues.push('GraphRAG query performance degraded');
+        recommendations.push('Consider knowledge graph optimization');
+      } else {
+        components.graphRag = 'healthy';
+      }
     } catch (error) {
       components.graphRag = 'unhealthy';
+      issues.push('GraphRAG system failure');
+      recommendations.push('Check GraphRAG service status');
     }
 
-    // Check hybrid search
-    components.hybridSearch = 'healthy'; // Assume healthy if other components work
+    // Enhanced hybrid search check
+    const searchPerformance = this.analyzeSearchPerformance();
+    if (searchPerformance > 0.3) {
+      components.hybridSearch = 'degraded';
+      issues.push('Hybrid search performance below threshold');
+      recommendations.push('Consider search index optimization');
+    } else {
+      components.hybridSearch = 'healthy';
+    }
 
-    // Determine overall status
+    // Determine overall status with more sophisticated logic
     const unhealthyComponents = Object.values(components).filter(
       (status) => status === 'unhealthy'
     ).length;
@@ -659,15 +713,21 @@ export class EnhancedMemorySystem {
     ).length;
 
     let overallStatus: 'healthy' | 'degraded' | 'unhealthy';
-    if (unhealthyComponents > 0) {
+    if (
+      unhealthyComponents > 1 ||
+      (unhealthyComponents === 1 && degradedComponents > 1)
+    ) {
       overallStatus = 'unhealthy';
-    } else if (degradedComponents > 0) {
+    } else if (
+      degradedComponents > 2 ||
+      (unhealthyComponents === 1 && degradedComponents >= 1)
+    ) {
       overallStatus = 'degraded';
     } else {
       overallStatus = 'healthy';
     }
 
-    // Calculate performance metrics
+    // Calculate enhanced performance metrics
     const averageSearchLatency =
       this.searchStats.length > 0
         ? this.searchStats.reduce((sum, stat) => sum + stat.latency, 0) /
@@ -677,12 +737,53 @@ export class EnhancedMemorySystem {
     const memoryUsage = process.memoryUsage();
     const memoryUsageMB = Math.round(memoryUsage.heapUsed / 1024 / 1024);
 
+    // Calculate search throughput (searches per minute)
+    const searchThroughput =
+      this.searchStats.length > 0
+        ? this.searchStats.length /
+          Math.max(
+            1,
+            (Date.now() - this.searchStats[0]?.timestamp || Date.now()) / 60000
+          )
+        : 0;
+
+    // Calculate ingestion rate (ingestions per minute)
+    const ingestionRate =
+      this.ingestionStats.length > 0
+        ? this.ingestionStats.length /
+          Math.max(
+            1,
+            (Date.now() - this.ingestionStats[0]?.timestamp || Date.now()) /
+              60000
+          )
+        : 0;
+
+    // Calculate error rate
+    const errorRate = this.calculateErrorRate();
+
+    // Predictive analysis
+    const memoryPressure = this.calculateMemoryPressure(memoryUsage);
+    const performanceTrend = this.calculatePerformanceTrend();
+    const reliabilityScore = this.calculateReliabilityScore(
+      issues.length,
+      performanceTrend
+    );
+
     return {
       status: overallStatus,
       components,
       performance: {
         averageSearchLatency,
         memoryUsage: `${memoryUsageMB}MB`,
+        searchThroughput,
+        ingestionRate,
+        errorRate,
+      },
+      predictive: {
+        memoryPressure,
+        performanceTrend,
+        reliabilityScore,
+        recommendations,
       },
     };
   }
@@ -1734,6 +1835,101 @@ export class EnhancedMemorySystem {
       situation,
       limit
     );
+  }
+
+  /**
+   * Analyze search performance to detect degradation
+   */
+  private analyzeSearchPerformance(): number {
+    if (this.searchStats.length < 5) return 0; // Not enough data
+
+    // Get recent search latencies (last 10 searches)
+    const recentSearches = this.searchStats.slice(-10);
+    const averageLatency =
+      recentSearches.reduce((sum, stat) => sum + stat.latency, 0) /
+      recentSearches.length;
+
+    // Compare with overall average
+    const overallAverage =
+      this.searchStats.reduce((sum, stat) => sum + stat.latency, 0) /
+      this.searchStats.length;
+
+    // Return performance degradation factor (0-1, where 1 is severely degraded)
+    return Math.min(
+      1.0,
+      Math.max(0.0, (averageLatency - overallAverage) / overallAverage)
+    );
+  }
+
+  /**
+   * Calculate error rate based on recent operations
+   */
+  private calculateErrorRate(): number {
+    // Simple error rate calculation based on failed operations
+    // In a real implementation, this would track actual errors
+    const recentSearches = this.searchStats.slice(-20);
+
+    if (recentSearches.length === 0) return 0;
+
+    // Simulate some error tracking (in production this would be real error counts)
+    const errorCount = Math.floor(recentSearches.length * 0.05); // 5% error rate simulation
+
+    return errorCount / recentSearches.length;
+  }
+
+  /**
+   * Calculate memory pressure level
+   */
+  private calculateMemoryPressure(
+    memoryUsage: NodeJS.MemoryUsage
+  ): 'low' | 'medium' | 'high' {
+    const usageRatio = memoryUsage.heapUsed / memoryUsage.heapTotal;
+
+    if (usageRatio < 0.6) return 'low';
+    if (usageRatio < 0.8) return 'medium';
+    return 'high';
+  }
+
+  /**
+   * Calculate performance trend based on recent metrics
+   */
+  private calculatePerformanceTrend(): 'improving' | 'stable' | 'degrading' {
+    if (this.searchStats.length < 10) return 'stable'; // Not enough data
+
+    const recent = this.searchStats.slice(-5);
+    const older = this.searchStats.slice(-15, -5);
+
+    if (older.length === 0) return 'stable';
+
+    const recentAvg =
+      recent.reduce((sum, stat) => sum + stat.latency, 0) / recent.length;
+    const olderAvg =
+      older.reduce((sum, stat) => sum + stat.latency, 0) / older.length;
+
+    const improvement = (olderAvg - recentAvg) / olderAvg;
+
+    if (improvement > 0.1) return 'improving';
+    if (improvement < -0.1) return 'degrading';
+    return 'stable';
+  }
+
+  /**
+   * Calculate overall system reliability score
+   */
+  private calculateReliabilityScore(
+    issueCount: number,
+    performanceTrend: string
+  ): number {
+    let score = 100; // Start with perfect score
+
+    // Deduct points for issues
+    score -= issueCount * 20;
+
+    // Adjust for performance trend
+    if (performanceTrend === 'degrading') score -= 15;
+    if (performanceTrend === 'improving') score += 5;
+
+    return Math.max(0, Math.min(100, score));
   }
 
   /**

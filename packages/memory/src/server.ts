@@ -116,9 +116,10 @@ const memorySystem = {
         .totalDecisions,
     getRecentActions: (count: number) => {
       // Get all decisions and sort by timestamp (most recent first)
-      const allDecisions = memorySystem.provenance.system.components.decisionTracker.getAllDecisions()
-        .sort((a, b) => b.timestamp - a.timestamp);
-      
+      const allDecisions = memorySystem.provenance.system
+        .getAllDecisions('system')
+        .sort((a: any, b: any) => b.timestamp - a.timestamp);
+
       // Extract actions from recent decisions
       const actions: Array<{
         id: string;
@@ -129,7 +130,7 @@ const memorySystem = {
         decisionId: string;
         result?: any;
       }> = [];
-      
+
       for (const decision of allDecisions) {
         if (decision.execution?.actions) {
           for (const action of decision.execution.actions) {
@@ -140,18 +141,18 @@ const memorySystem = {
               timestamp: action.timestamp,
               status: action.status,
               decisionId: decision.id,
-              result: action.result
+              result: action.result,
             });
           }
         }
-        
+
         // Stop when we have enough actions
         if (actions.length >= count) break;
       }
-      
+
       // Sort actions by timestamp (most recent first) and return requested count
       return actions
-        .sort((a, b) => b.timestamp - a.timestamp)
+        .sort((a: any, b: any) => b.timestamp - a.timestamp)
         .slice(0, count);
     },
   },

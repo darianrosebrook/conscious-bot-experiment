@@ -900,15 +900,53 @@ export class SimpleMinecraftInterface extends EventEmitter {
       // Stop any current movement
       this.bot.clearControlStates();
 
+      // Stop any existing pathfinding
+      if (this.bot.pathfinder) {
+        this.bot.pathfinder.setGoal(null);
+      }
+
       // Find nearest player and start following
       const players = Object.values(this.bot.players).filter(
-        (p) => p.entity !== this.bot.entity
+        (p) => p.entity !== this.bot.entity && p.entity
       );
+
       if (players.length > 0) {
         const nearestPlayer = players[0];
-        await this.bot.lookAt(nearestPlayer.entity.position);
-        this.bot.setControlState('forward', true);
-        console.log('🤖 Started following player');
+
+        // Use pathfinder if available for more intelligent following
+        if (this.bot.pathfinder) {
+          try {
+            const movements = new (require('mineflayer-pathfinder').Movements)(
+              this.bot
+            );
+            const goal =
+              new (require('mineflayer-pathfinder').goals.GoalFollow)(
+                nearestPlayer.entity,
+                3 // Follow within 3 blocks
+              );
+
+            this.bot.pathfinder.setMovements(movements);
+            this.bot.pathfinder.setGoal(goal);
+
+            console.log(
+              `🤖 Started following ${nearestPlayer.username} with pathfinding`
+            );
+          } catch (pathError) {
+            console.warn('Pathfinder failed, using basic movement:', pathError);
+            await this.bot.lookAt(nearestPlayer.entity.position);
+            this.bot.setControlState('forward', true);
+            console.log(
+              `🤖 Started following ${nearestPlayer.username} (basic mode)`
+            );
+          }
+        } else {
+          // Fallback to basic movement
+          await this.bot.lookAt(nearestPlayer.entity.position);
+          this.bot.setControlState('forward', true);
+          console.log(
+            `🤖 Started following ${nearestPlayer.username} (basic mode)`
+          );
+        }
       } else {
         console.log('❌ No players to follow');
       }
@@ -927,8 +965,18 @@ export class SimpleMinecraftInterface extends EventEmitter {
     }
 
     try {
+      // Clear all movement controls
       this.bot.clearControlStates();
-      console.log('⏹️ Stopped bot movement');
+
+      // Stop pathfinding if active
+      if (this.bot.pathfinder) {
+        this.bot.pathfinder.setGoal(null);
+      }
+
+      // Stop any physics movement
+      this.bot.entity.velocity.set(0, 0, 0);
+
+      console.log('⏹️ Stopped all bot movement');
     } catch (error) {
       console.error('Failed to stop movement:', error);
       throw error;
@@ -947,16 +995,79 @@ export class SimpleMinecraftInterface extends EventEmitter {
       // Stop any current movement
       this.bot.clearControlStates();
 
+      if (this.bot.pathfinder) {
+        this.bot.pathfinder.setGoal(null);
+      }
+
       // Find nearest player and move toward them
       const players = Object.values(this.bot.players).filter(
-        (p) => p.entity !== this.bot.entity
+        (p) => p.entity !== this.bot.entity && p.entity
       );
+
       if (players.length > 0) {
         const nearestPlayer = players[0];
         const playerPos = nearestPlayer.entity.position;
-        await this.bot.lookAt(playerPos);
-        this.bot.setControlState('forward', true);
-        console.log('🏃 Coming to player');
+
+        // Use pathfinder for intelligent navigation
+        if (this.bot.pathfinder) {
+          try {
+            const movements = new (require('mineflayer-pathfinder').Movements)(
+              this.bot
+            );
+            const goal = new (require('mineflayer-pathfinder').goals.GoalNear)(
+              playerPos.x,
+              playerPos.y,
+              playerPos.z,
+              2 // Get within 2 blocks of player
+            );
+
+            this.bot.pathfinder.setMovements(movements);
+            this.bot.pathfinder.setGoal(goal);
+
+            console.log(`🏃 Pathfinding to ${nearestPlayer.username}`);
+
+            // Wait for pathfinding to complete or timeout
+            await new Promise<void>((resolve, reject) => {
+              const timeout = setTimeout(() => {
+                reject(new Error('Pathfinding timeout'));
+              }, 15000); // 15 second timeout
+
+              const goalReached = () => {
+                clearTimeout(timeout);
+                this.bot.removeListener('goal_reached', goalReached);
+                this.bot.removeListener('path_stop', pathStopped);
+                console.log(`✅ Reached ${nearestPlayer.username}`);
+                resolve();
+              };
+
+              const pathStopped = (reason?: string) => {
+                clearTimeout(timeout);
+                this.bot.removeListener('goal_reached', goalReached);
+                this.bot.removeListener('path_stop', pathStopped);
+                if (reason === 'goal_reached') {
+                  console.log(`✅ Reached ${nearestPlayer.username}`);
+                  resolve();
+                } else {
+                  console.warn(`Pathfinding stopped: ${reason || 'unknown'}`);
+                  resolve(); // Don't fail on pathfinding issues
+                }
+              };
+
+              this.bot.once('goal_reached', goalReached);
+              this.bot.once('path_stop', pathStopped);
+            });
+          } catch (pathError) {
+            console.warn('Pathfinder failed, using basic movement:', pathError);
+            await this.bot.lookAt(playerPos);
+            this.bot.setControlState('forward', true);
+            console.log(`🏃 Coming to ${nearestPlayer.username} (basic mode)`);
+          }
+        } else {
+          // Fallback to basic movement
+          await this.bot.lookAt(playerPos);
+          this.bot.setControlState('forward', true);
+          console.log(`🏃 Coming to ${nearestPlayer.username} (basic mode)`);
+        }
       } else {
         console.log('❌ No players to come to');
       }
@@ -978,19 +1089,56 @@ export class SimpleMinecraftInterface extends EventEmitter {
       // Stop any current movement
       this.bot.clearControlStates();
 
-      // Start moving in a random direction for exploration
-      const directions = ['forward', 'back', 'left', 'right'];
-      const randomDirection =
-        directions[Math.floor(Math.random() * directions.length)];
+      if (this.bot.pathfinder) {
+        this.bot.pathfinder.setGoal(null);
+      }
 
-      if (randomDirection === 'left') {
-        this.bot.setControlState('left', true);
-        setTimeout(() => this.bot.setControlState('left', false), 1000);
-      } else if (randomDirection === 'right') {
-        this.bot.setControlState('right', true);
-        setTimeout(() => this.bot.setControlState('right', false), 1000);
+      // Use pathfinder for intelligent exploration if available
+      if (this.bot.pathfinder) {
+        try {
+          const movements = new (require('mineflayer-pathfinder').Movements)(
+            this.bot
+          );
+
+          // Generate a random exploration point within 50 blocks
+          const currentPos = this.bot.entity.position;
+          const angle = Math.random() * Math.PI * 2; // Random direction
+          const distance = 20 + Math.random() * 30; // 20-50 blocks away
+
+          const targetX = Math.floor(currentPos.x + Math.cos(angle) * distance);
+          const targetZ = Math.floor(currentPos.z + Math.sin(angle) * distance);
+          const targetY = currentPos.y; // Stay at current Y level initially
+
+          const goal = new (require('mineflayer-pathfinder').goals.GoalNear)(
+            targetX,
+            targetY,
+            targetZ,
+            3 // Get within 3 blocks of target
+          );
+
+          this.bot.pathfinder.setMovements(movements);
+          this.bot.pathfinder.setGoal(goal);
+
+          console.log(
+            `🗺️ Exploring towards (${targetX}, ${targetY}, ${targetZ})`
+          );
+
+          // Set a timeout to change direction after some time
+          setTimeout(() => {
+            if (this.bot?.pathfinder) {
+              console.log('🔄 Changing exploration direction');
+              this.startExploration(); // Recursively start new exploration
+            }
+          }, 30000); // Change direction every 30 seconds
+        } catch (pathError) {
+          console.warn(
+            'Pathfinder failed, using basic exploration:',
+            pathError
+          );
+          this.basicExploration();
+        }
       } else {
-        this.bot.setControlState('forward', true);
+        this.basicExploration();
       }
 
       console.log('🗺️ Started autonomous exploration');
@@ -998,6 +1146,32 @@ export class SimpleMinecraftInterface extends EventEmitter {
       console.error('Failed to start exploration:', error);
       throw error;
     }
+  }
+
+  /**
+   * Basic exploration without pathfinding
+   */
+  private basicExploration(): void {
+    // Start moving in a random direction for exploration
+    const directions = ['forward', 'back', 'left', 'right'];
+    const randomDirection =
+      directions[Math.floor(Math.random() * directions.length)];
+
+    if (randomDirection === 'left') {
+      this.bot.setControlState('left', true);
+      setTimeout(() => this.bot.setControlState('left', false), 1000);
+    } else if (randomDirection === 'right') {
+      this.bot.setControlState('right', true);
+      setTimeout(() => this.bot.setControlState('right', false), 1000);
+    } else {
+      this.bot.setControlState('forward', true);
+    }
+
+    // Change direction after some time
+    setTimeout(() => {
+      this.bot.clearControlStates();
+      this.basicExploration();
+    }, 5000); // Change direction every 5 seconds
   }
 }
 

@@ -30,7 +30,10 @@ import {
 import { DecisionTracker, DecisionTrackerConfig } from './decision-tracker';
 import { EvidenceManager, EvidenceManagerConfig } from './evidence-manager';
 import { AuditTrail, AuditTrailConfig } from './audit-trail';
-import { ExplanationGenerator, ExplanationGeneratorConfig } from './explanation-generator';
+import {
+  ExplanationGenerator,
+  ExplanationGeneratorConfig,
+} from './explanation-generator';
 
 /**
  * Provenance system configuration
@@ -123,7 +126,10 @@ export class ProvenanceSystem {
     actor: string
   ): DecisionRecord | null {
     // Add information source
-    const decision = this.decisionTracker.addInformationSource(decisionId, source);
+    const decision = this.decisionTracker.addInformationSource(
+      decisionId,
+      source
+    );
     if (!decision) {
       return null;
     }
@@ -154,7 +160,10 @@ export class ProvenanceSystem {
     actor: string
   ): DecisionRecord | null {
     // Add alternative
-    const decision = this.decisionTracker.addAlternative(decisionId, alternative);
+    const decision = this.decisionTracker.addAlternative(
+      decisionId,
+      alternative
+    );
     if (!decision) {
       return null;
     }
@@ -480,7 +489,8 @@ export class ProvenanceSystem {
     };
 
     // Generate explanation
-    const explanation = this.explanationGenerator.generateExplanation(fullRequest);
+    const explanation =
+      this.explanationGenerator.generateExplanation(fullRequest);
     if (!explanation) {
       return null;
     }
@@ -560,6 +570,26 @@ export class ProvenanceSystem {
       details: {
         action: 'get_decisions_by_importance',
         importance,
+        count: decisions.length,
+      },
+    });
+
+    return decisions;
+  }
+
+  /**
+   * Get all decisions
+   */
+  getAllDecisions(actor: string): DecisionRecord[] {
+    const decisions = this.decisionTracker.getAllDecisions();
+
+    // Add audit entry
+    this.auditTrail.addEntry({
+      decisionId: 'global',
+      actor,
+      action: AuditAction.ACCESS,
+      details: {
+        action: 'get_all_decisions',
         count: decisions.length,
       },
     });

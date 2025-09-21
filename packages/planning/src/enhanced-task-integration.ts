@@ -1246,11 +1246,13 @@ export class EnhancedTaskIntegration extends EventEmitter {
   }
 
   /**
-   * Verify crafting access
+   * Verify crafting access with intelligent decision-making
    */
   private async verifyCraftingAccess(): Promise<boolean> {
     try {
-      // Check if we have a crafting table in inventory or nearby
+      console.log('🔍 Starting intelligent crafting table analysis...');
+      
+      // Step 1: Check if we have a crafting table in inventory
       const response = await fetch('http://localhost:3005/inventory', {
         method: 'GET',
         headers: { 'Content-Type': 'application/json' },
@@ -1262,28 +1264,55 @@ export class EnhancedTaskIntegration extends EventEmitter {
       const data = (await response.json()) as any;
       const inventory = data.data || [];
 
-      // Check for crafting table in inventory
       const hasCraftingTable = inventory.some((item: any) =>
         item.type?.toLowerCase().includes('crafting_table')
       );
 
       if (hasCraftingTable) {
-        console.log('🔍 Crafting access verified: crafting table in inventory');
+        console.log('✅ Crafting access verified: crafting table in inventory');
         return true;
       }
 
-      // Check for nearby crafting tables in the world
+      // Step 2: Check if we have resources to make a crafting table
+      const craftingAnalysis = await this.analyzeCraftingTableOptions(inventory);
+      
+      if (craftingAnalysis.canCraft) {
+        console.log('🔨 Can craft crafting table with available resources');
+        // Weighted decision: prefer crafting if we have materials readily available
+        return true;
+      }
+
+      // Step 3: Check for nearby crafting tables in the world
       const nearbyCraftingTables = await this.scanForNearbyCraftingTables();
+      
       if (nearbyCraftingTables.length > 0) {
-        console.log('🔍 Crafting access verified: found nearby crafting table');
-        return true;
+        const nearestTable = nearbyCraftingTables[0];
+        console.log(`🏗️ Found nearby crafting table at distance ${nearestTable.distance} blocks`);
+        
+        // Decision weight: nearby tables vs. crafting new one
+        const locationScore = this.evaluateTableLocation(nearestTable, craftingAnalysis);
+        
+        if (locationScore.useExisting) {
+          console.log(`✅ Using existing crafting table (score: ${locationScore.score})`);
+          return true;
+        } else {
+          console.log(`🔨 Better to craft new table (score: ${locationScore.score})`);
+          // Will need to gather resources first
+          return craftingAnalysis.canCraft;
+        }
       }
 
-      // For now, assume we can craft basic items without a table
-      console.log('🔍 Crafting access verified: basic crafting available');
-      return true;
+      // Step 4: No table available, check if we can eventually get one
+      if (craftingAnalysis.needsGathering && craftingAnalysis.gatheringFeasible) {
+        console.log('🌳 Need to gather resources for crafting table - feasible');
+        return false; // Will trigger resource gathering
+      }
+
+      // Fall back to basic 2x2 crafting if available
+      console.log('⚠️ No crafting table access - using basic crafting only');
+      return false;
     } catch (error) {
-      // Failed to verify crafting access: ${error}
+      console.error('Error verifying crafting access:', error);
       return false;
     }
   }
@@ -1759,6 +1788,166 @@ export class EnhancedTaskIntegration extends EventEmitter {
    */
   getConfig(): EnhancedTaskIntegrationConfig {
     return { ...this.config };
+  }
+
+  /**
+   * Analyze crafting table options and resource availability
+   */
+  private async analyzeCraftingTableOptions(inventory: any[]): Promise<{
+    canCraft: boolean;
+    hasWood: boolean;
+    needsGathering: boolean;
+    gatheringFeasible: boolean;
+    woodCount: number;
+    resourceEfficiency: number;
+  }> {
+    try {
+      // Check for wood/planks in inventory
+      const woodItems = inventory.filter((item: any) => 
+        item.type?.toLowerCase().includes('log') ||
+        item.type?.toLowerCase().includes('wood') ||
+        item.type?.toLowerCase().includes('plank')
+      );
+
+      const woodCount = woodItems.reduce((total, item) => total + (item.count || 1), 0);
+      const hasWood = woodCount >= 4; // Need 4 wood planks for crafting table
+
+      // Check if we can convert logs to planks
+      const logItems = inventory.filter((item: any) =>
+        item.type?.toLowerCase().includes('log')
+      );
+      const logCount = logItems.reduce((total, item) => total + (item.count || 1), 0);
+      const totalWoodPotential = woodCount + (logCount * 4); // Each log = 4 planks
+
+      const canCraft = totalWoodPotential >= 4;
+      const needsGathering = !canCraft;
+      
+      // Check if gathering is feasible (are we in an area with trees?)
+      const gatheringFeasible = await this.assessGatheringFeasibility();
+      
+      // Calculate resource efficiency (how much extra wood we have)
+      const resourceEfficiency = Math.min(1.0, totalWoodPotential / 16); // Normalize to 0-1
+
+      return {
+        canCraft,
+        hasWood,
+        needsGathering,
+        gatheringFeasible,
+        woodCount: totalWoodPotential,
+        resourceEfficiency,
+      };
+    } catch (error) {
+      console.error('Error analyzing crafting table options:', error);
+      return {
+        canCraft: false,
+        hasWood: false,
+        needsGathering: true,
+        gatheringFeasible: false,
+        woodCount: 0,
+        resourceEfficiency: 0,
+      };
+    }
+  }
+
+  /**
+   * Evaluate whether to use existing table or craft new one
+   */
+  private evaluateTableLocation(
+    nearestTable: { position: any; distance: number },
+    craftingAnalysis: any
+  ): { useExisting: boolean; score: number; reasoning: string } {
+    try {
+      // Factors to consider:
+      // 1. Distance to existing table
+      // 2. Resource availability for new table
+      // 3. Travel time vs crafting time
+      // 4. Strategic positioning
+
+      let score = 0;
+      let reasoning = '';
+
+      // Distance factor (closer is better for existing table)
+      const distanceFactor = Math.max(0, 1 - (nearestTable.distance / 20)); // 20 blocks = 0 score
+      const distanceScore = distanceFactor * 0.4; // 40% weight
+
+      // Resource availability factor (having resources favors crafting new)
+      const resourceScore = craftingAnalysis.resourceEfficiency * 0.3; // 30% weight
+
+      // Travel time estimation (distance in blocks ~= seconds of travel)
+      const travelTime = nearestTable.distance * 2; // Rough estimate: 2 seconds per block
+      const craftingTime = craftingAnalysis.canCraft ? 10 : 60; // 10s if have materials, 60s if need to gather
+
+      const timeEfficiencyScore = travelTime < craftingTime ? 0.2 : 0; // 20% weight
+
+      // Strategic positioning (existing table might be in a good central location)
+      const strategicScore = nearestTable.distance < 5 ? 0.1 : 0; // 10% weight if very close
+
+      score = distanceScore + resourceScore + timeEfficiencyScore + strategicScore;
+
+      // Decision threshold: use existing if score > 0.5, craft new if <= 0.5
+      const useExisting = score > 0.5 || !craftingAnalysis.canCraft;
+
+      reasoning = `Distance: ${nearestTable.distance}b (${distanceScore.toFixed(2)}), ` +
+                  `Resources: ${craftingAnalysis.resourceEfficiency.toFixed(2)} (${resourceScore.toFixed(2)}), ` +
+                  `Time efficiency: ${timeEfficiencyScore.toFixed(2)}, ` +
+                  `Strategic: ${strategicScore.toFixed(2)}`;
+
+      console.log(`📊 Table evaluation: ${reasoning} | Total: ${score.toFixed(2)}`);
+
+      return {
+        useExisting,
+        score: Math.round(score * 100) / 100,
+        reasoning,
+      };
+    } catch (error) {
+      console.error('Error evaluating table location:', error);
+      return {
+        useExisting: true, // Default to using existing table on error
+        score: 0,
+        reasoning: 'Error in evaluation',
+      };
+    }
+  }
+
+  /**
+   * Assess if gathering wood is feasible in current area
+   */
+  private async assessGatheringFeasibility(): Promise<boolean> {
+    try {
+      // Check for nearby trees or wood sources
+      const nearbyBlocksResponse = await fetch(
+        'http://localhost:3005/nearby-blocks',
+        {
+          method: 'GET',
+          headers: { 'Content-Type': 'application/json' },
+          signal: AbortSignal.timeout(3000),
+        }
+      );
+
+      if (!nearbyBlocksResponse.ok) {
+        console.warn('Could not assess gathering feasibility');
+        return true; // Assume feasible if we can't check
+      }
+
+      const nearbyBlocks = (await nearbyBlocksResponse.json()) as any;
+      
+      if (nearbyBlocks.data && Array.isArray(nearbyBlocks.data)) {
+        const treeBlocks = nearbyBlocks.data.filter((block: any) =>
+          block.type?.toLowerCase().includes('log') ||
+          block.type?.toLowerCase().includes('leaves') ||
+          block.type?.toLowerCase().includes('wood')
+        );
+
+        const feasible = treeBlocks.length > 5; // Need reasonable number of tree blocks
+        console.log(`🌳 Gathering feasibility: ${treeBlocks.length} tree blocks found - ${feasible ? 'feasible' : 'difficult'}`);
+        return feasible;
+      }
+
+      return true; // Default to feasible
+    } catch (error) {
+      console.warn('Error assessing gathering feasibility:', error);
+      return true; // Default to feasible
+    }
   }
 
   /**

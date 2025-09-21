@@ -6,6 +6,19 @@
 
 import { z } from 'zod';
 
+// ===== COGNITIVE TASK SYSTEM =====
+
+/**
+ * Module type enumeration
+ */
+export enum ModuleType {
+  PLANNING = 'planning',
+  REASONING = 'reasoning',
+  SOCIAL = 'social',
+  REACTIVE = 'reactive',
+  EXPLORATION = 'exploration',
+}
+
 // ===== SIGNAL SYSTEM =====
 
 /**
@@ -64,6 +77,7 @@ export const CognitiveTaskSchema = z.object({
   id: z.string(),
   type: z.enum(['planning', 'reasoning', 'social', 'reactive', 'exploration']),
   priority: z.number().min(0).max(1),
+  urgency: z.number().min(0).max(1),
   complexity: z.enum(['simple', 'moderate', 'complex']),
   context: z.record(z.any()),
   deadline: z.number().optional(),
@@ -76,15 +90,38 @@ export type CognitiveTask = z.infer<typeof CognitiveTaskSchema>;
  * Signature of a task for routing decisions
  */
 export const TaskSignatureSchema = z.object({
-  symbolicPreconditions: z.number().min(0).max(1),
-  socialContent: z.boolean(),
-  ambiguousContext: z.boolean(),
-  requiresPlanning: z.boolean(),
-  timeConstraint: z.number(), // ms
-  riskLevel: z.enum(['low', 'medium', 'high']),
+  type: z.string(),
+  complexity: z.string(),
+  requirements: z.array(z.string()),
+  timeConstraint: z.number().optional(),
+  symbolicPreconditions: z.array(z.string()).optional(),
+  requiresPlanning: z.boolean().optional(),
+  socialContent: z.boolean().optional(),
+  ambiguousContext: z.boolean().optional(),
 });
 
 export type TaskSignature = z.infer<typeof TaskSignatureSchema>;
+
+/**
+ * Routing decision for task processing
+ */
+export const RoutingDecisionSchema = z.object({
+  selectedModule: z.nativeEnum(ModuleType),
+  confidence: z.number().min(0).max(1),
+  reasoning: z.string(),
+  alternatives: z.array(
+    z.object({
+      module: z.nativeEnum(ModuleType),
+      score: z.number().min(0).max(1),
+      reason: z.string(),
+    })
+  ),
+  processingTime: z.number().optional(),
+  riskAssessment: z.enum(['low', 'medium', 'high']).optional(),
+  timestamp: z.number(),
+});
+
+export type RoutingDecision = z.infer<typeof RoutingDecisionSchema>;
 
 // ===== PERFORMANCE BUDGETS =====
 
@@ -143,25 +180,6 @@ export enum ModuleType {
   GOAP = 'goap', // Goal-Oriented Action Planning
   REFLEX = 'reflex', // Immediate reflexes
 }
-
-/**
- * Routing decision for cognitive tasks
- */
-export const RoutingDecisionSchema = z.object({
-  selectedModule: z.nativeEnum(ModuleType),
-  confidence: z.number().min(0).max(1),
-  reasoning: z.string(),
-  alternatives: z.array(
-    z.object({
-      module: z.nativeEnum(ModuleType),
-      score: z.number().min(0).max(1),
-      reason: z.string(),
-    })
-  ),
-  timestamp: z.number(),
-});
-
-export type RoutingDecision = z.infer<typeof RoutingDecisionSchema>;
 
 // ===== PREEMPTION SYSTEM =====
 

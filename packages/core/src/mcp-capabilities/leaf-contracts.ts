@@ -42,7 +42,10 @@ export function getErrorStats() {
   return {
     stats: Object.fromEntries(errorStats),
     recentErrors: [...recentErrors].slice(-20), // Return last 20 errors
-    totalErrors: Array.from(errorStats.values()).reduce((sum, count) => sum + count, 0),
+    totalErrors: Array.from(errorStats.values()).reduce(
+      (sum, count) => sum + count,
+      0
+    ),
   };
 }
 
@@ -752,14 +755,17 @@ export function createLeafContext(
       const errorKey = `${error.code}_${error.retryable ? 'retryable' : 'fatal'}`;
       errorStats.set(errorKey, (errorStats.get(errorKey) || 0) + 1);
       recentErrors.push(errorEvent);
-      
+
       // Keep only last 100 errors in memory to prevent memory leaks
       if (recentErrors.length > 100) {
         recentErrors.shift();
       }
 
       // Emit to console in development or when verbose logging is enabled
-      if (process.env.NODE_ENV !== 'production' || process.env.VERBOSE_ERRORS === 'true') {
+      if (
+        process.env.NODE_ENV !== 'production' ||
+        process.env.VERBOSE_ERRORS === 'true'
+      ) {
         // eslint-disable-next-line no-console
         console.error(`[MCP ERROR] ${error.code}:`, {
           error: errorEvent.error,
@@ -771,13 +777,17 @@ export function createLeafContext(
       // Alerting for critical errors (non-retryable) - can be extended to integrate with monitoring systems
       if (!error.retryable) {
         // eslint-disable-next-line no-console
-        console.warn(`🚫 CRITICAL MCP ERROR detected: ${error.code} - Consider investigation`);
-        
+        console.warn(
+          `🚫 CRITICAL MCP ERROR detected: ${error.code} - Consider investigation`
+        );
+
         // Check for error pattern threshold
         const currentCount = errorStats.get(errorKey) || 0;
         if (currentCount >= 5) {
           // eslint-disable-next-line no-console
-          console.warn(`⚠️ HIGH ERROR FREQUENCY: ${error.code} occurred ${currentCount} times`);
+          console.warn(
+            `⚠️ HIGH ERROR FREQUENCY: ${error.code} occurred ${currentCount} times`
+          );
         }
       }
 
