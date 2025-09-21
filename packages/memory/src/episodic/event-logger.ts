@@ -25,9 +25,9 @@ import * as path from 'path';
 function getDefaultEmotionalState(): EmotionalState {
   return {
     satisfaction: 0.5,
-    frustration: 0.1,
-    excitement: 0.3,
-    curiosity: 0.4,
+    frustration: 0.0,
+    excitement: 0.0,
+    curiosity: 0.5,
     confidence: 0.5,
     timestamp: Date.now(),
   };
@@ -149,21 +149,17 @@ export class EventLogger {
     const curiosity = discoveries.length > 0 ? 0.8 : 0.6;
     const excitement = discoveries.length > 0 ? 0.7 : 0.4;
 
-    return this.logExperience(
-      ExperienceType.EXPLORATION,
-      description,
-      {
-        location,
-        emotions: {
-          ...getDefaultEmotionalState(),
-          curiosity,
-          excitement,
-        },
-        salienceScore: discoveries.length > 0 ? 0.6 : 0.4,
-        tags: ['exploration', 'discovery', ...discoveries],
-        metadata: { discoveries },
-      }
-    );
+    return this.logExperience(ExperienceType.EXPLORATION, description, {
+      location,
+      emotions: {
+        ...getDefaultEmotionalState(),
+        curiosity,
+        excitement,
+      },
+      salienceScore: discoveries.length > 0 ? 0.6 : 0.4,
+      tags: ['exploration', 'discovery', ...discoveries],
+      metadata: { discoveries },
+    });
   }
 
   /**
@@ -255,7 +251,11 @@ export class EventLogger {
   async saveToDisk(dir?: string): Promise<void> {
     const { dir: d, file } = this.episodicPaths(dir);
     await fs.mkdir(d, { recursive: true });
-    await fs.writeFile(file, JSON.stringify({ version: 1, events: this.events }, null, 2), 'utf-8');
+    await fs.writeFile(
+      file,
+      JSON.stringify({ version: 1, events: this.events }, null, 2),
+      'utf-8'
+    );
   }
 
   async loadFromDisk(dir?: string): Promise<void> {
@@ -278,11 +278,14 @@ export class EventLogger {
 
   startAutoSave(intervalMs: number, dir?: string): void {
     if (this.autoSaveHandle) clearInterval(this.autoSaveHandle);
-    this.autoSaveHandle = setInterval(() => {
-      this.saveToDisk(dir).catch((e) =>
-        console.warn('EventLogger autoSave failed:', e?.message)
-      );
-    }, Math.max(5_000, intervalMs));
+    this.autoSaveHandle = setInterval(
+      () => {
+        this.saveToDisk(dir).catch((e) =>
+          console.warn('EventLogger autoSave failed:', e?.message)
+        );
+      },
+      Math.max(5_000, intervalMs)
+    );
   }
 
   stopAutoSave(): void {

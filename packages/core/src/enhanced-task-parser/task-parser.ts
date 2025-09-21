@@ -12,62 +12,24 @@ import { EventEmitter } from 'events';
 import { v4 as uuidv4 } from 'uuid';
 
 import {
-  TaskDefinition,
-  TaskParsingResult,
-  TaskValidationResult,
-  TaskFeasibility,
-  EnvironmentalContext,
-  TaskParserConfig,
-  TaskParserError,
-  TaskParserErrorInfo,
-  TaskPerformanceMetrics,
+  TaskParserConfig as BaseTaskParserConfig,
+  TaskParsingResult as BaseTaskParsingResult,
+  TaskParser as BaseTaskParser,
 } from './types';
 
 import {
   DualChannelPrompting,
-  ChannelType,
-  DualChannelConfig,
-  DEFAULT_DUAL_CHANNEL_CONFIG,
-  PromptResult,
-  TaskParaphraseResult,
+  createDualChannelPrompting,
 } from './dual-channel-prompting';
 
 import {
   CreativeParaphrasing,
-  CreativeParaphrasingConfig,
-  DEFAULT_CREATIVE_PARAPHRASING_CONFIG,
-  ParaphrasingContext,
-  ParaphrasingStyle,
-  EnhancedParaphraseResult,
-  LanguageGenerationRequest,
+  createCreativeParaphrasing,
 } from './creative-paraphrasing';
 
 // ===== TASK PARSER SCHEMAS =====
 
-/**
- * Task parser configuration
- */
-export interface TaskParserConfig {
-  dual_channel: DualChannelConfig;
-  creative_paraphrasing: CreativeParaphrasingConfig;
-  enable_schema_validation: boolean;
-  enable_context_awareness: boolean;
-  enable_adaptive_learning: boolean;
-  enable_user_feedback_integration: boolean;
-  max_paraphrase_options: number;
-  paraphrase_confidence_threshold: number;
-}
 
-/**
- * Task parsing result
- */
-export interface TaskParsingResult {
-  paraphrase_options: EnhancedParaphraseResult[];
-  selected_paraphrase: EnhancedParaphraseResult;
-  channel_used: ChannelType;
-  context_adaptations: string[];
-  user_interaction_metadata: Record<string, any>;
-}
 
 /**
  * User interaction context
@@ -100,15 +62,16 @@ export interface SchemaValidationResult {
 /**
  * Enhanced task parser configuration
  */
-export const ENHANCED_TASK_PARSER_CONFIG = {
-  dual_channel: DEFAULT_DUAL_CHANNEL_CONFIG,
-  creative_paraphrasing: DEFAULT_CREATIVE_PARAPHRASING_CONFIG,
-  enable_schema_validation: true,
-  enable_context_awareness: true,
-  enable_adaptive_learning: true,
-  enable_user_feedback_integration: true,
-  max_paraphrase_options: 3,
-  paraphrase_confidence_threshold: 0.7,
+export const ENHANCED_TASK_PARSER_CONFIG: BaseTaskParserConfig = {
+  enable_validation: true,
+  enable_feasibility_check: true,
+  enable_progress_persistence: true,
+  enable_chat_processing: true,
+  max_task_history: 100,
+  validation_timeout: 5000,
+  feasibility_timeout: 3000,
+  chat_processing_timeout: 10000,
+  debug_mode: false,
 };
 
 // ===== TASK PARSER SYSTEM =====
@@ -124,7 +87,7 @@ export class TaskParser extends EventEmitter {
   private config: any; // Enhanced config with additional properties
   private dualChannelPrompting: DualChannelPrompting;
   private creativeParaphrasing: CreativeParaphrasing;
-  private taskHistory: Map<string, TaskParsingResult> = new Map();
+  private taskHistory: Map<string, BaseTaskParsingResult> = new Map();
   private userInteractionHistory: Map<string, UserInteractionContext> =
     new Map();
   private performanceMetrics: TaskPerformanceMetrics = {
@@ -137,20 +100,15 @@ export class TaskParser extends EventEmitter {
     recovery_rate: 0,
   };
 
-  constructor(config: Partial<TaskParserConfig> = {}) {
+  constructor(config: Partial<BaseTaskParserConfig> = {}) {
     super();
     this.config = { ...ENHANCED_TASK_PARSER_CONFIG, ...config };
 
     // Initialize dual-channel prompting
-    this.dualChannelPrompting = new DualChannelPrompting(
-      this.config.dual_channel
-    );
+    this.dualChannelPrompting = createDualChannelPrompting();
 
     // Initialize creative paraphrasing
-    this.creativeParaphrasing = new CreativeParaphrasing(
-      this.dualChannelPrompting,
-      this.config.creative_paraphrasing
-    );
+    this.creativeParaphrasing = createCreativeParaphrasing();
 
     // Set up event listeners for integration
     this.setupEventListeners();

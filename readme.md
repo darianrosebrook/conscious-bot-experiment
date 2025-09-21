@@ -7,6 +7,7 @@ We propose and implement a unified cognitive architecture that integrates **embo
 **Key implemented components include:**
 - **Visible-range world model** with ray-cast perception and D* Lite navigation
 - **Advanced memory system** with vector search, GraphRAG retrieval, and human-like decay management
+- **Identity memory system** with emotional preservation (2% daily decay), self-narrative construction, and LLM fine-tuning
 - **Signal→need→goal pipeline** for drive-based goal formulation with advanced priority scoring
 - **Hybrid planner** combining HRM-inspired hierarchical task decomposition and enhanced GOAP reactive execution
 - **Constitutional filter** with ethical rules engine and safety oversight
@@ -195,7 +196,7 @@ Finally, we draw on cognitive theories to inform specific components. For exampl
 **🎉 MILESTONE 2 (INTELLIGENCE) COMPLETE** - All memory systems, goal formulation, and constitutional framework implemented  
 **🎉 MILESTONE 3 (PLANNING) COMPLETE** - All planning systems, hierarchical reasoning, and reactive execution implemented
 
-The conscious bot project has achieved **85% implementation completion** with comprehensive cognitive architecture deployed across 9 core packages. The system is operational with all services running and high test coverage.
+The conscious bot project has achieved **90% implementation completion** with comprehensive cognitive architecture deployed across 9 core packages, including the new identity memory system with emotional preservation, self-narrative construction, and LLM fine-tuning. The system is operational with all services running and high test coverage.
 
 ### Implemented Core Systems
 
@@ -242,6 +243,34 @@ The conscious bot project has achieved **85% implementation completion** with co
   - Learns emotional patterns and predicts responses based on situations
   - Provides emotion-specific coping strategies and trigger avoidance
   - Monitors emotional health trends and mood stability over time
+
+- **Identity Memory Guardian** (New - 639 lines) - Protects key identity memories from decay
+  - **Significance-based protection**: Core, Important, Contextual, Ephemeral levels
+  - **Auto-protection** for high-salience memories (≥70% salience score)
+  - **Self-concept snapshots** track personality and value evolution over time
+  - **Narrative integration** ensures identity-defining memories persist
+  - **Emotional memory preservation** with 2% daily decay rate as specified
+
+- **Self-Narrative Constructor** (New - 651 lines) - Generates coherent life stories at milestones
+  - **Milestone-based construction** every 10-24 game days (configurable)
+  - **Multiple narrative types**: Growth Reflection, Achievement Celebration, Emotional Processing
+  - **Emotional context integration** weaves emotional experiences into identity narrative
+  - **Identity reinforcement** through narrative integration and self-reflection
+  - **Configurable milestone conditions** based on experience count, emotional intensity, identity change
+
+- **Emotional Memory LLM Adapter** (New - 680 lines) - Fine-tunes LLM with emotional context
+  - **Emotional memory integration** into LLM prompts and responses
+  - **Self-narrative context** provides identity-aware responses
+  - **Emotional state tracking** and automatic emotional updates
+  - **Identity reinforcement analysis** validates response alignment with self-concept
+  - **Emotional processing validation** ensures responses support emotional health
+
+- **Memory System Coordinator** (New - 652 lines) - Orchestrates cross-system memory integration
+  - **Automatic coordination** every hour to check milestone conditions
+  - **Cross-system synchronization** between emotional, identity, and narrative systems
+  - **Event-driven architecture** for system interactions and milestone triggering
+  - **Milestone status tracking** with real-time coordination reporting
+  - **Immediate memory protection** for high-value experiences
 
 - **Tool Efficiency Memory** (Previously implemented) - Context-aware tool selection and optimization
   - Different tools for different materials/biomes with efficiency scoring
@@ -299,6 +328,35 @@ The conscious bot project has achieved **85% implementation completion** with co
 - **Performance Optimization**: Ongoing improvements to navigation and perception systems
 
 **Current Focus**: Maintaining operational stability while addressing remaining test failures.
+
+### 🧠 **Identity Memory System** (Latest Addition)
+
+The system now includes a comprehensive **identity memory system** that enables the bot to maintain a coherent sense of self through:
+
+#### **🎯 Core Identity Preservation**
+- **Emotional Memory Decay**: Precisely 2% daily decay rate for emotional memories (as specified)
+- **Identity Memory Guardian**: Protects core identity-defining experiences from excessive forgetting
+- **Significance-Based Protection**: Automatic protection of high-salience memories (≥70% salience threshold)
+- **Self-Concept Snapshots**: Regular tracking of personality traits and value evolution
+
+#### **📖 Self-Narrative Construction**
+- **Milestone-Based Narratives**: Automatic generation every 10-24 game days
+- **Multiple Narrative Types**: Growth Reflection, Achievement Celebration, Emotional Processing
+- **Emotional Context Integration**: Weaves emotional experiences into coherent life stories
+- **Identity Reinforcement**: Uses narratives to strengthen and evolve self-concept
+
+#### **🤖 LLM Fine-Tuning with Identity**
+- **Emotional Memory Integration**: LLM responses incorporate relevant emotional experiences
+- **Self-Narrative Context**: Provides identity-aware responses based on life story
+- **Emotional State Tracking**: Automatic updates and emotional processing validation
+- **Identity Alignment**: Validates responses against established personality and values
+
+#### **🔄 Cross-System Coordination**
+- **Memory System Orchestration**: Coordinates emotional, identity, and narrative systems
+- **Event-Driven Architecture**: Automatic milestone detection and narrative triggering
+- **Cross-Domain Intelligence**: Integrates insights from all memory domains for holistic decision-making
+
+This identity system ensures the bot maintains **personal continuity** and **emotional authenticity** while evolving through experiences, creating a more coherent and self-aware artificial consciousness.
 
 ### Architecture Integration Status
 

@@ -550,9 +550,9 @@ export class EpisodicRetrieval {
       const negativeEmotions = ['frustration', 'fear', 'sadness'];
       
       if (emotionalValue === 'positive') {
-        return Math.max(...positiveEmotions.map(e => memory.emotions[e] || 0));
+        return Math.max(...positiveEmotions.map(e => (memory.emotions as any)[e] || 0));
       } else if (emotionalValue === 'negative') {
-        return Math.max(...negativeEmotions.map(e => memory.emotions[e] || 0));
+        return Math.max(...negativeEmotions.map(e => (memory.emotions as any)[e] || 0));
       }
     } else if (typeof emotionalValue === 'object') {
       // Specific emotional state query
@@ -560,8 +560,8 @@ export class EpisodicRetrieval {
       let totalEmotions = 0;
       
       for (const [emotion, intensity] of Object.entries(emotionalValue)) {
-        if (memory.emotions[emotion] !== undefined) {
-          const match = 1 - Math.abs(memory.emotions[emotion] - (intensity as number));
+        if ((memory.emotions as any)[emotion] !== undefined) {
+          const match = 1 - Math.abs((memory.emotions as any)[emotion] - (intensity as number));
           totalMatch += match;
           totalEmotions++;
         }

@@ -8,12 +8,19 @@
  */
 
 import { z } from 'zod';
+import { EmotionalState } from './types';
+
+// Re-export for backward compatibility
+export type { EmotionalState } from './types';
 
 // ============================================================================
-// Types and Interfaces
+// Advanced Emotional State Interface
 // ============================================================================
 
-export interface EmotionalState {
+/**
+ * Advanced emotional state interface for sophisticated emotional reasoning
+ */
+export interface AdvancedEmotionalState {
   id: string;
   primaryEmotion:
     | 'happy'
@@ -37,8 +44,83 @@ export interface EmotionalState {
   duration?: number; // How long the state lasted
   outcome?: string; // What happened as a result
   copingStrategies?: string[]; // What strategies were used
-  effectiveness?: number; // 0-1 how effective the strategies were
+  effectiveness?: number; // 0-1 effectiveness of coping strategies
 }
+
+// ============================================================================
+// Conversion Utilities
+// ============================================================================
+
+/**
+ * Convert simple EmotionalState to AdvancedEmotionalState
+ */
+export function toAdvancedEmotionalState(
+  simple: EmotionalState,
+  options: {
+    id?: string;
+    primaryEmotion?: AdvancedEmotionalState['primaryEmotion'];
+    triggers?: string[];
+    context?: string;
+  } = {}
+): AdvancedEmotionalState {
+  const { id, primaryEmotion, triggers = [], context = '' } = options;
+
+  return {
+    id: id || `simple-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+    primaryEmotion: primaryEmotion || 'neutral',
+    intensity: Math.max(
+      simple.satisfaction,
+      simple.excitement,
+      1 - simple.frustration
+    ),
+    secondaryEmotions: [
+      { emotion: 'satisfaction', intensity: simple.satisfaction },
+      { emotion: 'excitement', intensity: simple.excitement },
+      { emotion: 'frustration', intensity: simple.frustration },
+      { emotion: 'curiosity', intensity: simple.curiosity },
+      { emotion: 'confidence', intensity: simple.confidence },
+    ].filter((e) => e.intensity > 0),
+    triggers,
+    context,
+    timestamp: simple.timestamp,
+  };
+}
+
+/**
+ * Convert AdvancedEmotionalState to simple EmotionalState
+ */
+export function toSimpleEmotionalState(
+  advanced: AdvancedEmotionalState
+): EmotionalState {
+  const satisfaction =
+    advanced.secondaryEmotions?.find((e) => e.emotion === 'satisfaction')
+      ?.intensity || 0.5;
+  const excitement =
+    advanced.secondaryEmotions?.find((e) => e.emotion === 'excitement')
+      ?.intensity || 0.3;
+  const frustration =
+    advanced.secondaryEmotions?.find((e) => e.emotion === 'frustration')
+      ?.intensity || 0.1;
+  const curiosity =
+    advanced.secondaryEmotions?.find((e) => e.emotion === 'curiosity')
+      ?.intensity || 0.4;
+  const confidence =
+    advanced.secondaryEmotions?.find((e) => e.emotion === 'confidence')
+      ?.intensity || 0.5;
+
+  return {
+    satisfaction,
+    frustration,
+    excitement,
+    curiosity,
+    confidence,
+    timestamp: advanced.timestamp,
+  };
+}
+
+// ============================================================================
+// Types and Interfaces
+// ============================================================================
 
 export interface EmotionalPattern {
   id: string;
@@ -112,7 +194,7 @@ export const DEFAULT_EMOTIONAL_MEMORY_CONFIG: Partial<EmotionalMemoryConfig> = {
 
 export class EmotionalMemoryManager {
   private config: Required<EmotionalMemoryConfig>;
-  private emotionalStates: EmotionalState[] = [];
+  private emotionalStates: AdvancedEmotionalState[] = [];
   private patterns: EmotionalPattern[] = [];
   private triggers: EmotionalTrigger[] = [];
   private lastCleanup: number = 0;
@@ -134,11 +216,11 @@ export class EmotionalMemoryManager {
    * Record an emotional state
    */
   async recordEmotionalState(
-    state: Omit<EmotionalState, 'id' | 'timestamp'>
+    state: Omit<AdvancedEmotionalState, 'id' | 'timestamp'>
   ): Promise<void> {
     if (!this.config.enabled) return;
 
-    const fullState: EmotionalState = {
+    const fullState: AdvancedEmotionalState = {
       id: this.generateId(),
       timestamp: Date.now(),
       ...state,
@@ -326,7 +408,9 @@ export class EmotionalMemoryManager {
   /**
    * Learn emotional patterns from states
    */
-  private async learnEmotionalPatterns(state: EmotionalState): Promise<void> {
+  private async learnEmotionalPatterns(
+    state: AdvancedEmotionalState
+  ): Promise<void> {
     // Look for similar situations to create or update patterns
     const similarStates = this.emotionalStates.filter(
       (s) =>
@@ -368,7 +452,7 @@ export class EmotionalMemoryManager {
   /**
    * Analyze triggers from emotional state
    */
-  private async analyzeTriggers(state: EmotionalState): Promise<void> {
+  private async analyzeTriggers(state: AdvancedEmotionalState): Promise<void> {
     for (const trigger of state.triggers) {
       let existingTrigger = this.triggers.find((t) => t.name === trigger);
 
@@ -407,7 +491,9 @@ export class EmotionalMemoryManager {
   /**
    * Update current mood based on emotional state
    */
-  private async updateCurrentMood(state: EmotionalState): Promise<void> {
+  private async updateCurrentMood(
+    state: AdvancedEmotionalState
+  ): Promise<void> {
     const now = Date.now();
     const timeWeight = Math.exp(-(now - state.timestamp) / (1000 * 60 * 60)); // Decay over hours
 
@@ -595,13 +681,13 @@ export class EmotionalMemoryManager {
   /**
    * Calculate emotional trends
    */
-  private calculateEmotionalTrends(states: EmotionalState[]): Array<{
+  private calculateEmotionalTrends(states: AdvancedEmotionalState[]): Array<{
     emotion: string;
     frequency: number;
     averageIntensity: number;
     trend: 'increasing' | 'decreasing' | 'stable';
   }> {
-    const emotionGroups = new Map<string, EmotionalState[]>();
+    const emotionGroups = new Map<string, AdvancedEmotionalState[]>();
 
     for (const state of states) {
       if (!emotionGroups.has(state.primaryEmotion)) {
@@ -655,7 +741,7 @@ export class EmotionalMemoryManager {
   /**
    * Identify common triggers
    */
-  private identifyCommonTriggers(states: EmotionalState[]): Array<{
+  private identifyCommonTriggers(states: AdvancedEmotionalState[]): Array<{
     trigger: string;
     frequency: number;
     mostCommonEmotion: string;
@@ -695,7 +781,7 @@ export class EmotionalMemoryManager {
   /**
    * Evaluate coping strategies
    */
-  private evaluateCopingStrategies(states: EmotionalState[]): Array<{
+  private evaluateCopingStrategies(states: AdvancedEmotionalState[]): Array<{
     strategy: string;
     effectiveness: number;
     usageCount: number;
@@ -734,7 +820,7 @@ export class EmotionalMemoryManager {
   /**
    * Calculate mood stability
    */
-  private calculateMoodStability(states: EmotionalState[]): number {
+  private calculateMoodStability(states: AdvancedEmotionalState[]): number {
     if (states.length < 2) return 0.5;
 
     const intensities = states.map((s) => s.intensity);
@@ -752,7 +838,7 @@ export class EmotionalMemoryManager {
    * Calculate emotional health score
    */
   private calculateEmotionalHealthScore(
-    states: EmotionalState[],
+    states: AdvancedEmotionalState[],
     moodStability: number
   ): number {
     let healthScore = 0.5; // Base score
@@ -906,7 +992,7 @@ export class EmotionalMemoryManager {
   /**
    * Calculate typical outcomes
    */
-  private calculateTypicalOutcomes(states: EmotionalState[]): Array<{
+  private calculateTypicalOutcomes(states: AdvancedEmotionalState[]): Array<{
     outcome: string;
     frequency: number;
   }> {
@@ -930,7 +1016,7 @@ export class EmotionalMemoryManager {
    * Calculate pattern coping effectiveness
    */
   private calculatePatternCopingEffectiveness(
-    states: EmotionalState[]
+    states: AdvancedEmotionalState[]
   ): number {
     const copingStates = states.filter((s) => s.effectiveness !== undefined);
     if (copingStates.length === 0) return 0.5;
@@ -1011,6 +1097,44 @@ export class EmotionalMemoryManager {
       currentMood: this.currentMood?.primaryEmotion || undefined,
       mostCommonEmotions,
       emotionalHealthScore,
+    };
+  }
+
+  /**
+   * Get all emotional states (for guardian integration)
+   */
+  getEmotionalStates(): AdvancedEmotionalState[] {
+    return [...this.emotionalStates];
+  }
+
+  /**
+   * Convert emotional state to simple format for integration
+   */
+  toSimpleEmotionalState(state: AdvancedEmotionalState): {
+    id: string;
+    primaryEmotion: string;
+    intensity: number;
+    secondaryEmotions: Array<{ emotion: string; intensity: number }>;
+    triggers: string[];
+    context: string;
+    timestamp: number;
+    duration?: number;
+    outcome?: string;
+    copingStrategies?: string[];
+    effectiveness?: number;
+  } {
+    return {
+      id: state.id,
+      primaryEmotion: state.primaryEmotion,
+      intensity: state.intensity,
+      secondaryEmotions: state.secondaryEmotions,
+      triggers: state.triggers,
+      context: state.context,
+      timestamp: state.timestamp,
+      duration: state.duration,
+      outcome: state.outcome,
+      copingStrategies: state.copingStrategies,
+      effectiveness: state.effectiveness,
     };
   }
 }

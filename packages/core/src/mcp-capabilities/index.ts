@@ -14,8 +14,8 @@ export { ConstitutionalFilter } from './constitutional-filter';
 export { DynamicCreationFlow } from './dynamic-creation-flow';
 
 // Types
-export type { ShadowRunResult } from './capability-registry';
 export type { ImpasseResult } from './dynamic-creation-flow';
+export type { RegistryStatus, ShadowRunResult } from './types';
 
 // Hybrid HRM Integration
 export { HybridHRMRouter } from './hybrid-hrm-integration';

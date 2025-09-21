@@ -1602,9 +1602,6 @@ function getNetworkRequestCount(): number {
   // For now, return a simulated value
   return networkRequestCount || 0;
 }
-
-// Enhanced cognitive state tracking
-class CognitiveStateTracker {
   private activeConversations = new Set<string>();
   private recentOperations: Array<{
     type: string;

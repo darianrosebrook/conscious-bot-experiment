@@ -669,15 +669,21 @@ async function checkCraftingTablePrerequisite(task: any): Promise<boolean> {
 
     // Step 2: Analyze resources and options
     const resourceAnalysis = await analyzeCraftingResources(inventory);
-    
+
     // Step 3: Check for nearby crafting tables
     const nearbyTables = await scanForNearbyCraftingTables();
-    
+
     // Step 4: Make intelligent decision
-    const decision = await decideCraftingTableStrategy(resourceAnalysis, nearbyTables, task);
-    
+    const decision = await decideCraftingTableStrategy(
+      resourceAnalysis,
+      nearbyTables,
+      task
+    );
+
     if (decision.action === 'use_existing') {
-      console.log(`✅ Using existing crafting table at distance ${decision.details.distance}`);
+      console.log(
+        `✅ Using existing crafting table at distance ${decision.details.distance}`
+      );
       return true;
     } else if (decision.action === 'craft_new') {
       console.log(`🔨 Crafting new table: ${decision.reasoning}`);
@@ -710,20 +716,27 @@ async function analyzeCraftingResources(inventory: any[]): Promise<{
 }> {
   try {
     // Check for wood/planks in inventory
-    const woodItems = inventory.filter((item: any) => 
-      item.type?.toLowerCase().includes('log') ||
-      item.type?.toLowerCase().includes('wood') ||
-      item.type?.toLowerCase().includes('plank')
+    const woodItems = inventory.filter(
+      (item: any) =>
+        item.type?.toLowerCase().includes('log') ||
+        item.type?.toLowerCase().includes('wood') ||
+        item.type?.toLowerCase().includes('plank')
     );
 
-    const woodCount = woodItems.reduce((total, item) => total + (item.count || 1), 0);
-    
+    const woodCount = woodItems.reduce(
+      (total, item) => total + (item.count || 1),
+      0
+    );
+
     // Check if we can convert logs to planks
     const logItems = inventory.filter((item: any) =>
       item.type?.toLowerCase().includes('log')
     );
-    const logCount = logItems.reduce((total, item) => total + (item.count || 1), 0);
-    const totalWoodPotential = woodCount + (logCount * 4); // Each log = 4 planks
+    const logCount = logItems.reduce(
+      (total, item) => total + (item.count || 1),
+      0
+    );
+    const totalWoodPotential = woodCount + logCount * 4; // Each log = 4 planks
 
     const canCraft = totalWoodPotential >= 4;
     const hasWood = woodCount > 0 || logCount > 0;
@@ -752,10 +765,12 @@ async function analyzeCraftingResources(inventory: any[]): Promise<{
 /**
  * Scan for nearby crafting tables
  */
-async function scanForNearbyCraftingTables(): Promise<Array<{
-  position: any;
-  distance: number;
-}>> {
+async function scanForNearbyCraftingTables(): Promise<
+  Array<{
+    position: any;
+    distance: number;
+  }>
+> {
   try {
     // Get current bot position from world state
     const worldStateResponse = await fetch('http://localhost:3005/state', {
@@ -766,7 +781,7 @@ async function scanForNearbyCraftingTables(): Promise<Array<{
 
     if (!worldStateResponse.ok) return [];
 
-    const worldData = await worldStateResponse.json() as any;
+    const worldData = (await worldStateResponse.json()) as any;
     const botPosition = worldData.data?.position;
 
     if (!botPosition) return [];
@@ -783,7 +798,7 @@ async function scanForNearbyCraftingTables(): Promise<Array<{
 
     if (!nearbyBlocksResponse.ok) return [];
 
-    const nearbyBlocks = await nearbyBlocksResponse.json();
+    const nearbyBlocks = (await nearbyBlocksResponse.json()) as any;
     const craftingTables: Array<{ position: any; distance: number }> = [];
 
     if (nearbyBlocks.data && Array.isArray(nearbyBlocks.data)) {
@@ -828,21 +843,25 @@ async function decideCraftingTableStrategy(
     // If we have nearby tables and limited resources, prefer using existing
     if (nearbyTables.length > 0) {
       const nearestTable = nearbyTables[0];
-      
+
       // Calculate decision factors
-      const distanceFactor = Math.max(0, 1 - (nearestTable.distance / 15));
+      const distanceFactor = Math.max(0, 1 - nearestTable.distance / 15);
       const resourceFactor = resourceAnalysis.efficiency;
       const travelTime = nearestTable.distance * 1.5; // seconds
       const craftingTime = resourceAnalysis.canCraft ? 8 : 45;
-      
+
       // Score existing table option
-      const existingScore = distanceFactor * 0.6 + (travelTime < craftingTime ? 0.4 : 0);
-      
+      const existingScore =
+        distanceFactor * 0.6 + (travelTime < craftingTime ? 0.4 : 0);
+
       if (existingScore > 0.5 || !resourceAnalysis.canCraft) {
         return {
           action: 'use_existing',
           reasoning: `Table ${nearestTable.distance}b away (score: ${existingScore.toFixed(2)})`,
-          details: { distance: nearestTable.distance, position: nearestTable.position }
+          details: {
+            distance: nearestTable.distance,
+            position: nearestTable.position,
+          },
         };
       }
     }
@@ -852,7 +871,7 @@ async function decideCraftingTableStrategy(
       return {
         action: 'craft_new',
         reasoning: `Have ${resourceAnalysis.woodCount} wood units, efficient to craft new table`,
-        details: { hasResources: true, woodCount: resourceAnalysis.woodCount }
+        details: { hasResources: true, woodCount: resourceAnalysis.woodCount },
       };
     }
 
@@ -861,10 +880,10 @@ async function decideCraftingTableStrategy(
       return {
         action: 'gather_resources',
         reasoning: `Need ${4 - resourceAnalysis.woodCount} more wood units for crafting table`,
-        details: { 
+        details: {
           neededWood: Math.max(0, 4 - resourceAnalysis.woodCount),
-          currentWood: resourceAnalysis.woodCount 
-        }
+          currentWood: resourceAnalysis.woodCount,
+        },
       };
     }
 
@@ -872,14 +891,14 @@ async function decideCraftingTableStrategy(
     return {
       action: 'craft_new',
       reasoning: 'Default action when other options unavailable',
-      details: {}
+      details: {},
     };
   } catch (error) {
     console.error('Error deciding crafting table strategy:', error);
     return {
       action: 'gather_resources',
       reasoning: 'Error in analysis, defaulting to resource gathering',
-      details: {}
+      details: {},
     };
   }
 }
@@ -887,7 +906,10 @@ async function decideCraftingTableStrategy(
 /**
  * Add crafting table task with proper configuration
  */
-async function addCraftingTableTask(originalTask: any, details: any): Promise<void> {
+async function addCraftingTableTask(
+  originalTask: any,
+  details: any
+): Promise<void> {
   const craftingTableTask = {
     id: `task-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
     title: 'Craft Crafting Table',
@@ -953,7 +975,10 @@ async function addCraftingTableTask(originalTask: any, details: any): Promise<vo
 /**
  * Add resource gathering task for crafting table materials
  */
-async function addResourceGatheringTask(originalTask: any, details: any): Promise<void> {
+async function addResourceGatheringTask(
+  originalTask: any,
+  details: any
+): Promise<void> {
   const woodTask = {
     id: `task-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
     title: 'Gather Wood for Crafting Table',
@@ -1473,6 +1498,8 @@ async function autonomousTaskExecutor() {
         `🎯 Found MCP option: ${suitableOption.name} (${suitableOption.id}) - execution temporarily disabled`
       );
       // TODO: Re-enable MCP execution after fixing the crash - investigate MCP execution failure
+
+      return;
     }
 
     // If no BT option found, try to use individual leaves directly

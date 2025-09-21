@@ -98,6 +98,7 @@ export const TaskSignatureSchema = z.object({
   requiresPlanning: z.boolean().optional(),
   socialContent: z.boolean().optional(),
   ambiguousContext: z.boolean().optional(),
+  riskLevel: z.enum(['low', 'medium', 'high', 'critical']).optional(),
 });
 
 export type TaskSignature = z.infer<typeof TaskSignatureSchema>;
@@ -253,6 +254,198 @@ export const HealthAssessmentSchema = z.object({
 });
 
 export type HealthAssessment = z.infer<typeof HealthAssessmentSchema>;
+
+// ===== NEED SYSTEM TYPES =====
+
+export enum NeedType {
+  SAFETY = 'safety',
+  NUTRITION = 'nutrition',
+  PROGRESS = 'progress',
+  SOCIAL = 'social',
+  CURIOSITY = 'curiosity',
+  INTEGRITY = 'integrity',
+  ACHIEVEMENT = 'achievement',
+  BELONGING = 'belonging',
+}
+
+export enum TrendDirection {
+  INCREASING = 'increasing',
+  DECREASING = 'decreasing',
+  STABLE = 'stable',
+  OSCILLATING = 'oscillating',
+  UNKNOWN = 'unknown',
+}
+
+export enum TimeOfDay {
+  DAWN = 'dawn',
+  MORNING = 'morning',
+  NOON = 'noon',
+  AFTERNOON = 'afternoon',
+  DUSK = 'dusk',
+  NIGHT = 'night',
+  MIDNIGHT = 'midnight',
+  UNKNOWN = 'unknown',
+}
+
+export enum LocationType {
+  VILLAGE = 'village',
+  WILDERNESS = 'wilderness',
+  CAVE = 'cave',
+  OCEAN = 'ocean',
+  NETHER = 'nether',
+  END = 'end',
+  UNKNOWN = 'unknown',
+}
+
+export enum SocialContext {
+  ALONE = 'alone',
+  WITH_PLAYERS = 'with_players',
+  WITH_NPCS = 'with_npcs',
+  IN_GROUP = 'in_group',
+  IN_CONFLICT = 'in_conflict',
+  LEADING = 'leading',
+  FOLLOWING = 'following',
+}
+
+export interface EnvironmentalFactor {
+  type: string;
+  intensity: number;
+  impact: number;
+  description: string;
+}
+
+export interface NeedContext {
+  timeOfDay: TimeOfDay;
+  location: LocationType;
+  socialContext: SocialContext;
+  environmentalFactors: EnvironmentalFactor[];
+  recentEvents: string[];
+  currentGoals: string[];
+  availableResources: string[];
+}
+
+export interface NeedHistoryEntry {
+  timestamp: number;
+  intensity: number;
+  urgency: number;
+  context: Partial<NeedContext>;
+  triggers: string[];
+  satisfaction: number; // 0-1, how well the need was met
+}
+
+export interface Need {
+  id: string;
+  type: NeedType;
+  intensity: number; // 0-1
+  urgency: number; // 0-1
+  trend: TrendDirection;
+  trendStrength: number; // 0-1
+  context: NeedContext;
+  memoryInfluence: number; // 0-1
+  noveltyScore: number; // 0-1
+  commitmentBoost: number; // 0-1
+  timestamp: number;
+  history: NeedHistoryEntry[];
+}
+
+// ===== TASK SYSTEM TYPES =====
+
+export enum TaskType {
+  MAINTENANCE = 'maintenance',
+  GOAL_PURSUIT = 'goal_pursuit',
+  SOCIAL = 'social',
+  EXPLORATION = 'exploration',
+  EMERGENCY = 'emergency',
+  LEARNING = 'learning',
+}
+
+export enum ResourceType {
+  TIME = 'time',
+  ENERGY = 'energy',
+  TOOLS = 'tools',
+  MATERIALS = 'materials',
+  ATTENTION = 'attention',
+}
+
+export interface ResourceRequirement {
+  type: ResourceType;
+  name: string;
+  quantity: number;
+  criticality: number; // 0-1, how critical this resource is
+  alternatives: string[];
+}
+
+export interface TaskContext {
+  environment: string;
+  socialContext: string;
+  currentGoals: string[];
+  recentEvents: string[];
+  availableResources: string[];
+  constraints: string[];
+  opportunities: string[];
+  timeOfDay: string;
+  energyLevel: number; // 0-1
+  stressLevel: number; // 0-1
+}
+
+export interface TaskMetadata {
+  category: string;
+  tags: string[];
+  difficulty: number; // 0-1
+  skillRequirements: string[];
+  emotionalImpact: number; // -1 to 1
+  satisfaction: number; // 0-1, expected satisfaction
+  novelty: number; // 0-1, how novel the task is
+  socialValue: number; // 0-1, value to social relationships
+}
+
+export enum RiskLevel {
+  LOW = 'low',
+  MEDIUM = 'medium',
+  HIGH = 'high',
+  CRITICAL = 'critical',
+}
+
+export interface PriorityTask {
+  id: string;
+  name: string;
+  description: string;
+  type: TaskType;
+  basePriority: number; // 0-1
+  urgency: number; // 0-1
+  importance: number; // 0-1
+  complexity: number; // 0-1
+  estimatedDuration: number; // minutes
+  deadline?: number; // timestamp
+  dependencies: string[]; // task IDs
+  resources: ResourceRequirement[];
+  context: TaskContext;
+  metadata: TaskMetadata;
+  createdAt: number;
+  lastUpdated: number;
+}
+
+export interface PriorityFactor {
+  name: string;
+  value: number; // 0-1
+  weight: number; // 0-1
+  description: string;
+}
+
+export interface PrioritizedTask extends PriorityTask {
+  calculatedPriority: number; // 0-1, final priority score
+  commitmentBoost: number; // 0-1, boost from commitments
+  noveltyBoost: number; // 0-1, boost from novelty
+  opportunityCostBoost: number; // 0-1, boost from opportunity cost
+  deadlinePressure: number; // 0-1, pressure from approaching deadline
+  resourceAvailability: number; // 0-1, how available resources are
+  socialImpact: number; // 0-1, impact on social relationships
+  learningValue: number; // 0-1, potential learning value
+  riskLevel: RiskLevel;
+  feasibility: number; // 0-1, how feasible the task is
+  priorityFactors: PriorityFactor[];
+  rankingReason: string;
+}
 
 // ===== CONFIGURATION =====
 

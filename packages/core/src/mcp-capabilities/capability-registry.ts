@@ -8,6 +8,8 @@
  */
 
 import { performance } from 'node:perf_hooks';
+import { EventEmitter } from 'events';
+import { v4 as uuidv4 } from 'uuid';
 import { WorkingLeafFactory } from './working-leaf-factory';
 import {
   LeafImpl,
@@ -17,15 +19,27 @@ import {
   createExecError,
 } from './leaf-contracts';
 import { BTDSLParser, CompiledBTNode } from './bt-dsl-parser';
+import {
+  CapabilitySpec,
+  ExecutionResult,
+  ExecutionRequest,
+  ValidationResult,
+  CapabilityExecutor,
+  CapabilityValidator,
+  CapabilityMetrics,
+  RiskLevel,
+  CapabilityQuery,
+  CapabilityMatch,
+  RegistryStatus,
+  validateCapabilitySpec,
+  validateExecutionRequest,
+  validateExecutionContext,
+  ExecutionContext,
+} from './types';
 
 // ============================================================================
 // Registry Status and Versioning (C0)
 // ============================================================================
-
-/**
- * Registry status for leaves and options
- */
-export type RegistryStatus = 'shadow' | 'active' | 'retired' | 'revoked';
 
 /**
  * Provenance information for tracking authorship and lineage
@@ -133,9 +147,8 @@ export class CapabilityRegistry extends EventEmitter<CapabilityRegistryEvents> {
       // Check for conflicts
       if (this.capabilities.has(validatedSpec.id)) {
         return {
-          success: false,
-          capabilityId: validatedSpec.id,
-          message: `Capability ${validatedSpec.id} already exists`,
+          ok: false,
+          error: `Capability ${validatedSpec.id} already exists`,
         };
       }
 
@@ -160,15 +173,14 @@ export class CapabilityRegistry extends EventEmitter<CapabilityRegistryEvents> {
       this.emit('capability-registered', validatedSpec);
 
       return {
-        success: true,
-        capabilityId: validatedSpec.id,
-        message: `Successfully registered capability: ${validatedSpec.name}`,
+        ok: true,
+        id: validatedSpec.id,
+        detail: `Successfully registered capability: ${validatedSpec.name}`,
       };
     } catch (error) {
       return {
-        success: false,
-        capabilityId: spec.id,
-        message: `Failed to register capability: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        ok: false,
+        error: `Failed to register capability: ${error instanceof Error ? error.message : 'Unknown error'}`,
       };
     }
   }

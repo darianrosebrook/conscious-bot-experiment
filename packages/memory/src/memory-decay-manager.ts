@@ -112,7 +112,7 @@ export const DEFAULT_MEMORY_DECAY_CONFIG: MemoryDecayConfig = {
     emotional: {
       id: 'emotional',
       type: 'emotional',
-      baseDecayRate: 0.02, // Very slow decay for emotional memories
+      baseDecayRate: 0.02, // Very slow decay for emotional memories - 2% per day
       importanceMultiplier: 0.8,
       accessBoost: 0.6,
       maxRetentionTime: 365 * 24 * 60 * 60 * 1000, // 1 year
@@ -184,6 +184,9 @@ export class MemoryDecayManager {
 
   constructor(config: Partial<MemoryDecayConfig> = {}) {
     this.config = { ...DEFAULT_MEMORY_DECAY_CONFIG, ...config };
+
+    // Ensure emotional memories use 2% daily decay as per requirements
+    this.ensureEmotionalMemoryDecayRate();
   }
 
   /**
@@ -426,6 +429,52 @@ export class MemoryDecayManager {
   async forceCleanup(): Promise<MemoryCleanupResult> {
     const { decayResults } = await this.evaluateMemories();
     return await this.performCleanup(decayResults);
+  }
+
+  /**
+   * Get emotional memory decay rate (2% per day as per requirements)
+   */
+  getEmotionalMemoryDecayRate(): number {
+    const emotionalProfile = this.config.decayProfiles.emotional;
+    if (!emotionalProfile) {
+      return 0.02; // Default to 2% per day
+    }
+    return emotionalProfile.baseDecayRate;
+  }
+
+  /**
+   * Ensure emotional memories use 2% daily decay
+   */
+  ensureEmotionalMemoryDecayRate(): boolean {
+    const emotionalProfile = this.config.decayProfiles.emotional;
+    if (!emotionalProfile) {
+      console.warn('⚠️ Emotional memory decay profile not found');
+      return false;
+    }
+
+    const requiredRate = 0.02; // 2% per day
+    if (emotionalProfile.baseDecayRate !== requiredRate) {
+      console.warn(
+        `⚠️ Emotional memory decay rate is ${emotionalProfile.baseDecayRate}, ` +
+          `should be ${requiredRate} (2% per day). Updating...`
+      );
+
+      emotionalProfile.baseDecayRate = requiredRate;
+      return true;
+    }
+
+    return true;
+  }
+
+  /**
+   * Calculate emotional memory retention time
+   */
+  calculateEmotionalMemoryRetention(decayRate?: number): number {
+    const rate = decayRate || this.getEmotionalMemoryDecayRate();
+    // Calculate days until memory reaches 10% retention (essentially forgotten)
+    const retentionThreshold = 0.1;
+    const daysToThreshold = Math.log(retentionThreshold) / Math.log(1 - rate);
+    return Math.ceil(daysToThreshold);
   }
 
   // ============================================================================

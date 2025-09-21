@@ -1,0 +1,54 @@
+id: COGNITION-001
+title: "LLM Integration and Cognitive Processing System"
+risk_tier: 2
+scope:
+  in:
+    - "Process natural language inputs and outputs"
+    - "Integrate with LLM models for reasoning"
+    - "Handle cognitive stream processing"
+    - "Manage emotional memory LLM adapter"
+    - "Provide reflection and self-analysis capabilities"
+  out:
+    - "Language model API calls"
+    - "Cognitive insights"
+    - "Self-reflection outputs"
+invariants:
+  - "LLM integration maintains <2s response time for standard queries"
+  - "Cognitive stream processing preserves context integrity"
+  - "Emotional memory integration maintains accurate valence tracking"
+  - "Self-reflection maintains narrative coherence"
+  - "Error handling graceful for LLM API failures"
+acceptance:
+  - id: A1
+    given: "natural language processing request"
+    when: "LLM integration processes"
+    then: "appropriate response generated within time limits"
+  - id: A2
+    given: "emotional memory context"
+    when: "cognitive processing occurs"
+    then: "emotional valence correctly incorporated into response"
+  - id: A3
+    given: "self-reflection trigger"
+    when: "reflection system activates"
+    then: "coherent narrative generated with proper context"
+non_functional:
+  a11y: ["cognitive output clarity", "reflection feedback"]
+  perf:
+    api_p95_ms: 2000
+    lcp_ms: 3000
+  security: ["input sanitization", "output filtering", "rate limiting"]
+contracts:
+  - type: openapi
+    path: "contracts/cognition-api.yaml"
+observability:
+  logs: ["llm_api_calls", "cognitive_stream_events", "emotional_memory_integration"]
+  metrics: ["llm_response_quality", "cognitive_coherence_score", "reflection_accuracy"]
+  traces: ["cognitive_processing_pipeline", "llm_integration_flow", "emotional_context_handling"]
+migrations:
+  - "add cognitive_stream_log with processing metrics"
+  - "implement llm_performance_tracking"
+  - "create emotional_memory_adapter_state"
+rollback:
+  - "feature flag COGNITION_LLM_INTEGRATION=false"
+  - "revert to rule-based cognitive processing"
+  - "disable emotional memory integration"

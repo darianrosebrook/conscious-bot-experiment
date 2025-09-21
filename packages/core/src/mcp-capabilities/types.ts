@@ -311,6 +311,28 @@ export const CapabilityMatchSchema = z.object({
 
 export type CapabilityMatch = z.infer<typeof CapabilityMatchSchema>;
 
+// ===== REGISTRY INTERFACES =====
+
+/**
+ * Registry status for capabilities
+ */
+export type RegistryStatus = 'shadow' | 'active' | 'retired' | 'revoked';
+
+/**
+ * Shadow run result for testing capabilities before activation
+ */
+export interface ShadowRunResult {
+  capabilityId: string;
+  success: boolean;
+  duration: number;
+  effects: Effect[];
+  errors: string[];
+  metrics: {
+    cpuTime: number;
+    memoryUsed: number;
+  };
+}
+
 // ===== MONITORING AND TELEMETRY =====
 
 /**
@@ -440,10 +462,10 @@ export interface CapabilityValidator {
  * Registration result for new capabilities
  */
 export interface RegistrationResult {
-  success: boolean;
-  capabilityId: string;
-  message: string;
-  warnings?: string[];
+  ok: boolean;
+  id?: string;
+  error?: string;
+  detail?: string;
 }
 
 /**

@@ -427,4 +427,12 @@ How should I respond?`;
     this.config = { ...this.config, ...newConfig };
     this.baseUrl = `http://${this.config.host}:${this.config.port}`;
   }
+
+  /**
+   * Close the LLM interface
+   */
+  async close(): Promise<void> {
+    // No specific cleanup needed for basic LLM interface
+    console.log('🔌 LLM interface closed');
+  }
 }

@@ -10,7 +10,16 @@
 
 import { LLMInterface, LLMContext, LLMResponse } from './llm-interface';
 import { LLMConfig } from '../types';
-import { EnhancedMemorySystem } from '@conscious-bot/memory';
+import { createEnhancedMemorySystem } from '@conscious-bot/memory';
+
+interface EnhancedMemorySystem {
+  initialize(): Promise<void>;
+  searchMemories(params: any): Promise<any>;
+  ingestMemory(params: any): Promise<any>;
+  recordCognitivePattern(type: string, data: any): Promise<void>;
+  close(): Promise<void>;
+  // Add other methods as needed
+}
 
 // ============================================================================
 // Types and Interfaces
@@ -162,12 +171,15 @@ export class MemoryAwareLLMInterface extends LLMInterface {
         enableToolEfficiencyTracking: true,
         enableBehaviorTreeLearning: true,
         enableCognitivePatternTracking: true,
-      });
+      } as any);
 
       await this.memorySystem.initialize();
       console.log('✅ Memory system initialized for LLM integration');
     } catch (error) {
-      console.warn('⚠️ Could not initialize memory system:', error);
+      console.warn(
+        '⚠️ Could not initialize memory system:',
+        error instanceof Error ? error.message : String(error)
+      );
       console.warn('⚠️ LLM will operate without memory integration');
     }
   }
@@ -279,7 +291,7 @@ export class MemoryAwareLLMInterface extends LLMInterface {
         context: context.memoryContext,
       });
 
-      return searchResults.results.map((result) => ({
+      return searchResults.results.map((result: any) => ({
         id: result.id,
         type: result.type,
         content: result.content,
@@ -400,7 +412,7 @@ If the memories are relevant, incorporate them naturally into your reasoning. If
       }
 
       // Store cognitive processing pattern if tracking is enabled
-      if (this.memoryConfig.enableCognitivePatternTracking) {
+      if ((this.memoryConfig as any).enableCognitivePatternTracking) {
         await this.memorySystem.recordCognitivePattern(
           'decision',
           {

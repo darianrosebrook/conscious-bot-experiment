@@ -57,6 +57,11 @@ export * from './spatial-memory-manager';
 // Emotional Memory
 export * from './emotional-memory-manager';
 
+// Identity Memory System
+export * from './identity-memory-guardian';
+export * from './self-narrative-constructor';
+export * from './memory-system-coordinator';
+
 // Cognitive Task Memory Enhancement
 export * from './cognitive-task-memory';
 

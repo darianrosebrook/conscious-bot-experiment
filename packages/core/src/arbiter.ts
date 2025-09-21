@@ -15,11 +15,7 @@ import {
   PerformanceMonitor,
   DEFAULT_PERFORMANCE_CONFIG,
 } from './performance-monitor';
-import {
-  AdvancedNeedGenerator,
-  NeedType,
-  TrendDirection,
-} from './advanced-need-generator';
+import { AdvancedNeedGenerator } from './advanced-need-generator';
 import { GoalTemplateManager } from './goal-template-manager';
 import {
   AdvancedSignalProcessor,
@@ -40,6 +36,16 @@ import {
   ArbiterConfig,
   DegradationLevel,
   SystemEvents,
+  Need,
+  PriorityTask,
+  NeedContext,
+  TaskContext,
+  NeedType,
+  TrendDirection,
+  TimeOfDay,
+  LocationType,
+  SocialContext,
+  EnvironmentalFactor,
   validateSignal,
   validateCognitiveTask,
   validateArbiterConfig,
@@ -112,7 +118,7 @@ export class ReflexModule implements CognitiveModule {
 
   canHandle(task: CognitiveTask, signature?: TaskSignature): boolean {
     if (signature?.timeConstraint) {
-      return task.priority > 0.8 || signature.timeConstraint < 100;
+      return task.priority > 0.8 || (signature.timeConstraint ?? 200) < 100;
     }
     return task.priority > 0.8;
   }
@@ -286,12 +292,12 @@ export class Arbiter extends EventEmitter<SystemEvents> {
           .getCurrentNeeds()
           .map((need) => ({
             id: uuidv4(),
-            type: need.type as any, // NeedType enum
+            type: need.type as NeedType,
             intensity: need.urgency,
             urgency: need.urgency,
-            trend: 'stable' as any, // TrendDirection enum
+            trend: TrendDirection.STABLE,
             trendStrength: 0.5,
-            context: this.getCurrentContext(),
+            context: this.getCurrentNeedContext(),
             memoryInfluence: 0.5,
             noveltyScore: 0.5,
             commitmentBoost: 0.5,
@@ -302,7 +308,7 @@ export class Arbiter extends EventEmitter<SystemEvents> {
         const enhancedNeeds =
           await this.advancedNeedGenerator.generateEnhancedNeeds(
             baseNeeds,
-            this.getCurrentContext(),
+            this.getCurrentNeedContext(),
             processedSignals.processedSignals.map((s) => ({
               type: 'experience' as const,
               content: s.data.content,
@@ -449,7 +455,10 @@ export class Arbiter extends EventEmitter<SystemEvents> {
     }
 
     return {
-      symbolicPreconditions: hasSymbolic ? 0.8 : 0.2,
+      type: task.type,
+      complexity: task.complexity,
+      requirements: [],
+      symbolicPreconditions: hasSymbolic ? ['planning', 'reasoning'] : [],
       socialContent: isSocial,
       ambiguousContext: isAmbiguous,
       requiresPlanning: needsPlanning,
@@ -473,11 +482,11 @@ export class Arbiter extends EventEmitter<SystemEvents> {
     switch (module.type) {
       case ModuleType.REFLEX:
         score += task.priority * 0.5; // Higher score for urgent tasks
-        score += signature.timeConstraint < 100 ? 0.4 : 0;
+        score += (signature.timeConstraint ?? 200) < 100 ? 0.4 : 0;
         break;
 
       case ModuleType.HRM:
-        score += signature.symbolicPreconditions * 0.4;
+        score += (signature.symbolicPreconditions?.length ?? 0) * 0.4;
         score += signature.requiresPlanning ? 0.3 : 0;
         score -= signature.socialContent ? 0.2 : 0; // HRM not great at social
         break;
@@ -485,7 +494,7 @@ export class Arbiter extends EventEmitter<SystemEvents> {
       case ModuleType.LLM:
         score += signature.socialContent ? 0.4 : 0;
         score += signature.ambiguousContext ? 0.3 : 0;
-        score -= signature.timeConstraint < 200 ? 0.3 : 0; // LLM is slower
+        score -= (signature.timeConstraint ?? 200) < 200 ? 0.3 : 0; // LLM is slower
         break;
 
       case ModuleType.GOAP:
@@ -496,7 +505,7 @@ export class Arbiter extends EventEmitter<SystemEvents> {
 
     // Adjust for estimated processing time vs available budget
     const estimatedTime = module.estimateProcessingTime(task);
-    if (estimatedTime <= signature.timeConstraint) {
+    if (estimatedTime <= (signature.timeConstraint ?? 200)) {
       score += 0.2;
     } else {
       score -= 0.3; // Penalize if likely to exceed budget
@@ -515,10 +524,10 @@ export class Arbiter extends EventEmitter<SystemEvents> {
   ): string {
     const reasons: string[] = [];
 
-    if (signature.timeConstraint < 100) {
+    if ((signature.timeConstraint ?? 200) < 100) {
       reasons.push('urgent timing constraint');
     }
-    if (signature.symbolicPreconditions > 0.7) {
+    if ((signature.symbolicPreconditions?.length ?? 0) > 0.7) {
       reasons.push('symbolic reasoning required');
     }
     if (signature.socialContent) {
@@ -706,9 +715,9 @@ export class Arbiter extends EventEmitter<SystemEvents> {
         type: need.type as NeedType, // NeedType enum
         intensity: need.urgency,
         urgency: need.urgency,
-        trend: 'stable' as TrendDirection, // TrendDirection enum
+        trend: TrendDirection.STABLE,
         trendStrength: 0.5,
-        context: this.getCurrentContext(),
+        context: this.getCurrentNeedContext(),
         memoryInfluence: 0.5,
         noveltyScore: 0.5,
         commitmentBoost: 0.5,
@@ -720,7 +729,7 @@ export class Arbiter extends EventEmitter<SystemEvents> {
       const enhancedNeeds =
         await this.advancedNeedGenerator.generateEnhancedNeeds(
           baseNeeds,
-          this.getCurrentContext(),
+          this.getCurrentNeedContext(),
           []
         );
 
@@ -737,7 +746,7 @@ export class Arbiter extends EventEmitter<SystemEvents> {
         estimatedDuration: 30, // Default 30 minutes
         dependencies: [],
         resources: [],
-        context: this.getCurrentContext(),
+        context: this.getCurrentTaskContext(),
         metadata: {
           category: 'need_satisfaction',
           tags: [need.type, 'urgent'],
@@ -755,7 +764,7 @@ export class Arbiter extends EventEmitter<SystemEvents> {
       // Rank tasks by priority
       const ranking = await this.priorityRanker.rankTasks(
         priorityTasks,
-        this.getCurrentContext()
+        this.getCurrentTaskContext()
       );
 
       // Process top priority tasks
@@ -1075,7 +1084,40 @@ export class Arbiter extends EventEmitter<SystemEvents> {
   }
 
   /**
+   * Get current system context for need processing
+   */
+  private getCurrentNeedContext(): NeedContext {
+    return {
+      timeOfDay: this.getTimeOfDay(),
+      location: this.getCurrentLocation(),
+      socialContext: this.getCurrentSocialContext(),
+      environmentalFactors: this.getEnvironmentalFactors(),
+      recentEvents: this.getRecentEvents(),
+      currentGoals: this.getCurrentGoals(),
+      availableResources: this.getAvailableResources(),
+    };
+  }
+
+  /**
    * Get current system context for task processing
+   */
+  private getCurrentTaskContext(): TaskContext {
+    return {
+      environment: this.getCurrentEnvironment(),
+      socialContext: this.getCurrentSocialContext(),
+      currentGoals: this.getCurrentGoals(),
+      recentEvents: this.getRecentEvents(),
+      availableResources: this.getAvailableResources(),
+      constraints: this.getCurrentConstraints(),
+      opportunities: this.getCurrentOpportunities(),
+      timeOfDay: this.getTimeOfDay(),
+      energyLevel: this.getCurrentEnergyLevel(),
+      stressLevel: this.getCurrentStressLevel(),
+    };
+  }
+
+  /**
+   * Legacy method for backward compatibility
    */
   private getCurrentContext(): Record<string, any> {
     return {
@@ -1086,6 +1128,61 @@ export class Arbiter extends EventEmitter<SystemEvents> {
         .filter((n) => n.urgency > 0.7).length,
       timestamp: Date.now(),
     };
+  }
+
+  // Helper methods for context creation
+  private getTimeOfDay(): TimeOfDay {
+    const hour = new Date().getHours();
+    if (hour < 6) return TimeOfDay.DAWN;
+    if (hour < 12) return TimeOfDay.MORNING;
+    if (hour < 15) return TimeOfDay.NOON;
+    if (hour < 18) return TimeOfDay.AFTERNOON;
+    if (hour < 20) return TimeOfDay.DUSK;
+    return TimeOfDay.NIGHT;
+  }
+
+  private getCurrentLocation(): LocationType {
+    return LocationType.VILLAGE; // Default for now
+  }
+
+  private getCurrentSocialContext(): SocialContext {
+    return SocialContext.ALONE; // Default for now
+  }
+
+  private getEnvironmentalFactors(): EnvironmentalFactor[] {
+    return []; // Default for now - would include weather, lighting, etc.
+  }
+
+  private getRecentEvents(): string[] {
+    return []; // Default for now
+  }
+
+  private getCurrentGoals(): string[] {
+    return []; // Default for now
+  }
+
+  private getAvailableResources(): string[] {
+    return ['time', 'attention']; // Default for now
+  }
+
+  private getCurrentEnvironment(): string {
+    return 'normal'; // Default for now
+  }
+
+  private getCurrentConstraints(): string[] {
+    return []; // Default for now
+  }
+
+  private getCurrentOpportunities(): string[] {
+    return []; // Default for now
+  }
+
+  private getCurrentEnergyLevel(): number {
+    return 0.8; // Default for now
+  }
+
+  private getCurrentStressLevel(): number {
+    return 0.3; // Default for now
   }
 
   /**
