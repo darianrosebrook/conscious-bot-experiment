@@ -248,7 +248,7 @@ app.post('/bot-position', (req, res) => {
   try {
     const { x, y, z } = req.body;
 
-    // TODO: Implement actual position update logic
+    // TODO: Implement actual position update logic with bot state management
     const result = {
       updated: true,
       position: { x, y, z },

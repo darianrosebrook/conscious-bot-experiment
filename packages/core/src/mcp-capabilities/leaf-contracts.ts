@@ -13,6 +13,48 @@ import { performance } from 'node:perf_hooks';
 import Ajv from 'ajv';
 
 // ============================================================================
+// Error Tracking & Aggregation
+// ============================================================================
+
+/**
+ * In-memory error statistics for pattern tracking
+ */
+const errorStats = new Map<string, number>();
+
+/**
+ * Recent error events for health monitoring and debugging
+ */
+const recentErrors: Array<{
+  type: string;
+  timestamp: number;
+  error: {
+    code: string;
+    retryable: boolean;
+    detail: string;
+  };
+  metadata: Record<string, any>;
+}> = [];
+
+/**
+ * Get error statistics and recent errors for health monitoring
+ */
+export function getErrorStats() {
+  return {
+    stats: Object.fromEntries(errorStats),
+    recentErrors: [...recentErrors].slice(-20), // Return last 20 errors
+    totalErrors: Array.from(errorStats.values()).reduce((sum, count) => sum + count, 0),
+  };
+}
+
+/**
+ * Clear error statistics (useful for testing or reset scenarios)
+ */
+export function clearErrorStats() {
+  errorStats.clear();
+  recentErrors.length = 0;
+}
+
+// ============================================================================
 // Error Taxonomy (C3)
 // ============================================================================
 
@@ -33,6 +75,25 @@ export type ExecErrorCode =
   | 'craft.missingInput'
   | 'craft.uiTimeout'
   | 'craft.containerBusy'
+  | 'container.unsupported'
+  | 'container.busy'
+  | 'container.error'
+  | 'container.transferError'
+  | 'container.closeError'
+  | 'container.managementError'
+  | 'container.notImplemented'
+  | 'farm.soilNotTillable'
+  | 'farm.noFarmland'
+  | 'farm.cropNotReady'
+  | 'farm.noSeeds'
+  | 'farm.farmlandOccupied'
+  | 'farm.harvestFailed'
+  | 'world.notInteractive'
+  | 'world.notRedstoneComponent'
+  | 'world.pistonOperationFailed'
+  | 'world.structureBuildFailed'
+  | 'world.environmentControlFailed'
+  | 'world.insufficientMaterials'
   | 'sense.apiError'
   | 'movement.timeout'
   | 'movement.collision'
@@ -76,6 +137,7 @@ export interface LeafContext {
   inventory(): Promise<InventoryState>;
   emitMetric(name: string, value: number, tags?: Record<string, string>): void;
   emitError(error: ExecError): void;
+  containerManager?: any; // Container tracking system
 }
 
 /**
@@ -415,6 +477,87 @@ export function mapExceptionToErrorCode(error: unknown): ExecErrorCode {
       return 'craft.containerBusy';
     }
 
+    // Container errors
+    if (
+      message.includes('unsupported') ||
+      message.includes('not yet supported')
+    ) {
+      return 'container.unsupported';
+    }
+    if (message.includes('busy') || message.includes('in use')) {
+      return 'container.busy';
+    }
+    if (message.includes('transfer') || message.includes('move')) {
+      return 'container.transferError';
+    }
+    if (message.includes('close') || message.includes('closing')) {
+      return 'container.closeError';
+    }
+    if (message.includes('management') || message.includes('organize')) {
+      return 'container.managementError';
+    }
+    if (
+      message.includes('not implemented') ||
+      message.includes('not yet implemented')
+    ) {
+      return 'container.notImplemented';
+    }
+
+    // Farming errors
+    if (message.includes('not tillable') || message.includes('cannot till')) {
+      return 'farm.soilNotTillable';
+    }
+    if (
+      message.includes('no farmland') ||
+      message.includes('farmland not found')
+    ) {
+      return 'farm.noFarmland';
+    }
+    if (message.includes('not ready') || message.includes('not mature')) {
+      return 'farm.cropNotReady';
+    }
+    if (message.includes('no seeds') || message.includes('seeds not found')) {
+      return 'farm.noSeeds';
+    }
+    if (message.includes('occupied') || message.includes('already planted')) {
+      return 'farm.farmlandOccupied';
+    }
+    if (
+      message.includes('harvest failed') ||
+      message.includes('cannot harvest')
+    ) {
+      return 'farm.harvestFailed';
+    }
+
+    // World interaction errors
+    if (
+      message.includes('not interactive') ||
+      message.includes('cannot interact')
+    ) {
+      return 'world.notInteractive';
+    }
+    if (
+      message.includes('not redstone') ||
+      message.includes('invalid redstone')
+    ) {
+      return 'world.notRedstoneComponent';
+    }
+    if (message.includes('piston') && message.includes('failed')) {
+      return 'world.pistonOperationFailed';
+    }
+    if (message.includes('structure') && message.includes('failed')) {
+      return 'world.structureBuildFailed';
+    }
+    if (message.includes('environment') && message.includes('failed')) {
+      return 'world.environmentControlFailed';
+    }
+    if (
+      message.includes('insufficient') ||
+      message.includes('not enough materials')
+    ) {
+      return 'world.insufficientMaterials';
+    }
+
     // Movement errors
     if (message.includes('timeout') && message.includes('move')) {
       return 'movement.timeout';
@@ -465,6 +608,20 @@ export function isRetryableError(code: ExecErrorCode): boolean {
     'dig.timeout',
     'place.timeout',
     'craft.uiTimeout',
+    'craft.containerBusy',
+    'container.busy',
+    'container.error',
+    'container.transferError',
+    'container.closeError',
+    'container.managementError',
+    'farm.soilNotTillable',
+    'farm.noFarmland',
+    'farm.noSeeds',
+    'farm.harvestFailed',
+    'world.notInteractive',
+    'world.pistonOperationFailed',
+    'world.structureBuildFailed',
+    'world.insufficientMaterials',
     'movement.timeout',
     'sense.apiError',
     'permission.denied', // Rate limiting is retryable
@@ -525,12 +682,11 @@ export function createLeafContext(
       }
 
       // weather
-      const weather =
-        (bot as any).isThundering && (bot as any).isThundering()
-          ? 'thunder'
-          : (bot as any).isRaining && (bot as any).isRaining()
-            ? 'rain'
-            : 'clear';
+      const weather = (bot as any).isThundering?.()
+        ? 'thunder'
+        : (bot as any).isRaining?.()
+          ? 'rain'
+          : 'clear';
 
       // hostiles (bounded radius)
       const me = position;
@@ -575,13 +731,58 @@ export function createLeafContext(
     },
 
     emitError: (error: ExecError) => {
-      // TODO: Implement error emission
-      if (process.env.NODE_ENV !== 'production') {
-        // eslint-disable-next-line no-console
-        console.log(`ERROR: ${error.code} - ${error.detail}`, {
+      // Structured error emission for MCP capabilities
+      const errorEvent = {
+        type: 'leaf_execution_error',
+        timestamp: Date.now(),
+        error: {
+          code: error.code,
           retryable: error.retryable,
+          detail: error.detail,
+        },
+        metadata: {
+          source: 'mcp_leaf_execution',
+          severity: error.retryable ? 'warning' : 'error',
+          sessionId: process.env.SESSION_ID || 'unknown',
+          nodeEnv: process.env.NODE_ENV || 'development',
+        },
+      };
+
+      // Error aggregation - track error patterns
+      const errorKey = `${error.code}_${error.retryable ? 'retryable' : 'fatal'}`;
+      errorStats.set(errorKey, (errorStats.get(errorKey) || 0) + 1);
+      recentErrors.push(errorEvent);
+      
+      // Keep only last 100 errors in memory to prevent memory leaks
+      if (recentErrors.length > 100) {
+        recentErrors.shift();
+      }
+
+      // Emit to console in development or when verbose logging is enabled
+      if (process.env.NODE_ENV !== 'production' || process.env.VERBOSE_ERRORS === 'true') {
+        // eslint-disable-next-line no-console
+        console.error(`[MCP ERROR] ${error.code}:`, {
+          error: errorEvent.error,
+          metadata: errorEvent.metadata,
+          count: errorStats.get(errorKey),
         });
       }
+
+      // Alerting for critical errors (non-retryable) - can be extended to integrate with monitoring systems
+      if (!error.retryable) {
+        // eslint-disable-next-line no-console
+        console.warn(`🚫 CRITICAL MCP ERROR detected: ${error.code} - Consider investigation`);
+        
+        // Check for error pattern threshold
+        const currentCount = errorStats.get(errorKey) || 0;
+        if (currentCount >= 5) {
+          // eslint-disable-next-line no-console
+          console.warn(`⚠️ HIGH ERROR FREQUENCY: ${error.code} occurred ${currentCount} times`);
+        }
+      }
+
+      // Emit structured event for potential external monitoring integration
+      process.emit('mcpError', errorEvent);
     },
   };
 }

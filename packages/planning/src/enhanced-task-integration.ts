@@ -186,14 +186,28 @@ export class EnhancedTaskIntegration extends EventEmitter {
   private taskHistory: Task[] = [];
   private progressTracker: Map<string, TaskProgress> = new Map();
   private actionVerifications: Map<string, ActionVerification> = new Map();
+
+  /**
+   * Update task status
+   */
+  async updateTaskStatus(taskId: string, status: string): Promise<void> {
+    const task = this.tasks.get(taskId);
+    if (task) {
+      task.status = status as any;
+      console.log(`Updated task ${taskId} status to ${status}`);
+    }
+  }
   // Ephemeral per-step snapshot to compare before/after state
-  private _stepStartSnapshots: Map<string, {
-    position?: { x: number; y: number; z: number };
-    food?: number;
-    health?: number;
-    inventoryTotal?: number;
-    ts: number;
-  }> = new Map();
+  private _stepStartSnapshots: Map<
+    string,
+    {
+      position?: { x: number; y: number; z: number };
+      food?: number;
+      health?: number;
+      inventoryTotal?: number;
+      ts: number;
+    }
+  > = new Map();
 
   /**
    * Update the current (first incomplete) step label to include a leaf and its parameters
@@ -204,7 +218,8 @@ export class EnhancedTaskIntegration extends EventEmitter {
     args: Record<string, any> = {}
   ): boolean {
     const task = this.tasks.get(taskId);
-    if (!task || !Array.isArray(task.steps) || task.steps.length === 0) return false;
+    if (!task || !Array.isArray(task.steps) || task.steps.length === 0)
+      return false;
     const idx = task.steps.findIndex((s) => !s.done);
     if (idx < 0) return false;
     const step = task.steps[idx];
@@ -235,7 +250,9 @@ export class EnhancedTaskIntegration extends EventEmitter {
     for (const k of keys) if (args[k] !== undefined) picked[k] = args[k];
     const paramStr = Object.keys(picked).length
       ? ` (${Object.entries(picked)
-          .map(([k, v]) => `${k}=${typeof v === 'object' ? JSON.stringify(v) : v}`)
+          .map(
+            ([k, v]) => `${k}=${typeof v === 'object' ? JSON.stringify(v) : v}`
+          )
           .join(', ')})`
       : '';
 
@@ -243,7 +260,10 @@ export class EnhancedTaskIntegration extends EventEmitter {
     task.metadata.updatedAt = Date.now();
     this.emit('taskMetadataUpdated', { task, metadata: task.metadata });
     if (this.config.enableRealTimeUpdates) {
-      this.notifyDashboard('taskMetadataUpdated', { task, metadata: task.metadata });
+      this.notifyDashboard('taskMetadataUpdated', {
+        task,
+        metadata: task.metadata,
+      });
     }
     return true;
   }
@@ -257,7 +277,8 @@ export class EnhancedTaskIntegration extends EventEmitter {
     args: Record<string, any> = {}
   ): boolean {
     const task = this.tasks.get(taskId);
-    if (!task || !Array.isArray(task.steps) || task.steps.length === 0) return false;
+    if (!task || !Array.isArray(task.steps) || task.steps.length === 0)
+      return false;
     const idx = task.steps.findIndex((s) => !s.done);
     if (idx < 0) return false;
     const step = task.steps[idx];
@@ -287,7 +308,9 @@ export class EnhancedTaskIntegration extends EventEmitter {
     for (const k of keys) if (args[k] !== undefined) picked[k] = args[k];
     const paramStr = Object.keys(picked).length
       ? ` (${Object.entries(picked)
-          .map(([k, v]) => `${k}=${typeof v === 'object' ? JSON.stringify(v) : v}`)
+          .map(
+            ([k, v]) => `${k}=${typeof v === 'object' ? JSON.stringify(v) : v}`
+          )
           .join(', ')})`
       : '';
 
@@ -295,7 +318,10 @@ export class EnhancedTaskIntegration extends EventEmitter {
     task.metadata.updatedAt = Date.now();
     this.emit('taskMetadataUpdated', { task, metadata: task.metadata });
     if (this.config.enableRealTimeUpdates) {
-      this.notifyDashboard('taskMetadataUpdated', { task, metadata: task.metadata });
+      this.notifyDashboard('taskMetadataUpdated', {
+        task,
+        metadata: task.metadata,
+      });
     }
     return true;
   }
@@ -303,7 +329,10 @@ export class EnhancedTaskIntegration extends EventEmitter {
   /**
    * Extract a parameter from a leaf-annotated step label: "Leaf: minecraft.X (key=value, ...)"
    */
-  private getLeafParamFromLabel(label: string, key: string): string | undefined {
+  private getLeafParamFromLabel(
+    label: string,
+    key: string
+  ): string | undefined {
     const m = label.match(/\((.*)\)$/);
     if (!m) return undefined;
     const parts = m[1].split(',').map((s) => s.trim());
@@ -760,17 +789,28 @@ export class EnhancedTaskIntegration extends EventEmitter {
             const leaf = stepLabel.replace('leaf: minecraft.', '').trim();
             if (leaf === 'move_to') {
               verification.verified = await this.verifyMovement();
-            } else if (leaf === 'step_forward_safely' || leaf === 'follow_entity') {
+            } else if (
+              leaf === 'step_forward_safely' ||
+              leaf === 'follow_entity'
+            ) {
               verification.verified = await this.verifyMovement();
             } else if (leaf === 'dig_block') {
               // Prefer blockType/item in label when available
-              const bt = this.getLeafParamFromLabel(stepLabel, 'blockType') || this.getLeafParamFromLabel(stepLabel, 'item');
+              const bt =
+                this.getLeafParamFromLabel(stepLabel, 'blockType') ||
+                this.getLeafParamFromLabel(stepLabel, 'item');
               const resource = bt ? String(bt) : 'wood';
-              verification.verified = await this.verifyResourceCollection(resource);
+              verification.verified =
+                await this.verifyResourceCollection(resource);
             } else if (leaf === 'pickup_item') {
-              verification.verified = await this.verifyPickupFromInventoryDelta(taskId, stepId);
+              verification.verified = await this.verifyPickupFromInventoryDelta(
+                taskId,
+                stepId
+              );
             } else if (leaf === 'place_block') {
-              const bt = this.getLeafParamFromLabel(stepLabel, 'blockType') || this.getLeafParamFromLabel(stepLabel, 'item');
+              const bt =
+                this.getLeafParamFromLabel(stepLabel, 'blockType') ||
+                this.getLeafParamFromLabel(stepLabel, 'item');
               verification.verified = await this.verifyNearbyBlock(bt);
             } else if (leaf === 'place_torch_if_needed') {
               verification.verified = await this.verifyNearbyBlock('torch');
@@ -779,12 +819,22 @@ export class EnhancedTaskIntegration extends EventEmitter {
               const placed = await this.verifyNearbyBlock();
               verification.verified = moved || placed;
             } else if (leaf === 'consume_food') {
-              verification.verified = await this.verifyConsumeFood(taskId, stepId);
+              verification.verified = await this.verifyConsumeFood(
+                taskId,
+                stepId
+              );
             } else if (leaf === 'sense_hostiles') {
               verification.verified = true;
             } else if (leaf === 'get_light_level') {
               verification.verified = await this.verifyLightLevel();
-            } else if (leaf === 'chat' || leaf === 'wait' || leaf === 'look_at' || leaf === 'turn_left' || leaf === 'turn_right' || leaf === 'jump') {
+            } else if (
+              leaf === 'chat' ||
+              leaf === 'wait' ||
+              leaf === 'look_at' ||
+              leaf === 'turn_left' ||
+              leaf === 'turn_right' ||
+              leaf === 'jump'
+            ) {
               // Consider these non-critical and pass
               verification.verified = true;
             } else if (leaf === 'craft_recipe') {
@@ -939,7 +989,7 @@ export class EnhancedTaskIntegration extends EventEmitter {
       }
       // Fallback: require at least a non-zero velocity or position change can't be verified
       const vel = data.botStatus?.velocity;
-      if (vel && (Math.abs(vel.x) + Math.abs(vel.y) + Math.abs(vel.z)) > 0) {
+      if (vel && Math.abs(vel.x) + Math.abs(vel.y) + Math.abs(vel.z) > 0) {
         return true;
       }
       return false;
@@ -952,7 +1002,10 @@ export class EnhancedTaskIntegration extends EventEmitter {
   /**
    * Verify a pickup by checking if inventory total increased since step start
    */
-  private async verifyPickupFromInventoryDelta(taskId: string, stepId: string): Promise<boolean> {
+  private async verifyPickupFromInventoryDelta(
+    taskId: string,
+    stepId: string
+  ): Promise<boolean> {
     try {
       const start = this._stepStartSnapshots.get(`${taskId}-${stepId}`) as any;
       const res = await fetch('http://localhost:3005/inventory', {
@@ -988,13 +1041,18 @@ export class EnhancedTaskIntegration extends EventEmitter {
       });
       if (!res.ok) return false;
       const data = (await res.json()) as any;
-      const blocks: any[] = data?.data?.worldState?.environment?.nearbyBlocks || [];
+      const blocks: any[] =
+        data?.data?.worldState?.environment?.nearbyBlocks || [];
       if (!Array.isArray(blocks)) return false;
       if (!pattern) {
         return blocks.length > 0; // some block visible nearby
       }
       const p = pattern.toLowerCase();
-      return blocks.some((b: any) => String(b?.type || b?.name || '').toLowerCase().includes(p));
+      return blocks.some((b: any) =>
+        String(b?.type || b?.name || '')
+          .toLowerCase()
+          .includes(p)
+      );
     } catch {
       return false;
     }
@@ -1003,7 +1061,10 @@ export class EnhancedTaskIntegration extends EventEmitter {
   /**
    * Verify that food level increased since step start (consume_food)
    */
-  private async verifyConsumeFood(taskId: string, stepId: string): Promise<boolean> {
+  private async verifyConsumeFood(
+    taskId: string,
+    stepId: string
+  ): Promise<boolean> {
     try {
       const start = this._stepStartSnapshots.get(`${taskId}-${stepId}`) as any;
       const res = await fetch('http://localhost:3005/health', {
@@ -1211,7 +1272,13 @@ export class EnhancedTaskIntegration extends EventEmitter {
         return true;
       }
 
-      // TODO: Check for nearby crafting table in world
+      // Check for nearby crafting tables in the world
+      const nearbyCraftingTables = await this.scanForNearbyCraftingTables();
+      if (nearbyCraftingTables.length > 0) {
+        console.log('🔍 Crafting access verified: found nearby crafting table');
+        return true;
+      }
+
       // For now, assume we can craft basic items without a table
       console.log('🔍 Crafting access verified: basic crafting available');
       return true;
@@ -1299,7 +1366,12 @@ export class EnhancedTaskIntegration extends EventEmitter {
         if (healthRes.ok) {
           const data = (await healthRes.json()) as any;
           const p = data?.botStatus?.position;
-          if (p && typeof p.x === 'number' && typeof p.y === 'number' && typeof p.z === 'number') {
+          if (
+            p &&
+            typeof p.x === 'number' &&
+            typeof p.y === 'number' &&
+            typeof p.z === 'number'
+          ) {
             snap.position = { x: p.x, y: p.y, z: p.z };
           }
           const food = data?.botStatus?.food;
@@ -1315,7 +1387,9 @@ export class EnhancedTaskIntegration extends EventEmitter {
             : 0;
         }
         this._stepStartSnapshots.set(`${taskId}-${stepId}`, snap);
-      } catch {}
+      } catch {
+        // Ignore snapshot creation errors to avoid blocking task execution
+      }
     })();
 
     // Update task status to active if it was pending
@@ -1685,5 +1759,79 @@ export class EnhancedTaskIntegration extends EventEmitter {
    */
   getConfig(): EnhancedTaskIntegrationConfig {
     return { ...this.config };
+  }
+
+  /**
+   * Scan for nearby crafting tables in the world
+   */
+  private async scanForNearbyCraftingTables(): Promise<
+    Array<{ position: any; distance: number }>
+  > {
+    try {
+      // Get current bot position from world state
+      const worldStateResponse = await fetch('http://localhost:3005/state', {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json' },
+        signal: AbortSignal.timeout(3000),
+      });
+
+      if (!worldStateResponse.ok) {
+        console.warn('Could not get world state for crafting table scanning');
+        return [];
+      }
+
+      const worldData = (await worldStateResponse.json()) as any;
+      const botPosition = worldData.data?.position;
+
+      if (!botPosition) {
+        console.warn('No bot position available for crafting table scanning');
+        return [];
+      }
+
+      // Query nearby blocks to find crafting tables
+      const nearbyBlocksResponse = await fetch(
+        'http://localhost:3005/nearby-blocks',
+        {
+          method: 'GET',
+          headers: { 'Content-Type': 'application/json' },
+          signal: AbortSignal.timeout(3000),
+        }
+      );
+
+      if (!nearbyBlocksResponse.ok) {
+        console.warn('Could not get nearby blocks for crafting table scanning');
+        return [];
+      }
+
+      const nearbyBlocks = (await nearbyBlocksResponse.json()) as any;
+      const craftingTables: Array<{ position: any; distance: number }> = [];
+
+      // Check nearby blocks for crafting tables
+      if (nearbyBlocks.data && Array.isArray(nearbyBlocks.data)) {
+        nearbyBlocks.data.forEach((block: any) => {
+          if (block.type?.toLowerCase().includes('crafting_table')) {
+            const distance = Math.sqrt(
+              Math.pow(block.position.x - botPosition.x, 2) +
+                Math.pow(block.position.y - botPosition.y, 2) +
+                Math.pow(block.position.z - botPosition.z, 2)
+            );
+
+            // Only include crafting tables within reasonable distance (e.g., 10 blocks)
+            if (distance <= 10) {
+              craftingTables.push({
+                position: block.position,
+                distance: Math.round(distance * 100) / 100,
+              });
+            }
+          }
+        });
+      }
+
+      console.log(`🔍 Found ${craftingTables.length} nearby crafting tables`);
+      return craftingTables;
+    } catch (error) {
+      console.error('Error scanning for nearby crafting tables:', error);
+      return [];
+    }
   }
 }

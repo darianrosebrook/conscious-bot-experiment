@@ -355,7 +355,7 @@ export class MinecraftSignalProcessor {
   }
 
   private calculateProgressLevel(currentTime: number): number {
-    // TODO: Implement based on goal achievement tracking
+    // TODO: Implement goal achievement tracking for progress calculation
     return 50; // Placeholder - neutral progress level
   }
 
@@ -522,7 +522,7 @@ export class MinecraftSignalProcessor {
   }
 
   private getLightLevel(worldState: MinecraftWorldState, bot: Bot): number {
-    // TODO: Get actual light level from bot
+    // TODO: Get actual light level from bot using mineflayer API
     return worldState.environment.timeOfDay > 13000 ? 4 : 15; // Simplified
   }
 
@@ -567,7 +567,7 @@ export class MinecraftSignalProcessor {
   private identifySocialOpportunities(
     worldState: MinecraftWorldState
   ): string[] {
-    // TODO: Implement social opportunity detection
+    // TODO: Implement social opportunity detection based on nearby players and entities
     return ['chat', 'trade', 'collaborate'];
   }
 
@@ -623,7 +623,7 @@ export class MinecraftSignalProcessor {
           type: block.type,
           value,
           position: block.position,
-          abundance: 1, // TODO: Calculate actual abundance
+          abundance: 1, // TODO: Calculate actual resource abundance based on inventory and environment
           toolRequired: this.getRequiredTool(block.type),
           accessibility: this.calculateAccessibility(block.position),
         });
@@ -647,7 +647,7 @@ export class MinecraftSignalProcessor {
   }
 
   private calculateAccessibility(position: any): number {
-    // TODO: Implement proper accessibility calculation
+    // TODO: Implement proper accessibility calculation based on terrain and bot capabilities
     return 80; // Placeholder - assume most resources are accessible
   }
 

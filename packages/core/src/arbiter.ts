@@ -124,9 +124,53 @@ export class ReflexModule implements CognitiveModule {
   }
 
   estimateProcessingTime(task: CognitiveTask): number {
-    // TODO: Implement actual estimation logic
-    console.log('TODO: IMPLEMENT... estimateProcessingTime', task);
-    return 15; // Very fast reflex responses
+    // Implement actual processing time estimation based on task complexity
+    const baseTime = 10; // Base processing time in milliseconds
+
+    // Complexity factors based on task properties
+    let complexityMultiplier = 1.0;
+
+    // Task type complexity
+    const taskComplexity: Record<string, number> = {
+      reflex: 0.5, // Fastest - immediate reactions
+      perception: 0.8, // Quick sensory processing
+      decision: 1.0, // Standard decision making
+      planning: 1.5, // More complex planning
+      learning: 2.0, // Complex learning processes
+      social: 1.8, // Social interaction processing
+      creative: 2.5, // Most complex - creative thinking
+      emotional: 1.3, // Emotional processing
+      memory: 1.2, // Memory operations
+      communication: 1.1, // Communication processing
+    };
+
+    complexityMultiplier *= taskComplexity[task.type] || 1.0;
+
+    // Priority impact (higher priority = faster processing)
+    const priorityMultiplier = Math.max(0.5, 1.0 - task.priority * 0.1);
+
+    // Urgency impact (urgent tasks get faster processing)
+    const urgencyMultiplier = task.urgency > 0.8 ? 0.7 : 1.0;
+
+    // Context complexity (more context = more processing time)
+    const contextMultiplier = Math.min(
+      2.0,
+      1.0 + Object.keys(task.context || {}).length * 0.1
+    );
+
+    // Calculate final processing time
+    const estimatedTime =
+      baseTime *
+      complexityMultiplier *
+      priorityMultiplier *
+      urgencyMultiplier *
+      contextMultiplier;
+
+    console.log(
+      `Processing time estimation for ${task.type}: ${Math.round(estimatedTime)}ms (complexity: ${complexityMultiplier.toFixed(2)})`
+    );
+
+    return Math.round(estimatedTime);
   }
 }
 
@@ -268,7 +312,7 @@ export class Arbiter extends EventEmitter<SystemEvents> {
             }))
           );
 
-        // TODO: Enhanced needs generated - could be used for further processing
+        // TODO: Enhanced needs generated - integrate with decision making system
         // Note: Signal processor needs are managed internally
         console.log('TODO: IMPLEMENT... enhancedNeeds', enhancedNeeds);
       }
@@ -622,7 +666,37 @@ export class Arbiter extends EventEmitter<SystemEvents> {
     try {
       // Check for high-priority needs that require immediate action
       const currentNeeds = this.signalProcessor.getCurrentNeeds();
-      // TODO: const urgentNeeds = currentNeeds.filter((need) => need.urgency > 0.7);
+
+      // Implement urgent needs filtering for priority decision making
+      const urgentNeeds = currentNeeds.filter((need) => need.urgency > 0.7);
+      const highPriorityNeeds = currentNeeds.filter(
+        (need) => need.urgency > 0.5 && need.urgency <= 0.7
+      );
+      const normalNeeds = currentNeeds.filter((need) => need.urgency <= 0.5);
+
+      // Process urgent needs immediately (urgency > 0.7)
+      if (urgentNeeds.length > 0) {
+        console.log(
+          `🚨 Processing ${urgentNeeds.length} urgent needs:`,
+          urgentNeeds.map((n) => `${n.type}(${n.urgency.toFixed(2)})`)
+        );
+
+        for (const urgentNeed of urgentNeeds) {
+          await this.processUrgentNeed(urgentNeed);
+        }
+      }
+
+      // Process high-priority needs (urgency 0.5-0.7)
+      if (highPriorityNeeds.length > 0) {
+        console.log(
+          `⚡ Processing ${highPriorityNeeds.length} high-priority needs:`,
+          highPriorityNeeds.map((n) => `${n.type}(${n.urgency.toFixed(2)})`)
+        );
+
+        for (const highNeed of highPriorityNeeds) {
+          await this.processHighPriorityNeed(highNeed);
+        }
+      }
 
       // Convert current needs to advanced need generator format
       const baseNeeds = currentNeeds.map((need) => ({
@@ -917,6 +991,113 @@ export class Arbiter extends EventEmitter<SystemEvents> {
 
   getPriorityRanker(): PriorityRanker {
     return this.priorityRanker;
+  }
+
+  /**
+   * Process an urgent need that requires immediate attention
+   */
+  private async processUrgentNeed(need: any): Promise<void> {
+    console.log(
+      `🚨 Processing urgent need: ${need.type} (urgency: ${need.urgency})`
+    );
+
+    try {
+      // For urgent needs, bypass normal processing and go straight to execution
+      const urgentTask: CognitiveTask = {
+        id: uuidv4(),
+        type: need.type,
+        priority: 0.9, // Very high priority
+        urgency: need.urgency,
+        deadline: Date.now() + 1000, // 1 second deadline
+        context: this.getCurrentContext(),
+        requirements: [],
+        constraints: ['immediate_execution'],
+      };
+
+      // Execute immediately without queuing
+      const result = await this.executeTask(urgentTask);
+      console.log(`✅ Urgent need processed: ${need.type} -> ${result}`);
+
+      // Emit event for monitoring
+      this.emit('urgentNeedProcessed', {
+        need: need.type,
+        urgency: need.urgency,
+        result,
+        timestamp: Date.now(),
+      });
+    } catch (error) {
+      console.error(`❌ Failed to process urgent need ${need.type}:`, error);
+      this.emit('urgentNeedFailed', {
+        need: need.type,
+        urgency: need.urgency,
+        error: error instanceof Error ? error.message : 'Unknown error',
+        timestamp: Date.now(),
+      });
+    }
+  }
+
+  /**
+   * Process a high-priority need
+   */
+  private async processHighPriorityNeed(need: any): Promise<void> {
+    console.log(
+      `⚡ Processing high-priority need: ${need.type} (urgency: ${need.urgency})`
+    );
+
+    try {
+      // Create high-priority task
+      const highPriorityTask: CognitiveTask = {
+        id: uuidv4(),
+        type: need.type,
+        priority: 0.7, // High priority
+        urgency: need.urgency,
+        deadline: Date.now() + 5000, // 5 second deadline
+        context: this.getCurrentContext(),
+        requirements: [],
+        constraints: ['high_priority'],
+      };
+
+      // Add to front of processing queue
+      this.taskQueue.unshift(highPriorityTask);
+
+      // Process if not currently processing
+      if (!this.isProcessing) {
+        await this.processNextTask();
+      }
+
+      console.log(`✅ High-priority need queued: ${need.type}`);
+    } catch (error) {
+      console.error(
+        `❌ Failed to process high-priority need ${need.type}:`,
+        error
+      );
+    }
+  }
+
+  /**
+   * Get current system context for task processing
+   */
+  private getCurrentContext(): Record<string, any> {
+    return {
+      systemLoad: this.getSystemLoad(),
+      activeTasks: this.taskQueue.length,
+      urgentNeeds: this.signalProcessor
+        .getCurrentNeeds()
+        .filter((n) => n.urgency > 0.7).length,
+      timestamp: Date.now(),
+    };
+  }
+
+  /**
+   * Get current system load for context
+   */
+  private getSystemLoad(): number {
+    // Simple system load calculation based on active tasks and memory
+    const activeTasks = this.taskQueue.length;
+    const memoryUsage = process.memoryUsage();
+    const memoryLoad = memoryUsage.heapUsed / memoryUsage.heapTotal;
+
+    return Math.min(1.0, activeTasks * 0.1 + memoryLoad);
   }
 }
 

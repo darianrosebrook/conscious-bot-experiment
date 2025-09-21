@@ -24,6 +24,15 @@ import { MemoryVersioningManager } from './memory-versioning-manager';
 import { MemoryContext, ExperienceType } from './types';
 import { normalizeExperienceType } from './utils/experience-normalizer';
 
+// Enhanced memory system components
+import {
+  createEnhancedMemorySystem,
+  DEFAULT_MEMORY_CONFIG,
+} from './memory-system';
+
+// Initialize enhanced memory system (lazy initialization)
+let enhancedMemorySystem: any = null;
+
 const app: express.Application = express();
 const port = process.env.PORT ? parseInt(process.env.PORT) : 3001;
 
@@ -105,7 +114,46 @@ const memorySystem = {
     getActionCount: () =>
       memorySystem.provenance.system.getStats('system').decisions
         .totalDecisions,
-    getRecentActions: (count: number) => [], // TODO: Implement recent actions retrieval
+    getRecentActions: (count: number) => {
+      // Get all decisions and sort by timestamp (most recent first)
+      const allDecisions = memorySystem.provenance.system.decisionTracker.getAllDecisions()
+        .sort((a, b) => b.timestamp - a.timestamp);
+      
+      // Extract actions from recent decisions
+      const actions: Array<{
+        id: string;
+        type: string;
+        description: string;
+        timestamp: number;
+        status: string;
+        decisionId: string;
+        result?: any;
+      }> = [];
+      
+      for (const decision of allDecisions) {
+        if (decision.execution?.actions) {
+          for (const action of decision.execution.actions) {
+            actions.push({
+              id: action.id,
+              type: action.type,
+              description: action.description,
+              timestamp: action.timestamp,
+              status: action.status,
+              decisionId: decision.id,
+              result: action.result
+            });
+          }
+        }
+        
+        // Stop when we have enough actions
+        if (actions.length >= count) break;
+      }
+      
+      // Sort actions by timestamp (most recent first) and return requested count
+      return actions
+        .sort((a, b) => b.timestamp - a.timestamp)
+        .slice(0, count);
+    },
   },
   skills: {
     registry: skillRegistry,
@@ -127,6 +175,12 @@ app.get('/health', (req, res) => {
     system: 'memory',
     timestamp: Date.now(),
     version: '0.1.0',
+    enhancedMemorySystem: {
+      available: true,
+      description:
+        'New vector search + GraphRAG system with per-seed isolation',
+      endpoints: ['/enhanced/status', '/enhanced/seed', '/enhanced/database'],
+    },
   });
 });
 
@@ -530,10 +584,92 @@ app.get('/versioning/stats', (req, res) => {
   }
 });
 
+// Enhanced Memory System Endpoints
+// ============================================================================
+
+// Get enhanced memory system status
+app.get('/enhanced/status', async (req, res) => {
+  try {
+    // Initialize enhanced system if needed
+    if (!enhancedMemorySystem) {
+      enhancedMemorySystem = createEnhancedMemorySystem(DEFAULT_MEMORY_CONFIG);
+      await enhancedMemorySystem.initialize();
+    }
+
+    const status = await enhancedMemorySystem.getStatus();
+    res.json({
+      success: true,
+      status,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Failed to get enhanced memory system status',
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
+
+// Get current world seed
+app.get('/enhanced/seed', (req, res) => {
+  try {
+    const worldSeed = process.env.WORLD_SEED || '0';
+    res.json({
+      success: true,
+      worldSeed: parseInt(worldSeed),
+      databaseName:
+        worldSeed !== '0'
+          ? `${process.env.PG_DATABASE || 'conscious_bot'}_seed_${worldSeed}`
+          : process.env.PG_DATABASE || 'conscious_bot',
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Failed to get world seed information',
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
+
+// Get database information
+app.get('/enhanced/database', async (req, res) => {
+  try {
+    // Initialize enhanced system if needed
+    if (!enhancedMemorySystem) {
+      enhancedMemorySystem = createEnhancedMemorySystem(DEFAULT_MEMORY_CONFIG);
+      await enhancedMemorySystem.initialize();
+    }
+
+    const databaseName = enhancedMemorySystem.getDatabaseName();
+    res.json({
+      success: true,
+      databaseName,
+      configuration: {
+        host: process.env.PG_HOST || 'localhost',
+        port: parseInt(process.env.PG_PORT || '5432'),
+        user: process.env.PG_USER || 'postgres',
+        database: process.env.PG_DATABASE || 'conscious_bot',
+        worldSeed: parseInt(process.env.WORLD_SEED || '0'),
+      },
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Failed to get database information',
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
+
 // Start server
 app.listen(port, () => {
   console.log(`Memory system server running on port ${port}`);
   console.log(`Health check: http://localhost:${port}/health`);
+  console.log(
+    `Enhanced system status: http://localhost:${port}/enhanced/status`
+  );
+  console.log(`Current seed info: http://localhost:${port}/enhanced/seed`);
+  console.log(`Database info: http://localhost:${port}/enhanced/database`);
 });
 
 export default app;

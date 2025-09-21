@@ -726,7 +726,8 @@ export class SimpleMinecraftInterface extends EventEmitter {
           break;
 
         case 'follow':
-          // TODO: Implement follow logic
+          // TODO: Implement follow logic using bot.follow() and pathfinding
+          await this.startFollowing();
           await this.executeAction({
             type: 'chat',
             parameters: { message: "I'll follow you! Lead the way." },
@@ -734,7 +735,8 @@ export class SimpleMinecraftInterface extends EventEmitter {
           break;
 
         case 'stop':
-          // TODO: Implement stop logic
+          // TODO: Implement stop logic to halt current bot movement
+          await this.stopMovement();
           await this.executeAction({
             type: 'chat',
             parameters: { message: 'Stopping here.' },
@@ -742,7 +744,8 @@ export class SimpleMinecraftInterface extends EventEmitter {
           break;
 
         case 'come':
-          // TODO: Implement come logic
+          // TODO: Implement come logic using pathfinding to reach player
+          await this.comeToPlayer();
           await this.executeAction({
             type: 'chat',
             parameters: { message: 'Coming to you!' },
@@ -750,7 +753,8 @@ export class SimpleMinecraftInterface extends EventEmitter {
           break;
 
         case 'go':
-          // TODO: Implement go logic
+          // TODO: Implement go logic for autonomous exploration
+          await this.startExploration();
           await this.executeAction({
             type: 'chat',
             parameters: { message: "I'll go explore the area." },
@@ -882,6 +886,118 @@ export class SimpleMinecraftInterface extends EventEmitter {
    */
   getRecentProcessedMessages(count: number = 10) {
     return this.chatProcessor.getRecentMessages(count);
+  }
+
+  /**
+   * Start following the nearest player
+   */
+  private async startFollowing(): Promise<void> {
+    if (!this.bot || !this.isConnected) {
+      throw new Error('Bot not connected');
+    }
+
+    try {
+      // Stop any current movement
+      this.bot.clearControlStates();
+
+      // Find nearest player and start following
+      const players = Object.values(this.bot.players).filter(
+        (p) => p.entity !== this.bot.entity
+      );
+      if (players.length > 0) {
+        const nearestPlayer = players[0];
+        await this.bot.lookAt(nearestPlayer.entity.position);
+        this.bot.setControlState('forward', true);
+        console.log('🤖 Started following player');
+      } else {
+        console.log('❌ No players to follow');
+      }
+    } catch (error) {
+      console.error('Failed to start following:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Stop current bot movement
+   */
+  private async stopMovement(): Promise<void> {
+    if (!this.bot || !this.isConnected) {
+      throw new Error('Bot not connected');
+    }
+
+    try {
+      this.bot.clearControlStates();
+      console.log('⏹️ Stopped bot movement');
+    } catch (error) {
+      console.error('Failed to stop movement:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Move bot to the nearest player
+   */
+  private async comeToPlayer(): Promise<void> {
+    if (!this.bot || !this.isConnected) {
+      throw new Error('Bot not connected');
+    }
+
+    try {
+      // Stop any current movement
+      this.bot.clearControlStates();
+
+      // Find nearest player and move toward them
+      const players = Object.values(this.bot.players).filter(
+        (p) => p.entity !== this.bot.entity
+      );
+      if (players.length > 0) {
+        const nearestPlayer = players[0];
+        const playerPos = nearestPlayer.entity.position;
+        await this.bot.lookAt(playerPos);
+        this.bot.setControlState('forward', true);
+        console.log('🏃 Coming to player');
+      } else {
+        console.log('❌ No players to come to');
+      }
+    } catch (error) {
+      console.error('Failed to come to player:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Start autonomous exploration
+   */
+  private async startExploration(): Promise<void> {
+    if (!this.bot || !this.isConnected) {
+      throw new Error('Bot not connected');
+    }
+
+    try {
+      // Stop any current movement
+      this.bot.clearControlStates();
+
+      // Start moving in a random direction for exploration
+      const directions = ['forward', 'back', 'left', 'right'];
+      const randomDirection =
+        directions[Math.floor(Math.random() * directions.length)];
+
+      if (randomDirection === 'left') {
+        this.bot.setControlState('left', true);
+        setTimeout(() => this.bot.setControlState('left', false), 1000);
+      } else if (randomDirection === 'right') {
+        this.bot.setControlState('right', true);
+        setTimeout(() => this.bot.setControlState('right', false), 1000);
+      } else {
+        this.bot.setControlState('forward', true);
+      }
+
+      console.log('🗺️ Started autonomous exploration');
+    } catch (error) {
+      console.error('Failed to start exploration:', error);
+      throw error;
+    }
   }
 }
 

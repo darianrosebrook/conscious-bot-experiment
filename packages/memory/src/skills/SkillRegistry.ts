@@ -401,7 +401,7 @@ export class SkillRegistry {
             id: 'pre-1',
             condition: 'wood>=N || reachable_trees',
             description: 'Have wood or access to trees',
-            isSatisfied: (state: any) => true, // TODO: Implement actual condition checking
+            isSatisfied: (state: any) => true, // TODO: Implement actual precondition condition checking
           },
           {
             id: 'pre-2',
