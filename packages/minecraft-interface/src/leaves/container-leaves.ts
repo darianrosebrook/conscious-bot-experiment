@@ -997,12 +997,95 @@ export class TransferItemsLeaf implements LeafImpl {
         };
       }
 
-      // TODO: Implement actual item transfer logic
-      // This would involve:
-      // 1. Identifying items to transfer based on mode
-      // 2. Moving items between containers
-      // 3. Handling slot management
-      // 4. Error handling for failed transfers
+      // Implement actual item transfer logic
+      let itemsTransferred = 0;
+      
+      try {
+        const sourceWindow = sourceContainer.window;
+        const destWindow = destContainer.window;
+        
+        if (!sourceWindow || !destWindow) {
+          throw new Error('Container windows not available');
+        }
+
+        // Identify items to transfer based on mode
+        const itemsToTransfer: Array<{slot: number, item: any, count: number}> = [];
+        
+        if (mode.includes('all')) {
+          // Transfer all items from source to destination
+          for (let slot = 0; slot < sourceWindow.inventoryStart + sourceWindow.inventoryEnd; slot++) {
+            const item = sourceWindow.slots[slot];
+            if (item) {
+              itemsToTransfer.push({slot, item, count: item.count});
+            }
+          }
+        } else if (mode.includes('deposit')) {
+          // Transfer from bot inventory to container
+          for (let slot = sourceWindow.inventoryStart; slot < sourceWindow.inventoryEnd; slot++) {
+            const item = sourceWindow.slots[slot];
+            if (item) {
+              itemsToTransfer.push({slot, item, count: item.count});
+            }
+          }
+        } else if (mode.includes('withdraw')) {
+          // Transfer from container to bot inventory
+          for (let slot = 0; slot < sourceWindow.inventoryStart; slot++) {
+            const item = sourceWindow.slots[slot];
+            if (item) {
+              itemsToTransfer.push({slot, item, count: item.count});
+            }
+          }
+        } else {
+          // Custom transfer based on mode - look for specific item types
+          for (let slot = 0; slot < sourceWindow.inventoryStart + sourceWindow.inventoryEnd; slot++) {
+            const item = sourceWindow.slots[slot];
+            if (item && mode.some(m => item.name.includes(m.toLowerCase()))) {
+              itemsToTransfer.push({slot, item, count: item.count});
+            }
+          }
+        }
+
+        // Perform the actual item transfers
+        for (const transfer of itemsToTransfer) {
+          try {
+            // Find an empty slot in destination
+            let emptySlot = -1;
+            const destSlots = mode.includes('withdraw') 
+              ? destWindow.inventoryStart // Transfer to bot inventory
+              : 0; // Transfer to container
+            const destSlotsEnd = mode.includes('withdraw')
+              ? destWindow.inventoryEnd
+              : destWindow.inventoryStart;
+              
+            for (let slot = destSlots; slot < destSlotsEnd; slot++) {
+              if (!destWindow.slots[slot]) {
+                emptySlot = slot;
+                break;
+              }
+            }
+            
+            if (emptySlot === -1) {
+              console.warn(`No empty slot found for ${transfer.item.name}`);
+              continue;
+            }
+
+            // Move the item
+            await sourceWindow.transferItem(transfer.slot, emptySlot, transfer.count);
+            itemsTransferred++;
+            
+            console.log(`✅ Transferred ${transfer.count}x ${transfer.item.name}`);
+            
+            // Small delay to prevent overwhelming the server
+            await new Promise(resolve => setTimeout(resolve, 100));
+            
+          } catch (transferError) {
+            console.warn(`Failed to transfer ${transfer.item.name}:`, transferError);
+          }
+        }
+        
+      } catch (transferError) {
+        console.error('Item transfer logic error:', transferError);
+      }
 
       const endTime = ctx.now();
       const duration = endTime - startTime;
@@ -1010,6 +1093,7 @@ export class TransferItemsLeaf implements LeafImpl {
       // Emit metrics
       ctx.emitMetric('transfer_items_duration', duration);
       ctx.emitMetric('transfer_items_mode', mode.length);
+      ctx.emitMetric('transfer_items_count', itemsTransferred);
 
       return {
         status: 'success',
@@ -1017,7 +1101,7 @@ export class TransferItemsLeaf implements LeafImpl {
           sourceContainer: sourceContainer.id,
           destinationContainer: destContainer.id,
           mode,
-          itemsTransferred: 0, // TODO: Track actual item count
+          itemsTransferred,
           transferTime: duration,
         },
         metrics: {

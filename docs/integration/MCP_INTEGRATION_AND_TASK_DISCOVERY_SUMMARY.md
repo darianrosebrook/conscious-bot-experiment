@@ -7,18 +7,18 @@ This document summarizes the improvements made to the MCP (Model Context Protoco
 ## Issues Identified and Resolved
 
 ### 1. **Missing `updateTaskMetadata` Method**
-**Problem**: The `EnhancedTaskIntegration` class was missing the `updateTaskMetadata` method, causing TypeError when the autonomous task executor tried to update task metadata.
+**Problem**: The `TaskIntegration` class was missing the `updateTaskMetadata` method, causing TypeError when the autonomous task executor tried to update task metadata.
 
-**Solution**: 
-- Added the missing `updateTaskMetadata` method to `EnhancedTaskIntegration`
+**Solution**:
+- Added the missing `updateTaskMetadata` method to `TaskIntegration`
 - Method properly updates task metadata and emits events for real-time updates
 - Includes dashboard notification support
 
 ### 2. **MCP Integration Initialization**
-**Problem**: The MCP integration was not properly initialized with an `EnhancedRegistry`, causing the MCP server to fail when trying to list options.
+**Problem**: The MCP integration was not properly initialized with the capability registry, causing the MCP server to fail when trying to list options.
 
 **Solution**:
-- Modified server startup to create an `EnhancedRegistry` instance
+- Modified server startup to create a `CapabilityRegistry` instance
 - Passed the registry to the MCP integration initialization
 - Added proper error handling for MCP initialization failures
 

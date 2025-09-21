@@ -593,7 +593,7 @@ This goal formulation system provides intelligent, context-aware decision making
 ###  Implemented Components
 
 **Core Goal Management:**
-- `packages/planning/src/goal-formulation/goal-manager.ts` (128 lines) - Basic goal management
+- `packages/planning/src/goal-formulation/enhanced-goal-manager.ts` (421 lines) - Advanced goal management with priority scoring
 - Goal creation and tracking
 - Basic priority management
 - Goal state monitoring
