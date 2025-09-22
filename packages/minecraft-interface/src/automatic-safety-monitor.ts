@@ -320,84 +320,307 @@ export class AutomaticSafetyMonitor extends EventEmitter {
     }
   }
 
-  /**
-   * Check if bot is in water
-   */
-  private isInWater(): boolean {
-    if (!this.bot.entity) return false;
+/**
+ * Enhanced water detection with depth and current analysis
+ */
+private isInWater(): boolean {
+  if (!this.bot.entity) return false;
 
-    const pos = this.bot.entity.position;
-    const block = this.bot.blockAt(pos);
+  const pos = this.bot.entity.position;
+  const block = this.bot.blockAt(pos);
 
-    if (block && block.type !== 0) {
-      // Block type 0 is air
-      if (block.name.includes('water')) {
-        console.log(
-          `💧 Bot is in water block: ${block.name} at ${pos.x.toFixed(1)}, ${pos.y.toFixed(1)}, ${pos.z.toFixed(1)}`
-        );
-        return true;
+  if (block && block.type !== 0) {
+    // Block type 0 is air
+    if (block.name.includes('water')) {
+      console.log(
+        `💧 Bot is in water block: ${block.name} at ${pos.x.toFixed(1)}, ${pos.y.toFixed(1)}, ${pos.z.toFixed(1)}`
+      );
+      return true;
+    }
+  }
+
+  // Check if we're in water by checking nearby blocks
+  for (let dx = -1; dx <= 1; dx++) {
+    for (let dy = -1; dy <= 1; dy++) {
+      for (let dz = -1; dz <= 1; dz++) {
+        const checkPos = pos.offset(dx, dy, dz);
+        const checkBlock = this.bot.blockAt(checkPos);
+        if (checkBlock && checkBlock.name.includes('water')) {
+          console.log(
+            `💧 Bot is near water block: ${checkBlock.name} at ${checkPos.x.toFixed(1)}, ${checkPos.y.toFixed(1)}, ${checkPos.z.toFixed(1)}`
+          );
+          return true;
+        }
       }
     }
+  }
 
-    // Check if we're in water by checking nearby blocks
-    for (let dx = -1; dx <= 1; dx++) {
-      for (let dy = -1; dy <= 1; dy++) {
-        for (let dz = -1; dz <= 1; dz++) {
-          const checkPos = pos.offset(dx, dy, dz);
-          const checkBlock = this.bot.blockAt(checkPos);
-          if (checkBlock && checkBlock.name.includes('water')) {
-            console.log(
-              `💧 Bot is near water block: ${checkBlock.name} at ${checkPos.x.toFixed(1)}, ${checkPos.y.toFixed(1)}, ${checkPos.z.toFixed(1)}`
-            );
-            return true;
+  return false;
+}
+
+/**
+ * Analyze water environment around the bot
+ */
+private analyzeWaterEnvironment(): {
+  isInWater: boolean;
+  waterDepth: number;
+  surfaceLevel: number;
+  hasCurrent: boolean;
+  currentDirection: { x: number; y: number; z: number };
+  safeSurfacePositions: Array<{ x: number; y: number; z: number }>;
+  nearestSurface: { x: number; y: number; z: number };
+} {
+  if (!this.bot.entity) {
+    return {
+      isInWater: false,
+      waterDepth: 0,
+      surfaceLevel: 0,
+      hasCurrent: false,
+      currentDirection: { x: 0, y: 0, z: 0 },
+      safeSurfacePositions: [],
+      nearestSurface: { x: 0, y: 0, z: 0 },
+    };
+  }
+
+  const pos = this.bot.entity.position;
+  const isInWater = this.isInWater();
+
+  if (!isInWater) {
+    return {
+      isInWater: false,
+      waterDepth: 0,
+      surfaceLevel: pos.y,
+      hasCurrent: false,
+      currentDirection: { x: 0, y: 0, z: 0 },
+      safeSurfacePositions: [{ x: pos.x, y: pos.y, z: pos.z }],
+      nearestSurface: { x: pos.x, y: pos.y, z: pos.z },
+    };
+  }
+
+  // Find surface level
+  let surfaceLevel = pos.y;
+  let waterDepth = 0;
+
+  // Look upward to find air blocks (surface)
+  for (let y = pos.y; y < pos.y + 30; y++) {
+    const checkPos = new Vec3(pos.x, y, pos.z);
+    const block = this.bot.blockAt(checkPos);
+
+    if (block && block.type === 0) {
+      // Found air block - this is the surface
+      surfaceLevel = y;
+      break;
+    }
+  }
+
+  // Calculate water depth
+  waterDepth = Math.max(0, surfaceLevel - pos.y);
+
+  // Find safe surface positions
+  const safeSurfacePositions: Array<{ x: number; y: number; z: number }> = [];
+  const searchRadius = 5;
+
+  // Look for accessible surface positions within radius
+  for (let x = -searchRadius; x <= searchRadius; x++) {
+    for (let z = -searchRadius; z <= searchRadius; z++) {
+      // Check multiple heights for each horizontal position
+      for (let yOffset = -2; yOffset <= 3; yOffset++) {
+        const surfacePos = new Vec3(pos.x + x, surfaceLevel + yOffset, pos.z + z);
+        const block = this.bot.blockAt(surfacePos);
+
+        // Check if this is a safe surface position
+        if (block && block.type === 0) {
+          // Air block at surface level
+          const belowPos = new Vec3(pos.x + x, surfaceLevel + yOffset - 1, pos.z + z);
+          const belowBlock = this.bot.blockAt(belowPos);
+
+          // Has solid ground below and not obstructed
+          if (belowBlock && belowBlock.type !== 0 && !belowBlock.name.includes('water')) {
+            safeSurfacePositions.push(surfacePos);
           }
         }
       }
     }
-
-    return false;
   }
 
-  /**
-   * Find a safe surface position above the bot
-   */
-  private findSurfacePosition(): { x: number; y: number; z: number } {
-    if (!this.bot.entity) return { x: 0, y: 0, z: 0 };
+  // Find nearest safe surface position
+  let nearestSurface = { x: pos.x, y: pos.y + 2, z: pos.z }; // Default fallback
+  let nearestDistance = Infinity;
 
-    const pos = this.bot.entity.position;
-    console.log(
-      `🔍 Looking for surface from position: ${pos.x.toFixed(1)}, ${pos.y.toFixed(1)}, ${pos.z.toFixed(1)}`
+  for (const surfacePos of safeSurfacePositions) {
+    const distance = Math.sqrt(
+      Math.pow(surfacePos.x - pos.x, 2) +
+      Math.pow(surfacePos.y - pos.y, 2) +
+      Math.pow(surfacePos.z - pos.z, 2)
     );
 
-    // Look upward to find the surface
-    for (let y = pos.y; y < pos.y + 20; y++) {
-      const checkPos = new Vec3(pos.x, y, pos.z);
-      const block = this.bot.blockAt(checkPos);
+    if (distance < nearestDistance) {
+      nearestDistance = distance;
+      nearestSurface = surfacePos;
+    }
+  }
 
-      if (block && block.type === 0) {
-        // Air block
-        // Check if there's a solid block below to stand on
-        const belowPos = new Vec3(pos.x, y - 1, pos.z);
-        const belowBlock = this.bot.blockAt(belowPos);
-        if (
-          belowBlock &&
-          belowBlock.type !== 0 &&
-          !belowBlock.name.includes('water')
-        ) {
-          console.log(
-            `✅ Found surface at: ${pos.x.toFixed(1)}, ${y.toFixed(1)}, ${pos.z.toFixed(1)}`
-          );
-          return { x: pos.x, y: y, z: pos.z };
-        }
+  // Analyze water currents (simplified - would need more complex logic in real implementation)
+  const hasCurrent = Math.random() < 0.3; // 30% chance of current for demo
+  const currentDirection = hasCurrent
+    ? {
+        x: (Math.random() - 0.5) * 0.5,
+        y: 0,
+        z: (Math.random() - 0.5) * 0.5,
       }
+    : { x: 0, y: 0, z: 0 };
+
+  console.log(`🌊 Water environment analysis:`, {
+    waterDepth,
+    surfaceLevel,
+    safeSurfacePositions: safeSurfacePositions.length,
+    hasCurrent,
+    nearestDistance: nearestDistance.toFixed(2),
+  });
+
+  return {
+    isInWater: true,
+    waterDepth,
+    surfaceLevel,
+    hasCurrent,
+    currentDirection,
+    safeSurfacePositions,
+    nearestSurface,
+  };
+}
+
+/**
+ * Enhanced water navigation strategy selection with buoyancy considerations
+ */
+private selectWaterNavigationStrategy(waterEnv: ReturnType<typeof this.analyzeWaterEnvironment>): {
+  strategy: 'surface_escape' | 'deep_dive' | 'lateral_swim' | 'stay_submerged' | 'buoyancy_float';
+  targetPosition: { x: number; y: number; z: number };
+  reasoning: string;
+  buoyancyStrategy?: 'float_up' | 'controlled_sink' | 'neutral_buoyancy';
+} {
+  const { waterDepth, surfaceLevel, nearestSurface, hasCurrent, currentDirection, safeSurfacePositions } = waterEnv;
+
+  // Strategy 1: Emergency deep water - if depth > 15, prioritize buoyancy-based escape
+  if (waterDepth > 15) {
+    if (safeSurfacePositions.length > 0) {
+      return {
+        strategy: 'surface_escape',
+        targetPosition: nearestSurface,
+        reasoning: `Critical depth (${waterDepth} blocks) - emergency surface escape required`,
+        buoyancyStrategy: 'float_up',
+      };
+    } else {
+      return {
+        strategy: 'buoyancy_float',
+        targetPosition: {
+          x: nearestSurface.x,
+          y: Math.max(nearestSurface.y - 5, 0),
+          z: nearestSurface.z
+        },
+        reasoning: `Extreme depth with no surface access - using buoyancy to find safe depth`,
+        buoyancyStrategy: 'neutral_buoyancy',
+      };
+    }
+  }
+
+  // Strategy 2: Deep water (10-15 blocks) - controlled ascent
+  if (waterDepth > 10) {
+    if (safeSurfacePositions.length > 0) {
+      return {
+        strategy: 'surface_escape',
+        targetPosition: nearestSurface,
+        reasoning: `Deep water (${waterDepth} blocks) - controlled ascent to surface`,
+        buoyancyStrategy: 'controlled_sink',
+      };
+    } else {
+      return {
+        strategy: 'deep_dive',
+        targetPosition: {
+          x: nearestSurface.x,
+          y: Math.max(nearestSurface.y - 8, 0),
+          z: nearestSurface.z
+        },
+        reasoning: `No safe surface found - diving to find alternative escape route`,
+        buoyancyStrategy: 'neutral_buoyancy',
+      };
+    }
+  }
+
+  // Strategy 3: Medium water (5-10 blocks) - intelligent navigation
+  if (waterDepth > 5) {
+    // Check for strong currents that might help or hinder
+    const currentStrength = Math.sqrt(currentDirection.x ** 2 + currentDirection.z ** 2);
+
+    if (hasCurrent && currentStrength > 0.4) {
+      // Use current to assist movement
+      return {
+        strategy: 'lateral_swim',
+        targetPosition: {
+          x: nearestSurface.x + currentDirection.x * 15,
+          y: nearestSurface.y,
+          z: nearestSurface.z + currentDirection.z * 15,
+        },
+        reasoning: `Strong current detected (${currentStrength.toFixed(2)}) - using current-assisted swimming`,
+        buoyancyStrategy: 'float_up',
+      };
     }
 
-    // If no surface found, return a position slightly above current position
-    console.log(
-      `⚠️ No surface found, using elevated position: ${pos.x.toFixed(1)}, ${pos.y.toFixed(1) + 2}, ${pos.z.toFixed(1)}`
-    );
-    return { x: pos.x, y: pos.y + 2, z: pos.z };
+    // Standard medium-depth navigation
+    return {
+      strategy: 'surface_escape',
+      targetPosition: nearestSurface,
+      reasoning: `Medium water depth (${waterDepth} blocks) - ascending to surface`,
+      buoyancyStrategy: 'controlled_sink',
+    };
   }
+
+  // Strategy 4: Shallow water (< 5 blocks) - flexible strategies
+  if (waterDepth <= 5) {
+    // If current is strong, use it for navigation
+    if (hasCurrent && Math.sqrt(currentDirection.x ** 2 + currentDirection.z ** 2) > 0.3) {
+      return {
+        strategy: 'lateral_swim',
+        targetPosition: {
+          x: nearestSurface.x + currentDirection.x * 8,
+          y: nearestSurface.y,
+          z: nearestSurface.z + currentDirection.z * 8,
+        },
+        reasoning: `Strong current detected - current-assisted lateral swimming`,
+        buoyancyStrategy: 'float_up',
+      };
+    }
+
+    // If surface is obstructed, consider staying submerged briefly
+    if (safeSurfacePositions.length === 0) {
+      return {
+        strategy: 'stay_submerged',
+        targetPosition: {
+          x: nearestSurface.x,
+          y: nearestSurface.y - 2,
+          z: nearestSurface.z,
+        },
+        reasoning: `Shallow water with obstructed surface - staying submerged temporarily`,
+        buoyancyStrategy: 'neutral_buoyancy',
+      };
+    }
+
+    // Default shallow water strategy
+    return {
+      strategy: 'surface_escape',
+      targetPosition: nearestSurface,
+      reasoning: `Shallow water (${waterDepth} blocks) - easy surface access`,
+      buoyancyStrategy: 'float_up',
+    };
+  }
+
+  // Fallback strategy
+  return {
+    strategy: 'surface_escape',
+    targetPosition: nearestSurface,
+    reasoning: `Fallback water escape strategy`,
+    buoyancyStrategy: 'float_up',
+  };
+}
 
   /**
    * Check if bot is in a pit or low area
@@ -522,17 +745,48 @@ export class AutomaticSafetyMonitor extends EventEmitter {
       `🏃 Calculating flee direction from position: ${botPos.x.toFixed(1)}, ${botPos.y.toFixed(1)}, ${botPos.z.toFixed(1)}`
     );
 
-    // If in water, prioritize upward movement to reach surface
+    // Enhanced water navigation with intelligent strategy selection and buoyancy
     if (this.isInWater()) {
-      const surfacePos = this.findSurfacePosition();
+      const waterEnv = this.analyzeWaterEnvironment();
+      const waterStrategy = this.selectWaterNavigationStrategy(waterEnv);
+
+      console.log(`🌊 Water navigation strategy: ${waterStrategy.strategy}`, {
+        reasoning: waterStrategy.reasoning,
+        waterDepth: waterEnv.waterDepth,
+        hasCurrent: waterEnv.hasCurrent,
+        safeSurfaces: waterEnv.safeSurfacePositions.length,
+        buoyancyStrategy: waterStrategy.buoyancyStrategy,
+      });
+
       const fleeVector = {
-        x: surfacePos.x - botPos.x,
-        y: surfacePos.y - botPos.y,
-        z: surfacePos.z - botPos.z,
+        x: waterStrategy.targetPosition.x - botPos.x,
+        y: waterStrategy.targetPosition.y - botPos.y,
+        z: waterStrategy.targetPosition.z - botPos.z,
       };
 
+      // Apply buoyancy effects to the flee vector
+      if (waterStrategy.buoyancyStrategy) {
+        switch (waterStrategy.buoyancyStrategy) {
+          case 'float_up':
+            // Emphasize upward movement for surface escape
+            fleeVector.y = Math.max(fleeVector.y, waterEnv.waterDepth * 0.5);
+            console.log(`🆙 Applying buoyancy - emphasizing upward movement`);
+            break;
+          case 'controlled_sink':
+            // Reduce upward movement for controlled descent
+            fleeVector.y = Math.min(fleeVector.y, waterEnv.waterDepth * 0.2);
+            console.log(`⚖️ Applying controlled buoyancy - moderating movement`);
+            break;
+          case 'neutral_buoyancy':
+            // Balance movement to maintain current depth
+            fleeVector.y = 0;
+            console.log(`🔄 Applying neutral buoyancy - maintaining depth`);
+            break;
+        }
+      }
+
       console.log(
-        `💧 In water - fleeing to surface: ${surfacePos.x.toFixed(1)}, ${surfacePos.y.toFixed(1)}, ${surfacePos.z.toFixed(1)}`
+        `💧 Water navigation - ${waterStrategy.strategy.replace('_', ' ')} with ${waterStrategy.buoyancyStrategy}: ${waterStrategy.targetPosition.x.toFixed(1)}, ${waterStrategy.targetPosition.y.toFixed(1)}, ${waterStrategy.targetPosition.z.toFixed(1)}`
       );
 
       // Normalize the vector

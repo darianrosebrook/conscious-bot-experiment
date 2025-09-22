@@ -295,6 +295,9 @@ export interface KnowledgeGraphConfig {
   persistToStorage: boolean;
   storageDirectory?: string;
   autoSaveInterval?: number;
+  enableSemanticDecay: boolean;
+  semanticDecayRate: number; // Rate at which confidence decays over time
+  minimumSemanticConfidence: number; // Minimum confidence (never fully forget)
 }
 
 // ============================================================================
@@ -363,4 +366,7 @@ export const KnowledgeGraphConfigSchema = z.object({
   persistToStorage: z.boolean(),
   storageDirectory: z.string().optional(),
   autoSaveInterval: z.number().optional(),
+  enableSemanticDecay: z.boolean(),
+  semanticDecayRate: z.number().min(0).max(1),
+  minimumSemanticConfidence: z.number().min(0).max(1),
 });

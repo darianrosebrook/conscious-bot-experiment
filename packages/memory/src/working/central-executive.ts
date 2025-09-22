@@ -70,7 +70,10 @@ export class CentralExecutive {
   /**
    * Focus attention on a specific item or goal
    */
-  focusAttention(target: string, source: string = 'deliberate'): MemoryOperationResult {
+  focusAttention(
+    target: string,
+    source: string = 'deliberate'
+  ): MemoryOperationResult {
     if (!target) {
       return {
         success: false,
@@ -84,11 +87,12 @@ export class CentralExecutive {
 
     const now = Date.now();
     const previousFocus = this.state.attentionFocus.primaryFocus;
-    
+
     // Find the target in working items or goals
-    const targetItem = this.state.workingItems.find(i => i.id === target) ||
-                      this.state.activeGoals.find(g => g.id === target);
-    
+    const targetItem =
+      this.state.workingItems.find((i) => i.id === target) ||
+      this.state.activeGoals.find((g) => g.id === target);
+
     if (!targetItem) {
       return {
         success: false,
@@ -103,7 +107,7 @@ export class CentralExecutive {
       // Move previous focus to secondary
       if (!this.state.attentionFocus.secondaryFoci.includes(previousFocus)) {
         this.state.attentionFocus.secondaryFoci.unshift(previousFocus);
-        
+
         // Limit secondary foci
         if (this.state.attentionFocus.secondaryFoci.length > 3) {
           this.state.attentionFocus.secondaryFoci.pop();
@@ -115,12 +119,14 @@ export class CentralExecutive {
     this.state.attentionFocus.primaryFocus = target;
     this.state.attentionFocus.lastShift = now;
     this.state.attentionFocus.sustainedDuration = 0;
-    
+
     // Adjust focus strength based on cognitive load and distractions
     const distractionPenalty = this.calculateDistractionPenalty();
     const loadPenalty = this.state.cognitiveLoad * 0.3;
-    this.state.attentionFocus.focusStrength = Math.max(0.1, 
-      Math.min(1.0, 0.9 - distractionPenalty - loadPenalty));
+    this.state.attentionFocus.focusStrength = Math.max(
+      0.1,
+      Math.min(1.0, 0.9 - distractionPenalty - loadPenalty)
+    );
 
     // Update the accessed item
     if (targetItem) {
@@ -128,7 +134,10 @@ export class CentralExecutive {
         (targetItem as WorkingItem).accessCount++;
         (targetItem as WorkingItem).lastAccessed = now;
       } else if ('attention' in targetItem) {
-        (targetItem as ActiveGoal).attention = Math.min(1.0, (targetItem as ActiveGoal).attention + 0.3);
+        (targetItem as ActiveGoal).attention = Math.min(
+          1.0,
+          (targetItem as ActiveGoal).attention + 0.3
+        );
       }
     }
 
@@ -158,7 +167,7 @@ export class CentralExecutive {
 
     const now = Date.now();
     const id = `wm-${type}-${now}-${Math.random().toString(36).substring(2, 9)}`;
-    
+
     const item: WorkingItem = {
       id,
       type,
@@ -180,10 +189,12 @@ export class CentralExecutive {
     }
 
     this.state.workingItems.push(item);
-    
+
     // Increase cognitive load
-    this.state.cognitiveLoad = Math.min(1.0, 
-      this.state.cognitiveLoad + (item.importance * 0.1));
+    this.state.cognitiveLoad = Math.min(
+      1.0,
+      this.state.cognitiveLoad + item.importance * 0.1
+    );
 
     // Add as distraction if important enough
     if (item.importance > this.config.distractionThreshold) {
@@ -219,7 +230,7 @@ export class CentralExecutive {
 
     const now = Date.now();
     const id = `ctx-${type}-${now}-${Math.random().toString(36).substring(2, 9)}`;
-    
+
     const frame: ContextFrame = {
       id,
       type,
@@ -231,7 +242,9 @@ export class CentralExecutive {
     };
 
     // Replace existing frame of same type if present
-    const existingIndex = this.state.contextFrames.findIndex(f => f.type === type);
+    const existingIndex = this.state.contextFrames.findIndex(
+      (f) => f.type === type
+    );
     if (existingIndex >= 0) {
       this.state.contextFrames[existingIndex] = frame;
     } else {
@@ -239,8 +252,10 @@ export class CentralExecutive {
     }
 
     // Update cognitive load
-    this.state.cognitiveLoad = Math.min(1.0, 
-      this.state.cognitiveLoad + (frame.relevance * 0.05));
+    this.state.cognitiveLoad = Math.min(
+      1.0,
+      this.state.cognitiveLoad + frame.relevance * 0.05
+    );
 
     return {
       success: true,
@@ -267,11 +282,13 @@ export class CentralExecutive {
 
     const now = Date.now();
     const id = `goal-${now}-${Math.random().toString(36).substring(2, 9)}`;
-    
+
     // Check goal capacity
-    if (this.state.activeGoals.filter(g => 
-        g.status === GoalStatus.ACTIVE || 
-        g.status === GoalStatus.PAUSED).length >= this.config.goalCapacity) {
+    if (
+      this.state.activeGoals.filter(
+        (g) => g.status === GoalStatus.ACTIVE || g.status === GoalStatus.PAUSED
+      ).length >= this.config.goalCapacity
+    ) {
       return {
         success: false,
         message: 'Working memory goal capacity reached',
@@ -279,7 +296,7 @@ export class CentralExecutive {
         timestamp: now,
       };
     }
-    
+
     const goal: ActiveGoal = {
       id,
       description,
@@ -294,20 +311,26 @@ export class CentralExecutive {
     };
 
     this.state.activeGoals.push(goal);
-    
+
     // Add goal context
-    this.addContextFrame(ContextType.GOAL, {
-      goalId: id,
-      description,
-      priority: goal.priority,
-    }, {
-      relevance: goal.priority,
-      source: 'goal_management',
-    });
+    this.addContextFrame(
+      ContextType.GOAL,
+      {
+        goalId: id,
+        description,
+        priority: goal.priority,
+      },
+      {
+        relevance: goal.priority,
+        source: 'goal_management',
+      }
+    );
 
     // Increase cognitive load
-    this.state.cognitiveLoad = Math.min(1.0, 
-      this.state.cognitiveLoad + (goal.priority * 0.15));
+    this.state.cognitiveLoad = Math.min(
+      1.0,
+      this.state.cognitiveLoad + goal.priority * 0.15
+    );
 
     return {
       success: true,
@@ -327,7 +350,7 @@ export class CentralExecutive {
   ): MemoryOperationResult {
     this.updateWorkingMemory();
 
-    const goal = this.state.activeGoals.find(g => g.id === goalId);
+    const goal = this.state.activeGoals.find((g) => g.id === goalId);
     if (!goal) {
       return {
         success: false,
@@ -344,10 +367,9 @@ export class CentralExecutive {
 
     // Update goal context if present
     const goalContext = this.state.contextFrames.find(
-      f => f.type === ContextType.GOAL && 
-      f.content?.goalId === goalId
+      (f) => f.type === ContextType.GOAL && f.content?.goalId === goalId
     );
-    
+
     if (goalContext) {
       goalContext.content.status = status;
       goalContext.content.progress = goal.progress;
@@ -355,8 +377,10 @@ export class CentralExecutive {
 
     // Adjust cognitive load based on completion
     if (status === GoalStatus.COMPLETED || status === GoalStatus.FAILED) {
-      this.state.cognitiveLoad = Math.max(0, 
-        this.state.cognitiveLoad - (goal.priority * 0.1));
+      this.state.cognitiveLoad = Math.max(
+        0,
+        this.state.cognitiveLoad - goal.priority * 0.1
+      );
     }
 
     return {
@@ -382,7 +406,7 @@ export class CentralExecutive {
 
     const now = Date.now();
     const id = `proc-${type}-${now}-${Math.random().toString(36).substring(2, 9)}`;
-    
+
     // Check if we have available resources
     if (this.state.cognitiveLoad > 0.8) {
       return {
@@ -392,7 +416,7 @@ export class CentralExecutive {
         timestamp: now,
       };
     }
-    
+
     const stage: ProcessingStage = {
       id,
       type,
@@ -410,10 +434,12 @@ export class CentralExecutive {
     };
 
     this.state.processingStages.push(stage);
-    
+
     // Increase cognitive load
-    this.state.cognitiveLoad = Math.min(1.0, 
-      this.state.cognitiveLoad + (stage.priority * 0.2));
+    this.state.cognitiveLoad = Math.min(
+      1.0,
+      this.state.cognitiveLoad + stage.priority * 0.2
+    );
 
     return {
       success: true,
@@ -432,7 +458,9 @@ export class CentralExecutive {
   ): MemoryOperationResult {
     this.updateWorkingMemory();
 
-    const stage = this.state.processingStages.find(p => p.id === processingId);
+    const stage = this.state.processingStages.find(
+      (p) => p.id === processingId
+    );
     if (!stage) {
       return {
         success: false,
@@ -445,13 +473,15 @@ export class CentralExecutive {
     stage.status = ProcessingStatus.COMPLETED;
     stage.progress = 1.0;
     stage.outputs = outputs;
-    
+
     // Release resources
-    stage.resources.forEach(r => r.reserved = false);
-    
+    stage.resources.forEach((r) => (r.reserved = false));
+
     // Reduce cognitive load
-    this.state.cognitiveLoad = Math.max(0, 
-      this.state.cognitiveLoad - (stage.priority * 0.15));
+    this.state.cognitiveLoad = Math.max(
+      0,
+      this.state.cognitiveLoad - stage.priority * 0.15
+    );
 
     return {
       success: true,
@@ -468,15 +498,17 @@ export class CentralExecutive {
     this.updateWorkingMemory();
 
     // Check if it's a working item
-    const itemIndex = this.state.workingItems.findIndex(i => i.id === itemId);
+    const itemIndex = this.state.workingItems.findIndex((i) => i.id === itemId);
     if (itemIndex >= 0) {
       const item = this.state.workingItems[itemIndex];
       this.state.workingItems.splice(itemIndex, 1);
-      
+
       // Reduce cognitive load
-      this.state.cognitiveLoad = Math.max(0, 
-        this.state.cognitiveLoad - (item.importance * 0.05));
-      
+      this.state.cognitiveLoad = Math.max(
+        0,
+        this.state.cognitiveLoad - item.importance * 0.05
+      );
+
       return {
         success: true,
         message: `Removed item from working memory`,
@@ -484,17 +516,21 @@ export class CentralExecutive {
         timestamp: Date.now(),
       };
     }
-    
+
     // Check if it's a context frame
-    const frameIndex = this.state.contextFrames.findIndex(f => f.id === itemId);
+    const frameIndex = this.state.contextFrames.findIndex(
+      (f) => f.id === itemId
+    );
     if (frameIndex >= 0) {
       const frame = this.state.contextFrames[frameIndex];
       this.state.contextFrames.splice(frameIndex, 1);
-      
+
       // Reduce cognitive load
-      this.state.cognitiveLoad = Math.max(0, 
-        this.state.cognitiveLoad - (frame.relevance * 0.03));
-      
+      this.state.cognitiveLoad = Math.max(
+        0,
+        this.state.cognitiveLoad - frame.relevance * 0.03
+      );
+
       return {
         success: true,
         message: `Removed context frame from working memory`,
@@ -502,17 +538,19 @@ export class CentralExecutive {
         timestamp: Date.now(),
       };
     }
-    
+
     // Check if it's a goal
-    const goalIndex = this.state.activeGoals.findIndex(g => g.id === itemId);
+    const goalIndex = this.state.activeGoals.findIndex((g) => g.id === itemId);
     if (goalIndex >= 0) {
       const goal = this.state.activeGoals[goalIndex];
       this.state.activeGoals.splice(goalIndex, 1);
-      
+
       // Reduce cognitive load
-      this.state.cognitiveLoad = Math.max(0, 
-        this.state.cognitiveLoad - (goal.priority * 0.1));
-      
+      this.state.cognitiveLoad = Math.max(
+        0,
+        this.state.cognitiveLoad - goal.priority * 0.1
+      );
+
       return {
         success: true,
         message: `Removed goal from working memory`,
@@ -536,9 +574,9 @@ export class CentralExecutive {
     this.updateWorkingMemory();
 
     const distraction = this.state.attentionFocus.distractions.find(
-      d => d.source === distractionSource && !d.handled
+      (d) => d.source === distractionSource && !d.handled
     );
-    
+
     if (!distraction) {
       return {
         success: false,
@@ -549,10 +587,12 @@ export class CentralExecutive {
     }
 
     distraction.handled = true;
-    
+
     // Improve focus strength as distraction is handled
-    this.state.attentionFocus.focusStrength = Math.min(1.0, 
-      this.state.attentionFocus.focusStrength + 0.1);
+    this.state.attentionFocus.focusStrength = Math.min(
+      1.0,
+      this.state.attentionFocus.focusStrength + 0.1
+    );
 
     return {
       success: true,
@@ -568,7 +608,7 @@ export class CentralExecutive {
   clear(): MemoryOperationResult {
     const now = Date.now();
     this.state = this.initializeWorkingMemory();
-    
+
     return {
       success: true,
       message: 'Working memory cleared',
@@ -582,16 +622,21 @@ export class CentralExecutive {
    */
   getStats() {
     this.updateWorkingMemory();
-    
+
     return {
       itemCount: this.state.workingItems.length,
       maxCapacity: this.config.maxCapacity,
-      utilizationRatio: this.state.workingItems.length / this.config.maxCapacity,
+      utilizationRatio:
+        this.state.workingItems.length / this.config.maxCapacity,
       cognitiveLoad: this.state.cognitiveLoad,
-      activeGoals: this.state.activeGoals.filter(g => g.status === GoalStatus.ACTIVE).length,
+      activeGoals: this.state.activeGoals.filter(
+        (g) => g.status === GoalStatus.ACTIVE
+      ).length,
       contextFrameCount: this.state.contextFrames.length,
       focusStrength: this.state.attentionFocus.focusStrength,
-      distractionCount: this.state.attentionFocus.distractions.filter(d => !d.handled).length,
+      distractionCount: this.state.attentionFocus.distractions.filter(
+        (d) => !d.handled
+      ).length,
     };
   }
 
@@ -600,7 +645,7 @@ export class CentralExecutive {
    */
   private initializeWorkingMemory(): WorkingMemoryState {
     const now = Date.now();
-    
+
     const state: WorkingMemoryState = {
       id: `wm-${now}`,
       timestamp: now,
@@ -639,66 +684,87 @@ export class CentralExecutive {
   private updateWorkingMemory(): void {
     const now = Date.now();
     const timeSinceLastUpdate = now - this.lastUpdateTime;
-    
+
     // Only update if enough time has passed
     if (timeSinceLastUpdate < this.updateInterval) {
       return;
     }
-    
+
     this.lastUpdateTime = now;
     this.state.timestamp = now;
-    
+
     // Update attention duration
     if (this.state.attentionFocus.primaryFocus) {
       this.state.attentionFocus.sustainedDuration += timeSinceLastUpdate;
     }
-    
+
     // Apply decay to items
     this.applyWorkingItemDecay(timeSinceLastUpdate);
-    
+
     // Clean up expired items
     this.cleanupExpiredItems();
-    
+
     // Update processing stages
     this.updateProcessingStages(timeSinceLastUpdate);
-    
+
     // Update cognitive load
     this.updateCognitiveLoad();
-    
+
     // Clean up handled distractions
-    this.state.attentionFocus.distractions = this.state.attentionFocus.distractions
-      .filter(d => !d.handled || now - d.timestamp < 10000); // Keep handled distractions for 10 seconds
+    this.state.attentionFocus.distractions =
+      this.state.attentionFocus.distractions.filter(
+        (d) => !d.handled || now - d.timestamp < 10000
+      ); // Keep handled distractions for 10 seconds
   }
 
   /**
    * Apply decay to working memory items
    */
   private applyWorkingItemDecay(elapsedMs: number): void {
-    // Calculate decay factor based on time
-    const decayFactor = (elapsedMs / 1000) * this.config.decayRate;
-    
-    // Apply decay to working items importance
-    this.state.workingItems.forEach(item => {
+    const elapsedSeconds = elapsedMs / 1000;
+    const minimumStrength = 0.05; // Never fully forget
+
+    // Apply logarithmic decay to working items importance
+    this.state.workingItems.forEach((item) => {
       // Items decay based on recency of access and importance
       const timeSinceAccess = this.state.timestamp - item.lastAccessed;
       const accessRecency = Math.min(1, timeSinceAccess / (60 * 1000)); // 1 minute max
-      
+
       // More important items decay slower
-      const itemDecay = decayFactor * (1 - item.importance * 0.5) * accessRecency;
-      item.importance = Math.max(0, item.importance - itemDecay);
+      const timeBasedDecay =
+        this.config.decayRate * accessRecency * elapsedSeconds;
+
+      // Apply logarithmic decay: approaches minimum strength asymptotically
+      const newImportance =
+        minimumStrength +
+        (item.importance - minimumStrength) / (1 + timeBasedDecay);
+
+      item.importance = Math.max(minimumStrength, newImportance);
     });
-    
-    // Apply decay to context frames relevance
-    this.state.contextFrames.forEach(frame => {
-      const frameDecay = decayFactor * 0.5; // Context decays slower
-      frame.relevance = Math.max(0, frame.relevance - frameDecay);
+
+    // Apply logarithmic decay to context frames relevance
+    this.state.contextFrames.forEach((frame) => {
+      const timeBasedDecay = this.config.decayRate * 0.5 * elapsedSeconds;
+
+      // Apply logarithmic decay: approaches minimum strength asymptotically
+      const newRelevance =
+        minimumStrength +
+        (frame.relevance - minimumStrength) / (1 + timeBasedDecay);
+
+      frame.relevance = Math.max(minimumStrength, newRelevance);
     });
-    
-    // Apply decay to goal attention
-    this.state.activeGoals.forEach(goal => {
+
+    // Apply logarithmic decay to goal attention
+    this.state.activeGoals.forEach((goal) => {
       if (goal.status === GoalStatus.ACTIVE) {
-        const attentionDecay = decayFactor * 0.3; // Goals decay slower
-        goal.attention = Math.max(0.1, goal.attention - attentionDecay);
+        const timeBasedDecay = this.config.decayRate * 0.3 * elapsedSeconds;
+
+        // Apply logarithmic decay: approaches minimum strength asymptotically
+        const newAttention =
+          minimumStrength +
+          (goal.attention - minimumStrength) / (1 + timeBasedDecay);
+
+        goal.attention = Math.max(minimumStrength, newAttention);
       }
     });
   }
@@ -708,25 +774,25 @@ export class CentralExecutive {
    */
   private cleanupExpiredItems(): void {
     const now = this.state.timestamp;
-    
+
     // Remove expired working items
-    this.state.workingItems = this.state.workingItems.filter(item => 
-      !item.expiresAt || item.expiresAt > now
+    this.state.workingItems = this.state.workingItems.filter(
+      (item) => !item.expiresAt || item.expiresAt > now
     );
-    
+
     // Remove expired context frames
-    this.state.contextFrames = this.state.contextFrames.filter(frame => 
-      !frame.expiresAt || frame.expiresAt > now
+    this.state.contextFrames = this.state.contextFrames.filter(
+      (frame) => !frame.expiresAt || frame.expiresAt > now
     );
-    
+
     // Remove completely decayed items
-    this.state.workingItems = this.state.workingItems.filter(item => 
-      item.importance > 0.05
+    this.state.workingItems = this.state.workingItems.filter(
+      (item) => item.importance > 0.05
     );
-    
+
     // Remove irrelevant context frames
-    this.state.contextFrames = this.state.contextFrames.filter(frame => 
-      frame.relevance > 0.1
+    this.state.contextFrames = this.state.contextFrames.filter(
+      (frame) => frame.relevance > 0.1
     );
   }
 
@@ -735,29 +801,32 @@ export class CentralExecutive {
    */
   private updateProcessingStages(elapsedMs: number): void {
     const progressIncrement = elapsedMs / 10000; // Full processing in 10 seconds
-    
-    this.state.processingStages.forEach(stage => {
+
+    this.state.processingStages.forEach((stage) => {
       if (stage.status === ProcessingStatus.ACTIVE) {
         // Progress based on priority (higher priority = faster progress)
-        stage.progress = Math.min(1.0, 
-          stage.progress + (progressIncrement * (0.5 + stage.priority * 0.5)));
-        
+        stage.progress = Math.min(
+          1.0,
+          stage.progress + progressIncrement * (0.5 + stage.priority * 0.5)
+        );
+
         // Check for completion or deadline
         if (stage.progress >= 1.0) {
           stage.status = ProcessingStatus.COMPLETED;
-          stage.resources.forEach(r => r.reserved = false);
+          stage.resources.forEach((r) => (r.reserved = false));
         } else if (stage.deadline && this.state.timestamp > stage.deadline) {
           stage.status = ProcessingStatus.FAILED;
-          stage.resources.forEach(r => r.reserved = false);
+          stage.resources.forEach((r) => (r.reserved = false));
         }
       }
     });
-    
+
     // Remove completed/failed stages after some time
-    this.state.processingStages = this.state.processingStages.filter(stage => 
-      stage.status === ProcessingStatus.ACTIVE ||
-      stage.status === ProcessingStatus.PAUSED ||
-      this.state.timestamp - stage.startTime < 30000 // Keep for 30 seconds after completion
+    this.state.processingStages = this.state.processingStages.filter(
+      (stage) =>
+        stage.status === ProcessingStatus.ACTIVE ||
+        stage.status === ProcessingStatus.PAUSED ||
+        this.state.timestamp - stage.startTime < 30000 // Keep for 30 seconds after completion
     );
   }
 
@@ -767,34 +836,43 @@ export class CentralExecutive {
   private updateCognitiveLoad(): void {
     // Base load from item count
     const itemRatio = this.state.workingItems.length / this.config.maxCapacity;
-    
+
     // Processing load
     const processingLoad = this.state.processingStages
-      .filter(p => p.status === ProcessingStatus.ACTIVE)
-      .reduce((sum, p) => sum + p.resources
-        .filter(r => r.type === ResourceType.PROCESSING)
-        .reduce((rSum, r) => rSum + r.amount, 0), 0);
-    
+      .filter((p) => p.status === ProcessingStatus.ACTIVE)
+      .reduce(
+        (sum, p) =>
+          sum +
+          p.resources
+            .filter((r) => r.type === ResourceType.PROCESSING)
+            .reduce((rSum, r) => rSum + r.amount, 0),
+        0
+      );
+
     // Goal load
     const goalLoad = this.state.activeGoals
-      .filter(g => g.status === GoalStatus.ACTIVE)
+      .filter((g) => g.status === GoalStatus.ACTIVE)
       .reduce((sum, g) => sum + g.priority * 0.1, 0);
-    
+
     // Distraction load
     const distractionLoad = this.state.attentionFocus.distractions
-      .filter(d => !d.handled)
+      .filter((d) => !d.handled)
       .reduce((sum, d) => sum + d.strength * 0.05, 0);
-    
+
     // Calculate new load
-    const newLoad = 0.1 + // Base load
-                   (itemRatio * 0.3) + 
-                   processingLoad + 
-                   goalLoad + 
-                   distractionLoad;
-    
+    const newLoad =
+      0.1 + // Base load
+      itemRatio * 0.3 +
+      processingLoad +
+      goalLoad +
+      distractionLoad;
+
     // Apply with smoothing
-    this.state.cognitiveLoad = (this.state.cognitiveLoad * 0.7) + (newLoad * 0.3);
-    this.state.cognitiveLoad = Math.max(0.1, Math.min(1.0, this.state.cognitiveLoad));
+    this.state.cognitiveLoad = this.state.cognitiveLoad * 0.7 + newLoad * 0.3;
+    this.state.cognitiveLoad = Math.max(
+      0.1,
+      Math.min(1.0, this.state.cognitiveLoad)
+    );
   }
 
   /**
@@ -802,7 +880,7 @@ export class CentralExecutive {
    */
   private calculateDistractionPenalty(): number {
     return this.state.attentionFocus.distractions
-      .filter(d => !d.handled)
+      .filter((d) => !d.handled)
       .reduce((sum, d) => sum + d.strength * 0.2, 0);
   }
 
@@ -811,24 +889,26 @@ export class CentralExecutive {
    */
   private makeRoomForNewItem(): void {
     // Sort by importance and last accessed
-    const sortedItems = [...this.state.workingItems]
-      .sort((a, b) => {
-        // First by importance
-        const importanceDiff = a.importance - b.importance;
-        if (Math.abs(importanceDiff) > 0.1) {
-          return importanceDiff;
-        }
-        // Then by last accessed time (older first)
-        return a.lastAccessed - b.lastAccessed;
-      });
-    
+    const sortedItems = [...this.state.workingItems].sort((a, b) => {
+      // First by importance
+      const importanceDiff = a.importance - b.importance;
+      if (Math.abs(importanceDiff) > 0.1) {
+        return importanceDiff;
+      }
+      // Then by last accessed time (older first)
+      return a.lastAccessed - b.lastAccessed;
+    });
+
     // Remove least important item
     if (sortedItems.length > 0) {
       const toRemove = sortedItems[0];
-      this.state.workingItems = this.state.workingItems
-        .filter(i => i.id !== toRemove.id);
-      
-      console.log(`Removed item ${toRemove.id} to make room (importance: ${toRemove.importance.toFixed(2)})`);
+      this.state.workingItems = this.state.workingItems.filter(
+        (i) => i.id !== toRemove.id
+      );
+
+      console.log(
+        `Removed item ${toRemove.id} to make room (importance: ${toRemove.importance.toFixed(2)})`
+      );
     }
   }
 }

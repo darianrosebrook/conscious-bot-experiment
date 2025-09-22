@@ -63,10 +63,11 @@ export class SimpleMinecraftInterface extends EventEmitter {
       );
     });
 
-    this.chatProcessor.on('responseReady', (response: ChatResponse) => {
-      console.log(` Response ready: "${response.content}"`);
-      this.sendChat(response.content);
-    });
+    // DISABLED: Direct response - now handled by cognitive system
+    // this.chatProcessor.on('responseReady', (response: ChatResponse) => {
+    //   console.log(` Response ready: "${response.content}"`);
+    //   this.sendChat(response.content);
+    // });
 
     this.chatProcessor.on('commandReceived', ({ command, message }) => {
       console.log(` Command received: ${command} from ${message.sender}`);
@@ -720,6 +721,7 @@ export class SimpleMinecraftInterface extends EventEmitter {
     message: ChatMessage
   ): Promise<void> {
     try {
+      // TODO: Implement command handling, resolving the many todos below
       switch (command) {
         case 'help':
           await this.executeAction({

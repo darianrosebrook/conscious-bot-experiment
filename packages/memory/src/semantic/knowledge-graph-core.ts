@@ -38,6 +38,9 @@ const DEFAULT_CONFIG: KnowledgeGraphConfig = {
   maxEntities: 10000,
   enableInference: true,
   persistToStorage: false,
+  enableSemanticDecay: true,
+  semanticDecayRate: 0.02, // 2% decay per day
+  minimumSemanticConfidence: 0.05, // Never fully forget
 };
 
 /**
@@ -88,10 +91,12 @@ export class KnowledgeGraphCore {
   // ============================================================================
 
   private getStoragePaths() {
-    const dir = this.config.storageDirectory || path.resolve(process.cwd(), 'memory-storage');
+    const dir =
+      this.config.storageDirectory ||
+      path.resolve(process.cwd(), 'memory-storage');
     const file = path.join(dir, 'knowledge-graph.json');
     return { dir, file };
-    }
+  }
 
   private toSerializable() {
     return {
@@ -103,7 +108,11 @@ export class KnowledgeGraphCore {
   }
 
   private fromSerializable(data: any) {
-    if (!data || !Array.isArray(data.entities) || !Array.isArray(data.relationships)) {
+    if (
+      !data ||
+      !Array.isArray(data.entities) ||
+      !Array.isArray(data.relationships)
+    ) {
       throw new Error('Invalid knowledge graph file format');
     }
 
@@ -131,8 +140,10 @@ export class KnowledgeGraphCore {
       this.relationships.set(rel.id, rel);
       this.relationshipsByType.get(rel.type)?.add(rel.id);
       // Track adjacency
-      if (!this.entityRelationships.has(rel.sourceId)) this.entityRelationships.set(rel.sourceId, new Set());
-      if (!this.entityRelationships.has(rel.targetId)) this.entityRelationships.set(rel.targetId, new Set());
+      if (!this.entityRelationships.has(rel.sourceId))
+        this.entityRelationships.set(rel.sourceId, new Set());
+      if (!this.entityRelationships.has(rel.targetId))
+        this.entityRelationships.set(rel.targetId, new Set());
       this.entityRelationships.get(rel.sourceId)!.add(rel.id);
       this.entityRelationships.get(rel.targetId)!.add(rel.id);
     }
@@ -161,11 +172,14 @@ export class KnowledgeGraphCore {
 
   startAutoSave(intervalMs: number): void {
     if (this.autoSaveHandle) clearInterval(this.autoSaveHandle);
-    this.autoSaveHandle = setInterval(() => {
-      this.saveToDisk().catch((e) =>
-        console.warn('KnowledgeGraphCore autoSave failed:', e?.message)
-      );
-    }, Math.max(5_000, intervalMs));
+    this.autoSaveHandle = setInterval(
+      () => {
+        this.saveToDisk().catch((e) =>
+          console.warn('KnowledgeGraphCore autoSave failed:', e?.message)
+        );
+      },
+      Math.max(5_000, intervalMs)
+    );
   }
 
   stopAutoSave(): void {
@@ -397,6 +411,9 @@ export class KnowledgeGraphCore {
       return null;
     }
 
+    // Apply semantic decay before returning
+    this.applySemanticDecay();
+
     // Update access stats
     entity.lastAccessed = Date.now();
     entity.accessCount++;
@@ -413,6 +430,9 @@ export class KnowledgeGraphCore {
       return null;
     }
 
+    // Apply semantic decay before returning
+    this.applySemanticDecay();
+
     // Update access stats
     relationship.lastAccessed = Date.now();
     relationship.accessCount++;
@@ -426,6 +446,9 @@ export class KnowledgeGraphCore {
   findEntityByName(name: string, type?: EntityType): Entity | null {
     for (const entity of this.entities.values()) {
       if (entity.name === name && (!type || entity.type === type)) {
+        // Apply semantic decay before returning
+        this.applySemanticDecay();
+
         // Update access stats
         entity.lastAccessed = Date.now();
         entity.accessCount++;
@@ -455,6 +478,9 @@ export class KnowledgeGraphCore {
       const typeMatch = !type || relationship.type === type;
 
       if (((sourceMatch && targetMatch) || bidirectionalMatch) && typeMatch) {
+        // Apply semantic decay before returning
+        this.applySemanticDecay();
+
         // Update access stats
         relationship.lastAccessed = Date.now();
         relationship.accessCount++;
@@ -889,6 +915,55 @@ export class KnowledgeGraphCore {
       }
       return b.confidence - a.confidence;
     });
+  }
+
+  /**
+   * Apply logarithmic decay to semantic confidence over time
+   */
+  private applySemanticDecay(): void {
+    if (!this.config.enableSemanticDecay) return;
+
+    const now = Date.now();
+
+    // Apply decay to entities
+    for (const entity of this.entities.values()) {
+      const timeSinceLastAccess = now - entity.lastAccessed;
+      const daysSinceAccess = timeSinceLastAccess / (24 * 60 * 60 * 1000);
+
+      if (daysSinceAccess > 1) {
+        // Only decay if not accessed recently
+        // Apply logarithmic decay to confidence
+        const newConfidence =
+          this.config.minimumSemanticConfidence +
+          (entity.confidence - this.config.minimumSemanticConfidence) /
+            (1 + this.config.semanticDecayRate * Math.log(1 + daysSinceAccess));
+
+        entity.confidence = Math.max(
+          this.config.minimumSemanticConfidence,
+          newConfidence
+        );
+      }
+    }
+
+    // Apply decay to relationships
+    for (const relationship of this.relationships.values()) {
+      const timeSinceLastAccess = now - relationship.lastAccessed;
+      const daysSinceAccess = timeSinceLastAccess / (24 * 60 * 60 * 1000);
+
+      if (daysSinceAccess > 1) {
+        // Only decay if not accessed recently
+        // Apply logarithmic decay to confidence
+        const newConfidence =
+          this.config.minimumSemanticConfidence +
+          (relationship.confidence - this.config.minimumSemanticConfidence) /
+            (1 + this.config.semanticDecayRate * Math.log(1 + daysSinceAccess));
+
+        relationship.confidence = Math.max(
+          this.config.minimumSemanticConfidence,
+          newConfidence
+        );
+      }
+    }
   }
 
   /**

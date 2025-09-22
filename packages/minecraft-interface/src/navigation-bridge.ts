@@ -21,6 +21,7 @@ import {
   environmentalDetector,
   EnvironmentalState,
 } from './environmental-detector.js';
+import { WaterNavigationManager } from './water-navigation-manager.js';
 
 // Import D* Lite components from world package
 // Temporarily comment out to use local types
@@ -67,6 +68,12 @@ interface NavigationConfig {
     verticalMultiplier?: number;
     jumpCost?: number;
     swimCost?: number;
+    // Enhanced water navigation costs
+    surfaceSwimCost?: number;
+    deepSwimCost?: number;
+    currentResistanceCost?: number;
+    buoyancyCost?: number;
+    waterExitCost?: number;
   };
   hazardCosts?: {
     lavaProximity?: number;
@@ -74,6 +81,11 @@ interface NavigationConfig {
     mobProximity?: number;
     darknessPenalty?: number;
     waterPenalty?: number;
+    // Enhanced water hazards
+    drowningRisk?: number;
+    currentHazard?: number;
+    deepWaterPenalty?: number;
+    surfaceObstruction?: number;
     // Minecraft-specific hazards
     cactusPenalty?: number;
     firePenalty?: number;
@@ -1217,6 +1229,12 @@ export class NavigationBridge extends EventEmitter {
         verticalMultiplier: 1.3,
         jumpCost: 2.0,
         swimCost: 5.0,
+        // Enhanced water navigation costs
+        surfaceSwimCost: 2.0,
+        deepSwimCost: 8.0,
+        currentResistanceCost: 3.0,
+        buoyancyCost: 1.5,
+        waterExitCost: 1.2,
       },
       hazardCosts: {
         lavaProximity: 2000,
@@ -1224,6 +1242,11 @@ export class NavigationBridge extends EventEmitter {
         mobProximity: 150,
         darknessPenalty: 30,
         waterPenalty: 15,
+        // Enhanced water hazards
+        drowningRisk: 500,
+        currentHazard: 200,
+        deepWaterPenalty: 300,
+        surfaceObstruction: 100,
         cactusPenalty: 50,
         firePenalty: 800,
         poisonPenalty: 100,
@@ -1554,11 +1577,22 @@ class DynamicReconfigurator {
           verticalMultiplier: 2.0,
           jumpCost: 3.0,
           swimCost: 2.0,
+          // Water-specific optimizations
+          surfaceSwimCost: 1.5, // Easier at surface
+          deepSwimCost: 4.0, // Harder in deep water
+          currentResistanceCost: 2.5,
+          buoyancyCost: 1.0, // Natural buoyancy helps
+          waterExitCost: 0.8, // Easy to exit water
         },
         hazardCosts: {
           ...(baseConfig.hazardCosts ?? {}),
           mobProximity: 500,
           waterPenalty: 0,
+          // Water-specific hazards
+          drowningRisk: 300,
+          currentHazard: 150,
+          deepWaterPenalty: 200,
+          surfaceObstruction: 50,
         },
       },
       [TerrainType.MIXED]: {

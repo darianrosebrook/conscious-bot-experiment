@@ -9,42 +9,81 @@
  */
 
 import { EventEmitter } from 'events';
-// Dynamic import to avoid TypeScript path resolution issues
-import type {
-  EventDrivenThoughtGenerator,
-  BotLifecycleEvent,
-} from '@conscious-bot/cognition';
 
-// Dynamic import at runtime - will be initialized when needed
-let eventDrivenThoughtGenerator: any = null;
-
-/**
- * Initialize the event-driven thought generator
- */
-async function initializeEventDrivenThoughtGenerator(): Promise<void> {
-  if (!eventDrivenThoughtGenerator) {
-    try {
-      // Dynamic import to avoid TypeScript issues
-      const { eventDrivenThoughtGenerator: generator } = await import(
-        '@conscious-bot/cognition'
-      );
-      eventDrivenThoughtGenerator = generator;
-      console.log('✅ Event-driven thought generator initialized');
-    } catch (error) {
-      console.warn(
-        '⚠️ Failed to initialize event-driven thought generator:',
-        error
-      );
-    }
-  }
+// Cognitive stream integration for thought-to-task conversion
+interface CognitiveThought {
+  type: string;
+  content: string;
+  attribution: string;
+  context: {
+    emotionalState: string;
+    confidence: number;
+    cognitiveSystem?: string;
+  };
+  metadata: {
+    thoughtType: string;
+    trigger?: string;
+    context?: string;
+    intensity?: number;
+    llmConfidence?: number;
+    model?: string;
+  };
+  id: string;
+  timestamp: number;
+  processed: boolean;
 }
 
-/**
- * Get the event-driven thought generator (initialize if needed)
- */
-async function getEventDrivenThoughtGenerator(): Promise<any> {
-  await initializeEventDrivenThoughtGenerator();
-  return eventDrivenThoughtGenerator;
+// Cognitive stream client for monitoring thoughts
+class CognitiveStreamClient {
+  private lastPollTime = 0;
+  private pollInterval = 3000; // 3 seconds
+
+  async getRecentThoughts(): Promise<CognitiveThought[]> {
+    try {
+      const response = await fetch('http://localhost:3000/api/cognitive-stream/recent', {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json' },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        return data.thoughts || [];
+      } else {
+        console.warn('Failed to fetch recent thoughts:', response.statusText);
+        return [];
+      }
+    } catch (error) {
+      console.warn('Error fetching cognitive stream:', error);
+      return [];
+    }
+  }
+
+  async getActionableThoughts(): Promise<CognitiveThought[]> {
+    const recentThoughts = await this.getRecentThoughts();
+    const now = Date.now();
+
+    // Filter for actionable thoughts (not processed, recent, contains action words)
+    return recentThoughts.filter(thought => {
+      // Skip already processed thoughts
+      if (thought.processed) return false;
+
+      // Only process thoughts from last 5 minutes
+      if (now - thought.timestamp > 5 * 60 * 1000) return false;
+
+      // Look for actionable content
+      const content = thought.content.toLowerCase();
+      const actionableWords = [
+        'gather', 'collect', 'wood', 'log', 'craft', 'build', 'make', 'create',
+        'mine', 'iron', 'stone', 'ore', 'dig', 'explore', 'search', 'scout',
+        'farm', 'plant', 'harvest', 'move', 'go to', 'walk', 'place', 'put',
+        'set', 'find', 'look for', 'get', 'obtain', 'acquire', 'need to',
+        'should', 'going to', 'plan to', 'want to', 'will', 'can', 'help',
+        'assist', 'work on', 'start', 'begin', 'continue', 'finish'
+      ];
+
+      return actionableWords.some(word => content.includes(word));
+    });
+  }
 }
 
 export interface TaskStep {
@@ -223,6 +262,267 @@ export class EnhancedTaskIntegration extends EventEmitter {
   private taskHistory: Task[] = [];
   private progressTracker: Map<string, TaskProgress> = new Map();
   private actionVerifications: Map<string, ActionVerification> = new Map();
+  private cognitiveStreamClient: CognitiveStreamClient;
+  private thoughtPollingInterval?: NodeJS.Timeout;
+
+  /**
+   * Start polling for cognitive thoughts and convert them to tasks
+   */
+  private startThoughtToTaskConversion(): void {
+    // Poll every 5 seconds for new actionable thoughts
+    this.thoughtPollingInterval = setInterval(async () => {
+      try {
+        await this.processActionableThoughts();
+      } catch (error) {
+        console.error('Error processing actionable thoughts:', error);
+      }
+    }, 5000);
+
+    console.log('🧠 Started thought-to-task conversion polling');
+  }
+
+  /**
+   * Process actionable thoughts from cognitive stream
+   */
+  private async processActionableThoughts(): Promise<void> {
+    const actionableThoughts = await this.cognitiveStreamClient.getActionableThoughts();
+
+    for (const thought of actionableThoughts) {
+      try {
+        // Create a task from the actionable thought
+        const task = await this.convertThoughtToTask(thought);
+        if (task) {
+          console.log(`🎯 Created task from cognitive thought: ${task.title}`);
+          this.emit('thoughtConvertedToTask', { thought, task });
+        }
+      } catch (error) {
+        console.error(`Error converting thought to task:`, error);
+      }
+    }
+  }
+
+  /**
+   * Convert a cognitive thought to a planning task
+   */
+  private async convertThoughtToTask(thought: CognitiveThought): Promise<Task | null> {
+    try {
+      // Skip already processed thoughts
+      if (thought.processed) return null;
+
+      const content = thought.content.toLowerCase();
+
+      // Extract action type from thought content
+      let actionType = 'general';
+      let taskTitle = thought.content;
+      let taskDescription = thought.content;
+
+      // Determine action type based on content
+      if (content.includes('gather') || content.includes('collect') || content.includes('wood') || content.includes('log')) {
+        actionType = 'gathering';
+        taskTitle = this.extractActionTitle(content, 'gather');
+      } else if (content.includes('craft') || content.includes('build') || content.includes('make') || content.includes('create')) {
+        actionType = 'crafting';
+        taskTitle = this.extractActionTitle(content, 'craft');
+      } else if (content.includes('mine') || content.includes('dig') || content.includes('ore')) {
+        actionType = 'mining';
+        taskTitle = this.extractActionTitle(content, 'mine');
+      } else if (content.includes('explore') || content.includes('search') || content.includes('scout')) {
+        actionType = 'exploration';
+        taskTitle = this.extractActionTitle(content, 'explore');
+      } else if (content.includes('farm') || content.includes('plant') || content.includes('harvest')) {
+        actionType = 'farming';
+        taskTitle = this.extractActionTitle(content, 'farm');
+      } else {
+        taskTitle = thought.content;
+      }
+
+      // Create task parameters based on action type
+      const parameters: Record<string, any> = {
+        thoughtContent: thought.content,
+        thoughtId: thought.id,
+        thoughtType: thought.metadata.thoughtType,
+        confidence: thought.context.confidence,
+        cognitiveSystem: thought.context.cognitiveSystem,
+        llmConfidence: thought.metadata.llmConfidence,
+        model: thought.metadata.model,
+      };
+
+      // Add specific parameters based on action type
+      if (actionType === 'gathering') {
+        parameters.resourceType = this.extractResourceType(content);
+      } else if (actionType === 'crafting') {
+        parameters.itemType = this.extractItemType(content);
+      } else if (actionType === 'mining') {
+        parameters.blockType = this.extractBlockType(content);
+      }
+
+      // Create the task
+      const task: Task = {
+        id: `cognitive-task-${thought.id}-${Date.now()}`,
+        title: taskTitle,
+        description: taskDescription,
+        type: actionType,
+        priority: this.calculateTaskPriority(thought),
+        urgency: this.calculateTaskUrgency(thought),
+        progress: 0,
+        status: 'pending',
+        source: 'cognitive',
+        steps: [
+          {
+            id: `step-1-${Date.now()}`,
+            label: `Execute: ${taskTitle}`,
+            done: false,
+            order: 1,
+          },
+        ],
+        parameters,
+        metadata: {
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+          retryCount: 0,
+          maxRetries: 3,
+          tags: ['cognitive', 'autonomous', thought.metadata.thoughtType],
+          category: actionType,
+        },
+      };
+
+      // Add the task to the system
+      await this.addTaskInternal(task);
+
+      // Mark the thought as processed
+      await this.markThoughtAsProcessed(thought.id);
+
+      return task;
+    } catch (error) {
+      console.error('Error converting thought to task:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Extract action title from thought content
+   */
+  private extractActionTitle(content: string, actionType: string): string {
+    const sentences = content.split(/[.!?]/);
+    for (const sentence of sentences) {
+      if (sentence.toLowerCase().includes(actionType)) {
+        return sentence.trim();
+      }
+    }
+    return content;
+  }
+
+  /**
+   * Extract resource type from content
+   */
+  private extractResourceType(content: string): string {
+    if (content.includes('wood') || content.includes('log')) return 'wood';
+    if (content.includes('iron')) return 'iron';
+    if (content.includes('stone')) return 'stone';
+    if (content.includes('food')) return 'food';
+    return 'general';
+  }
+
+  /**
+   * Extract item type from content
+   */
+  private extractItemType(content: string): string {
+    if (content.includes('pickaxe')) return 'pickaxe';
+    if (content.includes('sword')) return 'sword';
+    if (content.includes('axe')) return 'axe';
+    if (content.includes('shovel')) return 'shovel';
+    if (content.includes('table')) return 'crafting_table';
+    if (content.includes('tools')) return 'tools';
+    return 'item';
+  }
+
+  /**
+   * Extract block type from content
+   */
+  private extractBlockType(content: string): string {
+    if (content.includes('iron')) return 'iron_ore';
+    if (content.includes('coal')) return 'coal_ore';
+    if (content.includes('stone')) return 'stone';
+    if (content.includes('diamond')) return 'diamond_ore';
+    return 'ore';
+  }
+
+  /**
+   * Calculate task priority from thought context
+   */
+  private calculateTaskPriority(thought: CognitiveThought): number {
+    let priority = 0.5; // Default medium priority
+
+    // Higher confidence = higher priority
+    priority += thought.context.confidence * 0.3;
+
+    // LLM confidence also affects priority
+    if (thought.metadata.llmConfidence) {
+      priority += thought.metadata.llmConfidence * 0.2;
+    }
+
+    // Emotional state affects priority
+    if (thought.context.emotionalState === 'urgent') {
+      priority += 0.2;
+    } else if (thought.context.emotionalState === 'excited') {
+      priority += 0.1;
+    }
+
+    return Math.min(1.0, priority);
+  }
+
+  /**
+   * Calculate task urgency from thought context
+   */
+  private calculateTaskUrgency(thought: CognitiveThought): number {
+    let urgency = 0.3; // Default low-medium urgency
+
+    // Emotional state affects urgency
+    if (thought.context.emotionalState === 'urgent') {
+      urgency = 0.8;
+    } else if (thought.context.emotionalState === 'excited') {
+      urgency = 0.6;
+    } else if (thought.context.emotionalState === 'focused') {
+      urgency = 0.5;
+    }
+
+    // Confidence affects urgency
+    urgency += thought.context.confidence * 0.2;
+
+    return Math.min(1.0, urgency);
+  }
+
+  /**
+   * Mark a thought as processed in the cognitive stream
+   */
+  private async markThoughtAsProcessed(thoughtId: string): Promise<void> {
+    try {
+      await fetch(`http://localhost:3000/api/cognitive-stream/${thoughtId}/processed`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ processed: true }),
+      });
+    } catch (error) {
+      console.warn('Failed to mark thought as processed:', error);
+    }
+  }
+
+  /**
+   * Add a task internally (bypasses the public addTask method)
+   */
+  private async addTaskInternal(task: Task): Promise<void> {
+    this.tasks.set(task.id, task);
+    this.taskHistory.push(task);
+
+    // Keep only last 1000 tasks in history
+    if (this.taskHistory.length > 1000) {
+      this.taskHistory = this.taskHistory.slice(-1000);
+    }
+
+    // Emit task added event
+    this.emit('taskAdded', task);
+    console.log(`✅ Added task: ${task.title} (${task.type})`);
+  }
 
   /**
    * Update task status
@@ -505,6 +805,12 @@ export class EnhancedTaskIntegration extends EventEmitter {
   constructor(config: Partial<EnhancedTaskIntegrationConfig> = {}) {
     super();
     this.config = { ...DEFAULT_CONFIG, ...config };
+
+    // Initialize cognitive stream client for thought-to-task conversion
+    this.cognitiveStreamClient = new CognitiveStreamClient();
+
+    // Start thought-to-task conversion polling
+    this.startThoughtToTaskConversion();
 
     // Initialize event-driven thought generator
     initializeEventDrivenThoughtGenerator();

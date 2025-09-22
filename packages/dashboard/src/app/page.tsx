@@ -1558,36 +1558,108 @@ function ConsciousMinecraftDashboardContent() {
                               thought.thoughtType === 'observation' ||
                               thought.thoughtType === 'planning';
 
+                            // Cognitive system event types
+                            const isSystemEvent =
+                              thought.thoughtType === 'system_event';
+                            const isThoughtProcessing =
+                              thought.thoughtType === 'thought_processing';
+                            const isTaskCreation =
+                              thought.thoughtType === 'task_creation';
+                            const isSocialConsideration =
+                              thought.thoughtType === 'social_consideration';
+                            const isSystemStatus =
+                              thought.thoughtType === 'system_status';
+                            const isSystemMetric =
+                              thought.thoughtType === 'system_metric';
+                            const isSystemLog =
+                              thought.thoughtType === 'system_log';
+
                             let borderColor = 'border-zinc-800';
                             let bgColor = 'bg-zinc-950';
                             let prefix = '';
                             let typeLabel = thought.thoughtType || thought.type;
+                            let textColor = 'text-zinc-200';
+                            let iconColor = 'text-zinc-400';
 
                             if (isIntrusive) {
                               borderColor = 'border-purple-600/50';
                               bgColor = 'bg-purple-950/20';
                               prefix = ' ';
                               typeLabel = 'intrusive';
+                              textColor = 'text-purple-200';
+                              iconColor = 'text-purple-400';
                             } else if (isExternalChat) {
                               borderColor = 'border-blue-600/50';
                               bgColor = 'bg-blue-950/20';
                               prefix = ` ${thought.sender}: `;
                               typeLabel = 'chat_in';
+                              textColor = 'text-blue-200';
+                              iconColor = 'text-blue-400';
                             } else if (isBotResponse) {
                               borderColor = 'border-green-600/50';
                               bgColor = 'bg-green-950/20';
                               prefix = ' ';
                               typeLabel = 'chat_out';
-                            } else if (isSocial) {
+                              textColor = 'text-green-200';
+                              iconColor = 'text-green-400';
+                            } else if (isSocial || isSocialConsideration) {
                               borderColor = 'border-orange-600/50';
                               bgColor = 'bg-orange-950/20';
                               prefix = ' ';
-                              typeLabel = 'social';
+                              typeLabel = isSocialConsideration
+                                ? 'social_consideration'
+                                : 'social';
+                              textColor = 'text-orange-200';
+                              iconColor = 'text-orange-400';
                             } else if (isInternal) {
                               borderColor = 'border-yellow-600/50';
                               bgColor = 'bg-yellow-950/20';
                               prefix = ' ';
                               typeLabel = 'internal';
+                              textColor = 'text-yellow-200';
+                              iconColor = 'text-yellow-400';
+                            } else if (isSystemEvent) {
+                              borderColor = 'border-indigo-600/50';
+                              bgColor = 'bg-indigo-950/20';
+                              prefix = '🔄 ';
+                              typeLabel = 'system_event';
+                              textColor = 'text-indigo-200';
+                              iconColor = 'text-indigo-400';
+                            } else if (isThoughtProcessing) {
+                              borderColor = 'border-cyan-600/50';
+                              bgColor = 'bg-cyan-950/20';
+                              prefix = '⚡ ';
+                              typeLabel = 'thought_processing';
+                              textColor = 'text-cyan-200';
+                              iconColor = 'text-cyan-400';
+                            } else if (isTaskCreation) {
+                              borderColor = 'border-emerald-600/50';
+                              bgColor = 'bg-emerald-950/20';
+                              prefix = '✅ ';
+                              typeLabel = 'task_creation';
+                              textColor = 'text-emerald-200';
+                              iconColor = 'text-emerald-400';
+                            } else if (isSystemStatus) {
+                              borderColor = 'border-slate-600/50';
+                              bgColor = 'bg-slate-950/20';
+                              prefix = '📊 ';
+                              typeLabel = 'system_status';
+                              textColor = 'text-slate-200';
+                              iconColor = 'text-slate-400';
+                            } else if (isSystemMetric) {
+                              borderColor = 'border-pink-600/50';
+                              bgColor = 'bg-pink-950/20';
+                              prefix = '📈 ';
+                              typeLabel = 'system_metric';
+                              textColor = 'text-pink-200';
+                              iconColor = 'text-pink-400';
+                            } else if (isSystemLog) {
+                              borderColor = 'border-gray-600/50';
+                              bgColor = 'bg-gray-950/20';
+                              prefix = '📝 ';
+                              typeLabel = 'system_log';
+                              textColor = 'text-gray-200';
+                              iconColor = 'text-gray-400';
                             }
 
                             return (
@@ -1603,7 +1675,7 @@ function ConsciousMinecraftDashboardContent() {
                                     {formatTime(thought.ts)}
                                   </time>
                                 </div>
-                                <p className="mt-1 text-sm text-zinc-200">
+                                <p className={`mt-1 text-sm ${textColor}`}>
                                   {prefix}
                                   {thought.text}
                                 </p>

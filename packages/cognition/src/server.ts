@@ -14,6 +14,195 @@ import {
   ContextualThought,
 } from './event-driven-thought-generator';
 
+/**
+ * Cognitive Stream Logger
+ *
+ * Centralized logging system that sends cognition system logs to the cognitive stream
+ * for dashboard visibility and emergent behavior observation.
+ *
+ * @author @darianrosebrook
+ */
+class CognitiveStreamLogger {
+  private static instance: CognitiveStreamLogger;
+  private cognitiveStreamUrl: string;
+
+  private constructor() {
+    this.cognitiveStreamUrl = 'http://localhost:3000/api/ws/cognitive-stream';
+  }
+
+  public static getInstance(): CognitiveStreamLogger {
+    if (!CognitiveStreamLogger.instance) {
+      CognitiveStreamLogger.instance = new CognitiveStreamLogger();
+    }
+    return CognitiveStreamLogger.instance;
+  }
+
+  /**
+   * Send a log entry to the cognitive stream
+   */
+  async logToCognitiveStream(
+    type: string,
+    content: string,
+    context: {
+      emotionalState?: string;
+      confidence?: number;
+      cognitiveSystem?: string;
+      category?: string;
+      tags?: string[];
+    } = {}
+  ): Promise<void> {
+    try {
+      const response = await fetch(this.cognitiveStreamUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: type || 'system_log',
+          content: content,
+          attribution: 'self',
+          context: {
+            emotionalState: context.emotionalState || 'neutral',
+            confidence: context.confidence || 0.5,
+            cognitiveSystem: context.cognitiveSystem || 'cognition-system',
+            ...context,
+          },
+          metadata: {
+            thoughtType: type || 'system_log',
+            category: context.category || 'system',
+            tags: context.tags || ['system', 'log'],
+            source: 'cognition-system',
+            timestamp: Date.now(),
+          },
+        }),
+      });
+
+      if (!response.ok) {
+        console.warn(
+          '❌ Failed to send log to cognitive stream:',
+          response.status
+        );
+      }
+    } catch (error) {
+      console.warn('❌ Error sending log to cognitive stream:', error);
+    }
+  }
+
+  /**
+   * Log a cognition system event
+   */
+  async logEvent(
+    eventType: string,
+    content: string,
+    context: any = {}
+  ): Promise<void> {
+    await this.logToCognitiveStream('system_event', content, {
+      emotionalState: 'neutral',
+      confidence: 0.7,
+      cognitiveSystem: 'cognition-system',
+      category: 'system',
+      tags: ['event', eventType],
+      ...context,
+    });
+  }
+
+  /**
+   * Log a thought processing event
+   */
+  async logThoughtProcessing(
+    thought: string,
+    status: 'started' | 'completed' | 'error',
+    context: any = {}
+  ): Promise<void> {
+    const content = `Thought processing ${status}: "${thought}"`;
+    await this.logToCognitiveStream('thought_processing', content, {
+      emotionalState: status === 'error' ? 'concerned' : 'focused',
+      confidence: status === 'error' ? 0.3 : 0.6,
+      cognitiveSystem: 'intrusive-processor',
+      category: 'processing',
+      tags: ['thought', 'processing', status],
+      ...context,
+    });
+  }
+
+  /**
+   * Log a task creation event
+   */
+  async logTaskCreation(
+    taskTitle: string,
+    source: string,
+    context: any = {}
+  ): Promise<void> {
+    const content = `Task created: "${taskTitle}" (from ${source})`;
+    await this.logToCognitiveStream('task_creation', content, {
+      emotionalState: 'focused',
+      confidence: 0.8,
+      cognitiveSystem: 'planning-integration',
+      category: 'task',
+      tags: ['task', 'created', source],
+      ...context,
+    });
+  }
+
+  /**
+   * Log a social consideration
+   */
+  async logSocialConsideration(
+    entity: string,
+    reasoning: string,
+    context: any = {}
+  ): Promise<void> {
+    const content = `Social consideration: ${entity} - ${reasoning}`;
+    await this.logToCognitiveStream('social_consideration', content, {
+      emotionalState: 'thoughtful',
+      confidence: 0.7,
+      cognitiveSystem: 'social-awareness',
+      category: 'social',
+      tags: ['social', 'consideration', entity],
+      ...context,
+    });
+  }
+
+  /**
+   * Log a system status update
+   */
+  async logStatus(
+    status: string,
+    details: string,
+    context: any = {}
+  ): Promise<void> {
+    const content = `System status: ${status} - ${details}`;
+    await this.logToCognitiveStream('system_status', content, {
+      emotionalState: 'neutral',
+      confidence: 0.5,
+      cognitiveSystem: 'cognition-system',
+      category: 'status',
+      tags: ['status', status.toLowerCase()],
+      ...context,
+    });
+  }
+
+  /**
+   * Log a performance metric
+   */
+  async logMetric(
+    metric: string,
+    value: number | string,
+    context: any = {}
+  ): Promise<void> {
+    const content = `Metric: ${metric} = ${value}`;
+    await this.logToCognitiveStream('system_metric', content, {
+      emotionalState: 'neutral',
+      confidence: 0.5,
+      cognitiveSystem: 'cognition-system',
+      category: 'metric',
+      tags: ['metric', metric.toLowerCase()],
+      ...context,
+    });
+  }
+}
+
+// Initialize the cognitive stream logger
+const cognitiveLogger = CognitiveStreamLogger.getInstance();
+
 const app = express.default();
 const port = process.env.PORT ? parseInt(process.env.PORT) : 3003;
 
@@ -367,7 +556,9 @@ const intrusiveThoughtProcessor = new IntrusiveThoughtProcessor({
 // Initialize social memory manager
 let socialMemoryManager: SocialMemoryManager | null = null;
 try {
-  const { KnowledgeGraphCore } = require('../memory/src/semantic/knowledge-graph-core');
+  const {
+    KnowledgeGraphCore,
+  } = require('../memory/src/semantic/knowledge-graph-core');
   const knowledgeGraph = new KnowledgeGraphCore({
     persistToStorage: true,
     storageDirectory: './memory-storage',
@@ -376,7 +567,10 @@ try {
     enableVerboseLogging: true,
   });
 } catch (error) {
-  console.warn('⚠️ Social memory system could not be initialized:', (error as Error)?.message);
+  console.warn(
+    '⚠️ Social memory system could not be initialized:',
+    (error as Error)?.message
+  );
 }
 
 // Initialize social awareness manager
@@ -452,6 +646,22 @@ function startThoughtGeneration() {
     clearInterval(thoughtGenerationInterval);
   }
 
+  // Log the start of thought generation
+  cognitiveLogger
+    .logStatus(
+      'thought_generation_started',
+      'Enhanced thought generator started with 60-second intervals',
+      {
+        interval: 60000,
+        cognitiveSystem: 'cognition-system',
+        category: 'system',
+        tags: ['thought_generation', 'started'],
+      }
+    )
+    .catch((error) => {
+      console.warn('Failed to log thought generation start:', error);
+    });
+
   // Generate initial thought
   enhancedThoughtGenerator.generateThought({
     currentState: {},
@@ -487,6 +697,22 @@ function startThoughtGeneration() {
       });
     } catch (error) {
       console.error('Error generating periodic thought:', error);
+
+      // Log the error to cognitive stream
+      cognitiveLogger
+        .logEvent(
+          'thought_generation_error',
+          `Error generating periodic thought: ${error instanceof Error ? error.message : 'Unknown error'}`,
+          {
+            error: error instanceof Error ? error.message : 'Unknown error',
+            cognitiveSystem: 'cognition-system',
+            category: 'error',
+            tags: ['thought_generation', 'error'],
+          }
+        )
+        .catch((logError) => {
+          console.warn('Failed to log thought generation error:', logError);
+        });
     }
   }, 60000); // 60 seconds
 
@@ -497,13 +723,30 @@ function stopThoughtGeneration() {
   if (thoughtGenerationInterval) {
     clearInterval(thoughtGenerationInterval);
     thoughtGenerationInterval = null;
+
+    // Log the stop of thought generation
+    cognitiveLogger
+      .logStatus(
+        'thought_generation_stopped',
+        'Enhanced thought generator stopped',
+        {
+          cognitiveSystem: 'cognition-system',
+          category: 'system',
+          tags: ['thought_generation', 'stopped'],
+        }
+      )
+      .catch((error) => {
+        console.warn('Failed to log thought generation stop:', error);
+      });
+
     console.log('🛑 Enhanced thought generator stopped');
   }
 }
 
 // Set up event listeners for enhanced components
 enhancedThoughtGenerator.on('thoughtGenerated', (thought) => {
-  console.log('Enhanced thought generated:', thought.content);
+  // Log the thought generation to cognitive stream
+
   cognitiveThoughts.push(thought);
 
   // Send the thought to the cognitive stream
@@ -513,7 +756,16 @@ enhancedThoughtGenerator.on('thoughtGenerated', (thought) => {
 intrusiveThoughtProcessor.on(
   'thoughtProcessingStarted',
   ({ thought, timestamp }) => {
-    console.log('Started processing intrusive thought:', thought);
+    // Log the processing start to cognitive stream
+    cognitiveLogger
+      .logThoughtProcessing(thought, 'started', {
+        cognitiveSystem: 'intrusive-processor',
+        category: 'processing',
+        tags: ['intrusive', 'processing', 'started'],
+      })
+      .catch((error) => {
+        console.warn('Failed to log thought processing start:', error);
+      });
 
     const processingThought = {
       id: `processing-started-${timestamp}`,
@@ -536,10 +788,22 @@ intrusiveThoughtProcessor.on(
 );
 
 intrusiveThoughtProcessor.on('thoughtGenerated', ({ thought, timestamp }) => {
-  console.log(
-    'Intrusive thought generated as internal thought:',
-    thought.content
-  );
+  // Log the intrusive thought generation to cognitive stream
+  cognitiveLogger
+    .logEvent(
+      'intrusive_thought_generated',
+      `Intrusive thought generated as internal thought: "${thought.content}"`,
+      {
+        emotionalState: 'curious',
+        confidence: 0.7,
+        cognitiveSystem: 'intrusive-processor',
+        category: 'thought_generation',
+        tags: ['intrusive', 'generated', 'internal'],
+      }
+    )
+    .catch((error) => {
+      console.warn('Failed to log intrusive thought generation:', error);
+    });
 
   const generatedThought = {
     id: `intrusive-generated-${timestamp}`,
@@ -748,11 +1012,23 @@ intrusiveThoughtProcessor.on('processingError', ({ thought, error }) => {
 
 // Social awareness manager event listeners
 socialAwarenessManager.on('socialConsiderationGenerated', (result: any) => {
-  console.log('Social consideration generated:', {
-    entity: result.entity,
-    shouldAcknowledge: result.shouldAcknowledge,
-    priority: result.priority,
-  });
+  // Log the social consideration to cognitive stream
+  cognitiveLogger
+    .logSocialConsideration(
+      `${result.entity.type} ${result.entity.id}`,
+      result.reasoning,
+      {
+        shouldAcknowledge: result.shouldAcknowledge,
+        priority: result.priority,
+        distance: result.entity.distance,
+        action: result.action,
+        entityType: result.entity.type,
+        entityId: result.entity.id,
+      }
+    )
+    .catch((error) => {
+      console.warn('Failed to log social consideration:', error);
+    });
 
   const considerationThought = {
     id: `social-consideration-${result.timestamp}`,
@@ -780,11 +1056,24 @@ socialAwarenessManager.on('socialConsiderationGenerated', (result: any) => {
 
 // Chat consideration event listeners
 socialAwarenessManager.on('chatConsiderationGenerated', (result: any) => {
-  console.log('Chat consideration generated:', {
-    sender: result.message.sender,
-    shouldRespond: result.shouldRespond,
-    priority: result.priority,
-  });
+  // Log the chat consideration to cognitive stream
+  cognitiveLogger
+    .logSocialConsideration(
+      `chat from ${result.message.sender}`,
+      result.reasoning,
+      {
+        sender: result.message.sender,
+        senderType: result.message.senderType,
+        shouldRespond: result.shouldRespond,
+        priority: result.priority,
+        responseContent: result.responseContent,
+        responseType: result.responseType,
+        trigger: 'incoming-chat',
+      }
+    )
+    .catch((error) => {
+      console.warn('Failed to log chat consideration:', error);
+    });
 
   const chatConsiderationThought = {
     id: `chat-consideration-${result.timestamp}`,
@@ -2143,7 +2432,21 @@ eventDrivenThoughtGenerator.on(
 
 // Start the server
 app.listen(port, () => {
-  console.log(`🧠 Cognition service running on port ${port}`);
+  const startupMessage = `🧠 Cognition service running on port ${port}`;
+
+  // Log the server startup to cognitive stream
+  cognitiveLogger
+    .logStatus('cognition_service_started', startupMessage, {
+      port: port,
+      cognitiveSystem: 'cognition-system',
+      category: 'system',
+      tags: ['server', 'startup'],
+    })
+    .catch((error) => {
+      console.warn('Failed to log server startup:', error);
+    });
+
+  console.log(startupMessage);
   console.log(
     `📊 Cognitive metrics endpoint: http://localhost:${port}/metrics`
   );
@@ -2168,9 +2471,14 @@ app.listen(port, () => {
   console.log(
     `🚪 Departure communication endpoint: http://localhost:${port}/consider-departure`
   );
+  console.log(`🧠 Cognitive stream endpoints:`);
   console.log(
-    `🧠 Social memory endpoints:`
+    `  📋 Get recent thoughts: http://localhost:${port}/api/cognitive-stream/recent`
   );
+  console.log(
+    `  ✅ Mark thoughts processed: http://localhost:${port}/api/cognitive-stream/:id/processed`
+  );
+  console.log(`🧠 Social memory endpoints:`);
   console.log(
     `  📋 Get remembered entities: http://localhost:${port}/social-memory/entities`
   );
@@ -2180,6 +2488,54 @@ app.listen(port, () => {
   console.log(
     `  📊 Social memory stats: http://localhost:${port}/social-memory/stats`
   );
+});
+
+// ============================================================================
+// Cognitive Stream Integration for Planning System
+// ============================================================================
+
+// Get recent thoughts for planning system
+app.get('/api/cognitive-stream/recent', async (req, res) => {
+  try {
+    const { limit = 10, processed = false } = req.query;
+
+    // Get recent thoughts from the cognitive stream
+    // This is a simplified implementation - in a real system, you'd store thoughts in a database
+    // For now, we'll return a mock response to demonstrate the integration
+    const recentThoughts = [];
+
+    res.json({
+      success: true,
+      thoughts: recentThoughts,
+      count: recentThoughts.length,
+      timestamp: Date.now(),
+    });
+  } catch (error) {
+    console.error('Error retrieving recent thoughts:', error);
+    res.status(500).json({ error: 'Failed to retrieve recent thoughts' });
+  }
+});
+
+// Mark thought as processed
+app.post('/api/cognitive-stream/:thoughtId/processed', async (req, res) => {
+  try {
+    const { thoughtId } = req.params;
+    const { processed } = req.body;
+
+    console.log(`📝 Marking thought ${thoughtId} as processed: ${processed}`);
+
+    // In a real implementation, you'd update the thought in the database
+    // For now, just return success
+    res.json({
+      success: true,
+      thoughtId,
+      processed,
+      timestamp: Date.now(),
+    });
+  } catch (error) {
+    console.error('Error marking thought as processed:', error);
+    res.status(500).json({ error: 'Failed to mark thought as processed' });
+  }
 });
 
 // ============================================================================
@@ -2198,7 +2554,8 @@ app.get('/social-memory/entities', async (req, res) => {
       });
     }
 
-    const entities = await socialMemoryManager.getRememberedEntities(minStrength);
+    const entities =
+      await socialMemoryManager.getRememberedEntities(minStrength);
 
     res.json({
       success: true,
@@ -2233,7 +2590,9 @@ app.get('/social-memory/search', async (req, res) => {
 
     const entities = await socialMemoryManager.searchByFact(query);
     const filteredEntities = minStrength
-      ? entities.filter((e: any) => e.memoryStrength >= parseFloat(minStrength as string))
+      ? entities.filter(
+          (e: any) => e.memoryStrength >= parseFloat(minStrength as string)
+        )
       : entities;
 
     res.json({
