@@ -10,11 +10,14 @@
 import { createBot, Bot } from 'mineflayer';
 import { Vec3 } from 'vec3';
 import { EventEmitter } from 'events';
+import { pathfinder } from 'mineflayer-pathfinder';
 import {
   ChatProcessor,
   type ChatMessage,
   type ChatResponse,
 } from './chat-processor';
+
+// Bot type already includes pathfinder from mineflayer-pathfinder plugin
 
 export interface SimpleBotConfig {
   host: string;
@@ -92,6 +95,9 @@ export class SimpleMinecraftInterface extends EventEmitter {
         version: this.config.version,
         auth: this.config.auth || 'offline',
       });
+
+      // Load pathfinder plugin
+      this.bot.loadPlugin(pathfinder);
 
       this.bot.once('login', () => {
         clearTimeout(timeoutId);
