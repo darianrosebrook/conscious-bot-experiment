@@ -2237,7 +2237,7 @@ export class ActionTranslator {
         );
       }
 
-      const perceptionResult = await response.json() as {
+      const perceptionResult = (await response.json()) as {
         observations?: Array<{
           type: string;
           itemId?: string;
