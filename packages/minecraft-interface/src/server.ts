@@ -178,11 +178,64 @@ let minecraftInterface: {
   observationMapper: ObservationMapper;
   planExecutor: PlanExecutor;
 } | null = null;
+
+// Thought generation interval
+let thoughtGenerationInterval: NodeJS.Timeout | null = null;
 let planningCoordinator: any = null;
 let memoryIntegration: MemoryIntegrationService | null = null;
 let isConnecting = false;
 let viewerActive = false;
 let autoConnectInterval: NodeJS.Timeout | null = null;
+
+/**
+ * Start automatic thought generation from bot experiences
+ */
+function startThoughtGeneration() {
+  if (thoughtGenerationInterval) {
+    clearInterval(thoughtGenerationInterval);
+  }
+
+  thoughtGenerationInterval = setInterval(async () => {
+    if (!minecraftInterface) {
+      return;
+    }
+
+    try {
+      const bot = minecraftInterface.botAdapter.getBot();
+      if (!bot.entity) {
+        return; // Bot not ready
+      }
+
+      // Send a simple status thought
+      const success =
+        await minecraftInterface.observationMapper.sendThoughtToCognition(
+          `Bot is active and monitoring environment`,
+          'status'
+        );
+
+      if (success) {
+        console.log('🧠 Status thought sent successfully');
+      } else {
+        console.warn('⚠️ Failed to send status thought');
+      }
+    } catch (error) {
+      console.error('❌ Error in thought generation cycle:', error);
+    }
+  }, 10000); // Every 10 seconds
+
+  console.log('✅ Automatic thought generation started (10s intervals)');
+}
+
+/**
+ * Stop automatic thought generation
+ */
+function stopThoughtGeneration() {
+  if (thoughtGenerationInterval) {
+    clearInterval(thoughtGenerationInterval);
+    thoughtGenerationInterval = null;
+    console.log('🛑 Automatic thought generation stopped');
+  }
+}
 
 /**
  * Broadcast bot state updates to all connected WebSocket clients
@@ -243,10 +296,18 @@ function setupBotStateWebSocket() {
 
   minecraftInterface.botAdapter.on('disconnected', (data) => {
     broadcastBotStateUpdate('disconnected', data);
+
+    // Stop thought generation when bot disconnects
+    console.log('🔌 Bot disconnected, stopping thought generation...');
+    stopThoughtGeneration();
   });
 
   minecraftInterface.botAdapter.on('spawned', (data) => {
     broadcastBotStateUpdate('spawned', data);
+
+    // Start thought generation when bot spawns
+    console.log('🤖 Bot spawned, starting thought generation...');
+    startThoughtGeneration();
   });
 
   minecraftInterface.botAdapter.on('warning', (data) => {
@@ -263,6 +324,10 @@ function setupBotStateWebSocket() {
         food: data.food || 0,
         saturation: 0,
       });
+
+      // Stop thought generation when bot dies
+      console.log('💀 Bot died, stopping thought generation...');
+      stopThoughtGeneration();
     }
     broadcastBotStateUpdate('error', data);
   });
@@ -275,6 +340,10 @@ function setupBotStateWebSocket() {
       saturation: 5.2,
     });
     broadcastBotStateUpdate('respawned', data);
+
+    // Restart thought generation when bot respawns
+    console.log('🔄 Bot respawned, restarting thought generation...');
+    startThoughtGeneration();
   });
 
   // Send periodic HUD updates every 5 seconds

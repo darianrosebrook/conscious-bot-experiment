@@ -995,6 +995,7 @@ export class MinecraftSignalProcessor {
 /**
  * Factory function to create a configured signal processor
  */
+
 export function createMinecraftSignalProcessor(): MinecraftSignalProcessor {
   return new MinecraftSignalProcessor();
 }

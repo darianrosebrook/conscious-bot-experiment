@@ -796,16 +796,87 @@ app.get('/state', (req, res) => {
 app.get('/thoughts', (req, res) => {
   try {
     const limit = parseInt(req.query.limit as string) || 50;
-    const thoughts = enhancedThoughtGenerator.getThoughtHistory(limit);
+    const since = parseInt(req.query.since as string) || 0;
+
+    // Get thoughts from both sources
+    const generatedThoughts = enhancedThoughtGenerator.getThoughtHistory(1000); // Get all generated thoughts
+    const allThoughts = [...cognitiveThoughts, ...generatedThoughts];
+
+    // Filter by timestamp if specified
+    const filteredThoughts =
+      since > 0
+        ? allThoughts.filter((thought) => thought.timestamp > since)
+        : allThoughts;
+
+    // Sort by timestamp (newest first)
+    filteredThoughts.sort((a, b) => b.timestamp - a.timestamp);
+
+    // Apply limit
+    const limitedThoughts = filteredThoughts.slice(0, limit);
 
     res.json({
-      thoughts: thoughts,
-      count: thoughts.length,
+      thoughts: limitedThoughts,
+      count: limitedThoughts.length,
+      total: allThoughts.length,
       timestamp: Date.now(),
     });
   } catch (error) {
     console.error('Error getting cognitive thoughts:', error);
     res.status(500).json({ error: 'Failed to get cognitive thoughts' });
+  }
+});
+
+// Receive and store thoughts from external sources (like Minecraft interface)
+app.post('/thoughts', (req, res) => {
+  try {
+    const { type, content, attribution, context, metadata, id, timestamp } =
+      req.body;
+
+    if (!type || !content) {
+      return res.status(400).json({
+        error: 'Missing required fields: type and content are required',
+      });
+    }
+
+    // Create a cognitive thought object
+    const thought = {
+      id:
+        id ||
+        `external-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      type: type,
+      content: content,
+      attribution: attribution || 'minecraft-interface',
+      context: context || {
+        emotionalState: 'neutral',
+        confidence: 0.5,
+        cognitiveSystem: 'minecraft-interface',
+      },
+      metadata: {
+        thoughtType: 'external-input',
+        source: 'minecraft-interface',
+        ...metadata,
+      },
+      timestamp: timestamp || Date.now(),
+    };
+
+    // Store the thought
+    cognitiveThoughts.push(thought);
+
+    // Send to cognitive stream if available
+    sendThoughtToCognitiveStream(thought);
+
+    console.log(
+      `✅ Received external thought: ${thought.type} - ${thought.content.substring(0, 50)}...`
+    );
+
+    res.json({
+      success: true,
+      thoughtId: thought.id,
+      timestamp: Date.now(),
+    });
+  } catch (error) {
+    console.error('Error storing external thought:', error);
+    res.status(500).json({ error: 'Failed to store external thought' });
   }
 });
 
@@ -1611,8 +1682,16 @@ function getNetworkRequestCount(): number {
 // Start the server
 app.listen(port, () => {
   console.log(`🧠 Cognition service running on port ${port}`);
-  console.log(`📊 Cognitive metrics endpoint: http://localhost:${port}/metrics`);
-  console.log(`💭 Thought generation endpoint: http://localhost:${port}/generate-thoughts`);
-  console.log(`🎯 ReAct arbiter endpoint: http://localhost:${port}/react-arbiter`);
-  console.log(`🤝 Social cognition endpoint: http://localhost:${port}/social-cognition`);
+  console.log(
+    `📊 Cognitive metrics endpoint: http://localhost:${port}/metrics`
+  );
+  console.log(
+    `💭 Thought generation endpoint: http://localhost:${port}/generate-thoughts`
+  );
+  console.log(
+    `🎯 ReAct arbiter endpoint: http://localhost:${port}/react-arbiter`
+  );
+  console.log(
+    `🤝 Social cognition endpoint: http://localhost:${port}/social-cognition`
+  );
 });

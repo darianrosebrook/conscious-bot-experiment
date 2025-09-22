@@ -10,6 +10,11 @@
 
 import { EventEmitter } from 'events';
 import { SignalExtractionPipeline } from './signal-extraction-pipeline';
+import {
+  ToolDiscoveryResult,
+  ToolExecutionResult,
+  MCPIntegration,
+} from './modules/mcp-integration';
 
 export interface CognitiveThought {
   type:
@@ -144,7 +149,7 @@ class HttpMemoryClient implements MemoryClient {
         };
       }
 
-      return await response.json() as {
+      return (await response.json()) as {
         memories: any[];
         insights: string[];
         recommendations: string[];
@@ -239,6 +244,7 @@ export class CognitiveThoughtProcessor extends EventEmitter {
   private cognitive: CognitiveClient;
   private memory?: MemoryClient;
   private signalPipeline?: SignalExtractionPipeline;
+  private mcpIntegration?: MCPIntegration;
   // fetch cursors / dedupe
   private lastEtag?: string;
   private lastSeenTs: number = 0;
@@ -780,7 +786,7 @@ export class CognitiveThoughtProcessor extends EventEmitter {
       parameters: {
         thoughtContent: thought.content,
         thoughtType: thought.type,
-        signals: signals.map(signal => ({
+        signals: signals.map((signal) => ({
           type: signal.type,
           concept: signal.concept,
           confidence: signal.confidence,
@@ -789,7 +795,7 @@ export class CognitiveThoughtProcessor extends EventEmitter {
           // Convert new signal format to old format for backward compatibility
           value: signal.confidence,
           context: signal.details?.context || 'general',
-          details: signal.details
+          details: signal.details,
         })), // Use the unified signals array converted to old format
         cognitiveContext: thought.context,
       },
@@ -1179,10 +1185,109 @@ export class CognitiveThoughtProcessor extends EventEmitter {
 
     // Boost priority if memory suggests it's important
     if (memoryContext.confidence > 0.8 && memoryContext.memories.length > 0) {
-      const priorityMap = { low: 'medium' as const, medium: 'high' as const, high: 'high' as const };
+      const priorityMap = {
+        low: 'medium' as const,
+        medium: 'high' as const,
+        high: 'high' as const,
+      };
       return priorityMap[basePriority] || basePriority;
     }
 
     return basePriority;
+  }
+
+  /**
+   * Prepare arguments for tool execution based on thought and world state
+   */
+  private prepareToolArgs(
+    tool: any,
+    thought: CognitiveThought,
+    worldState: any
+  ): any {
+    return {
+      thought: {
+        id: thought.id,
+        content: thought.content,
+        type: thought.type,
+        category: thought.category,
+        priority: thought.priority,
+        timestamp: thought.timestamp,
+      },
+      worldState,
+      context: thought.context,
+      metadata: thought.metadata,
+    };
+  }
+
+  /**
+   * Extract expected outcome from a thought
+   */
+  private extractExpectedOutcome(thought: CognitiveThought): string {
+    // Simple extraction based on thought content
+    const content = thought.content.toLowerCase();
+
+    if (content.includes('analyze') || content.includes('understand')) {
+      return 'analysis';
+    }
+    if (content.includes('create') || content.includes('build')) {
+      return 'creation';
+    }
+    if (content.includes('optimize') || content.includes('improve')) {
+      return 'optimization';
+    }
+    if (content.includes('plan') || content.includes('organize')) {
+      return 'planning';
+    }
+
+    return 'execution';
+  }
+
+  /**
+   * Evaluate tool execution results for a thought
+   */
+  private async evaluateToolExecutionForThought(
+    thought: CognitiveThought,
+    toolResults: ToolExecutionResult[],
+    worldState: any
+  ): Promise<any> {
+    const successfulResults = toolResults.filter((r) => r.success);
+    const failedResults = toolResults.filter((r) => !r.success);
+
+    return {
+      success: successfulResults.length > 0,
+      successfulTools: successfulResults.length,
+      failedTools: failedResults.length,
+      totalTools: toolResults.length,
+      results: toolResults,
+      evaluationTime: Date.now(),
+      worldState,
+    };
+  }
+
+  /**
+   * Enhance a task with tool execution results
+   */
+  private enhanceTaskWithToolResults(
+    task: any,
+    toolResults: ToolExecutionResult[],
+    toolEvaluation: any
+  ): any {
+    if (!task) return task;
+
+    const enhancedTask = { ...task };
+
+    // Add tool execution metadata
+    enhancedTask.metadata = {
+      ...enhancedTask.metadata,
+      toolExecution: {
+        count: toolResults.length,
+        successful: toolResults.filter((r) => r.success).length,
+        failed: toolResults.filter((r) => !r.success).length,
+        results: toolResults,
+        evaluation: toolEvaluation,
+      },
+    };
+
+    return enhancedTask;
   }
 }

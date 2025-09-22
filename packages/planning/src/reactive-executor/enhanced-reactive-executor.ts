@@ -1639,6 +1639,8 @@ class DefaultExecutionContextBuilder implements ExecutionContextBuilder {
  */
 class DefaultRealTimeAdapter implements RealTimeAdapter {
   private pbiEnforcer: ReturnType<typeof createPBIEnforcer>;
+  private mcpConfig?: any;
+  private mcpIntegration?: MCPIntegration;
 
   constructor(pbiEnforcer: ReturnType<typeof createPBIEnforcer>) {
     this.pbiEnforcer = pbiEnforcer;
@@ -2084,5 +2086,20 @@ class DefaultRealTimeAdapter implements RealTimeAdapter {
         this.initializeMCPIntegration();
       }
     }
+  }
+
+  /**
+   * Emit method for EventEmitter compatibility
+   */
+  emit(event: string, ...args: any[]): boolean {
+    return true; // Stub implementation
+  }
+
+  /**
+   * Initialize MCP integration
+   */
+  initializeMCPIntegration(): void {
+    // Stub implementation
+    console.log('🔧 Initializing MCP integration in DefaultRealTimeAdapter');
   }
 }

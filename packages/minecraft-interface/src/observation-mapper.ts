@@ -87,6 +87,50 @@ export class ObservationMapper {
   }
 
   /**
+   * Send a simple thought to the cognition system
+   */
+  async sendThoughtToCognition(
+    content: string,
+    thoughtType: string = 'observation'
+  ): Promise<boolean> {
+    try {
+      const thought = {
+        type: thoughtType,
+        content: content,
+        attribution: 'minecraft-bot',
+        context: {
+          cognitiveSystem: 'minecraft-interface',
+        },
+        metadata: {
+          thoughtType: 'bot-experience',
+          source: 'minecraft-interface',
+        },
+        timestamp: Date.now(),
+      };
+
+      const response = await fetch('http://localhost:3003/thoughts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(thought),
+        signal: AbortSignal.timeout(5000),
+      });
+
+      if (response.ok) {
+        console.log(`✅ Sent thought to cognition server: ${thoughtType}`);
+        return true;
+      } else {
+        console.error(
+          `Failed to send thought to cognition server: ${response.status}`
+        );
+        return false;
+      }
+    } catch (error) {
+      console.error('Error sending thought to cognition server:', error);
+      return false;
+    }
+  }
+
+  /**
    * Extract raw Minecraft world state from mineflayer bot
    */
   public extractMinecraftWorldState(bot: Bot): MinecraftWorldState {

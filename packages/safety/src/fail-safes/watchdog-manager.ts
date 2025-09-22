@@ -73,12 +73,12 @@ class ComponentWatchdog {
    */
   stopMonitoring(): void {
     this.isMonitoring = false;
-    
+
     if (this.healthCheckTimer) {
       clearTimeout(this.healthCheckTimer);
       this.healthCheckTimer = undefined;
     }
-    
+
     if (this.timeoutTimer) {
       clearTimeout(this.timeoutTimer);
       this.timeoutTimer = undefined;
@@ -90,10 +90,10 @@ class ComponentWatchdog {
    */
   async performHealthCheck(): Promise<FailSafeHealthCheckResult> {
     const startTime = Date.now();
-    
+
     try {
       let result: FailSafeHealthCheckResult;
-      
+
       if (this.healthChecker) {
         // Use custom health checker if provided
         result = await this.healthChecker();
@@ -112,7 +112,7 @@ class ComponentWatchdog {
       const validatedResult = validateFailSafeHealthCheckResult(result);
       this.updateMetrics(validatedResult);
       this.lastHealthCheck = validatedResult;
-      
+
       return validatedResult;
     } catch (error) {
       const errorResult: FailSafeHealthCheckResult = {
@@ -123,10 +123,10 @@ class ComponentWatchdog {
         timestamp: Date.now(),
         error: error instanceof Error ? error.message : 'Unknown error',
       };
-      
+
       this.updateMetrics(errorResult);
       this.lastHealthCheck = errorResult;
-      
+
       // Record failure if watchdog manager is available
       if (this.watchdogManager) {
         this.watchdogManager.recordFailure(
@@ -137,7 +137,7 @@ class ComponentWatchdog {
           'Health check failed'
         );
       }
-      
+
       return errorResult;
     }
   }
@@ -147,7 +147,7 @@ class ComponentWatchdog {
    */
   updateHeartbeat(): void {
     this.metrics.lastHeartbeat = Date.now();
-    
+
     if (this.metrics.consecutiveFailures > 0) {
       this.metrics.consecutiveFailures = 0;
     }
@@ -165,23 +165,25 @@ class ComponentWatchdog {
    */
   getCurrentFailSafeHealthStatus(): FailSafeHealthStatus {
     const timeSinceLastHeartbeat = Date.now() - this.metrics.lastHeartbeat;
-    
+
     if (timeSinceLastHeartbeat > this.config.timeoutThreshold) {
       return FailSafeHealthStatus.CRITICAL;
     }
-    
-    if (this.metrics.consecutiveFailures >= this.config.maxConsecutiveFailures) {
+
+    if (
+      this.metrics.consecutiveFailures >= this.config.maxConsecutiveFailures
+    ) {
       return FailSafeHealthStatus.UNHEALTHY;
     }
-    
+
     if (this.metrics.healthScore < 0.5) {
       return FailSafeHealthStatus.DEGRADED;
     }
-    
+
     if (this.lastHealthCheck) {
       return this.lastHealthCheck.status;
     }
-    
+
     return FailSafeHealthStatus.HEALTHY;
   }
 
@@ -205,17 +207,20 @@ class ComponentWatchdog {
 
   private updateMetrics(result: FailSafeHealthCheckResult): void {
     this.metrics.responseTime = result.responseTime;
-    
+
     // Update average response time
     if (this.metrics.averageResponseTime === 0) {
       this.metrics.averageResponseTime = result.responseTime;
     } else {
-      this.metrics.averageResponseTime = 
-        (this.metrics.averageResponseTime * 0.9) + (result.responseTime * 0.1);
+      this.metrics.averageResponseTime =
+        this.metrics.averageResponseTime * 0.9 + result.responseTime * 0.1;
     }
 
     // Update failure metrics
-    if (result.status === FailSafeHealthStatus.UNHEALTHY || result.status === FailSafeHealthStatus.CRITICAL) {
+    if (
+      result.status === FailSafeHealthStatus.UNHEALTHY ||
+      result.status === FailSafeHealthStatus.CRITICAL
+    ) {
       this.metrics.consecutiveFailures++;
       this.metrics.totalFailures++;
     } else {
@@ -224,14 +229,14 @@ class ComponentWatchdog {
 
     // Update health score
     this.updateHealthScore(result.status);
-    
+
     // Update uptime percentage
     this.updateUptimePercentage(result.status);
   }
 
   private updateHealthScore(status: FailSafeHealthStatus): void {
     let statusScore: number;
-    
+
     switch (status) {
       case FailSafeHealthStatus.HEALTHY:
         statusScore = 1.0;
@@ -250,16 +255,19 @@ class ComponentWatchdog {
     }
 
     // Exponential moving average
-    this.metrics.healthScore = (this.metrics.healthScore * 0.8) + (statusScore * 0.2);
+    this.metrics.healthScore =
+      this.metrics.healthScore * 0.8 + statusScore * 0.2;
   }
 
   private updateUptimePercentage(status: FailSafeHealthStatus): void {
-    const isUp = status === FailSafeHealthStatus.HEALTHY || status === FailSafeHealthStatus.DEGRADED;
+    const isUp =
+      status === FailSafeHealthStatus.HEALTHY ||
+      status === FailSafeHealthStatus.DEGRADED;
     const uptimeScore = isUp ? 100 : 0;
-    
+
     // Exponential moving average over time
-    this.metrics.uptimePercentage = 
-      (this.metrics.uptimePercentage * 0.99) + (uptimeScore * 0.01);
+    this.metrics.uptimePercentage =
+      this.metrics.uptimePercentage * 0.99 + uptimeScore * 0.01;
   }
 }
 
@@ -291,9 +299,9 @@ export class WatchdogManager extends EventEmitter {
       const validatedConfig = validateComponentWatchdogConfig(config);
       const watchdog = new ComponentWatchdog(validatedConfig, healthChecker);
       watchdog.setWatchdogManager(this);
-      
+
       this.componentWatchdogs.set(validatedConfig.componentName, watchdog);
-      
+
       if (this.isRunning && validatedConfig.enabled) {
         watchdog.startMonitoring();
       }
@@ -345,7 +353,7 @@ export class WatchdogManager extends EventEmitter {
     }
 
     this.isRunning = true;
-    
+
     // Start monitoring all registered components
     for (const watchdog of this.componentWatchdogs.values()) {
       if (watchdog.getConfig().enabled) {
@@ -421,18 +429,22 @@ export class WatchdogManager extends EventEmitter {
     for (const [name, watchdog] of this.componentWatchdogs.entries()) {
       const status = watchdog.getCurrentFailSafeHealthStatus();
       const metrics = watchdog.getMetrics();
-      
+
       componentStatuses[name] = status;
       totalHealthScore += metrics.healthScore;
       componentCount++;
 
-      if (status === FailSafeHealthStatus.UNHEALTHY || status === FailSafeHealthStatus.CRITICAL) {
+      if (
+        status === FailSafeHealthStatus.UNHEALTHY ||
+        status === FailSafeHealthStatus.CRITICAL
+      ) {
         unhealthyComponents.push(name);
       }
     }
 
-    const healthScore = componentCount > 0 ? totalHealthScore / componentCount : 1.0;
-    
+    const healthScore =
+      componentCount > 0 ? totalHealthScore / componentCount : 1.0;
+
     let overallStatus: FailSafeHealthStatus;
     if (unhealthyComponents.length === 0) {
       overallStatus = FailSafeHealthStatus.HEALTHY;
@@ -489,14 +501,14 @@ export class WatchdogManager extends EventEmitter {
     if (!this.failureHistory.has(componentName)) {
       this.failureHistory.set(componentName, []);
     }
-    
+
     const history = this.failureHistory.get(componentName);
     if (!history) {
       console.error(`No failure history found for component: ${componentName}`);
       return failure; // Return the failure that was created above
     }
     history.push(failure);
-    
+
     // Keep only last 100 failures per component
     if (history.length > 100) {
       history.splice(0, history.length - 100);
@@ -572,7 +584,8 @@ export class WatchdogManager extends EventEmitter {
       unhealthyComponents: unhealthyCount,
       criticalComponents: criticalCount,
       totalFailures,
-      averageHealthScore: componentCount > 0 ? totalHealthScore / componentCount : 0,
+      averageHealthScore:
+        componentCount > 0 ? totalHealthScore / componentCount : 0,
       averageUptime: componentCount > 0 ? totalUptime / componentCount : 0,
     };
   }
@@ -590,7 +603,7 @@ export class WatchdogManager extends EventEmitter {
 
   private async performGlobalHealthCheck(): Promise<void> {
     const systemHealth = this.getSystemHealth();
-    
+
     this.emit('global-health-check', {
       timestamp: Date.now(),
       systemHealth,
@@ -607,7 +620,10 @@ export class WatchdogManager extends EventEmitter {
     }
   }
 
-  private checkEscalationNeed(componentName: string, failure: FailureEvent): void {
+  private checkEscalationNeed(
+    componentName: string,
+    failure: FailureEvent
+  ): void {
     const watchdog = this.componentWatchdogs.get(componentName);
     if (!watchdog) {
       return;

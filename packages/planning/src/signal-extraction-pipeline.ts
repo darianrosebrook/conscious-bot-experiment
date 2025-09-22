@@ -423,7 +423,7 @@ export class LLMExtractor implements SignalExtractor {
 
     if (!response.ok) return null;
 
-    const data = await response.json() as {
+    const data = (await response.json()) as {
       choices?: Array<{
         message?: {
           content?: string;

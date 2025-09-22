@@ -8,6 +8,7 @@
 
 import { EventEmitter } from 'events';
 import { Bot } from 'mineflayer';
+import { Vec3 } from 'vec3';
 import { ActionTranslator } from './action-translator';
 
 export interface SafetyMonitorConfig {
@@ -320,12 +321,257 @@ export class AutomaticSafetyMonitor extends EventEmitter {
   }
 
   /**
+   * Check if bot is in water
+   */
+  private isInWater(): boolean {
+    if (!this.bot.entity) return false;
+
+    const pos = this.bot.entity.position;
+    const block = this.bot.blockAt(pos);
+
+    if (block && block.type !== 0) {
+      // Block type 0 is air
+      if (block.name.includes('water')) {
+        console.log(
+          `💧 Bot is in water block: ${block.name} at ${pos.x.toFixed(1)}, ${pos.y.toFixed(1)}, ${pos.z.toFixed(1)}`
+        );
+        return true;
+      }
+    }
+
+    // Check if we're in water by checking nearby blocks
+    for (let dx = -1; dx <= 1; dx++) {
+      for (let dy = -1; dy <= 1; dy++) {
+        for (let dz = -1; dz <= 1; dz++) {
+          const checkPos = pos.offset(dx, dy, dz);
+          const checkBlock = this.bot.blockAt(checkPos);
+          if (checkBlock && checkBlock.name.includes('water')) {
+            console.log(
+              `💧 Bot is near water block: ${checkBlock.name} at ${checkPos.x.toFixed(1)}, ${checkPos.y.toFixed(1)}, ${checkPos.z.toFixed(1)}`
+            );
+            return true;
+          }
+        }
+      }
+    }
+
+    return false;
+  }
+
+  /**
+   * Find a safe surface position above the bot
+   */
+  private findSurfacePosition(): { x: number; y: number; z: number } {
+    if (!this.bot.entity) return { x: 0, y: 0, z: 0 };
+
+    const pos = this.bot.entity.position;
+    console.log(
+      `🔍 Looking for surface from position: ${pos.x.toFixed(1)}, ${pos.y.toFixed(1)}, ${pos.z.toFixed(1)}`
+    );
+
+    // Look upward to find the surface
+    for (let y = pos.y; y < pos.y + 20; y++) {
+      const checkPos = new Vec3(pos.x, y, pos.z);
+      const block = this.bot.blockAt(checkPos);
+
+      if (block && block.type === 0) {
+        // Air block
+        // Check if there's a solid block below to stand on
+        const belowPos = new Vec3(pos.x, y - 1, pos.z);
+        const belowBlock = this.bot.blockAt(belowPos);
+        if (
+          belowBlock &&
+          belowBlock.type !== 0 &&
+          !belowBlock.name.includes('water')
+        ) {
+          console.log(
+            `✅ Found surface at: ${pos.x.toFixed(1)}, ${y.toFixed(1)}, ${pos.z.toFixed(1)}`
+          );
+          return { x: pos.x, y: y, z: pos.z };
+        }
+      }
+    }
+
+    // If no surface found, return a position slightly above current position
+    console.log(
+      `⚠️ No surface found, using elevated position: ${pos.x.toFixed(1)}, ${pos.y.toFixed(1) + 2}, ${pos.z.toFixed(1)}`
+    );
+    return { x: pos.x, y: pos.y + 2, z: pos.z };
+  }
+
+  /**
+   * Check if bot is in a pit or low area
+   */
+  private checkIfInPit(): boolean {
+    if (!this.bot.entity) return false;
+
+    const pos = this.bot.entity.position;
+    const block = this.bot.blockAt(pos);
+
+    // If we're in water, we already handled this case
+    if (block && block.name.includes('water')) {
+      return false;
+    }
+
+    // Check if we're surrounded by walls above us
+    let wallCount = 0;
+    const checkDistance = 2;
+
+    for (let x = -checkDistance; x <= checkDistance; x++) {
+      for (let z = -checkDistance; z <= checkDistance; z++) {
+        if (x === 0 && z === 0) continue; // Skip current position
+
+        // Check blocks above us
+        for (let y = 1; y <= 5; y++) {
+          const checkPos = new Vec3(pos.x + x, pos.y + y, pos.z + z);
+          const checkBlock = this.bot.blockAt(checkPos);
+
+          if (checkBlock && checkBlock.type !== 0) {
+            // Not air
+            wallCount++;
+            break; // Found a wall at this horizontal position
+          }
+        }
+      }
+    }
+
+    // If we're surrounded by walls above us, we're likely in a pit
+    const pitThreshold = 8; // Number of walls needed to consider it a pit
+    const isPit = wallCount >= pitThreshold;
+
+    if (isPit) {
+      console.log(
+        `🕳️ Bot appears to be in a pit with ${wallCount} walls above`
+      );
+    }
+
+    return isPit;
+  }
+
+  /**
+   * Find an escape position from a pit
+   */
+  private findEscapePosition(): { x: number; y: number; z: number } {
+    if (!this.bot.entity) return { x: 0, y: 0, z: 0 };
+
+    const pos = this.bot.entity.position;
+
+    // Look for an opening in the walls around us
+    const searchRadius = 3;
+    let bestEscapePos: { x: number; y: number; z: number } | null = null;
+    let bestScore = -Infinity;
+
+    for (let x = -searchRadius; x <= searchRadius; x++) {
+      for (let z = -searchRadius; z <= searchRadius; z++) {
+        if (x === 0 && z === 0) continue; // Skip current position
+
+        // Check positions at different heights
+        for (let y = -2; y <= 5; y++) {
+          const checkPos = new Vec3(pos.x + x, pos.y + y, pos.z + z);
+          const block = this.bot.blockAt(checkPos);
+
+          // Prefer air blocks that have solid ground below
+          if (block && block.type === 0) {
+            // Air block
+            const belowPos = new Vec3(pos.x + x, pos.y + y - 1, pos.z + z);
+            const belowBlock = this.bot.blockAt(belowPos);
+
+            if (
+              belowBlock &&
+              belowBlock.type !== 0 &&
+              !belowBlock.name.includes('water')
+            ) {
+              // Score this position (higher is better)
+              const distance = Math.sqrt(x * x + y * y + z * z);
+              const heightScore = y; // Prefer higher positions
+              const score = heightScore - distance * 0.1;
+
+              if (score > bestScore) {
+                bestScore = score;
+                bestEscapePos = { x: pos.x + x, y: pos.y + y, z: pos.z + z };
+              }
+            }
+          }
+        }
+      }
+    }
+
+    if (bestEscapePos) {
+      console.log(
+        `🛤️ Found escape position: ${bestEscapePos.x.toFixed(1)}, ${bestEscapePos.y.toFixed(1)}, ${bestEscapePos.z.toFixed(1)}`
+      );
+      return bestEscapePos;
+    }
+
+    // If no good escape found, try to go up
+    console.log(
+      `⚠️ No good escape found, trying to go up from current position`
+    );
+    return { x: pos.x, y: pos.y + 3, z: pos.z };
+  }
+
+  /**
    * Calculate flee direction (away from threats)
    */
   private calculateFleeDirection(): { x: number; y: number; z: number } {
     const botPos = this.bot.entity.position;
     let totalX = 0,
       totalZ = 0;
+
+    console.log(
+      `🏃 Calculating flee direction from position: ${botPos.x.toFixed(1)}, ${botPos.y.toFixed(1)}, ${botPos.z.toFixed(1)}`
+    );
+
+    // If in water, prioritize upward movement to reach surface
+    if (this.isInWater()) {
+      const surfacePos = this.findSurfacePosition();
+      const fleeVector = {
+        x: surfacePos.x - botPos.x,
+        y: surfacePos.y - botPos.y,
+        z: surfacePos.z - botPos.z,
+      };
+
+      console.log(
+        `💧 In water - fleeing to surface: ${surfacePos.x.toFixed(1)}, ${surfacePos.y.toFixed(1)}, ${surfacePos.z.toFixed(1)}`
+      );
+
+      // Normalize the vector
+      const magnitude = Math.sqrt(
+        fleeVector.x ** 2 + fleeVector.y ** 2 + fleeVector.z ** 2
+      );
+      if (magnitude > 0) {
+        return {
+          x: fleeVector.x / magnitude,
+          y: fleeVector.y / magnitude,
+          z: fleeVector.z / magnitude,
+        };
+      }
+    }
+
+    // Check if we're in a pit or low area and need to move upward
+    const isInPit = this.checkIfInPit();
+    if (isInPit) {
+      console.log(`🕳️ In pit - moving upward to escape`);
+      const escapePos = this.findEscapePosition();
+      const fleeVector = {
+        x: escapePos.x - botPos.x,
+        y: escapePos.y - botPos.y,
+        z: escapePos.z - botPos.z,
+      };
+
+      const magnitude = Math.sqrt(
+        fleeVector.x ** 2 + fleeVector.y ** 2 + fleeVector.z ** 2
+      );
+      if (magnitude > 0) {
+        return {
+          x: fleeVector.x / magnitude,
+          y: fleeVector.y / magnitude,
+          z: fleeVector.z / magnitude,
+        };
+      }
+    }
+
+    // Calculate horizontal flee direction from threats
     let threatCount = 0;
 
     // Calculate average direction away from threats
