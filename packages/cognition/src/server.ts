@@ -2502,7 +2502,48 @@ app.get('/api/cognitive-stream/recent', async (req, res) => {
     // Get recent thoughts from the cognitive stream
     // This is a simplified implementation - in a real system, you'd store thoughts in a database
     // For now, we'll return a mock response to demonstrate the integration
-    const recentThoughts = [];
+    // TODO: Pull from our current memory system that includes the thoughts and memories
+    // For now, provide mock actionable thoughts to test the integration
+    const recentThoughts: any[] = [
+      {
+        id: 'test-thought-1',
+        type: 'reflection',
+        content:
+          'Gather some wood from nearby trees to craft tools. Observing the area for resources and threats.',
+        attribution: 'self',
+        context: {
+          emotionalState: 'focused',
+          confidence: 0.7,
+          cognitiveSystem: 'llm-core',
+        },
+        metadata: {
+          thoughtType: 'reflection',
+          trigger: 'time-based',
+          context: 'environmental-monitoring',
+          intensity: 0.4,
+          llmConfidence: 0.7,
+          model: 'qwen2.5:7b',
+        },
+        timestamp: Date.now() - 30000, // 30 seconds ago
+        processed: false,
+      },
+      {
+        id: 'test-thought-2',
+        type: 'intrusive',
+        content: 'Have i found anything to eat? I should go find food.',
+        attribution: 'intrusive',
+        context: {
+          emotionalState: 'curious',
+          confidence: 0.8,
+        },
+        metadata: {
+          thoughtType: 'intrusive',
+          trigger: 'intrusive-thought-processed',
+        },
+        timestamp: Date.now() - 45000, // 45 seconds ago
+        processed: false,
+      },
+    ];
 
     res.json({
       success: true,

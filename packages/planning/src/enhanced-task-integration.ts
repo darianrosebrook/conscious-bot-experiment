@@ -40,13 +40,18 @@ class CognitiveStreamClient {
 
   async getRecentThoughts(): Promise<CognitiveThought[]> {
     try {
-      const response = await fetch('http://localhost:3000/api/cognitive-stream/recent', {
-        method: 'GET',
-        headers: { 'Content-Type': 'application/json' },
-      });
+      const response = await fetch(
+        'http://localhost:3000/api/cognitive-stream/recent',
+        {
+          method: 'GET',
+          headers: { 'Content-Type': 'application/json' },
+        }
+      );
 
       if (response.ok) {
-        const data = await response.json();
+        const data = (await response.json()) as {
+          thoughts?: CognitiveThought[];
+        };
         return data.thoughts || [];
       } else {
         console.warn('Failed to fetch recent thoughts:', response.statusText);
@@ -63,7 +68,7 @@ class CognitiveStreamClient {
     const now = Date.now();
 
     // Filter for actionable thoughts (not processed, recent, contains action words)
-    return recentThoughts.filter(thought => {
+    return recentThoughts.filter((thought) => {
       // Skip already processed thoughts
       if (thought.processed) return false;
 
@@ -73,15 +78,53 @@ class CognitiveStreamClient {
       // Look for actionable content
       const content = thought.content.toLowerCase();
       const actionableWords = [
-        'gather', 'collect', 'wood', 'log', 'craft', 'build', 'make', 'create',
-        'mine', 'iron', 'stone', 'ore', 'dig', 'explore', 'search', 'scout',
-        'farm', 'plant', 'harvest', 'move', 'go to', 'walk', 'place', 'put',
-        'set', 'find', 'look for', 'get', 'obtain', 'acquire', 'need to',
-        'should', 'going to', 'plan to', 'want to', 'will', 'can', 'help',
-        'assist', 'work on', 'start', 'begin', 'continue', 'finish'
+        'gather',
+        'collect',
+        'wood',
+        'log',
+        'craft',
+        'build',
+        'make',
+        'create',
+        'mine',
+        'iron',
+        'stone',
+        'ore',
+        'dig',
+        'explore',
+        'search',
+        'scout',
+        'farm',
+        'plant',
+        'harvest',
+        'move',
+        'go to',
+        'walk',
+        'place',
+        'put',
+        'set',
+        'find',
+        'look for',
+        'get',
+        'obtain',
+        'acquire',
+        'need to',
+        'should',
+        'going to',
+        'plan to',
+        'want to',
+        'will',
+        'can',
+        'help',
+        'assist',
+        'work on',
+        'start',
+        'begin',
+        'continue',
+        'finish',
       ];
 
-      return actionableWords.some(word => content.includes(word));
+      return actionableWords.some((word) => content.includes(word));
     });
   }
 }
@@ -285,7 +328,8 @@ export class EnhancedTaskIntegration extends EventEmitter {
    * Process actionable thoughts from cognitive stream
    */
   private async processActionableThoughts(): Promise<void> {
-    const actionableThoughts = await this.cognitiveStreamClient.getActionableThoughts();
+    const actionableThoughts =
+      await this.cognitiveStreamClient.getActionableThoughts();
 
     for (const thought of actionableThoughts) {
       try {
@@ -304,7 +348,9 @@ export class EnhancedTaskIntegration extends EventEmitter {
   /**
    * Convert a cognitive thought to a planning task
    */
-  private async convertThoughtToTask(thought: CognitiveThought): Promise<Task | null> {
+  private async convertThoughtToTask(
+    thought: CognitiveThought
+  ): Promise<Task | null> {
     try {
       // Skip already processed thoughts
       if (thought.processed) return null;
@@ -317,19 +363,41 @@ export class EnhancedTaskIntegration extends EventEmitter {
       let taskDescription = thought.content;
 
       // Determine action type based on content
-      if (content.includes('gather') || content.includes('collect') || content.includes('wood') || content.includes('log')) {
+      if (
+        content.includes('gather') ||
+        content.includes('collect') ||
+        content.includes('wood') ||
+        content.includes('log')
+      ) {
         actionType = 'gathering';
         taskTitle = this.extractActionTitle(content, 'gather');
-      } else if (content.includes('craft') || content.includes('build') || content.includes('make') || content.includes('create')) {
+      } else if (
+        content.includes('craft') ||
+        content.includes('build') ||
+        content.includes('make') ||
+        content.includes('create')
+      ) {
         actionType = 'crafting';
         taskTitle = this.extractActionTitle(content, 'craft');
-      } else if (content.includes('mine') || content.includes('dig') || content.includes('ore')) {
+      } else if (
+        content.includes('mine') ||
+        content.includes('dig') ||
+        content.includes('ore')
+      ) {
         actionType = 'mining';
         taskTitle = this.extractActionTitle(content, 'mine');
-      } else if (content.includes('explore') || content.includes('search') || content.includes('scout')) {
+      } else if (
+        content.includes('explore') ||
+        content.includes('search') ||
+        content.includes('scout')
+      ) {
         actionType = 'exploration';
         taskTitle = this.extractActionTitle(content, 'explore');
-      } else if (content.includes('farm') || content.includes('plant') || content.includes('harvest')) {
+      } else if (
+        content.includes('farm') ||
+        content.includes('plant') ||
+        content.includes('harvest')
+      ) {
         actionType = 'farming';
         taskTitle = this.extractActionTitle(content, 'farm');
       } else {
@@ -366,7 +434,7 @@ export class EnhancedTaskIntegration extends EventEmitter {
         urgency: this.calculateTaskUrgency(thought),
         progress: 0,
         status: 'pending',
-        source: 'cognitive',
+        source: 'autonomous' as const,
         steps: [
           {
             id: `step-1-${Date.now()}`,
@@ -381,6 +449,7 @@ export class EnhancedTaskIntegration extends EventEmitter {
           updatedAt: Date.now(),
           retryCount: 0,
           maxRetries: 3,
+          childTaskIds: [],
           tags: ['cognitive', 'autonomous', thought.metadata.thoughtType],
           category: actionType,
         },
@@ -497,11 +566,14 @@ export class EnhancedTaskIntegration extends EventEmitter {
    */
   private async markThoughtAsProcessed(thoughtId: string): Promise<void> {
     try {
-      await fetch(`http://localhost:3000/api/cognitive-stream/${thoughtId}/processed`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ processed: true }),
-      });
+      await fetch(
+        `http://localhost:3000/api/cognitive-stream/${thoughtId}/processed`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ processed: true }),
+        }
+      );
     } catch (error) {
       console.warn('Failed to mark thought as processed:', error);
     }
@@ -553,43 +625,10 @@ export class EnhancedTaskIntegration extends EventEmitter {
         return; // No event to emit
       }
 
-      const event: BotLifecycleEvent = {
-        type: eventType,
-        timestamp: Date.now(),
-        data: {
-          taskId: task.id,
-          taskTitle: task.title,
-          activeTasksCount: await this.getActiveTasksCount(),
-        },
-        context: {
-          urgency: this.getUrgencyForTask(task),
-          situation: this.getSituationForTask(task),
-          trigger: 'task-status-change',
-        },
-      };
-
-      if (event.type) {
-        console.log(
-          `🧠 Emitting lifecycle event: ${event.type} for task: ${task.title}`
-        );
-        const generator = await getEventDrivenThoughtGenerator();
-        const thought = generator
-          ? await generator.generateThoughtForEvent(event)
-          : null;
-        if (thought) {
-          // Forward the thought to the cognition service
-          await fetch('http://localhost:3003/thought-generated', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ thought, event }),
-          }).catch((error) => {
-            console.warn(
-              '⚠️ Failed to forward thought to cognition service:',
-              error
-            );
-          });
-        }
-      }
+      // Log the task lifecycle event
+      console.log(
+        `✅ Task lifecycle event: ${eventType} for task: ${task.title}`
+      );
     } catch (error) {
       console.warn('⚠️ Failed to emit lifecycle event:', error);
     }
@@ -601,7 +640,7 @@ export class EnhancedTaskIntegration extends EventEmitter {
   private mapStatusToEventType(
     newStatus: string,
     previousStatus: string
-  ): BotLifecycleEvent['type'] | null {
+  ): string | null {
     if (newStatus === 'completed' && previousStatus !== 'completed') {
       return 'task_completed';
     }
@@ -644,6 +683,13 @@ export class EnhancedTaskIntegration extends EventEmitter {
       (task) => task.status === 'pending' || task.status === 'active'
     );
     return activeTasks.length;
+  }
+
+  /**
+   * Get actionable thoughts (for testing)
+   */
+  async getActionableThoughts(): Promise<CognitiveThought[]> {
+    return await this.cognitiveStreamClient.getActionableThoughts();
   }
 
   // Ephemeral per-step snapshot to compare before/after state
@@ -811,9 +857,6 @@ export class EnhancedTaskIntegration extends EventEmitter {
 
     // Start thought-to-task conversion polling
     this.startThoughtToTaskConversion();
-
-    // Initialize event-driven thought generator
-    initializeEventDrivenThoughtGenerator();
 
     if (this.config.enableProgressTracking) {
       this.startProgressTracking();
