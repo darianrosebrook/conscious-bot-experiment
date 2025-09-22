@@ -10,7 +10,6 @@
 import { createBot, Bot } from 'mineflayer';
 import { Vec3 } from 'vec3';
 import { EventEmitter } from 'events';
-import { pathfinder } from 'mineflayer-pathfinder';
 import {
   ChatProcessor,
   type ChatMessage,
@@ -97,6 +96,7 @@ export class SimpleMinecraftInterface extends EventEmitter {
       });
 
       // Load pathfinder plugin
+      const { pathfinder } = await import('mineflayer-pathfinder');
       this.bot.loadPlugin(pathfinder);
 
       this.bot.once('login', () => {
@@ -922,14 +922,14 @@ export class SimpleMinecraftInterface extends EventEmitter {
         // Use pathfinder if available for more intelligent following
         if (this.bot.pathfinder) {
           try {
-            const movements = new (require('mineflayer-pathfinder').Movements)(
-              this.bot
+            const { pathfinder, Movements } = await import(
+              'mineflayer-pathfinder'
             );
-            const goal =
-              new (require('mineflayer-pathfinder').goals.GoalFollow)(
-                nearestPlayer.entity,
-                3 // Follow within 3 blocks
-              );
+            const movements = new Movements(this.bot);
+            const goal = new pathfinder.goals.GoalFollow(
+              nearestPlayer.entity,
+              3 // Follow within 3 blocks
+            );
 
             this.bot.pathfinder.setMovements(movements);
             this.bot.pathfinder.setGoal(goal);
@@ -1017,10 +1017,11 @@ export class SimpleMinecraftInterface extends EventEmitter {
         // Use pathfinder for intelligent navigation
         if (this.bot.pathfinder) {
           try {
-            const movements = new (require('mineflayer-pathfinder').Movements)(
-              this.bot
+            const { pathfinder, Movements } = await import(
+              'mineflayer-pathfinder'
             );
-            const goal = new (require('mineflayer-pathfinder').goals.GoalNear)(
+            const movements = new Movements(this.bot);
+            const goal = new pathfinder.goals.GoalNear(
               playerPos.x,
               playerPos.y,
               playerPos.z,
@@ -1115,7 +1116,8 @@ export class SimpleMinecraftInterface extends EventEmitter {
           const targetZ = Math.floor(currentPos.z + Math.sin(angle) * distance);
           const targetY = currentPos.y; // Stay at current Y level initially
 
-          const goal = new (require('mineflayer-pathfinder').goals.GoalNear)(
+          const { pathfinder } = await import('mineflayer-pathfinder');
+          const goal = new pathfinder.goals.GoalNear(
             targetX,
             targetY,
             targetZ,
