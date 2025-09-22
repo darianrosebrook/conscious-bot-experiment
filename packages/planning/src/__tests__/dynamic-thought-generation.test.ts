@@ -8,7 +8,7 @@
  * @author @darianrosebrook
  */
 
-import { describe, it, expect, beforeEach, afterEach, jest } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { CognitiveThoughtProcessor } from '../cognitive-thought-processor';
 import { CognitiveThought } from '../cognitive-thought-processor';
 
@@ -59,13 +59,13 @@ describe('Dynamic Thought Generation Tests', () => {
   });
 
   afterEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
   });
 
   describe('Dynamic Context-Based Thought Generation', () => {
     it('should generate thoughts based on health status', async () => {
       // Mock world state with low health
-      const mockFetch = jest.spyOn(global, 'fetch');
+      const mockFetch = vi.spyOn(global, 'fetch');
       mockFetch.mockResolvedValueOnce({
         ok: true,
         json: async () => ({
@@ -96,7 +96,7 @@ describe('Dynamic Thought Generation Tests', () => {
 
     it('should generate thoughts based on inventory status', async () => {
       // Mock world state with empty inventory
-      const mockFetch = jest.spyOn(global, 'fetch');
+      const mockFetch = vi.spyOn(global, 'fetch');
       mockFetch.mockResolvedValueOnce({
         ok: true,
         json: async () => ({
@@ -128,7 +128,7 @@ describe('Dynamic Thought Generation Tests', () => {
 
     it('should generate thoughts based on environmental factors', async () => {
       // Mock world state with night time
-      const mockFetch = jest.spyOn(global, 'fetch');
+      const mockFetch = vi.spyOn(global, 'fetch');
       mockFetch.mockResolvedValueOnce({
         ok: true,
         json: async () => ({
@@ -158,7 +158,7 @@ describe('Dynamic Thought Generation Tests', () => {
 
     it('should generate thoughts based on biome-specific opportunities', async () => {
       // Mock world state in desert biome
-      const mockFetch = jest.spyOn(global, 'fetch');
+      const mockFetch = vi.spyOn(global, 'fetch');
       mockFetch.mockResolvedValueOnce({
         ok: true,
         json: async () => ({
@@ -187,7 +187,7 @@ describe('Dynamic Thought Generation Tests', () => {
 
     it('should generate thoughts based on position and elevation', async () => {
       // Mock world state at high elevation
-      const mockFetch = jest.spyOn(global, 'fetch');
+      const mockFetch = vi.spyOn(global, 'fetch');
       mockFetch.mockResolvedValueOnce({
         ok: true,
         json: async () => ({
@@ -216,7 +216,7 @@ describe('Dynamic Thought Generation Tests', () => {
 
     it('should generate thoughts based on underground position', async () => {
       // Mock world state underground
-      const mockFetch = jest.spyOn(global, 'fetch');
+      const mockFetch = vi.spyOn(global, 'fetch');
       mockFetch.mockResolvedValueOnce({
         ok: true,
         json: async () => ({
@@ -251,7 +251,7 @@ describe('Dynamic Thought Generation Tests', () => {
   describe('Memory-Based Thought Generation', () => {
     it('should generate thoughts from memory insights', async () => {
       // Mock successful memory response
-      const mockFetch = jest.spyOn(global, 'fetch');
+      const mockFetch = vi.spyOn(global, 'fetch');
       mockFetch.mockResolvedValueOnce({
         ok: true,
         json: async () => mockMemoryResponse,
@@ -274,7 +274,7 @@ describe('Dynamic Thought Generation Tests', () => {
 
     it('should generate thoughts from memory recommendations', async () => {
       // Mock successful memory response
-      const mockFetch = jest.spyOn(global, 'fetch');
+      const mockFetch = vi.spyOn(global, 'fetch');
       mockFetch.mockResolvedValueOnce({
         ok: true,
         json: async () => mockMemoryResponse,
@@ -295,7 +295,7 @@ describe('Dynamic Thought Generation Tests', () => {
 
     it('should handle memory system unavailability gracefully', async () => {
       // Mock failed memory response
-      const mockFetch = jest.spyOn(global, 'fetch');
+      const mockFetch = vi.spyOn(global, 'fetch');
       mockFetch.mockResolvedValueOnce({
         ok: false,
         status: 503,
@@ -364,7 +364,7 @@ describe('Dynamic Thought Generation Tests', () => {
   describe('Integration Scenarios', () => {
     it('should generate comprehensive thoughts for dangerous situation', async () => {
       // Mock world state with multiple concerns
-      const mockFetch = jest.spyOn(global, 'fetch');
+      const mockFetch = vi.spyOn(global, 'fetch');
       mockFetch.mockResolvedValueOnce({
         ok: true,
         json: async () => ({
@@ -408,7 +408,7 @@ describe('Dynamic Thought Generation Tests', () => {
 
     it('should generate exploration-focused thoughts for safe situation', async () => {
       // Mock world state with good conditions
-      const mockFetch = jest.spyOn(global, 'fetch');
+      const mockFetch = vi.spyOn(global, 'fetch');
       mockFetch.mockResolvedValueOnce({
         ok: true,
         json: async () => ({
@@ -447,7 +447,7 @@ describe('Dynamic Thought Generation Tests', () => {
 
     it('should prioritize thoughts based on urgency', async () => {
       // Mock world state with critical health
-      const mockFetch = jest.spyOn(global, 'fetch');
+      const mockFetch = vi.spyOn(global, 'fetch');
       mockFetch.mockResolvedValueOnce({
         ok: true,
         json: async () => ({
@@ -481,7 +481,7 @@ describe('Dynamic Thought Generation Tests', () => {
 
   describe('Thought Generation Quality', () => {
     it('should generate thoughts with proper structure', async () => {
-      const mockFetch = jest.spyOn(global, 'fetch');
+      const mockFetch = vi.spyOn(global, 'fetch');
       mockFetch.mockResolvedValueOnce({
         ok: true,
         json: async () => ({
@@ -519,7 +519,7 @@ describe('Dynamic Thought Generation Tests', () => {
     });
 
     it('should generate thoughts with appropriate priorities', async () => {
-      const mockFetch = jest.spyOn(global, 'fetch');
+      const mockFetch = vi.spyOn(global, 'fetch');
       mockFetch.mockResolvedValueOnce({
         ok: true,
         json: async () => ({

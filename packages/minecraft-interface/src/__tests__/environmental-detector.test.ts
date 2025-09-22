@@ -24,11 +24,21 @@ describe('Environmental Detector', () => {
 
   describe('Biome Detection and Analysis', () => {
     it('should detect and analyze different biomes', async () => {
-      const plainsState = await environmentalDetector.analyzeEnvironment(new Vec3(0, 64, 0));
-      const forestState = await environmentalDetector.analyzeEnvironment(new Vec3(100, 70, 100));
-      const desertState = await environmentalDetector.analyzeEnvironment(new Vec3(200, 70, 200));
-      const mountainState = await environmentalDetector.analyzeEnvironment(new Vec3(300, 120, 300));
-      const oceanState = await environmentalDetector.analyzeEnvironment(new Vec3(400, 50, 400));
+      const plainsState = await environmentalDetector.analyzeEnvironment(
+        new Vec3(0, 64, 0)
+      );
+      const forestState = await environmentalDetector.analyzeEnvironment(
+        new Vec3(100, 70, 100)
+      );
+      const desertState = await environmentalDetector.analyzeEnvironment(
+        new Vec3(200, 70, 200)
+      );
+      const mountainState = await environmentalDetector.analyzeEnvironment(
+        new Vec3(300, 120, 300)
+      );
+      const oceanState = await environmentalDetector.analyzeEnvironment(
+        new Vec3(400, 50, 400)
+      );
 
       expect(plainsState.biome.name).toBe('plains');
       expect(forestState.biome.name).toBe('forest');
@@ -44,7 +54,9 @@ describe('Environmental Detector', () => {
     });
 
     it('should provide biome-specific characteristics', async () => {
-      const state = await environmentalDetector.analyzeEnvironment(new Vec3(0, 64, 0));
+      const state = await environmentalDetector.analyzeEnvironment(
+        new Vec3(0, 64, 0)
+      );
 
       expect(state.biome.temperature).toBeGreaterThanOrEqual(-1);
       expect(state.biome.temperature).toBeLessThanOrEqual(1);
@@ -58,8 +70,12 @@ describe('Environmental Detector', () => {
     });
 
     it('should identify biome-specific hazards', async () => {
-      const plainsHazards = environmentalDetector.detectHazards(new Vec3(0, 64, 0));
-      const mountainHazards = environmentalDetector.detectHazards(new Vec3(300, 120, 300));
+      const plainsHazards = environmentalDetector.detectHazards(
+        new Vec3(0, 64, 0)
+      );
+      const mountainHazards = environmentalDetector.detectHazards(
+        new Vec3(300, 120, 300)
+      );
 
       expect(Array.isArray(plainsHazards)).toBe(true);
       expect(Array.isArray(mountainHazards)).toBe(true);
@@ -69,7 +85,9 @@ describe('Environmental Detector', () => {
     });
 
     it('should track biome-specific resources', async () => {
-      const state = await environmentalDetector.analyzeEnvironment(new Vec3(0, 64, 0));
+      const state = await environmentalDetector.analyzeEnvironment(
+        new Vec3(0, 64, 0)
+      );
 
       expect(state.biome.resources).toBeDefined();
       expect(Array.isArray(state.biome.resources)).toBe(true);
@@ -79,7 +97,9 @@ describe('Environmental Detector', () => {
 
   describe('Dimension Detection', () => {
     it('should detect overworld characteristics', async () => {
-      const state = await environmentalDetector.analyzeEnvironment(new Vec3(0, 64, 0));
+      const state = await environmentalDetector.analyzeEnvironment(
+        new Vec3(0, 64, 0)
+      );
 
       expect(state.dimension.name).toBe('overworld');
       expect(state.dimension.gravity).toBe(1.0);
@@ -89,7 +109,9 @@ describe('Environmental Detector', () => {
     });
 
     it('should identify dimension-specific hazards', async () => {
-      const state = await environmentalDetector.analyzeEnvironment(new Vec3(0, 64, 0));
+      const state = await environmentalDetector.analyzeEnvironment(
+        new Vec3(0, 64, 0)
+      );
 
       expect(state.dimension.hazards).toBeDefined();
       expect(Array.isArray(state.dimension.hazards)).toBe(true);
@@ -97,7 +119,9 @@ describe('Environmental Detector', () => {
     });
 
     it('should track dimension-specific resources', async () => {
-      const state = await environmentalDetector.analyzeEnvironment(new Vec3(0, 64, 0));
+      const state = await environmentalDetector.analyzeEnvironment(
+        new Vec3(0, 64, 0)
+      );
 
       expect(state.dimension.resources).toBeDefined();
       expect(Array.isArray(state.dimension.resources)).toBe(true);
@@ -107,17 +131,23 @@ describe('Environmental Detector', () => {
 
   describe('Weather Analysis', () => {
     it('should analyze weather conditions', async () => {
-      const state = await environmentalDetector.analyzeEnvironment(new Vec3(0, 64, 0));
+      const state = await environmentalDetector.analyzeEnvironment(
+        new Vec3(0, 64, 0)
+      );
 
       expect(state.weather.type).toBeDefined();
-      expect(['clear', 'rain', 'snow', 'storm', 'fog']).toContain(state.weather.type);
+      expect(['clear', 'rain', 'snow', 'storm', 'fog']).toContain(
+        state.weather.type
+      );
       expect(state.weather.intensity).toBeGreaterThanOrEqual(0);
       expect(state.weather.intensity).toBeLessThanOrEqual(1);
       expect(state.weather.duration).toBeGreaterThan(0);
     });
 
     it('should provide weather effects on navigation', async () => {
-      const state = await environmentalDetector.analyzeEnvironment(new Vec3(0, 64, 0));
+      const state = await environmentalDetector.analyzeEnvironment(
+        new Vec3(0, 64, 0)
+      );
 
       expect(state.weather.effects).toBeDefined();
       expect(state.weather.effects.visibility).toBeGreaterThanOrEqual(0);
@@ -126,12 +156,16 @@ describe('Environmental Detector', () => {
       expect(state.weather.effects.movementSpeed).toBeLessThanOrEqual(1);
       expect(state.weather.effects.hazardRisk).toBeGreaterThanOrEqual(0);
       expect(state.weather.effects.hazardRisk).toBeLessThanOrEqual(1);
-      expect(state.weather.effects.resourceAvailability).toBeGreaterThanOrEqual(0);
+      expect(state.weather.effects.resourceAvailability).toBeGreaterThanOrEqual(
+        0
+      );
       expect(state.weather.effects.resourceAvailability).toBeLessThanOrEqual(1);
     });
 
     it('should predict weather changes', async () => {
-      const state = await environmentalDetector.analyzeEnvironment(new Vec3(0, 64, 0));
+      const state = await environmentalDetector.analyzeEnvironment(
+        new Vec3(0, 64, 0)
+      );
 
       expect(state.weather.predictedChanges).toBeDefined();
       expect(Array.isArray(state.weather.predictedChanges)).toBe(true);
@@ -140,7 +174,9 @@ describe('Environmental Detector', () => {
 
   describe('Environmental State Integration', () => {
     it('should calculate overall stability scores', async () => {
-      const state = await environmentalDetector.analyzeEnvironment(new Vec3(0, 64, 0));
+      const state = await environmentalDetector.analyzeEnvironment(
+        new Vec3(0, 64, 0)
+      );
 
       expect(state.stabilityScore).toBeGreaterThanOrEqual(0);
       expect(state.stabilityScore).toBeLessThanOrEqual(1);
@@ -202,7 +238,7 @@ describe('Environmental Detector', () => {
       expect(Array.isArray(hazards)).toBe(true);
 
       // Each hazard should have required properties
-      hazards.forEach(hazard => {
+      hazards.forEach((hazard) => {
         expect(hazard.type).toBeDefined();
         expect(hazard.position).toBeDefined();
         expect(hazard.severity).toMatch(/^(low|medium|high)$/);
@@ -214,7 +250,7 @@ describe('Environmental Detector', () => {
     it('should provide hazard-specific information', () => {
       const hazards = environmentalDetector.detectHazards(new Vec3(0, 64, 0));
 
-      hazards.forEach(hazard => {
+      hazards.forEach((hazard) => {
         expect(hazard.type).toBeDefined();
         expect(hazard.severity).toMatch(/^(low|medium|high)$/);
         expect(hazard.description).toBeDefined();
@@ -226,7 +262,7 @@ describe('Environmental Detector', () => {
     it('should handle different hazard severities', () => {
       const hazards = environmentalDetector.detectHazards(new Vec3(0, 64, 0));
 
-      const severities = hazards.map(h => h.severity);
+      const severities = hazards.map((h) => h.severity);
       expect(severities).toContain('low');
       expect(severities).toContain('medium');
       expect(severities).toContain('high');
@@ -243,8 +279,12 @@ describe('Environmental Detector', () => {
     });
 
     it('should provide environmental state updates', async () => {
-      const initialState = await environmentalDetector.analyzeEnvironment(new Vec3(0, 64, 0));
-      const updatedState = await environmentalDetector.analyzeEnvironment(new Vec3(100, 64, 100));
+      const initialState = await environmentalDetector.analyzeEnvironment(
+        new Vec3(0, 64, 0)
+      );
+      const updatedState = await environmentalDetector.analyzeEnvironment(
+        new Vec3(100, 64, 100)
+      );
 
       expect(initialState).toBeDefined();
       expect(updatedState).toBeDefined();
@@ -265,8 +305,9 @@ describe('Environmental Detector', () => {
     it('should handle multiple environmental analyses efficiently', async () => {
       const startTime = Date.now();
 
-      const positions = Array.from({ length: 5 }, (_, i) =>
-        new Vec3(i * 50, 64, i * 50)
+      const positions = Array.from(
+        { length: 5 },
+        (_, i) => new Vec3(i * 50, 64, i * 50)
       );
 
       for (const position of positions) {

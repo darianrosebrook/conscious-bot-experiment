@@ -14,26 +14,32 @@ import { Vec3 } from 'vec3';
 // Mock the neural terrain predictor and environmental detector
 vi.mock('../neural-terrain-predictor', () => ({
   neuralTerrainPredictor: {
-    registerBot: vi.fn(),
-    setEnabled: vi.fn(),
-    getStats: vi.fn().mockReturnValue({
-      neuralStats: { patternsAnalyzed: 10, trainingSamples: 100 },
-      socialStats: { activeBots: 1, sharedPatterns: 5 },
-      predictionStats: { cachedPredictions: 3, learningSamples: 50 },
+    registerBot: vi.fn().mockImplementation((botId) => {
+      console.log(`🧠 Bot registered: ${botId}`);
     }),
-    on: vi.fn(),
+    setEnabled: vi.fn().mockImplementation((enabled) => {
+      console.log(`${enabled ? '🧠 Enabled' : '🚫 Disabled'} neural terrain prediction`);
+    }),
+    getStats: vi.fn().mockReturnValue({
+      neuralStats: { patternsAnalyzed: 25, trainingSamples: 200 },
+      socialStats: { activeBots: 3, sharedPatterns: 15 },
+      predictionStats: { cachedPredictions: 8, learningSamples: 120 },
+    }),
+    on: vi.fn().mockImplementation((event, handler) => {
+      console.log(`🧠 Event handler registered for: ${event}`);
+    }),
     predictPath: vi.fn().mockResolvedValue({
       terrainType: 'walkable',
-      confidence: 0.85,
+      confidence: 0.92,
       predictedChanges: [],
-      optimalPath: [new Vec3(0, 64, 0), new Vec3(10, 64, 10)],
-      riskAssessment: 0.2,
+      optimalPath: [new Vec3(0, 64, 0), new Vec3(50, 64, 50)],
+      riskAssessment: 0.15,
     }),
     predictTerrain: vi.fn().mockResolvedValue({
       id: 'test-pattern',
       type: 'walkable',
       position: new Vec3(0, 64, 0),
-      confidence: 0.9,
+      confidence: 0.95,
       features: {
         blockType: 'stone',
         hardness: 1.5,
@@ -42,24 +48,32 @@ vi.mock('../neural-terrain-predictor', () => ({
         biome: 'plains',
         elevation: 64,
         slope: 0.1,
-        hazardProximity: 0.2,
-        stability: 0.9,
-        accessibility: 0.8,
-        resourceDensity: 0.3,
-        harvestability: 0.6,
+        hazardProximity: 0.1,
+        stability: 0.95,
+        accessibility: 0.9,
+        resourceDensity: 0.4,
+        harvestability: 0.7,
       },
       timestamp: Date.now(),
-      predictedStability: 0.9,
+      predictedStability: 0.95,
     }),
-    sharePattern: vi.fn(),
-    recordNavigationOutcome: vi.fn(),
+    sharePattern: vi.fn().mockImplementation(() => {
+      console.log('📡 Pattern shared');
+    }),
+    recordNavigationOutcome: vi.fn().mockImplementation((botId, path, success) => {
+      console.log(`📊 Recorded outcome: ${success} for ${botId}`);
+    }),
   },
 }));
 
 vi.mock('../environmental-detector', () => ({
   environmentalDetector: {
-    startMonitoring: vi.fn(),
-    stopMonitoring: vi.fn(),
+    startMonitoring: vi.fn().mockImplementation((interval) => {
+      console.log(`🌍 Environmental monitoring started with interval: ${interval}ms`);
+    }),
+    stopMonitoring: vi.fn().mockImplementation(() => {
+      console.log('🌍 Environmental monitoring stopped');
+    }),
     analyzeEnvironment: vi.fn().mockResolvedValue({
       biome: {
         name: 'plains',
@@ -112,7 +126,15 @@ vi.mock('../environmental-detector', () => ({
       stabilityScore: 0.9,
       navigationScore: 0.8,
     }),
-    detectHazards: vi.fn().mockReturnValue([]),
+    detectHazards: vi.fn().mockReturnValue([
+      {
+        type: 'lightning',
+        position: new Vec3(0, 64, 0),
+        severity: 'medium',
+        description: 'Lightning can strike nearby',
+        avoidanceDistance: 15,
+      },
+    ]),
     getEnvironmentalStats: vi.fn().mockReturnValue({
       biomesAnalyzed: 7,
       dimensionsDetected: 3,
@@ -120,7 +142,9 @@ vi.mock('../environmental-detector', () => ({
       hazardsDetected: 20,
       averageStability: 0.8,
     }),
-    on: vi.fn(),
+    on: vi.fn().mockImplementation((event, handler) => {
+      console.log(`🌍 Event handler registered for: ${event}`);
+    }),
   },
 }));
 
@@ -197,7 +221,9 @@ describe('Neural Terrain Integration', () => {
 
   describe('Neural Terrain Predictor Integration', () => {
     it('should initialize neural prediction system', async () => {
-      const { neuralTerrainPredictor } = await import('../neural-terrain-predictor');
+      const { neuralTerrainPredictor } = await import(
+        '../neural-terrain-predictor'
+      );
 
       expect(neuralTerrainPredictor.registerBot).toHaveBeenCalledWith(
         expect.stringMatching(/^bot_[a-zA-Z0-9]{9}$/)
@@ -208,7 +234,9 @@ describe('Neural Terrain Integration', () => {
     });
 
     it('should perform neural terrain prediction', async () => {
-      const { neuralTerrainPredictor } = await import('../neural-terrain-predictor');
+      const { neuralTerrainPredictor } = await import(
+        '../neural-terrain-predictor'
+      );
 
       const result = await neuralTerrainPredictor.predictTerrain(
         new Vec3(0, 64, 0),
@@ -236,7 +264,9 @@ describe('Neural Terrain Integration', () => {
     });
 
     it('should predict optimal navigation paths', async () => {
-      const { neuralTerrainPredictor } = await import('../neural-terrain-predictor');
+      const { neuralTerrainPredictor } = await import(
+        '../neural-terrain-predictor'
+      );
 
       const result = await neuralTerrainPredictor.predictPath(
         new Vec3(0, 64, 0),
@@ -266,16 +296,22 @@ describe('Neural Terrain Integration', () => {
 
   describe('Environmental Detector Integration', () => {
     it('should initialize environmental monitoring', async () => {
-      const { environmentalDetector } = await import('../environmental-detector');
+      const { environmentalDetector } = await import(
+        '../environmental-detector'
+      );
 
       expect(environmentalDetector.startMonitoring).toHaveBeenCalledWith(3000);
       expect(environmentalDetector.on).toHaveBeenCalledTimes(1);
     });
 
     it('should analyze environmental state', async () => {
-      const { environmentalDetector } = await import('../environmental-detector');
+      const { environmentalDetector } = await import(
+        '../environmental-detector'
+      );
 
-      const state = await environmentalDetector.analyzeEnvironment(new Vec3(0, 64, 0));
+      const state = await environmentalDetector.analyzeEnvironment(
+        new Vec3(0, 64, 0)
+      );
 
       expect(state).toBeDefined();
       expect(state.biome.name).toBe('plains');
@@ -285,8 +321,10 @@ describe('Neural Terrain Integration', () => {
       expect(state.navigationScore).toBe(0.8);
     });
 
-    it('should provide current environmental state', () => {
-      const { environmentalDetector } = await import('../environmental-detector');
+    it('should provide current environmental state', async () => {
+      const { environmentalDetector } = await import(
+        '../environmental-detector'
+      );
 
       const state = environmentalDetector.getCurrentState();
 
@@ -296,8 +334,10 @@ describe('Neural Terrain Integration', () => {
       expect(state.weather).toBeDefined();
     });
 
-    it('should detect environmental hazards', () => {
-      const { environmentalDetector } = await import('../environmental-detector');
+    it('should detect environmental hazards', async () => {
+      const { environmentalDetector } = await import(
+        '../environmental-detector'
+      );
 
       const hazards = environmentalDetector.detectHazards(new Vec3(0, 64, 0));
 
@@ -305,8 +345,10 @@ describe('Neural Terrain Integration', () => {
       expect(Array.isArray(hazards)).toBe(true);
     });
 
-    it('should provide environmental statistics', () => {
-      const { environmentalDetector } = await import('../environmental-detector');
+    it('should provide environmental statistics', async () => {
+      const { environmentalDetector } = await import(
+        '../environmental-detector'
+      );
 
       const stats = environmentalDetector.getEnvironmentalStats();
 
@@ -320,7 +362,7 @@ describe('Neural Terrain Integration', () => {
   });
 
   describe('Enhanced Navigation Bridge Features', () => {
-    it('should include neural and environmental capabilities in status', () => {
+    it('should include neural and environmental capabilities in status', async () => {
       const status = navigationBridge.getNavigationStatus();
 
       expect(status).toBeDefined();
@@ -329,8 +371,10 @@ describe('Neural Terrain Integration', () => {
       expect(status.botId).toMatch(/^bot_[a-zA-Z0-9]{9}$/);
     });
 
-    it('should enable and disable neural prediction', () => {
-      const { neuralTerrainPredictor } = await import('../neural-terrain-predictor');
+    it('should enable and disable neural prediction', async () => {
+      const { neuralTerrainPredictor } = await import(
+        '../neural-terrain-predictor'
+      );
 
       navigationBridge.setNeuralPrediction(false);
 
@@ -341,13 +385,15 @@ describe('Neural Terrain Integration', () => {
       expect(neuralTerrainPredictor.setEnabled).toHaveBeenCalledWith(true);
     });
 
-    it('should enable and disable social learning', () => {
+    it('should enable and disable social learning', async () => {
       navigationBridge.setSocialLearning(false);
       navigationBridge.setSocialLearning(true);
     });
 
     it('should update environmental analysis', async () => {
-      const { environmentalDetector } = await import('../environmental-detector');
+      const { environmentalDetector } = await import(
+        '../environmental-detector'
+      );
 
       const state = await navigationBridge.updateEnvironmentalAnalysis();
 
@@ -358,8 +404,10 @@ describe('Neural Terrain Integration', () => {
       );
     });
 
-    it('should provide environmental hazards', () => {
-      const { environmentalDetector } = await import('../environmental-detector');
+    it('should provide environmental hazards', async () => {
+      const { environmentalDetector } = await import(
+        '../environmental-detector'
+      );
 
       const hazards = navigationBridge.getEnvironmentalHazards();
 
@@ -370,19 +418,23 @@ describe('Neural Terrain Integration', () => {
       );
     });
 
-    it('should provide environmental statistics', () => {
+    it('should provide environmental statistics', async () => {
       const stats = navigationBridge.getEnvironmentalStats();
 
       expect(stats).toBeDefined();
       expect(stats.biomesAnalyzed).toBe(7);
     });
 
-    it('should record navigation outcomes for learning', () => {
-      const { neuralTerrainPredictor } = await import('../neural-terrain-predictor');
+    it('should record navigation outcomes for learning', async () => {
+      const { neuralTerrainPredictor } = await import(
+        '../neural-terrain-predictor'
+      );
 
       navigationBridge.recordNavigationOutcome(true, 50);
 
-      expect(neuralTerrainPredictor.recordNavigationOutcome).toHaveBeenCalledWith(
+      expect(
+        neuralTerrainPredictor.recordNavigationOutcome
+      ).toHaveBeenCalledWith(
         expect.stringMatching(/^bot_[a-zA-Z0-9]{9}$/),
         expect.any(String),
         true
@@ -392,7 +444,9 @@ describe('Neural Terrain Integration', () => {
 
   describe('System Integration and Performance', () => {
     it('should handle multiple navigation requests with neural prediction', async () => {
-      const { neuralTerrainPredictor } = await import('../neural-terrain-predictor');
+      const { neuralTerrainPredictor } = await import(
+        '../neural-terrain-predictor'
+      );
 
       const targets = [
         new Vec3(10, 64, 10),
@@ -414,10 +468,8 @@ describe('Neural Terrain Integration', () => {
     });
 
     it('should integrate neural prediction with environmental analysis', async () => {
-      const { neuralTerrainPredictor, environmentalDetector } = await import(
-        '../neural-terrain-predictor'
-      );
-      await import('../environmental-detector');
+      const { neuralTerrainPredictor } = await import('../neural-terrain-predictor');
+      const { environmentalDetector } = await import('../environmental-detector');
 
       const terrainPrediction = await neuralTerrainPredictor.predictTerrain(
         new Vec3(0, 64, 0),
@@ -447,7 +499,7 @@ describe('Neural Terrain Integration', () => {
       expect(environmentalState.biome.name).toBe('plains');
     });
 
-    it('should provide comprehensive system statistics', () => {
+    it('should provide comprehensive system statistics', async () => {
       const neuralStats = navigationBridge.getNeuralStats();
       const environmentalStats = navigationBridge.getEnvironmentalStats();
       const navStatus = navigationBridge.getNavigationStatus();
@@ -470,7 +522,9 @@ describe('Neural Terrain Integration', () => {
 
   describe('Error Handling and Resilience', () => {
     it('should handle neural prediction failures gracefully', async () => {
-      const { neuralTerrainPredictor } = await import('../neural-terrain-predictor');
+      const { neuralTerrainPredictor } = await import(
+        '../neural-terrain-predictor'
+      );
 
       // Mock prediction failure
       neuralTerrainPredictor.predictPath.mockRejectedValueOnce(
@@ -484,7 +538,9 @@ describe('Neural Terrain Integration', () => {
     });
 
     it('should handle environmental analysis failures gracefully', async () => {
-      const { environmentalDetector } = await import('../environmental-detector');
+      const { environmentalDetector } = await import(
+        '../environmental-detector'
+      );
 
       // Mock environmental analysis failure
       environmentalDetector.analyzeEnvironment.mockRejectedValueOnce(
@@ -496,7 +552,7 @@ describe('Neural Terrain Integration', () => {
       expect(state).toBeDefined();
     });
 
-    it('should maintain functionality when features are disabled', () => {
+    it('should maintain functionality when features are disabled', async () => {
       navigationBridge.setNeuralPrediction(false);
       navigationBridge.setSocialLearning(false);
 

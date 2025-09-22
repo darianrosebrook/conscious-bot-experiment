@@ -21,7 +21,7 @@ import {
   LLMExtractor,
   HeuristicExtractor,
   type Signal,
-  type SignalType
+  type SignalType,
 } from './signal-extraction-pipeline';
 
 export interface CognitiveThought {
@@ -40,6 +40,25 @@ export interface CognitiveThought {
   priority?: 'low' | 'medium' | 'high';
   id: string;
   timestamp: number;
+}
+
+/**
+ * Intent represents a planner-ready goal with preconditions and uncertainties
+ */
+export interface Intent {
+  id: string;
+  goal: string; // e.g., 'AcquireResource', 'ImproveSafety', 'ScoutArea', 'CraftTool'
+  params: Record<string, any>;
+  priority: number; // 0-1
+  urgency: number; // 0-1
+  confidence: number; // 0-1
+  preconditions?: string[]; // e.g., ['has:stone_pickaxe']
+  uncertainties?: string[]; // drives probe tasks
+  provenance: {
+    thoughtId: string;
+    memoryRefs?: string[];
+    signalSources?: string[];
+  };
 }
 
 export interface CognitiveThoughtProcessorConfig {
@@ -256,6 +275,7 @@ export class CognitiveThoughtProcessor extends EventEmitter {
   private cognitive: CognitiveClient;
   private memory?: MemoryClient;
   private lastActivityCheck: number = 0;
+  private signalPipeline?: SignalExtractionPipeline;
   // NEW: MCP Integration
   private mcpIntegration?: MCPIntegration;
   // fetch cursors / dedupe
@@ -273,6 +293,34 @@ export class CognitiveThoughtProcessor extends EventEmitter {
     // Initialize memory client if enabled
     if (this.config.enableMemoryIntegration && this.config.memoryEndpoint) {
       this.memory = new HttpMemoryClient(this.config.memoryEndpoint);
+    }
+
+    // Initialize signal extraction pipeline if enabled
+    if (this.config.enableSignalPipeline) {
+      this.signalPipeline = new SignalExtractionPipeline({
+        confidenceThreshold: this.config.signalConfidenceThreshold || 0.3,
+        maxSignalsPerThought: 10,
+      });
+
+      // Register extractors in priority order
+      if (this.memory) {
+        this.signalPipeline.registerExtractor(
+          new MemoryBackedExtractor(this.memory)
+        );
+      }
+
+      if (this.config.cognitiveEndpoint) {
+        this.signalPipeline.registerExtractor(
+          new LLMExtractor(this.memory, this.config.cognitiveEndpoint)
+        );
+      }
+
+      // Always register heuristic extractor as fallback
+      this.signalPipeline.registerExtractor(new HeuristicExtractor());
+
+      console.log(
+        '🔍 [COGNITIVE THOUGHT PROCESSOR] Signal extraction pipeline initialized'
+      );
     }
 
     // NEW: Initialize MCP integration if enabled
