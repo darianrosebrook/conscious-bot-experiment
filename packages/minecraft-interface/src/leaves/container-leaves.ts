@@ -376,7 +376,6 @@ class ContainerManager {
   console.log(`📦 Storage optimization: ${layout.hotbarItems.length} hotbar items, ${tools.length} tools, ${armor.length} armor, ${food.length} food, ${materials.length} materials`);
 
   return layout;
-  }
 }
 
 
@@ -384,15 +383,10 @@ class ContainerManager {
 // Helper Functions
 // ============================================================================
 
-
-// ============================================================================
-// Inventory Management Functions
-// ============================================================================
-
 /**
  * Sort inventory items by type and value
  */
-function sortInventoryItems(bot: Bot, keepItems: string[] = []): any[] {
+private sortInventoryItems(bot: Bot, keepItems: string[] = []): any[] {
   const items = bot.inventory.items();
 
   // Sort items by category priority and then by count/value
