@@ -34,6 +34,8 @@ export interface CognitiveThoughtProcessorConfig {
   maxThoughtsPerBatch: number;
   planningEndpoint: string;
   cognitiveEndpoint: string;
+  memoryEndpoint?: string;
+  enableMemoryIntegration?: boolean;
 }
 
 const DEFAULT_CONFIG: CognitiveThoughtProcessorConfig = {
@@ -42,6 +44,8 @@ const DEFAULT_CONFIG: CognitiveThoughtProcessorConfig = {
   maxThoughtsPerBatch: 5,
   planningEndpoint: 'http://localhost:3002',
   cognitiveEndpoint: 'http://localhost:3003',
+  memoryEndpoint: process.env.MEMORY_ENDPOINT || 'http://localhost:3001',
+  enableMemoryIntegration: true,
 };
 
 // -----------------------------------------------------------------------------
@@ -49,6 +53,23 @@ const DEFAULT_CONFIG: CognitiveThoughtProcessorConfig = {
 // -----------------------------------------------------------------------------
 interface PlanningClient {
   addTask(task: any): Promise<{ ok: boolean; id?: string; error?: string }>;
+}
+
+interface MemoryClient {
+  getMemoryEnhancedContext(context: {
+    query?: string;
+    taskType?: string;
+    entities?: string[];
+    location?: any;
+    recentEvents?: any[];
+    maxMemories?: number;
+  }): Promise<{
+    memories: any[];
+    insights: string[];
+    recommendations: string[];
+    confidence: number;
+  }>;
+  addThoughtToMemory(thought: CognitiveThought): Promise<boolean>;
 }
 
 class HttpPlanningClient implements PlanningClient {
@@ -74,6 +95,68 @@ class HttpPlanningClient implements PlanningClient {
     }
     const json = await (res as any).json().catch(() => ({}));
     return { ok: true, id: json?.id };
+  }
+}
+
+class HttpMemoryClient implements MemoryClient {
+  constructor(private base: string) {}
+
+  async getMemoryEnhancedContext(context: {
+    query?: string;
+    taskType?: string;
+    entities?: string[];
+    location?: any;
+    recentEvents?: any[];
+    maxMemories?: number;
+  }): Promise<{
+    memories: any[];
+    insights: string[];
+    recommendations: string[];
+    confidence: number;
+  }> {
+    try {
+      const response = await fetch(`${this.base}/memory-enhanced-context`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(context),
+        signal: AbortSignal.timeout(3000),
+      });
+
+      if (!response.ok) {
+        return {
+          memories: [],
+          insights: ['Memory system unavailable'],
+          recommendations: ['Consider retrying later'],
+          confidence: 0.0,
+        };
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('Memory client error:', error);
+      return {
+        memories: [],
+        insights: ['Memory system error occurred'],
+        recommendations: ['Consider using fallback planning'],
+        confidence: 0.0,
+      };
+    }
+  }
+
+  async addThoughtToMemory(thought: CognitiveThought): Promise<boolean> {
+    try {
+      const response = await fetch(`${this.base}/thought`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(thought),
+        signal: AbortSignal.timeout(2000),
+      });
+
+      return response.ok;
+    } catch (error) {
+      console.error('Failed to add thought to memory:', error);
+      return false;
+    }
   }
 }
 
@@ -136,6 +219,7 @@ export class CognitiveThoughtProcessor extends EventEmitter {
   // IO clients
   private planning: PlanningClient;
   private cognitive: CognitiveClient;
+  private memory?: MemoryClient;
   // fetch cursors / dedupe
   private lastEtag?: string;
   private lastSeenTs: number = 0;
@@ -147,6 +231,11 @@ export class CognitiveThoughtProcessor extends EventEmitter {
     this.config = { ...DEFAULT_CONFIG, ...config };
     this.planning = new HttpPlanningClient(this.config.planningEndpoint);
     this.cognitive = new HttpCognitiveClient(this.config.cognitiveEndpoint);
+
+    // Initialize memory client if enabled
+    if (this.config.enableMemoryIntegration && this.config.memoryEndpoint) {
+      this.memory = new HttpMemoryClient(this.config.memoryEndpoint);
+    }
   }
 
   /**
@@ -773,5 +862,150 @@ export class CognitiveThoughtProcessor extends EventEmitter {
       this.processedThoughts.add(thought.id);
     }
     return task;
+  }
+
+  /**
+   * Process a thought with memory enhancement
+   */
+  async processThoughtWithMemory(thought: CognitiveThought): Promise<{
+    task?: any;
+    memoryContext?: any;
+    enhancedThought?: CognitiveThought;
+    recommendations?: string[];
+  }> {
+    const result: any = {};
+
+    // 1. Get memory-enhanced context if memory client is available
+    if (this.memory) {
+      try {
+        const memoryContext = await this.memory.getMemoryEnhancedContext({
+          query: thought.content,
+          taskType: thought.category,
+          entities: this.extractEntitiesFromThought(thought),
+          location: this.worldState?.location,
+          recentEvents: this.getRecentTaskHistory(5),
+          maxMemories: 3,
+        });
+
+        result.memoryContext = memoryContext;
+        result.recommendations = memoryContext.recommendations;
+
+        // Enhance the thought with memory context
+        result.enhancedThought = {
+          ...thought,
+          content: `${thought.content}\n\nMemory Context:\n${memoryContext.insights.join('\n')}`,
+          priority: this.calculateMemoryEnhancedPriority(
+            thought,
+            memoryContext
+          ),
+          metadata: {
+            ...thought.metadata,
+            memoryConfidence: memoryContext.confidence,
+            memoryInsights: memoryContext.insights,
+          },
+        };
+      } catch (error) {
+        console.error('Memory enhancement failed:', error);
+        result.enhancedThought = thought; // Fallback to original thought
+      }
+    } else {
+      result.enhancedThought = thought;
+    }
+
+    // 2. Process the enhanced thought into a task
+    const task = this.translateThoughtToTask(result.enhancedThought);
+    result.task = task;
+
+    // 3. Submit task if available
+    if (task) {
+      await this.submitTaskToPlanning(task);
+      this.processedThoughts.add(thought.id);
+
+      // 4. Store thought in memory if memory client is available
+      if (this.memory) {
+        await this.memory.addThoughtToMemory(result.enhancedThought);
+      }
+    }
+
+    return result;
+  }
+
+  /**
+   * Extract entities from a thought
+   */
+  private extractEntitiesFromThought(thought: CognitiveThought): string[] {
+    const entities: string[] = [];
+
+    // Simple entity extraction - in a real system this would use NLP
+    const content = thought.content.toLowerCase();
+
+    // Common Minecraft entities
+    const minecraftEntities = [
+      'diamond',
+      'iron',
+      'gold',
+      'wood',
+      'stone',
+      'dirt',
+      'water',
+      'lava',
+      'tree',
+      'cave',
+      'mountain',
+      'river',
+      'ocean',
+      'forest',
+      'desert',
+      'zombie',
+      'skeleton',
+      'creeper',
+      'spider',
+      'wolf',
+      'cow',
+      'pig',
+      'sheep',
+    ];
+
+    for (const entity of minecraftEntities) {
+      if (content.includes(entity)) {
+        entities.push(entity);
+      }
+    }
+
+    return entities;
+  }
+
+  /**
+   * Get recent task history for memory context
+   */
+  private getRecentTaskHistory(limit: number): any[] {
+    // This would normally come from the task history
+    // For now, return placeholder data
+    return Array.from(this.recentTaskKeys.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, limit)
+      .map(([key, ts]) => ({
+        key,
+        timestamp: ts,
+        type: key.split('_')[0] || 'unknown',
+      }));
+  }
+
+  /**
+   * Calculate memory-enhanced priority
+   */
+  private calculateMemoryEnhancedPriority(
+    thought: CognitiveThought,
+    memoryContext: any
+  ): CognitiveThought['priority'] {
+    const basePriority = thought.priority || 'medium';
+
+    // Boost priority if memory suggests it's important
+    if (memoryContext.confidence > 0.8 && memoryContext.memories.length > 0) {
+      const priorityMap = { low: 'medium', medium: 'high', high: 'high' };
+      return priorityMap[basePriority] || basePriority;
+    }
+
+    return basePriority;
   }
 }

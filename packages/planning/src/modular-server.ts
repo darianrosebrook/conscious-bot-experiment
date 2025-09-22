@@ -2387,7 +2387,6 @@ const cognitiveThoughtProcessor = new CognitiveThoughtProcessor({
   cognitiveEndpoint: 'http://localhost:3003',
 });
 
-
 // Connect cognitive thought processor to world state
 worldStateManager.on('updated', (snapshot) => {
   try {
@@ -2430,10 +2429,13 @@ const enhancedMemoryIntegration = new EnhancedMemoryIntegration({
   enableRealTimeUpdates: true,
   enableReflectiveNotes: true,
   enableEventLogging: true,
-  dashboardEndpoint: 'http://localhost:3000',
-  memorySystemEndpoint: 'http://localhost:3001',
+  enableMemoryDiscovery: true,
+  dashboardEndpoint: process.env.DASHBOARD_ENDPOINT || 'http://localhost:3000',
+  memorySystemEndpoint: process.env.MEMORY_ENDPOINT || 'http://localhost:3001',
   maxEvents: 100,
   maxNotes: 50,
+  memorySystemTimeout: parseInt(process.env.MEMORY_TIMEOUT || '5000'),
+  retryAttempts: parseInt(process.env.MEMORY_RETRIES || '3'),
 });
 
 const enhancedEnvironmentIntegration = new EnhancedEnvironmentIntegration({

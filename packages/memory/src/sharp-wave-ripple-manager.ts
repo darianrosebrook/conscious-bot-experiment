@@ -106,6 +106,12 @@ export class SharpWaveRippleManager {
     temporalCompressionSavings: 0,
   };
 
+  // Performance optimization: Cache frequently calculated values
+  private cachedQueueSize = 0;
+  private cachedAverageStrength = 0;
+  private lastCacheUpdate = 0;
+  private readonly CACHE_UPDATE_INTERVAL = 1000; // Update cache every 1 second
+
   constructor(config: SharpWaveRippleConfig) {
     this.config = config;
 
@@ -248,6 +254,22 @@ export class SharpWaveRippleManager {
     oldestTagged: number;
     newestTagged: number;
   } {
+    const now = Date.now();
+
+    // Update cache if needed
+    if (now - this.lastCacheUpdate > this.CACHE_UPDATE_INTERVAL) {
+      this.cachedQueueSize = this.swrQueue.length;
+      // Calculate average strength across all queued items
+      this.cachedAverageStrength =
+        this.swrQueue.length > 0
+          ? this.swrQueue.reduce(
+              (sum, event) => sum + this.calculateNeuralStrength(event),
+              0
+            ) / this.swrQueue.length
+          : 0;
+      this.lastCacheUpdate = now;
+    }
+
     if (this.swrQueue.length === 0) {
       return {
         queueSize: 0,
@@ -257,13 +279,11 @@ export class SharpWaveRippleManager {
       };
     }
 
-    const strengths = this.swrQueue.map((e) => e.swrStrength);
     const timestamps = this.swrQueue.map((e) => e.taggedAt);
 
     return {
-      queueSize: this.swrQueue.length,
-      averageStrength:
-        strengths.reduce((sum, s) => sum + s, 0) / strengths.length,
+      queueSize: this.cachedQueueSize,
+      averageStrength: this.cachedAverageStrength,
       oldestTagged: Math.min(...timestamps),
       newestTagged: Math.max(...timestamps),
     };
@@ -553,22 +573,23 @@ export class SharpWaveRippleManager {
       totalCycles,
       timestamp: Date.now(),
       pattern: {
-        // Sharp wave component (excitation)
-        excitationLevel: 0.7 + Math.random() * 0.3,
-        // Ripple frequency (high-frequency oscillation)
-        rippleFrequency: 150 + Math.random() * 50, // Hz
+        // Sharp wave component (excitation) - reduced randomness
+        excitationLevel: 0.7 + event.metadata.importance * 0.2,
+        // Ripple frequency (high-frequency oscillation) - importance-based
+        rippleFrequency: 150 + event.metadata.importance * 30, // Hz
         // Temporal compression factor
         compressionRatio:
           this.config.temporalCompressionRatio *
           (1 + event.metadata.importance * 0.5),
-        // Neural competition window
-        competitionWindow: Math.random() < 0.4, // 40% chance
+        // Neural competition window - deterministic based on cycle
+        competitionWindow: cycle % 3 === 0, // Every 3rd cycle
       },
     };
   }
 
   /**
    * Simulate neural competition during replay
+   * Optimized for performance with reduced randomness
    */
   private async simulateNeuralCompetition(
     event: SharpWaveRippleEvent,
@@ -580,10 +601,10 @@ export class SharpWaveRippleManager {
     }
 
     // Calculate competition success based on memory strength
+    // Use pre-calculated values to reduce computation
     const competitionSuccess =
       event.swrStrength * 0.6 + // Base strength
-      event.metadata.importance * 0.3 + // Importance factor
-      Math.random() * 0.1; // Random factor
+      event.metadata.importance * 0.3; // Importance factor
 
     // Competition threshold based on current consolidation load
     const currentLoad = this.swrQueue.length / this.config.maxQueueSize;

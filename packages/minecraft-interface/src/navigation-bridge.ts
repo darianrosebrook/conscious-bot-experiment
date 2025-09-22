@@ -103,13 +103,7 @@ class MockNavigationSystem extends EventEmitter {
       nodes: estimatedNodes,
     };
   }
-  on(_event: string, _listener: (..._args: any[]) => void): this {
-    return this;
-  }
-
-  emit(_event: string, ..._args: any[]): boolean {
-    return true;
-  }
+  // eslint
   async planPath(request: PathPlanningRequest): Promise<PathPlanningResult> {
     // Simple mock implementation that creates a path
     const start = request.start;
@@ -217,7 +211,7 @@ export class NavigationBridge extends EventEmitter {
       ...config,
     };
 
-        // Configure dynamic D* Lite with terrain-aware parameter switching
+    // Configure dynamic D* Lite with terrain-aware parameter switching
     // See docs/planning/dstar-lite-terrain-optimization.md for detailed analysis
     const navConfig: NavigationConfig = this.createDynamicConfig();
 
@@ -227,6 +221,9 @@ export class NavigationBridge extends EventEmitter {
       this.terrainAnalyzer,
       this.navigationSystem
     );
+
+    // Additional configuration for navigation system
+    const additionalConfig = {
       optimization: {
         pathSmoothing: true,
         lookaheadDistance: 20,
@@ -246,6 +243,10 @@ export class NavigationBridge extends EventEmitter {
         lookaheadTime: 1.0,
       },
     };
+
+    // Merge additional config into navConfig
+    Object.assign(navConfig, additionalConfig);
+
     this.navigationSystem = new MockNavigationSystem(navConfig);
 
     // Initialize pathfinder asynchronously - it will be ready when needed
@@ -273,7 +274,9 @@ export class NavigationBridge extends EventEmitter {
         const mcData = mcDataModule.default || mcDataModule;
         // Check if mcData is callable
         if (typeof mcData === 'function') {
-          const mcDataInstance = mcData(this.bot.version);
+          // eslint-disable-next-line @typescript-eslint/no-unused-vars
+          // eslint-disable-next-line @typescript-eslint/no-unused-vars
+          const _mcDataInstance = mcData(this.bot.version);
           console.log(
             '✅ Minecraft data loaded for version:',
             this.bot.version
@@ -735,11 +738,13 @@ export class NavigationBridge extends EventEmitter {
         z: number;
         range: number;
 
-        heuristic(node: any): number {
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        heuristic(_node: any): number {
           return 0;
         }
 
-        isEnd(endNode: any): boolean {
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        isEnd(_endNode: any): boolean {
           return false;
         }
 
@@ -902,8 +907,11 @@ export class NavigationBridge extends EventEmitter {
         maxZ: Math.max(start.z + 50, target.z + 50),
       },
       // Mock samples to let the D* façade build something plausible
-      isWalkable: (pos: WorldPosition) => pos.y > 50 && pos.y < 200,
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      isWalkable: (_pos: WorldPosition) => true,
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       getBlockType: (_pos: WorldPosition) => 'stone',
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       isHazardous: (_pos: WorldPosition) => false,
     };
     try {
@@ -990,7 +998,10 @@ enum TerrainType {
   DESERT = 'desert',
   WATER = 'water',
   MIXED = 'mixed',
-  UNKNOWN = 'unknown'
+  MOUNTAINS = 'mountains',
+  NETHER = 'nether',
+  END = 'end',
+  UNKNOWN = 'unknown',
 }
 
 /**
@@ -1003,8 +1014,11 @@ class TerrainAnalyzer {
   /**
    * Analyze terrain around a position
    */
-  async analyzeTerrain(position: Vec3, radius: number = 16): Promise<TerrainType> {
-    const cacheKey = `${position.x},${position.y},${position.z}`;
+  async analyzeTerrain(
+    _position: Vec3,
+    _radius: number = 16
+  ): Promise<TerrainType> {
+    const cacheKey = `${_position.x},${_position.y},${_position.z}`;
 
     // Check cache first (5 second TTL)
     const cached = this.analysisCache.get(cacheKey);
@@ -1012,7 +1026,7 @@ class TerrainAnalyzer {
       return cached;
     }
 
-    const terrainType = await this.performTerrainAnalysis(position, radius);
+    const terrainType = await this.performTerrainAnalysis(_position, _radius);
     this.analysisCache.set(cacheKey, terrainType);
     this.lastAnalysis = Date.now();
 
@@ -1022,7 +1036,11 @@ class TerrainAnalyzer {
   /**
    * Perform actual terrain analysis using bot's view
    */
-  private async performTerrainAnalysis(position: Vec3, radius: number): Promise<TerrainType> {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  private async performTerrainAnalysis(
+    _position: Vec3,
+    _radius: number
+  ): Promise<TerrainType> {
     // This would use bot's raycasting and block inspection
     // For now, return UNKNOWN to be enhanced later
     return TerrainType.UNKNOWN;
@@ -1096,7 +1114,15 @@ interface TerrainCharacteristics {
   obstacleDensity: 'low' | 'medium' | 'high';
   hazardLevel: 'low' | 'medium' | 'high';
   dynamicEnvironment: boolean;
-  preferredMovement: 'fast' | 'careful' | 'safe' | 'cautious' | 'balanced' | 'adaptive';
+  preferredMovement:
+    | 'aggressive'
+    | 'fast'
+    | 'moderate'
+    | 'careful'
+    | 'safe'
+    | 'cautious'
+    | 'balanced'
+    | 'adaptive';
 }
 
 /**
@@ -1111,9 +1137,10 @@ class DynamicReconfigurator {
     config: NavigationConfig;
   }> = [];
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   constructor(
-    private terrainAnalyzer: TerrainAnalyzer,
-    private navigationSystem: MockNavigationSystem
+    private _terrainAnalyzer: TerrainAnalyzer,
+    private _navigationSystem: MockNavigationSystem
   ) {
     // Set up periodic terrain checking during navigation
     setInterval(() => this.checkTerrainChanges(), 2000); // Check every 2 seconds
@@ -1162,13 +1189,13 @@ class DynamicReconfigurator {
       [TerrainType.HILLS]: {
         ...baseConfig,
         dstarLite: {
-          ...baseConfig.dstarLite!,
+          ...(baseConfig.dstarLite ?? {}),
           searchRadius: 250,
           replanThreshold: 2,
           heuristicWeight: 1.2,
         },
         costCalculation: {
-          ...baseConfig.costCalculation!,
+          ...(baseConfig.costCalculation ?? {}),
           verticalMultiplier: 1.2,
           jumpCost: 1.8,
         },
@@ -1176,20 +1203,20 @@ class DynamicReconfigurator {
       [TerrainType.CAVES]: {
         ...baseConfig,
         dstarLite: {
-          ...baseConfig.dstarLite!,
+          ...(baseConfig.dstarLite ?? {}),
           searchRadius: 150,
           replanThreshold: 1,
           maxComputationTime: 15,
           heuristicWeight: 0.9,
         },
         costCalculation: {
-          ...baseConfig.costCalculation!,
+          ...(baseConfig.costCalculation ?? {}),
           verticalMultiplier: 1.5,
           jumpCost: 2.5,
           swimCost: 10.0,
         },
         hazardCosts: {
-          ...baseConfig.hazardCosts!,
+          ...(baseConfig.hazardCosts ?? {}),
           lavaProximity: 5000,
           darknessPenalty: 100,
           voidFall: 20000,
@@ -1198,18 +1225,18 @@ class DynamicReconfigurator {
       [TerrainType.FOREST]: {
         ...baseConfig,
         dstarLite: {
-          ...baseConfig.dstarLite!,
+          ...(baseConfig.dstarLite ?? {}),
           searchRadius: 180,
           replanThreshold: 4,
           maxComputationTime: 30,
         },
         costCalculation: {
-          ...baseConfig.costCalculation!,
+          ...(baseConfig.costCalculation ?? {}),
           verticalMultiplier: 1.4,
           jumpCost: 2.2,
         },
         hazardCosts: {
-          ...baseConfig.hazardCosts!,
+          ...(baseConfig.hazardCosts ?? {}),
           mobProximity: 300,
           poisonPenalty: 150,
         },
@@ -1217,20 +1244,20 @@ class DynamicReconfigurator {
       [TerrainType.DESERT]: {
         ...baseConfig,
         dstarLite: {
-          ...baseConfig.dstarLite!,
+          ...(baseConfig.dstarLite ?? {}),
           searchRadius: 300,
           replanThreshold: 5,
           maxComputationTime: 35,
           heuristicWeight: 1.3,
         },
         costCalculation: {
-          ...baseConfig.costCalculation!,
+          ...(baseConfig.costCalculation ?? {}),
           verticalMultiplier: 1.6,
           jumpCost: 1.5,
           swimCost: 15.0,
         },
         hazardCosts: {
-          ...baseConfig.hazardCosts!,
+          ...(baseConfig.hazardCosts ?? {}),
           cactusPenalty: 200,
           firePenalty: 1200,
         },
@@ -1238,20 +1265,20 @@ class DynamicReconfigurator {
       [TerrainType.WATER]: {
         ...baseConfig,
         dstarLite: {
-          ...baseConfig.dstarLite!,
+          ...(baseConfig.dstarLite ?? {}),
           searchRadius: 120,
           replanThreshold: 2,
           maxComputationTime: 20,
           heuristicWeight: 0.8,
         },
         costCalculation: {
-          ...baseConfig.costCalculation!,
+          ...(baseConfig.costCalculation ?? {}),
           verticalMultiplier: 2.0,
           jumpCost: 3.0,
           swimCost: 2.0,
         },
         hazardCosts: {
-          ...baseConfig.hazardCosts!,
+          ...(baseConfig.hazardCosts ?? {}),
           mobProximity: 500,
           waterPenalty: 0,
         },
@@ -1259,20 +1286,20 @@ class DynamicReconfigurator {
       [TerrainType.MIXED]: {
         ...baseConfig,
         dstarLite: {
-          ...baseConfig.dstarLite!,
+          ...(baseConfig.dstarLite ?? {}),
           searchRadius: 220,
           replanThreshold: 3,
           maxComputationTime: 28,
           heuristicWeight: 1.1,
         },
         costCalculation: {
-          ...baseConfig.costCalculation!,
+          ...(baseConfig.costCalculation ?? {}),
           verticalMultiplier: 1.4,
           jumpCost: 2.0,
           swimCost: 6.0,
         },
         hazardCosts: {
-          ...baseConfig.hazardCosts!,
+          ...(baseConfig.hazardCosts ?? {}),
           lavaProximity: 3000,
           mobProximity: 250,
           darknessPenalty: 40,

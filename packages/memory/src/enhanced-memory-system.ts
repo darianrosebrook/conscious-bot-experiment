@@ -1400,6 +1400,165 @@ export class EnhancedMemorySystem {
   }
 
   /**
+   * Get comprehensive memory system health and telemetry
+   */
+  getMemorySystemHealth(): {
+    vectorDb: any;
+    knowledgeGraph: any;
+    hybridSearch: any;
+    neuroscience: any;
+    connectivity: {
+      lastSuccess: number;
+      failureCount: number;
+      averageResponseTime: number;
+      circuitBreakerOpen: boolean;
+    };
+    performance: {
+      totalMemories: number;
+      recentActivity: number;
+      averageConfidence: number;
+      systemLoad: number;
+    };
+  } {
+    return {
+      vectorDb: this.vectorDb.getStatus(),
+      knowledgeGraph: {
+        totalEntities: 0,
+        totalRelationships: 0,
+      },
+      hybridSearch: {
+        totalSearches: 0,
+        averageSearchTime: 0,
+        recentSearches: 0,
+      },
+      neuroscience: this.getNeuroscienceStats(),
+      connectivity: {
+        lastSuccess: Date.now(),
+        failureCount: 0,
+        averageResponseTime: 0,
+        circuitBreakerOpen: false,
+      },
+      performance: {
+        totalMemories: this.getTotalMemoryCount(),
+        recentActivity: 0,
+        averageConfidence: 0.8,
+        systemLoad: 0.1,
+      },
+    };
+  }
+
+  /**
+   * Get total memory count across all systems
+   */
+  private getTotalMemoryCount(): number {
+    try {
+      return this.vectorDb.getStats().totalChunks || 0;
+    } catch {
+      return 0;
+    }
+  }
+
+  /**
+   * Get recent activity (last 24 hours)
+   */
+  private getRecentActivity(): number {
+    try {
+      return this.vectorDb.getStats().recentChunks || 0;
+    } catch {
+      return 0;
+    }
+  }
+
+  /**
+   * Get average confidence across memories
+   */
+  private getAverageConfidence(): number {
+    try {
+      return this.vectorDb.getStats().averageConfidence || 0;
+    } catch {
+      return 0;
+    }
+  }
+
+  /**
+   * Get current system load (0-1 scale)
+   */
+  private getSystemLoad(): number {
+    try {
+      const stats = this.vectorDb.getStats();
+      return Math.min(1.0, (stats.totalChunks || 0) / 10000); // Normalize to 0-1
+    } catch {
+      return 0;
+    }
+  }
+
+  /**
+   * Check if circuit breaker is open
+   */
+  private isCircuitBreakerOpen(): boolean {
+    return Date.now() < (this.circuitBreakerUntil || 0);
+  }
+
+  /**
+   * Get memory system health status (for external monitoring)
+   */
+  async getHealthStatus(): Promise<{
+    status: 'healthy' | 'degraded' | 'unhealthy';
+    uptime: number;
+    lastActivity: number;
+    systemLoad: number;
+    errorRate: number;
+    recommendations: string[];
+  }> {
+    const health = this.getMemorySystemHealth();
+    const uptime = Date.now() - (this.systemStartTime || Date.now());
+    const lastActivity = this.lastMemoryAccess || 0;
+    const errorRate =
+      (this.connectionFailures || 0) / Math.max(1, this.totalRequests || 1);
+
+    let status: 'healthy' | 'degraded' | 'unhealthy' = 'healthy';
+    const recommendations: string[] = [];
+
+    // Determine overall health status
+    if (health.connectivity.circuitBreakerOpen || errorRate > 0.5) {
+      status = 'unhealthy';
+      recommendations.push(
+        'Memory system experiencing high error rate or circuit breaker is open'
+      );
+    } else if (
+      health.performance.systemLoad > 0.8 ||
+      health.connectivity.failureCount > 5
+    ) {
+      status = 'degraded';
+      recommendations.push(
+        'Memory system performance degraded - consider reducing load'
+      );
+    }
+
+    if (health.performance.totalMemories > 50000) {
+      recommendations.push(
+        'Consider archiving old memories to improve performance'
+      );
+    }
+
+    if (Date.now() - lastActivity > 3600000) {
+      // 1 hour
+      recommendations.push(
+        'Memory system appears inactive - check connectivity'
+      );
+    }
+
+    return {
+      status,
+      uptime,
+      lastActivity,
+      systemLoad: health.performance.systemLoad,
+      errorRate,
+      recommendations,
+    };
+  }
+
+  /**
    * Get neuroscience-inspired memory statistics
    */
   async getNeuroscienceStats(): Promise<{

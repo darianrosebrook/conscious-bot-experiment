@@ -71,6 +71,10 @@ export class EnhancedReactiveExecutor {
   // PBI Integration
   private pbiEnforcer: ReturnType<typeof createPBIEnforcer>;
 
+  // Memory Integration
+  private memoryEndpoint?: string;
+  private memoryClient?: any;
+
   constructor() {
     this.goapPlanner = new EnhancedGOAPPlanner();
     this.planRepair = new EnhancedPlanRepair();
@@ -81,9 +85,57 @@ export class EnhancedReactiveExecutor {
     this.pbiEnforcer = createPBIEnforcer();
     this.realTimeAdapter = new DefaultRealTimeAdapter(this.pbiEnforcer);
 
+    // Initialize memory integration
+    this.initializeMemoryIntegration();
+
     // Bootstrap essential capabilities for fresh start
     // Note: This is fire-and-forget since constructor can't be async
     void this.bootstrapPBICapabilities();
+  }
+
+  /**
+   * Initialize memory integration
+   */
+  private initializeMemoryIntegration(): void {
+    this.memoryEndpoint =
+      process.env.MEMORY_ENDPOINT || 'http://localhost:3001';
+
+    if (this.memoryEndpoint) {
+      this.memoryClient = {
+        getMemoryEnhancedContext: async (context: any) => {
+          try {
+            const response = await fetch(
+              `${this.memoryEndpoint}/memory-enhanced-context`,
+              {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(context),
+                signal: AbortSignal.timeout(3000),
+              }
+            );
+
+            if (!response.ok) {
+              return {
+                memories: [],
+                insights: ['Memory system unavailable'],
+                recommendations: ['Consider using fallback planning'],
+                confidence: 0.0,
+              };
+            }
+
+            return await response.json();
+          } catch (error) {
+            console.error('Memory client error:', error);
+            return {
+              memories: [],
+              insights: ['Memory system error occurred'],
+              recommendations: ['Consider using fallback planning'],
+              confidence: 0.0,
+            };
+          }
+        },
+      };
+    }
   }
 
   /**
@@ -148,6 +200,197 @@ export class EnhancedReactiveExecutor {
   }
 
   /**
+   * Get memory-enhanced context for plan execution
+   */
+  private async getMemoryEnhancedExecutionContext(
+    plan: Plan,
+    worldState: WorldState,
+    goapPlan: GOAPPlan
+  ): Promise<{
+    memories: any[];
+    insights: string[];
+    recommendations: string[];
+    confidence: number;
+    planMemory?: any;
+  }> {
+    // Default fallback
+    const defaultContext = {
+      memories: [],
+      insights: ['Memory system not available for plan enhancement'],
+      recommendations: [
+        'Consider enabling memory integration for better planning',
+      ],
+      confidence: 0.0,
+    };
+
+    if (!this.memoryClient) {
+      return defaultContext;
+    }
+
+    try {
+      // Extract context from plan and world state
+      const context = {
+        query: `Planning execution for: ${plan.goal.description}`,
+        taskType: plan.goal.type,
+        entities: this.extractEntitiesFromPlan(plan),
+        location: worldState.currentLocation,
+        recentEvents: this.getRecentExecutionHistory(3),
+        maxMemories: 5,
+      };
+
+      const memoryContext =
+        await this.memoryClient.getMemoryEnhancedContext(context);
+
+      // Add plan-specific memory analysis
+      const planMemory = {
+        planType: plan.goal.type,
+        planComplexity: plan.steps.length,
+        estimatedDuration: this.estimatePlanDuration(plan),
+        successProbability: this.calculatePlanSuccessProbability(
+          plan,
+          memoryContext
+        ),
+        memoryEnhancedRecommendations: memoryContext.recommendations,
+      };
+
+      return {
+        ...memoryContext,
+        planMemory,
+      };
+    } catch (error) {
+      console.error('Failed to get memory-enhanced execution context:', error);
+      return defaultContext;
+    }
+  }
+
+  /**
+   * Extract entities from a plan for memory context
+   */
+  private extractEntitiesFromPlan(plan: Plan): string[] {
+    const entities: string[] = [];
+
+    // Extract from goal
+    const goalContent = plan.goal.description.toLowerCase();
+    const goalEntities = this.extractMinecraftEntities(goalContent);
+    entities.push(...goalEntities);
+
+    // Extract from plan steps
+    for (const step of plan.steps) {
+      const stepContent = step.description.toLowerCase();
+      const stepEntities = this.extractMinecraftEntities(stepContent);
+      entities.push(...stepEntities);
+    }
+
+    return [...new Set(entities)]; // Remove duplicates
+  }
+
+  /**
+   * Extract Minecraft entities from text
+   */
+  private extractMinecraftEntities(text: string): string[] {
+    const entities: string[] = [];
+    const minecraftItems = [
+      'diamond',
+      'iron',
+      'gold',
+      'wood',
+      'stone',
+      'dirt',
+      'water',
+      'lava',
+      'tree',
+      'cave',
+      'mountain',
+      'river',
+      'ocean',
+      'forest',
+      'desert',
+      'zombie',
+      'skeleton',
+      'creeper',
+      'spider',
+      'wolf',
+      'cow',
+      'pig',
+      'sheep',
+      'pickaxe',
+      'sword',
+      'axe',
+      'shovel',
+      'hoe',
+      'crafting_table',
+      'furnace',
+      'chest',
+      'door',
+      'window',
+      'bed',
+      'torch',
+      'coal',
+      'redstone',
+      'lapis',
+    ];
+
+    for (const entity of minecraftItems) {
+      if (text.includes(entity)) {
+        entities.push(entity);
+      }
+    }
+
+    return entities;
+  }
+
+  /**
+   * Get recent execution history
+   */
+  private getRecentExecutionHistory(limit: number): any[] {
+    return this.executionHistory.slice(-limit).map((result) => ({
+      success: result.success,
+      duration: result.duration,
+      actionsCompleted: result.actionsCompleted,
+      error: result.error,
+      timestamp: Date.now() - result.duration, // Approximate timestamp
+    }));
+  }
+
+  /**
+   * Estimate plan duration based on steps and complexity
+   */
+  private estimatePlanDuration(plan: Plan): number {
+    // Simple estimation: 30 seconds per step + 10 seconds overhead
+    return plan.steps.length * 30 + 10;
+  }
+
+  /**
+   * Calculate plan success probability based on memory context
+   */
+  private calculatePlanSuccessProbability(
+    plan: Plan,
+    memoryContext: any
+  ): number {
+    let probability = 0.5; // Base 50% probability
+
+    // Boost probability if memory suggests success
+    if (memoryContext.confidence > 0.7) {
+      probability += 0.2;
+    }
+
+    // Adjust based on plan complexity
+    const complexityPenalty = Math.min(0.3, plan.steps.length * 0.05);
+    probability -= complexityPenalty;
+
+    // Adjust based on historical success rate
+    const recentHistory = this.getRecentExecutionHistory(5);
+    const successfulExecutions = recentHistory.filter((h) => h.success).length;
+    const successRate =
+      recentHistory.length > 0
+        ? successfulExecutions / recentHistory.length
+        : 0.5;
+    probability = probability * 0.7 + successRate * 0.3; // Weighted average
+
+    return Math.max(0.1, Math.min(0.95, probability)); // Clamp between 10% and 95%
+  }
+
+  /**
    * Execute a plan reactively with real-time adaptation
    */
   async execute(
@@ -161,8 +404,16 @@ export class EnhancedReactiveExecutor {
       // Convert Plan to GOAPPlan
       const goapPlan = this.convertPlanToGOAP(plan);
 
-      // Build execution context
+      // Get memory-enhanced context for better decision making
+      const memoryContext = await this.getMemoryEnhancedExecutionContext(
+        plan,
+        worldState,
+        goapPlan
+      );
+
+      // Build execution context with memory enhancement
       const context = this.contextBuilder.buildContext(worldState, goapPlan);
+      context.memoryContext = memoryContext;
 
       // Check for safety reflexes first
       const safetyReflex = this.goapPlanner.checkSafetyReflexes(

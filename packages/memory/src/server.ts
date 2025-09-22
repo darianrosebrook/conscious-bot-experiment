@@ -241,6 +241,95 @@ app.get('/telemetry', (req, res) => {
   }
 });
 
+// Memory-enhanced context endpoint for planning integration
+app.post('/memory-enhanced-context', async (req, res) => {
+  try {
+    const context = req.body;
+
+    // Initialize enhanced memory system if needed
+    if (!enhancedMemorySystem) {
+      enhancedMemorySystem = createEnhancedMemorySystem(DEFAULT_MEMORY_CONFIG);
+    }
+
+    // Get memory-enhanced context
+    const memoryContext =
+      await enhancedMemorySystem.getMemoryEnhancedContext(context);
+
+    res.json(memoryContext);
+  } catch (error) {
+    console.error('Failed to get memory-enhanced context:', error);
+    res.status(500).json({
+      memories: [],
+      insights: ['Memory system error occurred'],
+      recommendations: ['Consider using fallback planning'],
+      confidence: 0.0,
+    });
+  }
+});
+
+// Search endpoint for hybrid memory retrieval
+app.post('/search', async (req, res) => {
+  try {
+    const searchQuery = req.body;
+
+    // Initialize enhanced memory system if needed
+    if (!enhancedMemorySystem) {
+      enhancedMemorySystem = createEnhancedMemorySystem(DEFAULT_MEMORY_CONFIG);
+    }
+
+    // Perform hybrid search
+    const searchResults = await enhancedMemorySystem.searchMemories({
+      query: searchQuery.query || 'Search query',
+      limit: searchQuery.limit || 10,
+      types: searchQuery.types,
+      entities: searchQuery.entities,
+      maxAge: searchQuery.maxAge,
+    });
+
+    res.json({
+      results: searchResults.results,
+      confidence: searchResults.confidence,
+    });
+  } catch (error) {
+    console.error('Failed to perform memory search:', error);
+    res.status(500).json({
+      results: [],
+      confidence: 0.0,
+      error: 'Search service unavailable',
+    });
+  }
+});
+
+// Thought storage endpoint
+app.post('/thought', async (req, res) => {
+  try {
+    const thought = req.body;
+
+    // Initialize enhanced memory system if needed
+    if (!enhancedMemorySystem) {
+      enhancedMemorySystem = createEnhancedMemorySystem(DEFAULT_MEMORY_CONFIG);
+    }
+
+    // Store thought as memory
+    const result = await enhancedMemorySystem.ingestMemory({
+      content: thought.content,
+      type: 'cognitive_thought',
+      metadata: {
+        thoughtType: thought.type,
+        category: thought.category,
+        priority: thought.priority,
+        attribution: thought.attribution,
+        timestamp: thought.timestamp,
+      },
+    });
+
+    res.json({ success: true, id: result.id });
+  } catch (error) {
+    console.error('Failed to store thought:', error);
+    res.status(500).json({ success: false, error: 'Failed to store thought' });
+  }
+});
+
 // Execute memory action
 app.post('/action', (req, res) => {
   try {

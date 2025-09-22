@@ -36,20 +36,26 @@ interface MemoryIntegrationConfig {
   enableRealTimeUpdates: boolean;
   enableReflectiveNotes: boolean;
   enableEventLogging: boolean;
+  enableMemoryDiscovery: boolean;
   dashboardEndpoint: string;
   memorySystemEndpoint: string;
   maxEvents: number;
   maxNotes: number;
+  memorySystemTimeout: number;
+  retryAttempts: number;
 }
 
 const DEFAULT_CONFIG: MemoryIntegrationConfig = {
   enableRealTimeUpdates: true,
   enableReflectiveNotes: true,
   enableEventLogging: true,
+  enableMemoryDiscovery: true,
   dashboardEndpoint: 'http://localhost:3000',
   memorySystemEndpoint: 'http://localhost:3001',
   maxEvents: 100,
   maxNotes: 50,
+  memorySystemTimeout: 5000,
+  retryAttempts: 3,
 };
 
 export class EnhancedMemoryIntegration extends EventEmitter {
@@ -61,14 +67,81 @@ export class EnhancedMemoryIntegration extends EventEmitter {
   // Simple per-instance circuit breaker for memory system
   private memFailureCount = 0;
   private memCircuitOpenUntil = 0; // epoch ms until which circuit is open
+  private discoveredEndpoints: string[] = [];
+  private lastDiscovery: number = 0;
+  private readonly DISCOVERY_INTERVAL = 30000; // 30 seconds
 
   constructor(config: Partial<MemoryIntegrationConfig> = {}) {
     super();
     this.config = { ...DEFAULT_CONFIG, ...config };
+
+    // Start memory system discovery if enabled
+    if (this.config.enableMemoryDiscovery) {
+      this.discoverMemorySystemEndpoints();
+      // Set up periodic discovery
+      setInterval(() => {
+        this.discoverMemorySystemEndpoints();
+      }, this.DISCOVERY_INTERVAL);
+    }
   }
 
   private isMemCircuitOpen(): boolean {
     return Date.now() < this.memCircuitOpenUntil;
+  }
+
+  /**
+   * Discover available memory system endpoints
+   */
+  private async discoverMemorySystemEndpoints(): Promise<void> {
+    if (Date.now() - this.lastDiscovery < this.DISCOVERY_INTERVAL) {
+      return; // Don't discover too frequently
+    }
+
+    console.log('🔍 Discovering memory system endpoints...');
+
+    // Try multiple endpoints in order of preference
+    const potentialEndpoints = [
+      process.env.MEMORY_ENDPOINT,
+      'http://localhost:3001',
+      'http://memory:3001',
+      'http://127.0.0.1:3001',
+      'http://conscious-bot-memory:3001',
+    ].filter(Boolean);
+
+    const discovered: string[] = [];
+
+    for (const endpoint of potentialEndpoints) {
+      try {
+        const response = await fetch(`${endpoint.replace(/\/$/, '')}/health`, {
+          method: 'GET',
+          signal: AbortSignal.timeout(2000),
+        });
+
+        if (response.ok) {
+          discovered.push(endpoint);
+          console.log(`✅ Memory system found at: ${endpoint}`);
+        }
+      } catch (error) {
+        console.log(`❌ Memory system not available at: ${endpoint}`);
+      }
+    }
+
+    if (discovered.length > 0) {
+      this.discoveredEndpoints = discovered;
+      // Update config with best available endpoint
+      if (
+        !this.config.memorySystemEndpoint ||
+        !discovered.includes(this.config.memorySystemEndpoint)
+      ) {
+        this.config.memorySystemEndpoint = discovered[0];
+        console.log(
+          `🔄 Updated memory system endpoint to: ${this.config.memorySystemEndpoint}`
+        );
+        this.emit('memorySystemDiscovered', this.config.memorySystemEndpoint);
+      }
+    }
+
+    this.lastDiscovery = Date.now();
   }
 
   private recordMemFailure(): void {
@@ -90,44 +163,67 @@ export class EnhancedMemoryIntegration extends EventEmitter {
     if (this.isMemCircuitOpen()) {
       throw new Error('Memory endpoint circuit open');
     }
-    const base = this.config.memorySystemEndpoint.replace(/\/$/, '');
-    const url = `${base}${path.startsWith('/') ? '' : '/'}${path}`;
-    const retries = 2;
+
+    // Get all available endpoints (discovered + configured)
+    const endpoints = [
+      ...this.discoveredEndpoints,
+      this.config.memorySystemEndpoint,
+    ];
+    const uniqueEndpoints = [...new Set(endpoints)].filter(Boolean);
+
+    if (uniqueEndpoints.length === 0) {
+      throw new Error('No memory system endpoints available');
+    }
+
+    const retries = this.config.retryAttempts;
     const baseDelay = 300;
     let lastErr: any;
-    for (let attempt = 0; attempt <= retries; attempt++) {
-      try {
-        const controller = new AbortController();
-        const timeout = setTimeout(
-          () => controller.abort(),
-          init.timeoutMs ?? 7_000
-        );
-        const res = await fetch(url, { ...init, signal: controller.signal });
-        clearTimeout(timeout);
-        if (res.ok) {
-          this.recordMemSuccess();
-          return res;
+
+    // Try each endpoint in order
+    for (const base of uniqueEndpoints) {
+      const url = `${base.replace(/\/$/, '')}${path.startsWith('/') ? '' : '/'}${path}`;
+
+      for (let attempt = 0; attempt <= retries; attempt++) {
+        try {
+          const controller = new AbortController();
+          const timeout = setTimeout(
+            () => controller.abort(),
+            init.timeoutMs ?? this.config.memorySystemTimeout
+          );
+          const res = await fetch(url, { ...init, signal: controller.signal });
+          clearTimeout(timeout);
+
+          if (res.ok) {
+            this.recordMemSuccess();
+            return res;
+          }
+
+          // If server error and we have retries, try again
+          if (res.status >= 500 && res.status < 600 && attempt < retries) {
+            const delay =
+              baseDelay * Math.pow(2, attempt) + Math.random() * 100;
+            await new Promise((r) => setTimeout(r, delay));
+            continue;
+          }
+
+          // If client error or no more retries, try next endpoint
+          break;
+        } catch (err) {
+          lastErr = err;
+          if (attempt < retries) {
+            const delay =
+              baseDelay * Math.pow(2, attempt) + Math.random() * 100;
+            await new Promise((r) => setTimeout(r, delay));
+            continue;
+          }
+          // Try next endpoint
+          break;
         }
-        if (res.status >= 500 && res.status < 600 && attempt < retries) {
-          const delay = baseDelay * Math.pow(2, attempt) + Math.random() * 100;
-          await new Promise((r) => setTimeout(r, delay));
-          continue;
-        }
-        this.recordMemFailure();
-        return res;
-      } catch (err) {
-        lastErr = err;
-        if (attempt < retries) {
-          const delay = baseDelay * Math.pow(2, attempt) + Math.random() * 100;
-          await new Promise((r) => setTimeout(r, delay));
-          continue;
-        }
-        this.recordMemFailure();
-        throw err;
       }
     }
+
     this.recordMemFailure();
-    throw lastErr || new Error('Unknown memFetch error');
+    throw lastErr || new Error('All memory system endpoints failed');
   }
 
   /**
@@ -282,14 +378,24 @@ export class EnhancedMemoryIntegration extends EventEmitter {
     const list = this.getTaskLogByDay(daysBack);
     const completed = list.filter((e) => e.type === 'task_completed');
     const failed = list.filter((e) => e.type === 'task_failed');
-    const title = daysBack === 0 ? 'Today\'s Action Summary' : 'Yesterday\'s Action Summary';
+    const title =
+      daysBack === 0 ? "Today's Action Summary" : "Yesterday's Action Summary";
     const lines = [
       `Completed: ${completed.length}`,
       `Failed: ${failed.length}`,
       '',
-      ...completed.slice(0, 20).map((e) => `✔ ${e.data?.taskType || 'task'}: ${e.data?.taskId}`),
+      ...completed
+        .slice(0, 20)
+        .map((e) => `✔ ${e.data?.taskType || 'task'}: ${e.data?.taskId}`),
     ];
-    return this.addReflectiveNote('reflection', title, lines.join('\n'), [], 'planning-system', 0.7);
+    return this.addReflectiveNote(
+      'reflection',
+      title,
+      lines.join('\n'),
+      [],
+      'planning-system',
+      0.7
+    );
   }
 
   /**
@@ -428,7 +534,10 @@ export class EnhancedMemoryIntegration extends EventEmitter {
   async getMemorySystemEvents(): Promise<MemoryEvent[]> {
     try {
       if (this.isMemCircuitOpen()) return [];
-      const response = await this.memFetch('/telemetry', { method: 'GET', timeoutMs: 5_000 });
+      const response = await this.memFetch('/telemetry', {
+        method: 'GET',
+        timeoutMs: 5_000,
+      });
       if (!response.ok) {
         return [];
       }
@@ -466,7 +575,10 @@ export class EnhancedMemoryIntegration extends EventEmitter {
   async getMemorySystemMemories(): Promise<ReflectiveNote[]> {
     try {
       if (this.isMemCircuitOpen()) return [];
-      const response = await this.memFetch('/state', { method: 'GET', timeoutMs: 5_000 });
+      const response = await this.memFetch('/state', {
+        method: 'GET',
+        timeoutMs: 5_000,
+      });
       if (!response.ok) {
         return [];
       }
@@ -511,6 +623,159 @@ export class EnhancedMemoryIntegration extends EventEmitter {
       console.error('Failed to fetch memory system memories:', error);
       return [];
     }
+  }
+
+  /**
+   * Get memory-enhanced context for planning decisions
+   */
+  async getMemoryEnhancedContext(
+    context: {
+      query?: string;
+      taskType?: string;
+      entities?: string[];
+      location?: any;
+      recentEvents?: any[];
+      maxMemories?: number;
+    } = {}
+  ): Promise<{
+    memories: ReflectiveNote[];
+    insights: string[];
+    recommendations: string[];
+    confidence: number;
+  }> {
+    try {
+      if (this.isMemCircuitOpen()) {
+        return {
+          memories: [],
+          insights: [],
+          recommendations: [],
+          confidence: 0.0,
+        };
+      }
+
+      // Build search query from context
+      const searchQuery =
+        context.query ||
+        (context.entities && context.entities.length > 0
+          ? `Context about ${context.entities.join(', ')}`
+          : 'Relevant memories for current context');
+
+      // Try to use hybrid search if available
+      const searchResponse = await this.memFetch('/search', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          query: searchQuery,
+          limit: context.maxMemories || 10,
+          types: context.taskType ? [context.taskType] : undefined,
+          entities: context.entities,
+          maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+        }),
+        timeoutMs: 3000,
+      });
+
+      if (!searchResponse.ok) {
+        // Fallback to basic memory retrieval
+        const memories = await this.getMemorySystemMemories();
+        return {
+          memories: memories.slice(0, context.maxMemories || 5),
+          insights: [
+            'Basic memory retrieval used due to search service unavailability',
+          ],
+          recommendations: ['Consider enabling hybrid search service'],
+          confidence: 0.5,
+        };
+      }
+
+      const searchData = await searchResponse.json();
+      const memories: ReflectiveNote[] = [];
+
+      // Convert search results to reflective notes
+      if (searchData.results && Array.isArray(searchData.results)) {
+        for (const result of searchData.results) {
+          memories.push({
+            id: result.id || `search-${Date.now()}`,
+            timestamp: result.metadata?.timestamp || Date.now(),
+            type: 'reflection',
+            title: result.content?.substring(0, 50) + '...' || 'Memory',
+            content: result.content || 'No content available',
+            insights: [result.content || 'Memory retrieved'],
+            priority: result.score || 0.5,
+            source: 'memory-search',
+            confidence: result.score || 0.5,
+          });
+        }
+      }
+
+      // Extract insights from search results
+      const insights = memories.map((m) => m.content).slice(0, 3);
+
+      // Generate recommendations based on memory patterns
+      const recommendations = this.generateMemoryBasedRecommendations(
+        memories,
+        context
+      );
+
+      return {
+        memories,
+        insights,
+        recommendations,
+        confidence: searchData.confidence || 0.8,
+      };
+    } catch (error) {
+      console.error('Failed to get memory-enhanced context:', error);
+      return {
+        memories: [],
+        insights: ['Memory system unavailable for context enhancement'],
+        recommendations: ['Consider retrying with memory system available'],
+        confidence: 0.0,
+      };
+    }
+  }
+
+  /**
+   * Generate recommendations based on memory patterns
+   */
+  private generateMemoryBasedRecommendations(
+    memories: ReflectiveNote[],
+    context: any
+  ): string[] {
+    const recommendations: string[] = [];
+
+    // Analyze memory patterns for recommendations
+    if (memories.length === 0) {
+      recommendations.push(
+        'No relevant memories found - consider exploring new approaches'
+      );
+      return recommendations;
+    }
+
+    const successfulMemories = memories.filter((m) => m.priority > 0.7);
+    const failedMemories = memories.filter((m) => m.priority < 0.3);
+
+    if (successfulMemories.length > failedMemories.length) {
+      recommendations.push(
+        'Historical data suggests high success rate for similar tasks'
+      );
+    } else if (failedMemories.length > 0) {
+      recommendations.push(
+        'Previous attempts at similar tasks have had mixed results - consider alternative approaches'
+      );
+    }
+
+    if (context.taskType === 'crafting') {
+      recommendations.push(
+        'Consider checking available resources before starting crafting tasks'
+      );
+    }
+
+    if (context.location?.biome === 'cave') {
+      recommendations.push(
+        'Cave environments may require additional lighting and safety precautions'
+      );
+    }
+
+    return recommendations;
   }
 
   /**
