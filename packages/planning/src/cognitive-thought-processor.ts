@@ -9,20 +9,7 @@
  */
 
 import { EventEmitter } from 'events';
-import {
-  MCPIntegration,
-  ToolDiscoveryResult,
-  GoalToolMatch,
-  ToolExecutionResult,
-} from './modules/mcp-integration';
-import {
-  SignalExtractionPipeline,
-  MemoryBackedExtractor,
-  LLMExtractor,
-  HeuristicExtractor,
-  type Signal,
-  type SignalType,
-} from './signal-extraction-pipeline';
+import { SignalExtractionPipeline } from './signal-extraction-pipeline';
 
 export interface CognitiveThought {
   type:
@@ -42,25 +29,6 @@ export interface CognitiveThought {
   timestamp: number;
 }
 
-/**
- * Intent represents a planner-ready goal with preconditions and uncertainties
- */
-export interface Intent {
-  id: string;
-  goal: string; // e.g., 'AcquireResource', 'ImproveSafety', 'ScoutArea', 'CraftTool'
-  params: Record<string, any>;
-  priority: number; // 0-1
-  urgency: number; // 0-1
-  confidence: number; // 0-1
-  preconditions?: string[]; // e.g., ['has:stone_pickaxe']
-  uncertainties?: string[]; // drives probe tasks
-  provenance: {
-    thoughtId: string;
-    memoryRefs?: string[];
-    signalSources?: string[];
-  };
-}
-
 export interface CognitiveThoughtProcessorConfig {
   enableThoughtToTaskTranslation: boolean;
   thoughtProcessingInterval: number;
@@ -69,15 +37,14 @@ export interface CognitiveThoughtProcessorConfig {
   cognitiveEndpoint: string;
   memoryEndpoint?: string;
   enableMemoryIntegration?: boolean;
+  // NEW: Signal Extraction Pipeline configuration
+  enableSignalPipeline?: boolean; // Enable new signal extraction pipeline
+  signalConfidenceThreshold?: number; // Minimum confidence for signals (default 0.3)
   // NEW: MCP Integration configuration
   enableMCPIntegration?: boolean;
   mcpEndpoint?: string;
   enableToolDiscovery?: boolean;
   maxToolsPerThought?: number;
-  toolExecutionTimeout?: number;
-  // NEW: Signal Extraction Pipeline configuration
-  enableSignalPipeline?: boolean; // Enable new signal extraction pipeline
-  signalConfidenceThreshold?: number; // Minimum confidence for signals (default 0.3)
 }
 
 const DEFAULT_CONFIG: CognitiveThoughtProcessorConfig = {
@@ -88,12 +55,10 @@ const DEFAULT_CONFIG: CognitiveThoughtProcessorConfig = {
   cognitiveEndpoint: 'http://localhost:3003',
   memoryEndpoint: process.env.MEMORY_ENDPOINT || 'http://localhost:3001',
   enableMemoryIntegration: true,
-  // NEW: MCP Integration defaults
-  enableMCPIntegration: true,
-  mcpEndpoint: process.env.MCP_ENDPOINT || 'http://localhost:3000',
-  enableToolDiscovery: true,
+  enableSignalPipeline: false,
+  signalConfidenceThreshold: 0.5,
+  enableToolDiscovery: false,
   maxToolsPerThought: 3,
-  toolExecutionTimeout: 30000,
 };
 
 // -----------------------------------------------------------------------------
@@ -179,8 +144,7 @@ class HttpMemoryClient implements MemoryClient {
         };
       }
 
-      const result = await response.json();
-      return result as {
+      return await response.json() as {
         memories: any[];
         insights: string[];
         recommendations: string[];
@@ -274,10 +238,7 @@ export class CognitiveThoughtProcessor extends EventEmitter {
   private planning: PlanningClient;
   private cognitive: CognitiveClient;
   private memory?: MemoryClient;
-  private lastActivityCheck: number = 0;
   private signalPipeline?: SignalExtractionPipeline;
-  // NEW: MCP Integration
-  private mcpIntegration?: MCPIntegration;
   // fetch cursors / dedupe
   private lastEtag?: string;
   private lastSeenTs: number = 0;
@@ -293,48 +254,6 @@ export class CognitiveThoughtProcessor extends EventEmitter {
     // Initialize memory client if enabled
     if (this.config.enableMemoryIntegration && this.config.memoryEndpoint) {
       this.memory = new HttpMemoryClient(this.config.memoryEndpoint);
-    }
-
-    // Initialize signal extraction pipeline if enabled
-    if (this.config.enableSignalPipeline) {
-      this.signalPipeline = new SignalExtractionPipeline({
-        confidenceThreshold: this.config.signalConfidenceThreshold || 0.3,
-        maxSignalsPerThought: 10,
-      });
-
-      // Register extractors in priority order
-      if (this.memory) {
-        this.signalPipeline.registerExtractor(
-          new MemoryBackedExtractor(this.memory)
-        );
-      }
-
-      if (this.config.cognitiveEndpoint) {
-        this.signalPipeline.registerExtractor(
-          new LLMExtractor(this.memory, this.config.cognitiveEndpoint)
-        );
-      }
-
-      // Always register heuristic extractor as fallback
-      this.signalPipeline.registerExtractor(new HeuristicExtractor());
-
-      console.log(
-        '🔍 [COGNITIVE THOUGHT PROCESSOR] Signal extraction pipeline initialized'
-      );
-    }
-
-    // NEW: Initialize MCP integration if enabled
-    if (this.config.enableMCPIntegration) {
-      this.mcpIntegration = new MCPIntegration({
-        enableMCP: true,
-        enableToolDiscovery: this.config.enableToolDiscovery,
-        toolDiscoveryEndpoint: this.config.mcpEndpoint,
-        maxToolsPerGoal: this.config.maxToolsPerThought,
-        toolTimeoutMs: this.config.toolExecutionTimeout,
-      });
-
-      // Initialize MCP integration (async, but fire-and-forget since constructor can't be async)
-      void this.mcpIntegration.initialize();
     }
   }
 
@@ -492,30 +411,26 @@ export class CognitiveThoughtProcessor extends EventEmitter {
    */
   private async processThoughts(): Promise<void> {
     try {
-      // Generate thoughts dynamically based on current state and memory
+      // Fetch recent thoughts using cursor/etag
       console.log(
-        '🔄 [COGNITIVE THOUGHT PROCESSOR] Generating thoughts dynamically...'
+        '🔄 [COGNITIVE THOUGHT PROCESSOR] Fetching recent thoughts...'
       );
-      const thoughts = await this.generateThoughtsFromContext();
+      const { thoughts, etag } = await this.cognitive.fetchRecentThoughts(
+        this.lastSeenTs,
+        this.lastEtag
+      );
+      if (etag) this.lastEtag = etag;
 
       console.log(
-        `🔄 [COGNITIVE THOUGHT PROCESSOR] Generated ${thoughts.length} thoughts`
+        `🔄 [COGNITIVE THOUGHT PROCESSOR] Found ${thoughts.length} thoughts`
       );
 
       if (thoughts.length === 0) {
         console.log(
-          '🔄 [COGNITIVE THOUGHT PROCESSOR] No thoughts generated, checking memory for context...'
+          '🔄 [COGNITIVE THOUGHT PROCESSOR] No thoughts found, skipping processing'
         );
-        // Generate thoughts based on memory context
-        const memoryThoughts = await this.generateThoughtsFromMemory();
-        thoughts.push(...memoryThoughts);
-        console.log(
-          `🔄 [COGNITIVE THOUGHT PROCESSOR] Generated ${memoryThoughts.length} thoughts from memory context`
-        );
+        return;
       }
-
-      // Store generated thoughts in memory for learning
-      await this.storeThoughtsInMemory(thoughts);
 
       // Only log in development mode
       if (process.env.NODE_ENV === 'development') {
@@ -543,7 +458,7 @@ export class CognitiveThoughtProcessor extends EventEmitter {
           `🔄 [COGNITIVE THOUGHT PROCESSOR] Thought type: ${thought.type}, category: ${thought.category}`
         );
 
-        const task = this.translateThoughtToTask(thought);
+        const task = await this.translateThoughtToTask(thought);
         if (task) {
           console.log(
             `✅ [COGNITIVE THOUGHT PROCESSOR] Successfully translated to task: ${task.type} - ${task.title}`
@@ -737,7 +652,12 @@ export class CognitiveThoughtProcessor extends EventEmitter {
       },
     });
 
-    return signals;
+    // DEPRECATED: This method is replaced by Signal Extraction Pipeline
+    // Return empty array to avoid conflicts with new signal system
+    console.warn(
+      '⚠️ [DEPRECATED] createBehaviorTreeSignals called - use signal pipeline instead'
+    );
+    return [];
   }
 
   /**
@@ -787,7 +707,9 @@ export class CognitiveThoughtProcessor extends EventEmitter {
   /**
    * Translate a cognitive thought to executable tasks (can return multiple tasks for compound thoughts)
    */
-  private translateThoughtToTask(thought: CognitiveThought): any | null {
+  private async translateThoughtToTask(
+    thought: CognitiveThought
+  ): Promise<any | null> {
     const content = thought.content.toLowerCase();
 
     // Skip thoughts that are just status updates or system messages
@@ -811,11 +733,36 @@ export class CognitiveThoughtProcessor extends EventEmitter {
       return null;
     }
 
-    // Extract key concepts and create behavior tree signals instead of hardcoded mappings
-    const conceptSignals = this.extractThoughtSignals(thought);
-    const behaviorSignals = this.createBehaviorTreeSignals(thought);
+    // Use signal extraction pipeline if enabled, otherwise fallback to legacy methods
+    let signals: any[] = [];
+    if (this.config.enableSignalPipeline && this.signalPipeline) {
+      // Use new signal pipeline
+      try {
+        const extractedSignals = await this.signalPipeline.extractSignals({
+          thought,
+          worldState: this.worldState,
+          memoryClient: this.memory,
+          llmEndpoint: this.config.cognitiveEndpoint,
+        });
+        signals = extractedSignals;
+      } catch (error) {
+        console.warn(
+          'Signal pipeline failed, falling back to legacy methods:',
+          error
+        );
+        // Fallback to deprecated methods (they return empty arrays now)
+        const conceptSignals = this.extractThoughtSignals(thought);
+        const behaviorSignals = this.createBehaviorTreeSignals(thought);
+        signals = [...conceptSignals, ...behaviorSignals];
+      }
+    } else {
+      // Use legacy methods (deprecated)
+      const conceptSignals = this.extractThoughtSignals(thought);
+      const behaviorSignals = this.createBehaviorTreeSignals(thought);
+      signals = [...conceptSignals, ...behaviorSignals];
+    }
 
-    if (conceptSignals.length === 0 && behaviorSignals.length === 0) {
+    if (signals.length === 0) {
       return null;
     }
 
@@ -833,7 +780,17 @@ export class CognitiveThoughtProcessor extends EventEmitter {
       parameters: {
         thoughtContent: thought.content,
         thoughtType: thought.type,
-        signals: [...conceptSignals, ...behaviorSignals],
+        signals: signals.map(signal => ({
+          type: signal.type,
+          concept: signal.concept,
+          confidence: signal.confidence,
+          source: signal.source,
+          thoughtId: signal.thoughtId,
+          // Convert new signal format to old format for backward compatibility
+          value: signal.confidence,
+          context: signal.details?.context || 'general',
+          details: signal.details
+        })), // Use the unified signals array converted to old format
         cognitiveContext: thought.context,
       },
       goal: 'interpret_cognitive_reflection',
@@ -846,7 +803,7 @@ export class CognitiveThoughtProcessor extends EventEmitter {
       metadata: {
         origin: { thoughtId: thought.id, attribution: thought.attribution },
         worldSeenAt: this.lastWorldStateUpdate || null,
-        signalsGenerated: conceptSignals.length + behaviorSignals.length,
+        signalsGenerated: signals.length,
         thoughtCategory: thought.category,
         thoughtPriority: thought.priority,
       },
@@ -1207,7 +1164,7 @@ export class CognitiveThoughtProcessor extends EventEmitter {
       .map(([key, ts]) => ({
         key,
         timestamp: ts,
-        type: key.split('_')[0] || 'unknown',
+        type: (key.split('_')[0] as 'low' | 'medium' | 'high') || 'medium',
       }));
   }
 
@@ -1222,919 +1179,10 @@ export class CognitiveThoughtProcessor extends EventEmitter {
 
     // Boost priority if memory suggests it's important
     if (memoryContext.confidence > 0.8 && memoryContext.memories.length > 0) {
-      const priorityMap: Record<string, 'low' | 'medium' | 'high'> = {
-        low: 'medium',
-        medium: 'high',
-        high: 'high',
-      };
-      return priorityMap[basePriority] || 'medium';
+      const priorityMap = { low: 'medium' as const, medium: 'high' as const, high: 'high' as const };
+      return priorityMap[basePriority] || basePriority;
     }
 
     return basePriority;
-  }
-
-  /**
-   * Generate thoughts dynamically based on current context and world state
-   */
-  private async generateThoughtsFromContext(): Promise<CognitiveThought[]> {
-    const thoughts: CognitiveThought[] = [];
-
-    try {
-      // Get current world state from planning system
-      const worldState = await this.getCurrentWorldState();
-
-      if (!worldState || !worldState.connected) {
-        console.log(
-          '🔄 [COGNITIVE THOUGHT PROCESSOR] No world state available'
-        );
-        return thoughts;
-      }
-
-      // Generate thoughts based on current needs and context
-      const contextThoughts = this.analyzeCurrentContext(worldState);
-      thoughts.push(...contextThoughts);
-
-      // Generate thoughts based on environmental factors
-      const environmentalThoughts =
-        this.analyzeEnvironmentalFactors(worldState);
-      thoughts.push(...environmentalThoughts);
-
-      // Generate thoughts based on temporal patterns
-      const temporalThoughts = this.analyzeTemporalPatterns();
-      thoughts.push(...temporalThoughts);
-    } catch (error) {
-      console.error('Error generating thoughts from context:', error);
-    }
-
-    return thoughts;
-  }
-
-  /**
-   * Generate thoughts based on memory context and historical data
-   */
-  private async generateThoughtsFromMemory(): Promise<CognitiveThought[]> {
-    const thoughts: CognitiveThought[] = [];
-
-    try {
-      if (!this.memory) {
-        console.log(
-          '🔄 [COGNITIVE THOUGHT PROCESSOR] No memory client available'
-        );
-        return thoughts;
-      }
-
-      // Get memory context for current situation
-      const worldState = await this.getCurrentWorldState();
-
-      const memoryContext = await this.memory.getMemoryEnhancedContext({
-        query: 'Current situation analysis and potential actions',
-        taskType: 'planning',
-        entities: this.extractCurrentEntities(worldState),
-        location: worldState.position || { x: 0, y: 0, z: 0 },
-        recentEvents: this.getRecentTaskHistory(5),
-        maxMemories: 5,
-      });
-
-      if (memoryContext.memories.length === 0) {
-        console.log(
-          '🔄 [COGNITIVE THOUGHT PROCESSOR] No relevant memories found'
-        );
-        return thoughts;
-      }
-
-      // Generate thoughts based on memory insights
-      const memoryInsights = memoryContext.insights || [];
-      const recommendations = memoryContext.recommendations || [];
-
-      for (const insight of memoryInsights.slice(0, 3)) {
-        thoughts.push({
-          type: 'reflection',
-          content: `Memory insight: ${insight}`,
-          attribution: 'memory-system',
-          context: {
-            source: 'memory-analysis',
-            confidence: memoryContext.confidence,
-          },
-          category: 'analysis',
-          priority: memoryContext.confidence > 0.7 ? 'high' : 'medium',
-          id: `memory-insight-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-          timestamp: Date.now(),
-        });
-      }
-
-      // Generate thoughts based on memory recommendations
-      for (const recommendation of recommendations.slice(0, 2)) {
-        thoughts.push({
-          type: 'planning',
-          content: `Memory-based recommendation: ${recommendation}`,
-          attribution: 'memory-system',
-          context: {
-            source: 'memory-recommendation',
-            confidence: memoryContext.confidence,
-          },
-          category: 'planning',
-          priority: 'high',
-          id: `memory-recommendation-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-          timestamp: Date.now(),
-        });
-      }
-    } catch (error) {
-      console.error('Error generating thoughts from memory:', error);
-    }
-
-    return thoughts;
-  }
-
-  /**
-   * Get current world state from planning system
-   */
-  private async getCurrentWorldState(): Promise<any> {
-    try {
-      // Try to get world state from the planning system
-      const response = await fetch(
-        `${this.config.planningEndpoint}/world-state`,
-        {
-          method: 'GET',
-          headers: { 'Content-Type': 'application/json' },
-          signal: AbortSignal.timeout(5000),
-        }
-      );
-
-      if (!response.ok) {
-        console.log(
-          '🔄 [COGNITIVE THOUGHT PROCESSOR] Planning system world state unavailable, using defaults'
-        );
-        return this.getDefaultWorldState();
-      }
-
-      const worldState = await response.json();
-      return worldState;
-    } catch (error) {
-      console.error('Error getting world state from planning system:', error);
-      return this.getDefaultWorldState();
-    }
-  }
-
-  /**
-   * Get default world state when planning system unavailable
-   */
-  private getDefaultWorldState(): any {
-    const hour = new Date().getHours();
-    const isNight = hour >= 20 || hour <= 6;
-
-    return {
-      connected: true,
-      hasPosition: true,
-      position: { x: 10.5, y: 71, z: 29.5 }, // Default position from logs
-      health: 20,
-      inventoryCount: 0,
-      environment: 'surface',
-      time: isNight ? 'night' : 'day',
-      biome: 'plains',
-      nearbyEntities: [],
-      recentEvents: [],
-      threats: [],
-      opportunities: [],
-    };
-  }
-
-  /**
-   * Analyze current context to generate relevant thoughts
-   */
-  private analyzeCurrentContext(worldState: any): CognitiveThought[] {
-    const thoughts: CognitiveThought[] = [];
-
-    // Health-based thoughts
-    if (worldState.health < 15) {
-      thoughts.push({
-        type: 'planning',
-        content: `Health is critically low (${worldState.health}/20). Immediate priority: find food, avoid threats, seek shelter.`,
-        attribution: 'health-monitor',
-        context: {
-          health: worldState.health,
-          urgency: 'critical',
-          biome: worldState.biome,
-        },
-        category: 'survival',
-        priority: 'high',
-        id: `health-critical-${Date.now()}`,
-        timestamp: Date.now(),
-      });
-    } else if (worldState.health < 18) {
-      thoughts.push({
-        type: 'planning',
-        content: `Health is getting low (${worldState.health}/20). Should consider finding food or avoiding risky activities.`,
-        attribution: 'health-monitor',
-        context: {
-          health: worldState.health,
-          urgency: 'medium',
-          biome: worldState.biome,
-        },
-        category: 'survival',
-        priority: 'medium',
-        id: `health-low-${Date.now()}`,
-        timestamp: Date.now(),
-      });
-    }
-
-    // Inventory-based thoughts
-    if (worldState.inventoryCount === 0) {
-      const inventoryAdvice = this.getInventoryAdvice(worldState);
-      thoughts.push({
-        type: 'planning',
-        content: `My inventory is empty. ${inventoryAdvice}`,
-        attribution: 'inventory-monitor',
-        context: {
-          inventoryCount: worldState.inventoryCount,
-          biome: worldState.biome,
-          time: worldState.time,
-        },
-        category: 'resource_gathering',
-        priority: 'medium',
-        id: `inventory-empty-${Date.now()}`,
-        timestamp: Date.now(),
-      });
-    }
-
-    // Environmental thoughts based on biome and time
-    const environmentalThought = this.analyzeEnvironment(worldState);
-    if (environmentalThought) {
-      thoughts.push(environmentalThought);
-    }
-
-    // Position-based thoughts
-    const positionThought = this.analyzePosition(worldState);
-    if (positionThought) {
-      thoughts.push(positionThought);
-    }
-
-    // Threat assessment
-    const threatThought = this.analyzeThreats(worldState);
-    if (threatThought) {
-      thoughts.push(threatThought);
-    }
-
-    return thoughts;
-  }
-
-  /**
-   * Analyze environmental factors to generate contextual thoughts
-   */
-  private analyzeEnvironmentalFactors(worldState: any): CognitiveThought[] {
-    const thoughts: CognitiveThought[] = [];
-
-    // Time-based thoughts
-    const hour = new Date().getHours();
-    if (hour >= 20 || hour <= 6) {
-      thoughts.push({
-        type: 'planning',
-        content:
-          'Night time approaching. Should consider shelter and safety. Visibility will be reduced and hostile mobs will spawn.',
-        attribution: 'time-monitor',
-        context: { time: 'night', urgency: 'medium', biome: worldState.biome },
-        category: 'survival',
-        priority: 'medium',
-        id: `night-approaching-${Date.now()}`,
-        timestamp: Date.now(),
-      });
-    } else if (hour >= 18 && hour < 20) {
-      thoughts.push({
-        type: 'planning',
-        content:
-          'Evening approaching. Good time to prepare shelter before nightfall.',
-        attribution: 'time-monitor',
-        context: { time: 'evening', urgency: 'low', biome: worldState.biome },
-        category: 'survival',
-        priority: 'low',
-        id: `evening-approaching-${Date.now()}`,
-        timestamp: Date.now(),
-      });
-    }
-
-    // Weather-based thoughts (placeholder for future weather system)
-    if (worldState.weather) {
-      if (worldState.weather === 'rain' || worldState.weather === 'storm') {
-        thoughts.push({
-          type: 'planning',
-          content: `Weather conditions: ${worldState.weather}. Visibility reduced, should consider shelter or waterproofing.`,
-          attribution: 'weather-monitor',
-          context: { weather: worldState.weather, biome: worldState.biome },
-          category: 'survival',
-          priority: 'medium',
-          id: `weather-concern-${Date.now()}`,
-          timestamp: Date.now(),
-        });
-      }
-    }
-
-    // Position-based thoughts
-    if (worldState.position) {
-      const { x, y, z } = worldState.position;
-      if (y < 50) {
-        const depth = 64 - y; // Distance below surface
-        thoughts.push({
-          type: 'planning',
-          content: `Currently at underground level (Y=${y}). Cave exploration opportunities. ${depth}m below surface - be cautious of dark areas and mobs.`,
-          attribution: 'position-monitor',
-          context: {
-            position: worldState.position,
-            depth,
-            environment: 'underground',
-          },
-          category: 'exploration',
-          priority: 'low',
-          id: `underground-position-${Date.now()}`,
-          timestamp: Date.now(),
-        });
-      } else if (y > 80) {
-        thoughts.push({
-          type: 'planning',
-          content: `At high elevation (Y=${y}). Good vantage point for exploration but watch for falls.`,
-          attribution: 'position-monitor',
-          context: {
-            position: worldState.position,
-            elevation: y,
-            environment: 'high_elevation',
-          },
-          category: 'exploration',
-          priority: 'low',
-          id: `high-elevation-${Date.now()}`,
-          timestamp: Date.now(),
-        });
-      }
-    }
-
-    // Biome-specific opportunities
-    const biome = worldState.biome || 'plains';
-    const biomeOpportunities = this.getBiomeOpportunities(biome, worldState);
-    if (biomeOpportunities) {
-      thoughts.push(biomeOpportunities);
-    }
-
-    return thoughts;
-  }
-
-  /**
-   * Get biome-specific opportunities and advice
-   */
-  private getBiomeOpportunities(
-    biome: string,
-    worldState: any
-  ): CognitiveThought | null {
-    const opportunities: Record<string, string> = {
-      forest:
-        'Abundant wood and food resources. Good for shelter construction and basic tools.',
-      plains:
-        'Open terrain for easy navigation. Look for villages, animals, and scattered resources.',
-      desert:
-        'Scarce water and food. Cacti provide green dye, and temples may contain valuable loot.',
-      mountain:
-        'Rich in minerals (coal, iron, redstone). Watch for steep drops and limited resources.',
-      ocean:
-        'Fish provide food. Look for shipwrecks, ocean monuments, and underwater structures.',
-      tundra:
-        'Cold climate with unique resources. Animals provide food and materials.',
-      jungle:
-        'Dense vegetation with unique resources. Watch for dangerous mobs and difficult navigation.',
-      swamp:
-        'Mushrooms, clay, and slime provide unique resources. Witch huts may contain valuable items.',
-    };
-
-    const risks: Record<string, string> = {
-      desert: 'Extreme heat and lack of water make survival challenging.',
-      mountain: 'Steep terrain and falls are major hazards.',
-      ocean: 'Drowning and ocean currents are significant risks.',
-      jungle:
-        'Dense vegetation makes navigation difficult and dangerous mobs spawn.',
-      swamp: 'Water hazards and poisonous witches pose threats.',
-    };
-
-    if (opportunities[biome]) {
-      const content = opportunities[biome];
-      const risk = risks[biome] ? ` However, ${risks[biome]}` : '';
-
-      return {
-        type: 'planning',
-        content: `Biome analysis: ${biome} environment. ${content}${risk}`,
-        attribution: 'biome-monitor',
-        context: { biome, opportunities: true, risks: !!risks[biome] },
-        category: 'exploration',
-        priority: risks[biome] ? 'medium' : 'low',
-        id: `biome-opportunities-${Date.now()}`,
-        timestamp: Date.now(),
-      };
-    }
-
-    return null;
-  }
-
-  /**
-   * Analyze temporal patterns to generate thoughts
-   */
-  private analyzeTemporalPatterns(): CognitiveThought[] {
-    const thoughts: CognitiveThought[] = [];
-
-    // Regular maintenance thoughts
-    const now = Date.now();
-    const minutesSinceLast = (now - this.lastActivityCheck) / (1000 * 60);
-
-    if (minutesSinceLast > 30) {
-      thoughts.push({
-        type: 'reflection',
-        content:
-          "It's been a while since I checked my overall situation. Let me assess my current needs.",
-        attribution: 'temporal-monitor',
-        context: { timeSinceLastCheck: minutesSinceLast },
-        category: 'self_assessment',
-        priority: 'medium',
-        id: `temporal-check-${Date.now()}`,
-        timestamp: Date.now(),
-      });
-      this.lastActivityCheck = now;
-    }
-
-    return thoughts;
-  }
-
-  /**
-   * Extract entities from current world state
-   */
-  private extractCurrentEntities(worldState: any): string[] {
-    const entities: string[] = [];
-
-    // Common Minecraft entities and items
-    const minecraftItems = [
-      'wood',
-      'stone',
-      'diamond',
-      'iron',
-      'gold',
-      'coal',
-      'tree',
-      'cave',
-      'mountain',
-      'water',
-      'lava',
-      'zombie',
-      'skeleton',
-      'creeper',
-      'spider',
-      'crafting_table',
-      'furnace',
-      'chest',
-      'torch',
-    ];
-
-    // Add entities based on context
-    if (worldState.environment === 'surface') {
-      entities.push('surface', 'exploration');
-    } else if (worldState.position && worldState.position.y < 50) {
-      entities.push('cave', 'underground');
-    }
-
-    if (worldState.inventoryCount === 0) {
-      entities.push('resources', 'gathering');
-    }
-
-    return entities;
-  }
-
-  /**
-   * Get context-aware inventory advice based on current situation
-   */
-  private getInventoryAdvice(worldState: any): string {
-    const biome = worldState.biome || 'plains';
-    const time = worldState.time || 'day';
-
-    if (time === 'night') {
-      return 'I should prioritize finding shelter and basic survival items before gathering resources.';
-    }
-
-    if (biome === 'forest') {
-      return 'I should gather wood and basic materials for tools and shelter.';
-    }
-
-    if (biome === 'desert') {
-      return 'I need to find water and shade while gathering basic materials.';
-    }
-
-    if (biome === 'mountain') {
-      return 'I should look for coal and iron while being careful of heights.';
-    }
-
-    return 'I should gather basic materials like wood and stone to start crafting tools.';
-  }
-
-  /**
-   * Analyze environment for contextual thoughts
-   */
-  private analyzeEnvironment(worldState: any): CognitiveThought | null {
-    const biome = worldState.biome || 'plains';
-    const time = worldState.time || 'day';
-
-    // Night time thoughts
-    if (time === 'night') {
-      return {
-        type: 'planning',
-        content: `Night time conditions: ${biome} biome. Should prioritize safety and shelter over exploration.`,
-        attribution: 'environment-monitor',
-        context: { biome, time, safety: 'high' },
-        category: 'survival',
-        priority: 'medium',
-        id: `night-environment-${Date.now()}`,
-        timestamp: Date.now(),
-      };
-    }
-
-    // Biome-specific thoughts
-    const biomeThoughts: Record<string, string> = {
-      forest:
-        'Good for gathering wood and food. Trees provide shelter and resources.',
-      plains:
-        'Open terrain good for exploration. Look for villages or animals.',
-      desert:
-        'Hot and dry. Need water and shade. Cacti provide some resources.',
-      mountain:
-        'Rich in minerals but dangerous terrain. Look for coal and iron.',
-      cave: 'Underground environment. Need lighting and be careful of mobs.',
-      ocean: 'Water environment. Need boat or swimming skills. Fish for food.',
-      tundra:
-        'Cold environment. Need warm clothing. Look for animals and resources.',
-    };
-
-    if (biomeThoughts[biome]) {
-      return {
-        type: 'planning',
-        content: `Environmental analysis: ${biome} biome. ${biomeThoughts[biome]}`,
-        attribution: 'environment-monitor',
-        context: { biome, time, analysis: 'biome_specific' },
-        category: 'exploration',
-        priority: 'low',
-        id: `biome-analysis-${Date.now()}`,
-        timestamp: Date.now(),
-      };
-    }
-
-    return null;
-  }
-
-  /**
-   * Analyze position for contextual thoughts
-   */
-  private analyzePosition(worldState: any): CognitiveThought | null {
-    if (!worldState.position) return null;
-
-    const { x, y, z } = worldState.position;
-
-    // Underground analysis
-    if (y < 50) {
-      const depth = 64 - y; // Distance below surface
-      return {
-        type: 'planning',
-        content: `Currently at underground level (Y=${y}). Cave exploration opportunities. ${depth}m below surface.`,
-        attribution: 'position-monitor',
-        context: {
-          position: worldState.position,
-          depth,
-          environment: 'underground',
-        },
-        category: 'exploration',
-        priority: 'low',
-        id: `underground-position-${Date.now()}`,
-        timestamp: Date.now(),
-      };
-    }
-
-    // Surface analysis
-    if (y >= 50) {
-      return {
-        type: 'planning',
-        content: `Currently on surface (Y=${y}). Good visibility for exploration and resource gathering.`,
-        attribution: 'position-monitor',
-        context: { position: worldState.position, environment: 'surface' },
-        category: 'exploration',
-        priority: 'low',
-        id: `surface-position-${Date.now()}`,
-        timestamp: Date.now(),
-      };
-    }
-
-    return null;
-  }
-
-  /**
-   * Analyze threats for contextual thoughts
-   */
-  private analyzeThreats(worldState: any): CognitiveThought | null {
-    const threats = worldState.threats || [];
-    const nearbyEntities = worldState.nearbyEntities || [];
-
-    if (threats.length > 0) {
-      return {
-        type: 'planning',
-        content: `Detected ${threats.length} threats in the area. Should prioritize safety and defensive measures.`,
-        attribution: 'threat-monitor',
-        context: { threats, nearbyEntities, urgency: 'high' },
-        category: 'survival',
-        priority: 'high',
-        id: `threats-detected-${Date.now()}`,
-        timestamp: Date.now(),
-      };
-    }
-
-    if (nearbyEntities.length > 0) {
-      const hostileEntities = nearbyEntities.filter(
-        (e: any) => e.type === 'hostile' || e.type === 'mob'
-      );
-
-      if (hostileEntities.length > 0) {
-        return {
-          type: 'planning',
-          content: `Detected ${hostileEntities.length} hostile entities nearby. Should be cautious and consider defensive actions.`,
-          attribution: 'threat-monitor',
-          context: {
-            hostileEntities,
-            totalEntities: nearbyEntities.length,
-            urgency: 'medium',
-          },
-          category: 'survival',
-          priority: 'medium',
-          id: `hostile-entities-${Date.now()}`,
-          timestamp: Date.now(),
-        };
-      }
-    }
-
-    return null;
-  }
-
-  /**
-   * Store generated thoughts back to memory system
-   */
-  private async storeThoughtsInMemory(
-    thoughts: CognitiveThought[]
-  ): Promise<void> {
-    if (!this.memory || thoughts.length === 0) return;
-
-    try {
-      for (const thought of thoughts) {
-        await this.memory.addThoughtToMemory(thought);
-      }
-
-      console.log(
-        `🔄 [COGNITIVE THOUGHT PROCESSOR] Stored ${thoughts.length} thoughts in memory`
-      );
-    } catch (error) {
-      console.error('Error storing thoughts in memory:', error);
-    }
-  }
-
-  /**
-   * Prepare tool arguments based on thought and world state
-   */
-  private prepareToolArgs(
-    tool: any,
-    thought: CognitiveThought,
-    worldState?: any
-  ): Record<string, any> {
-    const args: Record<string, any> = {};
-
-    // Extract parameters from thought content
-    const content = thought.content.toLowerCase();
-
-    // Common parameter mappings
-    if (content.includes('wood') || content.includes('log')) {
-      args.item = 'log';
-      args.count = 1;
-    }
-    if (content.includes('stone') || content.includes('rock')) {
-      args.item = 'stone';
-      args.count = 1;
-    }
-    if (content.includes('iron') || content.includes('ore')) {
-      args.item = 'iron_ore';
-      args.count = 1;
-    }
-    if (content.includes('move') || content.includes('go to')) {
-      args.destination = 'nearby';
-      args.radius = 10;
-    }
-    if (content.includes('safe') || content.includes('careful')) {
-      args.safety = true;
-      args.avoid_hostiles = true;
-    }
-
-    // Add world state context if available
-    if (worldState) {
-      if (worldState.position) {
-        args.current_position = worldState.position;
-      }
-      if (worldState.inventory) {
-        args.inventory = worldState.inventory;
-      }
-      if (worldState.health !== undefined) {
-        args.health_level = worldState.health;
-      }
-    }
-
-    // Add thought context
-    if (thought.context) {
-      args.thought_context = thought.context;
-    }
-
-    return args;
-  }
-
-  /**
-   * Extract expected outcome from a thought
-   */
-  private extractExpectedOutcome(thought: CognitiveThought): string {
-    const content = thought.content.toLowerCase();
-
-    if (content.includes('gather') || content.includes('collect')) {
-      return 'item_collected';
-    }
-    if (content.includes('move') || content.includes('navigate')) {
-      return 'position_changed';
-    }
-    if (content.includes('craft') || content.includes('make')) {
-      return 'item_created';
-    }
-    if (content.includes('mine') || content.includes('dig')) {
-      return 'block_removed';
-    }
-    if (content.includes('sense') || content.includes('scan')) {
-      return 'information_gathered';
-    }
-
-    return 'task_completed';
-  }
-
-  /**
-   * Evaluate tool execution results for a thought
-   */
-  private async evaluateToolExecutionForThought(
-    thought: CognitiveThought,
-    executedTools: ToolExecutionResult[],
-    worldState?: any
-  ): Promise<{
-    overallSuccess: boolean;
-    effectiveness: number;
-    recommendations: string[];
-    nextActions: string[];
-  }> {
-    let totalEffectiveness = 0;
-    let successfulTools = 0;
-    const recommendations: string[] = [];
-    const nextActions: string[] = [];
-
-    for (const toolResult of executedTools) {
-      totalEffectiveness += toolResult.evaluation.effectiveness;
-
-      if (toolResult.success) {
-        successfulTools++;
-
-        // Generate recommendations based on success
-        if (toolResult.evaluation.effectiveness > 0.8) {
-          recommendations.push(
-            `Tool ${toolResult.toolName} was highly effective`
-          );
-        } else if (toolResult.evaluation.effectiveness > 0.5) {
-          recommendations.push(
-            `Tool ${toolResult.toolName} was moderately effective`
-          );
-        }
-
-        // Check for side effects
-        if (toolResult.evaluation.sideEffects.length > 0) {
-          recommendations.push(
-            `Tool ${toolResult.toolName} had side effects: ${toolResult.evaluation.sideEffects.join(', ')}`
-          );
-        }
-      } else {
-        recommendations.push(
-          `Tool ${toolResult.toolName} failed: ${toolResult.error || 'Unknown error'}`
-        );
-      }
-    }
-
-    const averageEffectiveness =
-      executedTools.length > 0 ? totalEffectiveness / executedTools.length : 0;
-    const overallSuccess = successfulTools > 0;
-
-    // Generate next actions based on evaluation
-    if (overallSuccess && averageEffectiveness > 0.7) {
-      nextActions.push('Continue with current approach');
-      nextActions.push('Consider optimizing successful tools');
-    } else if (successfulTools > 0) {
-      nextActions.push('Improve tool effectiveness');
-      nextActions.push('Address side effects before continuing');
-    } else {
-      nextActions.push('Try alternative tools or approaches');
-      nextActions.push('Re-evaluate goal feasibility');
-    }
-
-    // Context-based evaluation
-    if (worldState && !overallSuccess) {
-      if (worldState.health < 15) {
-        nextActions.unshift('Prioritize safety - health is critical');
-      }
-      if (worldState.inventory?.freeSlots === 0) {
-        nextActions.push('Clear inventory space before continuing');
-      }
-    }
-
-    return {
-      overallSuccess,
-      effectiveness: averageEffectiveness,
-      recommendations,
-      nextActions,
-    };
-  }
-
-  /**
-   * Enhance a task with tool execution results
-   */
-  private enhanceTaskWithToolResults(
-    task: any,
-    executedTools: ToolExecutionResult[],
-    toolEvaluation: any
-  ): any {
-    const enhancedTask = { ...task };
-
-    // Add tool execution metadata
-    enhancedTask.metadata = {
-      ...enhancedTask.metadata,
-      toolExecution: {
-        toolsExecuted: executedTools.length,
-        successfulTools: executedTools.filter((t) => t.success).length,
-        averageEffectiveness: toolEvaluation.effectiveness,
-        totalExecutionTime: executedTools.reduce(
-          (sum, t) => sum + t.executionTime,
-          0
-        ),
-        recommendations: toolEvaluation.recommendations,
-      },
-      executionHistory: executedTools.map((t) => ({
-        toolName: t.toolName,
-        success: t.success,
-        effectiveness: t.evaluation.effectiveness,
-        executionTime: t.executionTime,
-      })),
-    };
-
-    // Adjust task priority based on tool success
-    if (toolEvaluation.overallSuccess && toolEvaluation.effectiveness > 0.7) {
-      // Successful tools - maintain or increase priority
-      enhancedTask.priority = Math.min(1, enhancedTask.priority + 0.1);
-    } else if (
-      toolEvaluation.overallSuccess &&
-      toolEvaluation.effectiveness < 0.5
-    ) {
-      // Partial success - reduce priority
-      enhancedTask.priority = Math.max(0, enhancedTask.priority - 0.1);
-    } else {
-      // Failed tools - significantly reduce priority
-      enhancedTask.priority = Math.max(0, enhancedTask.priority - 0.2);
-    }
-
-    // Add next actions to task description
-    if (toolEvaluation.nextActions.length > 0) {
-      enhancedTask.description = `${enhancedTask.description}\n\nNext Actions:\n${toolEvaluation.nextActions.map((action: string) => `- ${action}`).join('\n')}`;
-    }
-
-    return enhancedTask;
-  }
-
-  /**
-   * Get MCP integration status
-   */
-  getMCPStatus(): {
-    enabled: boolean;
-    initialized: boolean;
-    toolDiscoveryEnabled: boolean;
-    toolsAvailable: number;
-    executionHistoryCount: number;
-  } {
-    const status = {
-      enabled: !!this.config.enableMCPIntegration,
-      initialized: !!this.mcpIntegration,
-      toolDiscoveryEnabled: !!this.config.enableToolDiscovery,
-      toolsAvailable: 0,
-      executionHistoryCount: 0,
-    };
-
-    if (this.mcpIntegration) {
-      try {
-        // This would need to be implemented in MCPIntegration
-        // status.toolsAvailable = this.mcpIntegration.getAvailableToolsCount();
-        status.executionHistoryCount =
-          this.mcpIntegration.getToolExecutionHistory().length;
-      } catch (error) {
-        console.error('Error getting MCP status:', error);
-      }
-    }
-
-    return status;
   }
 }

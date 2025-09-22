@@ -66,7 +66,9 @@ export class SignalExtractionPipeline {
     maxSignalsPerThought: number;
   };
 
-  constructor(config: { confidenceThreshold?: number; maxSignalsPerThought?: number } = {}) {
+  constructor(
+    config: { confidenceThreshold?: number; maxSignalsPerThought?: number } = {}
+  ) {
     this.config = {
       confidenceThreshold: config.confidenceThreshold || 0.3,
       maxSignalsPerThought: config.maxSignalsPerThought || 10,
@@ -89,9 +91,10 @@ export class SignalExtractionPipeline {
     const { thought, worldState, memoryClient, llmEndpoint } = input;
 
     // Run all extractors in parallel
-    const extractorPromises = this.extractors.map(extractor =>
-      extractor.run({ thought, worldState, memoryClient, llmEndpoint })
-        .catch(error => {
+    const extractorPromises = this.extractors.map((extractor) =>
+      extractor
+        .run({ thought, worldState, memoryClient, llmEndpoint })
+        .catch((error) => {
           console.warn(`Signal extractor ${extractor.name} failed:`, error);
           return []; // Return empty array on failure
         })
@@ -112,12 +115,16 @@ export class SignalExtractionPipeline {
 
     // Apply confidence threshold and limit
     const filteredSignals = mergedSignals
-      .filter(signal => signal.confidence >= this.config.confidenceThreshold)
+      .filter((signal) => signal.confidence >= this.config.confidenceThreshold)
       .slice(0, this.config.maxSignalsPerThought);
 
-    console.log(`🔍 [SIGNAL PIPELINE] Extracted ${filteredSignals.length} signals from thought ${thought.id.substring(0, 8)}`);
-    filteredSignals.forEach(signal => {
-      console.log(`  - ${signal.source}:${signal.type}:${signal.concept} (${signal.confidence.toFixed(2)})`);
+    console.log(
+      `🔍 [SIGNAL PIPELINE] Extracted ${filteredSignals.length} signals from thought ${thought.id.substring(0, 8)}`
+    );
+    filteredSignals.forEach((signal) => {
+      console.log(
+        `  - ${signal.source}:${signal.type}:${signal.concept} (${signal.confidence.toFixed(2)})`
+      );
     });
 
     return filteredSignals;
@@ -136,7 +143,9 @@ export class SignalExtractionPipeline {
       if (!existing || signal.confidence > existing.confidence) {
         // Merge memory references if both have them
         if (existing && existing.memoryRefs && signal.memoryRefs) {
-          signal.memoryRefs = [...new Set([...existing.memoryRefs, ...signal.memoryRefs])];
+          signal.memoryRefs = [
+            ...new Set([...existing.memoryRefs, ...signal.memoryRefs]),
+          ];
         }
         byKey.set(key, signal);
       } else if (existing && signal.memoryRefs) {
@@ -156,7 +165,10 @@ export class SignalExtractionPipeline {
   getStats(): { extractorCount: number; totalSignals: number } {
     return {
       extractorCount: this.extractors.length,
-      totalSignals: this.extractors.reduce((sum, ext) => sum + (ext as any).signalCount || 0, 0)
+      totalSignals: this.extractors.reduce(
+        (sum, ext) => sum + (ext as any).signalCount || 0,
+        0
+      ),
     };
   }
 }
@@ -187,7 +199,7 @@ export class MemoryBackedExtractor implements SignalExtractor {
           taskType: 'entity_analysis',
           entities: [entity],
           location: worldState?.position,
-          maxMemories: 3
+          maxMemories: 3,
         });
 
         // Convert memory results to signals
@@ -200,7 +212,6 @@ export class MemoryBackedExtractor implements SignalExtractor {
       // Query for area-specific signals
       const areaSignals = await this.extractAreaSignals(thought, worldState);
       signals.push(...areaSignals);
-
     } catch (error) {
       console.warn('MemoryBackedExtractor failed:', error);
     }
@@ -223,20 +234,24 @@ export class MemoryBackedExtractor implements SignalExtractor {
       /\b(cave|tunnel|mine|underground)\b/gi,
       /\b(village|house|building|structure)\b/gi,
       /\b(food|hunger|health|damage|hurt)\b/gi,
-      /\b(light|dark|torch|lantern|bright)\b/gi
+      /\b(light|dark|torch|lantern|bright)\b/gi,
     ];
 
     for (const pattern of patterns) {
       const matches = content.match(pattern);
       if (matches) {
-        matches.forEach(match => entities.add(match.toLowerCase()));
+        matches.forEach((match) => entities.add(match.toLowerCase()));
       }
     }
 
     return Array.from(entities);
   }
 
-  private async memoryToSignal(memory: any, thought: CognitiveThought, entity: string): Promise<Signal | null> {
+  private async memoryToSignal(
+    memory: any,
+    thought: CognitiveThought,
+    entity: string
+  ): Promise<Signal | null> {
     if (!memory.content) return null;
 
     // Determine signal type based on memory content
@@ -247,9 +262,17 @@ export class MemoryBackedExtractor implements SignalExtractor {
       signalType = 'resource_need';
     } else if (content.includes('tool') || content.includes('craft')) {
       signalType = 'tool_need';
-    } else if (content.includes('danger') || content.includes('safe') || content.includes('protect')) {
+    } else if (
+      content.includes('danger') ||
+      content.includes('safe') ||
+      content.includes('protect')
+    ) {
       signalType = 'safety_concern';
-    } else if (content.includes('explore') || content.includes('find') || content.includes('search')) {
+    } else if (
+      content.includes('explore') ||
+      content.includes('find') ||
+      content.includes('search')
+    ) {
       signalType = 'exploration';
     }
 
@@ -259,16 +282,19 @@ export class MemoryBackedExtractor implements SignalExtractor {
       confidence: Math.min(memory.confidence || 0.5, 1.0),
       details: {
         memoryContent: memory.content,
-        memoryType: memory.type
+        memoryType: memory.type,
       },
       source: 'memory',
       thoughtId: thought.id,
       timestamp: Date.now(),
-      memoryRefs: [memory.id]
+      memoryRefs: [memory.id],
     };
   }
 
-  private async extractAreaSignals(thought: CognitiveThought, worldState?: any): Promise<Signal[]> {
+  private async extractAreaSignals(
+    thought: CognitiveThought,
+    worldState?: any
+  ): Promise<Signal[]> {
     if (!worldState?.position || !worldState?.biome) return [];
 
     const signals: Signal[] = [];
@@ -280,7 +306,7 @@ export class MemoryBackedExtractor implements SignalExtractor {
       taskType: 'area_analysis',
       entities: [biome],
       location: worldState.position,
-      maxMemories: 5
+      maxMemories: 5,
     });
 
     for (const memory of memoryContext.memories || []) {
@@ -296,7 +322,7 @@ export class MemoryBackedExtractor implements SignalExtractor {
               source: 'memory',
               thoughtId: thought.id,
               timestamp: Date.now(),
-              memoryRefs: [memory.id]
+              memoryRefs: [memory.id],
             });
           }
         }
@@ -312,7 +338,7 @@ export class MemoryBackedExtractor implements SignalExtractor {
               source: 'memory',
               thoughtId: thought.id,
               timestamp: Date.now(),
-              memoryRefs: [memory.id]
+              memoryRefs: [memory.id],
             });
           }
         }
@@ -330,7 +356,10 @@ export class LLMExtractor implements SignalExtractor {
   name = 'llm-backed';
   priority = 80; // High priority
 
-  constructor(private memoryClient?: any, private llmEndpoint?: string) {}
+  constructor(
+    private memoryClient?: any,
+    private llmEndpoint?: string
+  ) {}
 
   async run(input: SignalExtractionInput): Promise<Signal[]> {
     if (!this.llmEndpoint) return [];
@@ -346,19 +375,23 @@ export class LLMExtractor implements SignalExtractor {
           query: `context for: ${thought.content}`,
           taskType: 'signal_context',
           entities: this.extractEntitiesFromThought(thought.content),
-          maxMemories: 3
+          maxMemories: 3,
         });
 
-        memoryContext = memories.memories?.map((m: any) => m.content).join('\n') || '';
+        memoryContext =
+          memories.memories?.map((m: any) => m.content).join('\n') || '';
       }
 
       // Call LLM with structured prompt
-      const llmResponse = await this.callLLM(thought, worldState, memoryContext);
+      const llmResponse = await this.callLLM(
+        thought,
+        worldState,
+        memoryContext
+      );
 
       if (llmResponse?.entities) {
         signals.push(...this.llmResponseToSignals(llmResponse, thought));
       }
-
     } catch (error) {
       console.warn('LLMExtractor failed:', error);
     }
@@ -366,8 +399,16 @@ export class LLMExtractor implements SignalExtractor {
     return signals;
   }
 
-  private async callLLM(thought: CognitiveThought, worldState?: any, memoryContext?: string): Promise<any> {
-    const prompt = this.buildStructuredPrompt(thought, worldState, memoryContext);
+  private async callLLM(
+    thought: CognitiveThought,
+    worldState?: any,
+    memoryContext?: string
+  ): Promise<any> {
+    const prompt = this.buildStructuredPrompt(
+      thought,
+      worldState,
+      memoryContext
+    );
 
     const response = await fetch(this.llmEndpoint!, {
       method: 'POST',
@@ -375,14 +416,20 @@ export class LLMExtractor implements SignalExtractor {
       body: JSON.stringify({
         messages: [{ role: 'user', content: prompt }],
         temperature: 0.1, // Low temperature for structured output
-        max_tokens: 500
+        max_tokens: 500,
       }),
-      signal: AbortSignal.timeout(10000)
+      signal: AbortSignal.timeout(10000),
     });
 
     if (!response.ok) return null;
 
-    const data = await response.json();
+    const data = await response.json() as {
+      choices?: Array<{
+        message?: {
+          content?: string;
+        };
+      }>;
+    };
     const content = data.choices?.[0]?.message?.content;
 
     if (!content) return null;
@@ -395,7 +442,11 @@ export class LLMExtractor implements SignalExtractor {
     }
   }
 
-  private buildStructuredPrompt(thought: CognitiveThought, worldState?: any, memoryContext?: string): string {
+  private buildStructuredPrompt(
+    thought: CognitiveThought,
+    worldState?: any,
+    memoryContext?: string
+  ): string {
     return `Analyze this cognitive thought and extract structured signals. Respond ONLY with valid JSON.
 
 Thought: "${thought.content}"
@@ -416,7 +467,10 @@ Return JSON with this exact schema:
 Focus on actionable concepts related to Minecraft survival, crafting, exploration, and decision-making.`;
   }
 
-  private llmResponseToSignals(response: any, thought: CognitiveThought): Signal[] {
+  private llmResponseToSignals(
+    response: any,
+    thought: CognitiveThought
+  ): Signal[] {
     const signals: Signal[] = [];
 
     // Convert entities to signals
@@ -427,7 +481,7 @@ Focus on actionable concepts related to Minecraft survival, crafting, exploratio
         confidence: 0.7,
         source: 'llm',
         thoughtId: thought.id,
-        timestamp: Date.now()
+        timestamp: Date.now(),
       });
     }
 
@@ -439,7 +493,7 @@ Focus on actionable concepts related to Minecraft survival, crafting, exploratio
         confidence: 0.6,
         source: 'llm',
         thoughtId: thought.id,
-        timestamp: Date.now()
+        timestamp: Date.now(),
       });
     }
 
@@ -451,20 +505,22 @@ Focus on actionable concepts related to Minecraft survival, crafting, exploratio
         confidence: 0.6,
         source: 'llm',
         thoughtId: thought.id,
-        timestamp: Date.now()
+        timestamp: Date.now(),
       });
     }
 
     // Convert needs to resource/tool signals
     for (const need of response.needs || []) {
-      const signalType: SignalType = need.toLowerCase().includes('tool') ? 'tool_need' : 'resource_need';
+      const signalType: SignalType = need.toLowerCase().includes('tool')
+        ? 'tool_need'
+        : 'resource_need';
       signals.push({
         type: signalType,
         concept: need,
         confidence: 0.6,
         source: 'llm',
         thoughtId: thought.id,
-        timestamp: Date.now()
+        timestamp: Date.now(),
       });
     }
 
@@ -502,7 +558,7 @@ export class HeuristicExtractor implements SignalExtractor {
             details: { matches },
             source: 'heuristic',
             thoughtId: thought.id,
-            timestamp: Date.now()
+            timestamp: Date.now(),
           });
         }
       }
@@ -513,38 +569,38 @@ export class HeuristicExtractor implements SignalExtractor {
 
   private getPatterns(): Record<string, Record<string, RegExp>> {
     return {
-      'resource_need': {
-        'wood': /\b(wood|log|tree|plank)\b/gi,
-        'stone': /\b(stone|cobblestone)\b/gi,
-        'iron': /\b(iron|ore)\b/gi,
-        'coal': /\b(coal|charcoal)\b/gi,
-        'food': /\b(food|hunger|eat|starve)\b/gi,
-        'water': /\b(water|thirst|drink)\b/gi
+      resource_need: {
+        wood: /\b(wood|log|tree|plank)\b/gi,
+        stone: /\b(stone|cobblestone)\b/gi,
+        iron: /\b(iron|ore)\b/gi,
+        coal: /\b(coal|charcoal)\b/gi,
+        food: /\b(food|hunger|eat|starve)\b/gi,
+        water: /\b(water|thirst|drink)\b/gi,
       },
-      'tool_need': {
-        'pickaxe': /\b(pickaxe|pick|mine|mining)\b/gi,
-        'axe': /\b(axe|chop|cut|wood)\b/gi,
-        'shovel': /\b(shovel|dig|dirt)\b/gi,
-        'sword': /\b(sword|weapon|fight|combat)\b/gi,
-        'torch': /\b(torch|light|dark|lantern)\b/gi
+      tool_need: {
+        pickaxe: /\b(pickaxe|pick|mine|mining)\b/gi,
+        axe: /\b(axe|chop|cut|wood)\b/gi,
+        shovel: /\b(shovel|dig|dirt)\b/gi,
+        sword: /\b(sword|weapon|fight|combat)\b/gi,
+        torch: /\b(torch|light|dark|lantern)\b/gi,
       },
-      'safety_concern': {
-        'health': /\b(health|hurt|damage|die|danger)\b/gi,
-        'lighting': /\b(light|dark|torch|lantern|bright)\b/gi,
-        'hostiles': /\b(hostile|monster|mob|zombie|creeper|skeleton|spider)\b/gi,
-        'fall': /\b(fall|height|cliff|drop|edge)\b/gi
+      safety_concern: {
+        health: /\b(health|hurt|damage|die|danger)\b/gi,
+        lighting: /\b(light|dark|torch|lantern|bright)\b/gi,
+        hostiles: /\b(hostile|monster|mob|zombie|creeper|skeleton|spider)\b/gi,
+        fall: /\b(fall|height|cliff|drop|edge)\b/gi,
       },
-      'exploration': {
-        'cave': /\b(cave|underground|tunnel|mine)\b/gi,
-        'village': /\b(village|house|building|structure)\b/gi,
-        'biome': /\b(biome|area|terrain|environment)\b/gi,
-        'resource': /\b(resource|material|item|gather)\b/gi
+      exploration: {
+        cave: /\b(cave|underground|tunnel|mine)\b/gi,
+        village: /\b(village|house|building|structure)\b/gi,
+        biome: /\b(biome|area|terrain|environment)\b/gi,
+        resource: /\b(resource|material|item|gather)\b/gi,
       },
-      'knowledge_gap': {
-        'unknown': /\b(unknown|unsure|confused|what|how|where)\b/gi,
-        'need_info': /\b(need|require|want|should|could)\b/gi,
-        'explore': /\b(explore|find|search|look|discover)\b/gi
-      }
+      knowledge_gap: {
+        unknown: /\b(unknown|unsure|confused|what|how|where)\b/gi,
+        need_info: /\b(need|require|want|should|could)\b/gi,
+        explore: /\b(explore|find|search|look|discover)\b/gi,
+      },
     };
   }
 }

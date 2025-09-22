@@ -440,7 +440,7 @@ export class HealthMonitor
       const errorResult: HealthCheckResult = {
         checkId: execution.check.id,
         timestamp: Date.now(),
-        status: 'critical',
+        status: 'critical' as const,
         responseTime,
         error: error instanceof Error ? error.message : 'Unknown error',
       };
@@ -454,7 +454,7 @@ export class HealthMonitor
 
       this.emit('health-check-failed', {
         checkId: execution.check.id,
-        error: errorResult.error!,
+        error: errorResult.error || 'Unknown error occurred',
       });
 
       return errorResult;
@@ -616,8 +616,15 @@ export class HealthMonitor
       });
     }
 
-    const tracker = this.components.get(componentId)!;
-    tracker.checks.set(checkId, this.checks.get(checkId)!);
+    const tracker = this.components.get(componentId);
+    const check = this.checks.get(checkId);
+
+    if (!tracker || !check) {
+      console.error(`Component or check not found: ${componentId}, ${checkId}`);
+      return;
+    }
+
+    tracker.checks.set(checkId, check);
   }
 
   private updateComponentHealth(

@@ -2385,6 +2385,8 @@ const cognitiveThoughtProcessor = new CognitiveThoughtProcessor({
   maxThoughtsPerBatch: 5,
   planningEndpoint: 'http://localhost:3002',
   cognitiveEndpoint: 'http://localhost:3003',
+  enableSignalPipeline: true, // Enable the new signal extraction pipeline
+  signalConfidenceThreshold: 0.3, // Minimum confidence for signals
 });
 
 // Connect cognitive thought processor to world state

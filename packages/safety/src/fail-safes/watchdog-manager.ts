@@ -490,7 +490,11 @@ export class WatchdogManager extends EventEmitter {
       this.failureHistory.set(componentName, []);
     }
     
-    const history = this.failureHistory.get(componentName)!;
+    const history = this.failureHistory.get(componentName);
+    if (!history) {
+      console.error(`No failure history found for component: ${componentName}`);
+      return failure; // Return the failure that was created above
+    }
     history.push(failure);
     
     // Keep only last 100 failures per component
