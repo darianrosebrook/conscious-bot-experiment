@@ -108,6 +108,17 @@ async function saveThoughts(thoughts: CognitiveThought[]): Promise<void> {
   }
 }
 
+// Helper functions for the PUT endpoint
+async function getThoughtStore(): Promise<CognitiveThought[]> {
+  await maybeReloadThoughtStore();
+  return thoughtHistory;
+}
+
+async function saveThoughtStore(thoughts: CognitiveThought[]): Promise<void> {
+  thoughtHistory = thoughts;
+  await saveThoughts(thoughts);
+}
+
 // =============================================================================
 // Thought Management
 // =============================================================================
@@ -607,6 +618,35 @@ export const OPTIONS = async () => {
       'Access-Control-Allow-Headers': 'Content-Type',
     },
   });
+};
+
+// Mark a thought as processed
+export const PUT = async (req: NextRequest) => {
+  try {
+    await maybeReloadThoughtStore();
+    const { thoughtId } = await req.json();
+
+    if (!thoughtId) {
+      return new Response(
+        JSON.stringify({ success: false, error: 'Thought ID required' }),
+        { status: 400, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const thoughtStore = await getThoughtStore();
+    const updated = thoughtStore.map((thought) =>
+      thought.id === thoughtId ? { ...thought, processed: true } : thought
+    );
+
+    await saveThoughtStore(updated);
+
+    return new Response(JSON.stringify({ success: true, thoughtId }), {
+      headers: { 'Content-Type': 'application/json' },
+    });
+  } catch (error) {
+    console.error('PUT /api/ws/cognitive-stream error:', error);
+    return new Response('Internal server error', { status: 500 });
+  }
 };
 
 export const POST = async (req: NextRequest) => {

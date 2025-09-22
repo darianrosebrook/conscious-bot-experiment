@@ -9,8 +9,12 @@ import type { Environment } from '@/types';
  */
 export async function GET(_request: NextRequest) {
   try {
+    // Get minecraft service URL from environment
+    const minecraftUrl =
+      process.env.MINECRAFT_SERVICE_URL || 'http://localhost:3005';
+
     // Fetch environment data from minecraft service
-    const minecraftRes = await fetch('http://localhost:3005/state');
+    const minecraftRes = await fetch(`${minecraftUrl}/state`);
 
     if (!minecraftRes.ok) {
       return NextResponse.json(

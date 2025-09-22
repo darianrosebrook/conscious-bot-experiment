@@ -18,12 +18,14 @@ let lastProcessedInventory: any[] = [];
  * Generate a hash of inventory data for change detection
  */
 function generateInventoryHash(inventory: any[]): string {
-  return JSON.stringify(inventory.map(item => ({
-    type: item.type,
-    count: item.count,
-    slot: item.slot,
-    name: item.name
-  })));
+  return JSON.stringify(
+    inventory.map((item) => ({
+      type: item.type,
+      count: item.count,
+      slot: item.slot,
+      name: item.name,
+    }))
+  );
 }
 
 /**
@@ -47,7 +49,9 @@ export async function GET(_request: NextRequest) {
 
     try {
       // Try to fetch inventory data from minecraft interface directly
-      const minecraftResponse = await fetch('http://localhost:3005/inventory', {
+      const minecraftUrl =
+        process.env.MINECRAFT_SERVICE_URL || 'http://localhost:3005';
+      const minecraftResponse = await fetch(`${minecraftUrl}/inventory`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -69,7 +73,9 @@ export async function GET(_request: NextRequest) {
 
       // Fallback to minecraft bot state endpoint
       try {
-        const stateResponse = await fetch('http://localhost:3005/state', {
+        const minecraftUrl =
+          process.env.MINECRAFT_SERVICE_URL || 'http://localhost:3005';
+        const stateResponse = await fetch(`${minecraftUrl}/state`, {
           method: 'GET',
           headers: {
             'Content-Type': 'application/json',

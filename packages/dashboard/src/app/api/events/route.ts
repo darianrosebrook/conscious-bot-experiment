@@ -11,9 +11,16 @@ export async function GET(_request: NextRequest) {
   try {
     const events = [];
 
+    // Get service URLs from environment
+    const memoryUrl = process.env.MEMORY_SERVICE_URL || 'http://localhost:3001';
+    const planningUrl =
+      process.env.PLANNING_SERVICE_URL || 'http://localhost:3002';
+    const minecraftUrl =
+      process.env.MINECRAFT_SERVICE_URL || 'http://localhost:3005';
+
     // Fetch events from memory system
     try {
-      const memoryRes = await fetch('http://localhost:3001/telemetry');
+      const memoryRes = await fetch(`${memoryUrl}/telemetry`);
       if (memoryRes.ok) {
         const memoryData = await memoryRes.json();
         if (memoryData.events) {
@@ -52,7 +59,7 @@ export async function GET(_request: NextRequest) {
     // Fetch events from planning system
     try {
       // Fetch from telemetry endpoint
-      const planningRes = await fetch('http://localhost:3002/telemetry');
+      const planningRes = await fetch(`${planningUrl}/telemetry`);
       if (planningRes.ok) {
         const planningData = await planningRes.json();
         if (planningData.events) {
@@ -86,7 +93,7 @@ export async function GET(_request: NextRequest) {
       }
 
       // Fetch from events endpoint
-      const eventsRes = await fetch('http://localhost:3002/events');
+      const eventsRes = await fetch(`${planningUrl}/events`);
       if (eventsRes.ok) {
         const eventsData = await eventsRes.json();
         if (eventsData.events) {
@@ -109,7 +116,7 @@ export async function GET(_request: NextRequest) {
 
     // Fetch events from minecraft bot
     try {
-      const minecraftRes = await fetch('http://localhost:3005/telemetry');
+      const minecraftRes = await fetch(`${minecraftUrl}/telemetry`);
       if (minecraftRes.ok) {
         const minecraftData = await minecraftRes.json();
         if (minecraftData.events) {

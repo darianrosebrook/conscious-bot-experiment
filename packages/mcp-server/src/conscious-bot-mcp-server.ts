@@ -256,9 +256,7 @@ class ConsciousBotMCPServer extends Server {
           version: leafVersion,
           timeoutMs: spec.timeoutMs,
           retries: spec.retries,
-          permissions: Array.isArray(spec.permissions)
-            ? spec.permissions
-            : [],
+          permissions: Array.isArray(spec.permissions) ? spec.permissions : [],
         },
       };
 
@@ -438,7 +436,7 @@ class ConsciousBotMCPServer extends Server {
                     type: 'action',
                     name: 'collect_drops',
                     action: 'collect_items',
-                    args: { radius: 3 },
+                    args: { radius: 10 },
                   },
                 ],
               },

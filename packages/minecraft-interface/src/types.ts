@@ -6,6 +6,55 @@
 
 import { Bot } from 'mineflayer';
 import { Vec3 } from 'vec3';
+
+// ==================== Navigation Configuration ====================
+
+export interface NavigationConfig {
+  dstarLite?: {
+    searchRadius?: number;
+    replanThreshold?: number;
+    maxComputationTime?: number;
+    heuristicWeight?: number;
+  };
+  costCalculation?: {
+    baseMoveCost?: number;
+    diagonalMultiplier?: number;
+    verticalMultiplier?: number;
+    jumpCost?: number;
+    swimCost?: number;
+    // Enhanced water navigation costs
+    surfaceSwimCost?: number;
+    deepSwimCost?: number;
+    currentResistanceCost?: number;
+    buoyancyCost?: number;
+    waterExitCost?: number;
+  };
+  hazardCosts?: {
+    lavaProximity?: number;
+    voidFall?: number;
+    mobProximity?: number;
+    darknessPenalty?: number;
+    waterPenalty?: number;
+    // Enhanced water hazards
+    drowningRisk?: number;
+    currentHazard?: number;
+    deepWaterPenalty?: number;
+    surfaceObstruction?: number;
+    // Minecraft-specific hazards
+    cactusPenalty?: number;
+    firePenalty?: number;
+    poisonPenalty?: number;
+  };
+  optimization?: {
+    pathSmoothing?: boolean;
+    lookaheadDistance?: number;
+    safetyMargin?: number;
+  };
+  maxDistance?: number;
+  timeout?: number;
+  [key: string]: any;
+}
+
 // Minimal type definitions to avoid circular dependency with planning package
 export interface PlanningContext {
   goal: string;
@@ -157,6 +206,7 @@ export type MinecraftActionType =
   | 'craft_item'
   | 'craft'
   | 'pickup_item'
+  | 'collect_items_enhanced'
   | 'drop_item'
   | 'use_item'
   | 'attack_entity'

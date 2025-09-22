@@ -502,8 +502,8 @@ function ConsciousMinecraftDashboardContent() {
 
   // Periodic viewer status check only (auto-start handled by minecraft interface)
   useEffect(() => {
-    // Check every 30 seconds (reduced frequency to prevent conflicts)
-    const interval = setInterval(checkViewerStatus, 30000);
+    // Check every 60 seconds (reduced frequency to prevent conflicts)
+    const interval = setInterval(checkViewerStatus, 60000);
 
     // Initial check
     checkViewerStatus();
@@ -867,8 +867,8 @@ function ConsciousMinecraftDashboardContent() {
       }
     };
 
-    // Refresh every 30 seconds for more responsive viewer status updates
-    const interval = setInterval(refreshBotState, 30000);
+    // Refresh every 60 seconds for more responsive viewer status updates
+    const interval = setInterval(refreshBotState, 60000);
     return () => clearInterval(interval);
   }, [setInventory, thoughts, addThought]);
 

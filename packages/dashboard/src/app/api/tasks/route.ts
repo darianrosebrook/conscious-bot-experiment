@@ -4,19 +4,30 @@ import { parseCurrentAction } from '@/lib/message-parser';
 
 /**
  * Tasks API
- * Provides task data from the planning system
+ * Provides task data from the planning system using service discovery
  *
  * @author @darianrosebrook
  */
 export async function GET(_request: NextRequest) {
   try {
-    // Fetch tasks directly from planning system with timeout
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+    // Get service endpoints from environment configuration
+    const planningUrl =
+      process.env.PLANNING_SERVICE_URL || 'http://localhost:3002';
+    const timeoutMs = 5000;
 
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+    // Fetch tasks and state from planning system
     const [tasksRes, stateRes] = await Promise.allSettled([
-      fetch('http://localhost:3002/tasks', { signal: controller.signal }),
-      fetch('http://localhost:3002/state', { signal: controller.signal }),
+      fetch(`${planningUrl}/tasks`, {
+        signal: controller.signal,
+        headers: { Accept: 'application/json' },
+      }),
+      fetch(`${planningUrl}/state`, {
+        signal: controller.signal,
+        headers: { Accept: 'application/json' },
+      }),
     ]);
 
     clearTimeout(timeoutId);

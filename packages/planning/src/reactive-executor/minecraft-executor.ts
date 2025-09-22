@@ -276,7 +276,7 @@ export class MinecraftExecutor {
     ) {
       return {
         type: 'pickup_item',
-        parameters: { radius: 3 },
+        parameters: { radius: 10 },
       };
     } else if (stepName.includes('explore') || stepName.includes('scan')) {
       return {

@@ -9,9 +9,12 @@ import { NextRequest, NextResponse } from 'next/server';
 
 export async function GET(_request: NextRequest) {
   try {
+    // Get memory service URL from environment
+    const memoryUrl = process.env.MEMORY_SERVICE_URL || 'http://localhost:3001';
+
     // Fetch memory data from memory system
-    const memoryRes = await fetch('http://localhost:3001/state');
-    const telemetryRes = await fetch('http://localhost:3001/telemetry');
+    const memoryRes = await fetch(`${memoryUrl}/state`);
+    const telemetryRes = await fetch(`${memoryUrl}/telemetry`);
 
     if (!memoryRes.ok || !telemetryRes.ok) {
       return NextResponse.json(

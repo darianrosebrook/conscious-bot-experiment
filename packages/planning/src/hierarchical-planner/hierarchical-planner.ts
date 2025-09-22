@@ -114,7 +114,7 @@ export class HierarchicalPlanner {
         estimatedDuration: 5000,
         action: {
           type: 'pickup_item',
-          parameters: { radius: 3, item_type: 'wood' },
+          parameters: { radius: 10, item_type: 'wood' },
         },
       },
     ];

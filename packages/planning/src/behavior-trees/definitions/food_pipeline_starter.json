@@ -87,7 +87,7 @@
                 "type": "action",
                 "name": "collect_berries",
                 "action": "collect_items",
-                "args": { "item": "berries" }
+                "args": { "item": "berries", "radius": 10 }
               }
             ]
           }

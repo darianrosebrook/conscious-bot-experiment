@@ -202,7 +202,14 @@ export function mapBTActionToMinecraft(
         },
       };
     case 'collect_items':
-      return { type: 'pickup_item', parameters: { radius: args.radius || 3 } };
+      return {
+        type: 'collect_items_enhanced',
+        parameters: {
+          radius: args.radius || 10,
+          exploreOnFail: true,
+          maxSearchTime: 30000,
+        },
+      };
     case 'clear_3x3_area':
       return {
         type: 'mine_block',

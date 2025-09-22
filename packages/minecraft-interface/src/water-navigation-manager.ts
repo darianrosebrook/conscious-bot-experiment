@@ -14,7 +14,7 @@
 import { Bot } from 'mineflayer';
 import { Vec3 } from 'vec3';
 import { EventEmitter } from 'events';
-import { NavigationConfig } from './navigation-bridge.js';
+import { NavigationConfig } from './types.js';
 
 // Water navigation strategy types
 export type WaterNavigationStrategy =

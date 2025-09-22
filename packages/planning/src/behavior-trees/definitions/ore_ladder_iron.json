@@ -54,7 +54,7 @@
             "type": "action",
             "name": "collect_ore",
             "action": "collect_items",
-            "args": { "radius": 3 }
+            "args": { "radius": 10 }
           }
         ]
       },

@@ -40,11 +40,13 @@ class CognitiveStreamClient {
 
   async getRecentThoughts(): Promise<CognitiveThought[]> {
     try {
+      // Try to get thoughts directly from cognition system
       const response = await fetch(
-        'http://localhost:3000/api/cognitive-stream/recent',
+        'http://localhost:3003/api/cognitive-stream/recent',
         {
           method: 'GET',
           headers: { 'Content-Type': 'application/json' },
+          signal: AbortSignal.timeout(5000),
         }
       );
 
@@ -52,7 +54,17 @@ class CognitiveStreamClient {
         const data = (await response.json()) as {
           thoughts?: CognitiveThought[];
         };
-        return data.thoughts || [];
+        const thoughts = data.thoughts || [];
+        console.log(
+          `📡 Fetched ${thoughts.length} thoughts from cognitive stream`
+        );
+        if (thoughts.length > 0) {
+          console.log(
+            `📋 Recent thoughts:`,
+            thoughts.map((t) => `"${t.content}"`)
+          );
+        }
+        return thoughts;
       } else {
         console.warn('Failed to fetch recent thoughts:', response.statusText);
         return [];
@@ -312,14 +324,14 @@ export class EnhancedTaskIntegration extends EventEmitter {
    * Start polling for cognitive thoughts and convert them to tasks
    */
   private startThoughtToTaskConversion(): void {
-    // Poll every 5 seconds for new actionable thoughts
+    // Poll every 30 seconds for new actionable thoughts to reduce spam
     this.thoughtPollingInterval = setInterval(async () => {
       try {
         await this.processActionableThoughts();
       } catch (error) {
         console.error('Error processing actionable thoughts:', error);
       }
-    }, 5000);
+    }, 30000); // 30 seconds
 
     console.log('🧠 Started thought-to-task conversion polling');
   }
@@ -328,20 +340,42 @@ export class EnhancedTaskIntegration extends EventEmitter {
    * Process actionable thoughts from cognitive stream
    */
   private async processActionableThoughts(): Promise<void> {
-    const actionableThoughts =
-      await this.cognitiveStreamClient.getActionableThoughts();
+    try {
+      const actionableThoughts =
+        await this.cognitiveStreamClient.getActionableThoughts();
 
-    for (const thought of actionableThoughts) {
-      try {
-        // Create a task from the actionable thought
-        const task = await this.convertThoughtToTask(thought);
-        if (task) {
-          console.log(`🎯 Created task from cognitive thought: ${task.title}`);
-          this.emit('thoughtConvertedToTask', { thought, task });
+      console.log(
+        `🔍 Found ${actionableThoughts.length} potential actionable thoughts`
+      );
+
+      for (const thought of actionableThoughts) {
+        try {
+          console.log(
+            `📝 Processing thought: "${thought.content}" (type: ${thought.type})`
+          );
+
+          // Create a task from the actionable thought
+          const task = await this.convertThoughtToTask(thought);
+          if (task) {
+            console.log(
+              `🎯 Created task from cognitive thought: ${task.title}`
+            );
+            this.emit('thoughtConvertedToTask', { thought, task });
+          } else {
+            console.log(
+              `⚠️ Thought not converted to task: "${thought.content}"`
+            );
+          }
+        } catch (error) {
+          console.error(`Error converting thought to task:`, error);
         }
-      } catch (error) {
-        console.error(`Error converting thought to task:`, error);
       }
+
+      if (actionableThoughts.length === 0) {
+        console.log(`🤔 No actionable thoughts found in recent thoughts`);
+      }
+    } catch (error) {
+      console.error(`Error processing actionable thoughts:`, error);
     }
   }
 
@@ -455,13 +489,13 @@ export class EnhancedTaskIntegration extends EventEmitter {
         },
       };
 
-      // Add the task to the system
-      await this.addTaskInternal(task);
+      // Add the task to the system (this will handle deduplication)
+      const addedTask = await this.addTask(task);
 
       // Mark the thought as processed
       await this.markThoughtAsProcessed(thought.id);
 
-      return task;
+      return addedTask;
     } catch (error) {
       console.error('Error converting thought to task:', error);
       return null;
@@ -566,14 +600,22 @@ export class EnhancedTaskIntegration extends EventEmitter {
    */
   private async markThoughtAsProcessed(thoughtId: string): Promise<void> {
     try {
-      await fetch(
-        `http://localhost:3000/api/cognitive-stream/${thoughtId}/processed`,
+      const response = await fetch(
+        `http://localhost:3000/api/ws/cognitive-stream`,
         {
-          method: 'POST',
+          method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ processed: true }),
+          body: JSON.stringify({ thoughtId }),
+          signal: AbortSignal.timeout(5000),
         }
       );
+
+      if (!response.ok) {
+        console.warn(
+          'Failed to mark thought as processed:',
+          response.statusText
+        );
+      }
     } catch (error) {
       console.warn('Failed to mark thought as processed:', error);
     }
@@ -925,9 +967,12 @@ export class EnhancedTaskIntegration extends EventEmitter {
     const type = taskData.type?.toLowerCase() || '';
     const source = taskData.source || '';
 
-    // Check for exact title matches
+    // Check for exact title matches (pending or recently completed)
     for (const task of this.tasks.values()) {
-      if (task.title.toLowerCase() === title && task.status === 'pending') {
+      if (
+        task.title.toLowerCase() === title &&
+        (task.status === 'pending' || task.status === 'active')
+      ) {
         return task;
       }
     }
@@ -937,7 +982,7 @@ export class EnhancedTaskIntegration extends EventEmitter {
       if (
         task.type.toLowerCase() === type &&
         task.source === source &&
-        task.status === 'pending'
+        (task.status === 'pending' || task.status === 'active')
       ) {
         // Check if titles are similar (simple similarity check)
         const taskTitle = task.title.toLowerCase();

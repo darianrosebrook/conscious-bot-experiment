@@ -17,7 +17,30 @@ A Next.js 15 dashboard that provides a media-style interface for monitoring the 
 
 ## Architecture
 
-The dashboard follows a microservices architecture with the following components:
+The dashboard follows a sophisticated microservices architecture with automatic service discovery:
+
+```
+┌─────────────────┐    ┌──────────────────────┐    ┌─────────────────┐
+│   Dashboard     │────│  Service Discovery   │────│   All Services  │
+│   (Port 3000)   │    │  & API Client        │    │   (Auto-found)  │
+└─────────────────┘    └──────────────────────┘    └─────────────────┘
+                                │
+                                ▼
+                       ┌──────────────────────┐
+                       │  Environment Config  │
+                       │  (Development/Docker/│
+                       │    Kubernetes/Prod)  │
+                       └──────────────────────┘
+```
+
+### **Service Discovery System**
+
+- **Automatic Detection**: Finds services based on environment configuration
+- **Health Monitoring**: Real-time health checks for all connected services
+- **Retry Logic**: Robust error handling with automatic retries and fallbacks
+- **Environment Support**: Development, Docker, Kubernetes, and Production deployments
+
+### **Key Services**
 
 - **Dashboard (Port 3000)**: Next.js 15 frontend with real-time UI
 - **Cognition System (Port 3003)**: Inner loop processing and thought generation
@@ -25,13 +48,17 @@ The dashboard follows a microservices architecture with the following components
 - **Minecraft Bot (Port 3005)**: Mineflayer agent with screenshot capture
 - **Memory System (Port 3001)**: Vector/graph store for memories
 - **Planning System (Port 3002)**: Task graph and hierarchical planning
+- **Evaluation System (Port 3006)**: Performance metrics and analysis
 
 ## Tech Stack
 
 - **Frontend**: Next.js 15 (App Router), React 18, TypeScript
 - **Styling**: Tailwind CSS, shadcn/ui components
 - **State Management**: Zustand
-- **Real-time**: WebSocket connections
+- **Real-time**: WebSocket connections with automatic reconnection
+- **Service Discovery**: Custom service discovery and health monitoring
+- **API Client**: Centralized API client with retry logic and fallbacks
+- **Configuration**: Environment-based configuration management
 - **Icons**: Lucide React
 - **Build Tool**: Vite (via Next.js)
 
@@ -52,11 +79,26 @@ cd packages/dashboard
 # Install dependencies
 pnpm install
 
+# Configure environment (optional)
+cp .env.example .env.local
+# Edit .env.local with your service URLs if needed
+
 # Start development server
 pnpm dev
 ```
 
 The dashboard will be available at `http://localhost:3000`
+
+### **Service Discovery**
+
+The dashboard automatically discovers and connects to all services:
+
+- **Development**: Services expected on localhost ports (3001-3006)
+- **Docker**: Services accessed via Docker service names
+- **Kubernetes**: Services accessed via Kubernetes service discovery
+- **Production**: Services accessed via environment variables
+
+If services are not available, the dashboard gracefully falls back to cached data or mock responses.
 
 ### Development
 

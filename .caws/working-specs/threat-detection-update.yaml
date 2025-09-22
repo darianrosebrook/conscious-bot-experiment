@@ -1,0 +1,46 @@
+id: THREAT-UPDATE-001
+title: "Update Legacy Threat Detection for Localized Perception"
+risk_tier: 2
+scope:
+  in:
+    - "Integrate raycasting for line-of-sight checks"
+    - "Limit detection radius to 20-50 blocks for localized awareness"
+    - "Add memory/persistence to track known threats"
+    - "Factor bot health, task context, and environmental state"
+    - "Refactor automatic-safety-monitor.ts with code-splitting"
+  out:
+    - "Omniscient detection (through blocks/walls)"
+    - "Unlimited range threat scanning"
+    - "Repeated false-positive flee actions"
+invariants:
+  - "Threats beyond 50 blocks ignored unless line-of-sight confirmed"
+  - "Bot health <=6 always prioritizes self-threats over distant mobs"
+  - "No threat re-detection for known/persistent entities within 5-minute window"
+  - "Raycasting fails-fast to safe default (ignore) on errors"
+acceptance:
+  - id: A1
+    given: "Bot with health >10 and active task"
+    when: "Distant mobs (>50 blocks, no line-of-sight) detected"
+    then: "System ignores threats; task continues uninterrupted"
+  - id: A2
+    given: "Bot in pit with low health (≤6)"
+    when: "Nearby threats (≤20 blocks) with line-of-sight"
+    then: "Triggers flee or healing; integrates with navigation escape"
+  - id: A3
+    given: "Known threat from memory"
+    when: "Re-scanned within persistence window"
+    then: "Skips re-detection; uses cached data"
+non_functional:
+  a11y: ["Line-of-sight checks include terrain accessibility for keyboard/pathfinding"]
+  perf: { api_p95_ms: 150 }
+  security: ["No exposure of bot position to external threats"]
+contracts:
+  - type: openapi
+    path: "contracts/minecraft-threat-api.yaml#/detectThreats"
+observability:
+  logs: ["threat_detected with distance and line_of_sight", "raycast_failure with reason"]
+  metrics: ["threat_scan_success_rate", "false_positive_reductions"]
+  traces: ["detectThreats span with bot_health, task_context"]
+migrations:
+  - "Update threat detection to use raycasting and memory; deprecate old scan logic"
+rollback: ["Feature flag: OLD_THREAT_DETECTION=true; revert migration with DB cleanup"]

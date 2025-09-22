@@ -1845,5 +1845,900 @@
     "id": "thought-1758532992452-aepkaam",
     "timestamp": 1758532992452,
     "processed": false
+  },
+  {
+    "type": "reflection",
+    "content": "Gather some wood to craft a torch and build a shelter for the night.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.6,
+      "cognitiveSystem": "llm-core"
+    },
+    "metadata": {
+      "thoughtType": "reflection",
+      "trigger": "time-based",
+      "context": "environmental-monitoring",
+      "intensity": 0.4,
+      "llmConfidence": 0.6,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1758533052336-lpfqrmu",
+    "timestamp": 1758533052336,
+    "processed": false
+  },
+  {
+    "type": "system_event",
+    "content": "Enhanced thought generated: \"Gather some wood to craft a torch and build a shelter for the night.\"",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.6,
+      "cognitiveSystem": "enhanced-generator",
+      "category": "thought_generation",
+      "tags": [
+        "thought",
+        "enhanced",
+        "generated"
+      ]
+    },
+    "metadata": {
+      "thoughtType": "system_event",
+      "category": "thought_generation",
+      "tags": [
+        "thought",
+        "enhanced",
+        "generated"
+      ],
+      "source": "cognition-system",
+      "timestamp": 1758533052323
+    },
+    "id": "thought-1758533052342-gkt23ni",
+    "timestamp": 1758533052342,
+    "processed": false
+  },
+  {
+    "type": "intrusive",
+    "content": "I should get out of this hole.",
+    "attribution": "intrusive",
+    "context": {
+      "emotionalState": "curious",
+      "confidence": 0.8
+    },
+    "metadata": {
+      "messageType": "intrusion",
+      "intent": "external_suggestion",
+      "thoughtType": "intrusive"
+    },
+    "id": "thought-1758534094074-cyji2yd",
+    "timestamp": 1758534094074,
+    "processed": false
+  },
+  {
+    "type": "reflection",
+    "content": "Processing intrusive thought: \"i should get out of this hole.\"",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "focused",
+      "confidence": 0.6,
+      "cognitiveSystem": "intrusive-processor"
+    },
+    "metadata": {
+      "thoughtType": "reflection",
+      "source": "intrusive-thought"
+    },
+    "id": "thought-1758534094459-0nusj79",
+    "timestamp": 1758534094459,
+    "processed": false
+  },
+  {
+    "type": "intrusive",
+    "content": "i should get out of this hole.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "curious",
+      "confidence": 0.7,
+      "cognitiveSystem": "intrusive-processor"
+    },
+    "metadata": {
+      "thoughtType": "intrusive",
+      "source": "intrusive-thought",
+      "trigger": "intrusive-thought-processed"
+    },
+    "id": "thought-1758534094461-p1kahcv",
+    "timestamp": 1758534094461,
+    "processed": false
+  },
+  {
+    "type": "intrusive",
+    "content": "i should get out of this hole.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "curious",
+      "confidence": 0.7,
+      "cognitiveSystem": "intrusive-processor"
+    },
+    "metadata": {
+      "thoughtType": "intrusive",
+      "source": "intrusive-thought",
+      "trigger": "intrusive-thought-processed"
+    },
+    "id": "thought-1758534094470-ysqjnqr",
+    "timestamp": 1758534094470,
+    "processed": false
+  },
+  {
+    "type": "reflection",
+    "content": "Gather some wood to craft a pickaxe and build a shelter for the night.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.6,
+      "cognitiveSystem": "llm-core"
+    },
+    "metadata": {
+      "thoughtType": "reflection",
+      "trigger": "time-based",
+      "context": "environmental-monitoring",
+      "intensity": 0.4,
+      "llmConfidence": 0.6,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1758534121585-gmeey1v",
+    "timestamp": 1758534121585,
+    "processed": false
+  },
+  {
+    "type": "reflection",
+    "content": "Gather some wood from nearby trees to craft tools and build a shelter.",
+    "attribution": "self",
+    "context": {
+      "cognitiveSystem": "llm-core"
+    },
+    "metadata": {
+      "thoughtType": "reflection"
+    },
+    "id": "thought-1758534217819-te06j9e",
+    "timestamp": 1758534217819,
+    "processed": false
+  },
+  {
+    "type": "reflection",
+    "content": "Gather some wood from nearby trees to craft tools and build a shelter.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.6,
+      "cognitiveSystem": "llm-core"
+    },
+    "metadata": {
+      "thoughtType": "reflection",
+      "trigger": "time-based",
+      "context": "environmental-monitoring",
+      "intensity": 0.4,
+      "llmConfidence": 0.6,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1758534217837-lom33tr",
+    "timestamp": 1758534217837,
+    "processed": false
+  },
+  {
+    "type": "reflection",
+    "content": "Gather some wood from nearby trees to craft tools and build a shelter. Observing the area for resources and potential threats. Planning to start with an axe for efficient tree cutting.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.7,
+      "cognitiveSystem": "llm-core"
+    },
+    "metadata": {
+      "thoughtType": "reflection",
+      "trigger": "time-based",
+      "context": "environmental-monitoring",
+      "intensity": 0.4,
+      "llmConfidence": 0.7,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1758534300784-rsbe9f8",
+    "timestamp": 1758534300784,
+    "processed": false
+  },
+  {
+    "type": "reflection",
+    "content": "Gather some wood to craft tools and build a shelter before night falls. Observing the area for resources and potential threats. Planning to check nearby trees first.",
+    "attribution": "self",
+    "context": {
+      "cognitiveSystem": "llm-core"
+    },
+    "metadata": {
+      "thoughtType": "reflection"
+    },
+    "id": "thought-1758534366858-y4eu8tc",
+    "timestamp": 1758534366858,
+    "processed": false
+  },
+  {
+    "type": "reflection",
+    "content": "Gather some wood to craft tools and build a shelter before night falls. Observing the area for resources and potential threats. Planning to check nearby trees first.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.7,
+      "cognitiveSystem": "llm-core"
+    },
+    "metadata": {
+      "thoughtType": "reflection",
+      "trigger": "time-based",
+      "context": "environmental-monitoring",
+      "intensity": 0.4,
+      "llmConfidence": 0.7,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1758534366868-1grwl9r",
+    "timestamp": 1758534366868,
+    "processed": false
+  },
+  {
+    "type": "reflection",
+    "content": "Find a safe location to build a shelter and gather wood for torches. Observing the surroundings for resources and potential threats.",
+    "attribution": "self",
+    "context": {
+      "cognitiveSystem": "llm-core"
+    },
+    "metadata": {
+      "thoughtType": "reflection"
+    },
+    "id": "thought-1758534499752-awp8ioh",
+    "timestamp": 1758534499752,
+    "processed": false
+  },
+  {
+    "type": "reflection",
+    "content": "Find a safe location to build a shelter and gather wood for torches. Observing the surroundings for resources and potential threats.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.7,
+      "cognitiveSystem": "llm-core"
+    },
+    "metadata": {
+      "thoughtType": "reflection",
+      "trigger": "time-based",
+      "context": "environmental-monitoring",
+      "intensity": 0.4,
+      "llmConfidence": 0.7,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1758534499765-c34w2jd",
+    "timestamp": 1758534499765,
+    "processed": false
+  },
+  {
+    "type": "reflection",
+    "content": "Gather some wood from nearby trees to craft tools and build a shelter.",
+    "attribution": "self",
+    "context": {
+      "cognitiveSystem": "llm-core"
+    },
+    "metadata": {
+      "thoughtType": "reflection"
+    },
+    "id": "thought-1758534619529-ulsieq9",
+    "timestamp": 1758534619529,
+    "processed": false
+  },
+  {
+    "type": "reflection",
+    "content": "Gather some wood from nearby trees to craft tools and build a shelter.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.6,
+      "cognitiveSystem": "llm-core"
+    },
+    "metadata": {
+      "thoughtType": "reflection",
+      "trigger": "time-based",
+      "context": "environmental-monitoring",
+      "intensity": 0.4,
+      "llmConfidence": 0.6,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1758534619546-vuq171b",
+    "timestamp": 1758534619546,
+    "processed": false
+  },
+  {
+    "type": "intrusive",
+    "content": "Let's grab some wood from a tree.",
+    "attribution": "intrusive",
+    "context": {
+      "emotionalState": "curious",
+      "confidence": 0.8
+    },
+    "metadata": {
+      "messageType": "intrusion",
+      "intent": "external_suggestion",
+      "thoughtType": "intrusive"
+    },
+    "id": "thought-1758535411096-w3393l5",
+    "timestamp": 1758535411096,
+    "processed": false
+  },
+  {
+    "type": "thought_processing",
+    "content": "Thought processing started: \"let's grab some wood from a tree.\"",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "focused",
+      "confidence": 0.6,
+      "cognitiveSystem": "intrusive-processor",
+      "category": "processing",
+      "tags": [
+        "intrusive",
+        "processing",
+        "started"
+      ]
+    },
+    "metadata": {
+      "thoughtType": "thought_processing",
+      "category": "processing",
+      "tags": [
+        "intrusive",
+        "processing",
+        "started"
+      ],
+      "source": "cognition-system",
+      "timestamp": 1758535411508
+    },
+    "id": "thought-1758535411554-erxtpe1",
+    "timestamp": 1758535411554,
+    "processed": false
+  },
+  {
+    "type": "system_event",
+    "content": "Intrusive thought generated as internal thought: \"let's grab some wood from a tree.\"",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "curious",
+      "confidence": 0.7,
+      "cognitiveSystem": "intrusive-processor",
+      "category": "thought_generation",
+      "tags": [
+        "intrusive",
+        "generated",
+        "internal"
+      ]
+    },
+    "metadata": {
+      "thoughtType": "system_event",
+      "category": "thought_generation",
+      "tags": [
+        "intrusive",
+        "generated",
+        "internal"
+      ],
+      "source": "cognition-system",
+      "timestamp": 1758535411509
+    },
+    "id": "thought-1758535411563-tkhtkp2",
+    "timestamp": 1758535411563,
+    "processed": false
+  },
+  {
+    "type": "intrusive",
+    "content": "let's grab some wood from a tree.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "curious",
+      "confidence": 0.7,
+      "cognitiveSystem": "intrusive-processor"
+    },
+    "metadata": {
+      "thoughtType": "intrusive",
+      "source": "intrusive-thought",
+      "trigger": "intrusive-thought-processed"
+    },
+    "id": "thought-1758535411565-buxyv1h",
+    "timestamp": 1758535411565,
+    "processed": false
+  },
+  {
+    "type": "intrusive",
+    "content": "let's grab some wood from a tree.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "curious",
+      "confidence": 0.7,
+      "cognitiveSystem": "intrusive-processor"
+    },
+    "metadata": {
+      "thoughtType": "intrusive",
+      "source": "intrusive-thought",
+      "trigger": "intrusive-thought-processed"
+    },
+    "id": "thought-1758535411570-xu0swrv",
+    "timestamp": 1758535411570,
+    "processed": false
+  },
+  {
+    "type": "reflection",
+    "content": "Processing intrusive thought: \"let's grab some wood from a tree.\"",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "focused",
+      "confidence": 0.6,
+      "cognitiveSystem": "intrusive-processor"
+    },
+    "metadata": {
+      "thoughtType": "reflection",
+      "source": "intrusive-thought"
+    },
+    "id": "thought-1758535411577-lfyg8lj",
+    "timestamp": 1758535411577,
+    "processed": false
+  },
+  {
+    "type": "reflection",
+    "content": "Craft a wooden axe and gather more wood to build a shelter. Observing the area for resources and potential threats.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.7,
+      "cognitiveSystem": "llm-core"
+    },
+    "metadata": {
+      "thoughtType": "reflection",
+      "trigger": "time-based",
+      "context": "environmental-monitoring",
+      "intensity": 0.4,
+      "llmConfidence": 0.7,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1758535443810-h13kg0k",
+    "timestamp": 1758535443810,
+    "processed": false
+  },
+  {
+    "type": "reflection",
+    "content": "Gather some wood from nearby trees to craft tools and build a shelter.",
+    "attribution": "self",
+    "context": {
+      "cognitiveSystem": "llm-core"
+    },
+    "metadata": {
+      "thoughtType": "reflection"
+    },
+    "id": "thought-1758535589799-pe9p9ir",
+    "timestamp": 1758535589799,
+    "processed": false
+  },
+  {
+    "type": "reflection",
+    "content": "Gather some wood from nearby trees to craft tools and build a shelter.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.6,
+      "cognitiveSystem": "llm-core"
+    },
+    "metadata": {
+      "thoughtType": "reflection",
+      "trigger": "time-based",
+      "context": "environmental-monitoring",
+      "intensity": 0.4,
+      "llmConfidence": 0.6,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1758535589823-i8rjiwh",
+    "timestamp": 1758535589823,
+    "processed": false
+  },
+  {
+    "type": "reflection",
+    "content": "Gather some wood to craft a pickaxe and build a shelter.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.6,
+      "cognitiveSystem": "llm-core"
+    },
+    "metadata": {
+      "thoughtType": "reflection",
+      "trigger": "time-based",
+      "context": "environmental-monitoring",
+      "intensity": 0.4,
+      "llmConfidence": 0.6,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1758535649806-m1wt5l5",
+    "timestamp": 1758535649806,
+    "processed": false
+  },
+  {
+    "type": "reflection",
+    "content": "Gather some wood to craft tools and a shelter before night falls. Observing the area for trees and potential threats. Planning to head to the nearest forest.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.7,
+      "cognitiveSystem": "llm-core"
+    },
+    "metadata": {
+      "thoughtType": "reflection",
+      "trigger": "time-based",
+      "context": "environmental-monitoring",
+      "intensity": 0.4,
+      "llmConfidence": 0.7,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1758535719031-2se7wnb",
+    "timestamp": 1758535719031,
+    "processed": false
+  },
+  {
+    "type": "reflection",
+    "content": "Gather some wood from the nearby trees to craft tools and build a shelter.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.6,
+      "cognitiveSystem": "llm-core"
+    },
+    "metadata": {
+      "thoughtType": "reflection",
+      "trigger": "time-based",
+      "context": "environmental-monitoring",
+      "intensity": 0.4,
+      "llmConfidence": 0.6,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1758535770305-vszba2h",
+    "timestamp": 1758535770305,
+    "processed": false
+  },
+  {
+    "type": "reflection",
+    "content": "Gather some wood to craft tools and a shelter. Observing the area for trees. Planning to head to the nearest forest.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.7,
+      "cognitiveSystem": "llm-core"
+    },
+    "metadata": {
+      "thoughtType": "reflection",
+      "trigger": "time-based",
+      "context": "environmental-monitoring",
+      "intensity": 0.4,
+      "llmConfidence": 0.7,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1758535830062-ysmttj2",
+    "timestamp": 1758535830062,
+    "processed": false
+  },
+  {
+    "type": "reflection",
+    "content": "Gather some wood from nearby trees to craft tools and a shelter.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.6,
+      "cognitiveSystem": "llm-core"
+    },
+    "metadata": {
+      "thoughtType": "reflection",
+      "trigger": "time-based",
+      "context": "environmental-monitoring",
+      "intensity": 0.4,
+      "llmConfidence": 0.6,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1758535889775-uyirn11",
+    "timestamp": 1758535889775,
+    "processed": false
+  },
+  {
+    "type": "reflection",
+    "content": "Gather some wood to craft tools and build a shelter before nightfall.",
+    "attribution": "self",
+    "context": {
+      "cognitiveSystem": "llm-core"
+    },
+    "metadata": {
+      "thoughtType": "reflection"
+    },
+    "id": "thought-1758536039076-tei9q6u",
+    "timestamp": 1758536039076,
+    "processed": false
+  },
+  {
+    "type": "reflection",
+    "content": "Gather some wood to craft tools and build a shelter. Observing the area for trees.",
+    "attribution": "self",
+    "context": {
+      "cognitiveSystem": "llm-core"
+    },
+    "metadata": {
+      "thoughtType": "reflection"
+    },
+    "id": "thought-1758536099782-87h36mj",
+    "timestamp": 1758536099782,
+    "processed": false
+  },
+  {
+    "type": "reflection",
+    "content": "Gather some wood to craft tools and build a shelter. Observing the area for trees.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.6,
+      "cognitiveSystem": "llm-core"
+    },
+    "metadata": {
+      "thoughtType": "reflection",
+      "trigger": "time-based",
+      "context": "environmental-monitoring",
+      "intensity": 0.4,
+      "llmConfidence": 0.6,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1758536099896-kkaz3xr",
+    "timestamp": 1758536099896,
+    "processed": false
+  },
+  {
+    "type": "reflection",
+    "content": "Find a nearby tree to gather wood for crafting tools.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.6,
+      "cognitiveSystem": "llm-core"
+    },
+    "metadata": {
+      "thoughtType": "reflection",
+      "trigger": "time-based",
+      "context": "environmental-monitoring",
+      "intensity": 0.4,
+      "llmConfidence": 0.6,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1758536399443-2i0iuhk",
+    "timestamp": 1758536399443,
+    "processed": false
+  },
+  {
+    "type": "reflection",
+    "content": "Gather wood from nearby trees to craft tools and a shelter.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.6,
+      "cognitiveSystem": "llm-core"
+    },
+    "metadata": {
+      "thoughtType": "reflection",
+      "trigger": "time-based",
+      "context": "environmental-monitoring",
+      "intensity": 0.4,
+      "llmConfidence": 0.6,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1758536479552-0w71fbj",
+    "timestamp": 1758536479552,
+    "processed": false
+  },
+  {
+    "type": "reflection",
+    "content": "Gather wood from nearby trees to craft tools and build a shelter.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.6,
+      "cognitiveSystem": "llm-core"
+    },
+    "metadata": {
+      "thoughtType": "reflection",
+      "trigger": "time-based",
+      "context": "environmental-monitoring",
+      "intensity": 0.4,
+      "llmConfidence": 0.6,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1758536553644-2l9zgvy",
+    "timestamp": 1758536553644,
+    "processed": false
+  },
+  {
+    "type": "reflection",
+    "content": "Gather wood from nearby trees to craft tools and build a shelter.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.6,
+      "cognitiveSystem": "llm-core"
+    },
+    "metadata": {
+      "thoughtType": "reflection",
+      "trigger": "time-based",
+      "context": "environmental-monitoring",
+      "intensity": 0.4,
+      "llmConfidence": 0.6,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1758536635254-jqnxqm9",
+    "timestamp": 1758536635254,
+    "processed": false
+  },
+  {
+    "type": "reflection",
+    "content": "Gather some wood to craft a basic pickaxe and build a shelter. Observing the area for trees and suitable building materials. Planning to find a safe spot to sleep before dark falls again.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.7,
+      "cognitiveSystem": "llm-core"
+    },
+    "metadata": {
+      "thoughtType": "reflection",
+      "trigger": "time-based",
+      "context": "environmental-monitoring",
+      "intensity": 0.4,
+      "llmConfidence": 0.7,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1758536695827-66o2abl",
+    "timestamp": 1758536695827,
+    "processed": false
+  },
+  {
+    "type": "reflection",
+    "content": "Gather some wood to craft tools and a shelter. Observing the surroundings for trees. Planning to start with an axe for efficient tree cutting.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.7,
+      "cognitiveSystem": "llm-core"
+    },
+    "metadata": {
+      "thoughtType": "reflection",
+      "trigger": "time-based",
+      "context": "environmental-monitoring",
+      "intensity": 0.4,
+      "llmConfidence": 0.7,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1758536755951-9jre4ux",
+    "timestamp": 1758536755951,
+    "processed": false
+  },
+  {
+    "type": "reflection",
+    "content": "Gather some wood to craft a pickaxe and build a shelter. Observing the area for resources and potential threats.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.7,
+      "cognitiveSystem": "llm-core"
+    },
+    "metadata": {
+      "thoughtType": "reflection",
+      "trigger": "time-based",
+      "context": "environmental-monitoring",
+      "intensity": 0.4,
+      "llmConfidence": 0.7,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1758536819740-4aa27rp",
+    "timestamp": 1758536819740,
+    "processed": false
+  },
+  {
+    "type": "reflection",
+    "content": "Gather some wood to craft tools and build shelter before night falls.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.6,
+      "cognitiveSystem": "llm-core"
+    },
+    "metadata": {
+      "thoughtType": "reflection",
+      "trigger": "time-based",
+      "context": "environmental-monitoring",
+      "intensity": 0.4,
+      "llmConfidence": 0.6,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1758536899160-ytwxal3",
+    "timestamp": 1758536899160,
+    "processed": false
+  },
+  {
+    "type": "reflection",
+    "content": "Gather wood from nearby trees to craft tools and build a shelter.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.6,
+      "cognitiveSystem": "llm-core"
+    },
+    "metadata": {
+      "thoughtType": "reflection",
+      "trigger": "time-based",
+      "context": "environmental-monitoring",
+      "intensity": 0.4,
+      "llmConfidence": 0.6,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1758536959865-5cgi473",
+    "timestamp": 1758536959865,
+    "processed": false
+  },
+  {
+    "type": "reflection",
+    "content": "Gather some wood from nearby trees to craft tools and a shelter. Observing no immediate threats, focus on survival first.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.7,
+      "cognitiveSystem": "llm-core"
+    },
+    "metadata": {
+      "thoughtType": "reflection",
+      "trigger": "time-based",
+      "context": "environmental-monitoring",
+      "intensity": 0.4,
+      "llmConfidence": 0.7,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1758537033556-fy31wki",
+    "timestamp": 1758537033556,
+    "processed": false
+  },
+  {
+    "type": "reflection",
+    "content": "Gather some wood to craft tools and build a shelter before nightfall. Observing the area for resources and safe spots.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.7,
+      "cognitiveSystem": "llm-core"
+    },
+    "metadata": {
+      "thoughtType": "reflection",
+      "trigger": "time-based",
+      "context": "environmental-monitoring",
+      "intensity": 0.4,
+      "llmConfidence": 0.7,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1758537093570-0rukj3t",
+    "timestamp": 1758537093570,
+    "processed": false
+  },
+  {
+    "type": "reflection",
+    "content": "Gather some wood to make a basic crafting table and tools. Need to set up a shelter before the night gets too dark.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.7,
+      "cognitiveSystem": "llm-core"
+    },
+    "metadata": {
+      "thoughtType": "reflection",
+      "trigger": "time-based",
+      "context": "environmental-monitoring",
+      "intensity": 0.4,
+      "llmConfidence": 0.7,
+      "model": "qwen2.5:7b"
+    },
+    "id": "thought-1758537177099-ii6otaf",
+    "timestamp": 1758537177099,
+    "processed": false
   }
 ]

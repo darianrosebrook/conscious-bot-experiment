@@ -1454,6 +1454,7 @@ async function autonomousTaskExecutor() {
   try {
     // singleton guard
     if (!global.__planningExecutorState) {
+      console.log('🤖 [AUTONOMOUS EXECUTOR] Initializing executor state...');
       global.__planningExecutorState = {
         running: false,
         failures: 0,
@@ -1484,6 +1485,9 @@ async function autonomousTaskExecutor() {
       console.log(
         `🤖 [AUTONOMOUS EXECUTOR] Found ${activeTasks.length} active tasks`
       );
+      if (activeTasks.length > 0) {
+        console.log(`🤖 [AUTONOMOUS EXECUTOR] Top task: ${activeTasks[0].title}`);
+      }
       global.lastTaskCount = activeTasks.length;
       global.lastTaskCountLog = now;
     }
@@ -1514,6 +1518,8 @@ async function autonomousTaskExecutor() {
         global.lastIdleEvent = now;
       }
       return;
+    } else {
+      console.log(`🤖 [AUTONOMOUS EXECUTOR] Found ${activeTasks.length} active tasks, executing...`);
     }
 
     // Execute the highest priority task, prioritizing prerequisite tasks
@@ -1589,7 +1595,10 @@ async function autonomousTaskExecutor() {
     );
 
     // Circuit breaker around bot health
+    console.log(`🤖 [AUTONOMOUS EXECUTOR] Checking bot connection...`);
     const botConnected = await checkBotConnection();
+    console.log(`🤖 [AUTONOMOUS EXECUTOR] Bot connected: ${botConnected}`);
+
     if (!botConnected) {
       const st = global.__planningExecutorState;
       if (st.breaker === 'closed') {
@@ -1601,6 +1610,7 @@ async function autonomousTaskExecutor() {
     } else {
       const st = global.__planningExecutorState;
       if (st.breaker !== 'closed') {
+        console.log(`🤖 [AUTONOMOUS EXECUTOR] Circuit breaker was ${st.breaker}, closing it`);
         console.log('✅ Bot reachable — closing circuit');
         st.breaker = 'closed';
         st.failures = 0;
@@ -2985,11 +2995,17 @@ async function startServer() {
 
     // Start the server
     await serverConfig.start();
+    console.log('✅ Server started successfully');
 
     // Start autonomous task executor (singleton; supports hot-reload)
+    console.log('🚀 Starting autonomous task executor...');
+    console.log('📊 Enhanced task integration has', enhancedTaskIntegration.getActiveTasks().length, 'active tasks');
+    console.log('🔧 Initializing autonomous executor state...');
     if (global.__planningInterval) clearInterval(global.__planningInterval);
     global.__planningInterval = setInterval(async () => {
       try {
+        console.log('⏰ Autonomous executor timer fired...');
+        console.log('📊 Current task count:', enhancedTaskIntegration.getActiveTasks().length);
         const st = global.__planningExecutorState!;
         // exponential backoff while breaker is open
         if (st?.breaker === 'open') {

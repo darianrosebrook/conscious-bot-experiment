@@ -597,7 +597,7 @@ const cognitionSystem = {
 };
 
 // Store cognitive thoughts for external access
-const cognitiveThoughts: any[] = [];
+let cognitiveThoughts: any[] = [];
 
 // Function to send thoughts to cognitive stream
 async function sendThoughtToCognitiveStream(thought: any) {
@@ -2498,57 +2498,53 @@ app.listen(port, () => {
 app.get('/api/cognitive-stream/recent', async (req, res) => {
   try {
     const { limit = 10, processed = false } = req.query;
+    const limitNum = parseInt(limit as string, 10);
 
-    // Get recent thoughts from the cognitive stream
-    // This is a simplified implementation - in a real system, you'd store thoughts in a database
-    // For now, we'll return a mock response to demonstrate the integration
-    // TODO: Pull from our current memory system that includes the thoughts and memories
-    // For now, provide mock actionable thoughts to test the integration
-    const recentThoughts: any[] = [
-      {
-        id: 'test-thought-1',
-        type: 'reflection',
-        content:
-          'Gather some wood from nearby trees to craft tools. Observing the area for resources and threats.',
-        attribution: 'self',
-        context: {
-          emotionalState: 'focused',
-          confidence: 0.7,
-          cognitiveSystem: 'llm-core',
-        },
-        metadata: {
-          thoughtType: 'reflection',
-          trigger: 'time-based',
-          context: 'environmental-monitoring',
-          intensity: 0.4,
-          llmConfidence: 0.7,
-          model: 'qwen2.5:7b',
-        },
-        timestamp: Date.now() - 30000, // 30 seconds ago
-        processed: false,
-      },
-      {
-        id: 'test-thought-2',
-        type: 'intrusive',
-        content: 'Have i found anything to eat? I should go find food.',
-        attribution: 'intrusive',
-        context: {
-          emotionalState: 'curious',
-          confidence: 0.8,
-        },
-        metadata: {
-          thoughtType: 'intrusive',
-          trigger: 'intrusive-thought-processed',
-        },
-        timestamp: Date.now() - 45000, // 45 seconds ago
-        processed: false,
-      },
-    ];
+    // Get recent thoughts from the actual cognitive stream
+    // Filter out processed thoughts if requested
+    let recentThoughts = cognitiveThoughts.slice();
+
+    // Clean up old processed thoughts to prevent memory buildup
+    const now = Date.now();
+    const cutoffTime = now - 24 * 60 * 60 * 1000; // 24 hours ago
+    cognitiveThoughts = cognitiveThoughts.filter(
+      (thought) => !thought.processed || thought.timestamp > cutoffTime
+    );
+
+    // Also get thoughts from enhanced thought generator (limit to recent ones)
+    const generatedThoughts = enhancedThoughtGenerator.getThoughtHistory(5); // Only get the 5 most recent
+    console.log(
+      `📋 Enhanced thought generator has ${generatedThoughts.length} recent thoughts`
+    );
+
+    // Combine all thoughts
+    recentThoughts = [...recentThoughts, ...generatedThoughts];
+
+    if (processed === 'false') {
+      recentThoughts = recentThoughts.filter((thought) => !thought.processed);
+    }
+
+    // Sort by timestamp (newest first) and limit results
+    recentThoughts = recentThoughts
+      .sort((a, b) => b.timestamp - a.timestamp)
+      .slice(0, limitNum);
+
+    // Ensure we have the required fields for the planning system
+    const formattedThoughts = recentThoughts.map((thought) => ({
+      id: thought.id,
+      type: thought.type || 'reflection',
+      content: thought.content,
+      attribution: thought.attribution || 'self',
+      context: thought.context,
+      metadata: thought.metadata,
+      timestamp: thought.timestamp,
+      processed: thought.processed || false,
+    }));
 
     res.json({
       success: true,
-      thoughts: recentThoughts,
-      count: recentThoughts.length,
+      thoughts: formattedThoughts,
+      count: formattedThoughts.length,
       timestamp: Date.now(),
     });
   } catch (error) {

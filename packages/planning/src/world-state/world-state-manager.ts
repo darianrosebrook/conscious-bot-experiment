@@ -42,7 +42,7 @@ export class WorldStateManager extends EventEmitter {
     return this.snapshot.inventory ? [...this.snapshot.inventory] : undefined;
   }
 
-  startPolling(intervalMs = 10000): void {
+  startPolling(intervalMs = 30000): void {
     if (this.pollHandle) clearInterval(this.pollHandle);
     this.pollHandle = setInterval(
       () => this.pollOnce().catch(() => {}),

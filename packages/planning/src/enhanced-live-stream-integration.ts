@@ -106,7 +106,7 @@ const DEFAULT_CONFIG: LiveStreamIntegrationConfig = {
   dashboardEndpoint: 'http://localhost:3000',
   minecraftEndpoint: 'http://localhost:3005',
   screenshotEndpoint: 'http://localhost:3005/screenshots',
-  updateInterval: 10000, // Reduced from 2 seconds to 10 seconds
+  updateInterval: 30000, // Increased to 30 seconds to reduce spam
   maxActionLogs: 1000,
   maxVisualFeedbacks: 100,
   screenshotInterval: 30000, // Reduced from 10 seconds to 30 seconds

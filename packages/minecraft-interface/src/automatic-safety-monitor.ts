@@ -10,6 +10,7 @@ import { EventEmitter } from 'events';
 import { Bot } from 'mineflayer';
 import { Vec3 } from 'vec3';
 import { ActionTranslator } from './action-translator';
+import { ThreatPerceptionManager } from './threat-perception-manager';
 
 export interface SafetyMonitorConfig {
   healthThreshold: number; // Trigger emergency response when health drops below this
@@ -32,6 +33,7 @@ export interface ThreatAssessment {
 export class AutomaticSafetyMonitor extends EventEmitter {
   private bot: Bot;
   private actionTranslator: ActionTranslator;
+  private threatPerceptionManager: ThreatPerceptionManager;
   private config: SafetyMonitorConfig;
   private isMonitoring = false;
   private lastHealth = 20;
@@ -55,6 +57,13 @@ export class AutomaticSafetyMonitor extends EventEmitter {
       maxFleeDistance: 20,
       ...config,
     };
+
+    // Initialize threat perception manager for localized detection
+    this.threatPerceptionManager = new ThreatPerceptionManager(bot, this, {
+      maxDetectionRadius: 50,
+      lineOfSightRequired: true,
+      persistenceWindowMs: 300000,
+    });
   }
 
   /**
@@ -82,6 +91,8 @@ export class AutomaticSafetyMonitor extends EventEmitter {
     // Start periodic monitoring
     this.monitoringInterval = setInterval(() => {
       this.performSafetyCheck();
+      // Clean up old threats from memory
+      this.threatPerceptionManager.cleanupOldThreats();
     }, this.config.checkInterval);
 
     this.emit('monitoring-started');
@@ -132,17 +143,16 @@ export class AutomaticSafetyMonitor extends EventEmitter {
   }
 
   /**
-   * Handle entity movement
+   * Handle entity movement - now handled by ThreatPerceptionManager for consistency.
+   * Kept for backward compatibility; main logic moved to assessThreats.
    */
   private async handleEntityMovement(entity: any): Promise<void> {
-    // Check if entity is hostile
+    // Lightweight check for immediate threats (<3 blocks) to maintain reactivity
     if (this.isHostileEntity(entity)) {
       const distance = this.bot.entity.position.distanceTo(entity.position);
-
-      // If hostile entity is very close, flee
       if (distance < 3) {
         console.log(
-          `🚨 Hostile entity (${entity.name}) detected at distance ${distance.toFixed(1)}! Fleeing`
+          `🚨 Immediate threat: ${entity.name} at ${distance.toFixed(1)} blocks! Triggering response`
         );
         await this.triggerEmergencyResponse('hostile_nearby', {
           entity: entity.name,
@@ -177,59 +187,22 @@ export class AutomaticSafetyMonitor extends EventEmitter {
   }
 
   /**
-   * Assess current threats
+   * Assess current threats using the new localized perception manager.
    */
   private async assessThreats(): Promise<ThreatAssessment> {
-    const threats: ThreatAssessment['threats'] = [];
-    let maxThreatLevel = 0;
+    const result = await this.threatPerceptionManager.assessThreats();
 
-    // Check for hostile entities
-    for (const entity of Object.values(this.bot.entities)) {
-      if (this.isHostileEntity(entity)) {
-        const distance = this.bot.entity.position.distanceTo(entity.position);
-        const threatLevel = this.calculateThreatLevel(entity, distance);
-
-        threats.push({
-          type: entity.name || entity.type,
-          distance,
-          threatLevel,
-        });
-
-        maxThreatLevel = Math.max(maxThreatLevel, threatLevel);
-      }
-    }
-
-    // Check health-based threats
-    const healthThreat = Math.max(0, (20 - this.bot.health) / 20) * 100;
-    if (healthThreat > 0) {
-      threats.push({
-        type: 'low_health',
-        distance: 0,
-        threatLevel: healthThreat,
-      });
-      maxThreatLevel = Math.max(maxThreatLevel, healthThreat);
-    }
-
-    // Determine overall threat level
-    let threatLevel: ThreatAssessment['threatLevel'] = 'low';
-    if (maxThreatLevel > 80) threatLevel = 'critical';
-    else if (maxThreatLevel > 60) threatLevel = 'high';
-    else if (maxThreatLevel > 30) threatLevel = 'medium';
-
-    // Determine recommended action
-    let recommendedAction: ThreatAssessment['recommendedAction'] = 'none';
-    if (threatLevel === 'critical') {
-      recommendedAction = 'flee';
-    } else if (threatLevel === 'high') {
-      recommendedAction = this.bot.health < 10 ? 'flee' : 'find_shelter';
-    } else if (threatLevel === 'medium') {
-      recommendedAction = 'find_shelter';
-    }
+    // Convert to original ThreatAssessment format for compatibility
+    const threats: ThreatAssessment['threats'] = result.threats.map((t) => ({
+      type: t.type,
+      distance: t.distance,
+      threatLevel: t.threatLevel,
+    }));
 
     return {
-      threatLevel,
+      threatLevel: result.overallThreatLevel,
       threats,
-      recommendedAction,
+      recommendedAction: result.recommendedAction,
     };
   }
 
@@ -946,11 +919,20 @@ export class AutomaticSafetyMonitor extends EventEmitter {
     isMonitoring: boolean;
     lastHealth: number;
     config: SafetyMonitorConfig;
+    threatManager: ThreatPerceptionManager;
   } {
     return {
       isMonitoring: this.isMonitoring,
       lastHealth: this.lastHealth,
       config: this.config,
+      threatManager: this.threatPerceptionManager,
     };
+  }
+
+  /**
+   * Get the threat perception manager for external access.
+   */
+  getThreatManager(): ThreatPerceptionManager {
+    return this.threatPerceptionManager;
   }
 }

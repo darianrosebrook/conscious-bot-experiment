@@ -21,6 +21,8 @@ import {
   environmentalDetector,
   EnvironmentalState,
 } from './environmental-detector.js';
+import { WaterNavigationManager } from './water-navigation-manager.js';
+import { LongJourneyNavigator } from './long-journey-navigator.js';
 
 // Import D* Lite components from world package
 // Temporarily comment out to use local types
@@ -31,8 +33,8 @@ import {
 //   PathPlanningResult,
 // } from '@conscious-bot/world';
 
-// Local type definitions for now
-// NavigationConfig and other types are now imported from @conscious-bot/world
+// NavigationConfig and other types are now imported from local types file
+import { NavigationConfig } from './types.js';
 
 interface PathPlanningRequest {
   start: { x: number; y: number; z: number };
@@ -52,52 +54,6 @@ interface PathPlanningResult {
   cost?: number;
   error?: string;
   reason?: string;
-}
-
-interface NavigationConfig {
-  dstarLite?: {
-    searchRadius?: number;
-    replanThreshold?: number;
-    maxComputationTime?: number;
-    heuristicWeight?: number;
-  };
-  costCalculation?: {
-    baseMoveCost?: number;
-    diagonalMultiplier?: number;
-    verticalMultiplier?: number;
-    jumpCost?: number;
-    swimCost?: number;
-    // Enhanced water navigation costs
-    surfaceSwimCost?: number;
-    deepSwimCost?: number;
-    currentResistanceCost?: number;
-    buoyancyCost?: number;
-    waterExitCost?: number;
-  };
-  hazardCosts?: {
-    lavaProximity?: number;
-    voidFall?: number;
-    mobProximity?: number;
-    darknessPenalty?: number;
-    waterPenalty?: number;
-    // Enhanced water hazards
-    drowningRisk?: number;
-    currentHazard?: number;
-    deepWaterPenalty?: number;
-    surfaceObstruction?: number;
-    // Minecraft-specific hazards
-    cactusPenalty?: number;
-    firePenalty?: number;
-    poisonPenalty?: number;
-  };
-  optimization?: {
-    pathSmoothing?: boolean;
-    lookaheadDistance?: number;
-    safetyMargin?: number;
-  };
-  maxDistance?: number;
-  timeout?: number;
-  [key: string]: any;
 }
 
 class MockNavigationSystem extends EventEmitter {
@@ -217,6 +173,9 @@ export class NavigationBridge extends EventEmitter {
   // Water navigation
   private waterNavigationManager: WaterNavigationManager;
 
+  // Long journey navigation
+  private longJourneyNavigator: LongJourneyNavigator;
+
   constructor(bot: Bot, config: Partial<NavigationBridgeConfig> = {}) {
     super();
 
@@ -283,6 +242,13 @@ export class NavigationBridge extends EventEmitter {
     // Initialize water navigation manager
     this.waterNavigationManager = new WaterNavigationManager(
       this.bot,
+      navConfig
+    );
+
+    // Initialize long journey navigator
+    this.longJourneyNavigator = new LongJourneyNavigator(
+      this.bot,
+      this,
       navConfig
     );
 
@@ -1082,6 +1048,114 @@ export class NavigationBridge extends EventEmitter {
    */
   getEnvironmentalStats(): any {
     return environmentalDetector.getEnvironmentalStats();
+  }
+
+  // ==================== Long Journey Navigation ====================
+
+  /**
+   * Navigate to a distant destination using chunk-based pathfinding
+   */
+  async navigateLongJourney(
+    destination: Vec3,
+    urgency: 'low' | 'medium' | 'high' | 'critical' = 'medium'
+  ): Promise<{
+    success: boolean;
+    totalDistance: number;
+    totalTime: number;
+    stages: number;
+    waypointsDiscovered: number;
+    error?: string;
+  }> {
+    console.log(
+      `🗺️ Starting long journey to: ${destination.x.toFixed(1)}, ${destination.y.toFixed(1)}, ${destination.z.toFixed(1)}`
+    );
+
+    try {
+      const result = await this.longJourneyNavigator.navigateToDestination({
+        destination,
+        urgency,
+        constraints: {
+          avoidWater: false,
+          avoidHostileAreas: true,
+          preferSafePaths: true,
+        },
+      });
+
+      return {
+        success: result.success,
+        totalDistance: result.totalDistance,
+        totalTime: result.totalTime,
+        stages: result.stages.length,
+        waypointsDiscovered: result.waypointsDiscovered.length,
+        error: result.error,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        totalDistance: 0,
+        totalTime: 0,
+        stages: 0,
+        waypointsDiscovered: 0,
+        error: error instanceof Error ? error.message : String(error),
+      };
+    }
+  }
+
+  /**
+   * Start following a player with intelligent pathfinding
+   */
+  async startFollowingPlayer(
+    playerId: string,
+    playerName: string
+  ): Promise<boolean> {
+    return await this.longJourneyNavigator.startFollowingPlayer(
+      playerId,
+      playerName
+    );
+  }
+
+  /**
+   * Stop following the current player
+   */
+  stopFollowingPlayer(): void {
+    this.longJourneyNavigator.stopFollowingPlayer();
+  }
+
+  /**
+   * Get journey statistics
+   */
+  getJourneyStatistics(): any {
+    return this.longJourneyNavigator.getJourneyStatistics();
+  }
+
+  /**
+   * Add a waypoint manually
+   */
+  addWaypoint(waypoint: {
+    position: Vec3;
+    type: 'safe' | 'hazard' | 'resource' | 'landmark' | 'portal';
+    description: string;
+    riskLevel: 'low' | 'medium' | 'high';
+    accessibility: {
+      canReach: boolean;
+      requiresTools?: string[];
+      seasonalAccess?: boolean;
+      timeRestrictions?: { start: number; end: number };
+    };
+    chunk: {
+      x: number;
+      z: number;
+      key: string;
+    };
+  }): any {
+    return this.longJourneyNavigator.addWaypoint(waypoint);
+  }
+
+  /**
+   * Get waypoints in a specific chunk
+   */
+  getChunkWaypoints(chunkX: number, chunkZ: number): any[] {
+    return this.longJourneyNavigator.getChunkWaypoints(chunkX, chunkZ);
   }
 
   /**

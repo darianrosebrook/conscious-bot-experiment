@@ -494,13 +494,16 @@ export class ActionTranslator {
         };
 
       case 'collect_items':
-        // Creating collect items action
+        // Creating collect items action with improved search
         return {
-          type: 'pickup_item',
+          type: 'collect_items_enhanced',
           parameters: {
-            maxDistance: params.radius || 3,
+            item: params.item,
+            radius: params.radius || 10,
+            maxSearchTime: 30000, // Search for up to 30 seconds
+            exploreOnFail: true, // Explore area if items not found immediately
           },
-          timeout: 5000,
+          timeout: 35000, // Allow time for exploration
         };
 
       case 'pickup_item':
@@ -508,7 +511,7 @@ export class ActionTranslator {
         return {
           type: 'pickup_item',
           parameters: {
-            maxDistance: params.maxDistance || params.radius || 3,
+            maxDistance: params.maxDistance || params.radius || 10,
             item: params.item,
           },
           timeout: 5000,
@@ -926,6 +929,9 @@ export class ActionTranslator {
 
         case 'pickup_item':
           return await this.executePickup(action, timeout);
+
+        case 'collect_items_enhanced':
+          return await this.executeCollectItemsEnhanced(action, timeout);
 
         case 'look_at':
           return await this.executeLookAt(action, timeout);
@@ -2126,6 +2132,263 @@ export class ActionTranslator {
         error: 'Failed to collect any items',
       };
     }
+  }
+
+  /**
+   * Execute enhanced collect items action with exploration
+   */
+  private async executeCollectItemsEnhanced(
+    action: MinecraftAction,
+    timeout: number
+  ): Promise<{ success: boolean; data?: any; error?: string }> {
+    const {
+      item,
+      radius = 10,
+      maxSearchTime = 30000,
+      exploreOnFail = true,
+    } = action.parameters;
+    const startTime = Date.now();
+
+    console.log(
+      `🔍 Starting enhanced item collection for ${item || 'any items'} within ${radius} blocks`
+    );
+
+    // First, try the normal pickup method
+    const initialPickup = await this.executePickup(
+      {
+        type: 'pickup_item',
+        parameters: { item, maxDistance: radius },
+        timeout: Math.min(5000, timeout),
+      },
+      Math.min(5000, timeout)
+    );
+
+    if (initialPickup.success) {
+      console.log('✅ Items found and collected immediately');
+      return initialPickup;
+    }
+
+    // If no items found and exploreOnFail is enabled, try exploration
+    if (exploreOnFail && Date.now() - startTime < maxSearchTime) {
+      console.log(
+        `🔍 No items found immediately, starting exploration within ${radius} blocks`
+      );
+
+      // Try to explore the area by moving in a spiral pattern
+      const explorationResult = await this.exploreForItems(
+        item,
+        radius,
+        maxSearchTime - (Date.now() - startTime)
+      );
+
+      if (explorationResult.success) {
+        console.log('✅ Items found during exploration');
+        return explorationResult;
+      }
+    }
+
+    return {
+      success: false,
+      error: `No ${item || 'items'} found within ${radius} blocks after ${Math.round((Date.now() - startTime) / 1000)}s search`,
+    };
+  }
+
+  /**
+   * Explore area for items using spiral movement pattern
+   */
+  private async exploreForItems(
+    item: string | undefined,
+    radius: number,
+    maxTime: number
+  ): Promise<{ success: boolean; data?: any; error?: string }> {
+    const startTime = Date.now();
+    const center = this.bot.entity.position.clone();
+    const spiralRadius = Math.min(radius, 10); // Limit spiral to reasonable size
+
+    console.log(
+      `🔄 Starting enhanced exploration using perception system within ${radius} blocks`
+    );
+
+    try {
+      // Use the world package's perception system for better item detection
+      const worldUrl = process.env.WORLD_SERVICE_URL || 'http://localhost:3004';
+
+      const response = await fetch(`${worldUrl}/api/perception/visual-field`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          position: { x: center.x, y: center.y, z: center.z },
+          radius: radius,
+          fieldOfView: { horizontal: 120, vertical: 60 }, // Wide field of view for exploration
+          maxDistance: radius,
+          observerPosition: { x: center.x, y: center.y, z: center.z },
+          level: 'enhanced', // Use enhanced perception for better detection
+        }),
+      });
+
+      if (!response.ok) {
+        console.log(
+          `World perception API failed, falling back to spiral search`
+        );
+        return this.fallbackSpiralExploration(
+          item,
+          radius,
+          maxTime - (Date.now() - startTime)
+        );
+      }
+
+      const perceptionResult = await response.json() as {
+        observations?: Array<{
+          type: string;
+          itemId?: string;
+          pos: { x: number; y: number; z: number };
+          distance: number;
+        }>;
+      };
+
+      // Look for items in the perception results
+      const itemsFound =
+        perceptionResult.observations?.filter(
+          (obs) =>
+            obs.type === 'item' &&
+            (!item ||
+              obs.itemId === (this.bot as any).mcData.itemsByName[item]?.id)
+        ) || [];
+
+      if (itemsFound.length > 0) {
+        console.log(
+          `🎯 Found ${itemsFound.length} items via perception system`
+        );
+
+        // Try to collect the closest item
+        const closestItem = itemsFound.reduce((closest: any, current: any) =>
+          current.distance < closest.distance ? current : closest
+        );
+
+        // Move to the item using pathfinding
+        try {
+          const Goals = await getGoals();
+          await this.bot.pathfinder.goto(
+            new Goals.GoalBlock(
+              closestItem.pos.x,
+              closestItem.pos.y,
+              closestItem.pos.z
+            )
+          );
+
+          return await this.executePickup(
+            {
+              type: 'pickup_item',
+              parameters: { item, maxDistance: radius },
+              timeout: 5000,
+            },
+            5000
+          );
+        } catch (error) {
+          console.log(`Failed to reach item at ${closestItem.pos}:`, error);
+        }
+      }
+
+      // If no items found via perception, fall back to spiral exploration
+      return this.fallbackSpiralExploration(
+        item,
+        radius,
+        maxTime - (Date.now() - startTime)
+      );
+    } catch (error) {
+      console.log(
+        `Perception exploration failed, falling back to spiral:`,
+        error
+      );
+      return this.fallbackSpiralExploration(
+        item,
+        radius,
+        maxTime - (Date.now() - startTime)
+      );
+    }
+  }
+
+  /**
+   * Fallback spiral exploration for when perception system fails
+   */
+  private async fallbackSpiralExploration(
+    item: string | undefined,
+    radius: number,
+    maxTime: number
+  ): Promise<{ success: boolean; data?: any; error?: string }> {
+    const startTime = Date.now();
+    const center = this.bot.entity.position.clone();
+    const spiralRadius = Math.min(radius, 10); // Limit spiral to reasonable size
+
+    console.log(
+      `🔄 Starting fallback spiral exploration pattern within ${spiralRadius} blocks`
+    );
+
+    // Simple spiral exploration
+    for (let r = 1; r <= spiralRadius; r += 2) {
+      if (Date.now() - startTime > maxTime) {
+        break;
+      }
+
+      // Check 4 directions at this radius
+      const directions = [
+        new Vec3(r, 0, 0), // East
+        new Vec3(0, 0, r), // South
+        new Vec3(-r, 0, 0), // West
+        new Vec3(0, 0, -r), // North
+      ];
+
+      for (const direction of directions) {
+        const targetPos = center.clone().add(direction);
+
+        // Check if position is safe (not over void, water, lava, etc.)
+        const block = this.bot.blockAt(targetPos);
+        if (!block || block.name === 'air') {
+          continue;
+        }
+
+        // Move to position
+        try {
+          const Goals = await getGoals();
+          await this.bot.pathfinder.goto(
+            new Goals.GoalBlock(targetPos.x, targetPos.y, targetPos.z)
+          );
+
+          // Look for items from this new position
+          const itemsFound = Object.values(this.bot.entities).filter(
+            (entity) =>
+              entity.name === 'item' &&
+              (!item ||
+                (entity.metadata?.[8] as any)?.itemId ===
+                  (this.bot as any).mcData.itemsByName[item]?.id) &&
+              entity.position.distanceTo(this.bot.entity.position) <= radius
+          );
+
+          if (itemsFound.length > 0) {
+            console.log(
+              `🎯 Found ${itemsFound.length} items at exploration position`
+            );
+            // Try to collect them
+            return await this.executePickup(
+              {
+                type: 'pickup_item',
+                parameters: { item, maxDistance: radius },
+                timeout: 5000,
+              },
+              5000
+            );
+          }
+        } catch (error) {
+          // Ignore pathfinding errors and continue
+          continue;
+        }
+      }
+    }
+
+    return {
+      success: false,
+      error: 'No items found during exploration',
+    };
   }
 
   /**
