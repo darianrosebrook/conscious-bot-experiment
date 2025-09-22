@@ -1200,7 +1200,7 @@ class HRMCognitiveModule implements CognitiveModule {
     // Handle complex reasoning tasks
     return (
       task.complexity === 'complex' ||
-      (signature?.symbolicPreconditions || 0) > 0.6
+      (signature?.symbolicPreconditions?.length || 0) > 0.6
     );
   }
 

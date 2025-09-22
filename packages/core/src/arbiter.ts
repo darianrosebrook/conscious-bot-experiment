@@ -16,6 +16,7 @@ import {
   DEFAULT_PERFORMANCE_CONFIG,
 } from './performance-monitor';
 import { AdvancedNeedGenerator } from './advanced-need-generator';
+import type { EnhancedNeed } from './advanced-need-generator';
 import { GoalTemplateManager } from './goal-template-manager';
 import {
   AdvancedSignalProcessor,
@@ -200,6 +201,7 @@ export class Arbiter extends EventEmitter<SystemEvents> {
   private lastSignalTime = 0;
   private taskQueue: CognitiveTask[] = [];
   private isProcessing = false;
+  private enhancedNeedTaskCount = 0;
 
   constructor(options: ArbiterOptions = {}) {
     super();
@@ -320,9 +322,7 @@ export class Arbiter extends EventEmitter<SystemEvents> {
             }))
           );
 
-        // TODO: Enhanced needs generated - integrate with decision making system
-        // Note: Signal processor needs are managed internally
-        console.log('TODO: IMPLEMENT... enhancedNeeds', enhancedNeeds);
+        await this.integrateEnhancedNeeds(enhancedNeeds, 'signal');
       }
 
       // Track signal statistics
@@ -807,6 +807,155 @@ export class Arbiter extends EventEmitter<SystemEvents> {
   }
 
   /**
+   * Integrate enhanced needs into the decision-making system
+   */
+  private async integrateEnhancedNeeds(
+    enhancedNeeds: EnhancedNeed[],
+    source: 'signal' | 'loop'
+  ): Promise<void> {
+    if (enhancedNeeds.length === 0) {
+      return;
+    }
+
+    const integrationStart = Date.now();
+    const priorityThreshold = 0.5;
+
+    const taskContext = this.getCurrentTaskContext();
+    const now = Date.now();
+
+    const priorityTasks = enhancedNeeds
+      .filter((need) => need.priorityScore >= priorityThreshold)
+      .map((need) => this.buildPriorityTaskFromNeed(need, taskContext, now));
+
+    if (priorityTasks.length === 0) {
+      console.log('arbiter.enhanced_need.integration', {
+        source,
+        considered: enhancedNeeds.length,
+        scheduled: 0,
+        reason: 'below_threshold',
+      });
+      return;
+    }
+
+    const ranking = await this.priorityRanker.rankTasks(
+      priorityTasks,
+      this.getCurrentTaskContext()
+    );
+
+    const scheduledTasks = ranking.tasks
+      .slice(0, 3)
+      .filter((task) => task.calculatedPriority >= priorityThreshold);
+
+    if (scheduledTasks.length === 0) {
+      console.log('arbiter.enhanced_need.integration', {
+        source,
+        considered: enhancedNeeds.length,
+        scheduled: 0,
+        reason: 'low_rank',
+      });
+      return;
+    }
+
+    const scheduledIds = new Set<string>();
+
+    for (const prioritizedTask of scheduledTasks) {
+      if (scheduledIds.has(prioritizedTask.id)) {
+        continue;
+      }
+      scheduledIds.add(prioritizedTask.id);
+
+      const cognitiveTask = this.buildCognitiveTaskFromPrioritizedTask(
+        prioritizedTask,
+        source
+      );
+
+      this.processCognitiveTask(cognitiveTask).catch((error) => {
+        console.error('Failed to process enhanced need task:', error);
+      });
+    }
+
+    this.enhancedNeedTaskCount += scheduledIds.size;
+
+    console.log('arbiter.enhanced_need.integration', {
+      source,
+      considered: enhancedNeeds.length,
+      scheduled: scheduledIds.size,
+      elapsedMs: Date.now() - integrationStart,
+      threshold: priorityThreshold,
+    });
+  }
+
+  private buildPriorityTaskFromNeed(
+    need: EnhancedNeed,
+    context: TaskContext,
+    timestamp: number
+  ): PriorityTask {
+    return {
+      id: need.id ?? uuidv4(),
+      name: `${need.type}_need`,
+      description: `Address ${need.type} need with priority ${need.priorityScore.toFixed(2)}`,
+      type: this.mapNeedTypeToTaskType(need.type),
+      basePriority: need.priorityScore,
+      urgency: need.urgency,
+      importance: need.intensity,
+      complexity: need.intensity,
+      estimatedDuration: 30,
+      dependencies: [],
+      resources: [],
+      context: { ...context },
+      metadata: {
+        category: 'need_satisfaction',
+        tags: [need.type, 'enhanced_need'],
+        difficulty: need.intensity,
+        skillRequirements: [],
+        emotionalImpact: need.socialImpact ?? 0,
+        satisfaction: 0.8,
+        novelty: need.noveltyScore,
+        socialValue: need.socialImpact ?? 0,
+      },
+      createdAt: timestamp,
+      lastUpdated: timestamp,
+    };
+  }
+
+  private buildCognitiveTaskFromPrioritizedTask(
+    prioritizedTask: PriorityTask & { calculatedPriority?: number; rankingReason?: string },
+    source: string
+  ): CognitiveTask {
+    const calculatedPriority =
+      'calculatedPriority' in prioritizedTask &&
+      typeof prioritizedTask.calculatedPriority === 'number'
+        ? prioritizedTask.calculatedPriority
+        : prioritizedTask.basePriority;
+
+    const complexityLevel =
+      prioritizedTask.complexity > 0.66
+        ? 'complex'
+        : prioritizedTask.complexity > 0.33
+          ? 'moderate'
+          : 'simple';
+
+    return {
+      id: prioritizedTask.id,
+      type: this.mapTaskTypeToCognitiveType(prioritizedTask.type) as
+        | 'social'
+        | 'planning'
+        | 'reasoning'
+        | 'reactive'
+        | 'exploration',
+      priority: calculatedPriority,
+      urgency: prioritizedTask.urgency,
+      complexity: complexityLevel,
+      context: {
+        needType: prioritizedTask.name,
+        needScore: calculatedPriority,
+        rankingReason: (prioritizedTask as any).rankingReason ?? 'enhanced_need',
+        source,
+      },
+    };
+  }
+
+  /**
    * Stop the arbiter and cleanup resources
    */
   stop(): void {
@@ -871,6 +1020,7 @@ export class Arbiter extends EventEmitter<SystemEvents> {
     performance: any;
     lastSignalTime: number;
     totalSignalsProcessed: number;
+    enhancedNeedTasksRouted: number;
   } {
     return {
       running: this.running,
@@ -880,6 +1030,7 @@ export class Arbiter extends EventEmitter<SystemEvents> {
       performance: this.performanceMonitor.getCurrentMetrics(),
       lastSignalTime: this.lastSignalTime,
       totalSignalsProcessed: this.totalSignalsProcessed,
+      enhancedNeedTasksRouted: this.enhancedNeedTaskCount,
     };
   }
 

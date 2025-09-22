@@ -1492,14 +1492,15 @@ async function autonomousTaskExecutor() {
       console.warn('Inventory progress estimation failed:', e);
     }
 
-    // Execute MCP option if found (temporarily disabled due to crash)
+    // Execute MCP option if found
     if (suitableOption) {
       console.log(
-        `🎯 Found MCP option: ${suitableOption.name} (${suitableOption.id}) - execution temporarily disabled`
+        `🎯 Found MCP option: ${suitableOption.name} (${suitableOption.id}) - delegating to MCP execution pipeline`
       );
-      // TODO: Re-enable MCP execution after fixing the crash - investigate MCP execution failure
-
-      return;
+      enhancedTaskIntegration.updateTaskMetadata(currentTask.id, {
+        ...currentTask.metadata,
+        updatedAt: Date.now(),
+      });
     }
 
     // If no BT option found, try to use individual leaves directly

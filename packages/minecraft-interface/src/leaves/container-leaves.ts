@@ -167,41 +167,223 @@ class ContainerManager {
 
     return nearest;
   }
+
+  /**
+   * Calculate item values for intelligent inventory management
+   */
+  private calculateItemValues(items: any[], bot: Bot): any {
+    const itemValues = new Map<string, number>();
+
+  // Base item values (rarity-based)
+  const baseValues: Record<string, number> = {
+    // Tools and weapons
+    'diamond_sword': 2000, 'diamond_pickaxe': 1800, 'diamond_axe': 1600, 'diamond_shovel': 1400,
+    'iron_sword': 500, 'iron_pickaxe': 450, 'iron_axe': 400, 'iron_shovel': 350,
+    'stone_sword': 50, 'stone_pickaxe': 45, 'stone_axe': 40, 'stone_shovel': 35,
+    'wooden_sword': 10, 'wooden_pickaxe': 8, 'wooden_axe': 6, 'wooden_shovel': 4,
+
+    // Armor
+    'diamond_helmet': 1600, 'diamond_chestplate': 2000, 'diamond_leggings': 1800, 'diamond_boots': 1400,
+    'iron_helmet': 400, 'iron_chestplate': 500, 'iron_leggings': 450, 'iron_boots': 350,
+    'chainmail_helmet': 150, 'chainmail_chestplate': 200, 'chainmail_leggings': 175, 'chainmail_boots': 125,
+    'leather_helmet': 50, 'leather_chestplate': 75, 'leather_leggings': 60, 'leather_boots': 40,
+
+    // Materials
+    'diamond': 100, 'iron_ingot': 25, 'gold_ingot': 30, 'emerald': 50, 'redstone': 5,
+    'lapis_lazuli': 8, 'coal': 3, 'quartz': 6, 'obsidian': 15, 'crying_obsidian': 20,
+
+    // Food
+    'golden_apple': 500, 'enchanted_golden_apple': 2000, 'cooked_beef': 15, 'cooked_porkchop': 15,
+    'cooked_chicken': 12, 'bread': 8, 'apple': 5, 'carrot': 3, 'potato': 3,
+
+    // Building blocks
+    'diamond_block': 900, 'iron_block': 225, 'gold_block': 270, 'obsidian': 135,
+  };
+
+  // Calculate values for all items
+  for (const item of items) {
+    let value = baseValues[item.name] || 1; // Default low value
+
+    // Enchantment bonus (simplified)
+    if (item.metadata?.enchanted) {
+      value *= 1.5;
+    }
+
+    // Durability bonus (simplified)
+    if (item.metadata?.durability) {
+      const durabilityRatio = item.metadata.durability / 100;
+      value *= (0.5 + durabilityRatio * 0.5); // 50-100% of base value
+    }
+
+    // Stack size bonus
+    if (item.count > 1) {
+      value *= Math.min(2, item.count / 10); // Bonus for larger stacks
+    }
+
+    itemValues.set(item.name, Math.round(value));
+  }
+
+  return itemValues;
 }
+
+  /**
+   * Analyze crafting opportunities based on available materials
+   */
+  private analyzeCraftingOpportunities(items: any[], bot: Bot): any {
+  const opportunities: Array<{
+    recipe: string;
+    requiredItems: Array<{ item: string; count: number; available: number }>;
+    output: string;
+    priority: number;
+    value: number;
+  }> = [];
+
+  // Define basic crafting recipes
+  const recipes: Record<string, {
+    ingredients: Array<{ item: string; count: number }>;
+    output: string;
+    priority: number;
+    baseValue: number;
+  }> = {
+    'iron_sword': {
+      ingredients: [{ item: 'iron_ingot', count: 2 }, { item: 'stick', count: 1 }],
+      output: 'iron_sword',
+      priority: 8,
+      baseValue: 500,
+    },
+    'iron_pickaxe': {
+      ingredients: [{ item: 'iron_ingot', count: 3 }, { item: 'stick', count: 2 }],
+      output: 'iron_pickaxe',
+      priority: 8,
+      baseValue: 450,
+    },
+    'bread': {
+      ingredients: [{ item: 'wheat', count: 3 }],
+      output: 'bread',
+      priority: 6,
+      baseValue: 8,
+    },
+    'cooked_beef': {
+      ingredients: [{ item: 'raw_beef', count: 1 }],
+      output: 'cooked_beef',
+      priority: 7,
+      baseValue: 15,
+    },
+  };
+
+  // Analyze each recipe
+  for (const [recipeName, recipe] of Object.entries(recipes)) {
+    const requiredItems: Array<{ item: string; count: number; available: number }> = [];
+    let canCraft = true;
+
+    for (const ingredient of recipe.ingredients) {
+      const availableItem = items.find((item: any) =>
+        item.name.includes(ingredient.item.split('_')[0]) // Fuzzy matching
+      );
+      const availableCount = availableItem?.count || 0;
+
+      requiredItems.push({
+        item: ingredient.item,
+        count: ingredient.count,
+        available: availableCount,
+      });
+
+      if (availableCount < ingredient.count) {
+        canCraft = false;
+      }
+    }
+
+    if (canCraft) {
+      opportunities.push({
+        recipe: recipeName,
+        requiredItems,
+        output: recipe.output,
+        priority: recipe.priority,
+        value: recipe.baseValue,
+      });
+    }
+  }
+
+  // Sort by priority and value
+  opportunities.sort((a, b) => b.priority * b.value - a.priority * a.value);
+
+  console.log(`🔧 Found ${opportunities.length} crafting opportunities`);
+  return opportunities;
+}
+
+  /**
+   * Optimize storage layout for better organization
+   */
+  private optimizeStorageLayout(items: any[]): any {
+  const layout = {
+    hotbarItems: [] as string[],
+    mainInventoryLayout: {} as Record<number, string>,
+    recommendations: [] as string[],
+  };
+
+  // Prioritize items for hotbar (tools, weapons, food)
+  const hotbarPriority = [
+    'diamond_sword', 'iron_sword', 'diamond_pickaxe', 'iron_pickaxe',
+    'diamond_axe', 'iron_axe', 'golden_apple', 'cooked_beef', 'bread'
+  ];
+
+  const availableHotbarItems = items.filter((item: any) =>
+    hotbarPriority.some((priority) => item.name.includes(priority.split('_')[0]))
+  );
+
+  layout.hotbarItems = availableHotbarItems.slice(0, 9).map((item: any) => item.name);
+
+  // Suggest optimal main inventory layout
+  const remainingItems = items.filter((item: any) =>
+    !layout.hotbarItems.includes(item.name)
+  );
+
+  // Organize by category
+  const tools = remainingItems.filter((item: any) =>
+    item.name.includes('sword') || item.name.includes('pickaxe') ||
+    item.name.includes('axe') || item.name.includes('shovel')
+  );
+
+  const armor = remainingItems.filter((item: any) =>
+    item.name.includes('helmet') || item.name.includes('chestplate') ||
+    item.name.includes('leggings') || item.name.includes('boots')
+  );
+
+  const food = remainingItems.filter((item: any) =>
+    item.name.includes('apple') || item.name.includes('bread') ||
+    item.name.includes('beef') || item.name.includes('chicken') ||
+    item.name.includes('porkchop') || item.name.includes('carrot') ||
+    item.name.includes('potato')
+  );
+
+  const materials = remainingItems.filter((item: any) =>
+    !tools.includes(item) && !armor.includes(item) && !food.includes(item)
+  );
+
+  // Generate recommendations
+  if (tools.length > 10) {
+    layout.recommendations.push('Consider storing excess tools in chests');
+  }
+
+  if (materials.length > 20) {
+    layout.recommendations.push('Store excess materials in dedicated chests');
+  }
+
+  if (availableHotbarItems.length > 9) {
+    layout.recommendations.push('Multiple high-priority items available for hotbar');
+  }
+
+  console.log(`📦 Storage optimization: ${layout.hotbarItems.length} hotbar items, ${tools.length} tools, ${armor.length} armor, ${food.length} food, ${materials.length} materials`);
+
+  return layout;
+  }
+}
+
 
 // ============================================================================
 // Helper Functions
 // ============================================================================
 
-/**
- * Find the nearest chest within radius
- */
-async function findNearestChest(
-  bot: Bot,
-  radius: number
-): Promise<Vec3 | null> {
-  if (!bot.entity?.position) return null;
-
-  const pos = bot.entity.position;
-
-  for (let x = -radius; x <= radius; x++) {
-    for (let y = -radius; y <= radius; y++) {
-      for (let z = -radius; z <= radius; z++) {
-        const checkPos = pos.offset(x, y, z);
-        const block = bot.blockAt(checkPos);
-
-        if (
-          block &&
-          (block.name === 'chest' || block.name === 'trapped_chest')
-        ) {
-          return checkPos;
-        }
-      }
-    }
-  }
-
-  return null;
-}
 
 // ============================================================================
 // Inventory Management Functions
@@ -438,269 +620,6 @@ async function dropUnwantedItems(
   return { processed: items.length, dropped };
 }
 
-  /**
-   * Calculate item values for intelligent inventory management
-   */
-  private calculateItemValues(items: any[], bot: Bot): any {
-    const itemValues = new Map<string, number>();
-
-  // Base item values (rarity-based)
-  const baseValues: Record<string, number> = {
-    // Tools and weapons
-    'diamond_sword': 2000, 'diamond_pickaxe': 1800, 'diamond_axe': 1600, 'diamond_shovel': 1400,
-    'iron_sword': 500, 'iron_pickaxe': 450, 'iron_axe': 400, 'iron_shovel': 350,
-    'stone_sword': 50, 'stone_pickaxe': 45, 'stone_axe': 40, 'stone_shovel': 35,
-    'wooden_sword': 10, 'wooden_pickaxe': 8, 'wooden_axe': 6, 'wooden_shovel': 4,
-
-    // Armor
-    'diamond_helmet': 1600, 'diamond_chestplate': 2000, 'diamond_leggings': 1800, 'diamond_boots': 1400,
-    'iron_helmet': 400, 'iron_chestplate': 500, 'iron_leggings': 450, 'iron_boots': 350,
-    'chainmail_helmet': 150, 'chainmail_chestplate': 200, 'chainmail_leggings': 175, 'chainmail_boots': 125,
-    'leather_helmet': 50, 'leather_chestplate': 75, 'leather_leggings': 60, 'leather_boots': 40,
-
-    // Materials
-    'diamond': 100, 'iron_ingot': 25, 'gold_ingot': 30, 'emerald': 50, 'redstone': 5,
-    'lapis_lazuli': 8, 'coal': 3, 'quartz': 6, 'obsidian': 15, 'crying_obsidian': 20,
-
-    // Food
-    'golden_apple': 500, 'enchanted_golden_apple': 2000, 'cooked_beef': 15, 'cooked_porkchop': 15,
-    'cooked_chicken': 12, 'bread': 8, 'apple': 5, 'carrot': 3, 'potato': 3,
-
-    // Building blocks
-    'diamond_block': 900, 'iron_block': 225, 'gold_block': 270, 'obsidian': 135,
-  };
-
-  // Calculate values for all items
-  for (const item of items) {
-    let value = baseValues[item.name] || 1; // Default low value
-
-    // Enchantment bonus (simplified)
-    if (item.metadata?.enchanted) {
-      value *= 1.5;
-    }
-
-    // Durability bonus (simplified)
-    if (item.metadata?.durability) {
-      const durabilityRatio = item.metadata.durability / 100;
-      value *= (0.5 + durabilityRatio * 0.5); // 50-100% of base value
-    }
-
-    // Stack size bonus
-    if (item.count > 1) {
-      value *= Math.min(2, item.count / 10); // Bonus for larger stacks
-    }
-
-    itemValues.set(item.name, Math.round(value));
-  }
-
-  return itemValues;
-}
-
-  /**
-   * Analyze crafting opportunities based on available materials
-   */
-  private analyzeCraftingOpportunities(items: any[], bot: Bot): any {
-  const opportunities: Array<{
-    recipe: string;
-    requiredItems: Array<{ item: string; count: number; available: number }>;
-    output: string;
-    priority: number;
-    value: number;
-  }> = [];
-
-  // Define basic crafting recipes
-  const recipes: Record<string, {
-    ingredients: Array<{ item: string; count: number }>;
-    output: string;
-    priority: number;
-    baseValue: number;
-  }> = {
-    'iron_sword': {
-      ingredients: [{ item: 'iron_ingot', count: 2 }, { item: 'stick', count: 1 }],
-      output: 'iron_sword',
-      priority: 8,
-      baseValue: 500,
-    },
-    'iron_pickaxe': {
-      ingredients: [{ item: 'iron_ingot', count: 3 }, { item: 'stick', count: 2 }],
-      output: 'iron_pickaxe',
-      priority: 8,
-      baseValue: 450,
-    },
-    'bread': {
-      ingredients: [{ item: 'wheat', count: 3 }],
-      output: 'bread',
-      priority: 6,
-      baseValue: 8,
-    },
-    'cooked_beef': {
-      ingredients: [{ item: 'raw_beef', count: 1 }],
-      output: 'cooked_beef',
-      priority: 7,
-      baseValue: 15,
-    },
-  };
-
-  // Analyze each recipe
-  for (const [recipeName, recipe] of Object.entries(recipes)) {
-    const requiredItems: Array<{ item: string; count: number; available: number }> = [];
-    let canCraft = true;
-
-    for (const ingredient of recipe.ingredients) {
-      const availableItem = items.find((item: any) =>
-        item.name.includes(ingredient.item.split('_')[0]) // Fuzzy matching
-      );
-      const availableCount = availableItem?.count || 0;
-
-      requiredItems.push({
-        item: ingredient.item,
-        count: ingredient.count,
-        available: availableCount,
-      });
-
-      if (availableCount < ingredient.count) {
-        canCraft = false;
-      }
-    }
-
-    if (canCraft) {
-      opportunities.push({
-        recipe: recipeName,
-        requiredItems,
-        output: recipe.output,
-        priority: recipe.priority,
-        value: recipe.baseValue,
-      });
-    }
-  }
-
-  // Sort by priority and value
-  opportunities.sort((a, b) => b.priority * b.value - a.priority * a.value);
-
-  console.log(`🔧 Found ${opportunities.length} crafting opportunities`);
-  return opportunities;
-}
-
-  /**
-   * Optimize storage layout for better organization
-   */
-  private optimizeStorageLayout(items: any[]): any {
-  const layout = {
-    hotbarItems: [] as string[],
-    mainInventoryLayout: {} as Record<number, string>,
-    recommendations: [] as string[],
-  };
-
-  // Prioritize items for hotbar (tools, weapons, food)
-  const hotbarPriority = [
-    'diamond_sword', 'iron_sword', 'diamond_pickaxe', 'iron_pickaxe',
-    'diamond_axe', 'iron_axe', 'golden_apple', 'cooked_beef', 'bread'
-  ];
-
-  const availableHotbarItems = items.filter((item: any) =>
-    hotbarPriority.some((priority) => item.name.includes(priority.split('_')[0]))
-  );
-
-  layout.hotbarItems = availableHotbarItems.slice(0, 9).map((item: any) => item.name);
-
-  // Suggest optimal main inventory layout
-  const remainingItems = items.filter((item: any) =>
-    !layout.hotbarItems.includes(item.name)
-  );
-
-  // Organize by category
-  const tools = remainingItems.filter((item: any) =>
-    item.name.includes('sword') || item.name.includes('pickaxe') ||
-    item.name.includes('axe') || item.name.includes('shovel')
-  );
-
-  const armor = remainingItems.filter((item: any) =>
-    item.name.includes('helmet') || item.name.includes('chestplate') ||
-    item.name.includes('leggings') || item.name.includes('boots')
-  );
-
-  const food = remainingItems.filter((item: any) =>
-    item.name.includes('apple') || item.name.includes('bread') ||
-    item.name.includes('beef') || item.name.includes('chicken') ||
-    item.name.includes('porkchop') || item.name.includes('carrot') ||
-    item.name.includes('potato')
-  );
-
-  const materials = remainingItems.filter((item: any) =>
-    !tools.includes(item) && !armor.includes(item) && !food.includes(item)
-  );
-
-  // Generate recommendations
-  if (tools.length > 10) {
-    layout.recommendations.push('Consider storing excess tools in chests');
-  }
-
-  if (materials.length > 20) {
-    layout.recommendations.push('Store excess materials in dedicated chests');
-  }
-
-  if (availableHotbarItems.length > 9) {
-    layout.recommendations.push('Multiple high-priority items available for hotbar');
-  }
-
-  console.log(`📦 Storage optimization: ${layout.hotbarItems.length} hotbar items, ${tools.length} tools, ${armor.length} armor, ${food.length} food, ${materials.length} materials`);
-
-  return layout;
-
-  console.log(`🗑️ Inventory cleanup complete: dropped ${dropped} items`);
-  return { processed: items.length, dropped };
-}
-
-/**
- * Comprehensive inventory organization
- */
-async function organizeInventory(
-  bot: Bot,
-  keepItems: string[] = [],
-  maxStackSize: number
-): Promise<{ processed: number; compacted: number; dropped: number }> {
-  console.log('🧹 Starting comprehensive inventory organization...');
-
-  const items = bot.inventory.items();
-  let compacted = 0;
-  let dropped = 0;
-
-  try {
-    // Step 1: Sort items by priority
-    console.log('📦 Step 1: Sorting inventory items...');
-    const sortedItems = sortInventoryItems(bot, keepItems);
-    console.log(`✅ Sorted ${sortedItems.length} items`);
-
-    // Step 2: Compact item stacks
-    console.log('🔧 Step 2: Compacting inventory stacks...');
-    const compactResult = compactInventoryStacks(bot, maxStackSize);
-    compacted = compactResult.compacted;
-    console.log(`✅ Compacted ${compacted} stacks`);
-
-    // Step 3: Drop unwanted items
-    console.log('🗑️ Step 3: Cleaning up unwanted items...');
-    const dropResult = await dropUnwantedItems(bot, keepItems);
-    dropped = dropResult.dropped;
-    console.log(`✅ Dropped ${dropped} unwanted items`);
-
-    console.log(
-      `🧹 Inventory organization complete: processed ${items.length} items, compacted ${compacted} stacks, dropped ${dropped} items`
-    );
-
-    return {
-      processed: items.length,
-      compacted,
-      dropped,
-    };
-  } catch (error) {
-    console.error('❌ Inventory organization failed:', error);
-    return {
-      processed: items.length,
-      compacted: 0,
-      dropped: 0,
-    };
-  }
-}
 
 // ============================================================================
 // Helper Functions
@@ -823,7 +742,6 @@ async function openContainerAtPosition(
     console.error('Failed to open container at position:', error);
     return null;
   }
-}
 
 /**
  * Get container type from position
@@ -1109,6 +1027,8 @@ export class OpenContainerLeaf implements LeafImpl {
       };
     }
   }
+}
+}
 
 // ============================================================================
 // Transfer Items Leaf
@@ -1383,6 +1303,8 @@ export class TransferItemsLeaf implements LeafImpl {
       };
     }
   }
+}
+}
 
 // ============================================================================
 // Close Container Leaf
@@ -1515,6 +1437,8 @@ export class CloseContainerLeaf implements LeafImpl {
       };
     }
   }
+}
+}
 
 // ============================================================================
 // Inventory Management Leaf
@@ -1701,3 +1625,6 @@ export class InventoryManagementLeaf implements LeafImpl {
       };
     }
   }
+}
+}
+

@@ -44,6 +44,8 @@ export interface EmotionalLLMContext extends MemoryEnhancedLLMContext {
   emotionalFocus?:
     | 'current_state'
     | 'recent_experiences'
+    | 'identity_reinforcement'
+    | 'emotional_processing'
     | 'identity_narrative'
     | 'balanced';
 
@@ -52,6 +54,43 @@ export interface EmotionalLLMContext extends MemoryEnhancedLLMContext {
 
   /** Self-reflection mode */
   selfReflection?: boolean;
+}
+
+/**
+ * Emotional context for LLM adaptation with memory data
+ */
+export interface EmotionalMemoryContext {
+  /** Emotional memories for context */
+  emotionalMemories: Array<{
+    id: string;
+    content: string;
+    emotionalImpact: number;
+    recency: number;
+  }>;
+
+  /** Self-narratives for identity context */
+  selfNarratives: Array<{
+    id: string;
+    content: string;
+    emotionalSignificance: number;
+    identityImpact: number;
+  }>;
+
+  /** Emotional baseline */
+  emotionalBaseline: {
+    primaryEmotion: string;
+    averageIntensity: number;
+    moodStability: number;
+  };
+
+  /** Emotional focus for response */
+  emotionalFocus?:
+    | 'current_state'
+    | 'recent_experiences'
+    | 'identity_reinforcement'
+    | 'emotional_processing'
+    | 'identity_narrative'
+    | 'balanced';
 }
 
 /**
@@ -162,7 +201,7 @@ export class EmotionalMemoryLLMAdapter extends MemoryAwareLLMInterface {
   private emotionalManager?: EmotionalMemoryManager;
   private narrativeConstructor?: SelfNarrativeConstructor;
   private identityGuardian?: IdentityMemoryGuardian;
-  private config: Required<EmotionalMemoryLLMConfig> & LLMConfig;
+  private emotionalConfig: Required<EmotionalMemoryLLMConfig>;
 
   constructor(
     memoryAwareConfig: Partial<LLMConfig> = {},
@@ -173,11 +212,22 @@ export class EmotionalMemoryLLMAdapter extends MemoryAwareLLMInterface {
   ) {
     super(memoryAwareConfig);
 
-    this.config = {
-      ...DEFAULT_EMOTIONAL_MEMORY_CONFIG,
+    this.emotionalConfig = {
+      enabled: true,
+      maxEmotionalMemories: 10,
+      maxSelfNarratives: 5,
+      emotionalRecencyThreshold: 24,
+      minEmotionalIntensity: 0.5,
+      autoEmotionalStateTracking: false,
+      emotionalContextStrategy: 'prepend' as const,
+      enableEmotionalRegulation: true,
+      enableIdentityReinforcement: true,
+      enableNarrativeIntegration: true,
+      enableEmotionalHealthMonitoring: true,
+      enableSelfConceptTracking: true,
+      enablePatternLearning: true,
       ...emotionalConfig,
-      ...memoryAwareConfig,
-    } as Required<EmotionalMemoryLLMConfig> & LLMConfig;
+    } as Required<EmotionalMemoryLLMConfig>;
 
     this.emotionalManager = emotionalManager;
     this.narrativeConstructor = narrativeConstructor;
@@ -188,10 +238,10 @@ export class EmotionalMemoryLLMAdapter extends MemoryAwareLLMInterface {
    * Initialize emotional memory adapter
    */
   async initialize(): Promise<void> {
-    if (this.config.enabled) {
+    if (this.emotionalConfig.enabled) {
       console.log('🧠 Emotional Memory LLM Adapter initialized');
       // Initialize base class if it has an initialize method
-      if (super.initialize) {
+      if (typeof super.initialize === 'function') {
         await super.initialize();
       }
     }
@@ -210,7 +260,7 @@ export class EmotionalMemoryLLMAdapter extends MemoryAwareLLMInterface {
       systemPrompt?: string;
     }
   ): Promise<EmotionalMemoryResponse> {
-    if (!this.config.enabled) {
+    if (!this.emotionalConfig.enabled) {
       return (await super.generateMemoryEnhancedResponse(
         prompt,
         context,
@@ -352,10 +402,10 @@ export class EmotionalMemoryLLMAdapter extends MemoryAwareLLMInterface {
    * Update configuration
    */
   updateEmotionalConfig(newConfig: Partial<EmotionalMemoryLLMConfig>): void {
-    this.config = {
-      ...this.config,
+    this.emotionalConfig = {
+      ...this.emotionalConfig,
       ...newConfig,
-    } as Required<EmotionalMemoryLLMConfig>;
+    };
     console.log('⚙️ Updated emotional memory LLM adapter configuration');
   }
 
@@ -365,7 +415,7 @@ export class EmotionalMemoryLLMAdapter extends MemoryAwareLLMInterface {
 
   private async buildEmotionalContext(
     context: EmotionalLLMContext
-  ): Promise<EmotionalMemoryResponse['emotionalContext']> {
+  ): Promise<EmotionalMemoryContext | undefined> {
     if (!this.emotionalManager && !this.narrativeConstructor) {
       return {
         emotionalMemories: [],
@@ -373,28 +423,27 @@ export class EmotionalMemoryLLMAdapter extends MemoryAwareLLMInterface {
         emotionalBaseline: {
           primaryEmotion: 'neutral',
           averageIntensity: 0.5,
-          moodStability: 0.5
-        }
+          moodStability: 0.5,
+        },
       };
     }
 
-    const emotionalMemories: EmotionalMemoryResponse['emotionalContext']['emotionalMemories'] =
-      [];
-    const selfNarratives: EmotionalMemoryResponse['emotionalContext']['selfNarratives'] =
-      [];
+    const emotionalMemories: EmotionalMemoryContext['emotionalMemories'] = [];
+    const selfNarratives: EmotionalMemoryContext['selfNarratives'] = [];
 
     // Get emotional memories
-    if (context.includeEmotionalMemories !== false && this.emotionalManager) {
+    if (this.emotionalManager) {
       const insights = await this.emotionalManager.getEmotionalInsights();
 
       // Get recent high-intensity emotional memories
       const emotionalStates = await this.emotionalManager.getEmotionalStates();
       const recentThreshold =
-        Date.now() - this.config.emotionalRecencyThreshold * 60 * 60 * 1000;
+        Date.now() -
+        this.emotionalConfig.emotionalRecencyThreshold * 60 * 60 * 1000;
 
       for (const state of emotionalStates) {
         if (
-          state.intensity >= this.config.minEmotionalIntensity &&
+          state.intensity >= this.emotionalConfig.minEmotionalIntensity &&
           state.timestamp >= recentThreshold
         ) {
           emotionalMemories.push({
@@ -404,14 +453,17 @@ export class EmotionalMemoryLLMAdapter extends MemoryAwareLLMInterface {
             recency: (Date.now() - state.timestamp) / (1000 * 60 * 60), // Hours ago
           });
 
-          if (emotionalMemories.length >= this.config.maxEmotionalMemories)
+          if (
+            emotionalMemories.length >=
+            this.emotionalConfig.maxEmotionalMemories
+          )
             break;
         }
       }
     }
 
     // Get relevant self-narratives
-    if (context.includeSelfNarratives !== false && this.narrativeConstructor) {
+    if (this.narrativeConstructor) {
       const recentNarratives = this.narrativeConstructor.getRecentNarratives(5);
 
       for (const narrative of recentNarratives) {
@@ -423,7 +475,8 @@ export class EmotionalMemoryLLMAdapter extends MemoryAwareLLMInterface {
             identityImpact: narrative.significance,
           });
 
-          if (selfNarratives.length >= this.config.maxSelfNarratives) break;
+          if (selfNarratives.length >= this.emotionalConfig.maxSelfNarratives)
+            break;
         }
       }
     }
@@ -444,10 +497,14 @@ export class EmotionalMemoryLLMAdapter extends MemoryAwareLLMInterface {
 
   private async enhancePromptWithEmotionalContext(
     prompt: string,
-    emotionalContext: EmotionalMemoryResponse['emotionalContext'],
+    emotionalContext: EmotionalMemoryContext | undefined,
     context: EmotionalLLMContext
   ): Promise<string> {
-    if (!emotionalContext || (!emotionalContext.emotionalMemories.length && !emotionalContext.selfNarratives.length)) {
+    if (
+      !emotionalContext ||
+      (!(emotionalContext as any).emotionalMemories.length &&
+        !(emotionalContext as any).selfNarratives.length)
+    ) {
       return prompt;
     }
 
@@ -470,7 +527,10 @@ export class EmotionalMemoryLLMAdapter extends MemoryAwareLLMInterface {
     }
 
     // Add emotional memories
-    if (emotionalContext?.emotionalMemories?.length > 0) {
+    if (
+      emotionalContext?.emotionalMemories &&
+      emotionalContext.emotionalMemories.length > 0
+    ) {
       const memoryTexts = emotionalContext.emotionalMemories
         .sort((a, b) => b.emotionalImpact - a.emotionalImpact)
         .map((mem) => `[Emotional Memory] ${mem.content}`)
@@ -480,7 +540,10 @@ export class EmotionalMemoryLLMAdapter extends MemoryAwareLLMInterface {
     }
 
     // Add self-narratives
-    if (emotionalContext?.selfNarratives?.length > 0) {
+    if (
+      emotionalContext?.selfNarratives &&
+      emotionalContext.selfNarratives.length > 0
+    ) {
       const narrativeTexts = emotionalContext.selfNarratives
         .sort((a, b) => b.identityImpact - a.identityImpact)
         .map((nar) => `[Self-Narrative] ${nar.content.substring(0, 200)}...`)
@@ -490,8 +553,8 @@ export class EmotionalMemoryLLMAdapter extends MemoryAwareLLMInterface {
     }
 
     // Add emotional focus guidance
-    if (context.emotionalFocus) {
-      switch (context.emotionalFocus) {
+    if (emotionalContext.emotionalFocus) {
+      switch (emotionalContext.emotionalFocus) {
         case 'current_state':
           emotionalPrompts.push('Focus on processing current emotional state.');
           break;
@@ -530,7 +593,7 @@ export class EmotionalMemoryLLMAdapter extends MemoryAwareLLMInterface {
     // Inject emotional context into prompt
     const emotionalContextText = emotionalPrompts.join('\n\n');
 
-    switch (this.config.emotionalContextStrategy) {
+    switch (this.emotionalConfig.emotionalContextStrategy) {
       case 'prepend':
         return `${emotionalContextText}\n\n---\n\n${prompt}`;
       case 'append':
@@ -559,10 +622,14 @@ Your response should reflect the emotional awareness and self-understanding gain
 
   private async addEmotionalProcessing(
     response: EmotionalMemoryResponse,
-    emotionalContext: EmotionalMemoryResponse['emotionalContext'],
+    emotionalContext: EmotionalMemoryContext | undefined,
     context: EmotionalLLMContext
   ): Promise<EmotionalMemoryResponse> {
-    if (!emotionalContext || (!emotionalContext.emotionalMemories.length && !emotionalContext.selfNarratives.length)) {
+    if (
+      !emotionalContext ||
+      (!(emotionalContext as any).emotionalMemories.length &&
+        !(emotionalContext as any).selfNarratives.length)
+    ) {
       return response;
     }
 
@@ -579,13 +646,13 @@ Your response should reflect the emotional awareness and self-understanding gain
     );
 
     // Update emotional state based on response
-    if (this.config.autoEmotionalStateTracking) {
+    if (this.emotionalConfig.autoEmotionalStateTracking && emotionalContext) {
       await this.updateEmotionalStateFromResponse(response, emotionalContext);
     }
 
     return {
       ...response,
-      emotionalContext,
+      emotionalContext: emotionalContext || undefined,
       identityReinforcement,
       emotionalProcessing,
     };
@@ -637,7 +704,8 @@ Your response should reflect the emotional awareness and self-understanding gain
       }
     }
 
-    const narrativeIntegration = emotionalContext.selfNarratives.length > 0;
+    const narrativeIntegration =
+      (emotionalContext as any)?.selfNarratives?.length > 0;
     const selfConceptUpdate =
       reinforcedTraits.length > 0 || reinforcedValues.length > 0;
 
@@ -684,7 +752,7 @@ Your response should reflect the emotional awareness and self-understanding gain
 
   private async updateEmotionalStateFromResponse(
     response: EmotionalMemoryResponse,
-    emotionalContext?: EmotionalMemoryResponse['emotionalContext']
+    emotionalContext?: EmotionalMemoryContext | undefined
   ): Promise<void> {
     // Analyze response sentiment to infer emotional state changes
     const text = response.text.toLowerCase();

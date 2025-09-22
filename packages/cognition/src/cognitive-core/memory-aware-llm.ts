@@ -16,7 +16,13 @@ interface EnhancedMemorySystem {
   initialize(): Promise<void>;
   searchMemories(params: any): Promise<any>;
   ingestMemory(params: any): Promise<any>;
-  recordCognitivePattern(type: string, data: any): Promise<void>;
+  recordCognitivePattern(
+    thoughtType: string,
+    context: any,
+    processing: any,
+    outcome: any,
+    patterns: any
+  ): Promise<any>;
   close(): Promise<void>;
   // Add other methods as needed
 }
@@ -153,6 +159,15 @@ export class MemoryAwareLLMInterface extends LLMInterface {
   }
 
   /**
+   * Initialize the memory-aware LLM interface
+   */
+  async initialize(): Promise<void> {
+    if (this.memoryConfig.enableAutoMemoryIntegration) {
+      await this.initializeMemorySystem();
+    }
+  }
+
+  /**
    * Initialize the memory system connection
    */
   private async initializeMemorySystem(): Promise<void> {
@@ -181,6 +196,7 @@ export class MemoryAwareLLMInterface extends LLMInterface {
         error instanceof Error ? error.message : String(error)
       );
       console.warn('⚠️ LLM will operate without memory integration');
+      this.memorySystem = undefined; // Ensure it's undefined on error
     }
   }
 
@@ -449,12 +465,17 @@ If the memories are relevant, incorporate them naturally into your reasoning. If
         );
       }
     } catch (error) {
-      console.warn('⚠️ Memory storage failed:', error);
+      console.warn(
+        '⚠️ Memory storage failed:',
+        error instanceof Error ? error.message : String(error)
+      );
       operations.push({
         type: 'store',
         memoryType: 'dialogue',
         content: 'Failed to store memory',
-        metadata: { error: error.message },
+        metadata: {
+          error: error instanceof Error ? error.message : String(error),
+        },
         success: false,
       });
     }

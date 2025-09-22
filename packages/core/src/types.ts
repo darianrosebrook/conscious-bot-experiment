@@ -273,6 +273,7 @@ export enum TrendDirection {
   DECREASING = 'decreasing',
   STABLE = 'stable',
   OSCILLATING = 'oscillating',
+  VOLATILE = 'volatile',
   UNKNOWN = 'unknown',
 }
 
@@ -479,6 +480,12 @@ export interface SystemEvents {
   'safety-violation': [SafetyViolation];
   'degradation-changed': [DegradationLevel];
   'performance-update': [PerformanceMetrics];
+  urgentNeedProcessed: [
+    { need: string; urgency: number; result: any; timestamp: number },
+  ];
+  urgentNeedFailed: [
+    { need: string; urgency: number; error: string; timestamp: number },
+  ];
 }
 
 // ===== UTILITY TYPES =====

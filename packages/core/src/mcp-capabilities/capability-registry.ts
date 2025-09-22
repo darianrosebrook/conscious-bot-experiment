@@ -7,8 +7,8 @@
  * @author @darianrosebrook
  */
 
-import { performance } from 'node:perf_hooks';
 import { EventEmitter } from 'events';
+import { performance } from 'node:perf_hooks';
 import { v4 as uuidv4 } from 'uuid';
 import { WorkingLeafFactory } from './working-leaf-factory';
 import {

@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "description": "High-level reasoning, self-awareness, and social modeling systems",
   "main": "dist/index.js",
+  "types": "dist/index.d.ts",
   "type": "module",
   "scripts": {
     "build": "tsc",

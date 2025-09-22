@@ -100,6 +100,16 @@ export type { Experience, Outcome, EmotionalState } from './types';
 
 export { ExperienceType, OutcomeType, ExperienceSchema } from './types';
 
+// Export hybrid search types
+export type {
+  HybridSearchResult,
+  HybridSearchResponse,
+  HybridSearchOptions,
+  HybridSearchServiceConfig,
+} from './hybrid-search-service';
+
+export { HybridSearchService } from './hybrid-search-service';
+
 // ============================================================================
 // Quick Start Functions
 // ============================================================================

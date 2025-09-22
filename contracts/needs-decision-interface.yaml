@@ -1,0 +1,45 @@
+openapi: 3.1.0
+info:
+  title: Enhanced Need Decision Interface
+  version: 1.0.0
+components:
+  schemas:
+    EnhancedNeedTask:
+      type: object
+      required:
+        - id
+        - needType
+        - priorityScore
+        - urgency
+        - context
+      properties:
+        id:
+          type: string
+          description: Unique identifier for the generated task
+        needType:
+          type: string
+          description: Normalized need type driving the task
+        priorityScore:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 1
+        urgency:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 1
+        context:
+          type: object
+          additionalProperties: true
+          description: Context used when routing the task
+        commitmentBoost:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 1
+        noveltyScore:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 1

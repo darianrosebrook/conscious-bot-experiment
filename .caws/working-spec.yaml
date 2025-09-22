@@ -1,0 +1,46 @@
+id: CBOT-4821
+title: "Integrate enhanced needs into decision flow"
+risk_tier: 2
+scope:
+  in:
+    - "Convert enhanced needs from signal processing into prioritized decision tasks"
+    - "Trigger decision routing based on enhanced need priorities"
+  out:
+    - "Authoring new goal templates"
+    - "Altering external MCP or HTTP interfaces"
+invariants:
+  - "Enhanced needs above priority threshold emit at most one decision task per batch"
+  - "Signal processing latency stays within routine budget (<=200ms)"
+acceptance:
+  - id: A1
+    given: "A processed signal batch yielding enhanced needs with high priority"
+    when: "The arbiter processes the signals"
+    then: "Corresponding cognitive tasks are routed through the decision system"
+  - id: A2
+    given: "Enhanced needs below the scheduling threshold"
+    when: "Signals are processed"
+    then: "No new cognitive tasks are enqueued from enhanced needs"
+  - id: A3
+    given: "Multiple enhanced needs produced concurrently"
+    when: "The arbiter integrates them"
+    then: "Tasks are prioritized and limited to the configured top slice"
+non_functional:
+  a11y:
+    - "No UI impact; maintain existing keyboard path coverage"
+  perf:
+    api_p95_ms: 180
+  security:
+    - "No new external surfaces; maintain existing module privilege boundaries"
+contracts:
+  - type: openapi
+    path: "contracts/needs-decision-interface.yaml#/EnhancedNeedTask"
+observability:
+  logs:
+    - "arbiter.enhanced_need.integration"
+  metrics:
+    - "arbiter_enhanced_need_task_count"
+  traces:
+    - "arbiter.integrate_enhanced_needs"
+migrations: []
+rollback:
+  - "Disable enhanced need scheduling via config flag"

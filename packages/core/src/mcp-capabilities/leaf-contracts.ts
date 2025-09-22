@@ -741,7 +741,7 @@ export function createLeafContext(
         error: {
           code: error.code,
           retryable: error.retryable,
-          detail: error.detail,
+          detail: error.detail || 'No additional details',
         },
         metadata: {
           source: 'mcp_leaf_execution',
@@ -791,8 +791,8 @@ export function createLeafContext(
         }
       }
 
-      // Emit structured event for potential external monitoring integration
-      process.emit('mcpError', errorEvent);
+      // Note: Error event has been logged and tracked above
+      // External monitoring integration can be added here if needed
     },
   };
 }

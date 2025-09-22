@@ -107,6 +107,7 @@ export enum TrendDirection {
   DECREASING = 'decreasing',
   STABLE = 'stable',
   OSCILLATING = 'oscillating',
+  VOLATILE = 'volatile',
   UNKNOWN = 'unknown',
 }
 

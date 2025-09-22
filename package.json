@@ -29,10 +29,14 @@
     "core:dev": "pnpm --filter @conscious-bot/core dev",
     "hrm:train": "cd sapient-hrm && python pretrain.py",
     "hrm:eval": "cd sapient-hrm && python evaluate.py",
-    "audit": "node scripts/audit-architecture.js",
-    "audit:architecture": "node scripts/audit-architecture.js architecture",
-    "audit:integration": "node scripts/audit-architecture.js integration",
-    "audit:complete": "node scripts/audit-architecture.js complete"
+    "audit": "node docs/audit/audit-runner.ts",
+    "audit:architecture": "node docs/audit/audit-runner.ts architecture",
+    "audit:integration": "node docs/audit/audit-runner.ts integration",
+    "audit:complete": "node docs/audit/audit-runner.ts complete",
+    "audit:quality-gates": "node docs/audit/verification-system.ts",
+    "audit:integration-map": "node docs/audit/integration-mapper.ts",
+    "audit:comprehensive": "node docs/audit/reporting-system.ts",
+    "audit:working-specs": "node docs/audit/audit-runner.ts --validate-specs"
   },
   "workspaces": [
     "packages/*",
