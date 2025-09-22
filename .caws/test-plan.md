@@ -1,29 +1,30 @@
-# MCP-217 Test Plan
+# MCB-482 Test Plan
 
 ## Unit Tests
-- `packages/mcp-server`: add spec for dependency wiring that instantiates `ConsciousBotMCPServer` with a stub leaf factory and verifies `getTools()` output after registering a mock leaf (covers A1, mutation target: missing dependency).
-- `packages/planning`: add targeted unit tests around `MCPIntegration.registerLeaf`, `registerOption`, and `updateBotInstance` using spies to ensure correct API usage and error propagation (covers A1–A3).
+- `packages/minecraft-interface`: cover observation payload builder + throttled response flow; mock fetch to ensure cognition endpoint receives structured body (A1).
+- `packages/cognition`: exercise observation reasoner with mocked `LLMInterface` returning JSON, malformed text, and timeout to drive fallback path (A1, A3).
+- Validate task forwarding helper maps LLM `tasks` into planning service requests including observation ids (A2).
 
 ## Contract Tests
-- Use Pact-like fixture to assert `register_option` interaction returns `{ status: 'success', optionId }` when server dependencies accept registration (A2).
-- Verify `list_tools` interaction surfaces tool entries with `minecraft.<spec.name>@<version>` after hydration (A1).
+- JSON-schema validate `contracts/cognition-observation.yaml` against mocked responses from cognition server and ensure required fields (thought.text, actions.shouldRespond) are present (A1).
+- Pact-style consumer test for minecraft-interface ensuring POST `/process` accepts structured observation payload with entity + bot context (A1).
 
 ## Integration Tests
-- Spin up `MCPIntegration` with a real `ConsciousBotMCPServer` and a stub registry/bot to validate full flow: leaf registration → tool hydration → option registration, ensuring no fallback path triggers (A1, A2).
+- Spin up cognition observation reasoner with stub LLM returning deterministic JSON; invoke `process` handler end-to-end and assert thought/feed + planning call (A2).
+- Minecraft-interface integration harness: simulate entity detection, intercept planning service fetch to confirm new payload and throttling logic (A2).
 
 ## E2E Smoke
-- Trigger `/mcp/options` HTTP endpoint in planning modular server to ensure 200 response and underlying MCP call succeeds with seeded option (A2). (Optional manual validation during review.)
+- Manual/automated smoke: run `mc-sim` scenario with hostile mob spawn; verify bot emits LLM-authored thought in dashboard stream and throttled chat (A1).
 
 ## Data Setup / Teardown
-- Use deterministic stub leaves with explicit `spec` metadata.
-- Reset `LeafFactory` and `MCPIntegration` instances between tests to avoid shared state.
-- Provide mock bot object with minimal methods (`chat`, `entity`) required by leaf context.
+- Use deterministic Vec3 positions and entity fixtures; sanitize coordinates for logging assertions.
+- Stub planning service with in-memory fetch mock; reset between tests.
+- Provide fake LLM outputs via fixture JSON to avoid real Ollama dependency.
 
 ## Flake Controls
-- Tests rely on pure in-memory objects; no network I/O.
-- Use fake timers for rate-limit guards if necessary.
-- If asynchronous retries introduced, cap with deterministic delays and assert via resolved promises.
+- Use fake timers for cooldown tests; ensure timers restored after each suite.
+- Keep observation reasoner tests pure async with capped timeouts and explicit AbortController to avoid hanging.
 
 ## Coverage & Mutation Targets
-- Mutation focus: dependency injection guard (throws when missing), registration branch, error handling branches in `registerOption` and `updateBotInstance`.
-- Ensure new tests exercise both success and failure paths to meet Tier 2 thresholds (branch ≥80%, mutation ≥50%).
+- Mutation focus: observation payload validation, LLM response guard, fallback branch for invalid JSON, planning task gating.
+- Ensure branch coverage ≥ 80% on observation reasoner module and new bot-adapter helpers.

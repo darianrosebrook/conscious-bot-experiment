@@ -1,51 +1,57 @@
-id: MCP-217
-title: "Stabilize MCP integration with core leaf factory"
+id: MCB-482
+title: "LLM-driven observation reasoning for Minecraft interface"
 risk_tier: 2
 scope:
   in:
-    - "Ensure @conscious-bot/mcp-server declares the runtime dependency on @conscious-bot/core so Node can resolve imports"
-    - "Update planning MCP integration to use the real leaf factory API and refresh MCP tools without fallback errors"
-    - "Add contract and automated tests validating MCP tool hydration and option execution paths"
+    - "Replace hardcoded entity/environment thoughts in bot adapter with LLM-generated insights"
+    - "Augment cognition service environmental_awareness pipeline to consume structured observations and return action guidance"
+    - "Wire planning task suggestions to use LLM-provided structured actions when available"
   out:
-    - "Refactoring behavior tree runner semantics or goal management"
-    - "Creating new leaf implementations beyond existing catalog"
-    - "Production deployment automation or infra changes"
+    - "Overhauling chat conversation flow or external social reasoning modules"
+    - "Introducing new Minecraft behaviours beyond observation-driven reactions"
+    - "Persisting long-term memory summaries of every observation"
 invariants:
-  - "MCP integration must register only leaves with defined spec.name and spec.version"
-  - "Planning service must expose MCP tool entries for every registered leaf without throwing TypeError"
-  - "Option, leaf, and bot update flows must surface structured errors rather than uncaught exceptions"
+  - "Observation payloads sent from minecraft-interface must include entity/event metadata and current bot vitals"
+  - "LLM outputs are validated as JSON with thought + action fields; invalid responses trigger deterministic fallback"
+  - "Generated planning tasks must reference the originating observation id for auditability"
 acceptance:
   - id: A1
-    given: "Planning server bootstraps MCP integration with workspace packages built"
-    when: "core leaves register via MCPIntegration.registerLeaf"
-    then: "MCP server import succeeds without fallback and listTools returns the registered leaf names"
+    given: "A nearby entity is detected within observation radius"
+    when: "bot-adapter processes the entity"
+    then: "it calls cognition environmental_awareness endpoint with structured payload and receives an LLM-authored thought"
   - id: A2
-    given: "An option registration request is invoked through MCPIntegration.registerOption"
-    when: "the MCP server processes the request"
-    then: "the option is recorded with status success and the returned id matches id@version"
+    given: "Cognition returns action suggestions for an observation"
+    when: "bot-adapter handles the insight"
+    then: "it respects chat/task throttles and forwards structured tasks to the planning service with observation metadata"
   - id: A3
-    given: "Minecraft interface updates the bot instance"
-    when: "MCPIntegration.updateBotInstance is called"
-    then: "the bot dependency updates without TypeError and logs a success message"
+    given: "LLM generation times out or produces invalid output"
+    when: "cognition processes the observation"
+    then: "a safe fallback thought is emitted, no unsafe actions are queued, and the failure is logged with metrics"
 non_functional:
   a11y:
-    - "Server-only change; no UI impact"
+    - "Server-side change; ensure dashboard cognitive stream renders new thought metadata without regression"
   perf:
-    api_p95_ms: 250
+    api_p95_ms: 400
+    lcp_ms: 2500
   security:
-    - "No new network exposure; dependency policy remains satisfied"
+    - "Scrub sensitive coordinates before logging; no raw auth tokens in prompts"
 contracts:
-  - type: pact
-    path: "contracts/mcp-integration.pact.json"
+  - type: openapi
+    path: "contracts/cognition-observation.yaml#/components/schemas/ObservationInsight"
+  - type: openapi
+    path: "contracts/cognition-observation.yaml#/paths/~1process/post"
 observability:
   logs:
-    - "[MCP] MCP server created successfully"
-    - "[MCP] Bot instance updated successfully"
+    - "cognition.observation.llm_request"
+    - "cognition.observation.fallback"
+    - "minecraft.observation.forwarded"
   metrics:
-    - "mcp.leaf.registration.count"
-    - "mcp.option.registration.success"
+    - "cognition_observation_llm_latency_ms"
+    - "cognition_observation_fallback_total"
+    - "minecraft_observation_tasks_created"
   traces:
-    - "mcp.integration.register_option"
+    - "observation.reasoning.pipeline"
 migrations: []
 rollback:
-  - "Disable MCP integration via enableMCP=false configuration flag to revert to previous fallback"
+  - "Set COGNITION_LLM_OBSERVATION_DISABLED=true to bypass LLM reasoning and revert to deterministic strings"
+  - "Feature flag minecraft interface to skip structured observation payloads via USE_LEGACY_ENTITY_THOUGHTS=true"

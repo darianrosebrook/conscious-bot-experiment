@@ -6,9 +6,28 @@
     "type": "sequence",
     "children": [
       {
+        "type": "selector",
+        "name": "ensure_axe",
+        "children": [
+          {
+            "type": "condition",
+            "name": "check_has_axe",
+            "condition": "has_axe"
+          },
+          {
+            "type": "action",
+            "name": "craft_axe",
+            "action": "execute_bt",
+            "args": {
+              "bt_id": "opt.craft_wooden_axe"
+            }
+          }
+        ]
+      },
+      {
         "type": "condition",
-        "name": "check_tools",
-        "condition": "has_axe && (light_level >= 7 || has_torch)"
+        "name": "check_light",
+        "condition": "light_level >= 7 || has_torch"
       },
       {
         "type": "selector",

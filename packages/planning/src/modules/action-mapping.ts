@@ -179,10 +179,11 @@ export function mapBTActionToMinecraft(
       return {
         type: 'scan_environment',
         parameters: {
-          radius: args.radius || 10,
+          radius: args.radius || 50,
           targetBlock: args.blockType || 'oak_log',
           action: 'find_nearest_block',
         },
+        timeout: 10000, // Give enough time for scanning
       };
     case 'pathfind':
       return {
@@ -190,7 +191,23 @@ export function mapBTActionToMinecraft(
         parameters: { distance: args.distance || 1 },
       };
     case 'scan_tree_structure':
-      return { type: 'wait', parameters: { duration: 1000 } };
+      return {
+        type: 'scan_environment',
+        parameters: {
+          radius: 10,
+          targetBlock: 'oak_log',
+          action: 'analyze_tree_structure',
+        },
+        timeout: 3000,
+      };
+    case 'execute_bt':
+      return {
+        type: 'execute_behavior_tree',
+        parameters: {
+          btId: args.bt_id,
+        },
+        timeout: 30000,
+      };
     case 'dig_blocks':
     case 'dig_block':
       return {
@@ -205,6 +222,7 @@ export function mapBTActionToMinecraft(
       return {
         type: 'collect_items_enhanced',
         parameters: {
+          item: args.item || args.blockType || 'oak_log', // Support both item and blockType
           radius: args.radius || 10,
           exploreOnFail: true,
           maxSearchTime: 30000,

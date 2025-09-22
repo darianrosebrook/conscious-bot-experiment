@@ -13,6 +13,11 @@ import {
   eventDrivenThoughtGenerator,
   ContextualThought,
 } from './event-driven-thought-generator';
+import { LLMInterface } from './cognitive-core/llm-interface';
+import {
+  ObservationReasoner,
+  ObservationPayload,
+} from './environmental/observation-reasoner';
 
 /**
  * Cognitive Stream Logger
@@ -203,6 +208,11 @@ class CognitiveStreamLogger {
 // Initialize the cognitive stream logger
 const cognitiveLogger = CognitiveStreamLogger.getInstance();
 
+const llmInterface = new LLMInterface();
+const observationReasoner = new ObservationReasoner(llmInterface, {
+  disabled: process.env.COGNITION_LLM_OBSERVATION_DISABLED === 'true',
+});
+
 const app = express.default();
 const port = process.env.PORT ? parseInt(process.env.PORT) : 3003;
 
@@ -279,6 +289,170 @@ class CognitiveMetricsTracker {
       intrusionsHandled: this.intrusionsHandled,
     };
   }
+}
+
+const POSITION_REDACTION_GRANULARITY = 5;
+const HOSTILE_KEYWORDS = [
+  'zombie',
+  'skeleton',
+  'creeper',
+  'spider',
+  'witch',
+  'enderman',
+  'pillager',
+  'vindicator',
+  'evoker',
+  'ravager',
+  'phantom',
+  'blaze',
+  'ghast',
+  'guardian',
+  'warden',
+];
+
+function redactPositionForLog(position?: { x: number; y: number; z: number }) {
+  if (!position) return undefined;
+  const round = (value: number) =>
+    Math.round(value / POSITION_REDACTION_GRANULARITY) *
+    POSITION_REDACTION_GRANULARITY;
+  return {
+    x: round(position.x),
+    y: round(position.y),
+    z: round(position.z),
+  };
+}
+
+function coerceNumber(value: unknown): number | undefined {
+  if (value === null || value === undefined) return undefined;
+  const num = Number(value);
+  return Number.isFinite(num) ? num : undefined;
+}
+
+function inferThreatLevel(
+  name?: string
+): 'unknown' | 'friendly' | 'neutral' | 'hostile' {
+  if (!name) return 'unknown';
+  const lowerName = name.toLowerCase();
+  if (HOSTILE_KEYWORDS.some((keyword) => lowerName.includes(keyword))) {
+    return 'hostile';
+  }
+  if (lowerName.includes('villager') || lowerName.includes('golem')) {
+    return 'friendly';
+  }
+  if (
+    lowerName.includes('cow') ||
+    lowerName.includes('sheep') ||
+    lowerName.includes('pig')
+  ) {
+    return 'neutral';
+  }
+  return 'unknown';
+}
+
+function buildObservationPayload(
+  raw: any,
+  metadata: any = {}
+): ObservationPayload | null {
+  if (!raw || typeof raw !== 'object') {
+    return null;
+  }
+
+  let bot = raw.bot || metadata?.bot || undefined;
+  if (!bot || !bot.position) {
+    // Try to get bot position from metadata
+    if (metadata?.botPosition) {
+      bot = { position: metadata.botPosition };
+    } else {
+      return null;
+    }
+  }
+
+  const position = bot.position;
+  if (
+    position === undefined ||
+    position.x === undefined ||
+    position.y === undefined ||
+    position.z === undefined
+  ) {
+    return null;
+  }
+
+  const observationId =
+    typeof raw.observationId === 'string'
+      ? raw.observationId
+      : `obs-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+
+  const baseCategory =
+    raw.category === 'environment' ? 'environment' : 'entity';
+  const entity = raw.entity || metadata?.entity || undefined;
+  const event = raw.event || undefined;
+
+  const payload: ObservationPayload = {
+    observationId,
+    category: entity ? 'entity' : baseCategory,
+    bot: {
+      position: {
+        x: Number(position.x) || 0,
+        y: Number(position.y) || 0,
+        z: Number(position.z) || 0,
+      },
+      health: coerceNumber(bot.health) || coerceNumber(metadata?.botHealth),
+      food: coerceNumber(bot.food) || coerceNumber(metadata?.botFood),
+      dimension: typeof bot.dimension === 'string' ? bot.dimension : undefined,
+      gameMode: typeof bot.gameMode === 'string' ? bot.gameMode : undefined,
+    },
+    entity: entity
+      ? {
+          id: (entity.id ?? metadata?.entityId ?? observationId).toString(),
+          name:
+            typeof entity.name === 'string'
+              ? entity.name
+              : (metadata?.entityType ?? 'unknown'),
+          displayName: entity.displayName,
+          kind: entity.kind,
+          threatLevel:
+            entity.threatLevel ??
+            metadata?.threatLevel ??
+            inferThreatLevel(entity.name),
+          distance:
+            coerceNumber(entity.distance ?? metadata?.distance) ?? undefined,
+          position: entity.position
+            ? {
+                x: Number(entity.position.x) || 0,
+                y: Number(entity.position.y) || 0,
+                z: Number(entity.position.z) || 0,
+              }
+            : undefined,
+          velocity: entity.velocity
+            ? {
+                x: Number(entity.velocity.x) || 0,
+                y: Number(entity.velocity.y) || 0,
+                z: Number(entity.velocity.z) || 0,
+              }
+            : undefined,
+        }
+      : undefined,
+    event: event
+      ? {
+          type: event.type ?? metadata?.eventType ?? 'unknown',
+          description: event.description ?? metadata?.description,
+          severity: event.severity ?? metadata?.severity,
+          position: event.position
+            ? {
+                x: Number(event.position.x) || 0,
+                y: Number(event.position.y) || 0,
+                z: Number(event.position.z) || 0,
+              }
+            : undefined,
+        }
+      : undefined,
+    context:
+      raw.context ??
+      (metadata && Object.keys(metadata).length > 0 ? metadata : undefined),
+    timestamp: coerceNumber(raw.timestamp) ?? Date.now(),
+  };
+
+  return payload;
 }
 
 const metricsTracker = new CognitiveMetricsTracker();
@@ -1349,78 +1523,166 @@ app.post('/process', async (req, res) => {
       console.log('Processing environmental awareness:', { content, metadata });
 
       try {
-        // Create an internal thought about the environmental observation
-        const internalThought = {
+        // The minecraft interface sends data directly in req.body, not in req.body.observation
+        const rawObservation = req.body as any;
+        const observation = buildObservationPayload(
+          rawObservation,
+          rawObservation?.metadata
+        );
+
+        if (observation) {
+          console.log('cognition.observation.llm_request', {
+            observationId: observation.observationId,
+            category: observation.category,
+          });
+
+          const insight = await observationReasoner.reason(observation);
+
+          if (insight.fallback) {
+            console.warn('cognition.observation.fallback', {
+              observationId: observation.observationId,
+              reason: insight.error,
+            });
+          }
+
+          const sanitizedBotPosition = redactPositionForLog(
+            observation.bot.position
+          );
+          const sanitizedEntityPosition = redactPositionForLog(
+            observation.entity?.position
+          );
+
+          const internalThought = {
+            type: 'environmental',
+            content: insight.thought.text,
+            attribution: 'self',
+            context: {
+              emotionalState: insight.fallback ? 'cautious' : 'curious',
+              confidence: insight.thought.confidence ?? 0.75,
+              cognitiveSystem:
+                insight.thought.source === 'llm'
+                  ? 'environmental-llm'
+                  : 'environmental-fallback',
+              observationId: observation.observationId,
+            },
+            metadata: {
+              thoughtType: 'environmental',
+              source: observation.category,
+              observationId: observation.observationId,
+              fallback: insight.fallback,
+              entity: observation.entity
+                ? {
+                    name:
+                      observation.entity.displayName || observation.entity.name,
+                    threatLevel: observation.entity.threatLevel,
+                    distance: observation.entity.distance,
+                    position: sanitizedEntityPosition,
+                  }
+                : undefined,
+              event: observation.event
+                ? {
+                    type: observation.event.type,
+                    description: observation.event.description,
+                    severity: observation.event.severity,
+                    position: redactPositionForLog(observation.event.position),
+                  }
+                : undefined,
+              botPosition: sanitizedBotPosition,
+              timestamp: observation.timestamp,
+            },
+            id: `thought-${Date.now()}-env-${Math.random()
+              .toString(36)
+              .substr(2, 9)}`,
+            timestamp: Date.now(),
+            processed: true,
+          };
+
+          const cognitiveStreamResponse = await fetch(
+            'http://localhost:3000/api/ws/cognitive-stream',
+            {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(internalThought),
+            }
+          );
+
+          if (!cognitiveStreamResponse.ok) {
+            console.warn(
+              '❌ Failed to send observation thought to cognitive stream'
+            );
+          }
+
+          const primaryTask = insight.actions.tasks?.[0];
+
+          res.json({
+            processed: true,
+            type: 'environmental_awareness',
+            observationId: observation.observationId,
+            thought: insight.thought,
+            actions: insight.actions,
+            fallback: insight.fallback,
+            error: insight.error,
+            shouldRespond: insight.actions.shouldRespond,
+            response: insight.actions.response ?? '',
+            shouldCreateTask: insight.actions.shouldCreateTask,
+            taskSuggestion: primaryTask?.description,
+            internalThought,
+            timestamp: Date.now(),
+          });
+          return;
+        }
+
+        // Fallback to minimal processing when observation payload missing
+        const fallbackThought = {
           type: 'environmental',
-          content: `I notice: ${content}`,
+          content: content || 'Maintaining awareness of surroundings.',
           attribution: 'self',
           context: {
-            emotionalState: 'curious',
-            confidence: 0.8,
-            cognitiveSystem: 'environmental-processor',
-            ...metadata,
+            emotionalState: 'alert',
+            confidence: 0.5,
+            cognitiveSystem: 'environmental-fallback',
           },
           metadata: {
             thoughtType: 'environmental',
-            source: 'entity-detection',
+            source: 'legacy-content',
+            fallback: true,
+            botPosition: redactPositionForLog(metadata?.botPosition),
             entityType: metadata?.entityType,
             distance: metadata?.distance,
-            position: metadata?.position,
-            botPosition: metadata?.botPosition,
-            ...metadata,
           },
           id: `thought-${Date.now()}-env-${Math.random().toString(36).substr(2, 9)}`,
           timestamp: Date.now(),
-          processed: false,
+          processed: true,
         };
 
-        // Send to cognitive stream
-        const cognitiveStreamResponse = await fetch(
-          'http://localhost:3000/api/ws/cognitive-stream',
-          {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(internalThought),
-          }
-        );
-
-        let shouldRespond = false;
-        let response = '';
-        let shouldCreateTask = false;
-        let taskSuggestion = '';
-
-        // Only respond to truly interesting events, not every entity detection
-        if (metadata?.entityType && metadata?.distance) {
-          const entityType = metadata.entityType.toLowerCase();
-          const distance = metadata.distance;
-
-          // Only respond if entity is very close (within 5 blocks) or is a player
-          if (entityType.includes('player') && distance <= 10) {
-            // Don't spam - only respond occasionally to players
-            shouldRespond = Math.random() < 0.3; // 30% chance
-            if (shouldRespond) {
-              response = `I notice you nearby. How can I help?`;
-            }
-            shouldCreateTask = true;
-            taskSuggestion = `Interact with player ${metadata?.entityType} at distance ${distance.toFixed(1)} blocks`;
-          } else if (entityType.includes('hostile') && distance <= 8) {
-            // Only respond to immediate threats
-            shouldRespond = true;
-            response = `Hostile mob detected ${distance.toFixed(1)} blocks away - staying alert.`;
-            shouldCreateTask = true;
-            taskSuggestion = `Monitor immediate threat: ${metadata?.entityType}`;
-          }
-          // Don't create tasks for distant animals/villagers - too noisy
-        }
+        await fetch('http://localhost:3000/api/ws/cognitive-stream', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(fallbackThought),
+        });
 
         res.json({
           processed: true,
           type: 'environmental_awareness',
-          shouldRespond,
-          response,
-          shouldCreateTask,
-          taskSuggestion,
-          internalThought,
+          observationId: fallbackThought.id,
+          thought: {
+            text: fallbackThought.content,
+            confidence: 0.5,
+            categories: ['fallback'],
+            source: 'fallback',
+          },
+          actions: {
+            shouldRespond: false,
+            response: undefined,
+            shouldCreateTask: false,
+            tasks: [],
+          },
+          fallback: true,
+          shouldRespond: false,
+          response: '',
+          shouldCreateTask: false,
+          taskSuggestion: undefined,
+          internalThought: fallbackThought,
           timestamp: Date.now(),
         });
       } catch (error) {
@@ -1501,7 +1763,10 @@ app.post('/process', async (req, res) => {
           response = `I understand there's a safety concern. I'm monitoring the situation.`;
           shouldCreateTask = true;
           taskSuggestion = `Address safety concern from ${sender}`;
-        } else if (message.length < 10 && (message.includes('hello') || message.includes('hi'))) {
+        } else if (
+          message.length < 10 &&
+          (message.includes('hello') || message.includes('hi'))
+        ) {
           // Short greeting - respond occasionally
           shouldRespond = Math.random() < 0.4; // 40% chance
           if (shouldRespond) {
@@ -1586,7 +1851,11 @@ app.post('/process', async (req, res) => {
           response = `That hurt! I should be more careful in this area.`;
           shouldCreateTask = true;
           taskSuggestion = `Investigate and avoid the source of damage`;
-        } else if (eventType === 'block_break' && eventData.oldBlock && eventData.oldBlock !== 'air') {
+        } else if (
+          eventType === 'block_break' &&
+          eventData.oldBlock &&
+          eventData.oldBlock !== 'air'
+        ) {
           // Only respond to interesting block changes, not every fire tick
           shouldRespond = Math.random() < 0.2; // 20% chance for interesting blocks
           if (shouldRespond) {

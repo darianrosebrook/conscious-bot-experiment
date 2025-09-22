@@ -659,3 +659,6 @@ export class SocialMemoryManager extends EventEmitter {
     }
   }
 }
+
+// Export the class as default
+export default SocialMemoryManager;

@@ -1,5 +1,5 @@
 # A11y / Performance / Security Budgets
 
-- **Accessibility**: No UI touchpoints; ensure regression suite keeps axe + keyboard coverage unchanged (`npm run test:axe`).
-- **Performance**: Bootstrap logic must keep planner-side work ≤ 200 ms p95; LLM call timeout capped at 4 s with graceful degradation and circuit breaker logging.
-- **Security**: Sanitize/scrub memory-derived snippets before LLM prompting; confirm secret scanning + dep policy (`npm run secret:scan`, `npm run dep:policy`) remain clean.
+- **Accessibility**: Dashboard cognitive stream must continue to pass axe + keyboard suites (`npm run test:axe`); ensure new metadata fields have accessible labels.
+- **Performance**: Observation→LLM round trip p95 ≤ 400 ms; enforce AbortController timeout of 4 s with metric logging.
+- **Security**: Strip world seed/session identifiers from prompts; verify `npm run secret:scan` and dep policy remain green; redact precise coordinates in logs (`<redacted>` granularity within 5 blocks).

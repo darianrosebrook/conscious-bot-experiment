@@ -207,6 +207,7 @@ export type MinecraftActionType =
   | 'craft'
   | 'pickup_item'
   | 'collect_items_enhanced'
+  | 'execute_behavior_tree'
   | 'drop_item'
   | 'use_item'
   | 'attack_entity'

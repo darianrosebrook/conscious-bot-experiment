@@ -1,0 +1,196 @@
+openapi: 3.1.0
+info:
+  title: Cognition Observation Processing
+  version: "1.0.0"
+  description: >-
+    Structured contract for minecraft-interface to submit environmental observations
+    to the cognition service and receive LLM-authored thoughts plus action guidance.
+servers:
+  - url: http://localhost:3003
+    description: Local cognition service
+paths:
+  /process:
+    post:
+      summary: Process cognitive event or observation
+      description: >-
+        Accepts structured observation payloads for environmental awareness events
+        and returns an insight produced by the cognition LLM. Other event types
+        continue to be supported but are not described in this contract.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ObservationRequest'
+      responses:
+        '200':
+          description: Observation processed successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ObservationInsight'
+        '400':
+          description: Invalid payload
+        '500':
+          description: Cognition service failed to process the observation
+components:
+  schemas:
+    ObservationRequest:
+      type: object
+      required: [type, observation]
+      properties:
+        type:
+          type: string
+          const: environmental_awareness
+        observation:
+          $ref: '#/components/schemas/ObservationPayload'
+        metadata:
+          type: object
+          description: Optional auxiliary metadata preserved for logging/streaming.
+        content:
+          type: string
+          description: Backwards compatibility field ignored when `observation` supplied.
+    ObservationPayload:
+      type: object
+      required: [category, bot, timestamp]
+      properties:
+        observationId:
+          type: string
+          description: Client generated id for traceability.
+        category:
+          type: string
+          enum: [entity, environment]
+        bot:
+          type: object
+          required: [position, health, food, dimension]
+          properties:
+            position:
+              $ref: '#/components/schemas/Vec3'
+            health:
+              type: number
+            food:
+              type: number
+            dimension:
+              type: string
+            gameMode:
+              type: string
+        entity:
+          $ref: '#/components/schemas/EntitySnapshot'
+        event:
+          $ref: '#/components/schemas/EventSnapshot'
+        context:
+          type: object
+          description: Additional environment or planner context.
+        timestamp:
+          type: integer
+          format: int64
+    EntitySnapshot:
+      type: object
+      required: [id, name, position, distance]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        displayName:
+          type: string
+        kind:
+          type: string
+        threatLevel:
+          type: string
+          enum: [unknown, neutral, friendly, hostile]
+        distance:
+          type: number
+        position:
+          $ref: '#/components/schemas/Vec3'
+        velocity:
+          $ref: '#/components/schemas/Vec3'
+    EventSnapshot:
+      type: object
+      properties:
+        type:
+          type: string
+        description:
+          type: string
+        position:
+          $ref: '#/components/schemas/Vec3'
+        severity:
+          type: string
+    Vec3:
+      type: object
+      required: [x, y, z]
+      properties:
+        x:
+          type: number
+        y:
+          type: number
+        z:
+          type: number
+    ObservationInsight:
+      type: object
+      required: [processed, type, timestamp]
+      properties:
+        processed:
+          type: boolean
+        type:
+          type: string
+          const: environmental_awareness
+        timestamp:
+          type: integer
+          format: int64
+        observationId:
+          type: string
+        thought:
+          $ref: '#/components/schemas/ObservationThought'
+        actions:
+          $ref: '#/components/schemas/ObservationActions'
+        fallback:
+          type: boolean
+          description: Indicates heuristic fallback was used instead of LLM output.
+        error:
+          type: string
+          description: Present when processing failed.
+    ObservationThought:
+      type: object
+      required: [text, source]
+      properties:
+        text:
+          type: string
+        source:
+          type: string
+          enum: [llm, fallback]
+        confidence:
+          type: number
+        categories:
+          type: array
+          items:
+            type: string
+    ObservationActions:
+      type: object
+      required: [shouldRespond, shouldCreateTask]
+      properties:
+        shouldRespond:
+          type: boolean
+        response:
+          type: string
+        shouldCreateTask:
+          type: boolean
+        tasks:
+          type: array
+          items:
+            $ref: '#/components/schemas/ObservationTask'
+    ObservationTask:
+      type: object
+      required: [description, priority, source]
+      properties:
+        description:
+          type: string
+        priority:
+          type: number
+        urgency:
+          type: number
+        source:
+          type: string
+          enum: [llm, fallback]
+        metadata:
+          type: object

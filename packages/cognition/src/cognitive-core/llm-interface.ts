@@ -18,6 +18,7 @@ export type { LLMContext, LLMResponse } from '../types';
 export class LLMInterface {
   private config: LLMConfig;
   private baseUrl: string;
+  private available: boolean;
 
   constructor(config: Partial<LLMConfig> = {}) {
     const defaultConfig: LLMConfig = {
@@ -41,6 +42,11 @@ export class LLMInterface {
     }
 
     this.baseUrl = `http://${this.config.host}:${this.config.port}`;
+    this.available = true;
+  }
+
+  isAvailable(): boolean {
+    return this.available;
   }
 
   /**

@@ -1,24 +1,26 @@
-# Change Impact Map: CBOT-4972
+# Change Impact Map: MCB-482
 
 ## Modules
-- `packages/planning/src/goal-formulation/task-bootstrapper.ts` (new): memory/LLM/exploration task synthesis logic.
-- `packages/planning/src/integrated-planning-coordinator.ts`: wire bootstrapper into planning pipeline.
-- `contracts/needs-decision-interface.yaml`: extend schema with `BootstrapTask` definition for serialized outputs.
-- `packages/planning/src/__tests__`: new coverage for bootstrap behaviour.
+- `packages/minecraft-interface/src/bot-adapter.ts`: replace entity/event thought generation with LLM-backed observation flow.
+- `packages/minecraft-interface/src/observation-reasoner.ts` (new helper) or companion utilities for structured payloads and parsing.
+- `packages/cognition/src/server.ts`: update `/process` environmental_awareness branch to call LLM reasoner.
+- `packages/cognition/src/environmental/observation-reasoner.ts` (new): encapsulate LLM prompt/parse logic.
+- `packages/minecraft-interface/src/__tests__/observation-reasoner.test.ts` (new) and cognition tests for fallback logic.
 
 ## Dependencies
-- Consumes memory service `/state` endpoint; requires running memory server but degrades gracefully.
-- Optional LLM endpoint via `LLM_ENDPOINT`; bootstrapper must tolerate timeout/failure.
-- Reuses existing environment integration for inventory/world snapshots.
+- Consumes `@conscious-bot/cognition` LLM interface; ensure Ollama endpoint reachable or use mock in tests.
+- Planning service `/goal` endpoint via existing PLANNING_SERVICE_URL; payload now includes observation metadata but remains backwards compatible.
+- Cognition service `/process` endpoint contract expanded to accept structured observations; existing clients continue to function.
 
 ## Roll-forward Strategy
-- Ship behind planner config switch defaulting to enabled; observe `planning_bootstrap_source_count` metric.
-- Enable structured logging (`planning.bootstrap.tasks`) in staging to validate payload shape.
+- Deploy behind env flags `COGNITION_LLM_OBSERVATION_DISABLED=false` and `USE_LEGACY_ENTITY_THOUGHTS=false` (defaults) with monitoring on `cognition_observation_llm_latency_ms`.
+- Gradually increase observation sampling via config if latency acceptable.
 
 ## Rollback Strategy
-- Toggle planner flag to skip bootstrap; recompiles without touching contracts.
-- Remove schema addition only if upstream consumers mis-handle it.
+- Toggle env flags above to revert to legacy string-based flow without redeploy.
+- If contract issues occur, restore previous `bot-adapter.ts` and `server.ts` versions; new helper modules can remain unused.
 
 ## Operational Notes
-- Monitor bootstrap latency against 200ms budget; investigate spikes due to memory/LLM endpoints.
-- Alert if LLM endpoint errors exceed 5% over rolling hour (observability follow-up ticket).
+- Monitor cognition logs for `cognition.observation.fallback` spikes (>5% per 15 min) indicating LLM instability.
+- Ensure planning task queue does not receive duplicate observation ids; clean up if flagged by metrics.
+- Document new contract for dashboard consumers to display `thought.source=llm` metadata.

@@ -1,0 +1,31 @@
+{
+  "id": "opt.craft_wooden_axe",
+  "name": "Craft Wooden Axe",
+  "description": "Gather materials and craft a wooden axe",
+  "root": {
+    "type": "sequence",
+    "name": "craft_axe_sequence",
+    "children": [
+      {
+        "type": "condition",
+        "name": "check_materials",
+        "condition": "inventory.oak_planks >= 3 && inventory.stick >= 2"
+      },
+      {
+        "type": "action",
+        "name": "craft_axe",
+        "action": "craft",
+        "args": {
+          "item": "wooden_axe",
+          "quantity": 1
+        }
+      }
+    ]
+  },
+  "metadata": {
+    "timeout": 15000,
+    "retries": 1,
+    "priority": "high",
+    "interruptible": false
+  }
+}

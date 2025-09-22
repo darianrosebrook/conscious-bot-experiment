@@ -1,15 +1,15 @@
 modules:
-  - packages/mcp-server/package.json
-  - packages/mcp-server/src/index.ts
-  - packages/mcp-server/src/conscious-bot-mcp-server.ts
-  - packages/planning/src/modules/mcp-integration.ts
-  - packages/planning/tests/mcp-integration.integration.test.ts (new)
+  - packages/minecraft-interface/src/bot-adapter.ts
+  - packages/minecraft-interface/src/observation-insight.ts (new)
+  - packages/cognition/src/server.ts
+  - packages/cognition/src/environmental/observation-reasoner.ts (new)
+  - packages/cognition/src/__tests__/observation-reasoner.test.ts (new)
 interfaces:
-  - contracts/mcp-integration.pact.json
+  - contracts/cognition-observation.yaml
 migrations: []
 roll_forward:
-  - Build workspace (`pnpm turbo run build`) to ensure new dependency graph is compiled
-  - Restart planning service to confirm MCP server boots without fallback
+  - Deploy cognition service with new observation reasoner enabled and verify `/process` accepts structured payload via smoke test
+  - Redeploy minecraft-interface so bot emits LLM thoughts; watch `cognition_observation_llm_latency_ms`
 rollback:
-  - Revert workspace packages to previous versions
-  - Set planning configuration `enableMCP=false` to bypass integration if immediate rollback required
+  - Set `COGNITION_LLM_OBSERVATION_DISABLED=true` to bypass reasoner while keeping code deployed
+  - Revert minecraft-interface release if planning payloads regress
