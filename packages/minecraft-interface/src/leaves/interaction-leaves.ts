@@ -17,6 +17,8 @@ import {
 } from '@conscious-bot/core';
 import { pathfinder } from 'mineflayer-pathfinder';
 // Use require for goals since ES Module import doesn't work
+import { createRequire } from 'module';
+const require = createRequire(import.meta.url);
 const { goals } = require('mineflayer-pathfinder');
 
 // Extend Bot type to include pathfinder

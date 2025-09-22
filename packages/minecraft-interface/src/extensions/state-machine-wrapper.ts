@@ -13,6 +13,8 @@ import { EventEmitter } from 'events';
 import { PlanStep, MinecraftAction } from '../types';
 
 // Import the statemachine plugin
+import { createRequire } from 'module';
+const require = createRequire(import.meta.url);
 const { StateMachine } = require('mineflayer-statemachine');
 
 export interface StateMachineConfig {

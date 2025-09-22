@@ -1,0 +1,916 @@
+{
+  "timestamp": "2025-09-22T01:00:55.797Z",
+  "summary": {
+    "totalIntegrationPoints": 48,
+    "criticalPaths": 2,
+    "riskDistribution": {
+      "1": 11,
+      "2": 26,
+      "3": 11
+    },
+    "dataFlows": 3
+  },
+  "integrationPoints": [
+    {
+      "source": "cognition",
+      "target": "core",
+      "type": "api",
+      "protocol": "internal-package",
+      "description": "Package dependency: cognition -> @conscious-bot/core",
+      "riskTier": 2,
+      "dataFlow": "Package import and API calls"
+    },
+    {
+      "source": "cognition",
+      "target": "memory",
+      "type": "api",
+      "protocol": "internal-package",
+      "description": "Package dependency: cognition -> @conscious-bot/memory",
+      "riskTier": 2,
+      "dataFlow": "Package import and API calls"
+    },
+    {
+      "source": "cognition",
+      "target": "planning",
+      "type": "api",
+      "protocol": "internal-package",
+      "description": "Package dependency: cognition -> @conscious-bot/planning",
+      "riskTier": 2,
+      "dataFlow": "Package import and API calls"
+    },
+    {
+      "source": "core",
+      "target": "planning",
+      "type": "api",
+      "protocol": "internal-package",
+      "description": "Package dependency: core -> @conscious-bot/planning",
+      "riskTier": 1,
+      "dataFlow": "Package import and API calls"
+    },
+    {
+      "source": "dashboard",
+      "target": "evaluation",
+      "type": "api",
+      "protocol": "internal-package",
+      "description": "Package dependency: dashboard -> @conscious-bot/evaluation",
+      "riskTier": 3,
+      "dataFlow": "Package import and API calls"
+    },
+    {
+      "source": "evaluation",
+      "target": "cognition",
+      "type": "api",
+      "protocol": "internal-package",
+      "description": "Package dependency: evaluation -> @conscious-bot/cognition",
+      "riskTier": 3,
+      "dataFlow": "Package import and API calls"
+    },
+    {
+      "source": "evaluation",
+      "target": "core",
+      "type": "api",
+      "protocol": "internal-package",
+      "description": "Package dependency: evaluation -> @conscious-bot/core",
+      "riskTier": 3,
+      "dataFlow": "Package import and API calls"
+    },
+    {
+      "source": "evaluation",
+      "target": "memory",
+      "type": "api",
+      "protocol": "internal-package",
+      "description": "Package dependency: evaluation -> @conscious-bot/memory",
+      "riskTier": 3,
+      "dataFlow": "Package import and API calls"
+    },
+    {
+      "source": "evaluation",
+      "target": "planning",
+      "type": "api",
+      "protocol": "internal-package",
+      "description": "Package dependency: evaluation -> @conscious-bot/planning",
+      "riskTier": 3,
+      "dataFlow": "Package import and API calls"
+    },
+    {
+      "source": "evaluation",
+      "target": "safety",
+      "type": "api",
+      "protocol": "internal-package",
+      "description": "Package dependency: evaluation -> @conscious-bot/safety",
+      "riskTier": 3,
+      "dataFlow": "Package import and API calls"
+    },
+    {
+      "source": "evaluation",
+      "target": "world",
+      "type": "api",
+      "protocol": "internal-package",
+      "description": "Package dependency: evaluation -> @conscious-bot/world",
+      "riskTier": 3,
+      "dataFlow": "Package import and API calls"
+    },
+    {
+      "source": "memory",
+      "target": "world",
+      "type": "api",
+      "protocol": "internal-package",
+      "description": "Package dependency: memory -> @conscious-bot/world",
+      "riskTier": 1,
+      "dataFlow": "Package import and API calls"
+    },
+    {
+      "source": "minecraft-interface",
+      "target": "core",
+      "type": "api",
+      "protocol": "internal-package",
+      "description": "Package dependency: minecraft-interface -> @conscious-bot/core",
+      "riskTier": 2,
+      "dataFlow": "Package import and API calls"
+    },
+    {
+      "source": "minecraft-interface",
+      "target": "planning",
+      "type": "api",
+      "protocol": "internal-package",
+      "description": "Package dependency: minecraft-interface -> @conscious-bot/planning",
+      "riskTier": 2,
+      "dataFlow": "Package import and API calls"
+    },
+    {
+      "source": "minecraft-interface",
+      "target": "world",
+      "type": "api",
+      "protocol": "internal-package",
+      "description": "Package dependency: minecraft-interface -> @conscious-bot/world",
+      "riskTier": 2,
+      "dataFlow": "Package import and API calls"
+    },
+    {
+      "source": "planning",
+      "target": "mcp-server",
+      "type": "api",
+      "protocol": "internal-package",
+      "description": "Package dependency: planning -> @conscious-bot/mcp-server",
+      "riskTier": 2,
+      "dataFlow": "Package import and API calls"
+    },
+    {
+      "source": "planning",
+      "target": "memory",
+      "type": "api",
+      "protocol": "internal-package",
+      "description": "Package dependency: planning -> @conscious-bot/memory",
+      "riskTier": 2,
+      "dataFlow": "Package import and API calls"
+    },
+    {
+      "source": "planning",
+      "target": "world",
+      "type": "api",
+      "protocol": "internal-package",
+      "description": "Package dependency: planning -> @conscious-bot/world",
+      "riskTier": 2,
+      "dataFlow": "Package import and API calls"
+    },
+    {
+      "source": "core",
+      "target": "external-clients",
+      "type": "api",
+      "protocol": "http",
+      "description": "HTTP API endpoint: /signal",
+      "riskTier": 1,
+      "dataFlow": "REST API calls to /signal"
+    },
+    {
+      "source": "core",
+      "target": "external-clients",
+      "type": "api",
+      "protocol": "http",
+      "description": "HTTP API endpoint: /arbiter",
+      "riskTier": 1,
+      "dataFlow": "REST API calls to /arbiter"
+    },
+    {
+      "source": "core",
+      "target": "external-clients",
+      "type": "api",
+      "protocol": "http",
+      "description": "HTTP API endpoint: /performance",
+      "riskTier": 1,
+      "dataFlow": "REST API calls to /performance"
+    },
+    {
+      "source": "memory",
+      "target": "external-clients",
+      "type": "api",
+      "protocol": "http",
+      "description": "HTTP API endpoint: /memory",
+      "riskTier": 1,
+      "dataFlow": "REST API calls to /memory"
+    },
+    {
+      "source": "memory",
+      "target": "external-clients",
+      "type": "api",
+      "protocol": "http",
+      "description": "HTTP API endpoint: /search",
+      "riskTier": 1,
+      "dataFlow": "REST API calls to /search"
+    },
+    {
+      "source": "memory",
+      "target": "external-clients",
+      "type": "api",
+      "protocol": "http",
+      "description": "HTTP API endpoint: /identity",
+      "riskTier": 1,
+      "dataFlow": "REST API calls to /identity"
+    },
+    {
+      "source": "planning",
+      "target": "external-clients",
+      "type": "api",
+      "protocol": "http",
+      "description": "HTTP API endpoint: /plan",
+      "riskTier": 2,
+      "dataFlow": "REST API calls to /plan"
+    },
+    {
+      "source": "planning",
+      "target": "external-clients",
+      "type": "api",
+      "protocol": "http",
+      "description": "HTTP API endpoint: /task",
+      "riskTier": 2,
+      "dataFlow": "REST API calls to /task"
+    },
+    {
+      "source": "planning",
+      "target": "external-clients",
+      "type": "api",
+      "protocol": "http",
+      "description": "HTTP API endpoint: /mcp",
+      "riskTier": 2,
+      "dataFlow": "REST API calls to /mcp"
+    },
+    {
+      "source": "cognition",
+      "target": "external-clients",
+      "type": "api",
+      "protocol": "http",
+      "description": "HTTP API endpoint: /cognition",
+      "riskTier": 2,
+      "dataFlow": "REST API calls to /cognition"
+    },
+    {
+      "source": "cognition",
+      "target": "external-clients",
+      "type": "api",
+      "protocol": "http",
+      "description": "HTTP API endpoint: /llm",
+      "riskTier": 2,
+      "dataFlow": "REST API calls to /llm"
+    },
+    {
+      "source": "cognition",
+      "target": "external-clients",
+      "type": "api",
+      "protocol": "http",
+      "description": "HTTP API endpoint: /reflection",
+      "riskTier": 2,
+      "dataFlow": "REST API calls to /reflection"
+    },
+    {
+      "source": "world",
+      "target": "external-clients",
+      "type": "api",
+      "protocol": "http",
+      "description": "HTTP API endpoint: /world",
+      "riskTier": 2,
+      "dataFlow": "REST API calls to /world"
+    },
+    {
+      "source": "world",
+      "target": "external-clients",
+      "type": "api",
+      "protocol": "http",
+      "description": "HTTP API endpoint: /navigation",
+      "riskTier": 2,
+      "dataFlow": "REST API calls to /navigation"
+    },
+    {
+      "source": "world",
+      "target": "external-clients",
+      "type": "api",
+      "protocol": "http",
+      "description": "HTTP API endpoint: /perception",
+      "riskTier": 2,
+      "dataFlow": "REST API calls to /perception"
+    },
+    {
+      "source": "dashboard",
+      "target": "external-clients",
+      "type": "api",
+      "protocol": "http",
+      "description": "HTTP API endpoint: /dashboard",
+      "riskTier": 3,
+      "dataFlow": "REST API calls to /dashboard"
+    },
+    {
+      "source": "dashboard",
+      "target": "external-clients",
+      "type": "api",
+      "protocol": "http",
+      "description": "HTTP API endpoint: /metrics",
+      "riskTier": 3,
+      "dataFlow": "REST API calls to /metrics"
+    },
+    {
+      "source": "dashboard",
+      "target": "external-clients",
+      "type": "api",
+      "protocol": "http",
+      "description": "HTTP API endpoint: /status",
+      "riskTier": 3,
+      "dataFlow": "REST API calls to /status"
+    },
+    {
+      "source": "minecraft-interface",
+      "target": "external-clients",
+      "type": "api",
+      "protocol": "http",
+      "description": "HTTP API endpoint: /minecraft",
+      "riskTier": 2,
+      "dataFlow": "REST API calls to /minecraft"
+    },
+    {
+      "source": "minecraft-interface",
+      "target": "external-clients",
+      "type": "api",
+      "protocol": "http",
+      "description": "HTTP API endpoint: /bot",
+      "riskTier": 2,
+      "dataFlow": "REST API calls to /bot"
+    },
+    {
+      "source": "minecraft-interface",
+      "target": "external-clients",
+      "type": "api",
+      "protocol": "http",
+      "description": "HTTP API endpoint: /game",
+      "riskTier": 2,
+      "dataFlow": "REST API calls to /game"
+    },
+    {
+      "source": "memory",
+      "target": "postgresql",
+      "type": "database",
+      "protocol": "postgresql",
+      "description": "PostgreSQL connection for memory storage",
+      "riskTier": 1,
+      "dataFlow": "SQL queries and vector operations"
+    },
+    {
+      "source": "memory",
+      "target": "pgvector",
+      "type": "database",
+      "protocol": "postgresql+vector",
+      "description": "Vector database for semantic search",
+      "riskTier": 1,
+      "dataFlow": "Vector similarity search operations"
+    },
+    {
+      "source": "core",
+      "target": "filesystem",
+      "type": "filesystem",
+      "protocol": "file-read",
+      "description": "Configuration file reading",
+      "riskTier": 2,
+      "dataFlow": "Configuration loading and validation"
+    },
+    {
+      "source": "all-packages",
+      "target": "filesystem",
+      "type": "filesystem",
+      "protocol": "file-write",
+      "description": "Log file writing",
+      "riskTier": 3,
+      "dataFlow": "Structured logging to files"
+    },
+    {
+      "source": "cognition",
+      "target": "llm-service",
+      "type": "network",
+      "protocol": "http",
+      "description": "External LLM API calls",
+      "riskTier": 2,
+      "dataFlow": "Natural language processing requests"
+    },
+    {
+      "source": "minecraft-interface",
+      "target": "minecraft-server",
+      "type": "network",
+      "protocol": "minecraft-protocol",
+      "description": "Minecraft server connection",
+      "riskTier": 2,
+      "dataFlow": "Real-time game state synchronization"
+    },
+    {
+      "source": "planning",
+      "target": "mcp-server",
+      "type": "network",
+      "protocol": "http",
+      "description": "MCP server for task execution",
+      "riskTier": 2,
+      "dataFlow": "Task execution via MCP protocol"
+    },
+    {
+      "source": "core",
+      "target": "dashboard",
+      "type": "event",
+      "protocol": "websocket",
+      "description": "Real-time event streaming to dashboard",
+      "riskTier": 2,
+      "dataFlow": "Live system status updates"
+    },
+    {
+      "source": "cognition",
+      "target": "memory",
+      "type": "event",
+      "protocol": "memory-stream",
+      "description": "Cognitive stream processing",
+      "riskTier": 1,
+      "dataFlow": "Real-time cognitive state updates"
+    }
+  ],
+  "dataFlows": [
+    {
+      "id": "signal-processing",
+      "name": "Signal Processing Pipeline",
+      "description": "Complete signal flow from world perception to action execution",
+      "riskTier": 1,
+      "steps": [
+        {
+          "component": "world",
+          "action": "Perceive world state",
+          "integrationPoints": [
+            {
+              "source": "world",
+              "target": "external-clients",
+              "type": "api",
+              "protocol": "http",
+              "description": "HTTP API endpoint: /world",
+              "riskTier": 2,
+              "dataFlow": "REST API calls to /world"
+            },
+            {
+              "source": "world",
+              "target": "external-clients",
+              "type": "api",
+              "protocol": "http",
+              "description": "HTTP API endpoint: /navigation",
+              "riskTier": 2,
+              "dataFlow": "REST API calls to /navigation"
+            },
+            {
+              "source": "world",
+              "target": "external-clients",
+              "type": "api",
+              "protocol": "http",
+              "description": "HTTP API endpoint: /perception",
+              "riskTier": 2,
+              "dataFlow": "REST API calls to /perception"
+            }
+          ],
+          "expectedDuration": 100,
+          "failureRecovery": "Graceful degradation with cached data"
+        },
+        {
+          "component": "core",
+          "action": "Process signals through arbiter",
+          "integrationPoints": [
+            {
+              "source": "core",
+              "target": "planning",
+              "type": "api",
+              "protocol": "internal-package",
+              "description": "Package dependency: core -> @conscious-bot/planning",
+              "riskTier": 1,
+              "dataFlow": "Package import and API calls"
+            },
+            {
+              "source": "core",
+              "target": "external-clients",
+              "type": "api",
+              "protocol": "http",
+              "description": "HTTP API endpoint: /signal",
+              "riskTier": 1,
+              "dataFlow": "REST API calls to /signal"
+            },
+            {
+              "source": "core",
+              "target": "external-clients",
+              "type": "api",
+              "protocol": "http",
+              "description": "HTTP API endpoint: /arbiter",
+              "riskTier": 1,
+              "dataFlow": "REST API calls to /arbiter"
+            },
+            {
+              "source": "core",
+              "target": "external-clients",
+              "type": "api",
+              "protocol": "http",
+              "description": "HTTP API endpoint: /performance",
+              "riskTier": 1,
+              "dataFlow": "REST API calls to /performance"
+            },
+            {
+              "source": "core",
+              "target": "filesystem",
+              "type": "filesystem",
+              "protocol": "file-read",
+              "description": "Configuration file reading",
+              "riskTier": 2,
+              "dataFlow": "Configuration loading and validation"
+            },
+            {
+              "source": "core",
+              "target": "dashboard",
+              "type": "event",
+              "protocol": "websocket",
+              "description": "Real-time event streaming to dashboard",
+              "riskTier": 2,
+              "dataFlow": "Live system status updates"
+            }
+          ],
+          "expectedDuration": 50,
+          "failureRecovery": "Circuit breaker activation"
+        },
+        {
+          "component": "planning",
+          "action": "Generate and execute plans",
+          "integrationPoints": [
+            {
+              "source": "planning",
+              "target": "mcp-server",
+              "type": "api",
+              "protocol": "internal-package",
+              "description": "Package dependency: planning -> @conscious-bot/mcp-server",
+              "riskTier": 2,
+              "dataFlow": "Package import and API calls"
+            },
+            {
+              "source": "planning",
+              "target": "memory",
+              "type": "api",
+              "protocol": "internal-package",
+              "description": "Package dependency: planning -> @conscious-bot/memory",
+              "riskTier": 2,
+              "dataFlow": "Package import and API calls"
+            },
+            {
+              "source": "planning",
+              "target": "world",
+              "type": "api",
+              "protocol": "internal-package",
+              "description": "Package dependency: planning -> @conscious-bot/world",
+              "riskTier": 2,
+              "dataFlow": "Package import and API calls"
+            },
+            {
+              "source": "planning",
+              "target": "external-clients",
+              "type": "api",
+              "protocol": "http",
+              "description": "HTTP API endpoint: /plan",
+              "riskTier": 2,
+              "dataFlow": "REST API calls to /plan"
+            },
+            {
+              "source": "planning",
+              "target": "external-clients",
+              "type": "api",
+              "protocol": "http",
+              "description": "HTTP API endpoint: /task",
+              "riskTier": 2,
+              "dataFlow": "REST API calls to /task"
+            },
+            {
+              "source": "planning",
+              "target": "external-clients",
+              "type": "api",
+              "protocol": "http",
+              "description": "HTTP API endpoint: /mcp",
+              "riskTier": 2,
+              "dataFlow": "REST API calls to /mcp"
+            },
+            {
+              "source": "planning",
+              "target": "mcp-server",
+              "type": "network",
+              "protocol": "http",
+              "description": "MCP server for task execution",
+              "riskTier": 2,
+              "dataFlow": "Task execution via MCP protocol"
+            }
+          ],
+          "expectedDuration": 1000,
+          "failureRecovery": "Fallback to reactive execution"
+        },
+        {
+          "component": "minecraft-interface",
+          "action": "Execute actions in game",
+          "integrationPoints": [
+            {
+              "source": "minecraft-interface",
+              "target": "core",
+              "type": "api",
+              "protocol": "internal-package",
+              "description": "Package dependency: minecraft-interface -> @conscious-bot/core",
+              "riskTier": 2,
+              "dataFlow": "Package import and API calls"
+            },
+            {
+              "source": "minecraft-interface",
+              "target": "planning",
+              "type": "api",
+              "protocol": "internal-package",
+              "description": "Package dependency: minecraft-interface -> @conscious-bot/planning",
+              "riskTier": 2,
+              "dataFlow": "Package import and API calls"
+            },
+            {
+              "source": "minecraft-interface",
+              "target": "world",
+              "type": "api",
+              "protocol": "internal-package",
+              "description": "Package dependency: minecraft-interface -> @conscious-bot/world",
+              "riskTier": 2,
+              "dataFlow": "Package import and API calls"
+            },
+            {
+              "source": "minecraft-interface",
+              "target": "external-clients",
+              "type": "api",
+              "protocol": "http",
+              "description": "HTTP API endpoint: /minecraft",
+              "riskTier": 2,
+              "dataFlow": "REST API calls to /minecraft"
+            },
+            {
+              "source": "minecraft-interface",
+              "target": "external-clients",
+              "type": "api",
+              "protocol": "http",
+              "description": "HTTP API endpoint: /bot",
+              "riskTier": 2,
+              "dataFlow": "REST API calls to /bot"
+            },
+            {
+              "source": "minecraft-interface",
+              "target": "external-clients",
+              "type": "api",
+              "protocol": "http",
+              "description": "HTTP API endpoint: /game",
+              "riskTier": 2,
+              "dataFlow": "REST API calls to /game"
+            },
+            {
+              "source": "minecraft-interface",
+              "target": "minecraft-server",
+              "type": "network",
+              "protocol": "minecraft-protocol",
+              "description": "Minecraft server connection",
+              "riskTier": 2,
+              "dataFlow": "Real-time game state synchronization"
+            }
+          ],
+          "expectedDuration": 50,
+          "failureRecovery": "Action queue with retry logic"
+        }
+      ],
+      "performance": {
+        "expectedLatency": 1200,
+        "throughput": "100 signals/second",
+        "failureModes": [
+          "Network latency",
+          "Service unavailability",
+          "Resource constraints"
+        ]
+      }
+    },
+    {
+      "id": "memory-retrieval",
+      "name": "Memory Retrieval Flow",
+      "description": "Vector search and memory retrieval pipeline",
+      "riskTier": 1,
+      "steps": [
+        {
+          "component": "memory",
+          "action": "Vector search query processing",
+          "integrationPoints": [
+            {
+              "source": "memory",
+              "target": "pgvector",
+              "type": "database",
+              "protocol": "postgresql+vector",
+              "description": "Vector database for semantic search",
+              "riskTier": 1,
+              "dataFlow": "Vector similarity search operations"
+            }
+          ],
+          "expectedDuration": 200,
+          "failureRecovery": "Fallback to basic search"
+        },
+        {
+          "component": "memory",
+          "action": "Emotional memory integration",
+          "integrationPoints": [],
+          "expectedDuration": 100,
+          "failureRecovery": "Continue without emotional context"
+        }
+      ],
+      "performance": {
+        "expectedLatency": 300,
+        "throughput": "50 queries/second",
+        "failureModes": [
+          "Database unavailability",
+          "Vector index corruption"
+        ]
+      }
+    },
+    {
+      "id": "cognitive-processing",
+      "name": "Cognitive Processing Flow",
+      "description": "LLM integration and cognitive reasoning",
+      "riskTier": 2,
+      "steps": [
+        {
+          "component": "cognition",
+          "action": "LLM API integration",
+          "integrationPoints": [
+            {
+              "source": "cognition",
+              "target": "llm-service",
+              "type": "network",
+              "protocol": "http",
+              "description": "External LLM API calls",
+              "riskTier": 2,
+              "dataFlow": "Natural language processing requests"
+            }
+          ],
+          "expectedDuration": 2000,
+          "failureRecovery": "Cached responses and rule-based fallback"
+        },
+        {
+          "component": "cognition",
+          "action": "Self-reflection processing",
+          "integrationPoints": [
+            {
+              "source": "cognition",
+              "target": "core",
+              "type": "api",
+              "protocol": "internal-package",
+              "description": "Package dependency: cognition -> @conscious-bot/core",
+              "riskTier": 2,
+              "dataFlow": "Package import and API calls"
+            },
+            {
+              "source": "cognition",
+              "target": "memory",
+              "type": "api",
+              "protocol": "internal-package",
+              "description": "Package dependency: cognition -> @conscious-bot/memory",
+              "riskTier": 2,
+              "dataFlow": "Package import and API calls"
+            },
+            {
+              "source": "cognition",
+              "target": "planning",
+              "type": "api",
+              "protocol": "internal-package",
+              "description": "Package dependency: cognition -> @conscious-bot/planning",
+              "riskTier": 2,
+              "dataFlow": "Package import and API calls"
+            },
+            {
+              "source": "cognition",
+              "target": "external-clients",
+              "type": "api",
+              "protocol": "http",
+              "description": "HTTP API endpoint: /cognition",
+              "riskTier": 2,
+              "dataFlow": "REST API calls to /cognition"
+            },
+            {
+              "source": "cognition",
+              "target": "external-clients",
+              "type": "api",
+              "protocol": "http",
+              "description": "HTTP API endpoint: /llm",
+              "riskTier": 2,
+              "dataFlow": "REST API calls to /llm"
+            },
+            {
+              "source": "cognition",
+              "target": "external-clients",
+              "type": "api",
+              "protocol": "http",
+              "description": "HTTP API endpoint: /reflection",
+              "riskTier": 2,
+              "dataFlow": "REST API calls to /reflection"
+            },
+            {
+              "source": "cognition",
+              "target": "llm-service",
+              "type": "network",
+              "protocol": "http",
+              "description": "External LLM API calls",
+              "riskTier": 2,
+              "dataFlow": "Natural language processing requests"
+            },
+            {
+              "source": "cognition",
+              "target": "memory",
+              "type": "event",
+              "protocol": "memory-stream",
+              "description": "Cognitive stream processing",
+              "riskTier": 1,
+              "dataFlow": "Real-time cognitive state updates"
+            }
+          ],
+          "expectedDuration": 500,
+          "failureRecovery": "Skip reflection for current cycle"
+        }
+      ],
+      "performance": {
+        "expectedLatency": 2500,
+        "throughput": "10 complex queries/second",
+        "failureModes": [
+          "LLM API unavailability",
+          "Rate limiting",
+          "Response timeouts"
+        ]
+      }
+    }
+  ],
+  "serviceDependencies": [
+    {
+      "service": "core",
+      "dependencies": [
+        "memory",
+        "planning",
+        "cognition",
+        "world",
+        "safety"
+      ],
+      "riskTier": 1,
+      "communicationPattern": "sync",
+      "dataFormat": "JSON"
+    },
+    {
+      "service": "planning",
+      "dependencies": [
+        "core",
+        "memory",
+        "world",
+        "minecraft-interface"
+      ],
+      "riskTier": 2,
+      "communicationPattern": "async",
+      "dataFormat": "JSON"
+    },
+    {
+      "service": "memory",
+      "dependencies": [
+        "postgresql",
+        "pgvector"
+      ],
+      "riskTier": 1,
+      "communicationPattern": "sync",
+      "dataFormat": "SQL"
+    },
+    {
+      "service": "dashboard",
+      "dependencies": [
+        "core",
+        "memory",
+        "planning",
+        "cognition",
+        "world"
+      ],
+      "riskTier": 3,
+      "communicationPattern": "event-driven",
+      "dataFormat": "JSON"
+    }
+  ],
+  "recommendations": [
+    "Critical: Monitor 11 Tier 1 integration points closely",
+    "Performance: Optimize 2 slow data flows",
+    "Architecture: Simplify dependencies for 3 services",
+    "Reliability: Add redundancy for 2 failure-prone flows"
+  ],
+  "mermaidDiagram": "graph TD\n    core[core]\n    memory[memory]\n    planning[planning]\n    cognition[cognition]\n    world[world]\n    safety[safety]\n    dashboard[dashboard]\n    minecraft-interface[minecraft-interface]\n\n    %% External systems\n    postgres[(PostgreSQL)]\n    pgvector[(pgvector)]\n    llm[LLM Service]\n    minecraft[Minecraft Server]\n\n    %% Integration flows\n    core -->|signals| planning\n    core -->|coordination| memory\n    core -->|monitoring| dashboard\n    core -->|safety| safety\n    memory -->|queries| postgres\n    memory -->|vectors| pgvector\n    planning -->|actions| minecraft-interface\n    planning -->|mcp| planning\n    cognition -->|llm| llm\n    cognition -->|reflection| memory\n    world -->|perception| core\n    world -->|navigation| planning\n    minecraft-interface -->|bot| minecraft\n    dashboard -.->|websocket| core\n    dashboard -.->|websocket| memory\n    dashboard -.->|websocket| planning\n"
+}

@@ -10,6 +10,8 @@
 import { Bot } from 'mineflayer';
 import { pathfinder } from 'mineflayer-pathfinder';
 // Use require for goals since ES Module import doesn't work
+import { createRequire } from 'module';
+const require = createRequire(import.meta.url);
 const { goals } = require('mineflayer-pathfinder');
 import { Vec3 } from 'vec3';
 import {

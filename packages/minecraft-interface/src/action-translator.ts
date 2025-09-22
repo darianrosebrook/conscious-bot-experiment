@@ -9,9 +9,12 @@
 
 import { Bot } from 'mineflayer';
 import { pathfinder, Movements } from 'mineflayer-pathfinder';
-// Use require for goals since ES Module import doesn't work
-const { goals } = require('mineflayer-pathfinder');
 import { Vec3 } from 'vec3';
+
+// Use createRequire for goals since ES module import doesn't work
+import { createRequire } from 'module';
+const require = createRequire(import.meta.url);
+const { goals } = require('mineflayer-pathfinder');
 import { PlanStep } from './types';
 import {
   MinecraftAction,
