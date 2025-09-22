@@ -1362,15 +1362,10 @@ async function convertCognitiveReflectionToTasks(
         );
       }
 
-      // Mark the original cognitive reflection as completed since we've extracted its actionable content
-      // Note: The cognitive reflection is considered complete once actionable tasks are created
-      // The actual execution success will be tracked by the individual actionable tasks
-      await enhancedTaskIntegration.updateTaskStatus(
-        cognitiveTask.id,
-        'completed'
-      );
+      // DO NOT mark cognitive reflection as completed here
+      // It should only be marked complete when actionable tasks are actually executed
       console.log(
-        `✅ [AUTONOMOUS EXECUTOR] Cognitive reflection converted to actionable tasks and marked as completed`
+        `✅ [AUTONOMOUS EXECUTOR] Cognitive reflection converted to actionable tasks - keeping reflection task active until execution`
       );
     } else {
       console.log(
@@ -1575,14 +1570,10 @@ async function autonomousTaskExecutor() {
           `🧠 [AUTONOMOUS EXECUTOR] Processing cognitive reflection task: ${currentTask.title}`
         );
 
-        // Pure cognitive reflection - already completed by the cognitive thought processor
-        await enhancedTaskIntegration.updateTaskStatus(
-          currentTask.id,
-          'completed'
-        );
-
+        // Pure cognitive reflection - should remain active until actionable tasks complete
+        // Don't mark as completed just because we processed the thought
         console.log(
-          `✅ [AUTONOMOUS EXECUTOR] Cognitive reflection task marked as completed (insights already generated)`
+          `ℹ️ [AUTONOMOUS EXECUTOR] Pure cognitive reflection task - keeping active for potential actionable conversion`
         );
       }
       return;
@@ -3025,16 +3016,19 @@ async function startServer() {
       }
     }, EXECUTOR_POLL_MS);
 
-    // Start cognitive thought processor
-    try {
-      console.log('Starting cognitive thought processor...');
-      cognitiveThoughtProcessor.startProcessing();
-    } catch (error) {
-      console.warn(
-        '⚠️ Cognitive thought processor failed to start, continuing without it:',
-        error
-      );
-    }
+    // Start cognitive thought processor (DISABLED - using event-driven system instead)
+    // try {
+    //   console.log('Starting cognitive thought processor...');
+    //   cognitiveThoughtProcessor.startProcessing();
+    // } catch (error) {
+    //   console.warn(
+    //     '⚠️ Cognitive thought processor failed to start, continuing without it:',
+    //     error
+    //   );
+    // }
+    console.log(
+      'ℹ️ Using event-driven thought generation system instead of old cognitive processor'
+    );
 
     console.log('✅ Modular planning server started successfully');
   } catch (error) {

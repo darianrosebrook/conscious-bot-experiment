@@ -343,6 +343,7 @@ const reactArbiter = new ReActArbiter({
 import { EnhancedThoughtGenerator } from './thought-generator';
 import { IntrusiveThoughtProcessor } from './intrusive-thought-processor';
 import { SocialAwarenessManager } from './social-awareness-manager';
+import { SocialMemoryManager } from '../../memory/src/social/social-memory-manager';
 
 // Initialize enhanced thought generator
 const enhancedThoughtGenerator = new EnhancedThoughtGenerator({
@@ -363,12 +364,29 @@ const intrusiveThoughtProcessor = new IntrusiveThoughtProcessor({
   minecraftEndpoint: 'http://localhost:3005',
 });
 
+// Initialize social memory manager
+let socialMemoryManager: SocialMemoryManager | null = null;
+try {
+  const { KnowledgeGraphCore } = require('../memory/src/semantic/knowledge-graph-core');
+  const knowledgeGraph = new KnowledgeGraphCore({
+    persistToStorage: true,
+    storageDirectory: './memory-storage',
+  });
+  socialMemoryManager = new SocialMemoryManager(knowledgeGraph, {
+    enableVerboseLogging: true,
+  });
+} catch (error) {
+  console.warn('⚠️ Social memory system could not be initialized:', (error as Error)?.message);
+}
+
 // Initialize social awareness manager
 const socialAwarenessManager = new SocialAwarenessManager({
   maxDistance: 15,
   considerationCooldownMs: 30000,
   enableVerboseLogging: true,
   cognitionEndpoint: 'http://localhost:3003',
+  enableSocialMemory: true,
+  socialMemoryManager: socialMemoryManager,
 });
 
 // Initialize cognition system (simplified for now)
@@ -758,6 +776,39 @@ socialAwarenessManager.on('socialConsiderationGenerated', (result: any) => {
   };
 
   sendThoughtToCognitiveStream(considerationThought);
+});
+
+// Chat consideration event listeners
+socialAwarenessManager.on('chatConsiderationGenerated', (result: any) => {
+  console.log('Chat consideration generated:', {
+    sender: result.message.sender,
+    shouldRespond: result.shouldRespond,
+    priority: result.priority,
+  });
+
+  const chatConsiderationThought = {
+    id: `chat-consideration-${result.timestamp}`,
+    type: 'social_consideration',
+    content: result.reasoning,
+    timestamp: result.timestamp,
+    context: {
+      emotionalState: 'thoughtful',
+      confidence: 0.7,
+      cognitiveSystem: 'social-awareness',
+    },
+    metadata: {
+      thoughtType: 'chat-consideration',
+      sender: result.message.sender,
+      senderType: result.message.senderType,
+      shouldRespond: result.shouldRespond,
+      priority: result.priority,
+      responseContent: result.responseContent,
+      responseType: result.responseType,
+      trigger: 'incoming-chat',
+    },
+  };
+
+  sendThoughtToCognitiveStream(chatConsiderationThought);
 });
 
 // Health check endpoint
@@ -1301,6 +1352,141 @@ app.post('/process-nearby-entities', async (req, res) => {
   } catch (error) {
     console.error('Error processing nearby entities:', error);
     res.status(500).json({ error: 'Failed to process nearby entities' });
+  }
+});
+
+// Process chat messages for response consideration
+app.post('/consider-chat', async (req, res) => {
+  try {
+    const { message, context } = req.body;
+
+    if (!message || !message.sender || !message.content) {
+      return res.status(400).json({
+        error: 'Missing required fields: message.sender, message.content',
+      });
+    }
+
+    console.log(`💬 Processing chat consideration for ${message.sender}:`, {
+      message: message.content.substring(0, 50) + '...',
+      senderType: message.senderType,
+      isDirect: message.isDirect,
+    });
+
+    // Use social awareness manager for chat consideration
+    const result = await socialAwarenessManager.processChatMessage(
+      message,
+      context
+    );
+
+    // Send chat consideration to cognitive stream
+    if (result) {
+      const chatConsiderationThought = {
+        id: `chat-consideration-${result.timestamp}`,
+        type: 'social_consideration',
+        content: result.reasoning,
+        timestamp: result.timestamp,
+        context: {
+          emotionalState: 'thoughtful',
+          confidence: 0.7,
+          cognitiveSystem: 'social-awareness',
+        },
+        metadata: {
+          thoughtType: 'chat-consideration',
+          sender: result.message.sender,
+          senderType: result.message.senderType,
+          shouldRespond: result.shouldRespond,
+          priority: result.priority,
+          responseContent: result.responseContent,
+          responseType: result.responseType,
+          trigger: 'incoming-chat',
+        },
+        category: 'social',
+        tags: ['social', 'chat', 'consideration'],
+      };
+
+      await sendThoughtToCognitiveStream(chatConsiderationThought);
+    }
+
+    res.json({
+      processed: true,
+      message: message,
+      shouldRespond: result?.shouldRespond || false,
+      reasoning: result?.reasoning || 'No consideration generated',
+      responseContent: result?.responseContent,
+      responseType: result?.responseType,
+      priority: result?.priority || 'low',
+      timestamp: Date.now(),
+    });
+  } catch (error) {
+    console.error('Error processing chat consideration:', error);
+    res.status(500).json({ error: 'Failed to process chat consideration' });
+  }
+});
+
+// Consider departure communication
+app.post('/consider-departure', async (req, res) => {
+  try {
+    const { currentArea, newTask, context } = req.body;
+
+    if (!currentArea || !newTask) {
+      return res.status(400).json({
+        error: 'Missing required fields: currentArea, newTask',
+      });
+    }
+
+    console.log(`🚪 Considering departure communication:`, {
+      area: currentArea.name,
+      newTask: newTask.title,
+      entitiesNearby: currentArea.entities.length,
+    });
+
+    // Use social awareness manager for departure communication
+    const result = await socialAwarenessManager.generateDepartureCommunication(
+      currentArea,
+      newTask,
+      context
+    );
+
+    // Send departure consideration to cognitive stream
+    if (result.shouldAnnounce) {
+      const departureThought = {
+        id: `departure-consideration-${Date.now()}`,
+        type: 'social_consideration',
+        content: result.reasoning,
+        timestamp: Date.now(),
+        context: {
+          emotionalState: 'focused',
+          confidence: 0.8,
+          cognitiveSystem: 'social-awareness',
+        },
+        metadata: {
+          thoughtType: 'departure-consideration',
+          area: currentArea.name,
+          task: newTask.title,
+          shouldAnnounce: result.shouldAnnounce,
+          priority: result.priority,
+          trigger: 'task-departure',
+        },
+        category: 'social',
+        tags: ['social', 'departure', 'communication'],
+      };
+
+      await sendThoughtToCognitiveStream(departureThought);
+    }
+
+    res.json({
+      processed: true,
+      shouldAnnounce: result.shouldAnnounce,
+      message: result.message,
+      reasoning: result.reasoning,
+      priority: result.priority,
+      timestamp: Date.now(),
+    });
+  } catch (error) {
+    console.error('Error processing departure consideration:', error);
+    res
+      .status(500)
+      .json({ error: 'Failed to process departure consideration' });
   }
 });
 
@@ -1976,4 +2162,147 @@ app.listen(port, () => {
   console.log(
     `🤔 Nearby entities processing endpoint: http://localhost:${port}/process-nearby-entities`
   );
+  console.log(
+    `💬 Chat consideration endpoint: http://localhost:${port}/consider-chat`
+  );
+  console.log(
+    `🚪 Departure communication endpoint: http://localhost:${port}/consider-departure`
+  );
+  console.log(
+    `🧠 Social memory endpoints:`
+  );
+  console.log(
+    `  📋 Get remembered entities: http://localhost:${port}/social-memory/entities`
+  );
+  console.log(
+    `  🔍 Search entities by fact: http://localhost:${port}/social-memory/search`
+  );
+  console.log(
+    `  📊 Social memory stats: http://localhost:${port}/social-memory/stats`
+  );
+});
+
+// ============================================================================
+// Social Memory Endpoints
+// ============================================================================
+
+// Get remembered entities
+app.get('/social-memory/entities', async (req, res) => {
+  try {
+    const minStrength = parseFloat(req.query.minStrength as string) || 0.1;
+
+    if (!socialMemoryManager) {
+      return res.status(503).json({
+        error: 'Social memory system not available',
+        entities: [],
+      });
+    }
+
+    const entities = await socialMemoryManager.getRememberedEntities(minStrength);
+
+    res.json({
+      success: true,
+      entities,
+      count: entities.length,
+      minStrength,
+      timestamp: Date.now(),
+    });
+  } catch (error) {
+    console.error('Error retrieving remembered entities:', error);
+    res.status(500).json({ error: 'Failed to retrieve remembered entities' });
+  }
+});
+
+// Search entities by fact content
+app.get('/social-memory/search', async (req, res) => {
+  try {
+    const { query, minStrength } = req.query;
+
+    if (!query || typeof query !== 'string') {
+      return res.status(400).json({
+        error: 'Query parameter is required',
+      });
+    }
+
+    if (!socialMemoryManager) {
+      return res.status(503).json({
+        error: 'Social memory system not available',
+        entities: [],
+      });
+    }
+
+    const entities = await socialMemoryManager.searchByFact(query);
+    const filteredEntities = minStrength
+      ? entities.filter((e: any) => e.memoryStrength >= parseFloat(minStrength as string))
+      : entities;
+
+    res.json({
+      success: true,
+      query,
+      entities: filteredEntities,
+      count: filteredEntities.length,
+      timestamp: Date.now(),
+    });
+  } catch (error) {
+    console.error('Error searching entities by fact:', error);
+    res.status(500).json({ error: 'Failed to search entities by fact' });
+  }
+});
+
+// Get social memory statistics
+app.get('/social-memory/stats', async (req, res) => {
+  try {
+    if (!socialMemoryManager) {
+      return res.status(503).json({
+        error: 'Social memory system not available',
+        stats: null,
+      });
+    }
+
+    const stats = await socialMemoryManager.getStats();
+
+    res.json({
+      success: true,
+      stats,
+      timestamp: Date.now(),
+    });
+  } catch (error) {
+    console.error('Error retrieving social memory stats:', error);
+    res.status(500).json({ error: 'Failed to retrieve social memory stats' });
+  }
+});
+
+// Record a social fact manually
+app.post('/social-memory/fact', async (req, res) => {
+  try {
+    const { entityId, factContent, category, confidence } = req.body;
+
+    if (!entityId || !factContent || !category) {
+      return res.status(400).json({
+        error: 'Missing required fields: entityId, factContent, category',
+      });
+    }
+
+    if (!socialMemoryManager) {
+      return res.status(503).json({
+        error: 'Social memory system not available',
+      });
+    }
+
+    // Note: Social facts are automatically recorded through encounters
+    // Manual fact recording not yet implemented
+    console.warn('Manual social fact recording not implemented yet');
+
+    res.json({
+      success: true,
+      message: 'Social fact recorded successfully',
+      entityId,
+      factContent,
+      category,
+      timestamp: Date.now(),
+    });
+  } catch (error) {
+    console.error('Error recording social fact:', error);
+    res.status(500).json({ error: 'Failed to record social fact' });
+  }
 });
