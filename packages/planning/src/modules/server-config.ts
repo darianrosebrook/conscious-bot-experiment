@@ -7,8 +7,8 @@
  * @author @darianrosebrook
  */
 
-const express = require('express');
-const cors = require('cors');
+import express from 'express';
+import cors from 'cors';
 import type {
   Application,
   Router,
@@ -53,7 +53,11 @@ export class ServerConfiguration {
     this.config = {
       port: 3002,
       enableCORS: true,
-      enableMCP: true,
+      enableMCP: true, // Enable MCP to connect to Minecraft interface
+      mcpConfig: {
+        botEndpoint: 'http://localhost:3005',
+        ...config.mcpConfig,
+      },
       ...config,
     };
 

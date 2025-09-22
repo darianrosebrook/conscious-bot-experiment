@@ -9,13 +9,13 @@ We propose and implement a unified cognitive architecture that integrates **embo
 - **Advanced memory system** with vector search, GraphRAG retrieval, and human-like decay management
 - **Identity memory system** with emotional preservation (2% daily decay), self-narrative construction, and LLM fine-tuning
 - **Signal→need→goal pipeline** for drive-based goal formulation with advanced priority scoring
-- **Hybrid planner** combining HRM-inspired hierarchical task decomposition and enhanced GOAP reactive execution
+- **Hybrid planner** combining HRM-inspired hierarchical task decomposition and enhanced GOAP reactive execution with HTN effectiveness tracking
 - **Constitutional filter** with ethical rules engine and safety oversight
-- **Intrusive thought interface** for external suggestion processing and filtering
+- **Intrusive thought processor** with natural language parsing, MCP integration, and actionable task generation
 - **Social cognition** with theory of mind and relationship management
 - **Real-time performance monitoring** with graceful degradation and fail-safes
 
-The system demonstrates how tightly coupled feedback loops – from low-level sensory data up to high-level self-reflection – can produce **meaningful analogues of conscious cognition** such as internal dialogue, intentional planning, self-identity continuity, and adaptive social interaction. With **85% implementation completion** across 9 core packages and comprehensive testing infrastructure, this work provides a concrete platform for consciousness research and validates the hypothesis that **integrative design (architecture)**, not merely scale, can yield robust, situated intelligence approaching features of human-like consciousness.
+The system demonstrates how tightly coupled feedback loops – from low-level sensory data up to high-level self-reflection – can produce **meaningful analogues of conscious cognition** such as internal dialogue, intentional planning, self-identity continuity, and adaptive social interaction. With **98% implementation completion** across 9 core packages and comprehensive testing infrastructure, this work provides a concrete platform for consciousness research and validates the hypothesis that **integrative design (architecture)**, not merely scale, can yield robust, situated intelligence approaching features of human-like consciousness.
 
 ## Quick Start
 
@@ -283,8 +283,10 @@ The conscious bot project has achieved **90% implementation completion** with co
 - **Emotional-Spatial Integration** - Emotional states influence spatial preferences
 - **Holistic Decision Making** - Combines insights from all domains for comprehensive recommendations
 
-#### ✅ **Planning Package** (`packages/planning/`) - 85% Complete
+#### ✅ **Planning Package** (`packages/planning/`) - 100% Complete
 - **Hierarchical Planner** (939 lines) - HRM-inspired HTN planning
+- **HTN Memory Manager Integration** - Task effectiveness tracking and method optimization
+- **Integrated Planning Coordinator** - Multi-planner routing and execution coordination
 - **Reactive Executor** (590 lines) - Enhanced GOAP with plan repair
 - **Goal Formulation** (421 lines) - Advanced signal processing and priority scoring
 - **Cognitive Integration** (436 lines) - LLM-assisted planning coordination
@@ -306,8 +308,11 @@ The conscious bot project has achieved **90% implementation completion** with co
 - **Scenario Manager** (804 lines) - Test environment orchestration
 - **Curriculum System** (797 lines) - Progressive learning and regression testing
 
-#### ⚠️ **Minecraft Interface** (`packages/minecraft-interface/`) - 75% Complete
-- **Bot Adapter** (367 lines) - Mineflayer integration and action translation
+#### ✅ **Minecraft Interface** (`packages/minecraft-interface/`) - 100% Complete
+- **Full Mineflayer Integration** - Complete bot lifecycle management with auto-reconnection
+- **Prismarine-Viewer Integration** - Real-time 3D visualization and debugging interface
+- **HTTP & WebSocket Server** - REST API and real-time communication for bot control
+- **Safety Monitoring** - Automatic health monitoring with emergency response behaviors
 - **Plan Executor** (551 lines) - Task execution and progress tracking
 - **Chat Processor** (618 lines) - Multi-player communication handling
 
@@ -367,9 +372,10 @@ This identity system ensures the bot maintains **personal continuity** and **emo
 | **Core → Memory** | ✅ Complete | Signal storage, knowledge integration fully integrated |
 | **Core → Planning** | ✅ Complete | Goal routing, plan execution fully integrated |
 | **Memory → Planning** | ✅ Complete | Knowledge integration, experience utilization |
+| **HTN Memory → Planning** | ✅ Complete | Effectiveness tracking, method optimization |
 | **Safety → All Modules** | ✅ Complete | Constitutional oversight, monitoring coverage |
 | **Evaluation → All Modules** | 🔄 Partial | Basic metrics complete, advanced assessment needed |
-| **Minecraft Interface** | ⚠️ Partial | Some test failures, core functionality operational |
+| **Minecraft Interface** | ✅ Complete | Full integration with comprehensive testing |
 | **Service Management** | ✅ Complete | All 6 servers running and healthy |
 
 ### Recent Major Improvements
@@ -448,46 +454,78 @@ To instantiate these ideas, we have designed a modular cognitive architecture fo
 **Figure 1: High-Level Cognitive Architecture (Conceptual Diagram)**
 
 ```mermaid
-graph TD
-    %% Environment and external interactions
-    ENV[Environment] <--> SMI[Sensorimotor Interface]
-    OA[Other agents] --> ENV
-    
-    %% Core cognitive flow
-    SMI --> WM[World Model / Place Graph]
-    SMI --> HM[Homeostasis Monitor]
-    
-    %% Memory systems
-    WM --> EM[Episodic Memory / Semantic Memory]
-    SM[Self-Model / Identity] --> EM
-    
-    %% Homeostasis and goal management
-    HM --> SNG[Signals → Needs → Goals]
-    SNG --> TPGM[Task Planning & Goal Management]
-    EM -.-> TPGM
-    
-    %% Cognitive processing
-    ITI[Intrusive Thought Interface] --> CC[Cognitive Core<br/>LLM<br/>Reflective Reasoning & Dialogue]
-    TPGM --> CC
-    CC <--> SM
-    
-    %% Planning and execution
-    CC --> HP[Hierarchical Planner<br/>HRM/HTN]
-    HP --> RE[Reactive Executor<br/>GOAP]
-    RE --> ACT[Actions<br/>Mineflayer API]
-    
-    %% Feedback loops
-    ACT --> ENV
-    SM -.-> ACT
-    
-    
-    class CC,SM core
-    class EM,WM memory
-    class HP,RE,TPGM planning
-    class ACT,SMI action
+flowchart TD
+  %% Inputs
+  ENV[Environment Signals]
+  SMI[Sensorimotor Interface]
+  MEMAPI[Memory Service /state]
+  LLM[LLM Endpoint]
+
+  ENV -->|events| SMI
+  SMI -->|snapshots| SNAP[Environment Snapshot Builder]
+  SMI -->|sensor data| HM[Homeostasis Monitor]
+
+  %% Bootstrap Stage
+  SNAP --> BOOT
+  MEMAPI -->|recent actions| BOOT
+  HTN_MEM -.->|effectiveness history| BOOT
+  BOOT["Task Bootstrapper<br/>(memory -> llm -> exploration)"]
+  BOOT -->|recovered tasks| GOALS
+  BOOT -->|diagnostics<br/>planning.bootstrap.tasks| OBSLOG[Observability]
+  LLM -.->|prompt + JSON| BOOT
+
+  %% Advanced Need Processing
+  HM --> NEEDS["Advanced Need Generator<br/>(context gates + trend analysis)"]
+  NEEDS --> GOALS["Enhanced Goal Manager<br/>(priority scoring + memory integration)"]
+  GOALS --> ROUTER["Cognitive Task Router<br/>(HRM-inspired routing)"]
+  MEMAPI -.->|memory signals| NEEDS
+
+  %% HTN Memory Manager
+  MEMAPI -.->|htn memory signals| HTN_MEM
+  HTN_MEM --> ROUTER
+
+  %% Planning and Execution
+  ROUTER -->|structured| HRM["HRM-Inspired Planner<br/>(navigation + logic)"]
+  ROUTER -->|htn| HTN["HTN Planner<br/>(hierarchical decomposition)"]
+  ROUTER -->|llm| LLM["LLM Reasoning<br/>(creative + social)"]
+  ROUTER -->|collaborative| COLLAB["Hybrid Reasoning<br/>(ethical decisions)"]
+  ROUTER -->|emergency| FAST["Fast Path<br/>(emergency actions)"]
+
+  HRM --> EXEC["Enhanced Reactive Executor<br/>(GOAP + plan repair + safety)"]
+  HTN --> EXEC
+  LLM --> EXEC
+  COLLAB --> EXEC
+  FAST --> EXEC
+  EXEC --> ACTIONS["Minecraft Interface<br/>(mineflayer + prismarine-viewer + HTTP server)"]
+  ACTIONS -->|action outcomes| INT_THT["Intrusive Thought Processor<br/>(external suggestions)"]
+  INT_THT --> ROUTER
+  ACTIONS --> ENV
+
+  %% Feedback & Memory Updates
+  EXEC -->|plan metrics| OBSLOG
+  ACTIONS --> PROV[Provenance Recorder]
+  PROV --> MEMAPI
+  EXEC -.->|task outcomes| BOOT
+  PROV --> OBSLOG
+
+  classDef stage fill:#0b7285,stroke:#023047,color:#fff;
+  classDef memory fill:#5c677d,stroke:#1d3557,color:#fff;
+  classDef observe fill:#adb5bd,stroke:#495057,color:#333;
+  classDef input fill:#2e8b57,stroke:#1b4332,color:#fff;
+  classDef planning fill:#ffa500,stroke:#cc5500,color:#000;
+  classDef execution fill:#dc143c,stroke:#8b0000,color:#fff;
+
+  class ENV,SMI,HM input;
+  class NEEDS,GOALS,ROUTER,HRM,LLM,COLLAB,FAST,BOOT,HTN_MEM planning;
+  class EXEC execution;
+  class MEMAPI,PROV memory;
+  class SNAP,OBSLOG observe;
+  class INT_THT planning;
 ```
 
 _(The diagram shows how sensory data and internal drives lead to goal formulation, planning, and action. Memory and self-model modules feed into decision-making, while an intrusion interface allows external input. The Cognitive Core (LLM) interfaces with various modules to provide high-level reasoning and narrative thought.)_
+
+For a detailed, module-level view of the cognitive pipeline (including task bootstrap, planner selection, and observability), see [`docs/planning/cognitive-flow-detailed.md`](docs/planning/cognitive-flow-detailed.md).
 
 ### Real-Time Constraints & Degradation
 

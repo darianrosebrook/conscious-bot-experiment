@@ -20,6 +20,7 @@ import {
   checkBotConnection,
   waitForBotConnection,
   getBotPosition,
+  executeTask,
 } from './modules/mc-client';
 import {
   extractItemFromTask,
@@ -1492,6 +1493,9 @@ async function autonomousTaskExecutor() {
       console.warn('Inventory progress estimation failed:', e);
     }
 
+    // Track if task was executed successfully
+    let executionResult = false;
+
     // Execute MCP option if found
     if (suitableOption) {
       console.log(
@@ -1501,10 +1505,57 @@ async function autonomousTaskExecutor() {
         ...currentTask.metadata,
         updatedAt: Date.now(),
       });
+    } else {
+      // No MCP option found - execute directly through Minecraft interface
+      console.log(
+        `🔄 No MCP option found for task: ${currentTask.title} (${currentTask.type}) - executing directly`
+      );
+
+      try {
+        const execResult = await executeTask(currentTask);
+        executionResult = execResult.success;
+
+        if (execResult.success) {
+          console.log(
+            `✅ Task executed successfully: ${currentTask.title} (${execResult.completedSteps || 0} steps completed)`
+          );
+
+          // Update task status
+          await enhancedTaskIntegration.updateTaskStatus(
+            currentTask.id,
+            'completed'
+          );
+
+          return; // Task completed successfully
+        } else {
+          console.warn(
+            `⚠️ Task execution failed: ${currentTask.title} - ${execResult.error}`
+          );
+
+          // Update task with failure
+          await enhancedTaskIntegration.updateTaskStatus(
+            currentTask.id,
+            'failed'
+          );
+
+          return; // Task failed, don't continue
+        }
+      } catch (error) {
+        console.error(`❌ Task execution error: ${currentTask.title}`, error);
+
+        // Update task with error
+        await enhancedTaskIntegration.updateTaskStatus(
+          currentTask.id,
+          'failed'
+        );
+
+        return; // Task failed, don't continue
+      }
     }
 
+    // Task execution handled above - if no MCP option was found, we executed directly
     // If no BT option found, try to use individual leaves directly
-    if (!suitableOption) {
+    if (!suitableOption && !executionResult) {
       // Map task types to individual leaves
       const inferredRecipe = resolvedRecipe(currentTask);
       const inferredBlock = resolvedBlock(currentTask);
@@ -2454,7 +2505,7 @@ async function startServer() {
         for (const leaf of leaves) {
           try {
             // Register in governance registry (active status for now)
-            registry.registerLeaf(leaf.name, leaf as any);
+            registry.registerLeaf(leaf.spec?.name || 'unknown', leaf as any);
             // Register with MCP integration for tool hydration
             const ok = await mcpIntegration.registerLeaf(leaf as any);
             if (ok) registered++;
