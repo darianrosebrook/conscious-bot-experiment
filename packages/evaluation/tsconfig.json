@@ -28,5 +28,5 @@
     { "path": "../safety" },
     { "path": "../world" }
   ],
-  "exclude": ["dist", "node_modules", "**/*.test.ts", "**/*.spec.ts"]
+  "exclude": ["dist", "node_modules", "src/__tests__/complex-reasoning-evaluation.test.ts", "src/__tests__/phase5-integration.test.ts"]
 }

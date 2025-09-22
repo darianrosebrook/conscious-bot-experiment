@@ -17,6 +17,7 @@ import {
   SelfNarrative,
 } from './self-narrative-constructor';
 import { IdentityMemoryGuardian } from './identity-memory-guardian';
+import { HTNMemoryManager } from './htn-memory';
 
 /**
  * Memory system coordination configuration
@@ -116,6 +117,12 @@ export interface CoordinationStatus {
     identityChangeScore: number;
     nextMilestoneEligible: boolean;
   };
+  htnStatus: {
+    totalExecutions: number;
+    averageEffectiveness: number;
+    mostEffectiveMethod: string;
+    integrated: boolean;
+  };
 }
 
 /**
@@ -163,6 +170,7 @@ export class MemorySystemCoordinator {
   private decayManager?: MemoryDecayManager;
   private narrativeConstructor?: SelfNarrativeConstructor;
   private identityGuardian?: IdentityMemoryGuardian;
+  private htnMemoryManager?: HTNMemoryManager;
 
   // Recent experiences for milestone evaluation
   private recentExperiences: Experience[] = [];
@@ -172,7 +180,8 @@ export class MemorySystemCoordinator {
     emotionalManager?: EmotionalMemoryManager,
     decayManager?: MemoryDecayManager,
     narrativeConstructor?: SelfNarrativeConstructor,
-    identityGuardian?: IdentityMemoryGuardian
+    identityGuardian?: IdentityMemoryGuardian,
+    htnMemoryManager?: HTNMemoryManager
   ) {
     this.config = {
       ...DEFAULT_COORDINATION_CONFIG,
@@ -183,6 +192,7 @@ export class MemorySystemCoordinator {
     this.decayManager = decayManager;
     this.narrativeConstructor = narrativeConstructor;
     this.identityGuardian = identityGuardian;
+    this.htnMemoryManager = htnMemoryManager;
   }
 
   /**
@@ -195,6 +205,64 @@ export class MemorySystemCoordinator {
         `📅 Milestone interval: ${this.config.milestoneCoordination.minDaysBetweenNarratives}-` +
           `${this.config.milestoneCoordination.maxDaysBetweenNarratives} game days`
       );
+
+      // Initialize HTN memory coordination
+      if (this.htnMemoryManager) {
+        console.log('🤖 HTN Memory Manager integrated');
+      }
+    }
+  }
+
+  /**
+   * Coordinate HTN learning with other memory systems
+   */
+  async coordinateHTNLearning(): Promise<void> {
+    if (!this.htnMemoryManager) return;
+
+    try {
+      const stats = this.htnMemoryManager.getStats();
+
+      // Share HTN effectiveness insights with emotional memory
+      if (
+        this.emotionalManager &&
+        this.config.crossSystemCommunication.shareEmotionalContext
+      ) {
+        // Map HTN task effectiveness to emotional context
+        for (const [methodKey, method] of this.htnMemoryManager[
+          'methods'
+        ].entries()) {
+          const emotionalContext = {
+            primaryEmotion:
+              method.effectiveness > 0.7
+                ? 'excited'
+                : method.effectiveness > 0.4
+                  ? 'content'
+                  : ('frustration' as any),
+            intensity: method.effectiveness,
+            secondaryEmotions: [
+              { emotion: 'confidence', intensity: method.confidence },
+            ],
+            triggers: [`htn-method:${methodKey}`],
+            context: `HTN method effectiveness: ${method.effectiveness}, confidence: ${method.confidence}, task: ${methodKey.split(':')[0]}`,
+            source: 'htn-learning',
+            timestamp: Date.now(),
+          };
+
+          // Store emotional context for this task type
+          await this.emotionalManager.recordEmotionalState(emotionalContext);
+        }
+      }
+
+      // Share HTN patterns with identity guardian for self-concept updates
+      if (this.identityGuardian && stats.mostEffectiveMethod) {
+        console.log(
+          `🤖 HTN Insight: ${stats.mostEffectiveMethod} is most effective (${stats.averageEffectiveness.toFixed(2)} avg effectiveness)`
+        );
+      }
+
+      console.log('🔄 HTN learning coordinated with other systems');
+    } catch (error) {
+      console.error('Failed to coordinate HTN learning:', error);
     }
   }
 
@@ -283,6 +351,9 @@ export class MemorySystemCoordinator {
       this.coordinationEvents = this.coordinationEvents.slice(-100);
     }
 
+    // Coordinate HTN learning with other systems
+    await this.coordinateHTNLearning();
+
     console.log(`✅ Coordination complete: ${events.length} events processed`);
     return events;
   }
@@ -300,6 +371,12 @@ export class MemorySystemCoordinator {
     const now = Date.now();
     const daysSinceLastNarrative = this.calculateDaysSinceLastNarrative();
 
+    const htnStats = this.htnMemoryManager?.getStats() || {
+      totalExecutions: 0,
+      averageEffectiveness: 0,
+      mostEffectiveMethod: 'none',
+    };
+
     const milestoneStatus = {
       daysSinceLastNarrative,
       experiencesAccumulated: this.recentExperiences.length,
@@ -308,6 +385,13 @@ export class MemorySystemCoordinator {
       nextMilestoneEligible:
         daysSinceLastNarrative >=
         this.config.milestoneCoordination.minDaysBetweenNarratives,
+    };
+
+    const htnStatus = {
+      totalExecutions: htnStats.totalExecutions,
+      averageEffectiveness: htnStats.averageEffectiveness,
+      mostEffectiveMethod: htnStats.mostEffectiveMethod,
+      integrated: !!this.htnMemoryManager,
     };
 
     const recentEvents = this.coordinationEvents.slice(-10);
@@ -319,6 +403,7 @@ export class MemorySystemCoordinator {
       pendingEvents: [],
       recentEvents,
       milestoneStatus,
+      htnStatus,
     };
   }
 
@@ -701,6 +786,51 @@ export class MemorySystemCoordinator {
       description,
       systems,
       data,
+    };
+  }
+
+  /**
+   * Get coordination status including HTN integration
+   */
+  getStatus(): CoordinationStatus {
+    const htnStats = this.htnMemoryManager?.getStats() || {
+      totalExecutions: 0,
+      averageEffectiveness: 0,
+      mostEffectiveMethod: 'none',
+    };
+
+    return {
+      lastCoordination: this.lastCoordination,
+      currentGameDay: this.config.gameTimeConfig.currentGameDay || 0,
+      systemsOnline: [
+        ...(this.emotionalManager ? ['emotional'] : []),
+        ...(this.decayManager ? ['decay'] : []),
+        ...(this.narrativeConstructor ? ['narrative'] : []),
+        ...(this.identityGuardian ? ['identity'] : []),
+        ...(this.htnMemoryManager ? ['htn'] : []),
+      ],
+      pendingEvents: this.coordinationEvents.filter(
+        (e) => e.type === CoordinationEventType.CROSS_SYSTEM_SYNC
+      ),
+      recentEvents: this.coordinationEvents.slice(-10),
+      milestoneStatus: {
+        daysSinceLastNarrative:
+          this.config.gameTimeConfig.lastCoordinationDay &&
+          this.config.gameTimeConfig.currentGameDay
+            ? this.config.gameTimeConfig.currentGameDay -
+              this.config.gameTimeConfig.lastCoordinationDay
+            : 0,
+        experiencesAccumulated: this.recentExperiences.length,
+        emotionalIntensity: 0.5, // Default value, would need to implement this properly
+        identityChangeScore: 0, // Would need to implement this
+        nextMilestoneEligible: false, // Would need to implement this
+      },
+      htnStatus: {
+        totalExecutions: htnStats.totalExecutions,
+        averageEffectiveness: htnStats.averageEffectiveness,
+        mostEffectiveMethod: htnStats.mostEffectiveMethod,
+        integrated: !!this.htnMemoryManager,
+      },
     };
   }
 }

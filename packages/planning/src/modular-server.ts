@@ -20,6 +20,7 @@ import {
   checkBotConnection,
   waitForBotConnection,
   getBotPosition,
+  executeTask,
 } from './modules/mc-client';
 import {
   extractItemFromTask,
@@ -49,6 +50,17 @@ import {
 } from './modules/requirements';
 import { logOptimizer } from './modules/logging';
 
+// Extend global interface for rate limiting variables
+declare global {
+  var lastNoTasksLog: number | undefined;
+  var lastTaskCount: number | undefined;
+  var lastTaskCountLog: number | undefined;
+  var lastMcpWarnLog: number | undefined;
+  var lastMcpBotWarnLog: number | undefined;
+  var lastConvertedStateLog: number | undefined;
+  var lastStateLog: number | undefined;
+}
+
 // Import existing components
 import { CognitiveIntegration } from './cognitive-integration';
 import { BehaviorTreeRunner } from './behavior-trees/BehaviorTreeRunner';
@@ -76,7 +88,7 @@ import { WorldKnowledgeIntegrator } from './world-state/world-knowledge-integrat
 
 // Centralized Minecraft endpoint and resilient HTTP utilities
 const worldStateManager = new WorldStateManager(MC_ENDPOINT);
-worldStateManager.startPolling(3000);
+worldStateManager.startPolling(3000); // Poll every 3 seconds for testing
 const worldKnowledge = new WorldKnowledgeIntegrator(worldStateManager);
 worldStateManager.on('updated', (snapshot) => {
   try {
@@ -1238,6 +1250,174 @@ async function generateComplexCraftingSubtasks(task: any): Promise<void> {
 }
 
 /**
+ * Helper function to detect if cognitive reflection contains actionable steps
+ */
+function detectActionableSteps(thoughtContent: string): boolean {
+  const actionableKeywords = [
+    'approach',
+    'chop',
+    'craft',
+    'build',
+    'gather',
+    'collect',
+    'use',
+    'move',
+    'identify',
+    'return',
+    'place',
+    'set up',
+    'choose',
+    'begin',
+    'start',
+    'scan',
+    'mark',
+    'transport',
+    'break',
+    'cut down',
+    'observe',
+  ];
+
+  const content = thoughtContent.toLowerCase();
+  return actionableKeywords.some((keyword) => content.includes(keyword));
+}
+
+/**
+ * Helper function to convert cognitive reflection tasks to actionable tasks
+ */
+async function convertCognitiveReflectionToTasks(
+  cognitiveTask: any
+): Promise<void> {
+  try {
+    console.log(
+      `🧠 [AUTONOMOUS EXECUTOR] Converting cognitive reflection to actionable tasks: ${cognitiveTask.title}`
+    );
+
+    const thoughtContent = cognitiveTask.parameters?.thoughtContent || '';
+
+    // Extract actionable steps from the cognitive reflection
+    const steps = extractActionableSteps(thoughtContent);
+
+    if (steps.length > 0) {
+      console.log(
+        `🧠 [AUTONOMOUS EXECUTOR] Found ${steps.length} actionable steps`
+      );
+
+      // Create actionable tasks from the steps
+      for (const step of steps) {
+        const actionTask = {
+          id: `action-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+          title: step.label,
+          type: 'action',
+          description: step.label,
+          priority: cognitiveTask.priority || 0.5,
+          urgency: cognitiveTask.urgency || 0.5,
+          parameters: {
+            action: determineActionType(step.label),
+            estimatedDuration: step.estimatedDuration || 5000,
+          },
+          goal: 'execute_action',
+          status: 'pending' as const,
+          createdAt: Date.now(),
+          completedAt: null,
+          parentTaskId: cognitiveTask.id,
+          progress: 0,
+        };
+
+        // Submit the actionable task
+        await enhancedTaskIntegration.addTask(actionTask);
+        console.log(
+          `🧠 [AUTONOMOUS EXECUTOR] Created actionable task: ${actionTask.title}`
+        );
+      }
+
+      // Mark the original cognitive reflection as completed since we've extracted its actionable content
+      await enhancedTaskIntegration.updateTaskStatus(
+        cognitiveTask.id,
+        'completed'
+      );
+      console.log(
+        `✅ [AUTONOMOUS EXECUTOR] Cognitive reflection converted to actionable tasks and marked as completed`
+      );
+    } else {
+      console.log(
+        `🧠 [AUTONOMOUS EXECUTOR] No actionable steps found, marking as completed`
+      );
+      await enhancedTaskIntegration.updateTaskStatus(
+        cognitiveTask.id,
+        'completed'
+      );
+    }
+  } catch (error) {
+    console.error(
+      `❌ [AUTONOMOUS EXECUTOR] Failed to convert cognitive reflection to tasks:`,
+      error
+    );
+    await enhancedTaskIntegration.updateTaskStatus(cognitiveTask.id, 'failed');
+  }
+}
+
+/**
+ * Extract actionable steps from cognitive reflection content
+ */
+function extractActionableSteps(content: string): any[] {
+  // Simple parsing to extract actionable steps
+  // This is a basic implementation - could be enhanced with NLP
+  const steps = [];
+  const sentences = content.split(/[.!?]+/).filter((s) => s.trim().length > 0);
+
+  for (const sentence of sentences) {
+    if (
+      sentence.toLowerCase().includes('approach') ||
+      sentence.toLowerCase().includes('chop') ||
+      sentence.toLowerCase().includes('craft') ||
+      sentence.toLowerCase().includes('build') ||
+      sentence.toLowerCase().includes('gather') ||
+      sentence.toLowerCase().includes('collect') ||
+      sentence.toLowerCase().includes('use') ||
+      sentence.toLowerCase().includes('move') ||
+      sentence.toLowerCase().includes('identify') ||
+      sentence.toLowerCase().includes('scan')
+    ) {
+      steps.push({
+        label: sentence.trim(),
+        estimatedDuration: 5000, // Default 5 seconds
+      });
+    }
+  }
+
+  return steps;
+}
+
+/**
+ * Determine action type from step description
+ */
+function determineActionType(stepDescription: string): string {
+  const description = stepDescription.toLowerCase();
+
+  if (
+    description.includes('approach') ||
+    description.includes('move') ||
+    description.includes('walk')
+  ) {
+    return 'move_to';
+  }
+  if (description.includes('chop') || description.includes('cut')) {
+    return 'dig_block';
+  }
+  if (description.includes('craft')) {
+    return 'craft_recipe';
+  }
+  if (description.includes('build') || description.includes('construct')) {
+    return 'build_structure';
+  }
+  if (description.includes('gather') || description.includes('collect')) {
+    return 'gather_resources';
+  }
+
+  return 'generic_action';
+}
+
+/**
  * Autonomous task executor - Real Action Based Progress
  * Only updates progress when actual bot actions are performed
  */
@@ -1264,9 +1444,20 @@ async function autonomousTaskExecutor() {
     // Get active tasks directly from the enhanced task integration
     const activeTasks = enhancedTaskIntegration.getActiveTasks();
 
-    console.log(
-      `🤖 [AUTONOMOUS EXECUTOR] Found ${activeTasks.length} active tasks`
-    );
+    // Only log task count when it changes or every 5 minutes
+    const now = Date.now();
+    const lastTaskCountLog = global.lastTaskCountLog || 0;
+    if (
+      !global.lastTaskCount ||
+      global.lastTaskCount !== activeTasks.length ||
+      now - lastTaskCountLog > 300000
+    ) {
+      console.log(
+        `🤖 [AUTONOMOUS EXECUTOR] Found ${activeTasks.length} active tasks`
+      );
+      global.lastTaskCount = activeTasks.length;
+      global.lastTaskCountLog = now;
+    }
     if (activeTasks.length > 0) {
       console.log(
         `🤖 [AUTONOMOUS EXECUTOR] Top task: ${activeTasks[0].title} (${activeTasks[0].type})`
@@ -1277,8 +1468,13 @@ async function autonomousTaskExecutor() {
     }
 
     if (activeTasks.length === 0) {
-      console.log('🤖 [AUTONOMOUS EXECUTOR] No active tasks to execute');
-      logOptimizer.log('No active tasks to execute', 'no-active-tasks');
+      // Only log once per minute to avoid spam
+      const now = Date.now();
+      if (!global.lastNoTasksLog || now - global.lastNoTasksLog > 60000) {
+        console.log('🤖 [AUTONOMOUS EXECUTOR] No active tasks to execute');
+        logOptimizer.log('No active tasks to execute', 'no-active-tasks');
+        global.lastNoTasksLog = now;
+      }
       return;
     }
 
@@ -1320,14 +1516,32 @@ async function autonomousTaskExecutor() {
         `🧠 [AUTONOMOUS EXECUTOR] Signals received: ${currentTask.parameters?.signals?.length || 0}`
       );
 
-      // Mark cognitive reflection as completed since behavior tree already processed it
-      await enhancedTaskIntegration.updateTaskStatus(
-        currentTask.id,
-        'completed'
-      );
-      console.log(
-        `✅ [AUTONOMOUS EXECUTOR] Cognitive reflection task completed`
-      );
+      // Check if this cognitive reflection contains actionable steps
+      const thoughtContent = currentTask.parameters?.thoughtContent || '';
+      const hasActionableSteps = detectActionableSteps(thoughtContent);
+
+      if (hasActionableSteps) {
+        console.log(
+          `🧠 [AUTONOMOUS EXECUTOR] Cognitive reflection contains actionable steps - converting to executable tasks`
+        );
+
+        // Convert cognitive reflection to actionable tasks
+        await convertCognitiveReflectionToTasks(currentTask);
+      } else {
+        console.log(
+          `🧠 [AUTONOMOUS EXECUTOR] Processing cognitive reflection task: ${currentTask.title}`
+        );
+
+        // Pure cognitive reflection - already completed by the cognitive thought processor
+        await enhancedTaskIntegration.updateTaskStatus(
+          currentTask.id,
+          'completed'
+        );
+
+        console.log(
+          `✅ [AUTONOMOUS EXECUTOR] Cognitive reflection task marked as completed (insights already generated)`
+        );
+      }
       return;
     }
 
@@ -1492,6 +1706,9 @@ async function autonomousTaskExecutor() {
       console.warn('Inventory progress estimation failed:', e);
     }
 
+    // Track if task was executed successfully
+    let executionResult = false;
+
     // Execute MCP option if found
     if (suitableOption) {
       console.log(
@@ -1501,10 +1718,57 @@ async function autonomousTaskExecutor() {
         ...currentTask.metadata,
         updatedAt: Date.now(),
       });
+    } else {
+      // No MCP option found - execute directly through Minecraft interface
+      console.log(
+        `🔄 No MCP option found for task: ${currentTask.title} (${currentTask.type}) - executing directly`
+      );
+
+      try {
+        const execResult = await executeTask(currentTask);
+        executionResult = execResult.success;
+
+        if (execResult.success) {
+          console.log(
+            `✅ Task executed successfully: ${currentTask.title} (${execResult.completedSteps || 0} steps completed)`
+          );
+
+          // Update task status
+          await enhancedTaskIntegration.updateTaskStatus(
+            currentTask.id,
+            'completed'
+          );
+
+          return; // Task completed successfully
+        } else {
+          console.warn(
+            `⚠️ Task execution failed: ${currentTask.title} - ${execResult.error}`
+          );
+
+          // Update task with failure
+          await enhancedTaskIntegration.updateTaskStatus(
+            currentTask.id,
+            'failed'
+          );
+
+          return; // Task failed, don't continue
+        }
+      } catch (error) {
+        console.error(`❌ Task execution error: ${currentTask.title}`, error);
+
+        // Update task with error
+        await enhancedTaskIntegration.updateTaskStatus(
+          currentTask.id,
+          'failed'
+        );
+
+        return; // Task failed, don't continue
+      }
     }
 
+    // Task execution handled above - if no MCP option was found, we executed directly
     // If no BT option found, try to use individual leaves directly
-    if (!suitableOption) {
+    if (!suitableOption && !executionResult) {
       // Map task types to individual leaves
       const inferredRecipe = resolvedRecipe(currentTask);
       const inferredBlock = resolvedBlock(currentTask);
@@ -2123,6 +2387,7 @@ const cognitiveThoughtProcessor = new CognitiveThoughtProcessor({
   cognitiveEndpoint: 'http://localhost:3003',
 });
 
+
 // Connect cognitive thought processor to world state
 worldStateManager.on('updated', (snapshot) => {
   try {
@@ -2342,6 +2607,17 @@ enhancedTaskIntegration.on(
   }
 );
 
+// Expose world state manager data for world server
+serverConfig.addEndpoint('get', '/world-state', (req, res) => {
+  try {
+    const snapshot = worldStateManager.getSnapshot();
+    res.json(snapshot);
+  } catch (error) {
+    console.error('Failed to get world state:', error);
+    res.status(500).json({ error: 'Failed to get world state' });
+  }
+});
+
 // Main server startup function
 async function startServer() {
   try {
@@ -2454,7 +2730,7 @@ async function startServer() {
         for (const leaf of leaves) {
           try {
             // Register in governance registry (active status for now)
-            registry.registerLeaf(leaf.name, leaf as any);
+            registry.registerLeaf(leaf.spec?.name || 'unknown', leaf as any);
             // Register with MCP integration for tool hydration
             const ok = await mcpIntegration.registerLeaf(leaf as any);
             if (ok) registered++;

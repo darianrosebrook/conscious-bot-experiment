@@ -43,3 +43,43 @@ components:
           format: float
           minimum: 0
           maximum: 1
+    BootstrapTask:
+      type: object
+      required:
+        - id
+        - goalType
+        - priority
+        - origin
+      properties:
+        id:
+          type: string
+          description: Unique identifier for the bootstrapped task
+        goalType:
+          type: string
+          description: Target goal type inferred from memory/LLM/exploration
+        description:
+          type: string
+          description: Human-readable summary of the task intent
+        priority:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 1
+          description: Relative priority assigned during bootstrap
+        urgency:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 1
+          description: Time sensitivity inferred during bootstrap
+        origin:
+          type: string
+          enum: [memory, llm, exploration]
+          description: Source of the bootstrapped task suggestion
+        reasoning:
+          type: string
+          description: Rationale for why the task was surfaced
+        metadata:
+          type: object
+          additionalProperties: true
+          description: Supplemental context (e.g., memory ids, inventory needs)

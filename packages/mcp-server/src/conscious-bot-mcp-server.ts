@@ -16,14 +16,17 @@ import {
   ReadResourceRequestSchema,
   ListPromptsRequestSchema,
   GetPromptRequestSchema,
-  Tool,
-  Resource,
-  Prompt,
+  // Tool,
+  // Resource,
+  // Prompt,
 } from '@modelcontextprotocol/sdk/types.js';
 import Ajv, { ValidateFunction } from 'ajv';
 
 // Import our existing components
-import { LeafFactory, createLeafContext } from '@conscious-bot/core';
+import {
+  LeafFactory,
+  createLeafContext,
+} from '@conscious-bot/executor-contracts';
 
 // MCP-like interface definitions
 interface MCPToolDefinition {
@@ -58,7 +61,7 @@ interface MCPPromptDefinition {
 }
 
 // Dependencies interface
-interface MCPServerDependencies {
+export interface MCPServerDependencies {
   leafFactory: LeafFactory;
   registry?: any; // EnhancedRegistry - will be properly typed when available
   bot?: any; // Bot instance - will be properly typed when available
@@ -205,31 +208,115 @@ class ConsciousBotMCPServer extends Server {
       typeof (this.leafFactory as any).listLeaves !== 'function'
     ) {
       console.warn(
-        '[MCP] LeafFactory.listLeaves() not available; demo leaves will not be exposed.'
+        '[MCP] LeafFactory.listLeaves() not available; minecraft.* tools will be unavailable.'
       );
       return;
     }
-    const leaves = this.leafFactory.listLeaves(); // => LeafImpl[]
+
+    // Reset existing minecraft tools while keeping registry utilities intact
+    for (const key of Array.from(this.tools.keys())) {
+      if (this.isMinecraftToolKey(key)) {
+        this.tools.delete(key);
+      }
+    }
+    this.validators.clear();
+
+    let leaves: Array<{ name: string; version: string; spec: any }> = [];
+    try {
+      leaves = this.leafFactory.listLeaves();
+    } catch (error) {
+      console.error('[MCP] Failed to list leaves from factory:', error);
+      return;
+    }
+
     for (const leaf of leaves) {
-      const name = `minecraft.${leaf.spec.name}@${leaf.spec.version}`;
+      const spec = leaf?.spec ?? {};
+      const leafName = spec.name ?? leaf?.name;
+      const leafVersion = spec.version ?? leaf?.version ?? '1.0.0';
+      if (!leafName) {
+        console.warn('[MCP] Skipping leaf without name', leaf);
+        continue;
+      }
+
+      const toolKey = `minecraft.${leafName}@${leafVersion}`;
+      const inputSchema = this.normalizeSchema(
+        spec.inputSchema ?? { type: 'object', additionalProperties: true },
+        { type: 'object', additionalProperties: true }
+      );
+      const outputSchema = this.normalizeSchema(spec.outputSchema, {
+        type: 'null',
+      });
+
       const def: MCPToolDefinition = {
-        name,
-        description: leaf.spec.description ?? leaf.spec.name,
-        inputSchema: leaf.spec.inputSchema,
-        outputSchema: leaf.spec.outputSchema ?? { type: 'null' },
+        name: toolKey,
+        description: spec.description ?? leafName,
+        inputSchema,
+        outputSchema,
         metadata: {
-          version: leaf.spec.version,
-          timeoutMs: leaf.spec.timeoutMs,
-          retries: leaf.spec.retries,
-          permissions: leaf.spec.permissions, // must match your leaf-contract permissions
+          version: leafVersion,
+          timeoutMs: spec.timeoutMs,
+          retries: spec.retries,
+          permissions: Array.isArray(spec.permissions)
+            ? spec.permissions
+            : [],
         },
       };
-      this.tools.set(name, def);
-      const vin = this.ajv.compile(def.inputSchema);
-      const vout = def.outputSchema
-        ? this.ajv.compile(def.outputSchema)
+
+      const validatorIn = this.compileSchema(inputSchema, toolKey, 'input');
+      if (!validatorIn) {
+        console.warn(
+          `[MCP] Skipping tool ${toolKey}: input schema compilation failed`
+        );
+        continue;
+      }
+      const validatorOut = outputSchema
+        ? this.compileSchema(outputSchema, toolKey, 'output')
         : undefined;
-      this.validators.set(name, { in: vin, out: vout });
+
+      this.tools.set(toolKey, def);
+      this.validators.set(toolKey, { in: validatorIn, out: validatorOut });
+    }
+  }
+
+  private isMinecraftToolKey(key: string): boolean {
+    return key.startsWith('minecraft.');
+  }
+
+  private normalizeSchema(schema: any, fallback: any) {
+    if (!schema) return fallback;
+
+    // Accept already usable JSON schema objects
+    if (typeof schema === 'object' && !('safeParse' in schema)) {
+      return schema;
+    }
+
+    // Handle Zod schemas by deferring to provided toJSON if available
+    if (schema && typeof schema === 'object') {
+      if (typeof schema.toJSON === 'function') {
+        try {
+          return schema.toJSON();
+        } catch (error) {
+          console.warn('[MCP] Failed to convert schema via toJSON', error);
+        }
+      }
+    }
+
+    return fallback;
+  }
+
+  private compileSchema(
+    schema: any,
+    toolKey: string,
+    type: 'input' | 'output'
+  ): ValidateFunction | undefined {
+    try {
+      return this.ajv.compile(schema);
+    } catch (error) {
+      console.error(
+        `[MCP] ${type} schema compilation failed for ${toolKey}:`,
+        error
+      );
+      return undefined;
     }
   }
 
@@ -240,7 +327,10 @@ class ConsciousBotMCPServer extends Server {
       name: 'World Snapshot',
       description: 'Position, time, light, hostiles, inventory summary',
       mimeType: 'application/json',
-      metadata: {}, // filled at read-time
+      metadata: {
+        version: '1.0.0',
+        permissions: ['sense'],
+      }, // filled at read-time
     });
 
     this.resources.set('policy://buckets', {
@@ -786,7 +876,12 @@ class ConsciousBotMCPServer extends Server {
       });
     }
 
-    const def = this.tools.get(key)!;
+    const def: MCPToolDefinition | undefined = this.tools?.get(key);
+    if (!def) {
+      throw Object.assign(new Error('tool.not_found'), {
+        data: { detail: `Tool not found: ${name}` },
+      });
+    }
 
     // Check permissions
     if (!this.isAllowedTool(def, args?.goal)) {
@@ -799,15 +894,25 @@ class ConsciousBotMCPServer extends Server {
     const normArgs = this.normalizeArgsForLeaf(leafName, args);
 
     // Validate input
-    const val = this.validators.get(key)!;
+    const val = this.validators.get(key);
+    if (!val) {
+      throw Object.assign(new Error('validation.missing'), {
+        data: { detail: `No validator found for ${leafName}` },
+      });
+    }
     if (!val.in(normArgs)) {
       throw Object.assign(new Error('validation.failed'), {
-        data: { detail: this.ajv.errorsText(val.in.errors) },
+        data: { detail: this.ajv.errorsText(val.in.errors ?? []) },
       });
     }
 
     // PATCH 2: Execute the tool via LeafFactory.run()
-    const [_, v] = (key as string).split('@');
+    const [, v] = (key as string).split('@');
+    if (!v) {
+      throw Object.assign(new Error('validation.missing'), {
+        data: { detail: `No version found for ${leafName}` },
+      });
+    }
     const ctx = this.deps.bot ? createLeafContext(this.deps.bot) : undefined;
     if (!ctx) {
       throw Object.assign(new Error('bot.unavailable'), {
@@ -816,7 +921,7 @@ class ConsciousBotMCPServer extends Server {
     }
     const res = await this.leafFactory.run(leafName, v, ctx, normArgs, {
       idempotencyKey: (args as any)?.idempotencyKey,
-    });
+    } as any);
 
     if (res.status === 'failure') {
       // Let the MCP transport surface a proper error; include your typed error as data
@@ -826,14 +931,14 @@ class ConsciousBotMCPServer extends Server {
         detail: 'leaf_failed',
       };
       // Throwing causes MCP to emit an error response; do NOT wrap as a success JSON payload
-      throw Object.assign(new Error(err.code), { data: err });
+      throw Object.assign(new Error(err.code), { data: err as any });
     }
 
     const payload = res.result ?? null;
     // Output validation (kept)
-    if (def.outputSchema && val.out && !val.out(payload)) {
+    if (def.outputSchema && val && val.out && !val.out(payload as any)) {
       throw Object.assign(new Error('tool.output_schema_mismatch'), {
-        data: { detail: this.ajv.errorsText(val.out.errors) },
+        data: { detail: this.ajv.errorsText(val.out.errors ?? []) },
       });
     }
     return payload;
@@ -999,11 +1104,11 @@ class ConsciousBotMCPServer extends Server {
     // fallback to your resource map...
     const options = Array.from(this.resources.entries())
       .filter(([uri]) => uri.startsWith('mcp+bt://options/'))
-      .filter(([uri, resource]) => {
+      .filter(([_uri, resource]) => {
         if (status === 'all') return true;
         return resource.metadata.status === status;
       })
-      .map(([uri, resource]) => ({
+      .map(([_uri, resource]) => ({
         id: resource.metadata.id,
         name: resource.name,
         status: resource.metadata.status,
@@ -1015,6 +1120,7 @@ class ConsciousBotMCPServer extends Server {
 
   // PATCH 7: enforce a minimal safe policy
   private isAllowedTool(def: MCPToolDefinition, _goal?: string): boolean {
+    if (!def) return false;
     const perms = new Set<string>(def?.metadata?.permissions ?? []);
     // Minimal deny-by-default for risky ops; make this data-driven later
     if (perms.has('container.write')) return false;
@@ -1052,7 +1158,7 @@ class ConsciousBotMCPServer extends Server {
       if (!n || typeof n !== 'object') return;
       if (n.type === 'Leaf' && n.leafName) {
         const impl = this.leafFactory.get?.(n.leafName);
-        if (impl) {
+        if (impl && impl.spec) {
           (impl.spec.permissions || []).forEach((p: string) => perms.add(p));
         } else {
           // Gracefully handle unknown leaves by inferring a safe minimal set
@@ -1315,4 +1421,4 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   main().catch(console.error);
 }
 
-export { ConsciousBotMCPServer, MCPServerDependencies };
+export { ConsciousBotMCPServer };

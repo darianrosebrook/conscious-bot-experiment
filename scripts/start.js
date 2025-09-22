@@ -33,16 +33,9 @@ const colors = {
   bold: '\x1b[1m',
 };
 
-// Service configuration
+// Service configuration with startup dependencies
 const services = [
-  {
-    name: 'Dashboard',
-    command: 'pnpm',
-    args: ['--filter', '@conscious-bot/dashboard', 'dev'],
-    port: 3000,
-    healthUrl: 'http://localhost:3000',
-    description: 'Web dashboard for monitoring and control',
-  },
+  // Core infrastructure services (start first)
   {
     name: 'Core API',
     command: 'pnpm',
@@ -50,6 +43,48 @@ const services = [
     port: 3007,
     healthUrl: 'http://localhost:3007/health',
     description: 'Core API and capability registry',
+    priority: 1, // Start first
+    dependencies: [], // No dependencies
+  },
+  {
+    name: 'Memory',
+    command: 'pnpm',
+    args: ['--filter', '@conscious-bot/memory', 'run', 'dev:server'],
+    port: 3001,
+    healthUrl: 'http://localhost:3001/health',
+    description: 'Memory storage and retrieval system',
+    priority: 2, // Start after core
+    dependencies: ['Core API'],
+  },
+  {
+    name: 'World',
+    command: 'pnpm',
+    args: ['--filter', '@conscious-bot/world', 'run', 'dev:server'],
+    port: 3004,
+    healthUrl: 'http://localhost:3004/health',
+    description: 'World state management and simulation',
+    priority: 2, // Start after core
+    dependencies: ['Core API'],
+  },
+  {
+    name: 'Cognition',
+    command: 'pnpm',
+    args: ['--filter', '@conscious-bot/cognition', 'run', 'dev:server'],
+    port: 3003,
+    healthUrl: 'http://localhost:3003/health',
+    description: 'Cognitive reasoning and decision making',
+    priority: 3, // Start after core services
+    dependencies: ['Core API'],
+  },
+  {
+    name: 'Planning',
+    command: 'pnpm',
+    args: ['--filter', '@conscious-bot/planning', 'run', 'dev:server'],
+    port: 3002,
+    healthUrl: 'http://localhost:3002/health',
+    description: 'Task planning and execution coordination',
+    priority: 4, // Start after core and memory/world
+    dependencies: ['Core API', 'Memory', 'World'],
   },
   {
     name: 'Minecraft Interface',
@@ -63,38 +98,8 @@ const services = [
     port: 3005,
     healthUrl: 'http://localhost:3005/health',
     description: 'Minecraft bot interface and control',
-  },
-  {
-    name: 'Cognition',
-    command: 'pnpm',
-    args: ['--filter', '@conscious-bot/cognition', 'run', 'dev:server'],
-    port: 3003,
-    healthUrl: 'http://localhost:3003/health',
-    description: 'Cognitive reasoning and decision making',
-  },
-  {
-    name: 'Memory',
-    command: 'pnpm',
-    args: ['--filter', '@conscious-bot/memory', 'run', 'dev:server'],
-    port: 3001,
-    healthUrl: 'http://localhost:3001/health',
-    description: 'Memory storage and retrieval system',
-  },
-  {
-    name: 'World',
-    command: 'pnpm',
-    args: ['--filter', '@conscious-bot/world', 'run', 'dev:server'],
-    port: 3004,
-    healthUrl: 'http://localhost:3004/health',
-    description: 'World state management and simulation',
-  },
-  {
-    name: 'Planning',
-    command: 'pnpm',
-    args: ['--filter', '@conscious-bot/planning', 'run', 'dev:server'],
-    port: 3002,
-    healthUrl: 'http://localhost:3002/health',
-    description: 'Task planning and execution coordination',
+    priority: 5, // Start after planning
+    dependencies: ['Core API', 'Planning'],
   },
   {
     name: 'Sapient HRM',
@@ -106,6 +111,19 @@ const services = [
     port: 5001,
     healthUrl: 'http://localhost:5001/health',
     description: 'Python HRM model for hierarchical reasoning',
+    priority: 6, // Start after core services
+    dependencies: [],
+  },
+  // Dashboard should start last for monitoring all services
+  {
+    name: 'Dashboard',
+    command: 'pnpm',
+    args: ['--filter', '@conscious-bot/dashboard', 'dev'],
+    port: 3000,
+    healthUrl: 'http://localhost:3000',
+    description: 'Web dashboard for monitoring and control',
+    priority: 7, // Start last
+    dependencies: ['Core API', 'Planning', 'Minecraft Interface'],
   },
 ];
 
@@ -121,6 +139,36 @@ function logBanner() {
   log('', colors.reset);
 }
 
+// Enhanced logging with structured format
+function logWithTimestamp(message, level = 'INFO', color = colors.reset) {
+  const timestamp = new Date().toISOString();
+  const logEntry = `[${timestamp}] [${level}] ${message}`;
+  console.log(`${color}${logEntry}${colors.reset}`);
+}
+
+// Service-specific logging with consistent format
+function logService(serviceName, message, level = 'INFO') {
+  const timestamp = new Date().toISOString();
+  const color = getServiceColor(serviceName);
+  const logEntry = `[${timestamp}] [${serviceName}] [${level}] ${message}`;
+  console.log(`${color}${logEntry}${colors.reset}`);
+}
+
+// Get color for service based on name
+function getServiceColor(serviceName) {
+  const colorMap = {
+    'Core API': colors.cyan,
+    Dashboard: colors.green,
+    'Minecraft Interface': colors.yellow,
+    Cognition: colors.purple,
+    Memory: colors.blue,
+    World: colors.magenta,
+    Planning: colors.red,
+    'Sapient HRM': colors.cyan,
+  };
+  return colorMap[serviceName] || colors.reset;
+}
+
 function checkPort(port) {
   try {
     execSync(`lsof -Pi :${port} -sTCP:LISTEN -t`, { stdio: 'ignore' });
@@ -128,6 +176,17 @@ function checkPort(port) {
   } catch {
     return false; // Port is available
   }
+}
+
+// Enhanced port checking with logging
+function checkPortWithLogging(port, serviceName) {
+  const isInUse = checkPort(port);
+  if (isInUse) {
+    logService(serviceName, `Port ${port} is already in use`, 'WARN');
+  } else {
+    logService(serviceName, `Port ${port} is available`, 'INFO');
+  }
+  return isInUse;
 }
 
 function killProcessesByPort(port) {
@@ -164,29 +223,28 @@ async function waitForService(url, serviceName, maxAttempts = 60) {
       const req = client.get(url, (res) => {
         if (res.statusCode >= 200 && res.statusCode < 500) {
           const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
-          log(` ✅ ${serviceName} is ready! (${elapsed}s)`, colors.green);
           resolve();
         } else {
           if (attempts < maxAttempts) {
             setTimeout(check, 2000);
           } else {
             const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
-            log(
-              ` ⚠️  ${serviceName} health check failed after ${elapsed}s`,
-              colors.yellow
+            reject(
+              new Error(
+                `Health check failed with status ${res.statusCode} after ${elapsed}s`
+              )
             );
-            resolve(); // Don't fail, just warn
           }
         }
       });
 
-      req.on('error', () => {
+      req.on('error', (error) => {
         if (attempts < maxAttempts) {
-          // Only log every 10 attempts to reduce verbosity
-          if (attempts - lastLogAttempt >= 10 || attempts === 1) {
+          // Only log every 5 attempts to reduce verbosity
+          if (attempts - lastLogAttempt >= 5 || attempts === 1) {
             const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
             log(
-              ` ⏳ Attempt ${attempts}/${maxAttempts} - ${serviceName} starting... (${elapsed}s)`,
+              ` ⏳ Attempt ${attempts}/${maxAttempts} - ${serviceName} not ready yet (${elapsed}s)`,
               colors.yellow
             );
             lastLogAttempt = attempts;
@@ -194,11 +252,9 @@ async function waitForService(url, serviceName, maxAttempts = 60) {
           setTimeout(check, 2000);
         } else {
           const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
-          log(
-            ` ⚠️  ${serviceName} health check timeout after ${elapsed}s`,
-            colors.yellow
+          reject(
+            new Error(`Health check failed after ${elapsed}s: ${error.message}`)
           );
-          resolve(); // Don't fail, just warn
         }
       });
 
@@ -208,11 +264,7 @@ async function waitForService(url, serviceName, maxAttempts = 60) {
           setTimeout(check, 2000);
         } else {
           const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
-          log(
-            ` ⚠️  ${serviceName} health check timeout after ${elapsed}s`,
-            colors.yellow
-          );
-          resolve(); // Don't fail, just warn
+          reject(new Error(`Health check timeout after ${elapsed}s`));
         }
       });
     };
@@ -360,17 +412,8 @@ async function main() {
   const portConflicts = [];
 
   for (const service of services) {
-    if (checkPort(service.port)) {
+    if (checkPortWithLogging(service.port, service.name)) {
       portConflicts.push(service);
-      log(
-        ` ❌ Port ${service.port} is still in use for ${service.name}`,
-        colors.red
-      );
-    } else {
-      log(
-        ` ✅ Port ${service.port} is available for ${service.name}`,
-        colors.green
-      );
     }
   }
 
@@ -403,18 +446,38 @@ async function main() {
     process.exit(1);
   }
 
-  // Step 8: Start all services
-  log('\n🚀 Starting all services...', colors.cyan);
+  // Step 8: Start services in priority order with dependency checking
+  log('\n🚀 Starting services in dependency order...', colors.cyan);
   log('');
 
   const processes = [];
+  const startedServices = new Set();
 
-  for (const service of services) {
-    log(
-      ` 🚀 Starting ${service.name} (port ${service.port})...`,
-      colors.purple
+  // Sort services by priority
+  const sortedServices = [...services].sort((a, b) => a.priority - b.priority);
+
+  for (const service of sortedServices) {
+    // Wait for dependencies to be ready
+    if (service.dependencies.length > 0) {
+      log(
+        ` ⏳ Waiting for dependencies: ${service.dependencies.join(', ')}`,
+        colors.yellow
+      );
+
+      for (const dep of service.dependencies) {
+        while (!startedServices.has(dep)) {
+          await wait(1000); // Wait 1 second before checking again
+          log(`   Waiting for ${dep} to be ready...`, colors.yellow);
+        }
+      }
+    }
+
+    logService(
+      service.name,
+      `Starting service on port ${service.port}`,
+      'START'
     );
-    log(`    ${service.description}`, colors.reset);
+    logService(service.name, service.description, 'INFO');
 
     const child = spawn(service.command, service.args, {
       stdio: 'pipe',
@@ -442,96 +505,214 @@ async function main() {
     });
 
     child.on('error', (error) => {
-      log(` ❌ Failed to start ${service.name}: ${error.message}`, colors.red);
+      logService(service.name, `Failed to start: ${error.message}`, 'ERROR');
     });
 
     child.on('exit', (code) => {
       if (code !== 0) {
-        log(` ❌ ${service.name} exited with code ${code}`, colors.red);
+        logService(service.name, `Exited with code ${code}`, 'ERROR');
       } else {
-        log(` ✅ ${service.name} exited normally`, colors.green);
+        logService(service.name, 'Exited normally', 'INFO');
       }
     });
 
     processes.push({ child, service });
 
-    // Small delay between starts
-    await wait(1000);
+    // Add to started services set
+    startedServices.add(service.name);
+
+    // Longer delay between critical services
+    const delay = service.priority <= 3 ? 3000 : 1000; // 3 seconds for core services, 1 second for others
+    await wait(delay);
   }
 
-  // Step 9: Wait for services to start and check health
+  // Step 9: Wait for services to start and check health with retry logic
   log('\n⏳ Waiting for services to start...', colors.cyan);
-  await wait(8000); // Increased from 5s to 8s to give services more time to initialize
+  await wait(8000); // Give services time to initialize
 
   log('\n🔍 Checking service health...', colors.cyan);
 
-  try {
-    // Check services sequentially to avoid overwhelming them
-    for (const { service } of processes) {
+  const healthResults = [];
+  const failedServices = [];
+
+  // Check services with improved error handling
+  for (const { service } of processes) {
+    try {
       await waitForService(service.healthUrl, service.name);
-      // Small delay between health checks
-      await wait(500);
+      healthResults.push({ service: service.name, status: 'healthy' });
+      logService(service.name, 'Health check passed', 'HEALTH');
+    } catch (error) {
+      healthResults.push({
+        service: service.name,
+        status: 'unhealthy',
+        error: error.message,
+      });
+      failedServices.push(service.name);
+      logService(
+        service.name,
+        `Health check failed: ${error.message}`,
+        'ERROR'
+      );
     }
-  } catch (error) {
-    log(
-      ` ⚠️  Some services may not be fully ready: ${error.message}`,
+
+    // Small delay between health checks
+    await wait(500);
+  }
+
+  // Summary of health checks
+  log('\n📊 Health Check Summary:', colors.blue);
+  for (const result of healthResults) {
+    if (result.status === 'healthy') {
+      log(`  ✅ ${result.service}`, colors.green);
+    } else {
+      log(`  ❌ ${result.service}: ${result.error}`, colors.red);
+    }
+  }
+
+  // Exit if critical services failed
+  const criticalServices = ['Core API', 'Planning', 'Minecraft Interface'];
+  const criticalFailures = failedServices.filter((service) =>
+    criticalServices.includes(service)
+  );
+
+  if (criticalFailures.length > 0) {
+    logWithTimestamp(
+      '\n🚨 Critical services failed to start:',
+      'CRITICAL',
+      colors.red
+    );
+    criticalFailures.forEach((service) =>
+      logService(service, 'Failed to start', 'CRITICAL')
+    );
+
+    logWithTimestamp(
+      '\n💡 Troubleshooting suggestions:',
+      'INFO',
       colors.yellow
+    );
+    logWithTimestamp(
+      '  1. Check if ports are already in use',
+      'INFO',
+      colors.cyan
+    );
+    logWithTimestamp(
+      '  2. Verify all dependencies are installed',
+      'INFO',
+      colors.cyan
+    );
+    logWithTimestamp('  3. Check service logs for errors', 'INFO', colors.cyan);
+    logWithTimestamp(
+      '  4. Try running "pnpm kill" to clean up processes',
+      'INFO',
+      colors.cyan
+    );
+
+    // Don't exit immediately - let user see the status
+    logWithTimestamp(
+      '\n⚠️  System may not function properly with failed critical services',
+      'WARN',
+      colors.yellow
+    );
+  } else if (failedServices.length > 0) {
+    logWithTimestamp(
+      '\n⚠️  Some non-critical services failed, but system should still function:',
+      'WARN',
+      colors.yellow
+    );
+    failedServices.forEach((service) =>
+      logService(service, 'Failed to start (non-critical)', 'WARN')
+    );
+  } else {
+    logWithTimestamp(
+      '\n🎉 All services passed health checks!',
+      'SUCCESS',
+      colors.green
     );
   }
 
   // Step 10: Display status and URLs
-  log('\n🎉 Conscious Bot System is running!', colors.green);
-  log('');
-  log('📊 Service Status:', colors.blue);
+  logWithTimestamp(
+    '\n🎉 Conscious Bot System is running!',
+    'SUCCESS',
+    colors.green
+  );
+  logWithTimestamp('📊 Service Status:', 'INFO', colors.blue);
 
   for (const service of services) {
-    log(
-      `  ${colors.cyan}${service.name}:${colors.reset}     http://localhost:${service.port}`,
-      colors.reset
+    logWithTimestamp(
+      `  ${service.name}:     http://localhost:${service.port}`,
+      'INFO',
+      colors.cyan
     );
   }
 
-  log('');
-  log('🔗 Quick Actions:', colors.blue);
-  log(
-    `  ${colors.cyan}Dashboard:${colors.reset}     http://localhost:3000`,
-    colors.reset
+  logWithTimestamp('', 'INFO');
+  logWithTimestamp('🔗 Quick Actions:', 'INFO', colors.blue);
+  logWithTimestamp(
+    '  Dashboard:     http://localhost:3000',
+    'INFO',
+    colors.cyan
   );
-  log(
-    `  ${colors.cyan}Core API:${colors.reset}      http://localhost:3007`,
-    colors.reset
+  logWithTimestamp(
+    '  Core API:      http://localhost:3007',
+    'INFO',
+    colors.cyan
   );
-  log(
-    `  ${colors.cyan}Minecraft Bot:${colors.reset}  http://localhost:3005`,
-    colors.reset
+  logWithTimestamp(
+    '  Minecraft Bot: http://localhost:3005',
+    'INFO',
+    colors.cyan
   );
-  log(
-    `  ${colors.cyan}Sapient HRM:${colors.reset}    http://localhost:5001`,
-    colors.reset
+  logWithTimestamp(
+    '  Sapient HRM:   http://localhost:5001',
+    'INFO',
+    colors.cyan
   );
-  log('');
-  log('🎮 Minecraft Commands:', colors.yellow);
-  log('  Connect bot: curl -X POST http://localhost:3005/connect');
-  log('  Disconnect bot: curl -X POST http://localhost:3005/disconnect');
-  log('  Get status: curl http://localhost:3005/status');
-  log('');
-  log('🧠 HRM Commands:', colors.yellow);
-  log('  Health check: curl http://localhost:5001/health');
-  log(
-    '  Test reasoning: curl -X POST http://localhost:5001/reason -H "Content-Type: application/json" -d \'{"task": "test", "context": {}}\''
+  logWithTimestamp('', 'INFO');
+  logWithTimestamp('🎮 Minecraft Commands:', 'INFO', colors.yellow);
+  logWithTimestamp(
+    '  Connect bot: curl -X POST http://localhost:3005/connect',
+    'INFO',
+    colors.cyan
   );
-  log('');
-  log('🛑 To stop all services:', colors.yellow);
-  log('  Press Ctrl+C or run: pnpm kill');
-  log('');
+  logWithTimestamp(
+    '  Disconnect bot: curl -X POST http://localhost:3005/disconnect',
+    'INFO',
+    colors.cyan
+  );
+  logWithTimestamp(
+    '  Get status: curl http://localhost:3005/status',
+    'INFO',
+    colors.cyan
+  );
+  logWithTimestamp('', 'INFO');
+  logWithTimestamp('🧠 HRM Commands:', 'INFO', colors.yellow);
+  logWithTimestamp(
+    '  Health check: curl http://localhost:5001/health',
+    'INFO',
+    colors.cyan
+  );
+  logWithTimestamp(
+    '  Test reasoning: curl -X POST http://localhost:5001/reason -H "Content-Type: application/json" -d \'{"task": "test", "context": {}}\'',
+    'INFO',
+    colors.cyan
+  );
+  logWithTimestamp('', 'INFO');
+  logWithTimestamp('🛑 To stop all services:', 'INFO', colors.yellow);
+  logWithTimestamp('  Press Ctrl+C or run: pnpm kill', 'INFO', colors.cyan);
+  logWithTimestamp('', 'INFO');
 
   // Step 11: Handle graceful shutdown
   const cleanup = async () => {
-    log('\n🛑 Shutting down Conscious Bot System...', colors.yellow);
+    logWithTimestamp(
+      '\n🛑 Shutting down Conscious Bot System...',
+      'SHUTDOWN',
+      colors.yellow
+    );
 
     // Kill all child processes
     for (const { child, service } of processes) {
-      log(`  Stopping ${service.name}...`, colors.yellow);
+      logService(service.name, 'Stopping service...', 'SHUTDOWN');
       child.kill('SIGTERM');
     }
 
@@ -541,7 +722,7 @@ async function main() {
     // Force kill any remaining processes
     for (const { child, service } of processes) {
       if (!child.killed) {
-        log(`  Force killing ${service.name}...`, colors.yellow);
+        logService(service.name, 'Force killing service...', 'SHUTDOWN');
         child.kill('SIGKILL');
       }
     }
@@ -551,8 +732,8 @@ async function main() {
       killProcessesByPort(service.port);
     }
 
-    log('✅ All services stopped', colors.green);
-    log('👋 Goodbye!', colors.blue);
+    logWithTimestamp('✅ All services stopped', 'SUCCESS', colors.green);
+    logWithTimestamp('👋 Goodbye!', 'INFO', colors.blue);
     process.exit(0);
   };
 
@@ -560,11 +741,15 @@ async function main() {
   process.on('SIGTERM', cleanup);
 
   // Keep the script running
-  log('💡 Services are running. Press Ctrl+C to stop.', colors.green);
+  logWithTimestamp(
+    '💡 Services are running. Press Ctrl+C to stop.',
+    'INFO',
+    colors.green
+  );
 }
 
 // Run the main function
 main().catch((error) => {
-  log(`❌ Error: ${error.message}`, colors.red);
+  logWithTimestamp(`❌ Error: ${error.message}`, 'ERROR', colors.red);
   process.exit(1);
 });

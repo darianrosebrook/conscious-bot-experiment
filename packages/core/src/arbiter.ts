@@ -17,7 +17,7 @@ import {
 } from './performance-monitor';
 import { AdvancedNeedGenerator } from './advanced-need-generator';
 import type { EnhancedNeed } from './advanced-need-generator';
-import { GoalTemplateManager } from './goal-template-manager';
+// import { GoalTemplateManager } from './goal-template-manager';
 import {
   AdvancedSignalProcessor,
   Signal as AdvancedSignal,
@@ -190,7 +190,7 @@ export class Arbiter extends EventEmitter<SystemEvents> {
   private signalProcessor: SignalProcessor;
   private performanceMonitor: PerformanceMonitor;
   private advancedNeedGenerator: AdvancedNeedGenerator;
-  private goalTemplateManager: GoalTemplateManager;
+  // private goalTemplateManager: GoalTemplateManager;
   private advancedSignalProcessor: AdvancedSignalProcessor;
   private priorityRanker: PriorityRanker;
   private registeredModules = new Map<ModuleType, CognitiveModule>();
@@ -213,7 +213,7 @@ export class Arbiter extends EventEmitter<SystemEvents> {
     this.signalProcessor = new SignalProcessor(options.signalConfig);
     this.performanceMonitor = new PerformanceMonitor(options.performanceConfig);
     this.advancedNeedGenerator = new AdvancedNeedGenerator();
-    this.goalTemplateManager = new GoalTemplateManager();
+    // this.goalTemplateManager = new GoalTemplateManager();
     this.advancedSignalProcessor = new AdvancedSignalProcessor();
     this.priorityRanker = new PriorityRanker();
 
@@ -919,7 +919,10 @@ export class Arbiter extends EventEmitter<SystemEvents> {
   }
 
   private buildCognitiveTaskFromPrioritizedTask(
-    prioritizedTask: PriorityTask & { calculatedPriority?: number; rankingReason?: string },
+    prioritizedTask: PriorityTask & {
+      calculatedPriority?: number;
+      rankingReason?: string;
+    },
     source: string
   ): CognitiveTask {
     const calculatedPriority =
@@ -949,7 +952,8 @@ export class Arbiter extends EventEmitter<SystemEvents> {
       context: {
         needType: prioritizedTask.name,
         needScore: calculatedPriority,
-        rankingReason: (prioritizedTask as any).rankingReason ?? 'enhanced_need',
+        rankingReason:
+          (prioritizedTask as any).rankingReason ?? 'enhanced_need',
         source,
       },
     };
@@ -1124,9 +1128,9 @@ export class Arbiter extends EventEmitter<SystemEvents> {
     return this.advancedNeedGenerator;
   }
 
-  getGoalTemplateManager(): GoalTemplateManager {
-    return this.goalTemplateManager;
-  }
+  // getGoalTemplateManager(): GoalTemplateManager {
+  //   return this.goalTemplateManager;
+  // }
 
   getAdvancedSignalProcessor(): AdvancedSignalProcessor {
     return this.advancedSignalProcessor;

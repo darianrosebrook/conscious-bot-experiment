@@ -35,9 +35,6 @@ export {
   SimpleMinecraftInterface,
   createSimpleMinecraftInterface,
   DEFAULT_SIMPLE_CONFIG,
-  SimpleBotConfig,
-  SimpleGameState,
-  SimpleAction,
 } from './standalone-simple';
 
 // Simulation stub for offline testing
@@ -45,8 +42,6 @@ export {
   SimulatedMinecraftInterface,
   createSimulatedMinecraftInterface,
   DEFAULT_SIMULATION_CONFIG,
-  SimulationConfig,
-  SimulatedGameState,
 } from './simulation-stub';
 
 // Types

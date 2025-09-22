@@ -597,7 +597,7 @@ export class ConsentManager extends EventEmitter {
     expired: number;
   }> {
     const expiredConsents = this.consentStorage.getConsentsNeedingRenewal();
-    let renewed = 0;
+    const renewed = 0;
 
     for (const consent of expiredConsents) {
       // Send renewal reminder

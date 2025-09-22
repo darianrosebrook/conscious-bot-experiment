@@ -6,17 +6,22 @@
  * @author @darianrosebrook
  */
 
-import express from 'express';
-import cors from 'cors';
+import * as express from 'express';
+import * as cors from 'cors';
 import { ReActArbiter } from './react-arbiter/ReActArbiter';
 
-const app = express();
+const app = express.default();
 const port = process.env.PORT ? parseInt(process.env.PORT) : 3003;
 
 // Network request tracking
 let networkRequestCount = 0;
 
 // Cognitive metrics tracking
+app.use(cors.default());
+
+// Type definitions for Express
+interface Request extends express.Request {}
+interface Response extends express.Response {}
 class CognitiveMetricsTracker {
   private optimizationCount = 0;
   private conversationCount = 0;
@@ -284,7 +289,7 @@ class CognitiveStateTracker {
 const cognitiveStateTracker = new CognitiveStateTracker();
 
 // Middleware
-app.use(cors());
+app.use(cors.default());
 app.use(express.json());
 
 // Middleware to track network requests
@@ -1602,3 +1607,12 @@ function getNetworkRequestCount(): number {
   // For now, return a simulated value
   return networkRequestCount || 0;
 }
+
+// Start the server
+app.listen(port, () => {
+  console.log(`🧠 Cognition service running on port ${port}`);
+  console.log(`📊 Cognitive metrics endpoint: http://localhost:${port}/metrics`);
+  console.log(`💭 Thought generation endpoint: http://localhost:${port}/generate-thoughts`);
+  console.log(`🎯 ReAct arbiter endpoint: http://localhost:${port}/react-arbiter`);
+  console.log(`🤝 Social cognition endpoint: http://localhost:${port}/social-cognition`);
+});

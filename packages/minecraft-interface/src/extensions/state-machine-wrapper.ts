@@ -10,10 +10,15 @@
 
 import { Bot } from 'mineflayer';
 import { EventEmitter } from 'events';
-import { PlanStep, MinecraftAction } from '../types';
+import { PlanStep /*MinecraftAction */ } from '../types'; // TODO: add back in
 
 // Import the statemachine plugin
-const { StateMachine } = require('mineflayer-statemachine');
+// Use dynamic import for ES modules compatibility
+let StateMachine: any;
+(async () => {
+  const stateMachineModule = await import('mineflayer-statemachine');
+  StateMachine = stateMachineModule.BotStateMachine;
+})();
 
 export interface StateMachineConfig {
   enableDebugLogging?: boolean;
@@ -288,7 +293,7 @@ export class StateMachineWrapper extends EventEmitter {
       }
 
       // Execute the state machine
-      await this.executeStateMachine(targetState, planStep);
+      await this.executeStateMachine(targetState /*, planStep */); // TODO: add back in
 
       const result: StateMachineResult = {
         success: true,
@@ -431,8 +436,8 @@ export class StateMachineWrapper extends EventEmitter {
    * Execute a specific state machine with improved timeout handling
    */
   private async executeStateMachine(
-    targetState: string,
-    planStep: PlanStep
+    targetState: string
+    // planStep: PlanStep // TODO: add back in
   ): Promise<void> {
     // Set the initial state
     this.stateMachine.setState(targetState);

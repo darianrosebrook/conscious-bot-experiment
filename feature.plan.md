@@ -1,31 +1,78 @@
-# Feature Plan: CBOT-4821 Integrate enhanced needs into decision flow
+# Feature Plan: CBOT-4972 Bootstrap tasks from memory and context
 
 ## Design Sketch
 ```
-[Signal] -> [AdvancedSignalProcessor] -> [AdvancedNeedGenerator]
-    -> {Enhanced Needs}
-    -> [Need Integration] -> [PriorityRanker] -> [Decision Router]
-                                 \-> emits CognitiveTask(s)
+[Memory /state] --unfinished--> [Task Bootstrapper]
+                          |
+                          v (empty)
+[Env Snapshot + Inventory] --prompt--> [LLM Synthesizer]
+                          |
+                          v (empty)
+[Exploration Fallback Builder]
+                          |
+                          v
+[IntegratedPlanningCoordinator] -> Goals -> Routing
 ```
-- New helper wires enhanced needs into existing priority ranking and routing.
-- Threshold guards avoid flooding queue; reuse contextual mappers already in Arbiter.
+- Bootstrapper dedupes memory tasks per planning cycle and tags origin.
+- LLM synthesis runs behind timeout/circuit breaker; fallback builds exploration sweep tasks logging observations.
 
 ## Test Matrix
-- **Unit**: simulate processed signals returning enhanced needs -> assert integration schedules tasks (A1).
-- **Unit (negative)**: ensure low-priority needs do not enqueue tasks (A2).
-- **Integration**: stub AdvancedNeedGenerator output and verify PriorityRanker invoked, tasks routed (A3).
-- **Mutation targets**: gating threshold comparisons, task creation mapping.
+- **Unit**: memory stub returns unfinished tasks → bootstrapper outputs goals (A1).
+- **Unit**: memory empty, LLM stub returns JSON → bootstrapper parses/queues tasks (A2).
+- **Unit**: memory + LLM fail → fallback exploration goals emitted with logging flag (A3).
+- **Integration**: coordinator with mocked fetch ensures bootstrap goals precede existing need pipeline.
+- **Contract**: serialize bootstrap payloads and validate against `BootstrapTask` schema.
+- **Mutation targets**: branch on source selection, JSON parsing guards, fallback gating.
 
 ## Data Plan
-- Use synthetic enhanced need fixtures with varying priority/urgency.
-- Fixtures seeded directly in tests (no external IO).
-- Ensure deterministic UUIDs via injection so assertions stable.
+- Memory fixtures: unfinished task objects with varied statuses/timestamps.
+- LLM fixtures: deterministic JSON payloads for inventory context; include malformed variant for negative path.
+- Exploration fixtures: synthetic environment snapshots for coverage (inventory empty vs resource rich).
 
 ## Observability Plan
-- Emit log `arbiter.enhanced_need.integration` with summary counts.
-- Increment metric `arbiter_enhanced_need_task_count` for accepted tasks.
-- Wrap integration path with trace span `arbiter.integrate_enhanced_needs` (no-op tracer in tests).
+- Log `planning.bootstrap.tasks` with source counts and latency.
+- Metric `planning_bootstrap_source_count{source=memory|llm|exploration}` increment per cycle.
+- Trace span `planning.bootstrap.pipeline` encloses bootstrap decision path; attach error tags on fallback.
 
 ## Risk & Tier
-- Tier 2 per CAWS policy: core flow change with moderate complexity.
-- Mitigations: threshold gating, bounded task fan-out, targeted tests.
+- Tier 2: affects core planning order with external dependencies (memory, optional LLM).
+- Mitigations: graceful degradation, configurable timeouts, comprehensive unit coverage of each branch.
+
+# Feature Plan: MCP-217 Stabilize MCP integration with core leaf factory
+
+## Design Sketch
+```
+[Planning Server] --registerLeaf--> [LeafFactory (core)]
+       |                                  |
+       |  deps                             | exposes listLeaves()
+       v                                  v
+[MCPIntegration] --hydrate--> [ConsciousBotMCPServer]
+       |                                 |
+   runOption/registerOption ------> tool.execute()
+       |
+   updateBotInstance ----> deps.bot assignment
+```
+- Planning owns `MCPIntegration`, which now instantiates the real core `LeafFactory` and passes it to the MCP server.
+- `ConsciousBotMCPServer` exposes `getTools()`/`executeTool()`; integration refreshes toolset via public map instead of fallback stubs.
+- Option registration flows through the MCP server, which communicates back to planning registry.
+
+## Test Matrix
+- **Unit (mcp-server)**: instantiate `ConsciousBotMCPServer` with stub leaf; expect hydration adds `minecraft.<name>@<version>` tool (A1).
+- **Unit (planning)**: `MCPIntegration.registerLeaf` returns success and errors when server missing; `updateBotInstance` assigns deps.bot (A1, A3).
+- **Contract**: Pact fixture ensures `register_option` returns `success` with normalized id (A2).
+- **Integration**: `MCPIntegration` end-to-end with real server to register leaf, list tools, register option (A1, A2, A3).
+- **Mutation targets**: guard `mcpServer` presence, LeafFactory registration result branch, option error propagation.
+
+## Data Plan
+- Stub leaf with deterministic `spec` (name/version) and synchronous `run` implementation.
+- Mock registry that records registrations for assertions; reset per test.
+- Mock bot object providing required shape when updating instance.
+- Pact fixtures stored in `contracts/mcp-integration.pact.json` with generated timestamps stripped for determinism.
+
+## Observability Plan
+- Ensure existing `[MCP] MCP server created successfully` log emitted only once per init.
+- Add structured log on option registration failures with leaf/option id context.
+- Track metric counter increments inside tests using spyable metric client (if available); otherwise validate logger invocation.
+
+## Risk & Tier
+- Tier 2: change spans cross-package dependency graph and planning runtime behavior; contract + integration tests mitigate.

@@ -33,6 +33,9 @@ export type {
 // Export utility functions
 export { quickPlan } from './hrm-inspired-planner';
 
+// Export initial HTN planner
+export { HTNPlanner } from './htn-planner';
+
 /**
  * Integrated Planning System
  *

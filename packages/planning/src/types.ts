@@ -25,6 +25,7 @@ export interface Goal {
   deadline?: number;
   parentGoalId?: string;
   subGoals: string[];
+  metadata?: Record<string, any>;
 }
 
 export enum GoalType {
@@ -269,6 +270,229 @@ export enum ActionType {
 }
 
 // =========================================================================
+// Hierarchical Task Network (HTN) Types
+// =========================================================================
+
+/**
+ * HTN Task - represents a hierarchical task with effectiveness tracking
+ */
+export interface HTNTask {
+  id: string;
+  name: string;
+  description: string;
+  parentTaskId?: string;
+  subTasks: string[];
+  preconditions: Precondition[];
+  effects: Effect[];
+  methods: TaskMethod[];
+  status: HTNTaskStatus;
+  effectiveness: TaskEffectiveness;
+  memory: TaskMemory;
+  createdAt: number;
+  updatedAt: number;
+  lastExecutedAt?: number;
+  executionCount: number;
+  successCount: number;
+  failureCount: number;
+  averageDuration: number;
+  tags: string[];
+  metadata?: Record<string, any>;
+}
+
+/**
+ * Task decomposition method
+ */
+export interface TaskMethod {
+  id: string;
+  name: string;
+  description: string;
+  preconditions: Precondition[];
+  subtasks: string[];
+  orderingConstraints: TaskOrdering[];
+  resourceRequirements: Resource[];
+  estimatedDuration: number;
+  effectiveness: number; // 0-1, learned effectiveness score
+  lastUsedAt?: number;
+  usageCount: number;
+  successRate: number; // 0-1
+  memoryReferences: string[]; // References to related experiences
+}
+
+/**
+ * Task ordering constraints
+ */
+export interface TaskOrdering {
+  type: 'sequence' | 'parallel' | 'choice';
+  tasks: string[];
+  conditions?: Precondition[];
+}
+
+/**
+ * Task effectiveness tracking
+ */
+export interface TaskEffectiveness {
+  score: number; // 0-1, overall effectiveness
+  successRate: number; // 0-1, ratio of successful executions
+  averageReward: number; // Average reward/utility gained
+  risk: number; // 0-1, estimated risk of failure
+  reliability: number; // 0-1, consistency of outcomes
+  learningRate: number; // 0-1, how quickly effectiveness is learned
+  lastUpdated: number;
+  confidence: number; // 0-1, confidence in effectiveness score
+}
+
+/**
+ * Task memory integration
+ */
+export interface TaskMemory {
+  experiences: string[]; // Experience IDs related to this task
+  patterns: TaskPattern[];
+  learningHistory: TaskLearningEntry[];
+  memorySignals: MemorySignal[];
+  relatedGoals: string[];
+  contextualFactors: ContextualFactor[];
+}
+
+/**
+ * Task execution patterns
+ */
+export interface TaskPattern {
+  id: string;
+  pattern: 'success' | 'failure' | 'partial' | 'unexpected';
+  description: string;
+  preconditions: Record<string, any>;
+  outcomes: Record<string, any>;
+  frequency: number;
+  lastOccurred: number;
+  confidence: number;
+  effectiveness: number;
+}
+
+/**
+ * Task learning entry
+ */
+export interface TaskLearningEntry {
+  timestamp: number;
+  outcome: 'success' | 'failure' | 'partial';
+  reward: number;
+  duration: number;
+  context: Record<string, any>;
+  methodUsed: string;
+  effectiveness: number;
+  learningUpdate: number;
+}
+
+/**
+ * Memory signal for task effectiveness
+ */
+export interface MemorySignal {
+  type:
+    | 'task_effectiveness'
+    | 'pattern_discovered'
+    | 'method_preference'
+    | 'context_sensitivity';
+  content: string;
+  relevance: number; // 0-1
+  emotionalValence: number; // -1 to 1
+  urgency: number; // 0-1
+  timestamp: number;
+  decayRate: number;
+}
+
+/**
+ * Contextual factors affecting task effectiveness
+ */
+export interface ContextualFactor {
+  factor: string;
+  value: any;
+  impact: number; // -1 to 1, impact on effectiveness
+  stability: number; // 0-1, how stable this factor is
+  lastUpdated: number;
+}
+
+export enum HTNTaskStatus {
+  PENDING = 'pending',
+  ACTIVE = 'active',
+  DECOMPOSING = 'decomposing',
+  EXECUTING = 'executing',
+  COMPLETED = 'completed',
+  FAILED = 'failed',
+  SUSPENDED = 'suspended',
+  ABANDONED = 'abandoned',
+}
+
+/**
+ * HTN Task Network - collection of related tasks
+ */
+export interface HTNTaskNetwork {
+  id: string;
+  name: string;
+  description: string;
+  rootTasks: string[];
+  allTasks: Map<string, HTNTask>;
+  effectiveness: NetworkEffectiveness;
+  memory: NetworkMemory;
+  createdAt: number;
+  updatedAt: number;
+}
+
+/**
+ * Network-level effectiveness
+ */
+export interface NetworkEffectiveness {
+  overallScore: number;
+  taskCompletionRate: number;
+  averageExecutionTime: number;
+  riskProfile: number;
+  adaptability: number;
+  lastUpdated: number;
+}
+
+/**
+ * Network memory integration
+ */
+export interface NetworkMemory {
+  sharedExperiences: string[];
+  crossTaskPatterns: CrossTaskPattern[];
+  optimizationHistory: NetworkOptimization[];
+  preferenceEvolution: PreferenceEvolution[];
+}
+
+/**
+ * Patterns that span multiple tasks
+ */
+export interface CrossTaskPattern {
+  id: string;
+  pattern: string;
+  involvedTasks: string[];
+  effectiveness: number;
+  frequency: number;
+  lastOccurred: number;
+}
+
+/**
+ * Network optimization events
+ */
+export interface NetworkOptimization {
+  timestamp: number;
+  type: 'method_replacement' | 'ordering_change' | 'resource_reallocation';
+  description: string;
+  impact: number;
+  tasksAffected: string[];
+}
+
+/**
+ * Evolution of task preferences over time
+ */
+export interface PreferenceEvolution {
+  taskId: string;
+  methodId: string;
+  preferenceScore: number;
+  evolutionRate: number;
+  lastUpdated: number;
+}
+
+// =========================================================================
 // Resource & Utility
 // =========================================================================
 
@@ -374,4 +598,75 @@ export const PlanSchema = z.object({
   createdAt: z.number(),
   updatedAt: z.number(),
   successProbability: z.number().min(0).max(1),
+});
+
+// =========================================================================
+// HTN Zod Schemas
+// =========================================================================
+
+export const HTNTaskSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  description: z.string(),
+  parentTaskId: z.string().optional(),
+  subTasks: z.array(z.string()),
+  preconditions: z.array(z.any()),
+  effects: z.array(z.any()),
+  methods: z.array(z.any()),
+  status: z.nativeEnum(HTNTaskStatus),
+  effectiveness: z.object({
+    score: z.number().min(0).max(1),
+    successRate: z.number().min(0).max(1),
+    averageReward: z.number(),
+    risk: z.number().min(0).max(1),
+    reliability: z.number().min(0).max(1),
+    learningRate: z.number().min(0).max(1),
+    lastUpdated: z.number(),
+    confidence: z.number().min(0).max(1),
+  }),
+  memory: z.any(),
+  createdAt: z.number(),
+  updatedAt: z.number(),
+  lastExecutedAt: z.number().optional(),
+  executionCount: z.number(),
+  successCount: z.number(),
+  failureCount: z.number(),
+  averageDuration: z.number(),
+  tags: z.array(z.string()),
+  metadata: z.record(z.any()).optional(),
+});
+
+export const TaskMethodSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  description: z.string(),
+  preconditions: z.array(z.any()),
+  subtasks: z.array(z.string()),
+  orderingConstraints: z.array(z.any()),
+  resourceRequirements: z.array(z.any()),
+  estimatedDuration: z.number(),
+  effectiveness: z.number().min(0).max(1),
+  lastUsedAt: z.number().optional(),
+  usageCount: z.number(),
+  successRate: z.number().min(0).max(1),
+  memoryReferences: z.array(z.string()),
+});
+
+export const HTNTaskNetworkSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  description: z.string(),
+  rootTasks: z.array(z.string()),
+  allTasks: z.any(),
+  effectiveness: z.object({
+    overallScore: z.number(),
+    taskCompletionRate: z.number(),
+    averageExecutionTime: z.number(),
+    riskProfile: z.number(),
+    adaptability: z.number(),
+    lastUpdated: z.number(),
+  }),
+  memory: z.any(),
+  createdAt: z.number(),
+  updatedAt: z.number(),
 });

@@ -694,7 +694,7 @@ export class AdvancedSignalProcessor extends EventEmitter {
     const assessments: ThreatAssessment[] = [];
     const threatGroups = this.groupThreatsByType();
 
-    for (const [threatType, signals] of threatGroups) {
+    for (const [threatType, signals] of Array.from(threatGroups.entries())) {
       const assessment = await this.threatDetector.assessThreats(signals);
       assessments.push(assessment);
     }
@@ -708,7 +708,7 @@ export class AdvancedSignalProcessor extends EventEmitter {
   private groupThreatsByType(): Map<ThreatType, IntrusionSignal[]> {
     const groups = new Map<ThreatType, IntrusionSignal[]>();
 
-    for (const signal of this.threatSignals.values()) {
+    for (const signal of Array.from(this.threatSignals.values())) {
       const type = signal.threatType;
       if (!groups.has(type)) {
         groups.set(type, []);
@@ -726,14 +726,14 @@ export class AdvancedSignalProcessor extends EventEmitter {
     const cutoffTime = Date.now() - 3600000; // 1 hour ago
 
     // Clean up regular signals
-    for (const [id, signal] of this.signals) {
+    for (const [id, signal] of Array.from(this.signals.entries())) {
       if (signal.timestamp < cutoffTime) {
         this.signals.delete(id);
       }
     }
 
     // Clean up memory signals with decay
-    for (const [id, signal] of this.memorySignals) {
+    for (const [id, signal] of Array.from(this.memorySignals.entries())) {
       const age = Date.now() - signal.timestamp;
       const decayFactor = Math.pow(this.config.memoryDecayRate, age / 60000); // 1 minute intervals
 
@@ -983,7 +983,7 @@ class PatternRecognizer {
     // Simple pattern detection based on signal frequency and timing
     const signalGroups = this.groupSignalsByType(signals);
 
-    for (const [type, typeSignals] of signalGroups) {
+    for (const [type, typeSignals] of Array.from(signalGroups.entries())) {
       const frequency = this.calculateFrequency(typeSignals);
       if (frequency > 0.1) {
         // More than 1 signal per 10 minutes

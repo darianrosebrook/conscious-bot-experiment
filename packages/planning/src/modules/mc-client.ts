@@ -1,6 +1,7 @@
 // Centralized Minecraft endpoint and resilient HTTP utilities
 
-export const MC_ENDPOINT = process.env.MINECRAFT_ENDPOINT || 'http://localhost:3005';
+export const MC_ENDPOINT =
+  process.env.MINECRAFT_ENDPOINT || 'http://localhost:3005';
 
 let mcFailureCount = 0;
 let mcCircuitOpenUntil = 0; // epoch ms
@@ -35,7 +36,10 @@ export async function mcFetch(
   for (let attempt = 0; attempt <= retries; attempt++) {
     try {
       const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), init.timeoutMs ?? 10_000);
+      const timeout = setTimeout(
+        () => controller.abort(),
+        init.timeoutMs ?? 10_000
+      );
       const res = await fetch(url, { ...init, signal: controller.signal });
       clearTimeout(timeout);
       if (res.ok) {
@@ -87,7 +91,9 @@ export async function mcPostJson<T = any>(
   }
 }
 
-export async function waitForBotConnection(timeoutMs: number): Promise<boolean> {
+export async function waitForBotConnection(
+  timeoutMs: number
+): Promise<boolean> {
   const start = Date.now();
   const poll = async (): Promise<boolean> => {
     const ok = await checkBotConnection();
@@ -102,10 +108,18 @@ export async function waitForBotConnection(timeoutMs: number): Promise<boolean> 
 export async function checkBotConnection(): Promise<boolean> {
   try {
     if (mcCircuitOpen()) return false;
-    const response = await mcFetch('/health', { method: 'GET', timeoutMs: 2000 });
+    const response = await mcFetch('/health', {
+      method: 'GET',
+      timeoutMs: 2000,
+    });
     if (response.ok) {
-      const status = (await response.json()) as { status?: string; botStatus?: { connected?: boolean } };
-      return status.status === 'connected' || status.botStatus?.connected === true;
+      const status = (await response.json()) as {
+        status?: string;
+        botStatus?: { connected?: boolean };
+      };
+      return (
+        status.status === 'connected' || status.botStatus?.connected === true
+      );
     }
     return false;
   } catch (error) {
@@ -114,14 +128,24 @@ export async function checkBotConnection(): Promise<boolean> {
   }
 }
 
-export async function getBotPosition(): Promise<{ x: number; y: number; z: number } | null> {
+export async function getBotPosition(): Promise<{
+  x: number;
+  y: number;
+  z: number;
+} | null> {
   try {
     if (mcCircuitOpen()) return null;
     const res = await mcFetch('/health', { method: 'GET', timeoutMs: 2000 });
     if (!res.ok) return null;
     const status = (await res.json()) as any;
-    const p = status?.botStatus?.position || status?.executionStatus?.bot?.position;
-    if (p && typeof p.x === 'number' && typeof p.y === 'number' && typeof p.z === 'number') {
+    const p =
+      status?.botStatus?.position || status?.executionStatus?.bot?.position;
+    if (
+      p &&
+      typeof p.x === 'number' &&
+      typeof p.y === 'number' &&
+      typeof p.z === 'number'
+    ) {
       return { x: Math.floor(p.x), y: Math.floor(p.y), z: Math.floor(p.z) };
     }
   } catch (e) {
@@ -130,3 +154,57 @@ export async function getBotPosition(): Promise<{ x: number; y: number; z: numbe
   return null;
 }
 
+export interface TaskExecutionResult {
+  success: boolean;
+  error?: string;
+  taskId?: string;
+  completedSteps?: number;
+}
+
+export async function executeTask(task: any): Promise<TaskExecutionResult> {
+  try {
+    if (mcCircuitOpen()) {
+      return { success: false, error: 'Bot circuit is open' };
+    }
+
+    const response = await mcFetch('/execute-scenario', {
+      method: 'POST',
+      timeoutMs: 30000,
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        name: task.title || 'Autonomous Task',
+        signals: [
+          {
+            type: 'task_execution',
+            value: 80,
+            urgency: 'high',
+            taskId: task.id,
+            taskType: task.type,
+          },
+        ],
+        timeout: 60000, // 1 minute timeout
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      return { success: false, error: `HTTP ${response.status}: ${errorText}` };
+    }
+
+    const result = (await response.json()) as any;
+    return {
+      success: result.success || false,
+      error: result.error,
+      taskId: task.id,
+      completedSteps: result.executedSteps || 0,
+    };
+  } catch (error) {
+    console.error('Task execution failed:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    };
+  }
+}

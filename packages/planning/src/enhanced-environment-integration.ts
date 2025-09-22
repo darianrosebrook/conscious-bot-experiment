@@ -105,7 +105,7 @@ const DEFAULT_CONFIG: EnvironmentIntegrationConfig = {
   dashboardEndpoint: 'http://localhost:3000',
   worldSystemEndpoint: 'http://localhost:3004',
   minecraftEndpoint: 'http://localhost:3005',
-  updateInterval: 5000,
+  updateInterval: 15000, // Reduced from 5 seconds to 15 seconds
   maxEntityDistance: 50,
   maxBlockDistance: 20,
 };

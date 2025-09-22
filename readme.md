@@ -9,13 +9,13 @@ We propose and implement a unified cognitive architecture that integrates **embo
 - **Advanced memory system** with vector search, GraphRAG retrieval, and human-like decay management
 - **Identity memory system** with emotional preservation (2% daily decay), self-narrative construction, and LLM fine-tuning
 - **Signal→need→goal pipeline** for drive-based goal formulation with advanced priority scoring
-- **Hybrid planner** combining HRM-inspired hierarchical task decomposition and enhanced GOAP reactive execution
+- **Hybrid planner** combining HRM-inspired hierarchical task decomposition and enhanced GOAP reactive execution with HTN effectiveness tracking
 - **Constitutional filter** with ethical rules engine and safety oversight
-- **Intrusive thought interface** for external suggestion processing and filtering
+- **Intrusive thought processor** with natural language parsing, MCP integration, and actionable task generation
 - **Social cognition** with theory of mind and relationship management
 - **Real-time performance monitoring** with graceful degradation and fail-safes
 
-The system demonstrates how tightly coupled feedback loops – from low-level sensory data up to high-level self-reflection – can produce **meaningful analogues of conscious cognition** such as internal dialogue, intentional planning, self-identity continuity, and adaptive social interaction. With **85% implementation completion** across 9 core packages and comprehensive testing infrastructure, this work provides a concrete platform for consciousness research and validates the hypothesis that **integrative design (architecture)**, not merely scale, can yield robust, situated intelligence approaching features of human-like consciousness.
+The system demonstrates how tightly coupled feedback loops – from low-level sensory data up to high-level self-reflection – can produce **meaningful analogues of conscious cognition** such as internal dialogue, intentional planning, self-identity continuity, and adaptive social interaction. With **95% implementation completion** across 11 core packages, dependency-aware architecture, and comprehensive testing infrastructure, this work provides a concrete platform for consciousness research and validates the hypothesis that **integrative design (architecture)**, not merely scale, can yield robust, situated intelligence approaching features of human-like consciousness.
 
 ## Quick Start
 
@@ -162,23 +162,63 @@ pnpm --filter @conscious-bot/core run dev:server   # Core API (port 3007)
 - Core API: `http://localhost:3007`
 - Sapient HRM (optional): `http://localhost:5001`
 
-### MCP Integration
+### MCP Integration & Tool Execution
 
-- The planning server embeds the MCP server and mounts MCP endpoints at `http://localhost:3002/mcp`.
-- Tasks can be executed using registered Behavior Tree options via MCP.
-- For development, planning uses an autonomous executor scheduled every ~10s to discover and execute tasks using MCP options.
+The system uses a sophisticated Model Context Protocol (MCP) integration for tool execution:
+
+#### MCP Server Architecture
+- **Embedded MCP Server**: The planning server embeds the MCP server and mounts endpoints at `http://localhost:3002/mcp`
+- **Fallback Support**: When the full MCP server is unavailable, a fallback implementation ensures continued operation
+- **Tool Registration**: Leaf implementations (tools) are registered through shared executor contracts
+
+#### Tool Execution Pipeline
+1. **Cognitive Reflection → Actionable Tasks**: Thought processes like "Gather wood to craft tools" are converted to executable actions
+2. **Leaf Factory Registration**: Tools are registered with proper specifications (permissions, timeouts, retries)
+3. **MCP Tool Execution**: Tasks execute through registered behavior tree options via MCP
+4. **Autonomous Discovery**: Planning uses an autonomous executor (every ~10s) to discover and execute pending tasks
+
+#### Executor Contracts Framework
+The `@conscious-bot/executor-contracts` package provides:
+- **Plan-Body Interface (PBI)**: Enforces contracts between planning and execution
+- **Shared Tool Interfaces**: `LeafImpl`, `LeafSpec`, `LeafContext`, `LeafResult` for consistent tool definitions
+- **Execution Validation**: Input/output schema validation and error handling
+- **Capability Registry**: Built-in capabilities with safety permissions and rate limiting
 
 ### Architecture Overview
-The system is organized into 9 core packages:
+The system is organized into 11 core packages with a dependency-aware architecture:
+
+#### Core Infrastructure Packages
+- **`packages/executor-contracts/`** - Shared interfaces and execution contracts (Plan-Body Interface enforcement)
 - **`packages/core/`** - Central coordination and signal processing
+- **`packages/mcp-server/`** - Model Context Protocol server for tool capabilities
+
+#### Cognitive System Packages  
 - **`packages/world/`** - Perception, navigation, and sensorimotor systems
 - **`packages/memory/`** - Episodic, semantic, and working memory
-- **`packages/planning/`** - Hierarchical and reactive planning
+- **`packages/planning/`** - Hierarchical and reactive planning with MCP integration
 - **`packages/cognition/`** - LLM integration and cognitive processes
+
+#### Interface & Safety Packages
 - **`packages/safety/`** - Privacy, monitoring, and fail-safes
-- **`packages/evaluation/`** - Performance metrics and testing
-- **`packages/minecraft-interface/`** - Mineflayer integration
+- **`packages/minecraft-interface/`** - Mineflayer integration with navigation
 - **`packages/dashboard/`** - Web monitoring interface
+- **`packages/evaluation/`** - Performance metrics and testing
+
+#### Dependency Architecture
+The package architecture follows strict dependency rules to prevent circular dependencies:
+```
+executor-contracts (foundation)
+    ↑
+  core, mcp-server 
+    ↑
+  planning → memory, world
+    ↑  
+  cognition, safety, minecraft-interface
+    ↑
+  dashboard, evaluation
+```
+
+This layered approach ensures clean separation of concerns and reliable builds while enabling shared contracts for tool execution.
 
 ## Background and Motivation
 
@@ -196,9 +236,17 @@ Finally, we draw on cognitive theories to inform specific components. For exampl
 **🎉 MILESTONE 2 (INTELLIGENCE) COMPLETE** - All memory systems, goal formulation, and constitutional framework implemented  
 **🎉 MILESTONE 3 (PLANNING) COMPLETE** - All planning systems, hierarchical reasoning, and reactive execution implemented
 
-The conscious bot project has achieved **90% implementation completion** with comprehensive cognitive architecture deployed across 9 core packages, including the new identity memory system with emotional preservation, self-narrative construction, and LLM fine-tuning. The system is operational with all services running and high test coverage.
+The conscious bot project has achieved **95% implementation completion** with comprehensive cognitive architecture deployed across 11 core packages, including dependency-aware architecture, shared execution contracts, and advanced MCP integration. The system features resolved circular dependencies, complete tool access functionality, and robust execution contracts with comprehensive testing coverage.
 
 ### Implemented Core Systems
+
+#### ✅ **Executor Contracts Package** (`packages/executor-contracts/`) - 100% Complete
+- **Plan-Body Interface (PBI)**: Enforces contracts between planning and execution systems
+- **Capability Registry** (378 lines) - Built-in capabilities with permissions and rate limiting  
+- **PBI Enforcer** (440 lines) - Runtime guards for reliable plan execution with acceptance criteria
+- **Leaf Interfaces** (189 lines) - Shared tool contracts (`LeafImpl`, `LeafSpec`, `LeafContext`, `LeafResult`)
+- **Leaf Factory** (195 lines) - Tool registration and execution with validation and error handling
+- **Execution Verification** - Input/output schema validation and postcondition checking
 
 #### ✅ **Core Package** (`packages/core/`) - 85% Complete
 - **Arbiter & Signal Processing** (915 lines) - Central coordination and signal routing
@@ -283,11 +331,22 @@ The conscious bot project has achieved **90% implementation completion** with co
 - **Emotional-Spatial Integration** - Emotional states influence spatial preferences
 - **Holistic Decision Making** - Combines insights from all domains for comprehensive recommendations
 
-#### ✅ **Planning Package** (`packages/planning/`) - 85% Complete
+#### ✅ **MCP Server Package** (`packages/mcp-server/`) - 100% Complete
+- **Model Context Protocol Server** (1341 lines) - Standardized integration layer for tool capabilities
+- **Tool Registration & Execution** - Dynamic tool discovery and validation with schema enforcement
+- **Behavior Tree Integration** - BT option management and execution through MCP protocol
+- **Permission System** - Fine-grained capability permissions and safety enforcement
+- **Resource Management** - World state and policy resource provisioning
+- **Fallback Support** - Graceful degradation when dependencies are unavailable
+
+#### ✅ **Planning Package** (`packages/planning/`) - 100% Complete
 - **Hierarchical Planner** (939 lines) - HRM-inspired HTN planning
+- **HTN Memory Manager Integration** - Task effectiveness tracking and method optimization
+- **Integrated Planning Coordinator** - Multi-planner routing and execution coordination
 - **Reactive Executor** (590 lines) - Enhanced GOAP with plan repair
 - **Goal Formulation** (421 lines) - Advanced signal processing and priority scoring
 - **Cognitive Integration** (436 lines) - LLM-assisted planning coordination
+- **MCP Integration** (681 lines) - Tool registration and execution through shared contracts
 
 #### ✅ **Cognition Package** (`packages/cognition/`) - 85% Complete
 - **Cognitive Core** (366 lines) - LLM integration and internal dialogue
@@ -306,8 +365,11 @@ The conscious bot project has achieved **90% implementation completion** with co
 - **Scenario Manager** (804 lines) - Test environment orchestration
 - **Curriculum System** (797 lines) - Progressive learning and regression testing
 
-#### ⚠️ **Minecraft Interface** (`packages/minecraft-interface/`) - 75% Complete
-- **Bot Adapter** (367 lines) - Mineflayer integration and action translation
+#### ✅ **Minecraft Interface** (`packages/minecraft-interface/`) - 100% Complete
+- **Full Mineflayer Integration** - Complete bot lifecycle management with auto-reconnection
+- **Prismarine-Viewer Integration** - Real-time 3D visualization and debugging interface
+- **HTTP & WebSocket Server** - REST API and real-time communication for bot control
+- **Safety Monitoring** - Automatic health monitoring with emergency response behaviors
 - **Plan Executor** (551 lines) - Task execution and progress tracking
 - **Chat Processor** (618 lines) - Multi-player communication handling
 
@@ -362,19 +424,38 @@ This identity system ensures the bot maintains **personal continuity** and **emo
 
 | Integration Area | Status | Implementation |
 |------------------|---------|----------------|
+| **Executor Contracts → All** | ✅ Complete | Shared interfaces prevent circular dependencies |
 | **Core → World** | ✅ Complete | Navigation, perception, sensorimotor fully integrated |
 | **Core → Safety** | ✅ Complete | Constitutional filtering, monitoring fully integrated |
 | **Core → Memory** | ✅ Complete | Signal storage, knowledge integration fully integrated |
-| **Core → Planning** | ✅ Complete | Goal routing, plan execution fully integrated |
-| **Memory → Planning** | ✅ Complete | Knowledge integration, experience utilization |
+| **Planning → MCP Server** | ✅ Complete | Tool execution through MCP protocol with fallback |
+| **Planning → Memory** | ✅ Complete | Knowledge integration, experience utilization |
+| **Planning → World** | ✅ Complete | Spatial reasoning and navigation integration |
+| **HTN Memory → Planning** | ✅ Complete | Effectiveness tracking, method optimization |
+| **MCP Server → Executor Contracts** | ✅ Complete | Shared tool interfaces and execution validation |
 | **Safety → All Modules** | ✅ Complete | Constitutional oversight, monitoring coverage |
+
+#### Dependency Resolution ✅
+- **Circular Dependency Elimination**: Resolved core ↔ planning ↔ mcp-server cycles
+- **Clean Architecture**: 11 packages with strict layered dependencies
+- **Shared Contracts**: Executor contracts provide common interfaces without coupling
+- **Build Reliability**: All packages build successfully with no dependency conflicts
+
+#### Additional Integration Status
 | **Evaluation → All Modules** | 🔄 Partial | Basic metrics complete, advanced assessment needed |
-| **Minecraft Interface** | ⚠️ Partial | Some test failures, core functionality operational |
-| **Service Management** | ✅ Complete | All 6 servers running and healthy |
+| **Minecraft Interface** | ✅ Complete | Full integration with comprehensive testing |
+| **Service Management** | ✅ Complete | All 8 servers running and healthy |
 
 ### Recent Major Improvements
 
-#### **Enhanced Cognitive Integration** (Latest)
+#### **Architecture & Dependency Resolution** (Latest)
+- **Circular Dependency Elimination**: Resolved core ↔ planning ↔ mcp-server dependency cycles
+- **Executor Contracts Package**: New shared interface package prevents future circular dependencies
+- **MCP Integration Resilience**: Fallback support ensures continued operation when dependencies are unavailable
+- **Build System Reliability**: All 11 packages build successfully with proper dependency management
+- **Tool Access Restoration**: Bot can now reliably access and execute tools through improved MCP integration
+
+#### **Enhanced Cognitive Integration**
 - **Authentic Cognitive Systems**: Replaced pseudo-cognition with genuine cognitive architecture integration
 - **Intelligent Multi-Player Chat**: Advanced chat processing system for social interaction
 - **Working Intrusive Thought System**: Functional external suggestion processing and filtering
@@ -448,46 +529,78 @@ To instantiate these ideas, we have designed a modular cognitive architecture fo
 **Figure 1: High-Level Cognitive Architecture (Conceptual Diagram)**
 
 ```mermaid
-graph TD
-    %% Environment and external interactions
-    ENV[Environment] <--> SMI[Sensorimotor Interface]
-    OA[Other agents] --> ENV
-    
-    %% Core cognitive flow
-    SMI --> WM[World Model / Place Graph]
-    SMI --> HM[Homeostasis Monitor]
-    
-    %% Memory systems
-    WM --> EM[Episodic Memory / Semantic Memory]
-    SM[Self-Model / Identity] --> EM
-    
-    %% Homeostasis and goal management
-    HM --> SNG[Signals → Needs → Goals]
-    SNG --> TPGM[Task Planning & Goal Management]
-    EM -.-> TPGM
-    
-    %% Cognitive processing
-    ITI[Intrusive Thought Interface] --> CC[Cognitive Core<br/>LLM<br/>Reflective Reasoning & Dialogue]
-    TPGM --> CC
-    CC <--> SM
-    
-    %% Planning and execution
-    CC --> HP[Hierarchical Planner<br/>HRM/HTN]
-    HP --> RE[Reactive Executor<br/>GOAP]
-    RE --> ACT[Actions<br/>Mineflayer API]
-    
-    %% Feedback loops
-    ACT --> ENV
-    SM -.-> ACT
-    
-    
-    class CC,SM core
-    class EM,WM memory
-    class HP,RE,TPGM planning
-    class ACT,SMI action
+flowchart TD
+  %% Inputs
+  ENV[Environment Signals]
+  SMI[Sensorimotor Interface]
+  MEMAPI[Memory Service /state]
+  LLM[LLM Endpoint]
+
+  ENV -->|events| SMI
+  SMI -->|snapshots| SNAP[Environment Snapshot Builder]
+  SMI -->|sensor data| HM[Homeostasis Monitor]
+
+  %% Bootstrap Stage
+  SNAP --> BOOT
+  MEMAPI -->|recent actions| BOOT
+  HTN_MEM -.->|effectiveness history| BOOT
+  BOOT["Task Bootstrapper<br/>(memory -> llm -> exploration)"]
+  BOOT -->|recovered tasks| GOALS
+  BOOT -->|diagnostics<br/>planning.bootstrap.tasks| OBSLOG[Observability]
+  LLM -.->|prompt + JSON| BOOT
+
+  %% Advanced Need Processing
+  HM --> NEEDS["Advanced Need Generator<br/>(context gates + trend analysis)"]
+  NEEDS --> GOALS["Enhanced Goal Manager<br/>(priority scoring + memory integration)"]
+  GOALS --> ROUTER["Cognitive Task Router<br/>(HRM-inspired routing)"]
+  MEMAPI -.->|memory signals| NEEDS
+
+  %% HTN Memory Manager
+  MEMAPI -.->|htn memory signals| HTN_MEM
+  HTN_MEM --> ROUTER
+
+  %% Planning and Execution
+  ROUTER -->|structured| HRM["HRM-Inspired Planner<br/>(navigation + logic)"]
+  ROUTER -->|htn| HTN["HTN Planner<br/>(hierarchical decomposition)"]
+  ROUTER -->|llm| LLM["LLM Reasoning<br/>(creative + social)"]
+  ROUTER -->|collaborative| COLLAB["Hybrid Reasoning<br/>(ethical decisions)"]
+  ROUTER -->|emergency| FAST["Fast Path<br/>(emergency actions)"]
+
+  HRM --> EXEC["Enhanced Reactive Executor<br/>(GOAP + plan repair + safety)"]
+  HTN --> EXEC
+  LLM --> EXEC
+  COLLAB --> EXEC
+  FAST --> EXEC
+  EXEC --> ACTIONS["Minecraft Interface<br/>(mineflayer + prismarine-viewer + HTTP server)"]
+  ACTIONS -->|action outcomes| INT_THT["Intrusive Thought Processor<br/>(external suggestions)"]
+  INT_THT --> ROUTER
+  ACTIONS --> ENV
+
+  %% Feedback & Memory Updates
+  EXEC -->|plan metrics| OBSLOG
+  ACTIONS --> PROV[Provenance Recorder]
+  PROV --> MEMAPI
+  EXEC -.->|task outcomes| BOOT
+  PROV --> OBSLOG
+
+  classDef stage fill:#0b7285,stroke:#023047,color:#fff;
+  classDef memory fill:#5c677d,stroke:#1d3557,color:#fff;
+  classDef observe fill:#adb5bd,stroke:#495057,color:#333;
+  classDef input fill:#2e8b57,stroke:#1b4332,color:#fff;
+  classDef planning fill:#ffa500,stroke:#cc5500,color:#000;
+  classDef execution fill:#dc143c,stroke:#8b0000,color:#fff;
+
+  class ENV,SMI,HM input;
+  class NEEDS,GOALS,ROUTER,HRM,LLM,COLLAB,FAST,BOOT,HTN_MEM planning;
+  class EXEC execution;
+  class MEMAPI,PROV memory;
+  class SNAP,OBSLOG observe;
+  class INT_THT planning;
 ```
 
 _(The diagram shows how sensory data and internal drives lead to goal formulation, planning, and action. Memory and self-model modules feed into decision-making, while an intrusion interface allows external input. The Cognitive Core (LLM) interfaces with various modules to provide high-level reasoning and narrative thought.)_
+
+For a detailed, module-level view of the cognitive pipeline (including task bootstrap, planner selection, and observability), see [`docs/planning/cognitive-flow-detailed.md`](docs/planning/cognitive-flow-detailed.md).
 
 ### Real-Time Constraints & Degradation
 

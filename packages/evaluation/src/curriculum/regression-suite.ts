@@ -605,9 +605,9 @@ export class RegressionSuiteManager {
       return 'passed';
     } else if (overallScore >= 0.6) {
       return 'warning';
-    } else {
+    } 
       return 'failed';
-    }
+    
   }
 
   /**

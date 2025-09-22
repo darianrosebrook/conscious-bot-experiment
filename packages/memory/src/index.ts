@@ -64,6 +64,7 @@ export * from './memory-system-coordinator';
 
 // Cognitive Task Memory Enhancement
 export * from './cognitive-task-memory';
+export * from './htn-memory';
 
 // Reflection and Learning Memory
 export * from './reflection-memory';

@@ -460,3 +460,280 @@ export const DecisionProvenanceSchema = z.object({
   confidence: z.number().min(0).max(1),
   outcome: z.any().optional(),
 });
+
+// =========================================================================
+// HTN Memory Integration Types
+// =========================================================================
+
+/**
+ * HTN Task effectiveness memory entry
+ */
+export interface HTNTaskMemory {
+  id: string;
+  taskId: string;
+  executionId: string;
+  outcome: 'success' | 'failure' | 'partial' | 'abandoned';
+  effectiveness: number; // 0-1
+  duration: number; // milliseconds
+  reward: number; // utility gained/lost
+  context: Record<string, any>;
+  methodUsed: string;
+  subtasksCompleted: number;
+  subtasksTotal: number;
+  errors: string[];
+  preconditionsMet: number;
+  preconditionsTotal: number;
+  resourceUtilization: number; // 0-1
+  timestamp: number;
+  sessionId: string;
+  worldState?: any;
+  emotionalState?: EmotionalState;
+  tags: string[];
+  metadata: Record<string, any>;
+}
+
+/**
+ * HTN Method effectiveness tracking
+ */
+export interface HTNMethodMemory {
+  id: string;
+  taskId: string;
+  methodId: string;
+  effectiveness: number; // 0-1
+  successRate: number; // 0-1
+  averageDuration: number;
+  averageReward: number;
+  usageCount: number;
+  lastUsed: number;
+  contextSensitivity: Record<string, number>; // Factor -> effectiveness impact
+  failurePatterns: FailurePattern[];
+  optimizationHistory: MethodOptimization[];
+  confidence: number; // 0-1
+  timestamp: number;
+}
+
+/**
+ * Failure pattern analysis
+ */
+export interface FailurePattern {
+  id: string;
+  pattern: string;
+  frequency: number;
+  context: Record<string, any>;
+  suggestedAlternatives: string[];
+  avoidanceScore: number; // 0-1
+  lastOccurred: number;
+  severity: number; // 0-1
+}
+
+/**
+ * Method optimization events
+ */
+export interface MethodOptimization {
+  timestamp: number;
+  type:
+    | 'parameter_adjustment'
+    | 'ordering_change'
+    | 'resource_reallocation'
+    | 'context_adaptation';
+  description: string;
+  impact: number; // -1 to 1
+  methodId: string;
+  taskId: string;
+}
+
+/**
+ * HTN Network effectiveness memory
+ */
+export interface HTNNetworkMemory {
+  id: string;
+  networkId: string;
+  overallEffectiveness: number;
+  taskCompletionRate: number;
+  averageExecutionTime: number;
+  riskProfile: number;
+  adaptabilityScore: number;
+  crossTaskPatterns: CrossTaskPattern[];
+  preferenceEvolution: PreferenceEvolution[];
+  optimizationEvents: NetworkOptimization[];
+  timestamp: number;
+  sessionId: string;
+}
+
+/**
+ * Cross-task pattern that affects multiple tasks
+ */
+export interface CrossTaskPattern {
+  id: string;
+  pattern: string;
+  involvedTasks: string[];
+  effectiveness: number;
+  frequency: number;
+  lastOccurred: number;
+  context: Record<string, any>;
+  suggestedOptimizations: string[];
+}
+
+/**
+ * Evolution of method preferences over time
+ */
+export interface PreferenceEvolution {
+  taskId: string;
+  methodId: string;
+  preferenceScore: number; // 0-1
+  evolutionRate: number; // Rate of change over time
+  lastUpdated: number;
+  factors: Record<string, number>; // Factor -> impact on preference
+}
+
+/**
+ * Network optimization events
+ */
+export interface NetworkOptimization {
+  timestamp: number;
+  type:
+    | 'method_replacement'
+    | 'ordering_change'
+    | 'resource_reallocation'
+    | 'structural_change';
+  description: string;
+  impact: number; // -1 to 1
+  tasksAffected: string[];
+  networkId: string;
+}
+
+/**
+ * HTN Memory query interface
+ */
+export interface HTNMemoryQuery {
+  taskId?: string;
+  methodId?: string;
+  outcome?: 'success' | 'failure' | 'partial' | 'abandoned';
+  effectiveness?: { min?: number; max?: number };
+  timeRange?: { start: number; end: number };
+  context?: Record<string, any>;
+  tags?: string[];
+  limit?: number;
+  sortBy?: 'effectiveness' | 'timestamp' | 'frequency';
+  sortOrder?: 'asc' | 'desc';
+}
+
+/**
+ * HTN Memory statistics
+ */
+export interface HTNMemoryStats {
+  totalExecutions: number;
+  successRate: number;
+  averageEffectiveness: number;
+  averageDuration: number;
+  averageReward: number;
+  methodCount: number;
+  taskCount: number;
+  failurePatternCount: number;
+  optimizationCount: number;
+  timeRange: { start: number; end: number };
+  mostEffectiveMethod: string;
+  leastEffectiveMethod: string;
+  emergingPatterns: string[];
+  decliningPatterns: string[];
+}
+
+/**
+ * HTN Learning update
+ */
+export interface HTNLearningUpdate {
+  taskId: string;
+  methodId: string;
+  effectivenessChange: number;
+  confidenceChange: number;
+  patternUpdates: PatternUpdate[];
+  optimizationSuggestions: OptimizationSuggestion[];
+  timestamp: number;
+}
+
+/**
+ * Pattern update for learning
+ */
+export interface PatternUpdate {
+  patternId: string;
+  frequencyChange: number;
+  effectivenessChange: number;
+  confidenceChange: number;
+  newContext?: Record<string, any>;
+}
+
+/**
+ * Optimization suggestion
+ */
+export interface OptimizationSuggestion {
+  type:
+    | 'method_switch'
+    | 'parameter_adjustment'
+    | 'ordering_change'
+    | 'resource_reallocation';
+  target: string;
+  suggestion: string;
+  expectedImpact: number;
+  confidence: number;
+  reasoning: string;
+}
+
+// =========================================================================
+// HTN Memory Zod Schemas
+// =========================================================================
+
+export const HTNTaskMemorySchema = z.object({
+  id: z.string(),
+  taskId: z.string(),
+  executionId: z.string(),
+  outcome: z.enum(['success', 'failure', 'partial', 'abandoned']),
+  effectiveness: z.number().min(0).max(1),
+  duration: z.number(),
+  reward: z.number(),
+  context: z.record(z.any()),
+  methodUsed: z.string(),
+  subtasksCompleted: z.number(),
+  subtasksTotal: z.number(),
+  errors: z.array(z.string()),
+  preconditionsMet: z.number(),
+  preconditionsTotal: z.number(),
+  resourceUtilization: z.number().min(0).max(1),
+  timestamp: z.number(),
+  sessionId: z.string(),
+  worldState: z.any(),
+  emotionalState: z.any(),
+  tags: z.array(z.string()),
+  metadata: z.record(z.any()),
+});
+
+export const HTNMethodMemorySchema = z.object({
+  id: z.string(),
+  taskId: z.string(),
+  methodId: z.string(),
+  effectiveness: z.number().min(0).max(1),
+  successRate: z.number().min(0).max(1),
+  averageDuration: z.number(),
+  averageReward: z.number(),
+  usageCount: z.number(),
+  lastUsed: z.number(),
+  contextSensitivity: z.record(z.number()),
+  failurePatterns: z.array(z.any()),
+  optimizationHistory: z.array(z.any()),
+  confidence: z.number().min(0).max(1),
+  timestamp: z.number(),
+});
+
+export const HTNNetworkMemorySchema = z.object({
+  id: z.string(),
+  networkId: z.string(),
+  overallEffectiveness: z.number(),
+  taskCompletionRate: z.number(),
+  averageExecutionTime: z.number(),
+  riskProfile: z.number(),
+  adaptabilityScore: z.number(),
+  crossTaskPatterns: z.array(z.any()),
+  preferenceEvolution: z.array(z.any()),
+  optimizationEvents: z.array(z.any()),
+  timestamp: z.number(),
+  sessionId: z.string(),
+});

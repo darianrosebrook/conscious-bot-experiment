@@ -305,6 +305,41 @@ export function mapBTActionToMinecraft(
       };
     case 'wait':
       return { type: 'wait', parameters: { duration: args.duration || 2000 } };
+    // Add new action mappings for cognitive reflection generated actions
+    case 'move_and_gather':
+      return {
+        type: 'gather_resources',
+        parameters: {
+          resource: args.resource || 'wood',
+          quantity: args.quantity || 5,
+          searchRadius: args.searchRadius || 20,
+        },
+      };
+    case 'move_and_mine':
+      return {
+        type: 'mine_block',
+        parameters: {
+          blockType: args.resource === 'iron' ? 'iron_ore' : 'stone',
+          searchRadius: args.searchRadius || 20,
+          quantity: args.quantity || 3,
+        },
+      };
+    case 'explore_area':
+      return {
+        type: 'move_random',
+        parameters: {
+          radius: args.radius || 25,
+          duration: args.duration || 15000,
+        },
+      };
+    case 'assess_safety':
+      return {
+        type: 'scan_environment',
+        parameters: {
+          radius: args.checkRadius || 20,
+          action: 'assess_threats',
+        },
+      };
     default:
       return { type: tool, parameters: args, debug: debugInfo };
   }

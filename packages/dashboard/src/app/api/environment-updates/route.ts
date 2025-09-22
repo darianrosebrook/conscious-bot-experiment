@@ -31,8 +31,8 @@ export async function POST(request: NextRequest) {
       }
     });
 
-    // Only log in debug mode
-    if (process.env.NODE_ENV === 'development' && process.env.DEBUG_API === 'true') {
+    // Only log in debug mode with proper environment variable check
+    if (process.env.NODE_ENV === 'development' && process.env.DEBUG_API === 'true' && process.env.DEBUG_ENVIRONMENT === 'true') {
       const requestStart = request.headers.get('x-request-start');
       const duration = requestStart ? Date.now() - parseInt(requestStart) : 0;
       console.log(`[Dashboard] POST /api/environment-updates 200 in ${duration}ms`);

@@ -642,9 +642,11 @@ async function openContainerAtPosition(
     const botPos = bot.entity?.position;
     if (botPos && botPos.distanceTo(position) > 2) {
       try {
-        const pf = require('mineflayer-pathfinder');
-        const movements = new pf.Movements(bot);
-        const goal = new pf.goals.GoalNear(
+        const { pathfinder, Movements } = await import('mineflayer-pathfinder');
+        const movements = new Movements(bot);
+
+        // Use simple goals implementation
+        const goal = new pathfinder.goals.GoalNear(
           position.x,
           position.y,
           position.z,

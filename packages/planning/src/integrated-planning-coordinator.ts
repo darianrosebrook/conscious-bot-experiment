@@ -55,6 +55,11 @@ import { HomeostasisMonitor } from './goal-formulation/homeostasis-monitor';
 import { generateNeeds } from './goal-formulation/need-generator';
 import { EnhancedGoalManager } from './goal-formulation/enhanced-goal-manager';
 import { createWeightedUtility } from './goal-formulation/utility-calculator';
+import { TaskBootstrapper } from './goal-formulation/task-bootstrapper';
+import type {
+  BootstrapResult,
+  TaskBootstrapperConfig,
+} from './goal-formulation/task-bootstrapper';
 
 export interface PlanningConfiguration {
   // HRM Configuration
@@ -84,6 +89,8 @@ export interface PlanningConfiguration {
     fallbackTimeout: number;
     enablePlanMerging: boolean;
     enableCrossValidation: boolean;
+    enableTaskBootstrap: boolean;
+    bootstrapConfig?: TaskBootstrapperConfig;
   };
 }
 
@@ -159,6 +166,7 @@ export class IntegratedPlanningCoordinator extends EventEmitter {
   // Goal Formulation Components
   private homeostasisMonitor!: HomeostasisMonitor;
   private goalManager!: EnhancedGoalManager;
+  private taskBootstrapper!: TaskBootstrapper;
 
   // Planning State
   private activePlans: Map<string, Plan> = new Map();
@@ -172,6 +180,9 @@ export class IntegratedPlanningCoordinator extends EventEmitter {
 
     this.config = this.mergeWithDefaults(config);
     this.initializeComponents();
+    this.taskBootstrapper = new TaskBootstrapper(
+      this.config.coordinatorConfig.bootstrapConfig || {}
+    );
     this.performanceMetrics = new PlanningPerformanceMetrics();
   }
 
@@ -185,11 +196,27 @@ export class IntegratedPlanningCoordinator extends EventEmitter {
     const startTime = Date.now();
 
     try {
-      // Step 1: Goal Formulation (Signals → Needs → Goals)
-      const goalFormulation = await this.performGoalFormulation(
-        signals,
-        context
-      );
+      let bootstrapResult: BootstrapResult | null = null;
+      if (this.config.coordinatorConfig.enableTaskBootstrap) {
+        try {
+          bootstrapResult = await this.taskBootstrapper.bootstrap({
+            context,
+            signals,
+          });
+        } catch (error) {
+          console.warn('Task bootstrap failed; falling back to signals', error);
+        }
+      }
+
+      const goalFormulation =
+        bootstrapResult && bootstrapResult.goals.length > 0
+          ? this.buildGoalFormulationFromBootstrap(bootstrapResult)
+          : await this.performGoalFormulation(signals, context);
+
+      if (bootstrapResult && bootstrapResult.goals.length > 0) {
+        this.performanceMetrics.recordBootstrap(bootstrapResult);
+        this.logBootstrapResult(bootstrapResult);
+      }
 
       // Step 2: Cognitive Routing (Task Classification)
       const routingDecision = await this.performCognitiveRouting(
@@ -345,6 +372,47 @@ export class IntegratedPlanningCoordinator extends EventEmitter {
       generatedGoals,
       priorityRanking,
     };
+  }
+
+  private buildGoalFormulationFromBootstrap(
+    result: BootstrapResult
+  ): IntegratedPlanningResult['goalFormulation'] {
+    const priorityRanking = result.goals.map((goal) => ({
+      goalId: goal.id,
+      score: Math.max(0, Math.min(1, goal.priority ?? 0.5)),
+      reasoning: String(goal.metadata?.origin ?? 'bootstrap'),
+    }));
+
+    return {
+      identifiedNeeds: [],
+      generatedGoals: result.goals,
+      priorityRanking,
+    };
+  }
+
+  private logBootstrapResult(result: BootstrapResult): void {
+    const originCounts = result.goals.reduce(
+      (acc, goal) => {
+        const origin = String(goal.metadata?.origin ?? result.source);
+        acc[origin] = (acc[origin] || 0) + 1;
+        return acc;
+      },
+      {} as Record<string, number>
+    );
+
+    try {
+      console.log('planning.bootstrap.tasks', {
+        source: result.source,
+        planned: result.goals.length,
+        originCounts,
+        memoryConsidered: result.diagnostics.memoryConsidered,
+        llmConsidered: result.diagnostics.llmConsidered,
+        errors: result.diagnostics.errors,
+        latencyMs: result.diagnostics.latencyMs,
+      });
+    } catch (error) {
+      console.error('Failed to log bootstrap diagnostics', error);
+    }
   }
 
   /**
@@ -784,7 +852,9 @@ export class IntegratedPlanningCoordinator extends EventEmitter {
         fallbackTimeout: 5000,
         enablePlanMerging: true,
         enableCrossValidation: true,
+        enableTaskBootstrap: true,
         ...config.coordinatorConfig,
+        bootstrapConfig: config.coordinatorConfig?.bootstrapConfig,
       },
     };
   }
@@ -1553,9 +1623,14 @@ export class IntegratedPlanningCoordinator extends EventEmitter {
  */
 class PlanningPerformanceMetrics {
   private sessions: IntegratedPlanningResult[] = [];
+  private bootstrapRecords: BootstrapResult[] = [];
 
   recordPlanningSession(result: IntegratedPlanningResult): void {
     this.sessions.push(result);
+  }
+
+  recordBootstrap(result: BootstrapResult): void {
+    this.bootstrapRecords.push(result);
   }
 
   getMetrics(): any {
@@ -1573,6 +1648,7 @@ class PlanningPerformanceMetrics {
       successRate:
         this.sessions.filter((s) => s.estimatedSuccess > 0.7).length /
         this.sessions.length,
+      bootstrapSources: this.getBootstrapDistribution(),
     };
   }
 
@@ -1583,6 +1659,19 @@ class PlanningPerformanceMetrics {
         (distribution[session.planningApproach] || 0) + 1;
     });
     return distribution;
+  }
+
+  private getBootstrapDistribution(): Record<string, number> {
+    if (this.bootstrapRecords.length === 0) {
+      return {};
+    }
+    return this.bootstrapRecords.reduce(
+      (acc, record) => {
+        acc[record.source] = (acc[record.source] || 0) + 1;
+        return acc;
+      },
+      {} as Record<string, number>
+    );
   }
 }
 
