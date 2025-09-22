@@ -1,0 +1,15 @@
+modules:
+  - packages/mcp-server/package.json
+  - packages/mcp-server/src/index.ts
+  - packages/mcp-server/src/conscious-bot-mcp-server.ts
+  - packages/planning/src/modules/mcp-integration.ts
+  - packages/planning/tests/mcp-integration.integration.test.ts (new)
+interfaces:
+  - contracts/mcp-integration.pact.json
+migrations: []
+roll_forward:
+  - Build workspace (`pnpm turbo run build`) to ensure new dependency graph is compiled
+  - Restart planning service to confirm MCP server boots without fallback
+rollback:
+  - Revert workspace packages to previous versions
+  - Set planning configuration `enableMCP=false` to bypass integration if immediate rollback required

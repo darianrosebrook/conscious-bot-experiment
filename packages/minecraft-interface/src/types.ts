@@ -138,6 +138,7 @@ export interface BotConfig {
   pathfindingTimeout: number;
   actionTimeout: number;
   observationRadius: number;
+  maxRetries?: number;
 
   // Safety settings
   autoReconnect: boolean;

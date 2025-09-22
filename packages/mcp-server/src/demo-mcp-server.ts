@@ -1,13 +1,16 @@
 /**
  * Demo script for Conscious Bot MCP Server
- * 
+ *
  * Demonstrates the MCP server functionality and shows how it works.
- * 
+ *
  * @author @darianrosebrook
  */
 
-import { ConsciousBotMCPServer, MCPServerDependencies } from './conscious-bot-mcp-server.js';
-import { LeafFactory } from '@conscious-bot/core';
+import {
+  ConsciousBotMCPServer,
+  MCPServerDependencies,
+} from './conscious-bot-mcp-server.js';
+import { LeafFactory } from '@conscious-bot/executor-contracts';
 
 async function demoMCPServer() {
   console.log('🚀 Conscious Bot MCP Server Demo\n');

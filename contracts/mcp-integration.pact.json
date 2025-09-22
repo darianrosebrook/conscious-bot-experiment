@@ -1,0 +1,55 @@
+{
+  "consumer": {
+    "name": "PlanningServer"
+  },
+  "provider": {
+    "name": "ConsciousBotMCPServer"
+  },
+  "interactions": [
+    {
+      "description": "register option succeeds",
+      "providerState": "leaf factory hydrated",
+      "request": {
+        "tool": "register_option",
+        "arguments": {
+          "id": "opt.test_option",
+          "name": "Test Option",
+          "description": "Test option for planning",
+          "btDefinition": {
+            "id": "opt.test_option",
+            "name": "Test Option",
+            "root": {
+              "type": "sequence",
+              "children": []
+            }
+          },
+          "permissions": []
+        }
+      },
+      "response": {
+        "status": "success",
+        "optionId": "opt.test_option@1.0.0"
+      }
+    },
+    {
+      "description": "list tools exposes registered leaves",
+      "providerState": "leaf factory hydrated",
+      "request": {
+        "method": "list_tools"
+      },
+      "response": {
+        "tools": [
+          {
+            "name": "minecraft.move_to@1.0.0",
+            "description": "Move to target position"
+          }
+        ]
+      }
+    }
+  ],
+  "metadata": {
+    "pactSpecification": {
+      "version": "4.0"
+    }
+  }
+}

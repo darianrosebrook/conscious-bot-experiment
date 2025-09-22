@@ -1,46 +1,51 @@
-id: CBOT-4821
-title: "Integrate enhanced needs into decision flow"
+id: MCP-217
+title: "Stabilize MCP integration with core leaf factory"
 risk_tier: 2
 scope:
   in:
-    - "Convert enhanced needs from signal processing into prioritized decision tasks"
-    - "Trigger decision routing based on enhanced need priorities"
+    - "Ensure @conscious-bot/mcp-server declares the runtime dependency on @conscious-bot/core so Node can resolve imports"
+    - "Update planning MCP integration to use the real leaf factory API and refresh MCP tools without fallback errors"
+    - "Add contract and automated tests validating MCP tool hydration and option execution paths"
   out:
-    - "Authoring new goal templates"
-    - "Altering external MCP or HTTP interfaces"
+    - "Refactoring behavior tree runner semantics or goal management"
+    - "Creating new leaf implementations beyond existing catalog"
+    - "Production deployment automation or infra changes"
 invariants:
-  - "Enhanced needs above priority threshold emit at most one decision task per batch"
-  - "Signal processing latency stays within routine budget (<=200ms)"
+  - "MCP integration must register only leaves with defined spec.name and spec.version"
+  - "Planning service must expose MCP tool entries for every registered leaf without throwing TypeError"
+  - "Option, leaf, and bot update flows must surface structured errors rather than uncaught exceptions"
 acceptance:
   - id: A1
-    given: "A processed signal batch yielding enhanced needs with high priority"
-    when: "The arbiter processes the signals"
-    then: "Corresponding cognitive tasks are routed through the decision system"
+    given: "Planning server bootstraps MCP integration with workspace packages built"
+    when: "core leaves register via MCPIntegration.registerLeaf"
+    then: "MCP server import succeeds without fallback and listTools returns the registered leaf names"
   - id: A2
-    given: "Enhanced needs below the scheduling threshold"
-    when: "Signals are processed"
-    then: "No new cognitive tasks are enqueued from enhanced needs"
+    given: "An option registration request is invoked through MCPIntegration.registerOption"
+    when: "the MCP server processes the request"
+    then: "the option is recorded with status success and the returned id matches id@version"
   - id: A3
-    given: "Multiple enhanced needs produced concurrently"
-    when: "The arbiter integrates them"
-    then: "Tasks are prioritized and limited to the configured top slice"
+    given: "Minecraft interface updates the bot instance"
+    when: "MCPIntegration.updateBotInstance is called"
+    then: "the bot dependency updates without TypeError and logs a success message"
 non_functional:
   a11y:
-    - "No UI impact; maintain existing keyboard path coverage"
+    - "Server-only change; no UI impact"
   perf:
-    api_p95_ms: 180
+    api_p95_ms: 250
   security:
-    - "No new external surfaces; maintain existing module privilege boundaries"
+    - "No new network exposure; dependency policy remains satisfied"
 contracts:
-  - type: openapi
-    path: "contracts/needs-decision-interface.yaml#/EnhancedNeedTask"
+  - type: pact
+    path: "contracts/mcp-integration.pact.json"
 observability:
   logs:
-    - "arbiter.enhanced_need.integration"
+    - "[MCP] MCP server created successfully"
+    - "[MCP] Bot instance updated successfully"
   metrics:
-    - "arbiter_enhanced_need_task_count"
+    - "mcp.leaf.registration.count"
+    - "mcp.option.registration.success"
   traces:
-    - "arbiter.integrate_enhanced_needs"
+    - "mcp.integration.register_option"
 migrations: []
 rollback:
-  - "Disable enhanced need scheduling via config flag"
+  - "Disable MCP integration via enableMCP=false configuration flag to revert to previous fallback"

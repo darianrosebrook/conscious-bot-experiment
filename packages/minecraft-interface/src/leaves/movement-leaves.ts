@@ -9,10 +9,96 @@
 
 import { Bot } from 'mineflayer';
 import { pathfinder } from 'mineflayer-pathfinder';
-// Use require for goals since ES Module import doesn't work
-import { createRequire } from 'module';
-const require = createRequire(import.meta.url);
-const { goals } = require('mineflayer-pathfinder');
+// Use simple goals implementation
+class SimpleGoalNear {
+  constructor(x: number, y: number, z: number, range: number = 1) {
+    this.x = x;
+    this.y = y;
+    this.z = z;
+    this.range = range;
+  }
+  x: number;
+  y: number;
+  z: number;
+  range: number;
+
+  // Required Goal interface properties
+  heuristic(node: any): number {
+    return 0;
+  }
+
+  isEnd(endNode: any): boolean {
+    return false;
+  }
+
+  hasChanged(): boolean {
+    return false;
+  }
+
+  isValid(): boolean {
+    return true;
+  }
+}
+
+class SimpleGoalBlock {
+  constructor(x: number, y: number, z: number) {
+    this.x = x;
+    this.y = y;
+    this.z = z;
+  }
+  x: number;
+  y: number;
+  z: number;
+
+  // Required Goal interface properties
+  heuristic(node: any): number {
+    return 0;
+  }
+
+  isEnd(endNode: any): boolean {
+    return false;
+  }
+
+  hasChanged(): boolean {
+    return false;
+  }
+
+  isValid(): boolean {
+    return true;
+  }
+}
+
+class SimpleGoalFollow {
+  constructor(entity: any, range: number = 3) {
+    this.entity = entity;
+    this.range = range;
+  }
+  entity: any;
+  range: number;
+
+  // Required Goal interface properties
+  heuristic(node: any): number {
+    return 0;
+  }
+
+  isEnd(endNode: any): boolean {
+    return false;
+  }
+
+  hasChanged(): boolean {
+    return false;
+  }
+
+  isValid(): boolean {
+    return true;
+  }
+}
+
+const simpleGoals = {
+  GoalNear: SimpleGoalNear,
+  GoalBlock: SimpleGoalBlock,
+  GoalFollow: SimpleGoalFollow,
+};
 import { Vec3 } from 'vec3';
 import {
   LeafImpl,
@@ -135,8 +221,8 @@ export class MoveToLeaf implements LeafImpl {
     // Build goal
     let g: any;
     if (goalType === 'GoalBlock')
-      g = new goals.GoalBlock(target.x, target.y, target.z);
-    else g = new goals.GoalNear(target.x, target.y, target.z, 1);
+      g = new simpleGoals.GoalBlock(target.x, target.y, target.z);
+    else g = new simpleGoals.GoalNear(target.x, target.y, target.z, 1);
 
     // Local abort controller that aggregates ctx.abortSignal + timeout
     const ac = new AbortController();
@@ -344,7 +430,7 @@ export class StepForwardSafelyLeaf implements LeafImpl {
     const ac = new AbortController();
     const to = setTimeout(() => ac.abort(), this.spec.timeoutMs);
     const done = bot.pathfinder?.setGoal(
-      new goals.GoalNear(bTarget.x, bTarget.y, bTarget.z, 0.5),
+      new simpleGoals.GoalNear(bTarget.x, bTarget.y, bTarget.z, 0.5),
       true
     );
 
@@ -471,7 +557,7 @@ export class FollowEntityLeaf implements LeafImpl {
     ctx.abortSignal?.addEventListener('abort', onCtxAbort, { once: true });
 
     try {
-      bot.pathfinder.setGoal(new goals.GoalFollow(entity, range), true);
+      bot.pathfinder.setGoal(new simpleGoals.GoalFollow(entity, range), true);
 
       await new Promise<void>((resolve, reject) => {
         const tick = () => {

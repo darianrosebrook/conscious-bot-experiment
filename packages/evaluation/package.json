@@ -29,7 +29,10 @@
     "@testcontainers/postgresql": "^10.9.0",
     "testcontainers": "^10.9.0",
     "typescript": "^5.2.2",
-    "vitest": "^3.2.4"
+    "vitest": "^3.2.4",
+    "eslint": "^8.57.1",
+    "@typescript-eslint/eslint-plugin": "^6.21.0",
+    "@typescript-eslint/parser": "^6.21.0"
   },
   "keywords": [
     "evaluation",

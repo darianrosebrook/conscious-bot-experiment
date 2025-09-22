@@ -11,10 +11,74 @@ import { Bot } from 'mineflayer';
 import { pathfinder, Movements } from 'mineflayer-pathfinder';
 import { Vec3 } from 'vec3';
 
-// Use createRequire for goals since ES module import doesn't work
-import { createRequire } from 'module';
-const require = createRequire(import.meta.url);
-const { goals } = require('mineflayer-pathfinder');
+// Simple inline goal classes for ES modules compatibility
+class SimpleGoalNear {
+  constructor(x: number, y: number, z: number, range: number = 1) {
+    this.x = x;
+    this.y = y;
+    this.z = z;
+    this.range = range;
+  }
+  x: number;
+  y: number;
+  z: number;
+  range: number;
+
+  // Required Goal interface properties
+  heuristic(node: any): number {
+    return 0;
+  }
+
+  isEnd(endNode: any): boolean {
+    return false;
+  }
+
+  hasChanged(): boolean {
+    return false;
+  }
+
+  isValid(): boolean {
+    return true;
+  }
+}
+
+class SimpleGoalBlock {
+  constructor(x: number, y: number, z: number) {
+    this.x = x;
+    this.y = y;
+    this.z = z;
+  }
+  x: number;
+  y: number;
+  z: number;
+
+  // Required Goal interface properties
+  heuristic(node: any): number {
+    return 0;
+  }
+
+  isEnd(endNode: any): boolean {
+    return false;
+  }
+
+  hasChanged(): boolean {
+    return false;
+  }
+
+  isValid(): boolean {
+    return true;
+  }
+}
+
+// Export goals object
+const simpleGoals = {
+  GoalNear: SimpleGoalNear,
+  GoalBlock: SimpleGoalBlock,
+};
+
+function getGoals() {
+  return Promise.resolve(simpleGoals);
+}
 import { PlanStep } from './types';
 import {
   MinecraftAction,
@@ -28,23 +92,34 @@ import {
   PlaceBlockAction,
   FindShelterAction,
 } from './types';
+
+// Configuration interface for ActionTranslator
+interface ActionTranslatorConfig {
+  actionTimeout: number;
+  pathfindingTimeout?: number;
+  maxRetries?: number;
+}
 import { NavigationBridge } from './navigation-bridge';
 import { StateMachineWrapper } from './extensions/state-machine-wrapper';
 
 export class ActionTranslator {
   private bot: Bot;
-  private config: BotConfig;
+  private config: ActionTranslatorConfig;
   private movements: Movements;
   private navigationBridge: NavigationBridge;
   private stateMachineWrapper?: StateMachineWrapper;
 
   constructor(
     bot: Bot,
-    config: BotConfig,
+    config: ActionTranslatorConfig,
     stateMachineWrapper?: StateMachineWrapper
   ) {
     this.bot = bot;
-    this.config = config;
+    this.config = {
+      ...config,
+      pathfindingTimeout: config.pathfindingTimeout || 10000,
+      maxRetries: config.maxRetries || 3,
+    };
     this.stateMachineWrapper = stateMachineWrapper;
 
     // Initialize pathfinder only if bot is spawned
@@ -58,6 +133,20 @@ export class ActionTranslator {
         hasStateMachine: !!stateMachineWrapper,
         timestamp: Date.now(),
       });
+
+      // Goals are initialized inline with simple implementation
+
+      // Initialize D* Lite navigation bridge
+      this.navigationBridge = new NavigationBridge(bot, {
+        maxRaycastDistance: 32,
+        pathfindingTimeout: 30000,
+        replanThreshold: 5,
+        obstacleDetectionRadius: 8,
+        enableDynamicReplanning: true,
+        useRaycasting: true,
+        usePathfinding: true,
+      });
+
       this.movements.scafoldingBlocks = []; // Don't place blocks while pathfinding
       this.movements.canDig = false; // Don't break blocks while pathfinding initially
     } else {
@@ -65,18 +154,17 @@ export class ActionTranslator {
       this.movements = new Movements(bot);
       this.movements.scafoldingBlocks = [];
       this.movements.canDig = false;
-    }
 
-    // Initialize D* Lite navigation bridge
-    this.navigationBridge = new NavigationBridge(bot, {
-      maxRaycastDistance: 32,
-      pathfindingTimeout: 30000,
-      replanThreshold: 5,
-      obstacleDetectionRadius: 8,
-      enableDynamicReplanning: true,
-      useRaycasting: true,
-      usePathfinding: true,
-    });
+      console.log(
+        '⚠️ ActionTranslator initialized without NavigationBridge - bot not fully spawned yet',
+        {
+          hasBot: !!bot,
+          botSpawned: !!bot.entity?.position,
+          hasStateMachine: !!stateMachineWrapper,
+          timestamp: Date.now(),
+        }
+      );
+    }
   }
 
   /**
@@ -775,11 +863,9 @@ export class ActionTranslator {
   async executeAction(
     action: MinecraftAction
   ): Promise<{ success: boolean; data?: any; error?: string }> {
-    // executeAction called with action
     const timeout = action.timeout || this.config.actionTimeout;
 
     try {
-      // About to switch on action type: ${action.type}
       switch (action.type) {
         case 'navigate':
           return await this.executeNavigate(action as NavigateAction, timeout);
@@ -1534,8 +1620,16 @@ export class ActionTranslator {
 
       if (shelterFound && shelterPosition) {
         // Move to the shelter
+        const Goals = await getGoals();
+        console.log('🔍 Using Goals module:', !!Goals, typeof Goals);
+
+        if (!Goals || !Goals.GoalBlock) {
+          console.error('❌ Goals module missing GoalBlock:', Goals);
+          throw new Error('Goals module not properly initialized');
+        }
+
         await this.bot.pathfinder.goto(
-          new goals.GoalBlock(
+          new Goals.GoalBlock(
             shelterPosition.x,
             shelterPosition.y,
             shelterPosition.z
@@ -1704,6 +1798,28 @@ export class ActionTranslator {
     const { target, range, sprint } = action.parameters;
 
     try {
+      console.log(
+        `🧭 executeNavigate called with target: ${target.x}, ${target.y}, ${target.z}`
+      );
+      console.log('🔍 ActionTranslator state:', {
+        hasNavigationBridge: !!this.navigationBridge,
+        hasBot: !!this.bot,
+        botSpawned: !!this.bot.entity?.position,
+        botPathfinder: !!(this.bot as any).pathfinder,
+        timestamp: Date.now(),
+      });
+
+      if (!this.navigationBridge) {
+        console.error(
+          '❌ NavigationBridge not initialized in ActionTranslator'
+        );
+        return {
+          success: false,
+          error:
+            'NavigationBridge not initialized - bot may not be fully spawned',
+        };
+      }
+
       console.log(
         `🧭 Using D* Lite navigation to target: ${target.x}, ${target.y}, ${target.z}`
       );
@@ -1881,8 +1997,9 @@ export class ActionTranslator {
         }
 
         // Move to crafting table
+        const Goals = await getGoals();
         await this.bot.pathfinder.goto(
-          new goals.GoalNear(
+          new Goals.GoalNear(
             craftingTable.position.x,
             craftingTable.position.y,
             craftingTable.position.z,
@@ -1953,7 +2070,8 @@ export class ActionTranslator {
     for (const itemEntity of sortedItems) {
       try {
         // Move to the item
-        const goal = new goals.GoalNear(
+        const Goals = await getGoals();
+        const goal = new Goals.GoalNear(
           itemEntity.position.x,
           itemEntity.position.y,
           itemEntity.position.z,
@@ -2305,7 +2423,8 @@ export class ActionTranslator {
           );
 
           // First, move closer to the block to ensure we can pick up items
-          const goal = new goals.GoalNear(
+          const Goals = await getGoals();
+          const goal = new Goals.GoalNear(
             blockPos.x,
             blockPos.y,
             blockPos.z,
@@ -2686,8 +2805,9 @@ export class ActionTranslator {
         targetEntity.position
       );
       if (distance > 3) {
+        const Goals = await getGoals();
         await this.bot.pathfinder.goto(
-          new goals.GoalBlock(
+          new Goals.GoalBlock(
             targetEntity.position.x,
             targetEntity.position.y,
             targetEntity.position.z

@@ -482,13 +482,13 @@ describe('Curriculum System', () => {
           criteria: [
             {
               metric: 'success_rate',
-              operator: 'gte',
+              operator: 'gte' as const,
               threshold: 0.8,
               weight: 1.0,
             },
           ],
-          action: 'pass',
-          severity: 'high',
+          action: 'pass' as const,
+          severity: 'high' as const,
         },
       ];
 
@@ -534,13 +534,13 @@ describe('Curriculum System', () => {
           criteria: [
             {
               metric: 'success_rate',
-              operator: 'gte',
+              operator: 'gte' as const,
               threshold: 0.8,
               weight: 1.0,
             },
           ],
-          action: 'pass',
-          severity: 'high',
+          action: 'pass' as const,
+          severity: 'high' as const,
         },
       ];
 
@@ -634,13 +634,13 @@ describe('Curriculum System', () => {
           criteria: [
             {
               metric: 'functional_success_rate',
-              operator: 'gte',
+              operator: 'gte' as const,
               threshold: 0.8,
               weight: 1.0,
             },
           ],
-          action: 'pass',
-          severity: 'high',
+          action: 'pass' as const,
+          severity: 'high' as const,
         },
       ];
 

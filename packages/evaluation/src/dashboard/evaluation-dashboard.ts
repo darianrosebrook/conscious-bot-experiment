@@ -180,7 +180,7 @@ export class EvaluationDashboard extends EventEmitter {
    */
   addEvaluationResult(result: EvaluationResults): void {
     // Validate result has minimum required fields
-    if (!result || !result.sessionId || !result.scenarioId) {
+    if (!result?.sessionId || !result.scenarioId) {
       console.warn('Invalid evaluation result provided, skipping');
       return;
     }
@@ -436,13 +436,10 @@ export class EvaluationDashboard extends EventEmitter {
     // Filter out invalid results
     const validResults = recentResults.filter(
       (r) =>
-        r &&
-        r.overallScore !== undefined &&
+        r?.overallScore !== undefined &&
         r.success !== undefined &&
-        r.planningPerformance &&
-        r.planningPerformance.latency !== undefined &&
-        r.executionPerformance &&
-        r.executionPerformance.latency !== undefined
+        r.planningPerformance?.latency !== undefined &&
+        r.executionPerformance?.latency !== undefined
     );
 
     if (validResults.length === 0) {
@@ -794,10 +791,10 @@ export class EvaluationDashboard extends EventEmitter {
 
     if (format === 'json') {
       return JSON.stringify(exportData, null, 2);
-    } else {
+    } 
       // CSV export would be implemented here
       return this.convertToCSV(exportData);
-    }
+    
   }
 
   /**

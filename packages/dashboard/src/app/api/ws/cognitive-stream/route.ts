@@ -244,7 +244,7 @@ async function generateThoughts(): Promise<CognitiveThought[]> {
 
   // If services are down, generate basic thoughts from available data
   if (!state || !plan) {
-    return generateFallbackThoughts();
+    return [];
   }
 
   const context = {
@@ -271,7 +271,7 @@ async function generateThoughts(): Promise<CognitiveThought[]> {
       signal: AbortSignal.timeout(3000),
     });
 
-    if (!resp.ok) return generateFallbackThoughts();
+    if (!resp.ok) return [];
     const data = await resp.json();
     return (data.thoughts || []).flatMap((t: any) => {
       const dup = thoughtHistory.find(
@@ -298,41 +298,8 @@ async function generateThoughts(): Promise<CognitiveThought[]> {
       'Cognition service unavailable, using fallback thoughts:',
       error
     );
-    return generateFallbackThoughts();
+    return [];
   }
-}
-
-function generateFallbackThoughts(): CognitiveThought[] {
-  const fallbackThoughts = [
-    "I'm sensing the environment around me, gathering information about my current state.",
-    'I should consider my current goals and how to achieve them systematically.',
-    'The world seems stable right now. I should maintain awareness of my surroundings.',
-    'My cognitive processes are active and functioning normally.',
-    'I need to stay focused on my primary objectives while remaining adaptable.',
-    'The environment appears calm. This is a good time for reflection and planning.',
-    "I'm processing sensory data and updating my internal model of the world.",
-    'My thought patterns are clear and logical at the moment.',
-  ];
-
-  const randomThought =
-    fallbackThoughts[Math.floor(Math.random() * fallbackThoughts.length)];
-
-  return [
-    addThought({
-      type: 'reflection',
-      content: randomThought,
-      attribution: 'self',
-      context: {
-        emotionalState: 'neutral',
-        confidence: 0.6,
-        cognitiveSystem: 'fallback-generator',
-      },
-      metadata: {
-        thoughtType: 'reflection',
-        fallback: true,
-      },
-    }),
-  ];
 }
 
 async function processExternalChat(): Promise<CognitiveThought[]> {

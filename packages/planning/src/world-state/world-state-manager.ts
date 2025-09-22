@@ -42,9 +42,12 @@ export class WorldStateManager extends EventEmitter {
     return this.snapshot.inventory ? [...this.snapshot.inventory] : undefined;
   }
 
-  startPolling(intervalMs = 2000): void {
+  startPolling(intervalMs = 10000): void {
     if (this.pollHandle) clearInterval(this.pollHandle);
-    this.pollHandle = setInterval(() => this.pollOnce().catch(() => {}), intervalMs);
+    this.pollHandle = setInterval(
+      () => this.pollOnce().catch(() => {}),
+      intervalMs
+    );
     // Kick immediately
     this.pollOnce().catch(() => {});
   }
@@ -67,34 +70,60 @@ export class WorldStateManager extends EventEmitter {
       const json = (await res.json()) as any;
       const data = json?.data || {};
       const worldState = data.worldState || {};
-      const inv = Array.isArray(worldState.inventory?.items)
-        ? (worldState.inventory.items as CachedInventoryItem[])
-        : [];
+      const player = worldState.player || {};
+
+      // Extract inventory items
+      const inv = Array.isArray(data.inventory)
+        ? (data.inventory as CachedInventoryItem[])
+        : Array.isArray(worldState.inventory?.items)
+          ? (worldState.inventory.items as CachedInventoryItem[])
+          : [];
+
       const prev = this.snapshot;
       this.snapshot = {
         ts: Date.now(),
         connected: json?.status === 'connected' || json?.isAlive === true,
-        agentPosition: data.agentPosition || worldState.agentPosition,
-        agentHealth: data.agentHealth || worldState.agentHealth,
+        agentPosition: data.position || player.position,
+        agentHealth: data.health || player.health,
         inventory: inv,
         nearbyEntities: worldState.nearbyEntities || [],
         timeOfDay: worldState.timeOfDay,
         weather: worldState.weather,
-        dimension: worldState.dimension,
+        dimension: player.dimension || worldState.dimension,
         biome: worldState.biome,
-        dangerLevel: worldState.dangerLevel,
+        dangerLevel: 0, // Calculate based on environment
       };
+
+      // Debug logging
+      console.log('WorldStateManager poll result:', {
+        connected: this.snapshot.connected,
+        hasPosition: !!this.snapshot.agentPosition,
+        position: this.snapshot.agentPosition,
+        health: this.snapshot.agentHealth,
+        inventoryCount: this.snapshot.inventory?.length || 0,
+      });
+
       if (this.hasMeaningfulChange(prev, this.snapshot)) {
+        console.log('WorldStateManager emitting update');
         this.emit('updated', this.getSnapshot());
+      } else {
+        console.log('WorldStateManager no meaningful change');
       }
     } catch (e) {
-      // Silent fail; snapshot remains
+      console.error('WorldStateManager poll error:', e);
     }
   }
 
   applyEffects(
     effects: Array<
-      { type: string; item?: string; quantity?: number; change?: string; metadata?: any } | any
+      | {
+          type: string;
+          item?: string;
+          quantity?: number;
+          change?: string;
+          metadata?: any;
+        }
+      | any
     >
   ): void {
     if (!effects || effects.length === 0) return;
@@ -102,9 +131,14 @@ export class WorldStateManager extends EventEmitter {
     for (const eff of effects) {
       // Inventory effects from capability result
       if (eff.type === 'inventory' || eff.change?.startsWith('inventory_')) {
-        const itemName = String(eff.item || eff.metadata?.item || '').toLowerCase();
+        const itemName = String(
+          eff.item || eff.metadata?.item || ''
+        ).toLowerCase();
         const qtyRaw = Number(eff.quantity ?? eff.metadata?.quantity ?? 0);
-        const qty = eff.change === 'inventory_removed' ? -Math.abs(qtyRaw) : Math.abs(qtyRaw);
+        const qty =
+          eff.change === 'inventory_removed'
+            ? -Math.abs(qtyRaw)
+            : Math.abs(qtyRaw);
         if (!this.snapshot.inventory) this.snapshot.inventory = [];
         const idx = this.snapshot.inventory.findIndex((it) =>
           String(it.name || it.displayName || it.type || '')
@@ -127,10 +161,41 @@ export class WorldStateManager extends EventEmitter {
     }
   }
 
-  private hasMeaningfulChange(a: WorldStateSnapshot, b: WorldStateSnapshot): boolean {
+  private hasMeaningfulChange(
+    a: WorldStateSnapshot,
+    b: WorldStateSnapshot
+  ): boolean {
     if (a.connected !== b.connected) return true;
     if (!!a.inventory !== !!b.inventory) return true;
     if ((a.inventory?.length || 0) !== (b.inventory?.length || 0)) return true;
+
+    // Check for position changes
+    if (a.agentPosition !== b.agentPosition) {
+      if (!a.agentPosition && b.agentPosition) return true;
+      if (a.agentPosition && !b.agentPosition) return true;
+      if (a.agentPosition && b.agentPosition) {
+        const dx = Math.abs(
+          (a.agentPosition.x || 0) - (b.agentPosition.x || 0)
+        );
+        const dy = Math.abs(
+          (a.agentPosition.y || 0) - (b.agentPosition.y || 0)
+        );
+        const dz = Math.abs(
+          (a.agentPosition.z || 0) - (b.agentPosition.z || 0)
+        );
+        // Consider position change meaningful if any coordinate changed by more than 0.1
+        if (dx > 0.1 || dy > 0.1 || dz > 0.1) return true;
+      }
+    }
+
+    // Check for health changes
+    if (a.agentHealth !== b.agentHealth) return true;
+
+    // Check for environmental changes
+    if (a.timeOfDay !== b.timeOfDay) return true;
+    if (a.weather !== b.weather) return true;
+    if (a.biome !== b.biome) return true;
+
     return false;
   }
 }

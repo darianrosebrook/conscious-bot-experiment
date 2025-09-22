@@ -8,6 +8,7 @@
 
 import express from 'express';
 import cors from 'cors';
+import { EventEmitter } from 'events';
 
 const app = express();
 const port = process.env.PORT ? parseInt(process.env.PORT) : 3004;
@@ -16,34 +17,128 @@ const port = process.env.PORT ? parseInt(process.env.PORT) : 3004;
 app.use(cors());
 app.use(express.json());
 
-// Initialize world system (simplified for now)
-const worldSystem = {
-  navigation: {
-    getCurrentPath: () => null,
-    getDestination: () => null,
-    isPathfindingActive: () => false,
-  },
-  perception: {
-    getVisibleEntities: () => [],
-    getRecognizedObjects: () => [],
-    getPerceptionQuality: () => 0.5,
-    isActive: () => false,
-  },
-  placeGraph: {
-    getKnownPlaces: () => [],
-    getCurrentPlace: () => null,
-    getPlaceConnections: () => [],
-  },
-  sensorimotor: {
-    getCurrentAction: () => null,
-    getActionQueue: () => [],
-    isMotorControlActive: () => false,
-  },
+// World state cache
+interface WorldState {
+  player?: {
+    position?: { x: number; y: number; z: number };
+    health?: number;
+    inventory?: any[];
+  };
+  environment?: {
+    timeOfDay?: number;
+    weather?: string;
+    biome?: string;
+  };
+  navigation?: {
+    currentPath?: any;
+    destination?: any;
+    pathfindingActive?: boolean;
+  };
+  perception?: {
+    visibleEntities?: any[];
+    recognizedObjects?: any[];
+    perceptionQuality?: number;
+  };
+  placeGraph?: {
+    knownPlaces?: any[];
+    currentPlace?: any;
+    placeConnections?: any[];
+  };
+  sensorimotor?: {
+    currentAction?: any;
+    actionQueue?: any[];
+    motorControlActive?: boolean;
+  };
+  sensing?: {
+    sensorData?: any;
+    sensorStatus?: string;
+  };
+}
+
+let currentWorldState: WorldState = {
   sensing: {
-    getSensorData: () => ({}),
-    getSensorStatus: () => 'active',
+    sensorStatus: 'active',
   },
 };
+
+// Event emitter for world state updates
+const worldStateEmitter = new EventEmitter();
+
+// Fetch world state from planning server
+async function fetchWorldStateFromPlanning(): Promise<WorldState | null> {
+  try {
+    const response = await fetch('http://localhost:3002/world-state');
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+    const data = (await response.json()) as any;
+    if (!data) {
+      throw new Error('No data returned from planning server');
+    }
+
+    // Transform planning server data to world server format
+    return {
+      player: {
+        position: data.agentPosition,
+        health: data.agentHealth,
+        inventory: data.inventory,
+      },
+      environment: {
+        timeOfDay: data.timeOfDay,
+        weather: data.weather,
+        biome: data.biome,
+      },
+      navigation: {
+        currentPath: data.navigation?.currentPath,
+        destination: data.navigation?.destination,
+        pathfindingActive: data.navigation?.pathfindingActive,
+      },
+      perception: {
+        visibleEntities: data.perception?.visibleEntities || [],
+        recognizedObjects: data.perception?.recognizedObjects || [],
+        perceptionQuality: data.perception?.perceptionQuality || 0.5,
+      },
+      placeGraph: {
+        knownPlaces: data.placeGraph?.knownPlaces || [],
+        currentPlace: data.placeGraph?.currentPlace,
+        placeConnections: data.placeGraph?.placeConnections || [],
+      },
+      sensorimotor: {
+        currentAction: data.sensorimotor?.currentAction,
+        actionQueue: data.sensorimotor?.actionQueue || [],
+        motorControlActive: data.sensorimotor?.motorControlActive || false,
+      },
+      sensing: {
+        sensorData: data.sensing?.sensorData || {},
+        sensorStatus: data.sensing?.sensorStatus || 'active',
+      },
+    };
+  } catch (error) {
+    console.error('Failed to fetch world state from planning server:', error);
+    return null;
+  }
+}
+
+// Update world state periodically
+async function updateWorldState() {
+  try {
+    const newState = await fetchWorldStateFromPlanning();
+    if (newState) {
+      currentWorldState = newState;
+      worldStateEmitter.emit('updated', currentWorldState);
+    }
+  } catch (error) {
+    console.error('Failed to update world state:', error);
+  }
+}
+
+// Start polling for world state updates
+setInterval(updateWorldState, 5000); // Poll every 5 seconds
+
+// Get current world state
+function getWorldState(): WorldState {
+  return currentWorldState;
+}
 
 // Health check endpoint
 app.get('/health', (req, res) => {
@@ -58,34 +153,35 @@ app.get('/health', (req, res) => {
 // Get world system state
 app.get('/state', (req, res) => {
   try {
-    const state = {
-      navigation: {
-        currentPath: worldSystem.navigation.getCurrentPath(),
-        destination: worldSystem.navigation.getDestination(),
-        pathfindingActive: worldSystem.navigation.isPathfindingActive(),
+    const state = getWorldState();
+    res.json({
+      navigation: state.navigation || {
+        currentPath: null,
+        destination: null,
+        pathfindingActive: false,
       },
-      perception: {
-        visibleEntities: worldSystem.perception.getVisibleEntities(),
-        recognizedObjects: worldSystem.perception.getRecognizedObjects(),
-        perceptionQuality: worldSystem.perception.getPerceptionQuality(),
+      perception: state.perception || {
+        visibleEntities: [],
+        recognizedObjects: [],
+        perceptionQuality: 0.5,
       },
-      placeGraph: {
-        knownPlaces: worldSystem.placeGraph.getKnownPlaces(),
-        currentPlace: worldSystem.placeGraph.getCurrentPlace(),
-        placeConnections: worldSystem.placeGraph.getPlaceConnections(),
+      placeGraph: state.placeGraph || {
+        knownPlaces: [],
+        currentPlace: null,
+        placeConnections: [],
       },
-      sensorimotor: {
-        currentAction: worldSystem.sensorimotor.getCurrentAction(),
-        actionQueue: worldSystem.sensorimotor.getActionQueue(),
-        motorControlActive: worldSystem.sensorimotor.isMotorControlActive(),
+      sensorimotor: state.sensorimotor || {
+        currentAction: null,
+        actionQueue: [],
+        motorControlActive: false,
       },
-      sensing: {
-        sensorData: worldSystem.sensing.getSensorData(),
-        sensorStatus: worldSystem.sensing.getSensorStatus(),
+      sensing: state.sensing || {
+        sensorData: {},
+        sensorStatus: 'active',
       },
-    };
-
-    res.json(state);
+      player: state.player,
+      environment: state.environment,
+    });
   } catch (error) {
     console.error('Error getting world state:', error);
     res.status(500).json({ error: 'Failed to get world state' });
@@ -273,9 +369,9 @@ app.get('/telemetry', (req, res) => {
           source: 'world-system',
           type: 'world_state',
           data: {
-            navigationActive: worldSystem.navigation.isPathfindingActive(),
-            perceptionActive: worldSystem.perception.isActive(),
-            motorControlActive: worldSystem.sensorimotor.isMotorControlActive(),
+            navigationActive: false, // TODO: Connect to actual navigation system
+            perceptionActive: true, // TODO: Connect to actual perception system
+            motorControlActive: false, // TODO: Connect to actual sensorimotor system
             metrics: {
               activeProcesses: 0,
               memoryUsage: process.memoryUsage(),

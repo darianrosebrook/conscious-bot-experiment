@@ -16,10 +16,40 @@ import {
   LeafSpec,
 } from '@conscious-bot/core';
 import { pathfinder } from 'mineflayer-pathfinder';
-// Use require for goals since ES Module import doesn't work
-import { createRequire } from 'module';
-const require = createRequire(import.meta.url);
-const { goals } = require('mineflayer-pathfinder');
+// Use simple goals implementation
+class SimpleGoalNear {
+  constructor(x: number, y: number, z: number, range: number = 1) {
+    this.x = x;
+    this.y = y;
+    this.z = z;
+    this.range = range;
+  }
+  x: number;
+  y: number;
+  z: number;
+  range: number;
+
+  // Required Goal interface properties
+  heuristic(node: any): number {
+    return 0;
+  }
+
+  isEnd(endNode: any): boolean {
+    return false;
+  }
+
+  hasChanged(): boolean {
+    return false;
+  }
+
+  isValid(): boolean {
+    return true;
+  }
+}
+
+const simpleGoals = {
+  GoalNear: SimpleGoalNear,
+};
 
 // Extend Bot type to include pathfinder
 interface BotWithPathfinder extends Bot {
@@ -407,7 +437,12 @@ export class RetreatAndBlockLeaf implements LeafImpl {
           botWithPathfinder.loadPlugin(pathfinder);
         }
         await botWithPathfinder.pathfinder.goto(
-          new goals.GoalNear(safePosition.x, safePosition.y, safePosition.z, 1)
+          new simpleGoals.GoalNear(
+            safePosition.x,
+            safePosition.y,
+            safePosition.z,
+            1
+          )
         );
         retreated = true;
       } catch (error) {

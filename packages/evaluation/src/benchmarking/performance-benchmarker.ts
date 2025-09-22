@@ -799,10 +799,10 @@ export class PerformanceBenchmarker extends EventEmitter {
 
     if (format === 'json') {
       return JSON.stringify(history, null, 2);
-    } else {
+    } 
       // CSV export implementation
       return this.convertToCSV(history);
-    }
+    
   }
 
   /**

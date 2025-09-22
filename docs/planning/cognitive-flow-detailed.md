@@ -51,8 +51,15 @@ The brain of the system - deciding what to do and how to do it:
 Components that turn plans into actions:
 
 - **Enhanced Reactive Executor**: GOAP-based (Goal-Oriented Action Planning) execution system that builds action sequences and repairs plans when conditions change unexpectedly.
-
+  - [EnhancedReactiveExecutor](../packages/planning/src/reactive-executor/enhanced-reactive-executor.ts)
+  - [EnhancedGOAPPlanner](../packages/planning/src/reactive-executor/enhanced-goap-planner.ts)
 - **Minecraft Interface**: Integration layer using Mineflayer for bot control, Prismarine-Viewer for 3D visualization, and HTTP server for external monitoring and control.
+  - [MinecraftInterface](../packages/minecraft-interface/src/server.ts)
+  - [Mineflayer Integration](../packages/minecraft-interface/src/)
+- **PBI Executor Contracts**: Runtime enforcement of plan-body interface contracts
+  - [PBI Enforcer](../packages/executor-contracts/src/pbi-enforcer.ts)
+  - [Capability Registry](../packages/executor-contracts/src/capability-registry.ts)
+  - [PBI Types](../packages/executor-contracts/src/types.ts)
 
 ## Component Coupling and Contracts
 
@@ -623,5 +630,76 @@ The system demonstrates that complex autonomous behavior can be achieved through
 
 ---
 
-If you want, I can turn the **Capability Registry** and **PBI checks** above into a small `@conscious-bot/executor-contracts` package (types + helpers + runtime guards), plus a codemod to auto-wrap your existing BT runners with schema/guard/acceptance stubs. That's typically a ≤300-line addition that pays for itself the first time a planner emits an unknown verb.
+## Integration with Existing System
+
+### Using the Executor Contracts Package
+
+The `@conscious-bot/executor-contracts` package provides the PBI enforcement layer that can be integrated with the existing planning system:
+
+```ts
+import { createPBIEnforcer, PBIError } from '@conscious-bot/executor-contracts';
+import { EnhancedReactiveExecutor } from '../packages/planning/src/reactive-executor/enhanced-reactive-executor';
+
+// Create PBI enforcer with built-in capabilities
+const pbiEnforcer = createPBIEnforcer();
+
+// Wrap existing executor with PBI enforcement
+class PBIEnhancedExecutor {
+  private pbiEnforcer: PBIEnforcer;
+  private baseExecutor: EnhancedReactiveExecutor;
+
+  constructor(baseExecutor: EnhancedReactiveExecutor) {
+    this.baseExecutor = baseExecutor;
+    this.pbiEnforcer = createPBIEnforcer();
+  }
+
+  async executePlanStep(step: PlanStep, context: ExecutionContext, worldState: WorldState) {
+    try {
+      // PBI verification first
+      const verification = await this.pbiEnforcer.verifyStep(step, context);
+      if (verification.errors.length > 0) {
+        throw new PBIError(PBIErrorCode.SCHEMA_VIOLATION, verification.errors.join(', '));
+      }
+
+      // Execute with PBI enforcement
+      const result = await this.pbiEnforcer.executeStep(step, context, worldState);
+
+      if (result.success) {
+        // Continue with base executor logic
+        return await this.baseExecutor.execute(result.result);
+      } else {
+        // Handle PBI failure
+        return this.handlePBIError(result.error);
+      }
+    } catch (error) {
+      return this.handlePBIError(error);
+    }
+  }
+}
+```
+
+### Key Integration Points
+
+1. **EnhancedReactiveExecutor Integration**
+   - [EnhancedReactiveExecutor](../packages/planning/src/reactive-executor/enhanced-reactive-executor.ts) - Base execution logic
+   - [EnhancedGOAPPlanner](../packages/planning/src/reactive-executor/enhanced-goap-planner.ts) - GOAP planning integration
+
+2. **Integrated Planning Coordinator**
+   - [IntegratedPlanningCoordinator](../packages/planning/src/integrated-planning-coordinator.ts) - Main planning orchestration
+   - [CognitiveTaskRouter](../packages/planning/src/hierarchical-planner/cognitive-router.ts) - Task routing logic
+
+3. **Behavior Trees Integration**
+   - [BehaviorTreeRunner](../packages/planning/src/behavior-trees/BehaviorTreeRunner.ts) - BT execution engine
+   - [Skill Definitions](../packages/planning/src/behavior-trees/definitions/) - BT-based capabilities
+
+### Migration Strategy
+
+The executor-contracts package can be integrated incrementally:
+
+1. **Phase 1**: Add capability registry to existing BT runners
+2. **Phase 2**: Wrap existing executor with PBI enforcement
+3. **Phase 3**: Update planning output to use canonical verbs
+4. **Phase 4**: Implement full acceptance testing and verification
+
+This approach ensures that the existing functionality continues to work while adding the reliability guarantees of the PBI contracts.
  

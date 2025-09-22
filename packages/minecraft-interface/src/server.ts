@@ -454,6 +454,7 @@ app.post('/connect', async (req, res) => {
         fallbackTimeout: 3000,
         enablePlanMerging: true,
         enableCrossValidation: true,
+        enableTaskBootstrap: true,
       },
     });
 
@@ -636,6 +637,7 @@ async function attemptAutoConnect() {
         fallbackTimeout: 3000,
         enablePlanMerging: true,
         enableCrossValidation: true,
+        enableTaskBootstrap: true,
       },
     });
 
@@ -985,22 +987,9 @@ app.get('/safety', (req, res) => {
 // Get bot state
 app.get('/state', async (req, res) => {
   try {
-    console.log('🔍 [MINECRAFT INTERFACE] /state endpoint called');
-
     const botStatus = minecraftInterface?.botAdapter.getStatus();
     const executionStatus =
       minecraftInterface?.planExecutor.getExecutionStatus();
-
-    console.log('🔍 [MINECRAFT INTERFACE] Bot status:', {
-      connected: botStatus?.connected,
-      connectionState: botStatus?.connectionState,
-      isSpawned: botStatus?.isSpawned,
-      health: botStatus?.health,
-    });
-    console.log('🔍 [MINECRAFT INTERFACE] Execution status:', {
-      hasBot: !!executionStatus?.bot,
-      botConnected: executionStatus?.bot?.connected,
-    });
 
     // Check if bot is connected and spawned
     const isConnected =
@@ -1009,13 +998,18 @@ app.get('/state', async (req, res) => {
         executionStatus.bot.connected) ||
       (botStatus?.connected && botStatus?.connectionState === 'spawned');
 
-    console.log('🔍 [MINECRAFT INTERFACE] Is connected:', isConnected);
-
     // Check if bot is alive
     const isAlive = botStatus?.health && botStatus.health > 0;
 
     if (!isConnected) {
-      console.log('🔍 [MINECRAFT INTERFACE] Bot not connected, returning 503');
+      // Only log once per minute to avoid spam
+      const now = Date.now();
+      if (!global.lastStateLog || now - global.lastStateLog > 60000) {
+        console.log(
+          '🔍 [MINECRAFT INTERFACE] Bot not connected, returning 503'
+        );
+        global.lastStateLog = now;
+      }
       return res.status(503).json({
         success: false,
         message: 'Bot not connected',
@@ -1119,11 +1113,19 @@ app.get('/state', async (req, res) => {
       isAlive: gameState.worldState.health > 0,
     };
 
-    console.log('🔍 [MINECRAFT INTERFACE] Converted state:', {
-      position: convertedState.data.position,
-      health: convertedState.data.health,
-      inventoryItems: convertedState.data.inventory?.length || 0,
-    });
+    // Only log converted state when connection status changes
+    const now = Date.now();
+    if (
+      !global.lastConvertedStateLog ||
+      now - global.lastConvertedStateLog > 30000
+    ) {
+      console.log('🔍 [MINECRAFT INTERFACE] Bot state updated:', {
+        position: convertedState.data.position,
+        health: convertedState.data.health,
+        inventoryItems: convertedState.data.inventory?.length || 0,
+      });
+      global.lastConvertedStateLog = now;
+    }
 
     res.json({
       success: true,
@@ -1150,23 +1152,12 @@ app.get('/inventory', async (req, res) => {
     const executionStatus =
       minecraftInterface?.planExecutor.getExecutionStatus();
 
-    console.log('🔍 [MINECRAFT INTERFACE] Inventory - Bot status:', {
-      connected: botStatus?.connected,
-      connectionState: botStatus?.connectionState,
-      isSpawned: botStatus?.isSpawned,
-    });
-
     // Use execution status if available, otherwise fall back to bot adapter status
     const isConnected =
       (executionStatus &&
         executionStatus.bot &&
         executionStatus.bot.connected) ||
       (botStatus?.connected && botStatus?.connectionState === 'spawned');
-
-    console.log(
-      '🔍 [MINECRAFT INTERFACE] Inventory - Is connected:',
-      isConnected
-    );
 
     if (!isConnected) {
       console.log(
@@ -1261,8 +1252,27 @@ app.post('/action', async (req, res) => {
       throw new Error('Minecraft interface not initialized');
     }
 
-    const planExecutor = minecraftInterface.planExecutor;
-    const actionTranslator = (planExecutor as any).actionTranslator;
+    // Get the bot from the botAdapter
+    const bot = minecraftInterface.botAdapter.getBot();
+    if (!bot) {
+      throw new Error('Bot not available');
+    }
+
+    // Create ActionTranslator directly
+    const { ActionTranslator } = await import('./action-translator');
+    console.log('🔧 Creating ActionTranslator for request...');
+    console.log('🔍 Bot state for ActionTranslator:', {
+      hasBot: !!bot,
+      hasEntity: !!bot.entity,
+      hasPosition: !!bot.entity?.position,
+      hasPathfinder: !!(bot as any).pathfinder,
+    });
+
+    const actionTranslator = new ActionTranslator(bot, {
+      actionTimeout: 15000,
+      pathfindingTimeout: 30000,
+    });
+    console.log('✅ ActionTranslator created for request');
 
     // Execute the action directly instead of as a plan step
     const action = {
@@ -2245,4 +2255,4 @@ async function updateBotInstanceInPlanningServer() {
 }
 
 // Try to update bot instance periodically
-setInterval(updateBotInstanceInPlanningServer, 10000); // Every 10 seconds
+setInterval(updateBotInstanceInPlanningServer, 30000); // Every 30 seconds (reduced from 10)

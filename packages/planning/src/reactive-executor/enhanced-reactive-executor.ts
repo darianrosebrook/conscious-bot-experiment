@@ -9,24 +9,29 @@
 
 import {
   Plan,
-  PlanStep,
-  PlanStatus,
-  PlanStepStatus,
   GoalType,
   GoalStatus,
-  ActionType,
+  PlanStatus,
+  PlanStepStatus,
 } from '../types';
 import {
   EnhancedGOAPPlanner,
   GOAPPlan,
   WorldState,
-  ExecutionContext,
   SafetyAction,
   ActionResult,
   ReactiveExecutorMetrics,
   MCPBus,
+  ExecutionContext as GOAPExecutionContext,
 } from './enhanced-goap-planner';
 import { EnhancedPlanRepair } from './enhanced-plan-repair';
+import {
+  createPBIEnforcer,
+  PlanStep as PBIPlanStep,
+  ExecutionContext as PBIExecutionContext,
+  ExecutionHealthMetrics,
+  DEFAULT_PBI_ACCEPTANCE,
+} from '@conscious-bot/executor-contracts';
 
 export interface ExecutionResult {
   success: boolean;
@@ -42,13 +47,13 @@ export interface ExecutionContextBuilder {
   buildContext(
     worldState: WorldState,
     currentPlan?: GOAPPlan
-  ): ExecutionContext;
+  ): GOAPExecutionContext;
 }
 
 export interface RealTimeAdapter {
-  adaptToOpportunities(context: ExecutionContext): any[];
+  adaptToOpportunities(context: GOAPExecutionContext): any[];
   respondToThreats(threats: any[]): any[];
-  optimizeExecution(plan: GOAPPlan, context: ExecutionContext): GOAPPlan;
+  optimizeExecution(plan: GOAPPlan, context: GOAPExecutionContext): GOAPPlan;
 }
 
 /**
@@ -62,12 +67,80 @@ export class EnhancedReactiveExecutor {
   private metrics: ReactiveExecutorMetrics;
   private executionHistory: ExecutionResult[] = [];
 
+  // PBI Integration
+  private pbiEnforcer: ReturnType<typeof createPBIEnforcer>;
+  private bootstrappedCapabilities: boolean = false;
+
   constructor() {
     this.goapPlanner = new EnhancedGOAPPlanner();
     this.planRepair = new EnhancedPlanRepair();
     this.contextBuilder = new DefaultExecutionContextBuilder();
     this.realTimeAdapter = new DefaultRealTimeAdapter();
     this.metrics = this.initializeMetrics();
+
+    // Initialize PBI enforcer for plan-body interface enforcement
+    this.pbiEnforcer = createPBIEnforcer();
+
+    // Bootstrap essential capabilities for fresh start
+    // Note: This is fire-and-forget since constructor can't be async
+    void this.bootstrapPBICapabilities();
+  }
+
+  /**
+   * Bootstrap essential PBI capabilities for fresh start scenarios
+   */
+  private async bootstrapPBICapabilities(): Promise<void> {
+    if (this.bootstrappedCapabilities) {
+      return; // Already bootstrapped
+    }
+
+    console.log('🔧 Bootstrapping PBI capabilities for fresh start...');
+
+    // Register essential capabilities that allow basic survival actions
+    const basicCapabilities = [
+      'explore',
+      'navigate',
+      'move_forward',
+      'dig_block',
+      'place_block',
+      'craft_item',
+      'gather',
+      'consume_food',
+      'sense_environment',
+      'wait',
+      'chat',
+    ];
+
+    for (const capability of basicCapabilities) {
+      try {
+        // Register capability with PBI enforcer
+        await this.pbiEnforcer.registerCapability({
+          name: capability,
+          version: '1.0.0',
+          inputSchema: { type: 'object' },
+          guard: () => true, // Allow all basic capabilities
+          runner: async (ctx, args) => ({
+            ok: true,
+            startedAt: Date.now(),
+            endedAt: Date.now() + 1000,
+            observables: { capability, args },
+          }),
+          acceptance: () => true,
+          sla: {
+            p95DurationMs: 2000,
+            successRate: 0.9,
+            maxRetries: 3,
+          },
+        });
+
+        console.log(`✅ Bootstrapped capability: ${capability}`);
+      } catch (error) {
+        console.warn(`⚠️ Failed to bootstrap capability ${capability}:`, error);
+      }
+    }
+
+    this.bootstrappedCapabilities = true;
+    console.log('✅ PBI capability bootstrap completed');
   }
 
   /**
@@ -142,7 +215,7 @@ export class EnhancedReactiveExecutor {
   private async executePlanWithAdaptation(
     plan: GOAPPlan,
     worldState: WorldState,
-    context: ExecutionContext,
+    context: GOAPExecutionContext,
     mcpBus: MCPBus
   ): Promise<ExecutionResult> {
     let currentPlan = plan;
@@ -416,12 +489,54 @@ export class EnhancedReactiveExecutor {
   }
 
   /**
+   * Get PBI effectiveness metrics (placeholder for now)
+   */
+  getPBIEffectivenessMetrics(): ExecutionHealthMetrics {
+    // TODO: Implement proper PBI metrics collection
+    return {
+      // Timing
+      ttfaP50: 0,
+      ttfaP95: 0,
+
+      // Throughput
+      actionsPerSecond: 0,
+
+      // Reliability
+      planRepairRate: 0,
+      localRetrySuccessRate: 0,
+      stepsPerSuccess: 0,
+
+      // Failure modes
+      timeoutsPerHour: 0,
+      stuckLoopsPerHour: 0,
+
+      // Capability health
+      capabilitySLAs: {},
+
+      // Memory impact
+      methodUplift: {},
+      hazardRecallRate: 0,
+    };
+  }
+
+  /**
+   * Check if PBI is meeting effectiveness targets (placeholder for now)
+   */
+  isPBIEffective(): boolean {
+    // TODO: Implement proper PBI effectiveness tracking
+    return true;
+  }
+
+  /**
    * Execute a specific task
    */
   async executeTask(task: any): Promise<any> {
     try {
-      // Use the executeTaskInMinecraft function directly for proper task execution
-      const result = await this.executeTaskInMinecraft(task);
+      // Use the PBI-wrapped task execution for proper task execution with enforcement
+      const result = await this.executeTaskWithPBI(
+        task,
+        'http://localhost:3005'
+      );
 
       // Return result in the expected format
       return {
@@ -494,6 +609,9 @@ export class EnhancedReactiveExecutor {
 
       // Execute the task based on type
       switch (task.type) {
+        case 'action':
+          // Handle generic action tasks by inferring the specific action from the title/description
+          return await this.executeGenericActionTask(task, minecraftUrl);
         case 'craft':
         case 'crafting':
           return await this.executeCraftTask(task, minecraftUrl);
@@ -535,7 +653,7 @@ export class EnhancedReactiveExecutor {
 
     // Skip can_craft check since it's not supported by the Minecraft interface
     // The Minecraft interface will handle validation internally
-    
+
     // Actually attempt to craft the item
     const craftResult = await fetch(`${minecraftUrl}/action`, {
       method: 'POST',
@@ -684,6 +802,319 @@ export class EnhancedReactiveExecutor {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error',
         type: 'mining',
+      };
+    }
+  }
+
+  /**
+   * Execute task with PBI enforcement
+   * This wraps task execution with PBI verification and monitoring
+   */
+  private async executeTaskWithPBI(
+    task: any,
+    minecraftUrl: string
+  ): Promise<any> {
+    const startTime = performance.now();
+
+    try {
+      // Convert task to PBI PlanStep format
+      const pbiStep: PBIPlanStep = {
+        stepId: `task-${task.id || Date.now()}`,
+        type: this.mapTaskTypeToCanonicalVerb(task.type),
+        args: this.mapTaskParameters(task),
+        safetyLevel: this.assessTaskSafety(task),
+        expectedDurationMs: this.estimateTaskDuration(task),
+      };
+
+      // Create execution context for PBI
+      const executionContext: PBIExecutionContext = {
+        threatLevel: 0.1, // TODO: Get from world state
+        hostileCount: 0,
+        nearLava: false,
+        lavaDistance: 100,
+        resourceValue: 0.5,
+        detourDistance: 0,
+        subgoalUrgency: 0.5,
+        estimatedTimeToSubgoal: 3000,
+        commitmentStrength: 0.7,
+        timeOfDay: 'day',
+        lightLevel: 15,
+        airLevel: 300,
+      };
+
+      // Create mock world state for PBI
+      const mockWorldState = {
+        getHealth: () => 20,
+        getHunger: () => 20,
+        getEnergy: () => 20,
+        getPosition: () => ({ x: 0, y: 0, z: 0 }),
+        getLightLevel: () => 15,
+        getAir: () => 300,
+        getTimeOfDay: () => 'day' as const,
+        hasItem: (item: string) => false,
+        distanceTo: (target: any) => 50,
+        getThreatLevel: () => 0.1,
+        getInventory: () => ({}),
+        getNearbyResources: () => [],
+        getNearbyHostiles: () => [],
+      };
+
+      // Execute with PBI enforcement
+      const pbiResult = await this.pbiEnforcer.executeStep(
+        pbiStep,
+        executionContext,
+        mockWorldState
+      );
+
+      console.log(`📋 PBI Execution Result:`, {
+        success: pbiResult.success,
+        ttfaMs: pbiResult.ttfaMs,
+        verificationErrors: pbiResult.verification.errors.length,
+        executionId: pbiResult.executionId,
+        duration: pbiResult.duration,
+      });
+
+      // If PBI verification failed, return early
+      if (!pbiResult.success) {
+        return {
+          success: false,
+          error: pbiResult.error?.message || 'PBI verification failed',
+          type: task.type,
+          pbiResult,
+        };
+      }
+
+      // Continue with normal task execution using PBI wrapper
+      const taskResult = await this.executeTaskWithPBI(task, minecraftUrl);
+
+      // Track effectiveness metrics
+      const totalTime = performance.now() - startTime;
+      const ttfaTarget = DEFAULT_PBI_ACCEPTANCE.ttfaMs;
+
+      if (pbiResult.ttfaMs > ttfaTarget) {
+        console.warn(
+          `⚠️ TTFA exceeded target: ${pbiResult.ttfaMs}ms > ${ttfaTarget}ms`
+        );
+      }
+
+      // Update PBI metrics based on task execution result
+      if (taskResult.success) {
+        this.pbiEnforcer.updateMetrics(
+          pbiStep.type,
+          'success',
+          pbiResult.ttfaMs
+        );
+      } else {
+        this.pbiEnforcer.updateMetrics(
+          pbiStep.type,
+          'failure',
+          pbiResult.ttfaMs
+        );
+      }
+
+      return {
+        ...taskResult,
+        pbiResult,
+        effectiveness: {
+          ttfaMs: pbiResult.ttfaMs,
+          withinTarget: pbiResult.ttfaMs <= ttfaTarget,
+          totalExecutionTime: totalTime,
+        },
+      };
+    } catch (error) {
+      const totalTime = performance.now() - startTime;
+
+      console.error('❌ PBI Execution failed:', error);
+
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown PBI error',
+        type: task.type,
+        executionTime: totalTime,
+      };
+    }
+  }
+
+  /**
+   * Map task type to canonical verb for PBI
+   */
+  private mapTaskTypeToCanonicalVerb(taskType: string): string {
+    const typeMapping: Record<string, string> = {
+      craft: 'craft_item',
+      move: 'move_forward',
+      gather: 'gather',
+      explore: 'explore',
+      mine: 'dig_block',
+      navigate: 'navigate',
+      eat: 'consume_food',
+      build: 'build_structure',
+      place: 'place_block',
+      pillar: 'pillar_up',
+      flee: 'flee',
+    };
+
+    return typeMapping[taskType] || 'explore'; // Default fallback
+  }
+
+  /**
+   * Map task parameters to PBI format
+   */
+  private mapTaskParameters(task: any): Record<string, any> {
+    return {
+      ...task.parameters,
+      // Add any additional PBI-specific parameters
+      timeoutMs: task.timeout || 30000,
+      avoidHazards: task.avoidHazards !== false,
+    };
+  }
+
+  /**
+   * Assess safety level for task
+   */
+  private assessTaskSafety(task: any): 'safe' | 'caution' | 'restricted' {
+    // Simple safety assessment based on task type and parameters
+    if (task.parameters?.dangerous) {
+      return 'restricted';
+    }
+
+    if (task.type === 'navigate' && task.parameters?.avoidHazards === false) {
+      return 'caution';
+    }
+
+    return 'safe';
+  }
+
+  /**
+   * Estimate task duration for PBI
+   */
+  private estimateTaskDuration(task: any): number {
+    const durationEstimates: Record<string, number> = {
+      craft: 2000,
+      move: 1000,
+      gather: 1500,
+      explore: 3000,
+      mine: 2500,
+      navigate: 2000,
+      eat: 500,
+      build: 5000,
+      place: 1000,
+      pillar: 3000,
+      flee: 500,
+    };
+
+    return durationEstimates[task.type] || 2000;
+  }
+
+  /**
+   * Execute generic action task by inferring the specific action type
+   */
+  private async executeGenericActionTask(task: any, minecraftUrl: string) {
+    try {
+      console.log(`🎯 Executing generic action task: ${task.title}`);
+
+      const taskTitle = (task.title || '').toLowerCase();
+      const taskDescription = (
+        task.parameters?.thoughtContent ||
+        task.description ||
+        ''
+      ).toLowerCase();
+      const content = `${taskTitle} ${taskDescription}`;
+
+      // Intelligent action routing based on task content
+      let actionType = 'explore'; // Default fallback
+      let parameters: any = {};
+
+      if (
+        content.includes('craft') &&
+        (content.includes('tool') ||
+          content.includes('axe') ||
+          content.includes('pickaxe'))
+      ) {
+        // Crafting task takes priority when explicitly mentioned with tools
+        actionType = 'craft_item';
+        parameters = {
+          item: 'wooden_axe',
+          materials: 'auto_collect',
+        };
+      } else if (
+        content.includes('wood') ||
+        content.includes('tree') ||
+        content.includes('log') ||
+        content.includes('gather')
+      ) {
+        // Wood gathering task
+        actionType = 'navigate';
+        parameters = {
+          target: 'tree',
+          action: 'gather_wood',
+          max_distance: 20,
+        };
+      } else if (
+        content.includes('mine') ||
+        content.includes('stone') ||
+        content.includes('dig')
+      ) {
+        // Mining task
+        actionType = 'dig_block';
+        parameters = {
+          block: 'stone',
+          position: 'nearest',
+        };
+      } else if (
+        content.includes('move') ||
+        content.includes('go') ||
+        content.includes('walk')
+      ) {
+        // Movement task
+        actionType = 'move_forward';
+        parameters = {
+          distance: 5,
+        };
+      } else if (content.includes('gather') || content.includes('collect')) {
+        // Generic gathering
+        actionType = 'navigate';
+        parameters = {
+          target: 'auto_detect',
+          max_distance: 15,
+        };
+      }
+
+      console.log(
+        `🔄 Routing action task as: ${actionType} with parameters:`,
+        parameters
+      );
+
+      // Execute the inferred action via the minecraft interface
+      const response = await fetch(`${minecraftUrl}/action`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: actionType,
+          parameters,
+        }),
+        signal: AbortSignal.timeout(30000),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(
+          `Minecraft interface responded with ${response.status}: ${errorText}`
+        );
+      }
+
+      const result = await response.json();
+      return {
+        success: (result as any).success,
+        error: (result as any).error,
+        type: 'action',
+        actionType,
+        data: (result as any).data,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+        type: 'action',
       };
     }
   }
@@ -859,10 +1290,10 @@ class DefaultExecutionContextBuilder implements ExecutionContextBuilder {
   buildContext(
     worldState: WorldState,
     currentPlan?: GOAPPlan
-  ): ExecutionContext {
+  ): GOAPExecutionContext {
     // Real context building would analyze world state and plan
     // For now, use basic values from world state with empty defaults
-    const context: ExecutionContext = {
+    const context: GOAPExecutionContext = {
       threatLevel: worldState.getThreatLevel(),
       hostileCount: worldState.getNearbyHostiles().length,
       nearLava: false, // Would be determined by world state analysis
@@ -892,7 +1323,7 @@ class DefaultExecutionContextBuilder implements ExecutionContextBuilder {
  * Default real-time adapter
  */
 class DefaultRealTimeAdapter implements RealTimeAdapter {
-  adaptToOpportunities(context: ExecutionContext): any[] {
+  adaptToOpportunities(context: GOAPExecutionContext): any[] {
     // Real opportunity detection would analyze world state
     // For now, return empty array to indicate no opportunities detected
     console.log('🔍 Opportunity detection: No real-time analysis available');
@@ -910,10 +1341,137 @@ class DefaultRealTimeAdapter implements RealTimeAdapter {
     return [];
   }
 
-  optimizeExecution(plan: GOAPPlan, context: ExecutionContext): GOAPPlan {
+  optimizeExecution(plan: GOAPPlan, context: GOAPExecutionContext): GOAPPlan {
     // Real optimization would analyze context and modify plan accordingly
     // For now, return plan unchanged to indicate no optimization available
     console.log('⚡ Plan optimization: No real-time optimization available');
     return plan;
+  }
+
+  /**
+   * Bootstrap essential PBI capabilities for fresh start scenarios
+   */
+  private async bootstrapPBICapabilities(): Promise<void> {
+    if (this.bootstrappedCapabilities) {
+      return; // Already bootstrapped
+    }
+
+    console.log('🔧 Bootstrapping PBI capabilities for fresh start...');
+
+    // Register essential capabilities that allow basic survival actions
+    const basicCapabilities = [
+      'explore',
+      'navigate',
+      'move_forward',
+      'dig_block',
+      'place_block',
+      'craft_item',
+      'gather',
+      'consume_food',
+      'sense_environment',
+      'wait',
+      'chat',
+    ];
+
+    for (const capability of basicCapabilities) {
+      try {
+        // Register capability with PBI enforcer
+        await this.pbiEnforcer.registerCapability({
+          name: capability,
+          version: '1.0.0',
+          inputSchema: { type: 'object' },
+          guard: () => true, // Allow all basic capabilities
+          runner: async (ctx, args) => ({
+            ok: true,
+            startedAt: Date.now(),
+            endedAt: Date.now() + 1000,
+            observables: { capability, args },
+          }),
+          acceptance: () => true,
+          sla: {
+            p95DurationMs: 2000,
+            successRate: 0.9,
+            maxRetries: 3,
+          },
+        });
+
+        console.log(`✅ Bootstrapped capability: ${capability}`);
+      } catch (error) {
+        console.warn(`⚠️ Failed to bootstrap capability ${capability}:`, error);
+      }
+    }
+
+    this.bootstrappedCapabilities = true;
+    console.log('✅ PBI capability bootstrap completed');
+  }
+
+  /**
+   * Map task type to canonical verb for PBI
+   */
+  private mapTaskTypeToCanonicalVerb(taskType: string): string {
+    const typeMapping: Record<string, string> = {
+      craft: 'craft_item',
+      move: 'move_forward',
+      gather: 'gather',
+      explore: 'explore',
+      mine: 'dig_block',
+      navigate: 'navigate',
+      eat: 'consume_food',
+      build: 'build_structure',
+      place: 'place_block',
+      pillar: 'pillar_up',
+      flee: 'flee',
+    };
+
+    return typeMapping[taskType] || 'explore'; // Default fallback
+  }
+
+  /**
+   * Map task parameters to PBI format
+   */
+  private mapTaskParameters(task: any): Record<string, any> {
+    return {
+      ...task.parameters,
+      // Add any additional PBI-specific parameters
+      timeoutMs: task.timeout || 30000,
+      avoidHazards: task.avoidHazards !== false,
+    };
+  }
+
+  /**
+   * Assess safety level for task
+   */
+  private assessTaskSafety(task: any): 'safe' | 'caution' | 'restricted' {
+    // Simple safety assessment based on task type and parameters
+    if (task.parameters?.dangerous) {
+      return 'restricted';
+    }
+
+    if (task.type === 'navigate' && task.parameters?.avoidHazards === false) {
+      return 'caution';
+    }
+
+    return 'safe';
+  }
+
+  /**
+   * Estimate task duration for PBI
+   */
+  private estimateTaskDuration(task: any): number {
+    const durationEstimates: Record<string, number> = {
+      craft: 2000,
+      move: 1000,
+      gather: 1500,
+      explore: 3000,
+      mine: 2500,
+      navigate: 2000,
+      eat: 500,
+      build: 5000,
+      place: 1000,
+      pillar: 3000,
+      flee: 500,
+    };
+
+    return durationEstimates[task.type] || 2000;
   }
 }

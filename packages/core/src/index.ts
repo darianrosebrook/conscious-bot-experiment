@@ -38,6 +38,7 @@ export { CapabilityRateLimiter } from './mcp-capabilities/rate-limiter';
 export { createLeafContext } from './mcp-capabilities/leaf-contracts';
 export { LeafFactory } from './mcp-capabilities/leaf-factory';
 export { DynamicCreationFlow } from './mcp-capabilities';
+export { EnhancedRegistry } from './mcp-capabilities/enhanced-registry';
 export type {
   ShadowRunResult,
   ImpasseResult,

@@ -11,6 +11,7 @@ import { Bot, createBot } from 'mineflayer';
 import { EventEmitter } from 'events';
 import { BotConfig, BotEvent, BotEventType } from './types';
 import { AutomaticSafetyMonitor } from './automatic-safety-monitor';
+import { ActionTranslator } from './action-translator';
 import mcData from 'minecraft-data';
 
 export class BotAdapter extends EventEmitter {
@@ -185,11 +186,11 @@ export class BotAdapter extends EventEmitter {
 
     try {
       // Create action translator for safety monitor
-      const actionTranslator =
-        new (require('./action-translator').ActionTranslator)(this.bot, {
-          actionTimeout: 10000,
-          maxRetries: 3,
-        });
+      const actionTranslator = new ActionTranslator(this.bot, {
+        actionTimeout: 10000,
+        pathfindingTimeout: 15000,
+        maxRetries: 3,
+      });
 
       this.safetyMonitor = new AutomaticSafetyMonitor(
         this.bot,

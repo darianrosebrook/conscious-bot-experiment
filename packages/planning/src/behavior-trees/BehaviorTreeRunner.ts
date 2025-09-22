@@ -1014,21 +1014,54 @@ class BTRun extends EventEmitter {
         urgencyLevel: analysis.urgencyLevel,
       });
 
-      // For now, we'll mark this as successful since we processed the signals
-      // In a more sophisticated implementation, this would:
-      // 1. Update the bot's internal state based on the reflection
-      // 2. Generate appropriate goals or tasks
-      // 3. Adjust behavior tree priorities
+      // Execute actions based on the analyzed signals
+      const actions = this.generateActionsFromSignals(analysis, thoughtContent);
+
+      // Execute the actions through the tool executor
+      let actionResults = [];
+      if (actions.length > 0) {
+        console.log(
+          `🧠 [BEHAVIOR TREE] Executing ${actions.length} actions based on cognitive reflection`
+        );
+
+        for (const action of actions) {
+          try {
+            console.log(
+              `🧠 [BEHAVIOR TREE] Executing action: ${action.type} - ${action.description}`
+            );
+            const result = await this.toolExecutor.execute(
+              action.type,
+              action.parameters || {}
+            );
+            actionResults.push({ action, success: result.ok, result });
+          } catch (error) {
+            console.error(
+              `❌ [BEHAVIOR TREE] Action execution failed: ${action.type}`,
+              error
+            );
+            actionResults.push({
+              action,
+              success: false,
+              error: error instanceof Error ? error.message : 'Unknown error',
+            });
+          }
+        }
+      }
+
       const result = {
-        status: BTNodeStatus.SUCCESS,
+        status: actionResults.every((r) => r.success)
+          ? BTNodeStatus.SUCCESS
+          : BTNodeStatus.FAILURE,
         data: {
           thoughtContent,
           signalsProcessed: signals.length,
           analysis,
+          actionsExecuted: actions.length,
+          actionResults,
           timestamp: Date.now(),
         },
-        confidence: 0.8, // High confidence in signal processing
-        cost: 0.1, // Low cost for cognitive processing
+        confidence: actionResults.length > 0 ? 0.8 : 0.6, // Higher confidence if actions were executed
+        cost: 0.1 + actions.length * 0.05, // Cost increases with number of actions
         duration: Date.now() - startTime,
       };
 
@@ -1095,6 +1128,78 @@ class BTRun extends EventEmitter {
     });
 
     return { resourceNeeds, toolNeeds, safetyConcerns, urgencyLevel };
+  }
+
+  /**
+   * Generate bot actions based on analyzed cognitive signals
+   */
+  private generateActionsFromSignals(
+    analysis: any,
+    thoughtContent: string
+  ): any[] {
+    const actions: any[] = [];
+
+    // Generate actions based on resource needs
+    analysis.resourceNeeds.forEach((need: any) => {
+      if (need.concept === 'wood') {
+        actions.push({
+          type: 'move_and_gather',
+          description: `Gather wood to satisfy resource need`,
+          parameters: {
+            resource: 'wood',
+            quantity: Math.min(need.value * 10, 20), // Convert signal value to quantity
+            searchRadius: 50,
+          },
+        });
+      } else if (need.concept === 'iron') {
+        actions.push({
+          type: 'move_and_mine',
+          description: `Mine iron to satisfy resource need`,
+          parameters: {
+            resource: 'iron',
+            quantity: Math.min(need.value * 5, 10), // Iron is harder to get
+            searchRadius: 30,
+          },
+        });
+      }
+    });
+
+    // Generate actions based on exploration drive
+    if (analysis.urgencyLevel >= 0.4) {
+      actions.push({
+        type: 'explore_area',
+        description: `Explore area to satisfy curiosity and gather resources`,
+        parameters: {
+          radius: 25,
+          duration: 30000, // 30 seconds
+        },
+      });
+    }
+
+    // Generate safety actions if there are safety concerns
+    if (analysis.safetyConcerns.length > 0) {
+      actions.push({
+        type: 'assess_safety',
+        description: `Assess and improve safety based on concerns`,
+        parameters: {
+          checkRadius: 20,
+        },
+      });
+    }
+
+    // If no specific actions were generated, add a general movement action
+    if (actions.length === 0) {
+      actions.push({
+        type: 'move_random',
+        description: `Move to a random location for general exploration`,
+        parameters: {
+          distance: 20,
+          duration: 15000, // 15 seconds
+        },
+      });
+    }
+
+    return actions;
   }
 
   private async loadBehaviorTree(optionId: string): Promise<BTNode> {

@@ -106,10 +106,10 @@ const DEFAULT_CONFIG: LiveStreamIntegrationConfig = {
   dashboardEndpoint: 'http://localhost:3000',
   minecraftEndpoint: 'http://localhost:3005',
   screenshotEndpoint: 'http://localhost:3005/screenshots',
-  updateInterval: 2000,
+  updateInterval: 10000, // Reduced from 2 seconds to 10 seconds
   maxActionLogs: 1000,
   maxVisualFeedbacks: 100,
-  screenshotInterval: 10000,
+  screenshotInterval: 30000, // Reduced from 10 seconds to 30 seconds
 };
 
 export class EnhancedLiveStreamIntegration extends EventEmitter {

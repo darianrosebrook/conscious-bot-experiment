@@ -919,7 +919,10 @@ export class Arbiter extends EventEmitter<SystemEvents> {
   }
 
   private buildCognitiveTaskFromPrioritizedTask(
-    prioritizedTask: PriorityTask & { calculatedPriority?: number; rankingReason?: string },
+    prioritizedTask: PriorityTask & {
+      calculatedPriority?: number;
+      rankingReason?: string;
+    },
     source: string
   ): CognitiveTask {
     const calculatedPriority =
@@ -949,7 +952,8 @@ export class Arbiter extends EventEmitter<SystemEvents> {
       context: {
         needType: prioritizedTask.name,
         needScore: calculatedPriority,
-        rankingReason: (prioritizedTask as any).rankingReason ?? 'enhanced_need',
+        rankingReason:
+          (prioritizedTask as any).rankingReason ?? 'enhanced_need',
         source,
       },
     };

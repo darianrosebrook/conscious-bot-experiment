@@ -208,6 +208,13 @@ export class ServerConfiguration {
   }
 
   /**
+   * Add a custom endpoint to the server
+   */
+  addEndpoint(method: 'get' | 'post' | 'put' | 'delete', path: string, handler: RequestHandler): void {
+    this.app[method](path, handler);
+  }
+
+  /**
    * Get the MCP integration instance
    */
   getMCPIntegration(): MCPIntegration | null {
