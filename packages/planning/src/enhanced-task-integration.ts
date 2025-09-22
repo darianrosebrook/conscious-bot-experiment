@@ -9,6 +9,43 @@
  */
 
 import { EventEmitter } from 'events';
+// Dynamic import to avoid TypeScript path resolution issues
+import type {
+  EventDrivenThoughtGenerator,
+  BotLifecycleEvent,
+} from '@conscious-bot/cognition';
+
+// Dynamic import at runtime - will be initialized when needed
+let eventDrivenThoughtGenerator: any = null;
+
+/**
+ * Initialize the event-driven thought generator
+ */
+async function initializeEventDrivenThoughtGenerator(): Promise<void> {
+  if (!eventDrivenThoughtGenerator) {
+    try {
+      // Dynamic import to avoid TypeScript issues
+      const { eventDrivenThoughtGenerator: generator } = await import(
+        '@conscious-bot/cognition'
+      );
+      eventDrivenThoughtGenerator = generator;
+      console.log('✅ Event-driven thought generator initialized');
+    } catch (error) {
+      console.warn(
+        '⚠️ Failed to initialize event-driven thought generator:',
+        error
+      );
+    }
+  }
+}
+
+/**
+ * Get the event-driven thought generator (initialize if needed)
+ */
+async function getEventDrivenThoughtGenerator(): Promise<any> {
+  await initializeEventDrivenThoughtGenerator();
+  return eventDrivenThoughtGenerator;
+}
 
 export interface TaskStep {
   id: string;
@@ -193,10 +230,122 @@ export class EnhancedTaskIntegration extends EventEmitter {
   async updateTaskStatus(taskId: string, status: string): Promise<void> {
     const task = this.tasks.get(taskId);
     if (task) {
+      const previousStatus = task.status;
       task.status = status as any;
       console.log(`Updated task ${taskId} status to ${status}`);
+
+      // Emit lifecycle events for thought generation
+      await this.emitLifecycleEvent(task, status, previousStatus);
     }
   }
+
+  /**
+   * Emit lifecycle events for thought generation
+   */
+  private async emitLifecycleEvent(
+    task: Task,
+    newStatus: string,
+    previousStatus: string
+  ): Promise<void> {
+    try {
+      const eventType = this.mapStatusToEventType(newStatus, previousStatus);
+      if (!eventType) {
+        return; // No event to emit
+      }
+
+      const event: BotLifecycleEvent = {
+        type: eventType,
+        timestamp: Date.now(),
+        data: {
+          taskId: task.id,
+          taskTitle: task.title,
+          activeTasksCount: await this.getActiveTasksCount(),
+        },
+        context: {
+          urgency: this.getUrgencyForTask(task),
+          situation: this.getSituationForTask(task),
+          trigger: 'task-status-change',
+        },
+      };
+
+      if (event.type) {
+        console.log(
+          `🧠 Emitting lifecycle event: ${event.type} for task: ${task.title}`
+        );
+        const generator = await getEventDrivenThoughtGenerator();
+        const thought = generator
+          ? await generator.generateThoughtForEvent(event)
+          : null;
+        if (thought) {
+          // Forward the thought to the cognition service
+          await fetch('http://localhost:3003/thought-generated', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ thought, event }),
+          }).catch((error) => {
+            console.warn(
+              '⚠️ Failed to forward thought to cognition service:',
+              error
+            );
+          });
+        }
+      }
+    } catch (error) {
+      console.warn('⚠️ Failed to emit lifecycle event:', error);
+    }
+  }
+
+  /**
+   * Map task status changes to lifecycle event types
+   */
+  private mapStatusToEventType(
+    newStatus: string,
+    previousStatus: string
+  ): BotLifecycleEvent['type'] | null {
+    if (newStatus === 'completed' && previousStatus !== 'completed') {
+      return 'task_completed';
+    }
+    if (newStatus === 'failed' && previousStatus !== 'failed') {
+      return 'task_failed';
+    }
+    if (newStatus === 'active' && previousStatus === 'pending') {
+      return 'task_started';
+    }
+    if (newStatus === 'active' && previousStatus === 'active') {
+      return 'task_switch';
+    }
+    return null;
+  }
+
+  /**
+   * Get urgency level for a task
+   */
+  private getUrgencyForTask(task: Task): 'low' | 'medium' | 'high' {
+    if (task.priority > 0.8) return 'high';
+    if (task.priority > 0.5) return 'medium';
+    return 'low';
+  }
+
+  /**
+   * Get situation context for a task
+   */
+  private getSituationForTask(task: Task): string {
+    if (task.type === 'crafting') return 'tool-crafting';
+    if (task.type === 'gathering') return 'resource-gathering';
+    if (task.type === 'exploration') return 'exploration';
+    return 'task-management';
+  }
+
+  /**
+   * Get count of active tasks
+   */
+  private async getActiveTasksCount(): Promise<number> {
+    const activeTasks = Array.from(this.tasks.values()).filter(
+      (task) => task.status === 'pending' || task.status === 'active'
+    );
+    return activeTasks.length;
+  }
+
   // Ephemeral per-step snapshot to compare before/after state
   private _stepStartSnapshots: Map<
     string,
@@ -356,6 +505,9 @@ export class EnhancedTaskIntegration extends EventEmitter {
   constructor(config: Partial<EnhancedTaskIntegrationConfig> = {}) {
     super();
     this.config = { ...DEFAULT_CONFIG, ...config };
+
+    // Initialize event-driven thought generator
+    initializeEventDrivenThoughtGenerator();
 
     if (this.config.enableProgressTracking) {
       this.startProgressTracking();

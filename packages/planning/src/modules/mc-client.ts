@@ -174,7 +174,7 @@ export async function executeTask(task: any): Promise<TaskExecutionResult> {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        name: task.title || 'Autonomous Task',
+        scenario: task.title || 'Autonomous Task',
         signals: [
           {
             type: 'task_execution',

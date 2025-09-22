@@ -9,6 +9,10 @@
 import * as express from 'express';
 import * as cors from 'cors';
 import { ReActArbiter } from './react-arbiter/ReActArbiter';
+import {
+  eventDrivenThoughtGenerator,
+  ContextualThought,
+} from './event-driven-thought-generator';
 
 const app = express.default();
 const port = process.env.PORT ? parseInt(process.env.PORT) : 3003;
@@ -1678,6 +1682,100 @@ function getNetworkRequestCount(): number {
   // For now, return a simulated value
   return networkRequestCount || 0;
 }
+
+// Endpoint to receive thoughts from planning system and forward to dashboard
+app.post('/thought-generated', async (req: Request, res: Response) => {
+  try {
+    const { thought, event } = req.body;
+
+    console.log(
+      '🧠 Received thought from planning system:',
+      thought.type,
+      '-',
+      thought.content.substring(0, 60)
+    );
+
+    // Forward the thought to the dashboard
+    try {
+      const dashboardResponse = await fetch(
+        'http://localhost:3000/api/ws/cognitive-stream',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            type: thought.type,
+            content: thought.content,
+            attribution: thought.attribution,
+            context: thought.context,
+            metadata: thought.metadata,
+            id: thought.id,
+            timestamp: thought.timestamp,
+            processed: thought.processed,
+          }),
+        }
+      );
+
+      if (dashboardResponse.ok) {
+        console.log('✅ Thought forwarded to dashboard successfully');
+        res.json({ success: true, message: 'Thought forwarded to dashboard' });
+      } else {
+        console.warn(
+          '⚠️ Failed to forward thought to dashboard:',
+          dashboardResponse.status
+        );
+        res
+          .status(500)
+          .json({ error: 'Failed to forward thought to dashboard' });
+      }
+    } catch (error) {
+      console.error('❌ Error forwarding thought to dashboard:', error);
+      res.status(500).json({ error: 'Failed to forward thought to dashboard' });
+    }
+  } catch (error) {
+    console.error('❌ Error processing thought generation:', error);
+    res.status(500).json({ error: 'Failed to process thought generation' });
+  }
+});
+
+// Listen for thought generation events and forward them to dashboard
+eventDrivenThoughtGenerator.on(
+  'thoughtGenerated',
+  async (data: {
+    thought: ContextualThought;
+    event: any;
+    forced?: boolean;
+  }) => {
+    try {
+      console.log(
+        '🧠 Thought generated event received:',
+        data.thought.type,
+        '-',
+        data.thought.content.substring(0, 60)
+      );
+
+      // Forward to dashboard
+      await fetch('http://localhost:3000/api/ws/cognitive-stream', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: data.thought.type,
+          content: data.thought.content,
+          attribution: data.thought.attribution,
+          context: data.thought.context,
+          metadata: data.thought.metadata,
+          id: data.thought.id,
+          timestamp: data.thought.timestamp,
+          processed: data.thought.processed,
+        }),
+      });
+    } catch (error) {
+      console.warn(
+        '⚠️ Failed to forward generated thought to dashboard:',
+        error
+      );
+    }
+  }
+);
 
 // Start the server
 app.listen(port, () => {

@@ -71,6 +71,7 @@ const DEFAULT_CONFIG: CognitiveThoughtProcessorConfig = {
 // -----------------------------------------------------------------------------
 interface PlanningClient {
   addTask(task: any): Promise<{ ok: boolean; id?: string; error?: string }>;
+  getActiveTasks(): Promise<any[]>;
 }
 
 interface MemoryClient {
@@ -92,6 +93,29 @@ interface MemoryClient {
 
 class HttpPlanningClient implements PlanningClient {
   constructor(private base: string) {}
+  async getActiveTasks(): Promise<any[]> {
+    try {
+      const response = await fetch(`${this.base}/tasks`, {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json' },
+        signal: AbortSignal.timeout(5000),
+      });
+
+      if (!response.ok) {
+        return [];
+      }
+
+      const payload = await response
+        .json()
+        .catch(() => ({ tasks: { current: [] } }));
+
+      const current = (payload as any)?.tasks?.current;
+      return Array.isArray(current) ? current : [];
+    } catch (error) {
+      console.warn('HttpPlanningClient.getActiveTasks failed', error);
+      return [];
+    }
+  }
   async addTask(
     task: any
   ): Promise<{ ok: boolean; id?: string; error?: string }> {
@@ -249,7 +273,8 @@ export class CognitiveThoughtProcessor extends EventEmitter {
   private lastEtag?: string;
   private lastSeenTs: number = 0;
   private recentTaskKeys: Map<string, number> = new Map(); // key -> ts
-  private recentTaskTTLms: number = 30_000; // de-dupe window
+  private recentTaskTTLms: number = 60_000; // de-dupe window (increased to 1 minute)
+  private maxActiveTasks: number = 3; // Maximum active tasks to prevent overload
 
   constructor(config: Partial<CognitiveThoughtProcessorConfig> = {}) {
     super();
@@ -269,6 +294,47 @@ export class CognitiveThoughtProcessor extends EventEmitter {
   updateWorldState(worldState: any): void {
     this.worldState = worldState;
     this.lastWorldStateUpdate = Date.now();
+  }
+
+  /**
+   * Check if we should create new tasks based on current queue size and context
+   */
+  private async shouldCreateNewTasks(): Promise<boolean> {
+    try {
+      const activeTasks = await this.planning.getActiveTasks();
+      const activeCount = activeTasks.filter(
+        (task: any) => task.status === 'pending' || task.status === 'active'
+      ).length;
+
+      if (activeCount >= this.maxActiveTasks) {
+        console.log(
+          `⏸️ [COGNITIVE THOUGHT PROCESSOR] Task queue full (${activeCount}/${this.maxActiveTasks}), skipping new task creation`
+        );
+        return false;
+      }
+
+      // Check for similar active tasks to prevent cognitive overload
+      const similarTasks = activeTasks.filter(
+        (task: any) =>
+          (task.type === 'gathering' || task.type === 'crafting') &&
+          task.status === 'active'
+      );
+
+      if (similarTasks.length > 1) {
+        console.log(
+          `⏸️ [COGNITIVE THOUGHT PROCESSOR] Too many similar active tasks (${similarTasks.length}), throttling new task creation`
+        );
+        return false;
+      }
+
+      return true;
+    } catch (error) {
+      console.warn(
+        '⚠️ Failed to check active task count, allowing task creation:',
+        error
+      );
+      return true; // Allow creation if we can't check
+    }
   }
 
   /**
@@ -469,6 +535,21 @@ export class CognitiveThoughtProcessor extends EventEmitter {
           console.log(
             `✅ [COGNITIVE THOUGHT PROCESSOR] Successfully translated to task: ${task.type} - ${task.title}`
           );
+
+          // Check if we should create new tasks based on queue size
+          const shouldCreate = await this.shouldCreateNewTasks();
+          if (!shouldCreate) {
+            console.log(
+              `⏸️ [COGNITIVE THOUGHT PROCESSOR] Skipping task creation due to full queue: ${task.title}`
+            );
+            this.emit('skippedThought', {
+              reason: 'queueFull',
+              thoughtId: thought.id,
+              taskTitle: task.title,
+            });
+            this.processedThoughts.add(thought.id);
+            continue;
+          }
 
           // de-dupe near-identical tasks in a short TTL window
           const key = this.taskKey(task);

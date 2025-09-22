@@ -7,12 +7,44 @@
  * @author @darianrosebrook
  */
 
+// Global type declarations
+declare global {
+  var lastIdleEvent: number | undefined;
+  var lastNoTasksLog: number | undefined;
+}
+
 import { ServerConfiguration } from './modules/server-config';
 import {
   createPlanningEndpoints,
   PlanningSystem,
 } from './modules/planning-endpoints';
 import { MCPIntegration } from './modules/mcp-integration';
+// Dynamic import to avoid TypeScript path resolution issues
+// import { eventDrivenThoughtGenerator, BotLifecycleEvent } from '@conscious-bot/cognition';
+
+// Dynamic import at runtime - will be initialized when needed
+let eventDrivenThoughtGenerator: any = null;
+
+/**
+ * Get the event-driven thought generator (initialize if needed)
+ */
+async function getEventDrivenThoughtGenerator(): Promise<any> {
+  if (!eventDrivenThoughtGenerator) {
+    try {
+      const { eventDrivenThoughtGenerator: generator } = await import(
+        '@conscious-bot/cognition'
+      );
+      eventDrivenThoughtGenerator = generator;
+      console.log('✅ Event-driven thought generator initialized');
+    } catch (error) {
+      console.warn(
+        '⚠️ Failed to initialize event-driven thought generator:',
+        error
+      );
+    }
+  }
+  return eventDrivenThoughtGenerator;
+}
 import {
   MC_ENDPOINT,
   mcFetch,
@@ -1331,6 +1363,8 @@ async function convertCognitiveReflectionToTasks(
       }
 
       // Mark the original cognitive reflection as completed since we've extracted its actionable content
+      // Note: The cognitive reflection is considered complete once actionable tasks are created
+      // The actual execution success will be tracked by the individual actionable tasks
       await enhancedTaskIntegration.updateTaskStatus(
         cognitiveTask.id,
         'completed'
@@ -1474,6 +1508,15 @@ async function autonomousTaskExecutor() {
         console.log('🤖 [AUTONOMOUS EXECUTOR] No active tasks to execute');
         logOptimizer.log('No active tasks to execute', 'no-active-tasks');
         global.lastNoTasksLog = now;
+      }
+
+      // Emit idle period event for thought generation (simplified)
+      if (!global.lastIdleEvent || now - global.lastIdleEvent > 300000) {
+        console.log(
+          '🧠 [AUTONOMOUS EXECUTOR] Bot is idle - could trigger reflection here'
+        );
+        // TODO: Add idle event generation later
+        global.lastIdleEvent = now;
       }
       return;
     }
@@ -2625,6 +2668,20 @@ serverConfig.addEndpoint('get', '/world-state', (req, res) => {
 // Main server startup function
 async function startServer() {
   try {
+    // Initialize event-driven thought generator
+    try {
+      const { eventDrivenThoughtGenerator: generator } = await import(
+        '@conscious-bot/cognition'
+      );
+      eventDrivenThoughtGenerator = generator;
+      console.log('✅ Event-driven thought generator initialized in server');
+    } catch (error) {
+      console.warn(
+        '⚠️ Failed to initialize event-driven thought generator:',
+        error
+      );
+    }
+
     // Create an EnhancedRegistry for MCP integration
     const registry = new EnhancedRegistry();
 

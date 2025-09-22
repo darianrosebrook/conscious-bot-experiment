@@ -128,7 +128,7 @@ function addThought(
 ): CognitiveThought {
   const newThought = {
     ...thought,
-    id: `thought-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+    id: `thought-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
     timestamp: Date.now(),
     processed: false,
   };
@@ -517,8 +517,12 @@ export const GET = async (req: NextRequest) => {
 
       const sendUpdates = async () => {
         try {
-          const thoughts = (Math.random() < 0.3 ? await generateThoughts() : []) // Increased from 5% to 30% for more activity
-            .concat(await processExternalChat(), await processBotResponses());
+          // Process external chat and bot responses only
+          // Thought generation is now handled by bot lifecycle events
+          const thoughts = [(await generateThoughts()) || []].concat(
+            await processExternalChat(),
+            await processBotResponses()
+          );
 
           if (thoughts.length > 0) {
             // Only log in development mode
@@ -540,13 +544,15 @@ export const GET = async (req: NextRequest) => {
             controller.enqueue(
               encoder.encode(`data: ${JSON.stringify(updateData)}\n\n`)
             );
+          } else {
+            console.log('No new thoughts to send');
           }
         } catch (error) {
           console.error('Error in sendUpdates:', error);
         }
       };
 
-      const interval = setInterval(sendUpdates, 10000); // Increased frequency from 30s to 10s for more real-time feel
+      const interval = setInterval(sendUpdates, 60000); // Process chat/responses every minute only
 
       // Send heartbeat every 10 seconds to keep connection alive
       const heartbeat = setInterval(() => {
