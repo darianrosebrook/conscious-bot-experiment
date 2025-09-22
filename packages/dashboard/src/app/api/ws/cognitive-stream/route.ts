@@ -749,3 +749,303 @@ export const POST = async (req: NextRequest) => {
     return new Response('Internal server error', { status: 500 });
   }
 };
+
+// =============================================================================
+// Cleanup and Maintenance Functions
+// =============================================================================
+
+/**
+ * Clean up old backup files to prevent disk space issues
+ */
+async function cleanupOldBackups(): Promise<void> {
+  try {
+    const dataDir = path.join(process.cwd(), 'data');
+    const backupFiles = await fs.readdir(dataDir).catch(() => []);
+
+    const backupPattern = /^cognitive-thoughts-backup-\d{8}_\d{6}\.json$/;
+    const oldBackups = backupFiles.filter((file) => backupPattern.test(file));
+
+    // Keep only the 3 most recent backups
+    const MAX_BACKUPS = 3;
+
+    if (oldBackups.length > MAX_BACKUPS) {
+      const sortedBackups = oldBackups
+        .map((file) => ({
+          file,
+          timestamp: file.match(/(\d{8})_(\d{6})/)?.[0] || '0',
+        }))
+        .sort((a, b) => b.timestamp.localeCompare(a.timestamp))
+        .slice(MAX_BACKUPS);
+
+      for (const backup of sortedBackups) {
+        const backupPath = path.join(dataDir, backup.file);
+        try {
+          await fs.unlink(backupPath);
+          console.log(`🧹 Cleaned up old backup: ${backup.file}`);
+        } catch (error) {
+          console.warn(`⚠️ Failed to clean up backup ${backup.file}:`, error);
+        }
+      }
+    }
+  } catch (error) {
+    console.error('❌ Error during backup cleanup:', error);
+  }
+}
+
+/**
+ * Clean up the main thoughts file if it gets too large
+ */
+async function cleanupMainThoughtsFile(): Promise<void> {
+  try {
+    const mainFilePath = path.join(
+      process.cwd(),
+      'data',
+      'cognitive-thoughts.json'
+    );
+    const stats = await fs.stat(mainFilePath).catch(() => null);
+
+    if (!stats) return;
+
+    // If file is over 1MB, create a backup and clean it up
+    const MAX_FILE_SIZE = 1024 * 1024; // 1MB
+
+    if (stats.size > MAX_FILE_SIZE) {
+      console.log(
+        `📁 Main thoughts file is ${Math.round(stats.size / 1024)}KB, creating cleanup...`
+      );
+
+      // Create a backup with timestamp
+      const timestamp = new Date()
+        .toISOString()
+        .replace(/[:.]/g, '-')
+        .slice(0, 19);
+      const backupPath = path.join(
+        process.cwd(),
+        'data',
+        `cognitive-thoughts-backup-${timestamp}.json`
+      );
+
+      await fs.copyFile(mainFilePath, backupPath);
+      console.log(`💾 Created backup: ${backupPath}`);
+
+      // Clean up the main file - keep only the last 100 thoughts
+      const thoughts = await loadThoughts();
+      const cleanedThoughts = thoughts.slice(-100);
+
+      await saveThoughts(cleanedThoughts);
+      console.log(
+        `🧹 Cleaned main file, kept ${cleanedThoughts.length} recent thoughts`
+      );
+
+      // Clean up old backups
+      await cleanupOldBackups();
+    }
+  } catch (error) {
+    console.error('❌ Error during main file cleanup:', error);
+  }
+}
+
+/**
+ * Clean up old turbo/build logs to prevent disk space issues
+ */
+async function cleanupTurboLogs(): Promise<void> {
+  try {
+    const turboDirs = [
+      'packages/core/.turbo',
+      'packages/memory/.turbo',
+      'packages/cognition/.turbo',
+      'packages/planning/.turbo',
+      'packages/world/.turbo',
+      'packages/safety/.turbo',
+      'packages/dashboard/.turbo',
+      'packages/evaluation/.turbo',
+      'packages/executor-contracts/.turbo',
+      'packages/minecraft-interface/.turbo',
+      'packages/mcp-server/.turbo',
+    ];
+
+    for (const dir of turboDirs) {
+      const fullPath = path.join(process.cwd(), dir);
+      try {
+        const files = await fs.readdir(fullPath).catch(() => []);
+        const logFiles = files.filter((file) => file.endsWith('.log'));
+
+        for (const logFile of logFiles) {
+          const logPath = path.join(fullPath, logFile);
+          const stats = await fs.stat(logPath).catch(() => null);
+
+          if (stats && stats.size > 100 * 1024) {
+            // Over 100KB
+            try {
+              await fs.unlink(logPath);
+              console.log(
+                `🧹 Cleaned up large log: ${logPath} (${Math.round(stats.size / 1024)}KB)`
+              );
+            } catch (error) {
+              console.warn(`⚠️ Failed to clean up log ${logPath}:`, error);
+            }
+          }
+        }
+      } catch (error) {
+        // Directory doesn't exist, skip
+      }
+    }
+  } catch (error) {
+    console.error('❌ Error during turbo log cleanup:', error);
+  }
+}
+
+/**
+ * Initialize cleanup system
+ */
+setInterval(async () => {
+  try {
+    await cleanupMainThoughtsFile();
+    await cleanupTurboLogs();
+  } catch (error) {
+    console.error('❌ Error in cleanup interval:', error);
+  }
+}, 300000); // Run cleanup every 5 minutes
+
+// Run cleanup on startup
+cleanupMainThoughtsFile().catch(console.error);
+cleanupTurboLogs().catch(console.error);
+
+// =============================================================================
+// Logging Control System
+// =============================================================================
+
+/**
+ * Centralized logging configuration
+ */
+const LOGGING_CONFIG = {
+  // Log levels: 'debug', 'info', 'warn', 'error', 'none'
+  currentLevel:
+    (process.env.LOG_LEVEL as 'debug' | 'info' | 'warn' | 'error' | 'none') ||
+    'info',
+
+  // Component-specific overrides
+  components: {
+    planning: 'warn', // Reduce planning noise
+    minecraft: 'warn', // Reduce minecraft noise
+    cognition: 'info', // Keep cognition logs for consciousness
+    dashboard: 'info', // Keep dashboard logs for UI
+  },
+};
+
+/**
+ * Check if a log should be displayed based on level and component
+ */
+function shouldLog(level: string, component?: string): boolean {
+  if (LOGGING_CONFIG.currentLevel === 'none') return false;
+  if (LOGGING_CONFIG.currentLevel === 'debug') return true;
+
+  const componentLevel = component
+    ? LOGGING_CONFIG.components[
+        component as keyof typeof LOGGING_CONFIG.components
+      ]
+    : LOGGING_CONFIG.currentLevel;
+
+  const levelHierarchy = { debug: 0, info: 1, warn: 2, error: 3 };
+  const currentLevelValue =
+    levelHierarchy[LOGGING_CONFIG.currentLevel as keyof typeof levelHierarchy];
+  const componentLevelValue =
+    levelHierarchy[componentLevel as keyof typeof levelHierarchy] ||
+    levelHierarchy[LOGGING_CONFIG.currentLevel];
+
+  return (
+    levelHierarchy[level as keyof typeof levelHierarchy] >=
+    Math.min(currentLevelValue, componentLevelValue)
+  );
+}
+
+/**
+ * Centralized logging functions
+ */
+const Logger = {
+  debug: (message: string, component?: string, ...args: any[]) => {
+    if (shouldLog('debug', component)) {
+      console.log(
+        `🐛 [DEBUG][${component?.toUpperCase() || 'APP'}] ${message}`,
+        ...args
+      );
+    }
+  },
+
+  info: (message: string, component?: string, ...args: any[]) => {
+    if (shouldLog('info', component)) {
+      console.log(
+        `ℹ️  [INFO][${component?.toUpperCase() || 'APP'}] ${message}`,
+        ...args
+      );
+    }
+  },
+
+  warn: (message: string, component?: string, ...args: any[]) => {
+    if (shouldLog('warn', component)) {
+      console.warn(
+        `⚠️  [WARN][${component?.toUpperCase() || 'APP'}] ${message}`,
+        ...args
+      );
+    }
+  },
+
+  error: (message: string, component?: string, ...args: any[]) => {
+    if (shouldLog('error', component)) {
+      console.error(
+        `❌ [ERROR][${component?.toUpperCase() || 'APP'}] ${message}`,
+        ...args
+      );
+    }
+  },
+
+  // Specialized loggers for different components
+  planning: (
+    level: 'debug' | 'info' | 'warn' | 'error',
+    message: string,
+    ...args: any[]
+  ) => {
+    if (shouldLog(level, 'planning')) {
+      const icons = { debug: '🐛', info: '📋', warn: '⚠️', error: '❌' };
+      console.log(`${icons[level]} [PLANNING] ${message}`, ...args);
+    }
+  },
+
+  minecraft: (
+    level: 'debug' | 'info' | 'warn' | 'error',
+    message: string,
+    ...args: any[]
+  ) => {
+    if (shouldLog(level, 'minecraft')) {
+      const icons = { debug: '🎮', info: '🌍', warn: '⚠️', error: '❌' };
+      console.log(`${icons[level]} [MINECRAFT] ${message}`, ...args);
+    }
+  },
+
+  cognition: (
+    level: 'debug' | 'info' | 'warn' | 'error',
+    message: string,
+    ...args: any[]
+  ) => {
+    if (shouldLog(level, 'cognition')) {
+      const icons = { debug: '🧠', info: '💭', warn: '⚠️', error: '❌' };
+      console.log(`${icons[level]} [COGNITION] ${message}`, ...args);
+    }
+  },
+
+  dashboard: (
+    level: 'debug' | 'info' | 'warn' | 'error',
+    message: string,
+    ...args: any[]
+  ) => {
+    if (shouldLog(level, 'dashboard')) {
+      const icons = { debug: '🖥️', info: '📊', warn: '⚠️', error: '❌' };
+      console.log(`${icons[level]} [DASHBOARD] ${message}`, ...args);
+    }
+  },
+};
+
+// Make Logger available globally
+if (typeof globalThis !== 'undefined') {
+  (globalThis as any).Logger = Logger;
+}

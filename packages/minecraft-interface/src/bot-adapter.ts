@@ -1186,9 +1186,11 @@ export class BotAdapter extends EventEmitter {
    */
   getPerformanceMetrics() {
     const uptime = Date.now() - this.performanceMetrics.startTime;
-    const avgResponseTime = this.performanceMetrics.responseTimes.length > 0
-      ? this.performanceMetrics.responseTimes.reduce((a, b) => a + b, 0) / this.performanceMetrics.responseTimes.length
-      : 0;
+    const avgResponseTime =
+      this.performanceMetrics.responseTimes.length > 0
+        ? this.performanceMetrics.responseTimes.reduce((a, b) => a + b, 0) /
+          this.performanceMetrics.responseTimes.length
+        : 0;
 
     return {
       uptime: Math.round(uptime / 1000), // seconds
@@ -1197,14 +1199,22 @@ export class BotAdapter extends EventEmitter {
       environmentalEvents: this.performanceMetrics.environmentalEvents,
       tasksCreated: this.performanceMetrics.tasksCreated,
       averageResponseTime: Math.round(avgResponseTime),
-      scansPerMinute: Math.round((this.performanceMetrics.entityScans / uptime) * 60000),
-      responsesPerMinute: Math.round((this.performanceMetrics.chatResponses / uptime) * 60000),
-      eventsPerMinute: Math.round((this.performanceMetrics.environmentalEvents / uptime) * 60000),
-      tasksPerMinute: Math.round((this.performanceMetrics.tasksCreated / uptime) * 60000),
+      scansPerMinute: Math.round(
+        (this.performanceMetrics.entityScans / uptime) * 60000
+      ),
+      responsesPerMinute: Math.round(
+        (this.performanceMetrics.chatResponses / uptime) * 60000
+      ),
+      eventsPerMinute: Math.round(
+        (this.performanceMetrics.environmentalEvents / uptime) * 60000
+      ),
+      tasksPerMinute: Math.round(
+        (this.performanceMetrics.tasksCreated / uptime) * 60000
+      ),
       throttling: {
         chatCooldown: this.chatCooldown / 1000,
         environmentalCooldown: this.environmentalCooldown / 1000,
-      }
+      },
     };
   }
 
