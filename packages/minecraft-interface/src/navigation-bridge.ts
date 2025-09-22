@@ -21,7 +21,6 @@ import {
   environmentalDetector,
   EnvironmentalState,
 } from './environmental-detector.js';
-import { WaterNavigationManager } from './water-navigation-manager.js';
 
 // Import D* Lite components from world package
 // Temporarily comment out to use local types
@@ -215,6 +214,9 @@ export class NavigationBridge extends EventEmitter {
   private predictionResults: Map<string, PredictionResult> = new Map();
   private socialLearningEnabled: boolean = true;
 
+  // Water navigation
+  private waterNavigationManager: WaterNavigationManager;
+
   constructor(bot: Bot, config: Partial<NavigationBridgeConfig> = {}) {
     super();
 
@@ -277,6 +279,12 @@ export class NavigationBridge extends EventEmitter {
     Object.assign(navConfig, additionalConfig);
 
     this.navigationSystem = new MockNavigationSystem(navConfig);
+
+    // Initialize water navigation manager
+    this.waterNavigationManager = new WaterNavigationManager(
+      this.bot,
+      navConfig
+    );
 
     // Initialize neural terrain prediction
     this.initializeNeuralPrediction();
