@@ -13,13 +13,57 @@ import { Vec3 } from 'vec3';
 import { EventEmitter } from 'events';
 
 // Import D* Lite components
-import {
-  DStarLiteCore,
-  NavigationSystem,
-  NavigationConfig,
-  PathPlanningRequest,
-  PathPlanningResult,
-} from '@conscious-bot/world';
+// Temporarily define types locally until world package import is resolved
+interface PathPlanningRequest {
+  start: { x: number; y: number; z: number };
+  goal: { x: number; y: number; z: number };
+  options?: any;
+  maxDistance?: number;
+  allowPartialPath?: boolean;
+  avoidHazards?: boolean;
+  urgency?: number;
+  preferences?: any;
+  timeout?: number;
+}
+
+interface PathPlanningResult {
+  success: boolean;
+  path?: Array<{ x: number; y: number; z: number }>;
+  cost?: number;
+  error?: string;
+  reason?: string;
+}
+
+interface NavigationConfig {
+  maxDistance?: number;
+  timeout?: number;
+  [key: string]: any;
+}
+
+class NavigationSystem extends EventEmitter {
+  constructor(config?: NavigationConfig) {
+    super();
+    // Mock implementation
+  }
+
+  async planPath(request: PathPlanningRequest): Promise<PathPlanningResult> {
+    // Mock implementation - return failure for now
+    return {
+      success: false,
+      error: 'NavigationSystem not implemented - using mock',
+      reason: 'mock_implementation',
+    };
+  }
+}
+
+// TODO: Re-enable world package import once resolved
+// import {
+//   DStarLiteCore,
+//   NavigationSystem,
+//   NavigationConfig,
+//   PathPlanningRequest,
+//   PathPlanningResult,
+// } from '@conscious-bot/world';
 
 // Define WorldPosition type locally since it's not exported from world package
 interface WorldPosition {
@@ -391,7 +435,7 @@ export class NavigationBridge extends EventEmitter {
       maxDistance: 200,
       allowPartialPath: true,
       avoidHazards: true,
-      urgency: 'normal',
+      urgency: 0.5,
       preferences: {
         preferLit: true,
         avoidMobs: true,

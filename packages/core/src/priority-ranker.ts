@@ -9,6 +9,7 @@
 
 import { EventEmitter } from 'events';
 import { v4 as uuidv4 } from 'uuid';
+import { TaskType, ResourceType, ResourceRequirement } from './types';
 
 // ============================================================================
 // Core Types
@@ -72,15 +73,6 @@ export interface TaskMetadata {
   socialValue: number; // 0-1, value to social relationships
 }
 
-export interface ResourceRequirement {
-  type: ResourceType;
-  name: string;
-  quantity: number;
-  criticality: number; // 0-1, how critical this resource is
-  alternatives: string[];
-  availability: number; // 0-1, current availability
-}
-
 export interface PriorityFactor {
   name: string;
   weight: number; // 0-1, importance of this factor
@@ -137,37 +129,6 @@ export interface PriorityDistribution {
   medium: number; // count of medium priority tasks
   low: number; // count of low priority tasks
   distribution: number[]; // histogram of priority scores
-}
-
-export enum TaskType {
-  SURVIVAL = 'survival',
-  SOCIAL = 'social',
-  EXPLORATION = 'exploration',
-  BUILDING = 'building',
-  CRAFTING = 'crafting',
-  COMBAT = 'combat',
-  LEARNING = 'learning',
-  ACHIEVEMENT = 'achievement',
-  MAINTENANCE = 'maintenance',
-  EMERGENCY = 'emergency',
-  CREATIVE = 'creative',
-  ADMINISTRATIVE = 'administrative',
-}
-
-export enum ResourceType {
-  MATERIAL = 'material',
-  TOOL = 'tool',
-  WEAPON = 'weapon',
-  ARMOR = 'armor',
-  FOOD = 'food',
-  BLOCK = 'block',
-  CRAFTING_TABLE = 'crafting_table',
-  FURNACE = 'furnace',
-  SKILL = 'skill',
-  KNOWLEDGE = 'knowledge',
-  TIME = 'time',
-  ENERGY = 'energy',
-  SOCIAL = 'social',
 }
 
 export enum RiskLevel {

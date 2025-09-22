@@ -352,20 +352,34 @@ export interface Need {
 // ===== TASK SYSTEM TYPES =====
 
 export enum TaskType {
-  MAINTENANCE = 'maintenance',
-  GOAL_PURSUIT = 'goal_pursuit',
+  SURVIVAL = 'survival',
   SOCIAL = 'social',
   EXPLORATION = 'exploration',
-  EMERGENCY = 'emergency',
+  BUILDING = 'building',
+  CRAFTING = 'crafting',
+  COMBAT = 'combat',
   LEARNING = 'learning',
+  ACHIEVEMENT = 'achievement',
+  MAINTENANCE = 'maintenance',
+  EMERGENCY = 'emergency',
+  CREATIVE = 'creative',
+  ADMINISTRATIVE = 'administrative',
 }
 
 export enum ResourceType {
+  MATERIAL = 'material',
+  TOOL = 'tool',
+  WEAPON = 'weapon',
+  ARMOR = 'armor',
+  FOOD = 'food',
+  BLOCK = 'block',
+  CRAFTING_TABLE = 'crafting_table',
+  FURNACE = 'furnace',
+  SKILL = 'skill',
+  KNOWLEDGE = 'knowledge',
   TIME = 'time',
   ENERGY = 'energy',
-  TOOLS = 'tools',
-  MATERIALS = 'materials',
-  ATTENTION = 'attention',
+  SOCIAL = 'social',
 }
 
 export interface ResourceRequirement {
@@ -374,6 +388,7 @@ export interface ResourceRequirement {
   quantity: number;
   criticality: number; // 0-1, how critical this resource is
   alternatives: string[];
+  availability: number; // 0-1, current availability
 }
 
 export interface TaskContext {

@@ -4,6 +4,8 @@
  * @author @darianrosebrook
  */
 
+import { vi } from 'vitest';
+
 import { Arbiter } from '../arbiter';
 import { Signal, CognitiveTask } from '../types';
 import {
@@ -23,7 +25,7 @@ describe('Arbiter Integration Tests', () => {
 
   afterEach(() => {
     arbiter.stop();
-    jest.restoreAllMocks();
+    vi.restoreAllMocks();
   });
 
   test('should initialize with default configuration', () => {
@@ -112,7 +114,7 @@ describe('Arbiter Integration Tests', () => {
     const arbiterAny = arbiter as any;
     const now = Date.now();
 
-    jest
+    vi
       .spyOn(arbiterAny.advancedNeedGenerator, 'generateEnhancedNeeds')
       .mockResolvedValue([
         {
@@ -144,7 +146,7 @@ describe('Arbiter Integration Tests', () => {
         },
       ]);
 
-    jest.spyOn(arbiterAny.priorityRanker, 'rankTasks').mockResolvedValue({
+    vi.spyOn(arbiterAny.priorityRanker, 'rankTasks').mockResolvedValue({
       id: 'ranking-1',
       timestamp: now,
       tasks: [
@@ -200,7 +202,7 @@ describe('Arbiter Integration Tests', () => {
       },
     });
 
-    const processSpy = jest
+    const processSpy = vi
       .spyOn(arbiter, 'processCognitiveTask')
       .mockResolvedValue('ok');
 
@@ -231,7 +233,7 @@ describe('Arbiter Integration Tests', () => {
   test('ignores low-priority enhanced needs', async () => {
     const arbiterAny = arbiter as any;
 
-    jest
+    vi
       .spyOn(arbiterAny.advancedNeedGenerator, 'generateEnhancedNeeds')
       .mockResolvedValue([
         {
@@ -263,8 +265,8 @@ describe('Arbiter Integration Tests', () => {
         },
       ]);
 
-    const rankSpy = jest.spyOn(arbiterAny.priorityRanker, 'rankTasks');
-    const processSpy = jest
+    const rankSpy = vi.spyOn(arbiterAny.priorityRanker, 'rankTasks');
+    const processSpy = vi
       .spyOn(arbiter, 'processCognitiveTask')
       .mockResolvedValue('ok');
 
