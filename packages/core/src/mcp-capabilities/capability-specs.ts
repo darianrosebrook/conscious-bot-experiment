@@ -137,6 +137,95 @@ class MoveForwardValidator extends BaseMinecraftValidator {
   }
 }
 
+class ExploreExecutor extends BaseMinecraftExecutor {
+  async execute(
+    request: ExecutionRequest,
+    context: ExecutionContext
+  ): Promise<ExecutionResult> {
+    const startTime = Date.now();
+
+    try {
+      // Simulate exploration movement
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+
+      const distance = Math.random() * 50; // Random distance up to 50 blocks
+
+      return {
+        id: `exec_${Date.now()}`,
+        requestId: request.id,
+        capabilityId: request.capabilityId,
+        success: true,
+        startTime,
+        endTime: Date.now(),
+        duration: Date.now() - startTime,
+        effects: [
+          {
+            type: 'entity',
+            change: 'position_updated',
+            location: 'agent',
+            metadata: { action: 'exploration', random_move: true, distance },
+          },
+          {
+            type: 'world',
+            change: 'area_scanned',
+            location: 'surrounding',
+            metadata: { radius: 50, type: 'exploration' },
+          },
+        ],
+        actualCost: 15,
+        retryCount: 0,
+      };
+    } catch (error) {
+      return {
+        id: `exec_${Date.now()}`,
+        requestId: request.id,
+        capabilityId: request.capabilityId,
+        success: false,
+        startTime,
+        endTime: Date.now(),
+        duration: Date.now() - startTime,
+        effects: [],
+        error: error instanceof Error ? error.message : 'Unknown error',
+        retryCount: 0,
+      };
+    }
+  }
+
+  estimateCost(request: ExecutionRequest, context: ExecutionContext): number {
+    return 15; // Exploration cost
+  }
+}
+
+class ExploreValidator extends BaseMinecraftValidator {
+  async validatePreconditions(
+    request: ExecutionRequest,
+    context: ExecutionContext
+  ): Promise<boolean> {
+    // Check if agent has enough health and is in a safe environment
+    return context.agentHealth > 0.2 && context.dangerLevel < 0.5;
+  }
+
+  predictEffects(
+    request: ExecutionRequest,
+    context: ExecutionContext
+  ): Effect[] {
+    return [
+      {
+        type: 'entity',
+        change: 'position_updated',
+        location: 'agent',
+        metadata: { action: 'exploration', random_move: true },
+      },
+      {
+        type: 'world',
+        change: 'area_scanned',
+        location: 'surrounding',
+        metadata: { radius: 50, type: 'exploration' },
+      },
+    ];
+  }
+}
+
 // ===== BLOCK MANIPULATION CAPABILITIES =====
 
 class PlaceBlockExecutor extends BaseMinecraftExecutor {
@@ -506,6 +595,58 @@ export const MOVEMENT_CAPABILITIES: CapabilitySpec[] = [
     requiresApproval: false,
     enabled: true,
   },
+
+  {
+    id: 'explore',
+    name: 'Explore Area',
+    description:
+      'Explore the surrounding area by moving to a random location within range',
+    category: 'movement',
+
+    preconditions: [
+      {
+        type: 'spatial',
+        condition: 'has_space',
+        args: { radius: 50 },
+        description: 'Must have space to explore within 50 blocks',
+      },
+      {
+        type: 'environmental',
+        condition: 'safe_environment',
+        args: {},
+        description: 'Environment must be safe for exploration',
+      },
+    ],
+
+    effects: [
+      {
+        type: 'entity',
+        change: 'position_updated',
+        location: 'agent',
+        metadata: { action: 'exploration', random_move: true },
+      },
+      {
+        type: 'world',
+        change: 'area_scanned',
+        location: 'surrounding',
+        metadata: { radius: 50, type: 'exploration' },
+      },
+    ],
+
+    costHint: 15,
+    durationMs: 5000,
+    energyCost: 5,
+
+    safetyTags: ['reversible', 'no_grief'],
+    constitutionalRules: ['avoid_dangerous_areas', 'respect_boundaries'],
+    riskLevel: RiskLevel.LOW,
+
+    cooldownMs: 10000, // 10 second cooldown
+    maxConcurrent: 1,
+
+    requiresApproval: false,
+    enabled: true,
+  },
 ];
 
 export const BLOCK_CAPABILITIES: CapabilitySpec[] = [
@@ -737,10 +878,12 @@ export const CAPABILITY_EXECUTORS: Record<string, CapabilityExecutor> = {
   move_forward: new MoveForwardExecutor(),
   place_block: new PlaceBlockExecutor(),
   mine_block: new MineBlockExecutor(),
+  explore: new ExploreExecutor(),
 };
 
 export const CAPABILITY_VALIDATORS: Record<string, CapabilityValidator> = {
   move_forward: new MoveForwardValidator(),
   place_block: new PlaceBlockValidator(),
   mine_block: new MineBlockValidator(),
+  explore: new ExploreValidator(),
 };

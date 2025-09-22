@@ -383,14 +383,32 @@ export class BotAdapter extends EventEmitter {
       }
     });
 
-    // Chat monitoring
-    this.bot.on('chat', (username, message) => {
+    // Chat monitoring with cognition integration
+    this.bot.on('chat', async (username, message) => {
+      const isOwnMessage = username === this.config.username;
+
+      // Emit the chat event for other systems
       this.emitBotEvent('chat_message', {
         username,
         message,
-        isOwnMessage: username === this.config.username,
+        isOwnMessage,
       });
+
+      // Process incoming chat messages through cognition system (but not our own messages)
+      if (!isOwnMessage && username !== 'unknown') {
+        try {
+          await this.processIncomingChat(username, message);
+        } catch (error) {
+          console.error('❌ Failed to process incoming chat:', error);
+        }
+      }
     });
+
+    // Entity detection and response
+    this.setupEntityDetection();
+
+    // Environmental event detection
+    this.setupEnvironmentalEventDetection();
 
     // Error handling
     this.bot.on('error', (error) => {
@@ -617,6 +635,475 @@ export class BotAdapter extends EventEmitter {
       this.safetyMonitor.start();
 
       console.log('🛡️ Automatic safety monitoring enabled');
+    }
+  }
+
+  /**
+   * Process incoming chat messages through cognition system
+   */
+  private async processIncomingChat(
+    sender: string,
+    message: string
+  ): Promise<void> {
+    try {
+      console.log(`💬 Processing chat from ${sender}: "${message}"`);
+
+      // Send to cognition system for processing
+      const cognitionUrl =
+        process.env.COGNITION_SERVICE_URL || 'http://localhost:3003';
+      const response = await fetch(`${cognitionUrl}/process`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'social_interaction',
+          content: `Chat from ${sender}: "${message}"`,
+          metadata: {
+            sender: sender,
+            message: message,
+            timestamp: Date.now(),
+            environment: 'minecraft',
+            botPosition: {
+              x: this.bot.entity.position.x,
+              y: this.bot.entity.position.y,
+              z: this.bot.entity.position.z,
+            },
+          },
+        }),
+      });
+
+      if (response.ok) {
+        const result = (await response.json()) as {
+          shouldRespond?: boolean;
+          response?: string;
+          shouldCreateTask?: boolean;
+          taskSuggestion?: string;
+        };
+        console.log(`🧠 Cognition system processed chat:`, result);
+
+        // If cognition system suggests a response, send it
+        if (result.shouldRespond && result.response) {
+          await this.bot.chat(result.response);
+          console.log(`✅ Bot responded: "${result.response}"`);
+        }
+      } else {
+        console.log(
+          `⚠️ Cognition system chat processing failed: ${response.status}`
+        );
+      }
+    } catch (error) {
+      console.error(
+        '❌ Failed to process chat through cognition system:',
+        error
+      );
+    }
+  }
+
+  /**
+   * Set up entity detection and reactive responses
+   */
+  private setupEntityDetection(): void {
+    if (!this.bot) return;
+
+    let lastEntityScan = 0;
+    const scanInterval = 5000; // Scan every 5 seconds
+
+    // Monitor entities and detect new/interesting ones
+    setInterval(async () => {
+      try {
+        await this.detectAndRespondToEntities();
+      } catch (error) {
+        console.error('❌ Entity detection error:', error);
+      }
+    }, scanInterval);
+
+    console.log('👁️ Entity detection system activated');
+  }
+
+  /**
+   * Detect nearby entities and trigger appropriate responses
+   */
+  private async detectAndRespondToEntities(): Promise<void> {
+    if (!this.bot || !this.bot.entity) return;
+
+    try {
+      // Get nearby entities
+      const nearbyEntities = Object.values(this.bot.entities).filter(
+        (entity) => {
+          const distance = entity.position.distanceTo(this.bot.entity.position);
+          return (
+            distance <= 15 &&
+            entity.name !== 'item' &&
+            entity !== this.bot.entity
+          );
+        }
+      );
+
+      if (nearbyEntities.length === 0) return;
+
+      console.log(`👀 Detected ${nearbyEntities.length} nearby entities`);
+
+      // Process each entity for potential reactions
+      for (const entity of nearbyEntities) {
+        await this.processEntity(entity);
+      }
+    } catch (error) {
+      console.error('❌ Error in entity detection:', error);
+    }
+  }
+
+  /**
+   * Process a single entity and decide if we should react
+   */
+  private async processEntity(entity: any): Promise<void> {
+    try {
+      const botPos = this.bot.entity.position;
+      const distance = entity.position.distanceTo(botPos);
+
+      // Create linguistic thought about the entity
+      const entityDescription = this.describeEntity(entity);
+      const thought = `I notice a ${entityDescription} ${distance.toFixed(1)} blocks away`;
+
+      console.log(`🧠 Entity thought: "${thought}"`);
+
+      // Send entity detection to cognition system
+      const cognitionUrl =
+        process.env.COGNITION_SERVICE_URL || 'http://localhost:3003';
+      const response = await fetch(`${cognitionUrl}/process`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'environmental_awareness',
+          content: thought,
+          metadata: {
+            entityType: entity.name,
+            entityId: entity.id,
+            distance: distance,
+            position: {
+              x: entity.position.x,
+              y: entity.position.y,
+              z: entity.position.z,
+            },
+            botPosition: {
+              x: botPos.x,
+              y: botPos.y,
+              z: botPos.z,
+            },
+            timestamp: Date.now(),
+          },
+        }),
+      });
+
+      if (response.ok) {
+        const result = (await response.json()) as {
+          shouldRespond?: boolean;
+          response?: string;
+          shouldCreateTask?: boolean;
+          taskSuggestion?: string;
+        };
+        console.log(`✅ Entity processed by cognition system:`, result);
+
+        // If cognition suggests a response, execute it
+        if (result.shouldRespond && result.response) {
+          await this.bot.chat(result.response);
+          console.log(`💬 Bot responded to entity: "${result.response}"`);
+        }
+
+        // If it's a task-worthy event, add to planner
+        if (result.shouldCreateTask && result.taskSuggestion) {
+          await this.createTaskFromEntity(entity, result.taskSuggestion);
+        }
+      }
+    } catch (error) {
+      console.error('❌ Error processing entity:', error);
+    }
+  }
+
+  /**
+   * Create a descriptive string for an entity
+   */
+  private describeEntity(entity: any): string {
+    const name = entity.name || 'unknown entity';
+
+    // Categorize entity types
+    if (name.includes('player') || name === 'player') {
+      return 'player';
+    } else if (
+      name.includes('zombie') ||
+      name.includes('skeleton') ||
+      name.includes('creeper')
+    ) {
+      return `hostile mob (${name})`;
+    } else if (
+      name.includes('cow') ||
+      name.includes('sheep') ||
+      name.includes('pig')
+    ) {
+      return `animal (${name})`;
+    } else if (name.includes('villager')) {
+      return 'villager';
+    } else {
+      return name;
+    }
+  }
+
+  /**
+   * Create a task from an interesting entity event
+   */
+  private async createTaskFromEntity(
+    entity: any,
+    taskSuggestion: string
+  ): Promise<void> {
+    try {
+      const planningUrl =
+        process.env.PLANNING_SERVICE_URL || 'http://localhost:3002';
+
+      const response = await fetch(`${planningUrl}/goal`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: `Respond to ${entity.name} encounter`,
+          description: taskSuggestion,
+          priority: 0.7,
+          urgency: 0.5,
+          tasks: [
+            {
+              type: 'autonomous',
+              description: taskSuggestion,
+              priority: 0.7,
+              urgency: 0.5,
+              parameters: {
+                entityId: entity.id,
+                entityType: entity.name,
+                entityPosition: {
+                  x: entity.position.x,
+                  y: entity.position.y,
+                  z: entity.position.z,
+                },
+              },
+            },
+          ],
+        }),
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        console.log(`✅ Created task from entity encounter:`, result);
+      } else {
+        console.log(`⚠️ Failed to create task: ${response.status}`);
+      }
+    } catch (error) {
+      console.error('❌ Error creating task from entity:', error);
+    }
+  }
+
+  /**
+   * Set up environmental event detection (block changes, item pickups, etc.)
+   */
+  private setupEnvironmentalEventDetection(): void {
+    if (!this.bot) return;
+
+    // Monitor block break events - using generic event handler since mineflayer events vary
+    this.bot.on('blockUpdate' as any, async (oldBlock: any, newBlock: any) => {
+      if (oldBlock?.type !== newBlock?.type) {
+        try {
+          await this.processEnvironmentalEvent('block_break', {
+            oldBlock: oldBlock?.name || 'unknown',
+            newBlock: newBlock?.name || 'unknown',
+            position: newBlock?.position || { x: 0, y: 0, z: 0 },
+          });
+        } catch (error) {
+          console.error('❌ Error processing block break event:', error);
+        }
+      }
+    });
+
+    // Monitor item pickup events - using generic event handler
+    this.bot.on('playerCollect' as any, async (collector: any, collected: any) => {
+      if (collector === this.bot.entity) {
+        try {
+          await this.processEnvironmentalEvent('item_pickup', {
+            item: collected.name || 'unknown',
+            count: collected.count || 1,
+            position: collected.position || { x: 0, y: 0, z: 0 },
+          });
+        } catch (error) {
+          console.error('❌ Error processing item pickup event:', error);
+        }
+      }
+    });
+
+    // Monitor health changes using the existing health tracking
+    let lastHealth = this.bot.health;
+    setInterval(async () => {
+      try {
+        const currentHealth = this.bot.health;
+        const maxHealth = 20; // Default max health in Minecraft
+
+        if (currentHealth < lastHealth) {
+          await this.processEnvironmentalEvent('health_loss', {
+            previousHealth: lastHealth,
+            currentHealth: currentHealth,
+            maxHealth: maxHealth,
+            damage: lastHealth - currentHealth,
+          });
+        } else if (currentHealth > lastHealth) {
+          await this.processEnvironmentalEvent('health_gain', {
+            previousHealth: lastHealth,
+            currentHealth: currentHealth,
+            maxHealth: maxHealth,
+            healing: currentHealth - lastHealth,
+          });
+        }
+
+        lastHealth = currentHealth;
+      } catch (error) {
+        console.error('❌ Error processing health event:', error);
+      }
+    }, 1000); // Check every second
+
+    console.log('🌍 Environmental event detection activated');
+  }
+
+  /**
+   * Process environmental events and trigger cognitive responses
+   */
+  private async processEnvironmentalEvent(
+    eventType: string,
+    eventData: any
+  ): Promise<void> {
+    try {
+      // Create a linguistic description of the event
+      const eventDescription = this.describeEnvironmentalEvent(
+        eventType,
+        eventData
+      );
+      const thought = `Environmental event: ${eventDescription}`;
+
+      console.log(`🌍 ${eventType.toUpperCase()}: ${eventDescription}`);
+
+      // Send to cognition system
+      const cognitionUrl =
+        process.env.COGNITION_SERVICE_URL || 'http://localhost:3003';
+      const response = await fetch(`${cognitionUrl}/process`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'environmental_event',
+          content: thought,
+          metadata: {
+            eventType: eventType,
+            eventData: eventData,
+            timestamp: Date.now(),
+            botPosition: {
+              x: this.bot.entity.position.x,
+              y: this.bot.entity.position.y,
+              z: this.bot.entity.position.z,
+            },
+            ...eventData,
+          },
+        }),
+      });
+
+      if (response.ok) {
+        const result = await response.json() as {
+          shouldRespond?: boolean;
+          response?: string;
+          shouldCreateTask?: boolean;
+          taskSuggestion?: string;
+        };
+        console.log(`✅ Environmental event processed:`, result);
+
+        // If cognition suggests a response, execute it
+        if (result.shouldRespond && result.response) {
+          await this.bot.chat(result.response);
+          console.log(
+            `💬 Bot responded to environmental event: "${result.response}"`
+          );
+        }
+
+        // If it's a task-worthy event, add to planner
+        if (result.shouldCreateTask && result.taskSuggestion) {
+          await this.createTaskFromEnvironmentalEvent(
+            eventType,
+            eventData,
+            result.taskSuggestion
+          );
+        }
+      }
+    } catch (error) {
+      console.error('❌ Error processing environmental event:', error);
+    }
+  }
+
+  /**
+   * Create a descriptive string for an environmental event
+   */
+  private describeEnvironmentalEvent(
+    eventType: string,
+    eventData: any
+  ): string {
+    switch (eventType) {
+      case 'block_break':
+        return `Block broke: ${eventData.oldBlock} → ${eventData.newBlock} at (${eventData.position.x}, ${eventData.position.y}, ${eventData.position.z})`;
+
+      case 'item_pickup':
+        return `Picked up ${eventData.count} × ${eventData.item} at (${eventData.position.x}, ${eventData.position.y}, ${eventData.position.z})`;
+
+      case 'health_loss':
+        return `Took ${eventData.damage} damage, health now ${eventData.currentHealth}/${eventData.maxHealth}`;
+
+      case 'health_gain':
+        return `Gained ${eventData.healing} health, now ${eventData.currentHealth}/${eventData.maxHealth}`;
+
+      default:
+        return `${eventType}: ${JSON.stringify(eventData)}`;
+    }
+  }
+
+  /**
+   * Create a task from an environmental event
+   */
+  private async createTaskFromEnvironmentalEvent(
+    eventType: string,
+    eventData: any,
+    taskSuggestion: string
+  ): Promise<void> {
+    try {
+      const planningUrl =
+        process.env.PLANNING_SERVICE_URL || 'http://localhost:3002';
+
+      const response = await fetch(`${planningUrl}/goal`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: `Respond to ${eventType} event`,
+          description: taskSuggestion,
+          priority: 0.6,
+          urgency: 0.4,
+          tasks: [
+            {
+              type: 'autonomous',
+              description: taskSuggestion,
+              priority: 0.6,
+              urgency: 0.4,
+              parameters: {
+                eventType: eventType,
+                eventData: eventData,
+                position: eventData.position,
+              },
+            },
+          ],
+        }),
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        console.log(`✅ Created task from environmental event:`, result);
+      } else {
+        console.log(`⚠️ Failed to create task: ${response.status}`);
+      }
+    } catch (error) {
+      console.error('❌ Error creating task from environmental event:', error);
     }
   }
 }

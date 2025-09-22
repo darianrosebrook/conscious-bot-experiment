@@ -1344,6 +1344,297 @@ app.post('/process', async (req, res) => {
         thought: result.thought,
         timestamp: Date.now(),
       });
+    } else if (type === 'environmental_awareness') {
+      // Process environmental awareness (entity detection, events, etc.)
+      console.log('Processing environmental awareness:', { content, metadata });
+
+      try {
+        // Create an internal thought about the environmental observation
+        const internalThought = {
+          type: 'environmental',
+          content: `I notice: ${content}`,
+          attribution: 'self',
+          context: {
+            emotionalState: 'curious',
+            confidence: 0.8,
+            cognitiveSystem: 'environmental-processor',
+            ...metadata,
+          },
+          metadata: {
+            thoughtType: 'environmental',
+            source: 'entity-detection',
+            entityType: metadata?.entityType,
+            distance: metadata?.distance,
+            position: metadata?.position,
+            botPosition: metadata?.botPosition,
+            ...metadata,
+          },
+          id: `thought-${Date.now()}-env-${Math.random().toString(36).substr(2, 9)}`,
+          timestamp: Date.now(),
+          processed: false,
+        };
+
+        // Send to cognitive stream
+        const cognitiveStreamResponse = await fetch(
+          'http://localhost:3000/api/ws/cognitive-stream',
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(internalThought),
+          }
+        );
+
+        let shouldRespond = false;
+        let response = '';
+        let shouldCreateTask = false;
+        let taskSuggestion = '';
+
+        // Decide if we should respond or create a task based on the entity
+        if (metadata?.entityType) {
+          const entityType = metadata.entityType.toLowerCase();
+
+          if (entityType.includes('player')) {
+            shouldRespond = true;
+            response = `Hello ${metadata?.entityType}! I'm an autonomous bot exploring this world.`;
+            shouldCreateTask = true;
+            taskSuggestion = `Investigate the player ${metadata?.entityType} at position (${metadata?.position?.x?.toFixed(1)}, ${metadata?.position?.y?.toFixed(1)}, ${metadata?.position?.z?.toFixed(1)})`;
+          } else if (entityType.includes('hostile')) {
+            shouldRespond = true;
+            response = `I see a hostile mob ${metadata?.distance?.toFixed(1)} blocks away. I should be careful.`;
+            shouldCreateTask = true;
+            taskSuggestion = `Monitor hostile mob ${metadata?.entityType} at distance ${metadata?.distance?.toFixed(1)} blocks`;
+          } else if (
+            entityType.includes('animal') ||
+            entityType.includes('villager')
+          ) {
+            shouldCreateTask = true;
+            taskSuggestion = `Observe ${metadata?.entityType} at position (${metadata?.position?.x?.toFixed(1)}, ${metadata?.position?.y?.toFixed(1)}, ${metadata?.position?.z?.toFixed(1)})`;
+          }
+        }
+
+        res.json({
+          processed: true,
+          type: 'environmental_awareness',
+          shouldRespond,
+          response,
+          shouldCreateTask,
+          taskSuggestion,
+          internalThought,
+          timestamp: Date.now(),
+        });
+      } catch (error) {
+        console.error('❌ Error processing environmental awareness:', error);
+        res.json({
+          processed: false,
+          type: 'environmental_awareness',
+          error: error instanceof Error ? error.message : 'Unknown error',
+          timestamp: Date.now(),
+        });
+      }
+    } else if (type === 'social_interaction') {
+      // Process social interaction (chat from players, etc.)
+      console.log('Processing social interaction:', { content, metadata });
+
+      try {
+        // Create an internal thought about the social interaction
+        const internalThought = {
+          type: 'social',
+          content: `Social interaction: ${content}`,
+          attribution: 'self',
+          context: {
+            emotionalState: 'interested',
+            confidence: 0.9,
+            cognitiveSystem: 'social-processor',
+            sender: metadata?.sender,
+            message: metadata?.message,
+          },
+          metadata: {
+            thoughtType: 'social',
+            source: 'player-chat',
+            sender: metadata?.sender,
+            message: metadata?.message,
+            environment: metadata?.environment,
+            botPosition: metadata?.botPosition,
+            ...metadata,
+          },
+          id: `thought-${Date.now()}-social-${Math.random().toString(36).substr(2, 9)}`,
+          timestamp: Date.now(),
+          processed: false,
+        };
+
+        // Send to cognitive stream
+        const cognitiveStreamResponse = await fetch(
+          'http://localhost:3000/api/ws/cognitive-stream',
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(internalThought),
+          }
+        );
+
+        let shouldRespond = false;
+        let response = '';
+        let shouldCreateTask = false;
+        let taskSuggestion = '';
+
+        // Decide on response based on message content
+        const message = metadata?.message?.toLowerCase() || '';
+        const sender = metadata?.sender || 'unknown';
+
+        if (message.includes('hello') || message.includes('hi')) {
+          shouldRespond = true;
+          response = `Hello ${sender}! I'm an autonomous bot exploring this world. How can I help you?`;
+          shouldCreateTask = true;
+          taskSuggestion = `Respond to greeting from ${sender} and engage in conversation`;
+        } else if (message.includes('help')) {
+          shouldRespond = true;
+          response = `Hello ${sender}! I can help you by exploring the world, gathering resources, and performing tasks. What would you like me to do?`;
+          shouldCreateTask = true;
+          taskSuggestion = `Provide assistance to ${sender} based on their request`;
+        } else if (
+          message.includes('danger') ||
+          message.includes('enemy') ||
+          message.includes('mob')
+        ) {
+          shouldRespond = true;
+          response = `I understand there's danger nearby. I'm monitoring the situation and will stay safe.`;
+          shouldCreateTask = true;
+          taskSuggestion = `Address safety concerns mentioned by ${sender}`;
+        } else if (
+          message.includes('resource') ||
+          message.includes('item') ||
+          message.includes('craft')
+        ) {
+          shouldRespond = true;
+          response = `I'm always looking for resources to gather and craft with. What do you need?`;
+          shouldCreateTask = true;
+          taskSuggestion = `Assist ${sender} with resource gathering or crafting`;
+        } else {
+          // Generic response for other messages
+          shouldRespond = true;
+          response = `Interesting! I'm processing what you said and will consider it in my decision making.`;
+          shouldCreateTask = false;
+        }
+
+        res.json({
+          processed: true,
+          type: 'social_interaction',
+          shouldRespond,
+          response,
+          shouldCreateTask,
+          taskSuggestion,
+          internalThought,
+          timestamp: Date.now(),
+        });
+      } catch (error) {
+        console.error('❌ Error processing social interaction:', error);
+        res.json({
+          processed: false,
+          type: 'social_interaction',
+          error: error instanceof Error ? error.message : 'Unknown error',
+          timestamp: Date.now(),
+        });
+      }
+    } else if (type === 'environmental_event') {
+      // Process environmental events (block changes, item pickups, health changes, etc.)
+      console.log('Processing environmental event:', { content, metadata });
+
+      try {
+        // Create an internal thought about the environmental event
+        const internalThought = {
+          type: 'environmental',
+          content: `Environmental observation: ${content}`,
+          attribution: 'self',
+          context: {
+            emotionalState: 'observant',
+            confidence: 0.8,
+            cognitiveSystem: 'environmental-processor',
+            eventType: metadata?.eventType,
+            eventData: metadata?.eventData,
+          },
+          metadata: {
+            thoughtType: 'environmental',
+            source: 'environmental-event',
+            eventType: metadata?.eventType,
+            eventData: metadata?.eventData,
+            botPosition: metadata?.botPosition,
+            ...metadata,
+          },
+          id: `thought-${Date.now()}-env-event-${Math.random().toString(36).substr(2, 9)}`,
+          timestamp: Date.now(),
+          processed: false,
+        };
+
+        // Send to cognitive stream
+        const cognitiveStreamResponse = await fetch(
+          'http://localhost:3000/api/ws/cognitive-stream',
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(internalThought),
+          }
+        );
+
+        let shouldRespond = false;
+        let response = '';
+        let shouldCreateTask = false;
+        let taskSuggestion = '';
+
+        // Decide on response based on event type
+        const eventType = metadata?.eventType || '';
+        const eventData = metadata?.eventData || {};
+
+        switch (eventType) {
+          case 'block_break':
+            shouldRespond = true;
+            response = `I notice some mining activity nearby. That's interesting!`;
+            shouldCreateTask = true;
+            taskSuggestion = `Investigate the mining activity at (${eventData.position?.x}, ${eventData.position?.y}, ${eventData.position?.z})`;
+            break;
+
+          case 'item_pickup':
+            shouldRespond = true;
+            response = `I just picked up some items. That's always useful!`;
+            shouldCreateTask = false; // Already handled by the action
+            break;
+
+          case 'health_loss':
+            shouldRespond = true;
+            response = `Ouch! I took damage. I should be more careful.`;
+            shouldCreateTask = true;
+            taskSuggestion = `Assess and address the source of damage`;
+            break;
+
+          case 'health_gain':
+            shouldRespond = true;
+            response = `I feel better now. Health restored!`;
+            shouldCreateTask = false; // Already handled by the action
+            break;
+
+          default:
+            shouldCreateTask = true;
+            taskSuggestion = `Respond to ${eventType} environmental event`;
+        }
+
+        res.json({
+          processed: true,
+          type: 'environmental_event',
+          shouldRespond,
+          response,
+          shouldCreateTask,
+          taskSuggestion,
+          internalThought,
+          timestamp: Date.now(),
+        });
+      } catch (error) {
+        console.error('❌ Error processing environmental event:', error);
+        res.json({
+          processed: false,
+          type: 'environmental_event',
+          error: error instanceof Error ? error.message : 'Unknown error',
+          timestamp: Date.now(),
+        });
+      }
     } else if (type === 'external_chat') {
       // Process external chat message
       console.log('Processing external chat message:', { content, metadata });
