@@ -83,7 +83,9 @@ export class InternalDialogue {
     try {
       const response = await this.llm.generateInternalThought(prompt, {
         currentGoals: context.currentGoals,
-        recentMemories: context.recentEvents.map(event => ({ description: event })),
+        recentMemories: context.recentEvents.map((event) => ({
+          description: event,
+        })),
         agentState: context.currentState,
       });
 
@@ -126,7 +128,7 @@ export class InternalDialogue {
       trigger: 'experience_reflection',
       currentGoals: context?.currentGoals ?? [],
       currentState: context?.currentState ?? {},
-      recentEvents: experiences.map(exp => exp.description || exp.toString()),
+      recentEvents: experiences.map((exp) => exp.description || exp.toString()),
       emotionalState: context?.emotionalState ?? {},
       urgency: 0.4,
     };
@@ -175,15 +177,13 @@ export class InternalDialogue {
     timeWindowMs: number = 3600000
   ): InternalThought[] {
     const cutoff = Date.now() - timeWindowMs;
-    let filtered = this.thoughts.filter(t => t.timestamp >= cutoff);
+    let filtered = this.thoughts.filter((t) => t.timestamp >= cutoff);
 
     if (type) {
-      filtered = filtered.filter(t => t.type === type);
+      filtered = filtered.filter((t) => t.type === type);
     }
 
-    return filtered
-      .sort((a, b) => b.timestamp - a.timestamp)
-      .slice(0, limit);
+    return filtered.sort((a, b) => b.timestamp - a.timestamp).slice(0, limit);
   }
 
   /**
@@ -192,9 +192,10 @@ export class InternalDialogue {
   getThoughtsAbout(topic: string, limit: number = 5): InternalThought[] {
     const topicLower = topic.toLowerCase();
     return this.thoughts
-      .filter(thought =>
-        thought.content.toLowerCase().includes(topicLower) ||
-        thought.context.trigger.toLowerCase().includes(topicLower)
+      .filter(
+        (thought) =>
+          thought.content.toLowerCase().includes(topicLower) ||
+          thought.context.trigger.toLowerCase().includes(topicLower)
       )
       .sort((a, b) => b.timestamp - a.timestamp)
       .slice(0, limit);
@@ -271,24 +272,28 @@ export class InternalDialogue {
       // Simple keyword-based trigger evaluation
       switch (trigger.condition) {
         case 'goal_achieved':
-          shouldTrigger = situationLower.includes('achieved') || 
-                         situationLower.includes('completed') ||
-                         situationLower.includes('success');
+          shouldTrigger =
+            situationLower.includes('achieved') ||
+            situationLower.includes('completed') ||
+            situationLower.includes('success');
           break;
         case 'goal_failed':
-          shouldTrigger = situationLower.includes('failed') || 
-                         situationLower.includes('error') ||
-                         situationLower.includes('unsuccessful');
+          shouldTrigger =
+            situationLower.includes('failed') ||
+            situationLower.includes('error') ||
+            situationLower.includes('unsuccessful');
           break;
         case 'observation_made':
-          shouldTrigger = situationLower.includes('observed') || 
-                         situationLower.includes('noticed') ||
-                         situationLower.includes('detected');
+          shouldTrigger =
+            situationLower.includes('observed') ||
+            situationLower.includes('noticed') ||
+            situationLower.includes('detected');
           break;
         case 'decision_required':
-          shouldTrigger = situationLower.includes('decide') || 
-                         situationLower.includes('choice') ||
-                         situationLower.includes('options');
+          shouldTrigger =
+            situationLower.includes('decide') ||
+            situationLower.includes('choice') ||
+            situationLower.includes('options');
           break;
         case 'time_interval':
           shouldTrigger = context.urgency < 0.3; // Low urgency situations for reflection
@@ -306,7 +311,10 @@ export class InternalDialogue {
   /**
    * Build appropriate prompt for thought type
    */
-  private buildThoughtPrompt(type: ThoughtType, context: ThoughtContext): string {
+  private buildThoughtPrompt(
+    type: ThoughtType,
+    context: ThoughtContext
+  ): string {
     const baseContext = `Situation: ${context.trigger}
 Current goals: ${context.currentGoals.join(', ') || 'none specified'}
 Recent events: ${context.recentEvents.join('; ') || 'none'}`;
@@ -362,7 +370,10 @@ What are your thoughts about this situation?`;
   /**
    * Identify potential follow-up questions from thought content
    */
-  private identifyFollowUpQuestions(content: string, type: ThoughtType): string[] {
+  private identifyFollowUpQuestions(
+    content: string,
+    type: ThoughtType
+  ): string[] {
     const followUps: string[] = [];
 
     // Simple pattern matching for follow-up identification
@@ -393,7 +404,8 @@ What are your thoughts about this situation?`;
     const related: string[] = [];
 
     // Find thoughts with similar keywords
-    for (const thought of this.thoughts.slice(-50)) { // Check recent thoughts
+    for (const thought of this.thoughts.slice(-50)) {
+      // Check recent thoughts
       if (thought.type === type) continue; // Skip same type
 
       const thoughtContent = thought.content.toLowerCase();
@@ -411,19 +423,70 @@ What are your thoughts about this situation?`;
    * Get common meaningful words between two texts
    */
   private getCommonWords(text1: string, text2: string): string[] {
-    const stopWords = new Set(['the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by', 'is', 'are', 'was', 'were', 'be', 'been', 'being', 'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'could', 'should', 'may', 'might', 'must', 'can', 'this', 'that', 'these', 'those', 'i', 'you', 'he', 'she', 'it', 'we', 'they']);
+    const stopWords = new Set([
+      'the',
+      'a',
+      'an',
+      'and',
+      'or',
+      'but',
+      'in',
+      'on',
+      'at',
+      'to',
+      'for',
+      'of',
+      'with',
+      'by',
+      'is',
+      'are',
+      'was',
+      'were',
+      'be',
+      'been',
+      'being',
+      'have',
+      'has',
+      'had',
+      'do',
+      'does',
+      'did',
+      'will',
+      'would',
+      'could',
+      'should',
+      'may',
+      'might',
+      'must',
+      'can',
+      'this',
+      'that',
+      'these',
+      'those',
+      'i',
+      'you',
+      'he',
+      'she',
+      'it',
+      'we',
+      'they',
+    ]);
 
-    const words1 = text1.split(/\s+/).filter(word => word.length > 3 && !stopWords.has(word));
-    const words2 = text2.split(/\s+/).filter(word => word.length > 3 && !stopWords.has(word));
+    const words1 = text1
+      .split(/\s+/)
+      .filter((word) => word.length > 3 && !stopWords.has(word));
+    const words2 = text2
+      .split(/\s+/)
+      .filter((word) => word.length > 3 && !stopWords.has(word));
 
-    return words1.filter(word => words2.includes(word));
+    return words1.filter((word) => words2.includes(word));
   }
 
   /**
    * Check if a trigger is on cooldown
    */
-  private isOnCooldown(trigger: DialogueTrigger): boolean {
-    // Simple cooldown check - in a real implementation, 
+  private isOnCooldown(_trigger: DialogueTrigger): boolean {
+    // Simple cooldown check - in a real implementation,
     // this would track last trigger times
     return false;
   }
@@ -445,7 +508,7 @@ What are your thoughts about this situation?`;
       utilizationRatio: this.thoughts.length / this.maxThoughts,
       byType: Object.values(ThoughtType).reduce(
         (acc, type) => {
-          acc[type] = this.thoughts.filter(t => t.type === type).length;
+          acc[type] = this.thoughts.filter((t) => t.type === type).length;
           return acc;
         },
         {} as Record<ThoughtType, number>

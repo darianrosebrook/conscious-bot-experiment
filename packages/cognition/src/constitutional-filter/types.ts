@@ -30,6 +30,8 @@ export interface ConstitutionalRule {
   version: string;
 }
 
+// TODO: These enums are defined for future use
+// eslint-disable-next-line no-unused-vars
 export enum RuleCategory {
   SAFETY = 'safety',
   ETHICS = 'ethics',
@@ -40,6 +42,8 @@ export enum RuleCategory {
   COMMUNICATION = 'communication',
 }
 
+// TODO: These enums are defined for future use
+// eslint-disable-next-line no-unused-vars
 export enum RuleAction {
   ALLOW = 'allow',
   DENY = 'deny',
@@ -48,6 +52,8 @@ export enum RuleAction {
   ESCALATE = 'escalate',
 }
 
+// TODO: These enums are defined for future use
+// eslint-disable-next-line no-unused-vars
 export enum RuleSource {
   CORE = 'core',
   USER = 'user',
@@ -147,6 +153,8 @@ export interface RuleConflict {
   timestamp: number;
 }
 
+// TODO: These enums are defined for future use
+// eslint-disable-next-line no-unused-vars
 export enum ConflictType {
   CONTRADICTORY_ACTIONS = 'contradictory_actions',
   PRIORITY_AMBIGUITY = 'priority_ambiguity',
@@ -181,6 +189,8 @@ export interface ReasoningStep {
   confidence: number; // 0-1
 }
 
+// TODO: These enums are defined for future use
+// eslint-disable-next-line no-unused-vars
 export enum ReasoningStepType {
   PRINCIPLE_APPLICATION = 'principle_application',
   CONSEQUENCE_ANALYSIS = 'consequence_analysis',

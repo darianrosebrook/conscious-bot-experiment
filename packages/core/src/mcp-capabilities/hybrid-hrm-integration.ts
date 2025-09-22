@@ -11,6 +11,79 @@
 
 import { LeafContext } from './leaf-contracts';
 
+const HOSTILE_ENTITY_NAMES = new Set<string>([
+  'zombie',
+  'husk',
+  'drowned',
+  'skeleton',
+  'wither_skeleton',
+  'creeper',
+  'spider',
+  'cave_spider',
+  'witch',
+  'enderman',
+  'pillager',
+  'vindicator',
+  'evoker',
+  'ravager',
+  'phantom',
+  'blaze',
+  'ghast',
+  'guardian',
+  'elder_guardian',
+  'piglin_brute',
+  'hoglin',
+  'zoglin',
+  'warden',
+]);
+
+const HOSTILE_ALERT_DISTANCE = 12;
+const HOSTILE_DANGER_DISTANCE = 6;
+const HOSTILE_NORMALIZATION_DISTANCE = 16;
+const NEARBY_PLAYER_DISTANCE = 8;
+const LOW_HEALTH_THRESHOLD = 8;
+const LOW_FOOD_THRESHOLD = 6;
+
+function isFiniteNumber(value: unknown): value is number {
+  return typeof value === 'number' && Number.isFinite(value);
+}
+
+function isHostileEntity(entity: any): boolean {
+  if (!entity) {
+    return false;
+  }
+  const kind = typeof entity.kind === 'string' ? entity.kind.toLowerCase() : '';
+  if (kind.includes('hostile')) {
+    return true;
+  }
+  const name = (entity.displayName || entity.name || '').toLowerCase();
+  return HOSTILE_ENTITY_NAMES.has(name);
+}
+
+function distanceBetweenPositions(a: any, b: any): number | null {
+  if (!a || !b) {
+    return null;
+  }
+  if (typeof a.distanceTo === 'function') {
+    const dist = a.distanceTo(b);
+    return isFiniteNumber(dist) ? dist : null;
+  }
+  if (
+    isFiniteNumber(a.x) &&
+    isFiniteNumber(a.y) &&
+    isFiniteNumber(a.z) &&
+    isFiniteNumber(b.x) &&
+    isFiniteNumber(b.y) &&
+    isFiniteNumber(b.z)
+  ) {
+    const dx = a.x - b.x;
+    const dy = a.y - b.y;
+    const dz = a.z - b.z;
+    return Math.sqrt(dx * dx + dy * dy + dz * dz);
+  }
+  return null;
+}
+
 // Python HRM interface types
 export interface PythonHRMConfig {
   modelPath: string;
@@ -219,15 +292,91 @@ export class HybridHRMRouter {
     task: string,
     context: LeafContext
   ): TaskSignature {
-    console.log(`TODO: Use ${context} to analyse task ${task}`);
+    const bot = context?.bot;
+    let reactiveFromContext = 0;
+    let timeCriticalFromContext = false;
+    let safetyCriticalFromContext = false;
+    let playersNearby = false;
+
+    if (bot) {
+      const health = bot.health;
+      if (isFiniteNumber(health) && health < LOW_HEALTH_THRESHOLD) {
+        reactiveFromContext = Math.max(reactiveFromContext, 0.7);
+        timeCriticalFromContext = true;
+        safetyCriticalFromContext = true;
+      }
+
+      const food = bot.food;
+      if (isFiniteNumber(food) && food < LOW_FOOD_THRESHOLD) {
+        reactiveFromContext = Math.max(reactiveFromContext, 0.5);
+        timeCriticalFromContext = true;
+      }
+
+      const selfEntity = bot.entity;
+      const botPosition = selfEntity?.position;
+
+      if (botPosition) {
+        let nearestHostile = Number.POSITIVE_INFINITY;
+
+        const entities = bot.entities ?? {};
+        for (const entity of Object.values(entities)) {
+          if (!entity || entity === selfEntity) {
+            continue;
+          }
+          if (!isHostileEntity(entity)) {
+            continue;
+          }
+          const distance = distanceBetweenPositions(
+            entity.position,
+            botPosition
+          );
+          if (distance === null) {
+            continue;
+          }
+          if (distance < nearestHostile) {
+            nearestHostile = distance;
+          }
+        }
+
+        if (nearestHostile !== Number.POSITIVE_INFINITY) {
+          const normalizedThreat = Math.min(
+            1,
+            Math.max(0, 1 - nearestHostile / HOSTILE_NORMALIZATION_DISTANCE)
+          );
+          reactiveFromContext = Math.max(reactiveFromContext, normalizedThreat);
+          if (nearestHostile <= HOSTILE_ALERT_DISTANCE) {
+            timeCriticalFromContext = true;
+          }
+          if (nearestHostile <= HOSTILE_DANGER_DISTANCE) {
+            safetyCriticalFromContext = true;
+          }
+        }
+
+        const players = bot.players ?? {};
+        for (const player of Object.values(players)) {
+          const entity = player?.entity;
+          if (!entity || entity === selfEntity) {
+            continue;
+          }
+          const distance = distanceBetweenPositions(
+            entity.position,
+            botPosition
+          );
+          if (distance !== null && distance <= NEARBY_PLAYER_DISTANCE) {
+            playersNearby = true;
+            break;
+          }
+        }
+      }
+    }
 
     const signature: TaskSignature = {
       structuredReasoning: 0,
       narrativeReasoning: 0,
-      reactiveResponse: 0,
+      reactiveResponse: reactiveFromContext,
       complexity: 0,
-      timeCritical: false,
-      safetyCritical: false,
+      timeCritical: timeCriticalFromContext,
+      safetyCritical: safetyCriticalFromContext,
     };
 
     const taskLower = task.toLowerCase();
@@ -260,7 +409,10 @@ export class HybridHRMRouter {
     const structuredMatches = structuredKeywords.filter((keyword) =>
       taskLower.includes(keyword)
     ).length;
-    signature.structuredReasoning = Math.min(structuredMatches / 3, 1);
+    signature.structuredReasoning = Math.max(
+      signature.structuredReasoning,
+      Math.min(structuredMatches / 3, 1)
+    );
 
     // Narrative reasoning indicators (LLM domain)
     const narrativeKeywords = [
@@ -289,7 +441,17 @@ export class HybridHRMRouter {
     const narrativeMatches = narrativeKeywords.filter((keyword) =>
       taskLower.includes(keyword)
     ).length;
-    signature.narrativeReasoning = Math.min(narrativeMatches / 3, 1);
+    signature.narrativeReasoning = Math.max(
+      signature.narrativeReasoning,
+      Math.min(narrativeMatches / 3, 1)
+    );
+
+    if (playersNearby) {
+      signature.narrativeReasoning = Math.min(
+        1,
+        signature.narrativeReasoning + 0.3
+      );
+    }
 
     // Reactive response indicators (GOAP domain)
     const reactiveKeywords = [
@@ -321,7 +483,10 @@ export class HybridHRMRouter {
     const reactiveMatches = reactiveKeywords.filter((keyword) =>
       taskLower.includes(keyword)
     ).length;
-    signature.reactiveResponse = Math.min(reactiveMatches / 3, 1);
+    signature.reactiveResponse = Math.max(
+      signature.reactiveResponse,
+      Math.min(reactiveMatches / 3, 1)
+    );
 
     // Complexity assessment
     const wordCount = task.split(' ').length;
@@ -329,6 +494,7 @@ export class HybridHRMRouter {
 
     // Time and safety criticality
     signature.timeCritical =
+      signature.timeCritical ||
       taskLower.includes('urgent') ||
       taskLower.includes('emergency') ||
       taskLower.includes('immediate') ||
@@ -336,6 +502,7 @@ export class HybridHRMRouter {
       taskLower.includes('fast');
 
     signature.safetyCritical =
+      signature.safetyCritical ||
       taskLower.includes('danger') ||
       taskLower.includes('threat') ||
       taskLower.includes('attack') ||

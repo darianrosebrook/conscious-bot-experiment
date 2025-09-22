@@ -24,15 +24,15 @@ export interface LeafImpl {
   spec?: LeafSpec; // Optional spec for compatibility
 
   execute?(
-    context: LeafContext,
-    args: Record<string, any>,
-    options?: LeafRunOptions
+    _context: LeafContext,
+    _args: Record<string, any>,
+    _options?: LeafRunOptions
   ): Promise<LeafResult>;
 
   run?(
-    context: LeafContext,
-    args: Record<string, any>,
-    options?: LeafRunOptions
+    _context: LeafContext,
+    _args: Record<string, any>,
+    _options?: LeafRunOptions
   ): Promise<LeafResult>;
 }
 
@@ -209,6 +209,8 @@ export function createExecError(
 /**
  * Error codes for leaf execution failures
  */
+// TODO: These enums are defined for future use
+// eslint-disable-next-line no-unused-vars
 export enum ExecErrorCode {
   TIMEOUT = 'TIMEOUT',
   VALIDATION_ERROR = 'VALIDATION_ERROR',

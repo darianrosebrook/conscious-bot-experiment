@@ -7,7 +7,7 @@ module.exports = {
   },
   ignorePatterns: ['dist/', 'node_modules/', '*.js'],
   rules: {
-    'no-unused-vars': ['warn', { argsIgnorePattern: '^_' }],
+    'no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
     '@typescript-eslint/no-non-null-assertion': 'warn',
     'prefer-const': 'warn',
     'no-case-declarations': 'warn',

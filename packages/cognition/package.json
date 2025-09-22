@@ -17,7 +17,6 @@
   "dependencies": {
     "@conscious-bot/core": "workspace:*",
     "@conscious-bot/memory": "workspace:*",
-    "@conscious-bot/planning": "workspace:*",
     "express": "^4.18.0",
     "cors": "^2.8.5",
     "ollama": "^0.1.0",

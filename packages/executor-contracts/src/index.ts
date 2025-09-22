@@ -181,7 +181,7 @@ export function healthCheck(): {
 } {
   try {
     // Try to create a registry to verify the package is working
-    const registry =
+    const _registry =
       new (require('./capability-registry').CapabilityRegistryBuilder)()
         .addBuiltIn('navigate')
         .build();

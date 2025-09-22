@@ -100,7 +100,8 @@ export interface CognitiveThought {
     | 'memory'
     | 'intrusive'
     | 'emotional'
-    | 'sensory';
+    | 'sensory'
+    | 'social_consideration';
   content: string;
   timestamp: number;
   context: {
@@ -135,6 +136,7 @@ export interface CognitiveThought {
     resourceType?: string;
     amount?: number;
     entityType?: string;
+    entityId?: string;
     hostile?: boolean;
     distance?: number;
     itemType?: string;
@@ -206,6 +208,61 @@ export class EnhancedThoughtGenerator extends EventEmitter {
       cooldownMs: this.config.thoughtDeduplicationCooldown || 30000, // 30 seconds default
       maxRecentThoughts: 50,
     });
+  }
+
+  /**
+   * Generate a social consideration thought for a nearby entity
+   */
+  async generateSocialConsideration(
+    entity: any,
+    context: ThoughtContext
+  ): Promise<CognitiveThought | null> {
+    const now = Date.now();
+
+    // Prevent too frequent social consideration thoughts
+    if (now - this.lastThoughtTime < 10000) {
+      // 10 second cooldown for social considerations
+      return null;
+    }
+
+    // Prevent concurrent generation
+    if (this.isGenerating) {
+      return null;
+    }
+
+    this.isGenerating = true;
+    this.lastThoughtTime = now;
+
+    try {
+      const thought = await this.generateSocialConsiderationThought(
+        entity,
+        context
+      );
+
+      if (thought) {
+        // Check if this thought is too similar to recent thoughts
+        if (!this.thoughtDeduplicator.shouldGenerateThought(thought.content)) {
+          console.log(
+            '🚫 Skipping repetitive social consideration thought:',
+            thought.content.substring(0, 50) + '...'
+          );
+          return null;
+        }
+
+        this.thoughtHistory.push(thought);
+
+        // Keep only last 100 thoughts to prevent memory leaks
+        if (this.thoughtHistory.length > 100) {
+          this.thoughtHistory = this.thoughtHistory.slice(-100);
+        }
+
+        this.emit('thoughtGenerated', thought);
+      }
+
+      return thought;
+    } finally {
+      this.isGenerating = false;
+    }
   }
 
   /**
@@ -360,6 +417,79 @@ export class EnhancedThoughtGenerator extends EventEmitter {
         tags: ['monitoring', 'fallback'],
         priority: 'low',
       };
+    }
+  }
+
+  /**
+   * Build situation description for social consideration thought generation
+   */
+  private buildSocialConsiderationSituation(
+    entity: any,
+    context: ThoughtContext
+  ): string {
+    const health = context.currentState?.health || 20;
+    const position = context.currentState?.position;
+    const biome = context.currentState?.biome || 'unknown';
+    const timeOfDay = context.currentState?.timeOfDay || 0;
+    const currentTasks = context.currentTasks || [];
+
+    let situation = `A ${entity.type} (ID: ${entity.id}) is ${entity.distance} blocks away. `;
+
+    // Add entity context
+    if (entity.hostile) {
+      situation += `This ${entity.type} appears to be hostile. `;
+    } else if (entity.friendly) {
+      situation += `This ${entity.type} appears to be friendly. `;
+    } else {
+      situation += `The nature of this ${entity.type} is unknown. `;
+    }
+
+    // Add bot context
+    situation += `My current health: ${health}/20. `;
+    if (position) {
+      situation += `I'm at (${Math.round(position.x)}, ${Math.round(position.y)}, ${Math.round(position.z)}). `;
+    }
+
+    // Add environmental context
+    if (biome !== 'unknown') {
+      situation += `We're in a ${biome} biome. `;
+    }
+
+    if (timeOfDay < 12000 || timeOfDay > 24000) {
+      situation += `It's currently nighttime. `;
+    }
+
+    // Add task context
+    if (currentTasks.length > 0) {
+      const activeTask = currentTasks[0];
+      situation += `I'm currently working on: "${activeTask.title}". `;
+    } else {
+      situation += `I don't have any active tasks. `;
+    }
+
+    situation +=
+      'Should I acknowledge this entity? Consider social norms, safety, and my current priorities.';
+
+    return situation;
+  }
+
+  /**
+   * Generate fallback social consideration content when LLM fails
+   */
+  private generateSocialConsiderationFallback(entity: any): string {
+    const isHostile = entity.hostile;
+    const isFriendly = entity.friendly;
+    const distance = entity.distance;
+
+    // Basic decision logic
+    if (isHostile && distance < 5) {
+      return `I should acknowledge this hostile ${entity.type} nearby - it could be a threat that requires immediate attention.`;
+    } else if (isFriendly && distance < 10) {
+      return `A friendly ${entity.type} is nearby. I should consider greeting them to maintain good relations.`;
+    } else if (distance < 8) {
+      return `There's an unknown ${entity.type} ${distance} blocks away. I should observe it briefly to determine if acknowledgment is warranted.`;
+    } else {
+      return `A ${entity.type} is ${distance} blocks away. It's probably not close enough to require immediate acknowledgment.`;
     }
   }
 
@@ -586,6 +716,98 @@ export class EnhancedThoughtGenerator extends EventEmitter {
           task.type,
         ],
         priority: 'medium',
+      };
+    }
+  }
+
+  /**
+   * Generate social consideration thoughts for nearby entities/events
+   */
+  private async generateSocialConsiderationThought(
+    entity: any,
+    context: ThoughtContext
+  ): Promise<CognitiveThought | null> {
+    try {
+      const situation = this.buildSocialConsiderationSituation(entity, context);
+
+      // Add timeout wrapper to prevent hanging
+      const response = await Promise.race([
+        this.llm.generateInternalThought(situation, {
+          currentGoals: context.currentTasks?.map((task) => task.title) || [],
+          recentMemories:
+            context.recentEvents?.map((event) => ({ description: event })) ||
+            [],
+          agentState: context.currentState,
+        }),
+        new Promise<never>(
+          (_, reject) =>
+            setTimeout(() => reject(new Error('LLM timeout')), 45000) // 45s timeout
+        ),
+      ]);
+
+      return {
+        id: `social-consideration-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        type: 'social_consideration',
+        content: response.text.trim(),
+        timestamp: Date.now(),
+        context: {
+          emotionalState: 'thoughtful',
+          confidence: response.confidence,
+          cognitiveSystem: 'llm-core',
+          health: context.currentState?.health,
+          position: context.currentState?.position,
+          inventory: context.currentState?.inventory,
+        },
+        metadata: {
+          thoughtType: 'social-consideration',
+          entityType: entity.type,
+          entityId: entity.id,
+          distance: entity.distance,
+          trigger: 'entity-nearby',
+          context: 'social-awareness',
+          intensity: 0.6,
+          llmConfidence: response.confidence,
+          model: response.model,
+        },
+        category: 'social',
+        tags: ['social', 'entity-nearby', 'consideration'],
+        priority: 'medium',
+      };
+    } catch (error) {
+      console.error(
+        'Failed to generate social consideration thought with LLM:',
+        error
+      );
+
+      // Fallback to basic social consideration
+      const fallbackContent = this.generateSocialConsiderationFallback(entity);
+
+      return {
+        id: `social-consideration-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        type: 'social_consideration',
+        content: fallbackContent,
+        timestamp: Date.now(),
+        context: {
+          emotionalState: 'thoughtful',
+          confidence: 0.4,
+          cognitiveSystem: 'fallback',
+          health: context.currentState?.health,
+          position: context.currentState?.position,
+          inventory: context.currentState?.inventory,
+        },
+        metadata: {
+          thoughtType: 'social-consideration',
+          entityType: entity.type,
+          entityId: entity.id,
+          distance: entity.distance,
+          trigger: 'entity-nearby',
+          context: 'social-awareness',
+          intensity: 0.4,
+          error: 'llm-generation-failed',
+        },
+        category: 'social',
+        tags: ['social', 'fallback'],
+        priority: 'low',
       };
     }
   }

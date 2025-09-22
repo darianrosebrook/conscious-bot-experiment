@@ -63,9 +63,9 @@ export interface CapabilitySpec {
   name: string; // 'craft_item' | 'build_structure' | ...
   version: string;
   inputSchema: z.ZodSchema<any>;
-  guard: (ctx: ExecutionContext) => boolean;
-  runner: (ctx: ExecutionContext, args: any) => Promise<ActionResult>;
-  acceptance: (pre: WorldSnapshot, post: WorldSnapshot) => boolean;
+  guard: (_ctx: ExecutionContext) => boolean;
+  runner: (_ctx: ExecutionContext, _args: any) => Promise<ActionResult>;
+  acceptance: (_pre: WorldSnapshot, _post: WorldSnapshot) => boolean;
   sla?: {
     p95DurationMs: number;
     successRate: number;
@@ -125,8 +125,8 @@ export interface WorldState {
   getLightLevel(): number;
   getAir(): number;
   getTimeOfDay(): 'dawn' | 'day' | 'dusk' | 'night';
-  hasItem(itemName: string, quantity?: number): boolean;
-  distanceTo(target: any): number;
+  hasItem(_itemName: string, _quantity?: number): boolean;
+  distanceTo(_target: any): number;
   getThreatLevel(): number;
   getInventory(): Record<string, number>;
   getNearbyResources(): any[];
@@ -207,17 +207,19 @@ export interface ExecutionHealthMetrics {
 
 export class PBIError extends Error {
   constructor(
-    public code: PBIErrorCode,
+    public _code: PBIErrorCode,
     message: string,
-    public stepId?: string,
-    public capability?: string,
-    public context?: any
+    public _stepId?: string,
+    public _capability?: string,
+    public _context?: any
   ) {
     super(message);
     this.name = 'PBIError';
   }
 }
 
+// TODO: These enums are defined for future use
+// eslint-disable-next-line no-unused-vars
 export enum PBIErrorCode {
   UNKNOWN_VERB = 'unknown_verb',
   SCHEMA_VIOLATION = 'schema_violation',

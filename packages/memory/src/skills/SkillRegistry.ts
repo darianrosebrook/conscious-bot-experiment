@@ -401,7 +401,103 @@ export class SkillRegistry {
             id: 'pre-1',
             condition: 'wood>=N || reachable_trees',
             description: 'Have wood or access to trees',
-            isSatisfied: (state: any) => true, // TODO: Implement actual precondition condition checking
+            isSatisfied: (state: any) => {
+              const toFiniteNumber = (value: unknown): number | null => {
+                if (typeof value === 'number' && Number.isFinite(value)) {
+                  return value;
+                }
+                if (typeof value === 'string') {
+                  const parsed = Number(value);
+                  return Number.isFinite(parsed) ? parsed : null;
+                }
+                return null;
+              };
+
+              const firstNumber = (...values: unknown[]): number | null => {
+                for (const candidate of values) {
+                  const numeric = toFiniteNumber(candidate);
+                  if (numeric !== null) {
+                    return numeric;
+                  }
+                }
+                return null;
+              };
+
+              const availableWood =
+                firstNumber(
+                  state?.inventory?.wood,
+                  state?.inventory?.logs,
+                  state?.resources?.wood,
+                  state?.resources?.logs,
+                  state?.materials?.wood,
+                  state?.materials?.logs,
+                  state?.wood,
+                  state?.logs
+                ) ?? 0;
+
+              const requiredWood =
+                firstNumber(
+                  state?.requirements?.wood,
+                  state?.requirements?.logs,
+                  state?.requirements?.count,
+                  state?.requirements?.quantity,
+                  state?.requirements?.N,
+                  state?.args?.requiredWood,
+                  state?.args?.logs,
+                  state?.args?.quantity,
+                  state?.args?.N,
+                  state?.N
+                ) ?? 1;
+
+              if (availableWood >= requiredWood) {
+                return true;
+              }
+
+              const treeSignals = [
+                state?.environment?.reachableTrees,
+                state?.environment?.reachable_trees,
+                state?.environment?.treesNearby,
+                state?.environment?.trees_nearby,
+                state?.sensors?.reachableTrees,
+                state?.sensors?.reachable_trees,
+                state?.analysis?.reachableTrees,
+                state?.analysis?.reachable_trees,
+                state?.reachableTrees,
+                state?.reachable_trees,
+              ];
+
+              const hasReachableTrees = treeSignals.some((value) => {
+                if (typeof value === 'boolean') {
+                  return value;
+                }
+                if (typeof value === 'number') {
+                  return value > 0;
+                }
+                if (typeof value === 'string') {
+                  const normalized = value.trim().toLowerCase();
+                  return (
+                    normalized === 'true' ||
+                    normalized === 'yes' ||
+                    normalized === 'y' ||
+                    normalized === 'reachable'
+                  );
+                }
+                return false;
+              });
+
+              if (hasReachableTrees) {
+                return true;
+              }
+
+              const treeDensity = firstNumber(
+                state?.environment?.treeDensity,
+                state?.environment?.trees?.density,
+                state?.analysis?.treeDensity,
+                state?.sensors?.treeDensity
+              );
+
+              return treeDensity !== null && treeDensity > 0;
+            },
           },
           {
             id: 'pre-2',

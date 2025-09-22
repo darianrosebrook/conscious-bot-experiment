@@ -8,7 +8,7 @@
  */
 
 import { Bot } from 'mineflayer';
-import { MinecraftWorldState } from './types';
+import { MinecraftWorldState, MinecraftItem } from './types';
 
 export interface MinecraftSignal {
   type:
@@ -300,7 +300,10 @@ export class MinecraftSignalProcessor {
     const nearbyBlocks = worldState.environment.nearbyBlocks;
 
     // Scan for valuable resources
-    const valuableResources = this.identifyValuableResources(nearbyBlocks);
+    const valuableResources = this.identifyValuableResources(
+      nearbyBlocks,
+      worldState.inventory.items
+    );
 
     for (const resource of valuableResources) {
       signals.push({
@@ -602,8 +605,30 @@ export class MinecraftSignalProcessor {
   }
 
   private getLightLevel(worldState: MinecraftWorldState, bot: Bot): number {
-    // TODO: Get actual light level from bot using mineflayer API
-    return worldState.environment.timeOfDay > 13000 ? 4 : 15; // Simplified
+    const fallback = worldState.environment.timeOfDay > 13000 ? 4 : 15;
+
+    try {
+      const position = (bot as any)?.entity?.position ?? worldState.player.position;
+      if (!position) return fallback;
+
+      const blockPos = typeof position.floored === 'function' ? position.floored() : position;
+      const lightFromWorld = (bot as any)?.world?.getLight?.(blockPos);
+      if (typeof lightFromWorld === 'number' && lightFromWorld >= 0) {
+        return lightFromWorld;
+      }
+
+      const block = (bot as any)?.blockAt?.(blockPos);
+      if (block) {
+        const blockLight = (block as any).light ?? (block as any).blockLight ?? (block as any).skyLight;
+        if (typeof blockLight === 'number' && blockLight >= 0) {
+          return blockLight;
+        }
+      }
+    } catch {
+      // Fall through to fallback when mineflayer data is unavailable
+    }
+
+    return fallback;
   }
 
   private getTimeOfDay(
@@ -761,7 +786,10 @@ export class MinecraftSignalProcessor {
     return features;
   }
 
-  private identifyValuableResources(blocks: any[]): Array<{
+  private identifyValuableResources(
+    blocks: any[],
+    inventoryItems: MinecraftItem[]
+  ): Array<{
     type: string;
     value: number;
     position: any;
@@ -787,14 +815,64 @@ export class MinecraftSignalProcessor {
       stone: 20,
     };
 
+    const environmentCounts: Record<string, number> = Object.create(null);
+    for (const block of blocks) {
+      if (!block?.type || !resourceValues[block.type]) continue;
+      environmentCounts[block.type] =
+        (environmentCounts[block.type] ?? 0) + 1;
+    }
+
+    const inventoryCounts: Record<string, number> = Object.create(null);
+    for (const item of inventoryItems) {
+      if (!item?.type || !resourceValues[item.type]) continue;
+      const count = typeof item.count === 'number' ? item.count : 1;
+      inventoryCounts[item.type] =
+        (inventoryCounts[item.type] ?? 0) + Math.max(0, count);
+    }
+
+    const clusterExpectations: Record<string, number> = {
+      diamond_ore: 4,
+      gold_ore: 6,
+      iron_ore: 8,
+      coal_ore: 10,
+      log: 12,
+      stone: 16,
+    };
+
+    const desiredInventoryLevels: Record<string, number> = {
+      diamond_ore: 12,
+      gold_ore: 24,
+      iron_ore: 48,
+      coal_ore: 64,
+      log: 64,
+      stone: 128,
+    };
+
     for (const block of blocks) {
       const value = resourceValues[block.type];
       if (value) {
+        const envCount = environmentCounts[block.type] ?? 0;
+        const invCount = inventoryCounts[block.type] ?? 0;
+
+        const expectedCluster = clusterExpectations[block.type] ?? 6;
+        const desiredInventory = desiredInventoryLevels[block.type] ?? 32;
+
+        const envFactor = expectedCluster > 0
+          ? Math.min(envCount / expectedCluster, 1)
+          : 1;
+        const inventoryFactor = desiredInventory > 0
+          ? Math.min(invCount / desiredInventory, 1)
+          : 1;
+
+        const abundanceScore = Math.round(
+          Math.min(envFactor * 0.7 + inventoryFactor * 0.3, 1) * 100
+        );
+
         resources.push({
           type: block.type,
           value,
           position: block.position,
-          abundance: 1, // TODO: Calculate actual resource abundance based on inventory and environment
+          abundance: abundanceScore,
           toolRequired: this.getRequiredTool(block.type),
           accessibility: this.calculateAccessibility(block.position),
         });

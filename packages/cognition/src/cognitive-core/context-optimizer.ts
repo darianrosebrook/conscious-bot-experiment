@@ -157,7 +157,7 @@ export class ContextOptimizer {
    */
   private simulateMemoryRetrieval(
     query: string,
-    requirements: ContextRequirements
+    _requirements: ContextRequirements
   ): MemoryRetrieval[] {
     const simulatedMemories: MemoryRetrieval[] = [];
     const keywords = query.toLowerCase().split(/\s+/);

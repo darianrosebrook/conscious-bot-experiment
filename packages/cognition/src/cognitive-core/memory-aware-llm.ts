@@ -10,18 +10,17 @@
 
 import { LLMInterface, LLMContext, LLMResponse } from './llm-interface';
 import { LLMConfig } from '../types';
-import { createEnhancedMemorySystem } from '@conscious-bot/memory';
 
 interface EnhancedMemorySystem {
   initialize(): Promise<void>;
   searchMemories(params: any): Promise<any>;
   ingestMemory(params: any): Promise<any>;
   recordCognitivePattern(
-    thoughtType: string,
-    context: any,
-    processing: any,
-    outcome: any,
-    patterns: any
+    _thoughtType: string,
+    _context: any,
+    _processing: any,
+    _outcome: any,
+    _patterns: any
   ): Promise<any>;
   close(): Promise<void>;
   // Add other methods as needed
@@ -333,7 +332,7 @@ export class MemoryAwareLLMInterface extends LLMInterface {
       relevance: number;
       timestamp: number;
     }>,
-    context: MemoryEnhancedLLMContext
+    _context: MemoryEnhancedLLMContext
   ): string {
     if (
       !this.memoryConfig.enableMemoryEnhancedPrompts ||
@@ -489,7 +488,7 @@ If the memories are relevant, incorporate them naturally into your reasoning. If
   private calculateMemoryEnhancedConfidence(
     response: LLMResponse,
     memories: Array<{ relevance: number }>,
-    context: MemoryEnhancedLLMContext
+    _context: MemoryEnhancedLLMContext
   ): number {
     if (!this.memoryConfig.enableMemoryBasedConfidence) {
       return response.confidence;
@@ -515,7 +514,7 @@ If the memories are relevant, incorporate them naturally into your reasoning. If
   private async generateMemoryRecommendations(
     prompt: string,
     response: LLMResponse,
-    context: MemoryEnhancedLLMContext
+    _context: MemoryEnhancedLLMContext
   ): Promise<
     Array<{
       action: 'recall' | 'store' | 'consolidate' | 'decay';
@@ -583,7 +582,7 @@ If the memories are relevant, incorporate them naturally into your reasoning. If
   private async analyzeCognitiveInsights(
     prompt: string,
     response: LLMResponse,
-    context: MemoryEnhancedLLMContext
+    _context: MemoryEnhancedLLMContext
   ): Promise<{
     thoughtPatterns?: string[];
     decisionQuality?: number;

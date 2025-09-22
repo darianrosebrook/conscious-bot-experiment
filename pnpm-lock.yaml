@@ -48,9 +48,6 @@ importers:
       '@conscious-bot/memory':
         specifier: workspace:*
         version: link:../memory
-      '@conscious-bot/planning':
-        specifier: workspace:*
-        version: link:../planning
       cors:
         specifier: ^2.8.5
         version: 2.8.5
@@ -503,6 +500,9 @@ importers:
 
   packages/planning:
     dependencies:
+      '@conscious-bot/cognition':
+        specifier: workspace:*
+        version: link:../cognition
       '@conscious-bot/executor-contracts':
         specifier: workspace:*
         version: link:../executor-contracts

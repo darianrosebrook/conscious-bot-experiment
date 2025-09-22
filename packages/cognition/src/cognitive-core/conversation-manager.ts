@@ -272,7 +272,7 @@ export class ConversationManager {
     const keywords: string[] = [];
 
     // Simple keyword extraction - in a real implementation, this would use NLP
-    for (const [topic, topicWords] of this.topicKeywords.entries()) {
+    for (const [, topicWords] of this.topicKeywords.entries()) {
       const matches = topicWords.filter((word) => words.includes(word));
       if (matches.length > 0) {
         keywords.push(...matches);
@@ -557,7 +557,7 @@ Provide style recommendations.`;
    */
   getCurrentTopic(conversationId: string): TopicModel | undefined {
     const state = this.conversations.get(conversationId);
-    if (!state || !state.currentTopic) return undefined;
+    if (!state?.currentTopic) return undefined;
 
     return state.topicHistory.find(
       (topic) => topic.name === state.currentTopic

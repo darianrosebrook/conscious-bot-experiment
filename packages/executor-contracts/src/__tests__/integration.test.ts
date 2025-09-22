@@ -7,13 +7,13 @@
  * @author @darianrosebrook
  */
 
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { createPBIEnforcer } from '../pbi-enforcer';
-import { CapabilityRegistry } from '../capability-registry';
+// import { CapabilityRegistry } from '../capability-registry';
 import {
   PlanStep,
   ExecutionContext,
-  WorldSnapshot,
+  // WorldSnapshot,
   PBIError,
   PBIErrorCode,
   DEFAULT_PBI_ACCEPTANCE,
@@ -88,8 +88,8 @@ describe('PBI Integration with Planning System', () => {
         getLightLevel: () => 15,
         getAir: () => 300,
         getTimeOfDay: () => 'day' as const,
-        hasItem: (item: string) => item === 'oak_log',
-        distanceTo: (target: any) => 50,
+        hasItem: (_item: string) => _item === 'oak_log',
+        distanceTo: (_target: any) => 50,
         getThreatLevel: () => 0.1,
         getInventory: () => ({ oak_log: 2, stick: 4 }),
         getNearbyResources: () => [
@@ -169,7 +169,7 @@ describe('PBI Integration with Planning System', () => {
         getAir: () => 300,
         getTimeOfDay: () => 'day' as const,
         hasItem: (item: string) => false,
-        distanceTo: (target: any) => 50,
+        distanceTo: (_target: any) => 50,
         getThreatLevel: () => 0.1,
         getInventory: () => ({}),
         getNearbyResources: () => [],
@@ -226,7 +226,7 @@ describe('PBI Integration with Planning System', () => {
         getAir: () => 300,
         getTimeOfDay: () => 'day' as const,
         hasItem: (item: string) => false,
-        distanceTo: (target: any) => 50,
+        distanceTo: (_target: any) => 50,
         getThreatLevel: () => 0.9,
         getInventory: () => ({}),
         getNearbyResources: () => [],
@@ -289,8 +289,8 @@ describe('PBI Integration with Planning System', () => {
         getLightLevel: () => 15,
         getAir: () => 300,
         getTimeOfDay: () => 'day' as const,
-        hasItem: (item: string) => item === 'oak_log',
-        distanceTo: (target: any) => 50,
+        hasItem: (_item: string) => _item === 'oak_log',
+        distanceTo: (_target: any) => 50,
         getThreatLevel: () => 0.1,
         getInventory: () => ({ oak_log: 2, stick: 4 }),
         getNearbyResources: () => [],
@@ -482,7 +482,7 @@ describe('PBI Integration with Planning System', () => {
         getAir: () => 300,
         getTimeOfDay: () => 'day' as const,
         hasItem: (item: string) => false,
-        distanceTo: (target: any) => 50,
+        distanceTo: (_target: any) => 50,
         getThreatLevel: () => 0.1,
         getInventory: () => ({}),
         getNearbyResources: () => [],
@@ -535,7 +535,7 @@ describe('PBI Integration with Planning System', () => {
         getAir: () => 300,
         getTimeOfDay: () => 'day' as const,
         hasItem: (item: string) => false,
-        distanceTo: (target: any) => 50,
+        distanceTo: (_target: any) => 50,
         getThreatLevel: () => 0.1,
         getInventory: () => ({}),
         getNearbyResources: () => [],
@@ -656,7 +656,7 @@ describe('PBI Integration with Planning System', () => {
         getAir: () => 300,
         getTimeOfDay: () => 'day' as const,
         hasItem: (item: string) => ['oak_log', 'stick'].includes(item),
-        distanceTo: (target: any) => 50,
+        distanceTo: (_target: any) => 50,
         getThreatLevel: () => 0.1,
         getInventory: () => ({ oak_log: 3, stick: 2 }),
         getNearbyResources: () => [

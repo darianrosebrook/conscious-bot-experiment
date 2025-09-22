@@ -414,7 +414,7 @@ export class EmotionalMemoryLLMAdapter extends MemoryAwareLLMInterface {
   // ============================================================================
 
   private async buildEmotionalContext(
-    context: EmotionalLLMContext
+    _context: EmotionalLLMContext
   ): Promise<EmotionalMemoryContext | undefined> {
     if (!this.emotionalManager && !this.narrativeConstructor) {
       return {
@@ -433,7 +433,7 @@ export class EmotionalMemoryLLMAdapter extends MemoryAwareLLMInterface {
 
     // Get emotional memories
     if (this.emotionalManager) {
-      const insights = await this.emotionalManager.getEmotionalInsights();
+      await this.emotionalManager.getEmotionalInsights();
 
       // Get recent high-intensity emotional memories
       const emotionalStates = await this.emotionalManager.getEmotionalStates();
@@ -719,7 +719,7 @@ Your response should reflect the emotional awareness and self-understanding gain
 
   private async analyzeEmotionalProcessing(
     response: EmotionalMemoryResponse,
-    context: EmotionalLLMContext
+    _context: EmotionalLLMContext
   ): Promise<EmotionalMemoryResponse['emotionalProcessing']> {
     const text = response.text.toLowerCase();
 
@@ -752,7 +752,7 @@ Your response should reflect the emotional awareness and self-understanding gain
 
   private async updateEmotionalStateFromResponse(
     response: EmotionalMemoryResponse,
-    emotionalContext?: EmotionalMemoryContext | undefined
+    _emotionalContext?: EmotionalMemoryContext | undefined
   ): Promise<void> {
     // Analyze response sentiment to infer emotional state changes
     const text = response.text.toLowerCase();

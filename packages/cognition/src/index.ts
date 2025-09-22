@@ -22,6 +22,13 @@ export { ConstitutionalFilter } from './constitutional-filter';
 // Enhanced Thought Generator
 export { EnhancedThoughtGenerator } from './thought-generator';
 
+// Event-Driven Thought Generator
+export {
+  eventDrivenThoughtGenerator,
+  EventDrivenThoughtGenerator,
+} from './event-driven-thought-generator';
+export type { BotLifecycleEvent } from './event-driven-thought-generator';
+
 // Self-Model
 export {
   IdentityTracker,

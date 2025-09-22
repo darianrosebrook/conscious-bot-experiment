@@ -7,21 +7,19 @@
  * @author @darianrosebrook
  */
 
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import {
   CapabilityRegistry,
   CapabilityRegistryBuilder,
   BUILT_IN_CAPABILITIES,
 } from '../capability-registry';
-import { PBIError, PBIErrorCode } from '../types';
+import { PBIError } from '../types';
 
 describe('CapabilityRegistry', () => {
   let registry: CapabilityRegistry;
 
   beforeEach(() => {
-    registry = new CapabilityRegistryBuilder()
-      .addAllBuiltIns()
-      .build();
+    registry = new CapabilityRegistryBuilder().addAllBuiltIns().build();
   });
 
   afterEach(() => {
@@ -241,7 +239,7 @@ describe('CapabilityRegistry', () => {
         inputSchema: BUILT_IN_CAPABILITIES.navigate.inputSchema,
         guard: () => true,
         runner: async () => ({ ok: true, startedAt: 0, endedAt: 0 }),
-        acceptance: () => true
+        acceptance: () => true,
       };
 
       expect(() => {

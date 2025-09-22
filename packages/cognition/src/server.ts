@@ -342,6 +342,7 @@ const reactArbiter = new ReActArbiter({
 // Import enhanced components
 import { EnhancedThoughtGenerator } from './thought-generator';
 import { IntrusiveThoughtProcessor } from './intrusive-thought-processor';
+import { SocialAwarenessManager } from './social-awareness-manager';
 
 // Initialize enhanced thought generator
 const enhancedThoughtGenerator = new EnhancedThoughtGenerator({
@@ -360,6 +361,14 @@ const intrusiveThoughtProcessor = new IntrusiveThoughtProcessor({
   enableMinecraftIntegration: true,
   planningEndpoint: 'http://localhost:3002',
   minecraftEndpoint: 'http://localhost:3005',
+});
+
+// Initialize social awareness manager
+const socialAwarenessManager = new SocialAwarenessManager({
+  maxDistance: 15,
+  considerationCooldownMs: 30000,
+  enableVerboseLogging: true,
+  cognitionEndpoint: 'http://localhost:3003',
 });
 
 // Initialize cognition system (simplified for now)
@@ -508,6 +517,27 @@ intrusiveThoughtProcessor.on(
   }
 );
 
+intrusiveThoughtProcessor.on('thoughtGenerated', ({ thought, timestamp }) => {
+  console.log(
+    'Intrusive thought generated as internal thought:',
+    thought.content
+  );
+
+  const generatedThought = {
+    id: `intrusive-generated-${timestamp}`,
+    type: thought.type || 'intrusive',
+    content: thought.content,
+    timestamp: thought.timestamp || timestamp,
+    context: thought.context,
+    metadata: thought.metadata,
+  };
+
+  sendThoughtToCognitiveStream(generatedThought);
+});
+
+// Legacy event listeners for action parsing and task creation - now disabled
+// since intrusive thoughts generate internal thoughts instead of tasks
+/*
 intrusiveThoughtProcessor.on(
   'actionParsed',
   ({ thought, action, timestamp }) => {
@@ -647,6 +677,7 @@ intrusiveThoughtProcessor.on('planningSystemUpdated', ({ task, result }) => {
 
   sendThoughtToCognitiveStream(planningThought);
 });
+*/
 
 intrusiveThoughtProcessor.on(
   'thoughtRecorded',
@@ -695,6 +726,38 @@ intrusiveThoughtProcessor.on('processingError', ({ thought, error }) => {
   };
 
   sendThoughtToCognitiveStream(errorThought);
+});
+
+// Social awareness manager event listeners
+socialAwarenessManager.on('socialConsiderationGenerated', (result: any) => {
+  console.log('Social consideration generated:', {
+    entity: result.entity,
+    shouldAcknowledge: result.shouldAcknowledge,
+    priority: result.priority,
+  });
+
+  const considerationThought = {
+    id: `social-consideration-${result.timestamp}`,
+    type: 'social_consideration',
+    content: result.reasoning,
+    timestamp: result.timestamp,
+    context: {
+      emotionalState: 'thoughtful',
+      confidence: 0.7,
+      cognitiveSystem: 'social-awareness',
+    },
+    metadata: {
+      thoughtType: 'social-consideration',
+      entityType: result.entity.type,
+      entityId: result.entity.id,
+      distance: result.entity.distance,
+      shouldAcknowledge: result.shouldAcknowledge,
+      priority: result.priority,
+      action: result.action,
+    },
+  };
+
+  sendThoughtToCognitiveStream(considerationThought);
 });
 
 // Health check endpoint
@@ -892,57 +955,53 @@ app.post('/process', async (req, res) => {
     console.log(`Processing ${type} request:`, { content, metadata });
 
     if (type === 'intrusion') {
-      // Use enhanced intrusive thought processor
+      // Use enhanced intrusive thought processor to generate internal thought
       const result =
         await intrusiveThoughtProcessor.processIntrusiveThought(content);
 
-      // Send the intrusive thought to the cognitive stream
-      try {
-        const cognitiveStreamResponse = await fetch(
-          'http://localhost:3000/api/ws/cognitive-stream',
-          {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              type: 'intrusive',
-              content: content,
-              attribution: 'external',
-              context: {
-                emotionalState: metadata?.emotion || 'curious',
-                confidence: metadata?.strength || 0.8,
-              },
-              metadata: {
-                messageType: 'intrusion',
-                intent: 'external_suggestion',
-                tags: metadata?.tags || [],
-                strength: metadata?.strength || 0.8,
-                processed: result.accepted,
-                taskId: result.taskId,
-              },
-            }),
-          }
-        );
+      // Send the generated internal thought to the cognitive stream with self attribution
+      if (result.thought) {
+        try {
+          const cognitiveStreamResponse = await fetch(
+            'http://localhost:3000/api/ws/cognitive-stream',
+            {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                type: result.thought.type || 'intrusive',
+                content: result.thought.content,
+                attribution: 'self',
+                context: result.thought.context,
+                metadata: result.thought.metadata,
+                id: result.thought.id,
+                timestamp: result.thought.timestamp,
+                processed: true,
+              }),
+            }
+          );
 
-        if (cognitiveStreamResponse.ok) {
-          console.log('✅ Intrusive thought sent to cognitive stream');
-        } else {
+          if (cognitiveStreamResponse.ok) {
+            console.log(
+              '✅ Intrusive thought processed as internal thought and sent to cognitive stream'
+            );
+          } else {
+            console.error(
+              '❌ Failed to send intrusive thought to cognitive stream as internal thought'
+            );
+          }
+        } catch (error) {
           console.error(
-            '❌ Failed to send intrusive thought to cognitive stream'
+            '❌ Error sending intrusive thought to cognitive stream as internal thought:',
+            error
           );
         }
-      } catch (error) {
-        console.error(
-          '❌ Error sending intrusive thought to cognitive stream:',
-          error
-        );
       }
 
       res.json({
         processed: result.accepted,
         type: 'intrusion',
         response: result.response,
-        taskId: result.taskId,
-        task: result.task,
+        thought: result.thought,
         timestamp: Date.now(),
       });
     } else if (type === 'external_chat') {
@@ -1123,6 +1182,125 @@ app.post('/generate-thoughts', async (req, res) => {
   } catch (error) {
     console.error('Error generating thoughts:', error);
     res.status(500).json({ error: 'Failed to generate thoughts' });
+  }
+});
+
+// Process social consideration for nearby entities
+app.post('/consider-social', async (req, res) => {
+  try {
+    const { entity, context } = req.body;
+
+    if (!entity || !entity.type) {
+      return res.status(400).json({
+        error: 'Missing required fields: entity.type',
+      });
+    }
+
+    console.log(`🤔 Processing social consideration for ${entity.type}:`, {
+      entityId: entity.id,
+      distance: entity.distance,
+      hostile: entity.hostile,
+      friendly: entity.friendly,
+    });
+
+    // Use enhanced thought generator for social consideration
+    const thought = await enhancedThoughtGenerator.generateSocialConsideration(
+      entity,
+      context
+    );
+
+    const thoughts = thought ? [thought] : [];
+
+    // Store thoughts for external access
+    thoughts.forEach((thought) => {
+      cognitiveThoughts.push(thought);
+    });
+
+    // Keep only the last 100 thoughts to prevent memory leaks
+    if (cognitiveThoughts.length > 100) {
+      cognitiveThoughts.splice(0, cognitiveThoughts.length - 100);
+    }
+
+    const result = {
+      processed: true,
+      entity: entity,
+      thought: thought,
+      socialDecision: thoughts.length > 0 ? thought?.content : null,
+      timestamp: Date.now(),
+    };
+
+    res.json(result);
+  } catch (error) {
+    console.error('Error processing social consideration:', error);
+    res.status(500).json({ error: 'Failed to process social consideration' });
+  }
+});
+
+// Process nearby entities for social consideration
+app.post('/process-nearby-entities', async (req, res) => {
+  try {
+    const { entities, context } = req.body;
+
+    if (!Array.isArray(entities)) {
+      return res.status(400).json({
+        error: 'entities must be an array',
+      });
+    }
+
+    console.log(
+      `🤔 Processing ${entities.length} nearby entities for social consideration`
+    );
+
+    // Use social awareness manager
+    const results = await socialAwarenessManager.processNearbyEntities(
+      entities,
+      context
+    );
+
+    // Send social consideration thoughts to cognitive stream
+    for (const result of results) {
+      const considerationThought = {
+        id: `social-consideration-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        type: 'social_consideration',
+        content: result.reasoning,
+        timestamp: result.timestamp,
+        context: {
+          emotionalState: 'thoughtful',
+          confidence: 0.7,
+          cognitiveSystem: 'social-awareness',
+        },
+        metadata: {
+          thoughtType: 'social-consideration',
+          entityType: result.entity.type,
+          entityId: result.entity.id,
+          distance: result.entity.distance,
+          shouldAcknowledge: result.shouldAcknowledge,
+          priority: result.priority,
+          action: result.action,
+          trigger: 'entity-nearby',
+        },
+        category: 'social',
+        tags: ['social', 'entity-nearby', 'consideration'],
+      };
+
+      await sendThoughtToCognitiveStream(considerationThought);
+    }
+
+    res.json({
+      processed: true,
+      entitiesConsidered: entities.length,
+      considerationsGenerated: results.length,
+      results: results.map((r) => ({
+        entity: r.entity,
+        shouldAcknowledge: r.shouldAcknowledge,
+        priority: r.priority,
+        action: r.action,
+      })),
+      timestamp: Date.now(),
+    });
+  } catch (error) {
+    console.error('Error processing nearby entities:', error);
+    res.status(500).json({ error: 'Failed to process nearby entities' });
   }
 });
 
@@ -1791,5 +1969,11 @@ app.listen(port, () => {
   );
   console.log(
     `🤝 Social cognition endpoint: http://localhost:${port}/social-cognition`
+  );
+  console.log(
+    `🧠 Social consideration endpoint: http://localhost:${port}/consider-social`
+  );
+  console.log(
+    `🤔 Nearby entities processing endpoint: http://localhost:${port}/process-nearby-entities`
   );
 });

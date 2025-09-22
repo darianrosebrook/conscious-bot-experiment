@@ -51,6 +51,7 @@ export interface BotResponse {
   task?: Task;
   recorded?: boolean;
   error?: string;
+  thought?: any; // Add thought interface for generated internal thoughts
 }
 
 // Plan types for MCP integration
@@ -173,8 +174,8 @@ export class IntrusiveThoughtProcessor extends EventEmitter {
   }
 
   /**
-   * Process an intrusive thought and convert it to actionable content
-   * Enhanced pipeline with MCP integration, grounding, and safety
+   * Process an intrusive thought and convert it to internal cognitive thought
+   * Now generates internal thoughts instead of external tasks
    */
   async processIntrusiveThought(thought: string): Promise<BotResponse> {
     try {
@@ -193,81 +194,23 @@ export class IntrusiveThoughtProcessor extends EventEmitter {
         };
       }
 
-      // Parse → intent (keep your regex as a fallback)
-      // If parsing fails, default to a safe clarification request rather than a vague investigation
-      const action = this.parseActionFromThought(canonical) ?? {
-        type: 'ask',
-        target: 'for clarification on next step',
-        priority: 'low',
-        category: 'social',
-      };
+      // Generate an internal thought about this intrusive thought
+      const internalThought =
+        this.generateInternalThoughtFromIntrusive(canonical);
 
-      // Policy gate (deny or patch unsafe)
-      const safeAction = this.policyRewrite(action);
-      if (!safeAction) {
-        return {
-          accepted: false,
-          response: `Unsafe or disallowed: ${action.type} ${action.target}`,
-        };
-      }
-
-      // Grounding: world snapshot via MCP (fast, cached)
-      const snapshot = this.config.mcp
-        ? await this.config.mcp.readResource<any>('world://snapshot')
-        : null;
-
-      // Readiness & survival bump
-      const adjusted = this.adjustPriorityByGrounding(safeAction, snapshot);
-
-      // Choose plan: existing option? sequence of leaves? propose new option?
-      let plan = await this.choosePlan(adjusted, snapshot);
-
-      // Preflight: ensure sequence leaves are available; if not, fall back to a status report
-      if (plan.kind === 'sequence') {
-        const ok = await this.sequenceLeavesAvailable(plan.leaves.map((l) => l.name));
-        if (!ok) {
-          plan = this.buildStatusReportPlan(snapshot);
-        }
-      }
-
-      // Bucket selection + idempotency key
-      const bucket = await this.selectBucket(plan, snapshot);
-      const idem = this.computeIdempotencyKey(canonical, plan, snapshot);
-
-      // Build task (steps derived from plan)
-      const task = this.buildTaskFromPlan(
-        thought,
-        adjusted,
-        plan,
-        bucket,
-        idem
-      );
+      // Emit event for the generated thought
+      this.emit('thoughtGenerated', {
+        thought: internalThought,
+        timestamp: Date.now(),
+      });
 
       // Record suppression last
       this.recent.set(canonical, Date.now());
 
-      // Send to planning system (reuse your existing updatePlanningSystem)
-      if (this.config.enablePlanningIntegration) {
-        await this.updatePlanningSystem(task);
-      }
-
-      // Optionally fire-and-forget tiny plans (Tactical bucket) immediately via MCP
-      if (plan.kind === 'option' && bucket.name === 'Tactical') {
-        try {
-          await this.config.mcp?.callTool('run_option', {
-            id: plan.id,
-            args: plan.args,
-          });
-        } catch {
-          /* ignore: planner will pick it up anyway */
-        }
-      }
-
       return {
         accepted: true,
-        response: `Created task (${bucket.name}): ${task.title}`,
-        taskId: task.id,
-        task,
+        response: `Generated internal thought: "${internalThought.content}"`,
+        thought: internalThought,
       };
     } catch (err) {
       this.emit('processingError', { thought, error: err });
@@ -278,6 +221,31 @@ export class IntrusiveThoughtProcessor extends EventEmitter {
         error: msg,
       };
     }
+  }
+
+  /**
+   * Generate an internal thought from an intrusive thought
+   */
+  private generateInternalThoughtFromIntrusive(thought: string): any {
+    return {
+      id: `intrusive-thought-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      type: 'intrusive',
+      content: thought,
+      timestamp: Date.now(),
+      context: {
+        emotionalState: 'curious',
+        confidence: 0.7,
+        cognitiveSystem: 'intrusive-processor',
+      },
+      metadata: {
+        thoughtType: 'intrusive-reflection',
+        source: 'intrusive-thought',
+        trigger: 'intrusive-thought-processed',
+      },
+      category: 'meta-cognitive',
+      tags: ['intrusive', 'reflection'],
+      priority: 'medium',
+    };
   }
 
   /**
