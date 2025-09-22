@@ -82,7 +82,7 @@ export class SimpleMinecraftInterface extends EventEmitter {
       throw new Error('Already connected');
     }
 
-    return new Promise((resolve, reject) => {
+    return new Promise(async (resolve, reject) => {
       const timeoutId = setTimeout(() => {
         reject(new Error('Connection timeout'));
       }, 30000);
@@ -922,11 +922,11 @@ export class SimpleMinecraftInterface extends EventEmitter {
         // Use pathfinder if available for more intelligent following
         if (this.bot.pathfinder) {
           try {
-            const { pathfinder, Movements } = await import(
+            const { pathfinder, goals, Movements } = await import(
               'mineflayer-pathfinder'
             );
             const movements = new Movements(this.bot);
-            const goal = new pathfinder.goals.GoalFollow(
+            const goal = new goals.GoalFollow(
               nearestPlayer.entity,
               3 // Follow within 3 blocks
             );
@@ -1017,11 +1017,11 @@ export class SimpleMinecraftInterface extends EventEmitter {
         // Use pathfinder for intelligent navigation
         if (this.bot.pathfinder) {
           try {
-            const { pathfinder, Movements } = await import(
+            const { pathfinder, goals, Movements } = await import(
               'mineflayer-pathfinder'
             );
             const movements = new Movements(this.bot);
-            const goal = new pathfinder.goals.GoalNear(
+            const goal = new goals.GoalNear(
               playerPos.x,
               playerPos.y,
               playerPos.z,
@@ -1116,8 +1116,8 @@ export class SimpleMinecraftInterface extends EventEmitter {
           const targetZ = Math.floor(currentPos.z + Math.sin(angle) * distance);
           const targetY = currentPos.y; // Stay at current Y level initially
 
-          const { pathfinder } = await import('mineflayer-pathfinder');
-          const goal = new pathfinder.goals.GoalNear(
+          const { pathfinder, goals } = await import('mineflayer-pathfinder');
+          const goal = new goals.GoalNear(
             targetX,
             targetY,
             targetZ,
