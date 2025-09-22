@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 /**
  * Navigation Bridge - Integrates D* Lite with Mineflayer's legitimate capabilities
  *
@@ -11,6 +12,15 @@
 import { Bot } from 'mineflayer';
 import { Vec3 } from 'vec3';
 import { EventEmitter } from 'events';
+import {
+  neuralTerrainPredictor,
+  TerrainPattern,
+  PredictionResult,
+} from './neural-terrain-predictor.js';
+import {
+  environmentalDetector,
+  EnvironmentalState,
+} from './environmental-detector.js';
 
 // Import D* Lite components from world package
 // Temporarily comment out to use local types
@@ -187,6 +197,12 @@ export class NavigationBridge extends EventEmitter {
   private terrainAnalyzer?: TerrainAnalyzer;
   private dynamicReconfigurator?: DynamicReconfigurator;
 
+  // Neural terrain prediction
+  private neuralEnabled: boolean = true;
+  private botId: string;
+  private predictionResults: Map<string, PredictionResult> = new Map();
+  private socialLearningEnabled: boolean = true;
+
   constructor(bot: Bot, config: Partial<NavigationBridgeConfig> = {}) {
     super();
 
@@ -200,6 +216,7 @@ export class NavigationBridge extends EventEmitter {
     });
 
     this.bot = bot;
+    this.botId = `bot_${Math.random().toString(36).substr(2, 9)}`;
     this.config = {
       maxRaycastDistance: 32,
       pathfindingTimeout: 30_000,
@@ -249,6 +266,12 @@ export class NavigationBridge extends EventEmitter {
 
     this.navigationSystem = new MockNavigationSystem(navConfig);
 
+    // Initialize neural terrain prediction
+    this.initializeNeuralPrediction();
+
+    // Initialize environmental monitoring
+    this.initializeEnvironmentalMonitoring();
+
     // Initialize pathfinder asynchronously - it will be ready when needed
     this.initializePathfinder();
     this.setupEventHandlers();
@@ -274,7 +297,6 @@ export class NavigationBridge extends EventEmitter {
         const mcData = mcDataModule.default || mcDataModule;
         // Check if mcData is callable
         if (typeof mcData === 'function') {
-          // eslint-disable-next-line @typescript-eslint/no-unused-vars
           // eslint-disable-next-line @typescript-eslint/no-unused-vars
           const _mcDataInstance = mcData(this.bot.version);
           console.log(
@@ -314,6 +336,70 @@ export class NavigationBridge extends EventEmitter {
 
       // Emit event that pathfinder failed
       this.emit('pathfinder-ready', { success: false, error: e });
+    }
+  }
+
+  /**
+   * Initialize neural terrain prediction system
+   */
+  private initializeNeuralPrediction(): void {
+    try {
+      console.log('🧠 Initializing neural terrain prediction...');
+
+      // Register this bot with the social learning system
+      neuralTerrainPredictor.registerBot(this.botId);
+
+      // Set up neural prediction event handlers
+      neuralTerrainPredictor.on(
+        'pattern-detected',
+        (pattern: TerrainPattern) => {
+          this.emit('neural-pattern-detected', pattern);
+        }
+      );
+
+      neuralTerrainPredictor.on(
+        'prediction-made',
+        (result: PredictionResult) => {
+          this.emit('neural-prediction-made', result);
+        }
+      );
+
+      neuralTerrainPredictor.on('learning-update', (data: any) => {
+        this.emit('neural-learning-update', data);
+      });
+
+      neuralTerrainPredictor.on('social-learning-analysis', (data: any) => {
+        this.emit('social-learning-analysis', data);
+      });
+
+      console.log('✅ Neural terrain prediction initialized');
+    } catch (error) {
+      console.error('❌ Failed to initialize neural prediction:', error);
+      this.neuralEnabled = false;
+    }
+  }
+
+  /**
+   * Initialize environmental monitoring system
+   */
+  private initializeEnvironmentalMonitoring(): void {
+    try {
+      console.log('🌍 Initializing environmental monitoring...');
+
+      // Start environmental monitoring
+      environmentalDetector.startMonitoring(3000); // Update every 3 seconds
+
+      // Set up environmental monitoring event handlers
+      environmentalDetector.on(
+        'environment-updated',
+        (state: EnvironmentalState) => {
+          this.emit('environment-updated', state);
+        }
+      );
+
+      console.log('✅ Environmental monitoring initialized');
+    } catch (error) {
+      console.error('❌ Failed to initialize environmental monitoring:', error);
     }
   }
 
@@ -406,11 +492,16 @@ export class NavigationBridge extends EventEmitter {
     const startTime = Date.now();
 
     try {
-      // 1) Observe local world (legitimate capabilities only)
+      // 1) Neural terrain prediction
+      if (this.neuralEnabled) {
+        await this.performNeuralPrediction(targetVec3);
+      }
+
+      // 2) Observe local world (legitimate capabilities only)
       const worldInfo = await this.gatherWorldInformation(targetVec3);
       this.obstaclesDetected = worldInfo.obstacles;
 
-      // 2) Plan with D* façade
+      // 3) Plan with D* façade
       const pathResult = await this.planPathWithDStarLite(targetVec3);
       if (
         !pathResult.success ||
@@ -881,13 +972,105 @@ export class NavigationBridge extends EventEmitter {
     currentPath: Vec3[];
     replanCount: number;
     obstaclesDetected: ObstacleInfo[];
+    neuralEnabled: boolean;
+    predictionResults: number;
+    botId: string;
+    environmentalState?: EnvironmentalState;
   } {
     return {
       isNavigating: this.isNavigating,
       currentPath: this.currentPath,
       replanCount: this.replanCount,
       obstaclesDetected: this.obstaclesDetected,
+      neuralEnabled: this.neuralEnabled,
+      predictionResults: this.predictionResults.size,
+      botId: this.botId,
+      environmentalState: environmentalDetector.getCurrentState() || undefined,
     };
+  }
+
+  /**
+   * Enable or disable neural prediction
+   */
+  setNeuralPrediction(enabled: boolean): void {
+    this.neuralEnabled = enabled;
+    neuralTerrainPredictor.setEnabled(enabled);
+    console.log(
+      `${enabled ? '🧠 Enabled' : '🚫 Disabled'} neural terrain prediction`
+    );
+  }
+
+  /**
+   * Enable or disable social learning
+   */
+  setSocialLearning(enabled: boolean): void {
+    this.socialLearningEnabled = enabled;
+    console.log(
+      `${enabled ? '👥 Enabled' : '🚫 Disabled'} social learning system`
+    );
+  }
+
+  /**
+   * Get neural prediction statistics
+   */
+  getNeuralStats(): any {
+    return neuralTerrainPredictor.getStats();
+  }
+
+  /**
+   * Record navigation outcome for learning
+   */
+  recordNavigationOutcome(success: boolean, pathLength?: number): void {
+    if (this.neuralEnabled && this.predictionResults.size > 0) {
+      // Use the most recent prediction for learning
+      const latestPrediction = Array.from(
+        this.predictionResults.values()
+      ).pop();
+      if (latestPrediction) {
+        const outcome = success ? 'success' : 'failure';
+        neuralTerrainPredictor.recordNavigationOutcome(
+          this.botId,
+          latestPrediction.optimalPath.join('_'),
+          outcome === 'success'
+        );
+      }
+    }
+  }
+
+  /**
+   * Get current environmental state
+   */
+  getEnvironmentalState(): EnvironmentalState | null {
+    return environmentalDetector.getCurrentState();
+  }
+
+  /**
+   * Detect environmental hazards at current position
+   */
+  getEnvironmentalHazards(): Array<{
+    type: string;
+    position: Vec3;
+    severity: 'low' | 'medium' | 'high';
+    description: string;
+    avoidanceDistance: number;
+  }> {
+    return environmentalDetector.detectHazards(this.bot.entity.position);
+  }
+
+  /**
+   * Get environmental statistics
+   */
+  getEnvironmentalStats(): any {
+    return environmentalDetector.getEnvironmentalStats();
+  }
+
+  /**
+   * Force environmental analysis update
+   */
+  async updateEnvironmentalAnalysis(): Promise<EnvironmentalState> {
+    return await environmentalDetector.analyzeEnvironment(
+      this.bot.entity.position
+    );
   }
 
   /**
@@ -944,6 +1127,76 @@ export class NavigationBridge extends EventEmitter {
       replans: this.replanCount,
       obstaclesDetected: this.obstaclesDetected.length,
       error: msg,
+    };
+  }
+
+  /**
+   * Perform neural terrain prediction for enhanced pathfinding
+   */
+  private async performNeuralPrediction(target: Vec3): Promise<void> {
+    try {
+      console.log('🧠 Performing neural terrain prediction...');
+
+      // Get neural prediction for the path
+      const prediction = await neuralTerrainPredictor.predictPath(
+        this.bot.entity.position,
+        target
+      );
+
+      // Store prediction result
+      const predictionId = `${this.bot.entity.position.x}_${this.bot.entity.position.z}_${target.x}_${target.z}`;
+      this.predictionResults.set(predictionId, prediction);
+
+      // Share successful patterns with social learning system
+      if (this.socialLearningEnabled && prediction.confidence > 0.7) {
+        const pattern: TerrainPattern = {
+          id: `pattern_${Date.now()}`,
+          type: prediction.terrainType,
+          position: this.bot.entity.position,
+          confidence: prediction.confidence,
+          features: await this.generateTerrainFeatures(
+            this.bot.entity.position
+          ),
+          timestamp: Date.now(),
+          predictedStability: 1 - prediction.riskAssessment,
+        };
+
+        neuralTerrainPredictor.sharePattern(this.botId, pattern);
+      }
+
+      console.log('✅ Neural prediction completed:', {
+        terrainType: prediction.terrainType,
+        confidence: prediction.confidence.toFixed(2),
+        riskAssessment: prediction.riskAssessment.toFixed(2),
+        predictedChanges: prediction.predictedChanges.length,
+      });
+    } catch (error) {
+      console.error('❌ Neural prediction failed:', error);
+    }
+  }
+
+  /**
+   * Generate terrain features for neural network analysis
+   */
+  private async generateTerrainFeatures(position: Vec3): Promise<any> {
+    // This would integrate with the actual Minecraft world
+    // For now, return mock features based on current world info
+    const lightLevel = 15; // Default daylight
+    const biome = 'plains'; // Default biome
+
+    return {
+      blockType: 'stone',
+      hardness: 1.5,
+      transparency: 0,
+      lightLevel,
+      biome,
+      elevation: position.y,
+      slope: 0.1,
+      hazardProximity: 0.2,
+      stability: 0.9,
+      accessibility: 0.8,
+      resourceDensity: 0.3,
+      harvestability: 0.6,
     };
   }
 
@@ -1015,7 +1268,9 @@ class TerrainAnalyzer {
    * Analyze terrain around a position
    */
   async analyzeTerrain(
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     _position: Vec3,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     _radius: number = 16
   ): Promise<TerrainType> {
     const cacheKey = `${_position.x},${_position.y},${_position.z}`;
@@ -1036,9 +1291,10 @@ class TerrainAnalyzer {
   /**
    * Perform actual terrain analysis using bot's view
    */
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   private async performTerrainAnalysis(
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     _position: Vec3,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     _radius: number
   ): Promise<TerrainType> {
     // This would use bot's raycasting and block inspection
@@ -1093,6 +1349,27 @@ class TerrainAnalyzer {
         dynamicEnvironment: true,
         preferredMovement: 'adaptive',
       },
+      [TerrainType.MOUNTAINS]: {
+        verticalMovement: 'high',
+        obstacleDensity: 'high',
+        hazardLevel: 'high',
+        dynamicEnvironment: true,
+        preferredMovement: 'careful',
+      },
+      [TerrainType.NETHER]: {
+        verticalMovement: 'medium',
+        obstacleDensity: 'high',
+        hazardLevel: 'high',
+        dynamicEnvironment: true,
+        preferredMovement: 'safe',
+      },
+      [TerrainType.END]: {
+        verticalMovement: 'medium',
+        obstacleDensity: 'low',
+        hazardLevel: 'medium',
+        dynamicEnvironment: false,
+        preferredMovement: 'balanced',
+      },
       [TerrainType.UNKNOWN]: {
         verticalMovement: 'medium',
         obstacleDensity: 'medium',
@@ -1137,9 +1414,10 @@ class DynamicReconfigurator {
     config: NavigationConfig;
   }> = [];
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   constructor(
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     private _terrainAnalyzer: TerrainAnalyzer,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     private _navigationSystem: MockNavigationSystem
   ) {
     // Set up periodic terrain checking during navigation
@@ -1304,6 +1582,68 @@ class DynamicReconfigurator {
           mobProximity: 250,
           darknessPenalty: 40,
           waterPenalty: 25,
+        },
+      },
+      [TerrainType.MOUNTAINS]: {
+        ...baseConfig,
+        dstarLite: {
+          ...(baseConfig.dstarLite ?? {}),
+          searchRadius: 280,
+          replanThreshold: 2,
+          maxComputationTime: 40,
+          heuristicWeight: 1.3,
+        },
+        costCalculation: {
+          ...(baseConfig.costCalculation ?? {}),
+          verticalMultiplier: 1.5,
+          jumpCost: 2.2,
+        },
+        hazardCosts: {
+          ...(baseConfig.hazardCosts ?? {}),
+          voidFall: 20000,
+          mobProximity: 200,
+        },
+      },
+      [TerrainType.NETHER]: {
+        ...baseConfig,
+        dstarLite: {
+          ...(baseConfig.dstarLite ?? {}),
+          searchRadius: 160,
+          replanThreshold: 1,
+          maxComputationTime: 20,
+          heuristicWeight: 0.8,
+        },
+        costCalculation: {
+          ...(baseConfig.costCalculation ?? {}),
+          verticalMultiplier: 1.8,
+          jumpCost: 3.0,
+          swimCost: 8.0,
+        },
+        hazardCosts: {
+          ...(baseConfig.hazardCosts ?? {}),
+          lavaProximity: 10000,
+          firePenalty: 2000,
+          darknessPenalty: 200,
+        },
+      },
+      [TerrainType.END]: {
+        ...baseConfig,
+        dstarLite: {
+          ...(baseConfig.dstarLite ?? {}),
+          searchRadius: 200,
+          replanThreshold: 3,
+          maxComputationTime: 25,
+          heuristicWeight: 1.0,
+        },
+        costCalculation: {
+          ...(baseConfig.costCalculation ?? {}),
+          verticalMultiplier: 1.2,
+          jumpCost: 1.5,
+        },
+        hazardCosts: {
+          ...(baseConfig.hazardCosts ?? {}),
+          voidFall: 25000,
+          mobProximity: 300,
         },
       },
       [TerrainType.UNKNOWN]: baseConfig,

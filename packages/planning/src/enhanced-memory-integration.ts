@@ -100,13 +100,13 @@ export class EnhancedMemoryIntegration extends EventEmitter {
     console.log('🔍 Discovering memory system endpoints...');
 
     // Try multiple endpoints in order of preference
-    const potentialEndpoints = [
-      process.env.MEMORY_ENDPOINT,
+    const potentialEndpoints: string[] = [
+      process.env.MEMORY_ENDPOINT || 'http://localhost:3001',
       'http://localhost:3001',
       'http://memory:3001',
       'http://127.0.0.1:3001',
       'http://conscious-bot-memory:3001',
-    ].filter(Boolean);
+    ];
 
     const discovered: string[] = [];
 
@@ -687,7 +687,7 @@ export class EnhancedMemoryIntegration extends EventEmitter {
         };
       }
 
-      const searchData = await searchResponse.json();
+      const searchData = (await searchResponse.json()) as any;
       const memories: ReflectiveNote[] = [];
 
       // Convert search results to reflective notes

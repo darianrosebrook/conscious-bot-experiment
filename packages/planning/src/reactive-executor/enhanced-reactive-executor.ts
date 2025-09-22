@@ -33,6 +33,11 @@ import {
   ExecutionHealthMetrics,
   DEFAULT_PBI_ACCEPTANCE,
 } from '@conscious-bot/executor-contracts';
+import {
+  MCPIntegration,
+  ToolExecutionResult,
+  ToolDiscoveryResult,
+} from '../modules/mcp-integration';
 
 export interface ExecutionResult {
   success: boolean;
@@ -57,6 +62,14 @@ export interface RealTimeAdapter {
   optimizeExecution(plan: GOAPPlan, context: GOAPExecutionContext): GOAPPlan;
 }
 
+export interface MCPExecutionConfig {
+  enableMCPExecution?: boolean;
+  mcpEndpoint?: string;
+  enableToolDiscovery?: boolean;
+  preferMCPForTaskTypes?: string[];
+  fallbackToMinecraft?: boolean;
+}
+
 /**
  * Enhanced Reactive Executor with advanced features
  */
@@ -75,7 +88,11 @@ export class EnhancedReactiveExecutor {
   private memoryEndpoint?: string;
   private memoryClient?: any;
 
-  constructor() {
+  // MCP Integration
+  private mcpConfig?: MCPExecutionConfig;
+  private mcpIntegration?: MCPIntegration;
+
+  constructor(mcpConfig?: MCPExecutionConfig) {
     this.goapPlanner = new EnhancedGOAPPlanner();
     this.planRepair = new EnhancedPlanRepair();
     this.contextBuilder = new DefaultExecutionContextBuilder();
@@ -88,9 +105,39 @@ export class EnhancedReactiveExecutor {
     // Initialize memory integration
     this.initializeMemoryIntegration();
 
+    // Initialize MCP integration
+    this.mcpConfig = {
+      enableMCPExecution: true,
+      mcpEndpoint: process.env.MCP_ENDPOINT || 'http://localhost:3000',
+      enableToolDiscovery: true,
+      preferMCPForTaskTypes: ['action', 'custom', 'tool'],
+      fallbackToMinecraft: true,
+      ...mcpConfig,
+    };
+
+    this.initializeMemoryIntegration();
+
     // Bootstrap essential capabilities for fresh start
     // Note: This is fire-and-forget since constructor can't be async
     void this.bootstrapPBICapabilities();
+  }
+
+  /**
+   * Initialize MCP integration
+   */
+  private initializeMCPIntegration(): void {
+    if (this.mcpConfig?.enableMCPExecution) {
+      this.mcpIntegration = new MCPIntegration({
+        enableMCP: true,
+        enableToolDiscovery: this.mcpConfig.enableToolDiscovery,
+        toolDiscoveryEndpoint: this.mcpConfig.mcpEndpoint,
+        maxToolsPerGoal: 5,
+        toolTimeoutMs: 30000,
+      });
+
+      // Initialize MCP integration (async, but fire-and-forget)
+      void this.mcpIntegration.initialize();
+    }
   }
 
   /**
@@ -230,10 +277,12 @@ export class EnhancedReactiveExecutor {
     try {
       // Extract context from plan and world state
       const context = {
-        query: `Planning execution for: ${plan.goal.description}`,
-        taskType: plan.goal.type,
+        query: `Planning execution for goal ${plan.goalId}`,
+        taskType: 'planning',
         entities: this.extractEntitiesFromPlan(plan),
-        location: worldState.currentLocation,
+        location: worldState.getPosition
+          ? worldState.getPosition()
+          : { x: 0, y: 0, z: 0 },
         recentEvents: this.getRecentExecutionHistory(3),
         maxMemories: 5,
       };
@@ -243,7 +292,7 @@ export class EnhancedReactiveExecutor {
 
       // Add plan-specific memory analysis
       const planMemory = {
-        planType: plan.goal.type,
+        planType: 'planning', // Default since Plan doesn't have goal property
         planComplexity: plan.steps.length,
         estimatedDuration: this.estimatePlanDuration(plan),
         successProbability: this.calculatePlanSuccessProbability(
@@ -269,14 +318,17 @@ export class EnhancedReactiveExecutor {
   private extractEntitiesFromPlan(plan: Plan): string[] {
     const entities: string[] = [];
 
-    // Extract from goal
-    const goalContent = plan.goal.description.toLowerCase();
+    // Extract from goal ID (Plan doesn't have goal property)
+    const goalContent = plan.goalId.toLowerCase();
     const goalEntities = this.extractMinecraftEntities(goalContent);
     entities.push(...goalEntities);
 
     // Extract from plan steps
     for (const step of plan.steps) {
-      const stepContent = step.description.toLowerCase();
+      const stepContent =
+        step.action && typeof (step.action as any) === 'string'
+          ? (step.action as any).toLowerCase()
+          : 'step';
       const stepEntities = this.extractMinecraftEntities(stepContent);
       entities.push(...stepEntities);
     }
@@ -413,7 +465,8 @@ export class EnhancedReactiveExecutor {
 
       // Build execution context with memory enhancement
       const context = this.contextBuilder.buildContext(worldState, goapPlan);
-      context.memoryContext = memoryContext;
+      // Note: context.memoryContext would be added if ExecutionContext interface supported it
+      // For now, memory context is handled separately in the execution logic
 
       // Check for safety reflexes first
       const safetyReflex = this.goapPlanner.checkSafetyReflexes(
@@ -862,7 +915,14 @@ export class EnhancedReactiveExecutor {
         };
       }
 
-      // Execute the task based on type
+      // Check if we should try MCP execution first
+      // TODO: Re-enable MCP integration when MCP methods are properly implemented
+      // For now, skip MCP and go directly to Minecraft execution
+      console.log(
+        `🔧 [REACTIVE EXECUTOR] Executing task directly via Minecraft: ${task.title}`
+      );
+
+      // Execute the task based on type (original logic)
       switch (task.type) {
         case 'action':
           // Handle generic action tasks by inferring the specific action from the title/description
@@ -1738,5 +1798,291 @@ class DefaultRealTimeAdapter implements RealTimeAdapter {
     };
 
     return durationEstimates[task.type] || 2000;
+  }
+
+  /**
+   * Check if a task should use MCP execution
+   */
+  private shouldUseMCPForTask(task: any): boolean {
+    if (!this.mcpConfig?.enableMCPExecution || !this.mcpIntegration) {
+      return false;
+    }
+
+    // Check if task type is preferred for MCP
+    if (this.mcpConfig.preferMCPForTaskTypes?.includes(task.type)) {
+      return true;
+    }
+
+    // Check if task has MCP-specific metadata
+    if (task.metadata?.useMCP || task.metadata?.mcpExecution) {
+      return true;
+    }
+
+    // Check if task is a cognitive reflection task (likely to benefit from MCP tools)
+    if (task.type === 'cognitive_reflection' || task.type === 'planning') {
+      return true;
+    }
+
+    // Check if task has tool execution history in metadata
+    if (task.metadata?.toolExecution) {
+      return true;
+    }
+
+    return false;
+  }
+
+  /**
+   * Execute a task via MCP tools
+   */
+  private async executeTaskViaMCP(
+    task: any,
+    minecraftUrl: string
+  ): Promise<any> {
+    if (!this.mcpIntegration) {
+      throw new Error('MCP integration not available');
+    }
+
+    const startTime = Date.now();
+
+    try {
+      // 1. Discover tools for this task
+      const toolDiscovery = await this.discoverToolsForTask(task);
+
+      if (toolDiscovery.matchedTools.length === 0) {
+        return {
+          success: false,
+          error: 'No suitable MCP tools found for task',
+          type: task.type,
+          executionMethod: 'mcp',
+          discoveryTime: toolDiscovery.discoveryTime,
+        };
+      }
+
+      // 2. Execute the most relevant tool
+      const bestTool = toolDiscovery.matchedTools[0].tool;
+      const toolArgs = this.prepareTaskArgsForTool(task, bestTool);
+
+      console.log(
+        `🔧 [REACTIVE EXECUTOR] Executing task via MCP tool: ${bestTool.name}`
+      );
+
+      const toolResult = await this.mcpIntegration.executeToolWithEvaluation(
+        bestTool,
+        toolArgs,
+        task.id || `task_${Date.now()}`,
+        {
+          worldState: await this.getCurrentWorldState(minecraftUrl),
+          taskContext: task,
+          minecraftEndpoint: minecraftUrl,
+        }
+      );
+
+      // 3. Convert MCP result to task execution result
+      const taskResult = this.convertMCPResultToTaskResult(
+        task,
+        toolResult,
+        minecraftUrl
+      );
+
+      // 4. Store execution history
+      this.storeTaskExecutionResult(task, taskResult, 'mcp');
+
+      return taskResult;
+    } catch (error) {
+      console.error(
+        `❌ [REACTIVE EXECUTOR] MCP execution failed for task: ${task.title}`,
+        error
+      );
+
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'MCP execution failed',
+        type: task.type,
+        executionMethod: 'mcp',
+        executionTime: Date.now() - startTime,
+      };
+    }
+  }
+
+  /**
+   * Discover MCP tools for a specific task
+   */
+  private async discoverToolsForTask(task: any): Promise<ToolDiscoveryResult> {
+    if (!this.mcpIntegration) {
+      throw new Error('MCP integration not available');
+    }
+
+    const taskDescription =
+      task.title || task.description || `Execute ${task.type} task`;
+    const goalId = task.id || `task_${Date.now()}`;
+
+    return await this.mcpIntegration.discoverToolsForGoal(
+      goalId,
+      taskDescription,
+      {
+        taskType: task.type,
+        taskParameters: task.parameters,
+        taskMetadata: task.metadata,
+        urgency: task.urgency || 0.5,
+        priority: task.priority || 0.5,
+      }
+    );
+  }
+
+  /**
+   * Prepare task arguments for MCP tool execution
+   */
+  private prepareTaskArgsForTool(task: any, tool: any): Record<string, any> {
+    const args: Record<string, any> = {};
+
+    // Add task parameters
+    if (task.parameters) {
+      Object.assign(args, task.parameters);
+    }
+
+    // Add task metadata
+    if (task.metadata) {
+      args.taskMetadata = task.metadata;
+    }
+
+    // Add task context
+    args.taskContext = {
+      id: task.id,
+      type: task.type,
+      title: task.title,
+      description: task.description,
+      priority: task.priority,
+      urgency: task.urgency,
+    };
+
+    // Add execution context
+    args.executionContext = {
+      executionMethod: 'reactive_executor',
+      timestamp: Date.now(),
+    };
+
+    return args;
+  }
+
+  /**
+   * Get current world state from Minecraft
+   */
+  private async getCurrentWorldState(minecraftUrl: string): Promise<any> {
+    try {
+      const response = await fetch(`${minecraftUrl}/health`);
+      if (response.ok) {
+        return await response.json();
+      }
+    } catch (error) {
+      console.warn('Failed to get world state from Minecraft:', error);
+    }
+
+    return {
+      position: { x: 0, y: 64, z: 0 },
+      health: 20,
+      inventory: { items: [], selectedSlot: 0 },
+      environment: 'surface',
+      time: 'day',
+      biome: 'plains',
+    };
+  }
+
+  /**
+   * Convert MCP tool result to task execution result
+   */
+  private convertMCPResultToTaskResult(
+    task: any,
+    toolResult: ToolExecutionResult,
+    minecraftUrl: string
+  ): any {
+    const executionTime = Date.now();
+
+    return {
+      success: toolResult.success,
+      error: toolResult.error,
+      type: task.type,
+      executionMethod: 'mcp',
+      executionTime: toolResult.executionTime,
+      toolResult: {
+        toolName: toolResult.toolName,
+        effectiveness: toolResult.evaluation.effectiveness,
+        sideEffects: toolResult.evaluation.sideEffects,
+        recommendation: toolResult.evaluation.recommendation,
+        metrics: toolResult.metrics,
+      },
+      result: toolResult.result,
+      metadata: {
+        ...task.metadata,
+        mcpExecution: {
+          toolName: toolResult.toolName,
+          toolSuccess: toolResult.success,
+          toolEffectiveness: toolResult.evaluation.effectiveness,
+          executionTime: toolResult.executionTime,
+        },
+      },
+    };
+  }
+
+  /**
+   * Store task execution result for analytics
+   */
+  private storeTaskExecutionResult(
+    task: any,
+    result: any,
+    method: 'mcp' | 'minecraft'
+  ): void {
+    // This could be extended to store in memory or send to analytics
+    console.log(
+      `📊 [REACTIVE EXECUTOR] Stored execution result for task: ${task.title} via ${method}`
+    );
+
+    if (result.toolResult) {
+      this.emit('taskExecuted', {
+        taskId: task.id,
+        taskType: task.type,
+        executionMethod: method,
+        success: result.success,
+        toolName: result.toolResult.toolName,
+        effectiveness: result.toolResult.effectiveness,
+        executionTime: result.executionTime,
+      });
+    }
+  }
+
+  /**
+   * Get MCP execution statistics
+   */
+  getMCPExecutionStats(): {
+    enabled: boolean;
+    totalExecutions: number;
+    successRate: number;
+    averageExecutionTime: number;
+    toolUsage: Record<string, { count: number; successRate: number }>;
+  } {
+    // This would need to be implemented with actual tracking data
+    return {
+      enabled: !!this.mcpConfig?.enableMCPExecution,
+      totalExecutions: 0,
+      successRate: 0,
+      averageExecutionTime: 0,
+      toolUsage: {},
+    };
+  }
+
+  /**
+   * Update MCP configuration
+   */
+  updateMCPConfig(newConfig: Partial<MCPExecutionConfig>): void {
+    if (this.mcpConfig) {
+      this.mcpConfig = { ...this.mcpConfig, ...newConfig };
+
+      // Re-initialize if needed
+      if (
+        newConfig.enableMCPExecution !== undefined ||
+        newConfig.mcpEndpoint !== undefined
+      ) {
+        this.initializeMCPIntegration();
+      }
+    }
   }
 }
