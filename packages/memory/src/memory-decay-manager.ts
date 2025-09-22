@@ -23,6 +23,15 @@ export interface MemoryAccessRecord {
   importance: number; // 0-1, higher = more important
   shouldRetain: boolean;
   consolidationCandidate: boolean;
+  // Neuroscience-inspired consolidation tracking
+  consolidatedAt?: number; // When this memory was last consolidated
+  swrStrength?: number; // Sharp wave ripple strength (0-1)
+  consolidationHistory: Array<{
+    timestamp: number;
+    consolidationType: 'swr' | 'decay' | 'manual';
+    strength: number;
+    importanceBoost: number;
+  }>;
 }
 
 export interface MemoryDecayProfile {
@@ -202,6 +211,8 @@ export class MemoryDecayManager {
       socialSignificance?: number;
       taskRelevance?: number;
       narrativeImportance?: number;
+      swrStrength?: number; // Sharp wave ripple strength
+      consolidationType?: 'swr' | 'decay' | 'manual'; // Type of consolidation
     } = {}
   ): MemoryAccessRecord {
     const now = Date.now();
@@ -218,6 +229,9 @@ export class MemoryDecayManager {
         importance: this.calculateImportance(metadata),
         shouldRetain: true,
         consolidationCandidate: false,
+        consolidatedAt: undefined,
+        swrStrength: metadata.swrStrength,
+        consolidationHistory: [],
       };
     } else {
       // Update existing record
@@ -226,6 +240,21 @@ export class MemoryDecayManager {
       record.accessPattern = this.updateAccessPattern(record);
       record.decayRate = this.recalculateDecayRate(record, metadata);
       record.importance = this.recalculateImportance(record, metadata);
+
+      // Update consolidation tracking
+      if (metadata.swrStrength !== undefined) {
+        record.swrStrength = metadata.swrStrength;
+      }
+
+      if (metadata.consolidationType) {
+        record.consolidatedAt = now;
+        record.consolidationHistory.push({
+          timestamp: now,
+          consolidationType: metadata.consolidationType,
+          strength: record.swrStrength || 0,
+          importanceBoost: this.calculateConsolidationBoost(record),
+        });
+      }
     }
 
     this.accessRecords.set(memoryId, record);
@@ -250,7 +279,11 @@ export class MemoryDecayManager {
 
     // Importance reduces decay
     const importanceProtection = Math.max(0, 1 - record.importance);
-    const currentDecay = Math.max(0, timeDecay - importanceProtection);
+    let currentDecay = Math.max(0, timeDecay - importanceProtection);
+
+    // Neuroscience-inspired: Recently consolidated memories get additional protection
+    const consolidationBoost = this.calculateConsolidationBoost(record);
+    currentDecay = Math.max(0, currentDecay - consolidationBoost);
 
     // Predict retention time
     const predictedRetentionDays =
@@ -475,6 +508,60 @@ export class MemoryDecayManager {
     const retentionThreshold = 0.1;
     const daysToThreshold = Math.log(retentionThreshold) / Math.log(1 - rate);
     return Math.ceil(daysToThreshold);
+  }
+
+  /**
+   * Calculate consolidation boost for recently consolidated memories
+   */
+  calculateConsolidationBoost(record: MemoryAccessRecord): number {
+    if (!record.consolidatedAt) return 0;
+
+    const now = Date.now();
+    const hoursSinceConsolidation =
+      (now - record.consolidatedAt) / (1000 * 60 * 60);
+
+    // Boost decays over time - max boost immediately after consolidation
+    if (hoursSinceConsolidation <= 1) {
+      // Within 1 hour
+      return 0.3; // 30% decay reduction
+    } else if (hoursSinceConsolidation <= 24) {
+      // Within 24 hours
+      return 0.2 * (1 - (hoursSinceConsolidation - 1) / 23); // Linear decay from 0.2 to 0
+    } else if (hoursSinceConsolidation <= 72) {
+      // Within 3 days
+      return 0.1 * (1 - (hoursSinceConsolidation - 24) / 48); // Linear decay from 0.1 to 0
+    }
+
+    return 0; // No boost after 3 days
+  }
+
+  /**
+   * Record memory consolidation event
+   */
+  recordConsolidation(
+    memoryId: string,
+    consolidationType: 'swr' | 'decay' | 'manual',
+    strength: number = 0.5,
+    importanceBoost: number = 0.1
+  ): void {
+    const record = this.accessRecords.get(memoryId);
+    if (!record) return;
+
+    const now = Date.now();
+    record.consolidatedAt = now;
+    record.consolidationHistory.push({
+      timestamp: now,
+      consolidationType,
+      strength,
+      importanceBoost,
+    });
+
+    // Boost importance based on consolidation
+    record.importance = Math.min(1.0, record.importance + importanceBoost);
+
+    console.log(
+      `🧠 Recorded ${consolidationType} consolidation for memory ${memoryId} with strength ${strength.toFixed(3)}`
+    );
   }
 
   // ============================================================================

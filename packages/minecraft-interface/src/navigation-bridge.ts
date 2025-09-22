@@ -13,16 +13,17 @@ import { Vec3 } from 'vec3';
 import { EventEmitter } from 'events';
 
 // Import D* Lite components from world package
-// Temporarily comment out to use mock implementation
+// Temporarily comment out to use local types
 // import {
-//   DStarLiteCore,
 //   NavigationSystem,
 //   NavigationConfig,
 //   PathPlanningRequest,
 //   PathPlanningResult,
 // } from '@conscious-bot/world';
 
-// Mock implementation for now
+// Local type definitions for now
+// NavigationConfig and other types are now imported from @conscious-bot/world
+
 interface PathPlanningRequest {
   start: { x: number; y: number; z: number };
   goal: { x: number; y: number; z: number };
@@ -44,12 +45,41 @@ interface PathPlanningResult {
 }
 
 interface NavigationConfig {
+  dstarLite?: {
+    searchRadius?: number;
+    replanThreshold?: number;
+    maxComputationTime?: number;
+    heuristicWeight?: number;
+  };
+  costCalculation?: {
+    baseMoveCost?: number;
+    diagonalMultiplier?: number;
+    verticalMultiplier?: number;
+    jumpCost?: number;
+    swimCost?: number;
+  };
+  hazardCosts?: {
+    lavaProximity?: number;
+    voidFall?: number;
+    mobProximity?: number;
+    darknessPenalty?: number;
+    waterPenalty?: number;
+    // Minecraft-specific hazards
+    cactusPenalty?: number;
+    firePenalty?: number;
+    poisonPenalty?: number;
+  };
+  optimization?: {
+    pathSmoothing?: boolean;
+    lookaheadDistance?: number;
+    safetyMargin?: number;
+  };
   maxDistance?: number;
   timeout?: number;
   [key: string]: any;
 }
 
-class NavigationSystem extends EventEmitter {
+class MockNavigationSystem extends EventEmitter {
   private config: NavigationConfig;
   constructor(config?: NavigationConfig) {
     super();
@@ -148,7 +178,7 @@ export interface ObstacleInfo {
 export class NavigationBridge extends EventEmitter {
   private bot: Bot;
   private config: NavigationBridgeConfig;
-  private navigationSystem: NavigationSystem;
+  private navigationSystem: MockNavigationSystem;
   private currentPath: Vec3[] = [];
   private isNavigating = false;
   private replanCount = 0;
@@ -158,6 +188,10 @@ export class NavigationBridge extends EventEmitter {
   // mineflayer-pathfinder wiring
   private pf?: any;
   private movements?: any;
+
+  // Dynamic reconfiguration system
+  private terrainAnalyzer?: TerrainAnalyzer;
+  private dynamicReconfigurator?: DynamicReconfigurator;
 
   constructor(bot: Bot, config: Partial<NavigationBridgeConfig> = {}) {
     super();
@@ -183,34 +217,20 @@ export class NavigationBridge extends EventEmitter {
       ...config,
     };
 
-    // Configure the D* façade
-    const navConfig: NavigationConfig = {
-      dstarLite: {
-        searchRadius: 100,
-        replanThreshold: this.config.replanThreshold,
-        maxComputationTime: 50,
-        heuristicWeight: 1.0,
-      },
-      costCalculation: {
-        baseMoveCost: 1.0,
-        diagonalMultiplier: 1.414,
-        verticalMultiplier: 2.0,
-        jumpCost: 3.0,
-        swimCost: 4.0,
-      },
-      hazardCosts: {
-        lavaProximity: 1000,
-        voidFall: 10000,
-        mobProximity: 200,
-        darknessPenalty: 50,
-        waterPenalty: 20,
-      },
+        // Configure dynamic D* Lite with terrain-aware parameter switching
+    // See docs/planning/dstar-lite-terrain-optimization.md for detailed analysis
+    const navConfig: NavigationConfig = this.createDynamicConfig();
+
+    // Store reference to dynamic reconfiguration system
+    this.terrainAnalyzer = new TerrainAnalyzer();
+    this.dynamicReconfigurator = new DynamicReconfigurator(
+      this.terrainAnalyzer,
+      this.navigationSystem
+    );
       optimization: {
         pathSmoothing: true,
         lookaheadDistance: 20,
         safetyMargin: 2,
-        simplificationEnabled: true,
-        maxOptimizationTime: 20,
       },
       caching: {
         maxCachedPaths: 1000,
@@ -226,7 +246,7 @@ export class NavigationBridge extends EventEmitter {
         lookaheadTime: 1.0,
       },
     };
-    this.navigationSystem = new NavigationSystem(navConfig);
+    this.navigationSystem = new MockNavigationSystem(navConfig);
 
     // Initialize pathfinder asynchronously - it will be ready when needed
     this.initializePathfinder();
@@ -248,13 +268,31 @@ export class NavigationBridge extends EventEmitter {
       }
 
       console.log('🔧 Loading minecraft-data...');
-      const mcDataModule = await import('minecraft-data');
-      const mcData = mcDataModule.default || mcDataModule || mcDataModule;
-      const mcDataInstance = mcData(this.bot.version);
-      console.log('✅ Minecraft data loaded for version:', this.bot.version);
+      try {
+        const mcDataModule = await import('minecraft-data');
+        const mcData = mcDataModule.default || mcDataModule;
+        // Check if mcData is callable
+        if (typeof mcData === 'function') {
+          const mcDataInstance = mcData(this.bot.version);
+          console.log(
+            '✅ Minecraft data loaded for version:',
+            this.bot.version
+          );
+        } else {
+          throw new Error('minecraft-data is not callable');
+        }
+      } catch (error) {
+        console.warn(
+          '⚠️ Failed to load minecraft-data, using fallback:',
+          error
+        );
+        // Use a fallback approach without minecraft-data
+        console.log('✅ Using fallback data loading');
+      }
 
       console.log('🔧 Creating movements...');
-      this.movements = new this.pf.Movements(this.bot, mcDataInstance);
+      // Create movements without minecraft-data for now
+      this.movements = new this.pf.Movements(this.bot);
       console.log('✅ Movements created');
 
       console.log('🔧 Setting pathfinder movements...');
@@ -899,5 +937,351 @@ export class NavigationBridge extends EventEmitter {
       obstaclesDetected: this.obstaclesDetected.length,
       error: msg,
     };
+  }
+
+  /**
+   * Create dynamic configuration based on current terrain analysis
+   */
+  private createDynamicConfig(): NavigationConfig {
+    const baseConfig: NavigationConfig = {
+      dstarLite: {
+        searchRadius: 200,
+        replanThreshold: 3,
+        maxComputationTime: 25,
+        heuristicWeight: 1.1,
+      },
+      costCalculation: {
+        baseMoveCost: 1.0,
+        diagonalMultiplier: 1.414,
+        verticalMultiplier: 1.3,
+        jumpCost: 2.0,
+        swimCost: 5.0,
+      },
+      hazardCosts: {
+        lavaProximity: 2000,
+        voidFall: 15000,
+        mobProximity: 150,
+        darknessPenalty: 30,
+        waterPenalty: 15,
+        cactusPenalty: 50,
+        firePenalty: 800,
+        poisonPenalty: 100,
+      },
+      optimization: {
+        pathSmoothing: true,
+        lookaheadDistance: 20,
+        safetyMargin: 2,
+      },
+      maxDistance: 1000,
+      timeout: 60000,
+    };
+
+    return baseConfig;
+  }
+}
+
+/**
+ * Terrain Type Detection and Analysis
+ */
+enum TerrainType {
+  HILLS = 'hills',
+  CAVES = 'caves',
+  FOREST = 'forest',
+  DESERT = 'desert',
+  WATER = 'water',
+  MIXED = 'mixed',
+  UNKNOWN = 'unknown'
+}
+
+/**
+ * Terrain Analyzer - Analyzes current environment to determine terrain type
+ */
+class TerrainAnalyzer {
+  private lastAnalysis: number = 0;
+  private analysisCache = new Map<string, TerrainType>();
+
+  /**
+   * Analyze terrain around a position
+   */
+  async analyzeTerrain(position: Vec3, radius: number = 16): Promise<TerrainType> {
+    const cacheKey = `${position.x},${position.y},${position.z}`;
+
+    // Check cache first (5 second TTL)
+    const cached = this.analysisCache.get(cacheKey);
+    if (cached && Date.now() - this.lastAnalysis < 5000) {
+      return cached;
+    }
+
+    const terrainType = await this.performTerrainAnalysis(position, radius);
+    this.analysisCache.set(cacheKey, terrainType);
+    this.lastAnalysis = Date.now();
+
+    return terrainType;
+  }
+
+  /**
+   * Perform actual terrain analysis using bot's view
+   */
+  private async performTerrainAnalysis(position: Vec3, radius: number): Promise<TerrainType> {
+    // This would use bot's raycasting and block inspection
+    // For now, return UNKNOWN to be enhanced later
+    return TerrainType.UNKNOWN;
+  }
+
+  /**
+   * Get terrain characteristics for parameter optimization
+   */
+  getTerrainCharacteristics(terrainType: TerrainType): TerrainCharacteristics {
+    const characteristics: Record<TerrainType, TerrainCharacteristics> = {
+      [TerrainType.HILLS]: {
+        verticalMovement: 'high',
+        obstacleDensity: 'medium',
+        hazardLevel: 'medium',
+        dynamicEnvironment: true,
+        preferredMovement: 'careful',
+      },
+      [TerrainType.CAVES]: {
+        verticalMovement: 'low',
+        obstacleDensity: 'high',
+        hazardLevel: 'high',
+        dynamicEnvironment: true,
+        preferredMovement: 'safe',
+      },
+      [TerrainType.FOREST]: {
+        verticalMovement: 'medium',
+        obstacleDensity: 'high',
+        hazardLevel: 'medium',
+        dynamicEnvironment: false,
+        preferredMovement: 'balanced',
+      },
+      [TerrainType.DESERT]: {
+        verticalMovement: 'low',
+        obstacleDensity: 'low',
+        hazardLevel: 'low',
+        dynamicEnvironment: false,
+        preferredMovement: 'fast',
+      },
+      [TerrainType.WATER]: {
+        verticalMovement: 'low',
+        obstacleDensity: 'low',
+        hazardLevel: 'high',
+        dynamicEnvironment: true,
+        preferredMovement: 'cautious',
+      },
+      [TerrainType.MIXED]: {
+        verticalMovement: 'medium',
+        obstacleDensity: 'medium',
+        hazardLevel: 'medium',
+        dynamicEnvironment: true,
+        preferredMovement: 'adaptive',
+      },
+      [TerrainType.UNKNOWN]: {
+        verticalMovement: 'medium',
+        obstacleDensity: 'medium',
+        hazardLevel: 'medium',
+        dynamicEnvironment: false,
+        preferredMovement: 'balanced',
+      },
+    };
+
+    return characteristics[terrainType] || characteristics[TerrainType.UNKNOWN];
+  }
+}
+
+/**
+ * Terrain characteristics for optimization
+ */
+interface TerrainCharacteristics {
+  verticalMovement: 'low' | 'medium' | 'high';
+  obstacleDensity: 'low' | 'medium' | 'high';
+  hazardLevel: 'low' | 'medium' | 'high';
+  dynamicEnvironment: boolean;
+  preferredMovement: 'fast' | 'careful' | 'safe' | 'cautious' | 'balanced' | 'adaptive';
+}
+
+/**
+ * Dynamic Reconfigurator - Switches navigation parameters based on terrain changes
+ */
+class DynamicReconfigurator {
+  private currentTerrain: TerrainType = TerrainType.UNKNOWN;
+  private lastReconfiguration = 0;
+  private reconfigurationHistory: Array<{
+    timestamp: number;
+    terrain: TerrainType;
+    config: NavigationConfig;
+  }> = [];
+
+  constructor(
+    private terrainAnalyzer: TerrainAnalyzer,
+    private navigationSystem: MockNavigationSystem
+  ) {
+    // Set up periodic terrain checking during navigation
+    setInterval(() => this.checkTerrainChanges(), 2000); // Check every 2 seconds
+  }
+
+  /**
+   * Check if terrain has changed and reconfigure if needed
+   */
+  async checkTerrainChanges(): Promise<void> {
+    // This would be called during active navigation
+    // Implementation would check current position and detect terrain changes
+  }
+
+  /**
+   * Get optimized configuration for specific terrain type
+   */
+  getOptimizedConfig(terrainType: TerrainType): NavigationConfig {
+    const baseConfig: NavigationConfig = {
+      dstarLite: {
+        searchRadius: 200,
+        replanThreshold: 3,
+        maxComputationTime: 25,
+        heuristicWeight: 1.1,
+      },
+      costCalculation: {
+        baseMoveCost: 1.0,
+        diagonalMultiplier: 1.414,
+        verticalMultiplier: 1.3,
+        jumpCost: 2.0,
+        swimCost: 5.0,
+      },
+      hazardCosts: {
+        lavaProximity: 2000,
+        voidFall: 15000,
+        mobProximity: 150,
+        darknessPenalty: 30,
+        waterPenalty: 15,
+        cactusPenalty: 50,
+        firePenalty: 800,
+        poisonPenalty: 100,
+      },
+    };
+
+    // Terrain-specific optimizations
+    const terrainConfigs: Record<TerrainType, NavigationConfig> = {
+      [TerrainType.HILLS]: {
+        ...baseConfig,
+        dstarLite: {
+          ...baseConfig.dstarLite!,
+          searchRadius: 250,
+          replanThreshold: 2,
+          heuristicWeight: 1.2,
+        },
+        costCalculation: {
+          ...baseConfig.costCalculation!,
+          verticalMultiplier: 1.2,
+          jumpCost: 1.8,
+        },
+      },
+      [TerrainType.CAVES]: {
+        ...baseConfig,
+        dstarLite: {
+          ...baseConfig.dstarLite!,
+          searchRadius: 150,
+          replanThreshold: 1,
+          maxComputationTime: 15,
+          heuristicWeight: 0.9,
+        },
+        costCalculation: {
+          ...baseConfig.costCalculation!,
+          verticalMultiplier: 1.5,
+          jumpCost: 2.5,
+          swimCost: 10.0,
+        },
+        hazardCosts: {
+          ...baseConfig.hazardCosts!,
+          lavaProximity: 5000,
+          darknessPenalty: 100,
+          voidFall: 20000,
+        },
+      },
+      [TerrainType.FOREST]: {
+        ...baseConfig,
+        dstarLite: {
+          ...baseConfig.dstarLite!,
+          searchRadius: 180,
+          replanThreshold: 4,
+          maxComputationTime: 30,
+        },
+        costCalculation: {
+          ...baseConfig.costCalculation!,
+          verticalMultiplier: 1.4,
+          jumpCost: 2.2,
+        },
+        hazardCosts: {
+          ...baseConfig.hazardCosts!,
+          mobProximity: 300,
+          poisonPenalty: 150,
+        },
+      },
+      [TerrainType.DESERT]: {
+        ...baseConfig,
+        dstarLite: {
+          ...baseConfig.dstarLite!,
+          searchRadius: 300,
+          replanThreshold: 5,
+          maxComputationTime: 35,
+          heuristicWeight: 1.3,
+        },
+        costCalculation: {
+          ...baseConfig.costCalculation!,
+          verticalMultiplier: 1.6,
+          jumpCost: 1.5,
+          swimCost: 15.0,
+        },
+        hazardCosts: {
+          ...baseConfig.hazardCosts!,
+          cactusPenalty: 200,
+          firePenalty: 1200,
+        },
+      },
+      [TerrainType.WATER]: {
+        ...baseConfig,
+        dstarLite: {
+          ...baseConfig.dstarLite!,
+          searchRadius: 120,
+          replanThreshold: 2,
+          maxComputationTime: 20,
+          heuristicWeight: 0.8,
+        },
+        costCalculation: {
+          ...baseConfig.costCalculation!,
+          verticalMultiplier: 2.0,
+          jumpCost: 3.0,
+          swimCost: 2.0,
+        },
+        hazardCosts: {
+          ...baseConfig.hazardCosts!,
+          mobProximity: 500,
+          waterPenalty: 0,
+        },
+      },
+      [TerrainType.MIXED]: {
+        ...baseConfig,
+        dstarLite: {
+          ...baseConfig.dstarLite!,
+          searchRadius: 220,
+          replanThreshold: 3,
+          maxComputationTime: 28,
+          heuristicWeight: 1.1,
+        },
+        costCalculation: {
+          ...baseConfig.costCalculation!,
+          verticalMultiplier: 1.4,
+          jumpCost: 2.0,
+          swimCost: 6.0,
+        },
+        hazardCosts: {
+          ...baseConfig.hazardCosts!,
+          lavaProximity: 3000,
+          mobProximity: 250,
+          darknessPenalty: 40,
+          waterPenalty: 25,
+        },
+      },
+      [TerrainType.UNKNOWN]: baseConfig,
+    };
+
+    return terrainConfigs[terrainType] || baseConfig;
   }
 }

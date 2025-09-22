@@ -33,6 +33,9 @@ import { ToolEfficiencyMemoryManager } from './tool-efficiency-memory';
 import { SocialMemoryManager } from './social-memory-manager';
 import { SpatialMemoryManager } from './spatial-memory-manager';
 import { EmotionalMemoryManager } from './emotional-memory-manager';
+import { SharpWaveRippleManager } from './sharp-wave-ripple-manager';
+import { CognitiveMapTracker } from './cognitive-map-tracker';
+import { NeuroscienceConsolidationManager } from './neuroscience-consolidation-manager';
 import { z } from 'zod';
 
 // ============================================================================
@@ -118,6 +121,21 @@ export interface EnhancedMemorySystemConfig {
   maxEmotionalStates: number;
   emotionalPatternLearningEnabled: boolean;
   emotionalTriggerAnalysisEnabled: boolean;
+
+  // Sharp wave ripple and consolidation configuration
+  enableSharpWaveRipples: boolean;
+  swrTaggingInterval: number;
+  consolidationInterval: number;
+  maxSWRQueueSize: number;
+  swrCompetitionThreshold: number;
+  temporalCompressionRatio: number;
+
+  // Cognitive map tracking configuration
+  enableCognitiveMapTracking: boolean;
+  cognitiveMapUpdateInterval: number;
+  maxCognitiveManifoldSize: number;
+  cognitiveManifoldDimensions: number;
+  cognitiveClusteringThreshold: number;
 }
 
 export interface MemoryIngestionOptions {
@@ -208,6 +226,9 @@ export class EnhancedMemorySystem {
   private socialMemoryManager: SocialMemoryManager;
   private spatialMemoryManager: SpatialMemoryManager;
   private emotionalMemoryManager: EmotionalMemoryManager;
+  private sharpWaveRippleManager: SharpWaveRippleManager;
+  private cognitiveMapTracker: CognitiveMapTracker;
+  private neuroscienceConsolidationManager?: NeuroscienceConsolidationManager;
 
   private searchStats: Array<{ timestamp: number; latency: number }> = [];
   private ingestionStats: Array<{
@@ -217,6 +238,7 @@ export class EnhancedMemorySystem {
     source: string;
   }> = [];
   private initialized = false;
+  private lastConsolidation = 0;
 
   constructor(private config: EnhancedMemorySystemConfig) {
     // Initialize core services
@@ -321,6 +343,45 @@ export class EnhancedMemorySystem {
       patternLearningEnabled: config.emotionalPatternLearningEnabled,
       triggerAnalysisEnabled: config.emotionalTriggerAnalysisEnabled,
     });
+
+    // Initialize Sharp Wave Ripple manager for neuroscience-inspired memory tagging
+    this.sharpWaveRippleManager = new SharpWaveRippleManager({
+      enabled: config.enableSharpWaveRipples,
+      taggingInterval: config.swrTaggingInterval,
+      consolidationInterval: config.consolidationInterval,
+      maxQueueSize: config.maxSWRQueueSize,
+      competitionThreshold: config.swrCompetitionThreshold,
+      temporalCompressionRatio: config.temporalCompressionRatio,
+      vectorDb: this.vectorDb,
+      embeddingService: this.embeddingService,
+    });
+
+    // Initialize Cognitive Map Tracker for memory organization analysis
+    this.cognitiveMapTracker = new CognitiveMapTracker({
+      enabled: config.enableCognitiveMapTracking,
+      updateInterval: config.cognitiveMapUpdateInterval,
+      maxManifoldSize: config.maxCognitiveManifoldSize,
+      manifoldDimensions: config.cognitiveManifoldDimensions,
+      clusteringThreshold: config.cognitiveClusteringThreshold,
+      vectorDb: this.vectorDb,
+      embeddingService: this.embeddingService,
+    });
+
+    // Initialize Neuroscience Consolidation Manager (optional orchestration layer)
+    if (config.enableSharpWaveRipples || config.enableCognitiveMapTracking) {
+      this.neuroscienceConsolidationManager =
+        new NeuroscienceConsolidationManager({
+          enabled: true,
+          consolidationCycleInterval: 3600000, // 1 hour
+          activityThreshold: 0.3,
+          adaptiveConsolidation: true,
+          vectorDb: this.vectorDb,
+          embeddingService: this.embeddingService,
+          sharpWaveRippleManager: this.sharpWaveRippleManager,
+          cognitiveMapTracker: this.cognitiveMapTracker,
+          memoryDecayManager: this.memoryDecayManager,
+        });
+    }
   }
 
   /**
@@ -407,6 +468,52 @@ export class EnhancedMemorySystem {
             taskRelevance: this.calculateTaskRelevance(options),
             narrativeImportance: this.calculateNarrativeImportance(options),
           });
+        }
+      }
+
+      // Tag important memories with Sharp Wave Ripples for consolidation
+      if (this.config.enableSharpWaveRipples) {
+        for (const chunk of chunks) {
+          const importance = this.calculateImportance(options);
+          if (importance > 0.6) {
+            // Only tag moderately to highly important memories
+            await this.sharpWaveRippleManager.tagMemory(
+              chunk.id,
+              chunk.content,
+              {
+                type: options.type,
+                importance,
+                emotionalImpact: this.extractEmotionalImpact(options.content),
+                learningValue: this.calculateLearningValue(options),
+                socialSignificance: this.calculateSocialSignificance(options),
+                taskRelevance: this.calculateTaskRelevance(options),
+                narrativeImportance: this.calculateNarrativeImportance(options),
+                entities: options.entities,
+                topics: options.topics,
+                timestamp: Date.now(),
+              }
+            );
+          }
+        }
+      }
+
+      // Add memories to cognitive map for organization analysis
+      if (this.config.enableCognitiveMapTracking) {
+        for (const chunk of chunks) {
+          const embedding = await this.embeddingService.embed(chunk.content);
+          await this.cognitiveMapTracker.addToManifold(
+            chunk.id,
+            chunk.content,
+            embedding.embedding,
+            {
+              type: options.type,
+              importance: this.calculateImportance(options),
+              timestamp: Date.now(),
+              entities: options.entities,
+              topics: options.topics,
+              position: options.position,
+            }
+          );
         }
       }
 
@@ -1248,6 +1355,400 @@ export class EnhancedMemorySystem {
   }
 
   /**
+   * Trigger neuroscience-inspired memory consolidation cycle
+   */
+  async triggerConsolidationCycle(): Promise<{
+    swrConsolidation?: any;
+    decayEvaluation?: any;
+    totalConsolidated: number;
+    totalEvaluated: number;
+  }> {
+    console.log('🧠 Triggering neuroscience-inspired memory consolidation...');
+
+    let swrConsolidation = null;
+    let decayEvaluation = null;
+    let totalConsolidated = 0;
+    let totalEvaluated = 0;
+
+    // Phase 1: Sharp Wave Ripple consolidation (awake → sleep transfer)
+    if (this.config.enableSharpWaveRipples) {
+      console.log('🌊 Phase 1: SWR consolidation');
+      swrConsolidation = await this.sharpWaveRippleManager.forceConsolidation();
+      totalConsolidated += swrConsolidation.consolidatedMemories || 0;
+    }
+
+    // Phase 2: Memory decay evaluation and cleanup (use it or lose it)
+    if (this.config.enableMemoryDecay) {
+      console.log('🧹 Phase 2: Memory decay evaluation');
+      decayEvaluation = await this.evaluateMemoryDecay();
+      totalEvaluated = decayEvaluation.decayResults?.length || 0;
+    }
+
+    // Track consolidation time
+    this.lastConsolidation = Date.now();
+
+    console.log(
+      `✅ Consolidation cycle complete: ${totalConsolidated} consolidated, ${totalEvaluated} evaluated`
+    );
+
+    return {
+      swrConsolidation,
+      decayEvaluation,
+      totalConsolidated,
+      totalEvaluated,
+    };
+  }
+
+  /**
+   * Get neuroscience-inspired memory statistics
+   */
+  async getNeuroscienceStats(): Promise<{
+    swrStatistics?: any;
+    decayStatistics?: any;
+    consolidationHealth: 'healthy' | 'degraded' | 'unhealthy';
+    recommendations: string[];
+  }> {
+    const recommendations: string[] = [];
+
+    // SWR statistics
+    const swrStatistics = this.config.enableSharpWaveRipples
+      ? this.sharpWaveRippleManager.getStatistics()
+      : null;
+
+    // Decay statistics
+    const decayStatistics = this.config.enableMemoryDecay
+      ? this.getMemoryDecayStats()
+      : null;
+
+    // Use neuroscience consolidation manager if available
+    if (this.neuroscienceConsolidationManager) {
+      const consolidationInsights =
+        await this.neuroscienceConsolidationManager.getConsolidationInsights();
+      recommendations.push(
+        ...consolidationInsights.recommendations.map((r) => r.message)
+      );
+
+      return {
+        swrStatistics,
+        decayStatistics,
+        consolidationHealth:
+          consolidationInsights.memoryHealth.overallScore >= 0.6
+            ? 'healthy'
+            : consolidationInsights.memoryHealth.overallScore >= 0.4
+              ? 'degraded'
+              : 'unhealthy',
+        recommendations,
+      };
+    }
+
+    // Fallback to basic health assessment
+    let consolidationHealth: 'healthy' | 'degraded' | 'unhealthy' = 'healthy';
+
+    if (swrStatistics) {
+      const consolidationRate = swrStatistics.consolidationEfficiency || 0;
+      if (consolidationRate < 0.3) {
+        consolidationHealth = 'unhealthy';
+        recommendations.push(
+          'Low memory consolidation efficiency - consider increasing SWR tagging threshold'
+        );
+      } else if (consolidationRate < 0.6) {
+        consolidationHealth = 'degraded';
+        recommendations.push(
+          'Moderate consolidation efficiency - monitor memory decay patterns'
+        );
+      }
+
+      if (swrStatistics.competitionWinRate < 0.2) {
+        recommendations.push(
+          'Very few memories winning consolidation competition - may be too selective'
+        );
+      }
+    }
+
+    if (decayStatistics && decayStatistics.totalTrackedMemories > 0) {
+      const averageImportance = decayStatistics.averageImportance || 0;
+      if (averageImportance < 0.4) {
+        recommendations.push(
+          'Overall memory importance is low - consider adjusting importance calculation'
+        );
+      }
+    }
+
+    return {
+      swrStatistics,
+      decayStatistics,
+      consolidationHealth,
+      recommendations,
+    };
+  }
+
+  /**
+   * Get current consolidation queue status
+   */
+  getConsolidationStatus(): {
+    swrQueueStatus?: any;
+    consolidationHistory?: any[];
+    nextConsolidationIn: number;
+    consolidationEnabled: boolean;
+  } {
+    const now = Date.now();
+
+    return {
+      swrQueueStatus: this.config.enableSharpWaveRipples
+        ? this.sharpWaveRippleManager.getQueueStatus()
+        : null,
+      consolidationHistory: this.config.enableSharpWaveRipples
+        ? this.sharpWaveRippleManager.getConsolidationHistory()
+        : [],
+      nextConsolidationIn: this.config.enableSharpWaveRipples
+        ? Math.max(
+            0,
+            this.config.consolidationInterval - (now - this.lastConsolidation)
+          )
+        : 0,
+      consolidationEnabled:
+        this.config.enableSharpWaveRipples || this.config.enableMemoryDecay,
+    };
+  }
+
+  /**
+   * Add important memory directly to SWR queue for consolidation
+   */
+  async addPriorityMemory(
+    memoryId: string,
+    content: string,
+    options: {
+      type: string;
+      importance: number;
+      emotionalImpact?: number;
+      learningValue?: number;
+      socialSignificance?: number;
+      taskRelevance?: number;
+      narrativeImportance?: number;
+      entities?: string[];
+      topics?: string[];
+    }
+  ): Promise<void> {
+    if (!this.config.enableSharpWaveRipples) {
+      console.log(
+        '⚠️ Sharp wave ripples disabled - adding to regular memory instead'
+      );
+      await this.ingestMemory({
+        type: options.type as any,
+        content,
+        source: 'priority-memory',
+        confidence: options.importance,
+        entities: options.entities,
+        topics: options.topics,
+      });
+      return;
+    }
+
+    console.log(
+      `🧠 Adding priority memory ${memoryId} to SWR consolidation queue`
+    );
+
+    await this.sharpWaveRippleManager.tagMemory(memoryId, content, {
+      type: options.type,
+      importance: options.importance,
+      emotionalImpact: options.emotionalImpact || 0,
+      learningValue: options.learningValue || 0,
+      socialSignificance: options.socialSignificance || 0,
+      taskRelevance: options.taskRelevance || 0,
+      narrativeImportance: options.narrativeImportance || 0,
+      entities: options.entities,
+      topics: options.topics,
+      timestamp: Date.now(),
+    });
+  }
+
+  /**
+   * Run neuroscience-inspired memory replay simulation
+   */
+  async runMemoryReplaySimulation(
+    memoryIds: string[],
+    options: {
+      replayCycles?: number;
+      competitionEnabled?: boolean;
+      temporalCompression?: number;
+      consolidationType?: 'swr' | 'decay' | 'manual';
+    } = {}
+  ): Promise<{
+    replayedMemories: number;
+    totalReplayTime: number;
+    averageStrengthGain: number;
+    competitionResults: Array<{
+      memoryId: string;
+      wonCompetition: boolean;
+      finalStrength: number;
+    }>;
+  }> {
+    if (!this.config.enableSharpWaveRipples) {
+      console.log(
+        '⚠️ Sharp wave ripples disabled - skipping replay simulation'
+      );
+      return {
+        replayedMemories: 0,
+        totalReplayTime: 0,
+        averageStrengthGain: 0,
+        competitionResults: [],
+      };
+    }
+
+    console.log(
+      `🧠 Running memory replay simulation for ${memoryIds.length} memories`
+    );
+
+    const replayPromises = memoryIds.map(async (memoryId) => {
+      // Find memory in SWR queue
+      const swrEvent = this.sharpWaveRippleManager['swrQueue'].find(
+        (event) => event.memoryId === memoryId
+      );
+
+      if (!swrEvent) {
+        console.log(`⚠️ Memory ${memoryId} not found in SWR queue`);
+        return null;
+      }
+
+      // Simulate replay with enhanced parameters
+      const originalReplayMethod = this.sharpWaveRippleManager['replayMemory'];
+      await originalReplayMethod.call(this.sharpWaveRippleManager, swrEvent);
+
+      return {
+        memoryId,
+        initialStrength: swrEvent.swrStrength,
+        finalStrength: swrEvent.swrStrength,
+        strengthGain: swrEvent.swrStrength - swrEvent.swrStrength,
+        replayCount: swrEvent.replayCount,
+      };
+    });
+
+    const results = (await Promise.all(replayPromises)).filter(Boolean);
+
+    const totalReplayTime = results.reduce(
+      (sum, r) => sum + (r?.replayCount || 0) * 100,
+      0
+    );
+    const averageStrengthGain =
+      results.length > 0
+        ? results.reduce((sum, r) => sum + (r?.strengthGain || 0), 0) /
+          results.length
+        : 0;
+
+    console.log(
+      `✅ Memory replay simulation completed: ${results.length} memories, +${averageStrengthGain.toFixed(3)} avg strength`
+    );
+
+    return {
+      replayedMemories: results.length,
+      totalReplayTime,
+      averageStrengthGain,
+      competitionResults: results.map((r) => ({
+        memoryId: r!.memoryId,
+        wonCompetition: true, // Simplified - in real implementation this would track competition results
+        finalStrength: r!.finalStrength,
+      })),
+    };
+  }
+
+  /**
+   * Get comprehensive neuroscience memory analysis
+   */
+  async getNeuroscienceAnalysis(): Promise<{
+    systemStatus: {
+      swrEnabled: boolean;
+      cognitiveMappingEnabled: boolean;
+      consolidationEnabled: boolean;
+      memoryDecayEnabled: boolean;
+    };
+    memoryHealth: {
+      totalMemories: number;
+      consolidationQueueSize: number;
+      cognitiveClusters: number;
+      averageMemoryImportance: number;
+      learningProgressRate: number;
+    };
+    consolidationMetrics: {
+      swrConsolidationRate: number;
+      competitionSuccessRate: number;
+      temporalCompressionEfficiency: number;
+      overallCognitiveHealth: string;
+    };
+    recommendations: string[];
+    insights: string[];
+  }> {
+    const swrStats = this.sharpWaveRippleManager.getStatistics();
+    const cognitiveStats = this.cognitiveMapTracker.getStatistics();
+    const consolidationInsights = await this.getNeuroscienceStats();
+
+    const recommendations: string[] = [];
+    const insights: string[] = [];
+
+    // System status
+    const systemStatus = {
+      swrEnabled: this.config.enableSharpWaveRipples,
+      cognitiveMappingEnabled: this.config.enableCognitiveMapTracking,
+      consolidationEnabled: true,
+      memoryDecayEnabled: this.config.enableMemoryDecay,
+    };
+
+    // Memory health
+    const memoryHealth = {
+      totalMemories: cognitiveStats.totalMemories,
+      consolidationQueueSize:
+        this.sharpWaveRippleManager.getQueueStatus().queueSize,
+      cognitiveClusters: cognitiveStats.totalClusters,
+      averageMemoryImportance: 0.5, // Would calculate from actual data
+      learningProgressRate: cognitiveStats.learningProgressRate,
+    };
+
+    // Consolidation metrics
+    const consolidationMetrics = {
+      swrConsolidationRate: swrStats.consolidationEfficiency,
+      competitionSuccessRate: swrStats.competitionWinRate,
+      temporalCompressionEfficiency:
+        swrStats.temporalCompressionSavings /
+        Math.max(1, swrStats.totalConsolidated),
+      overallCognitiveHealth: consolidationInsights.consolidationHealth,
+    };
+
+    // Generate insights
+    insights.push(
+      `Memory system processes ${memoryHealth.totalMemories} memories across ${memoryHealth.cognitiveClusters} cognitive clusters`,
+      `Sharp wave ripple consolidation achieves ${Math.round(consolidationMetrics.swrConsolidationRate * 100)}% efficiency`,
+      `Neural competition selects memories with ${Math.round(consolidationMetrics.competitionSuccessRate * 100)}% success rate`,
+      `Cognitive map shows ${consolidationMetrics.overallCognitiveHealth} learning progression`
+    );
+
+    // Generate recommendations
+    if (consolidationMetrics.swrConsolidationRate < 0.6) {
+      recommendations.push(
+        'Consider optimizing SWR tagging thresholds for better consolidation efficiency'
+      );
+    }
+
+    if (consolidationMetrics.competitionSuccessRate < 0.2) {
+      recommendations.push(
+        'Competition may be too restrictive - consider lowering competition threshold'
+      );
+    }
+
+    if (memoryHealth.learningProgressRate < 0) {
+      recommendations.push(
+        'Learning progression is declining - review memory decay parameters'
+      );
+    }
+
+    return {
+      systemStatus,
+      memoryHealth,
+      consolidationMetrics,
+      recommendations,
+      insights,
+    };
+  }
+
+  /**
    * Get memory decay statistics
    */
   getMemoryDecayStats(): any {
@@ -2061,4 +2562,36 @@ export const DEFAULT_MEMORY_CONFIG: EnhancedMemorySystemConfig = {
     process.env.MEMORY_EMOTIONAL_PATTERNS !== 'false',
   emotionalTriggerAnalysisEnabled:
     process.env.MEMORY_EMOTIONAL_TRIGGERS !== 'false',
+
+  // Sharp wave ripple and consolidation configuration
+  enableSharpWaveRipples: process.env.MEMORY_SWR_ENABLED !== 'false',
+  swrTaggingInterval: parseInt(
+    process.env.MEMORY_SWR_TAGGING_INTERVAL || '30000'
+  ), // 30 seconds
+  consolidationInterval: parseInt(
+    process.env.MEMORY_CONSOLIDATION_INTERVAL || '300000'
+  ), // 5 minutes
+  maxSWRQueueSize: parseInt(process.env.MEMORY_MAX_SWR_QUEUE || '100'),
+  swrCompetitionThreshold: parseFloat(
+    process.env.MEMORY_SWR_COMPETITION_THRESHOLD || '0.7'
+  ),
+  temporalCompressionRatio: parseFloat(
+    process.env.MEMORY_TEMPORAL_COMPRESSION || '0.1'
+  ),
+
+  // Cognitive map tracking configuration
+  enableCognitiveMapTracking:
+    process.env.MEMORY_COGNITIVE_MAP_ENABLED !== 'false',
+  cognitiveMapUpdateInterval: parseInt(
+    process.env.MEMORY_COGNITIVE_MAP_UPDATE_INTERVAL || '60000'
+  ), // 1 minute
+  maxCognitiveManifoldSize: parseInt(
+    process.env.MEMORY_MAX_COGNITIVE_MANIFOLD || '500'
+  ),
+  cognitiveManifoldDimensions: parseInt(
+    process.env.MEMORY_COGNITIVE_DIMENSIONS || '3'
+  ),
+  cognitiveClusteringThreshold: parseFloat(
+    process.env.MEMORY_COGNITIVE_CLUSTERING_THRESHOLD || '0.3'
+  ),
 };

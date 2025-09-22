@@ -14,6 +14,7 @@ import {
   PlanStatus,
   PlanStepStatus,
 } from '../types';
+import { z } from 'zod';
 import {
   EnhancedGOAPPlanner,
   GOAPPlan,
@@ -69,17 +70,16 @@ export class EnhancedReactiveExecutor {
 
   // PBI Integration
   private pbiEnforcer: ReturnType<typeof createPBIEnforcer>;
-  private bootstrappedCapabilities: boolean = false;
 
   constructor() {
     this.goapPlanner = new EnhancedGOAPPlanner();
     this.planRepair = new EnhancedPlanRepair();
     this.contextBuilder = new DefaultExecutionContextBuilder();
-    this.realTimeAdapter = new DefaultRealTimeAdapter();
     this.metrics = this.initializeMetrics();
 
     // Initialize PBI enforcer for plan-body interface enforcement
     this.pbiEnforcer = createPBIEnforcer();
+    this.realTimeAdapter = new DefaultRealTimeAdapter(this.pbiEnforcer);
 
     // Bootstrap essential capabilities for fresh start
     // Note: This is fire-and-forget since constructor can't be async
@@ -90,7 +90,9 @@ export class EnhancedReactiveExecutor {
    * Bootstrap essential PBI capabilities for fresh start scenarios
    */
   private async bootstrapPBICapabilities(): Promise<void> {
-    if (this.bootstrappedCapabilities) {
+    if (
+      this.pbiEnforcer.getRegistry().getHealthMetrics().totalCapabilities > 0
+    ) {
       return; // Already bootstrapped
     }
 
@@ -114,10 +116,10 @@ export class EnhancedReactiveExecutor {
     for (const capability of basicCapabilities) {
       try {
         // Register capability with PBI enforcer
-        await this.pbiEnforcer.registerCapability({
+        await this.pbiEnforcer.getRegistry().register({
           name: capability,
           version: '1.0.0',
-          inputSchema: { type: 'object' },
+          inputSchema: z.object({}),
           guard: () => true, // Allow all basic capabilities
           runner: async (ctx, args) => ({
             ok: true,
@@ -139,7 +141,9 @@ export class EnhancedReactiveExecutor {
       }
     }
 
-    this.bootstrappedCapabilities = true;
+    // Mark as bootstrapped by checking if we have capabilities
+    const hasCapabilities =
+      this.pbiEnforcer.getRegistry().getHealthMetrics().totalCapabilities > 0;
     console.log('✅ PBI capability bootstrap completed');
   }
 
@@ -1323,6 +1327,12 @@ class DefaultExecutionContextBuilder implements ExecutionContextBuilder {
  * Default real-time adapter
  */
 class DefaultRealTimeAdapter implements RealTimeAdapter {
+  private pbiEnforcer: ReturnType<typeof createPBIEnforcer>;
+
+  constructor(pbiEnforcer: ReturnType<typeof createPBIEnforcer>) {
+    this.pbiEnforcer = pbiEnforcer;
+  }
+
   adaptToOpportunities(context: GOAPExecutionContext): any[] {
     // Real opportunity detection would analyze world state
     // For now, return empty array to indicate no opportunities detected
@@ -1352,7 +1362,9 @@ class DefaultRealTimeAdapter implements RealTimeAdapter {
    * Bootstrap essential PBI capabilities for fresh start scenarios
    */
   private async bootstrapPBICapabilities(): Promise<void> {
-    if (this.bootstrappedCapabilities) {
+    if (
+      this.pbiEnforcer.getRegistry().getHealthMetrics().totalCapabilities > 0
+    ) {
       return; // Already bootstrapped
     }
 
@@ -1376,10 +1388,10 @@ class DefaultRealTimeAdapter implements RealTimeAdapter {
     for (const capability of basicCapabilities) {
       try {
         // Register capability with PBI enforcer
-        await this.pbiEnforcer.registerCapability({
+        await this.pbiEnforcer.getRegistry().register({
           name: capability,
           version: '1.0.0',
-          inputSchema: { type: 'object' },
+          inputSchema: z.object({}),
           guard: () => true, // Allow all basic capabilities
           runner: async (ctx, args) => ({
             ok: true,
@@ -1401,7 +1413,9 @@ class DefaultRealTimeAdapter implements RealTimeAdapter {
       }
     }
 
-    this.bootstrappedCapabilities = true;
+    // Mark as bootstrapped by checking if we have capabilities
+    const hasCapabilities =
+      this.pbiEnforcer.getRegistry().getHealthMetrics().totalCapabilities > 0;
     console.log('✅ PBI capability bootstrap completed');
   }
 

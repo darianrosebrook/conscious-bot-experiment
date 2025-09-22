@@ -351,6 +351,13 @@ export class PBIEnforcer {
   }
 
   /**
+   * Get the capability registry for direct access
+   */
+  public getRegistry(): CapabilityRegistry {
+    return this.registry;
+  }
+
+  /**
    * Capture world snapshot for acceptance testing
    */
   private captureWorldSnapshot(_worldState: any): WorldSnapshot {
