@@ -27,6 +27,22 @@ export class BotAdapter extends EventEmitter {
   private safetyMonitor: AutomaticSafetyMonitor | null = null;
   private actionTranslator: any = null;
 
+  // Throttling state
+  private lastChatResponse = 0;
+  private lastEnvironmentalResponse = 0;
+  private readonly chatCooldown = 30000; // 30 seconds between chat responses
+  private readonly environmentalCooldown = 15000; // 15 seconds between environmental responses
+
+  // Performance benchmarking
+  private performanceMetrics = {
+    entityScans: 0,
+    chatResponses: 0,
+    environmentalEvents: 0,
+    tasksCreated: 0,
+    responseTimes: [] as number[],
+    startTime: Date.now(),
+  };
+
   constructor(config: BotConfig) {
     super();
     this.config = config;
@@ -680,10 +696,24 @@ export class BotAdapter extends EventEmitter {
         };
         console.log(`🧠 Cognition system processed chat:`, result);
 
-        // If cognition system suggests a response, send it
+        // If cognition system suggests a response, send it (with throttling)
         if (result.shouldRespond && result.response) {
-          await this.bot.chat(result.response);
-          console.log(`✅ Bot responded: "${result.response}"`);
+          const now = Date.now();
+          if (now - this.lastChatResponse >= this.chatCooldown) {
+            const responseStart = Date.now();
+            await this.bot.chat(result.response);
+            const responseTime = Date.now() - responseStart;
+            this.performanceMetrics.responseTimes.push(responseTime);
+            this.performanceMetrics.chatResponses++;
+            console.log(
+              `✅ Bot responded: "${result.response}" (${responseTime}ms)`
+            );
+            this.lastChatResponse = now;
+          } else {
+            console.log(
+              `💬 Chat response throttled (cooldown: ${(this.chatCooldown - (now - this.lastChatResponse)) / 1000}s)`
+            );
+          }
         }
       } else {
         console.log(
@@ -699,25 +729,32 @@ export class BotAdapter extends EventEmitter {
   }
 
   /**
-   * Set up entity detection and reactive responses
+   * Set up entity detection and reactive responses with throttling
    */
   private setupEntityDetection(): void {
     if (!this.bot) return;
 
-    let lastEntityScan = 0;
-    const scanInterval = 5000; // Scan every 5 seconds
+    const scanInterval = 10000; // Scan every 10 seconds (reduced frequency)
 
     // Monitor entities and detect new/interesting ones
     setInterval(async () => {
       try {
+        // Only scan if enough time has passed since last scan
+        const now = Date.now();
+        if (now - this.lastEntityScan < scanInterval) return;
+
         await this.detectAndRespondToEntities();
+        this.lastEntityScan = now;
+        this.performanceMetrics.entityScans++;
       } catch (error) {
         console.error('❌ Entity detection error:', error);
       }
-    }, scanInterval);
+    }, 2000); // Check every 2 seconds but only process every 10 seconds
 
-    console.log('👁️ Entity detection system activated');
+    console.log('👁️ Entity detection system activated (throttled)');
   }
+
+  private lastEntityScan = 0;
 
   /**
    * Detect nearby entities and trigger appropriate responses
@@ -802,15 +839,30 @@ export class BotAdapter extends EventEmitter {
         };
         console.log(`✅ Entity processed by cognition system:`, result);
 
-        // If cognition suggests a response, execute it
+        // If cognition suggests a response, execute it (with throttling)
         if (result.shouldRespond && result.response) {
-          await this.bot.chat(result.response);
-          console.log(`💬 Bot responded to entity: "${result.response}"`);
+          const now = Date.now();
+          if (now - this.lastChatResponse >= this.chatCooldown) {
+            const responseStart = Date.now();
+            await this.bot.chat(result.response);
+            const responseTime = Date.now() - responseStart;
+            this.performanceMetrics.responseTimes.push(responseTime);
+            this.performanceMetrics.chatResponses++;
+            console.log(
+              `💬 Bot responded to entity: "${result.response}" (${responseTime}ms)`
+            );
+            this.lastChatResponse = now;
+          } else {
+            console.log(
+              `💬 Entity response throttled (cooldown: ${(this.chatCooldown - (now - this.lastChatResponse)) / 1000}s)`
+            );
+          }
         }
 
         // If it's a task-worthy event, add to planner
         if (result.shouldCreateTask && result.taskSuggestion) {
           await this.createTaskFromEntity(entity, result.taskSuggestion);
+          this.performanceMetrics.tasksCreated++;
         }
       }
     } catch (error) {
@@ -918,48 +970,53 @@ export class BotAdapter extends EventEmitter {
     });
 
     // Monitor item pickup events - using generic event handler
-    this.bot.on('playerCollect' as any, async (collector: any, collected: any) => {
-      if (collector === this.bot.entity) {
-        try {
-          await this.processEnvironmentalEvent('item_pickup', {
-            item: collected.name || 'unknown',
-            count: collected.count || 1,
-            position: collected.position || { x: 0, y: 0, z: 0 },
-          });
-        } catch (error) {
-          console.error('❌ Error processing item pickup event:', error);
+    this.bot.on(
+      'playerCollect' as any,
+      async (collector: any, collected: any) => {
+        if (collector === this.bot.entity) {
+          try {
+            await this.processEnvironmentalEvent('item_pickup', {
+              item: collected.name || 'unknown',
+              count: collected.count || 1,
+              position: collected.position || { x: 0, y: 0, z: 0 },
+            });
+          } catch (error) {
+            console.error('❌ Error processing item pickup event:', error);
+          }
         }
       }
-    });
+    );
 
-    // Monitor health changes using the existing health tracking
+    // Monitor health changes using the existing health tracking (less frequently)
     let lastHealth = this.bot.health;
     setInterval(async () => {
       try {
         const currentHealth = this.bot.health;
         const maxHealth = 20; // Default max health in Minecraft
 
-        if (currentHealth < lastHealth) {
-          await this.processEnvironmentalEvent('health_loss', {
-            previousHealth: lastHealth,
-            currentHealth: currentHealth,
-            maxHealth: maxHealth,
-            damage: lastHealth - currentHealth,
-          });
-        } else if (currentHealth > lastHealth) {
-          await this.processEnvironmentalEvent('health_gain', {
-            previousHealth: lastHealth,
-            currentHealth: currentHealth,
-            maxHealth: maxHealth,
-            healing: currentHealth - lastHealth,
-          });
+        // Only process significant health changes
+        if (Math.abs(currentHealth - lastHealth) >= 2) {
+          if (currentHealth < lastHealth) {
+            await this.processEnvironmentalEvent('health_loss', {
+              previousHealth: lastHealth,
+              currentHealth: currentHealth,
+              maxHealth: maxHealth,
+              damage: lastHealth - currentHealth,
+            });
+          } else if (currentHealth > lastHealth) {
+            await this.processEnvironmentalEvent('health_gain', {
+              previousHealth: lastHealth,
+              currentHealth: currentHealth,
+              maxHealth: maxHealth,
+              healing: currentHealth - lastHealth,
+            });
+          }
+          lastHealth = currentHealth;
         }
-
-        lastHealth = currentHealth;
       } catch (error) {
         console.error('❌ Error processing health event:', error);
       }
-    }, 1000); // Check every second
+    }, 5000); // Check every 5 seconds, only for significant changes
 
     console.log('🌍 Environmental event detection activated');
   }
@@ -1005,7 +1062,7 @@ export class BotAdapter extends EventEmitter {
       });
 
       if (response.ok) {
-        const result = await response.json() as {
+        const result = (await response.json()) as {
           shouldRespond?: boolean;
           response?: string;
           shouldCreateTask?: boolean;
@@ -1013,12 +1070,27 @@ export class BotAdapter extends EventEmitter {
         };
         console.log(`✅ Environmental event processed:`, result);
 
-        // If cognition suggests a response, execute it
+        // If cognition suggests a response, execute it (with throttling)
         if (result.shouldRespond && result.response) {
-          await this.bot.chat(result.response);
-          console.log(
-            `💬 Bot responded to environmental event: "${result.response}"`
-          );
+          const now = Date.now();
+          if (
+            now - this.lastEnvironmentalResponse >=
+            this.environmentalCooldown
+          ) {
+            const responseStart = Date.now();
+            await this.bot.chat(result.response);
+            const responseTime = Date.now() - responseStart;
+            this.performanceMetrics.responseTimes.push(responseTime);
+            this.performanceMetrics.chatResponses++;
+            console.log(
+              `💬 Bot responded to environmental event: "${result.response}" (${responseTime}ms)`
+            );
+            this.lastEnvironmentalResponse = now;
+          } else {
+            console.log(
+              `💬 Environmental response throttled (cooldown: ${(this.environmentalCooldown - (now - this.lastEnvironmentalResponse)) / 1000}s)`
+            );
+          }
         }
 
         // If it's a task-worthy event, add to planner
@@ -1028,7 +1100,9 @@ export class BotAdapter extends EventEmitter {
             eventData,
             result.taskSuggestion
           );
+          this.performanceMetrics.tasksCreated++;
         }
+        this.performanceMetrics.environmentalEvents++;
       }
     } catch (error) {
       console.error('❌ Error processing environmental event:', error);
@@ -1105,5 +1179,55 @@ export class BotAdapter extends EventEmitter {
     } catch (error) {
       console.error('❌ Error creating task from environmental event:', error);
     }
+  }
+
+  /**
+   * Get performance metrics for the reactive consciousness system
+   */
+  getPerformanceMetrics() {
+    const uptime = Date.now() - this.performanceMetrics.startTime;
+    const avgResponseTime = this.performanceMetrics.responseTimes.length > 0
+      ? this.performanceMetrics.responseTimes.reduce((a, b) => a + b, 0) / this.performanceMetrics.responseTimes.length
+      : 0;
+
+    return {
+      uptime: Math.round(uptime / 1000), // seconds
+      entityScans: this.performanceMetrics.entityScans,
+      chatResponses: this.performanceMetrics.chatResponses,
+      environmentalEvents: this.performanceMetrics.environmentalEvents,
+      tasksCreated: this.performanceMetrics.tasksCreated,
+      averageResponseTime: Math.round(avgResponseTime),
+      scansPerMinute: Math.round((this.performanceMetrics.entityScans / uptime) * 60000),
+      responsesPerMinute: Math.round((this.performanceMetrics.chatResponses / uptime) * 60000),
+      eventsPerMinute: Math.round((this.performanceMetrics.environmentalEvents / uptime) * 60000),
+      tasksPerMinute: Math.round((this.performanceMetrics.tasksCreated / uptime) * 60000),
+      throttling: {
+        chatCooldown: this.chatCooldown / 1000,
+        environmentalCooldown: this.environmentalCooldown / 1000,
+      }
+    };
+  }
+
+  /**
+   * Log performance metrics to console
+   */
+  logPerformanceMetrics() {
+    const metrics = this.getPerformanceMetrics();
+    console.log(`
+🤖 Reactive Consciousness Performance Report:
+══════════════════════════════════════════════════════
+⏱️  Uptime: ${metrics.uptime}s
+👁️  Entity Scans: ${metrics.entityScans} (${metrics.scansPerMinute}/min)
+💬  Chat Responses: ${metrics.chatResponses} (${metrics.responsesPerMinute}/min)
+🌍  Environmental Events: ${metrics.environmentalEvents} (${metrics.eventsPerMinute}/min)
+📋  Tasks Created: ${metrics.tasksCreated} (${metrics.tasksPerMinute}/min)
+⚡  Avg Response Time: ${metrics.averageResponseTime}ms
+
+🚦 Throttling:
+   • Chat Cooldown: ${metrics.throttling.chatCooldown}s
+   • Environmental Cooldown: ${metrics.throttling.environmentalCooldown}s
+
+══════════════════════════════════════════════════════
+    `);
   }
 }

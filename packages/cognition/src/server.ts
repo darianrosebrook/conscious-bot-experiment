@@ -1389,27 +1389,28 @@ app.post('/process', async (req, res) => {
         let shouldCreateTask = false;
         let taskSuggestion = '';
 
-        // Decide if we should respond or create a task based on the entity
-        if (metadata?.entityType) {
+        // Only respond to truly interesting events, not every entity detection
+        if (metadata?.entityType && metadata?.distance) {
           const entityType = metadata.entityType.toLowerCase();
+          const distance = metadata.distance;
 
-          if (entityType.includes('player')) {
+          // Only respond if entity is very close (within 5 blocks) or is a player
+          if (entityType.includes('player') && distance <= 10) {
+            // Don't spam - only respond occasionally to players
+            shouldRespond = Math.random() < 0.3; // 30% chance
+            if (shouldRespond) {
+              response = `I notice you nearby. How can I help?`;
+            }
+            shouldCreateTask = true;
+            taskSuggestion = `Interact with player ${metadata?.entityType} at distance ${distance.toFixed(1)} blocks`;
+          } else if (entityType.includes('hostile') && distance <= 8) {
+            // Only respond to immediate threats
             shouldRespond = true;
-            response = `Hello ${metadata?.entityType}! I'm an autonomous bot exploring this world.`;
+            response = `Hostile mob detected ${distance.toFixed(1)} blocks away - staying alert.`;
             shouldCreateTask = true;
-            taskSuggestion = `Investigate the player ${metadata?.entityType} at position (${metadata?.position?.x?.toFixed(1)}, ${metadata?.position?.y?.toFixed(1)}, ${metadata?.position?.z?.toFixed(1)})`;
-          } else if (entityType.includes('hostile')) {
-            shouldRespond = true;
-            response = `I see a hostile mob ${metadata?.distance?.toFixed(1)} blocks away. I should be careful.`;
-            shouldCreateTask = true;
-            taskSuggestion = `Monitor hostile mob ${metadata?.entityType} at distance ${metadata?.distance?.toFixed(1)} blocks`;
-          } else if (
-            entityType.includes('animal') ||
-            entityType.includes('villager')
-          ) {
-            shouldCreateTask = true;
-            taskSuggestion = `Observe ${metadata?.entityType} at position (${metadata?.position?.x?.toFixed(1)}, ${metadata?.position?.y?.toFixed(1)}, ${metadata?.position?.z?.toFixed(1)})`;
+            taskSuggestion = `Monitor immediate threat: ${metadata?.entityType}`;
           }
+          // Don't create tasks for distant animals/villagers - too noisy
         }
 
         res.json({
@@ -1477,44 +1478,38 @@ app.post('/process', async (req, res) => {
         let shouldCreateTask = false;
         let taskSuggestion = '';
 
-        // Decide on response based on message content
+        // Decide on response based on message content - be selective
         const message = metadata?.message?.toLowerCase() || '';
         const sender = metadata?.sender || 'unknown';
 
-        if (message.includes('hello') || message.includes('hi')) {
+        // Only respond to direct questions or important messages
+        if (message.includes('?')) {
+          // This is a question - respond
           shouldRespond = true;
-          response = `Hello ${sender}! I'm an autonomous bot exploring this world. How can I help you?`;
+          response = `I'm processing your question about "${message}". Let me think about that.`;
           shouldCreateTask = true;
-          taskSuggestion = `Respond to greeting from ${sender} and engage in conversation`;
-        } else if (message.includes('help')) {
+          taskSuggestion = `Answer question from ${sender}: "${message}"`;
+        } else if (message.includes('help') || message.includes('assist')) {
+          // Direct request for help
           shouldRespond = true;
-          response = `Hello ${sender}! I can help you by exploring the world, gathering resources, and performing tasks. What would you like me to do?`;
+          response = `I can help with exploration, resource gathering, and various tasks. What specifically do you need?`;
           shouldCreateTask = true;
-          taskSuggestion = `Provide assistance to ${sender} based on their request`;
-        } else if (
-          message.includes('danger') ||
-          message.includes('enemy') ||
-          message.includes('mob')
-        ) {
+          taskSuggestion = `Provide assistance requested by ${sender}`;
+        } else if (message.includes('danger') || message.includes('threat')) {
+          // Immediate safety concern
           shouldRespond = true;
-          response = `I understand there's danger nearby. I'm monitoring the situation and will stay safe.`;
+          response = `I understand there's a safety concern. I'm monitoring the situation.`;
           shouldCreateTask = true;
-          taskSuggestion = `Address safety concerns mentioned by ${sender}`;
-        } else if (
-          message.includes('resource') ||
-          message.includes('item') ||
-          message.includes('craft')
-        ) {
-          shouldRespond = true;
-          response = `I'm always looking for resources to gather and craft with. What do you need?`;
-          shouldCreateTask = true;
-          taskSuggestion = `Assist ${sender} with resource gathering or crafting`;
-        } else {
-          // Generic response for other messages
-          shouldRespond = true;
-          response = `Interesting! I'm processing what you said and will consider it in my decision making.`;
-          shouldCreateTask = false;
+          taskSuggestion = `Address safety concern from ${sender}`;
+        } else if (message.length < 10 && (message.includes('hello') || message.includes('hi'))) {
+          // Short greeting - respond occasionally
+          shouldRespond = Math.random() < 0.4; // 40% chance
+          if (shouldRespond) {
+            response = `Hello! I'm currently focused on my tasks, but I noticed your greeting.`;
+          }
+          shouldCreateTask = false; // Don't create tasks for casual greetings
         }
+        // For other messages, stay silent - don't spam responses
 
         res.json({
           processed: true,
@@ -1580,41 +1575,26 @@ app.post('/process', async (req, res) => {
         let shouldCreateTask = false;
         let taskSuggestion = '';
 
-        // Decide on response based on event type
+        // Decide on response based on event type - be very selective
         const eventType = metadata?.eventType || '';
         const eventData = metadata?.eventData || {};
 
-        switch (eventType) {
-          case 'block_break':
-            shouldRespond = true;
-            response = `I notice some mining activity nearby. That's interesting!`;
-            shouldCreateTask = true;
-            taskSuggestion = `Investigate the mining activity at (${eventData.position?.x}, ${eventData.position?.y}, ${eventData.position?.z})`;
-            break;
-
-          case 'item_pickup':
-            shouldRespond = true;
-            response = `I just picked up some items. That's always useful!`;
-            shouldCreateTask = false; // Already handled by the action
-            break;
-
-          case 'health_loss':
-            shouldRespond = true;
-            response = `Ouch! I took damage. I should be more careful.`;
-            shouldCreateTask = true;
-            taskSuggestion = `Assess and address the source of damage`;
-            break;
-
-          case 'health_gain':
-            shouldRespond = true;
-            response = `I feel better now. Health restored!`;
-            shouldCreateTask = false; // Already handled by the action
-            break;
-
-          default:
-            shouldCreateTask = true;
-            taskSuggestion = `Respond to ${eventType} environmental event`;
+        // Only respond to critical or very interesting events
+        if (eventType === 'health_loss' && eventData.damage > 5) {
+          // Only respond to significant damage
+          shouldRespond = true;
+          response = `That hurt! I should be more careful in this area.`;
+          shouldCreateTask = true;
+          taskSuggestion = `Investigate and avoid the source of damage`;
+        } else if (eventType === 'block_break' && eventData.oldBlock && eventData.oldBlock !== 'air') {
+          // Only respond to interesting block changes, not every fire tick
+          shouldRespond = Math.random() < 0.2; // 20% chance for interesting blocks
+          if (shouldRespond) {
+            response = `Interesting environmental change detected.`;
+          }
+          shouldCreateTask = false; // Don't spam tasks for every block change
         }
+        // Most environmental events (item pickups, minor changes) should be silent
 
         res.json({
           processed: true,
