@@ -1,0 +1,805 @@
+openapi: 3.0.3
+info:
+  title: Memory Hybrid Search API
+  description: |
+    API for hybrid memory search combining vector similarity with knowledge graph traversal.
+    Provides enhanced memory retrieval with explainable results and multi-hop reasoning.
+  version: 1.0.0
+  contact:
+    name: Memory Enhancement Team
+    email: team@conscious-bot.dev
+
+servers:
+  - url: http://localhost:3000/api/v1
+    description: Development server
+  - url: https://api.conscious-bot.dev/v1
+    description: Production server
+
+paths:
+  /memory/search:
+    post:
+      summary: Perform hybrid memory search
+      description: |
+        Execute a memory search query using hybrid vector similarity and knowledge graph traversal.
+        Returns ranked memory results with explainable relationship provenance.
+      operationId: searchMemoryHybrid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/HybridMemorySearchRequest'
+            examples:
+              basic_memory_search:
+                summary: Basic memory search query
+                value:
+                  query: "AI design patterns I worked on"
+                  options:
+                    maxResults: 10
+                    includeExplanation: true
+                    memoryTypes: ["episodic", "semantic"]
+              multi_hop_reasoning:
+                summary: Multi-hop reasoning search
+                value:
+                  query: "projects similar to neural network optimization"
+                  options:
+                    maxResults: 20
+                    maxHops: 3
+                    minConfidence: 0.7
+                    includeExplanation: true
+                    explainResults: true
+      responses:
+        '200':
+          description: Memory search completed successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HybridMemorySearchResponse'
+        '400':
+          description: Invalid search request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Rate limit exceeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /memory/search/{searchId}/explain:
+    get:
+      summary: Get detailed explanation for memory search result
+      description: |
+        Retrieve detailed explanation of how a specific memory search result was derived,
+        including entity relationship chains and reasoning paths.
+      operationId: explainMemorySearchResult
+      parameters:
+        - name: searchId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Unique identifier for the search session
+        - name: resultId
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Identifier for the specific result to explain
+      responses:
+        '200':
+          description: Explanation retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MemorySearchExplanation'
+        '404':
+          description: Search or result not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /memory/entities:
+    get:
+      summary: List entities in knowledge graph
+      description: |
+        Retrieve entities from the memory knowledge graph with optional filtering
+        and pagination support.
+      operationId: listMemoryEntities
+      parameters:
+        - name: type
+          in: query
+          schema:
+            $ref: '#/components/schemas/MemoryEntityType'
+          description: Filter by entity type
+        - name: search
+          in: query
+          schema:
+            type: string
+          description: Search entities by name (fuzzy matching)
+        - name: memoryType
+          in: query
+          schema:
+            type: string
+            enum: [episodic, semantic, procedural, social, emotional]
+          description: Filter by memory type where entity appears
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+          description: Maximum number of entities to return
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+          description: Number of entities to skip
+      responses:
+        '200':
+          description: Entities retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MemoryEntityListResponse'
+
+  /memory/entities/{entityId}:
+    get:
+      summary: Get entity details with relationships
+      description: |
+        Retrieve detailed information about a specific entity including
+        its relationships and associated memories.
+      operationId: getMemoryEntity
+      parameters:
+        - name: entityId
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Unique identifier for the entity
+        - name: includeRelationships
+          in: query
+          schema:
+            type: boolean
+            default: true
+          description: Whether to include entity relationships
+        - name: maxRelationships
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 50
+          description: Maximum number of relationships to return
+        - name: memoryTypes
+          in: query
+          schema:
+            type: array
+            items:
+              type: string
+              enum: [episodic, semantic, procedural, social, emotional]
+          description: Filter relationships by memory types
+      responses:
+        '200':
+          description: Entity retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MemoryEntityDetails'
+        '404':
+          description: Entity not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /memory/graph/stats:
+    get:
+      summary: Get memory knowledge graph statistics
+      description: |
+        Retrieve statistical information about the memory knowledge graph including
+        entity counts, relationship distributions, and growth metrics.
+      operationId: getMemoryGraphStats
+      parameters:
+        - name: memoryType
+          in: query
+          schema:
+            type: string
+            enum: [episodic, semantic, procedural, social, emotional]
+          description: Filter statistics by memory type
+      responses:
+        '200':
+          description: Statistics retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MemoryGraphStats'
+
+components:
+  schemas:
+    HybridMemorySearchRequest:
+      type: object
+      required:
+        - query
+      properties:
+        query:
+          type: string
+          minLength: 1
+          maxLength: 1000
+          description: The memory search query text
+          example: "AI design patterns I worked on"
+        options:
+          $ref: '#/components/schemas/HybridMemorySearchOptions'
+
+    HybridMemorySearchOptions:
+      type: object
+      properties:
+        maxResults:
+          type: integer
+          minimum: 1
+          maximum: 100
+          default: 10
+          description: Maximum number of results to return
+        maxHops:
+          type: integer
+          minimum: 1
+          maximum: 3
+          default: 2
+          description: Maximum number of hops for graph traversal
+        minConfidence:
+          type: number
+          minimum: 0.0
+          maximum: 1.0
+          default: 0.5
+          description: Minimum confidence threshold for results
+        includeExplanation:
+          type: boolean
+          default: false
+          description: Whether to include explanation in results
+        explainResults:
+          type: boolean
+          default: false
+          description: Whether to generate detailed explanations for results
+        memoryTypes:
+          type: array
+          items:
+            type: string
+            enum: [episodic, semantic, procedural, social, emotional]
+          description: Filter results by memory types
+        searchType:
+          type: string
+          enum: [vector, graph, hybrid]
+          default: hybrid
+          description: Type of search algorithm to use
+        queryExpansion:
+          type: boolean
+          default: true
+          description: Whether to expand queries using entity relationships
+
+    HybridMemorySearchResponse:
+      type: object
+      required:
+        - searchId
+        - results
+        - metadata
+      properties:
+        searchId:
+          type: string
+          format: uuid
+          description: Unique identifier for this search session
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/HybridMemorySearchResult'
+          description: Array of memory search results
+        metadata:
+          $ref: '#/components/schemas/HybridMemorySearchMetadata'
+        explanation:
+          $ref: '#/components/schemas/MemorySearchExplanation'
+
+    HybridMemorySearchResult:
+      type: object
+      required:
+        - id
+        - content
+        - score
+        - metadata
+      properties:
+        id:
+          type: string
+          description: Unique identifier for this memory result
+        content:
+          type: string
+          description: The memory content
+        score:
+          type: number
+          minimum: 0.0
+          maximum: 1.0
+          description: Overall relevance score for this result
+        metadata:
+          $ref: '#/components/schemas/MemoryChunkMetadata'
+        entities:
+          type: array
+          items:
+            $ref: '#/components/schemas/MemoryEntityReference'
+          description: Entities found in this memory
+        relationships:
+          type: array
+          items:
+            $ref: '#/components/schemas/MemoryRelationshipReference'
+          description: Relationships relevant to this memory
+        explanation:
+          $ref: '#/components/schemas/MemoryResultExplanation'
+
+    MemoryChunkMetadata:
+      type: object
+      required:
+        - memoryType
+        - timestamp
+      properties:
+        memoryType:
+          type: string
+          enum: [episodic, semantic, procedural, social, emotional]
+          description: Type of memory
+        timestamp:
+          type: string
+          format: date-time
+          description: When this memory was created
+        world:
+          type: string
+          description: Minecraft world context (if applicable)
+        confidence:
+          type: number
+          minimum: 0.0
+          maximum: 1.0
+          description: Confidence score for this memory
+        chunkId:
+          type: string
+          description: Identifier for the memory chunk
+
+    MemoryEntityReference:
+      type: object
+      required:
+        - id
+        - name
+        - type
+      properties:
+        id:
+          type: string
+          description: Unique identifier for the entity
+        name:
+          type: string
+          description: Display name of the entity
+        type:
+          $ref: '#/components/schemas/MemoryEntityType'
+        confidence:
+          type: number
+          minimum: 0.0
+          maximum: 1.0
+          description: Confidence score for entity extraction
+
+    MemoryRelationshipReference:
+      type: object
+      required:
+        - id
+        - sourceEntityId
+        - targetEntityId
+        - type
+      properties:
+        id:
+          type: string
+          description: Unique identifier for the relationship
+        sourceEntityId:
+          type: string
+          description: ID of the source entity
+        targetEntityId:
+          type: string
+          description: ID of the target entity
+        type:
+          $ref: '#/components/schemas/MemoryRelationshipType'
+        confidence:
+          type: number
+          minimum: 0.0
+          maximum: 1.0
+          description: Confidence score for relationship inference
+        strength:
+          type: number
+          minimum: 0.0
+          maximum: 1.0
+          description: Strength of the relationship
+
+    HybridMemorySearchMetadata:
+      type: object
+      required:
+        - totalResults
+        - searchTime
+        - searchType
+      properties:
+        totalResults:
+          type: integer
+          minimum: 0
+          description: Total number of results found
+        searchTime:
+          type: number
+          minimum: 0
+          description: Search execution time in milliseconds
+        searchType:
+          type: string
+          enum: [vector, graph, hybrid]
+          description: Type of search performed
+        graphTraversal:
+          $ref: '#/components/schemas/MemoryGraphTraversalMetadata'
+
+    MemoryGraphTraversalMetadata:
+      type: object
+      properties:
+        nodesVisited:
+          type: integer
+          minimum: 0
+          description: Number of nodes visited during traversal
+        edgesTraversed:
+          type: integer
+          minimum: 0
+          description: Number of edges traversed
+        maxHopsReached:
+          type: integer
+          minimum: 0
+          description: Maximum hop depth reached
+        traversalTime:
+          type: number
+          minimum: 0
+          description: Graph traversal time in milliseconds
+
+    MemorySearchExplanation:
+      type: object
+      properties:
+        queryEntities:
+          type: array
+          items:
+            $ref: '#/components/schemas/MemoryEntityReference'
+          description: Entities identified in the search query
+        traversalPaths:
+          type: array
+          items:
+            $ref: '#/components/schemas/MemoryTraversalPath'
+          description: Paths taken during graph traversal
+        reasoningSteps:
+          type: array
+          items:
+            $ref: '#/components/schemas/MemoryReasoningStep'
+          description: Step-by-step reasoning process
+
+    MemoryTraversalPath:
+      type: object
+      required:
+        - entities
+        - relationships
+        - confidence
+      properties:
+        entities:
+          type: array
+          items:
+            $ref: '#/components/schemas/MemoryEntityReference'
+          description: Entities in this traversal path
+        relationships:
+          type: array
+          items:
+            $ref: '#/components/schemas/MemoryRelationshipReference'
+          description: Relationships connecting the entities
+        confidence:
+          type: number
+          minimum: 0.0
+          maximum: 1.0
+          description: Confidence score for this path
+        hopCount:
+          type: integer
+          minimum: 1
+          description: Number of hops in this path
+
+    MemoryReasoningStep:
+      type: object
+      required:
+        - step
+        - description
+        - confidence
+      properties:
+        step:
+          type: integer
+          minimum: 1
+          description: Step number in the reasoning process
+        description:
+          type: string
+          description: Human-readable description of this reasoning step
+        confidence:
+          type: number
+          minimum: 0.0
+          maximum: 1.0
+          description: Confidence in this reasoning step
+        evidence:
+          type: array
+          items:
+            type: string
+          description: Evidence supporting this reasoning step
+
+    MemoryResultExplanation:
+      type: object
+      properties:
+        relevanceScore:
+          type: number
+          minimum: 0.0
+          maximum: 1.0
+          description: How relevant this result is to the query
+        reasoning:
+          type: string
+          description: Explanation of why this result was returned
+        entityConnections:
+          type: array
+          items:
+            type: string
+          description: Entity connections that led to this result
+
+    MemoryEntityDetails:
+      type: object
+      required:
+        - id
+        - name
+        - type
+        - confidence
+      properties:
+        id:
+          type: string
+          description: Unique identifier for the entity
+        name:
+          type: string
+          description: Canonical name of the entity
+        type:
+          $ref: '#/components/schemas/MemoryEntityType'
+        aliases:
+          type: array
+          items:
+            type: string
+          description: Alternative names for this entity
+        confidence:
+          type: number
+          minimum: 0.0
+          maximum: 1.0
+          description: Overall confidence score for this entity
+        metadata:
+          $ref: '#/components/schemas/MemoryEntityMetadata'
+        relationships:
+          type: array
+          items:
+            $ref: '#/components/schemas/MemoryRelationshipDetails'
+          description: Relationships involving this entity
+
+    MemoryEntityMetadata:
+      type: object
+      properties:
+        memoryTypes:
+          type: array
+          items:
+            type: string
+            enum: [episodic, semantic, procedural, social, emotional]
+          description: Memory types where this entity appears
+        extractionMethods:
+          type: array
+          items:
+            type: string
+          description: Methods used to extract this entity
+        firstSeen:
+          type: string
+          format: date-time
+          description: When this entity was first discovered
+        lastUpdated:
+          type: string
+          format: date-time
+          description: When this entity was last updated
+        occurrenceCount:
+          type: integer
+          minimum: 1
+          description: Number of times this entity was found
+
+    MemoryRelationshipDetails:
+      type: object
+      required:
+        - id
+        - targetEntity
+        - type
+        - confidence
+      properties:
+        id:
+          type: string
+          description: Unique identifier for the relationship
+        targetEntity:
+          $ref: '#/components/schemas/MemoryEntityReference'
+        type:
+          $ref: '#/components/schemas/MemoryRelationshipType'
+        confidence:
+          type: number
+          minimum: 0.0
+          maximum: 1.0
+          description: Confidence score for this relationship
+        strength:
+          type: number
+          minimum: 0.0
+          maximum: 1.0
+          description: Strength of the relationship
+        evidence:
+          $ref: '#/components/schemas/MemoryRelationshipEvidence'
+
+    MemoryRelationshipEvidence:
+      type: object
+      properties:
+        memoryChunks:
+          type: array
+          items:
+            type: string
+          description: Memory chunks supporting this relationship
+        cooccurrenceCount:
+          type: integer
+          minimum: 1
+          description: Number of times entities co-occurred
+        extractionContext:
+          type: string
+          description: Context in which the relationship was extracted
+
+    MemoryEntityListResponse:
+      type: object
+      required:
+        - entities
+        - pagination
+      properties:
+        entities:
+          type: array
+          items:
+            $ref: '#/components/schemas/MemoryEntityReference'
+        pagination:
+          $ref: '#/components/schemas/MemoryPaginationInfo'
+
+    MemoryPaginationInfo:
+      type: object
+      required:
+        - total
+        - limit
+        - offset
+      properties:
+        total:
+          type: integer
+          minimum: 0
+          description: Total number of entities available
+        limit:
+          type: integer
+          minimum: 1
+          description: Number of entities per page
+        offset:
+          type: integer
+          minimum: 0
+          description: Number of entities skipped
+        hasNext:
+          type: boolean
+          description: Whether there are more entities available
+
+    MemoryGraphStats:
+      type: object
+      required:
+        - entityCount
+        - relationshipCount
+        - lastUpdated
+      properties:
+        entityCount:
+          type: integer
+          minimum: 0
+          description: Total number of entities in the graph
+        relationshipCount:
+          type: integer
+          minimum: 0
+          description: Total number of relationships in the graph
+        entityTypeDistribution:
+          type: object
+          additionalProperties:
+            type: integer
+          description: Count of entities by type
+        relationshipTypeDistribution:
+          type: object
+          additionalProperties:
+            type: integer
+          description: Count of relationships by type
+        averageConnectivity:
+          type: number
+          minimum: 0
+          description: Average number of relationships per entity
+        lastUpdated:
+          type: string
+          format: date-time
+          description: When the graph was last updated
+
+    MemoryEntityType:
+      type: string
+      enum:
+        - PERSON
+        - ORGANIZATION
+        - LOCATION
+        - CONCEPT
+        - TECHNOLOGY
+        - PROJECT
+        - TASK
+        - EMOTION
+        - SKILL
+        - TOOL
+        - MEMORY_TYPE
+        - OTHER
+      description: Type classification for memory entities
+
+    MemoryRelationshipType:
+      type: string
+      enum:
+        - WORKS_ON
+        - PART_OF
+        - RELATED_TO
+        - MENTIONS
+        - LOCATED_IN
+        - CREATED_BY
+        - USED_BY
+        - SIMILAR_TO
+        - DEPENDS_ON
+        - COLLABORATES_WITH
+        - INFLUENCES
+        - LEADS_TO
+        - FOLLOWS_FROM
+        - OTHER
+      description: Type classification for memory relationships
+
+    ErrorResponse:
+      type: object
+      required:
+        - error
+        - message
+      properties:
+        error:
+          type: string
+          description: Error code
+        message:
+          type: string
+          description: Human-readable error message
+        details:
+          type: object
+          description: Additional error details
+        timestamp:
+          type: string
+          format: date-time
+          description: When the error occurred
+
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+security:
+  - ApiKeyAuth: []
+  - BearerAuth: []
+
+tags:
+  - name: Memory Search
+    description: Hybrid memory search operations
+  - name: Knowledge Graph
+    description: Memory knowledge graph entity management
+  - name: Graph Statistics
+    description: Memory knowledge graph statistics and metadata

@@ -1,0 +1,115 @@
+id: MEM-001
+title: "Hybrid Knowledge Graph + Vector Memory Enhancement System"
+risk_tier: 2
+scope:
+  in:
+    - "Knowledge graph construction for entity extraction and relationship inference"
+    - "Hybrid vector + graph search algorithms for enhanced memory retrieval"
+    - "Multi-hop reasoning capabilities (1-3 hops) for contextual understanding"
+    - "Explainable memory retrieval with provenance chains"
+    - "Entity deduplication and canonicalization across memory types"
+    - "Cross-modal entity linking between episodic, semantic, and procedural memories"
+    - "Advanced embedding strategy with model selection and confidence scoring"
+    - "Performance monitoring and optimization for hybrid search"
+  out:
+    - "Real-time collaborative knowledge graph editing interfaces"
+    - "External knowledge base integration (Wikipedia, Wikidata)"
+    - "Advanced graph algorithms (PageRank, community detection)"
+    - "Multi-tenant knowledge graph isolation"
+    - "Graph visualization and exploration UI components"
+    - "Neural-symbolic reasoning beyond 3-hop traversal"
+invariants:
+  - "Memory retrieval results must include explainable provenance showing entity relationship paths"
+  - "Knowledge graph consistency: entities have unique identifiers across all memory types"
+  - "Vector embeddings and graph relationships must remain synchronized during updates"
+  - "Search performance: P95 < 600ms for queries with ≤3 hops"
+  - "Graph updates are atomic: either all entities/relationships succeed or none"
+  - "Entity extraction confidence scores ≥ 0.7 for inclusion in knowledge graph"
+  - "Memory retrieval confidence never drops below 0.1 (graceful degradation)"
+  - "Hybrid search results maintain backward compatibility with existing vector-only search"
+  - "Knowledge graph size scales linearly with memory corpus size (O(n) complexity)"
+  - "Entity deduplication preserves most confident entity representation"
+acceptance:
+  - id: A1
+    given: "user queries for memories about 'AI design patterns'"
+    when: "system performs hybrid vector + graph search with 2-hop traversal"
+    then: "returns memories with relationship explanations showing concept connections"
+  - id: A2
+    given: "new episodic memory with entities already in knowledge graph"
+    when: "memory is stored"
+    then: "existing entities are linked, new relationships are created atomically"
+  - id: A3
+    given: "user query about entity relationships in memory recall"
+    when: "multi-hop graph traversal is performed (max 3 hops)"
+    then: "contextually relevant memories include 2-3 hop connections with confidence scores ≥ 0.5"
+  - id: A4
+    given: "hybrid search results are returned"
+    when: "user requests explanation"
+    then: "system shows entity relationship chain, source memories, and reasoning steps"
+  - id: A5
+    given: "large knowledge graph with 10K+ entities across memory types"
+    when: "complex multi-hop query is executed"
+    then: "results returned within 600ms P95 latency with graceful fallback to vector-only search"
+  - id: A6
+    given: "memory system receives high-confidence entity extraction"
+    when: "knowledge graph is updated"
+    then: "entity deduplication occurs automatically, preserving highest-confidence entity data"
+  - id: A7
+    given: "hybrid search is enabled with explainable results"
+    when: "user interacts with memory recall"
+    then: "confidence scores and provenance information are accessible and meaningful"
+non_functional:
+  perf:
+    api_p95_ms: 600
+    graph_traversal_max_hops: 3
+    concurrent_memory_searches: 50
+    memory_embedding_latency_p95: 1000
+    knowledge_graph_update_latency: 200
+  security:
+    - "Entity data sanitization to prevent injection attacks in graph queries"
+    - "Query complexity limits to prevent DoS via expensive graph traversals"
+    - "Access control for sensitive entity relationships in social memories"
+    - "Memory content validation to prevent malicious entity extraction"
+    - "Graph traversal depth limits to prevent infinite loops"
+  a11y:
+    - "Memory recall explanations are screen reader accessible"
+    - "Confidence scores are announced via aria-live for dynamic updates"
+    - "Graph traversal paths are keyboard navigable in explanation interfaces"
+contracts:
+  - type: openapi
+    path: "contracts/memory-hybrid-search-api.yaml"
+  - type: graphql
+    path: "contracts/memory-knowledge-graph-schema.graphql"
+observability:
+  logs:
+    - "memory.search.hybrid with query_complexity, hop_depth, result_count, confidence_avg"
+    - "memory.graph.entity_extraction with entity_count, relationship_count, confidence_distribution"
+    - "memory.graph.traversal with path_length, nodes_visited, execution_time, timeout_count"
+    - "memory.embedding.generation with model_used, confidence_score, latency_ms"
+    - "memory.deduplication.process with entities_merged, conflicts_resolved"
+  metrics:
+    - "memory_search_requests_total{search_type, hop_depth, memory_type}"
+    - "memory_entity_extraction_duration_seconds{content_type, extraction_method}"
+    - "memory_graph_traversal_duration_seconds{hop_count, complexity_score}"
+    - "memory_embedding_generation_duration_seconds{model_name, batch_size}"
+    - "memory_knowledge_graph_size{entity_type, relationship_type, memory_type}"
+    - "memory_search_confidence_score{search_type, hop_depth}"
+    - "memory_deduplication_rate{entity_type}"
+  traces:
+    - "memory_hybrid_search span with query_text, entities_found, relationships_traversed, fusion_strategy"
+    - "memory_entity_extraction span with content_type, entities_extracted, confidence_scores"
+    - "memory_graph_traversal span with start_entity, hop_count, path_confidence, timeout_occurred"
+migrations:
+  - "Create memory_knowledge_graph_entities table with vector embeddings and metadata"
+  - "Create memory_entity_relationships table with confidence scores, evidence, and provenance"
+  - "Create memory_entity_chunk_mappings table linking entities to memory chunks"
+  - "Add knowledge_graph_enabled column to memory_chunks for hybrid search participation"
+  - "Add graph_embedding column to memory_chunks for graph-based similarity"
+  - "Create memory_search_sessions table for query analytics and performance monitoring"
+  - "Add indexes for entity lookup, relationship traversal, and hybrid search optimization"
+rollback:
+  - "Feature flag ENABLE_HYBRID_MEMORY_SEARCH=false falls back to vector-only search"
+  - "Database migration rollback scripts for all new knowledge graph tables"
+  - "Graceful degradation: if graph database unavailable, use vector search with reduced confidence"
+  - "Entity extraction can be disabled per memory type for gradual rollout"
+  - "Knowledge graph size limits with automatic cleanup of low-confidence entities"

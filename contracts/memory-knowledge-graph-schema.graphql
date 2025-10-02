@@ -1,0 +1,495 @@
+# Memory Knowledge Graph GraphQL Schema
+# Provides rich querying capabilities for memory entities, relationships, and graph traversal
+
+scalar DateTime
+scalar JSON
+
+# Root Query type
+type Query {
+  # Memory entity queries
+  memoryEntity(id: ID!): MemoryEntity
+  memoryEntities(
+    filter: MemoryEntityFilter
+    pagination: PaginationInput
+  ): MemoryEntityConnection!
+
+  # Memory relationship queries
+  memoryRelationship(id: ID!): MemoryRelationship
+  memoryRelationships(
+    filter: MemoryRelationshipFilter
+    pagination: PaginationInput
+  ): MemoryRelationshipConnection!
+
+  # Memory graph traversal queries
+  findMemoryPath(
+    sourceId: ID!
+    targetId: ID!
+    maxHops: Int = 3
+    relationshipTypes: [MemoryRelationshipType!]
+  ): [MemoryTraversalPath!]!
+
+  findMemoryNeighbors(
+    entityId: ID!
+    hops: Int = 1
+    relationshipTypes: [MemoryRelationshipType!]
+    entityTypes: [MemoryEntityType!]
+  ): [MemoryEntity!]!
+
+  # Memory graph analytics
+  memoryGraphStats: MemoryGraphStatistics!
+  memoryEntityClusters(algorithm: ClusteringAlgorithm = COMMUNITY_DETECTION): [MemoryEntityCluster!]!
+
+  # Memory search integration
+  searchMemoryEntities(
+    query: String!
+    limit: Int = 20
+    fuzzy: Boolean = true
+    memoryTypes: [MemoryType!]
+  ): [MemoryEntitySearchResult!]!
+
+  # Memory type filtering
+  memoryEntitiesByType(
+    type: MemoryEntityType!
+    memoryTypes: [MemoryType!]
+    limit: Int = 50
+  ): [MemoryEntity!]!
+}
+
+# Root Mutation type
+type Mutation {
+  # Memory entity mutations
+  createMemoryEntity(input: CreateMemoryEntityInput!): MemoryEntity!
+  updateMemoryEntity(id: ID!, input: UpdateMemoryEntityInput!): MemoryEntity!
+  deleteMemoryEntity(id: ID!): Boolean!
+  mergeMemoryEntities(sourceId: ID!, targetId: ID!): MemoryEntity!
+
+  # Memory relationship mutations
+  createMemoryRelationship(input: CreateMemoryRelationshipInput!): MemoryRelationship!
+  updateMemoryRelationship(id: ID!, input: UpdateMemoryRelationshipInput!): MemoryRelationship!
+  deleteMemoryRelationship(id: ID!): Boolean!
+
+  # Bulk operations
+  bulkCreateMemoryEntities(input: [CreateMemoryEntityInput!]!): [MemoryEntity!]!
+  bulkCreateMemoryRelationships(input: [CreateMemoryRelationshipInput!]!): [MemoryRelationship!]!
+}
+
+# Root Subscription type for real-time updates
+type Subscription {
+  memoryEntityCreated: MemoryEntity!
+  memoryEntityUpdated: MemoryEntity!
+  memoryEntityDeleted: MemoryEntityDeletedEvent!
+
+  memoryRelationshipCreated: MemoryRelationship!
+  memoryRelationshipUpdated: MemoryRelationship!
+  memoryRelationshipDeleted: MemoryRelationshipDeletedEvent!
+
+  memoryGraphStatsUpdated: MemoryGraphStatistics!
+}
+
+# Core Memory Entity type
+type MemoryEntity {
+  id: ID!
+  name: String!
+  type: MemoryEntityType!
+  aliases: [String!]!
+  confidence: Float!
+
+  # Vector embedding for similarity search
+  embedding: [Float!]
+
+  # Memory metadata
+  metadata: MemoryEntityMetadata!
+
+  # Relationships (with pagination and filtering)
+  relationships(
+    types: [MemoryRelationshipType!]
+    direction: MemoryRelationshipDirection = BOTH
+    pagination: PaginationInput
+    memoryTypes: [MemoryType!]
+  ): MemoryRelationshipConnection!
+
+  # Connected entities
+  connectedEntities(
+    hops: Int = 1
+    types: [MemoryEntityType!]
+    relationshipTypes: [MemoryRelationshipType!]
+    memoryTypes: [MemoryType!]
+  ): [MemoryEntity!]!
+
+  # Similarity search
+  similarEntities(limit: Int = 10, threshold: Float = 0.7): [MemoryEntitySimilarity!]!
+
+  # Memory chunks where this entity appears
+  sourceMemories: [MemoryChunk!]!
+
+  # Memory type distribution
+  memoryTypeDistribution: [MemoryTypeCount!]!
+}
+
+# Memory entity metadata
+type MemoryEntityMetadata {
+  memoryTypes: [MemoryType!]!
+  extractionMethods: [String!]!
+  firstSeen: DateTime!
+  lastUpdated: DateTime!
+  occurrenceCount: Int!
+  averageConfidence: Float!
+
+  # Custom metadata as JSON
+  custom: JSON
+}
+
+# Memory relationship between entities
+type MemoryRelationship {
+  id: ID!
+  sourceEntity: MemoryEntity!
+  targetEntity: MemoryEntity!
+  type: MemoryRelationshipType!
+  confidence: Float!
+  strength: Float!
+
+  # Evidence supporting this relationship
+  evidence: MemoryRelationshipEvidence!
+
+  # Memory metadata
+  metadata: MemoryRelationshipMetadata!
+
+  # Bidirectional access
+  isDirectional: Boolean!
+
+  # Temporal information
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+# Evidence supporting a memory relationship
+type MemoryRelationshipEvidence {
+  sourceMemories: [MemoryChunk!]!
+  cooccurrenceCount: Int!
+  extractionContext: String
+  confidenceScores: [Float!]!
+
+  # Statistical measures
+  mutualInformation: Float
+  pointwiseMutualInformation: Float
+}
+
+# Memory relationship metadata
+type MemoryRelationshipMetadata {
+  extractionMethod: String!
+  validatedBy: String
+  validatedAt: DateTime
+
+  # Custom metadata as JSON
+  custom: JSON
+}
+
+# Memory chunk reference
+type MemoryChunk {
+  id: ID!
+  content: String!
+  memoryType: MemoryType!
+  timestamp: DateTime!
+  confidence: Float!
+
+  # Entities mentioned in this memory chunk
+  entities: [MemoryEntity!]!
+
+  # Relationships inferred from this memory chunk
+  relationships: [MemoryRelationship!]!
+
+  # Vector embedding
+  embedding: [Float!]
+
+  # Processing metadata
+  processingMetadata: JSON
+}
+
+# Memory traversal path between entities
+type MemoryTraversalPath {
+  entities: [MemoryEntity!]!
+  relationships: [MemoryRelationship!]!
+  confidence: Float!
+  hopCount: Int!
+  totalStrength: Float!
+
+  # Path explanation
+  explanation: String
+}
+
+# Memory entity similarity result
+type MemoryEntitySimilarity {
+  entity: MemoryEntity!
+  similarity: Float!
+  method: MemorySimilarityMethod!
+}
+
+# Memory entity search result with highlighting
+type MemoryEntitySearchResult {
+  entity: MemoryEntity!
+  score: Float!
+  highlights: [String!]!
+  matchedAliases: [String!]!
+  memoryTypes: [MemoryType!]!
+}
+
+# Memory entity cluster for graph analytics
+type MemoryEntityCluster {
+  id: ID!
+  entities: [MemoryEntity!]!
+  centroid: MemoryEntity
+  coherenceScore: Float!
+  size: Int!
+
+  # Cluster characteristics
+  dominantTypes: [MemoryEntityType!]!
+  averageConnectivity: Float!
+
+  # Cluster summary
+  summary: String
+}
+
+# Memory graph statistics
+type MemoryGraphStatistics {
+  entityCount: Int!
+  relationshipCount: Int!
+
+  # Type distributions
+  entityTypeDistribution: [MemoryTypeCount!]!
+  relationshipTypeDistribution: [MemoryTypeCount!]!
+  memoryTypeDistribution: [MemoryTypeCount!]!
+
+  # Connectivity metrics
+  averageConnectivity: Float!
+  maxConnectivity: Int!
+  connectedComponents: Int!
+
+  # Graph density and clustering
+  density: Float!
+  clusteringCoefficient: Float!
+
+  # Growth metrics
+  entitiesAddedToday: Int!
+  relationshipsAddedToday: Int!
+
+  # Quality metrics
+  averageEntityConfidence: Float!
+  averageRelationshipConfidence: Float!
+
+  # Last update
+  lastUpdated: DateTime!
+}
+
+# Memory type count for distributions
+type MemoryTypeCount {
+  type: String!
+  count: Int!
+  percentage: Float!
+}
+
+# Memory connection types for pagination
+type MemoryEntityConnection {
+  edges: [MemoryEntityEdge!]!
+  pageInfo: PageInfo!
+  totalCount: Int!
+}
+
+type MemoryEntityEdge {
+  node: MemoryEntity!
+  cursor: String!
+}
+
+type MemoryRelationshipConnection {
+  edges: [MemoryRelationshipEdge!]!
+  pageInfo: PageInfo!
+  totalCount: Int!
+}
+
+type MemoryRelationshipEdge {
+  node: MemoryRelationship!
+  cursor: String!
+}
+
+# Pagination info
+type PageInfo {
+  hasNextPage: Boolean!
+  hasPreviousPage: Boolean!
+  startCursor: String
+  endCursor: String
+}
+
+# Event types for subscriptions
+type MemoryEntityDeletedEvent {
+  id: ID!
+  name: String!
+  deletedAt: DateTime!
+}
+
+type MemoryRelationshipDeletedEvent {
+  id: ID!
+  sourceEntityId: ID!
+  targetEntityId: ID!
+  deletedAt: DateTime!
+}
+
+# Input types for mutations
+input CreateMemoryEntityInput {
+  name: String!
+  type: MemoryEntityType!
+  aliases: [String!] = []
+  confidence: Float!
+  embedding: [Float!]
+  metadata: MemoryEntityMetadataInput
+  memoryTypes: [MemoryType!]!
+}
+
+input UpdateMemoryEntityInput {
+  name: String
+  type: MemoryEntityType
+  aliases: [String!]
+  confidence: Float
+  embedding: [Float!]
+  metadata: MemoryEntityMetadataInput
+}
+
+input MemoryEntityMetadataInput {
+  extractionMethods: [String!]
+  custom: JSON
+}
+
+input CreateMemoryRelationshipInput {
+  sourceEntityId: ID!
+  targetEntityId: ID!
+  type: MemoryRelationshipType!
+  confidence: Float!
+  strength: Float = 1.0
+  evidence: MemoryRelationshipEvidenceInput!
+  isDirectional: Boolean = false
+}
+
+input UpdateMemoryRelationshipInput {
+  type: MemoryRelationshipType
+  confidence: Float
+  strength: Float
+  evidence: MemoryRelationshipEvidenceInput
+  isDirectional: Boolean
+}
+
+input MemoryRelationshipEvidenceInput {
+  sourceMemoryIds: [ID!]!
+  extractionContext: String
+  cooccurrenceCount: Int = 1
+}
+
+# Filter inputs
+input MemoryEntityFilter {
+  types: [MemoryEntityType!]
+  nameContains: String
+  minConfidence: Float
+  memoryTypes: [MemoryType!]
+  extractionMethods: [String!]
+  createdAfter: DateTime
+  createdBefore: DateTime
+}
+
+input MemoryRelationshipFilter {
+  types: [MemoryRelationshipType!]
+  sourceEntityIds: [ID!]
+  targetEntityIds: [ID!]
+  minConfidence: Float
+  minStrength: Float
+  isDirectional: Boolean
+  memoryTypes: [MemoryType!]
+  createdAfter: DateTime
+  createdBefore: DateTime
+}
+
+# Pagination input
+input PaginationInput {
+  first: Int
+  after: String
+  last: Int
+  before: String
+}
+
+# Enums
+enum MemoryType {
+  EPISODIC
+  SEMANTIC
+  PROCEDURAL
+  SOCIAL
+  EMOTIONAL
+}
+
+enum MemoryEntityType {
+  PERSON
+  ORGANIZATION
+  LOCATION
+  CONCEPT
+  TECHNOLOGY
+  PROJECT
+  TASK
+  EMOTION
+  SKILL
+  TOOL
+  MEMORY_TYPE
+  OTHER
+}
+
+enum MemoryRelationshipType {
+  WORKS_ON
+  PART_OF
+  RELATED_TO
+  MENTIONS
+  LOCATED_IN
+  CREATED_BY
+  USED_BY
+  SIMILAR_TO
+  DEPENDS_ON
+  COLLABORATES_WITH
+  INFLUENCES
+  LEADS_TO
+  FOLLOWS_FROM
+  OTHER
+}
+
+enum MemoryRelationshipDirection {
+  INCOMING
+  OUTGOING
+  BOTH
+}
+
+enum MemorySimilarityMethod {
+  COSINE
+  EUCLIDEAN
+  DOT_PRODUCT
+  SEMANTIC
+}
+
+enum ClusteringAlgorithm {
+  COMMUNITY_DETECTION
+  K_MEANS
+  HIERARCHICAL
+  LOUVAIN
+}
+
+# Directives for caching and authorization
+directive @cacheControl(
+  maxAge: Int
+  scope: CacheControlScope
+) on FIELD_DEFINITION | OBJECT | INTERFACE
+
+directive @auth(
+  requires: UserRole = USER
+) on FIELD_DEFINITION | OBJECT
+
+enum CacheControlScope {
+  PUBLIC
+  PRIVATE
+}
+
+enum UserRole {
+  ADMIN
+  USER
+  READONLY
+}
