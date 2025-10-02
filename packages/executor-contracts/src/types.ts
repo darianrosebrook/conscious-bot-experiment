@@ -149,6 +149,7 @@ export interface PBIVerificationResult {
   };
   errors: string[];
   warnings: string[];
+  errorCode?: PBIErrorCode;
   metrics: {
     ttfaMs?: number;
     stuckDetected: boolean;
@@ -207,7 +208,7 @@ export interface ExecutionHealthMetrics {
 
 export class PBIError extends Error {
   constructor(
-    public _code: PBIErrorCode,
+    public _code: string,
     message: string,
     public _stepId?: string,
     public _capability?: string,
@@ -216,21 +217,24 @@ export class PBIError extends Error {
     super(message);
     this.name = 'PBIError';
   }
+
+  // Getter for code field to allow access as error.code
+  get code(): string {
+    return this._code;
+  }
 }
 
-// TODO: These enums are defined for future use
-// eslint-disable-next-line no-unused-vars
 export enum PBIErrorCode {
-  UNKNOWN_VERB = 'unknown_verb',
   SCHEMA_VIOLATION = 'schema_violation',
-  GUARD_FAILED = 'guard_failed',
+  CAPABILITY_UNAVAILABLE = 'capability_unavailable',
   ACCEPTANCE_FAILED = 'acceptance_failed',
+  EXECUTION_TIMEOUT = 'execution_timeout',
+  UNKNOWN_VERB = 'unknown_verb',
+  GUARD_FAILED = 'guard_failed',
   TTFA_EXCEEDED = 'ttfa_exceeded',
   STUCK_DETECTED = 'stuck_detected',
-  EXECUTION_TIMEOUT = 'execution_timeout',
   DOUBLE_DISPATCH = 'double_dispatch',
   PRECOND_UNMET = 'precond_unmet',
-  CAPABILITY_UNAVAILABLE = 'capability_unavailable',
 }
 
 // ============================================================================

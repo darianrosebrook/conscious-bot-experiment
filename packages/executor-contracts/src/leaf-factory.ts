@@ -16,7 +16,6 @@ import {
   RegistrationResult,
   validateLeafImpl,
   createExecError,
-  ExecErrorCode,
 } from './leaf-interfaces';
 
 /**
@@ -91,10 +90,7 @@ export class LeafFactory {
     // Try to find leaf by name (look for versioned keys)
     const leaf = this.get(leafName);
     if (!leaf) {
-      return createExecError(
-        `Leaf ${leafName} not found`,
-        ExecErrorCode.EXECUTION_FAILED
-      );
+      return createExecError(`Leaf ${leafName} not found`, 'EXECUTION_FAILED');
     }
 
     try {
@@ -108,12 +104,12 @@ export class LeafFactory {
 
       return createExecError(
         `Leaf ${leafName} missing execute/run handler`,
-        ExecErrorCode.EXECUTION_FAILED
+        'EXECUTION_FAILED'
       );
     } catch (error) {
       return createExecError(
         `Leaf execution failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        ExecErrorCode.EXECUTION_FAILED
+        'EXECUTION_FAILED'
       );
     }
   }
@@ -201,7 +197,7 @@ export class LeafFactory {
     if (!leaf) {
       return createExecError(
         `Leaf ${name}@${version} not found`,
-        ExecErrorCode.EXECUTION_FAILED
+        'EXECUTION_FAILED'
       );
     }
 
@@ -214,12 +210,12 @@ export class LeafFactory {
       }
       return createExecError(
         `Leaf ${name}@${version} missing execute/run handler`,
-        ExecErrorCode.EXECUTION_FAILED
+        'EXECUTION_FAILED'
       );
     } catch (error) {
       return createExecError(
         `Leaf execution failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        ExecErrorCode.EXECUTION_FAILED
+        'EXECUTION_FAILED'
       );
     }
   }

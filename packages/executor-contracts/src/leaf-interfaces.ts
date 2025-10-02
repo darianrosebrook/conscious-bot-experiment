@@ -58,7 +58,7 @@ export type LeafStatus = 'success' | 'failure' | 'running';
  * Structured execution error
  */
 export interface ExecError {
-  code: ExecErrorCode;
+  code: string;
   retryable: boolean;
   detail?: string;
 }
@@ -191,7 +191,7 @@ export function validateLeafImpl(impl: any): impl is LeafImpl {
  */
 export function createExecError(
   message: string,
-  code: ExecErrorCode = ExecErrorCode.EXECUTION_FAILED,
+  code: string = 'EXECUTION_FAILED',
   retryable: boolean = false
 ): LeafResult {
   return {
@@ -210,15 +210,14 @@ export function createExecError(
  * Error codes for leaf execution failures
  */
 // TODO: These enums are defined for future use
-// eslint-disable-next-line no-unused-vars
 export enum ExecErrorCode {
-  TIMEOUT = 'TIMEOUT',
-  VALIDATION_ERROR = 'VALIDATION_ERROR',
-  EXECUTION_FAILED = 'EXECUTION_FAILED',
-  BOT_NOT_AVAILABLE = 'BOT_NOT_AVAILABLE',
-  PRECONDITION_FAILED = 'PRECONDITION_FAILED',
-  POSTCONDITION_FAILED = 'POSTCONDITION_FAILED',
-  RETRY_EXHAUSTED = 'RETRY_EXHAUSTED',
+  // EXECUTION_FAILED = 'EXECUTION_FAILED',
+  // TIMEOUT = 'TIMEOUT',
+  // VALIDATION_ERROR = 'VALIDATION_ERROR',
+  // BOT_NOT_AVAILABLE = 'BOT_NOT_AVAILABLE',
+  // PRECONDITION_FAILED = 'PRECONDITION_FAILED',
+  // POSTCONDITION_FAILED = 'POSTCONDITION_FAILED',
+  // RETRY_EXHAUSTED = 'RETRY_EXHAUSTED',
 }
 
 /**

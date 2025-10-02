@@ -21,7 +21,21 @@ import {
   // isPlanStep, // TODO: add back in
   isActionResult,
 } from './types';
-import { CapabilityRegistry } from './capability-registry';
+
+// Re-export types that are used in the public API
+export type {
+  ExecutionContext,
+  PlanStep,
+  PBIVerificationResult,
+  PBIAcceptanceCriteria,
+  DEFAULT_PBI_ACCEPTANCE,
+} from './types';
+
+export { PBIError, PBIErrorCode } from './types';
+import {
+  CapabilityRegistry,
+  CapabilityRegistryBuilder,
+} from './capability-registry';
 
 // ============================================================================
 // PBI Enforcer Implementation
@@ -83,6 +97,7 @@ export class PBIEnforcer {
         checks,
         errors,
         warnings,
+        errorCode: PBIErrorCode.UNKNOWN_VERB,
         metrics: { stuckDetected: false, localRetries: 0 },
       };
     }
@@ -96,6 +111,7 @@ export class PBIEnforcer {
         checks,
         errors,
         warnings,
+        errorCode: PBIErrorCode.CAPABILITY_UNAVAILABLE,
         metrics: { stuckDetected: false, localRetries: 0 },
       };
     }
@@ -106,6 +122,7 @@ export class PBIEnforcer {
         checks,
         errors,
         warnings,
+        errorCode: PBIErrorCode.SCHEMA_VIOLATION,
         metrics: { stuckDetected: false, localRetries: 0 },
       };
     }
@@ -118,6 +135,7 @@ export class PBIEnforcer {
         checks,
         errors,
         warnings,
+        errorCode: PBIErrorCode.GUARD_FAILED,
         metrics: { stuckDetected: false, localRetries: 0 },
       };
     }
@@ -158,10 +176,13 @@ export class PBIEnforcer {
       // Pre-execution verification
       const verification = await this.verifyStep(step, context);
       if (verification.errors.length > 0) {
+        // Update metrics for verification failures
+        this.updateMetrics(step.type, 'failure', 0);
+
         return {
           success: false,
           error: new PBIError(
-            PBIErrorCode.SCHEMA_VIOLATION,
+            verification.errorCode || PBIErrorCode.SCHEMA_VIOLATION,
             verification.errors.join(', '),
             step.stepId,
             step.type
@@ -360,21 +381,20 @@ export class PBIEnforcer {
   /**
    * Capture world snapshot for acceptance testing
    */
-  private captureWorldSnapshot(_worldState: any): WorldSnapshot {
-    // In real implementation, this would capture actual world state
-    // For now, return a mock snapshot
+  private captureWorldSnapshot(worldState: any): WorldSnapshot {
+    // Capture actual world state from the provided interface
     return {
       timestamp: Date.now(),
-      health: 20,
-      hunger: 20,
-      energy: 20,
-      position: { x: 0, y: 0, z: 0 },
-      inventory: {},
-      nearbyBlocks: [],
-      nearbyEntities: [],
-      timeOfDay: 'day',
-      lightLevel: 15,
-      airLevel: 300,
+      health: worldState.getHealth?.() ?? 20,
+      hunger: worldState.getHunger?.() ?? 20,
+      energy: worldState.getEnergy?.() ?? 20,
+      position: worldState.getPosition?.() ?? { x: 0, y: 0, z: 0 },
+      inventory: worldState.getInventory?.() ?? {},
+      nearbyBlocks: [], // Would be populated by worldState.getNearbyBlocks()
+      nearbyEntities: [], // Would be populated by worldState.getNearbyEntities()
+      timeOfDay: worldState.getTimeOfDay?.() ?? 'day',
+      lightLevel: worldState.getLightLevel?.() ?? 15,
+      airLevel: worldState.getAir?.() ?? 300,
     };
   }
 }
@@ -458,7 +478,6 @@ export interface ExecutionResult {
  * Create a PBI enforcer with default registry and acceptance criteria
  */
 export function createPBIEnforcer(): PBIEnforcer {
-  const { CapabilityRegistryBuilder } = require('./capability-registry');
   const registry = new CapabilityRegistryBuilder().addAllBuiltIns().build();
 
   return new PBIEnforcer(registry);

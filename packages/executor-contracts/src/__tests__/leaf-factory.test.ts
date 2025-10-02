@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { LeafFactory } from '../leaf-factory';
+import { LeafFactory, createLeafFactory } from '../leaf-factory';
 import { createLeafContext, ExecErrorCode } from '../leaf-interfaces';
 
 describe('LeafFactory', () => {
@@ -134,6 +134,90 @@ describe('LeafFactory', () => {
     });
     const result = await factory.run('broken_leaf', '1.0.0', context, {});
     expect(result.status).toBe('failure');
-    expect(result.error?.code).toBe(ExecErrorCode.EXECUTION_FAILED);
+    expect(result.error?.code).toBe('EXECUTION_FAILED');
+  });
+
+  it('should handle leaf without run method', async () => {
+    const factory = new LeafFactory();
+    const spec = {
+      name: 'incomplete_leaf',
+      version: '1.0.0',
+      description: 'Leaf without run method',
+      inputSchema: { type: 'object' },
+      outputSchema: { type: 'object' },
+      timeoutMs: 1_000,
+      retries: 0,
+      permissions: ['sense'],
+      implementation: {
+        spec: {
+          name: 'incomplete_leaf',
+          version: '1.0.0',
+          description: 'Leaf without run method',
+          inputSchema: { type: 'object' },
+          outputSchema: { type: 'object' },
+          timeoutMs: 1_000,
+          retries: 0,
+          permissions: ['sense'],
+        },
+      } as any,
+    };
+
+    const registerResult = factory.register(spec);
+    expect(registerResult.ok).toBe(false);
+    expect(registerResult.error).toBe('Invalid leaf implementation');
+
+    const context = createLeafContext(undefined, {
+      timestamp: Date.now(),
+      requestId: 'incomplete',
+    });
+    const result = await factory.run('incomplete_leaf', '1.0.0', context, {});
+    expect(result.status).toBe('failure');
+    expect(result.error?.code).toBe('EXECUTION_FAILED');
+  });
+
+  it('should handle exceptions during leaf execution', async () => {
+    const factory = new LeafFactory();
+    const spec = {
+      name: 'simple_leaf',
+      version: '1.0.0',
+      description: 'Simple leaf for testing',
+      inputSchema: { type: 'object' },
+      outputSchema: { type: 'object' },
+      timeoutMs: 1_000,
+      retries: 0,
+      permissions: ['sense'],
+      implementation: {
+        spec: {
+          name: 'simple_leaf',
+          version: '1.0.0',
+          description: 'Simple leaf for testing',
+          inputSchema: { type: 'object' },
+          outputSchema: { type: 'object' },
+          timeoutMs: 1_000,
+          retries: 0,
+          permissions: ['sense'],
+        },
+        async run() {
+          return { status: 'success' as const, result: {} };
+        },
+      } as any,
+    };
+
+    const registerResult = factory.register(spec);
+    expect(registerResult.ok).toBe(true);
+
+    const context = createLeafContext(undefined, {
+      timestamp: Date.now(),
+      requestId: 'simple',
+    });
+    const result = await factory.run('simple_leaf', '1.0.0', context, {});
+    expect(result.status).toBe('success');
+    expect(result.result).toEqual({});
+  });
+
+  it('should create leaf factory using factory function', () => {
+    const factory = createLeafFactory();
+    expect(factory).toBeInstanceOf(LeafFactory);
+    expect(factory).toBeDefined();
   });
 });

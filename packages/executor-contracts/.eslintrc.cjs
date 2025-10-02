@@ -6,6 +6,15 @@ module.exports = {
     tsconfigRootDir: __dirname,
   },
   ignorePatterns: ['dist/', 'node_modules/', '*.js'],
+  overrides: [
+    {
+      files: ['src/__tests__/**/*'],
+      rules: {
+        'no-unused-vars': 'off', // Disable for test files
+        '@typescript-eslint/no-unused-vars': 'off', // Disable for test files
+      },
+    },
+  ],
   rules: {
     'no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
     '@typescript-eslint/no-non-null-assertion': 'warn',

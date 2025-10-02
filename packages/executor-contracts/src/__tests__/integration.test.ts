@@ -80,23 +80,43 @@ describe('PBI Integration with Planning System', () => {
         airLevel: 300,
       };
 
-      const mockWorldState = {
-        getHealth: () => 20,
-        getHunger: () => 20,
-        getEnergy: () => 20,
-        getPosition: () => ({ x: 0, y: 0, z: 0 }),
-        getLightLevel: () => 15,
-        getAir: () => 300,
-        getTimeOfDay: () => 'day' as const,
-        hasItem: (_item: string) => _item === 'oak_log',
-        distanceTo: (_target: any) => 50,
-        getThreatLevel: () => 0.1,
-        getInventory: () => ({ oak_log: 2, stick: 4 }),
-        getNearbyResources: () => [
+      // Create a mock world state that simulates actual changes
+      const mockWorldState = (() => {
+        let currentPosition = { x: 0, y: 0, z: 0 };
+        let currentInventory = { oak_log: 2, stick: 4 };
+        let nearbyBlocks = [
           { type: 'stone', position: { x: 50, y: 64, z: 50 } },
-        ],
-        getNearbyHostiles: () => [],
-      };
+        ];
+
+        return {
+          getHealth: () => 20,
+          getHunger: () => 20,
+          getEnergy: () => 20,
+          getPosition: () => ({ ...currentPosition }),
+          getLightLevel: () => 15,
+          getAir: () => 300,
+          getTimeOfDay: () => 'day' as const,
+          hasItem: (item: string) => currentInventory[item] > 0,
+          distanceTo: (_target: any) => 50,
+          getThreatLevel: () => 0.1,
+          getInventory: () => ({ ...currentInventory }),
+          getNearbyResources: () => [...nearbyBlocks],
+          getNearbyHostiles: () => [],
+
+          // Helper methods to simulate state changes
+          updatePosition: (newPos: { x: number; y: number; z: number }) => {
+            currentPosition = newPos;
+          },
+          updateInventory: (item: string, quantity: number) => {
+            currentInventory[item] = (currentInventory[item] || 0) + quantity;
+          },
+          removeBlock: (blockType: string) => {
+            nearbyBlocks = nearbyBlocks.filter(
+              (block) => block.type !== blockType
+            );
+          },
+        };
+      })();
 
       const results = [];
 
@@ -111,6 +131,21 @@ describe('PBI Integration with Planning System', () => {
         // Each step should succeed
         expect(result.success).toBe(true);
         expect(result.error).toBeUndefined();
+
+        // Simulate world state changes after successful actions
+        if (result.success && step.type === 'navigate') {
+          // Move to the target position
+          mockWorldState.updatePosition(step.args);
+        } else if (result.success && step.type === 'craft_item') {
+          // Add crafted item to inventory
+          mockWorldState.updateInventory(
+            step.args.item,
+            step.args.quantity || 1
+          );
+        } else if (result.success && step.type === 'dig_block') {
+          // Remove the dug block
+          mockWorldState.removeBlock(step.args.block);
+        }
 
         // TTFA should be within acceptable limits
         expect(result.ttfaMs).toBeGreaterThan(0);
@@ -168,7 +203,7 @@ describe('PBI Integration with Planning System', () => {
         getLightLevel: () => 15,
         getAir: () => 300,
         getTimeOfDay: () => 'day' as const,
-        hasItem: (item: string) => false,
+        hasItem: (_item: string) => false,
         distanceTo: (_target: any) => 50,
         getThreatLevel: () => 0.1,
         getInventory: () => ({}),
@@ -225,7 +260,7 @@ describe('PBI Integration with Planning System', () => {
         getLightLevel: () => 15,
         getAir: () => 300,
         getTimeOfDay: () => 'day' as const,
-        hasItem: (item: string) => false,
+        hasItem: (_item: string) => false,
         distanceTo: (_target: any) => 50,
         getThreatLevel: () => 0.9,
         getInventory: () => ({}),
@@ -349,8 +384,8 @@ describe('PBI Integration with Planning System', () => {
         getLightLevel: () => 15,
         getAir: () => 300,
         getTimeOfDay: () => 'day' as const,
-        hasItem: (item: string) => false,
-        distanceTo: (target: any) => 1000, // Very far
+        hasItem: (_item: string) => false,
+        distanceTo: (_target: any) => 1000, // Very far
         getThreatLevel: () => 0.1,
         getInventory: () => ({}),
         getNearbyResources: () => [],
@@ -417,7 +452,7 @@ describe('PBI Integration with Planning System', () => {
         getAir: () => 300,
         getTimeOfDay: () => 'day' as const,
         hasItem: (item: string) => item === 'bread',
-        distanceTo: (target: any) => 100,
+        distanceTo: (_target: any) => 100,
         getThreatLevel: () => 0.2,
         getInventory: () => ({ bread: 3, oak_log: 5 }),
         getNearbyResources: () => [
@@ -481,7 +516,7 @@ describe('PBI Integration with Planning System', () => {
         getLightLevel: () => 15,
         getAir: () => 300,
         getTimeOfDay: () => 'day' as const,
-        hasItem: (item: string) => false,
+        hasItem: (_item: string) => false,
         distanceTo: (_target: any) => 50,
         getThreatLevel: () => 0.1,
         getInventory: () => ({}),
@@ -534,7 +569,7 @@ describe('PBI Integration with Planning System', () => {
         getLightLevel: () => 15,
         getAir: () => 300,
         getTimeOfDay: () => 'day' as const,
-        hasItem: (item: string) => false,
+        hasItem: (_item: string) => false,
         distanceTo: (_target: any) => 50,
         getThreatLevel: () => 0.1,
         getInventory: () => ({}),
@@ -591,8 +626,8 @@ describe('PBI Integration with Planning System', () => {
         getLightLevel: () => 15,
         getAir: () => 300,
         getTimeOfDay: () => 'day' as const,
-        hasItem: (item: string) => false,
-        distanceTo: (target: any) => 1000000, // Very far
+        hasItem: (_item: string) => false,
+        distanceTo: (_target: any) => 1000000, // Very far
         getThreatLevel: () => 0.1,
         getInventory: () => ({}),
         getNearbyResources: () => [],
