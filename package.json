@@ -71,5 +71,12 @@
   "license": "MIT",
   "dependencies": {
     "canvas": "^3.2.0"
+  },
+  "pnpm": {
+    "overrides": {
+      "axios": "^1.12.0",
+      "esbuild": "^0.25.0",
+      "vite": "^5.4.20"
+    }
   }
 }

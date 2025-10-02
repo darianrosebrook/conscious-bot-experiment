@@ -14,6 +14,77 @@ import {
 } from '../memory-system';
 import { VectorDatabase } from '../vector-database';
 import { Pool } from 'pg';
+import { EnhancedMemorySystemConfig } from '../memory-system';
+
+// Helper function to create complete config with all required properties
+function createCompleteConfig(
+  baseConfig: Partial<EnhancedMemorySystemConfig>
+): EnhancedMemorySystemConfig {
+  return {
+    // Database configuration
+    host: 'localhost',
+    port: 5432,
+    user: 'postgres',
+    password: '',
+    database: 'conscious_bot',
+    worldSeed: 0,
+    vectorDbTableName: 'memory_chunks',
+
+    // Embedding configuration
+    ollamaHost: 'http://localhost:11434',
+    embeddingModel: 'test-model',
+    embeddingDimension: 768,
+
+    // Search configuration
+    defaultGraphWeight: 0.5,
+    defaultVectorWeight: 0.5,
+    maxSearchResults: 10,
+    minSimilarity: 0.1,
+
+    // Advanced features
+    enableQueryExpansion: true,
+    enableDiversification: true,
+    enableSemanticBoost: true,
+    enablePersistence: true,
+
+    // Memory decay and cleanup configuration
+    enableMemoryDecay: true,
+    decayEvaluationInterval: 300000,
+    maxMemoryRetentionDays: 30,
+    frequentAccessThreshold: 0.7,
+    forgottenThresholdDays: 7,
+    enableMemoryConsolidation: true,
+    enableMemoryArchiving: true,
+
+    // Reflection and learning configuration
+    enableNarrativeTracking: true,
+    enableMetacognition: true,
+    enableSelfModelUpdates: true,
+    maxReflections: 10,
+    reflectionCheckpointInterval: 600000,
+    minLessonConfidence: 0.6,
+
+    // Performance and optimization
+    // Note: cacheSize and enableCompression are not in the interface
+
+    // Tool efficiency and learning configuration
+    enableToolEfficiencyTracking: true,
+    toolEfficiencyEvaluationInterval: 300000,
+    minUsesForToolRecommendation: 3,
+    toolEfficiencyRecencyWeight: 0.7,
+    enableBehaviorTreeLearning: true,
+    enableCognitivePatternTracking: true,
+    maxPatternsPerContext: 10,
+    enableAutoRecommendations: true,
+    toolEfficiencyThreshold: 0.6,
+    toolEfficiencyCleanupInterval: 3600000,
+
+    // Monitoring and debugging
+    // Note: enableDetailedLogging, enablePerformanceMetrics, enableHealthChecks are not in the interface
+
+    ...baseConfig,
+  };
+}
 
 // Test database setup
 const TEST_DB_CONFIG = {
@@ -84,25 +155,29 @@ describe('Per-Seed Database Isolation', () => {
         enablePersistence: true,
       };
 
-      const memorySystem1 = new EnhancedMemorySystem({
-        ...config1,
-        ollamaHost: 'http://localhost:11434',
-        embeddingModel: 'test-model',
-        defaultGraphWeight: 0.5,
-        defaultVectorWeight: 0.5,
-        maxSearchResults: 10,
-        minSimilarity: 0.1,
-      });
+      const memorySystem1 = new EnhancedMemorySystem(
+        createCompleteConfig({
+          ...config1,
+          ollamaHost: 'http://localhost:11434',
+          embeddingModel: 'test-model',
+          defaultGraphWeight: 0.5,
+          defaultVectorWeight: 0.5,
+          maxSearchResults: 10,
+          minSimilarity: 0.1,
+        })
+      );
 
-      const memorySystem2 = new EnhancedMemorySystem({
-        ...config2,
-        ollamaHost: 'http://localhost:11434',
-        embeddingModel: 'test-model',
-        defaultGraphWeight: 0.5,
-        defaultVectorWeight: 0.5,
-        maxSearchResults: 10,
-        minSimilarity: 0.1,
-      });
+      const memorySystem2 = new EnhancedMemorySystem(
+        createCompleteConfig({
+          ...config2,
+          ollamaHost: 'http://localhost:11434',
+          embeddingModel: 'test-model',
+          defaultGraphWeight: 0.5,
+          defaultVectorWeight: 0.5,
+          maxSearchResults: 10,
+          minSimilarity: 0.1,
+        })
+      );
 
       // Check that different database names are generated
       expect(memorySystem1.getDatabaseName()).toBe(
@@ -132,15 +207,17 @@ describe('Per-Seed Database Isolation', () => {
         enablePersistence: true,
       };
 
-      const memorySystem = new EnhancedMemorySystem({
-        ...config,
-        ollamaHost: 'http://localhost:11434',
-        embeddingModel: 'test-model',
-        defaultGraphWeight: 0.5,
-        defaultVectorWeight: 0.5,
-        maxSearchResults: 10,
-        minSimilarity: 0.1,
-      });
+      const memorySystem = new EnhancedMemorySystem(
+        createCompleteConfig({
+          ...config,
+          ollamaHost: 'http://localhost:11434',
+          embeddingModel: 'test-model',
+          defaultGraphWeight: 0.5,
+          defaultVectorWeight: 0.5,
+          maxSearchResults: 10,
+          minSimilarity: 0.1,
+        })
+      );
 
       expect(memorySystem.getDatabaseName()).toBe(TEST_DB_CONFIG.database);
       expect(memorySystem.getWorldSeed()).toBe(0);
@@ -155,33 +232,37 @@ describe('Per-Seed Database Isolation', () => {
       const seed2 = 67890;
 
       // Create memory systems for different seeds
-      const memorySystem1 = createEnhancedMemorySystem({
-        ...TEST_DB_CONFIG,
-        worldSeed: seed1,
-        vectorDbTableName: 'memory_chunks',
-        embeddingDimension: 768,
-        enablePersistence: true,
-        ollamaHost: 'http://localhost:11434',
-        embeddingModel: 'test-model',
-        defaultGraphWeight: 0.5,
-        defaultVectorWeight: 0.5,
-        maxSearchResults: 10,
-        minSimilarity: 0.1,
-      });
+      const memorySystem1 = createEnhancedMemorySystem(
+        createCompleteConfig({
+          ...TEST_DB_CONFIG,
+          worldSeed: seed1,
+          vectorDbTableName: 'memory_chunks',
+          embeddingDimension: 768,
+          enablePersistence: true,
+          ollamaHost: 'http://localhost:11434',
+          embeddingModel: 'test-model',
+          defaultGraphWeight: 0.5,
+          defaultVectorWeight: 0.5,
+          maxSearchResults: 10,
+          minSimilarity: 0.1,
+        })
+      );
 
-      const memorySystem2 = createEnhancedMemorySystem({
-        ...TEST_DB_CONFIG,
-        worldSeed: seed2,
-        vectorDbTableName: 'memory_chunks',
-        embeddingDimension: 768,
-        enablePersistence: true,
-        ollamaHost: 'http://localhost:11434',
-        embeddingModel: 'test-model',
-        defaultGraphWeight: 0.5,
-        defaultVectorWeight: 0.5,
-        maxSearchResults: 10,
-        minSimilarity: 0.1,
-      });
+      const memorySystem2 = createEnhancedMemorySystem(
+        createCompleteConfig({
+          ...TEST_DB_CONFIG,
+          worldSeed: seed2,
+          vectorDbTableName: 'memory_chunks',
+          embeddingDimension: 768,
+          enablePersistence: true,
+          ollamaHost: 'http://localhost:11434',
+          embeddingModel: 'test-model',
+          defaultGraphWeight: 0.5,
+          defaultVectorWeight: 0.5,
+          maxSearchResults: 10,
+          minSimilarity: 0.1,
+        })
+      );
 
       await memorySystem1.initialize();
       await memorySystem2.initialize();
@@ -252,19 +333,21 @@ describe('Per-Seed Database Isolation', () => {
       const seed = 54321;
 
       // Create first instance and ingest memory
-      let memorySystem1 = createEnhancedMemorySystem({
-        ...TEST_DB_CONFIG,
-        worldSeed: seed,
-        vectorDbTableName: 'memory_chunks',
-        embeddingDimension: 768,
-        enablePersistence: true,
-        ollamaHost: 'http://localhost:11434',
-        embeddingModel: 'test-model',
-        defaultGraphWeight: 0.5,
-        defaultVectorWeight: 0.5,
-        maxSearchResults: 10,
-        minSimilarity: 0.1,
-      });
+      let memorySystem1 = createEnhancedMemorySystem(
+        createCompleteConfig({
+          ...TEST_DB_CONFIG,
+          worldSeed: seed,
+          vectorDbTableName: 'memory_chunks',
+          embeddingDimension: 768,
+          enablePersistence: true,
+          ollamaHost: 'http://localhost:11434',
+          embeddingModel: 'test-model',
+          defaultGraphWeight: 0.5,
+          defaultVectorWeight: 0.5,
+          maxSearchResults: 10,
+          minSimilarity: 0.1,
+        })
+      );
 
       await memorySystem1.initialize();
 
@@ -278,19 +361,21 @@ describe('Per-Seed Database Isolation', () => {
       await memorySystem1.close();
 
       // Create second instance and verify memory persists in same seed
-      let memorySystem2 = createEnhancedMemorySystem({
-        ...TEST_DB_CONFIG,
-        worldSeed: seed,
-        vectorDbTableName: 'memory_chunks',
-        embeddingDimension: 768,
-        enablePersistence: true,
-        ollamaHost: 'http://localhost:11434',
-        embeddingModel: 'test-model',
-        defaultGraphWeight: 0.5,
-        defaultVectorWeight: 0.5,
-        maxSearchResults: 10,
-        minSimilarity: 0.1,
-      });
+      let memorySystem2 = createEnhancedMemorySystem(
+        createCompleteConfig({
+          ...TEST_DB_CONFIG,
+          worldSeed: seed,
+          vectorDbTableName: 'memory_chunks',
+          embeddingDimension: 768,
+          enablePersistence: true,
+          ollamaHost: 'http://localhost:11434',
+          embeddingModel: 'test-model',
+          defaultGraphWeight: 0.5,
+          defaultVectorWeight: 0.5,
+          maxSearchResults: 10,
+          minSimilarity: 0.1,
+        })
+      );
 
       await memorySystem2.initialize();
 
@@ -310,19 +395,21 @@ describe('Per-Seed Database Isolation', () => {
     it('should provide status information including seed details', async () => {
       const seed = 11111;
 
-      const memorySystem = createEnhancedMemorySystem({
-        ...TEST_DB_CONFIG,
-        worldSeed: seed,
-        vectorDbTableName: 'memory_chunks',
-        embeddingDimension: 768,
-        enablePersistence: true,
-        ollamaHost: 'http://localhost:11434',
-        embeddingModel: 'test-model',
-        defaultGraphWeight: 0.5,
-        defaultVectorWeight: 0.5,
-        maxSearchResults: 10,
-        minSimilarity: 0.1,
-      });
+      const memorySystem = createEnhancedMemorySystem(
+        createCompleteConfig({
+          ...TEST_DB_CONFIG,
+          worldSeed: seed,
+          vectorDbTableName: 'memory_chunks',
+          embeddingDimension: 768,
+          enablePersistence: true,
+          ollamaHost: 'http://localhost:11434',
+          embeddingModel: 'test-model',
+          defaultGraphWeight: 0.5,
+          defaultVectorWeight: 0.5,
+          maxSearchResults: 10,
+          minSimilarity: 0.1,
+        })
+      );
 
       await memorySystem.initialize();
 
@@ -340,20 +427,22 @@ describe('Per-Seed Database Isolation', () => {
     });
 
     it('should handle invalid database connections gracefully', async () => {
-      const memorySystem = createEnhancedMemorySystem({
-        ...TEST_DB_CONFIG,
-        host: 'invalid-host',
-        worldSeed: 99999,
-        vectorDbTableName: 'memory_chunks',
-        embeddingDimension: 768,
-        enablePersistence: true,
-        ollamaHost: 'http://localhost:11434',
-        embeddingModel: 'test-model',
-        defaultGraphWeight: 0.5,
-        defaultVectorWeight: 0.5,
-        maxSearchResults: 10,
-        minSimilarity: 0.1,
-      });
+      const memorySystem = createEnhancedMemorySystem(
+        createCompleteConfig({
+          ...TEST_DB_CONFIG,
+          host: 'invalid-host',
+          worldSeed: 99999,
+          vectorDbTableName: 'memory_chunks',
+          embeddingDimension: 768,
+          enablePersistence: true,
+          ollamaHost: 'http://localhost:11434',
+          embeddingModel: 'test-model',
+          defaultGraphWeight: 0.5,
+          defaultVectorWeight: 0.5,
+          maxSearchResults: 10,
+          minSimilarity: 0.1,
+        })
+      );
 
       const status = await memorySystem.getStatus();
 

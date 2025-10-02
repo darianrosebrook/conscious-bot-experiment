@@ -10,7 +10,7 @@
 
 import { Bot } from 'mineflayer';
 import { EventEmitter } from 'events';
-import { PlanStep /*MinecraftAction */ } from '../types'; // TODO: add back in
+import { PlanStep, MinecraftAction } from '../types';
 
 // Import the statemachine plugin
 // Use dynamic import for ES modules compatibility
@@ -57,6 +57,12 @@ export class StateMachineWrapper extends EventEmitter {
   private config: StateMachineConfig;
   private stateMachine: any = null;
   private currentState: string = 'idle';
+  private planStepContext?: {
+    stepId: string;
+    actionType: string;
+    parameters: any;
+    safetyLevel: string;
+  };
   private stateHistory: string[] = [];
   private stateStartTime: number = 0;
   private isExecuting: boolean = false;
@@ -293,7 +299,7 @@ export class StateMachineWrapper extends EventEmitter {
       }
 
       // Execute the state machine
-      await this.executeStateMachine(targetState /*, planStep */); // TODO: add back in
+      await this.executeStateMachine(targetState, planStep);
 
       const result: StateMachineResult = {
         success: true,
@@ -436,14 +442,18 @@ export class StateMachineWrapper extends EventEmitter {
    * Execute a specific state machine with improved timeout handling
    */
   private async executeStateMachine(
-    targetState: string
-    // planStep: PlanStep // TODO: add back in
+    targetState: string,
+    planStep: PlanStep
   ): Promise<void> {
     // Set the initial state
     this.stateMachine.setState(targetState);
 
+    // Configure state machine based on plan step
+    this.configureStateMachineForPlanStep(planStep);
+
     // Execute until completion or error, with a timeout mechanism
-    const maxDuration = this.config.maxStateDuration ?? 300000; // 5 minutes
+    const maxDuration =
+      planStep.expectedDurationMs || (this.config.maxStateDuration ?? 300000); // Use plan step duration or default
     const startTime = Date.now();
 
     while (
@@ -452,9 +462,13 @@ export class StateMachineWrapper extends EventEmitter {
     ) {
       await this.bot.waitForTicks(1);
 
-      // Check for timeout
+      // Check for timeout based on plan step duration
       if (Date.now() - startTime > maxDuration) {
-        console.warn(`State machine timeout in state: ${this.currentState}`);
+        console.warn(`State machine timeout in state: ${this.currentState}`, {
+          planStep: this.planStepContext?.actionType,
+          expectedDuration:
+            this.planStepContext?.parameters?.expectedDurationMs || maxDuration,
+        });
         // Force completion for timeout cases
         this.stateMachine.setState('done');
         break;
@@ -464,7 +478,23 @@ export class StateMachineWrapper extends EventEmitter {
       if (Date.now() - this.stateStartTime > 60000) {
         // 1 minute per state max
         console.warn(
-          `State machine stuck in state: ${this.currentState}, forcing transition`
+          `State machine stuck in state: ${this.currentState}, forcing transition`,
+          {
+            planStep: this.planStepContext?.actionType,
+            stepId: this.planStepContext?.stepId,
+          }
+        );
+        this.stateMachine.setState('done');
+        break;
+      }
+
+      // Check plan step safety constraints
+      if (
+        this.planStepContext?.safetyLevel === 'critical' &&
+        this.currentState === 'error'
+      ) {
+        console.error(
+          `Critical plan step failed: ${this.planStepContext.stepId}`
         );
         this.stateMachine.setState('done');
         break;
@@ -478,6 +508,31 @@ export class StateMachineWrapper extends EventEmitter {
       // Don't throw error, just log and continue
       this.stateMachine.setState('done');
     }
+  }
+
+  /**
+   * Configure state machine for plan step execution
+   */
+  private configureStateMachineForPlanStep(planStep: PlanStep): void {
+    // Configure timeout based on plan step duration
+    if (planStep.expectedDurationMs) {
+      // Override default timeout for this plan step
+      // Note: This would need to be implemented in the state machine configuration
+    }
+
+    // Set up action context for state machine
+    this.planStepContext = {
+      stepId: planStep.stepId,
+      actionType: planStep.type,
+      parameters: planStep.args,
+      safetyLevel: planStep.safetyLevel,
+    };
+
+    console.log(`🔧 Configured state machine for plan step: ${planStep.type}`, {
+      stepId: planStep.stepId,
+      expectedDuration: planStep.expectedDurationMs,
+      safetyLevel: planStep.safetyLevel,
+    });
   }
 
   /**

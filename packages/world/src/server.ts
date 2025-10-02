@@ -17,6 +17,21 @@ const port = process.env.PORT ? parseInt(process.env.PORT) : 3004;
 app.use(cors());
 app.use(express.json());
 
+// Bot state management
+interface BotState {
+  id: string;
+  position: { x: number; y: number; z: number };
+  health: number;
+  hunger: number;
+  inventory: Array<{
+    type: string;
+    count: number;
+    slot: number;
+  }>;
+  connected: boolean;
+  lastUpdated: number;
+}
+
 // World state cache
 interface WorldState {
   player?: {
@@ -54,6 +69,9 @@ interface WorldState {
     sensorStatus?: string;
   };
 }
+
+// Bot state storage
+const botStates = new Map<string, BotState>();
 
 let currentWorldState: WorldState = {
   sensing: {
@@ -339,18 +357,96 @@ app.get('/bot-state', (req, res) => {
   }
 });
 
+// Get bot state
+app.get('/bot-state/:botId?', (req, res) => {
+  try {
+    const botId = req.params.botId || 'default';
+    const botState = botStates.get(botId);
+
+    if (!botState) {
+      return res.status(404).json({ error: `Bot ${botId} not found` });
+    }
+
+    res.json({
+      botId: botState.id,
+      position: botState.position,
+      health: botState.health,
+      hunger: botState.hunger,
+      inventory: botState.inventory,
+      connected: botState.connected,
+      lastUpdated: botState.lastUpdated,
+    });
+  } catch (error) {
+    console.error('Error getting bot state:', error);
+    res.status(500).json({ error: 'Failed to get bot state' });
+  }
+});
+
 // Update bot position
 app.post('/bot-position', (req, res) => {
   try {
-    const { x, y, z } = req.body;
+    const { botId = 'default', x, y, z } = req.body;
 
-    // TODO: Implement actual position update logic with bot state management
+    if (
+      typeof x !== 'number' ||
+      typeof y !== 'number' ||
+      typeof z !== 'number'
+    ) {
+      return res.status(400).json({
+        error: 'Invalid position coordinates. x, y, z must be numbers.',
+      });
+    }
+
+    // Update bot state with new position
+    const currentBotState = botStates.get(botId);
+    const newPosition = { x, y, z };
+
+    if (currentBotState) {
+      // Update existing bot state
+      currentBotState.position = newPosition;
+      currentBotState.lastUpdated = Date.now();
+    } else {
+      // Create new bot state
+      const newBotState: BotState = {
+        id: botId,
+        position: newPosition,
+        health: 20,
+        hunger: 20,
+        inventory: [],
+        connected: true,
+        lastUpdated: Date.now(),
+      };
+      botStates.set(botId, newBotState);
+    }
+
+    // Update world state with bot position
+    if (!currentWorldState.player) {
+      currentWorldState.player = {};
+    }
+    currentWorldState.player.position = newPosition;
+
+    // Update navigation state
+    if (!currentWorldState.navigation) {
+      currentWorldState.navigation = {};
+    }
+    currentWorldState.navigation.pathfindingActive = true;
+
+    // Emit position update event
+    worldStateEmitter.emit('position-updated', {
+      botId,
+      position: newPosition,
+      timestamp: Date.now(),
+    });
+
     const result = {
       updated: true,
-      position: { x, y, z },
+      position: newPosition,
+      botId,
       timestamp: Date.now(),
+      botState: botStates.get(botId),
     };
 
+    console.log(`🤖 Bot ${botId} position updated to (${x}, ${y}, ${z})`);
     res.json(result);
   } catch (error) {
     console.error('Error updating bot position:', error);
@@ -361,6 +457,21 @@ app.post('/bot-position', (req, res) => {
 // Get telemetry data
 app.get('/telemetry', (req, res) => {
   try {
+    // Calculate bot connection status
+    const connectedBots = Array.from(botStates.values()).filter(
+      (bot) => bot.connected
+    );
+    const activeBots = connectedBots.length;
+
+    // Check system activity
+    const navigationActive =
+      currentWorldState.navigation?.pathfindingActive || false;
+    const perceptionActive = currentWorldState.perception?.perceptionQuality
+      ? currentWorldState.perception.perceptionQuality > 0
+      : false;
+    const motorControlActive =
+      currentWorldState.sensorimotor?.motorControlActive || false;
+
     const telemetry = {
       events: [
         {
@@ -369,13 +480,26 @@ app.get('/telemetry', (req, res) => {
           source: 'world-system',
           type: 'world_state',
           data: {
-            navigationActive: false, // TODO: Connect to actual navigation system
-            perceptionActive: true, // TODO: Connect to actual perception system
-            motorControlActive: false, // TODO: Connect to actual sensorimotor system
+            navigationActive,
+            perceptionActive,
+            motorControlActive,
+            botConnections: {
+              total: botStates.size,
+              active: activeBots,
+              bots: Array.from(botStates.values()).map((bot) => ({
+                id: bot.id,
+                position: bot.position,
+                health: bot.health,
+                connected: bot.connected,
+              })),
+            },
             metrics: {
-              activeProcesses: 0,
+              activeProcesses: activeBots,
               memoryUsage: process.memoryUsage(),
               uptime: process.uptime(),
+              navigationActive,
+              perceptionActive,
+              motorControlActive,
             },
           },
         },

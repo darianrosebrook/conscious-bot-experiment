@@ -74,6 +74,7 @@ const botConfig: BotConfig = {
   // ... other config
   worldSeed: process.env.WORLD_SEED,
   worldName: process.env.WORLD_NAME,
+  observationRadius: 16, // Radius in blocks for environmental observations (default: 16)
 };
 ```
 

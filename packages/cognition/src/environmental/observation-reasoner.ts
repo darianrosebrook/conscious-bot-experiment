@@ -1,5 +1,6 @@
 import { LLMInterface, LLMResponse } from '../cognitive-core/llm-interface';
 import { z } from 'zod';
+import { auditLogger } from '../audit/thought-action-audit-logger';
 
 const Vec3Schema = z.object({
   x: z.number(),
@@ -130,6 +131,8 @@ export class ObservationReasoner {
     const sanitised = this.sanitiseObservation(parsed);
     const prompt = this.buildPrompt(sanitised);
 
+    const startTime = Date.now();
+
     try {
       console.log(
         `[ObservationReasoner] Calling LLM with prompt: ${prompt.prompt.substring(0, 100)}...`
@@ -157,6 +160,24 @@ export class ObservationReasoner {
 
       console.log(
         `[ObservationReasoner] Successfully parsed LLM response: ${insight.thought.text}`
+      );
+
+      // Log feedback received for audit trail
+      auditLogger.log(
+        'feedback_received',
+        {
+          observationId,
+          feedbackType: 'environmental',
+          feedbackContent: insight.thought.text,
+          confidence: insight.thought.confidence ?? llmResponse.confidence,
+          shouldRespond: insight.actions.shouldRespond,
+          shouldCreateTask: insight.actions.shouldCreateTask,
+          taskCount: insight.actions.tasks?.length || 0,
+        },
+        {
+          success: true,
+          duration: Date.now() - startTime,
+        }
       );
 
       return {

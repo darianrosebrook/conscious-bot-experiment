@@ -4,6 +4,8 @@
  * Implements homeostatic monitoring, need generation, and constitutional filtering
  * for the conscious bot's signal-driven control architecture.
  *
+ * Enhanced with redundancy, circuit breakers, and graceful degradation for critical path reliability.
+ *
  * @author @darianrosebrook
  */
 
@@ -15,6 +17,30 @@ import {
   validateSignal,
   SystemEvents,
 } from './types';
+
+// Circuit breaker for external dependencies
+interface CircuitBreaker {
+  failures: number;
+  lastFailureTime: number;
+  state: 'closed' | 'open' | 'half-open';
+  threshold: number;
+  timeout: number;
+}
+
+interface PerformanceMetrics {
+  averageLatency: number;
+  maxLatency: number;
+  minLatency: number;
+  totalProcessed: number;
+  errorRate: number;
+  lastUpdate: number;
+}
+
+interface SignalBackupQueue {
+  signals: Signal[];
+  maxSize: number;
+  replayInProgress: boolean;
+}
 
 export interface SignalProcessorConfig {
   historySize: number;
@@ -112,6 +138,14 @@ export class SignalProcessor extends EventEmitter<SystemEvents> {
   private processTimer?: NodeJS.Timeout;
   private aggregationRules: NeedAggregationRule[];
 
+  // Reliability enhancements
+  private circuitBreakers: Map<string, CircuitBreaker> = new Map();
+  private performanceMetrics: PerformanceMetrics;
+  private backupQueue: SignalBackupQueue;
+  private isDegraded = false;
+  private degradationLevel = 0; // 0 = normal, 1 = reduced, 2 = minimal
+  private redundantProcessor?: SignalProcessor;
+
   constructor(
     private config: SignalProcessorConfig = DEFAULT_SIGNAL_CONFIG,
     customRules?: NeedAggregationRule[]
@@ -119,40 +153,83 @@ export class SignalProcessor extends EventEmitter<SystemEvents> {
     super();
     this.signalHistory = new BoundedHistory<Signal>(this.config.historySize);
     this.aggregationRules = customRules || DEFAULT_AGGREGATION_RULES;
+
+    // Initialize reliability components
+    this.performanceMetrics = {
+      averageLatency: 0,
+      maxLatency: 0,
+      minLatency: Infinity,
+      totalProcessed: 0,
+      errorRate: 0,
+      lastUpdate: Date.now(),
+    };
+
+    this.backupQueue = {
+      signals: [],
+      maxSize: 100,
+      replayInProgress: false,
+    };
+
+    // Initialize circuit breakers for external dependencies
+    this.initializeCircuitBreakers();
+
     this.startProcessing();
+    this.startPerformanceMonitoring();
   }
 
   /**
-   * Process incoming signal and update need calculations
+   * Process incoming signal and update need calculations with reliability enhancements
    *
    * @param signal - Raw signal from various sources
    */
   processSignal(signal: Signal): void {
-    // Validate signal format
-    const validatedSignal = validateSignal(signal);
+    const startTime = Date.now();
 
-    // Apply constitutional filtering if enabled
-    if (
-      this.config.constitutionalFiltering &&
-      !this.passesConstitutionalFilter(validatedSignal)
-    ) {
-      console.warn(
-        `Signal filtered out by constitutional rules: ${signal.type}`
+    try {
+      // Validate signal format with circuit breaker protection
+      const validatedSignal = this.processWithCircuitBreaker('validation', () =>
+        validateSignal(signal)
       );
-      return;
-    }
 
-    // Add to history
-    this.signalHistory.add(validatedSignal);
+      // Apply constitutional filtering if enabled and not degraded
+      if (
+        this.config.constitutionalFiltering &&
+        this.degradationLevel < 2 && // Skip in minimal mode
+        !this.passesConstitutionalFilter(validatedSignal)
+      ) {
+        console.warn(
+          `Signal filtered out by constitutional rules: ${signal.type}`
+        );
+        this.recordPerformance(Date.now() - startTime, false);
+        return;
+      }
 
-    // Emit signal received event
-    this.emit('signal-received', validatedSignal);
+      // Add to history with backup
+      this.signalHistory.add(validatedSignal);
+      this.addToBackupQueue(validatedSignal);
 
-    // Update needs if enough time has passed
-    const now = Date.now();
-    if (now - this.lastNeedUpdate >= this.config.needUpdateInterval) {
-      this.updateNeeds();
-      this.lastNeedUpdate = now;
+      // Emit signal received event
+      this.emit('signal-received', validatedSignal);
+
+      // Update needs if enough time has passed
+      const now = Date.now();
+      if (now - this.lastNeedUpdate >= this.config.needUpdateInterval) {
+        this.updateNeedsWithReliability();
+        this.lastNeedUpdate = now;
+      }
+
+      this.recordPerformance(Date.now() - startTime, true);
+
+      // Check if performance is degrading
+      this.checkPerformanceDegradation();
+    } catch (error) {
+      this.recordPerformance(Date.now() - startTime, false);
+      this.handleProcessingError(error, signal);
+
+      // In degraded mode, use simplified processing
+      if (this.degradationLevel > 0) {
+        this.processSignalDegraded(signal);
+      }
     }
   }
 
@@ -734,6 +811,591 @@ export class SignalProcessor extends EventEmitter<SystemEvents> {
     };
 
     return cooldowns[goalType] || 1000; // Default 1 second
+  }
+
+  /**
+   * Process any pending signals in the queue
+   */
+  private processPendingSignals(): void {
+    // This method would process any queued signals
+    // For now, it's a placeholder for the timer-based processing
+    // In a real implementation, this would process a signal queue
+  }
+
+  /**
+   * Convert calculateNeeds array result to NeedScore Map
+   */
+  private convertToNeedScoreMap(
+    needsArray: Array<{
+      type: string;
+      urgency: number;
+      confidence: number;
+      trend: number;
+      source: string;
+    }>
+  ): Map<string, NeedScore> {
+    const needMap = new Map<string, NeedScore>();
+
+    for (const need of needsArray) {
+      // Convert to proper NeedScore type
+      const needScore: NeedScore = {
+        type: need.type as
+          | 'safety'
+          | 'nutrition'
+          | 'progress'
+          | 'social'
+          | 'curiosity'
+          | 'integrity',
+        score: need.urgency, // Use urgency as score
+        trend: need.trend,
+        urgency: need.urgency,
+        lastUpdated: Date.now(),
+      };
+      needMap.set(need.type, needScore);
+    }
+
+    return needMap;
+  }
+
+  /**
+   * Initialize circuit breakers for external dependencies
+   */
+  private initializeCircuitBreakers(): void {
+    // Circuit breaker for validation service
+    this.circuitBreakers.set('validation', {
+      failures: 0,
+      lastFailureTime: 0,
+      state: 'closed',
+      threshold: 5,
+      timeout: 30000, // 30 seconds
+    });
+
+    // Circuit breaker for constitutional filtering
+    this.circuitBreakers.set('constitutional', {
+      failures: 0,
+      lastFailureTime: 0,
+      state: 'closed',
+      threshold: 3,
+      timeout: 15000, // 15 seconds
+    });
+  }
+
+  /**
+   * Process with circuit breaker protection
+   */
+  private processWithCircuitBreaker<T>(
+    serviceName: string,
+    operation: () => T
+  ): T {
+    const breaker = this.circuitBreakers.get(serviceName);
+    if (!breaker) {
+      return operation();
+    }
+
+    // Check if circuit breaker is open
+    if (breaker.state === 'open') {
+      const now = Date.now();
+      if (now - breaker.lastFailureTime > breaker.timeout) {
+        breaker.state = 'half-open';
+      } else {
+        throw new Error(`${serviceName} circuit breaker is open`);
+      }
+    }
+
+    try {
+      const result = operation();
+      // Success - reset failure count and close circuit
+      if (breaker.state === 'half-open') {
+        breaker.state = 'closed';
+        breaker.failures = 0;
+      }
+      return result;
+    } catch (error) {
+      breaker.failures++;
+      breaker.lastFailureTime = Date.now();
+
+      if (breaker.failures >= breaker.threshold) {
+        breaker.state = 'open';
+        console.warn(`Circuit breaker opened for ${serviceName}`);
+      }
+
+      throw error;
+    }
+  }
+
+  /**
+   * Add signal to backup queue for reliability
+   */
+  private addToBackupQueue(signal: Signal): void {
+    this.backupQueue.signals.push(signal);
+
+    // Maintain queue size limit
+    if (this.backupQueue.signals.length > this.backupQueue.maxSize) {
+      this.backupQueue.signals.shift(); // Remove oldest
+    }
+  }
+
+  /**
+   * Simplified signal processing for degraded mode
+   */
+  private processSignalDegraded(signal: Signal): void {
+    try {
+      // In degraded mode, only process critical signals
+      if (signal.type === 'intrusion' || signal.urgency > 0.8) {
+        this.signalHistory.add(signal);
+        this.emit('signal-received', signal);
+
+        // Minimal need updates in degraded mode
+        if (
+          Date.now() - this.lastNeedUpdate >=
+          this.config.needUpdateInterval * 2
+        ) {
+          this.updateNeedsMinimal();
+          this.lastNeedUpdate = Date.now();
+        }
+      }
+    } catch (error) {
+      console.error('Error in degraded signal processing:', error);
+    }
+  }
+
+  /**
+   * Update needs with reliability enhancements
+   */
+  private updateNeedsWithReliability(): void {
+    try {
+      // Use redundant processing if available
+      if (this.redundantProcessor && this.degradationLevel === 0) {
+        try {
+          const signals = this.signalHistory.getAll();
+          const primaryNeedsArray = this.calculateNeeds(signals);
+          const backupNeedsArray =
+            this.redundantProcessor.calculateNeeds(signals);
+
+          const primaryNeeds = this.convertToNeedScoreMap(primaryNeedsArray);
+          const backupNeeds = this.convertToNeedScoreMap(backupNeedsArray);
+
+          // Compare results for consistency
+          const consistencyCheck = this.compareNeedResults(
+            primaryNeeds,
+            backupNeeds
+          );
+
+          if (!consistencyCheck.consistent) {
+            console.warn(
+              'Need calculation inconsistency detected',
+              consistencyCheck.differences
+            );
+            // Use the more conservative result
+            this.currentNeeds = consistencyCheck.consensus;
+          } else {
+            this.currentNeeds = primaryNeeds;
+          }
+        } catch (error) {
+          console.warn('Primary need calculation failed, using backup:', error);
+          const backupSignals = this.signalHistory.getAll();
+          const backupNeedsArray =
+            this.redundantProcessor.calculateNeeds(backupSignals);
+          this.currentNeeds = this.convertToNeedScoreMap(backupNeedsArray);
+        }
+      } else {
+        const signals = this.signalHistory.getAll();
+        const needsArray = this.calculateNeeds(signals);
+        this.currentNeeds = this.convertToNeedScoreMap(needsArray);
+      }
+
+      this.emit('needs-updated', Array.from(this.currentNeeds.values()));
+    } catch (error) {
+      console.error('Critical error in need updates:', error);
+      this.handleCriticalFailure('need-calculation', error);
+    }
+  }
+
+  /**
+   * Minimal need updates for degraded mode
+   */
+  private updateNeedsMinimal(): void {
+    try {
+      // Only update critical needs in degraded mode
+      const signals = this.signalHistory.getAll();
+      const allNeedsArray = this.calculateNeeds(signals);
+      const allNeeds = this.convertToNeedScoreMap(allNeedsArray);
+      const criticalNeeds = Array.from(allNeeds.values()).filter(
+        (need) => need.score > 0.8 || need.type === 'safety'
+      );
+
+      // Update only critical needs
+      for (const need of criticalNeeds) {
+        this.currentNeeds.set(need.type, need);
+      }
+
+      if (criticalNeeds.length > 0) {
+        this.emit('needs-updated', criticalNeeds);
+      }
+    } catch (error) {
+      console.error('Error in minimal need updates:', error);
+    }
+  }
+
+  /**
+   * Compare need calculation results for consistency
+   */
+  private compareNeedResults(
+    primary: Map<string, NeedScore>,
+    backup: Map<string, NeedScore>
+  ): {
+    consistent: boolean;
+    differences: string[];
+    consensus: Map<string, NeedScore>;
+  } {
+    const differences: string[] = [];
+    const consensus = new Map<string, NeedScore>();
+
+    // Check all needs from both results
+    const allTypes = new Set([...primary.keys(), ...backup.keys()]);
+
+    for (const type of allTypes) {
+      const primaryNeed = primary.get(type);
+      const backupNeed = backup.get(type);
+
+      if (!primaryNeed || !backupNeed) {
+        differences.push(`Missing need type: ${type}`);
+        // Use whichever result exists
+        consensus.set(type, primaryNeed || backupNeed!);
+        continue;
+      }
+
+      // Check score difference
+      const scoreDiff = Math.abs(primaryNeed.score - backupNeed.score);
+      if (scoreDiff > 0.1) {
+        differences.push(`Score difference for ${type}: ${scoreDiff}`);
+      }
+
+      // Use average for consensus
+      consensus.set(type, {
+        type: type as
+          | 'safety'
+          | 'nutrition'
+          | 'progress'
+          | 'social'
+          | 'curiosity'
+          | 'integrity',
+        score: (primaryNeed.score + backupNeed.score) / 2,
+        trend: (primaryNeed.trend + backupNeed.trend) / 2,
+        urgency: (primaryNeed.urgency + backupNeed.urgency) / 2,
+        lastUpdated: Math.max(primaryNeed.lastUpdated, backupNeed.lastUpdated),
+      });
+    }
+
+    return {
+      consistent: differences.length === 0,
+      differences,
+      consensus,
+    };
+  }
+
+  /**
+   * Start performance monitoring
+   */
+  private startPerformanceMonitoring(): void {
+    setInterval(() => {
+      this.updatePerformanceMetrics();
+      this.checkPerformanceDegradation();
+    }, 5000); // Check every 5 seconds
+  }
+
+  /**
+   * Record performance metrics
+   */
+  private recordPerformance(latency: number, success: boolean): void {
+    const metrics = this.performanceMetrics;
+
+    metrics.totalProcessed++;
+    metrics.maxLatency = Math.max(metrics.maxLatency, latency);
+    metrics.minLatency = Math.min(metrics.minLatency, latency);
+
+    // Update running average
+    const alpha = 0.1; // Smoothing factor
+    metrics.averageLatency =
+      (1 - alpha) * metrics.averageLatency + alpha * latency;
+
+    if (!success) {
+      // Estimate error rate (simple moving average)
+      metrics.errorRate = (1 - alpha) * metrics.errorRate + alpha * 1;
+    }
+
+    metrics.lastUpdate = Date.now();
+  }
+
+  /**
+   * Update aggregated performance metrics
+   */
+  private updatePerformanceMetrics(): void {
+    // This would aggregate metrics from multiple sources
+    // For now, just ensure metrics are current
+    this.performanceMetrics.lastUpdate = Date.now();
+  }
+
+  /**
+   * Check if performance is degrading
+   */
+  private checkPerformanceDegradation(): void {
+    const metrics = this.performanceMetrics;
+    const now = Date.now();
+
+    // Check latency thresholds
+    if (metrics.averageLatency > 100) {
+      // > 100ms average
+      if (this.degradationLevel === 0) {
+        console.warn(
+          'Performance degradation detected - entering reduced mode'
+        );
+        this.enterDegradedMode(1);
+      }
+    }
+
+    if (metrics.averageLatency > 200) {
+      // > 200ms average
+      if (this.degradationLevel < 2) {
+        console.warn(
+          'Critical performance degradation - entering minimal mode'
+        );
+        this.enterDegradedMode(2);
+      }
+    }
+
+    // Check error rate
+    if (metrics.errorRate > 0.05) {
+      // > 5% error rate
+      if (this.degradationLevel === 0) {
+        console.warn('High error rate detected - entering reduced mode');
+        this.enterDegradedMode(1);
+      }
+    }
+
+    // Auto-recovery check
+    if (this.degradationLevel > 0 && now - metrics.lastUpdate > 30000) {
+      // Try to recover if performance has been good for 30 seconds
+      if (metrics.averageLatency < 50 && metrics.errorRate < 0.01) {
+        console.log('Performance recovered - exiting degraded mode');
+        this.exitDegradedMode();
+      }
+    }
+  }
+
+  /**
+   * Enter degraded operation mode
+   */
+  private enterDegradedMode(level: number): void {
+    this.degradationLevel = level;
+    this.isDegraded = true;
+
+    console.warn(`Signal processor entering degraded mode level ${level}`);
+
+    // Adjust processing based on degradation level
+    if (level >= 1) {
+      // Reduce processing frequency
+      if (this.processTimer) {
+        clearInterval(this.processTimer);
+        this.processTimer = setInterval(
+          () => this.processPendingSignals(),
+          5000
+        ); // Every 5 seconds
+      }
+    }
+
+    if (level >= 2) {
+      // Minimal mode - only critical signals
+      this.config.constitutionalFiltering = false;
+      this.config.needUpdateInterval = 10000; // Every 10 seconds
+    }
+
+    this.emit('degradation-activated', {
+      level,
+      timestamp: Date.now(),
+      reason: 'performance-degradation',
+    });
+  }
+
+  /**
+   * Exit degraded operation mode
+   */
+  private exitDegradedMode(): void {
+    if (this.degradationLevel === 0) return;
+
+    const oldLevel = this.degradationLevel;
+    this.degradationLevel = 0;
+    this.isDegraded = false;
+
+    // Restore normal operation
+    this.config.constitutionalFiltering = true;
+    this.config.needUpdateInterval = 2000;
+
+    if (this.processTimer) {
+      clearInterval(this.processTimer);
+      this.processTimer = setInterval(() => this.processPendingSignals(), 1000); // Every second
+    }
+
+    console.log('Signal processor recovered to normal operation');
+
+    this.emit('degradation-deactivated', {
+      previousLevel: oldLevel,
+      timestamp: Date.now(),
+      reason: 'performance-recovered',
+    });
+  }
+
+  /**
+   * Handle processing errors with appropriate escalation
+   */
+  private handleProcessingError(error: any, signal: Signal): void {
+    console.error(
+      'Signal processing error:',
+      error,
+      'for signal:',
+      signal.type
+    );
+
+    // Record error for monitoring
+    this.emit('processing-error', {
+      error: error.message,
+      signalType: signal.type,
+      timestamp: Date.now(),
+    });
+
+    // Escalate critical errors
+    if (
+      error.message?.includes('critical') ||
+      this.performanceMetrics.errorRate > 0.1
+    ) {
+      this.handleCriticalFailure('signal-processing', error);
+    }
+  }
+
+  /**
+   * Handle critical system failures
+   */
+  private handleCriticalFailure(component: string, error: any): void {
+    console.error(`Critical failure in ${component}:`, error);
+
+    this.emit('critical-failure', {
+      component,
+      error: error.message,
+      timestamp: Date.now(),
+      degradationLevel: this.degradationLevel,
+    });
+
+    // In critical failure, attempt emergency graceful degradation
+    if (this.degradationLevel < 2) {
+      this.enterDegradedMode(2);
+    }
+
+    // Replay backup signals if available
+    if (
+      this.backupQueue.signals.length > 0 &&
+      !this.backupQueue.replayInProgress
+    ) {
+      this.replayBackupSignals();
+    }
+  }
+
+  /**
+   * Replay signals from backup queue
+   */
+  private async replayBackupSignals(): Promise<void> {
+    if (
+      this.backupQueue.replayInProgress ||
+      this.backupQueue.signals.length === 0
+    ) {
+      return;
+    }
+
+    this.backupQueue.replayInProgress = true;
+
+    console.log(`Replaying ${this.backupQueue.signals.length} backup signals`);
+
+    for (const signal of this.backupQueue.signals) {
+      try {
+        // Process with lower priority
+        const lowPrioritySignal = { ...signal, priority: 'low' as const };
+        this.processSignal(lowPrioritySignal);
+        await new Promise((resolve) => setTimeout(resolve, 10)); // Small delay
+      } catch (error) {
+        console.warn('Error replaying backup signal:', error);
+      }
+    }
+
+    this.backupQueue.signals = [];
+    this.backupQueue.replayInProgress = false;
+
+    console.log('Backup signal replay completed');
+  }
+
+  /**
+   * Get current performance metrics
+   */
+  getPerformanceMetrics(): PerformanceMetrics {
+    return { ...this.performanceMetrics };
+  }
+
+  /**
+   * Get system health status
+   */
+  getSystemHealth(): {
+    status: 'healthy' | 'degraded' | 'critical';
+    degradationLevel: number;
+    performanceMetrics: PerformanceMetrics;
+    circuitBreakerStates: Record<string, string>;
+    backupQueueSize: number;
+  } {
+    const circuitBreakerStates: Record<string, string> = {};
+    for (const [name, breaker] of this.circuitBreakers) {
+      circuitBreakerStates[name] = breaker.state;
+    }
+
+    let status: 'healthy' | 'degraded' | 'critical' = 'healthy';
+    if (this.degradationLevel > 0) {
+      status = this.degradationLevel >= 2 ? 'critical' : 'degraded';
+    }
+
+    return {
+      status,
+      degradationLevel: this.degradationLevel,
+      performanceMetrics: this.getPerformanceMetrics(),
+      circuitBreakerStates,
+      backupQueueSize: this.backupQueue.signals.length,
+    };
+  }
+
+  /**
+   * Set up redundant processor for enhanced reliability
+   */
+  setRedundantProcessor(processor: SignalProcessor): void {
+    this.redundantProcessor = processor;
+
+    // Sync configuration
+    this.redundantProcessor.config = { ...this.config };
+
+    console.log('Redundant signal processor configured');
+  }
+
+  /**
+   * Shutdown the signal processor gracefully
+   */
+  async shutdown(): Promise<void> {
+    console.log('Shutting down signal processor...');
+    this.stop();
+
+    // Clear any pending timers
+    if (this.processTimer) {
+      clearInterval(this.processTimer);
+      this.processTimer = undefined;
+    }
+
+    // Clear backup queue
+    this.backupQueue.signals = [];
+
+    console.log('Signal processor shutdown complete');
   }
 
   /**

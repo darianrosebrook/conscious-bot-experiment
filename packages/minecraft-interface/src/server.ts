@@ -1177,7 +1177,7 @@ app.get('/state', async (req, res) => {
         },
         health: gameState.worldState.health,
         food: gameState.worldState.hunger,
-        inventory: [], // TODO: Fix inventory data from observation mapper - use ObservationMapper.extractInventoryState()
+        inventory: observationMapper.extractInventoryState(gameState.bot),
       },
       isAlive: gameState.worldState.health > 0,
     };

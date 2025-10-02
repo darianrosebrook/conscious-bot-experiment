@@ -13,7 +13,6 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { EnhancedMemorySystem } from '../memory-system';
-import { MemoryAwareLLMInterface } from '@conscious-bot/cognition';
 
 // Mock the LLM interface completely
 vi.mock('@conscious-bot/cognition', () => {
@@ -66,6 +65,18 @@ vi.mock('@conscious-bot/cognition', () => {
   }
 
   return {
+    IdentityTracker: vi.fn().mockImplementation(() => ({
+      updateIdentity: vi.fn(),
+      getCurrentIdentity: vi.fn().mockReturnValue({}),
+    })),
+    NarrativeManager: vi.fn().mockImplementation(() => ({
+      updateNarrative: vi.fn(),
+      getCurrentNarrative: vi.fn().mockReturnValue({}),
+    })),
+    ContractSystem: vi.fn().mockImplementation(() => ({
+      createContract: vi.fn(),
+      validateContract: vi.fn(),
+    })),
     MemoryAwareLLMInterface: MockMemoryAwareLLMInterface,
   };
 });
@@ -250,6 +261,18 @@ vi.mock('@conscious-bot/cognition', () => {
   }));
 
   return {
+    IdentityTracker: vi.fn().mockImplementation(() => ({
+      updateIdentity: vi.fn(),
+      getCurrentIdentity: vi.fn().mockReturnValue({}),
+    })),
+    NarrativeManager: vi.fn().mockImplementation(() => ({
+      updateNarrative: vi.fn(),
+      getCurrentNarrative: vi.fn().mockReturnValue({}),
+    })),
+    ContractSystem: vi.fn().mockImplementation(() => ({
+      createContract: vi.fn(),
+      validateContract: vi.fn(),
+    })),
     MemoryAwareLLMInterface: MockMemoryAwareLLMInterface,
   };
 });
@@ -263,11 +286,61 @@ describe('Complete Memory-LLM Integration Flow', () => {
 
     // Initialize memory system with tool efficiency tracking
     memorySystem = new EnhancedMemorySystem({
+      // Database configuration
+      host: 'localhost',
+      port: 5432,
+      user: 'postgres',
+      password: 'password',
+      database: 'test_db',
+      vectorDbTableName: 'embeddings',
+
+      // Embedding configuration
+      ollamaHost: 'localhost:11434',
+      embeddingModel: 'nomic-embed-text',
+      embeddingDimension: 768,
+
+      // Search configuration
+      defaultGraphWeight: 0.7,
+      defaultVectorWeight: 0.3,
+      maxSearchResults: 10,
+      minSimilarity: 0.7,
+
+      // Advanced features
+      enableQueryExpansion: true,
+      enableDiversification: true,
+      enableSemanticBoost: true,
+      enablePersistence: true,
+
+      // Memory decay and cleanup configuration
+      enableMemoryDecay: true,
+      decayEvaluationInterval: 3600000,
+      maxMemoryRetentionDays: 30,
+      frequentAccessThreshold: 5,
+      forgottenThresholdDays: 7,
+      enableMemoryConsolidation: true,
+      enableMemoryArchiving: true,
+
+      // Reflection and learning configuration
+      enableNarrativeTracking: true,
+      enableMetacognition: true,
+      enableSelfModelUpdates: true,
+      maxReflections: 100,
+      reflectionCheckpointInterval: 3600000,
+      minLessonConfidence: 0.7,
+
+      // Tool efficiency and learning configuration
       enableToolEfficiencyTracking: true,
+      toolEfficiencyEvaluationInterval: 60000,
+      minUsesForToolRecommendation: 3,
+      toolEfficiencyRecencyWeight: 0.8,
       enableBehaviorTreeLearning: true,
       enableCognitivePatternTracking: true,
-      enableMemoryDecay: true,
-      enableNarrativeTracking: true,
+      maxPatternsPerContext: 50,
+
+      // Additional required properties
+      enableAutoRecommendations: true,
+      toolEfficiencyThreshold: 0.7,
+      toolEfficiencyCleanupInterval: 3600000,
     });
 
     await memorySystem.initialize();
@@ -322,6 +395,7 @@ describe('Complete Memory-LLM Integration Flow', () => {
           resourcesGained: 8,
           durabilityUsed: 1,
           efficiency: 3.64,
+          successRate: 0.95,
         },
         {
           result: 'success',
@@ -342,7 +416,7 @@ describe('Complete Memory-LLM Integration Flow', () => {
         source: 'world_model',
         entities: ['mountains', 'iron_ore', 'daylight'],
         topics: ['resource_gathering', 'environment'],
-        metadata: {
+        customMetadata: {
           biome: 'mountains',
           timeOfDay: 'day',
           resourceAvailability: 'high',
@@ -436,7 +510,7 @@ describe('Complete Memory-LLM Integration Flow', () => {
           ],
           timestamp: Date.now(),
         },
-        { creator: 'memory_enhanced_system' }
+        { creator: 'bot' }
       );
 
       // Step 6: Verify memory system integration
@@ -541,6 +615,7 @@ describe('Complete Memory-LLM Integration Flow', () => {
             resourcesGained: scenario.success ? 5 : 0,
             durabilityUsed: scenario.success ? 1 : 0,
             efficiency: scenario.efficiency,
+            successRate: scenario.success ? 0.9 : 0.3,
           },
           {
             result: scenario.success ? 'success' : 'failure',
@@ -586,7 +661,7 @@ describe('Complete Memory-LLM Integration Flow', () => {
         source: 'mining_session',
         entities: ['diamond_ore', 'diamond_pickaxe'],
         topics: ['resource_gathering', 'high_value'],
-        metadata: {
+        customMetadata: {
           importance: 'high',
           emotionalImpact: 0.9,
           learningValue: 0.8,
@@ -600,7 +675,7 @@ describe('Complete Memory-LLM Integration Flow', () => {
         source: 'mining_session',
         entities: ['cobblestone', 'stone_pickaxe'],
         topics: ['resource_gathering'],
-        metadata: {
+        customMetadata: {
           importance: 'low',
           emotionalImpact: 0.1,
           learningValue: 0.3,
@@ -615,7 +690,7 @@ describe('Complete Memory-LLM Integration Flow', () => {
         source: 'reflection',
         entities: ['tools', 'efficiency', 'survival'],
         topics: ['learning', 'strategy'],
-        metadata: {
+        customMetadata: {
           importance: 'medium',
           emotionalImpact: 0.4,
           learningValue: 0.6,
@@ -655,7 +730,15 @@ describe('Complete Memory-LLM Integration Flow', () => {
         'mining',
         'mine_iron_ore',
         { biome: 'forest', material: 'iron_ore' },
-        { success: true, duration: 3000, efficiency: 2.0 },
+        {
+          success: true,
+          duration: 3000,
+          damageTaken: 0,
+          resourcesGained: 2,
+          durabilityUsed: 1,
+          efficiency: 2.0,
+          successRate: 0.7,
+        },
         { result: 'success', reason: 'Stone pickaxe worked but was slow' }
       );
 
@@ -664,7 +747,15 @@ describe('Complete Memory-LLM Integration Flow', () => {
         'mining',
         'mine_iron_ore',
         { biome: 'forest', material: 'iron_ore' },
-        { success: true, duration: 1500, efficiency: 4.0 },
+        {
+          success: true,
+          duration: 1500,
+          damageTaken: 0,
+          resourcesGained: 4,
+          durabilityUsed: 1,
+          efficiency: 4.0,
+          successRate: 0.95,
+        },
         { result: 'success', reason: 'Iron pickaxe was much faster' }
       );
 
@@ -718,7 +809,15 @@ describe('Complete Memory-LLM Integration Flow', () => {
           'crafting',
           'test_task',
           { biome: 'test' },
-          { success: true, duration: 1000, efficiency: 1.0 },
+          {
+            success: true,
+            duration: 1000,
+            damageTaken: 0,
+            resourcesGained: 1,
+            durabilityUsed: 1,
+            efficiency: 1.0,
+            successRate: 0.9,
+          },
           { result: 'success' }
         );
         integrationScore.memoryStorage = 1;
@@ -742,8 +841,19 @@ describe('Complete Memory-LLM Integration Flow', () => {
       try {
         await memorySystem.recordCognitivePattern(
           'decision',
-          { taskComplexity: 'simple', timePressure: 0.1 },
-          { approach: 'memory_based', confidence: 0.9, processingTime: 500 },
+          {
+            taskComplexity: 'simple',
+            timePressure: 0.1,
+            emotionalState: 'calm',
+            cognitiveLoad: 0.3,
+            socialContext: false,
+          },
+          {
+            approach: 'memory_based',
+            reasoning: 'memory provides reliable decision support',
+            confidence: 0.9,
+            processingTime: 500,
+          },
           {
             success: true,
             quality: 0.9,
@@ -767,9 +877,19 @@ describe('Complete Memory-LLM Integration Flow', () => {
         await memorySystem.recordBehaviorTreePattern(
           'test_sequence',
           ['test_step_1', 'test_step_2'],
-          { taskType: 'test' },
-          { success: true, duration: 5000, lessonsLearned: ['test_lesson'] },
-          { creator: 'integration_test' }
+          {
+            taskType: 'test',
+            initialConditions: { hasAccess: true },
+            environmentalFactors: { biome: 'test', timeOfDay: 'day' },
+          },
+          {
+            success: true,
+            duration: 5000,
+            resourcesUsed: { memory: 1, processing: 1 },
+            lessonsLearned: ['test_lesson'],
+            timestamp: Date.now(),
+          },
+          { creator: 'bot' }
         );
         integrationScore.planningIntegration = 1;
         console.log('✅ Planning Integration: PASS');
@@ -848,7 +968,15 @@ describe('Complete Memory-LLM Integration Flow', () => {
           'mining',
           'verification_task',
           { biome: 'test_biome' },
-          { success: true, duration: 1000, efficiency: 1.0 },
+          {
+            success: true,
+            duration: 1000,
+            damageTaken: 0,
+            resourcesGained: 1,
+            durabilityUsed: 1,
+            efficiency: 1.0,
+            successRate: 0.9,
+          },
           { result: 'success' }
         );
         testResult.sensorimotorToMemory = true;
@@ -870,9 +998,16 @@ describe('Complete Memory-LLM Integration Flow', () => {
       try {
         await memorySystem.recordCognitivePattern(
           'planning',
-          { taskComplexity: 'medium', timePressure: 0.2 },
+          {
+            taskComplexity: 'medium',
+            timePressure: 0.2,
+            emotionalState: 'focused',
+            cognitiveLoad: 0.7,
+            socialContext: false,
+          },
           {
             approach: 'integrated_planning',
+            reasoning: 'integrated planning provides better decision making',
             confidence: 0.85,
             processingTime: 800,
           },
@@ -898,13 +1033,19 @@ describe('Complete Memory-LLM Integration Flow', () => {
         await memorySystem.recordBehaviorTreePattern(
           'verification_sequence',
           ['step_1', 'step_2', 'step_3'],
-          { taskType: 'verification' },
+          {
+            taskType: 'verification',
+            initialConditions: { hasAccess: true },
+            environmentalFactors: { biome: 'test', timeOfDay: 'day' },
+          },
           {
             success: true,
             duration: 10000,
+            resourcesUsed: { memory: 2, processing: 3 },
             lessonsLearned: ['integration_works'],
+            timestamp: Date.now(),
           },
-          { creator: 'verification_test' }
+          { creator: 'bot' }
         );
         testResult.planningToMemory = true;
       } catch (error) {
@@ -1003,13 +1144,13 @@ describe('Complete Memory-LLM Integration Flow', () => {
     it('should handle memory recall triggering and surface to LLM thought center', async () => {
       // Store memories with different relevance levels
       await memorySystem.ingestMemory({
-        type: 'episodic',
+        type: 'experience',
         content:
           'Learned that iron pickaxe is much more efficient than stone pickaxe for mining iron ore',
         source: 'mining_experience',
         entities: ['iron_pickaxe', 'stone_pickaxe', 'iron_ore'],
         topics: ['tool_efficiency', 'resource_gathering'],
-        metadata: {
+        customMetadata: {
           relevance: 0.95,
           importance: 0.8,
           emotionalImpact: 0.6,
@@ -1024,7 +1165,7 @@ describe('Complete Memory-LLM Integration Flow', () => {
         source: 'reflection',
         entities: ['tool_selection', 'material_hardness', 'efficiency'],
         topics: ['strategy', 'decision_making'],
-        metadata: {
+        customMetadata: {
           relevance: 0.85,
           importance: 0.7,
           learningValue: 0.8,
@@ -1036,11 +1177,11 @@ describe('Complete Memory-LLM Integration Flow', () => {
         query: 'tool efficiency for iron ore mining',
         types: ['episodic', 'thought', 'procedural'],
         limit: 5,
-        minRelevance: 0.7,
+        minConfidence: 0.7,
       });
 
       expect(memories.results.length).toBeGreaterThan(0);
-      expect(memories.results[0].relevance).toBeGreaterThan(0.8);
+      expect(memories.results[0].confidence).toBeGreaterThan(0.8);
 
       // Verify memories can be surfaced to LLM
       const llmResponse = await mockLLM.generateResponse({

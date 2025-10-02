@@ -81,6 +81,20 @@ export class EnhancedReactiveExecutor {
   private metrics: ReactiveExecutorMetrics;
   private executionHistory: ExecutionResult[] = [];
 
+  // PBI Metrics Tracking
+  private pbiMetrics: {
+    recentTTFAs: Array<{ value: number; timestamp: number }>;
+    totalActions: number;
+    totalDuration: number;
+    successfulSteps: number;
+    failedSteps: number;
+    planRepairs: number;
+    localRetries: number;
+    successfulLocalRetries: number;
+    timeouts: number;
+    stuckLoops: number;
+  };
+
   // PBI Integration
   private pbiEnforcer: ReturnType<typeof createPBIEnforcer>;
 
@@ -97,6 +111,7 @@ export class EnhancedReactiveExecutor {
     this.planRepair = new EnhancedPlanRepair();
     this.contextBuilder = new DefaultExecutionContextBuilder();
     this.metrics = this.initializeMetrics();
+    this.pbiMetrics = this.initializePBIMetrics();
 
     // Initialize PBI enforcer for plan-body interface enforcement
     this.pbiEnforcer = createPBIEnforcer();
@@ -740,6 +755,24 @@ export class EnhancedReactiveExecutor {
   }
 
   /**
+   * Initialize PBI metrics
+   */
+  private initializePBIMetrics() {
+    return {
+      recentTTFAs: [],
+      totalActions: 0,
+      totalDuration: 0,
+      successfulSteps: 0,
+      failedSteps: 0,
+      planRepairs: 0,
+      localRetries: 0,
+      successfulLocalRetries: 0,
+      timeouts: 0,
+      stuckLoops: 0,
+    };
+  }
+
+  /**
    * Get comprehensive metrics
    */
   getMetrics(): {
@@ -797,42 +830,117 @@ export class EnhancedReactiveExecutor {
   }
 
   /**
-   * Get PBI effectiveness metrics (placeholder for now)
+   * Get PBI effectiveness metrics
    */
   getPBIEffectivenessMetrics(): ExecutionHealthMetrics {
-    // TODO: Implement proper PBI metrics collection
+    // Calculate metrics from collected data
+    const now = Date.now();
+    const hourMs = 60 * 60 * 1000;
+
+    // Calculate TTFA percentiles
+    const recentTTFAs = this.pbiMetrics.recentTTFAs.filter(
+      (ttfa) => now - ttfa.timestamp < hourMs
+    );
+
+    const sortedTTFAs = recentTTFAs
+      .map((ttfa) => ttfa.value)
+      .sort((a, b) => a - b);
+
+    const ttfaP50 =
+      sortedTTFAs.length > 0
+        ? sortedTTFAs[Math.floor(sortedTTFAs.length * 0.5)]
+        : 0;
+    const ttfaP95 =
+      sortedTTFAs.length > 0
+        ? sortedTTFAs[Math.floor(sortedTTFAs.length * 0.95)]
+        : 0;
+
+    // Calculate throughput (actions per second over last hour)
+    const actionsPerSecond =
+      this.pbiMetrics.totalActions / (this.pbiMetrics.totalDuration / 1000);
+
+    // Calculate reliability metrics
+    const totalSteps =
+      this.pbiMetrics.successfulSteps + this.pbiMetrics.failedSteps;
+    const planRepairRate =
+      totalSteps > 0 ? this.pbiMetrics.planRepairs / totalSteps : 0;
+    const localRetrySuccessRate =
+      this.pbiMetrics.localRetries > 0
+        ? this.pbiMetrics.successfulLocalRetries / this.pbiMetrics.localRetries
+        : 0;
+    const stepsPerSuccess =
+      this.pbiMetrics.successfulSteps > 0
+        ? totalSteps / this.pbiMetrics.successfulSteps
+        : 0;
+
+    // Calculate failure modes per hour
+    const timeoutsPerHour =
+      this.pbiMetrics.timeouts / (this.pbiMetrics.totalDuration / hourMs);
+    const stuckLoopsPerHour =
+      this.pbiMetrics.stuckLoops / (this.pbiMetrics.totalDuration / hourMs);
+
     return {
       // Timing
-      ttfaP50: 0,
-      ttfaP95: 0,
+      ttfaP50,
+      ttfaP95,
 
       // Throughput
-      actionsPerSecond: 0,
+      actionsPerSecond,
 
       // Reliability
-      planRepairRate: 0,
-      localRetrySuccessRate: 0,
-      stepsPerSuccess: 0,
+      planRepairRate,
+      localRetrySuccessRate,
+      stepsPerSuccess,
 
       // Failure modes
-      timeoutsPerHour: 0,
-      stuckLoopsPerHour: 0,
+      timeoutsPerHour,
+      stuckLoopsPerHour,
 
-      // Capability health
+      // Capability health (simplified for now)
       capabilitySLAs: {},
 
-      // Memory impact
+      // Memory impact (placeholder)
       methodUplift: {},
       hazardRecallRate: 0,
     };
   }
 
   /**
-   * Check if PBI is meeting effectiveness targets (placeholder for now)
+   * Check if PBI is meeting effectiveness targets
    */
   isPBIEffective(): boolean {
-    // TODO: Implement proper PBI effectiveness tracking
-    return true;
+    // Calculate effectiveness based on current metrics
+    const metrics = this.getPBIEffectivenessMetrics();
+
+    // Check if we're meeting minimum effectiveness thresholds
+    const minThroughput = 0.1; // 0.1 actions per second minimum
+    const maxAvgLatency = 5000; // 5 second average latency maximum
+    const minSuccessRate = 0.7; // 70% success rate minimum
+
+    const currentThroughput = metrics.actionsPerSecond;
+    const currentAvgLatency = metrics.latency.avg;
+    const currentSuccessRate =
+      this.pbiMetrics.successfulSteps /
+      (this.pbiMetrics.successfulSteps + this.pbiMetrics.failedSteps);
+
+    const isEffective =
+      currentThroughput >= minThroughput &&
+      currentAvgLatency <= maxAvgLatency &&
+      currentSuccessRate >= minSuccessRate;
+
+    console.log(`📊 PBI Effectiveness Check:`, {
+      throughput: currentThroughput.toFixed(3),
+      avgLatency: currentAvgLatency.toFixed(0),
+      successRate: (currentSuccessRate * 100).toFixed(1) + '%',
+      effective: isEffective,
+      thresholds: {
+        minThroughput,
+        maxAvgLatency,
+        minSuccessRate,
+      },
+    });
+
+    return isEffective;
   }
 
   /**
@@ -916,7 +1024,6 @@ export class EnhancedReactiveExecutor {
       }
 
       // Check if we should try MCP execution first
-      // TODO: Re-enable MCP integration when MCP methods are properly implemented
       // For now, skip MCP and go directly to Minecraft execution
       console.log(
         `🔧 [REACTIVE EXECUTOR] Executing task directly via Minecraft: ${task.title}`
@@ -1213,13 +1320,30 @@ export class EnhancedReactiveExecutor {
       }
 
       // Update PBI metrics based on task execution result
+      this.pbiMetrics.totalActions++;
+      this.pbiMetrics.totalDuration += totalTime;
+
+      // Track TTFA for percentile calculations
+      this.pbiMetrics.recentTTFAs.push({
+        value: pbiResult.ttfaMs,
+        timestamp: Date.now(),
+      });
+
+      // Keep only recent TTFA measurements (last hour)
+      const hourAgo = Date.now() - 60 * 60 * 1000;
+      this.pbiMetrics.recentTTFAs = this.pbiMetrics.recentTTFAs.filter(
+        (ttfa) => ttfa.timestamp > hourAgo
+      );
+
       if (taskResult.success) {
+        this.pbiMetrics.successfulSteps++;
         this.pbiEnforcer.updateMetrics(
           pbiStep.type,
           'success',
           pbiResult.ttfaMs
         );
       } else {
+        this.pbiMetrics.failedSteps++;
         this.pbiEnforcer.updateMetrics(
           pbiStep.type,
           'failure',

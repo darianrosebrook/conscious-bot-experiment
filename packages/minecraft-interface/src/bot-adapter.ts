@@ -9,6 +9,7 @@
 
 import { Bot, createBot } from 'mineflayer';
 import { EventEmitter } from 'events';
+import { Vec3 } from 'vec3';
 import { BotConfig, BotEvent, BotEventType } from './types';
 import { AutomaticSafetyMonitor } from './automatic-safety-monitor';
 import { ActionTranslator } from './action-translator';
@@ -958,11 +959,17 @@ export class BotAdapter extends EventEmitter {
     this.bot.on('blockUpdate' as any, async (oldBlock: any, newBlock: any) => {
       if (oldBlock?.type !== newBlock?.type) {
         try {
-          await this.processEnvironmentalEvent('block_break', {
-            oldBlock: oldBlock?.name || 'unknown',
-            newBlock: newBlock?.name || 'unknown',
-            position: newBlock?.position || { x: 0, y: 0, z: 0 },
-          });
+          // Check if the event is within the observation radius
+          if (
+            newBlock?.position &&
+            this.isWithinObservationRadius(newBlock.position)
+          ) {
+            await this.processEnvironmentalEvent('block_break', {
+              oldBlock: oldBlock?.name || 'unknown',
+              newBlock: newBlock?.name || 'unknown',
+              position: newBlock?.position || { x: 0, y: 0, z: 0 },
+            });
+          }
         } catch (error) {
           console.error('❌ Error processing block break event:', error);
         }
@@ -975,11 +982,17 @@ export class BotAdapter extends EventEmitter {
       async (collector: any, collected: any) => {
         if (collector === this.bot.entity) {
           try {
-            await this.processEnvironmentalEvent('item_pickup', {
-              item: collected.name || 'unknown',
-              count: collected.count || 1,
-              position: collected.position || { x: 0, y: 0, z: 0 },
-            });
+            // Check if the event is within the observation radius
+            if (
+              collected?.position &&
+              this.isWithinObservationRadius(collected.position)
+            ) {
+              await this.processEnvironmentalEvent('item_pickup', {
+                item: collected.name || 'unknown',
+                count: collected.count || 1,
+                position: collected.position || { x: 0, y: 0, z: 0 },
+              });
+            }
           } catch (error) {
             console.error('❌ Error processing item pickup event:', error);
           }
@@ -1239,5 +1252,28 @@ export class BotAdapter extends EventEmitter {
 
 ══════════════════════════════════════════════════════
     `);
+  }
+
+  /**
+   * Check if a position is within the bot's observation radius
+   */
+  private isWithinObservationRadius(position: {
+    x: number;
+    y: number;
+    z: number;
+  }): boolean {
+    if (!this.bot?.entity?.position) {
+      return false;
+    }
+
+    const botPos = new Vec3(
+      this.bot.entity.position.x,
+      this.bot.entity.position.y,
+      this.bot.entity.position.z
+    );
+    const eventPos = new Vec3(position.x, position.y, position.z);
+    const distance = botPos.distanceTo(eventPos);
+
+    return distance <= this.config.observationRadius;
   }
 }

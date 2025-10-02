@@ -97,13 +97,17 @@ class MetricAggregator {
       this.buckets.set(metricName, { values: [], lastUpdate: timestamp });
     }
 
-    const bucket = this.buckets.get(metricName)!;
+    const bucket = this.buckets.get(metricName);
+    if (!bucket) {
+      return; // Should never happen, but defensive programming
+    }
+
     bucket.values.push(value);
     bucket.lastUpdate = timestamp;
 
     // Keep only recent values (configurable window)
+    // eslint-disable-next-line no-unused-vars
     const maxAge = 3600000; // 1 hour
-    const cutoffTime = timestamp - maxAge;
 
     // Simple cleanup - remove old values (in real implementation, use time-based indexing)
     if (bucket.values.length > 10000) {
@@ -315,21 +319,12 @@ export class TelemetryCollector
   }
 
   /**
-   * Get telemetry metrics by name and time range
+   * Get telemetry metrics by name
    */
-  async getMetrics(
-    metricName: string,
-    startTime: number,
-    endTime: number
-  ): Promise<TelemetryData[]> {
+  async getMetrics(metricName: string): Promise<TelemetryData[]> {
     const allData = this.buffer.getAll();
 
-    return allData.filter(
-      (item) =>
-        item.metricName === metricName &&
-        item.timestamp >= startTime &&
-        item.timestamp <= endTime
-    );
+    return allData.filter((item) => item.metricName === metricName);
   }
 
   /**
@@ -337,15 +332,13 @@ export class TelemetryCollector
    */
   async getAggregatedMetrics(
     metricName: string,
-    period: AggregationPeriod,
-    startTime: number,
-    endTime: number
+    period: AggregationPeriod
   ): Promise<AggregatedMetrics[]> {
     const aggregated = this.aggregator.aggregate(
       metricName,
       period,
-      startTime,
-      endTime
+      Date.now() - 3600000, // 1 hour ago
+      Date.now()
     );
 
     if (aggregated) {

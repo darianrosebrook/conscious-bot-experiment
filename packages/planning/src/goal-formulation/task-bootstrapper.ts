@@ -1,5 +1,6 @@
 import { EnhancedEnvironmentIntegration } from '../enhanced-environment-integration';
 import { Goal, GoalStatus, GoalType } from '../types';
+import { auditLogger } from '../../cognition/src/audit/thought-action-audit-logger';
 
 import type { PlanningContext } from '../integrated-planning-coordinator';
 
@@ -111,6 +112,25 @@ export class TaskBootstrapper {
       const memoryResult = await this.recoverFromMemory();
       memoryConsidered = memoryResult.considered;
       if (memoryResult.goals.length > 0) {
+        // Log action planning for audit trail
+        memoryResult.goals.forEach((goal) => {
+          auditLogger.log(
+            'action_planned',
+            {
+              taskTitle: goal.title,
+              taskType: goal.type,
+              taskId: goal.id,
+              priority: goal.priority,
+              source: 'memory',
+              goalCount: memoryResult.goals.length,
+            },
+            {
+              success: true,
+              duration: Date.now() - start,
+            }
+          );
+        });
+
         return {
           goals: memoryResult.goals,
           source: 'memory',
@@ -131,6 +151,25 @@ export class TaskBootstrapper {
       const llmResult = await this.synthesizeWithLlm(snapshot);
       llmConsidered = llmResult.considered;
       if (llmResult.goals.length > 0) {
+        // Log action planning for audit trail
+        llmResult.goals.forEach((goal) => {
+          auditLogger.log(
+            'action_planned',
+            {
+              taskTitle: goal.title,
+              taskType: goal.type,
+              taskId: goal.id,
+              priority: goal.priority,
+              source: 'llm',
+              goalCount: llmResult.goals.length,
+            },
+            {
+              success: true,
+              duration: Date.now() - start,
+            }
+          );
+        });
+
         return {
           goals: llmResult.goals,
           source: 'llm',

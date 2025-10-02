@@ -6,7 +6,6 @@ import {
   BarChart3,
   Brain,
   FileText,
-  Flag,
   History,
   ListChecks,
   Map,
@@ -33,7 +32,6 @@ import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { DashboardProvider } from '@/contexts/dashboard-context';
-import type {} from '@/types';
 
 interface BotState {
   position?: {
@@ -256,7 +254,7 @@ function ConsciousMinecraftDashboardContent() {
         case 'warning': {
           // Add warning as a thought
           addThought({
-            id: `warning-${message.timestamp}-${Math.random().toString(36).substr(2, 9)}`,
+            id: `warning-${message.timestamp}-${Math.random().toString(36).substring(2, 9)}`,
             ts: new Date(message.timestamp).toISOString(),
             text: `Warning: ${message.data.message}`,
             type: 'reflection',
@@ -295,7 +293,7 @@ function ConsciousMinecraftDashboardContent() {
 
           // Add error as a thought
           addThought({
-            id: `error-${message.timestamp}-${Math.random().toString(36).substr(2, 9)}`,
+            id: `error-${message.timestamp}-${Math.random().toString(36).substring(2, 9)}`,
             ts: new Date(message.timestamp).toISOString(),
             text: `Error: ${errorData.error}`,
             type: 'reflection',
@@ -333,7 +331,7 @@ function ConsciousMinecraftDashboardContent() {
 
           // Add respawn as a thought
           addThought({
-            id: `respawned-${message.timestamp}-${Math.random().toString(36).substr(2, 9)}`,
+            id: `respawned-${message.timestamp}-${Math.random().toString(36).substring(2, 9)}`,
             ts: new Date(message.timestamp).toISOString(),
             text: `Respawned with ${respawnData.health || 20} health`,
             type: 'self',
@@ -346,7 +344,7 @@ function ConsciousMinecraftDashboardContent() {
           // Add block interaction as a thought
           const blockData = message.data;
           addThought({
-            id: `block-${message.timestamp}-${Math.random().toString(36).substr(2, 9)}`,
+            id: `block-${message.timestamp}-${Math.random().toString(36).substring(2, 9)}`,
             ts: new Date(message.timestamp).toISOString(),
             text: `${message.type === 'block_broken' ? 'Broke' : 'Placed'} ${blockData.blockType} at (${blockData.position.x.toFixed(1)}, ${blockData.position.y.toFixed(1)}, ${blockData.position.z.toFixed(1)})`,
             type: 'self',
@@ -477,7 +475,12 @@ function ConsciousMinecraftDashboardContent() {
         clearInterval(pollInterval);
       }
     };
-  }, [botStateWebSocket.isConnected, botStateWebSocket.error]);
+  }, [
+    botStateWebSocket.isConnected,
+    botStateWebSocket.error,
+    setHud,
+    setInventory,
+  ]);
 
   // Auto-scroll to bottom of thoughts
   useEffect(() => {
@@ -610,15 +613,6 @@ function ConsciousMinecraftDashboardContent() {
           }
         }
 
-        // Note: Memories are no longer converted to thoughts
-        // The cognitive stream now shows actual cognitive thoughts from the cognition system
-
-        // Note: Events are no longer converted to thoughts
-        // The cognitive stream now shows actual cognitive thoughts from the cognition system
-
-        // Note: Notes are no longer converted to thoughts
-        // The cognitive stream now shows actual cognitive thoughts from the cognition system
-
         // Fetch bot state and health (includes viewer info)
         const [botRes, healthRes] = await Promise.allSettled([
           fetch('http://localhost:3005/state', {
@@ -687,7 +681,18 @@ function ConsciousMinecraftDashboardContent() {
     };
 
     fetchInitialData();
-  }, [setTasks, setEnvironment, setInventory, addThought]);
+  }, [
+    setTasks,
+    setEnvironment,
+    setInventory,
+    addThought,
+    setPlannerData,
+    checkViewerStatus,
+    setBotState,
+    setBotConnections,
+    setHud,
+    loadThoughtsFromServer,
+  ]);
 
   // Periodic refresh of bot state and connection status
   useEffect(() => {
@@ -870,7 +875,15 @@ function ConsciousMinecraftDashboardContent() {
     // Refresh every 60 seconds for more responsive viewer status updates
     const interval = setInterval(refreshBotState, 60000);
     return () => clearInterval(interval);
-  }, [setInventory, thoughts, addThought]);
+  }, [
+    setInventory,
+    thoughts,
+    addThought,
+    setBotState,
+    setBotConnections,
+    setHud,
+    checkViewerStatus,
+  ]);
 
   /**
    * Submit an intrusive thought to the bot
@@ -1579,7 +1592,7 @@ function ConsciousMinecraftDashboardContent() {
                             let prefix = '';
                             let typeLabel = thought.thoughtType || thought.type;
                             let textColor = 'text-zinc-200';
-                            let iconColor = 'text-zinc-400';
+                            // let iconColor = 'text-zinc-400';
 
                             if (isIntrusive) {
                               borderColor = 'border-purple-600/50';
@@ -1587,21 +1600,21 @@ function ConsciousMinecraftDashboardContent() {
                               prefix = ' ';
                               typeLabel = 'intrusive';
                               textColor = 'text-purple-200';
-                              iconColor = 'text-purple-400';
+                              // iconColor = 'text-purple-400';
                             } else if (isExternalChat) {
                               borderColor = 'border-blue-600/50';
                               bgColor = 'bg-blue-950/20';
                               prefix = ` ${thought.sender}: `;
                               typeLabel = 'chat_in';
                               textColor = 'text-blue-200';
-                              iconColor = 'text-blue-400';
+                              // iconColor = 'text-blue-400';
                             } else if (isBotResponse) {
                               borderColor = 'border-green-600/50';
                               bgColor = 'bg-green-950/20';
                               prefix = ' ';
                               typeLabel = 'chat_out';
                               textColor = 'text-green-200';
-                              iconColor = 'text-green-400';
+                              // iconColor = 'text-green-400';
                             } else if (isSocial || isSocialConsideration) {
                               borderColor = 'border-orange-600/50';
                               bgColor = 'bg-orange-950/20';
@@ -1610,56 +1623,56 @@ function ConsciousMinecraftDashboardContent() {
                                 ? 'social_consideration'
                                 : 'social';
                               textColor = 'text-orange-200';
-                              iconColor = 'text-orange-400';
+                              // iconColor = 'text-orange-400';
                             } else if (isInternal) {
                               borderColor = 'border-yellow-600/50';
                               bgColor = 'bg-yellow-950/20';
                               prefix = ' ';
                               typeLabel = 'internal';
                               textColor = 'text-yellow-200';
-                              iconColor = 'text-yellow-400';
+                              // iconColor = 'text-yellow-400';
                             } else if (isSystemEvent) {
                               borderColor = 'border-indigo-600/50';
                               bgColor = 'bg-indigo-950/20';
                               prefix = '🔄 ';
                               typeLabel = 'system_event';
                               textColor = 'text-indigo-200';
-                              iconColor = 'text-indigo-400';
+                              // iconColor = 'text-indigo-400';
                             } else if (isThoughtProcessing) {
                               borderColor = 'border-cyan-600/50';
                               bgColor = 'bg-cyan-950/20';
                               prefix = '⚡ ';
                               typeLabel = 'thought_processing';
                               textColor = 'text-cyan-200';
-                              iconColor = 'text-cyan-400';
+                              // iconColor = 'text-cyan-400';
                             } else if (isTaskCreation) {
                               borderColor = 'border-emerald-600/50';
                               bgColor = 'bg-emerald-950/20';
                               prefix = '✅ ';
                               typeLabel = 'task_creation';
                               textColor = 'text-emerald-200';
-                              iconColor = 'text-emerald-400';
+                              // iconColor = 'text-emerald-400';
                             } else if (isSystemStatus) {
                               borderColor = 'border-slate-600/50';
                               bgColor = 'bg-slate-950/20';
                               prefix = '📊 ';
                               typeLabel = 'system_status';
                               textColor = 'text-slate-200';
-                              iconColor = 'text-slate-400';
+                              // iconColor = 'text-slate-400';
                             } else if (isSystemMetric) {
                               borderColor = 'border-pink-600/50';
                               bgColor = 'bg-pink-950/20';
                               prefix = '📈 ';
                               typeLabel = 'system_metric';
                               textColor = 'text-pink-200';
-                              iconColor = 'text-pink-400';
+                              // iconColor = 'text-pink-400';
                             } else if (isSystemLog) {
                               borderColor = 'border-gray-600/50';
                               bgColor = 'bg-gray-950/20';
                               prefix = '📝 ';
                               typeLabel = 'system_log';
                               textColor = 'text-gray-200';
-                              iconColor = 'text-gray-400';
+                              // iconColor = 'text-gray-400';
                             }
 
                             return (

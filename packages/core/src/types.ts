@@ -478,6 +478,18 @@ export const ArbiterConfigSchema = z.object({
   safeModeEnabled: z.boolean(),
   monitoringEnabled: z.boolean(),
   debugMode: z.boolean(),
+  redundancy: z
+    .object({
+      enabled: z.boolean().default(true),
+      instanceCount: z.number().min(1).max(5).default(3),
+      heartbeatInterval: z.number().positive().default(1000), // ms
+      failoverTimeout: z.number().positive().default(5000), // ms
+      stateSyncInterval: z.number().positive().default(100), // ms
+      loadBalancingStrategy: z
+        .enum(['round-robin', 'least-loaded', 'random'])
+        .default('least-loaded'),
+    })
+    .default({}),
 });
 
 export type ArbiterConfig = z.infer<typeof ArbiterConfigSchema>;
@@ -495,6 +507,25 @@ export interface SystemEvents {
   'safety-violation': [SafetyViolation];
   'degradation-changed': [DegradationLevel];
   'performance-update': [PerformanceMetrics];
+  'degradation-activated': [
+    { level: number; timestamp: number; reason: string },
+  ];
+  'degradation-deactivated': [
+    { previousLevel: number; timestamp: number; reason: string },
+  ];
+  'processing-error': [
+    { error: string; signalType: string; timestamp: number },
+  ];
+  'critical-failure': [
+    {
+      component: string;
+      error: string;
+      timestamp: number;
+      degradationLevel: number;
+    },
+  ];
+  'state-changed': [string];
+  error: [any];
   urgentNeedProcessed: [
     { need: string; urgency: number; result: any; timestamp: number },
   ];
@@ -547,6 +578,10 @@ export class BoundedHistory<T> {
 
   getSince(timestamp: number): Timestamped<T>[] {
     return this.items.filter((item) => item.timestamp >= timestamp);
+  }
+
+  getAll(): T[] {
+    return this.items.map((item) => item.value);
   }
 
   clear(): void {

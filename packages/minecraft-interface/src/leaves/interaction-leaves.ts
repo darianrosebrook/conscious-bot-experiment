@@ -64,6 +64,10 @@ interface BotWithPathfinder extends Bot {
  * Place a torch if light level is below threshold
  */
 export class PlaceTorchIfNeededLeaf implements LeafImpl {
+  // Torch placement tracking
+  private lastTorchPositions: Map<string, Vec3> = new Map();
+  private readonly maxTrackedTorches = 50;
+
   spec: LeafSpec = {
     name: 'place_torch_if_needed',
     version: '1.0.0',
@@ -218,6 +222,9 @@ export class PlaceTorchIfNeededLeaf implements LeafImpl {
       // Place the torch
       await bot.placeBlock(placementPos as any, torchItem as any);
 
+      // Record torch placement for optimal spacing
+      this.recordTorchPlacement(placementPos);
+
       // Verify placement
       const placedBlock = bot.blockAt(placementPos);
       const torchPlaced = placedBlock && placedBlock.name === 'torch';
@@ -282,12 +289,44 @@ export class PlaceTorchIfNeededLeaf implements LeafImpl {
   }
 
   /**
-   * Get distance from last torch (simplified implementation)
+   * Get distance from last torch position
    */
   private getDistanceFromLastTorch(botPos: Vec3): number {
-    // TODO: Implement proper tracking of last torch position for optimal placement
-    // For now, return a random value to simulate interval checking
-    return Math.floor(Math.random() * 10) + 1;
+    // Find the closest torch position to current bot position
+    let minDistance = Infinity;
+
+    for (const torchPos of this.lastTorchPositions.values()) {
+      const distance = Math.sqrt(
+        Math.pow(botPos.x - torchPos.x, 2) +
+          Math.pow(botPos.y - torchPos.y, 2) +
+          Math.pow(botPos.z - torchPos.z, 2)
+      );
+
+      if (distance < minDistance) {
+        minDistance = distance;
+      }
+    }
+
+    return minDistance === Infinity ? 0 : Math.floor(minDistance);
+  }
+
+  /**
+   * Record torch placement position
+   */
+  private recordTorchPlacement(position: Vec3): void {
+    // Create a unique key for this position (rounded to nearest block)
+    const key = `${Math.floor(position.x)},${Math.floor(position.y)},${Math.floor(position.z)}`;
+
+    this.lastTorchPositions.set(key, position);
+
+    // Keep only the most recent torch positions
+    if (this.lastTorchPositions.size > this.maxTrackedTorches) {
+      const keysToDelete = Array.from(this.lastTorchPositions.keys()).slice(
+        0,
+        this.lastTorchPositions.size - this.maxTrackedTorches
+      );
+      keysToDelete.forEach((key) => this.lastTorchPositions.delete(key));
+    }
   }
 
   /**

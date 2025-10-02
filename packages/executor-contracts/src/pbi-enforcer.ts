@@ -18,7 +18,7 @@ import {
   PBIError,
   PBIErrorCode,
   DEFAULT_PBI_ACCEPTANCE,
-  // isPlanStep, // TODO: add back in
+  isPlanStep,
   isActionResult,
 } from './types';
 

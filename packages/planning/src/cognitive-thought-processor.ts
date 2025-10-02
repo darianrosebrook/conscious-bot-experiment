@@ -1004,7 +1004,25 @@ export class CognitiveThoughtProcessor extends EventEmitter {
    * Manually process a specific thought
    */
   async processThought(thought: CognitiveThought): Promise<any | null> {
+    const startTime = Date.now();
     const task = this.translateThoughtToTask(thought);
+
+    auditLogger.log(
+      'thought_processed',
+      {
+        thoughtId: thought.id,
+        thoughtContent: thought.content.substring(0, 100),
+        thoughtType: thought.type,
+        taskCreated: !!task,
+        taskTitle: task?.title,
+        taskType: task?.type,
+      },
+      {
+        success: !!task,
+        duration: Date.now() - startTime,
+      }
+    );
+
     if (task) {
       await this.submitTaskToPlanning(task);
       this.processedThoughts.add(thought.id);

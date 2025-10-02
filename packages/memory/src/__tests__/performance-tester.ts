@@ -8,7 +8,7 @@
  */
 
 import { performance } from 'perf_hooks';
-import { os } from 'os';
+import * as os from 'os';
 import { EnhancedMemorySystem, MemorySearchOptions } from '../memory-system';
 import {
   TestDataGenerator,
@@ -119,6 +119,28 @@ export class MemoryPerformanceTester {
       chunkingService,
       embeddingService
     );
+  }
+
+  /**
+   * Warmup phase to stabilize performance measurements
+   */
+  private async warmupPhase(
+    dataset: TestDataset,
+    queryCount: number
+  ): Promise<void> {
+    const queries = dataset.queries.slice(0, queryCount);
+
+    for (const query of queries) {
+      try {
+        await this.memorySystem.searchMemories({
+          query: query.query,
+          limit: 10,
+        });
+      } catch (error) {
+        // Ignore warmup errors
+        console.warn(`Warmup query failed: ${error}`);
+      }
+    }
   }
 
   /**
@@ -462,12 +484,12 @@ export class MemoryPerformanceTester {
       await this.memorySystem.ingestMemory({
         type: memory.type as any,
         content: memory.content,
-        source: memory.metadata.source,
-        confidence: memory.metadata.confidence,
-        world: memory.metadata.world,
-        position: memory.metadata.position,
-        entities: memory.metadata.entities,
-        topics: memory.metadata.topics,
+        source: memory.metadata.metadata.source,
+        confidence: memory.metadata.metadata.confidence,
+        world: memory.metadata.metadata.world,
+        position: memory.metadata.metadata.position,
+        entities: memory.metadata.metadata.entities,
+        topics: memory.metadata.metadata.topics,
       });
     }
 
@@ -482,12 +504,12 @@ export class MemoryPerformanceTester {
       await system.ingestMemory({
         type: memory.type as any,
         content: memory.content,
-        source: memory.metadata.source,
-        confidence: memory.metadata.confidence,
-        world: memory.metadata.world,
-        position: memory.metadata.position,
-        entities: memory.metadata.entities,
-        topics: memory.metadata.topics,
+        source: memory.metadata.metadata.source,
+        confidence: memory.metadata.metadata.confidence,
+        world: memory.metadata.metadata.world,
+        position: memory.metadata.metadata.position,
+        entities: memory.metadata.metadata.entities,
+        topics: memory.metadata.metadata.topics,
       });
     }
   }
@@ -534,7 +556,7 @@ export class MemoryPerformanceTester {
           const averageSimilarity =
             searchResults.results.length > 0
               ? searchResults.results.reduce(
-                  (sum, r) => sum + r.cosineSimilarity,
+                  (sum, r) => sum + r.vectorScore,
                   0
                 ) / searchResults.results.length
               : 0;

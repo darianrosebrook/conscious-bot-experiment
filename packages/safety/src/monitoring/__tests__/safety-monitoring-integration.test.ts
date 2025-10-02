@@ -12,6 +12,7 @@ import { TelemetryCollector } from '../telemetry-collector';
 import { HealthMonitor } from '../health-monitor';
 import {
   SafetyMonitoringConfig,
+  // eslint-disable-next-line no-unused-vars
   TelemetryData,
   HealthCheck,
   createTelemetryData,
@@ -598,11 +599,7 @@ describe('Individual Safety Monitoring Components', () => {
       await collector.collect(data2);
 
       const endTime = Date.now();
-      const metrics = await collector.getMetrics(
-        'test_metric',
-        startTime,
-        endTime
-      );
+      const metrics = await collector.getMetrics('test_metric');
 
       expect(metrics.length).toBe(2);
       expect(metrics[0].value).toBe(1);

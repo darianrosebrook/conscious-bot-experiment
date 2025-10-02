@@ -795,12 +795,25 @@ export class MCPIntegration {
       this.toolDiscoveryCache.set(goalId, result);
 
       console.log(
-        `[MCP] Discovered ${matchedTools.length}/${availableTools.length} tools for goal: ${goalDescription}`
+        `[MCP] ✅ Discovered ${matchedTools.length}/${availableTools.length} tools for goal: ${goalDescription.substring(0, 80)}...`
       );
+
+      if (matchedTools.length === 0) {
+        console.warn(
+          `[MCP] ⚠️ No tools matched for goal. Available tools: ${availableTools.map((t) => t.name).join(', ')}`
+        );
+      } else {
+        console.log(
+          `[MCP] Top matched tools: ${matchedTools
+            .slice(0, 3)
+            .map((m) => `${m.tool.name} (${m.relevance.toFixed(2)})`)
+            .join(', ')}`
+        );
+      }
 
       return result;
     } catch (error) {
-      console.error('[MCP] Tool discovery failed:', error);
+      console.error('[MCP] ❌ Tool discovery failed:', error);
       return {
         goalId,
         goalDescription,
@@ -832,8 +845,11 @@ export class MCPIntegration {
       );
       const confidence = this.calculateToolConfidence(tool, context);
 
-      if (relevance > 0.3) {
-        // Minimum relevance threshold
+      // Lower threshold for better tool discovery (was 0.3)
+      // Use default of 0.2 if not configured
+      const relevanceThreshold = 0.2;
+
+      if (relevance > relevanceThreshold) {
         matches.push({
           tool,
           relevance,
@@ -846,6 +862,11 @@ export class MCPIntegration {
           estimatedDuration:
             tool.metadata.timeoutMs || this.config.toolTimeoutMs || 30000,
         });
+      } else if (relevance > 0.1) {
+        // Log tools that are close but didn't match
+        console.log(
+          `[MCP] Tool "${tool.name}" has low relevance (${relevance.toFixed(2)}) for goal: ${goalDescription}`
+        );
       }
     }
 

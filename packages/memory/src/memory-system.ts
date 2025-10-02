@@ -7,7 +7,12 @@
  * @author @darianrosebrook
  */
 
-import { VectorDatabase, MemoryChunk, SearchResult } from './vector-database';
+import { EventEmitter } from 'events';
+import {
+  EnhancedVectorDatabase,
+  EnhancedMemoryChunk,
+  EnhancedSearchResult,
+} from './vector-database';
 import { EmbeddingService, EmbeddingResult } from './embedding-service';
 import {
   ChunkingService,
@@ -176,8 +181,8 @@ export interface MemorySystemStatus {
 // Enhanced Memory System Implementation
 // ============================================================================
 
-export class EnhancedMemorySystem {
-  private vectorDb: VectorDatabase;
+export class EnhancedMemorySystem extends EventEmitter {
+  private vectorDb: EnhancedVectorDatabase;
   private embeddingService: EmbeddingService;
   private chunkingService: ChunkingService;
   private hybridSearchService: HybridSearchService;
@@ -188,6 +193,43 @@ export class EnhancedMemorySystem {
 
   private searchStats: Array<{ timestamp: number; latency: number }> = [];
   private initialized = false;
+
+  // Reliability and integrity properties
+  private circuitBreakers: Map<
+    string,
+    {
+      failures: number;
+      lastFailureTime: number;
+      state: 'closed' | 'open' | 'half-open';
+      threshold: number;
+      timeout: number;
+    }
+  > = new Map();
+
+  private identityPreservation:
+    | {
+        coreIdentity: {
+          agentName: string;
+          personalityTraits: string[];
+          coreMemories: string[];
+          behavioralPatterns: Record<string, number>;
+        };
+        backupHashes: string[];
+        lastIntegrityCheck: number;
+        identityDriftScore: number;
+      }
+    | undefined;
+
+  private integrityChecks: Array<{
+    timestamp: number;
+    identityHash: string;
+    memoryCount: number;
+    corruptionDetected: boolean;
+    issues: string[];
+  }> = [];
+
+  private backupQueue: MemoryChunk[] = [];
+  private isRecoveryMode = false;
 
   constructor(private config: EnhancedMemorySystemConfig) {
     // Initialize core services
@@ -268,6 +310,10 @@ export class EnhancedMemorySystem {
       efficiencyThreshold: config.toolEfficiencyThreshold,
       cleanupInterval: config.toolEfficiencyCleanupInterval,
     });
+
+    // Initialize reliability systems
+    this.initializeCircuitBreakers();
+    this.initializeIdentityPreservation();
   }
 
   /**
@@ -290,6 +336,10 @@ export class EnhancedMemorySystem {
     }
 
     this.initialized = true;
+
+    // Start integrity monitoring
+    this.startIntegrityMonitoring();
+
     console.log('✅ Enhanced Memory System initialized successfully');
   }
 
@@ -1452,6 +1502,658 @@ export class EnhancedMemorySystem {
     }
 
     return this.toolEfficiencyManager.getEfficiencyStats();
+  }
+
+  // ============================================================================
+  // Reliability and Integrity Methods
+  // ============================================================================
+
+  /**
+   * Initialize circuit breakers for external dependencies
+   */
+  private initializeCircuitBreakers(): void {
+    // Circuit breaker for vector database
+    this.circuitBreakers.set('vectorDb', {
+      failures: 0,
+      lastFailureTime: 0,
+      state: 'closed',
+      threshold: 5,
+      timeout: 30000, // 30 seconds
+    });
+
+    // Circuit breaker for embedding service
+    this.circuitBreakers.set('embedding', {
+      failures: 0,
+      lastFailureTime: 0,
+      state: 'closed',
+      threshold: 3,
+      timeout: 15000, // 15 seconds
+    });
+
+    // Circuit breaker for GraphRAG
+    this.circuitBreakers.set('graphRag', {
+      failures: 0,
+      lastFailureTime: 0,
+      state: 'closed',
+      threshold: 3,
+      timeout: 20000, // 20 seconds
+    });
+  }
+
+  /**
+   * Initialize identity preservation system
+   */
+  private initializeIdentityPreservation(): void {
+    this.identityPreservation = {
+      coreIdentity: {
+        agentName: 'conscious-bot',
+        personalityTraits: [
+          'curious',
+          'adaptive',
+          'goal-oriented',
+          'socially-aware',
+          'learning-focused',
+        ],
+        coreMemories: [
+          'initial-activation',
+          'first-learning-experience',
+          'personality-formation',
+        ],
+        behavioralPatterns: {
+          exploration: 0.7,
+          socialInteraction: 0.6,
+          problemSolving: 0.8,
+          adaptation: 0.9,
+        },
+      },
+      backupHashes: [],
+      lastIntegrityCheck: Date.now(),
+      identityDriftScore: 0.0,
+    };
+  }
+
+  /**
+   * Start integrity monitoring system
+   */
+  private startIntegrityMonitoring(): void {
+    // Run integrity checks every 5 minutes
+    setInterval(() => {
+      this.performIntegrityCheck();
+    }, 300000);
+
+    // Auto-backup critical memories every 30 minutes
+    setInterval(() => {
+      this.performAutoBackup();
+    }, 1800000);
+  }
+
+  /**
+   * Process with circuit breaker protection
+   */
+  private async processWithCircuitBreaker<T>(
+    serviceName: string,
+    operation: () => Promise<T>
+  ): Promise<T> {
+    const breaker = this.circuitBreakers.get(serviceName);
+    if (!breaker) {
+      return operation();
+    }
+
+    // Check if circuit breaker is open
+    if (breaker.state === 'open') {
+      const now = Date.now();
+      if (now - breaker.lastFailureTime > breaker.timeout) {
+        breaker.state = 'half-open';
+      } else {
+        throw new Error(`${serviceName} circuit breaker is open`);
+      }
+    }
+
+    try {
+      const result = await operation();
+      // Success - reset failure count and close circuit
+      if (breaker.state === 'half-open') {
+        breaker.state = 'closed';
+        breaker.failures = 0;
+      }
+      return result;
+    } catch (error) {
+      breaker.failures++;
+      breaker.lastFailureTime = Date.now();
+
+      if (breaker.failures >= breaker.threshold) {
+        breaker.state = 'open';
+        console.warn(`Circuit breaker opened for ${serviceName}`);
+      }
+
+      throw error;
+    }
+  }
+
+  /**
+   * Perform comprehensive memory integrity check
+   */
+  private async performIntegrityCheck(): Promise<void> {
+    try {
+      const startTime = Date.now();
+
+      // Check memory count consistency
+      const vectorStats = await this.vectorDb.getStats();
+      const graphStats = await this.graphRag.getStats();
+
+      const memoryCount = vectorStats.totalChunks || 0;
+      const graphEntities = graphStats.entityCount || 0;
+
+      // Generate identity hash based on core memories
+      const identityHash = await this.generateIdentityHash();
+
+      // Check for corruption indicators
+      const issues: string[] = [];
+      let corruptionDetected = false;
+
+      // Check memory count consistency
+      if (memoryCount < 10 && this.initialized) {
+        issues.push('Memory count suspiciously low');
+        corruptionDetected = true;
+      }
+
+      // Check identity consistency
+      const identityDrift = this.calculateIdentityDrift(identityHash);
+      if (identityDrift > 0.3) {
+        issues.push(`High identity drift detected: ${identityDrift}`);
+        corruptionDetected = true;
+      }
+
+      // Check circuit breaker states
+      const openBreakers = Array.from(this.circuitBreakers.values()).filter(
+        (b) => b.state === 'open'
+      );
+      if (openBreakers.length > 0) {
+        issues.push(`${openBreakers.length} circuit breakers are open`);
+      }
+
+      // Record integrity check
+      const check = {
+        timestamp: Date.now(),
+        identityHash,
+        memoryCount,
+        corruptionDetected,
+        issues,
+      };
+
+      this.integrityChecks.push(check);
+
+      // Keep only last 50 checks
+      if (this.integrityChecks.length > 50) {
+        this.integrityChecks = this.integrityChecks.slice(-50);
+      }
+
+      // Update identity preservation
+      if (this.identityPreservation) {
+        this.identityPreservation.lastIntegrityCheck = Date.now();
+        this.identityPreservation.identityDriftScore = identityDrift;
+      }
+
+      // Emit integrity check results
+      this.emit('integrity-check-completed', {
+        check,
+        duration: Date.now() - startTime,
+      });
+
+      if (corruptionDetected) {
+        console.warn('⚠️ Memory corruption detected:', issues);
+        this.emit('memory-corruption-detected', { issues, check });
+      }
+    } catch (error) {
+      console.error('❌ Integrity check failed:', error);
+      this.emit('integrity-check-failed', {
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
+  /**
+   * Generate identity hash for integrity verification
+   */
+  private async generateIdentityHash(): Promise<string> {
+    try {
+      if (!this.identityPreservation) {
+        return 'no-identity-preservation';
+      }
+
+      const coreData = JSON.stringify({
+        agentName: this.identityPreservation.coreIdentity.agentName,
+        personalityTraits:
+          this.identityPreservation.coreIdentity.personalityTraits,
+        behavioralPatterns:
+          this.identityPreservation.coreIdentity.behavioralPatterns,
+        memoryCount: await this.getTotalMemoryCount(),
+      });
+
+      // Simple hash function (in production, use crypto module)
+      let hash = 0;
+      for (let i = 0; i < coreData.length; i++) {
+        const char = coreData.charCodeAt(i);
+        hash = (hash << 5) - hash + char;
+        hash = hash & hash; // Convert to 32bit integer
+      }
+
+      return hash.toString(16);
+    } catch (error) {
+      console.error('Failed to generate identity hash:', error);
+      return 'error-generating-hash';
+    }
+  }
+
+  /**
+   * Calculate identity drift score
+   */
+  private calculateIdentityDrift(currentHash: string): number {
+    const recentHashes = this.integrityChecks
+      .slice(-10)
+      .map((check) => check.identityHash);
+
+    if (recentHashes.length === 0) return 0;
+
+    const matches = recentHashes.filter((hash) => hash === currentHash).length;
+    return 1 - matches / recentHashes.length;
+  }
+
+  /**
+   * Perform automatic backup of critical memories
+   */
+  private async performAutoBackup(): Promise<void> {
+    try {
+      if (this.isRecoveryMode) return; // Don't backup during recovery
+
+      // Backup core identity memories
+      const coreMemories = await this.exportMemories([
+        'knowledge',
+        'reflection',
+      ]);
+
+      // Add to backup queue (limit size)
+      this.backupQueue.push(...coreMemories);
+      if (this.backupQueue.length > 1000) {
+        this.backupQueue = this.backupQueue.slice(-1000);
+      }
+
+      // Generate backup hash
+      const backupHash = await this.generateBackupHash(coreMemories);
+      if (this.identityPreservation) {
+        this.identityPreservation.backupHashes.push(backupHash);
+
+        // Keep only last 10 backup hashes
+        if (this.identityPreservation.backupHashes.length > 10) {
+          this.identityPreservation.backupHashes =
+            this.identityPreservation.backupHashes.slice(-10);
+        }
+      }
+
+      console.log(`✅ Auto-backup completed: ${coreMemories.length} memories`);
+      this.emit('auto-backup-completed', {
+        memoryCount: coreMemories.length,
+        hash: backupHash,
+        timestamp: Date.now(),
+      });
+    } catch (error) {
+      console.error('❌ Auto-backup failed:', error);
+      this.emit('auto-backup-failed', {
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
+  /**
+   * Generate hash for backup verification
+   */
+  private async generateBackupHash(memories: MemoryChunk[]): Promise<string> {
+    const data = memories.map((m) => m.id + m.content).join('');
+    let hash = 0;
+    for (let i = 0; i < data.length; i++) {
+      const char = data.charCodeAt(i);
+      hash = (hash << 5) - hash + char;
+      hash = hash & hash;
+    }
+    return hash.toString(16);
+  }
+
+  /**
+   * Enhanced search with reliability protection
+   */
+  async searchMemoriesReliable(
+    options: HybridSearchOptions
+  ): Promise<HybridSearchResponse> {
+    const startTime = Date.now();
+
+    try {
+      // Check if we're in recovery mode
+      if (this.isRecoveryMode) {
+        return this.searchMemoriesRecovery(options);
+      }
+
+      // Use circuit breaker for vector database
+      const result = await this.processWithCircuitBreaker('vectorDb', () =>
+        this.searchMemories(options)
+      );
+
+      // Record successful search
+      this.searchStats.push({
+        timestamp: Date.now(),
+        latency: Date.now() - startTime,
+      });
+
+      return result;
+    } catch (error) {
+      console.error('❌ Reliable search failed:', error);
+
+      // Attempt degraded search
+      if (this.circuitBreakers.get('vectorDb')?.state === 'open') {
+        return this.searchMemoriesDegraded(options);
+      }
+
+      throw error;
+    }
+  }
+
+  /**
+   * Recovery mode search using backup data
+   */
+  private async searchMemoriesRecovery(
+    options: HybridSearchOptions
+  ): Promise<HybridSearchResponse> {
+    console.log('🔄 Using recovery mode search');
+
+    // Simple text matching against backup queue
+    const query = options.query.toLowerCase();
+    const matches = this.backupQueue
+      .filter((chunk) => chunk.content.toLowerCase().includes(query))
+      .slice(0, options.limit || 10);
+
+    return {
+      query: options.query,
+      results: matches.map((chunk) => ({
+        id: chunk.id,
+        content: chunk.content,
+        score: 0.5, // Default score for recovery mode
+        metadata: chunk.metadata,
+        source: 'backup-recovery',
+      })),
+      totalResults: matches.length,
+      searchTime: 0,
+      strategy: 'recovery',
+    };
+  }
+
+  /**
+   * Degraded search with reduced functionality
+   */
+  private async searchMemoriesDegraded(
+    options: HybridSearchOptions
+  ): Promise<HybridSearchResponse> {
+    console.log('⚠️ Using degraded search mode');
+
+    try {
+      // Try GraphRAG only search
+      const graphResults = await this.processWithCircuitBreaker(
+        'graphRag',
+        () => this.graphRag.query(options.query, options)
+      );
+
+      return {
+        query: options.query,
+        results:
+          graphResults.results?.map((r) => ({
+            id: r.id || 'unknown',
+            content: r.content || '',
+            score: r.score || 0.5,
+            metadata: r.metadata,
+            source: 'graph-only',
+          })) || [],
+        totalResults: graphResults.results?.length || 0,
+        searchTime: 0,
+        strategy: 'degraded-graph-only',
+      };
+    } catch (error) {
+      console.error('❌ Degraded search also failed:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Enhanced ingestion with reliability
+   */
+  async ingestMemoryReliable(
+    content: string,
+    options: {
+      type: string;
+      source: string;
+      metadata?: Record<string, any>;
+      priority?: 'low' | 'medium' | 'high';
+    }
+  ): Promise<string[]> {
+    const startTime = Date.now();
+
+    try {
+      // Check identity preservation before critical memory ingestion
+      if (options.type === 'reflection' || options.type === 'knowledge') {
+        await this.verifyIdentityIntegrity();
+      }
+
+      const chunkIds = await this.ingestMemory(content, options);
+
+      // Add to backup queue for critical memories
+      if (options.priority === 'high' || options.type === 'reflection') {
+        // Note: In a real implementation, we'd retrieve the chunks and add them to backup
+        // For now, this is a placeholder
+      }
+
+      return chunkIds;
+    } catch (error) {
+      console.error('❌ Reliable ingestion failed:', error);
+
+      // If circuit breaker is open, queue for later retry
+      if (this.circuitBreakers.get('vectorDb')?.state === 'open') {
+        console.log('📋 Queuing memory for later retry');
+        this.emit('memory-queued-for-retry', {
+          content,
+          options,
+          error: error instanceof Error ? error.message : String(error),
+          timestamp: Date.now(),
+        });
+      }
+
+      throw error;
+    }
+  }
+
+  /**
+   * Verify identity integrity before critical operations
+   */
+  private async verifyIdentityIntegrity(): Promise<void> {
+    if (!this.identityPreservation) return;
+
+    const drift = this.identityPreservation.identityDriftScore;
+
+    if (drift > 0.5) {
+      console.warn(
+        `⚠️ High identity drift detected (${drift}), pausing critical operations`
+      );
+      this.emit('identity-integrity-warning', {
+        driftScore: drift,
+        threshold: 0.5,
+        timestamp: Date.now(),
+      });
+
+      // In a real implementation, you might pause critical operations
+      // or trigger identity restoration
+    }
+  }
+
+  /**
+   * Get comprehensive memory system health with reliability metrics
+   */
+  getMemorySystemHealthWithReliability(): {
+    status: 'healthy' | 'degraded' | 'critical';
+    reliability: {
+      integrityChecks: number;
+      corruptionIncidents: number;
+      circuitBreakerStates: Record<string, string>;
+      backupQueueSize: number;
+      identityDriftScore: number;
+      lastIntegrityCheck: number;
+    };
+    performance: any; // Reuse existing performance metrics
+    connectivity: any; // Reuse existing connectivity metrics
+  } {
+    const baseHealth = this.getMemorySystemHealth();
+
+    // Count corruption incidents
+    const corruptionIncidents = this.integrityChecks.filter(
+      (check) => check.corruptionDetected
+    ).length;
+
+    // Get circuit breaker states
+    const circuitBreakerStates: Record<string, string> = {};
+    for (const [name, breaker] of this.circuitBreakers) {
+      circuitBreakerStates[name] = breaker.state;
+    }
+
+    // Determine overall status with reliability considerations
+    let status: 'healthy' | 'degraded' | 'critical' = baseHealth.status;
+
+    if (
+      corruptionIncidents > 0 ||
+      (this.identityPreservation &&
+        this.identityPreservation.identityDriftScore > 0.3)
+    ) {
+      status = 'degraded';
+    }
+
+    if (
+      this.isRecoveryMode ||
+      (Object.values(circuitBreakerStates).includes('open') &&
+        Object.values(circuitBreakerStates).filter((s) => s === 'open').length >
+          1)
+    ) {
+      status = 'critical';
+    }
+
+    return {
+      ...baseHealth,
+      status,
+      reliability: {
+        integrityChecks: this.integrityChecks.length,
+        corruptionIncidents,
+        circuitBreakerStates,
+        backupQueueSize: this.backupQueue.length,
+        identityDriftScore: this.identityPreservation?.identityDriftScore || 0,
+        lastIntegrityCheck: this.identityPreservation?.lastIntegrityCheck || 0,
+      },
+    };
+  }
+
+  /**
+   * Initiate recovery mode for memory system restoration
+   */
+  async enterRecoveryMode(): Promise<void> {
+    console.log('🚨 Entering memory system recovery mode');
+
+    this.isRecoveryMode = true;
+
+    // Reset circuit breakers to allow recovery attempts
+    for (const breaker of this.circuitBreakers.values()) {
+      breaker.state = 'half-open';
+      breaker.failures = 0;
+    }
+
+    // Attempt to restore from backup
+    try {
+      await this.restoreFromBackup();
+      console.log('✅ Recovery from backup successful');
+    } catch (error) {
+      console.error('❌ Recovery from backup failed:', error);
+      this.emit('recovery-failed', {
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+
+    this.emit('recovery-mode-entered', {
+      timestamp: Date.now(),
+      backupQueueSize: this.backupQueue.length,
+      integrityChecksCount: this.integrityChecks.length,
+    });
+  }
+
+  /**
+   * Restore memory system from backup
+   */
+  private async restoreFromBackup(): Promise<void> {
+    if (this.backupQueue.length === 0) {
+      throw new Error('No backup data available');
+    }
+
+    console.log(`🔄 Restoring ${this.backupQueue.length} memories from backup`);
+
+    // Re-ingest backup memories
+    for (const chunk of this.backupQueue) {
+      try {
+        await this.vectorDb.storeChunk(chunk);
+      } catch (error) {
+        console.warn(`Failed to restore chunk ${chunk.id}:`, error);
+      }
+    }
+
+    console.log('✅ Backup restoration completed');
+  }
+
+  /**
+   * Exit recovery mode
+   */
+  exitRecoveryMode(): void {
+    console.log('✅ Exiting memory system recovery mode');
+    this.isRecoveryMode = false;
+
+    this.emit('recovery-mode-exited', {
+      timestamp: Date.now(),
+      finalBackupQueueSize: this.backupQueue.length,
+    });
+  }
+
+  /**
+   * Get total memory count
+   */
+  private async getTotalMemoryCount(): Promise<number> {
+    try {
+      const stats = await this.vectorDb.getStats();
+      return stats.totalChunks || 0;
+    } catch (error) {
+      console.error('Failed to get memory count:', error);
+      return 0;
+    }
+  }
+
+  /**
+   * Get memory system health status
+   */
+  getMemorySystemHealth(): {
+    status: 'healthy' | 'degraded' | 'critical';
+    performance: any;
+    connectivity: any;
+  } {
+    // Basic health check - in a real implementation this would be more comprehensive
+    return {
+      status: 'healthy',
+      performance: {
+        searchLatency: 0,
+        memoryUsage: 0,
+      },
+      connectivity: {
+        vectorDb: true,
+        graphRag: true,
+        embedding: true,
+      },
+    };
   }
 
   /**

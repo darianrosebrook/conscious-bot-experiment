@@ -7,8 +7,8 @@
  * @author @darianrosebrook
  */
 
-import { os } from 'os';
-import { EnhancedMemorySystem } from '../enhanced-memory-system';
+import * as os from 'os';
+import { EnhancedMemorySystem } from '../memory-system';
 import { TestDataGenerator, TestDataset } from './test-data-generator';
 import {
   MemoryPerformanceTester,
@@ -76,9 +76,19 @@ export interface TestSuiteResult {
     };
     comparison: {
       improvement: {
-        latency: number;
-        quality: number;
-        throughput: number;
+        latency: {
+          average: number;
+          p95: number;
+          p99: number;
+        };
+        quality: {
+          precision: number;
+          recall: number;
+          f1Score: number;
+        };
+        throughput: {
+          queriesPerSecond: number;
+        };
       };
       statisticalSignificance: boolean;
     };
@@ -430,12 +440,12 @@ export class MemoryTestRunner {
       await this.memorySystem.ingestMemory({
         type: memory.type as any,
         content: memory.content,
-        source: memory.metadata.source,
-        confidence: memory.metadata.confidence,
-        world: memory.metadata.world,
-        position: memory.metadata.position,
-        entities: memory.metadata.entities,
-        topics: memory.metadata.topics,
+        source: memory.metadata.metadata?.source || 'unknown',
+        confidence: memory.metadata.metadata?.confidence || 0.5,
+        world: memory.metadata.metadata?.world,
+        position: memory.metadata.metadata?.position,
+        entities: memory.metadata.metadata?.entities || [],
+        topics: memory.metadata.metadata?.topics || [],
       });
     }
 
@@ -450,12 +460,12 @@ export class MemoryTestRunner {
       await system.ingestMemory({
         type: memory.type as any,
         content: memory.content,
-        source: memory.metadata.source,
-        confidence: memory.metadata.confidence,
-        world: memory.metadata.world,
-        position: memory.metadata.position,
-        entities: memory.metadata.entities,
-        topics: memory.metadata.topics,
+        source: memory.metadata.metadata?.source || 'unknown',
+        confidence: memory.metadata.metadata?.confidence || 0.5,
+        world: memory.metadata.metadata?.world,
+        position: memory.metadata.metadata?.position,
+        entities: memory.metadata.metadata?.entities || [],
+        topics: memory.metadata.metadata?.topics || [],
       });
     }
   }
@@ -636,7 +646,7 @@ export class MemoryTestRunner {
 
     const statisticalSignificance =
       comparisonResults.length > 0
-        ? comparisonResults[0].statisticalSignificance.f1Score === 'significant'
+        ? comparisonResults[0].statisticalSignificance.quality === 'significant'
         : false;
 
     return {
@@ -727,7 +737,7 @@ export class MemoryTestRunner {
       }
 
       if (
-        latestComparison.statisticalSignificance.f1Score === 'insignificant'
+        latestComparison.statisticalSignificance.quality === 'insignificant'
       ) {
         recommendations.push(
           'Changes not statistically significant - validate testing methodology'

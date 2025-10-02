@@ -353,7 +353,7 @@ export class TestDataGenerator {
     const expectedTopics = this.extractTopics(content);
 
     // Generate metadata
-    const metadata: ChunkMetadata = {
+    const chunkingMetadata = {
       type: type as any,
       confidence: 0.7 + Math.random() * 0.3, // 0.7-1.0 confidence
       source: 'test-generator',
@@ -363,10 +363,17 @@ export class TestDataGenerator {
       importance: this.calculateImportance(content, type),
     };
 
+    const metadata: ChunkMetadata = {
+      id: `test-${Date.now()}-${Math.random()}`,
+      content,
+      embedding: new Array(768).fill(0),
+      metadata: chunkingMetadata,
+    };
+
     // Add spatial context if requested
     if (options.includeSpatialData) {
-      metadata.world = options.worldName || 'TestWorld';
-      metadata.position = {
+      metadata.metadata.world = options.worldName || 'TestWorld';
+      metadata.metadata.position = {
         x: Math.floor(Math.random() * 1000) - 500,
         y: Math.floor(Math.random() * 256),
         z: Math.floor(Math.random() * 1000) - 500,
@@ -535,7 +542,7 @@ export class TestDataGenerator {
 
     // Recent memories (last 7 days)
     const recentMemories = memories.filter((m) => {
-      const age = Date.now() - m.metadata.timestamp;
+      const age = Date.now() - m.metadata.metadata.timestamp;
       return age < 7 * 24 * 60 * 60 * 1000; // 7 days
     });
 
@@ -566,11 +573,11 @@ export class TestDataGenerator {
     // Location-based queries
     const locationGroups = new Map<string, GeneratedMemory[]>();
     memories.forEach((memory) => {
-      if (memory.metadata.world) {
-        if (!locationGroups.has(memory.metadata.world)) {
-          locationGroups.set(memory.metadata.world, []);
+      if (memory.metadata.metadata.world) {
+        if (!locationGroups.has(memory.metadata.metadata.world)) {
+          locationGroups.set(memory.metadata.metadata.world, []);
         }
-        locationGroups.get(memory.metadata.world)!.push(memory);
+        locationGroups.get(memory.metadata.metadata.world)!.push(memory);
       }
     });
 

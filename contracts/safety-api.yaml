@@ -1,0 +1,529 @@
+openapi: 3.0.3
+info:
+  title: Safety System API
+  description: API for managing safety systems including fail-safes, monitoring, and privacy controls
+  version: 1.0.0
+  contact:
+    name: Conscious Bot Team
+    email: info@conscious-bot.dev
+
+servers:
+  - url: http://localhost:3002
+    description: Development server
+
+paths:
+  /health:
+    get:
+      summary: Health check endpoint
+      description: Returns the health status of the safety system
+      responses:
+        '200':
+          description: System is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: healthy
+                  system:
+                    type: string
+                    example: safety
+
+  /status:
+    get:
+      summary: Get system status
+      description: Retrieve the current status of the fail-safes system
+      responses:
+        '200':
+          description: System status information
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  timestamp:
+                    type: number
+                  overallHealth:
+                    type: string
+                    enum: [healthy, degraded, unhealthy, critical]
+                  currentMode:
+                    type: string
+                    enum: [full, basic, safe, emergency]
+                  activeEmergencies:
+                    type: array
+                    items:
+                      type: string
+                  componentStatuses:
+                    type: object
+                    additionalProperties:
+                      type: string
+                  resourceUsage:
+                    type: object
+
+  /health-check:
+    post:
+      summary: Perform health check
+      description: Perform a health check on system components
+      parameters:
+        - name: component
+          in: query
+          description: Specific component to check
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Health check results
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  overallStatus:
+                    type: string
+                  componentStatuses:
+                    type: object
+                  timestamp:
+                    type: number
+
+  /emergency:
+    post:
+      summary: Declare emergency
+      description: Declare a system emergency with specified type and severity
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                type:
+                  type: string
+                  enum: [system_failure, safety_violation, environmental_threat, performance_failure, security_incident, resource_exhaustion]
+                severity:
+                  type: string
+                  enum: [low, medium, high, critical]
+                description:
+                  type: string
+                context:
+                  type: object
+      responses:
+        '200':
+          description: Emergency declared successfully
+          content:
+            application/json:
+              schema:
+                type: string
+
+  /emergency/{id}/resolve:
+    post:
+      summary: Resolve emergency
+      description: Mark an emergency as resolved
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Emergency ID
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Emergency resolved successfully
+          content:
+            application/json:
+              schema:
+                type: boolean
+
+  /safe-mode:
+    post:
+      summary: Enter safe mode
+      description: Put the system into safe mode with specified reason
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reason:
+                  type: string
+                severity:
+                  type: string
+                  enum: [minimal, moderate, strict, lockdown]
+      responses:
+        '200':
+          description: System entered safe mode
+          content:
+            application/json:
+              schema:
+                type: boolean
+
+    delete:
+      summary: Exit safe mode
+      description: Exit safe mode and return to normal operation
+      responses:
+        '200':
+          description: System exited safe mode
+          content:
+            application/json:
+              schema:
+                type: boolean
+
+  /validate-action:
+    post:
+      summary: Validate action
+      description: Validate whether an action is allowed in current safety mode
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                action:
+                  type: string
+      responses:
+        '200':
+          description: Action validation result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  allowed:
+                    type: boolean
+                  reason:
+                    type: string
+                  requiresApproval:
+                    type: boolean
+
+  /resource-usage:
+    get:
+      summary: Get resource usage
+      description: Retrieve current resource usage information
+      responses:
+        '200':
+          description: Resource usage information
+          content:
+            application/json:
+              schema:
+                type: object
+
+  /resource-limits:
+    get:
+      summary: Get resource limits
+      description: Retrieve configured resource limits
+      responses:
+        '200':
+          description: Resource limits configuration
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  cpu:
+                    type: object
+                  memory:
+                    type: object
+                  disk:
+                    type: object
+                  network:
+                    type: object
+
+  /telemetry/metrics:
+    get:
+      summary: Get telemetry metrics
+      description: Retrieve telemetry metrics by name
+      parameters:
+        - name: metricName
+          in: query
+          required: true
+          description: Name of the metric to retrieve
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Telemetry metrics data
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+
+  /telemetry/aggregate:
+    get:
+      summary: Get aggregated telemetry metrics
+      description: Retrieve aggregated telemetry metrics for a time period
+      parameters:
+        - name: metricName
+          in: query
+          required: true
+          description: Name of the metric to aggregate
+          schema:
+            type: string
+        - name: period
+          in: query
+          required: true
+          description: Aggregation period
+          schema:
+            type: string
+            enum: [1s, 5s, 30s, 1m, 5m, 15m, 1h, 24h]
+      responses:
+        '200':
+          description: Aggregated telemetry metrics
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+
+  /telemetry/collect:
+    post:
+      summary: Collect telemetry data
+      description: Submit telemetry data for collection
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                metricName:
+                  type: string
+                value:
+                  type: number
+                timestamp:
+                  type: number
+                source:
+                  type: string
+                componentType:
+                  type: string
+                  enum: [core, world, memory, planning, interfaces, safety, external]
+                metadata:
+                  type: object
+      responses:
+        '200':
+          description: Telemetry data collected
+          content:
+            application/json:
+              schema:
+                type: object
+
+  /telemetry/flush:
+    post:
+      summary: Flush telemetry buffer
+      description: Force flush of buffered telemetry data
+      responses:
+        '200':
+          description: Telemetry buffer flushed
+          content:
+            application/json:
+              schema:
+                type: object
+
+  /privacy/consent:
+    post:
+      summary: Record consent
+      description: Record user consent for data processing
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                userId:
+                  type: string
+                consentType:
+                  type: string
+                granted:
+                  type: boolean
+                context:
+                  type: object
+      responses:
+        '200':
+          description: Consent recorded
+          content:
+            application/json:
+              schema:
+                type: object
+
+  /privacy/anonymize:
+    post:
+      summary: Anonymize data
+      description: Anonymize personal data according to privacy settings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                data:
+                  type: object
+                anonymizationLevel:
+                  type: string
+                  enum: [minimal, moderate, aggressive]
+      responses:
+        '200':
+          description: Data anonymized
+          content:
+            application/json:
+              schema:
+                type: object
+
+  /privacy/geofence/check:
+    post:
+      summary: Check geofence compliance
+      description: Check if location-based operations comply with geofence settings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                latitude:
+                  type: number
+                longitude:
+                  type: number
+                operation:
+                  type: string
+      responses:
+        '200':
+          description: Geofence compliance check result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  allowed:
+                    type: boolean
+                  reason:
+                    type: string
+
+  /privacy/rate-limit:
+    post:
+      summary: Check rate limit
+      description: Check if operation complies with rate limiting rules
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                operation:
+                  type: string
+                identifier:
+                  type: string
+      responses:
+        '200':
+          description: Rate limit check result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  allowed:
+                    type: boolean
+                  remainingRequests:
+                    type: number
+                  resetTime:
+                    type: number
+
+components:
+  schemas:
+    SystemStatus:
+      type: object
+      properties:
+        timestamp:
+          type: number
+        overallHealth:
+          type: string
+          enum: [healthy, degraded, unhealthy, critical]
+        currentMode:
+          type: string
+          enum: [full, basic, safe, emergency]
+        activeEmergencies:
+          type: array
+          items:
+            type: string
+        componentStatuses:
+          type: object
+          additionalProperties:
+            type: string
+        resourceUsage:
+          type: object
+
+    EmergencyDeclaration:
+      type: object
+      properties:
+        emergencyId:
+          type: string
+        type:
+          type: string
+          enum: [system_failure, safety_violation, environmental_threat, performance_failure, security_incident, resource_exhaustion]
+        severity:
+          type: string
+          enum: [low, medium, high, critical]
+        declaredAt:
+          type: number
+        declaredBy:
+          type: string
+        description:
+          type: string
+        context:
+          type: object
+        resolved:
+          type: boolean
+          default: false
+
+    SafeModeConfig:
+      type: object
+      properties:
+        severity:
+          type: string
+          enum: [minimal, moderate, strict, lockdown]
+        allowedActions:
+          type: array
+          items:
+            type: string
+        forbiddenActions:
+          type: array
+          items:
+            type: string
+        requireHumanApproval:
+          type: boolean
+          default: false
+        enableAutomaticReflexes:
+          type: boolean
+          default: true
+        monitoringFrequencyMs:
+          type: number
+          default: 5000
+        autoExitConditions:
+          type: array
+          items:
+            type: string
+
+    TelemetryData:
+      type: object
+      properties:
+        metricName:
+          type: string
+        value:
+          type: number
+        timestamp:
+          type: number
+        source:
+          type: string
+        componentType:
+          type: string
+          enum: [core, world, memory, planning, interfaces, safety, external]
+        metadata:
+          type: object
+

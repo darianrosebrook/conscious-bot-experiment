@@ -7,6 +7,7 @@
  * @author @darianrosebrook
  */
 
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { BotAdapter } from '../bot-adapter';
 import { ObservationMapper } from '../observation-mapper';
 import { ActionTranslator } from '../action-translator';
@@ -77,54 +78,98 @@ describe('Minecraft Interface - Standalone Tests', () => {
       username: 'TestBot',
       version: '1.20.1',
       auth: 'offline',
-      viewDistance: 'tiny',
-      chatLengthLimit: 100,
-      skipValidation: true,
-      connectTimeout: 30000,
-      keepAlive: true,
-      checkTimeoutInterval: 60000,
-      loadInternalPlugins: true,
-      plugins: {},
-      chat: 'enabled',
-      colorsEnabled: true,
-      logErrors: true,
-      hideErrors: false,
-      client: {
-        username: 'TestBot',
-        version: '1.20.1',
-        protocol: 763,
-      },
+      pathfindingTimeout: 30000,
+      actionTimeout: 10000,
+      observationRadius: 16,
+      autoReconnect: true,
+      maxReconnectAttempts: 5,
+      emergencyDisconnect: true,
     };
 
     botAdapter = new BotAdapter(config);
     observationMapper = new ObservationMapper(config);
-    actionTranslator = new ActionTranslator(config);
+
+    // Mock bot for ActionTranslator
+    const mockBot = {
+      entity: {
+        position: { x: 0, y: 64, z: 0, clone: () => ({ x: 0, y: 64, z: 0 }) },
+      },
+      loadPlugin: vi.fn(),
+    } as any;
+
+    // Skip ActionTranslator for now to focus on BotAdapter tests
+    // actionTranslator = new ActionTranslator(mockBot, config);
   });
 
   describe('BotAdapter', () => {
-    test('should create bot adapter with valid config', () => {
+    it('should create bot adapter with valid config', () => {
       expect(botAdapter).toBeDefined();
       expect(botAdapter.config).toEqual(config);
     });
 
-    test('should validate bot configuration', () => {
+    it('should validate bot configuration', () => {
       const validConfig = { ...config };
       expect(() => new BotAdapter(validConfig)).not.toThrow();
     });
 
-    test('should handle invalid configuration gracefully', () => {
+    it('should handle invalid configuration gracefully', () => {
       const invalidConfig = { ...config, host: '' };
       expect(() => new BotAdapter(invalidConfig)).not.toThrow();
+    });
+
+    it('should filter environmental observations by radius', () => {
+      // Test that events within radius are processed and events outside are ignored
+      const closePosition = { x: 5, y: 64, z: 5 }; // 5 blocks away
+      const farPosition = { x: 50, y: 64, z: 50 }; // 50 blocks away (beyond default radius of 16)
+
+      // Mock the bot entity position by setting it directly on the bot adapter
+      // We need to access the private bot property
+      (botAdapter as any).bot = {
+        entity: {
+          position: { x: 0, y: 64, z: 0 },
+        },
+        vec3: (x: number, y: number, z: number) => ({ x, y, z }),
+      } as any;
+
+      // Test close position (should be within radius)
+      expect(botAdapter.isWithinObservationRadius(closePosition)).toBe(true);
+
+      // Test far position (should be outside radius)
+      expect(botAdapter.isWithinObservationRadius(farPosition)).toBe(false);
+    });
+
+    it('should use configurable observation radius', () => {
+      const customConfig = { ...config, observationRadius: 32 };
+      const customBotAdapter = new BotAdapter(customConfig);
+
+      const closePosition = { x: 20, y: 64, z: 20 }; // 28.28 blocks away (diagonal, within 32)
+      const farPosition = { x: 50, y: 64, z: 50 }; // 70.71 blocks away (diagonal, beyond 32)
+
+      // Mock the bot entity position by setting it directly on the bot adapter
+      (customBotAdapter as any).bot = {
+        entity: {
+          position: { x: 0, y: 64, z: 0 },
+        },
+        vec3: (x: number, y: number, z: number) => ({ x, y, z }),
+      } as any;
+
+      // Test positions relative to custom radius (32 blocks)
+      expect(customBotAdapter.isWithinObservationRadius(closePosition)).toBe(
+        true
+      );
+      expect(customBotAdapter.isWithinObservationRadius(farPosition)).toBe(
+        false
+      );
     });
   });
 
   describe('ObservationMapper', () => {
-    test('should create observation mapper', () => {
+    it('should create observation mapper', () => {
       expect(observationMapper).toBeDefined();
       expect(observationMapper.config).toEqual(config);
     });
 
-    test('should map basic game state to cognitive context', () => {
+    it('should map basic game state to cognitive context', () => {
       const mockGameState = {
         position: { x: 10, y: 64, z: 10 },
         health: 20,
@@ -144,7 +189,7 @@ describe('Minecraft Interface - Standalone Tests', () => {
       expect(context.selfState.health).toBe(mockGameState.health);
     });
 
-    test('should handle empty game state', () => {
+    it('should handle empty game state', () => {
       const emptyState = {
         position: { x: 0, y: 64, z: 0 },
         health: 0,
@@ -163,12 +208,12 @@ describe('Minecraft Interface - Standalone Tests', () => {
   });
 
   describe('ActionTranslator', () => {
-    test('should create action translator', () => {
+    it('should create action translator', () => {
       expect(actionTranslator).toBeDefined();
       expect(actionTranslator.config).toEqual(config);
     });
 
-    test('should translate basic movement actions', () => {
+    it('should translate basic movement actions', () => {
       const movementAction = {
         type: 'move_forward',
         parameters: { distance: 5 },
@@ -181,7 +226,7 @@ describe('Minecraft Interface - Standalone Tests', () => {
       expect(Array.isArray(commands)).toBe(true);
     });
 
-    test('should translate mining actions', () => {
+    it('should translate mining actions', () => {
       const miningAction = {
         type: 'mine_block',
         parameters: {
@@ -196,7 +241,7 @@ describe('Minecraft Interface - Standalone Tests', () => {
       expect(Array.isArray(commands)).toBe(true);
     });
 
-    test('should handle unknown action types gracefully', () => {
+    it('should handle unknown action types gracefully', () => {
       const unknownAction = {
         type: 'unknown_action',
         parameters: {},
@@ -211,7 +256,7 @@ describe('Minecraft Interface - Standalone Tests', () => {
   });
 
   describe('Integration', () => {
-    test('should work together without planning system', () => {
+    it('should work together without planning system', () => {
       // Test that all components can be instantiated together
       expect(botAdapter).toBeDefined();
       expect(observationMapper).toBeDefined();

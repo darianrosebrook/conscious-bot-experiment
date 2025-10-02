@@ -448,16 +448,10 @@ export type MonitoringMetrics = z.infer<typeof MonitoringMetricsSchema>;
 export interface ITelemetryCollector {
   collect(data: TelemetryData): Promise<void>;
   collectBatch(data: TelemetryData[]): Promise<void>;
-  getMetrics(
-    metricName: string,
-    startTime: number,
-    endTime: number
-  ): Promise<TelemetryData[]>;
+  getMetrics(metricName: string): Promise<TelemetryData[]>;
   getAggregatedMetrics(
     metricName: string,
-    period: AggregationPeriod,
-    startTime: number,
-    endTime: number
+    period: AggregationPeriod
   ): Promise<AggregatedMetrics[]>;
   flush(): Promise<void>;
   getCollectionStats(): {

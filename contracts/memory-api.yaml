@@ -1,0 +1,488 @@
+openapi: 3.0.3
+info:
+  title: Memory System API
+  description: API for managing memory systems including episodic, semantic, and working memory
+  version: 1.0.0
+  contact:
+    name: Conscious Bot Team
+    email: info@conscious-bot.dev
+
+servers:
+  - url: http://localhost:3001
+    description: Development server
+
+paths:
+  /health:
+    get:
+      summary: Health check endpoint
+      description: Returns the health status of the memory system
+      responses:
+        '200':
+          description: System is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: healthy
+                  system:
+                    type: string
+                    example: memory
+
+  /state:
+    get:
+      summary: Get memory system state
+      description: Retrieve the current state of all memory subsystems
+      responses:
+        '200':
+          description: Memory system state
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  episodic:
+                    type: object
+                  semantic:
+                    type: object
+                  working:
+                    type: object
+                  skills:
+                    type: object
+
+  /telemetry:
+    get:
+      summary: Get memory system telemetry
+      description: Retrieve telemetry data from memory operations
+      responses:
+        '200':
+          description: Memory telemetry data
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  events:
+                    type: array
+                    items:
+                      type: object
+
+  /memory-enhanced-context:
+    post:
+      summary: Process enhanced memory context
+      description: Process and enhance memory context for better recall
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: Enhanced context processed
+          content:
+            application/json:
+              schema:
+                type: object
+
+  /search:
+    post:
+      summary: Search memory systems
+      description: Perform a search across all memory systems
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                query:
+                  type: string
+                context:
+                  type: object
+      responses:
+        '200':
+          description: Search results
+          content:
+            application/json:
+              schema:
+                type: object
+
+  /thought:
+    post:
+      summary: Record a thought in memory
+      description: Record a thought or cognitive event in memory
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                thought:
+                  type: string
+                context:
+                  type: object
+                importance:
+                  type: number
+      responses:
+        '200':
+          description: Thought recorded
+          content:
+            application/json:
+              schema:
+                type: object
+
+  /action:
+    post:
+      summary: Record an action in memory
+      description: Record an action taken by the system
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                action:
+                  type: string
+                parameters:
+                  type: object
+                outcome:
+                  type: string
+      responses:
+        '200':
+          description: Action recorded
+          content:
+            application/json:
+              schema:
+                type: object
+
+  /control:
+    post:
+      summary: Execute memory control operation
+      description: Execute a control operation on memory systems
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                action:
+                  type: string
+                parameters:
+                  type: object
+      responses:
+        '200':
+          description: Control operation executed
+          content:
+            application/json:
+              schema:
+                type: object
+
+  /skills:
+    get:
+      summary: Get registered skills
+      description: Retrieve all registered skills from the skill registry
+      responses:
+        '200':
+          description: List of registered skills
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Skill'
+
+    post:
+      summary: Register a new skill
+      description: Register a new skill in the memory system
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Skill'
+      responses:
+        '200':
+          description: Skill registered successfully
+          content:
+            application/json:
+              schema:
+                type: object
+
+  /skills/{id}:
+    get:
+      summary: Get specific skill
+      description: Retrieve detailed information about a specific skill
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Skill ID
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Skill details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Skill'
+
+  /skills/stats:
+    get:
+      summary: Get skill statistics
+      description: Retrieve statistics about skill usage and performance
+      responses:
+        '200':
+          description: Skill statistics
+          content:
+            application/json:
+              schema:
+                type: object
+
+  /skills/usage:
+    post:
+      summary: Record skill usage
+      description: Record the usage of a skill for analytics
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                skillId:
+                  type: string
+                success:
+                  type: boolean
+                duration:
+                  type: number
+      responses:
+        '200':
+          description: Skill usage recorded
+          content:
+            application/json:
+              schema:
+                type: object
+
+  /curriculum:
+    get:
+      summary: Get learning curriculum
+      description: Retrieve the current learning curriculum and progress
+      parameters:
+        - name: completedSkills
+          in: query
+          description: Filter by completed skills
+          schema:
+            type: array
+            items:
+              type: string
+      responses:
+        '200':
+          description: Curriculum information
+          content:
+            application/json:
+              schema:
+                type: object
+
+    post:
+      summary: Complete curriculum goal
+      description: Mark a curriculum goal as completed
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                goalId:
+                  type: string
+      responses:
+        '200':
+          description: Goal completed
+          content:
+            application/json:
+              schema:
+                type: object
+
+  /stats:
+    get:
+      summary: Get memory system statistics
+      description: Retrieve comprehensive statistics about all memory systems
+      responses:
+        '200':
+          description: Memory system statistics
+          content:
+            application/json:
+              schema:
+                type: object
+
+  /versioning/activate:
+    post:
+      summary: Activate memory versioning
+      description: Activate a specific memory namespace/version
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                worldSeed:
+                  type: string
+                worldName:
+                  type: string
+                sessionId:
+                  type: string
+      responses:
+        '200':
+          description: Memory versioning activated
+          content:
+            application/json:
+              schema:
+                type: object
+
+  /versioning/namespaces:
+    get:
+      summary: Get memory namespaces
+      description: Retrieve all available memory namespaces
+      responses:
+        '200':
+          description: List of memory namespaces
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: string
+
+  /versioning/active:
+    get:
+      summary: Get active namespace
+      description: Retrieve the currently active memory namespace
+      responses:
+        '200':
+          description: Active namespace information
+          content:
+            application/json:
+              schema:
+                type: string
+
+  /versioning/stats:
+    get:
+      summary: Get versioning statistics
+      description: Retrieve statistics about memory versioning
+      responses:
+        '200':
+          description: Versioning statistics
+          content:
+            application/json:
+              schema:
+                type: object
+
+  /enhanced/status:
+    get:
+      summary: Get enhanced memory status
+      description: Retrieve status of the enhanced memory system
+      responses:
+        '200':
+          description: Enhanced memory status
+          content:
+            application/json:
+              schema:
+                type: object
+
+  /enhanced/seed:
+    get:
+      summary: Get world seed information
+      description: Retrieve information about the current world seed
+      responses:
+        '200':
+          description: World seed information
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  worldSeed:
+                    type: string
+                  worldName:
+                    type: string
+
+  /enhanced/database:
+    get:
+      summary: Get database connection status
+      description: Retrieve information about database connections
+      responses:
+        '200':
+          description: Database connection information
+          content:
+            application/json:
+              schema:
+                type: object
+
+components:
+  schemas:
+    Skill:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        category:
+          type: string
+        implementation:
+          type: string
+        usageCount:
+          type: integer
+        successRate:
+          type: number
+        averageDuration:
+          type: number
+
+    MemorySearchQuery:
+      type: object
+      properties:
+        query:
+          type: string
+        context:
+          type: object
+        filters:
+          type: object
+        limit:
+          type: integer
+
+    Thought:
+      type: object
+      properties:
+        thought:
+          type: string
+        context:
+          type: object
+        importance:
+          type: number
+        timestamp:
+          type: string
+          format: date-time
+
+    Action:
+      type: object
+      properties:
+        action:
+          type: string
+        parameters:
+          type: object
+        outcome:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+

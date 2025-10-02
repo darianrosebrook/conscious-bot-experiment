@@ -9,6 +9,7 @@
 
 import { EventEmitter } from 'events';
 import { LLMInterface } from './cognitive-core/llm-interface';
+import { auditLogger } from './audit/thought-action-audit-logger';
 
 /**
  * Thought Deduplicator - Prevents repetitive thoughts to improve performance
@@ -363,7 +364,7 @@ export class EnhancedThoughtGenerator extends EventEmitter {
       ]);
 
       return {
-        id: `thought-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        id: `thought-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
         type: 'reflection',
         content: response.text.trim(),
         timestamp: Date.now(),
@@ -394,7 +395,7 @@ export class EnhancedThoughtGenerator extends EventEmitter {
       const fallbackContent = this.generateFallbackThought(context);
 
       return {
-        id: `thought-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        id: `thought-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
         type: 'reflection',
         content: fallbackContent,
         timestamp: Date.now(),
@@ -488,9 +489,8 @@ export class EnhancedThoughtGenerator extends EventEmitter {
       return `A friendly ${entity.type} is nearby. I should consider greeting them to maintain good relations.`;
     } else if (distance < 8) {
       return `There's an unknown ${entity.type} ${distance} blocks away. I should observe it briefly to determine if acknowledgment is warranted.`;
-    } else {
-      return `A ${entity.type} is ${distance} blocks away. It's probably not close enough to require immediate acknowledgment.`;
     }
+    return `A ${entity.type} is ${distance} blocks away. It's probably not close enough to require immediate acknowledgment.`;
   }
 
   /**
@@ -550,6 +550,8 @@ export class EnhancedThoughtGenerator extends EventEmitter {
     task: any,
     context: ThoughtContext
   ): Promise<CognitiveThought> {
+    const startTime = Date.now();
+
     try {
       const progress = task.progress || 0;
       const steps = task.steps || [];
@@ -600,14 +602,13 @@ export class EnhancedThoughtGenerator extends EventEmitter {
         ),
       ]);
 
-      return {
+      const thought: CognitiveThought = {
         id: `thought-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
-        type:
-          progress === 0
-            ? 'planning'
-            : progress === 1
-              ? 'reflection'
-              : 'observation',
+        type: (progress === 0
+          ? 'planning'
+          : progress === 1
+            ? 'reflection'
+            : 'observation') as CognitiveThought['type'],
         content: response.text.trim(),
         timestamp: Date.now(),
         context: {
@@ -642,7 +643,7 @@ export class EnhancedThoughtGenerator extends EventEmitter {
           llmConfidence: response.confidence,
           model: response.model,
         },
-        category: 'task-related',
+        category: 'task-related' as CognitiveThought['category'],
         tags: [
           progress === 0
             ? 'planning'
@@ -654,13 +655,33 @@ export class EnhancedThoughtGenerator extends EventEmitter {
         ],
         priority: 'medium',
       };
+
+      // Log thought generation for audit trail
+      auditLogger.log(
+        'thought_generated',
+        {
+          thoughtContent: thought.content,
+          thoughtType: thought.type,
+          thoughtCategory: thought.category,
+          taskId: task.id,
+          taskTitle: task.title,
+          progress: progress,
+          confidence: response.confidence,
+        },
+        {
+          success: true,
+          duration: Date.now() - startTime,
+        }
+      );
+
+      return thought;
     } catch (error) {
       console.error('Failed to generate task thought with LLM:', error);
 
       // Fallback to basic task thought
       const progress = task.progress || 0;
       return {
-        id: `thought-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        id: `thought-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
         type:
           progress === 0
             ? 'planning'
@@ -746,7 +767,7 @@ export class EnhancedThoughtGenerator extends EventEmitter {
       ]);
 
       return {
-        id: `social-consideration-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        id: `social-consideration-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
         type: 'social_consideration',
         content: response.text.trim(),
         timestamp: Date.now(),
@@ -783,7 +804,7 @@ export class EnhancedThoughtGenerator extends EventEmitter {
       const fallbackContent = this.generateSocialConsiderationFallback(entity);
 
       return {
-        id: `social-consideration-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        id: `social-consideration-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
         type: 'social_consideration',
         content: fallbackContent,
         timestamp: Date.now(),
@@ -865,7 +886,7 @@ export class EnhancedThoughtGenerator extends EventEmitter {
       ]);
 
       return {
-        id: `thought-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        id: `thought-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
         type: eventType === 'damage_taken' ? 'reflection' : 'observation',
         content: response.text.trim(),
         timestamp: Date.now(),
@@ -909,7 +930,7 @@ export class EnhancedThoughtGenerator extends EventEmitter {
       }
 
       return {
-        id: `thought-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        id: `thought-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
         type: eventType === 'damage_taken' ? 'reflection' : 'observation',
         content,
         timestamp: Date.now(),

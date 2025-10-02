@@ -1,0 +1,316 @@
+openapi: 3.0.3
+info:
+  title: Core Capability Registry API
+  description: API for managing dynamic capabilities in the Conscious Bot system
+  version: 1.0.0
+  contact:
+    name: Conscious Bot Team
+    email: info@conscious-bot.dev
+
+servers:
+  - url: http://localhost:3000
+    description: Development server
+
+security:
+  - bearerAuth: []
+
+paths:
+  /health:
+    get:
+      summary: Health check endpoint
+      description: Returns the health status of the core capability registry system
+      responses:
+        '200':
+          description: System is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: healthy
+                  system:
+                    type: string
+                    example: core-capability-registry
+                  timestamp:
+                    type: string
+                    format: date-time
+
+  /capabilities:
+    get:
+      summary: List capabilities
+      description: Retrieve a list of all registered capabilities with optional filtering
+      parameters:
+        - name: status
+          in: query
+          description: Filter by capability status
+          schema:
+            type: string
+            enum: [active, retired, draft]
+        - name: type
+          in: query
+          description: Filter by capability type
+          schema:
+            type: string
+            enum: [option, leaf]
+        - name: limit
+          in: query
+          description: Maximum number of results to return
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 50
+      responses:
+        '200':
+          description: List of capabilities
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  capabilities:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Capability'
+                  total:
+                    type: integer
+                  page:
+                    type: integer
+                  limit:
+                    type: integer
+
+    post:
+      summary: Register a new capability option
+      description: Register a new capability option authored by an LLM
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CapabilityOption'
+      responses:
+        '201':
+          description: Capability option registered successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  capabilityId:
+                    type: string
+                  message:
+                    type: string
+
+  /capabilities/leaf/register:
+    post:
+      summary: Register a new leaf capability
+      description: Register a new leaf capability with implementation details
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LeafCapability'
+      responses:
+        '201':
+          description: Leaf capability registered successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  capabilityId:
+                    type: string
+                  message:
+                    type: string
+
+  /capabilities/{id}:
+    get:
+      summary: Get specific capability
+      description: Retrieve detailed information about a specific capability
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Capability ID
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Capability details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Capability'
+        '404':
+          description: Capability not found
+
+    post:
+      summary: Promote a capability
+      description: Promote a capability from draft to active status
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Capability ID
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Capability promoted successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+
+  /capabilities/{id}/retire:
+    post:
+      summary: Retire a capability
+      description: Mark a capability as retired
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Capability ID
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Capability retired successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+
+  /capabilities/stats:
+    get:
+      summary: Get capability statistics
+      description: Retrieve statistics about the capability registry
+      responses:
+        '200':
+          description: Capability statistics
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  totalCapabilities:
+                    type: integer
+                  activeCapabilities:
+                    type: integer
+                  retiredCapabilities:
+                    type: integer
+                  draftCapabilities:
+                    type: integer
+                  capabilitiesByType:
+                    type: object
+                    additionalProperties:
+                      type: integer
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      description: Bearer token authentication using trusted signer API key
+
+  schemas:
+    Capability:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        type:
+          type: string
+          enum: [option, leaf]
+        status:
+          type: string
+          enum: [active, retired, draft]
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        author:
+          type: string
+        version:
+          type: string
+        metadata:
+          type: object
+          additionalProperties: true
+
+    CapabilityOption:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        optionContent:
+          type: string
+        author:
+          type: string
+        metadata:
+          type: object
+          additionalProperties: true
+
+    LeafCapability:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        implementation:
+          type: string
+        context:
+          type: object
+          properties:
+            componentType:
+              type: string
+            domain:
+              type: string
+            priority:
+              type: number
+        author:
+          type: string
+        metadata:
+          type: object
+          additionalProperties: true
+
+    Error:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+        error:
+          type: string
+        message:
+          type: string
+

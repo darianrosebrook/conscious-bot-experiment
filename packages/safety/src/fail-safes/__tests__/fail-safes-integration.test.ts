@@ -10,6 +10,7 @@ import { WatchdogManager } from '../watchdog-manager';
 import { PreemptionManager } from '../preemption-manager';
 import { EmergencyResponseCoordinator } from '../emergency-response';
 import {
+  // eslint-disable-next-line no-unused-vars
   FailureType,
   FailSafeHealthStatus,
   PreemptionPriority,

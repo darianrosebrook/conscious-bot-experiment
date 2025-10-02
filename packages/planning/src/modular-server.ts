@@ -247,24 +247,20 @@ const MCP_ONLY = String(process.env.MCP_ONLY || '').toLowerCase() === 'true';
 
 const toolExecutor = {
   async execute(tool: string, args: Record<string, any>, signal?: AbortSignal) {
-    if (!tool.startsWith('minecraft.')) {
-      return {
-        ok: false,
-        data: null,
-        environmentDeltas: {},
-        error: 'Unsupported tool namespace',
-        confidence: 0,
-        cost: 1,
-        duration: 0,
-        metadata: { reason: 'unsupported_namespace' },
-      };
-    }
-    console.log(`Executing tool: ${tool} with args:`, args);
+    // Normalize tool name: add minecraft. prefix if not present
+    const normalizedTool = tool.startsWith('minecraft.')
+      ? tool
+      : `minecraft.${tool}`;
+
+    console.log(
+      `[toolExecutor] Executing tool: ${tool} (normalized: ${normalizedTool}) with args:`,
+      args
+    );
 
     const startTime = Date.now();
     try {
       // Map BT actions to Minecraft actions
-      const mappedAction = mapBTActionToMinecraft(tool, args);
+      const mappedAction = mapBTActionToMinecraft(normalizedTool, args);
 
       if (!mappedAction) {
         return {
@@ -281,18 +277,22 @@ const toolExecutor = {
 
       // Prefer MCP path when available; fall back to direct action only if MCP_ONLY is false
       if (MCP_ONLY) {
-        console.log(
-          'MCP_ONLY=true; toolExecutor will not use direct /action fallback'
+        console.warn(
+          '⚠️ [toolExecutor] MCP_ONLY=true; toolExecutor will not use direct /action fallback. Set MCP_ONLY=false to enable direct execution.'
         );
         return {
           ok: false,
           data: null,
           environmentDeltas: {},
-          error: 'Direct action disabled (MCP_ONLY) — use MCP option execution',
+          error:
+            'Direct action disabled (MCP_ONLY) — use MCP option execution or set MCP_ONLY=false',
           confidence: 0,
           cost: 1,
           duration: Date.now() - startTime,
-          metadata: { reason: 'mcp_only_disabled' },
+          metadata: {
+            reason: 'mcp_only_disabled',
+            hint: 'Set environment variable MCP_ONLY=false to enable direct execution',
+          },
         };
       }
 
@@ -301,17 +301,45 @@ const toolExecutor = {
       const duration = Date.now() - startTime;
 
       // Enhance result with metrics
-      return {
+      const enhancedResult = {
         ...result,
         confidence: result.ok ? 0.8 : 0.2, // Basic confidence based on success
         cost: 1, // Base cost for all actions
         duration,
         metadata: {
-          tool,
+          originalTool: tool,
+          normalizedTool,
           args,
           mappedAction: mappedAction.type,
         },
       };
+
+      // Log tool execution for audit trail
+      import('../cognition/src/audit/thought-action-audit-logger')
+        .then(({ auditLogger }) => {
+          auditLogger.log(
+            'tool_executed',
+            {
+              originalTool: tool,
+              normalizedTool,
+              mappedAction: mappedAction.type,
+              args,
+              resultOk: result.ok,
+              resultData: result.data,
+              resultError: result.error,
+              duration,
+            },
+            {
+              success: result.ok,
+              duration,
+            }
+          );
+        })
+        .catch(() => {
+          // Silently fail if audit logger not available
+        });
+
+      return enhancedResult;
     } catch (error) {
       const duration = Date.now() - startTime;
       console.error(`Tool execution failed for ${tool}:`, error);
@@ -667,6 +695,30 @@ async function recomputeProgressAndMaybeComplete(task: any) {
     const allStepsComplete = task.steps.every((s: any) => s.done);
     if (canComplete && allStepsComplete) {
       enhancedTaskIntegration.updateTaskProgress(task.id, 1, 'completed');
+
+      // Log action completion for audit trail
+      import('../cognition/src/audit/thought-action-audit-logger')
+        .then(({ auditLogger }) => {
+          auditLogger.log(
+            'action_completed',
+            {
+              taskId: task.id,
+              taskTitle: task.title,
+              taskType: task.type,
+              finalProgress: 1,
+              finalStatus: 'completed',
+              requirement: requirement,
+              progressBefore: task.progress,
+            },
+            {
+              success: true,
+              duration: Date.now() - (task.createdAt || Date.now()),
+            }
+          );
+        })
+        .catch(() => {
+          // Silently fail if audit logger not available
+        });
     }
   } catch (e) {
     console.warn('Progress recompute failed:', e);
@@ -1486,7 +1538,9 @@ async function autonomousTaskExecutor() {
         `🤖 [AUTONOMOUS EXECUTOR] Found ${activeTasks.length} active tasks`
       );
       if (activeTasks.length > 0) {
-        console.log(`🤖 [AUTONOMOUS EXECUTOR] Top task: ${activeTasks[0].title}`);
+        console.log(
+          `🤖 [AUTONOMOUS EXECUTOR] Top task: ${activeTasks[0].title}`
+        );
       }
       global.lastTaskCount = activeTasks.length;
       global.lastTaskCountLog = now;
@@ -1519,7 +1573,9 @@ async function autonomousTaskExecutor() {
       }
       return;
     } else {
-      console.log(`🤖 [AUTONOMOUS EXECUTOR] Found ${activeTasks.length} active tasks, executing...`);
+      console.log(
+        `🤖 [AUTONOMOUS EXECUTOR] Found ${activeTasks.length} active tasks, executing...`
+      );
     }
 
     // Execute the highest priority task, prioritizing prerequisite tasks
@@ -1610,7 +1666,9 @@ async function autonomousTaskExecutor() {
     } else {
       const st = global.__planningExecutorState;
       if (st.breaker !== 'closed') {
-        console.log(`🤖 [AUTONOMOUS EXECUTOR] Circuit breaker was ${st.breaker}, closing it`);
+        console.log(
+          `🤖 [AUTONOMOUS EXECUTOR] Circuit breaker was ${st.breaker}, closing it`
+        );
         console.log('✅ Bot reachable — closing circuit');
         st.breaker = 'closed';
         st.failures = 0;
@@ -2999,13 +3057,20 @@ async function startServer() {
 
     // Start autonomous task executor (singleton; supports hot-reload)
     console.log('🚀 Starting autonomous task executor...');
-    console.log('📊 Enhanced task integration has', enhancedTaskIntegration.getActiveTasks().length, 'active tasks');
+    console.log(
+      '📊 Enhanced task integration has',
+      enhancedTaskIntegration.getActiveTasks().length,
+      'active tasks'
+    );
     console.log('🔧 Initializing autonomous executor state...');
     if (global.__planningInterval) clearInterval(global.__planningInterval);
     global.__planningInterval = setInterval(async () => {
       try {
         console.log('⏰ Autonomous executor timer fired...');
-        console.log('📊 Current task count:', enhancedTaskIntegration.getActiveTasks().length);
+        console.log(
+          '📊 Current task count:',
+          enhancedTaskIntegration.getActiveTasks().length
+        );
         const st = global.__planningExecutorState!;
         // exponential backoff while breaker is open
         if (st?.breaker === 'open') {

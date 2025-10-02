@@ -16,6 +16,7 @@ import {
   SafeModeValidation,
   SafeModeEvent,
   SafeModeSeverity,
+  Checkpoint,
   validateEmergencyDeclaration,
   validateSafeModeConfig,
 } from './types';
@@ -202,6 +203,13 @@ class EmergencyNotificationManager {
       channelStats,
     };
   }
+
+  /**
+   * Get registered channels
+   */
+  getChannels(): Map<string, NotificationChannel> {
+    return this.channels;
+  }
 }
 
 /**
@@ -212,6 +220,7 @@ class SafeModeManager extends EventEmitter {
   private isActive = false;
   private enteredAt?: number;
   private triggerReason?: string;
+  private events: SafeModeEvent[];
   private blockedActions: Array<{
     actionId: string;
     actionType: string;
@@ -231,6 +240,7 @@ class SafeModeManager extends EventEmitter {
   constructor(config: SafeModeConfig) {
     super();
     this.config = validateSafeModeConfig(config);
+    this.events = [];
     this.blockedActions = [];
     this.pendingApprovals = new Map();
   }
@@ -258,6 +268,8 @@ class SafeModeManager extends EventEmitter {
       severity: this.config.severity,
       triggerReason: reason,
     };
+
+    this.events.push(event);
 
     this.emit('safe-mode-entered', {
       event,
@@ -292,6 +304,8 @@ class SafeModeManager extends EventEmitter {
       severity: this.config.severity,
       triggerReason: reason,
     };
+
+    this.events.push(event);
 
     this.emit('safe-mode-exited', {
       event,
@@ -512,6 +526,13 @@ class SafeModeManager extends EventEmitter {
     };
   }
 
+  /**
+   * Get current mode string
+   */
+  getCurrentMode(): string {
+    return this.isActive ? 'safe' : 'normal';
+  }
+
   private recordBlockedAction(
     actionId: string,
     actionType: string,
@@ -538,6 +559,8 @@ class SafeModeManager extends EventEmitter {
       actionContext: { actionId, actionType },
     };
 
+    this.events.push(event);
+
     this.emit('action-blocked', { event, actionId, actionType, reason });
   }
 
@@ -552,6 +575,13 @@ class SafeModeManager extends EventEmitter {
     ];
 
     return riskyActions.some((risky) => actionType.includes(risky));
+  }
+
+  /**
+   * Get safe mode events
+   */
+  getEvents(): SafeModeEvent[] {
+    return this.events;
   }
 }
 
@@ -944,5 +974,67 @@ export class EmergencyResponseCoordinator extends EventEmitter {
     this.escalationTimers.clear();
 
     this.removeAllListeners();
+  }
+
+  /**
+   * Get notification channels
+   */
+  getNotificationChannels(): NotificationChannel[] {
+    return Array.from(this.notificationManager.getChannels().values());
+  }
+
+  /**
+   * Add emergency protocol
+   */
+  addEmergencyProtocol(protocol: EmergencyProtocol): boolean {
+    try {
+      // Basic validation
+      if (!protocol.protocolId || !protocol.emergencyType) {
+        return false;
+      }
+
+      this.protocols.set(protocol.protocolId, protocol);
+      return true;
+    } catch (error) {
+      return false;
+    }
+  }
+
+  /**
+   * Get emergency protocols
+   */
+  getEmergencyProtocols(): EmergencyProtocol[] {
+    return Array.from(this.protocols.values());
+  }
+
+  /**
+   * Get safe mode events
+   */
+  getSafeModeEvents(): SafeModeEvent[] {
+    return this.safeModeManager.getEvents();
+  }
+
+  /**
+   * Create checkpoint
+   */
+  createCheckpoint(reason: string): string {
+    const checkpointId = `checkpoint_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+    const checkpoint = {
+      checkpointId,
+      type: 'manual' as const,
+      createdAt: Date.now(),
+      reason,
+      state: {
+        activeEmergencies: Array.from(this.activeEmergencies.keys()),
+        currentMode: this.safeModeManager.getCurrentMode(),
+        protocolCount: this.protocols.size,
+      },
+    };
+
+    // Store checkpoint (in a real implementation, this would be persisted)
+    this.emit('checkpoint-created', checkpoint);
+
+    return checkpointId;
   }
 }

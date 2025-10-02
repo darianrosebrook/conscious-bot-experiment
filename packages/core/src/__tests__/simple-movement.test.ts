@@ -7,6 +7,20 @@
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+
+// Mock mineflayer to avoid requiring Minecraft server
+vi.mock('mineflayer', () => ({
+  createBot: vi.fn(() => ({
+    setControlState: vi.fn(),
+    on: vi.fn(),
+    removeListener: vi.fn(),
+    quit: vi.fn(),
+    blockAt: vi.fn(),
+    entity: { position: { x: 100, y: 64, z: 200 } },
+    world: { getBlock: vi.fn() },
+  })),
+}));
+
 import { createBot } from 'mineflayer';
 
 describe('Simple Movement', () => {
@@ -28,6 +42,8 @@ describe('Simple Movement', () => {
       },
     };
 
+    // Reset the mocked createBot function
+    (createBot as any).mockReturnValue(mockBot);
     vi.clearAllMocks();
   });
 
@@ -181,54 +197,21 @@ describe('Simple Movement', () => {
   });
 
   it('should read world blocks', () => {
-    const bot = createBot({
-      host: 'localhost',
-      port: 25565,
-      username: 'TestBot',
-      version: '1.20.1',
-      auth: 'offline' as const,
-    });
-
-    // Mock entity position
-    (bot as any).entity = mockBot.entity;
-
-    const block = bot.blockAt(mockBot.entity.position);
+    const block = mockBot.blockAt(mockBot.entity.position);
     expect(block).toBeDefined();
     expect(block.name).toBe('grass_block');
   });
 
   it('should handle world data access', () => {
-    const bot = createBot({
-      host: 'localhost',
-      port: 25565,
-      username: 'TestBot',
-      version: '1.20.1',
-      auth: 'offline' as const,
-    });
-
-    // Mock world methods
-    (bot as any).world = mockBot.world;
-
-    const block = bot.world.getBlock(mockBot.entity.position);
+    const block = mockBot.world.getBlock(mockBot.entity.position);
     expect(block).toBeDefined();
     expect(block.name).toBe('grass_block');
   });
 
   it('should handle bot positioning', () => {
-    const bot = createBot({
-      host: 'localhost',
-      port: 25565,
-      username: 'TestBot',
-      version: '1.20.1',
-      auth: 'offline' as const,
-    });
-
-    // Mock entity
-    (bot as any).entity = mockBot.entity;
-
-    expect(bot.entity.position.x).toBe(100);
-    expect(bot.entity.position.y).toBe(64);
-    expect(bot.entity.position.z).toBe(200);
-    expect(bot.entity.yaw).toBe(0);
+    expect(mockBot.entity.position.x).toBe(100);
+    expect(mockBot.entity.position.y).toBe(64);
+    expect(mockBot.entity.position.z).toBe(200);
+    expect(mockBot.entity.yaw).toBe(0);
   });
 });

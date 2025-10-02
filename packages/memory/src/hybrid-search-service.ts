@@ -101,6 +101,7 @@ export interface HybridSearchResponse {
   results: HybridSearchResult[];
   totalFound: number;
   searchTime: number;
+  length: number; // Add length property for compatibility
 
   // Metadata
   strategy: {
@@ -217,6 +218,7 @@ export class HybridSearchService {
       results: finalResults,
       totalFound: combinedResults.length,
       searchTime: totalTime,
+      length: finalResults.length, // Add length property
       strategy: {
         graphWeight: searchOptions.graphWeight || 0,
         vectorWeight: searchOptions.vectorWeight || 0,

@@ -12,7 +12,7 @@ import {
   MemorySignalGenerator,
   CognitiveTaskMemoryManager,
   ReflectionMemoryManager,
-} from './enhanced-memory-system';
+} from './memory-system';
 import { createDefaultMemorySystem } from './index';
 // Temporary local type definitions until @conscious-bot/core is available
 export interface Signal {

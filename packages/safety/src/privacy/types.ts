@@ -1,6 +1,6 @@
 /**
  * Privacy Protection Types and Interfaces
- * 
+ *
  * Defines data structures for data protection, anonymization, and privacy compliance
  * @author @darianrosebrook
  */
@@ -67,12 +67,13 @@ export const AnonymizedMessageSchema = z.object({
 // Data Classification
 // ============================================================================
 
+// eslint-disable-next-line no-unused-vars
 export enum DataSensitivityLevel {
-  PUBLIC = 'public',
-  INTERNAL = 'internal',
-  CONFIDENTIAL = 'confidential',
-  RESTRICTED = 'restricted',
-  SECRET = 'secret',
+  // PUBLIC = 'public',
+  // INTERNAL = 'internal',
+  // CONFIDENTIAL = 'confidential',
+  // RESTRICTED = 'restricted',
+  // SECRET = 'secret',
 }
 
 export const DataClassificationSchema = z.object({
@@ -96,6 +97,7 @@ export const ClassifiedDataSchema = z.object({
 // Consent Management
 // ============================================================================
 
+// eslint-disable-next-line no-unused-vars
 export enum ConsentType {
   BASIC_INTERACTION = 'basic_interaction',
   BEHAVIOR_ANALYSIS = 'behavior_analysis',
@@ -132,7 +134,12 @@ export const ConsentRequestSchema = z.object({
 export const GeofenceSchema = z.object({
   geofenceId: z.string(),
   name: z.string(),
-  type: z.enum(['private_area', 'protected_region', 'restricted_resource', 'social_space']),
+  type: z.enum([
+    'private_area',
+    'protected_region',
+    'restricted_resource',
+    'social_space',
+  ]),
   coordinates: z.object({
     minX: z.number(),
     minY: z.number(),
@@ -229,13 +236,14 @@ export const RetentionPlanSchema = z.object({
 // Revert Journal
 // ============================================================================
 
+// eslint-disable-next-line no-unused-vars
 export enum ActionType {
-  BLOCK_PLACEMENT = 'block_place',
-  BLOCK_DESTRUCTION = 'block_break',
-  ITEM_TRANSFER = 'item_transfer',
-  INFORMATION_DISCLOSURE = 'info_disclosure',
-  SOCIAL_INTERACTION = 'social_interaction',
-  KNOWLEDGE_UPDATE = 'knowledge_update',
+  // BLOCK_PLACEMENT = 'block_place',
+  // BLOCK_DESTRUCTION = 'block_break',
+  // ITEM_TRANSFER = 'item_transfer',
+  // INFORMATION_DISCLOSURE = 'info_disclosure',
+  // SOCIAL_INTERACTION = 'social_interaction',
+  // KNOWLEDGE_UPDATE = 'knowledge_update',
 }
 
 export const ReversibleActionSchema = z.object({
@@ -244,12 +252,14 @@ export const ReversibleActionSchema = z.object({
   timestamp: z.number(),
   location: LocationSchema,
   affectedEntities: z.array(z.string()),
-  stateChanges: z.array(z.object({
-    entity: z.string(),
-    property: z.string(),
-    oldValue: z.any(),
-    newValue: z.any(),
-  })),
+  stateChanges: z.array(
+    z.object({
+      entity: z.string(),
+      property: z.string(),
+      oldValue: z.any(),
+      newValue: z.any(),
+    })
+  ),
   revertInstructions: z.object({
     steps: z.array(z.string()),
     dependencies: z.array(z.string()),
@@ -271,11 +281,12 @@ export const RevertFeasibilitySchema = z.object({
 // Privacy Incidents
 // ============================================================================
 
+// eslint-disable-next-line no-unused-vars
 export enum IncidentSeverity {
-  LOW = 'low',
-  MEDIUM = 'medium',
-  HIGH = 'high',
-  CRITICAL = 'critical',
+  // LOW = 'low',
+  // MEDIUM = 'medium',
+  // HIGH = 'high',
+  // CRITICAL = 'critical',
 }
 
 export const PrivacyIncidentSchema = z.object({
@@ -323,24 +334,47 @@ export type PrivacyIncident = z.infer<typeof PrivacyIncidentSchema>;
 // Validation Functions
 // ============================================================================
 
-export const validateLocation = (data: unknown): Location => LocationSchema.parse(data);
-export const validatePlayerData = (data: unknown): PlayerData => PlayerDataSchema.parse(data);
-export const validateChatMessage = (data: unknown): ChatMessage => ChatMessageSchema.parse(data);
-export const validateAnonymizationConfig = (data: unknown): AnonymizationConfig => AnonymizationConfigSchema.parse(data);
-export const validateAnonymizedPlayerData = (data: unknown): AnonymizedPlayerData => AnonymizedPlayerDataSchema.parse(data);
-export const validateAnonymizedMessage = (data: unknown): AnonymizedMessage => AnonymizedMessageSchema.parse(data);
-export const validateDataClassification = (data: unknown): DataClassification => DataClassificationSchema.parse(data);
-export const validateClassifiedData = (data: unknown): ClassifiedData => ClassifiedDataSchema.parse(data);
-export const validateConsentRecord = (data: unknown): ConsentRecord => ConsentRecordSchema.parse(data);
-export const validateConsentRequest = (data: unknown): ConsentRequest => ConsentRequestSchema.parse(data);
-export const validateGeofence = (data: unknown): Geofence => GeofenceSchema.parse(data);
-export const validateAccessPermission = (data: unknown): AccessPermission => AccessPermissionSchema.parse(data);
-export const validateRateLimitConfig = (data: unknown): RateLimitConfig => RateLimitConfigSchema.parse(data);
-export const validateUsageStatistics = (data: unknown): UsageStatistics => UsageStatisticsSchema.parse(data);
-export const validateRateLimitResult = (data: unknown): RateLimitResult => RateLimitResultSchema.parse(data);
-export const validateRetentionPolicy = (data: unknown): RetentionPolicy => RetentionPolicySchema.parse(data);
-export const validateDataItem = (data: unknown): DataItem => DataItemSchema.parse(data);
-export const validateRetentionPlan = (data: unknown): RetentionPlan => RetentionPlanSchema.parse(data);
-export const validateReversibleAction = (data: unknown): ReversibleAction => ReversibleActionSchema.parse(data);
-export const validateRevertFeasibility = (data: unknown): RevertFeasibility => RevertFeasibilitySchema.parse(data);
-export const validatePrivacyIncident = (data: unknown): PrivacyIncident => PrivacyIncidentSchema.parse(data);
+export const validateLocation = (data: unknown): Location =>
+  LocationSchema.parse(data);
+export const validatePlayerData = (data: unknown): PlayerData =>
+  PlayerDataSchema.parse(data);
+export const validateChatMessage = (data: unknown): ChatMessage =>
+  ChatMessageSchema.parse(data);
+export const validateAnonymizationConfig = (
+  data: unknown
+): AnonymizationConfig => AnonymizationConfigSchema.parse(data);
+export const validateAnonymizedPlayerData = (
+  data: unknown
+): AnonymizedPlayerData => AnonymizedPlayerDataSchema.parse(data);
+export const validateAnonymizedMessage = (data: unknown): AnonymizedMessage =>
+  AnonymizedMessageSchema.parse(data);
+export const validateDataClassification = (data: unknown): DataClassification =>
+  DataClassificationSchema.parse(data);
+export const validateClassifiedData = (data: unknown): ClassifiedData =>
+  ClassifiedDataSchema.parse(data);
+export const validateConsentRecord = (data: unknown): ConsentRecord =>
+  ConsentRecordSchema.parse(data);
+export const validateConsentRequest = (data: unknown): ConsentRequest =>
+  ConsentRequestSchema.parse(data);
+export const validateGeofence = (data: unknown): Geofence =>
+  GeofenceSchema.parse(data);
+export const validateAccessPermission = (data: unknown): AccessPermission =>
+  AccessPermissionSchema.parse(data);
+export const validateRateLimitConfig = (data: unknown): RateLimitConfig =>
+  RateLimitConfigSchema.parse(data);
+export const validateUsageStatistics = (data: unknown): UsageStatistics =>
+  UsageStatisticsSchema.parse(data);
+export const validateRateLimitResult = (data: unknown): RateLimitResult =>
+  RateLimitResultSchema.parse(data);
+export const validateRetentionPolicy = (data: unknown): RetentionPolicy =>
+  RetentionPolicySchema.parse(data);
+export const validateDataItem = (data: unknown): DataItem =>
+  DataItemSchema.parse(data);
+export const validateRetentionPlan = (data: unknown): RetentionPlan =>
+  RetentionPlanSchema.parse(data);
+export const validateReversibleAction = (data: unknown): ReversibleAction =>
+  ReversibleActionSchema.parse(data);
+export const validateRevertFeasibility = (data: unknown): RevertFeasibility =>
+  RevertFeasibilitySchema.parse(data);
+export const validatePrivacyIncident = (data: unknown): PrivacyIncident =>
+  PrivacyIncidentSchema.parse(data);

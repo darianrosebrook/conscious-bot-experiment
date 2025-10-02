@@ -15,13 +15,15 @@
     "security-scan": "echo 'Security scan completed - no vulnerabilities found'"
   },
   "dependencies": {
-    "zod": "^3.22.4",
+    "eventemitter3": "^5.0.1",
     "uuid": "^9.0.1",
-    "eventemitter3": "^5.0.1"
+    "zod": "^3.22.4"
   },
   "devDependencies": {
+    "@testcontainers/postgresql": "^11.6.0",
     "@types/node": "^20.11.24",
     "@types/uuid": "^9.0.8",
+    "testcontainers": "^11.6.0",
     "typescript": "^5.3.3",
     "vitest": "^3.2.4"
   }

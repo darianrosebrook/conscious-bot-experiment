@@ -504,20 +504,13 @@ export class NeuroscienceConsolidationManager {
   private async assessOverallHealth(): Promise<
     'healthy' | 'degraded' | 'unhealthy'
   > {
-    const status = await this.getStatus();
     const insights = await this.getConsolidationInsights();
 
-    if (
-      status.consolidationHealth === 'unhealthy' ||
-      insights.memoryHealth.overallScore < 0.4
-    ) {
+    if (insights.memoryHealth.overallScore < 0.4) {
       return 'unhealthy';
     }
 
-    if (
-      status.consolidationHealth === 'degraded' ||
-      insights.memoryHealth.overallScore < 0.6
-    ) {
+    if (insights.memoryHealth.overallScore < 0.6) {
       return 'degraded';
     }
 

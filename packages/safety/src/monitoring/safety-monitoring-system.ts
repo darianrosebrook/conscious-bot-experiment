@@ -345,7 +345,6 @@ export class SafetyMonitoringSystem extends EventEmitter<SafetyMonitoringSystemE
    */
   getMetrics(): MonitoringMetrics {
     // Update telemetry metrics
-    const telemetryStats = this.telemetryCollector.getCollectionStats();
     const throughputMetrics = this.telemetryCollector.getThroughputMetrics();
 
     this.metrics.telemetry.bufferUtilization =

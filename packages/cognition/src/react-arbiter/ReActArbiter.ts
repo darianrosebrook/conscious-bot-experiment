@@ -9,6 +9,7 @@
 
 import { z } from 'zod';
 import { LLMInterface } from '../cognitive-core/llm-interface';
+import { auditLogger } from '../audit/thought-action-audit-logger';
 
 // ============================================================================
 // Types
@@ -155,6 +156,7 @@ export class ReActArbiter {
    * Always yields at most one tool call; subsequent state must include prior tool's result
    */
   async reason(context: ReActContext): Promise<ReActStep> {
+    const startTime = Date.now();
     const prompt = this.buildReActPrompt(context);
 
     try {
@@ -167,18 +169,92 @@ export class ReActArbiter {
 
       // Validate that we have at most one tool call
       if (!step.selectedTool) {
-        throw new Error('ReAct step must select exactly one tool');
+        console.warn('[ReActArbiter] No tool selected, using fallback');
+        // Fallback to safe default action
+        return {
+          thoughts: step.thoughts || 'Unable to parse tool selection',
+          selectedTool: 'chat',
+          args: {
+            channel: 'system',
+            message: `I'm having trouble selecting the right tool. Context: ${context.task?.title || 'unknown'}`,
+          },
+        };
       }
 
-      // Validate tool exists in registry
+      // Validate tool exists in registry - use fuzzy matching as fallback
       if (!this.toolRegistry.has(step.selectedTool)) {
-        throw new Error(`Unknown tool: ${step.selectedTool}`);
+        console.warn(
+          `[ReActArbiter] Unknown tool: ${step.selectedTool}, attempting fuzzy match`
+        );
+
+        // Try to find closest matching tool
+        const availableTools = Array.from(this.toolRegistry.keys());
+        const closeMatch = availableTools.find(
+          (tool) =>
+            tool.toLowerCase().includes(step.selectedTool.toLowerCase()) ||
+            step.selectedTool.toLowerCase().includes(tool.toLowerCase())
+        );
+
+        if (closeMatch) {
+          console.log(
+            `[ReActArbiter] Fuzzy matched ${step.selectedTool} to ${closeMatch}`
+          );
+          step.selectedTool = closeMatch;
+        } else {
+          console.warn(
+            `[ReActArbiter] No match found for ${step.selectedTool}, falling back to chat`
+          );
+          return {
+            thoughts: step.thoughts,
+            selectedTool: 'chat',
+            args: {
+              channel: 'system',
+              message: `I tried to use tool "${step.selectedTool}" but it's not available. Available tools: ${availableTools.join(', ')}`,
+            },
+          };
+        }
       }
+
+      console.log(
+        `[ReActArbiter] Selected tool: ${step.selectedTool} with args:`,
+        step.args
+      );
+
+      // Log tool selection for audit trail
+      auditLogger.log(
+        'tool_selected',
+        {
+          selectedTool: step.selectedTool,
+          args: step.args,
+          thoughts: step.thoughts?.substring(0, 100),
+          taskContext: context.task?.title,
+          taskDescription: context.task?.description,
+          inventoryItems: context.inventory?.items?.length || 0,
+          nearbyBlocks: context.snapshot?.nearbyBlocks?.length || 0,
+          hostileEntities:
+            context.snapshot?.nearbyEntities?.filter((e) => e.hostile)
+              ?.length || 0,
+        },
+        {
+          success: true,
+          duration: Date.now() - startTime,
+        }
+      );
 
       return step;
     } catch (error) {
-      console.error('ReAct reasoning failed:', error);
-      throw error;
+      console.error('[ReActArbiter] ReAct reasoning failed:', error);
+
+      // Fallback: return safe default instead of throwing
+      return {
+        thoughts: `Error during reasoning: ${error instanceof Error ? error.message : 'unknown error'}`,
+        selectedTool: 'chat',
+        args: {
+          channel: 'system',
+          message:
+            'I encountered an error while trying to reason about the next action.',
+        },
+      };
     }
   }
 
@@ -310,9 +386,30 @@ Keep your reflection concise and actionable.`;
 
   /**
    * Parse ReAct response to extract thoughts and tool selection
+   * Uses multiple parsing strategies with fallbacks
    */
   private parseReActResponse(responseText: string): ReActStep {
-    // Simple parsing - in a real implementation, this would be more sophisticated
+    // Strategy 1: Try JSON parsing first
+    const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      try {
+        const parsed = JSON.parse(jsonMatch[0]);
+        if (parsed.tool || parsed.action || parsed.selectedTool) {
+          return {
+            thoughts: parsed.thoughts || parsed.reasoning || '',
+            selectedTool:
+              parsed.tool || parsed.action || parsed.selectedTool || '',
+            args: parsed.args || parsed.parameters || {},
+          };
+        }
+      } catch (e) {
+        console.warn(
+          '[ReActArbiter] JSON parsing failed, trying fallback methods'
+        );
+      }
+    }
+
+    // Strategy 2: Line-by-line keyword matching (original approach)
     const lines = responseText.split('\n');
     let thoughts = '';
     let selectedTool = '';
@@ -333,15 +430,31 @@ Keep your reflection concise and actionable.`;
           const argsText = trimmed.split(':')[1]?.trim() || '{}';
           args = JSON.parse(argsText);
         } catch (e) {
-          console.warn('Failed to parse args:', e);
+          console.warn(
+            '[ReActArbiter] Failed to parse args from line:',
+            trimmed
+          );
         }
       } else if (trimmed && !selectedTool) {
         thoughts += trimmed + ' ';
       }
     }
 
+    // Strategy 3: Fuzzy tool name extraction from response text
+    if (!selectedTool) {
+      const toolNames = Array.from(this.toolRegistry.keys());
+      for (const toolName of toolNames) {
+        const regex = new RegExp(`\\b${toolName}\\b`, 'i');
+        if (regex.test(responseText)) {
+          selectedTool = toolName;
+          console.log(`[ReActArbiter] Fuzzy matched tool: ${toolName}`);
+          break;
+        }
+      }
+    }
+
     return {
-      thoughts: thoughts.trim(),
+      thoughts: thoughts.trim() || responseText.substring(0, 100),
       selectedTool,
       args,
     };
@@ -359,7 +472,7 @@ Keep your reflection concise and actionable.`;
   }
 
   /**
-   * Build ReAct prompt for reasoning
+   * Build ReAct prompt for reasoning with structured output format
    */
   private buildReActPrompt(context: ReActContext): string {
     const tools = Array.from(this.toolRegistry.values())
@@ -389,9 +502,21 @@ Instructions:
 1. Think step by step about what needs to be done
 2. Choose the most appropriate tool for the current situation
 3. Provide clear reasoning for your choice
-4. Execute the tool with proper parameters
+4. Respond in one of these formats:
 
-Let's start by analyzing the current situation and determining the next action.`;
+Format 1 (Preferred - JSON):
+{
+  "thoughts": "step by step reasoning",
+  "tool": "tool_name",
+  "args": { "param1": "value1" }
+}
+
+Format 2 (Fallback - Text):
+Tool: tool_name
+Args: {"param1": "value1"}
+Thoughts: step by step reasoning
+
+Choose ONE tool from the available tools list above and format your response correctly.`;
   }
 
   // ============================================================================
