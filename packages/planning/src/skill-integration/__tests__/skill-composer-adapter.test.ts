@@ -95,7 +95,7 @@ describe('SkillComposerAdapter', () => {
           worldState: {},
           availableResources: {},
           timeConstraints: {
-            urgency: 'high',
+            urgency: 'high' as const,
             maxPlanningTime: 5000,
           },
           botCapabilities: {
@@ -135,7 +135,7 @@ describe('SkillComposerAdapter', () => {
           worldState: {},
           availableResources: {},
           timeConstraints: {
-            urgency: 'medium',
+            urgency: 'medium' as const,
             maxPlanningTime: 5000,
           },
           botCapabilities: {
@@ -175,7 +175,7 @@ describe('SkillComposerAdapter', () => {
         worldState: { time: 'night', weather: 'clear' },
         availableResources: { food: 10, tools: 5 },
         timeConstraints: {
-          urgency: 'emergency',
+          urgency: 'emergency' as const,
           maxPlanningTime: 2000,
         },
         botCapabilities: {
@@ -193,7 +193,7 @@ describe('SkillComposerAdapter', () => {
         expect.objectContaining({
           worldState: { time: 'night', weather: 'clear' },
           timeConstraints: {
-            urgency: 'emergency',
+            urgency: 'emergency' as const,
             maxPlanningTime: 2000,
           },
           availableResources: { food: 10, tools: 5 },
@@ -272,7 +272,7 @@ describe('SkillComposerAdapter', () => {
         context: {
           worldState: {},
           availableResources: {},
-          timeConstraints: { urgency: 'low', maxPlanningTime: 5000 },
+          timeConstraints: { urgency: 'low' as const, maxPlanningTime: 5000 },
           botCapabilities: {
             availableLeaves: [],
             currentHealth: 100,

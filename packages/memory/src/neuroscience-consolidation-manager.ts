@@ -11,7 +11,7 @@
  * @author @darianrosebrook
  */
 
-import { VectorDatabase, MemoryChunk } from './vector-database';
+import { EnhancedVectorDatabase, EnhancedMemoryChunk } from './vector-database';
 import { EmbeddingService } from './embedding-service';
 import { SharpWaveRippleManager } from './sharp-wave-ripple-manager';
 import { CognitiveMapTracker } from './cognitive-map-tracker';
@@ -36,7 +36,7 @@ export interface NeuroscienceConsolidationConfig {
   adaptiveConsolidation: boolean;
 
   /** Dependencies */
-  vectorDb: VectorDatabase;
+  vectorDb: EnhancedVectorDatabase;
   embeddingService: EmbeddingService;
   sharpWaveRippleManager: SharpWaveRippleManager;
   cognitiveMapTracker: CognitiveMapTracker;

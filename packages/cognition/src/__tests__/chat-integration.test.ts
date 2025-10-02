@@ -74,7 +74,7 @@ async function getCurrentInventory(): Promise<any> {
       throw new Error(`Failed to fetch inventory: ${response.status}`);
     }
 
-    const data = await response.json();
+    const data = (await response.json()) as { data?: any };
     return data.data || { items: [], armor: [], tools: [] };
   } catch (error) {
     console.error('Failed to get inventory:', error);
@@ -309,7 +309,7 @@ describe('Chat Integration Tests', () => {
         const quality = analyzeResponseQuality(response);
         expect(quality.hasResponse).toBe(true);
         expect(quality.isReasonable).toBe(true);
-        expect(quality.reasoningQuality).toBeGreaterThanOrEqual('medium');
+        expect(['high', 'medium']).toContain(quality.reasoningQuality);
 
         console.log('🤖 Bot response:', response.response);
         console.log('📊 Response quality:', quality);
@@ -567,7 +567,7 @@ describe('Chat Integration Tests', () => {
     console.log('📦 Final inventory state:', finalInventory);
     console.log(
       '📊 Inventory changed during tests:',
-      !JSON.stringify(initialInventory) === JSON.stringify(finalInventory)
+      JSON.stringify(initialInventory) !== JSON.stringify(finalInventory)
     );
 
     // Summary of test results

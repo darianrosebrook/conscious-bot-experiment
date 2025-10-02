@@ -12,8 +12,6 @@ import { Pool, Client } from 'pg';
 import {
   Entity,
   Relationship,
-  EntityType,
-  RelationType,
   KnowledgeSource,
   QueryType,
   KnowledgeQuery,
@@ -29,9 +27,31 @@ import {
   RelationshipSchema,
 } from './semantic/types';
 
+// Import entity types as values (enums)
+import {
+  EntityType,
+  RelationshipType,
+  ExtractedEntity,
+  ExtractedRelationship,
+} from './entity-extraction-service';
+
+// Re-export for tests and other modules
+export { EntityType, RelationshipType as RelationType };
+
 // ============================================================================
 // Enhanced Types for PostgreSQL Integration
 // ============================================================================
+
+export interface EntitySearchOptions {
+  query?: string;
+  queryEmbedding?: number[];
+  entityTypes?: EntityType[];
+  minConfidence?: number;
+  memoryTypes?: string[];
+  limit?: number;
+  includeRelationships?: boolean;
+  searchMode?: 'vector' | 'text' | 'hybrid';
+}
 
 export interface EnhancedEntity extends Entity {
   // Vector embedding for similarity search
@@ -73,6 +93,9 @@ export interface EnhancedEntity extends Entity {
 }
 
 export interface EnhancedRelationship extends Relationship {
+  // Relationship strength for ranking and filtering
+  strength: number;
+
   // Enhanced evidence with statistical measures
   evidence: {
     sourceText: string;
@@ -125,6 +148,224 @@ export interface EnhancedKnowledgeGraphConfig extends KnowledgeGraphConfig {
   enableFuzzyMatching: boolean;
   enableStatisticalInference: boolean;
   enableExternalLinking: boolean;
+}
+
+// ============================================================================
+// Conversion Utilities
+// ============================================================================
+
+/**
+ * Map entity extraction EntityType to semantic EntityType
+ */
+function mapEntityType(extractionType: EntityType): EntityType {
+  // Map extraction entity types to semantic entity types
+  const typeMapping: Record<string, EntityType> = {
+    PERSON: 'PLAYER' as EntityType,
+    ORGANIZATION: 'SYSTEM' as EntityType,
+    LOCATION: 'PLACE' as EntityType,
+    CONCEPT: 'CONCEPT' as EntityType,
+    TECHNOLOGY: 'ITEM' as EntityType,
+    PROJECT: 'SYSTEM' as EntityType,
+    TASK: 'EVENT' as EntityType,
+    EMOTION: 'UNKNOWN' as EntityType,
+    SKILL: 'UNKNOWN' as EntityType,
+    TOOL: 'ITEM' as EntityType,
+    MEMORY_TYPE: 'CONCEPT' as EntityType,
+    OTHER: 'UNKNOWN' as EntityType,
+  };
+
+  return typeMapping[extractionType] || ('UNKNOWN' as EntityType);
+}
+
+/**
+ * Map entity extraction RelationshipType to semantic RelationType
+ */
+function mapRelationshipType(extractionType: RelationshipType): RelationType {
+  // Map extraction relationship types to semantic relationship types
+  const typeMapping: Record<string, RelationType> = {
+    WORKS_ON: 'USED_FOR' as RelationType,
+    PART_OF: 'PART_OF' as RelationType,
+    RELATED_TO: 'SIMILAR_TO' as RelationType,
+    MENTIONS: 'RELATED_TO' as RelationType,
+    LOCATED_IN: 'LOCATED_AT' as RelationType,
+    CREATED_BY: 'PRODUCES' as RelationType,
+    USED_BY: 'USED_FOR' as RelationType,
+    SIMILAR_TO: 'SIMILAR_TO' as RelationType,
+    DEPENDS_ON: 'REQUIRES' as RelationType,
+    COLLABORATES_WITH: 'RELATED_TO' as RelationType,
+    INFLUENCES: 'ENABLES' as RelationType,
+    LEADS_TO: 'CAUSES' as RelationType,
+    FOLLOWS_FROM: 'REQUIRES' as RelationType,
+    OTHER: 'RELATED_TO' as RelationType,
+  };
+
+  return typeMapping[extractionType] || ('RELATED_TO' as RelationType);
+}
+
+/**
+ * Convert ExtractedEntity to EnhancedEntity for knowledge graph processing
+ */
+function convertExtractedEntityToEnhancedEntity(
+  extracted: ExtractedEntity
+): EnhancedEntity {
+  const now = Date.now();
+
+  return {
+    id: extracted.id,
+    type: mapEntityType(extracted.type),
+    name: extracted.name,
+    description: extracted.description,
+    properties: {
+      aliases: {
+        confidence: extracted.confidence,
+        timestamp: now,
+        type: 'string_array',
+        source: 'entity_extraction',
+        value: extracted.aliases,
+      },
+      extractionMethod: {
+        confidence: extracted.confidence,
+        timestamp: now,
+        type: 'string',
+        source: 'entity_extraction',
+        value: extracted.extractionMethod,
+      },
+      sourceText: {
+        confidence: extracted.confidence,
+        timestamp: now,
+        type: 'string',
+        source: 'entity_extraction',
+        value: extracted.sourceText,
+      },
+      ...(extracted.position && {
+        position: {
+          confidence: extracted.confidence,
+          timestamp: now,
+          type: 'object',
+          source: 'entity_extraction',
+          value: extracted.position,
+        },
+      }),
+    },
+    tags: [],
+    confidence: extracted.confidence,
+    source: 'entity_extraction',
+    createdAt: now,
+    updatedAt: now,
+    lastAccessed: now,
+    accessCount: 1,
+
+    // Enhanced metadata
+    metadata: {
+      frequency: extracted.metadata.frequency,
+      context: extracted.metadata.context,
+      relatedTerms: extracted.metadata.relatedTerms,
+      importance: extracted.metadata.importance,
+      memoryTypes: ['semantic'],
+      extractionMethods: [extracted.extractionMethod],
+      wikidataId: extracted.metadata.wikidataId,
+    },
+
+    // Memory decay profile
+    decayProfile: {
+      memoryType: 'semantic',
+      baseDecayRate: 0.01, // Default decay rate
+      lastAccessed: now,
+      accessCount: 1,
+      importance: extracted.metadata.importance,
+      consolidationHistory: [
+        {
+          timestamp: now,
+          type: 'manual',
+          strength: extracted.confidence,
+        },
+      ],
+    },
+
+    // Provenance
+    provenance: {
+      sources: [
+        {
+          id: 'entity_extraction',
+          type: 'extraction',
+          confidence: extracted.confidence,
+          timestamp: now,
+          method: extracted.extractionMethod,
+        },
+      ],
+      evidence: [
+        {
+          type: 'text_extraction',
+          confidence: extracted.confidence,
+          source: extracted.sourceText,
+          timestamp: now,
+        },
+      ],
+      lastVerified: now,
+      verificationCount: 1,
+    },
+  };
+}
+
+/**
+ * Convert ExtractedRelationship to EnhancedRelationship for knowledge graph processing
+ */
+function convertExtractedRelationshipToEnhancedRelationship(
+  extracted: ExtractedRelationship
+): EnhancedRelationship {
+  const now = Date.now();
+
+  return {
+    id: extracted.id,
+    type: mapRelationshipType(extracted.type),
+    sourceId: extracted.sourceEntityId,
+    targetId: extracted.targetEntityId,
+    properties: {
+      strength: {
+        confidence: extracted.confidence,
+        timestamp: now,
+        type: 'number',
+        source: 'entity_extraction',
+        value: extracted.strength,
+      },
+      ...(extracted.evidence && {
+        evidence: {
+          confidence: extracted.confidence,
+          timestamp: now,
+          type: 'object',
+          source: 'entity_extraction',
+          value: extracted.evidence,
+        },
+      }),
+    },
+    bidirectional: false, // Default to directional
+    confidence: extracted.confidence,
+    source: 'entity_extraction',
+    createdAt: now,
+    updatedAt: now,
+    lastAccessed: now,
+    accessCount: 1,
+
+    // Enhanced strength
+    strength: extracted.strength,
+
+    // Enhanced evidence
+    evidence: {
+      sourceText: extracted.evidence || '',
+      cooccurrenceCount: 1,
+      contextWindow: 50, // Default context window
+      extractionMethod: 'entity_extraction',
+    },
+
+    // Memory decay profile
+    decayProfile: {
+      baseDecayRate: 0.02, // Relationships decay slightly faster than entities
+      lastAccessed: now,
+      accessCount: 1,
+      strength: extracted.strength,
+      certainty: extracted.confidence,
+    },
+  };
 }
 
 // ============================================================================
@@ -472,7 +713,7 @@ export class EnhancedKnowledgeGraphCore {
       },
       createdAt: now,
       updatedAt: now,
-      isDirectional: relationshipData.isDirectional || false,
+      bidirectional: false, // Default to directional
     };
 
     const client = await this.pool.connect();
@@ -778,9 +1019,16 @@ export class EnhancedKnowledgeGraphCore {
 
       return {
         entityId,
+        entity: {
+          id: entityId,
+          name: '',
+          type: EntityType.CONCEPT,
+          confidence: 0,
+        }, // Placeholder entity object
         neighbors: Array.from(neighbors.values()),
         relationships: Array.from(relationships.values()),
         hopCount: hops,
+        depth: hops,
       };
     } finally {
       client.release();
@@ -896,7 +1144,7 @@ export class EnhancedKnowledgeGraphCore {
     entityId: string,
     metadata: {
       importance?: number;
-      accessType?: 'read' | 'search' | 'traversal';
+      accessType?: 'read' | 'search' | 'traversal' | 'consolidation';
       swrStrength?: number;
     } = {}
   ): Promise<void> {
@@ -964,10 +1212,7 @@ export class EnhancedKnowledgeGraphCore {
    * Batch process entity extraction results
    */
   async processExtractionResults(
-    extractionResults: Array<{
-      entities: EnhancedEntity[];
-      relationships: EnhancedRelationship[];
-    }>
+    extractionResults: EntityExtractionResult[]
   ): Promise<{
     entitiesCreated: number;
     entitiesUpdated: number;
@@ -987,7 +1232,15 @@ export class EnhancedKnowledgeGraphCore {
 
       // Process entities
       for (const result of extractionResults) {
-        for (const entity of result.entities) {
+        // Convert extracted entities to enhanced entities
+        const enhancedEntities = result.entities.map(
+          convertExtractedEntityToEnhancedEntity
+        );
+        const enhancedRelationships = result.relationships.map(
+          convertExtractedRelationshipToEnhancedRelationship
+        );
+
+        for (const entity of enhancedEntities) {
           // Check for duplicates
           const existingEntity = await this.findDuplicateEntity(entity, client);
 
@@ -1004,7 +1257,7 @@ export class EnhancedKnowledgeGraphCore {
         }
 
         // Process relationships
-        for (const relationship of result.relationships) {
+        for (const relationship of enhancedRelationships) {
           const existingRelationship = await this.findExistingRelationship(
             relationship.sourceId,
             relationship.targetId,
@@ -1034,6 +1287,323 @@ export class EnhancedKnowledgeGraphCore {
         relationshipsCreated,
         relationshipsUpdated,
         duplicatesResolved,
+      };
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  // ============================================================================
+  // Decay-Aware Operations
+  // ============================================================================
+
+  /**
+   * Calculate decay factor for an entity
+   * Implements logarithmic decay: use it or lose it
+   */
+  calculateEntityDecay(entity: EnhancedEntity): number {
+    const now = Date.now();
+    const lastAccessed = entity.lastAccessed || entity.createdAt;
+    const timeSinceAccess = now - lastAccessed;
+    const daysSinceAccess = timeSinceAccess / (1000 * 60 * 60 * 24);
+
+    // Base decay rate varies by entity type
+    const baseDecayRate = this.getBaseDecayRate(entity.type);
+
+    // Usage boost from access frequency (logarithmic)
+    const usageBoost = Math.log10((entity.accessCount || 1) + 1) * 0.1;
+
+    // Importance protection
+    const importanceProtection = (entity.decayProfile?.importance || 0.5) * 0.3;
+
+    // Calculate decay (0-1 scale)
+    const decay = Math.min(
+      0.95,
+      daysSinceAccess * baseDecayRate - usageBoost - importanceProtection
+    );
+
+    return Math.max(0, decay);
+  }
+
+  /**
+   * Calculate decay factor for a relationship
+   */
+  calculateRelationshipDecay(relationship: EnhancedRelationship): number {
+    const now = Date.now();
+    const lastAccessed = relationship.lastAccessed || relationship.createdAt;
+    const timeSinceAccess = now - lastAccessed;
+    const daysSinceAccess = timeSinceAccess / (1000 * 60 * 60 * 24);
+
+    // Base decay rate for relationships (slower than entities)
+    const baseDecayRate = 0.01;
+
+    // Strength-based protection
+    const strengthProtection = relationship.strength * 0.2;
+
+    // Access count boost
+    const usageBoost = Math.log10((relationship.accessCount || 1) + 1) * 0.05;
+
+    const decay = Math.min(
+      0.8,
+      daysSinceAccess * baseDecayRate - strengthProtection - usageBoost
+    );
+
+    return Math.max(0, decay);
+  }
+
+  /**
+   * Update entity access and recalculate decay
+   */
+  async updateEntityAccess(entityId: string): Promise<void> {
+    const client = await this.pool.connect();
+    try {
+      await client.query('BEGIN');
+
+      await client.query(
+        `
+        UPDATE ${this.entityTable}
+        SET
+          last_accessed = NOW(),
+          access_count = access_count + 1,
+          updated_at = NOW()
+        WHERE id = $1
+      `,
+        [entityId]
+      );
+
+      await client.query('COMMIT');
+
+      // Update cache
+      const cached = this.entityCache.get(entityId);
+      if (cached) {
+        cached.lastAccessed = Date.now();
+        cached.accessCount = (cached.accessCount || 0) + 1;
+        cached.updatedAt = Date.now();
+      }
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  /**
+   * Update relationship access and recalculate decay
+   */
+  async updateRelationshipAccess(relationshipId: string): Promise<void> {
+    const client = await this.pool.connect();
+    try {
+      await client.query('BEGIN');
+
+      await client.query(
+        `
+        UPDATE ${this.relationshipTable}
+        SET
+          last_accessed = NOW(),
+          access_count = access_count + 1,
+          updated_at = NOW()
+        WHERE id = $1
+      `,
+        [relationshipId]
+      );
+
+      await client.query('COMMIT');
+
+      // Update cache
+      const cached = this.relationshipCache.get(relationshipId);
+      if (cached) {
+        cached.lastAccessed = Date.now();
+        cached.accessCount = (cached.accessCount || 0) + 1;
+        cached.updatedAt = Date.now();
+      }
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  /**
+   * Get decay-aware entity search results
+   */
+  async searchEntitiesWithDecayAwareness(
+    options: EntitySearchOptions & {
+      applyDecayRanking?: boolean;
+      decayThreshold?: number;
+    }
+  ): Promise<{
+    entities: EnhancedEntity[];
+    totalCount: number;
+    searchTime: number;
+    decayStats: {
+      averageDecay: number;
+      decayedEntityCount: number;
+      protectedEntityCount: number;
+    };
+  }> {
+    const startTime = performance.now();
+
+    const client = await this.pool.connect();
+    try {
+      // Base search query
+      const searchResult = await this.searchEntities(options);
+
+      if (!options.applyDecayRanking) {
+        return {
+          ...searchResult,
+          decayStats: {
+            averageDecay: 0,
+            decayedEntityCount: 0,
+            protectedEntityCount: 0,
+          },
+        };
+      }
+
+      // Apply decay-aware ranking
+      const entitiesWithDecay = searchResult.entities
+        .map((entity) => ({
+          ...entity,
+          decayFactor: this.calculateEntityDecay(entity),
+          adjustedScore:
+            entity.confidence * (1 - this.calculateEntityDecay(entity)),
+        }))
+        .sort((a, b) => b.adjustedScore - a.adjustedScore);
+
+      // Filter by decay threshold if specified
+      const filteredEntities = options.decayThreshold
+        ? entitiesWithDecay.filter(
+            (e) => e.decayFactor <= options.decayThreshold!
+          )
+        : entitiesWithDecay;
+
+      const averageDecay =
+        filteredEntities.reduce((sum, e) => sum + e.decayFactor, 0) /
+        filteredEntities.length;
+
+      const decayedEntityCount = filteredEntities.filter(
+        (e) => e.decayFactor > 0.3
+      ).length;
+      const protectedEntityCount = filteredEntities.filter(
+        (e) => e.decayFactor < 0.1
+      ).length;
+
+      return {
+        entities: filteredEntities,
+        totalCount: filteredEntities.length,
+        searchTime: performance.now() - startTime,
+        decayStats: {
+          averageDecay,
+          decayedEntityCount,
+          protectedEntityCount,
+        },
+      };
+    } finally {
+      client.release();
+    }
+  }
+
+  /**
+   * Get base decay rate for entity type
+   */
+  private getBaseDecayRate(entityType: EntityType): number {
+    const decayRates = {
+      [EntityType.PERSON]: 0.02, // People memories decay slowly
+      [EntityType.ORGANIZATION]: 0.015, // Organizations decay very slowly
+      [EntityType.LOCATION]: 0.025, // Locations decay moderately
+      [EntityType.TECHNOLOGY]: 0.03, // Technology changes quickly
+      [EntityType.CONCEPT]: 0.02, // Concepts decay slowly
+      [EntityType.PROJECT]: 0.025, // Projects decay moderately
+      [EntityType.TOOL]: 0.035, // Tools change frequently
+      [EntityType.FRAMEWORK]: 0.025, // Frameworks decay moderately
+    };
+
+    return decayRates[entityType] || 0.02;
+  }
+
+  /**
+   * Apply decay consolidation to entities and relationships
+   * Called during SWR (Sharp Wave Ripple) consolidation events
+   */
+  async consolidateDecayPatterns(): Promise<{
+    entitiesConsolidated: number;
+    relationshipsConsolidated: number;
+    decayProtectionApplied: number;
+  }> {
+    const client = await this.pool.connect();
+    try {
+      await client.query('BEGIN');
+
+      // Update entity decay profiles with recent consolidation
+      const entityResult = await client.query(`
+        UPDATE ${this.entityTable}
+        SET
+          decay_profile = jsonb_set(
+            COALESCE(decay_profile, '{}'),
+            '{consolidationHistory}',
+            COALESCE(decay_profile->'consolidationHistory', '[]') || jsonb_build_array(
+              jsonb_build_object(
+                'timestamp', ${Date.now()},
+                'type', 'decay_consolidation',
+                'strength', GREATEST(0.1, LEAST(1.0, (access_count::numeric / 10.0)))
+              )
+            )
+          ),
+          updated_at = NOW()
+        WHERE access_count > 0
+      `);
+
+      // Update relationship decay profiles
+      const relationshipResult = await client.query(`
+        UPDATE ${this.relationshipTable}
+        SET
+          decay_profile = jsonb_set(
+            COALESCE(decay_profile, '{}'),
+            '{consolidationHistory}',
+            COALESCE(decay_profile->'consolidationHistory', '[]') || jsonb_build_array(
+              jsonb_build_object(
+                'timestamp', ${Date.now()},
+                'type', 'decay_consolidation',
+                'relationshipStrength', strength
+              )
+            )
+          ),
+          updated_at = NOW()
+        WHERE access_count > 0
+      `);
+
+      // Apply decay protection to frequently accessed entities
+      const protectionResult = await client.query(`
+        UPDATE ${this.entityTable}
+        SET
+          decay_profile = jsonb_set(
+            COALESCE(decay_profile, '{}'),
+            '{importance}',
+            GREATEST(
+              COALESCE((decay_profile->>'importance')::numeric, 0.5),
+              LEAST(1.0, (access_count::numeric / 20.0))
+            )
+          ),
+          updated_at = NOW()
+        WHERE access_count >= 5
+      `);
+
+      await client.query('COMMIT');
+
+      return {
+        entitiesConsolidated: parseInt(
+          entityResult.rowCount?.toString() || '0'
+        ),
+        relationshipsConsolidated: parseInt(
+          relationshipResult.rowCount?.toString() || '0'
+        ),
+        decayProtectionApplied: parseInt(
+          protectionResult.rowCount?.toString() || '0'
+        ),
       };
     } catch (error) {
       await client.query('ROLLBACK');
@@ -1199,7 +1769,7 @@ export class EnhancedKnowledgeGraphCore {
       decayProfile: row.decay_profile || {},
       createdAt: row.created_at?.getTime() || Date.now(),
       updatedAt: row.updated_at?.getTime() || Date.now(),
-      isDirectional: row.is_directional || false,
+      bidirectional: row.is_directional || false,
     };
   }
 

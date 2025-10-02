@@ -12,7 +12,7 @@ import {
   EnhancedMemorySystem,
   createEnhancedMemorySystem,
 } from '../memory-system';
-import { VectorDatabase } from '../vector-database';
+import { EnhancedVectorDatabase } from '../vector-database';
 import { Pool } from 'pg';
 import { EnhancedMemorySystemConfig } from '../memory-system';
 
@@ -46,6 +46,12 @@ function createCompleteConfig(
     enableDiversification: true,
     enableSemanticBoost: true,
     enablePersistence: true,
+
+    // Enhanced search features
+    enableMultiHopReasoning: true,
+    enableProvenanceTracking: true,
+    enableDecayAwareRanking: true,
+    maxHops: 3,
 
     // Memory decay and cleanup configuration
     enableMemoryDecay: true,

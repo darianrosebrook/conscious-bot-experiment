@@ -129,6 +129,12 @@ describe('Memory Integration Scoring and Verification', () => {
       enableSemanticBoost: true,
       enablePersistence: true,
 
+      // Enhanced search features
+      enableMultiHopReasoning: true,
+      enableProvenanceTracking: true,
+      enableDecayAwareRanking: true,
+      maxHops: 3,
+
       // Memory decay and cleanup configuration
       enableMemoryDecay: true,
       decayEvaluationInterval: 3600000,
@@ -174,13 +180,11 @@ describe('Memory Integration Scoring and Verification', () => {
       processWithMemory: vi.fn().mockResolvedValue('mock memory response'),
     };
     mockPlanning = {
-      generatePlan: vi
-        .fn()
-        .mockResolvedValue({
-          memoryIntegration: true,
-          confidence: 0.9,
-          steps: ['step1'],
-        }),
+      generatePlan: vi.fn().mockResolvedValue({
+        memoryIntegration: true,
+        confidence: 0.9,
+        steps: ['step1'],
+      }),
     };
 
     // Mock assignments are already done above

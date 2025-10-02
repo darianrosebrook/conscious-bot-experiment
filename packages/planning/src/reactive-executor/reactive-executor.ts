@@ -24,8 +24,8 @@ import {
   ReactiveExecutorMetrics,
   MCPBus,
   ExecutionContext as GOAPExecutionContext,
-} from './enhanced-goap-planner';
-import { EnhancedPlanRepair } from './enhanced-plan-repair';
+} from './goap-planner';
+import { EnhancedPlanRepair } from './plan-repair';
 import {
   createPBIEnforcer,
   PlanStep as PBIPlanStep,
@@ -167,7 +167,7 @@ export class EnhancedReactiveExecutor {
         getMemoryEnhancedContext: async (context: any) => {
           try {
             const response = await fetch(
-              `${this.memoryEndpoint}/memory-enhanced-context`,
+              `${this.memoryEndpoint}/memory-context`,
               {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -262,7 +262,7 @@ export class EnhancedReactiveExecutor {
   }
 
   /**
-   * Get memory-enhanced context for plan execution
+   * Get memory context for plan execution
    */
   private async getMemoryEnhancedExecutionContext(
     plan: Plan,
@@ -322,7 +322,7 @@ export class EnhancedReactiveExecutor {
         planMemory,
       };
     } catch (error) {
-      console.error('Failed to get memory-enhanced execution context:', error);
+      console.error('Failed to get memory execution context:', error);
       return defaultContext;
     }
   }
@@ -471,7 +471,7 @@ export class EnhancedReactiveExecutor {
       // Convert Plan to GOAPPlan
       const goapPlan = this.convertPlanToGOAP(plan);
 
-      // Get memory-enhanced context for better decision making
+      // Get memory context for better decision making
       const memoryContext = await this.getMemoryEnhancedExecutionContext(
         plan,
         worldState,
@@ -918,7 +918,7 @@ export class EnhancedReactiveExecutor {
     const minSuccessRate = 0.7; // 70% success rate minimum
 
     const currentThroughput = metrics.actionsPerSecond;
-    const currentAvgLatency = metrics.latency.avg;
+    const currentAvgLatency = metrics.ttfaP95;
     const currentSuccessRate =
       this.pbiMetrics.successfulSteps /
       (this.pbiMetrics.successfulSteps + this.pbiMetrics.failedSteps);

@@ -16,7 +16,7 @@ import {
   ExecError,
   LeafStatus,
 } from '../mcp-capabilities/leaf-contracts';
-import { EnhancedRegistry } from '../mcp-capabilities/enhanced-registry';
+import { EnhancedRegistry } from '../mcp-capabilities/registry';
 import { LeafFactory } from '../mcp-capabilities/leaf-factory';
 import { BTDSLParser } from '../mcp-capabilities/bt-dsl-parser';
 import { DynamicCreationFlow } from '../mcp-capabilities/dynamic-creation-flow';

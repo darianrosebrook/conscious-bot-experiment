@@ -8,8 +8,8 @@ export { HybridSkillPlanner } from './hybrid-skill-planner';
 export { SkillComposerAdapter } from './skill-composer-adapter';
 export { MCPCapabilitiesAdapter } from './mcp-capabilities-adapter';
 export { SkillPlannerAdapter } from './skill-planner-adapter';
-export { LLMEnhancedSkillComposer } from './llm-enhanced-skill-composer';
-export { EnhancedMCPIntegration } from './enhanced-mcp-integration';
+export { LLMEnhancedSkillComposer } from './llm-skill-composer';
+export { EnhancedMCPIntegration } from './mcp-integration';
 
 // Re-export types
 export type {
@@ -37,7 +37,7 @@ export type {
   FeedbackAnalysisResult,
   SkillImprovement,
   CurriculumGoal,
-} from './llm-enhanced-skill-composer';
+} from './llm-skill-composer';
 
 export type {
   EnhancedMCPConfig,
@@ -49,4 +49,4 @@ export type {
   ComposedCapability,
   ExecutionStep as MCPExecutionStep,
   AdaptiveCapabilitySelector,
-} from './enhanced-mcp-integration';
+} from './mcp-integration';

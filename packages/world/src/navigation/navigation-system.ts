@@ -640,4 +640,11 @@ export class NavigationSystem extends EventEmitter<NavigationSystemEvents> {
       });
     }
   }
+
+  /**
+   * Get the navigation graph (protected for testing)
+   */
+  protected getNavigationGraph(): NavigationGraph {
+    return this.navigationGraph;
+  }
 }

@@ -9,7 +9,7 @@
  */
 
 import { faker } from '@faker-js/faker';
-import { MemoryChunk, ChunkMetadata } from '../vector-database';
+import { EnhancedMemoryChunk, EnhancedChunkMetadata } from '../vector-database';
 import { ChunkingService, ChunkingConfig } from '../chunking-service';
 import { EmbeddingService, EmbeddingResult } from '../embedding-service';
 
@@ -29,7 +29,7 @@ export interface GeneratedMemory {
   id: string;
   content: string;
   type: string;
-  metadata: ChunkMetadata;
+  metadata: EnhancedChunkMetadata;
   expectedKeywords: string[];
   expectedEntities: string[];
   expectedTopics: string[];
@@ -363,11 +363,52 @@ export class TestDataGenerator {
       importance: this.calculateImportance(content, type),
     };
 
-    const metadata: ChunkMetadata = {
+    const metadata: EnhancedChunkMetadata = {
       id: `test-${Date.now()}-${Math.random()}`,
       content,
       embedding: new Array(768).fill(0),
       metadata: chunkingMetadata,
+      entities: expectedEntities.map((entity, index) => ({
+        entityId: `entity-${index}`,
+        entityName: entity,
+        entityType: 'concept',
+        confidence: 0.8,
+      })),
+      relationships: [],
+      decayProfile: {
+        memoryType: 'semantic' as const,
+        baseDecayRate: 0.01,
+        lastAccessed: Date.now(),
+        accessCount: 1,
+        importance: chunkingMetadata.importance,
+        consolidationHistory: [
+          {
+            timestamp: Date.now(),
+            type: 'manual' as const,
+            strength: chunkingMetadata.importance,
+          },
+        ],
+      },
+      provenance: {
+        sourceSystem: 'test-data-generator',
+        extractionMethod: 'synthetic',
+        confidence: 0.9,
+        processingTime: Date.now(),
+        version: '1.0',
+      },
+      spatialContext: options.includeSpatialData
+        ? {
+            coordinates: {
+              x: Math.random() * 1000,
+              y: Math.random() * 1000,
+              z: Math.random() * 100,
+            },
+            dimension: 'overworld',
+            biome: 'plains',
+            nearbyEntities: [],
+            nearbyBlocks: [],
+          }
+        : undefined,
     };
 
     // Add spatial context if requested

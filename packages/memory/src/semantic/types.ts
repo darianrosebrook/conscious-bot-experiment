@@ -229,6 +229,7 @@ export interface KnowledgePath {
   entities: Entity[];
   relationships: Relationship[];
   length: number;
+  hopCount: number; // Number of hops in the path
   confidence: number;
 }
 
@@ -237,11 +238,13 @@ export interface KnowledgePath {
  */
 export interface EntityNeighborhood {
   entity: Entity;
+  entityId: string; // Convenience property for the entity ID
   neighbors: Array<{
     entity: Entity;
     relationship: Relationship;
     direction: 'outgoing' | 'incoming';
   }>;
+  relationships: Relationship[]; // All relationships in the neighborhood
   depth: number;
 }
 

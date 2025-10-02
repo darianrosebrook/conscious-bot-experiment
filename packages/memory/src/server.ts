@@ -241,8 +241,8 @@ app.get('/telemetry', (req, res) => {
   }
 });
 
-// Memory-enhanced context endpoint for planning integration
-app.post('/memory-enhanced-context', async (req, res) => {
+// Memory context endpoint for planning integration
+app.post('/memory-context', async (req, res) => {
   try {
     const context = req.body;
 
@@ -251,13 +251,13 @@ app.post('/memory-enhanced-context', async (req, res) => {
       enhancedMemorySystem = createEnhancedMemorySystem(DEFAULT_MEMORY_CONFIG);
     }
 
-    // Get memory-enhanced context
+    // Get memory context
     const memoryContext =
       await enhancedMemorySystem.getMemoryEnhancedContext(context);
 
     res.json(memoryContext);
   } catch (error) {
-    console.error('Failed to get memory-enhanced context:', error);
+    console.error('Failed to get memory context:', error);
     res.status(500).json({
       memories: [],
       insights: ['Memory system error occurred'],

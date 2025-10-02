@@ -9,7 +9,7 @@
  */
 
 import { performance } from 'node:perf_hooks';
-import { EnhancedRegistry, Provenance } from './enhanced-registry';
+import { EnhancedRegistry, Provenance } from './registry';
 import { BTDSLParser } from './bt-dsl-parser';
 import { LeafContext, ExecError } from './leaf-contracts';
 import { HRMLLMInterface } from './llm-integration';

@@ -17,8 +17,8 @@ import {
   ActionType,
 } from '../types';
 import { IntegratedPlanningCoordinator } from '../integrated-planning-coordinator';
-import { EnhancedGoalManager } from '../goal-formulation/enhanced-goal-manager';
-import { EnhancedReactiveExecutor } from '../reactive-executor/enhanced-reactive-executor';
+import { EnhancedGoalManager } from '../goal-formulation/goal-manager';
+import { EnhancedReactiveExecutor } from '../reactive-executor/reactive-executor';
 
 // ============================================================================
 // Mock Planning System Components

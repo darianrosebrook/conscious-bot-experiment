@@ -18,8 +18,15 @@ import {
   positionToNodeId,
 } from '../navigation/types';
 
+// Test subclass to access protected navigation graph
+class TestNavigationSystem extends NavigationSystem {
+  public get navigationGraph() {
+    return this.getNavigationGraph();
+  }
+}
+
 describe('Navigation Golden Tests', () => {
-  let navigationSystem: NavigationSystem;
+  let navigationSystem: TestNavigationSystem;
 
   beforeEach(() => {
     const config: NavigationConfig = {
@@ -65,7 +72,7 @@ describe('Navigation Golden Tests', () => {
       },
     };
 
-    navigationSystem = new NavigationSystem(config);
+    navigationSystem = new TestNavigationSystem(config);
 
     // Build a simple navigation graph for testing
     const graphResult = navigationSystem.buildGraph(

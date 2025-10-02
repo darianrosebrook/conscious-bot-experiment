@@ -14,7 +14,7 @@
 
 import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
 import { MemoryAwareLLMInterface } from '../memory-aware-llm';
-import { LLMResponse } from '../memory-aware-llm';
+import { LLMResponse } from '../llm-interface';
 
 describe('Complete Cognitive Architecture Integration', () => {
   let memoryAwareLLM: MemoryAwareLLMInterface;
@@ -24,10 +24,10 @@ describe('Complete Cognitive Architecture Integration', () => {
     vi.clearAllMocks();
 
     // Mock the memory system
-    const { createEnhancedMemorySystem } = await import(
+    const { createEnhancedMemorySystem, DEFAULT_MEMORY_CONFIG } = await import(
       '@conscious-bot/memory'
     );
-    mockMemorySystem = createEnhancedMemorySystem();
+    mockMemorySystem = createEnhancedMemorySystem(DEFAULT_MEMORY_CONFIG);
 
     memoryAwareLLM = new MemoryAwareLLMInterface(
       {
@@ -233,12 +233,17 @@ describe('Complete Cognitive Architecture Integration', () => {
           taskType: 'resource_gathering',
           emotionalState: 'determined',
           location: sensorimotorInput.currentLocation,
-          cognitiveLoad: 0.6,
-          socialContext: false,
         },
         currentGoals: ['mine_iron_ore', 'collect_coal', 'avoid_hostile_mobs'],
         agentState: sensorimotorInput.agentState,
-        memoryTypes: ['episodic', 'procedural', 'semantic', 'emotional'],
+        memoryTypes: [
+          'episodic',
+          'procedural',
+          'semantic',
+          'emotional',
+        ] as Array<
+          'episodic' | 'semantic' | 'procedural' | 'emotional' | 'spatial'
+        >,
         maxMemories: 5,
       };
 
@@ -250,6 +255,7 @@ describe('Complete Cognitive Architecture Integration', () => {
         latency: 1400,
         confidence: 0.92,
         metadata: {
+          finishReason: 'stop',
           reasoning: [
             'Analyzed current location and biome from sensorimotor input',
             'Checked inventory for appropriate tools',
@@ -304,13 +310,17 @@ describe('Complete Cognitive Architecture Integration', () => {
       });
 
       // B. All memory types were retrieved
-      expect(result.memoriesUsed).toHaveLength(4);
-      expect(result.memoriesUsed.some((m) => m.type === 'episodic')).toBe(true);
-      expect(result.memoriesUsed.some((m) => m.type === 'procedural')).toBe(
+      expect(result.memoriesUsed!).toHaveLength(4);
+      expect(result.memoriesUsed!.some((m) => m.type === 'episodic')).toBe(
         true
       );
-      expect(result.memoriesUsed.some((m) => m.type === 'semantic')).toBe(true);
-      expect(result.memoriesUsed.some((m) => m.type === 'emotional')).toBe(
+      expect(result.memoriesUsed!.some((m) => m.type === 'procedural')).toBe(
+        true
+      );
+      expect(result.memoriesUsed!.some((m) => m.type === 'semantic')).toBe(
+        true
+      );
+      expect(result.memoriesUsed!.some((m) => m.type === 'emotional')).toBe(
         true
       );
 
@@ -362,7 +372,7 @@ describe('Complete Cognitive Architecture Integration', () => {
       });
 
       console.log('   📝 Response length:', result.text.length, 'characters');
-      console.log('   🧠 Memories used:', result.memoriesUsed.length);
+      console.log('   🧠 Memories used:', result.memoriesUsed!.length);
       console.log('   🎯 Confidence:', result.confidence.toFixed(2));
       console.log(
         '   🧪 Decision quality:',
@@ -602,9 +612,6 @@ describe('Complete Cognitive Architecture Integration', () => {
         memoryContext: {
           taskType: 'complex_system_design',
           emotionalState: 'focused',
-          complexity: 'high',
-          cognitiveLoad: 0.8,
-          socialContext: false,
         },
         memoryTypes: [
           'episodic',
@@ -612,7 +619,9 @@ describe('Complete Cognitive Architecture Integration', () => {
           'semantic',
           'emotional',
           'spatial',
-        ],
+        ] as Array<
+          'episodic' | 'semantic' | 'procedural' | 'emotional' | 'spatial'
+        >,
         maxMemories: 8,
       };
 
@@ -675,6 +684,7 @@ describe('Complete Cognitive Architecture Integration', () => {
         latency: 2100,
         confidence: 0.94,
         metadata: {
+          finishReason: 'stop',
           reasoning: [
             'Analyzed spatial and material constraints',
             'Retrieved multi-domain memories for comprehensive context',
@@ -701,16 +711,20 @@ describe('Complete Cognitive Architecture Integration', () => {
       );
 
       // Verify comprehensive integration
-      expect(result.memoriesUsed).toHaveLength(5);
-      expect(result.memoriesUsed.some((m) => m.type === 'episodic')).toBe(true);
-      expect(result.memoriesUsed.some((m) => m.type === 'procedural')).toBe(
+      expect(result.memoriesUsed!).toHaveLength(5);
+      expect(result.memoriesUsed!.some((m) => m.type === 'episodic')).toBe(
         true
       );
-      expect(result.memoriesUsed.some((m) => m.type === 'semantic')).toBe(true);
-      expect(result.memoriesUsed.some((m) => m.type === 'emotional')).toBe(
+      expect(result.memoriesUsed!.some((m) => m.type === 'procedural')).toBe(
         true
       );
-      expect(result.memoriesUsed.some((m) => m.type === 'spatial')).toBe(true);
+      expect(result.memoriesUsed!.some((m) => m.type === 'semantic')).toBe(
+        true
+      );
+      expect(result.memoriesUsed!.some((m) => m.type === 'emotional')).toBe(
+        true
+      );
+      expect(result.memoriesUsed!.some((m) => m.type === 'spatial')).toBe(true);
 
       expect(result.text).toContain('hierarchical approach');
       expect(result.text).toContain('desert temple');
@@ -723,7 +737,7 @@ describe('Complete Cognitive Architecture Integration', () => {
       console.log('✅ Complex multi-domain scenario handled successfully!');
       console.log(
         '   📊 Memory types used:',
-        result.memoriesUsed.map((m) => m.type).join(', ')
+        result.memoriesUsed!.map((m) => m.type).join(', ')
       );
       console.log('   🎯 Response confidence:', result.confidence.toFixed(2));
       console.log(

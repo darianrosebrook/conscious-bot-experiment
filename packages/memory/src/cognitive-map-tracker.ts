@@ -9,7 +9,7 @@
  * @author @darianrosebrook
  */
 
-import { VectorDatabase, MemoryChunk } from './vector-database';
+import { EnhancedVectorDatabase, EnhancedMemoryChunk } from './vector-database';
 import { EmbeddingService } from './embedding-service';
 import { z } from 'zod';
 
@@ -34,7 +34,7 @@ export interface CognitiveMapConfig {
   clusteringThreshold: number;
 
   /** Dependencies */
-  vectorDb: VectorDatabase;
+  vectorDb: EnhancedVectorDatabase;
   embeddingService: EmbeddingService;
 }
 

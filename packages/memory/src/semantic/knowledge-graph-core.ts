@@ -789,7 +789,9 @@ export class KnowledgeGraphCore {
 
     return {
       entity,
+      entityId: entity.id,
       neighbors,
+      relationships: neighbors.map((n) => n.relationship),
       depth: depth as number,
     };
   }
@@ -874,6 +876,7 @@ export class KnowledgeGraphCore {
           entities: pathEntities,
           relationships: pathRelationships,
           length: path.length - 1,
+          hopCount: pathRelationships.length,
           confidence,
         });
         continue;

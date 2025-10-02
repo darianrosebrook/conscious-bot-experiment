@@ -23,7 +23,7 @@ import {
   Resource,
   UtilityContext,
 } from './types';
-import { ExecutionContext } from './reactive-executor/enhanced-goap-planner';
+import { ExecutionContext } from './reactive-executor/goap-planner';
 
 // Import our HRM-inspired components
 import {
@@ -47,13 +47,13 @@ import type {
 
 // Classical planning components
 import { HierarchicalPlanner } from './hierarchical-planner/hierarchical-planner';
-import { EnhancedReactiveExecutor } from './reactive-executor/enhanced-reactive-executor';
-import { EnhancedGOAPPlanner } from './reactive-executor/enhanced-goap-planner';
+import { EnhancedReactiveExecutor } from './reactive-executor/reactive-executor';
+import { EnhancedGOAPPlanner } from './reactive-executor/goap-planner';
 
 // Goal formulation components
 import { HomeostasisMonitor } from './goal-formulation/homeostasis-monitor';
 import { generateNeeds } from './goal-formulation/need-generator';
-import { EnhancedGoalManager } from './goal-formulation/enhanced-goal-manager';
+import { EnhancedGoalManager } from './goal-formulation/goal-manager';
 import { createWeightedUtility } from './goal-formulation/utility-calculator';
 import { TaskBootstrapper } from './goal-formulation/task-bootstrapper';
 import type {

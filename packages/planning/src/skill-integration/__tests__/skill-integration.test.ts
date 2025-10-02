@@ -27,6 +27,30 @@ const mockToolExecutor = {
   },
 };
 
+// Helper function to create a default currentState for tests
+function createDefaultCurrentState() {
+  return {
+    health: 20,
+    hunger: 15,
+    energy: 18,
+    safety: 16,
+    curiosity: 12,
+    social: 10,
+    achievement: 14,
+    creativity: 13,
+    resourceManagement: 15,
+    shelterStability: 10,
+    farmHealth: 8,
+    inventoryOrganization: 12,
+    worldKnowledge: 16,
+    redstoneProficiency: 5,
+    constructionSkill: 14,
+    environmentalComfort: 17,
+    mechanicalAptitude: 9,
+    agriculturalKnowledge: 11,
+  };
+}
+
 describe('Skill Integration System', () => {
   // Helper function to create properly typed contexts
   const createTestContext = (
@@ -47,6 +71,7 @@ describe('Skill Integration System', () => {
       preferHTN: false,
       preferGOAP: false,
       allowHybrid: true,
+      preferSimple: false,
     },
     constraints: [],
     domain: 'minecraft',
@@ -79,11 +104,13 @@ describe('Skill Integration System', () => {
       const goal = 'build a shelter';
       const context = {
         worldState: { wood: 10, time: 'dusk' },
+        currentState: createDefaultCurrentState(),
         availableSkills: skillRegistry.getAllSkills(),
         skillRegistry,
         goalRequirements: { shelter: { required: true } },
         constraints: [],
         resources: { wood: 10 },
+        goal: goal,
         timeLimit: undefined,
         urgency: 'medium' as const,
         domain: 'minecraft' as const,
@@ -103,11 +130,13 @@ describe('Skill Integration System', () => {
       const goal = 'chop trees safely';
       const context = {
         worldState: { has_axe: true, trees_nearby: true },
+        currentState: createDefaultCurrentState(),
         availableSkills: skillRegistry.getAllSkills(),
         skillRegistry,
         goalRequirements: { wood: { min: 1 } },
         constraints: [],
         resources: {},
+        goal: goal,
         timeLimit: undefined,
         urgency: 'medium' as const,
         domain: 'minecraft' as const,
@@ -265,12 +294,16 @@ describe('Skill Integration System', () => {
         },
         planningPreferences: {
           preferSkills: true,
+          preferMCP: false,
           preferHTN: true,
           preferGOAP: true,
           allowHybrid: true,
+          preferSimple: false,
         },
+        currentState: createDefaultCurrentState(),
         constraints: [],
         resources: { wood: 20, stone: 10 },
+        goal: goal,
         timeLimit: undefined,
         urgency: 'medium' as const,
         domain: 'minecraft' as const,
@@ -305,12 +338,16 @@ describe('Skill Integration System', () => {
         },
         planningPreferences: {
           preferSkills: true,
+          preferMCP: false,
           preferHTN: true,
           preferGOAP: true,
           allowHybrid: true,
+          preferSimple: false,
         },
+        currentState: createDefaultCurrentState(),
         constraints: [],
         resources: {},
+        goal: goal,
         timeLimit: undefined,
         urgency: 'medium' as const,
         domain: 'minecraft' as const,
@@ -344,12 +381,16 @@ describe('Skill Integration System', () => {
         },
         planningPreferences: {
           preferSkills: true,
+          preferMCP: false,
           preferHTN: true,
           preferGOAP: true,
           allowHybrid: true,
+          preferSimple: false,
         },
+        currentState: createDefaultCurrentState(),
         constraints: [],
         resources: { wood: 10 },
+        goal: goal,
         timeLimit: undefined,
         urgency: 'medium' as const,
         domain: 'minecraft' as const,
@@ -377,6 +418,7 @@ describe('Skill Integration System', () => {
     });
 
     it('should estimate planning latency based on approach and urgency', () => {
+      const goal = 'build shelter';
       const context = {
         skillRegistry,
         worldState: {},
@@ -388,12 +430,16 @@ describe('Skill Integration System', () => {
         },
         planningPreferences: {
           preferSkills: true,
+          preferMCP: false,
           preferHTN: true,
           preferGOAP: true,
           allowHybrid: true,
+          preferSimple: false,
         },
+        currentState: createDefaultCurrentState(),
         constraints: [],
         resources: {},
+        goal: goal,
         timeLimit: undefined,
         urgency: 'high' as const,
         domain: 'minecraft' as const,
@@ -551,6 +597,7 @@ describe('Skill Integration System', () => {
     });
 
     it('should identify fallback plans for different approaches', () => {
+      const goal = 'build shelter';
       const context = {
         skillRegistry,
         worldState: {},
@@ -562,12 +609,16 @@ describe('Skill Integration System', () => {
         },
         planningPreferences: {
           preferSkills: true,
+          preferMCP: false,
           preferHTN: true,
           preferGOAP: true,
           allowHybrid: true,
+          preferSimple: false,
         },
+        currentState: createDefaultCurrentState(),
         constraints: [],
         resources: {},
+        goal: goal,
         timeLimit: undefined,
         urgency: 'medium' as const,
         domain: 'minecraft' as const,
@@ -632,12 +683,16 @@ describe('Skill Integration System', () => {
         },
         planningPreferences: {
           preferSkills: true,
+          preferMCP: false,
           preferHTN: true,
           preferGOAP: true,
           allowHybrid: true,
+          preferSimple: false,
         },
+        currentState: createDefaultCurrentState(),
         constraints: [],
         resources: { wood: 15 },
+        goal: goal,
         timeLimit: undefined,
         urgency: 'medium' as const,
         domain: 'minecraft' as const,
@@ -668,12 +723,16 @@ describe('Skill Integration System', () => {
         },
         planningPreferences: {
           preferSkills: false,
+          preferMCP: false,
           preferHTN: false,
           preferGOAP: true,
           allowHybrid: false,
+          preferSimple: false,
         },
+        currentState: createDefaultCurrentState(),
         constraints: [],
         resources: {},
+        goal: goal,
         timeLimit: Date.now() + 1000,
         urgency: 'emergency' as const,
         domain: 'general' as const,

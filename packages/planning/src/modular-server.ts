@@ -98,12 +98,12 @@ import { CognitiveIntegration } from './cognitive-integration';
 import { BehaviorTreeRunner } from './behavior-trees/BehaviorTreeRunner';
 import { CognitiveThoughtProcessor } from './cognitive-thought-processor';
 import { IntegratedPlanningCoordinator } from './integrated-planning-coordinator';
-import { EnhancedGoalManager } from './goal-formulation/enhanced-goal-manager';
-import { EnhancedReactiveExecutor } from './reactive-executor/enhanced-reactive-executor';
-import { EnhancedTaskIntegration } from './enhanced-task-integration';
-import { EnhancedMemoryIntegration } from './enhanced-memory-integration';
-import { EnhancedEnvironmentIntegration } from './enhanced-environment-integration';
-import { EnhancedLiveStreamIntegration } from './enhanced-live-stream-integration';
+import { EnhancedGoalManager } from './goal-formulation/goal-manager';
+import { EnhancedReactiveExecutor } from './reactive-executor/reactive-executor';
+import { EnhancedTaskIntegration } from './task-integration';
+import { EnhancedMemoryIntegration } from './memory-integration';
+import { EnhancedEnvironmentIntegration } from './environment-integration';
+import { EnhancedLiveStreamIntegration } from './live-stream-integration';
 import { GoalStatus } from './types';
 // Temporary local type definition until @conscious-bot/core is available
 export class EnhancedRegistry {

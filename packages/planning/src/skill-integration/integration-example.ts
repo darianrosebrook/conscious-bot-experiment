@@ -66,7 +66,7 @@ export class DynamicCreationFlow {
   }
 }
 import { HRMInspiredPlanner } from '../hierarchical-planner/hrm-inspired-planner';
-import { EnhancedGOAPPlanner } from '../reactive-executor/enhanced-goap-planner';
+import { EnhancedGOAPPlanner } from '../reactive-executor/goap-planner';
 
 // Mock ToolExecutor for demonstration
 class MockToolExecutor {

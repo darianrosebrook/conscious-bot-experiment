@@ -119,6 +119,19 @@ export class SkillRegistry {
   }
 
   /**
+   * Register a skill (alias for registerSkill for compatibility)
+   */
+  register(
+    name: string,
+    skill: Omit<Skill, 'id' | 'createdAt' | 'updatedAt' | 'metadata'>
+  ): void {
+    this.registerSkill({
+      id: name,
+      ...skill,
+    });
+  }
+
+  /**
    * Get a skill by ID
    */
   getSkill(skillId: string): Skill | undefined {

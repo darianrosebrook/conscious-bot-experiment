@@ -311,6 +311,12 @@ describe('Complete Memory-LLM Integration Flow', () => {
       enableSemanticBoost: true,
       enablePersistence: true,
 
+      // Enhanced search features
+      enableMultiHopReasoning: true,
+      enableProvenanceTracking: true,
+      enableDecayAwareRanking: true,
+      maxHops: 3,
+
       // Memory decay and cleanup configuration
       enableMemoryDecay: true,
       decayEvaluationInterval: 3600000,

@@ -157,7 +157,7 @@ class HttpMemoryClient implements MemoryClient {
     confidence: number;
   }> {
     try {
-      const response = await fetch(`${this.base}/memory-enhanced-context`, {
+      const response = await fetch(`${this.base}/memory-context`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(context),
@@ -1157,7 +1157,7 @@ export class CognitiveThoughtProcessor extends EventEmitter {
   }> {
     const result: any = {};
 
-    // 1. Get memory-enhanced context if memory client is available
+    // 1. Get memory context if memory client is available
     if (this.memory) {
       try {
         const memoryContext = await this.memory.getMemoryEnhancedContext({
@@ -1274,7 +1274,7 @@ export class CognitiveThoughtProcessor extends EventEmitter {
   }
 
   /**
-   * Calculate memory-enhanced priority
+   * Calculate memory priority
    */
   private calculateMemoryEnhancedPriority(
     thought: CognitiveThought,

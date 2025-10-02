@@ -1,5 +1,5 @@
 /**
- * LLM-Enhanced Skill Composer - Integrates Language Models with Skill Composition
+ * LLM Skill Composer - Integrates Language Models with Skill Composition
  *
  * This enhanced version of the SkillComposer uses language models to:
  * - Refine and expand goal descriptions
@@ -120,7 +120,7 @@ export interface CurriculumGoal {
 }
 
 // ============================================================================
-// LLM-Enhanced Skill Composer Implementation
+// LLM Skill Composer Implementation
 // ============================================================================
 
 export class LLMEnhancedSkillComposer extends EventEmitter {
@@ -158,12 +158,12 @@ export class LLMEnhancedSkillComposer extends EventEmitter {
   private setupEventHandlers(): void {
     this.baseSkillComposer.on('skillComposed', (skill: ComposedSkill) => {
       this.emit('skillComposed', skill);
-      console.log(`🎯 LLM-enhanced skill composed: ${skill.name}`);
+      console.log(`🎯 LLM skill composed: ${skill.name}`);
     });
 
     this.baseSkillComposer.on('compositionError', (error: Error) => {
       this.emit('compositionError', error);
-      console.error(`❌ LLM-enhanced composition error: ${error.message}`);
+      console.error(`❌ LLM composition error: ${error.message}`);
     });
   }
 
@@ -180,7 +180,7 @@ export class LLMEnhancedSkillComposer extends EventEmitter {
     }
   ): Promise<ComposedSkill | null> {
     try {
-      console.log(`🧠 LLM-enhanced composition for goal: ${goal.description}`);
+      console.log(`🧠 LLM composition for goal: ${goal.description}`);
 
       let currentGoal = goal;
       let iteration = 0;
@@ -287,7 +287,7 @@ export class LLMEnhancedSkillComposer extends EventEmitter {
       });
       return null;
     } catch (error) {
-      console.error('Error in LLM-enhanced composition:', error);
+      console.error('Error in LLM composition:', error);
       this.emit('compositionError', error);
       return null;
     }

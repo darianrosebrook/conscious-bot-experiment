@@ -1,54 +1,78 @@
-id: MEMORY-001
-title: "Advanced Memory System with Vector Search and Emotional Preservation"
+id: MEMORY-002
+title: "Enhanced Memory System with Obsidian-RAG Patterns and Multi-Hop Reasoning"
 risk_tier: 1
 scope:
   in:
-    - "Store episodic memories with emotional context"
-    - "Maintain semantic knowledge graphs with decay management"
-    - "Provide vector search for memory retrieval"
+    - "Store episodic memories with emotional context and decay tracking"
+    - "Maintain semantic knowledge graphs with entity relationship modeling"
+    - "Provide vector search with strategic embedding selection"
+    - "Implement multi-hop reasoning for deeper entity understanding"
+    - "Enable cross-modal entity linking across memory types"
+    - "Apply neuroscience-inspired memory decay with access patterns"
     - "Manage identity memory with self-narrative construction"
     - "Handle per-seed database isolation"
+    - "Provide explainable provenance tracking for all decisions"
   out:
     - "External database systems"
     - "File system storage"
     - "LLM model dependencies"
+    - "Legacy memory systems"
 invariants:
-  - "Memory retrieval maintains <200ms average response time"
-  - "Emotional memory preserves 2% daily decay rate consistently"
+  - "Memory retrieval maintains <600ms P95 response time with enhanced features"
+  - "Multi-hop reasoning provides 5-10x deeper understanding"
+  - "Cross-modal entity linking maintains unified representation across memory types"
+  - "Memory decay preserves 2% daily rate with importance protection"
   - "Vector search maintains >95% accuracy for relevant memories"
   - "Per-seed database isolation prevents cross-contamination"
   - "Identity narrative maintains temporal consistency"
+  - "Explainable provenance provides complete reasoning transparency"
 acceptance:
   - id: A1
     given: "new episodic memory with emotional context"
     when: "memory system processes and stores"
-    then: "memory retrievable with correct emotional weighting"
+    then: "memory retrievable with correct emotional weighting and decay application"
   - id: A2
     given: "query for relevant memories"
-    when: "vector search executes"
-    then: "returns >95% relevant results within 200ms"
+    when: "hybrid search with multi-hop reasoning executes"
+    then: "returns >95% relevant results within 600ms with explainable provenance"
   - id: A3
     given: "identity memory across multiple sessions"
     when: "narrative construction occurs"
-    then: "maintains consistent self-model with emotional preservation"
+    then: "maintains consistent self-model with emotional preservation and cross-modal linking"
+  - id: A4
+    given: "entities from multiple memory types"
+    when: "cross-modal entity linking processes"
+    then: "creates unified entity representation with deduplication"
+  - id: A5
+    given: "strategic embedding selection criteria"
+    when: "embedding service processes request"
+    then: "selects optimal model based on memory type, domain, and quality requirements"
 non_functional:
-  a11y: ["memory query interfaces", "narrative generation feedback"]
+  a11y: ["memory query interfaces", "narrative generation feedback", "explainable provenance displays"]
   perf:
-    api_p95_ms: 200
+    api_p95_ms: 600  # Enhanced with multi-hop reasoning and decay calculations
     lcp_ms: 1500
-  security: ["memory isolation", "data encryption", "access controls"]
+  security: ["memory isolation", "data encryption", "access controls", "entity relationship privacy"]
 contracts:
   - type: openapi
     path: "contracts/memory-api.yaml"
 observability:
-  logs: ["memory_storage_operations", "vector_search_performance", "emotional_decay_cycles"]
-  metrics: ["memory_retrieval_accuracy", "storage_growth_rate", "identity_narrative_coherence"]
-  traces: ["memory_processing_pipeline", "vector_search_execution", "emotional_decay_application"]
+  logs: ["memory_storage_operations", "vector_search_performance", "emotional_decay_cycles", "multi_hop_reasoning", "entity_linking_operations", "embedding_model_selection"]
+  metrics: ["memory_retrieval_accuracy", "storage_growth_rate", "identity_narrative_coherence", "entity_deduplication_rate", "cross_modal_link_quality", "embedding_quality_scores"]
+  traces: ["memory_processing_pipeline", "vector_search_execution", "emotional_decay_application", "multi_hop_path_traversal", "cross_modal_entity_linking", "strategic_embedding_selection"]
 migrations:
   - "create per-seed database schema with vector extensions"
   - "add identity_memory table with narrative fields"
   - "implement emotional_decay tracking system"
+  - "add multi-hop relationship tables for entity traversal"
+  - "create cross-modal entity linking tables"
+  - "add strategic embedding model performance tracking"
+  - "implement enhanced provenance tracking schema"
 rollback:
-  - "feature flag MEMORY_VECTOR_SEARCH=false"
-  - "rollback database schema changes"
+  - "feature flag MEMORY_ENHANCED_FEATURES=false"
+  - "disable multi-hop reasoning and cross-modal linking"
+  - "revert to single-hop entity relationships"
+  - "disable strategic embedding selection"
+  - "fallback to basic vector search only"
+  - "rollback database schema changes for enhanced features"
   - "revert to legacy memory storage format"

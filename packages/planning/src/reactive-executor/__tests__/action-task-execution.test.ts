@@ -8,7 +8,7 @@
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { EnhancedReactiveExecutor } from '../enhanced-reactive-executor';
+import { EnhancedReactiveExecutor } from '../reactive-executor';
 
 // Mock fetch globally
 global.fetch = vi.fn();

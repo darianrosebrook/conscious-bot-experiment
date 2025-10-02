@@ -9,7 +9,7 @@
  */
 
 import { EventEmitter } from 'events';
-import { EnhancedRegistry } from './mcp-capabilities/enhanced-registry';
+import { EnhancedRegistry } from './mcp-capabilities/registry';
 import { DynamicCreationFlow } from './mcp-capabilities/dynamic-creation-flow';
 import {
   LeafImpl,

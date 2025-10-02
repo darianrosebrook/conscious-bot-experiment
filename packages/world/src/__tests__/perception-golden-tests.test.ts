@@ -7,6 +7,7 @@
  * @author @darianrosebrook
  */
 
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { PerceptionIntegration } from '../perception/perception-integration';
 import { VisualFieldManager } from '../perception/visual-field-manager';
 import { ObjectRecognition } from '../perception/object-recognition';

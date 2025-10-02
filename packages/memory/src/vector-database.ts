@@ -70,35 +70,53 @@ export const EnhancedMemoryChunkSchema = z.object({
   metadata: z.record(z.any()),
 
   // Enhanced entity and relationship data
-  entities: z.array(z.object({
-    entityId: z.string(),
-    entityName: z.string(),
-    entityType: z.string(),
-    confidence: z.number(),
-    relationshipType: z.string().optional(),
-  })).default([]),
+  entities: z
+    .array(
+      z.object({
+        entityId: z.string(),
+        entityName: z.string(),
+        entityType: z.string(),
+        confidence: z.number(),
+        relationshipType: z.string().optional(),
+      })
+    )
+    .default([]),
 
-  relationships: z.array(z.object({
-    relationshipId: z.string(),
-    sourceEntityId: z.string(),
-    targetEntityId: z.string(),
-    relationshipType: z.string(),
-    confidence: z.number(),
-    strength: z.number(),
-  })).default([]),
+  relationships: z
+    .array(
+      z.object({
+        relationshipId: z.string(),
+        sourceEntityId: z.string(),
+        targetEntityId: z.string(),
+        relationshipType: z.string(),
+        confidence: z.number(),
+        strength: z.number(),
+      })
+    )
+    .default([]),
 
   // Memory decay profile
   decayProfile: z.object({
-    memoryType: z.enum(['episodic', 'semantic', 'procedural', 'emotional', 'social']),
+    memoryType: z.enum([
+      'episodic',
+      'semantic',
+      'procedural',
+      'emotional',
+      'social',
+    ]),
     baseDecayRate: z.number(),
     lastAccessed: z.number(),
     accessCount: z.number(),
     importance: z.number(),
-    consolidationHistory: z.array(z.object({
-      timestamp: z.number(),
-      type: z.enum(['swr', 'decay', 'manual']),
-      strength: z.number(),
-    })).default([]),
+    consolidationHistory: z
+      .array(
+        z.object({
+          timestamp: z.number(),
+          type: z.enum(['swr', 'decay', 'manual']),
+          strength: z.number(),
+        })
+      )
+      .default([]),
   }),
 
   // Enhanced provenance
@@ -111,29 +129,37 @@ export const EnhancedMemoryChunkSchema = z.object({
   }),
 
   // Legacy support
-  graphLinks: z.array(z.object({
-    entityId: z.string(),
-    relationship: z.string(),
-    confidence: z.number(),
-  })).optional(),
+  graphLinks: z
+    .array(
+      z.object({
+        entityId: z.string(),
+        relationship: z.string(),
+        confidence: z.number(),
+      })
+    )
+    .optional(),
 
-  temporalContext: z.object({
-    timestamp: z.number(),
-    duration: z.number().optional(),
-    timeOfDay: z.string().optional(),
-    sessionId: z.string().optional(),
-  }).optional(),
+  temporalContext: z
+    .object({
+      timestamp: z.number(),
+      duration: z.number().optional(),
+      timeOfDay: z.string().optional(),
+      sessionId: z.string().optional(),
+    })
+    .optional(),
 
-  spatialContext: z.object({
-    world: z.string(),
-    position: z.object({
-      x: z.number(),
-      y: z.number(),
-      z: z.number(),
-    }),
-    dimension: z.string().optional(),
-    biome: z.string().optional(),
-  }).optional(),
+  spatialContext: z
+    .object({
+      world: z.string(),
+      position: z.object({
+        x: z.number(),
+        y: z.number(),
+        z: z.number(),
+      }),
+      dimension: z.string().optional(),
+      biome: z.string().optional(),
+    })
+    .optional(),
 
   createdAt: z.number(),
   updatedAt: z.number(),
@@ -445,7 +471,9 @@ export class EnhancedVectorDatabase {
   /**
    * Enhanced search with knowledge graph and decay awareness
    */
-  async search(options: EnhancedSearchOptions): Promise<EnhancedSearchResult[]> {
+  async search(
+    options: EnhancedSearchOptions
+  ): Promise<EnhancedSearchResult[]> {
     if (options.queryEmbedding.length !== this.config.dimension) {
       throw new Error(
         `Query embedding dimension mismatch: expected ${this.config.dimension}, got ${options.queryEmbedding.length}`
@@ -466,7 +494,10 @@ export class EnhancedVectorDatabase {
       const result = await client.query(query, params);
 
       // Process and enhance results
-      const enhancedResults = await this.processSearchResults(result.rows, options);
+      const enhancedResults = await this.processSearchResults(
+        result.rows,
+        options
+      );
 
       return enhancedResults;
     } finally {
@@ -573,9 +604,17 @@ export class EnhancedVectorDatabase {
 
       // Calculate enhanced scores
       const vectorScore = parseFloat(row.similarity);
-      const graphScore = this.calculateGraphScore(matchedEntities, matchedRelationships);
+      const graphScore = this.calculateGraphScore(
+        matchedEntities,
+        matchedRelationships
+      );
       const decayScore = this.calculateDecayScore(decayFactors, options);
-      const finalScore = this.combineScores(vectorScore, graphScore, decayScore, options);
+      const finalScore = this.combineScores(
+        vectorScore,
+        graphScore,
+        decayScore,
+        options
+      );
 
       // Generate explanation if requested
       let explanation;
@@ -651,7 +690,10 @@ export class EnhancedVectorDatabase {
     const hoursSinceAccess = (now - lastAccessed) / (1000 * 60 * 60);
 
     // Memory decay based on type and time
-    const baseDecay = Math.min(1, (hoursSinceAccess / 24) * decayProfile.baseDecayRate);
+    const baseDecay = Math.min(
+      1,
+      (hoursSinceAccess / 24) * decayProfile.baseDecayRate
+    );
 
     // Importance protection (higher importance = slower decay)
     const importanceProtection = decayProfile.importance * 0.3;
@@ -662,7 +704,10 @@ export class EnhancedVectorDatabase {
     // Access count boost (frequent access reduces decay)
     const accessBoost = Math.min(0.2, decayProfile.accessCount / 20);
 
-    const memoryDecay = Math.max(0, baseDecay - importanceProtection - recencyBoost - accessBoost);
+    const memoryDecay = Math.max(
+      0,
+      baseDecay - importanceProtection - recencyBoost - accessBoost
+    );
 
     return {
       memoryDecay,
@@ -680,13 +725,17 @@ export class EnhancedVectorDatabase {
     let score = 0;
 
     // Score based on entity matches
-    const highConfidenceEntities = entities.filter(e => e.confidence >= 0.7).length;
+    const highConfidenceEntities = entities.filter(
+      (e) => e.confidence >= 0.7
+    ).length;
     score += highConfidenceEntities * 0.1;
 
     // Score based on relationship strength
-    const avgRelationshipStrength = relationships.length > 0
-      ? relationships.reduce((sum, r) => sum + r.strength, 0) / relationships.length
-      : 0;
+    const avgRelationshipStrength =
+      relationships.length > 0
+        ? relationships.reduce((sum, r) => sum + r.strength, 0) /
+          relationships.length
+        : 0;
     score += avgRelationshipStrength * 0.2;
 
     return Math.min(1, score);
@@ -695,11 +744,21 @@ export class EnhancedVectorDatabase {
   /**
    * Calculate decay-aware score adjustment
    */
-  private calculateDecayScore(decayFactors: any, options: EnhancedSearchOptions): number {
-    const { memoryDecay, entityDecay, relationshipDecay, recencyBoost, importanceProtection } = decayFactors;
+  private calculateDecayScore(
+    decayFactors: any,
+    options: EnhancedSearchOptions
+  ): number {
+    const {
+      memoryDecay,
+      entityDecay,
+      relationshipDecay,
+      recencyBoost,
+      importanceProtection,
+    } = decayFactors;
 
     // Base decay penalty
-    let score = 1 - (memoryDecay * 0.3 + entityDecay * 0.2 + relationshipDecay * 0.1);
+    let score =
+      1 - (memoryDecay * 0.3 + entityDecay * 0.2 + relationshipDecay * 0.1);
 
     // Apply boosts
     score += recencyBoost * 0.2;
@@ -728,12 +787,12 @@ export class EnhancedVectorDatabase {
       case 'vector':
         return vectorScore;
       case 'graph_first':
-        return (vectorScore * 0.3) + (graphScore * 0.7);
+        return vectorScore * 0.3 + graphScore * 0.7;
       case 'decay_aware':
-        return (vectorScore * 0.6) + (decayScore * 0.4);
+        return vectorScore * 0.6 + decayScore * 0.4;
       case 'hybrid':
       default:
-        return (vectorScore * 0.5) + (graphScore * 0.3) + (decayScore * 0.2);
+        return vectorScore * 0.5 + graphScore * 0.3 + decayScore * 0.2;
     }
   }
 
@@ -754,22 +813,38 @@ export class EnhancedVectorDatabase {
 
     // Vector similarity explanation
     if (vectorScore > 0.7) {
-      reasoning.push(`High semantic similarity (${(vectorScore * 100).toFixed(1)}%) to query`);
+      reasoning.push(
+        `High semantic similarity (${(vectorScore * 100).toFixed(1)}%) to query`
+      );
     }
 
     // Graph connections explanation
     if (graphScore > 0.3) {
-      reasoning.push(`Strong entity relationships (${entities.length} entities, ${relationships.length} connections)`);
-      entityConnections.push(...entities.filter(e => e.confidence >= 0.7).map(e => e.entityName));
-      relationshipPaths.push(...relationships.filter(r => r.strength >= 0.6).map(r => `${r.relationshipType} (${(r.strength * 100).toFixed(1)}%)`));
+      reasoning.push(
+        `Strong entity relationships (${entities.length} entities, ${relationships.length} connections)`
+      );
+      entityConnections.push(
+        ...entities.filter((e) => e.confidence >= 0.7).map((e) => e.entityName)
+      );
+      relationshipPaths.push(
+        ...relationships
+          .filter((r) => r.strength >= 0.6)
+          .map(
+            (r) => `${r.relationshipType} (${(r.strength * 100).toFixed(1)}%)`
+          )
+      );
     }
 
     // Decay factors explanation
     if (decayFactors.recencyBoost > 0.1) {
-      reasoning.push(`Recent access provides relevance boost (${(decayFactors.recencyBoost * 100).toFixed(1)}%)`);
+      reasoning.push(
+        `Recent access provides relevance boost (${(decayFactors.recencyBoost * 100).toFixed(1)}%)`
+      );
     }
     if (decayFactors.importanceProtection > 0.1) {
-      reasoning.push(`High importance reduces decay penalty (${(decayFactors.importanceProtection * 100).toFixed(1)}%)`);
+      reasoning.push(
+        `High importance reduces decay penalty (${(decayFactors.importanceProtection * 100).toFixed(1)}%)`
+      );
     }
 
     return {
@@ -895,11 +970,13 @@ export class EnhancedVectorDatabase {
         `,
           [
             chunkId,
-            JSON.stringify([{
-              timestamp: now,
-              type: 'swr',
-              strength: metadata.swrStrength,
-            }]),
+            JSON.stringify([
+              {
+                timestamp: now,
+                type: 'swr',
+                strength: metadata.swrStrength,
+              },
+            ]),
           ]
         );
       }
@@ -950,7 +1027,8 @@ export class EnhancedVectorDatabase {
 
       return {
         totalChunks: parseInt(row.total_chunks),
-        avgEmbeddingDimension: parseFloat(row.avg_dimension) || this.config.dimension,
+        avgEmbeddingDimension:
+          parseFloat(row.avg_dimension) || this.config.dimension,
         memoryTypeDistribution,
         entityCount: parseInt(row.entity_count),
         relationshipCount: parseInt(row.relationship_count),
@@ -959,6 +1037,74 @@ export class EnhancedVectorDatabase {
     } finally {
       client.release();
     }
+  }
+
+  /**
+   * Cleanup old memories based on retention policy
+   */
+  async cleanup(retentionDays: number = 30): Promise<number> {
+    const client = await this.pool.connect();
+    try {
+      const cutoffDate = new Date();
+      cutoffDate.setDate(cutoffDate.getDate() - retentionDays);
+
+      const result = await client.query(
+        `DELETE FROM ${this.config.tableName} WHERE updated_at < $1`,
+        [cutoffDate.toISOString()]
+      );
+
+      console.log(`🧹 Cleaned up ${result.rowCount} old memory chunks`);
+      return result.rowCount || 0;
+    } finally {
+      client.release();
+    }
+  }
+
+  /**
+   * Get database status information
+   */
+  async getStatus(): Promise<{
+    connected: boolean;
+    totalChunks: number;
+    lastUpdated: Date | null;
+    databaseName: string;
+  }> {
+    const client = await this.pool.connect();
+    try {
+      const result = await client.query(
+        `SELECT COUNT(*) as count, MAX(updated_at) as last_updated FROM ${this.config.tableName}`
+      );
+
+      return {
+        connected: true,
+        totalChunks: parseInt(result.rows[0].count),
+        lastUpdated: result.rows[0].last_updated,
+        databaseName: this.seedDatabase,
+      };
+    } catch (error) {
+      return {
+        connected: false,
+        totalChunks: 0,
+        lastUpdated: null,
+        databaseName: this.seedDatabase,
+      };
+    } finally {
+      client.release();
+    }
+  }
+
+  /**
+   * Get database name
+   */
+  getDatabaseName(): string {
+    return this.seedDatabase;
+  }
+
+  /**
+   * Store a single chunk (alias for upsertChunk)
+   */
+  async storeChunk(chunk: EnhancedMemoryChunk): Promise<void> {
+    return this.upsertChunk(chunk);
   }
 
   /**

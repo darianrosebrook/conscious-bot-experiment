@@ -788,8 +788,7 @@ async function sendThoughtToCognitiveStream(thought: any) {
           context: {
             emotionalState: thought.context?.emotionalState || 'neutral',
             confidence: thought.context?.confidence || 0.5,
-            cognitiveSystem:
-              thought.context?.cognitiveSystem || 'enhanced-generator',
+            cognitiveSystem: thought.context?.cognitiveSystem || 'generator',
           },
           metadata: {
             thoughtType: thought.metadata?.thoughtType || thought.type,

@@ -205,9 +205,10 @@ describe('Memory System Integration with PostgreSQL + pgvector', () => {
     it('should support memory export and import', async () => {
       // Note: exportMemories currently returns empty array as placeholder
       // TODO: Implement proper memory export functionality
-      const exportData = await fixture.memorySystem.exportMemories({
-        includeMetadata: true,
-      });
+      const exportData = await fixture.memorySystem.exportMemories([
+        'episodic',
+        'semantic',
+      ]);
       expect(Array.isArray(exportData)).toBe(true);
       // Currently returns empty array - should return actual memories when implemented
       expect(exportData.length).toBeGreaterThanOrEqual(0);

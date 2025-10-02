@@ -14,7 +14,7 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { MemoryAwareLLMInterface } from '../memory-aware-llm';
-import { LLMResponse } from '../memory-aware-llm';
+import { LLMResponse } from '../llm-interface';
 
 // Mock the memory system completely
 vi.mock('@conscious-bot/memory', () => {
@@ -44,10 +44,10 @@ describe('Memory-LLM Integration Flow', () => {
     vi.clearAllMocks();
 
     // Get the mock memory system
-    const { createEnhancedMemorySystem } = await import(
+    const { createEnhancedMemorySystem, DEFAULT_MEMORY_CONFIG } = await import(
       '@conscious-bot/memory'
     );
-    mockMemorySystem = createEnhancedMemorySystem();
+    mockMemorySystem = createEnhancedMemorySystem(DEFAULT_MEMORY_CONFIG);
 
     // Initialize the memory-aware LLM
     memoryAwareLLM = new MemoryAwareLLMInterface(
@@ -129,6 +129,7 @@ describe('Memory-LLM Integration Flow', () => {
         latency: 1250,
         confidence: 0.88,
         metadata: {
+          finishReason: 'stop',
           reasoning: [
             'Retrieved episodic memory shows successful iron ore mining with stone pickaxe',
             'Semantic memory confirms tool requirements for iron ore',
@@ -157,7 +158,9 @@ describe('Memory-LLM Integration Flow', () => {
           location: { biome: 'mountains', x: 100, y: 64, z: 200 },
         },
         maxMemories: 5,
-        memoryTypes: ['episodic', 'semantic', 'procedural'],
+        memoryTypes: ['episodic', 'semantic', 'procedural'] as Array<
+          'episodic' | 'semantic' | 'procedural' | 'emotional' | 'spatial'
+        >,
       };
 
       const result = await memoryAwareLLM.generateMemoryEnhancedResponse(
@@ -179,12 +182,12 @@ describe('Memory-LLM Integration Flow', () => {
       });
 
       // B. Enhanced prompt was created with memory context
-      expect(result.memoriesUsed).toHaveLength(2);
-      expect(result.memoriesUsed[0]).toMatchObject({
+      expect(result.memoriesUsed!).toHaveLength(2);
+      expect(result.memoriesUsed![0]).toMatchObject({
         type: 'episodic',
         relevance: 0.85,
       });
-      expect(result.memoriesUsed[1]).toMatchObject({
+      expect(result.memoriesUsed![1]).toMatchObject({
         type: 'semantic',
         relevance: 0.92,
       });
@@ -256,7 +259,14 @@ describe('Memory-LLM Integration Flow', () => {
         tokensUsed: 80,
         latency: 800,
         confidence: 0.7,
-        metadata: {},
+        metadata: {
+          finishReason: 'stop',
+          usage: {
+            promptTokens: 40,
+            completionTokens: 40,
+            totalTokens: 80,
+          },
+        },
         timestamp: Date.now(),
       };
 
@@ -277,8 +287,8 @@ describe('Memory-LLM Integration Flow', () => {
       // Should still return a response even with memory failures
       expect(result.text).toContain('stone pickaxe');
       expect(result.memoriesUsed).toEqual([]); // No memories retrieved
-      expect(result.memoryOperations).toHaveLength(1);
-      expect(result.memoryOperations[0].success).toBe(false); // Storage failed
+      expect(result.memoryOperations!).toHaveLength(1);
+      expect(result.memoryOperations![0].success).toBe(false); // Storage failed
       expect(result.confidence).toBe(0.7); // No enhancement from memory
     });
 
@@ -337,6 +347,7 @@ describe('Memory-LLM Integration Flow', () => {
         latency: 1400,
         confidence: 0.92,
         metadata: {
+          finishReason: 'stop',
           reasoning: [
             'Analyzed current location and biome',
             'Checked inventory for available tools',
@@ -400,11 +411,13 @@ describe('Memory-LLM Integration Flow', () => {
       });
 
       // 7. Verify memory integration in response
-      expect(result.memoriesUsed).toHaveLength(2);
-      expect(result.memoriesUsed.some((m) => m.type === 'procedural')).toBe(
+      expect(result.memoriesUsed!).toHaveLength(2);
+      expect(result.memoriesUsed!.some((m) => m.type === 'procedural')).toBe(
         true
       );
-      expect(result.memoriesUsed.some((m) => m.type === 'episodic')).toBe(true);
+      expect(result.memoriesUsed!.some((m) => m.type === 'episodic')).toBe(
+        true
+      );
 
       // 8. Verify sensorimotor context was incorporated
       expect(result.text).toContain('mountains biome');
@@ -641,7 +654,14 @@ describe('Memory-LLM Integration Flow', () => {
         tokensUsed: 50,
         latency: 500,
         confidence: 0.6,
-        metadata: {},
+        metadata: {
+          finishReason: 'stop',
+          usage: {
+            promptTokens: 40,
+            completionTokens: 40,
+            totalTokens: 80,
+          },
+        },
         timestamp: Date.now(),
       };
 
@@ -730,7 +750,14 @@ describe('Memory-LLM Integration Flow', () => {
         tokensUsed: 80,
         latency: 600,
         confidence: 0.85,
-        metadata: {},
+        metadata: {
+          finishReason: 'stop',
+          usage: {
+            promptTokens: 40,
+            completionTokens: 40,
+            totalTokens: 80,
+          },
+        },
         timestamp: Date.now(),
       };
 
@@ -769,7 +796,14 @@ describe('Memory-LLM Integration Flow', () => {
         tokensUsed: 60,
         latency: 400,
         confidence: 0.8,
-        metadata: {},
+        metadata: {
+          finishReason: 'stop',
+          usage: {
+            promptTokens: 40,
+            completionTokens: 40,
+            totalTokens: 80,
+          },
+        },
         timestamp: Date.now(),
       };
 

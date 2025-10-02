@@ -64,7 +64,7 @@ interface SafetyIntegrityCheck {
 }
 
 // Export types for use in tests and other modules
-export {
+export type {
   FailSafeConfig,
   EmergencyDeclaration,
   EmergencyProtocol,

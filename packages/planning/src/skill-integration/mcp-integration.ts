@@ -3,7 +3,7 @@
  *
  * This enhanced MCP integration provides:
  * - Dynamic capability discovery and registration
- * - LLM-enhanced capability planning
+ * - LLM capability planning
  * - Integration with skill composition system
  * - Adaptive capability selection and execution
  *
@@ -33,7 +33,7 @@ export class DynamicCreationFlow {
     return { created: true, config };
   }
 }
-import { LLMEnhancedSkillComposer } from './llm-enhanced-skill-composer';
+import { LLMEnhancedSkillComposer } from './llm-skill-composer';
 import { Goal, GoalType, GoalStatus } from '../types';
 
 // ============================================================================
@@ -202,17 +202,17 @@ export class EnhancedMCPIntegration extends EventEmitter {
    * Set up event handlers for monitoring and debugging
    */
   private setupEventHandlers(): void {
-    this.llmSkillComposer.on('skillComposed', (skill) => {
+    this.llmSkillComposer.on('skillComposed', (skill: any) => {
       this.emit('skillComposed', skill);
       console.log(`🎯 LLM skill composed via MCP integration: ${skill.name}`);
     });
 
-    this.llmSkillComposer.on('goalRefined', (data) => {
+    this.llmSkillComposer.on('goalRefined', (data: any) => {
       this.emit('goalRefined', data);
       console.log(`✨ Goal refined via MCP integration: ${data.reasoning}`);
     });
 
-    this.llmSkillComposer.on('skillsGenerated', (data) => {
+    this.llmSkillComposer.on('skillsGenerated', (data: any) => {
       this.emit('skillsGenerated', data);
       console.log(
         `🎨 Skills generated via MCP integration: ${data.result.generatedSkills.length} skills`
@@ -495,7 +495,7 @@ export class EnhancedMCPIntegration extends EventEmitter {
   }
 
   /**
-   * Integrate with LLM-enhanced skill composer
+   * Integrate with LLM skill composer
    */
   async integrateWithLLMComposer(
     goal: Goal,
@@ -508,7 +508,7 @@ export class EnhancedMCPIntegration extends EventEmitter {
   }> {
     try {
       console.log(
-        `🧠 Integrating MCP with LLM-enhanced skill composer for goal: ${goal.description}`
+        `🧠 Integrating MCP with LLM skill composer for goal: ${goal.description}`
       );
 
       // 1. Discover MCP capabilities
@@ -519,7 +519,7 @@ export class EnhancedMCPIntegration extends EventEmitter {
         maxResults: 10,
       });
 
-      // 2. Attempt LLM-enhanced skill composition
+      // 2. Attempt LLM skill composition
       const llmContext = this.convertToLLMContext(context);
       const llmResult = await this.llmSkillComposer.composeLeavesWithLLM(
         goal,

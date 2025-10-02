@@ -10,24 +10,7 @@
  */
 
 import { EventEmitter } from 'events';
-// Temporary local type definition until @conscious-bot/memory is available
-export class SkillRegistry {
-  constructor() {}
-  register(name: string, skill: any): void {
-    console.log(`Registered skill: ${name}`);
-  }
-  getAllSkills(): any[] {
-    return [];
-  }
-  recordSkillUsage(skillId: string, success: boolean, duration: number): void {
-    console.log(
-      `Recorded skill usage: ${skillId}, success: ${success}, duration: ${duration}`
-    );
-  }
-  getSkill(id: string): any {
-    return null;
-  }
-}
+import { SkillRegistry } from '@conscious-bot/memory';
 import { BehaviorTreeRunner } from '../behavior-trees/BehaviorTreeRunner';
 import {
   SkillPlannerAdapter,

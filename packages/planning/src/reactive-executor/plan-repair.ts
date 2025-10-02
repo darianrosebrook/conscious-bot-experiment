@@ -14,7 +14,7 @@ import {
   WorldState,
   ExecutionContext,
   EnhancedGOAPPlanner,
-} from './enhanced-goap-planner';
+} from './goap-planner';
 
 export interface PlanRepairMetrics {
   repairAttempts: number;

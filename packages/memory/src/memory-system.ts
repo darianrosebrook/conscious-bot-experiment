@@ -30,10 +30,15 @@ import {
   GraphRAGOptions,
   GraphRAGResult,
 } from './semantic/graph-rag';
-import { KnowledgeGraphCore } from './semantic/knowledge-graph-core';
+import { EnhancedKnowledgeGraphCore } from './knowledge-graph-core';
 import { MemoryDecayManager } from './memory-decay-manager';
 import { ReflectionMemoryManager } from './reflection-memory';
 import { ToolEfficiencyMemoryManager } from './tool-efficiency-memory';
+import {
+  CrossModalEntityLinker,
+  CrossModalEntity,
+  EntityLinkingConfig,
+} from './cross-modal-entity-linker';
 import { z } from 'zod';
 import { EntityType, KnowledgeSource } from './semantic/types';
 
@@ -74,6 +79,12 @@ export interface EnhancedMemorySystemConfig {
   enableDiversification: boolean;
   enableSemanticBoost: boolean;
   enablePersistence: boolean;
+
+  // Enhanced search features
+  enableMultiHopReasoning: boolean;
+  enableProvenanceTracking: boolean;
+  enableDecayAwareRanking: boolean;
+  maxHops: number;
 
   // Memory decay and cleanup configuration
   enableMemoryDecay: boolean;
@@ -187,6 +198,8 @@ export class EnhancedMemorySystem extends EventEmitter {
   private chunkingService: ChunkingService;
   private hybridSearchService: HybridSearchService;
   private graphRag: GraphRAG;
+  private knowledgeGraph: EnhancedKnowledgeGraphCore;
+  private entityLinker: CrossModalEntityLinker;
   private memoryDecayManager: MemoryDecayManager;
   private reflectionMemoryManager: ReflectionMemoryManager;
   private toolEfficiencyManager: ToolEfficiencyMemoryManager;
@@ -228,12 +241,14 @@ export class EnhancedMemorySystem extends EventEmitter {
     issues: string[];
   }> = [];
 
-  private backupQueue: MemoryChunk[] = [];
+  private backupQueue: EnhancedMemoryChunk[] = [];
   private isRecoveryMode = false;
 
   constructor(private config: EnhancedMemorySystemConfig) {
+    super();
+
     // Initialize core services
-    this.vectorDb = new VectorDatabase({
+    this.vectorDb = new EnhancedVectorDatabase({
       host: config.host,
       port: config.port,
       user: config.user,
@@ -242,7 +257,6 @@ export class EnhancedMemorySystem extends EventEmitter {
       worldSeed: config.worldSeed,
       tableName: config.vectorDbTableName,
       dimension: config.embeddingDimension,
-      enablePersistence: config.enablePersistence,
     });
 
     this.embeddingService = new EmbeddingService({
@@ -254,19 +268,25 @@ export class EnhancedMemorySystem extends EventEmitter {
     this.chunkingService = new ChunkingService(config.chunkingConfig);
 
     // Initialize knowledge graph for GraphRAG
-    const knowledgeGraph = new KnowledgeGraphCore({
-      persistToStorage: config.enablePersistence,
-      storageDirectory: './memory-storage',
+    this.knowledgeGraph = new EnhancedKnowledgeGraphCore({
+      host: config.host,
+      port: config.port,
+      user: config.user,
+      password: config.password,
+      database: config.database,
+      vectorDb: this.vectorDb,
+      embeddingService: this.embeddingService,
     });
 
-    this.graphRag = new GraphRAG(knowledgeGraph);
+    this.graphRag = new GraphRAG(this.knowledgeGraph);
 
-    // Initialize hybrid search service
+    // Initialize hybrid search service with enhanced features
     this.hybridSearchService = new HybridSearchService({
       vectorDb: this.vectorDb,
       embeddingService: this.embeddingService,
       graphRag: this.graphRag,
       chunkingService: this.chunkingService,
+      knowledgeGraph: this.knowledgeGraph,
       defaultGraphWeight: config.defaultGraphWeight,
       defaultVectorWeight: config.defaultVectorWeight,
       maxResults: config.maxSearchResults,
@@ -274,6 +294,20 @@ export class EnhancedMemorySystem extends EventEmitter {
       enableQueryExpansion: config.enableQueryExpansion,
       enableDiversification: config.enableDiversification,
       enableSemanticBoost: config.enableSemanticBoost,
+      enableMultiHopReasoning: config.enableMultiHopReasoning,
+      enableProvenanceTracking: config.enableProvenanceTracking,
+      enableDecayAwareRanking: config.enableDecayAwareRanking,
+      maxHops: config.maxHops,
+    });
+
+    // Initialize cross-modal entity linker for unified entity representation
+    this.entityLinker = new CrossModalEntityLinker({
+      similarityThreshold: 0.8,
+      confidenceThreshold: 0.7,
+      maxAliases: 10,
+      enableEvolutionTracking: true,
+      enableCrossModalMerging: true,
+      enableAutomaticDeduplication: true,
     });
 
     // Initialize memory decay manager for "use it or lose it" memory management
@@ -375,7 +409,7 @@ export class EnhancedMemorySystem extends EventEmitter {
       for (const chunk of chunks) {
         const embedding = await this.embeddingService.embed(chunk.content);
 
-        const memoryChunk: MemoryChunk = {
+        const memoryChunk: EnhancedMemoryChunk = {
           id: chunk.id,
           content: chunk.content,
           embedding: embedding.embedding,
@@ -567,7 +601,7 @@ export class EnhancedMemorySystem extends EventEmitter {
   /**
    * Export memories for backup or migration
    */
-  async exportMemories(types?: string[]): Promise<MemoryChunk[]> {
+  async exportMemories(types?: string[]): Promise<EnhancedMemoryChunk[]> {
     // This would require a full table scan in production
     // For now, return empty array as placeholder
     console.log('📤 Exporting memories...');
@@ -577,7 +611,7 @@ export class EnhancedMemorySystem extends EventEmitter {
   /**
    * Import memories from backup
    */
-  async importMemories(chunks: MemoryChunk[]): Promise<number> {
+  async importMemories(chunks: EnhancedMemoryChunk[]): Promise<number> {
     console.log(`📥 Importing ${chunks.length} memories...`);
     await this.vectorDb.batchUpsertChunks(chunks);
     return chunks.length;
@@ -1807,7 +1841,9 @@ export class EnhancedMemorySystem extends EventEmitter {
   /**
    * Generate hash for backup verification
    */
-  private async generateBackupHash(memories: MemoryChunk[]): Promise<string> {
+  private async generateBackupHash(
+    memories: EnhancedMemoryChunk[]
+  ): Promise<string> {
     const data = memories.map((m) => m.id + m.content).join('');
     let hash = 0;
     for (let i = 0; i < data.length; i++) {

@@ -12,8 +12,11 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi, Mock } from 'vitest';
-import { MemoryAwareLLMInterface } from '../memory-aware-llm';
-import { LLMResponse, MemoryEnhancedLLMContext } from '../memory-aware-llm';
+import {
+  MemoryAwareLLMInterface,
+  MemoryEnhancedLLMContext,
+} from '../memory-aware-llm';
+import { LLMResponse } from '../llm-interface';
 import { EnhancedMemorySystem } from '@conscious-bot/memory';
 
 // Mock the memory system
@@ -188,7 +191,14 @@ describe('MemoryAwareLLMInterface', () => {
         tokensUsed: 100,
         latency: 1000,
         confidence: 0.8,
-        metadata: {},
+        metadata: {
+          finishReason: 'stop',
+          usage: {
+            promptTokens: 50,
+            completionTokens: 50,
+            totalTokens: 100,
+          },
+        },
         timestamp: Date.now(),
       };
 
@@ -196,7 +206,14 @@ describe('MemoryAwareLLMInterface', () => {
         id: 'stored-memory',
         content: 'Conversation stored',
         type: 'dialogue',
-        metadata: {},
+        metadata: {
+          finishReason: 'stop',
+          usage: {
+            promptTokens: 50,
+            completionTokens: 50,
+            totalTokens: 100,
+          },
+        },
       });
 
       const operations = await memoryAwareLLM['storeResponseAndMemories'](
@@ -222,7 +239,14 @@ describe('MemoryAwareLLMInterface', () => {
         tokensUsed: 100,
         latency: 1000,
         confidence: 0.8,
-        metadata: {},
+        metadata: {
+          finishReason: 'stop',
+          usage: {
+            promptTokens: 50,
+            completionTokens: 50,
+            totalTokens: 100,
+          },
+        },
         timestamp: Date.now(),
       };
 
@@ -255,7 +279,15 @@ describe('MemoryAwareLLMInterface', () => {
         tokensUsed: 100,
         latency: 1000,
         confidence: 0.8,
-        metadata: { reasoning: ['Step 1', 'Step 2'] },
+        metadata: {
+          finishReason: 'stop',
+          usage: {
+            promptTokens: 100,
+            completionTokens: 50,
+            totalTokens: 150,
+          },
+          reasoning: ['Step 1', 'Step 2'],
+        },
         timestamp: Date.now(),
       };
 
@@ -311,7 +343,14 @@ describe('MemoryAwareLLMInterface', () => {
         tokensUsed: 100,
         latency: 1000,
         confidence: 0.8,
-        metadata: {},
+        metadata: {
+          finishReason: 'stop',
+          usage: {
+            promptTokens: 50,
+            completionTokens: 50,
+            totalTokens: 100,
+          },
+        },
         timestamp: Date.now(),
       };
 
@@ -325,7 +364,14 @@ describe('MemoryAwareLLMInterface', () => {
         id: 'stored-memory',
         content: 'Conversation stored',
         type: 'dialogue',
-        metadata: {},
+        metadata: {
+          finishReason: 'stop',
+          usage: {
+            promptTokens: 50,
+            completionTokens: 50,
+            totalTokens: 100,
+          },
+        },
       });
 
       // Mock the base generateResponse method
@@ -373,7 +419,14 @@ describe('MemoryAwareLLMInterface', () => {
         tokensUsed: 50,
         latency: 500,
         confidence: 0.6,
-        metadata: {},
+        metadata: {
+          finishReason: 'stop',
+          usage: {
+            promptTokens: 50,
+            completionTokens: 50,
+            totalTokens: 100,
+          },
+        },
         timestamp: Date.now(),
       };
       vi.spyOn(memoryAwareLLM as any, 'generateResponse').mockResolvedValue(
@@ -392,8 +445,8 @@ describe('MemoryAwareLLMInterface', () => {
 
       expect(result.text).toBe('Fallback response');
       expect(result.memoriesUsed).toEqual([]);
-      expect(result.memoryOperations).toHaveLength(1);
-      expect(result.memoryOperations[0].success).toBe(false);
+      expect(result.memoryOperations!).toHaveLength(1);
+      expect(result.memoryOperations![0].success).toBe(false);
     });
   });
 
@@ -406,7 +459,14 @@ describe('MemoryAwareLLMInterface', () => {
         tokensUsed: 200,
         latency: 1500,
         confidence: 0.9,
-        metadata: {},
+        metadata: {
+          finishReason: 'stop',
+          usage: {
+            promptTokens: 50,
+            completionTokens: 50,
+            totalTokens: 100,
+          },
+        },
         timestamp: Date.now(),
       };
 
@@ -492,7 +552,15 @@ describe('MemoryAwareLLMInterface', () => {
         tokensUsed: 150,
         latency: 1200,
         confidence: 0.85,
-        metadata: { reasoning: ['Step 1', 'Step 2', 'Alternative considered'] },
+        metadata: {
+          finishReason: 'stop',
+          usage: {
+            promptTokens: 120,
+            completionTokens: 80,
+            totalTokens: 200,
+          },
+          reasoning: ['Step 1', 'Step 2', 'Alternative considered'],
+        },
         timestamp: Date.now(),
       };
 
@@ -540,7 +608,14 @@ describe('MemoryAwareLLMInterface', () => {
         tokensUsed: 100,
         latency: 1000,
         confidence: 0.8,
-        metadata: {},
+        metadata: {
+          finishReason: 'stop',
+          usage: {
+            promptTokens: 50,
+            completionTokens: 50,
+            totalTokens: 100,
+          },
+        },
         timestamp: Date.now(),
       };
 
@@ -557,7 +632,14 @@ describe('MemoryAwareLLMInterface', () => {
         tokensUsed: 200,
         latency: 1500,
         confidence: 0.9,
-        metadata: {},
+        metadata: {
+          finishReason: 'stop',
+          usage: {
+            promptTokens: 50,
+            completionTokens: 50,
+            totalTokens: 100,
+          },
+        },
         timestamp: Date.now(),
       };
 
@@ -576,7 +658,14 @@ describe('MemoryAwareLLMInterface', () => {
         tokensUsed: 100,
         latency: 1000,
         confidence: 0.9,
-        metadata: {},
+        metadata: {
+          finishReason: 'stop',
+          usage: {
+            promptTokens: 50,
+            completionTokens: 50,
+            totalTokens: 100,
+          },
+        },
         timestamp: Date.now(),
       };
 
@@ -614,6 +703,12 @@ describe('MemoryAwareLLMInterface', () => {
         latency: 1100,
         confidence: 0.85,
         metadata: {
+          finishReason: 'stop',
+          usage: {
+            promptTokens: 80,
+            completionTokens: 40,
+            totalTokens: 120,
+          },
           reasoning: [
             'Retrieved memories show successful pattern',
             'Knowledge confirms tool requirement',
@@ -632,7 +727,14 @@ describe('MemoryAwareLLMInterface', () => {
         id: 'stored-memory',
         content: 'Conversation about iron ore mining stored',
         type: 'dialogue',
-        metadata: {},
+        metadata: {
+          finishReason: 'stop',
+          usage: {
+            promptTokens: 50,
+            completionTokens: 50,
+            totalTokens: 100,
+          },
+        },
       });
 
       mockMemorySystem.recordCognitivePattern = vi
@@ -659,18 +761,18 @@ describe('MemoryAwareLLMInterface', () => {
       );
 
       // Verify the complete flow
-      expect(result.memoriesUsed).toHaveLength(2);
-      expect(result.memoriesUsed[0]).toMatchObject({
+      expect(result.memoriesUsed!).toHaveLength(2);
+      expect(result.memoriesUsed![0]).toMatchObject({
         type: 'episodic',
         relevance: 0.8,
       });
-      expect(result.memoriesUsed[1]).toMatchObject({
+      expect(result.memoriesUsed![1]).toMatchObject({
         type: 'semantic',
         relevance: 0.9,
       });
 
-      expect(result.memoryOperations).toHaveLength(1);
-      expect(result.memoryOperations[0]).toMatchObject({
+      expect(result.memoryOperations!).toHaveLength(1);
+      expect(result.memoryOperations![0]).toMatchObject({
         type: 'store',
         memoryType: 'dialogue',
         success: true,
@@ -699,7 +801,14 @@ describe('MemoryAwareLLMInterface', () => {
         tokensUsed: 150,
         latency: 1300,
         confidence: 0.88,
-        metadata: {},
+        metadata: {
+          finishReason: 'stop',
+          usage: {
+            promptTokens: 50,
+            completionTokens: 50,
+            totalTokens: 100,
+          },
+        },
         timestamp: Date.now(),
       };
 
@@ -713,7 +822,14 @@ describe('MemoryAwareLLMInterface', () => {
         id: 'stored-memory',
         content: 'Mining strategy conversation stored',
         type: 'dialogue',
-        metadata: {},
+        metadata: {
+          finishReason: 'stop',
+          usage: {
+            promptTokens: 50,
+            completionTokens: 50,
+            totalTokens: 100,
+          },
+        },
       });
 
       // Mock the base generateResponse method

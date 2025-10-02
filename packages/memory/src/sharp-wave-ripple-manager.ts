@@ -11,7 +11,7 @@
  * @author @darianrosebrook
  */
 
-import { VectorDatabase, MemoryChunk } from './vector-database';
+import { EnhancedVectorDatabase, EnhancedMemoryChunk } from './vector-database';
 import { EmbeddingService } from './embedding-service';
 import { z } from 'zod';
 
@@ -39,7 +39,7 @@ export interface SharpWaveRippleConfig {
   temporalCompressionRatio: number;
 
   /** Dependencies */
-  vectorDb: VectorDatabase;
+  vectorDb: EnhancedVectorDatabase;
   embeddingService: EmbeddingService;
 }
 

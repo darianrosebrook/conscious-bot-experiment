@@ -79,7 +79,9 @@ describe('MCPIntegration', () => {
     expect(server?.constructor?.name).toBe('ConsciousBotMCPServer');
 
     const tools = await integration.listTools();
-    expect(tools).toContain(`minecraft.${leaf.spec.name}@${leaf.spec.version}`);
+    expect(tools).toContain(
+      `minecraft.${leaf.spec!.name}@${leaf.spec!.version}`
+    );
   });
 
   it('registers options through the MCP server and updates the bot instance without errors', async () => {

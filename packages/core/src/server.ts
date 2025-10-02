@@ -8,7 +8,7 @@
  */
 
 import express from 'express';
-import { EnhancedRegistry } from './mcp-capabilities/enhanced-registry';
+import { EnhancedRegistry } from './mcp-capabilities/registry';
 import { DynamicCreationFlow } from './mcp-capabilities/dynamic-creation-flow';
 import { LeafContext } from './mcp-capabilities/leaf-contracts';
 

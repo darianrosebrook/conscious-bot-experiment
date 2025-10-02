@@ -1,4 +1,4 @@
-import { EnhancedEnvironmentIntegration } from '../enhanced-environment-integration';
+import { EnhancedEnvironmentIntegration } from '../environment-integration';
 import { Goal, GoalStatus, GoalType } from '../types';
 import { auditLogger } from '../../cognition/src/audit/thought-action-audit-logger';
 

@@ -282,7 +282,9 @@ export class QueryEngine {
 
     return {
       entity,
+      entityId: entity.id,
       neighbors,
+      relationships: neighbors.map((n) => n.relationship),
       depth,
     };
   }
@@ -319,6 +321,7 @@ export class QueryEngine {
       entities: result.entities,
       relationships: result.relationships,
       length: result.relationships.length,
+      hopCount: result.relationships.length,
       confidence: result.metadata.confidence,
     };
 

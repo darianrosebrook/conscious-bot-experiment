@@ -3,12 +3,21 @@
  *
  * Combines vector similarity search with knowledge graph queries to provide
  * the best of both worlds: semantic understanding and structured reasoning.
- * Implements advanced ranking, query expansion, and result diversification.
+ *
+ * Enhanced with obsidian-rag patterns:
+ * - Multi-hop reasoning across entity relationships
+ * - Explainable provenance tracking
+ * - Decay-aware search ranking
+ * - Cross-modal entity linking
  *
  * @author @darianrosebrook
  */
 
-import { VectorDatabase, MemoryChunk, SearchResult } from './vector-database';
+import {
+  EnhancedVectorDatabase,
+  EnhancedMemoryChunk,
+  EnhancedSearchResult,
+} from './vector-database';
 import { EmbeddingService, EmbeddingResult } from './embedding-service';
 import {
   ChunkingService,
@@ -20,6 +29,8 @@ import {
   GraphRAGOptions,
   GraphRAGResult,
 } from './semantic/graph-rag';
+import { EnhancedKnowledgeGraphCore } from './knowledge-graph-core';
+import { KnowledgePath } from './semantic/types';
 import { z } from 'zod';
 
 // ============================================================================
@@ -93,6 +104,25 @@ export interface HybridSearchResult {
   confidence: number;
   relevanceScore: number;
   freshnessScore: number;
+
+  // Enhanced with obsidian-rag patterns
+  provenance?: {
+    reasoning: string;
+    entityPaths?: Array<{
+      path: string[];
+      relationships: string[];
+      confidence: number;
+      hopCount: number;
+    }>;
+    searchMethod: 'vector' | 'graph_traversal' | 'hybrid_fusion';
+    decayFactors?: {
+      memoryDecay: number;
+      entityDecay: number;
+      relationshipDecay: number;
+      recencyBoost: number;
+      importanceProtection: number;
+    };
+  };
 }
 
 export interface HybridSearchResponse {
@@ -121,10 +151,11 @@ export interface HybridSearchResponse {
 }
 
 export interface HybridSearchServiceConfig {
-  vectorDb: VectorDatabase;
+  vectorDb: EnhancedVectorDatabase;
   embeddingService: EmbeddingService;
   graphRag: GraphRAG;
   chunkingService: ChunkingService;
+  knowledgeGraph: EnhancedKnowledgeGraphCore;
 
   // Default weights
   defaultGraphWeight: number;
@@ -138,6 +169,12 @@ export interface HybridSearchServiceConfig {
   enableQueryExpansion: boolean;
   enableDiversification: boolean;
   enableSemanticBoost: boolean;
+
+  // Enhanced features
+  enableMultiHopReasoning: boolean;
+  enableProvenanceTracking: boolean;
+  enableDecayAwareRanking: boolean;
+  maxHops: number;
 }
 
 // ============================================================================
@@ -153,6 +190,7 @@ export class HybridSearchService {
 
   /**
    * Perform hybrid search combining vector and graph approaches
+   * Enhanced with multi-hop reasoning and provenance tracking
    */
   async search(options: HybridSearchOptions): Promise<HybridSearchResponse> {
     const startTime = Date.now();
@@ -177,7 +215,7 @@ export class HybridSearchService {
     const embeddingResult =
       await this.config.embeddingService.embedWithStrategy(
         expandedQuery,
-        'memory',
+        'semantic',
         'minecraft'
       );
     const embeddingTime = Date.now() - embeddingStart;
@@ -193,12 +231,33 @@ export class HybridSearchService {
 
     // Combine and rank results
     const rankingStart = Date.now();
-    const combinedResults = this.combineResults(
+    let combinedResults = this.combineResults(
       vectorResults,
       graphResults,
       searchOptions,
       embeddingResult
     );
+
+    // Enhanced: Multi-hop reasoning and provenance tracking
+    if (this.config.enableMultiHopReasoning) {
+      combinedResults = await this.enhanceWithMultiHopReasoning(
+        combinedResults,
+        searchOptions
+      );
+    }
+
+    // Enhanced: Decay-aware ranking
+    if (this.config.enableDecayAwareRanking) {
+      combinedResults = this.applyDecayAwareRanking(combinedResults);
+    }
+
+    // Enhanced: Provenance tracking
+    if (this.config.enableProvenanceTracking) {
+      combinedResults = await this.addProvenanceTracking(
+        combinedResults,
+        searchOptions
+      );
+    }
 
     // Apply diversification if enabled
     const finalResults = searchOptions.resultDiversification
@@ -218,7 +277,7 @@ export class HybridSearchService {
       results: finalResults,
       totalFound: combinedResults.length,
       searchTime: totalTime,
-      length: finalResults.length, // Add length property
+      length: finalResults.length,
       strategy: {
         graphWeight: searchOptions.graphWeight || 0,
         vectorWeight: searchOptions.vectorWeight || 0,
@@ -328,11 +387,11 @@ export class HybridSearchService {
 
     return {
       totalMemories: stats.totalChunks,
-      typeDistribution: stats.typeDistribution,
-      recentActivity: stats.recentChunks,
+      typeDistribution: stats.memoryTypeDistribution,
+      recentActivity: 0, // Would need separate query
       topEntities: [], // Placeholder
       topTopics: [], // Placeholder
-      averageConfidence: stats.averageConfidence,
+      averageConfidence: 0.5, // Would need separate calculation
     };
   }
 
@@ -368,17 +427,15 @@ export class HybridSearchService {
   private async performVectorSearch(
     embedding: EmbeddingResult,
     options: HybridSearchOptions & { graphWeight: number; vectorWeight: number }
-  ): Promise<SearchResult[]> {
-    return this.config.vectorDb.search(
-      embedding.embedding,
-      options.limit || 50, // Get more for ranking
-      {
-        type: options.types?.[0],
-        minConfidence: options.minConfidence,
-        maxAge: options.maxAge,
-        world: options.world,
-      }
-    );
+  ): Promise<EnhancedSearchResult[]> {
+    return this.config.vectorDb.search({
+      queryEmbedding: embedding.embedding,
+      limit: options.limit || 50, // Get more for ranking
+      memoryTypes: options.types,
+      minConfidence: options.minConfidence,
+      maxAge: options.maxAge,
+      world: options.world,
+    });
   }
 
   private async performGraphSearch(
@@ -388,7 +445,7 @@ export class HybridSearchService {
   }
 
   private combineResults(
-    vectorResults: SearchResult[],
+    vectorResults: EnhancedSearchResult[],
     graphResults: GraphRAGResult,
     options: HybridSearchOptions & {
       graphWeight: number;
@@ -500,7 +557,7 @@ export class HybridSearchService {
   }
 
   private calculateRelevanceScore(
-    result: SearchResult,
+    result: EnhancedSearchResult,
     options: HybridSearchOptions,
     embedding: EmbeddingResult
   ): number {
@@ -525,7 +582,7 @@ export class HybridSearchService {
     return Math.min(1.0, relevance);
   }
 
-  private calculateFreshnessScore(result: SearchResult): number {
+  private calculateFreshnessScore(result: EnhancedSearchResult): number {
     const now = Date.now();
     const age = now - (result.metadata.timestamp || now);
     const ageHours = age / (1000 * 60 * 60);
@@ -680,5 +737,267 @@ export class HybridSearchService {
       graphWeight: 0.5,
       vectorWeight: 0.5,
     };
+  }
+
+  // ============================================================================
+  // Enhanced Methods: Multi-Hop Reasoning & Provenance Tracking
+  // ============================================================================
+
+  /**
+   * Enhance search results with multi-hop reasoning
+   * Finds related memories through entity relationship traversal
+   */
+  private async enhanceWithMultiHopReasoning(
+    results: HybridSearchResult[],
+    options: HybridSearchOptions
+  ): Promise<HybridSearchResult[]> {
+    const enhancedResults: HybridSearchResult[] = [];
+    const maxHops = this.config.maxHops || 3;
+
+    for (const result of results) {
+      const enhanced = { ...result };
+
+      // Extract entities from the result
+      const entities = result.metadata.entities || [];
+
+      if (entities.length > 0 && this.config.knowledgeGraph) {
+        try {
+          // Find paths between entities in the result
+          const paths: Array<{
+            path: string[];
+            relationships: string[];
+            confidence: number;
+            hopCount: number;
+          }> = [];
+
+          for (let i = 0; i < entities.length - 1; i++) {
+            for (let j = i + 1; j < entities.length; j++) {
+              // Search for entities in knowledge graph
+              const sourceResults =
+                await this.config.knowledgeGraph.searchEntities({
+                  query: entities[i],
+                  limit: 1,
+                });
+
+              const targetResults =
+                await this.config.knowledgeGraph.searchEntities({
+                  query: entities[j],
+                  limit: 1,
+                });
+
+              if (
+                sourceResults.entities.length > 0 &&
+                targetResults.entities.length > 0
+              ) {
+                const sourceId = sourceResults.entities[0].id;
+                const targetId = targetResults.entities[0].id;
+
+                // Find paths between entities
+                const knowledgePaths =
+                  await this.config.knowledgeGraph.findPath(
+                    sourceId,
+                    targetId,
+                    maxHops
+                  );
+
+                // Convert knowledge paths to provenance format
+                for (const kPath of knowledgePaths.slice(0, 3)) {
+                  paths.push({
+                    path: kPath.entities.map((e) => e.id),
+                    relationships: kPath.relationships.map((r) => r.id),
+                    confidence: kPath.confidence,
+                    hopCount: kPath.hopCount,
+                  });
+                }
+              }
+            }
+          }
+
+          // Add paths to result if found
+          if (paths.length > 0) {
+            enhanced.provenance = {
+              ...(enhanced.provenance || {
+                reasoning: '',
+                searchMethod: 'hybrid_fusion' as const,
+              }),
+              entityPaths: paths,
+            };
+
+            // Boost score based on path quality
+            const pathBoost =
+              paths.reduce((sum, p) => sum + p.confidence, 0) / paths.length;
+            enhanced.score = enhanced.score * (1 + pathBoost * 0.2);
+            enhanced.graphScore = Math.max(enhanced.graphScore, pathBoost);
+          }
+        } catch (error) {
+          console.warn('⚠️ Multi-hop reasoning failed:', error);
+        }
+      }
+
+      enhancedResults.push(enhanced);
+    }
+
+    // Re-sort by updated scores
+    return enhancedResults.sort((a, b) => b.score - a.score);
+  }
+
+  /**
+   * Apply decay-aware ranking to search results
+   * Adjusts scores based on memory decay factors
+   */
+  private applyDecayAwareRanking(
+    results: HybridSearchResult[]
+  ): HybridSearchResult[] {
+    const now = Date.now();
+
+    return results
+      .map((result) => {
+        const enhanced = { ...result };
+
+        // Calculate decay factors from metadata
+        const lastAccessed =
+          result.metadata.lastAccessed ||
+          result.metadata.timestamp ||
+          Date.now();
+        const timeSinceAccess = now - lastAccessed;
+        const daysSinceAccess = timeSinceAccess / (1000 * 60 * 60 * 24);
+
+        // Calculate memory decay (logarithmic: use it or lose it)
+        const accessCount = result.metadata.accessCount || 1;
+        const importance = result.metadata.importance || 0.5;
+
+        // Logarithmic decay formula
+        const usageBoost = Math.log10(accessCount + 1) * 0.1;
+        const memoryDecay = Math.min(0.9, daysSinceAccess * 0.02 - usageBoost);
+        const recencyBoost = Math.max(0, 1 - daysSinceAccess * 0.05);
+        const importanceProtection = importance * 0.3;
+
+        // Entity decay (if entities are present)
+        const entityDecay =
+          result.metadata.entities && result.metadata.entities.length > 0
+            ? Math.min(0.5, daysSinceAccess * 0.01)
+            : 0;
+
+        // Relationship decay (if multi-hop paths exist)
+        const relationshipDecay = result.provenance?.entityPaths
+          ? Math.min(0.3, daysSinceAccess * 0.005)
+          : 0;
+
+        const decayFactors = {
+          memoryDecay,
+          entityDecay,
+          relationshipDecay,
+          recencyBoost,
+          importanceProtection,
+        };
+
+        // Adjust score based on decay
+        const decayAdjustment =
+          1 -
+          memoryDecay +
+          recencyBoost * 0.3 +
+          importanceProtection -
+          entityDecay * 0.2 -
+          relationshipDecay * 0.1;
+
+        enhanced.score = result.score * Math.max(0.1, decayAdjustment);
+
+        // Add decay factors to provenance
+        enhanced.provenance = {
+          ...(enhanced.provenance || {
+            reasoning: '',
+            searchMethod: result.searchStrategy as
+              | 'vector'
+              | 'graph_traversal'
+              | 'hybrid_fusion',
+          }),
+          decayFactors,
+        };
+
+        return enhanced;
+      })
+      .sort((a, b) => b.score - a.score);
+  }
+
+  /**
+   * Add explainable provenance tracking to search results
+   * Explains why each result was retrieved and how it relates to the query
+   */
+  private async addProvenanceTracking(
+    results: HybridSearchResult[],
+    options: HybridSearchOptions
+  ): Promise<HybridSearchResult[]> {
+    return results.map((result) => {
+      const enhanced = { ...result };
+
+      // Build reasoning explanation
+      const reasoningParts: string[] = [];
+
+      // Vector search contribution
+      if (result.vectorScore > 0) {
+        reasoningParts.push(
+          `Semantic similarity: ${(result.vectorScore * 100).toFixed(1)}%`
+        );
+      }
+
+      // Graph search contribution
+      if (result.graphScore > 0) {
+        reasoningParts.push(
+          `Knowledge graph relevance: ${(result.graphScore * 100).toFixed(1)}%`
+        );
+      }
+
+      // Entity matches
+      if (result.metadata.entities && result.metadata.entities.length > 0) {
+        reasoningParts.push(
+          `Matched entities: ${result.metadata.entities.join(', ')}`
+        );
+      }
+
+      // Multi-hop paths
+      if (
+        result.provenance?.entityPaths &&
+        result.provenance.entityPaths.length > 0
+      ) {
+        const pathCount = result.provenance.entityPaths.length;
+        const avgHops =
+          result.provenance.entityPaths.reduce(
+            (sum, p) => sum + p.hopCount,
+            0
+          ) / pathCount;
+        reasoningParts.push(
+          `Found ${pathCount} relationship path${pathCount > 1 ? 's' : ''} (avg ${avgHops.toFixed(1)} hops)`
+        );
+      }
+
+      // Decay factors
+      if (result.provenance?.decayFactors) {
+        const df = result.provenance.decayFactors;
+        if (df.recencyBoost > 0.5) {
+          reasoningParts.push('Recently accessed');
+        }
+        if (df.importanceProtection > 0.2) {
+          reasoningParts.push('High importance');
+        }
+      }
+
+      // Freshness
+      if (result.freshnessScore > 0.8) {
+        reasoningParts.push('Recent memory');
+      }
+
+      const reasoning = reasoningParts.join(' • ');
+
+      enhanced.provenance = {
+        ...(enhanced.provenance || {}),
+        reasoning,
+        searchMethod: result.searchStrategy as
+          | 'vector'
+          | 'graph_traversal'
+          | 'hybrid_fusion',
+      };
+
+      return enhanced;
+    });
   }
 }

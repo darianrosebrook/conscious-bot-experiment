@@ -34,6 +34,10 @@ export interface ChunkingMetadata {
   topics?: string[];
   sentiment?: 'positive' | 'negative' | 'neutral';
   importance?: number;
+
+  // Memory decay tracking properties
+  lastAccessed?: number;
+  accessCount?: number;
 }
 
 export interface TextChunk {

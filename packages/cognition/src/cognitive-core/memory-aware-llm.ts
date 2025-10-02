@@ -239,7 +239,7 @@ export class MemoryAwareLLMInterface extends LLMInterface {
       memories
     );
 
-    // Step 5: Calculate memory-enhanced confidence
+    // Step 5: Calculate memory confidence
     const enhancedConfidence = this.calculateMemoryEnhancedConfidence(
       baseResponse,
       memories,
@@ -483,7 +483,7 @@ If the memories are relevant, incorporate them naturally into your reasoning. If
   }
 
   /**
-   * Calculate memory-enhanced confidence
+   * Calculate memory confidence
    */
   private calculateMemoryEnhancedConfidence(
     response: LLMResponse,

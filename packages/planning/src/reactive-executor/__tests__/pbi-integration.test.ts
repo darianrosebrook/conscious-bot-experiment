@@ -8,7 +8,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { EnhancedReactiveExecutor } from '../enhanced-reactive-executor';
+import { EnhancedReactiveExecutor } from '../reactive-executor';
 import { DEFAULT_PBI_ACCEPTANCE } from '@conscious-bot/executor-contracts/dist/index.js';
 
 describe('PBI Integration with EnhancedReactiveExecutor', () => {
@@ -95,10 +95,16 @@ describe('PBI Integration with EnhancedReactiveExecutor', () => {
       console.log('PBI Metrics:', executor.getPBIEffectivenessMetrics());
 
       // Debug: Check if PBI enforcer has metrics
-      console.log('PBI Enforcer has getMetrics:', typeof executor['pbiEnforcer'].getMetrics);
+      console.log(
+        'PBI Enforcer has getMetrics:',
+        typeof executor['pbiEnforcer'].getMetrics
+      );
 
       // Debug: Check if PBI enforcer has updateMetrics
-      console.log('PBI Enforcer has updateMetrics:', typeof executor['pbiEnforcer'].updateMetrics);
+      console.log(
+        'PBI Enforcer has updateMetrics:',
+        typeof executor['pbiEnforcer'].updateMetrics
+      );
 
       // Debug: Test updateMetrics directly
       const initialMetrics = executor.getPBIEffectivenessMetrics();
@@ -142,7 +148,7 @@ describe('PBI Integration with EnhancedReactiveExecutor', () => {
       const totalTime = endTime - startTime;
 
       // Should have tracked the execution attempt (may need a small delay for async metrics update)
-      await new Promise(resolve => setTimeout(resolve, 10));
+      await new Promise((resolve) => setTimeout(resolve, 10));
       const updatedMetrics = executor.getPBIEffectivenessMetrics();
       expect(updatedMetrics.stepAttempts).toBeGreaterThan(0);
 
@@ -265,7 +271,7 @@ describe('PBI Integration with EnhancedReactiveExecutor', () => {
       }
 
       // Should have tracked all attempts (may need a small delay for async metrics update)
-      await new Promise(resolve => setTimeout(resolve, 10));
+      await new Promise((resolve) => setTimeout(resolve, 10));
       const finalMetrics = executor.getPBIEffectivenessMetrics();
       expect(finalMetrics.stepAttempts).toBeGreaterThan(0);
 

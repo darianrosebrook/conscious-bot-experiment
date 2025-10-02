@@ -40,12 +40,50 @@ class MockVectorDatabase {
   async getChunkById(id: string): Promise<any> {
     return null;
   }
+
+  // Enhanced methods for hybrid search
+  async buildEnhancedSearchQuery(options: any): Promise<string> {
+    return 'SELECT * FROM test_table';
+  }
+
+  async processSearchResults(rows: any[]): Promise<any[]> {
+    return rows;
+  }
+
+  calculateDecayFactors(decayProfile: any): number {
+    return 1.0;
+  }
+
+  calculateGraphScore(entities: any[], relationships: any[]): number {
+    return 0.5;
+  }
+
+  calculateDecayScore(decayProfile: any): number {
+    return 1.0;
+  }
+
+  combineScores(
+    vectorScore: number,
+    graphScore: number,
+    decayScore: number
+  ): number {
+    return (vectorScore + graphScore + decayScore) / 3;
+  }
+
+  generateExplanation(scores: any): string {
+    return 'Mock explanation';
+  }
+
+  paramIndex: any = {};
 }
 
 class MockEmbeddingService {
   private config: any = {}; // Make config private to match interface
   private cache: any = {};
   private readonly CACHE_TTL: number = 300000;
+  private performanceMetrics: Map<string, any> = new Map();
+  private modelSelectionCache: Map<string, any> = new Map();
+  private readonly SELECTION_CACHE_TTL: number = 600000;
 
   async embed(content: string): Promise<any> {
     // Return predictable embedding based on content length
@@ -114,9 +152,43 @@ class MockEmbeddingService {
   isTechnicalContent(text: string): boolean {
     return text.includes('function') || text.includes('class');
   }
+
+  selectOptimalModel(criteria: any): any {
+    return { name: 'mock-model', dimensions: 768 };
+  }
+
+  getPerformanceMetrics(): any[] {
+    return Array.from(this.performanceMetrics.values());
+  }
+
+  clearPerformanceMetrics(): void {
+    this.performanceMetrics.clear();
+    this.modelSelectionCache.clear();
+  }
+
+  async generateEmbeddingWithModel(text: string, model: any): Promise<any> {
+    return this.embed(text);
+  }
+
+  async generateEmbedding(text: string): Promise<any> {
+    return this.embed(text);
+  }
+
+  async analyzeEmbeddingQuality(embedding: any): Promise<any> {
+    return { quality: 0.8, issues: [] };
+  }
+
+  async performQualityAnalysis(embedding: any): Promise<any> {
+    return this.analyzeEmbeddingQuality(embedding);
+  }
 }
 
 class MockMemoryDecayManager {
+  config: any = {};
+  accessRecords: any[] = [];
+  lastEvaluation: any = null;
+  cleanupHistory: any[] = [];
+
   async recordAccess(): Promise<any> {
     return {};
   }
@@ -154,6 +226,22 @@ class MockMemoryDecayManager {
   }
   getCleanupHistory(): any[] {
     return [];
+  }
+
+  calculateDecay(memoryId: string): number {
+    return 0.1;
+  }
+
+  async performCleanup(): Promise<any> {
+    return { cleaned: 0 };
+  }
+
+  async getAccessStats(): Promise<any> {
+    return { totalAccesses: 0 };
+  }
+
+  async updateConfig(newConfig: any): Promise<void> {
+    this.config = { ...this.config, ...newConfig };
   }
 }
 

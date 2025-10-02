@@ -626,7 +626,7 @@ export class EnhancedMemoryIntegration extends EventEmitter {
   }
 
   /**
-   * Get memory-enhanced context for planning decisions
+   * Get memory context for planning decisions
    */
   async getMemoryEnhancedContext(
     context: {
@@ -723,7 +723,7 @@ export class EnhancedMemoryIntegration extends EventEmitter {
         confidence: searchData.confidence || 0.8,
       };
     } catch (error) {
-      console.error('Failed to get memory-enhanced context:', error);
+      console.error('Failed to get memory context:', error);
       return {
         memories: [],
         insights: ['Memory system unavailable for context enhancement'],
