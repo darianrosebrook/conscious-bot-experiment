@@ -616,7 +616,7 @@ export class EmbeddingService {
       throw new Error(`Ollama API error: ${response.statusText}`);
     }
 
-    const data = await response.json();
+    const data = (await response.json()) as { embedding: number[] };
     return {
       embedding: data.embedding || [],
     };

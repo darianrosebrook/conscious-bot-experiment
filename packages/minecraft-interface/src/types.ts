@@ -66,6 +66,7 @@ export interface PlanningContext {
   activeGoals?: any[];
   availableResources?: any[];
   situationalFactors?: any;
+  bot?: any;
 }
 
 export interface IntegratedPlanningResult {
@@ -97,6 +98,10 @@ export interface PlanStep {
   preconditions?: any[];
   effects?: any[];
   order?: number;
+  expectedDurationMs?: number;
+  stepId?: string;
+  args?: any;
+  safetyLevel?: string;
   action?: {
     id?: string;
     name?: string;

@@ -51,6 +51,14 @@ export interface BotResponse {
   task?: Task;
   recorded?: boolean;
   error?: string;
+  thought?: {
+    id: string;
+    type: string;
+    content: string;
+    context?: any;
+    metadata?: any;
+    timestamp: number;
+  };
 }
 
 // Plan types for MCP integration
@@ -270,6 +278,14 @@ export class IntrusiveThoughtProcessor extends EventEmitter {
         response: `Created task (${bucket.name}): ${task.title}`,
         taskId: task.id,
         task,
+        thought: {
+          id: `thought-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+          type: action.category || 'task',
+          content: task.description || task.title,
+          context: { action, bucket: bucket.name },
+          metadata: { taskId: task.id, bucket: bucket.name },
+          timestamp: Date.now(),
+        },
       };
     } catch (err) {
       this.emit('processingError', { thought, error: err });

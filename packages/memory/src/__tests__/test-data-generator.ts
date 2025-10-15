@@ -396,19 +396,6 @@ export class TestDataGenerator {
         processingTime: Date.now(),
         version: '1.0',
       },
-      spatialContext: options.includeSpatialData
-        ? {
-            coordinates: {
-              x: Math.random() * 1000,
-              y: Math.random() * 1000,
-              z: Math.random() * 100,
-            },
-            dimension: 'overworld',
-            biome: 'plains',
-            nearbyEntities: [],
-            nearbyBlocks: [],
-          }
-        : undefined,
     };
 
     // Add spatial context if requested
@@ -421,7 +408,7 @@ export class TestDataGenerator {
       };
     }
 
-    return {
+    const result = {
       id: `test-memory-${index}-${Date.now()}`,
       content,
       type,
@@ -430,6 +417,22 @@ export class TestDataGenerator {
       expectedEntities,
       expectedTopics,
     };
+
+    // Add spatial context as a separate property if requested
+    if (options.includeSpatialData) {
+      (result as any).spatialContext = {
+        world: 'TestWorld',
+        position: {
+          x: Math.random() * 1000,
+          y: Math.random() * 1000,
+          z: Math.random() * 100,
+        },
+        dimension: 'overworld',
+        biome: 'plains',
+      };
+    }
+
+    return result;
   }
 
   /**

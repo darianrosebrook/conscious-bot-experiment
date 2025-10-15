@@ -8,7 +8,7 @@
  */
 
 import { HomeostasisState, Need, NeedType } from '../types';
-import { auditLogger } from '../../../cognition/src/audit/thought-action-audit-logger';
+import { auditLogger } from '@conscious-bot/cognition';
 
 /**
  * Generate needs ordered by intensity and urgency.

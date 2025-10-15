@@ -8,7 +8,11 @@
  */
 
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
-import { EnhancedVectorDatabase, EnhancedMemoryChunk, EnhancedSearchOptions } from '../vector-database';
+import {
+  EnhancedVectorDatabase,
+  EnhancedMemoryChunk,
+  EnhancedSearchOptions,
+} from '../vector-database';
 
 describe('Enhanced Vector Database', () => {
   let db: EnhancedVectorDatabase;
@@ -18,8 +22,8 @@ describe('Enhanced Vector Database', () => {
     db = new EnhancedVectorDatabase({
       host: 'localhost',
       port: 5432,
-      user: 'postgres',
-      password: '',
+      user: 'conscious_bot',
+      password: 'secure_password',
       database: 'conscious_bot_test',
       tableName: 'enhanced_memory_chunks_test',
       dimension: 768,
@@ -118,7 +122,7 @@ describe('Enhanced Vector Database', () => {
         decayProfile: {
           memoryType: 'episodic',
           baseDecayRate: 0.05,
-          lastAccessed: Date.now() - (24 * 60 * 60 * 1000), // 1 day ago
+          lastAccessed: Date.now() - 24 * 60 * 60 * 1000, // 1 day ago
           accessCount: 0,
           importance: 0.6,
           consolidationHistory: [],
@@ -145,7 +149,9 @@ describe('Enhanced Vector Database', () => {
       // Verify access was recorded
       const updated = await db.getChunk('test-chunk-decay');
       expect(updated!.decayProfile.accessCount).toBe(1);
-      expect(updated!.decayProfile.lastAccessed).toBeGreaterThan(chunk.decayProfile.lastAccessed);
+      expect(updated!.decayProfile.lastAccessed).toBeGreaterThan(
+        chunk.decayProfile.lastAccessed
+      );
     });
   });
 
@@ -211,7 +217,7 @@ describe('Enhanced Vector Database', () => {
           decayProfile: {
             memoryType: 'semantic',
             baseDecayRate: 0.01,
-            lastAccessed: Date.now() - (12 * 60 * 60 * 1000), // 12 hours ago
+            lastAccessed: Date.now() - 12 * 60 * 60 * 1000, // 12 hours ago
             accessCount: 2,
             importance: 0.7,
             consolidationHistory: [],
@@ -248,7 +254,9 @@ describe('Enhanced Vector Database', () => {
 
       // Should include explanation
       expect(results[0].explanation).toBeDefined();
-      expect(results[0].explanation!.reasoning).toContain('entity relationships');
+      expect(results[0].explanation!.reasoning).toContain(
+        'entity relationships'
+      );
     });
 
     it('applies decay-aware ranking [decay integration]', async () => {
@@ -281,7 +289,9 @@ describe('Enhanced Vector Database', () => {
 
       // Should prioritize chunks with strong technology entities and relationships
       expect(results.length).toBeGreaterThan(0);
-      const techEntities = results[0].matchedEntities.filter(e => e.entityType === 'TECHNOLOGY');
+      const techEntities = results[0].matchedEntities.filter(
+        (e) => e.entityType === 'TECHNOLOGY'
+      );
       expect(techEntities.length).toBeGreaterThan(0);
     });
   });
@@ -298,7 +308,7 @@ describe('Enhanced Vector Database', () => {
         decayProfile: {
           memoryType: 'episodic',
           baseDecayRate: 0.05, // 5% per day
-          lastAccessed: Date.now() - (48 * 60 * 60 * 1000), // 2 days ago
+          lastAccessed: Date.now() - 48 * 60 * 60 * 1000, // 2 days ago
           accessCount: 1,
           importance: 0.6,
           consolidationHistory: [],
@@ -370,31 +380,33 @@ describe('Enhanced Vector Database', () => {
 
   describe('Performance and Scalability', () => {
     it('handles batch operations efficiently [PERF: batch operations]', async () => {
-      const chunks: EnhancedMemoryChunk[] = Array(100).fill(null).map((_, i) => ({
-        id: `batch-chunk-${i}`,
-        content: `Batch test content ${i}`,
-        embedding: new Array(768).fill(0.1),
-        metadata: { type: 'episodic', confidence: 0.8 },
-        entities: [],
-        relationships: [],
-        decayProfile: {
-          memoryType: 'episodic',
-          baseDecayRate: 0.05,
-          lastAccessed: Date.now(),
-          accessCount: 1,
-          importance: 0.6,
-          consolidationHistory: [],
-        },
-        provenance: {
-          sourceSystem: 'test',
-          extractionMethod: 'batch',
-          confidence: 0.8,
-          processingTime: 100,
-          version: '1.0.0',
-        },
-        createdAt: Date.now(),
-        updatedAt: Date.now(),
-      }));
+      const chunks: EnhancedMemoryChunk[] = Array(100)
+        .fill(null)
+        .map((_, i) => ({
+          id: `batch-chunk-${i}`,
+          content: `Batch test content ${i}`,
+          embedding: new Array(768).fill(0.1),
+          metadata: { type: 'episodic', confidence: 0.8 },
+          entities: [],
+          relationships: [],
+          decayProfile: {
+            memoryType: 'episodic',
+            baseDecayRate: 0.05,
+            lastAccessed: Date.now(),
+            accessCount: 1,
+            importance: 0.6,
+            consolidationHistory: [],
+          },
+          provenance: {
+            sourceSystem: 'test',
+            extractionMethod: 'batch',
+            confidence: 0.8,
+            processingTime: 100,
+            version: '1.0.0',
+          },
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+        }));
 
       const start = performance.now();
       await db.batchUpsertChunks(chunks);
@@ -480,7 +492,9 @@ describe('Enhanced Vector Database', () => {
         updatedAt: Date.now(),
       };
 
-      await expect(db.upsertChunk(invalidChunk)).rejects.toThrow('Embedding dimension mismatch');
+      await expect(db.upsertChunk(invalidChunk)).rejects.toThrow(
+        'Embedding dimension mismatch'
+      );
     });
 
     it('handles empty search results gracefully', async () => {
@@ -502,7 +516,9 @@ describe('Enhanced Vector Database', () => {
         queryEmbedding,
       };
 
-      await expect(db.search(options)).rejects.toThrow('Query embedding dimension mismatch');
+      await expect(db.search(options)).rejects.toThrow(
+        'Query embedding dimension mismatch'
+      );
     });
   });
 });

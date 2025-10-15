@@ -8,16 +8,40 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 
-export async function GET(request: NextRequest) {
+export async function GET(_request: NextRequest) {
   try {
     // Dev-only mock; disabled by default
     if (process.env.ALLOW_DASHBOARD_MOCKS === 'true') {
       const evaluationData = {
         metrics: [
-          { name: 'Overall Score', value: 87.5, unit: '%', trend: 'up', color: 'blue' },
-          { name: 'Success Rate', value: 92.3, unit: '%', trend: 'stable', color: 'green' },
-          { name: 'Avg Planning Time', value: 2.4, unit: 's', trend: 'down', color: 'orange' },
-          { name: 'Avg Execution Time', value: 1.8, unit: 's', trend: 'down', color: 'purple' },
+          {
+            name: 'Overall Score',
+            value: 87.5,
+            unit: '%',
+            trend: 'up',
+            color: 'blue',
+          },
+          {
+            name: 'Success Rate',
+            value: 92.3,
+            unit: '%',
+            trend: 'stable',
+            color: 'green',
+          },
+          {
+            name: 'Avg Planning Time',
+            value: 2.4,
+            unit: 's',
+            trend: 'down',
+            color: 'orange',
+          },
+          {
+            name: 'Avg Execution Time',
+            value: 1.8,
+            unit: 's',
+            trend: 'down',
+            color: 'purple',
+          },
         ],
         alerts: [
           {

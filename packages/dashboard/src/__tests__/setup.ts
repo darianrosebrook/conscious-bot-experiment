@@ -8,9 +8,10 @@
  */
 
 import '@testing-library/vi-dom';
+import { vi } from 'vitest';
 
 // Global test timeout
-vi.setTimeout(10000);
+vi.setConfig({ testTimeout: 10000 });
 
 // Mock console methods to reduce noise in tests
 const originalConsole = { ...console };
@@ -76,13 +77,14 @@ vi.mock('next/navigation', () => ({
 }));
 
 // Mock Server-Sent Events
-global.EventSource = vi.fn().mockImplementation(() => ({
-  addEventListener: vi.fn(),
-  removeEventListener: vi.fn(),
-  close: vi.fn(),
-  readyState: 1,
-  url: 'http://localhost:3000/api/ws/cot',
-}));
+global.EventSource = vi
+  .fn()
+  .mockImplementation(
+    (): EventSource =>
+      new EventSource(
+        'http://localhost:3000/api/ws/cognitive-stream'
+      ) as EventSource
+  );
 
 // Mock Date.now for consistent timestamps in tests
 const mockDate = new Date('2024-01-01T00:00:00.000Z');

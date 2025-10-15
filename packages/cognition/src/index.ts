@@ -42,6 +42,18 @@ export { RelationshipManager } from './social-cognition/relationship-manager';
 export { SocialLearner } from './social-cognition/social-learner';
 export { TheoryOfMindEngine } from './social-cognition/theory-of-mind-engine';
 
+// Audit Logger
+export {
+  auditLogger,
+  ThoughtActionAuditLogger,
+} from './audit/thought-action-audit-logger';
+export type {
+  AuditEntry,
+  AuditStage,
+  AuditSession,
+  AuditSummary,
+} from './audit/thought-action-audit-logger';
+
 // Core Types (specific exports to avoid conflicts)
 export type {
   LLMConfig,

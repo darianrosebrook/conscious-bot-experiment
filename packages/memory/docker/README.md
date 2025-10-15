@@ -15,9 +15,10 @@ cd packages/memory/docker
 # Start services
 docker compose up -d
 
-# Run initialization scripts (enables pgvector and creates per-seed DBs)
-docker exec -it memory-postgres bash -c "/docker-entrypoint-initdb.d/00_create_databases.sh"
-docker exec -it memory-postgres bash -c "WORLD_SEED=1234567890 /docker-entrypoint-initdb.d/01_create_seed_databases.sh"
+# The databases and user will be automatically created during container initialization
+# If you need to recreate from scratch:
+docker compose down -v  # Remove volumes
+docker compose up -d    # Fresh start with auto-initialization
 ```
 
 ## 🔧 Configuration
@@ -38,6 +39,15 @@ Ollama is exposed on `11434`, PostgreSQL on `5432`.
 - `postgres_data` – persistent data for PostgreSQL
 - `ollama_data` – cached models for Ollama
 
+## 🗄️ Database Schema
+
+The initialization creates:
+- **conscious_bot** – Main database for the memory system
+- **conscious_bot_seed_template** – Template for per-seed databases
+- **conscious_bot_seed_{WORLD_SEED}** – Seed-specific database (created on first use)
+
+All databases have pgvector extension enabled for vector operations.
+
 ## 🧪 Health Checks
 
 Both services have built-in health checks. Verify status with:
@@ -47,3 +57,20 @@ docker compose ps
 docker compose logs postgres
 docker compose logs ollama
 ```
+
+## 🔌 Connection Details
+
+From the host application, connect using:
+- **Host**: `localhost`
+- **Port**: `5432`
+- **User**: `conscious_bot`
+- **Password**: `secure_password`
+- **Database**: `conscious_bot` (or seed-specific database)
+
+## 🛠️ Troubleshooting
+
+If connection fails:
+1. Ensure containers are running: `docker compose ps`
+2. Check logs: `docker compose logs postgres`
+3. Verify pgvector is enabled: connect and run `SELECT * FROM pg_extension WHERE extname = 'vector';`
+4. If databases are missing, they may have been created with wrong ownership - check with `docker compose down -v && docker compose up -d`

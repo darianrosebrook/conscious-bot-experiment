@@ -8,7 +8,7 @@
  * @author @darianrosebrook
  */
 
-import { Pool, Client } from 'pg';
+import { Pool, Client, PoolClient } from 'pg';
 import {
   Entity,
   Relationship,
@@ -25,18 +25,22 @@ import {
   FilterOperator,
   EntitySchema,
   RelationshipSchema,
+  EntityType,
+  RelationType,
+  PropertyType,
 } from './semantic/types';
 
 // Import entity types as values (enums)
 import {
-  EntityType,
-  RelationshipType,
+  ExtractedRelationshipType,
   ExtractedEntity,
   ExtractedRelationship,
+  ExtractedEntityType,
+  EntityExtractionResult,
 } from './entity-extraction-service';
 
 // Re-export for tests and other modules
-export { EntityType, RelationshipType as RelationType };
+export { EntityType, RelationType };
 
 // ============================================================================
 // Enhanced Types for PostgreSQL Integration
@@ -54,6 +58,9 @@ export interface EntitySearchOptions {
 }
 
 export interface EnhancedEntity extends Entity {
+  // Additional entity properties
+  aliases?: string[];
+
   // Vector embedding for similarity search
   embedding?: number[];
 
@@ -157,7 +164,7 @@ export interface EnhancedKnowledgeGraphConfig extends KnowledgeGraphConfig {
 /**
  * Map entity extraction EntityType to semantic EntityType
  */
-function mapEntityType(extractionType: EntityType): EntityType {
+function mapEntityType(extractionType: ExtractedEntityType): EntityType {
   // Map extraction entity types to semantic entity types
   const typeMapping: Record<string, EntityType> = {
     PERSON: 'PLAYER' as EntityType,
@@ -180,7 +187,9 @@ function mapEntityType(extractionType: EntityType): EntityType {
 /**
  * Map entity extraction RelationshipType to semantic RelationType
  */
-function mapRelationshipType(extractionType: RelationshipType): RelationType {
+function mapRelationshipType(
+  extractionType: ExtractedRelationshipType
+): RelationType {
   // Map extraction relationship types to semantic relationship types
   const typeMapping: Record<string, RelationType> = {
     WORKS_ON: 'USED_FOR' as RelationType,
@@ -219,37 +228,37 @@ function convertExtractedEntityToEnhancedEntity(
       aliases: {
         confidence: extracted.confidence,
         timestamp: now,
-        type: 'string_array',
-        source: 'entity_extraction',
+        type: PropertyType.ARRAY,
+        source: KnowledgeSource.SYSTEM,
         value: extracted.aliases,
       },
       extractionMethod: {
         confidence: extracted.confidence,
         timestamp: now,
-        type: 'string',
-        source: 'entity_extraction',
+        type: PropertyType.STRING,
+        source: KnowledgeSource.SYSTEM,
         value: extracted.extractionMethod,
       },
       sourceText: {
         confidence: extracted.confidence,
         timestamp: now,
-        type: 'string',
-        source: 'entity_extraction',
+        type: PropertyType.STRING,
+        source: KnowledgeSource.SYSTEM,
         value: extracted.sourceText,
       },
       ...(extracted.position && {
         position: {
           confidence: extracted.confidence,
           timestamp: now,
-          type: 'object',
-          source: 'entity_extraction',
+          type: PropertyType.OBJECT,
+          source: KnowledgeSource.SYSTEM,
           value: extracted.position,
         },
       }),
     },
     tags: [],
     confidence: extracted.confidence,
-    source: 'entity_extraction',
+    source: KnowledgeSource.SYSTEM,
     createdAt: now,
     updatedAt: now,
     lastAccessed: now,
@@ -284,25 +293,11 @@ function convertExtractedEntityToEnhancedEntity(
 
     // Provenance
     provenance: {
-      sources: [
-        {
-          id: 'entity_extraction',
-          type: 'extraction',
-          confidence: extracted.confidence,
-          timestamp: now,
-          method: extracted.extractionMethod,
-        },
-      ],
-      evidence: [
-        {
-          type: 'text_extraction',
-          confidence: extracted.confidence,
-          source: extracted.sourceText,
-          timestamp: now,
-        },
-      ],
-      lastVerified: now,
-      verificationCount: 1,
+      sourceSystem: 'enhanced_knowledge_graph',
+      extractionMethod: 'manual',
+      confidence: extracted.confidence,
+      processingTime: 0,
+      version: '1.0.0',
     },
   };
 }
@@ -324,23 +319,14 @@ function convertExtractedRelationshipToEnhancedRelationship(
       strength: {
         confidence: extracted.confidence,
         timestamp: now,
-        type: 'number',
-        source: 'entity_extraction',
+        type: PropertyType.NUMBER,
+        source: KnowledgeSource.SYSTEM,
         value: extracted.strength,
       },
-      ...(extracted.evidence && {
-        evidence: {
-          confidence: extracted.confidence,
-          timestamp: now,
-          type: 'object',
-          source: 'entity_extraction',
-          value: extracted.evidence,
-        },
-      }),
     },
     bidirectional: false, // Default to directional
     confidence: extracted.confidence,
-    source: 'entity_extraction',
+    source: KnowledgeSource.SYSTEM,
     createdAt: now,
     updatedAt: now,
     lastAccessed: now,
@@ -349,13 +335,8 @@ function convertExtractedRelationshipToEnhancedRelationship(
     // Enhanced strength
     strength: extracted.strength,
 
-    // Enhanced evidence
-    evidence: {
-      sourceText: extracted.evidence || '',
-      cooccurrenceCount: 1,
-      contextWindow: 50, // Default context window
-      extractionMethod: 'entity_extraction',
-    },
+    // Evidence as string for base Relationship
+    evidence: extracted.evidence || '',
 
     // Memory decay profile
     decayProfile: {
@@ -367,7 +348,6 @@ function convertExtractedRelationshipToEnhancedRelationship(
     },
   };
 }
-
 // ============================================================================
 // Enhanced Knowledge Graph Core Implementation
 // ============================================================================
@@ -395,6 +375,7 @@ export class EnhancedKnowledgeGraphCore {
       persistToStorage: true,
       enableSemanticDecay: true,
       semanticDecayRate: 0.02,
+      minimumSemanticConfidence: 0.1,
       vectorDimension: 768,
       enableVectorSearch: true,
       enableIndexing: true,
@@ -505,7 +486,7 @@ export class EnhancedKnowledgeGraphCore {
   /**
    * Create optimized indexes for hybrid search performance
    */
-  private async createOptimizedIndexes(client: Client): Promise<void> {
+  private async createOptimizedIndexes(client: PoolClient): Promise<void> {
     // Vector similarity index (HNSW for fast ANN search)
     await client.query(`
       CREATE INDEX IF NOT EXISTS ${this.entityTable}_embedding_hnsw_idx
@@ -606,6 +587,9 @@ export class EnhancedKnowledgeGraphCore {
       aliases: entityData.aliases || [],
       confidence: entityData.confidence,
       embedding: entityData.embedding,
+      properties: {},
+      tags: [],
+      source: KnowledgeSource.SYSTEM,
       metadata: {
         frequency: 1,
         context: [],
@@ -697,6 +681,12 @@ export class EnhancedKnowledgeGraphCore {
       type: relationshipData.type,
       confidence: relationshipData.confidence,
       strength: relationshipData.strength,
+      properties: {},
+      bidirectional:
+        relationshipData.isDirectional !== undefined
+          ? !relationshipData.isDirectional
+          : false,
+      source: KnowledgeSource.SYSTEM,
       evidence: {
         sourceText: '',
         cooccurrenceCount: 1,
@@ -713,7 +703,8 @@ export class EnhancedKnowledgeGraphCore {
       },
       createdAt: now,
       updatedAt: now,
-      bidirectional: false, // Default to directional
+      lastAccessed: now,
+      accessCount: 1,
     };
 
     const client = await this.pool.connect();
@@ -926,14 +917,11 @@ export class EnhancedKnowledgeGraphCore {
       const paths: KnowledgePath[] = result.rows.map((row) => ({
         entities: row.entity_path,
         relationships: row.relationship_path,
+        length: row.entity_path.length,
         confidence:
           row.path_strengths.reduce((sum: number, s: number) => sum + s, 0) /
           row.path_strengths.length,
         hopCount: row.hop_count,
-        totalStrength: row.path_strengths.reduce(
-          (sum: number, s: number) => sum + s,
-          0
-        ),
       }));
 
       return paths;
@@ -1023,11 +1011,18 @@ export class EnhancedKnowledgeGraphCore {
           id: entityId,
           name: '',
           type: EntityType.CONCEPT,
+          description: '',
+          properties: {},
+          tags: [],
           confidence: 0,
+          source: KnowledgeSource.SYSTEM,
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+          lastAccessed: Date.now(),
+          accessCount: 0,
         }, // Placeholder entity object
         neighbors: Array.from(neighbors.values()),
         relationships: Array.from(relationships.values()),
-        hopCount: hops,
         depth: hops,
       };
     } finally {
@@ -1113,11 +1108,10 @@ export class EnhancedKnowledgeGraphCore {
       return {
         entityCount: parseInt(row.entity_count),
         relationshipCount: parseInt(row.relationship_count),
-        entityTypeDistribution: {}, // Would need more complex query
-        relationshipTypeDistribution: {}, // Would need more complex query
-        averageConnectivity:
-          parseFloat(row.relationship_count) /
-          Math.max(1, parseInt(row.entity_count)),
+        entitiesByType: {} as Record<EntityType, number>,
+        relationshipsByType: {} as Record<RelationType, number>,
+        averageConfidence: 0, // Would need more complex query
+        densityScore: 0, // Would need more complex query
         lastUpdated: row.last_updated,
 
         // Enhanced stats
@@ -1125,13 +1119,13 @@ export class EnhancedKnowledgeGraphCore {
         totalEmbeddings: parseInt(vectorRow.embedding_count),
         avgEmbeddingDimension:
           parseFloat(vectorRow.avg_dimension) || this.config.vectorDimension,
-        memoryTypeDistribution,
+        // memoryTypeDistribution is handled above as entitiesByType
         decayStats: {
           avgImportance: parseFloat(decayRow.avg_importance) || 0,
           avgAccessCount: parseFloat(decayRow.avg_access_count) || 0,
           recentlyAccessed: parseInt(decayRow.recently_accessed) || 0,
         },
-      };
+      } as any;
     } finally {
       client.release();
     }
@@ -1273,7 +1267,15 @@ export class EnhancedKnowledgeGraphCore {
             );
             relationshipsUpdated++;
           } else {
-            await this.createRelationship(relationship);
+            await this.createRelationship({
+              sourceEntityId: relationship.sourceId,
+              targetEntityId: relationship.targetId,
+              type: relationship.type,
+              confidence: relationship.confidence,
+              strength: relationship.strength,
+              evidence: relationship.evidence,
+              isDirectional: !relationship.bidirectional,
+            });
             relationshipsCreated++;
           }
         }
@@ -1512,14 +1514,21 @@ export class EnhancedKnowledgeGraphCore {
    */
   private getBaseDecayRate(entityType: EntityType): number {
     const decayRates = {
-      [EntityType.PERSON]: 0.02, // People memories decay slowly
-      [EntityType.ORGANIZATION]: 0.015, // Organizations decay very slowly
-      [EntityType.LOCATION]: 0.025, // Locations decay moderately
-      [EntityType.TECHNOLOGY]: 0.03, // Technology changes quickly
+      [EntityType.OBJECT]: 0.02, // Objects decay slowly
+      [EntityType.PLACE]: 0.015, // Places decay very slowly
+      [EntityType.CREATURE]: 0.025, // Creatures decay moderately
+      [EntityType.PLAYER]: 0.03, // Players change frequently
       [EntityType.CONCEPT]: 0.02, // Concepts decay slowly
-      [EntityType.PROJECT]: 0.025, // Projects decay moderately
-      [EntityType.TOOL]: 0.035, // Tools change frequently
-      [EntityType.FRAMEWORK]: 0.025, // Frameworks decay moderately
+      [EntityType.EVENT]: 0.025, // Events decay moderately
+      [EntityType.RESOURCE]: 0.035, // Resources change frequently
+      [EntityType.BLOCK]: 0.025, // Blocks decay moderately
+      [EntityType.ITEM]: 0.03, // Items change frequently
+      [EntityType.BIOME]: 0.015, // Biomes decay very slowly
+      [EntityType.STRUCTURE]: 0.02, // Structures decay slowly
+      [EntityType.RECIPE]: 0.025, // Recipes decay moderately
+      [EntityType.RULE]: 0.02, // Rules decay slowly
+      [EntityType.SYSTEM]: 0.015, // Systems decay very slowly
+      [EntityType.UNKNOWN]: 0.03, // Unknown entities decay faster
     };
 
     return decayRates[entityType] || 0.02;
@@ -1636,8 +1645,12 @@ export class EnhancedKnowledgeGraphCore {
       id: row.id,
       name: row.name,
       type: row.type as EntityType,
+      description: row.description || '',
+      properties: row.properties || {},
+      tags: row.tags || [],
       aliases: row.aliases || [],
       confidence: parseFloat(row.confidence),
+      source: (row.source as KnowledgeSource) || KnowledgeSource.SYSTEM,
       embedding: row.embedding,
       metadata: row.metadata || {},
       decayProfile: row.decay_profile || {},
@@ -1651,7 +1664,7 @@ export class EnhancedKnowledgeGraphCore {
 
   private async findDuplicateEntity(
     entity: EnhancedEntity,
-    client: Client
+    client: PoolClient
   ): Promise<EnhancedEntity | null> {
     // Find entities with similar names and types
     const result = await client.query(
@@ -1674,7 +1687,7 @@ export class EnhancedKnowledgeGraphCore {
   private async mergeEntities(
     newEntity: EnhancedEntity,
     existingEntity: EnhancedEntity,
-    client: Client
+    client: PoolClient
   ): Promise<void> {
     // Merge metadata and keep higher confidence entity
     const mergedMetadata = {
@@ -1713,7 +1726,7 @@ export class EnhancedKnowledgeGraphCore {
     sourceId: string,
     targetId: string,
     type: RelationType,
-    client: Client
+    client: PoolClient
   ): Promise<EnhancedRelationship | null> {
     const result = await client.query(
       `
@@ -1734,7 +1747,7 @@ export class EnhancedKnowledgeGraphCore {
   private async updateRelationship(
     relationshipId: string,
     relationship: EnhancedRelationship,
-    client: Client
+    client: PoolClient
   ): Promise<void> {
     await client.query(
       `
@@ -1763,13 +1776,17 @@ export class EnhancedKnowledgeGraphCore {
       sourceId: row.source_entity_id,
       targetId: row.target_entity_id,
       type: row.type as RelationType,
+      properties: row.properties || {},
+      bidirectional: row.is_directional || false,
       confidence: parseFloat(row.confidence),
+      source: (row.source as KnowledgeSource) || KnowledgeSource.SYSTEM,
       strength: parseFloat(row.strength),
       evidence: row.evidence || {},
       decayProfile: row.decay_profile || {},
       createdAt: row.created_at?.getTime() || Date.now(),
       updatedAt: row.updated_at?.getTime() || Date.now(),
-      bidirectional: row.is_directional || false,
+      lastAccessed: row.last_accessed?.getTime() || Date.now(),
+      accessCount: row.access_count || 0,
     };
   }
 

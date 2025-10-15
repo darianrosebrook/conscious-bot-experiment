@@ -94,7 +94,7 @@ const mockDynamicFlow = {
 
 // Mock planners
 const mockHRMPlanner = new HRMInspiredPlanner();
-const mockGOAPPlanner = new EnhancedGOAPPlanner();
+const mockGOAPPlanner = new EnhancedGOAPPlanner() as any;
 
 // Create behavior tree runner with mock tool executor
 const mockToolExecutor = new MockToolExecutor();

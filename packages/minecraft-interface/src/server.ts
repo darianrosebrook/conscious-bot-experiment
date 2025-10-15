@@ -1177,7 +1177,9 @@ app.get('/state', async (req, res) => {
         },
         health: gameState.worldState.health,
         food: gameState.worldState.hunger,
-        inventory: observationMapper.extractInventoryState(gameState.bot),
+        inventory: minecraftInterface.observationMapper.extractInventoryState(
+          gameState.bot
+        ),
       },
       isAlive: gameState.worldState.health > 0,
     };
@@ -1191,7 +1193,7 @@ app.get('/state', async (req, res) => {
       console.log('🔍 [MINECRAFT INTERFACE] Bot state updated:', {
         position: convertedState.data.position,
         health: convertedState.data.health,
-        inventoryItems: convertedState.data.inventory?.length || 0,
+        inventoryItems: convertedState.data.inventory?.items?.length || 0,
       });
       global.lastConvertedStateLog = now;
     }

@@ -27,8 +27,8 @@ describe('Enhanced Knowledge Graph Core', () => {
       database: {
         host: 'localhost',
         port: 5432,
-        user: 'postgres',
-        password: '',
+        user: 'conscious_bot',
+        password: 'secure_password',
         database: 'conscious_bot_test',
         tablePrefix: 'enhanced_kg_test',
       },
@@ -61,7 +61,7 @@ describe('Enhanced Knowledge Graph Core', () => {
     it('creates entities with vector embeddings and decay profiles [A2]', async () => {
       const entityData = {
         name: 'Neural Network',
-        type: EntityType.TECHNOLOGY,
+        type: EntityType.CONCEPT,
         confidence: 0.9,
         aliases: ['NN', 'neural net'],
         embedding: new Array(768).fill(0.1),
@@ -94,7 +94,7 @@ describe('Enhanced Knowledge Graph Core', () => {
 
       expect(entity.id).toBeDefined();
       expect(entity.name).toBe('Neural Network');
-      expect(entity.type).toBe(EntityType.TECHNOLOGY);
+      expect(entity.type).toBe(EntityType.CONCEPT);
       expect(entity.confidence).toBe(0.9);
       expect(entity.embedding).toHaveLength(768);
       expect(entity.decayProfile.memoryType).toBe('semantic');
@@ -105,7 +105,7 @@ describe('Enhanced Knowledge Graph Core', () => {
       // Create first entity
       await knowledgeGraph.upsertEntity({
         name: 'Machine Learning',
-        type: EntityType.TECHNOLOGY,
+        type: EntityType.CONCEPT,
         confidence: 0.8,
         embedding: new Array(768).fill(0.1),
       });
@@ -113,7 +113,7 @@ describe('Enhanced Knowledge Graph Core', () => {
       // Create second entity with similar name (should merge)
       await knowledgeGraph.upsertEntity({
         name: 'machine learning', // Lowercase version
-        type: EntityType.TECHNOLOGY,
+        type: EntityType.CONCEPT,
         confidence: 0.85,
         embedding: new Array(768).fill(0.15),
       });
@@ -148,7 +148,7 @@ describe('Enhanced Knowledge Graph Core', () => {
       // Create source and target entities
       const sourceEntity = await knowledgeGraph.upsertEntity({
         name: 'Neural Network',
-        type: EntityType.TECHNOLOGY,
+        type: EntityType.CONCEPT,
         confidence: 0.9,
         embedding: new Array(768).fill(0.1),
       });
@@ -164,7 +164,7 @@ describe('Enhanced Knowledge Graph Core', () => {
       const relationship = await knowledgeGraph.createRelationship({
         sourceEntityId: sourceEntity.id,
         targetEntityId: targetEntity.id,
-        type: RelationType.USED_BY,
+        type: RelationType.USED_FOR,
         confidence: 0.8,
         strength: 0.7,
         evidence: {
@@ -179,7 +179,7 @@ describe('Enhanced Knowledge Graph Core', () => {
       expect(relationship.id).toBeDefined();
       expect(relationship.sourceId).toBe(sourceEntity.id);
       expect(relationship.targetId).toBe(targetEntity.id);
-      expect(relationship.type).toBe(RelationType.USED_BY);
+      expect(relationship.type).toBe(RelationType.USED_FOR);
       expect(relationship.confidence).toBe(0.8);
       expect(relationship.strength).toBe(0.7);
       expect(relationship.evidence.mutualInformation).toBe(0.6);
@@ -195,7 +195,7 @@ describe('Enhanced Knowledge Graph Core', () => {
 
       const targetEntity = await knowledgeGraph.upsertEntity({
         name: 'Entity B',
-        type: EntityType.TECHNOLOGY,
+        type: EntityType.CONCEPT,
         confidence: 0.85,
         embedding: new Array(768).fill(0.15),
       });
@@ -230,7 +230,7 @@ describe('Enhanced Knowledge Graph Core', () => {
       const testEntities = [
         {
           name: 'Neural Network',
-          type: EntityType.TECHNOLOGY,
+          type: EntityType.CONCEPT,
           confidence: 0.9,
           embedding: new Array(768).fill(0.2), // Similar embeddings
         },
@@ -242,7 +242,7 @@ describe('Enhanced Knowledge Graph Core', () => {
         },
         {
           name: 'Deep Learning',
-          type: EntityType.TECHNOLOGY,
+          type: EntityType.CONCEPT,
           confidence: 0.8,
           embedding: new Array(768).fill(0.22),
         },
@@ -266,7 +266,7 @@ describe('Enhanced Knowledge Graph Core', () => {
         await knowledgeGraph.createRelationship({
           sourceEntityId: neuralEntity.id,
           targetEntityId: mlEntity.id,
-          type: RelationType.USED_BY,
+          type: RelationType.USED_FOR,
           confidence: 0.8,
           strength: 0.7,
         });
@@ -276,7 +276,7 @@ describe('Enhanced Knowledge Graph Core', () => {
         await knowledgeGraph.createRelationship({
           sourceEntityId: neuralEntity.id,
           targetEntityId: dlEntity.id,
-          type: RelationType.SIMILAR_TO,
+          type: RelationType.RELATED_TO,
           confidence: 0.9,
           strength: 0.8,
         });

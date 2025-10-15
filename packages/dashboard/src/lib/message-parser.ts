@@ -97,9 +97,8 @@ export function parsePlannerAction(
             return `${key}: ${value}`;
           } else if (typeof value === 'object') {
             return `${key}: ${JSON.stringify(value)}`;
-          } else {
-            return `${key}: ${String(value)}`;
           }
+          return `${key}: ${String(value)}`;
         })
         .join(', ');
 

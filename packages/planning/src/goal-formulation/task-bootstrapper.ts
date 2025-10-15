@@ -1,6 +1,6 @@
 import { EnhancedEnvironmentIntegration } from '../environment-integration';
 import { Goal, GoalStatus, GoalType } from '../types';
-import { auditLogger } from '../../cognition/src/audit/thought-action-audit-logger';
+import { auditLogger } from '@conscious-bot/cognition';
 
 import type { PlanningContext } from '../integrated-planning-coordinator';
 
@@ -117,7 +117,7 @@ export class TaskBootstrapper {
           auditLogger.log(
             'action_planned',
             {
-              taskTitle: goal.title,
+              taskTitle: goal.description,
               taskType: goal.type,
               taskId: goal.id,
               priority: goal.priority,
@@ -156,7 +156,7 @@ export class TaskBootstrapper {
           auditLogger.log(
             'action_planned',
             {
-              taskTitle: goal.title,
+              taskTitle: goal.description,
               taskType: goal.type,
               taskId: goal.id,
               priority: goal.priority,

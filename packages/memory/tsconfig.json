@@ -21,6 +21,6 @@
     "downlevelIteration": true,
     "types": ["vitest/globals"]
   },
-  "include": ["src/**/*"],
+  "include": ["src/**/*", "src/__tests__/neuroscience-memory-system.test.ts"],
   "exclude": ["dist", "node_modules", "src/**/examples.ts", "src/**/integration-examples.ts", "src/**/tool-efficiency-examples.ts"]
 }

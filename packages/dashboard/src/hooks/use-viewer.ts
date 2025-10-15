@@ -8,7 +8,7 @@
  * @author @darianrosebrook
  */
 
-import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { useDashboardContext } from '@/contexts/dashboard-context';
 import { useApi } from '@/hooks/use-api';
 
@@ -51,8 +51,11 @@ export function useViewer() {
     isMounted.current = true;
     return () => {
       isMounted.current = false;
-      if (statusCheckTimeoutRef.current) {
-        clearTimeout(statusCheckTimeoutRef.current);
+
+      // Capture current timeout ID to avoid stale closure issues
+      const currentTimeout = statusCheckTimeoutRef.current;
+      if (currentTimeout) {
+        clearTimeout(currentTimeout);
       }
     };
   }, []);
@@ -67,7 +70,10 @@ export function useViewer() {
       };
 
       // Only update state if status actually changed
-      if (isMounted.current && JSON.stringify(newStatus) !== JSON.stringify(lastStatusRef.current)) {
+      if (
+        isMounted.current &&
+        JSON.stringify(newStatus) !== JSON.stringify(lastStatusRef.current)
+      ) {
         lastStatusRef.current = newStatus;
         setState((prev) => ({
           ...prev,
@@ -99,15 +105,15 @@ export function useViewer() {
   }, [api, config.routes]);
 
   // Debounced status check to prevent rapid successive calls
-  const debouncedCheckStatus = useCallback(() => {
-    if (statusCheckTimeoutRef.current) {
-      clearTimeout(statusCheckTimeoutRef.current);
-    }
-    
-    statusCheckTimeoutRef.current = setTimeout(() => {
-      checkStatus();
-    }, 1000); // 1 second debounce
-  }, [checkStatus]);
+  // const debouncedCheckStatus = useCallback(() => {
+  //   if (statusCheckTimeoutRef.current) {
+  //     clearTimeout(statusCheckTimeoutRef.current);
+  //   }
+
+  //   statusCheckTimeoutRef.current = setTimeout(() => {
+  //     checkStatus();
+  //   }, 1000); // 1 second debounce
+  // }, [checkStatus]);
 
   // Start viewer
   const startViewer = useCallback(async (): Promise<boolean> => {

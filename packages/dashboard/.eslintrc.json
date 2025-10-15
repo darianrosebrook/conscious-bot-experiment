@@ -8,6 +8,7 @@
     "@typescript-eslint/no-explicit-any": "off",
     // "no-console": "warn",
     "no-else-return": "warn",
-    "no-undef": "error"
+    "no-undef": "error",
+    "@next/next/no-html-link-for-pages": "off"
   }
 }

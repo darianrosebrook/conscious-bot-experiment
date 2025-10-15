@@ -14,7 +14,7 @@ import {
   TrendingUp,
   AlertTriangle,
   CheckCircle,
-  Clock,
+  // Clock,
   Target,
 } from 'lucide-react';
 import { Section } from './section';

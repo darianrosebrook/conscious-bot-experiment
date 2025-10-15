@@ -269,16 +269,16 @@ export class EnhancedMemorySystem extends EventEmitter {
 
     // Initialize knowledge graph for GraphRAG
     this.knowledgeGraph = new EnhancedKnowledgeGraphCore({
-      host: config.host,
-      port: config.port,
-      user: config.user,
-      password: config.password,
-      database: config.database,
-      vectorDb: this.vectorDb,
-      embeddingService: this.embeddingService,
+      database: {
+        host: config.host || 'localhost',
+        port: config.port || 5432,
+        user: config.user || 'conscious_bot',
+        password: config.password || 'secure_password',
+        database: config.database || 'conscious_bot',
+      },
     });
 
-    this.graphRag = new GraphRAG(this.knowledgeGraph);
+    this.graphRag = new GraphRAG(this.knowledgeGraph as any);
 
     // Initialize hybrid search service with enhanced features
     this.hybridSearchService = new HybridSearchService({
@@ -414,6 +414,23 @@ export class EnhancedMemorySystem extends EventEmitter {
           content: chunk.content,
           embedding: embedding.embedding,
           metadata: chunk.metadata,
+          entities: [],
+          relationships: [],
+          decayProfile: {
+            memoryType: 'semantic',
+            baseDecayRate: 0.01,
+            lastAccessed: Date.now(),
+            accessCount: 1,
+            importance: chunk.metadata.importance || 0.5,
+            consolidationHistory: [],
+          },
+          provenance: {
+            sourceSystem: 'memory_system',
+            extractionMethod: 'chunking',
+            confidence: 0.9,
+            processingTime: Date.now(),
+            version: '1.0.0',
+          },
           createdAt: Date.now(),
           updatedAt: Date.now(),
         };
@@ -783,10 +800,10 @@ export class EnhancedMemorySystem extends EventEmitter {
       initialized: this.initialized,
       worldSeed: this.config.worldSeed || 0,
       database: {
-        name: dbStatus.database,
-        status: dbStatus.connectionStatus,
+        name: dbStatus.databaseName,
+        status: dbStatus.connected ? 'connected' : 'disconnected',
         totalChunks: dbStatus.totalChunks,
-        storageSize: dbStatus.storageSize,
+        storageSize: '0MB', // TODO: Implement storage size calculation
       },
       services: {
         embeddingService: 'healthy', // Health checks implemented in healthCheck() method
@@ -1673,7 +1690,7 @@ export class EnhancedMemorySystem extends EventEmitter {
 
       // Check memory count consistency
       const vectorStats = await this.vectorDb.getStats();
-      const graphStats = await this.graphRag.getStats();
+      const graphStats = await this.knowledgeGraph.getStats();
 
       const memoryCount = vectorStats.totalChunks || 0;
       const graphEntities = graphStats.entityCount || 0;
@@ -1908,16 +1925,40 @@ export class EnhancedMemorySystem extends EventEmitter {
 
     return {
       query: options.query,
-      results: matches.map((chunk) => ({
-        id: chunk.id,
-        content: chunk.content,
-        score: 0.5, // Default score for recovery mode
-        metadata: chunk.metadata,
-        source: 'backup-recovery',
-      })),
-      totalResults: matches.length,
+      results: matches.map(
+        (chunk, index) =>
+          ({
+            id: chunk.id,
+            content: chunk.content,
+            metadata: {
+              type: 'knowledge' as const,
+              confidence: 0.5,
+              source: 'recovery',
+              timestamp: Date.now(),
+            } as any,
+            score: 0.5, // Default score for recovery mode
+            rank: index + 1,
+            vectorScore: 0.5,
+            graphScore: 0.5,
+            hybridScore: 0.5,
+            searchStrategy: 'vector' as const,
+          }) as any
+      ),
+      totalFound: matches.length,
+      length: matches.length,
       searchTime: 0,
-      strategy: 'recovery',
+      performance: {
+        vectorSearchTime: 0,
+        graphSearchTime: 0,
+        rankingTime: 0,
+        totalTime: 0,
+      },
+      strategy: {
+        graphWeight: 0,
+        vectorWeight: 1,
+        hybridMode: 'vector-only',
+        queryExpanded: false,
+      },
     };
   }
 
@@ -1939,16 +1980,40 @@ export class EnhancedMemorySystem extends EventEmitter {
       return {
         query: options.query,
         results:
-          graphResults.results?.map((r) => ({
-            id: r.id || 'unknown',
-            content: r.content || '',
-            score: r.score || 0.5,
-            metadata: r.metadata,
-            source: 'graph-only',
-          })) || [],
-        totalResults: graphResults.results?.length || 0,
+          graphResults.entities?.map(
+            (entity, index) =>
+              ({
+                id: entity.id,
+                content: entity.description || entity.name,
+                metadata: {
+                  type: 'knowledge' as const,
+                  confidence: entity.confidence,
+                  source: 'graph-rag',
+                  timestamp: Date.now(),
+                } as any,
+                score: entity.confidence,
+                rank: index + 1,
+                vectorScore: 0.5,
+                graphScore: entity.confidence,
+                hybridScore: entity.confidence,
+                searchStrategy: 'graph' as const,
+              }) as any
+          ) || [],
+        totalFound: graphResults.entities?.length || 0,
+        length: graphResults.entities?.length || 0,
         searchTime: 0,
-        strategy: 'degraded-graph-only',
+        performance: {
+          vectorSearchTime: 0,
+          graphSearchTime: 0,
+          rankingTime: 0,
+          totalTime: 0,
+        },
+        strategy: {
+          graphWeight: 1,
+          vectorWeight: 0,
+          hybridMode: 'graph-only',
+          queryExpanded: false,
+        },
       };
     } catch (error) {
       console.error('❌ Degraded search also failed:', error);
@@ -1976,7 +2041,13 @@ export class EnhancedMemorySystem extends EventEmitter {
         await this.verifyIdentityIntegrity();
       }
 
-      const chunkIds = await this.ingestMemory(content, options);
+      const chunkIds = await this.ingestMemory({
+        type: options.type as any,
+        content: content,
+        source: options.source,
+        confidence: 0.8,
+        customMetadata: options.metadata,
+      });
 
       // Add to backup queue for critical memories
       if (options.priority === 'high' || options.type === 'reflection') {
@@ -2217,8 +2288,8 @@ export function createEnhancedMemorySystem(
 export const DEFAULT_MEMORY_CONFIG: EnhancedMemorySystemConfig = {
   host: process.env.PG_HOST || 'localhost',
   port: parseInt(process.env.PG_PORT || '5432'),
-  user: process.env.PG_USER || 'postgres',
-  password: process.env.PG_PASSWORD || '',
+  user: process.env.PG_USER || 'conscious_bot',
+  password: process.env.PG_PASSWORD || 'secure_password',
   database: process.env.PG_DATABASE || 'conscious_bot',
   worldSeed: parseInt(process.env.WORLD_SEED || '0'),
   vectorDbTableName: 'memory_chunks',
@@ -2265,6 +2336,12 @@ export const DEFAULT_MEMORY_CONFIG: EnhancedMemorySystemConfig = {
   enableNarrativeTracking: process.env.MEMORY_ENABLE_NARRATIVE !== 'false',
   enableMetacognition: process.env.MEMORY_ENABLE_METACOGNITION !== 'false',
   enableSelfModelUpdates: process.env.MEMORY_ENABLE_SELF_MODEL !== 'false',
+
+  // Enhanced search features
+  enableMultiHopReasoning: process.env.MEMORY_ENABLE_MULTIHOP !== 'false',
+  enableProvenanceTracking: process.env.MEMORY_ENABLE_PROVENANCE !== 'false',
+  enableDecayAwareRanking: process.env.MEMORY_ENABLE_DECAY_RANKING !== 'false',
+  maxHops: parseInt(process.env.MEMORY_MAX_HOPS || '3'),
   maxReflections: parseInt(process.env.MEMORY_MAX_REFLECTIONS || '1000'),
   reflectionCheckpointInterval: parseInt(
     process.env.MEMORY_CHECKPOINT_INTERVAL || '86400000'

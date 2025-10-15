@@ -16,7 +16,7 @@ import { z } from 'zod';
 export interface ExtractedEntity {
   id: string;
   name: string;
-  type: EntityType;
+  type: ExtractedEntityType;
   confidence: number;
   aliases: string[];
   description?: string;
@@ -45,7 +45,7 @@ export interface ExtractedRelationship {
   id: string;
   sourceEntityId: string;
   targetEntityId: string;
-  type: RelationshipType;
+  type: ExtractedRelationshipType;
   confidence: number;
   strength: number; // 0-1, based on co-occurrence and context
 
@@ -116,7 +116,7 @@ export interface EntityExtractionConfig {
   }>;
 }
 
-export enum EntityType {
+export enum ExtractedEntityType {
   PERSON = 'PERSON',
   ORGANIZATION = 'ORGANIZATION',
   LOCATION = 'LOCATION',
@@ -131,7 +131,7 @@ export enum EntityType {
   OTHER = 'OTHER',
 }
 
-export enum RelationshipType {
+export enum ExtractedRelationshipType {
   WORKS_ON = 'WORKS_ON',
   PART_OF = 'PART_OF',
   RELATED_TO = 'RELATED_TO',
@@ -338,7 +338,7 @@ export class EntityExtractionService {
         entities.push({
           id: `entity-${this.generateId()}`,
           name,
-          type: EntityType.PERSON,
+          type: ExtractedEntityType.PERSON,
           confidence: this.calculateNameConfidence(name),
           aliases: [name.toLowerCase()],
           extractionMethod: 'regex_ner',
@@ -351,7 +351,10 @@ export class EntityExtractionService {
             frequency: 1,
             context: this.extractContext(text, match.index, 5),
             relatedTerms: [],
-            importance: this.calculateEntityImportance(name, EntityType.PERSON),
+            importance: this.calculateEntityImportance(
+              name,
+              ExtractedEntityType.PERSON
+            ),
           },
         });
       }
@@ -370,7 +373,7 @@ export class EntityExtractionService {
           entities.push({
             id: `entity-${this.generateId()}`,
             name,
-            type: EntityType.ORGANIZATION,
+            type: ExtractedEntityType.ORGANIZATION,
             confidence: 0.8,
             aliases: [name.toLowerCase()],
             extractionMethod: 'regex_ner',
@@ -385,7 +388,7 @@ export class EntityExtractionService {
               relatedTerms: [],
               importance: this.calculateEntityImportance(
                 name,
-                EntityType.ORGANIZATION
+                ExtractedEntityType.ORGANIZATION
               ),
             },
           });
@@ -407,7 +410,7 @@ export class EntityExtractionService {
           entities.push({
             id: `entity-${this.generateId()}`,
             name,
-            type: EntityType.LOCATION,
+            type: ExtractedEntityType.LOCATION,
             confidence: 0.75,
             aliases: [name.toLowerCase()],
             extractionMethod: 'regex_ner',
@@ -422,7 +425,7 @@ export class EntityExtractionService {
               relatedTerms: [],
               importance: this.calculateEntityImportance(
                 name,
-                EntityType.LOCATION
+                ExtractedEntityType.LOCATION
               ),
             },
           });
@@ -450,7 +453,7 @@ export class EntityExtractionService {
             entities.push({
               id: `entity-${this.generateId()}`,
               name,
-              type: entityType as EntityType,
+              type: entityType as ExtractedEntityType,
               confidence: 0.85, // Higher confidence for custom patterns
               aliases: [name.toLowerCase()],
               extractionMethod: 'custom_pattern',
@@ -465,7 +468,7 @@ export class EntityExtractionService {
                 relatedTerms: [],
                 importance: this.calculateEntityImportance(
                   name,
-                  entityType as EntityType
+                  entityType as ExtractedEntityType
                 ),
               },
             });
@@ -638,7 +641,7 @@ export class EntityExtractionService {
             id: `rel-${this.generateId()}`,
             sourceEntityId: entity1.id,
             targetEntityId: entity2.id,
-            type: RelationshipType.RELATED_TO,
+            type: ExtractedRelationshipType.RELATED_TO,
             confidence: Math.min(0.9, 0.5 + cooccurrenceCount * 0.1),
             strength: Math.min(1.0, mutualInformation),
             evidence: {
@@ -699,7 +702,7 @@ export class EntityExtractionService {
             id: `rel-${this.generateId()}`,
             sourceEntityId: sourceEntity.id,
             targetEntityId: targetEntity.id,
-            type: rule.relationshipType as RelationshipType,
+            type: rule.relationshipType as ExtractedRelationshipType,
             confidence: rule.confidence,
             strength: 0.8, // High strength for rule-based relationships
             evidence: {
@@ -744,7 +747,7 @@ export class EntityExtractionService {
             id: `rel-${this.generateId()}`,
             sourceEntityId: entity1.id,
             targetEntityId: entity2.id,
-            type: RelationshipType.RELATED_TO,
+            type: ExtractedRelationshipType.RELATED_TO,
             confidence: Math.min(0.9, pmi),
             strength: pmi,
             evidence: {
@@ -850,22 +853,22 @@ export class EntityExtractionService {
 
   private calculateEntityImportance(
     entityName: string,
-    entityType: EntityType
+    entityType: ExtractedEntityType
   ): number {
     // Base importance by entity type
     const typeImportance = {
-      [EntityType.PERSON]: 0.8,
-      [EntityType.ORGANIZATION]: 0.7,
-      [EntityType.LOCATION]: 0.6,
-      [EntityType.TECHNOLOGY]: 0.9,
-      [EntityType.CONCEPT]: 0.7,
-      [EntityType.PROJECT]: 0.8,
-      [EntityType.TASK]: 0.5,
-      [EntityType.EMOTION]: 0.6,
-      [EntityType.SKILL]: 0.7,
-      [EntityType.TOOL]: 0.8,
-      [EntityType.MEMORY_TYPE]: 0.5,
-      [EntityType.OTHER]: 0.4,
+      [ExtractedEntityType.PERSON]: 0.8,
+      [ExtractedEntityType.ORGANIZATION]: 0.7,
+      [ExtractedEntityType.LOCATION]: 0.6,
+      [ExtractedEntityType.TECHNOLOGY]: 0.9,
+      [ExtractedEntityType.CONCEPT]: 0.7,
+      [ExtractedEntityType.PROJECT]: 0.8,
+      [ExtractedEntityType.TASK]: 0.5,
+      [ExtractedEntityType.EMOTION]: 0.6,
+      [ExtractedEntityType.SKILL]: 0.7,
+      [ExtractedEntityType.TOOL]: 0.8,
+      [ExtractedEntityType.MEMORY_TYPE]: 0.5,
+      [ExtractedEntityType.OTHER]: 0.4,
     };
 
     // Boost for technical terms and specific patterns
@@ -884,7 +887,10 @@ export class EntityExtractionService {
     return Math.min(1.0, typeImportance[entityType] + boost);
   }
 
-  private inferEntityType(entityName: string, text: string): EntityType {
+  private inferEntityType(
+    entityName: string,
+    text: string
+  ): ExtractedEntityType {
     const lowerName = entityName.toLowerCase();
 
     // Technology indicators
@@ -896,7 +902,7 @@ export class EntityExtractionService {
       lowerName.includes('model') ||
       lowerName.includes('framework')
     ) {
-      return EntityType.TECHNOLOGY;
+      return ExtractedEntityType.TECHNOLOGY;
     }
 
     // Project indicators
@@ -905,7 +911,7 @@ export class EntityExtractionService {
       lowerName.includes('system') ||
       lowerName.includes('platform')
     ) {
-      return EntityType.PROJECT;
+      return ExtractedEntityType.PROJECT;
     }
 
     // Concept indicators
@@ -916,11 +922,11 @@ export class EntityExtractionService {
       lowerName.includes('pattern') ||
       lowerName.includes('principle')
     ) {
-      return EntityType.CONCEPT;
+      return ExtractedEntityType.CONCEPT;
     }
 
     // Default to OTHER for unknown types
-    return EntityType.OTHER;
+    return ExtractedEntityType.OTHER;
   }
 
   private findEntityPositions(text: string, entityName: string): number[] {
@@ -961,7 +967,7 @@ export class EntityExtractionService {
         id: `rel-${this.generateId()}`,
         sourceEntityId: entity1.id,
         targetEntityId: entity2.id,
-        type: RelationshipType.WORKS_ON,
+        type: ExtractedRelationshipType.WORKS_ON,
         confidence: 0.8,
         strength: 0.7,
         evidence: {
@@ -986,7 +992,7 @@ export class EntityExtractionService {
         id: `rel-${this.generateId()}`,
         sourceEntityId: entity1.id,
         targetEntityId: entity2.id,
-        type: RelationshipType.PART_OF,
+        type: ExtractedRelationshipType.PART_OF,
         confidence: 0.85,
         strength: 0.8,
         evidence: {

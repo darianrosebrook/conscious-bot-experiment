@@ -10,7 +10,7 @@
  */
 
 import { EventEmitter } from 'events';
-import { SkillRegistry } from '@conscious-bot/memory';
+import { SkillRegistry } from '../../../memory/src/skills';
 import { BehaviorTreeRunner } from '../behavior-trees/BehaviorTreeRunner';
 import {
   SkillPlannerAdapter,
@@ -29,7 +29,7 @@ import {
 import {
   EnhancedGOAPPlanner,
   GOAPPlan,
-} from '../reactive-executor/enhanced-goap-planner';
+} from '../reactive-executor/goap-planner';
 import {
   Plan,
   PlanningContext,

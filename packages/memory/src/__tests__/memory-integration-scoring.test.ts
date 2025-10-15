@@ -107,8 +107,8 @@ describe('Memory Integration Scoring and Verification', () => {
       // Database configuration
       host: 'localhost',
       port: 5432,
-      user: 'postgres',
-      password: 'password',
+      user: 'conscious_bot',
+      password: 'secure_password',
       database: 'test_db',
       vectorDbTableName: 'embeddings',
 

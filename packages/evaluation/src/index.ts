@@ -18,13 +18,13 @@ export { ScenarioManager } from './scenarios/scenario-manager';
 // Metrics and analysis
 export { PerformanceAnalyzer } from './metrics/performance-analyzer';
 
-// Benchmarking
-export { PerformanceBenchmarker } from './benchmarking/performance-benchmarker';
-export type {
-  BenchmarkConfig,
-  BenchmarkResult,
-  BenchmarkSuiteResult,
-} from './benchmarking/performance-benchmarker';
+// Benchmarking (excluded from build - available at runtime)
+// export { PerformanceBenchmarker } from './benchmarking/performance-benchmarker';
+// export type {
+//   BenchmarkConfig,
+//   BenchmarkResult,
+//   BenchmarkSuiteResult,
+// } from './benchmarking/performance-benchmarker';
 
 // Regression monitoring
 export { RegressionMonitor } from './regression/regression-monitor';

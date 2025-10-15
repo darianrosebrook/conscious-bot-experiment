@@ -10,8 +10,8 @@
 import { describe, it, expect } from 'vitest';
 import {
   EntityExtractionService,
-  EntityType,
-  RelationshipType,
+  ExtractedEntityType,
+  ExtractedRelationshipType,
 } from '../entity-extraction-service';
 
 describe('Entity Extraction Service', () => {
@@ -35,13 +35,13 @@ describe('Entity Extraction Service', () => {
 
       // Should extract person names
       const persons = result.entities.filter(
-        (e) => e.type === EntityType.PERSON
+        (e) => e.type === ExtractedEntityType.PERSON
       );
       expect(persons.length).toBeGreaterThanOrEqual(2);
 
       // Should extract organization names
       const organizations = result.entities.filter(
-        (e) => e.type === EntityType.ORGANIZATION
+        (e) => e.type === ExtractedEntityType.ORGANIZATION
       );
       expect(organizations.length).toBeGreaterThanOrEqual(2);
 
@@ -62,13 +62,13 @@ describe('Entity Extraction Service', () => {
 
       // Should extract technology entities
       const technologies = result.entities.filter(
-        (e) => e.type === EntityType.TECHNOLOGY
+        (e) => e.type === ExtractedEntityType.TECHNOLOGY
       );
       expect(technologies.length).toBeGreaterThanOrEqual(2);
 
       // Should extract concept entities
       const concepts = result.entities.filter(
-        (e) => e.type === EntityType.CONCEPT
+        (e) => e.type === ExtractedEntityType.CONCEPT
       );
       expect(concepts.length).toBeGreaterThanOrEqual(2);
 
@@ -148,13 +148,13 @@ describe('Entity Extraction Service', () => {
 
       // Should extract WORKS_ON relationships
       const worksOnRelationships = result.relationships.filter(
-        (r) => r.type === RelationshipType.WORKS_ON
+        (r) => r.type === ExtractedRelationshipType.WORKS_ON
       );
       expect(worksOnRelationships.length).toBeGreaterThan(0);
 
       // Should extract organizational relationships
       const partOfRelationships = result.relationships.filter(
-        (r) => r.type === RelationshipType.PART_OF
+        (r) => r.type === ExtractedRelationshipType.PART_OF
       );
       expect(partOfRelationships.length).toBeGreaterThan(0);
 
@@ -176,7 +176,7 @@ describe('Entity Extraction Service', () => {
 
       // Should find co-occurrence based relationships
       const relatedRelationships = result.relationships.filter(
-        (r) => r.type === RelationshipType.RELATED_TO
+        (r) => r.type === ExtractedRelationshipType.RELATED_TO
       );
       expect(relatedRelationships.length).toBeGreaterThan(0);
 
@@ -304,7 +304,7 @@ describe('Entity Extraction Service', () => {
 
         // All entities should be properly typed
         result.entities.forEach((entity) => {
-          expect(Object.values(EntityType)).toContain(entity.type);
+          expect(Object.values(ExtractedEntityType)).toContain(entity.type);
         });
       }
     });
@@ -350,7 +350,7 @@ describe('Entity Extraction Service', () => {
       // Create service with custom patterns
       const customService = new EntityExtractionService({
         customEntityPatterns: {
-          [EntityType.TECHNOLOGY]: [
+          [ExtractedEntityType.TECHNOLOGY]: [
             /\bCustomFramework\b/g,
             /\bSpecialLibrary\b/g,
           ],
@@ -367,7 +367,7 @@ describe('Entity Extraction Service', () => {
       // Should extract custom technology entities
       const customTech = result.entities.filter(
         (e) =>
-          e.type === EntityType.TECHNOLOGY &&
+          e.type === ExtractedEntityType.TECHNOLOGY &&
           (e.name === 'CustomFramework' || e.name === 'SpecialLibrary')
       );
 

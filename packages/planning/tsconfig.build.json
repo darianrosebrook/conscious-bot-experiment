@@ -4,6 +4,12 @@
     "baseUrl": ".",
     // Ensure build uses compiled workspace packages, not src path aliases
     "paths": {}
-  }
+  },
+  "exclude": [
+    "src/skill-integration/**/*",
+    "src/**/*.test.ts",
+    "src/**/*.test.tsx",
+    "src/__tests__/**/*"
+  ]
 }
 

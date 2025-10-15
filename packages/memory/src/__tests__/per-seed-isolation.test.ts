@@ -24,8 +24,8 @@ function createCompleteConfig(
     // Database configuration
     host: 'localhost',
     port: 5432,
-    user: 'postgres',
-    password: '',
+    user: 'conscious_bot',
+    password: 'secure_password',
     database: 'conscious_bot',
     worldSeed: 0,
     vectorDbTableName: 'memory_chunks',
@@ -96,8 +96,8 @@ function createCompleteConfig(
 const TEST_DB_CONFIG = {
   host: 'localhost',
   port: 5432,
-  user: 'postgres',
-  password: '',
+  user: 'conscious_bot',
+  password: 'secure_password',
   database: 'test_conscious_bot',
 };
 

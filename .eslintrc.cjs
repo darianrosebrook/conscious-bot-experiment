@@ -14,7 +14,7 @@ module.exports = {
     es2022: true,
   },
   globals: {
-    // Jest globals
+    // Jest/Vitest globals
     jest: 'readonly',
     describe: 'readonly',
     it: 'readonly',
@@ -24,6 +24,7 @@ module.exports = {
     afterEach: 'readonly',
     beforeAll: 'readonly',
     afterAll: 'readonly',
+    vi: 'readonly',
 
     // Browser globals
     fetch: 'readonly',

@@ -158,7 +158,7 @@ export class ObservationMapper {
   /**
    * Extract inventory information
    */
-  private extractInventoryState(bot: Bot) {
+  public extractInventoryState(bot: Bot) {
     const items: MinecraftItem[] = [];
     let usedSlots = 0;
 

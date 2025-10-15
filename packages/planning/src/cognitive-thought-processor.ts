@@ -15,6 +15,7 @@ import {
   ToolExecutionResult,
   MCPIntegration,
 } from './modules/mcp-integration';
+import { auditLogger } from '@conscious-bot/cognition';
 
 export interface CognitiveThought {
   type:
@@ -1005,7 +1006,7 @@ export class CognitiveThoughtProcessor extends EventEmitter {
    */
   async processThought(thought: CognitiveThought): Promise<any | null> {
     const startTime = Date.now();
-    const task = this.translateThoughtToTask(thought);
+    const task = await this.translateThoughtToTask(thought);
 
     auditLogger.log(
       'thought_processed',
@@ -1043,7 +1044,7 @@ export class CognitiveThoughtProcessor extends EventEmitter {
 
     try {
       // 1. Create a task from the thought
-      const task = this.translateThoughtToTask(thought);
+      const task = await this.translateThoughtToTask(thought);
       result.task = task;
 
       // 2. Discover available tools for the thought

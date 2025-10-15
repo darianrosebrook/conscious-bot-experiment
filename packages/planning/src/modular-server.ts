@@ -315,7 +315,7 @@ const toolExecutor = {
       };
 
       // Log tool execution for audit trail
-      import('../cognition/src/audit/thought-action-audit-logger')
+      import('@conscious-bot/cognition')
         .then(({ auditLogger }) => {
           auditLogger.log(
             'tool_executed',
@@ -697,7 +697,7 @@ async function recomputeProgressAndMaybeComplete(task: any) {
       enhancedTaskIntegration.updateTaskProgress(task.id, 1, 'completed');
 
       // Log action completion for audit trail
-      import('../cognition/src/audit/thought-action-audit-logger')
+      import('@conscious-bot/cognition')
         .then(({ auditLogger }) => {
           auditLogger.log(
             'action_completed',

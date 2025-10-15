@@ -75,6 +75,22 @@ class MockVectorDatabase {
   }
 
   paramIndex: any = {};
+
+  private getNextParamIndex(): number {
+    return this.paramIndex++;
+  }
+
+  async getChunk(id: string): Promise<any> {
+    return null;
+  }
+
+  async recordAccess(chunkId: string, metadata?: any): Promise<void> {
+    // Mock implementation
+  }
+
+  async storeChunk(chunk: any): Promise<void> {
+    // Mock implementation
+  }
 }
 
 class MockEmbeddingService {
@@ -181,6 +197,27 @@ class MockEmbeddingService {
   async performQualityAnalysis(embedding: any): Promise<any> {
     return this.analyzeEmbeddingQuality(embedding);
   }
+
+  // Additional required methods for EmbeddingService interface
+  getQualityMatch(query: string, result: any): number {
+    return 0.8; // Mock implementation
+  }
+
+  getUrgencyBonus(memoryType: string): number {
+    return 0.1; // Mock implementation
+  }
+
+  calculateEmbeddingConfidence(embedding: any): number {
+    return 0.9; // Mock implementation
+  }
+
+  getPerformanceStats(): any[] {
+    return []; // Mock implementation
+  }
+
+  clearMetrics(): void {
+    // Mock implementation
+  }
 }
 
 class MockMemoryDecayManager {
@@ -242,6 +279,63 @@ class MockMemoryDecayManager {
 
   async updateConfig(newConfig: any): Promise<void> {
     this.config = { ...this.config, ...newConfig };
+  }
+
+  // Missing methods from MemoryDecayManager
+  async forceCleanup(): Promise<number> {
+    return 0;
+  }
+
+  getEmotionalMemoryDecayRate(): number {
+    return 0.01;
+  }
+
+  async ensureEmotionalMemoryDecayRate(): Promise<void> {}
+
+  calculateEmotionalMemoryRetention(): number {
+    return 0.9;
+  }
+
+  // Additional required methods for MemoryDecayManager interface
+  calculateBaseDecayRate(): number {
+    return 0.01; // Mock implementation
+  }
+
+  calculateImportance(memoryId: string): number {
+    return 0.5; // Mock implementation
+  }
+
+  updateAccessPattern(memoryId: string, pattern: any): void {
+    // Mock implementation
+  }
+
+  async recalculateDecayRate(memoryId: string): Promise<number> {
+    return 0.01; // Mock implementation
+  }
+
+  getMemoryAge(memoryId: string): number {
+    return 0; // Mock implementation
+  }
+
+  shouldApplyDecay(memoryId: string): boolean {
+    return false; // Mock implementation
+  }
+
+  getDecayFactors(): any {
+    return {}; // Mock implementation
+  }
+
+  // Additional missing methods
+  async recalculateImportance(memoryId: string): Promise<number> {
+    return 0.5; // Mock implementation
+  }
+
+  generateCleanupRecommendations(): any[] {
+    return []; // Mock implementation
+  }
+
+  generateConsolidationSummary(): any {
+    return {}; // Mock implementation
   }
 }
 
@@ -654,11 +748,11 @@ describe('Neuroscience-Inspired Memory System', () => {
         consolidationCycleInterval: 300000, // 5 minutes
         activityThreshold: 0.1,
         adaptiveConsolidation: false,
-        vectorDb: mockVectorDb,
-        embeddingService: mockEmbeddingService,
+        vectorDb: mockVectorDb as any,
+        embeddingService: mockEmbeddingService as any,
         sharpWaveRippleManager: swrManager,
         cognitiveMapTracker: cognitiveMapTracker,
-        memoryDecayManager: mockMemoryDecayManager,
+        memoryDecayManager: mockMemoryDecayManager as any,
       });
 
       // Mock the dependencies to return expected values
@@ -731,11 +825,11 @@ describe('Neuroscience-Inspired Memory System', () => {
         consolidationCycleInterval: 300000,
         activityThreshold: 0.1,
         adaptiveConsolidation: false,
-        vectorDb: mockVectorDb,
-        embeddingService: mockEmbeddingService,
+        vectorDb: mockVectorDb as any,
+        embeddingService: mockEmbeddingService as any,
         sharpWaveRippleManager: swrManager,
         cognitiveMapTracker: cognitiveMapTracker,
-        memoryDecayManager: mockMemoryDecayManager,
+        memoryDecayManager: mockMemoryDecayManager as any,
       });
 
       const insights = await consolidationManager.getConsolidationInsights();
@@ -752,11 +846,11 @@ describe('Neuroscience-Inspired Memory System', () => {
         consolidationCycleInterval: 300000,
         activityThreshold: 0.1,
         adaptiveConsolidation: false,
-        vectorDb: mockVectorDb,
-        embeddingService: mockEmbeddingService,
+        vectorDb: mockVectorDb as any,
+        embeddingService: mockEmbeddingService as any,
         sharpWaveRippleManager: swrManager,
         cognitiveMapTracker: cognitiveMapTracker,
-        memoryDecayManager: mockMemoryDecayManager,
+        memoryDecayManager: mockMemoryDecayManager as any,
       });
 
       const status = await consolidationManager.getStatus();
@@ -875,11 +969,11 @@ describe('Neuroscience-Inspired Memory System', () => {
         consolidationCycleInterval: 300000,
         activityThreshold: 0.1,
         adaptiveConsolidation: false,
-        vectorDb: mockVectorDb,
-        embeddingService: mockEmbeddingService,
+        vectorDb: mockVectorDb as any,
+        embeddingService: mockEmbeddingService as any,
         sharpWaveRippleManager: swrManager,
         cognitiveMapTracker: cognitiveMapTracker,
-        memoryDecayManager: mockMemoryDecayManager,
+        memoryDecayManager: mockMemoryDecayManager as any,
       });
 
       const startTime = Date.now();

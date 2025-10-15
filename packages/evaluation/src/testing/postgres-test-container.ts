@@ -36,7 +36,12 @@ class MockEmbeddingService {
 
   async embed(): Promise<{
     embedding: number[];
-    model: { name: string; dimension: number; contextWindow: number; type: string };
+    model: {
+      name: string;
+      dimension: number;
+      contextWindow: number;
+      type: string;
+    };
     confidence: number;
     tokens: number;
   }> {
@@ -55,7 +60,12 @@ class MockEmbeddingService {
 
   async embedWithStrategy(): Promise<{
     embedding: number[];
-    model: { name: string; dimension: number; contextWindow: number; type: string };
+    model: {
+      name: string;
+      dimension: number;
+      contextWindow: number;
+      type: string;
+    };
     confidence: number;
     tokens: number;
   }> {
@@ -66,12 +76,19 @@ class MockEmbeddingService {
     return query;
   }
 
-  async embedBatch(texts: string[]): Promise<Array<{
-    embedding: number[];
-    model: { name: string; dimension: number; contextWindow: number; type: string };
-    confidence: number;
-    tokens: number;
-  }>> {
+  async embedBatch(texts: string[]): Promise<
+    Array<{
+      embedding: number[];
+      model: {
+        name: string;
+        dimension: number;
+        contextWindow: number;
+        type: string;
+      };
+      confidence: number;
+      tokens: number;
+    }>
+  > {
     return Promise.all(texts.map(() => this.embed()));
   }
 }
@@ -116,6 +133,7 @@ export async function createMemoryFixture(
     embeddingService: mockEmbedding as any,
     graphRag: (memorySystem as any).graphRag,
     chunkingService: (memorySystem as any).chunkingService,
+    knowledgeGraph: (memorySystem as any).knowledgeGraph,
     defaultGraphWeight: config.defaultGraphWeight,
     defaultVectorWeight: config.defaultVectorWeight,
     maxResults: config.maxSearchResults,
@@ -123,6 +141,10 @@ export async function createMemoryFixture(
     enableQueryExpansion: false,
     enableDiversification: false,
     enableSemanticBoost: false,
+    enableMultiHopReasoning: false,
+    enableProvenanceTracking: false,
+    enableDecayAwareRanking: false,
+    maxHops: 3,
   });
 
   await memorySystem.initialize();

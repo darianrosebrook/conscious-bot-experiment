@@ -350,7 +350,7 @@ export class DashboardApiClient {
     }
   }
 
-  async getCognitiveStream(limit?: number): Promise<ApiResponse> {
+  async getCognitiveStream(_limit?: number): Promise<ApiResponse> {
     try {
       const response = await this.makeRequest(
         this.config.endpoints.cognition.cognitiveStream.recent()

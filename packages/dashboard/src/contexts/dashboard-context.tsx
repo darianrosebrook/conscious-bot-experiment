@@ -9,8 +9,8 @@ import React, {
   createContext,
   useContext,
   ReactNode,
-  useState,
-  useEffect,
+  // useState,
+  // useEffect,
 } from 'react';
 
 // =============================================================================
@@ -296,7 +296,7 @@ class ApiClient {
   /**
    * Get cognitive stream data
    */
-  async getCognitiveStream(limit?: number) {
+  async getCognitiveStream(_limit?: number) {
     const response = await this.makeRequest(
       this.config.endpoints.cognition.cognitiveStream.recent()
     );
@@ -317,8 +317,8 @@ interface DashboardContextType {
 // Service discovery and connection management
 class ServiceDiscovery {
   private static instance: ServiceDiscovery;
-  private serviceRegistry = new Map<string, string>();
-  private healthChecks = new Map<string, NodeJS.Timeout>();
+  // private serviceRegistry = new Map<string, string>();
+  // private healthChecks = new Map<string, NodeJS.Timeout>();
   private readonly DEFAULT_PORTS = {
     minecraft: 3005,
     cognition: 3003,
@@ -487,7 +487,10 @@ class ServiceDiscovery {
   /**
    * Check if a service is healthy
    */
-  async checkServiceHealth(serviceName: string, url: string): Promise<boolean> {
+  async checkServiceHealth(
+    // _serviceName: string,
+    url: string
+  ): Promise<boolean> {
     try {
       const response = await fetch(url, {
         method: 'GET',
@@ -508,12 +511,12 @@ class ServiceDiscovery {
 
     // Check health of each service
     const healthChecks = await Promise.allSettled([
-      this.checkServiceHealth('minecraft', endpoints.minecraft.health()),
-      this.checkServiceHealth('cognition', endpoints.cognition.health()),
-      this.checkServiceHealth('memory', endpoints.memory.health()),
-      this.checkServiceHealth('planning', endpoints.planning.health()),
-      this.checkServiceHealth('world', endpoints.world.health()),
-      this.checkServiceHealth('evaluation', endpoints.evaluation.health()),
+      this.checkServiceHealth(endpoints.minecraft.health()),
+      this.checkServiceHealth(endpoints.cognition.health()),
+      this.checkServiceHealth(endpoints.memory.health()),
+      this.checkServiceHealth(endpoints.planning.health()),
+      this.checkServiceHealth(endpoints.world.health()),
+      this.checkServiceHealth(endpoints.evaluation.health()),
     ]);
 
     // Return endpoints with fallback URLs for unhealthy services

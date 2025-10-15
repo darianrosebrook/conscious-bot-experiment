@@ -55,10 +55,10 @@ import { HomeostasisMonitor } from './goal-formulation/homeostasis-monitor';
 import { generateNeeds } from './goal-formulation/need-generator';
 import { EnhancedGoalManager } from './goal-formulation/goal-manager';
 import { createWeightedUtility } from './goal-formulation/utility-calculator';
-import { TaskBootstrapper } from './goal-formulation/task-bootstrapper';
-import type {
+import {
+  TaskBootstrapper,
   BootstrapResult,
-  TaskBootstrapperConfig,
+  type TaskBootstrapperConfig,
 } from './goal-formulation/task-bootstrapper';
 
 export interface PlanningConfiguration {
@@ -110,6 +110,7 @@ export interface PlanningContext {
     socialContext: string[];
     environmentalFactors: string[];
   };
+  bot?: any;
 }
 
 export interface IntegratedPlanningResult {

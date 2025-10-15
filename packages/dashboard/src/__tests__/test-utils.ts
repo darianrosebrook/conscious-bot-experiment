@@ -6,6 +6,7 @@
  *
  * @author @darianrosebrook
  */
+import { vi } from 'vitest';
 
 // ============================================================================
 // Mock Data Factories

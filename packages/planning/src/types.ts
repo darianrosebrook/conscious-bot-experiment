@@ -226,6 +226,10 @@ export interface PlanStep {
   estimatedDuration: number;
   actualDuration?: number;
   dependencies: string[];
+  expectedDurationMs?: number;
+  stepId?: string;
+  args?: any;
+  safetyLevel?: string;
 }
 
 export enum PlanStepStatus {

@@ -15,7 +15,15 @@ import {
   Scenario,
   AgentConfig,
 } from '../types';
-import { BenchmarkSuiteResult } from '../benchmarking/performance-benchmarker';
+// import { BenchmarkSuiteResult } from '../benchmarking/performance-benchmarker';
+// Stub type for BenchmarkSuiteResult (benchmarking excluded from build)
+interface BenchmarkSuiteResult {
+  suiteId: string;
+  timestamp: number;
+  results: any[];
+  summary: any;
+}
+
 import {
   RegressionDetection,
   MonitoringDashboard,
@@ -791,10 +799,9 @@ export class EvaluationDashboard extends EventEmitter {
 
     if (format === 'json') {
       return JSON.stringify(exportData, null, 2);
-    } 
-      // CSV export would be implemented here
-      return this.convertToCSV(exportData);
-    
+    }
+    // CSV export would be implemented here
+    return this.convertToCSV(exportData);
   }
 
   /**

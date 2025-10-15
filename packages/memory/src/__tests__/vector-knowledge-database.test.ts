@@ -22,8 +22,8 @@ describe('Enhanced Vector Database', () => {
     db = new EnhancedVectorDatabase({
       host: 'localhost',
       port: 5432,
-      user: 'postgres',
-      password: '',
+      user: 'conscious_bot',
+      password: 'secure_password',
       database: 'conscious_bot_test',
       tableName: 'enhanced_memory_chunks_test',
       dimension: 768,

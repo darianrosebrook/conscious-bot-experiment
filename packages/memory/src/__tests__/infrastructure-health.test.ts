@@ -62,7 +62,7 @@ describe('Infrastructure Health Checks', () => {
     const response = await fetch(`${ollamaHost}/api/tags`);
     expect(response.ok).toBe(true);
 
-    const data = await response.json();
+    const data = (await response.json()) as { models: any[] };
     expect(data).toHaveProperty('models');
     expect(Array.isArray(data.models)).toBe(true);
   });
@@ -70,7 +70,7 @@ describe('Infrastructure Health Checks', () => {
   it('nomic-embed-text model is available', async () => {
     const ollamaHost = process.env.OLLAMA_HOST || 'http://localhost:11434';
     const response = await fetch(`${ollamaHost}/api/tags`);
-    const data = await response.json();
+    const data = (await response.json()) as { models: any[] };
 
     const nomicModel = data.models.find((m: any) =>
       m.name.includes('nomic-embed-text')
@@ -90,10 +90,9 @@ describe('Infrastructure Health Checks', () => {
     });
 
     expect(response.ok).toBe(true);
-    const data = await response.json();
+    const data = (await response.json()) as { embedding: number[] };
     expect(data).toHaveProperty('embedding');
     expect(Array.isArray(data.embedding)).toBe(true);
     expect(data.embedding.length).toBeGreaterThan(0);
   }, 30000); // Allow 30s for first embedding generation
 });
-
