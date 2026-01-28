@@ -19,7 +19,7 @@ import type { ThoughtType } from '@/types';
 // =============================================================================
 interface CognitiveThought {
   id: string;
-  timestamp: string;
+  timestamp: number | string;
   content: string;
   type: string;
   attribution?: string;
@@ -146,9 +146,13 @@ export function useCognitiveStream() {
             const thoughts = payload.data.thoughts as CognitiveThought[];
 
             for (const thought of thoughts) {
+              const parsed = new Date(thought.timestamp);
+              const ts = isNaN(parsed.getTime())
+                ? new Date().toISOString()
+                : parsed.toISOString();
               addThought({
                 id: thought.id,
-                ts: new Date(thought.timestamp).toISOString(),
+                ts,
                 text: thought.content,
                 type: mapThoughtType(thought.type),
                 attribution: mapAttribution(thought.attribution),

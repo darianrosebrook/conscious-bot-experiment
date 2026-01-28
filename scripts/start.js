@@ -21,6 +21,26 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+// Load .env file if present
+const envPath = path.join(path.dirname(__dirname), '.env');
+if (fs.existsSync(envPath)) {
+  const envContent = fs.readFileSync(envPath, 'utf-8');
+  for (const line of envContent.split('\n')) {
+    const trimmed = line.trim();
+    if (trimmed && !trimmed.startsWith('#')) {
+      const eqIdx = trimmed.indexOf('=');
+      if (eqIdx > 0) {
+        const key = trimmed.slice(0, eqIdx).trim();
+        const value = trimmed.slice(eqIdx + 1).trim();
+        if (!process.env[key]) {
+          process.env[key] = value;
+        }
+      }
+    }
+  }
+  console.log('\x1b[32m Loaded environment from .env\x1b[0m');
+}
+
 // Colors for output
 const colors = {
   red: '\x1b[31m',
@@ -518,12 +538,32 @@ async function main() {
 
     processes.push({ child, service });
 
-    // Add to started services set
-    startedServices.add(service.name);
+    // Wait for service to be healthy before marking as started
+    // This ensures dependencies are actually ready, not just spawned
+    try {
+      // Give service time to start (longer for core services)
+      const startupDelay = service.priority <= 3 ? 5000 : 3000;
+      await wait(startupDelay);
 
-    // Longer delay between critical services
-    const delay = service.priority <= 3 ? 3000 : 1000; // 3 seconds for core services, 1 second for others
-    await wait(delay);
+      // Check if service is healthy
+      await waitForService(service.healthUrl, service.name, 30); // 30 attempts = 60 seconds max
+
+      // Only mark as started if health check passes
+      startedServices.add(service.name);
+      logService(service.name, 'Service is healthy and ready', 'HEALTH');
+    } catch (error) {
+      // Service failed to become healthy
+      logService(
+        service.name,
+        `Failed to become healthy: ${error.message}`,
+        'ERROR'
+      );
+      // Don't mark as started - this will prevent dependent services from starting
+      // But continue with other services
+    }
+
+    // Small delay before starting next service
+    await wait(1000);
   }
 
   // Step 9: Wait for services to start and check health with retry logic
@@ -630,7 +670,44 @@ async function main() {
     );
   }
 
-  // Step 10: Display status and URLs
+  // Step 10: Check optional external services
+  log('\n🔍 Checking optional external services...', colors.cyan);
+
+  // Sterling reasoning server (external, not managed by us)
+  const sterlingUrl = process.env.STERLING_WS_URL || 'ws://localhost:8766';
+  try {
+    const { default: WS } = await import('ws');
+    await new Promise((resolve, reject) => {
+      const ws = new WS(sterlingUrl, { handshakeTimeout: 3000 });
+      const timer = setTimeout(() => {
+        ws.terminate();
+        reject(new Error('timeout'));
+      }, 4000);
+      ws.on('open', () => {
+        ws.send(JSON.stringify({ command: 'ping' }));
+        ws.on('message', (data) => {
+          try {
+            const msg = JSON.parse(data.toString());
+            if (msg.type === 'pong') {
+              clearTimeout(timer);
+              ws.close();
+              resolve();
+            }
+          } catch {}
+        });
+      });
+      ws.on('error', (err) => {
+        clearTimeout(timer);
+        reject(err);
+      });
+    });
+    log(`  ✅ Sterling reasoning server available at ${sterlingUrl}`, colors.green);
+  } catch {
+    log(`  ℹ️  Sterling reasoning server not available at ${sterlingUrl} (optional)`, colors.yellow);
+    log('     To enable: cd /path/to/sterling && source venv/bin/activate && python scripts/utils/sterling_unified_server.py', colors.cyan);
+  }
+
+  // Step 11: Display status and URLs
   logWithTimestamp(
     '\n🎉 Conscious Bot System is running!',
     'SUCCESS',
@@ -702,7 +779,7 @@ async function main() {
   logWithTimestamp('  Press Ctrl+C or run: pnpm kill', 'INFO', colors.cyan);
   logWithTimestamp('', 'INFO');
 
-  // Step 11: Handle graceful shutdown
+  // Step 12: Handle graceful shutdown
   const cleanup = async () => {
     logWithTimestamp(
       '\n🛑 Shutting down Conscious Bot System...',

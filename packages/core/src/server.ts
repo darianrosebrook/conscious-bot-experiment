@@ -361,13 +361,18 @@ const dynamicFlow = new DynamicCreationFlow(registry);
 const app = createServer(registry, dynamicFlow);
 
 // Start the server if this file is run directly
-if (require.main === module) {
+const isDirectRun = process.argv[1] && (
+  process.argv[1].endsWith('/server.ts') ||
+  process.argv[1].endsWith('/server.js')
+);
+
+if (isDirectRun) {
   const port = process.env.PORT || 3007;
 
   app.listen(port, () => {
-    console.log(`✅ Core API server ready on port ${port}`);
-    console.log(`📊 Health check: http://localhost:${port}/health`);
-    console.log(`🔧 Capability registry endpoints available`);
+    console.log(`Core API server ready on port ${port}`);
+    console.log(`Health check: http://localhost:${port}/health`);
+    console.log(`Capability registry endpoints available`);
   });
 }
 
