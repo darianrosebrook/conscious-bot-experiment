@@ -694,7 +694,7 @@ export class HybridHRMRouter {
         prompt: task,
         context: safeContext,
         systemMessage:
-          'You are a helpful AI assistant in a Minecraft world. Provide clear, actionable advice.',
+          'Given the current environment state, provide clear and actionable guidance.',
       });
 
       return {

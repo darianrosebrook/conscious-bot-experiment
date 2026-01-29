@@ -608,7 +608,7 @@ export class EmotionalMemoryLLMAdapter extends MemoryAwareLLMInterface {
         return `${firstPart}\n\n[Emotional Context]\n${emotionalContextText}\n\n${secondPart}`;
       case 'contextual':
       default:
-        return `You are an AI assistant with access to emotional memories and self-narratives that inform your identity and emotional processing.
+        return `The following emotional memories and self-narratives provide context for processing this request.
 
 ${emotionalContextText}
 

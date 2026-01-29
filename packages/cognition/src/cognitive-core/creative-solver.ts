@@ -205,7 +205,7 @@ export class CreativeProblemSolver {
       const response = await this.llm.generateResponse(
         prompt,
         {
-          systemPrompt: `You are an expert in creative problem solving using analogical reasoning. 
+          systemPrompt: `Apply creative problem solving using analogical reasoning to the following problem.
         Find relevant analogies from the specified domain that could help solve the given problem.
         Provide specific, actionable solutions based on the analogy.`,
         },

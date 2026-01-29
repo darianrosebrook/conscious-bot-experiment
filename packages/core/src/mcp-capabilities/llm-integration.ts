@@ -388,7 +388,7 @@ export class HRMLLMInterface {
    * High-level abstract planning (System 2)
    */
   private async generateAbstractPlan(request: any): Promise<any> {
-    const systemPrompt = `You are an expert Minecraft AI planner. Your role is to generate high-level strategic plans for solving complex problems.
+    const systemPrompt = `Generate a high-level strategic plan for solving the following problem.
 
 Focus on:
 - Breaking down complex tasks into manageable sub-goals
@@ -435,7 +435,7 @@ Consider the recent failures and design a robust approach that can handle simila
     abstractPlan: any,
     request: any
   ): Promise<any> {
-    const systemPrompt = `You are an expert Minecraft AI executor. Your role is to convert high-level strategic plans into detailed tactical execution steps.
+    const systemPrompt = `Convert the following high-level strategic plan into detailed tactical execution steps.
 
 Focus on:
 - Concrete action sequences
@@ -533,7 +533,7 @@ Generate specific, actionable steps that implement the abstract plan.`;
    * Refine the current plan
    */
   private async refinePlan(plan: any, request: any): Promise<any> {
-    const systemPrompt = `You are an expert Minecraft AI plan refiner. Your role is to improve and optimize existing plans based on feedback and analysis.
+    const systemPrompt = `Improve and optimize the following plan based on feedback and analysis.
 
 Focus on:
 - Identifying potential issues or weaknesses
@@ -577,7 +577,7 @@ Provide specific improvements to increase the plan's success probability and rob
    * Generate BT-DSL from refined plan
    */
   private async generateBTDSL(plan: any, request: any): Promise<any> {
-    const systemPrompt = `You are an expert in Behavior Tree Domain Specific Language (BT-DSL). Your role is to convert detailed execution plans into structured BT-DSL JSON.
+    const systemPrompt = `Convert the following execution plan into structured Behavior Tree Domain Specific Language (BT-DSL) JSON.
 
 Available node types:
 - Sequence: Execute children in order, fail if any child fails

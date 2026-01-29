@@ -302,7 +302,7 @@ export class ReActArbiter {
    * This is used for task decomposition outside of the ReAct loop
    */
   async generateTaskSteps(task: any): Promise<string> {
-    const prompt = `You are a Minecraft bot planning system. Generate specific, actionable steps for the following task:
+    const prompt = `Generate specific, actionable steps for the following task:
 
 TASK: ${task.title}
 DESCRIPTION: ${task.description || 'No description provided'}
@@ -369,7 +369,7 @@ Focus on the actual actions needed, not generic planning steps.`;
       ? `\nErrors encountered:\n${errors.map((e) => `- ${e}`).join('\n')}`
       : '';
 
-    return `You are a Minecraft bot reflecting on a completed episode.
+    return `Reflect on the following completed episode.
 
 Episode Trace:
 ${traceSummary}
@@ -483,7 +483,7 @@ Keep your reflection concise and actionable.`;
       ? `\nReflexion Hints:\n${context.reflexionHints.map((h) => `- ${h.lesson}`).join('\n')}`
       : '';
 
-    return `You are a Minecraft bot using ReAct reasoning to accomplish tasks.
+    return `Using ReAct (Reasoning + Acting), analyze the current situation and select an appropriate action.
 
 Available Tools:
 ${tools}

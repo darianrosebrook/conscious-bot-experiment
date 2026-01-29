@@ -468,7 +468,7 @@ export class LLMEnhancedSkillComposer extends EventEmitter {
       request;
 
     return `
-You are an AI assistant helping to refine a Minecraft bot goal for better skill composition.
+Refine the following goal for better skill composition.
 
 ORIGINAL GOAL:
 - Type: ${originalGoal.type}
@@ -515,7 +515,7 @@ Respond with a JSON object containing:
     const { goal, context, availableLeaves, complexity, style } = request;
 
     return `
-You are an AI assistant helping to generate new skill ideas for a Minecraft bot.
+Generate new skill ideas to accomplish the following goal.
 
 GOAL:
 - Description: ${goal.description}
@@ -565,7 +565,7 @@ Respond with a JSON array of skills:
     const { composedSkill, executionResult, context } = request;
 
     return `
-You are an AI assistant analyzing the execution feedback for a composed Minecraft bot skill.
+Analyze the following execution feedback for the composed skill.
 
 SKILL:
 - Name: ${composedSkill.name}
@@ -617,7 +617,7 @@ Respond with a JSON object containing:
     preferences?: Record<string, any>
   ): string {
     return `
-You are an AI assistant generating a learning curriculum for a Minecraft bot.
+Generate a learning curriculum based on the following current skills and world state.
 
 CURRENT SKILLS:
 ${currentSkills.map((skill) => `- ${skill}`).join('\n')}

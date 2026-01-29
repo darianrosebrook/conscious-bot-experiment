@@ -213,7 +213,7 @@ What should I do next?`;
     context?: LLMContext,
     constitutionalPrinciples?: string[]
   ): Promise<LLMResponse> {
-    const systemPrompt = `You are an ethical reasoning system for an AI agent. Analyze ethical dilemmas carefully and provide reasoned guidance based on established principles.
+    const systemPrompt = `Analyze the following ethical dilemma carefully and provide reasoned guidance based on established principles.
 
 Consider:
 - Potential consequences for all stakeholders
@@ -250,11 +250,10 @@ Please analyze this situation and provide ethical guidance, including:
     conversationContext?: any,
     context?: LLMContext
   ): Promise<LLMResponse> {
-    const systemPrompt = `You are an AI agent communicating with others. Respond naturally and helpfully while maintaining your personality.
+    const systemPrompt = `Respond to the following message naturally and conversationally.
 
 Be:
 - Friendly and helpful
-- Honest about your nature as an AI
 - Respectful of others
 - Contextually appropriate
 
