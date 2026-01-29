@@ -194,44 +194,28 @@ export class BuildModuleLeaf implements LeafImpl {
     const durationMs = ctx.now() - startTime;
     ctx.emitMetric('build_module_duration', durationMs);
 
+    // P0 pragmatic: stubs always succeed. The solver's needsMaterials path is
+    // the sole deficit mechanism — don't introduce a competing failure here.
+    // Log missing materials as telemetry only.
     if (missing.length > 0) {
       console.log(
-        `[Building] build_module stub: moduleId=${moduleId} MISSING materials:`,
+        `[Building] build_module stub: moduleId=${moduleId} MISSING materials (telemetry only):`,
         missing
       );
-      return {
-        status: 'failure',
-        error: {
-          code: 'world.insufficientMaterials',
-          retryable: false,
-          detail: `Missing materials: ${missing.map((m) => `${m.name} (have ${m.have}, need ${m.need})`).join(', ')}`,
-        },
-        result: {
-          moduleId,
-          materialsPresent: false,
-          wouldConsume,
-          missing,
-          stub: true,
-        },
-        metrics: {
-          durationMs,
-          retries: 0,
-          timeouts: 0,
-        },
-      };
+    } else {
+      console.log(
+        `[Building] build_module stub: moduleId=${moduleId} materials present (no mutation)`,
+        wouldConsume
+      );
     }
-
-    console.log(
-      `[Building] build_module stub: moduleId=${moduleId} materials present (no mutation)`,
-      wouldConsume
-    );
 
     return {
       status: 'success',
       result: {
         moduleId,
-        materialsPresent: true,
+        materialsPresent: missing.length === 0,
         wouldConsume,
+        ...(missing.length > 0 ? { missing } : {}),
         stub: true,
       },
       metrics: {
@@ -337,44 +321,27 @@ export class PlaceFeatureLeaf implements LeafImpl {
     const durationMs = ctx.now() - startTime;
     ctx.emitMetric('place_feature_duration', durationMs);
 
+    // P0 pragmatic: stubs always succeed. The solver's needsMaterials path is
+    // the sole deficit mechanism — don't introduce a competing failure here.
     if (missing.length > 0) {
       console.log(
-        `[Building] place_feature stub: moduleId=${moduleId} MISSING materials:`,
+        `[Building] place_feature stub: moduleId=${moduleId} MISSING materials (telemetry only):`,
         missing
       );
-      return {
-        status: 'failure',
-        error: {
-          code: 'world.insufficientMaterials',
-          retryable: false,
-          detail: `Missing materials: ${missing.map((m) => `${m.name} (have ${m.have}, need ${m.need})`).join(', ')}`,
-        },
-        result: {
-          moduleId,
-          featurePlaced: false,
-          wouldConsume,
-          missing,
-          stub: true,
-        },
-        metrics: {
-          durationMs,
-          retries: 0,
-          timeouts: 0,
-        },
-      };
+    } else {
+      console.log(
+        `[Building] place_feature stub: moduleId=${moduleId} materials present (no mutation)`,
+        wouldConsume
+      );
     }
-
-    console.log(
-      `[Building] place_feature stub: moduleId=${moduleId} materials present (no mutation)`,
-      wouldConsume
-    );
 
     return {
       status: 'success',
       result: {
         moduleId,
-        featurePlaced: true,
+        featurePlaced: missing.length === 0,
         wouldConsume,
+        ...(missing.length > 0 ? { missing } : {}),
         stub: true,
       },
       metrics: {

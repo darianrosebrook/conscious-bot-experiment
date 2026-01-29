@@ -27,6 +27,7 @@ interface TaskStep {
   done: boolean;
   order: number;
   estimatedDuration?: number;
+  meta?: Record<string, unknown>;
 }
 
 // ============================================================================
@@ -57,7 +58,8 @@ export class MinecraftBuildingSolver {
     goalModules: string[],
     inventory: Record<string, number>,
     siteState: BuildingSiteState,
-    modules: BuildingModule[]
+    modules: BuildingModule[],
+    executionMode?: string
   ): Promise<BuildingSolveResult> {
     if (!this.sterlingService.isAvailable()) {
       return {
@@ -102,6 +104,7 @@ export class MinecraftBuildingSolver {
       modules,
       maxNodes: 2000,
       useLearning: true,
+      executionMode: executionMode || undefined,
     });
 
     // Capture planId for episode reporting
@@ -203,6 +206,7 @@ export class MinecraftBuildingSolver {
           done: false,
           order: order++,
           estimatedDuration: 10000,
+          meta: { domain: 'building', leaf: 'acquire_material', item: itemName, count, templateId },
         });
       }
       console.log(
@@ -216,6 +220,7 @@ export class MinecraftBuildingSolver {
         done: false,
         order: order++,
         estimatedDuration: 2000,
+        meta: { domain: 'building', leaf: 'replan_building', templateId },
       });
 
       return taskSteps;
@@ -229,6 +234,13 @@ export class MinecraftBuildingSolver {
         done: false,
         order: order++,
         estimatedDuration: this.estimateDuration(step.moduleType),
+        meta: {
+          domain: 'building',
+          leaf: this.moduleTypeToLeaf(step.moduleType),
+          moduleId: step.moduleId,
+          moduleType: step.moduleType,
+          templateId,
+        },
       });
     }
 
@@ -263,7 +275,8 @@ export class MinecraftBuildingSolver {
     executedModuleIds: string[],
     failureAtModuleId?: string,
     failureReason?: string,
-    planId?: string | null
+    planId?: string | null,
+    isStub?: boolean
   ): void {
     if (!this.sterlingService.isAvailable()) return;
 
@@ -281,6 +294,7 @@ export class MinecraftBuildingSolver {
         executedModuleIds,
         failureAtModuleId,
         failureReason,
+        isStub: isStub ?? false,
       })
       .catch((err) => {
         console.warn(
@@ -331,6 +345,22 @@ export class MinecraftBuildingSolver {
         return `Leaf: minecraft.place_feature (module=${step.moduleId})`;
       default:
         return `Leaf: minecraft.building_step (module=${step.moduleId})`;
+    }
+  }
+
+  /**
+   * Map module type to leaf name for structured metadata.
+   */
+  private moduleTypeToLeaf(moduleType: string): string {
+    switch (moduleType) {
+      case 'prep_site':
+        return 'prepare_site';
+      case 'apply_module':
+        return 'build_module';
+      case 'place_feature':
+        return 'place_feature';
+      default:
+        return 'building_step';
     }
   }
 

@@ -153,6 +153,8 @@ export interface TaskStep {
   actualDuration?: number;
   startedAt?: number;
   completedAt?: number;
+  /** Structured metadata — domain, moduleId, planId, etc. Use instead of parsing labels. */
+  meta?: Record<string, unknown>;
 }
 
 export interface Task {
@@ -2268,6 +2270,10 @@ export class EnhancedTaskIntegration extends EventEmitter {
     // P0 quarantine: use stub templateId so learning doesn't contaminate real template
     const templateId = 'basic_shelter_5x5__p0stub';
 
+    // Guard against infinite replan loops — max 1 replan per task
+    const replanCount = ((taskData.metadata as any)?.buildingReplanCount as number) || 0;
+    const MAX_REPLANS = 1;
+
     const result = await this.buildingSolver.solveBuildingPlan(
       templateId,
       'N',
@@ -2275,12 +2281,35 @@ export class EnhancedTaskIntegration extends EventEmitter {
       inventory,
       siteState,
       template.modules.map((m) => ({ ...m, placementFeasible: true })),
+      'stub', // P0: salt digest so stub learning is isolated from live
     );
 
     // Store planId + templateId in task metadata for episode reporting
     if (taskData.metadata) {
       (taskData.metadata as any).buildingPlanId = this.buildingSolver.getLastPlanId();
       (taskData.metadata as any).buildingTemplateId = templateId;
+    }
+
+    // If deficit persists after replan limit, fail explicitly instead of looping
+    if (result.needsMaterials && replanCount >= MAX_REPLANS) {
+      const deficit = result.needsMaterials.deficit;
+      const deficitStr = Object.entries(deficit)
+        .map(([k, v]) => `${k}x${v}`)
+        .join(', ');
+      console.warn(`[Building] Replan limit reached (${MAX_REPLANS}). Still missing: ${deficitStr}`);
+      return [{
+        id: `step-${Date.now()}-replan-exhausted`,
+        label: `Building failed: materials still missing after acquisition (${deficitStr})`,
+        done: false,
+        order: 1,
+        estimatedDuration: 0,
+        meta: { domain: 'building', leaf: 'replan_exhausted', deficit, templateId },
+      }];
+    }
+
+    // Track replan count so the next invocation knows how many we've done
+    if (result.needsMaterials && taskData.metadata) {
+      (taskData.metadata as any).buildingReplanCount = replanCount + 1;
     }
 
     return this.buildingSolver.toTaskStepsWithReplan(result, templateId);
@@ -2300,18 +2329,26 @@ export class EnhancedTaskIntegration extends EventEmitter {
 
     const planId = (task.metadata as any)?.buildingPlanId;
 
+    // Prefer structured step.meta for module IDs; fall back to label parsing
     const completedModuleIds = task.steps
-      .filter((s) => s.done && s.label.includes('build_module'))
-      .map((s) => this.getLeafParamFromLabel(s.label, 'module'))
+      .filter((s) => s.done && (
+        (s.meta?.domain === 'building' && s.meta?.moduleId) ||
+        s.label.includes('build_module')
+      ))
+      .map((s) => (s.meta?.moduleId as string) || this.getLeafParamFromLabel(s.label, 'module'))
       .filter(Boolean) as string[];
 
     const failedStep = task.steps.find(
-      (s) => !s.done && s.label.includes('minecraft.')
+      (s) => !s.done && (
+        (s.meta?.domain === 'building' && s.meta?.moduleId) ||
+        s.label.includes('minecraft.')
+      )
     );
     const failedModuleId = failedStep
-      ? this.getLeafParamFromLabel(failedStep.label, 'module')
+      ? (failedStep.meta?.moduleId as string) || this.getLeafParamFromLabel(failedStep.label, 'module')
       : undefined;
 
+    // P0: all episodes are stub — server can distinguish via isStub + executionMode digest
     this.buildingSolver.reportEpisodeResult(
       templateId,
       success,
@@ -2319,6 +2356,7 @@ export class EnhancedTaskIntegration extends EventEmitter {
       failedModuleId || undefined,
       success ? undefined : 'execution_failure',
       planId,
+      true, // isStub — P0 leaves don't mutate world/inventory
     );
 
     console.log(
