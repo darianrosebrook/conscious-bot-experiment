@@ -10,6 +10,74 @@ Sterling remains an external Python service providing graph search + learned edg
 
 ---
 
+## Capability primitives
+
+This represents the "capability primitives + transfer envelopes," with toy domains treated only as a convenient proving rig. Each entry has: (1) the primitive, (2) the formal signature (what Sterling must represent/verify), (3) what you prove in the rig, and (4) the transfer envelope (where the same problem-shape recurs). See the [Capability Primitives](./capability-primitives.md) for more details.
+
+The intended goal is a general reasoning substrate rather than a collection of domain handlers.
+
+1. **Deterministic transformation planning (resource → product)**
+   Finite discrete state with typed operators having preconditions/effects, additive cost, goal predicate as subset/constraint satisfaction, search for minimal-cost path, with optional learned edge ordering that does not change transition semantics.
+
+2. **Capability gating and legality (what actions are permitted)**
+   State includes a capability set; operators are enabled/disabled by capability predicates; monotone or partially monotone capability progression; legality checks are fail-closed.
+
+3. **Temporal planning with durations, batching, and capacity**
+   Actions with duration and possible resource occupancy; objective includes time; state includes clocks or remaining-time fields; optionally parallel machines/slots; constraints on concurrency.
+
+4. **Multi-strategy acquisition (alternative methods, different failure modes)**
+   Multiple operator families reach the same subgoal; costs differ; some operators have preconditions that come from external availability; learning updates "which strategy works here."
+
+5. **Hierarchical planning (macro policy over micro solvers)**
+   Two (or more) abstraction layers; macro nodes represent regions/waypoints/contexts; micro controller handles local execution; macro edges invoke sub-solvers; costs incorporate execution feedback.
+
+6. **Goal-conditioned valuation under scarcity (keep/drop/allocate)**
+   Constrained capacity (slots, budget, attention); objective is utility under current goals; value model can shift with goals; learning updates item/action valuations.
+
+7. **Feasibility under constraints and partial-order structure**
+   Operators have nontrivial preconditions (support, dependency, reachability); some steps can commute; solution is a partially ordered plan; execution chooses a valid linearization.
+
+8. **Systems synthesis (compose components to satisfy a behavioral spec)**
+   State is a partial design; operators add components; evaluation function checks behavior/spec satisfaction (deterministic simulator if possible); goal is "spec holds."
+
+9. **Contingency planning with exogenous events**
+   Edges include chosen actions and forced transitions; state includes timeline/hazard triggers; goal includes survivability or invariant preservation; plan may be a policy (conditional branches).
+
+10. **Risk-aware planning (tail risk, not just expected cost)**
+    Stochastic outcomes; cost is distributional (e.g., chance constraints P(failure) < ε, CVaR); state includes risk budget; learning updates failure likelihoods.
+
+11. **Epistemic planning (belief-state and active sensing)**
+    Nodes represent beliefs (prob distributions or hypothesis sets); edges are probes/tests; transitions update beliefs; goal is confidence threshold or hypothesis collapse; cost is probe expense + risk.
+
+12. **Invariant maintenance (non-terminal goals; control-by-receding-horizon)**
+    State includes invariant metrics; drift dynamics; actions restore metrics; goal is to keep invariants within bounds over time (often solved repeatedly as MPC/receding horizon).
+
+13. **Irreversibility and commitment planning**
+    Some actions are irreversible or have large rollback cost; objective includes option value; planner must delay commitment until evidence threshold; constraints encode one-way doors.
+
+14. **Program-level planning (search over compressed representations)**
+    Plan is a structured program (templates/modules/parameters); edges refine program; compilation maps program → concrete actions; correctness requires compilation validity + constraint satisfaction.
+
+15. **Fault diagnosis and repair (hypotheses → tests → fix)**
+    Hypothesis set; test operators reduce entropy; repair operators modify system; goal is "fault isolated + fix validated"; learning ranks tests by information gain.
+
+16. **Representation invariance and state canonicalization**
+    Generalization hinges on canonical state hashing, count-capping, symmetry reduction, and "equivalence under irrelevant variation" to prevent brittleness and memory-hungry representations.
+
+17. **Credit assignment tied to execution, not plans**
+    Separating hypothesized plans from verified outcomes, then updating priors correctly based on executed success rather than planned success.
+
+18. **Multi-objective optimization and preference articulation**
+    Real-world planning requires Pareto handling (time vs risk vs resource burn vs disruption) and a way to surface trade-offs explicitly rather than single scalar cost.
+
+19. **Audit-grade explanations (why this plan, why not that plan)**
+    Structured rationales: which constraints bound the choice, which evidence updated beliefs, which alternatives were rejected and why, for trustworthy reasoning verification.
+
+20. **Adversarial robustness / "rule injection" hardening**
+    Client-defined rules are untrusted input requiring validation, boundedness, and "no untrusted semantics" guarantees for secure agentic integration and plugin ecosystems.
+
+---
+
 ## Global invariants (apply to every rig)
 
 These are not “features.” They are certifiability gates that every rig must satisfy.
@@ -37,43 +105,43 @@ These are not “features.” They are certifiability gates that every rig must 
 Rigs are grouped as “minimal proving suites.” Each rig targets one or more primitives and has a crisp certification plan: signature tests, performance tests, transfer tests.
 
 ### Rig A: Inventory transformation planning
-Proves primitives: 1, 16, 17, 19, 20
+Proves primitives: Deterministic transformation planning (1), Representation invariance and state canonicalization (16), Credit assignment tied to execution, not plans (17), Audit-grade explanations (19), Adversarial robustness / "rule injection" hardening (20)
 Status: implemented baseline (crafting), needs certification harness tightening
 
 ### Rig B: Capability gating and legality
-Proves primitives: 2, 16, 19, 20
+Proves primitives: Capability gating and legality (2), Representation invariance and state canonicalization (16), Audit-grade explanations (19), Adversarial robustness / "rule injection" hardening (20)
 Status: planned (tool tiers + station gating)
 
 ### Rig C: Temporal planning with capacity and batching
-Proves primitives: 3, 18, 16, 17, 19
+Proves primitives: Temporal planning with durations, batching, and capacity (3), Multi-objective optimization and preference articulation (18), Representation invariance and state canonicalization (16), Credit assignment tied to execution, not plans (17), Audit-grade explanations (19)
 Status: planned (furnaces + burn time + parallel slots)
 
 ### Rig D: Multi-strategy acquisition with environment-conditioned priors
-Proves primitives: 4, 17, 18, 19, 20 (and optionally 10 if risk modeled)
+Proves primitives: Multi-strategy acquisition (4), Credit assignment tied to execution, not plans (17), Multi-objective optimization and preference articulation (18), Audit-grade explanations (19), Adversarial robustness / "rule injection" hardening (20) (and optionally Risk-aware planning (10) if risk modeled)
 Status: planned (mine vs trade vs loot vs substitute)
 
 ### Rig E: Hierarchical planning (macro over micro controllers)
-Proves primitives: 5, 16, 17, 19
+Proves primitives: Hierarchical planning (5), Representation invariance and state canonicalization (16), Credit assignment tied to execution, not plans (17), Audit-grade explanations (19)
 Status: planned (waypoints macro + Mineflayer micro)
 
 ### Rig F: Goal-conditioned valuation under scarcity
-Proves primitives: 6, 18, 16, 17, 19
+Proves primitives: Goal-conditioned valuation under scarcity (6), Multi-objective optimization and preference articulation (18), Representation invariance and state canonicalization (16), Credit assignment tied to execution, not plans (17), Audit-grade explanations (19)
 Status: planned (keep/drop/store given goals)
 
 ### Rig G: Feasibility + partial-order structure planning
-Proves primitives: 7, 16, 17, 19
+Proves primitives: Feasibility under constraints and partial-order structure (7), Representation invariance and state canonicalization (16), Credit assignment tied to execution, not plans (17), Audit-grade explanations (19)
 Status: planned (shelter build sequencing under support/reachability constraints)
 
 ### Rig H: Systems synthesis in a deterministic simulator
-Proves primitives: 8, 14, 16, 19
+Proves primitives: Systems synthesis (8), Program-level planning (14), Representation invariance and state canonicalization (16), Audit-grade explanations (19)
 Status: planned (farm layout first; redstone later)
 
 ### Rig I: Epistemic planning (belief-state + active sensing)
-Proves primitives: 11, 19, 17 (and 13 if commitment decisions included)
+Proves primitives: Epistemic planning (11), Audit-grade explanations (19), Credit assignment tied to execution, not plans (17) (and Irreversibility and commitment planning (13) if commitment decisions included)
 Status: planned (structure localization via probes)
 
 ### Rig J: Invariant maintenance (receding horizon control)
-Proves primitives: 12, 18, 17, 19
+Proves primitives: Invariant maintenance (12), Multi-objective optimization and preference articulation (18), Credit assignment tied to execution, not plans (17), Audit-grade explanations (19)
 Status: planned (base light/food/tool buffers)
 
 ### Rig K: Irreversibility and commitment planning
@@ -81,15 +149,15 @@ Proves primitives: 13, 19, 20
 Status: planned (villager trade locking + “verify before commit”)
 
 ### Rig L: Contingency planning with exogenous events
-Proves primitives: 9, 18, 19
+Proves primitives: Contingency planning with exogenous events (9), Multi-objective optimization and preference articulation (18), Audit-grade explanations (19)
 Status: later (nightfall/hunger ticks modeled as forced edges)
 
 ### Rig M: Risk-aware planning (tail risk)
-Proves primitives: 10, 18, 17, 19
+Proves primitives: Risk-aware planning (10), Multi-objective optimization and preference articulation (18), Credit assignment tied to execution, not plans (17), Audit-grade explanations (19)
 Status: later (chance constraints, CVaR-ish objectives)
 
 ### Rig N: Fault diagnosis and repair (hypotheses → tests → fix)
-Proves primitives: 15, 11, 19
+Proves primitives: Fault diagnosis and repair (15), Epistemic planning (11), Audit-grade explanations (19)
 Status: later (jammed system diagnosis)
 
 Note: rigs L–N are “later” not because Minecraft can’t do them, but because they require stricter modeling discipline (forced transitions, stochasticity, entropy tracking) and you want A–K certified first.
@@ -116,10 +184,10 @@ Each rig below uses the same structure.
 A) Primitives and formal signature
 
 Primary: 
-- 1 deterministic transformation planning
+- Deterministic transformation planning (1)
 
 Also: 
-- 16 canonicalization, 17 execution-grounded credit, 19 audit explanations, 20 rule hardening
+- Representation invariance and state canonicalization (16), Credit assignment tied to execution, not plans (17), Audit-grade explanations (19), Adversarial robustness / "rule injection" hardening (20)
 
 
 Signature: 
@@ -165,11 +233,11 @@ Status: Implemented baseline. Next work is certification hardening: strict valid
 A) Primitives and formal signature
 
 Primary: 
-- 2 capability gating and legality
+- Capability gating and legality (2)
 
 
 Also: 
-- 16, 19, 20
+- Representation invariance and state canonicalization (16), Audit-grade explanations (19), Adversarial robustness / "rule injection" hardening (20)
 
 Signature: 
 - state includes capability set; operators enabled/disabled by capability predicates; monotone/partially monotone progression; fail-closed legality.
@@ -207,10 +275,10 @@ Status: Planned. This is the natural next rig after A.
 A) Primitives and formal signature
 
 Primary: 
-- 3 temporal planning
+- Temporal planning with durations, batching, and capacity (3)
 
 Also: 
-- 18 multi-objective clarity (time), 16, 17, 19
+- Multi-objective optimization and preference articulation (18), Representation invariance and state canonicalization (16), Credit assignment tied to execution, not plans (17), Audit-grade explanations (19)
 
 Signature: 
 - actions with durations and capacity occupancy; objective includes time; state includes clocks/remaining-time; optional parallel slots.
@@ -248,10 +316,10 @@ Status: Planned. Comes after B if you want “smelting chains” as a certified 
 A) Primitives and formal signature
 
 Primary: 
-- 4 multi-strategy acquisition
+- Multi-strategy acquisition (4)
 
 Also: 
-- 17, 18, 19, 20 (and optionally 10 if risk modeled)
+- Credit assignment tied to execution, not plans (17), Multi-objective optimization and preference articulation (18), Audit-grade explanations (19), Adversarial robustness / "rule injection" hardening (20) (and optionally Risk-aware planning (10) if risk modeled)
 
 Signature: 
 - multiple operator families reach same subgoal; costs differ; availability predicates from external world; learning updates “which strategy works here.”
@@ -286,10 +354,10 @@ Status: Planned.
 A) Primitives and formal signature
 
 Primary: 
-- 5 hierarchical planning
+- Hierarchical planning (5)
 
 Also: 
-- 16, 17, 19
+- Representation invariance and state canonicalization (16), Credit assignment tied to execution, not plans (17), Audit-grade explanations (19)
 
 Signature: 
 - macro abstraction layer; micro controller handles local execution; macro edges invoke sub-solvers; costs incorporate execution feedback.
@@ -325,10 +393,10 @@ Status: Planned.
 A) Primitives and formal signature
 
 Primary: 
-- 6 valuation under scarcity
+- Goal-conditioned valuation under scarcity (6)
 
 Also: 
-- 18, 16, 17, 19
+- Multi-objective optimization and preference articulation (18), Representation invariance and state canonicalization (16), Credit assignment tied to execution, not plans (17), Audit-grade explanations (19)
 
 Signature: 
 - capacity constraint; utility depends on goals; value model shifts with goals; learning updates valuations.
@@ -363,10 +431,10 @@ Status: Planned.
 A) Primitives and formal signature
 
 Primary: 
-- 7 feasibility + partial order
+- Feasibility under constraints and partial-order structure (7)
 
 Also: 
-- 16, 17, 19 (and 14 if you move to program-level templates)
+- Representation invariance and state canonicalization (16), Credit assignment tied to execution, not plans (17), Audit-grade explanations (19) (and Program-level planning (14) if you move to program-level templates)
 
 Signature: 
 - operators with nontrivial preconditions (support, reachability); steps commute; solution is a partially ordered plan or a plan robust to valid linearizations.
@@ -401,10 +469,10 @@ Status: Planned.
 A) Primitives and formal signature
 
 Primary: 
-- 8 synthesis
+- Systems synthesis (8)
 
 Also: 
-- 14 compressed planning, 16, 19
+- Program-level planning (14), Representation invariance and state canonicalization (16), Audit-grade explanations (19)
 
 Signature: 
 - state is partial design; operators add components; deterministic evaluation checks spec; goal is “spec holds.”
@@ -439,10 +507,10 @@ Status: Planned (farm first; redstone later).
 A) Primitives and formal signature
 
 Primary: 
-- 11 epistemic planning
+- Epistemic planning (11)
 
 Also: 
-- 19, 17 (and 13 if you include commitments)
+- Audit-grade explanations (19), Credit assignment tied to execution, not plans (17) (and Irreversibility and commitment planning (13) if you include commitments)
 
 Signature: 
 - belief nodes; probe operators; belief update; goal is confidence threshold or hypothesis collapse.
@@ -477,10 +545,10 @@ Status: Planned.
 A) Primitives and formal signature
 
 Primary: 
-- 12 invariant maintenance
+- Invariant maintenance (12)
 
 Also: 
-- 18, 17, 19
+- Multi-objective optimization and preference articulation (18), Credit assignment tied to execution, not plans (17), Audit-grade explanations (19)
 
 Signature: 
 - state includes invariant metrics + drift; actions restore; solved repeatedly as MPC/receding horizon.
@@ -515,10 +583,10 @@ Status: Planned.
 A) Primitives and formal signature
 
 Primary: 
-- 13 irreversibility
+- Irreversibility and commitment planning (13)
 
 Also: 
-- 19, 20
+- Audit-grade explanations (19), Adversarial robustness / "rule injection" hardening (20)
 
 Signature: 
 - some actions irreversible or expensive rollback; planner must delay commitment until verification; one-way door constraints.
@@ -553,10 +621,10 @@ Status: Planned.
 A) Primitives and formal signature
 
 Primary: 
-- 9 contingency planning
+- Contingency planning with exogenous events (9)
 
 Also: 
-- 18, 19
+- Multi-objective optimization and preference articulation (18), Audit-grade explanations (19)
 
 Signature: 
 - chosen actions and forced transitions; hazard triggers; policy/branching; goal includes survivability/invariants.
@@ -576,10 +644,10 @@ Status: Later.
 A) Primitives and formal signature
 
 Primary: 
-- 10 risk-aware
+- Risk-aware planning (10)
 
 Also: 
-- 18, 17, 19
+- Multi-objective optimization and preference articulation (18), Credit assignment tied to execution, not plans (17), Audit-grade explanations (19)
 
 Signature: 
 - stochastic outcomes; chance constraints or distributional objective; risk budget; learning updates failure likelihoods.
@@ -596,10 +664,10 @@ Status: Later.
 A) Primitives and formal signature
 
 Primary: 
-- 15 diagnosis/repair
+- Fault diagnosis and repair (15)
 
 Also: 
-- 11 epistemic, 19
+- Epistemic planning (11), Audit-grade explanations (19)
 
 Signature: 
 - hypothesis set; tests reduce entropy; repair operators; validation step.
