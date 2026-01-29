@@ -114,8 +114,6 @@ export class MinecraftBuildingSolver extends BaseDomainSolver<BuildingSolveResul
 
     // Call Sterling building domain
     const result = await this.sterlingService.solve(this.sterlingDomain, {
-      command: 'solve',
-      domain: this.sterlingDomain,
       contractVersion: this.contractVersion,
       templateId,
       facing,

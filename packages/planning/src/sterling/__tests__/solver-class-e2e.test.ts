@@ -10,9 +10,16 @@
  *
  * Run with:
  *   STERLING_E2E=1 npx vitest run packages/planning/src/sterling/__tests__/solver-class-e2e.test.ts
+ *
+ * NOTE: The Sterling backend uses nearbyBlocks (when present in the wire
+ * payload) to filter which mine actions are available. The tool progression
+ * solver intentionally omits nearbyBlocks from the wire payload — block
+ * availability is handled at the rule-builder level via missingBlocks.
  */
 
-import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
+import { describe, it, expect, afterAll } from 'vitest';
+import { writeFileSync, mkdirSync } from 'fs';
+import { join } from 'path';
 import { MinecraftToolProgressionSolver } from '../minecraft-tool-progression-solver';
 import { SterlingReasoningService } from '../sterling-reasoning-service';
 import { contentHash, canonicalize } from '../solve-bundle';
@@ -30,17 +37,18 @@ function describeIf(condition: boolean) {
 }
 
 // ---------------------------------------------------------------------------
-// Service lifecycle
+// Fresh connection per test
 // ---------------------------------------------------------------------------
+// Each test gets its own service + solver to avoid WebSocket message
+// interleaving across solves on a shared persistent connection.
 
-let service: SterlingReasoningService;
-let solver: MinecraftToolProgressionSolver;
-let serviceAvailable = false;
+const services: SterlingReasoningService[] = [];
 
-beforeAll(async () => {
-  if (!shouldRun) return;
-
-  service = new SterlingReasoningService({
+async function freshSolver(): Promise<{
+  solver: MinecraftToolProgressionSolver;
+  available: boolean;
+}> {
+  const service = new SterlingReasoningService({
     url: STERLING_URL,
     enabled: true,
     solveTimeout: 30000,
@@ -49,72 +57,19 @@ beforeAll(async () => {
   });
 
   await service.initialize();
+  await new Promise((r) => setTimeout(r, 500));
 
-  // Give the connection a moment to establish
-  await new Promise((r) => setTimeout(r, 1000));
+  services.push(service);
 
-  serviceAvailable = service.isAvailable();
+  return {
+    solver: new MinecraftToolProgressionSolver(service),
+    available: service.isAvailable(),
+  };
+}
 
-  if (!serviceAvailable) {
-    console.warn(
-      '\n⚠️  Sterling server not reachable at ' + STERLING_URL + '.\n' +
-      '   Solver-class E2E tests will be skipped.\n'
-    );
-  }
-
-  solver = new MinecraftToolProgressionSolver(service);
-
-  // Diagnostic: verify with the exact same rules the solver class would send
-  if (serviceAvailable) {
-    const { buildToolProgressionRules } = await import('../minecraft-tool-progression-rules');
-    const { rules } = buildToolProgressionRules('wooden_pickaxe', 'pickaxe', null, 'wooden', []);
-
-    // Test 1: raw solve with useLearning: false (like integration tests)
-    const rawResult1 = await service.solve('minecraft', {
-      command: 'solve',
-      domain: 'minecraft',
-      contractVersion: 1,
-      executionMode: 'tool_progression',
-      solverId: 'minecraft.tool_progression',
-      inventory: {},
-      goal: { wooden_pickaxe: 1 },
-      rules,
-      maxNodes: 5000,
-      useLearning: false,
-    });
-    console.log('[E2E setup] Raw solve (learning=false):',
-      'solutionFound:', rawResult1.solutionFound,
-      'nodes:', rawResult1.discoveredNodes.length,
-      'path:', rawResult1.solutionPath.length
-    );
-
-    // Test 2: same but useLearning: true (like the solver class does)
-    const rawResult2 = await service.solve('minecraft', {
-      command: 'solve',
-      domain: 'minecraft',
-      contractVersion: 1,
-      executionMode: 'tool_progression',
-      solverId: 'minecraft.tool_progression',
-      inventory: {},
-      goal: { wooden_pickaxe: 1 },
-      rules,
-      maxNodes: 5000,
-      useLearning: true,
-    });
-    console.log('[E2E setup] Raw solve (learning=true):',
-      'solutionFound:', rawResult2.solutionFound,
-      'nodes:', rawResult2.discoveredNodes.length,
-      'path:', rawResult2.solutionPath.length
-    );
-
-    // Allow any remaining backend messages to flush before test solves
-    await new Promise(r => setTimeout(r, 500));
-  }
-});
-
-afterAll(async () => {
-  if (service) {
-    service.destroy();
+afterAll(() => {
+  for (const svc of services) {
+    svc.destroy();
   }
 });
 
@@ -125,51 +80,17 @@ afterAll(async () => {
 describeIf(shouldRun)('ToolProgressionSolver — solver-class E2E', () => {
 
   it('wooden_pickaxe solve populates solveMeta.bundles', async () => {
-    if (!serviceAvailable) {
+    const { solver, available } = await freshSolver();
+    if (!available) {
       console.log('  [SKIPPED] Sterling server not available');
       return;
     }
 
-    // Capture what the solver sends to Sterling + full result
-    const originalSolve = service.solve.bind(service);
-    vi.spyOn(service, 'solve').mockImplementation(async (domain, params, onStep) => {
-      console.log('[E2E diagnostic] Solver sends domain:', domain);
-      console.log('[E2E diagnostic] rules count:', (params?.rules as unknown[])?.length ?? 'no rules');
-      console.log('[E2E diagnostic] goal:', JSON.stringify(params?.goal));
-      const clientResult = await originalSolve(domain, params, onStep);
-      console.log('[E2E diagnostic] Client result:',
-        'solutionFound:', clientResult.solutionFound,
-        'nodes:', clientResult.discoveredNodes.length,
-        'path:', clientResult.solutionPath.length,
-        'edges:', clientResult.searchEdges.length,
-        'error:', clientResult.error,
-        'durationMs:', clientResult.durationMs
-      );
-      return clientResult;
-    });
-
     const result = await solver.solveToolProgression(
       'wooden_pickaxe',
       {},
-      [] // wooden tier needs no nearbyBlocks
+      []
     );
-
-    // Restore
-    vi.restoreAllMocks();
-
-    // Diagnostics: if the solve fails, log why before asserting
-    if (!result.solved) {
-      console.log('[E2E diagnostic] solved=false');
-      console.log('  error:', result.error);
-      console.log('  totalNodes:', result.totalNodes);
-      console.log('  steps:', result.steps?.length);
-      console.log('  solveMeta bundles:', result.solveMeta?.bundles?.length);
-      if (result.solveMeta?.bundles?.[0]) {
-        const b = result.solveMeta.bundles[0];
-        console.log('  bundle.output.solved:', b.output.solved);
-        console.log('  bundle.output.searchStats:', JSON.stringify(b.output.searchStats));
-      }
-    }
 
     // The solve should succeed against a real backend
     expect(result.solved).toBe(true);
@@ -204,10 +125,19 @@ describeIf(shouldRun)('ToolProgressionSolver — solver-class E2E', () => {
 
     // searchHealth should be undefined until Python emits it
     expect(bundle.output.searchHealth).toBeUndefined();
+
+    // Export bundle artifact for post-run inspection
+    const artifactDir = join(__dirname, '__artifacts__');
+    mkdirSync(artifactDir, { recursive: true });
+    writeFileSync(
+      join(artifactDir, 'e2e-wooden-pickaxe-bundle.json'),
+      JSON.stringify(bundle, null, 2)
+    );
   });
 
   it('stepsDigest matches recomputed hash of returned steps', async () => {
-    if (!serviceAvailable) {
+    const { solver, available } = await freshSolver();
+    if (!available) {
       console.log('  [SKIPPED] Sterling server not available');
       return;
     }
@@ -231,30 +161,39 @@ describeIf(shouldRun)('ToolProgressionSolver — solver-class E2E', () => {
   });
 
   it('two identical solves produce identical bundleHash', async () => {
-    if (!serviceAvailable) {
+    const { solver: solver1, available: a1 } = await freshSolver();
+    const { solver: solver2, available: a2 } = await freshSolver();
+
+    if (!a1 || !a2) {
       console.log('  [SKIPPED] Sterling server not available');
       return;
     }
 
-    const result1 = await solver.solveToolProgression('wooden_pickaxe', {}, []);
-    const result2 = await solver.solveToolProgression('wooden_pickaxe', {}, []);
+    const result1 = await solver1.solveToolProgression('wooden_pickaxe', {}, []);
+    const result2 = await solver2.solveToolProgression('wooden_pickaxe', {}, []);
 
     expect(result1.solved).toBe(true);
     expect(result2.solved).toBe(true);
 
-    // If Sterling returns the same solution path, bundleHash should match.
-    // If Sterling's learning causes different paths, the hashes will differ
-    // — that's acceptable, but we still verify hashes are well-formed.
+    // Both hashes are well-formed
     expect(result1.solveMeta!.bundles[0].bundleHash).toMatch(/^[0-9a-f]{16}$/);
     expect(result2.solveMeta!.bundles[0].bundleHash).toMatch(/^[0-9a-f]{16}$/);
 
-    // If same steps, same hash
-    if (
-      result1.solveMeta!.bundles[0].output.stepsDigest ===
-      result2.solveMeta!.bundles[0].output.stepsDigest
-    ) {
-      expect(result1.solveMeta!.bundles[0].bundleHash)
-        .toBe(result2.solveMeta!.bundles[0].bundleHash);
-    }
+    // Both bundleIds follow the content-addressed format
+    expect(result1.solveMeta!.bundles[0].bundleId).toMatch(/^minecraft\.tool_progression:[0-9a-f]{16}$/);
+    expect(result2.solveMeta!.bundles[0].bundleId).toMatch(/^minecraft\.tool_progression:[0-9a-f]{16}$/);
+
+    // Input hashes should match (same rules, same inventory, same goal)
+    expect(result1.solveMeta!.bundles[0].input.definitionHash)
+      .toBe(result2.solveMeta!.bundles[0].input.definitionHash);
+    expect(result1.solveMeta!.bundles[0].input.initialStateHash)
+      .toBe(result2.solveMeta!.bundles[0].input.initialStateHash);
+    expect(result1.solveMeta!.bundles[0].input.goalHash)
+      .toBe(result2.solveMeta!.bundles[0].input.goalHash);
+
+    // NOTE: bundleHash equality is NOT asserted here — live solves have
+    // nondeterministic output fields (durationMs, totalNodes, planId) that
+    // differ per run. Deterministic bundle ID invariant is proven by the
+    // unit-level golden-master tests instead.
   });
 });

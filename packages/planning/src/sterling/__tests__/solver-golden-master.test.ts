@@ -656,10 +656,9 @@ describe('MinecraftBuildingSolver — golden-master', () => {
       const call = (service.solve as ReturnType<typeof vi.fn>).mock.calls[0];
       const payload = call[1];
 
-      // Capture the payload fields that Sterling sees (exclude solveMeta — output-side only)
+      // Capture the payload fields that Sterling sees.
+      // NOTE: command and domain are excluded — SterlingClient injects those.
       const stablePayload = {
-        command: payload.command,
-        domain: payload.domain,
         contractVersion: payload.contractVersion,
         templateId: payload.templateId,
         facing: payload.facing,

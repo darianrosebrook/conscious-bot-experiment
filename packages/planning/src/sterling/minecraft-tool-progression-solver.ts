@@ -205,17 +205,18 @@ export class MinecraftToolProgressionSolver extends BaseDomainSolver<ToolProgres
         tierMatrixVersion: TIER_MATRIX_VERSION,
       });
 
-      // Solve this tier step
+      // Solve this tier step.
+      // NOTE: nearbyBlocks is NOT sent to Sterling — block availability is
+      // handled at the rule-builder level (missingBlocks early-exit above).
+      // Sending nearbyBlocks to the backend causes a redundant filter that
+      // blocks mine actions even when rules were generated correctly.
       const result = await this.sterlingService.solve(this.sterlingDomain, {
-        command: 'solve',
-        domain: this.sterlingDomain,
         contractVersion: this.contractVersion,
         executionMode: 'tool_progression',
         tierMatrixVersion: TIER_MATRIX_VERSION,
         solverId: this.solverId,
         inventory: initialState,
         goal: tierGoalRecord,
-        nearbyBlocks,
         rules,
         maxNodes: 5000,
         useLearning: true,

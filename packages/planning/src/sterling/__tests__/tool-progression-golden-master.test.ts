@@ -415,15 +415,16 @@ describe('MinecraftToolProgressionSolver', () => {
     expect(service.solve).toHaveBeenCalledTimes(1);
     const call = (service.solve as ReturnType<typeof vi.fn>).mock.calls[0];
     expect(call[0]).toBe('minecraft'); // sterlingDomain
+    // command and domain are injected by SterlingClient — not in solver params
     expect(call[1]).toMatchObject({
-      command: 'solve',
-      domain: 'minecraft',
       contractVersion: 1,
       executionMode: 'tool_progression',
       solverId: 'minecraft.tool_progression',
       maxNodes: 5000,
       useLearning: true,
     });
+    expect(call[1]).not.toHaveProperty('command');
+    expect(call[1]).not.toHaveProperty('domain');
 
     // Rules should all have tp: or place: prefix
     const rules = call[1].rules as Array<{ action: string }>;
@@ -795,17 +796,17 @@ describe('MinecraftToolProgressionSolver', () => {
       const call = (service.solve as ReturnType<typeof vi.fn>).mock.calls[0];
       const payload = call[1];
 
-      // Capture the payload fields that Sterling sees
+      // Capture the payload fields that Sterling sees.
+      // NOTE: command/domain are excluded — SterlingClient injects those.
+      // NOTE: nearbyBlocks is excluded — the tool progression solver handles
+      // block availability at the rule-builder level, not via the wire payload.
       const stablePayload = {
-        command: payload.command,
-        domain: payload.domain,
         contractVersion: payload.contractVersion,
         executionMode: payload.executionMode,
         tierMatrixVersion: payload.tierMatrixVersion,
         solverId: payload.solverId,
         inventory: payload.inventory,
         goal: payload.goal,
-        nearbyBlocks: payload.nearbyBlocks,
         rules: payload.rules,
         maxNodes: payload.maxNodes,
         useLearning: payload.useLearning,
