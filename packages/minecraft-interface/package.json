@@ -52,7 +52,7 @@
     "test:planning:adaptive": "npx tsx bin/mc-integration-test.ts --strategy=adaptive --verbose",
     "demo:integration": "npx tsx src/quick-integration-demo.ts",
     "demo:quick": "npx tsx src/quick-integration-demo.ts",
-    "dev:server": "tsx src/server.ts",
+    "dev:server": "NODE_OPTIONS='--max-old-space-size=8192' tsx src/server.ts",
     "test:bot": "npx tsx bin/test-bot.ts",
     "test:bot:save": "npx tsx bin/test-bot.ts --save",
     "test:bot:all": "npx tsx bin/test-bot.ts --save --output=bot-test-results.json",
