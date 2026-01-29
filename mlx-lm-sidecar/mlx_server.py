@@ -14,6 +14,7 @@ Endpoints:
 """
 
 import argparse
+import threading
 import time
 import sys
 
@@ -26,6 +27,9 @@ from flask_cors import CORS
 # ---------------------------------------------------------------------------
 app = Flask(__name__)
 CORS(app)
+
+# Serialize all MLX GPU operations to prevent Metal command buffer races
+_gpu_lock = threading.Lock()
 
 generation_model = None
 generation_tokenizer = None
@@ -111,19 +115,20 @@ def api_generate():
 
     sampler = make_sampler(temp=temperature)
 
-    start = time.time()
-    text = mlx_lm_generate(
-        generation_model,
-        generation_tokenizer,
-        prompt=prompt,
-        max_tokens=max_tokens,
-        sampler=sampler,
-    )
-    elapsed = time.time() - start
+    with _gpu_lock:
+        start = time.time()
+        text = mlx_lm_generate(
+            generation_model,
+            generation_tokenizer,
+            prompt=prompt,
+            max_tokens=max_tokens,
+            sampler=sampler,
+        )
+        elapsed = time.time() - start
 
-    # Rough token counts
-    prompt_tokens = len(generation_tokenizer.encode(prompt))
-    completion_tokens = len(generation_tokenizer.encode(text))
+        # Rough token counts
+        prompt_tokens = len(generation_tokenizer.encode(prompt))
+        completion_tokens = len(generation_tokenizer.encode(text))
 
     return jsonify({
         "response": text,
@@ -155,11 +160,12 @@ def api_embeddings():
     input_ids = mx.array(inputs["input_ids"])
     attention_mask = mx.array(inputs["attention_mask"])
 
-    output = embedding_model(inputs=input_ids, attention_mask=attention_mask)
+    with _gpu_lock:
+        output = embedding_model(inputs=input_ids, attention_mask=attention_mask)
 
-    # Extract text embeddings - shape is (batch, dim)
-    embeds = output.text_embeds
-    vec = embeds[0].tolist()
+        # Extract text embeddings - shape is (batch, dim)
+        embeds = output.text_embeds
+        vec = embeds[0].tolist()
 
     return jsonify({"embedding": vec})
 
