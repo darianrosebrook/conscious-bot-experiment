@@ -10,8 +10,11 @@
 
 import { EventEmitter } from 'events';
 import { createServiceClients } from '@conscious-bot/core';
+import type { BaseDomainSolver } from './sterling/base-domain-solver';
 import type { MinecraftCraftingSolver } from './sterling/minecraft-crafting-solver';
 import type { MinecraftBuildingSolver } from './sterling/minecraft-building-solver';
+import type { MinecraftToolProgressionSolver } from './sterling/minecraft-tool-progression-solver';
+import { resolveRequirement } from './modules/requirements';
 
 // Cognitive stream integration for thought-to-task conversion
 interface CognitiveThought {
@@ -144,18 +147,8 @@ class CognitiveStreamClient {
   }
 }
 
-export interface TaskStep {
-  id: string;
-  label: string;
-  done: boolean;
-  order: number;
-  estimatedDuration?: number;
-  actualDuration?: number;
-  startedAt?: number;
-  completedAt?: number;
-  /** Structured metadata — domain, moduleId, planId, etc. Use instead of parsing labels. */
-  meta?: Record<string, unknown>;
-}
+export type { TaskStep } from './types/task-step';
+import type { TaskStep } from './types/task-step';
 
 export interface Task {
   id: string;
@@ -244,84 +237,6 @@ const DEFAULT_CONFIG: EnhancedTaskIntegrationConfig = {
   actionVerificationTimeout: 10000, // New: 10 second timeout
 };
 
-// Requirement resolution functions
-function parseRequiredQuantityFromTitle(
-  title: string | undefined,
-  fallback: number
-): number {
-  if (!title) return fallback;
-  const m = String(title).match(/(\d{1,3})/);
-  return m ? Math.max(1, parseInt(m[1], 10)) : fallback;
-}
-
-function resolveRequirement(task: any): any {
-  const ttl = (task.title || '').toLowerCase();
-  // Prefer explicit crafting intent first
-  if (task.type === 'crafting' && /pickaxe/.test(ttl)) {
-    return {
-      kind: 'craft',
-      outputPattern: 'wooden_pickaxe',
-      quantity: 1,
-      proxyPatterns: [
-        'oak_log',
-        'birch_log',
-        'spruce_log',
-        'jungle_log',
-        'acacia_log',
-        'dark_oak_log',
-        'plank',
-        'stick',
-      ],
-    };
-  }
-  // Gathering/mining rules next
-  if (task.type === 'gathering' || /\bgather\b|\bcollect\b/.test(ttl)) {
-    const qty = parseRequiredQuantityFromTitle(task.title, 8);
-    return {
-      kind: 'collect',
-      patterns: [
-        'oak_log',
-        'birch_log',
-        'spruce_log',
-        'jungle_log',
-        'acacia_log',
-        'dark_oak_log',
-      ],
-      quantity: qty,
-    };
-  }
-  if (task.type === 'mining' || /\bmine\b|\biron\b/.test(ttl)) {
-    const qty = parseRequiredQuantityFromTitle(task.title, 3);
-    return { kind: 'mine', patterns: ['iron_ore'], quantity: qty };
-  }
-  // Titles that explicitly mention wood but aren't crafting
-  if (/\bwood\b/.test(ttl)) {
-    const qty = parseRequiredQuantityFromTitle(task.title, 8);
-    return {
-      kind: 'collect',
-      patterns: [
-        'oak_log',
-        'birch_log',
-        'spruce_log',
-        'jungle_log',
-        'acacia_log',
-        'dark_oak_log',
-      ],
-      quantity: qty,
-    };
-  }
-  // Building domain — prefer explicit task type over regex
-  if (task.type === 'building') {
-    return { kind: 'build', structure: 'basic_shelter_5x5', quantity: 1 };
-  }
-  // Regex fallback for building — log when used
-  if (/\bbuild\b.*\bshelter\b|\bhouse\b/.test(ttl)) {
-    console.log('[Building] Regex-routed task to building domain:', ttl);
-    return { kind: 'build', structure: 'basic_shelter_5x5', quantity: 1 };
-  }
-  return null;
-}
-
 /**
  * Enhanced task integration system for dashboard connectivity
  * @author @darianrosebrook
@@ -335,8 +250,19 @@ export class EnhancedTaskIntegration extends EventEmitter {
   private cognitiveStreamClient: CognitiveStreamClient;
   private thoughtPollingInterval?: NodeJS.Timeout;
   private minecraftClient: ReturnType<typeof createServiceClients>['minecraft'];
-  private craftingSolver?: MinecraftCraftingSolver;
-  private buildingSolver?: MinecraftBuildingSolver;
+  private solverRegistry = new Map<string, BaseDomainSolver>();
+
+  private get craftingSolver(): MinecraftCraftingSolver | undefined {
+    return this.solverRegistry.get('minecraft.crafting') as MinecraftCraftingSolver | undefined;
+  }
+
+  private get buildingSolver(): MinecraftBuildingSolver | undefined {
+    return this.solverRegistry.get('minecraft.building') as MinecraftBuildingSolver | undefined;
+  }
+
+  private get toolProgressionSolver(): MinecraftToolProgressionSolver | undefined {
+    return this.solverRegistry.get('minecraft.tool_progression') as MinecraftToolProgressionSolver | undefined;
+  }
 
   /**
    * Helper method to make HTTP requests to Minecraft Interface with retry logic
@@ -943,17 +869,17 @@ export class EnhancedTaskIntegration extends EventEmitter {
   }
 
   /**
-   * Set the Sterling crafting solver for intelligent crafting step generation
+   * Register a domain solver by its solverId.
    */
-  setCraftingSolver(solver: MinecraftCraftingSolver): void {
-    this.craftingSolver = solver;
+  registerSolver(solver: BaseDomainSolver): void {
+    this.solverRegistry.set(solver.solverId, solver);
   }
 
   /**
-   * Set the Sterling building solver for building step generation
+   * Retrieve a registered solver by solverId.
    */
-  setBuildingSolver(solver: MinecraftBuildingSolver): void {
-    this.buildingSolver = solver;
+  getSolver<T extends BaseDomainSolver>(solverId: string): T | undefined {
+    return this.solverRegistry.get(solverId) as T | undefined;
   }
 
   /**
@@ -2142,6 +2068,18 @@ export class EnhancedTaskIntegration extends EventEmitter {
   private async generateDynamicSteps(
     taskData: Partial<Task>
   ): Promise<TaskStep[]> {
+    // Try Sterling tool progression solver first (supersedes crafting for tiered tools)
+    if (this.toolProgressionSolver) {
+      try {
+        const steps = await this.generateToolProgressionStepsFromSterling(taskData);
+        if (steps && steps.length > 0) {
+          return steps;
+        }
+      } catch (error) {
+        console.warn('Sterling tool progression solver failed, falling through:', error);
+      }
+    }
+
     // Try Sterling crafting solver for crafting/gathering tasks
     if (this.craftingSolver) {
       try {
@@ -2226,9 +2164,67 @@ export class EnhancedTaskIntegration extends EventEmitter {
       nearbyBlocks
     );
 
+    // Store planId in task metadata for episode reporting
+    if (taskData.metadata && result.planId) {
+      (taskData.metadata as any).craftingPlanId = result.planId;
+    }
+
     if (!result.solved) return [];
 
     return this.craftingSolver.toTaskSteps(result);
+  }
+
+  /**
+   * Generate steps from Sterling tool progression solver for tiered tool tasks.
+   *
+   * Activated when resolveRequirement() returns kind='tool_progression'.
+   * Returns needsBlocks early-exit signal when required ores aren't observed.
+   */
+  private async generateToolProgressionStepsFromSterling(
+    taskData: Partial<Task>
+  ): Promise<TaskStep[]> {
+    if (!this.toolProgressionSolver) return [];
+
+    const requirement = resolveRequirement(taskData);
+    if (!requirement || requirement.kind !== 'tool_progression') return [];
+
+    const targetTool = requirement.targetTool as string;
+
+    // Get current inventory from task metadata
+    const currentState = (taskData.metadata as any)?.currentState;
+    const inventoryItems: Array<{ name: string; count: number } | null | undefined> =
+      currentState?.inventory || [];
+    const nearbyBlocks: string[] = currentState?.nearbyBlocks || [];
+
+    // Convert inventory array to record
+    const inventory: Record<string, number> = {};
+    for (const item of inventoryItems) {
+      if (!item || !item.name) continue;
+      inventory[item.name] = (inventory[item.name] || 0) + item.count;
+    }
+
+    const result = await this.toolProgressionSolver.solveToolProgression(
+      targetTool,
+      inventory,
+      nearbyBlocks
+    );
+
+    // Store planId in task metadata for episode reporting
+    if (taskData.metadata && result.planId) {
+      (taskData.metadata as any).toolProgressionPlanId = result.planId;
+    }
+
+    // Log needsBlocks signal for observability (don't suppress it)
+    if (result.needsBlocks) {
+      console.log(
+        `[ToolProgression] Needs blocks for ${targetTool}: ${result.needsBlocks.missingBlocks.join(', ')} ` +
+        `(blocked at ${result.needsBlocks.blockedAtTier} tier)`
+      );
+    }
+
+    if (!result.solved) return [];
+
+    return this.toolProgressionSolver.toTaskSteps(result);
   }
 
   /**
@@ -2286,7 +2282,7 @@ export class EnhancedTaskIntegration extends EventEmitter {
 
     // Store planId + templateId in task metadata for episode reporting
     if (taskData.metadata) {
-      (taskData.metadata as any).buildingPlanId = this.buildingSolver.getLastPlanId();
+      (taskData.metadata as any).buildingPlanId = result.planId;
       (taskData.metadata as any).buildingTemplateId = templateId;
     }
 

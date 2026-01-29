@@ -3,7 +3,9 @@ import { InventoryItem, countItems, itemMatches } from './inventory-helpers';
 export type TaskRequirement =
   | { kind: 'collect'; patterns: string[]; quantity: number }
   | { kind: 'mine'; patterns: string[]; quantity: number }
-  | { kind: 'craft'; outputPattern: string; quantity: number; proxyPatterns?: string[] };
+  | { kind: 'craft'; outputPattern: string; quantity: number; proxyPatterns?: string[] }
+  | { kind: 'tool_progression'; targetTool: string; toolType: string; targetTier: string; quantity: number }
+  | { kind: 'build'; structure: string; quantity: number };
 
 export function parseRequiredQuantityFromTitle(title: string | undefined, fallback: number): number {
   if (!title) return fallback;
@@ -13,6 +15,34 @@ export function parseRequiredQuantityFromTitle(title: string | undefined, fallba
 
 export function resolveRequirement(task: any): TaskRequirement | null {
   const ttl = (task.title || '').toLowerCase();
+
+  // Tool progression — detect tier-specific tool tasks BEFORE generic crafting
+  // Matches: "craft stone pickaxe", "get iron pickaxe", "upgrade to diamond pickaxe"
+  const tierMatch = ttl.match(/\b(wooden|stone|iron|diamond)\b.*\b(pickaxe|axe|shovel|hoe|sword)\b/);
+  if (tierMatch && tierMatch[1] !== 'wooden') {
+    // Non-wooden tier tool → tool progression domain
+    const tier = tierMatch[1] as string;
+    const toolType = tierMatch[2] as string;
+    return {
+      kind: 'tool_progression',
+      targetTool: `${tier}_${toolType}`,
+      toolType,
+      targetTier: tier,
+      quantity: 1,
+    };
+  }
+  // Also detect explicit upgrade/progression intent
+  if (/\bupgrade\b.*\b(tool|pickaxe|axe|sword)\b|\btool\s*progression\b/.test(ttl)) {
+    return {
+      kind: 'tool_progression',
+      targetTool: 'iron_pickaxe',
+      toolType: 'pickaxe',
+      targetTier: 'iron',
+      quantity: 1,
+    };
+  }
+
+  // Prefer explicit crafting intent
   if (task.type === 'crafting' && /pickaxe/.test(ttl)) {
     return {
       kind: 'craft',
@@ -21,6 +51,7 @@ export function resolveRequirement(task: any): TaskRequirement | null {
       proxyPatterns: ['oak_log', '_log', ' log', 'plank', 'stick'],
     };
   }
+  // Gathering/mining rules
   if (task.type === 'gathering' || /\bgather\b|\bcollect\b/.test(ttl)) {
     const qty = parseRequiredQuantityFromTitle(task.title, 8);
     return {
@@ -33,6 +64,7 @@ export function resolveRequirement(task: any): TaskRequirement | null {
     const qty = parseRequiredQuantityFromTitle(task.title, 3);
     return { kind: 'mine', patterns: ['iron_ore'], quantity: qty };
   }
+  // Titles that explicitly mention wood but aren't crafting
   if (/\bwood\b/.test(ttl)) {
     const qty = parseRequiredQuantityFromTitle(task.title, 8);
     return {
@@ -40,6 +72,14 @@ export function resolveRequirement(task: any): TaskRequirement | null {
       patterns: ['oak_log', 'birch_log', 'spruce_log', 'jungle_log', 'acacia_log', 'dark_oak_log'],
       quantity: qty,
     };
+  }
+  // Building domain — prefer explicit task type over regex
+  if (task.type === 'building') {
+    return { kind: 'build', structure: 'basic_shelter_5x5', quantity: 1 };
+  }
+  // Regex fallback for building
+  if (/\bbuild\b.*\bshelter\b|\bhouse\b/.test(ttl)) {
+    return { kind: 'build', structure: 'basic_shelter_5x5', quantity: 1 };
   }
   return null;
 }

@@ -99,7 +99,7 @@ import { BehaviorTreeRunner } from './behavior-trees/BehaviorTreeRunner';
 import { CognitiveThoughtProcessor } from './cognitive-thought-processor';
 import { IntegratedPlanningCoordinator } from './integrated-planning-coordinator';
 import { createServiceClients, SterlingClient } from '@conscious-bot/core';
-import { SterlingReasoningService, MinecraftCraftingSolver, MinecraftBuildingSolver } from './sterling';
+import { SterlingReasoningService, MinecraftCraftingSolver, MinecraftBuildingSolver, MinecraftToolProgressionSolver } from './sterling';
 
 // Create HTTP clients for inter-service communication
 const serviceClients = createServiceClients();
@@ -108,6 +108,7 @@ const serviceClients = createServiceClients();
 let sterlingService: SterlingReasoningService | undefined;
 let minecraftCraftingSolver: MinecraftCraftingSolver | undefined;
 let minecraftBuildingSolver: MinecraftBuildingSolver | undefined;
+let minecraftToolProgressionSolver: MinecraftToolProgressionSolver | undefined;
 import { EnhancedGoalManager } from './goal-formulation/goal-manager';
 import { EnhancedReactiveExecutor } from './reactive-executor/reactive-executor';
 import { EnhancedTaskIntegration } from './task-integration';
@@ -2803,13 +2804,18 @@ async function startServer() {
 
       // Create crafting solver on top of Sterling service
       minecraftCraftingSolver = new MinecraftCraftingSolver(sterlingService);
-      enhancedTaskIntegration.setCraftingSolver(minecraftCraftingSolver);
+      enhancedTaskIntegration.registerSolver(minecraftCraftingSolver);
       console.log('✅ Minecraft crafting solver initialized');
 
       // Create building solver on top of Sterling service
       minecraftBuildingSolver = new MinecraftBuildingSolver(sterlingService);
-      enhancedTaskIntegration.setBuildingSolver(minecraftBuildingSolver);
+      enhancedTaskIntegration.registerSolver(minecraftBuildingSolver);
       console.log('✅ Minecraft building solver initialized');
+
+      // Create tool progression solver on top of Sterling service
+      minecraftToolProgressionSolver = new MinecraftToolProgressionSolver(sterlingService);
+      enhancedTaskIntegration.registerSolver(minecraftToolProgressionSolver);
+      console.log('✅ Minecraft tool progression solver initialized');
     } catch (error) {
       console.warn(
         '⚠️ Sterling reasoning service failed to initialize, continuing without it:',

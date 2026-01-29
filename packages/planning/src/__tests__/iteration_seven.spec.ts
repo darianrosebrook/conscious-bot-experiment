@@ -1,10 +1,10 @@
 import { describe, it, expect } from 'vitest';
+import type { InventoryItem } from '../modules/inventory-helpers';
 import {
-  type InventoryItem,
   resolveRequirement,
   computeProgressFromInventory,
   computeRequirementSnapshot,
-} from '../modular-server';
+} from '../modules/requirements';
 
 describe('Iteration Seven - Requirement and Progress Logic', () => {
   const inv = (...names: Array<[string, number]>) =>
