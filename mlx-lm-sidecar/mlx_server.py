@@ -101,6 +101,7 @@ def api_generate():
         return jsonify({"error": "Generation model not loaded"}), 503
 
     from mlx_lm import generate as mlx_lm_generate
+    from mlx_lm.sample_utils import make_sampler
 
     data = request.get_json(force=True)
     prompt = data.get("prompt", "")
@@ -108,13 +109,15 @@ def api_generate():
     temperature = options.get("temperature", 0.7)
     max_tokens = options.get("num_predict", 512)
 
+    sampler = make_sampler(temp=temperature)
+
     start = time.time()
     text = mlx_lm_generate(
         generation_model,
         generation_tokenizer,
         prompt=prompt,
         max_tokens=max_tokens,
-        temp=temperature,
+        sampler=sampler,
     )
     elapsed = time.time() - start
 
@@ -143,14 +146,16 @@ def api_embeddings():
 
     # Prepend retrieval task prefix for better embedding quality
     prefixed = f"task: search result | query: {prompt}"
-    inputs = embedding_tokenizer(prefixed, return_tensors="np", padding=True, truncation=True)
+
+    # mlx-embeddings wraps the tokenizer; use the inner HF tokenizer for encoding
+    hf_tokenizer = getattr(embedding_tokenizer, "_tokenizer", embedding_tokenizer)
+    inputs = hf_tokenizer(prefixed, return_tensors="np", padding=True, truncation=True)
 
     # Convert to mlx arrays
     input_ids = mx.array(inputs["input_ids"])
     attention_mask = mx.array(inputs["attention_mask"])
-    token_type_ids = mx.array(inputs.get("token_type_ids", [[0] * input_ids.shape[1]]))
 
-    output = embedding_model(input_ids=input_ids, attention_mask=attention_mask, token_type_ids=token_type_ids)
+    output = embedding_model(inputs=input_ids, attention_mask=attention_mask)
 
     # Extract text embeddings - shape is (batch, dim)
     embeds = output.text_embeds
