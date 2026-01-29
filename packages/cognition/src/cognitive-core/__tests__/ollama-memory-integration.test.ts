@@ -27,12 +27,12 @@ describe.skipIf(!OLLAMA_AVAILABLE)(
       // Initialize memory-aware LLM with real Ollama
       memoryAwareLLM = new MemoryAwareLLMInterface(
         {
-          model: 'qwen2.5:7b',
+          model: 'gemma3n:e2b',
           host: 'localhost',
-          port: 11434,
+          port: 5002,
           maxTokens: 2048,
           temperature: 0.7,
-          timeout: 60000,
+          timeout: 30000,
         },
         {
           enableAutoMemoryIntegration: true,
@@ -345,10 +345,10 @@ describe('Ollama Memory Integration (Mocked)', () => {
       {
         model: 'mock-model',
         host: 'localhost',
-        port: 11434,
+        port: 5002,
         maxTokens: 2048,
         temperature: 0.7,
-        timeout: 60000,
+        timeout: 30000,
       },
       {
         enableAutoMemoryIntegration: true,

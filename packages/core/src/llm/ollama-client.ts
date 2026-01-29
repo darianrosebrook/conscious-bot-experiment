@@ -6,7 +6,7 @@
  */
 
 export type OllamaClientConfig = {
-  baseUrl?: string; // e.g., http://localhost:11434
+  baseUrl?: string; // e.g., http://localhost:5002
   model?: string; // e.g., llama3.1, qwen2.5, deepseek-r1, etc
   useOpenAICompat?: boolean; // use /v1/chat/completions
   apiKey?: string; // if using a proxy that needs auth
@@ -23,7 +23,7 @@ export class OllamaClient {
   private timeoutMs: number;
 
   constructor(cfg: OllamaClientConfig = {}) {
-    this.baseUrl = cfg.baseUrl || process.env.OLLAMA_BASE_URL || 'http://localhost:11434';
+    this.baseUrl = cfg.baseUrl || process.env.OLLAMA_BASE_URL || 'http://localhost:5002';
     this.model = cfg.model || process.env.OLLAMA_MODEL || 'llama3.1';
     const flag = (process.env.OLLAMA_OPENAI || '').toLowerCase();
     this.useOpenAI = cfg.useOpenAICompat ?? (flag === '1' || flag === 'true');

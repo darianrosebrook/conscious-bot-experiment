@@ -91,7 +91,7 @@ export interface EmbeddingQualityAnalysis {
 }
 
 const DEFAULT_CONFIG: Required<EmbeddingServiceConfig> = {
-  ollamaHost: 'http://localhost:11434',
+  ollamaHost: process.env.OLLAMA_HOST || 'http://localhost:5002',
   embeddingModel: 'embeddinggemma',
   dimension: 768,
   maxRetries: 3,

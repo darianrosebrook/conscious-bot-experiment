@@ -149,8 +149,8 @@ PG_DATABASE=conscious_bot          # Base database name
 # World Seed (Required for per-seed DB isolation)
 WORLD_SEED=1234567890              # Minecraft world seed (integer)
 
-# Embedding Configuration
-OLLAMA_HOST=http://localhost:11434  # Ollama server URL
+# Embedding Configuration (MLX-LM Sidecar)
+OLLAMA_HOST=http://localhost:5002  # MLX sidecar URL (Ollama-compatible API)
 OLLAMA_EMBEDDING_MODEL=embeddinggemma:latest  # Embedding model
 MEMORY_EMBEDDING_DIMENSION=768     # Embedding dimension
 
@@ -224,7 +224,7 @@ PG_DATABASE=conscious_bot_dev
 
 WORLD_SEED=1234567890
 
-OLLAMA_HOST=http://localhost:11434
+OLLAMA_HOST=http://localhost:5002
 OLLAMA_EMBEDDING_MODEL=embeddinggemma:latest
 ```
 
@@ -239,7 +239,7 @@ PG_DATABASE=conscious_bot_prod
 
 WORLD_SEED=9876543210
 
-OLLAMA_HOST=https://ollama.example.com
+OLLAMA_HOST=http://localhost:5002
 OLLAMA_EMBEDDING_MODEL=embeddinggemma:latest
 
 # Performance tuning

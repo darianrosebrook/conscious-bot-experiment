@@ -42,9 +42,10 @@ PG_USER=your_username     # PostgreSQL username
 PG_PASSWORD=your_password # PostgreSQL password
 PG_DATABASE=conscious_bot # Base database name
 
-# Ollama Configuration (optional - for local embeddings)
-OLLAMA_HOST=http://localhost:11434
-OLLAMA_EMBEDDING_MODEL=embeddinggemma:latest
+# MLX-LM Sidecar (local LLM inference + embeddings on Apple Silicon)
+OLLAMA_HOST=http://localhost:5002
+MLX_LM_MODEL=gemma3n:e2b
+MLX_EMBEDDING_MODEL=embeddinggemma
 
 # World Seed Configuration
 WORLD_SEED=1234567890     # Minecraft world seed (integer)

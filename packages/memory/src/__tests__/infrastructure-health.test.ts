@@ -61,7 +61,7 @@ describe.skipIf(!POSTGRES_AVAILABLE && !OLLAMA_AVAILABLE)('Infrastructure Health
   });
 
   it.skipIf(!OLLAMA_AVAILABLE)('Ollama service is accessible', async () => {
-    const ollamaHost = process.env.OLLAMA_HOST || 'http://localhost:11434';
+    const ollamaHost = process.env.OLLAMA_HOST || 'http://localhost:5002';
     const response = await fetch(`${ollamaHost}/api/tags`);
     expect(response.ok).toBe(true);
 
@@ -71,7 +71,7 @@ describe.skipIf(!POSTGRES_AVAILABLE && !OLLAMA_AVAILABLE)('Infrastructure Health
   });
 
   it.skipIf(!OLLAMA_AVAILABLE)('nomic-embed-text model is available', async () => {
-    const ollamaHost = process.env.OLLAMA_HOST || 'http://localhost:11434';
+    const ollamaHost = process.env.OLLAMA_HOST || 'http://localhost:5002';
     const response = await fetch(`${ollamaHost}/api/tags`);
     const data = (await response.json()) as { models: any[] };
 
@@ -82,7 +82,7 @@ describe.skipIf(!POSTGRES_AVAILABLE && !OLLAMA_AVAILABLE)('Infrastructure Health
   });
 
   it.skipIf(!OLLAMA_AVAILABLE)('can generate embeddings via Ollama', async () => {
-    const ollamaHost = process.env.OLLAMA_HOST || 'http://localhost:11434';
+    const ollamaHost = process.env.OLLAMA_HOST || 'http://localhost:5002';
     const response = await fetch(`${ollamaHost}/api/embeddings`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

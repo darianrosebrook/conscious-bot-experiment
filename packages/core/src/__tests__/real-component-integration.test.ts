@@ -63,7 +63,7 @@ const REAL_COMPONENT_CONFIG = {
 async function checkServiceHealth() {
   const health = {
     pythonHRM: false,
-    ollama: false,
+    mlx: false,
     models: [] as string[],
   };
 
@@ -94,15 +94,15 @@ async function checkServiceHealth() {
     // Check Ollama with retry
     for (let i = 0; i < 3; i++) {
       try {
-        const ollamaResponse = await fetch('http://localhost:11434/api/tags', {
+        const ollamaResponse = await fetch('http://localhost:5002/api/tags', {
           timeout: 2000,
         });
         if (ollamaResponse.ok) {
           const ollamaData = await ollamaResponse.json();
-          health.ollama = true;
+          health.mlx = true;
           health.models = ollamaData.models.map((m: any) => m.name);
           console.log(
-            '✅ Ollama health check successful, models:',
+            '✅ MLX sidecar health check successful, models:',
             health.models
           );
           break;
@@ -227,9 +227,9 @@ describe('Real Component Integration', () => {
     );
 
     dynamicFlow = new DynamicCreationFlow(registry, {
-      isAvailable: () => serviceHealth.ollama,
+      isAvailable: () => serviceHealth.mlx,
       generate: async (prompt: string) => {
-        const response = await fetch('http://localhost:11434/api/generate', {
+        const response = await fetch('http://localhost:5002/api/generate', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -279,7 +279,7 @@ Return ONLY a valid JSON BT-DSL object. Use this exact format:
 }
 
 IMPORTANT: Use only the available leaves listed above. Do not use "execute_action" or any other leaves not in the list.`;
-        const result = await fetch('http://localhost:11434/api/generate', {
+        const result = await fetch('http://localhost:5002/api/generate', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -344,8 +344,8 @@ IMPORTANT: Use only the available leaves listed above. Do not use "execute_actio
       expect(typeof serviceHealth.pythonHRM).toBe('boolean');
     });
 
-    it('should have Ollama service available', () => {
-      expect(serviceHealth.ollama).toBe(true);
+    it('should have MLX sidecar service available', () => {
+      expect(serviceHealth.mlx).toBe(true);
     });
 
     it('should have required models available', () => {

@@ -2293,7 +2293,7 @@ export const DEFAULT_MEMORY_CONFIG: EnhancedMemorySystemConfig = {
   database: process.env.PG_DATABASE || 'conscious_bot',
   worldSeed: parseInt(process.env.WORLD_SEED || '0'),
   vectorDbTableName: 'memory_chunks',
-  ollamaHost: process.env.OLLAMA_HOST || 'http://localhost:11434',
+  ollamaHost: process.env.OLLAMA_HOST || 'http://localhost:5002',
   embeddingModel: process.env.MEMORY_EMBEDDING_MODEL || 'embeddinggemma',
   embeddingDimension: parseInt(process.env.MEMORY_EMBEDDING_DIMENSION || '768'),
   defaultGraphWeight: parseFloat(

@@ -41,7 +41,7 @@ vi.mock('@conscious-bot/memory', () => {
       database: 'conscious_bot',
       worldSeed: 0,
       vectorDbTableName: 'memory_chunks',
-      ollamaHost: 'http://localhost:11434',
+      ollamaHost: process.env.OLLAMA_HOST || 'http://localhost:5002',
       embeddingModel: 'nomic-embed-text',
       embeddingDimension: 768,
       defaultGraphWeight: 0.5,
@@ -99,12 +99,12 @@ describe('Memory-LLM Integration Flow', () => {
     // Initialize the memory-aware LLM
     memoryAwareLLM = new MemoryAwareLLMInterface(
       {
-        model: 'qwen2.5:7b',
+        model: 'gemma3n:e2b',
         host: 'localhost',
-        port: 11434,
+        port: 5002,
         maxTokens: 2048,
         temperature: 0.7,
-        timeout: 60000,
+        timeout: 30000,
       },
       {
         enableAutoMemoryIntegration: true,

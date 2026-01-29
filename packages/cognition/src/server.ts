@@ -697,8 +697,8 @@ app.use((req, res, next) => {
 
 // Initialize ReAct Arbiter
 const reactArbiter = new ReActArbiter({
-  provider: 'ollama',
-  model: 'qwen2.5:7b', // Optimal model from benchmark results
+  provider: 'mlx',
+  model: 'gemma3n:e2b',
   maxTokens: 1000,
   temperature: 0.3,
   timeout: 30000,

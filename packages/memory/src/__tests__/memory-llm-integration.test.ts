@@ -297,7 +297,7 @@ describe.skipIf(!OLLAMA_AVAILABLE)('Complete Memory-LLM Integration Flow', () =>
       vectorDbTableName: 'embeddings',
 
       // Embedding configuration
-      ollamaHost: 'localhost:11434',
+      ollamaHost: process.env.OLLAMA_HOST || 'http://localhost:5002',
       embeddingModel: 'nomic-embed-text',
       embeddingDimension: 768,
 

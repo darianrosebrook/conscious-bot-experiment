@@ -210,7 +210,7 @@ export class OllamaClient {
   private timeout: number;
 
   constructor(
-    baseUrl: string = 'http://localhost:11434',
+    baseUrl: string = 'http://localhost:5002',
     timeout: number = 10000
   ) {
     this.baseUrl = baseUrl;

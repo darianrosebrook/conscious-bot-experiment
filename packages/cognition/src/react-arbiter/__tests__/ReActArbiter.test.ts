@@ -18,8 +18,8 @@ describe('ReActArbiter', () => {
 
   beforeEach(() => {
     arbiter = new ReActArbiter({
-      provider: 'ollama',
-      model: 'llama3.2',
+      provider: 'mlx',
+      model: 'gemma3n:e2b',
       maxTokens: 1000,
       temperature: 0.3,
       timeout: 30000,

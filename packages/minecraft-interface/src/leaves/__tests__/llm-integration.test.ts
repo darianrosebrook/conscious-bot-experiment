@@ -88,7 +88,7 @@ describe('LLM Integration', () => {
     it('should generate response from model', async () => {
       try {
         const response = await ollamaClient.generate(
-          'qwen2.5:7b',
+          'gemma3n:e2b',
           'Hello, how are you?',
           {
             maxTokens: 50,

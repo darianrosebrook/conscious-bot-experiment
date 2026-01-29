@@ -131,7 +131,7 @@ export class MemoryTestRunner {
     // Initialize test components
     const chunkingService = new ChunkingService();
     const embeddingService = new EmbeddingService({
-      ollamaHost: process.env.OLLAMA_HOST || 'http://localhost:11434',
+      ollamaHost: process.env.OLLAMA_HOST || 'http://localhost:5002',
       embeddingModel: process.env.MEMORY_EMBEDDING_MODEL || 'embeddinggemma',
       dimension: 768,
     });

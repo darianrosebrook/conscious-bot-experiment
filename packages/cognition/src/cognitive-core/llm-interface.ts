@@ -22,14 +22,14 @@ export class LLMInterface {
 
   constructor(config: Partial<LLMConfig> = {}) {
     const defaultConfig: LLMConfig = {
-      provider: 'ollama',
-      model: 'qwen2.5:7b',
+      provider: 'mlx',
+      model: 'gemma3n:e2b',
       fallbackModel: 'qwen3:4b',
       host: 'localhost',
-      port: 11434,
+      port: 5002,
       maxTokens: 2048,
       temperature: 0.7,
-      timeout: 60000, // Increased from 30s to 60s for better reliability
+      timeout: 30000,
       retries: 2,
     };
 

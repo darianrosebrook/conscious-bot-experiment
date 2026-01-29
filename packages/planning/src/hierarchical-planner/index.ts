@@ -233,7 +233,7 @@ export class IntegratedPlanningSystem {
     }
 
     // Integrate with on-device Ollama LLM
-    const client = new OllamaClient({ host: 'localhost', port: 11434 });
+    const client = new OllamaClient({ host: 'localhost', port: 5002 });
     const system =
       'You are the planning co-pilot for a Minecraft agent. ' +
       'Given a goal and partial world context, reason step-by-step to propose a concise, actionable plan. ' +

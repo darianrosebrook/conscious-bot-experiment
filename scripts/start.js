@@ -122,6 +122,19 @@ const services = [
     dependencies: ['Core API', 'Planning'],
   },
   {
+    name: 'MLX-LM Sidecar',
+    command: 'bash',
+    args: [
+      '-c',
+      'cd mlx-lm-sidecar && ./venv-mlx/bin/python mlx_server.py --port 5002',
+    ],
+    port: 5002,
+    healthUrl: 'http://localhost:5002/health',
+    description: 'MLX-LM inference and embedding server for Apple Silicon',
+    priority: 2, // Before Cognition and Memory need it
+    dependencies: [],
+  },
+  {
     name: 'Sapient HRM',
     command: 'bash',
     args: [
@@ -184,6 +197,7 @@ function getServiceColor(serviceName) {
     Memory: colors.blue,
     World: colors.magenta,
     Planning: colors.red,
+    'MLX-LM Sidecar': colors.purple,
     'Sapient HRM': colors.cyan,
   };
   return colorMap[serviceName] || colors.reset;
@@ -371,6 +385,63 @@ async function setupPythonEnvironment() {
   }
 }
 
+async function setupMLXEnvironment() {
+  log('\n🧠 Setting up MLX-LM sidecar environment...', colors.purple);
+
+  const mlxDir = path.join(process.cwd(), 'mlx-lm-sidecar');
+  const venvPath = path.join(mlxDir, 'venv-mlx');
+
+  // Check if directory exists
+  if (!fs.existsSync(mlxDir)) {
+    log(' ⚠️  mlx-lm-sidecar directory not found, skipping MLX setup', colors.yellow);
+    return;
+  }
+
+  // Check for Apple Silicon
+  try {
+    const arch = execSync('uname -m', { encoding: 'utf-8' }).trim();
+    if (arch !== 'arm64') {
+      log(' ⚠️  MLX requires Apple Silicon (arm64). Skipping MLX setup.', colors.yellow);
+      return;
+    }
+  } catch {
+    log(' ⚠️  Could not detect architecture, skipping MLX setup', colors.yellow);
+    return;
+  }
+
+  // Create virtual environment if it doesn't exist
+  if (!fs.existsSync(venvPath)) {
+    log(' 📦 Creating MLX virtual environment...', colors.purple);
+    try {
+      execSync(`cd ${mlxDir} && python3 -m venv venv-mlx`, {
+        stdio: 'inherit',
+      });
+      log(' ✅ MLX virtual environment created', colors.green);
+    } catch (error) {
+      log(' ❌ Failed to create MLX virtual environment', colors.red);
+      return;
+    }
+  } else {
+    log(' ✅ MLX virtual environment already exists', colors.green);
+  }
+
+  // Install Python dependencies
+  log(' 📦 Installing MLX dependencies...', colors.purple);
+  try {
+    execSync(
+      `cd ${mlxDir} && ./venv-mlx/bin/pip install --upgrade pip`,
+      { stdio: 'inherit', shell: true }
+    );
+    execSync(
+      `cd ${mlxDir} && ./venv-mlx/bin/pip install -r requirements.txt`,
+      { stdio: 'inherit', shell: true }
+    );
+    log(' ✅ MLX dependencies installed', colors.green);
+  } catch (error) {
+    log(' ❌ Failed to install MLX dependencies', colors.red);
+  }
+}
+
 // Main function
 async function main() {
   logBanner();
@@ -404,6 +475,9 @@ async function main() {
   // Step 3: Setup Python environment
   await setupPythonEnvironment();
 
+  // Step 3b: Setup MLX-LM sidecar environment
+  await setupMLXEnvironment();
+
   // Step 4: Kill existing processes
   log('\n🔄 Cleaning up existing processes...', colors.cyan);
 
@@ -415,6 +489,8 @@ async function main() {
     'minecraft-interface',
     'python3.*hrm_bridge.py',
     'hrm_bridge.py',
+    'python3.*mlx_server.py',
+    'mlx_server.py',
   ];
 
   for (const pattern of processPatterns) {
@@ -505,7 +581,9 @@ async function main() {
       cwd:
         service.name === 'Sapient HRM'
           ? `${process.cwd()}/sapient-hrm`
-          : process.cwd(), // Set specific cwd for HRM
+          : service.name === 'MLX-LM Sidecar'
+            ? `${process.cwd()}/mlx-lm-sidecar`
+            : process.cwd(),
       env: { ...process.env, FORCE_COLOR: '1' },
     });
 
@@ -742,6 +820,11 @@ async function main() {
   );
   logWithTimestamp(
     '  Sapient HRM:   http://localhost:5001',
+    'INFO',
+    colors.cyan
+  );
+  logWithTimestamp(
+    '  MLX-LM Sidecar: http://localhost:5002',
     'INFO',
     colors.cyan
   );

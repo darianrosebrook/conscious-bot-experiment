@@ -47,7 +47,7 @@ var OllamaClient = /** @class */ (function () {
     function OllamaClient(cfg) {
         if (cfg === void 0) { cfg = {}; }
         var _a, _b, _c;
-        this.baseUrl = cfg.baseUrl || process.env.OLLAMA_BASE_URL || 'http://localhost:11434';
+        this.baseUrl = cfg.baseUrl || process.env.OLLAMA_BASE_URL || 'http://localhost:5002';
         this.model = cfg.model || process.env.OLLAMA_MODEL || 'llama3.1';
         var flag = (process.env.OLLAMA_OPENAI || '').toLowerCase();
         this.useOpenAI = (_a = cfg.useOpenAICompat) !== null && _a !== void 0 ? _a : (flag === '1' || flag === 'true');

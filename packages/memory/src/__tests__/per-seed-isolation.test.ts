@@ -34,7 +34,7 @@ function createCompleteConfig(
     vectorDbTableName: 'memory_chunks',
 
     // Embedding configuration
-    ollamaHost: 'http://localhost:11434',
+    ollamaHost: process.env.OLLAMA_HOST || 'http://localhost:5002',
     embeddingModel: 'test-model',
     embeddingDimension: 768,
 
@@ -167,7 +167,7 @@ describe.skipIf(!OLLAMA_AVAILABLE || !POSTGRES_AVAILABLE)('Per-Seed Database Iso
       const memorySystem1 = new EnhancedMemorySystem(
         createCompleteConfig({
           ...config1,
-          ollamaHost: 'http://localhost:11434',
+          ollamaHost: process.env.OLLAMA_HOST || 'http://localhost:5002',
           embeddingModel: 'test-model',
           defaultGraphWeight: 0.5,
           defaultVectorWeight: 0.5,
@@ -179,7 +179,7 @@ describe.skipIf(!OLLAMA_AVAILABLE || !POSTGRES_AVAILABLE)('Per-Seed Database Iso
       const memorySystem2 = new EnhancedMemorySystem(
         createCompleteConfig({
           ...config2,
-          ollamaHost: 'http://localhost:11434',
+          ollamaHost: process.env.OLLAMA_HOST || 'http://localhost:5002',
           embeddingModel: 'test-model',
           defaultGraphWeight: 0.5,
           defaultVectorWeight: 0.5,
@@ -219,7 +219,7 @@ describe.skipIf(!OLLAMA_AVAILABLE || !POSTGRES_AVAILABLE)('Per-Seed Database Iso
       const memorySystem = new EnhancedMemorySystem(
         createCompleteConfig({
           ...config,
-          ollamaHost: 'http://localhost:11434',
+          ollamaHost: process.env.OLLAMA_HOST || 'http://localhost:5002',
           embeddingModel: 'test-model',
           defaultGraphWeight: 0.5,
           defaultVectorWeight: 0.5,
@@ -248,7 +248,7 @@ describe.skipIf(!OLLAMA_AVAILABLE || !POSTGRES_AVAILABLE)('Per-Seed Database Iso
           vectorDbTableName: 'memory_chunks',
           embeddingDimension: 768,
           enablePersistence: true,
-          ollamaHost: 'http://localhost:11434',
+          ollamaHost: process.env.OLLAMA_HOST || 'http://localhost:5002',
           embeddingModel: 'test-model',
           defaultGraphWeight: 0.5,
           defaultVectorWeight: 0.5,
@@ -264,7 +264,7 @@ describe.skipIf(!OLLAMA_AVAILABLE || !POSTGRES_AVAILABLE)('Per-Seed Database Iso
           vectorDbTableName: 'memory_chunks',
           embeddingDimension: 768,
           enablePersistence: true,
-          ollamaHost: 'http://localhost:11434',
+          ollamaHost: process.env.OLLAMA_HOST || 'http://localhost:5002',
           embeddingModel: 'test-model',
           defaultGraphWeight: 0.5,
           defaultVectorWeight: 0.5,
@@ -349,7 +349,7 @@ describe.skipIf(!OLLAMA_AVAILABLE || !POSTGRES_AVAILABLE)('Per-Seed Database Iso
           vectorDbTableName: 'memory_chunks',
           embeddingDimension: 768,
           enablePersistence: true,
-          ollamaHost: 'http://localhost:11434',
+          ollamaHost: process.env.OLLAMA_HOST || 'http://localhost:5002',
           embeddingModel: 'test-model',
           defaultGraphWeight: 0.5,
           defaultVectorWeight: 0.5,
@@ -377,7 +377,7 @@ describe.skipIf(!OLLAMA_AVAILABLE || !POSTGRES_AVAILABLE)('Per-Seed Database Iso
           vectorDbTableName: 'memory_chunks',
           embeddingDimension: 768,
           enablePersistence: true,
-          ollamaHost: 'http://localhost:11434',
+          ollamaHost: process.env.OLLAMA_HOST || 'http://localhost:5002',
           embeddingModel: 'test-model',
           defaultGraphWeight: 0.5,
           defaultVectorWeight: 0.5,
@@ -411,7 +411,7 @@ describe.skipIf(!OLLAMA_AVAILABLE || !POSTGRES_AVAILABLE)('Per-Seed Database Iso
           vectorDbTableName: 'memory_chunks',
           embeddingDimension: 768,
           enablePersistence: true,
-          ollamaHost: 'http://localhost:11434',
+          ollamaHost: process.env.OLLAMA_HOST || 'http://localhost:5002',
           embeddingModel: 'test-model',
           defaultGraphWeight: 0.5,
           defaultVectorWeight: 0.5,
@@ -444,7 +444,7 @@ describe.skipIf(!OLLAMA_AVAILABLE || !POSTGRES_AVAILABLE)('Per-Seed Database Iso
           vectorDbTableName: 'memory_chunks',
           embeddingDimension: 768,
           enablePersistence: true,
-          ollamaHost: 'http://localhost:11434',
+          ollamaHost: process.env.OLLAMA_HOST || 'http://localhost:5002',
           embeddingModel: 'test-model',
           defaultGraphWeight: 0.5,
           defaultVectorWeight: 0.5,

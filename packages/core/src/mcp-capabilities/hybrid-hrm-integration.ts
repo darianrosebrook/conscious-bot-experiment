@@ -847,11 +847,11 @@ export class HybridHRMRouter {
           const controller = new AbortController();
           timeoutId = setTimeout(() => controller.abort(), timeout);
 
-          const response = await fetch('http://localhost:11434/api/generate', {
+          const response = await fetch(`${process.env.OLLAMA_HOST || 'http://localhost:5002'}/api/generate`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              model: config?.model || 'qwen3:0.6b', // Use fastest model
+              model: config?.model || 'gemma3n:e2b',
               prompt: `Minecraft: ${input.prompt}. Give a brief action plan in 1 sentence.`,
               stream: false,
               options: {

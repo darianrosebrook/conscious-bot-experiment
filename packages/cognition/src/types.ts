@@ -14,7 +14,7 @@ import { z } from 'zod';
  * LLM provider configuration
  */
 export interface LLMConfig {
-  provider: 'ollama' | 'openai' | 'anthropic';
+  provider: 'ollama' | 'openai' | 'anthropic' | 'mlx';
   model: string;
   fallbackModel?: string;
   host?: string;
@@ -715,7 +715,7 @@ export interface StyleAdapter {
 // ============================================================================
 
 export const LLMConfigSchema = z.object({
-  provider: z.enum(['ollama', 'openai', 'anthropic']),
+  provider: z.enum(['ollama', 'openai', 'anthropic', 'mlx']),
   model: z.string(),
   fallbackModel: z.string().optional(),
   host: z.string().optional(),

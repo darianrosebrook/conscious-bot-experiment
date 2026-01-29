@@ -115,7 +115,7 @@ describe.skipIf(!OLLAMA_AVAILABLE)('Memory Integration Scoring and Verification'
       vectorDbTableName: 'embeddings',
 
       // Embedding configuration
-      ollamaHost: 'localhost:11434',
+      ollamaHost: process.env.OLLAMA_HOST || 'http://localhost:5002',
       embeddingModel: 'nomic-embed-text',
       embeddingDimension: 768,
 
