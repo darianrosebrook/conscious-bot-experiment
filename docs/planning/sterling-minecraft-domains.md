@@ -94,34 +94,41 @@ Status: later (jammed system diagnosis)
 
 Note: rigs L–N are “later” not because Minecraft can’t do them, but because they require stricter modeling discipline (forced transitions, stochasticity, entropy tracking) and you want A–K certified first.
 
-⸻
+---
 
 ## Standard rig template
 
 Each rig below uses the same structure.
 
-A) Primitive(s) and formal signature
-B) Minecraft proving task(s)
-C) Required state representation (canonical)
-D) Operator families (typed; preconditions/effects)
-E) What must be proven (certification gates)
-F) Performance measurements
-G) Transfer envelope tests
-H) Common footguns and how this rig avoids them
+1. Primitive(s) and formal signature
+2. Minecraft proving task(s)
+3. Required state representation (canonical)
+4. Operator families (typed; preconditions/effects)
+5. What must be proven (certification gates)
+6. Performance measurements
+7. Transfer envelope tests
+8. Common footguns and how this rig avoids them
 
-⸻
+---
 
-### Rig A: Inventory transformation planning (resource → product)
+## Rig A: Inventory transformation planning (resource → product)
 
 A) Primitives and formal signature
-Primary: 1 deterministic transformation planning
-Also: 16 canonicalization, 17 execution-grounded credit, 19 audit explanations, 20 rule hardening
-Signature: finite discrete state, typed operators with preconditions/effects, additive cost, goal predicate as constraint satisfaction, minimal-cost path search; learned edge ordering that does not change transitions.
+
+Primary: 
+- 1 deterministic transformation planning
+
+Also: 
+- 16 canonicalization, 17 execution-grounded credit, 19 audit explanations, 20 rule hardening
+
+
+Signature: 
+- finite discrete state, typed operators with preconditions/effects, additive cost, goal predicate as constraint satisfaction, minimal-cost path search; learned edge ordering that does not change transitions.
 
 B) Minecraft proving tasks
-	1.	Produce target item from inventory via craft/mine/smelt/place.
-	2.	Produce composite goal (multiple items) to verify subset goal predicate works.
-	3.	“Substitute allowed” variant to prove catalog-based alternative operators without changing semantics.
+1.	Produce target item from inventory via craft/mine/smelt/place.
+2.	Produce composite goal (multiple items) to verify subset goal predicate works.
+3.	“Substitute allowed” variant to prove catalog-based alternative operators without changing semantics.
 
 C) State representation
 Inventory signature with: sorted item counts, zero filtered, count-capped for irrelevant items, and optional “placed station” flags. Canonical hash must be invariant to insertion order and to irrelevant items beyond cap.
@@ -130,11 +137,17 @@ D) Operators
 Craft, mine, smelt, place. Preconditions are purely inventory/station predicates; effects are inventory deltas + station flags. Cost is declared in operator input; validation ensures finite nonnegative cost within bounds.
 
 E) Certification gates
-Signature tests: legality (no negative counts), determinism (trace hash stable), boundedness (node cap enforced), rule validation (schema + cost bounds), canonicalization tests.
-Learning tests: ordering changes only; reachable set and operator semantics unchanged.
-Credit assignment: only execution reports update priors; planned “solution found” does not.
 
-F) Performance measurements
+Signature tests: 
+- legality (no negative counts), determinism (trace hash stable), boundedness (node cap enforced), rule validation (schema + cost bounds), canonicalization tests.
+
+Learning tests:
+- ordering changes only; reachable set and operator semantics unchanged.
+
+Credit assignment:
+- only execution reports update priors; planned “solution found” does not.
+
+### F) Performance measurements
 Nodes expanded, time-to-first-solution, repeat-solve convergence (expansions drop), plan length optimality under fixed cost model.
 
 G) Transfer tests
@@ -145,19 +158,26 @@ State explosion via unbounded counts; learning on planned success; untrusted rul
 
 Status: Implemented baseline. Next work is certification hardening: strict validation, trace bundle hashing, and execution-based credit updates.
 
-⸻
+---
 
-### Rig B: Capability gating and legality
+## Rig B: Capability gating and legality
 
 A) Primitives and formal signature
-Primary: 2 capability gating and legality
-Also: 16, 19, 20
-Signature: state includes capability set; operators enabled/disabled by capability predicates; monotone/partially monotone progression; fail-closed legality.
+
+Primary: 
+- 2 capability gating and legality
+
+
+Also: 
+- 16, 19, 20
+
+Signature: 
+- state includes capability set; operators enabled/disabled by capability predicates; monotone/partially monotone progression; fail-closed legality.
 
 B) Minecraft proving tasks
-	1.	“Mine iron ore” is illegal until a valid tool tier is acquired.
-	2.	“Mine diamond ore” illegal until iron tier.
-	3.	“Smelt ore” illegal until furnace is present/placed (if modeled as a capability).
+1.	“Mine iron ore” is illegal until a valid tool tier is acquired.
+2.	“Mine diamond ore” illegal until iron tier.
+3.	“Smelt ore” illegal until furnace is present/placed (if modeled as a capability).
 
 C) State representation
 Capability set is derived and represented explicitly, not inferred ad hoc. Example: can_mine_stone, can_mine_iron, has_station_furnace_available. Hash is sorted capability atoms + relevant inventory signature.
@@ -180,19 +200,25 @@ Gating hidden inside heuristics; legality checks that depend on external mutable
 
 Status: Planned. This is the natural next rig after A.
 
-⸻
+---
 
-### Rig C: Temporal planning with durations, batching, and capacity
+## Rig C: Temporal planning with durations, batching, and capacity
 
 A) Primitives and formal signature
-Primary: 3 temporal planning
-Also: 18 multi-objective clarity (time), 16, 17, 19
-Signature: actions with durations and capacity occupancy; objective includes time; state includes clocks/remaining-time; optional parallel slots.
+
+Primary: 
+- 3 temporal planning
+
+Also: 
+- 18 multi-objective clarity (time), 16, 17, 19
+
+Signature: 
+- actions with durations and capacity occupancy; objective includes time; state includes clocks/remaining-time; optional parallel slots.
 
 B) Minecraft proving tasks
-	1.	Smelt N items with one furnace: batching is better than repeated reload.
-	2.	Smelt N items with k furnaces: allocate across slots.
-	3.	Mixed queue: cooking food while smelting ore; choose schedule that minimizes makespan under capacity.
+1.	Smelt N items with one furnace: batching is better than repeated reload.
+2.	Smelt N items with k furnaces: allocate across slots.
+3.	Mixed queue: cooking food while smelting ore; choose schedule that minimizes makespan under capacity.
 
 C) State representation
 Add time fields: furnace slots with remaining burn, queue states, and “ready at tick” markers. Canonicalization must compress irrelevant timing granularity (e.g., tick buckets) to avoid blow-up.
@@ -215,14 +241,20 @@ Encoding time as continuous/unbounded; allowing “wait” to become a free loop
 
 Status: Planned. Comes after B if you want “smelting chains” as a certified capability, not just a domain.
 
-⸻
+---
 
-### Rig D: Multi-strategy acquisition (alternatives, failure modes, world-conditioned priors)
+## Rig D: Multi-strategy acquisition (alternatives, failure modes, world-conditioned priors)
 
 A) Primitives and formal signature
-Primary: 4 multi-strategy acquisition
-Also: 17, 18, 19, 20 (and optionally 10 if risk modeled)
-Signature: multiple operator families reach same subgoal; costs differ; availability predicates from external world; learning updates “which strategy works here.”
+
+Primary: 
+- 4 multi-strategy acquisition
+
+Also: 
+- 17, 18, 19, 20 (and optionally 10 if risk modeled)
+
+Signature: 
+- multiple operator families reach same subgoal; costs differ; availability predicates from external world; learning updates “which strategy works here.”
 
 B) Minecraft proving tasks
 Goal: “Acquire N iron ingots.” Competing strategies: mine+smelt, loot known chest, trade villagers, salvage gear. Availability is dynamic and supplied by the bot as part of the request.
@@ -247,18 +279,24 @@ Treating external availability as implicit and mutable; reinforcing planned succ
 
 Status: Planned.
 
-⸻
+---
 
-### Rig E: Hierarchical planning (macro policy over micro controllers)
+## Rig E: Hierarchical planning (macro policy over micro controllers)
 
 A) Primitives and formal signature
-Primary: 5 hierarchical planning
-Also: 16, 17, 19
-Signature: macro abstraction layer; micro controller handles local execution; macro edges invoke sub-solvers; costs incorporate execution feedback.
+
+Primary: 
+- 5 hierarchical planning
+
+Also: 
+- 16, 17, 19
+
+Signature: 
+- macro abstraction layer; micro controller handles local execution; macro edges invoke sub-solvers; costs incorporate execution feedback.
 
 B) Minecraft proving tasks
-	1.	Macro navigation: waypoint graph route selection while Mineflayer handles micro path.
-	2.	Macro build plan: choose template + material acquisition plan; invoke Rig A/C as sub-solvers.
+1.	Macro navigation: waypoint graph route selection while Mineflayer handles micro path.
+2.	Macro build plan: choose template + material acquisition plan; invoke Rig A/C as sub-solvers.
 
 C) State representation
 Macro nodes are waypoints/regions with coarse features: biome, danger rating, travel time estimate bucket. Micro details are not in macro state.
@@ -280,14 +318,20 @@ Leaking micro state into macro hash; non-attributable failures; oscillation due 
 
 Status: Planned.
 
-⸻
+---
 
-### Rig F: Goal-conditioned valuation under scarcity (keep/drop/allocate)
+## Rig F: Goal-conditioned valuation under scarcity (keep/drop/allocate)
 
 A) Primitives and formal signature
-Primary: 6 valuation under scarcity
-Also: 18, 16, 17, 19
-Signature: capacity constraint; utility depends on goals; value model shifts with goals; learning updates valuations.
+
+Primary: 
+- 6 valuation under scarcity
+
+Also: 
+- 18, 16, 17, 19
+
+Signature: 
+- capacity constraint; utility depends on goals; value model shifts with goals; learning updates valuations.
 
 B) Minecraft proving tasks
 Inventory full; bot encounters new item; decide keep/drop/store. Repeat under different active goals: building, mining, nether prep.
@@ -312,14 +356,20 @@ Hardcoded item values; non-explainable trades; slot-permutation state explosion.
 
 Status: Planned.
 
-⸻
+---
 
-### Rig G: Feasibility under constraints and partial-order structure (build sequencing)
+## Rig G: Feasibility under constraints and partial-order structure (build sequencing)
 
 A) Primitives and formal signature
-Primary: 7 feasibility + partial order
-Also: 16, 17, 19 (and 14 if you move to program-level templates)
-Signature: operators with nontrivial preconditions (support, reachability); steps commute; solution is a partially ordered plan or a plan robust to valid linearizations.
+
+Primary: 
+- 7 feasibility + partial order
+
+Also: 
+- 16, 17, 19 (and 14 if you move to program-level templates)
+
+Signature: 
+- operators with nontrivial preconditions (support, reachability); steps commute; solution is a partially ordered plan or a plan robust to valid linearizations.
 
 B) Minecraft proving tasks
 Build a minimal shelter: foundation, walls, roof, door, light. Constraints: support, reachability, no mid-air placement, minimal scaffolding.
@@ -344,14 +394,20 @@ Block-level state explosion; hiding feasibility in executor; reinforcing plans t
 
 Status: Planned.
 
-⸻
+---
 
-### Rig H: Systems synthesis (compose components to satisfy a behavioral spec)
+## Rig H: Systems synthesis (compose components to satisfy a behavioral spec)
 
 A) Primitives and formal signature
-Primary: 8 synthesis
-Also: 14 compressed planning, 16, 19
-Signature: state is partial design; operators add components; deterministic evaluation checks spec; goal is “spec holds.”
+
+Primary: 
+- 8 synthesis
+
+Also: 
+- 14 compressed planning, 16, 19
+
+Signature: 
+- state is partial design; operators add components; deterministic evaluation checks spec; goal is “spec holds.”
 
 B) Minecraft proving tasks
 Start with farm layout synthesis (deterministic constraints) before redstone. Example: “maximize planted tiles under irrigation constraint with bounded area.”
@@ -376,14 +432,20 @@ Trying redstone too early (simulator complexity); atomistic placement; no symmet
 
 Status: Planned (farm first; redstone later).
 
-⸻
+---
 
-### Rig I: Epistemic planning (belief-state, active sensing)
+## Rig I: Epistemic planning (belief-state, active sensing)
 
 A) Primitives and formal signature
-Primary: 11 epistemic planning
-Also: 19, 17 (and 13 if you include commitments)
-Signature: belief nodes; probe operators; belief update; goal is confidence threshold or hypothesis collapse.
+
+Primary: 
+- 11 epistemic planning
+
+Also: 
+- 19, 17 (and 13 if you include commitments)
+
+Signature: 
+- belief nodes; probe operators; belief update; goal is confidence threshold or hypothesis collapse.
 
 B) Minecraft proving tasks
 Locate structure/resource without known location (village/fortress). Probes: travel to vantage, biome sampling, mob mix sampling, follow terrain features.
@@ -408,14 +470,20 @@ Beliefs hidden inside heuristics; non-replayable updates; reinforcing “lucky f
 
 Status: Planned.
 
-⸻
+---
 
-### Rig J: Invariant maintenance (non-terminal goals; receding horizon)
+## Rig J: Invariant maintenance (non-terminal goals; receding horizon)
 
 A) Primitives and formal signature
-Primary: 12 invariant maintenance
-Also: 18, 17, 19
-Signature: state includes invariant metrics + drift; actions restore; solved repeatedly as MPC/receding horizon.
+
+Primary: 
+- 12 invariant maintenance
+
+Also: 
+- 18, 17, 19
+
+Signature: 
+- state includes invariant metrics + drift; actions restore; solved repeatedly as MPC/receding horizon.
 
 B) Minecraft proving tasks
 Maintain base: light coverage threshold, food buffer, tool durability, door integrity. Drift: night cycles, consumption, mob damage.
@@ -440,14 +508,20 @@ Turning maintenance into a pile of reactive triggers; no horizon; no explanation
 
 Status: Planned.
 
-⸻
+---
 
-### Rig K: Irreversibility and commitment planning
+## Rig K: Irreversibility and commitment planning
 
 A) Primitives and formal signature
-Primary: 13 irreversibility
-Also: 19, 20
-Signature: some actions irreversible or expensive rollback; planner must delay commitment until verification; one-way door constraints.
+
+Primary: 
+- 13 irreversibility
+
+Also: 
+- 19, 20
+
+Signature: 
+- some actions irreversible or expensive rollback; planner must delay commitment until verification; one-way door constraints.
 
 B) Minecraft proving tasks
 Villager trade locking: reroll vs lock; curing timing; leveling commits; workstation placement. Also “commit to base location” if you choose to model it.
@@ -472,14 +546,20 @@ Treating irreversibility as just a cost; allowing learned priors to override req
 
 Status: Planned.
 
-⸻
+---
 
-### Rig L: Contingency planning with exogenous events (policy planning)
+## Rig L: Contingency planning with exogenous events (policy planning)
 
 A) Primitives and formal signature
-Primary: 9 contingency planning
-Also: 18, 19
-Signature: chosen actions and forced transitions; hazard triggers; policy/branching; goal includes survivability/invariants.
+
+Primary: 
+- 9 contingency planning
+
+Also: 
+- 18, 19
+
+Signature: 
+- chosen actions and forced transitions; hazard triggers; policy/branching; goal includes survivability/invariants.
 
 B) Minecraft proving tasks
 Plan mining trip while anticipating nightfall and hunger ticks. Forced transitions are modeled explicitly (time triggers).
@@ -489,68 +569,87 @@ This rig only makes sense once you have temporal modeling discipline from Rig C 
 
 Status: Later.
 
-⸻
+---
 
-### Rig M: Risk-aware planning (tail risk)
+## Rig M: Risk-aware planning (tail risk)
 
 A) Primitives and formal signature
-Primary: 10 risk-aware
-Also: 18, 17, 19
-Signature: stochastic outcomes; chance constraints or distributional objective; risk budget; learning updates failure likelihoods.
+
+Primary: 
+- 10 risk-aware
+
+Also: 
+- 18, 17, 19
+
+Signature: 
+- stochastic outcomes; chance constraints or distributional objective; risk budget; learning updates failure likelihoods.
 
 B) Minecraft proving tasks
 Lava mining vs safer alternatives; nether traversal routes. Model death probability from execution history; enforce P(death)<ε for high-value loadouts.
 
 Status: Later.
 
-⸻
+---
 
-### Rig N: Fault diagnosis and repair
+## Rig N: Fault diagnosis and repair
 
 A) Primitives and formal signature
-Primary: 15 diagnosis/repair
-Also: 11 epistemic, 19
-Signature: hypothesis set; tests reduce entropy; repair operators; validation step.
+
+Primary: 
+- 15 diagnosis/repair
+
+Also: 
+- 11 epistemic, 19
+
+Signature: 
+- hypothesis set; tests reduce entropy; repair operators; validation step.
 
 B) Minecraft proving tasks
 Diagnose jammed item transport or failing farm hydration. Tests: inspect, sample flow, isolate module; repair; re-test.
 
 Status: Later.
 
-⸻
+---
 
 ## Implementation priority (capability-first)
 
 Track 1 (tightening what you already have):
-	1.	Rig A certification hardening (validation, canonicalization, trace hashing, execution credit, explanations)
-	2.	Rig B (capability gating)
-	3.	Rig C (temporal + capacity)
+1.	Rig A certification hardening (validation, canonicalization, trace hashing, execution credit, explanations)
+2.	Rig B (capability gating)
+3.	Rig C (temporal + capacity)
 
 Track 2 (widening representational power once A–C are solid):
-4) Rig D (multi-strategy acquisition)
-5) Rig E (hierarchical macro/micro)
-6) Rig I (epistemic)
-7) Rig J (invariant maintenance)
-8) Rig K (irreversibility)
+
+1. Rig D (multi-strategy acquisition)
+2. Rig E (hierarchical macro/micro)
+3. Rig I (epistemic)
+4. Rig J (invariant maintenance)
+5. Rig K (irreversibility)
 
 Later (policy, risk, diagnosis):
-9) Rig L → Rig M → Rig N
+- Rig L → Rig M → Rig N
 
 This ordering is chosen to keep substrate invariants from drifting: temporal and legality foundations (A–C) prevent you from building later rigs on ambiguous semantics.
 
-⸻
+---
 
 ## What “done” means for a rig
 
 A rig is not “done” when it returns a plan once. It’s done when it passes:
-	1.	Signature tests
+
+1.	Signature tests
+
 Legality, determinism, boundedness, canonicalization, validation/hardening.
-	2.	Performance tests
+
+2.	Performance tests
+
 Repeat solves improve (fewer expansions / faster completion) without destabilizing correctness. Learning does not alter semantics.
-	3.	Transfer tests
+
+3.	Transfer tests
+
 Same formal signature runs on at least one non-Minecraft surface (or a second distinct Minecraft surface) with the same invariants and harness.
 
-⸻
+---
 
 ## Architecture
 
