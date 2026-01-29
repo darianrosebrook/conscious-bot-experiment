@@ -948,22 +948,19 @@ export class EnhancedReactiveExecutor {
    */
   async executeTask(task: any): Promise<any> {
     try {
-      // Use the PBI-wrapped task execution for proper task execution with enforcement
-      const result = await this.executeTaskWithPBI(
-        task,
-        'http://localhost:3005'
-      );
+      // Execute the task directly via Minecraft interface
+      const taskResult = await this.executeTaskInMinecraft(task);
 
       // Return result in the expected format
       return {
-        success: result.success,
+        success: taskResult.success,
         planExecuted: true,
         safetyReflexActivated: false,
         planRepaired: false,
         duration: 0, // Will be calculated if needed
-        actionsCompleted: result.success ? 1 : 0,
-        error: result.error,
-        data: result,
+        actionsCompleted: taskResult.success ? 1 : 0,
+        error: taskResult.error,
+        data: taskResult,
       };
     } catch (error) {
       return {
@@ -1306,8 +1303,8 @@ export class EnhancedReactiveExecutor {
         };
       }
 
-      // Continue with normal task execution using PBI wrapper
-      const taskResult = await this.executeTaskWithPBI(task, minecraftUrl);
+      // Continue with normal task execution
+      const taskResult = await this.executeTaskInMinecraft(task);
 
       // Track effectiveness metrics
       const totalTime = performance.now() - startTime;

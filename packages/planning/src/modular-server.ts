@@ -98,6 +98,15 @@ import { CognitiveIntegration } from './cognitive-integration';
 import { BehaviorTreeRunner } from './behavior-trees/BehaviorTreeRunner';
 import { CognitiveThoughtProcessor } from './cognitive-thought-processor';
 import { IntegratedPlanningCoordinator } from './integrated-planning-coordinator';
+import { createServiceClients, SterlingClient } from '@conscious-bot/core';
+import { SterlingReasoningService, MinecraftCraftingSolver } from './sterling';
+
+// Create HTTP clients for inter-service communication
+const serviceClients = createServiceClients();
+
+// Sterling reasoning service (optional external dependency)
+let sterlingService: SterlingReasoningService | undefined;
+let minecraftCraftingSolver: MinecraftCraftingSolver | undefined;
 import { EnhancedGoalManager } from './goal-formulation/goal-manager';
 import { EnhancedReactiveExecutor } from './reactive-executor/reactive-executor';
 import { EnhancedTaskIntegration } from './task-integration';
@@ -869,10 +878,8 @@ async function scanForNearbyCraftingTables(): Promise<
 > {
   try {
     // Get current bot position from world state
-    const worldStateResponse = await fetch('http://localhost:3005/state', {
-      method: 'GET',
-      headers: { 'Content-Type': 'application/json' },
-      signal: AbortSignal.timeout(3000),
+    const worldStateResponse = await serviceClients.minecraft.get('/state', {
+      timeout: 3000,
     });
 
     if (!worldStateResponse.ok) return [];
@@ -883,12 +890,10 @@ async function scanForNearbyCraftingTables(): Promise<
     if (!botPosition) return [];
 
     // Query nearby blocks to find crafting tables
-    const nearbyBlocksResponse = await fetch(
-      'http://localhost:3005/nearby-blocks',
+    const nearbyBlocksResponse = await serviceClients.minecraft.get(
+      '/nearby-blocks',
       {
-        method: 'GET',
-        headers: { 'Content-Type': 'application/json' },
-        signal: AbortSignal.timeout(3000),
+        timeout: 3000,
       }
     );
 
@@ -2485,8 +2490,8 @@ const cognitiveThoughtProcessor = new CognitiveThoughtProcessor({
   enableThoughtToTaskTranslation: true,
   thoughtProcessingInterval: 30000,
   maxThoughtsPerBatch: 5,
-  planningEndpoint: 'http://localhost:3002',
-  cognitiveEndpoint: 'http://localhost:3003',
+  planningEndpoint: process.env.PLANNING_ENDPOINT || 'http://localhost:3002',
+  cognitiveEndpoint: process.env.COGNITION_ENDPOINT || 'http://localhost:3003',
   enableSignalPipeline: true, // Enable the new signal extraction pipeline
   signalConfidenceThreshold: 0.3, // Minimum confidence for signals
 });
@@ -2547,9 +2552,9 @@ const enhancedEnvironmentIntegration = new EnhancedEnvironmentIntegration({
   enableEntityDetection: true,
   enableInventoryTracking: true,
   enableResourceAssessment: true,
-  dashboardEndpoint: 'http://localhost:3000',
-  worldSystemEndpoint: 'http://localhost:3004',
-  minecraftEndpoint: 'http://localhost:3005',
+  dashboardEndpoint: process.env.DASHBOARD_ENDPOINT || 'http://localhost:3000',
+  worldSystemEndpoint: process.env.WORLD_ENDPOINT || 'http://localhost:3004',
+  minecraftEndpoint: process.env.MINECRAFT_ENDPOINT || 'http://localhost:3005',
   updateInterval: 15000, // Increased from 5000ms to 15000ms to reduce load
   maxEntityDistance: 50,
   maxBlockDistance: 20,
@@ -2561,9 +2566,9 @@ const enhancedLiveStreamIntegration = new EnhancedLiveStreamIntegration({
   enableVisualFeedback: true,
   enableMiniMap: true,
   enableScreenshots: true,
-  dashboardEndpoint: 'http://localhost:3000',
-  minecraftEndpoint: 'http://localhost:3005',
-  screenshotEndpoint: 'http://localhost:3005/screenshots',
+  dashboardEndpoint: process.env.DASHBOARD_ENDPOINT || 'http://localhost:3000',
+  minecraftEndpoint: process.env.MINECRAFT_ENDPOINT || 'http://localhost:3005',
+  screenshotEndpoint: `${process.env.MINECRAFT_ENDPOINT || 'http://localhost:3005'}/screenshots`,
   updateInterval: 10000, // Reduced from 2000ms to 10000ms to reduce load
   maxActionLogs: 100, // Reduced from 1000 to 100 to save memory
   maxVisualFeedbacks: 50, // Reduced from 100 to 50 to save memory
@@ -2724,6 +2729,50 @@ serverConfig.addEndpoint('get', '/world-state', (req, res) => {
   }
 });
 
+// Sterling health endpoint
+serverConfig.addEndpoint('get', '/sterling/health', (_req, res) => {
+  if (!sterlingService) {
+    res.json({ available: false, reason: 'Sterling service not initialized' });
+    return;
+  }
+  const health = sterlingService.getHealthStatus();
+  res.json({ available: health.connected && health.enabled, ...health });
+});
+
+// Sterling crafting solve endpoint (for direct testing)
+serverConfig.addEndpoint('post', '/sterling/crafting/solve', async (req, res) => {
+  if (!minecraftCraftingSolver) {
+    res.status(503).json({ error: 'Crafting solver not initialized' });
+    return;
+  }
+
+  try {
+    const { goalItem, inventory, nearbyBlocks, mcData } = req.body;
+    if (!goalItem) {
+      res.status(400).json({ error: 'goalItem is required' });
+      return;
+    }
+
+    const inventoryItems = Array.isArray(inventory)
+      ? inventory
+      : Object.entries(inventory || {}).map(([name, count]) => ({ name, count: count as number }));
+
+    const result = await minecraftCraftingSolver.solveCraftingGoal(
+      goalItem,
+      inventoryItems,
+      mcData || {},
+      nearbyBlocks || []
+    );
+
+    const taskSteps = minecraftCraftingSolver.toTaskSteps(result);
+    res.json({ ...result, taskSteps });
+  } catch (error) {
+    res.status(500).json({
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
+
 // Main server startup function
 async function startServer() {
   try {
@@ -2738,6 +2787,27 @@ async function startServer() {
       console.warn(
         '⚠️ Failed to initialize event-driven thought generator:',
         error
+      );
+    }
+
+    // Initialize Sterling reasoning service (optional external dependency)
+    try {
+      sterlingService = new SterlingReasoningService();
+      await sterlingService.initialize();
+      if (sterlingService.isAvailable()) {
+        console.log('✅ Sterling reasoning service connected');
+      } else {
+        console.log('ℹ️ Sterling reasoning service not available (will retry on demand)');
+      }
+
+      // Create crafting solver on top of Sterling service
+      minecraftCraftingSolver = new MinecraftCraftingSolver(sterlingService);
+      enhancedTaskIntegration.setCraftingSolver(minecraftCraftingSolver);
+      console.log('✅ Minecraft crafting solver initialized');
+    } catch (error) {
+      console.warn(
+        '⚠️ Sterling reasoning service failed to initialize, continuing without it:',
+        error instanceof Error ? error.message : error
       );
     }
 
@@ -2797,13 +2867,23 @@ async function startServer() {
             | 'container.write'
             | 'chat'
           >,
-          inputSchema: any = { type: 'object', additionalProperties: true }
+          inputSchema: any = { type: 'object', additionalProperties: true },
+          outputSchema: any = {
+            type: 'object',
+            properties: {
+              status: { type: 'string' },
+              result: { type: 'object', additionalProperties: true },
+            },
+            required: ['status'],
+            additionalProperties: true,
+          }
         ): any => ({
           spec: {
             name,
             version,
             description: `${name} (placeholder)` as any,
             inputSchema,
+            outputSchema,
             timeoutMs: 5000,
             retries: 0,
             permissions,
@@ -3129,9 +3209,20 @@ export {
   enhancedMemoryIntegration,
   enhancedEnvironmentIntegration,
   enhancedLiveStreamIntegration,
+  sterlingService,
+  minecraftCraftingSolver,
 };
 
-// Start server if this file is run directly
-if (require.main === module) {
-  startServer();
+// Start server if this file is run directly (ESM equivalent of require.main === module)
+// For tsx execution, we check if the module URL ends with the filename
+// This is more reliable than path comparisons which can vary
+const isMainModule =
+  import.meta.url.endsWith('modular-server.ts') ||
+  import.meta.url.includes('/modular-server.ts');
+
+if (isMainModule) {
+  startServer().catch((error) => {
+    console.error('Failed to start planning server:', error);
+    process.exit(1);
+  });
 }

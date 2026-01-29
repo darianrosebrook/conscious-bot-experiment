@@ -86,6 +86,8 @@ export * from './working';
 
 // Semantic Memory
 export * from './semantic';
+// Explicitly export KnowledgeGraphCore for easier access
+export { KnowledgeGraphCore } from './semantic/knowledge-graph-core';
 
 // Provenance Memory
 export * from './provenance';

@@ -8,6 +8,7 @@
 
 import * as express from 'express';
 import * as cors from 'cors';
+import { createServiceClients } from '@conscious-bot/core';
 import { ReActArbiter } from './react-arbiter/ReActArbiter';
 import {
   eventDrivenThoughtGenerator,
@@ -32,7 +33,9 @@ class CognitiveStreamLogger {
   private cognitiveStreamUrl: string;
 
   private constructor() {
-    this.cognitiveStreamUrl = 'http://localhost:3000/api/ws/cognitive-stream';
+    this.cognitiveStreamUrl = process.env.DASHBOARD_ENDPOINT
+      ? `${process.env.DASHBOARD_ENDPOINT}/api/ws/cognitive-stream`
+      : 'http://localhost:3000/api/ws/cognitive-stream';
   }
 
   public static getInstance(): CognitiveStreamLogger {
@@ -723,29 +726,30 @@ const intrusiveThoughtProcessor = new IntrusiveThoughtProcessor({
   enableTaskCreation: true,
   enablePlanningIntegration: true,
   enableMinecraftIntegration: true,
-  planningEndpoint: 'http://localhost:3002',
-  minecraftEndpoint: 'http://localhost:3005',
+  planningEndpoint: process.env.PLANNING_ENDPOINT || 'http://localhost:3002',
+  minecraftEndpoint: process.env.MINECRAFT_ENDPOINT || 'http://localhost:3005',
 });
 
 // Initialize social memory manager
 let socialMemoryManager: SocialMemoryManager | null = null;
-try {
-  const {
-    KnowledgeGraphCore,
-  } = require('../memory/src/semantic/knowledge-graph-core');
-  const knowledgeGraph = new KnowledgeGraphCore({
-    persistToStorage: true,
-    storageDirectory: './memory-storage',
-  });
-  socialMemoryManager = new SocialMemoryManager(knowledgeGraph, {
-    enableVerboseLogging: true,
-  });
-} catch (error) {
-  console.warn(
-    '⚠️ Social memory system could not be initialized:',
-    (error as Error)?.message
-  );
-}
+(async () => {
+  try {
+    const memoryModule = await import('@conscious-bot/memory');
+    const { KnowledgeGraphCore } = memoryModule;
+    const knowledgeGraph = new KnowledgeGraphCore({
+      persistToStorage: true,
+      storageDirectory: './memory-storage',
+    });
+    socialMemoryManager = new SocialMemoryManager(knowledgeGraph, {
+      enableVerboseLogging: true,
+    });
+  } catch (error) {
+    console.warn(
+      '⚠️ Social memory system could not be initialized:',
+      (error as Error)?.message
+    );
+  }
+})();
 
 // Initialize social awareness manager
 const socialAwarenessManager = new SocialAwarenessManager({

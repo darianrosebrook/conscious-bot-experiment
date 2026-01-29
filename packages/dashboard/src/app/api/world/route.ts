@@ -34,46 +34,49 @@ export async function GET(_request: NextRequest) {
 
     const envData = minecraftData.data.worldState;
 
+    // Read from the actual response shape: envData.environment.{biome,weather,timeOfDay}
+    const rawTime = envData.environment?.timeOfDay ?? envData.timeOfDay;
+
     // Convert to dashboard format
     const environment: Environment = {
-      biome: 'Overworld', // Minecraft dimension
-      weather: envData.weather || 'Unknown',
-      timeOfDay: envData.timeOfDay
-        ? `${Math.floor(envData.timeOfDay / 1000)}:${Math.floor((envData.timeOfDay % 1000) / 16.67)}`
+      biome: envData.environment?.biome || envData.player?.dimension || 'Unknown',
+      weather: envData.environment?.weather || 'Unknown',
+      timeOfDay: rawTime != null
+        ? `${Math.floor(rawTime / 1000)}:${String(Math.floor((rawTime % 1000) / 16.67)).padStart(2, '0')}`
         : 'Unknown',
       nearbyEntities: [],
     };
 
-    // Add nearby entities from minecraft data
-    if (
-      envData._minecraftState?.environment?.nearbyEntities &&
-      envData._minecraftState.environment.nearbyEntities.length > 0
-    ) {
-      for (const entity of envData._minecraftState.environment.nearbyEntities.slice(
-        0,
-        10
-      )) {
+    // Add nearby entities — try direct worldState paths first, then legacy _minecraftState
+    const entitySource =
+      envData.nearbyEntities ||
+      envData.environment?.nearbyEntities ||
+      envData._minecraftState?.environment?.nearbyEntities;
+    if (entitySource && entitySource.length > 0) {
+      for (const entity of entitySource.slice(0, 10)) {
         environment.nearbyEntities.push(
-          `${entity.type} (${entity.isHostile ? 'hostile' : 'passive'})`
+          `${entity.type || entity.name || 'entity'} (${entity.isHostile ? 'hostile' : 'passive'})`
         );
       }
     }
 
-    // Add nearby blocks
-    if (
-      envData._minecraftState?.environment?.nearbyBlocks &&
-      envData._minecraftState.environment.nearbyBlocks.length > 0
-    ) {
+    // Add nearby blocks — try direct worldState paths first, then legacy _minecraftState
+    const blockSource =
+      envData.nearbyBlocks ||
+      envData.environment?.nearbyBlocks ||
+      envData._minecraftState?.environment?.nearbyBlocks;
+    if (blockSource && blockSource.length > 0) {
       const blockTypes = new Set(
-        envData._minecraftState.environment.nearbyBlocks.map((b: any) => b.type)
+        blockSource.map((b: any) => b.type)
       );
       environment.nearbyEntities.push(`${blockTypes.size} block types nearby`);
     }
 
     // Add environmental conditions
-    if (envData._minecraftState?.environment?.isRaining !== undefined) {
+    const isRaining = envData.environment?.isRaining ?? envData._minecraftState?.environment?.isRaining;
+    if (isRaining !== undefined) {
       environment.nearbyEntities.push(
-        `Raining: ${envData._minecraftState.environment.isRaining ? 'Yes' : 'No'}`
+        `Raining: ${isRaining ? 'Yes' : 'No'}`
       );
     }
 

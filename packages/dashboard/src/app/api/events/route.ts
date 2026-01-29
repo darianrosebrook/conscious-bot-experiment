@@ -29,7 +29,7 @@ export async function GET(_request: NextRequest) {
 
             // Provide meaningful content for generic events
             if (event.type === 'memory_state') {
-              content = `Memory system updated with ${event.data?.memoryCount || 0} memories`;
+              content = `Memory system updated with ${event.data?.episodicMemories ?? event.data?.memoryCount ?? 0} memories`;
             } else if (event.type === 'episodic_memory') {
               content = `Stored new episodic memory: ${event.data?.description || 'Experience recorded'}`;
             } else if (event.type === 'semantic_memory') {

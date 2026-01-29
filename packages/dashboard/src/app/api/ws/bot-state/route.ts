@@ -67,65 +67,26 @@ export const GET = async (req: NextRequest) => {
           timestamp: Date.now(),
           data: {
             connected: minecraftData?.success || false,
-            inventory: minecraftData?.data?.worldState?.inventory?.items || [],
-            position: minecraftData?.data?.worldState?.playerPosition || null,
+            inventory: minecraftData?.data?.worldState?.inventory?.items || minecraftData?.data?.data?.inventory?.items || [],
+            position: minecraftData?.data?.worldState?.player?.position ?? minecraftData?.data?.data?.position ?? null,
             vitals: minecraftData?.data?.worldState
               ? {
-                  health: minecraftData.data.worldState.health || 0,
-                  hunger: minecraftData.data.worldState.hunger || 0,
+                  health: minecraftData.data.worldState.player?.health ?? minecraftData.data.data?.health ?? 0,
+                  hunger: minecraftData.data.worldState.player?.food ?? minecraftData.data.data?.food ?? 0,
                   stamina: 100, // Default stamina value
                   sleep: 100, // Default sleep value
                 }
-              : minecraftData?.data?.currentState
-                ? {
-                    health: (minecraftData.data.currentState.health || 0) * 20, // Convert from 0-1 to 0-20
-                    hunger: (minecraftData.data.currentState.hunger || 0) * 20, // Convert from 0-1 to 0-20
-                    stamina:
-                      (minecraftData.data.currentState.energy || 0) * 100, // Convert from 0-1 to 0-100
-                    sleep: 100, // Default sleep value
-                  }
-                : null,
-            intero:
-              cognitionData?.stress !== undefined &&
-              cognitionData?.focus !== undefined &&
-              cognitionData?.curiosity !== undefined
-                ? {
-                    stress: cognitionData.stress || 20,
-                    focus: cognitionData.focus || 80,
-                    curiosity: cognitionData.curiosity || 75,
-                  }
-                : minecraftData?.data?.currentState
-                  ? {
-                      stress:
-                        (1 - (minecraftData.data.currentState.safety || 0)) *
-                        100, // Convert safety to stress (inverted)
-                      focus:
-                        (minecraftData.data.currentState.curiosity || 0) * 100, // Use curiosity as focus proxy
-                      curiosity:
-                        (minecraftData.data.currentState.curiosity || 0) * 100, // Direct curiosity mapping
-                    }
-                  : {
-                      stress: 20, // Default stress level
-                      focus: 80, // Default focus level
-                      curiosity: 75, // Default curiosity level
-                    },
-            mood:
-              cognitionData?.mood ||
-              (minecraftData?.data?.currentState?.safety > 0.8
-                ? 'content'
-                : minecraftData?.data?.currentState?.safety > 0.5
-                  ? 'neutral'
-                  : 'concerned') ||
-              'neutral',
-            environment: worldData || null,
-            cognition: {
-              ...cognitionData,
-              // Add default interoceptive data
-              stress: 20, // Default stress level (lower is better)
-              focus: 80, // Default focus level
-              curiosity: 75, // Default curiosity level
-              mood: 'neutral', // Default mood
+              : null,
+            intero: {
+              stress: 20, // Default — cognition service doesn't expose interoceptive values
+              focus: 80,
+              curiosity: 75,
             },
+            mood: 'neutral',
+            environment: worldData || null,
+            cognition: cognitionData
+              ? { ...cognitionData }
+              : { error: 'Cognition service unavailable' },
           },
         };
 
@@ -271,28 +232,26 @@ export const GET = async (req: NextRequest) => {
               data: {
                 connected: minecraftData?.success || false,
                 inventory:
-                  minecraftData?.data?.inventory?.main ||
                   minecraftData?.data?.worldState?.inventory?.items ||
+                  minecraftData?.data?.data?.inventory?.items ||
                   [],
                 position:
-                  minecraftData?.data?.position ||
-                  minecraftData?.data?.worldState?.playerPosition ||
+                  minecraftData?.data?.worldState?.player?.position ??
+                  minecraftData?.data?.data?.position ??
                   null,
-                vitals:
-                  minecraftData?.data?.vitals || minecraftData?.data?.worldState
-                    ? {
-                        health: minecraftData.data.worldState.health || 0,
-                        food: minecraftData.data.worldState.hunger || 0,
-                        hunger: minecraftData.data.worldState.hunger || 0,
-                        stamina: 100, // Default stamina value
-                        sleep: 100, // Default sleep value
-                      }
-                    : null,
+                vitals: minecraftData?.data?.worldState
+                  ? {
+                      health: minecraftData.data.worldState.player?.health ?? minecraftData.data.data?.health ?? 0,
+                      food: minecraftData.data.worldState.player?.food ?? minecraftData.data.data?.food ?? 0,
+                      hunger: minecraftData.data.worldState.player?.food ?? minecraftData.data.data?.food ?? 0,
+                      stamina: 100, // Default stamina value
+                      sleep: 100, // Default sleep value
+                    }
+                  : null,
                 environment: worldData || null,
-                cognition: cognitionData || {
-                  // Only provide minimal fallback if no cognition data available
-                  error: 'Cognition service unavailable',
-                },
+                cognition: cognitionData
+                  ? { ...cognitionData }
+                  : { error: 'Cognition service unavailable' },
               },
             };
 

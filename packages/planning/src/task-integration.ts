@@ -9,6 +9,8 @@
  */
 
 import { EventEmitter } from 'events';
+import { createServiceClients } from '@conscious-bot/core';
+import type { MinecraftCraftingSolver } from './sterling/minecraft-crafting-solver';
 
 // Cognitive stream integration for thought-to-task conversion
 interface CognitiveThought {
@@ -222,6 +224,7 @@ export interface EnhancedTaskIntegrationConfig {
   maxTaskHistory: number;
   progressUpdateInterval: number;
   dashboardEndpoint: string;
+  minecraftEndpoint?: string; // Optional, defaults to env var or localhost:3005
   enableActionVerification: boolean; // New: Enable action verification
   actionVerificationTimeout: number; // New: Timeout for action verification
 }
@@ -319,6 +322,25 @@ export class EnhancedTaskIntegration extends EventEmitter {
   private actionVerifications: Map<string, ActionVerification> = new Map();
   private cognitiveStreamClient: CognitiveStreamClient;
   private thoughtPollingInterval?: NodeJS.Timeout;
+  private minecraftClient: ReturnType<typeof createServiceClients>['minecraft'];
+  private craftingSolver?: MinecraftCraftingSolver;
+
+  /**
+   * Helper method to make HTTP requests to Minecraft Interface with retry logic
+   */
+  private async minecraftRequest(
+    path: string,
+    options: { timeout?: number } = {}
+  ): Promise<Response> {
+    try {
+      return await this.minecraftClient.get(path, {
+        timeout: options.timeout || 5000,
+      });
+    } catch (error) {
+      console.warn(`Minecraft request failed for ${path}:`, error);
+      throw error;
+    }
+  }
 
   /**
    * Start polling for cognitive thoughts and convert them to tasks
@@ -893,6 +915,8 @@ export class EnhancedTaskIntegration extends EventEmitter {
   constructor(config: Partial<EnhancedTaskIntegrationConfig> = {}) {
     super();
     this.config = { ...DEFAULT_CONFIG, ...config };
+    const serviceClients = createServiceClients();
+    this.minecraftClient = serviceClients.minecraft;
 
     // Initialize cognitive stream client for thought-to-task conversion
     this.cognitiveStreamClient = new CognitiveStreamClient();
@@ -903,6 +927,13 @@ export class EnhancedTaskIntegration extends EventEmitter {
     if (this.config.enableProgressTracking) {
       this.startProgressTracking();
     }
+  }
+
+  /**
+   * Set the Sterling crafting solver for intelligent crafting step generation
+   */
+  setCraftingSolver(solver: MinecraftCraftingSolver): void {
+    this.craftingSolver = solver;
   }
 
   /**
@@ -1155,10 +1186,8 @@ export class EnhancedTaskIntegration extends EventEmitter {
       // For crafting tasks, verify the actual item is in inventory before marking as completed
       if (task.type === 'crafting') {
         try {
-          const response = await fetch('http://localhost:3005/inventory', {
-            method: 'GET',
-            headers: { 'Content-Type': 'application/json' },
-            signal: AbortSignal.timeout(5000),
+          const response = await this.minecraftRequest('/inventory', {
+            timeout: 5000,
           });
 
           if (response.ok) {
@@ -1207,10 +1236,8 @@ export class EnhancedTaskIntegration extends EventEmitter {
       // For gathering tasks, verify the required items are in inventory before marking as completed
       if (task.type === 'gathering') {
         try {
-          const response = await fetch('http://localhost:3005/inventory', {
-            method: 'GET',
-            headers: { 'Content-Type': 'application/json' },
-            signal: AbortSignal.timeout(5000),
+          const response = await this.minecraftRequest('/inventory', {
+            timeout: 5000,
           });
 
           if (response.ok) {
@@ -1443,10 +1470,8 @@ export class EnhancedTaskIntegration extends EventEmitter {
    */
   private async isBotConnected(): Promise<boolean> {
     try {
-      const response = await fetch('http://localhost:3005/health', {
-        method: 'GET',
-        headers: { 'Content-Type': 'application/json' },
-        signal: AbortSignal.timeout(5000),
+      const response = await this.minecraftRequest('/health', {
+        timeout: 5000,
       });
 
       if (!response.ok) return false;
@@ -1465,10 +1490,8 @@ export class EnhancedTaskIntegration extends EventEmitter {
   private async verifyResourceLocation(resourceType: string): Promise<boolean> {
     try {
       // Check if we have the resource in inventory (indicating we found it)
-      const response = await fetch('http://localhost:3005/inventory', {
-        method: 'GET',
-        headers: { 'Content-Type': 'application/json' },
-        signal: AbortSignal.timeout(5000),
+      const response = await this.minecraftRequest('/inventory', {
+        timeout: 5000,
       });
 
       if (!response.ok) return false;
@@ -1507,10 +1530,8 @@ export class EnhancedTaskIntegration extends EventEmitter {
   private async verifyMovement(): Promise<boolean> {
     try {
       // Check bot position to see if it changed from step start (if available)
-      const response = await fetch('http://localhost:3005/health', {
-        method: 'GET',
-        headers: { 'Content-Type': 'application/json' },
-        signal: AbortSignal.timeout(5000),
+      const response = await this.minecraftRequest('/health', {
+        timeout: 5000,
       });
 
       if (!response.ok) return false;
@@ -1554,11 +1575,7 @@ export class EnhancedTaskIntegration extends EventEmitter {
   ): Promise<boolean> {
     try {
       const start = this._stepStartSnapshots.get(`${taskId}-${stepId}`) as any;
-      const res = await fetch('http://localhost:3005/inventory', {
-        method: 'GET',
-        headers: { 'Content-Type': 'application/json' },
-        signal: AbortSignal.timeout(4000),
-      });
+      const res = await this.minecraftRequest('/inventory', { timeout: 4000 });
       if (!res.ok) return false;
       const data = (await res.json()) as any;
       const inventory = data?.data || [];
@@ -1580,11 +1597,7 @@ export class EnhancedTaskIntegration extends EventEmitter {
    */
   private async verifyNearbyBlock(pattern?: string): Promise<boolean> {
     try {
-      const res = await fetch('http://localhost:3005/state', {
-        method: 'GET',
-        headers: { 'Content-Type': 'application/json' },
-        signal: AbortSignal.timeout(5000),
-      });
+      const res = await this.minecraftRequest('/state', { timeout: 5000 });
       if (!res.ok) return false;
       const data = (await res.json()) as any;
       const blocks: any[] =
@@ -1613,11 +1626,7 @@ export class EnhancedTaskIntegration extends EventEmitter {
   ): Promise<boolean> {
     try {
       const start = this._stepStartSnapshots.get(`${taskId}-${stepId}`) as any;
-      const res = await fetch('http://localhost:3005/health', {
-        method: 'GET',
-        headers: { 'Content-Type': 'application/json' },
-        signal: AbortSignal.timeout(4000),
-      });
+      const res = await this.minecraftRequest('/health', { timeout: 4000 });
       if (!res.ok) return false;
       const data = (await res.json()) as any;
       const food = data?.botStatus?.food;
@@ -1636,11 +1645,7 @@ export class EnhancedTaskIntegration extends EventEmitter {
    */
   private async verifyLightLevel(): Promise<boolean> {
     try {
-      const res = await fetch('http://localhost:3005/state', {
-        method: 'GET',
-        headers: { 'Content-Type': 'application/json' },
-        signal: AbortSignal.timeout(4000),
-      });
+      const res = await this.minecraftRequest('/state', { timeout: 4000 });
       if (!res.ok) return false;
       const data = (await res.json()) as any;
       const time = data?.data?.worldState?.environment?.timeOfDay;
@@ -1655,11 +1660,7 @@ export class EnhancedTaskIntegration extends EventEmitter {
    */
   private async verifySmeltedItem(): Promise<boolean> {
     try {
-      const res = await fetch('http://localhost:3005/inventory', {
-        method: 'GET',
-        headers: { 'Content-Type': 'application/json' },
-        signal: AbortSignal.timeout(5000),
-      });
+      const res = await this.minecraftRequest('/inventory', { timeout: 5000 });
       if (!res.ok) return false;
       const data = (await res.json()) as any;
       const inventory = data?.data || [];
@@ -1680,10 +1681,8 @@ export class EnhancedTaskIntegration extends EventEmitter {
     resourceType: string
   ): Promise<boolean> {
     try {
-      const response = await fetch('http://localhost:3005/inventory', {
-        method: 'GET',
-        headers: { 'Content-Type': 'application/json' },
-        signal: AbortSignal.timeout(5000),
+      const response = await this.minecraftRequest('/inventory', {
+        timeout: 5000,
       });
 
       if (!response.ok) return false;
@@ -1723,10 +1722,8 @@ export class EnhancedTaskIntegration extends EventEmitter {
   private async verifyItemStorage(): Promise<boolean> {
     try {
       // Check if items are in inventory (indicating they were stored)
-      const response = await fetch('http://localhost:3005/inventory', {
-        method: 'GET',
-        headers: { 'Content-Type': 'application/json' },
-        signal: AbortSignal.timeout(5000),
+      const response = await this.minecraftRequest('/inventory', {
+        timeout: 5000,
       });
 
       if (!response.ok) return false;
@@ -1754,10 +1751,8 @@ export class EnhancedTaskIntegration extends EventEmitter {
   private async verifyMaterialCheck(): Promise<boolean> {
     try {
       // Check if we have the required materials for crafting
-      const response = await fetch('http://localhost:3005/inventory', {
-        method: 'GET',
-        headers: { 'Content-Type': 'application/json' },
-        signal: AbortSignal.timeout(5000),
+      const response = await this.minecraftRequest('/inventory', {
+        timeout: 5000,
       });
 
       if (!response.ok) return false;
@@ -1799,10 +1794,8 @@ export class EnhancedTaskIntegration extends EventEmitter {
       console.log('🔍 Starting intelligent crafting table analysis...');
 
       // Step 1: Check if we have a crafting table in inventory
-      const response = await fetch('http://localhost:3005/inventory', {
-        method: 'GET',
-        headers: { 'Content-Type': 'application/json' },
-        signal: AbortSignal.timeout(5000),
+      const response = await this.minecraftRequest('/inventory', {
+        timeout: 5000,
       });
 
       if (!response.ok) return false;
@@ -1884,10 +1877,8 @@ export class EnhancedTaskIntegration extends EventEmitter {
   private async verifyItemCreation(): Promise<boolean> {
     try {
       // Check if the crafted item is now in inventory
-      const response = await fetch('http://localhost:3005/inventory', {
-        method: 'GET',
-        headers: { 'Content-Type': 'application/json' },
-        signal: AbortSignal.timeout(5000),
+      const response = await this.minecraftRequest('/inventory', {
+        timeout: 5000,
       });
 
       if (!response.ok) return false;
@@ -1940,16 +1931,8 @@ export class EnhancedTaskIntegration extends EventEmitter {
     (async () => {
       try {
         const [healthRes, invRes] = await Promise.all([
-          fetch('http://localhost:3005/health', {
-            method: 'GET',
-            headers: { 'Content-Type': 'application/json' },
-            signal: AbortSignal.timeout(3000),
-          }),
-          fetch('http://localhost:3005/inventory', {
-            method: 'GET',
-            headers: { 'Content-Type': 'application/json' },
-            signal: AbortSignal.timeout(3000),
-          }),
+          this.minecraftRequest('/health', { timeout: 3000 }),
+          this.minecraftRequest('/inventory', { timeout: 3000 }),
         ]);
 
         const snap: any = { ts: Date.now() };
@@ -2120,8 +2103,20 @@ export class EnhancedTaskIntegration extends EventEmitter {
   private async generateDynamicSteps(
     taskData: Partial<Task>
   ): Promise<TaskStep[]> {
+    // Try Sterling crafting solver for crafting/gathering tasks
+    if (this.craftingSolver) {
+      try {
+        const steps = await this.generateStepsFromSterling(taskData);
+        if (steps && steps.length > 0) {
+          return steps;
+        }
+      } catch (error) {
+        console.warn('Sterling crafting solver failed, falling through:', error);
+      }
+    }
+
     try {
-      // Try to get steps from cognitive system first
+      // Try to get steps from cognitive system
       const steps = await this.generateStepsFromCognitive(taskData);
       if (steps && steps.length > 0) {
         return steps;
@@ -2135,6 +2130,54 @@ export class EnhancedTaskIntegration extends EventEmitter {
 
     // Fallback to intelligent step generation based on task type
     return this.generateIntelligentSteps(taskData);
+  }
+
+  /**
+   * Generate steps from Sterling crafting solver for crafting/gathering/mining tasks
+   */
+  private async generateStepsFromSterling(
+    taskData: Partial<Task>
+  ): Promise<TaskStep[]> {
+    if (!this.craftingSolver) return [];
+
+    // Resolve the requirement to determine if this is a craft/collect/mine task
+    const requirement = resolveRequirement(taskData);
+    if (!requirement) return [];
+
+    let goalItem: string | undefined;
+
+    if (requirement.kind === 'craft') {
+      goalItem = requirement.outputPattern;
+    } else if (requirement.kind === 'collect' || requirement.kind === 'mine') {
+      // Sterling crafting solver is primarily for crafting chains;
+      // simple gather/mine tasks don't benefit from graph search
+      return [];
+    }
+
+    if (!goalItem) return [];
+
+    // Get current inventory from task metadata if available
+    const currentState = (taskData.metadata as any)?.currentState;
+    const inventoryItems = currentState?.inventory || [];
+    const nearbyBlocks = currentState?.nearbyBlocks || [];
+
+    // We need mcData to build rules — get it from task metadata or fall through
+    const mcData = (taskData.metadata as any)?.mcData;
+    if (!mcData) {
+      // No mcData available — can't build crafting rules
+      return [];
+    }
+
+    const result = await this.craftingSolver.solveCraftingGoal(
+      goalItem,
+      inventoryItems,
+      mcData,
+      nearbyBlocks
+    );
+
+    if (!result.solved) return [];
+
+    return this.craftingSolver.toTaskSteps(result);
   }
 
   /**
@@ -2487,13 +2530,9 @@ export class EnhancedTaskIntegration extends EventEmitter {
   private async assessGatheringFeasibility(): Promise<boolean> {
     try {
       // Check for nearby trees or wood sources
-      const nearbyBlocksResponse = await fetch(
-        'http://localhost:3005/nearby-blocks',
-        {
-          method: 'GET',
-          headers: { 'Content-Type': 'application/json' },
-          signal: AbortSignal.timeout(3000),
-        }
+      const nearbyBlocksResponse = await this.minecraftRequest(
+        '/nearby-blocks',
+        { timeout: 3000 }
       );
 
       if (!nearbyBlocksResponse.ok) {
@@ -2533,10 +2572,8 @@ export class EnhancedTaskIntegration extends EventEmitter {
   > {
     try {
       // Get current bot position from world state
-      const worldStateResponse = await fetch('http://localhost:3005/state', {
-        method: 'GET',
-        headers: { 'Content-Type': 'application/json' },
-        signal: AbortSignal.timeout(3000),
+      const worldStateResponse = await this.minecraftRequest('/state', {
+        timeout: 3000,
       });
 
       if (!worldStateResponse.ok) {
@@ -2553,13 +2590,9 @@ export class EnhancedTaskIntegration extends EventEmitter {
       }
 
       // Query nearby blocks to find crafting tables
-      const nearbyBlocksResponse = await fetch(
-        'http://localhost:3005/nearby-blocks',
-        {
-          method: 'GET',
-          headers: { 'Content-Type': 'application/json' },
-          signal: AbortSignal.timeout(3000),
-        }
+      const nearbyBlocksResponse = await this.minecraftRequest(
+        '/nearby-blocks',
+        { timeout: 3000 }
       );
 
       if (!nearbyBlocksResponse.ok) {

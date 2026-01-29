@@ -7,6 +7,10 @@
  * @author @darianrosebrook
  */
 
+// HTTP Client utilities
+export { HttpClient, createServiceClients } from './utils/http-client';
+export type { HttpClientConfig } from './utils/http-client';
+
 // Main classes
 export { Arbiter, ReflexModule } from './arbiter';
 export { SignalProcessor } from './signal-processor';
@@ -28,7 +32,7 @@ export type {
 
 // Advanced Components
 export { AdvancedNeedGenerator } from './advanced-need-generator';
-// export { GoalTemplateManager } from './goal-template-manager';
+export { GoalTemplateManager } from './goal-template-manager';
 export { AdvancedSignalProcessor } from './advanced-signal-processor';
 export { PriorityRanker } from './priority-ranker';
 
@@ -71,21 +75,63 @@ export * from './leaves/sensing-leaves';
 export * from './leaves/crafting-leaves';
 
 // Real-Time Performance Monitoring
-// export {
-//   PerformanceTracker,
-//   BudgetEnforcer,
-//   DegradationManager,
-//   AlertingSystem,
-// } from './real-time';
+export {
+  PerformanceTracker,
+  BudgetEnforcer,
+  DegradationManager,
+  AlertingSystem,
+} from './real-time';
 
 // Types and interfaces
 export * from './types';
-export * from './mcp-capabilities/types';
-// LLM - commented out due to compilation issues
-// export { OllamaClient } from './llm/ollama-client';
+export {
+  RiskLevel as CapabilityRiskLevel,
+  PreconditionSchema,
+  EffectSchema,
+  CapabilitySpecSchema,
+  ExecutionRequestSchema,
+  ExecutionContextSchema,
+  ExecutionResultSchema,
+  ValidationResultSchema,
+  ConstitutionalDecisionSchema,
+  RateLimitConfigSchema,
+  RateLimitStatusSchema,
+  CapabilityQuerySchema,
+  CapabilityMatchSchema,
+  CapabilityMetricsSchema,
+  MCPConfigSchema,
+  validateCapabilitySpec,
+  validateExecutionRequest,
+  validateExecutionContext,
+  validateMCPConfig,
+} from './mcp-capabilities/types';
+export type {
+  SafetyTag,
+  Precondition,
+  Effect,
+  CapabilitySpec,
+  ExecutionRequest,
+  ExecutionContext,
+  ExecutionResult,
+  ValidationResult,
+  ConstitutionalDecision,
+  RateLimitConfig,
+  RateLimitStatus,
+  CapabilityQuery,
+  CapabilityMatch,
+  CapabilityMetrics,
+  MCPConfig,
+  CapabilityExecutor,
+  CapabilityValidator,
+  RegistrationResult as MCPRegistrationResult,
+  RollbackResult,
+} from './mcp-capabilities/types';
+// LLM
+export { OllamaClient } from './llm/ollama-client';
+export type { OllamaClientConfig } from './llm/ollama-client';
 
-// Logging configuration - commented out due to compilation issues
-// export * from './logging/config';
+// Logging configuration
+export * from './logging/config';
 
 // Advanced component types - explicit exports to avoid conflicts
 export type {
@@ -107,34 +153,31 @@ export type {
 } from './advanced-need-generator';
 
 export type {
-  // Goal Management Types - commented out due to goal-template-manager issues
-  // GoalTemplate,
-  // ResourceRequirement,
-  // SuccessCriterion,
-  // FailureCondition,
-  // FeasibilityFactor,
-  // PlanSketchHint,
-  // GoalInstance,
-  // GoalContext,
-  // RiskAssessment,
-  // RiskFactor,
-  // MitigationStrategy,
-  // ContingencyPlan,
-  // GoalAdaptation,
-  // GoalCheckpoint,
-  // ResourceStatus,
-  // Blocker,
-  // SuccessMetric,
-  // GoalCategory,
-  // ResourceType,
-  // RiskLevel,
-  // RiskType,
-  // GoalStatus,
-  // GoalTemplateManagerConfig,
-  // } from './goal-template-manager';
-  ResourceType,
-  RiskLevel,
-} from './types';
+  GoalTemplate,
+  ResourceRequirement,
+  SuccessCriterion,
+  FailureCondition,
+  FeasibilityFactor,
+  PlanSketchHint,
+  GoalInstance,
+  GoalContext,
+  RiskAssessment,
+  RiskFactor,
+  MitigationStrategy,
+  ContingencyPlan,
+  GoalAdaptation,
+  GoalCheckpoint,
+  ResourceStatus,
+  Blocker,
+  SuccessMetric,
+  GoalCategory,
+  GoalResourceType,
+  GoalRiskLevel,
+  RiskType,
+  GoalStatus,
+  GoalTemplateManagerConfig,
+  FeasibilityAnalysis,
+} from './goal-template-manager';
 
 export type {
   Signal,
@@ -180,22 +223,21 @@ export type {
   RankingMethod,
   PriorityRankerConfig,
 } from './priority-ranker';
-// Re-export real-time types with explicit naming to avoid conflicts - commented out due to compilation issues
-// export type {
-//   PerformanceMetrics as RealTimePerformanceMetrics,
-//   PerformanceMetricsSchema as RealTimePerformanceMetricsSchema,
-//   DegradationLevel as RealTimeDegradationLevel,
-// } from './real-time/types';
+// Re-export real-time types with explicit naming to avoid conflicts
+export type {
+  PerformanceMetrics as RealTimePerformanceMetrics,
+  DegradationLevel as RealTimeDegradationLevel,
+} from './real-time/types';
 
-// Export remaining real-time types that don't conflict - commented out due to compilation issues
-// export type {
-//   PerformanceQuery,
-//   PerformanceStats,
-//   PerformanceBaseline,
-//   PerformanceAnomaly,
-//   OperationType,
-//   PerformanceContext,
-// } from './real-time/types';
+// Export remaining real-time types that don't conflict
+export type {
+  PerformanceQuery,
+  PerformanceStats,
+  PerformanceBaseline,
+  PerformanceAnomaly,
+  OperationType,
+  PerformanceContext,
+} from './real-time/types';
 
 // Cognitive module interface
 export type { CognitiveModule } from './arbiter';
@@ -204,6 +246,18 @@ export type { CognitiveModule } from './arbiter';
 export { DEFAULT_ARBITER_CONFIG } from './arbiter';
 export { DEFAULT_SIGNAL_CONFIG } from './signal-processor';
 export { DEFAULT_PERFORMANCE_CONFIG } from './performance-monitor';
+
+// Sterling reasoning client
+export { SterlingClient } from './sterling';
+export type {
+  SterlingClientConfig,
+  SterlingSolveResult,
+  SterlingHealthStatus,
+  SterlingMessage,
+  SterlingDomain,
+  SterlingConnectionState,
+  SterlingSolveStepCallback,
+} from './sterling';
 
 // Version info
 export const VERSION = '0.1.0';

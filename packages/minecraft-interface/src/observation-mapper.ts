@@ -158,12 +158,22 @@ export class ObservationMapper {
   /**
    * Extract inventory information
    */
-  public extractInventoryState(bot: Bot) {
+  public extractInventoryState(bot: Bot | null | undefined) {
+    // Guard clause: return empty inventory if bot is not available
+    if (!bot || !bot.inventory) {
+      return {
+        items: [],
+        totalSlots: 36,
+        usedSlots: 0,
+      };
+    }
+
     const items: MinecraftItem[] = [];
     let usedSlots = 0;
 
     // Use the correct mineflayer API method to get inventory items
-    const inventoryItems = bot.inventory.items();
+    // Additional check: ensure inventory.items() exists and is callable
+    const inventoryItems = bot.inventory.items?.() || [];
 
     // Process all inventory items
     inventoryItems.forEach((item) => {
