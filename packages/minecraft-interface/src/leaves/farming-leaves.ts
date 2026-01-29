@@ -85,14 +85,14 @@ function isCropReady(block: any): boolean {
   if (!block || !isHarvestableCrop(block.name)) return false;
 
   const age = getCropAge(block);
-  const maxAge =
-    {
-      wheat: 7,
-      carrots: 7,
-      potatoes: 7,
-      beetroots: 3,
-      nether_wart: 3,
-    }[block.name] || 0;
+  const maxAgeMap: Record<string, number> = {
+    wheat: 7,
+    carrots: 7,
+    potatoes: 7,
+    beetroots: 3,
+    nether_wart: 3,
+  };
+  const maxAge = maxAgeMap[block.name as string] || 0;
 
   return age >= maxAge;
 }
@@ -236,8 +236,8 @@ export class TillSoilLeaf implements LeafImpl {
         }
       } else {
         // Search for nearest tillable soil
-        targetPos = findNearestTillableSoil(bot, radius);
-        if (!targetPos) {
+        const foundPos = findNearestTillableSoil(bot, radius);
+        if (!foundPos) {
           return {
             status: 'failure',
             error: {
@@ -252,6 +252,7 @@ export class TillSoilLeaf implements LeafImpl {
             },
           };
         }
+        targetPos = foundPos;
         block = bot.blockAt(targetPos);
       }
 
@@ -621,8 +622,8 @@ export class HarvestCropLeaf implements LeafImpl {
         }
       } else {
         // Search for nearest mature crop
-        targetPos = findNearestCrop(bot, radius);
-        if (!targetPos) {
+        const foundPos = findNearestCrop(bot, radius);
+        if (!foundPos) {
           return {
             status: 'failure',
             error: {
@@ -637,6 +638,7 @@ export class HarvestCropLeaf implements LeafImpl {
             },
           };
         }
+        targetPos = foundPos;
         cropBlock = bot.blockAt(targetPos);
       }
 

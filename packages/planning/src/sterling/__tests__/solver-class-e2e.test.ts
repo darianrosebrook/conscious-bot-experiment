@@ -12,7 +12,7 @@
  *   STERLING_E2E=1 npx vitest run packages/planning/src/sterling/__tests__/solver-class-e2e.test.ts
  */
 
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
 import { MinecraftToolProgressionSolver } from '../minecraft-tool-progression-solver';
 import { SterlingReasoningService } from '../sterling-reasoning-service';
 import { contentHash, canonicalize } from '../solve-bundle';
@@ -63,6 +63,53 @@ beforeAll(async () => {
   }
 
   solver = new MinecraftToolProgressionSolver(service);
+
+  // Diagnostic: verify with the exact same rules the solver class would send
+  if (serviceAvailable) {
+    const { buildToolProgressionRules } = await import('../minecraft-tool-progression-rules');
+    const { rules } = buildToolProgressionRules('wooden_pickaxe', 'pickaxe', null, 'wooden', []);
+
+    // Test 1: raw solve with useLearning: false (like integration tests)
+    const rawResult1 = await service.solve('minecraft', {
+      command: 'solve',
+      domain: 'minecraft',
+      contractVersion: 1,
+      executionMode: 'tool_progression',
+      solverId: 'minecraft.tool_progression',
+      inventory: {},
+      goal: { wooden_pickaxe: 1 },
+      rules,
+      maxNodes: 5000,
+      useLearning: false,
+    });
+    console.log('[E2E setup] Raw solve (learning=false):',
+      'solutionFound:', rawResult1.solutionFound,
+      'nodes:', rawResult1.discoveredNodes.length,
+      'path:', rawResult1.solutionPath.length
+    );
+
+    // Test 2: same but useLearning: true (like the solver class does)
+    const rawResult2 = await service.solve('minecraft', {
+      command: 'solve',
+      domain: 'minecraft',
+      contractVersion: 1,
+      executionMode: 'tool_progression',
+      solverId: 'minecraft.tool_progression',
+      inventory: {},
+      goal: { wooden_pickaxe: 1 },
+      rules,
+      maxNodes: 5000,
+      useLearning: true,
+    });
+    console.log('[E2E setup] Raw solve (learning=true):',
+      'solutionFound:', rawResult2.solutionFound,
+      'nodes:', rawResult2.discoveredNodes.length,
+      'path:', rawResult2.solutionPath.length
+    );
+
+    // Allow any remaining backend messages to flush before test solves
+    await new Promise(r => setTimeout(r, 500));
+  }
 });
 
 afterAll(async () => {
@@ -83,11 +130,46 @@ describeIf(shouldRun)('ToolProgressionSolver — solver-class E2E', () => {
       return;
     }
 
+    // Capture what the solver sends to Sterling + full result
+    const originalSolve = service.solve.bind(service);
+    vi.spyOn(service, 'solve').mockImplementation(async (domain, params, onStep) => {
+      console.log('[E2E diagnostic] Solver sends domain:', domain);
+      console.log('[E2E diagnostic] rules count:', (params?.rules as unknown[])?.length ?? 'no rules');
+      console.log('[E2E diagnostic] goal:', JSON.stringify(params?.goal));
+      const clientResult = await originalSolve(domain, params, onStep);
+      console.log('[E2E diagnostic] Client result:',
+        'solutionFound:', clientResult.solutionFound,
+        'nodes:', clientResult.discoveredNodes.length,
+        'path:', clientResult.solutionPath.length,
+        'edges:', clientResult.searchEdges.length,
+        'error:', clientResult.error,
+        'durationMs:', clientResult.durationMs
+      );
+      return clientResult;
+    });
+
     const result = await solver.solveToolProgression(
       'wooden_pickaxe',
       {},
       [] // wooden tier needs no nearbyBlocks
     );
+
+    // Restore
+    vi.restoreAllMocks();
+
+    // Diagnostics: if the solve fails, log why before asserting
+    if (!result.solved) {
+      console.log('[E2E diagnostic] solved=false');
+      console.log('  error:', result.error);
+      console.log('  totalNodes:', result.totalNodes);
+      console.log('  steps:', result.steps?.length);
+      console.log('  solveMeta bundles:', result.solveMeta?.bundles?.length);
+      if (result.solveMeta?.bundles?.[0]) {
+        const b = result.solveMeta.bundles[0];
+        console.log('  bundle.output.solved:', b.output.solved);
+        console.log('  bundle.output.searchStats:', JSON.stringify(b.output.searchStats));
+      }
+    }
 
     // The solve should succeed against a real backend
     expect(result.solved).toBe(true);

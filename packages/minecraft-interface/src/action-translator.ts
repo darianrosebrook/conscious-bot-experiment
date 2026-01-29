@@ -106,7 +106,7 @@ export class ActionTranslator {
   private bot: Bot;
   private config: ActionTranslatorConfig;
   private movements: Movements;
-  private navigationBridge: NavigationBridge;
+  private navigationBridge!: NavigationBridge;
   private stateMachineWrapper?: StateMachineWrapper;
 
   constructor(
@@ -174,6 +174,7 @@ export class ActionTranslator {
     const startTime = Date.now();
 
     try {
+      if (!step.action) throw new Error('Step action is required');
       const actionType = step.action.type.toLowerCase();
 
       // Check if this action type should be handled by state machine
@@ -196,7 +197,7 @@ export class ActionTranslator {
             success: result.success,
             action: {
               type: step.action.type as MinecraftActionType,
-              parameters: step.action.parameters,
+              parameters: step.action.parameters ?? {},
             },
             startTime,
             endTime: Date.now(),
@@ -241,6 +242,7 @@ export class ActionTranslator {
    * Translate planning step to Minecraft action
    */
   private translatePlanStepToAction(step: PlanStep): MinecraftAction {
+    if (!step.action) throw new Error('Step action is required');
     const actionType = step.action.type.toLowerCase();
     const params = step.action.parameters ?? {};
 
@@ -841,6 +843,7 @@ export class ActionTranslator {
    * Infer action from step description using keywords
    */
   private inferActionFromDescription(step: PlanStep): MinecraftAction {
+    if (!step.action) throw new Error('Step action is required');
     const description =
       step.action.type.toLowerCase() +
       ' ' +

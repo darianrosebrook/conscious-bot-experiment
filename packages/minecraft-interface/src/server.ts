@@ -233,8 +233,8 @@ function startThoughtGeneration() {
 
       // Send a contextual thought to cognition (preserve existing behavior)
       const worldState = minecraftInterface.observationMapper.mapBotStateToPlanningContext(bot);
-      const healthPct = Math.round((worldState.worldState.health / 20) * 100);
-      const hungerPct = Math.round((worldState.worldState.hunger / 20) * 100);
+      const healthPct = Math.round((worldState.worldState?.health ?? 0) / 20 * 100);
+      const hungerPct = Math.round((worldState.worldState?.hunger ?? 0) / 20 * 100);
       const thought = `Health: ${healthPct}%, Hunger: ${hungerPct}%. Observing environment and deciding next action.`;
 
       minecraftInterface.observationMapper.sendThoughtToCognition(thought, 'status')
@@ -1317,17 +1317,25 @@ app.get('/state', async (req, res) => {
       };
     }
 
+    const ws = gameState.worldState;
+    if (!ws) {
+      return res.status(500).json({
+        success: false,
+        message: 'Failed to read world state from bot',
+      });
+    }
+
     // Convert to format expected by cognition system
     const convertedState = {
       worldState: {
         player: {
           position: {
-            x: gameState.worldState.playerPosition[0],
-            y: gameState.worldState.playerPosition[1],
-            z: gameState.worldState.playerPosition[2],
+            x: ws.playerPosition[0],
+            y: ws.playerPosition[1],
+            z: ws.playerPosition[2],
           },
-          health: gameState.worldState.health,
-          food: gameState.worldState.hunger,
+          health: ws.health,
+          food: ws.hunger,
           experience: 0, // Not in the converted state
           gameMode: 'survival', // Default
           dimension: 'overworld', // Default
@@ -1344,15 +1352,15 @@ app.get('/state', async (req, res) => {
       status: 'connected',
       data: {
         position: {
-          x: gameState.worldState.playerPosition[0],
-          y: gameState.worldState.playerPosition[1],
-          z: gameState.worldState.playerPosition[2],
+          x: ws.playerPosition[0],
+          y: ws.playerPosition[1],
+          z: ws.playerPosition[2],
         },
-        health: gameState.worldState.health,
-        food: gameState.worldState.hunger,
+        health: ws.health,
+        food: ws.hunger,
         inventory: inventoryState,
       },
-      isAlive: gameState.worldState.health > 0,
+      isAlive: ws.health > 0,
     };
 
     // Only log converted state when connection status changes
@@ -1424,7 +1432,7 @@ app.get('/inventory', async (req, res) => {
     const bot = minecraftInterface.botAdapter.getBot();
     const gameState =
       minecraftInterface.observationMapper.mapBotStateToPlanningContext(bot);
-    const inventory = gameState.worldState.inventory?.items || [];
+    const inventory = gameState.worldState?.inventory?.items || [];
 
     res.json({
       success: true,

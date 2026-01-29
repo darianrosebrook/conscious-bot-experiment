@@ -55,10 +55,11 @@ export {
 
 export {
   PBIEnforcer,
-  ExecutionResult,
   createPBIEnforcer,
   createCustomPBIEnforcer,
 } from './pbi-enforcer';
+
+export type { ExecutionResult } from './pbi-enforcer';
 
 // Re-export StuckDetector as it's used in types
 export { StuckDetector } from './pbi-enforcer';

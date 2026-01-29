@@ -336,7 +336,6 @@ export class LongJourneyNavigator extends EventEmitter<LongJourneyEvents> {
 
     const fullWaypoint: Waypoint = {
       id,
-      chunk,
       discoveredAt: Date.now(),
       visitCount: 0,
       ...waypoint,

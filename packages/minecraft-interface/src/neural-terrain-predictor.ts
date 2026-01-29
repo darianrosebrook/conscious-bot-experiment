@@ -346,7 +346,7 @@ export class PredictivePathfinder extends EventEmitter {
     const cacheKey = `${start.x}_${start.y}_${start.z}_${goal.x}_${goal.y}_${goal.z}`;
 
     const cached = this.predictionCache.get(cacheKey);
-    if (cached && Date.now() - cached.timestamp < 5000) {
+    if (cached && cached.timestamp !== undefined && Date.now() - cached.timestamp < 5000) {
       return cached;
     }
 

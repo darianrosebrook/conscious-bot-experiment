@@ -48,6 +48,7 @@ export async function toolUsageTrackingExample() {
       resourcesGained: 1, // 1 stone pickaxe
       durabilityUsed: 0,
       efficiency: 0.4, // pickaxes per second
+      successRate: 1.0,
     },
     {
       result: 'success',
@@ -76,6 +77,7 @@ export async function toolUsageTrackingExample() {
       resourcesGained: 8,
       durabilityUsed: 2,
       efficiency: 4.44, // cobblestone per second
+      successRate: 1.0,
     },
     {
       result: 'success',
@@ -100,6 +102,7 @@ export async function toolUsageTrackingExample() {
       resourcesGained: 6,
       durabilityUsed: 1,
       efficiency: 2.73, // iron ore per second
+      successRate: 1.0,
     },
     {
       result: 'success',
@@ -125,6 +128,7 @@ export async function toolUsageTrackingExample() {
       resourcesGained: 0,
       durabilityUsed: 0,
       efficiency: 0,
+      successRate: 0.0,
     },
     {
       result: 'failure',
@@ -465,6 +469,7 @@ export async function adaptiveToolSelectionExample() {
         resourcesGained: scenario.expectedSuccess ? 5 : 0,
         durabilityUsed: scenario.expectedSuccess ? 1 : 0,
         efficiency: scenario.expectedSuccess ? 2.5 : 0,
+        successRate: scenario.expectedSuccess ? 1.0 : 0.0,
       },
       {
         result: scenario.expectedSuccess ? 'success' : 'failure',

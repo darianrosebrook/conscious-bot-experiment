@@ -8,11 +8,9 @@
  * @author @darianrosebrook
  */
 
-import {
-  MemorySignalGenerator,
-  CognitiveTaskMemoryManager,
-  ReflectionMemoryManager,
-} from './memory-system';
+import { MemorySignalGenerator } from './memory-signal-generator';
+import { CognitiveTaskMemoryManager } from './cognitive-task-memory';
+import { ReflectionMemoryManager } from './reflection-memory';
 import { createDefaultMemorySystem } from './index';
 // Temporary local type definitions until @conscious-bot/core is available
 export interface Signal {
@@ -139,8 +137,8 @@ export async function cognitiveTaskMemoryExample() {
   const task: CognitiveTask = {
     id: 'build_base_defenses',
     type: 'planning',
+    description: 'Build base defenses against hostile mobs',
     priority: 0.8,
-    complexity: 'complex',
     context: {
       currentThreats: ['creepers', 'zombies'],
       availableResources: ['cobblestone', 'torches'],
@@ -319,8 +317,8 @@ export async function completeIntegrationExample() {
   const complexTask: CognitiveTask = {
     id: 'nether_exploration',
     type: 'exploration',
+    description: 'Explore the Nether dimension',
     priority: 0.9,
-    complexity: 'complex',
     context: {
       dangerous: true,
       requiresPreparation: true,

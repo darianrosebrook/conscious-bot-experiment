@@ -115,7 +115,11 @@ export class BotAdapter extends EventEmitter {
         }
 
         this.emitBotEvent('spawned', spawnData);
-        resolve(this?.bot);
+        if (!this.bot) {
+          reject(new Error('Bot became null before spawn resolved'));
+          return;
+        }
+        resolve(this.bot);
       });
 
       this.bot.once('error', (error) => {
@@ -312,7 +316,7 @@ export class BotAdapter extends EventEmitter {
       });
 
       // Log critical health but don't disconnect
-      if (this.bot?.health <= 2) {
+      if (this.bot?.health != null && this.bot.health <= 2) {
         this.emitBotEvent('warning', {
           message: 'Critical health detected',
           health: this.bot?.health,
@@ -697,6 +701,8 @@ export class BotAdapter extends EventEmitter {
     sender: string,
     message: string
   ): Promise<void> {
+    if (!this.bot) return;
+
     try {
       console.log(`💬 Processing chat from ${sender}: "${message}"`);
 
@@ -715,9 +721,9 @@ export class BotAdapter extends EventEmitter {
             timestamp: Date.now(),
             environment: 'minecraft',
             botPosition: {
-              x: this.bot.entity.position.x,
-              y: this.bot.entity.position.y,
-              z: this.bot.entity.position.z,
+              x: this.bot.entity?.position?.x,
+              y: this.bot.entity?.position?.y,
+              z: this.bot.entity?.position?.z,
             },
           },
         }),
@@ -737,7 +743,7 @@ export class BotAdapter extends EventEmitter {
           const now = Date.now();
           if (now - this.lastChatResponse >= this.chatCooldown) {
             const responseStart = Date.now();
-            await this.bot.chat(result.response);
+            await this.bot?.chat(result.response);
             const responseTime = Date.now() - responseStart;
             this.recordResponseTime(responseTime);
             this.performanceMetrics.chatResponses++;
@@ -797,16 +803,17 @@ export class BotAdapter extends EventEmitter {
    */
   private async detectAndRespondToEntities(): Promise<void> {
     if (!this.bot || !this.bot.entity) return;
+    const bot = this.bot;
 
     try {
       // Get nearby entities
-      const nearbyEntities = Object.values(this.bot.entities).filter(
+      const nearbyEntities = Object.values(bot.entities).filter(
         (entity) => {
-          const distance = entity.position.distanceTo(this.bot.entity.position);
+          const distance = entity.position.distanceTo(bot.entity.position);
           return (
             distance <= 15 &&
             entity.name !== 'item' &&
-            entity !== this.bot.entity
+            entity !== bot.entity
           );
         }
       );
@@ -828,6 +835,8 @@ export class BotAdapter extends EventEmitter {
    * Process a single entity and decide if we should react
    */
   private async processEntity(entity: any): Promise<void> {
+    if (!this.bot?.entity) return;
+
     try {
       const botPos = this.bot.entity.position;
       const distance = entity.position.distanceTo(botPos);
@@ -880,7 +889,7 @@ export class BotAdapter extends EventEmitter {
           const now = Date.now();
           if (now - this.lastChatResponse >= this.chatCooldown) {
             const responseStart = Date.now();
-            await this.bot.chat(result.response);
+            await this.bot?.chat(result.response);
             const responseTime = Date.now() - responseStart;
             this.recordResponseTime(responseTime);
             this.performanceMetrics.chatResponses++;
@@ -1015,7 +1024,7 @@ export class BotAdapter extends EventEmitter {
     this.bot.on(
       'playerCollect' as any,
       async (collector: any, collected: any) => {
-        if (collector === this.bot.entity) {
+        if (this.bot && collector === this.bot.entity) {
           try {
             // Check if the event is within the observation radius
             if (
@@ -1039,6 +1048,7 @@ export class BotAdapter extends EventEmitter {
     let lastHealth = this.bot.health;
     this.trackInterval(setInterval(async () => {
       try {
+        if (!this.bot) return;
         const currentHealth = this.bot.health;
         const maxHealth = 20; // Default max health in Minecraft
 
@@ -1076,6 +1086,8 @@ export class BotAdapter extends EventEmitter {
     eventType: string,
     eventData: any
   ): Promise<void> {
+    if (!this.bot) return;
+
     try {
       // Create a linguistic description of the event
       const eventDescription = this.describeEnvironmentalEvent(
@@ -1100,9 +1112,9 @@ export class BotAdapter extends EventEmitter {
             eventData: eventData,
             timestamp: Date.now(),
             botPosition: {
-              x: this.bot.entity.position.x,
-              y: this.bot.entity.position.y,
-              z: this.bot.entity.position.z,
+              x: this.bot?.entity?.position?.x,
+              y: this.bot?.entity?.position?.y,
+              z: this.bot?.entity?.position?.z,
             },
             ...eventData,
           },
@@ -1126,7 +1138,7 @@ export class BotAdapter extends EventEmitter {
             this.environmentalCooldown
           ) {
             const responseStart = Date.now();
-            await this.bot.chat(result.response);
+            await this.bot?.chat(result.response);
             const responseTime = Date.now() - responseStart;
             this.recordResponseTime(responseTime);
             this.performanceMetrics.chatResponses++;

@@ -252,8 +252,8 @@ export class InteractWithBlockLeaf implements LeafImpl {
         }
       } else {
         // Search for nearest interactive block
-        targetPos = findNearestRedstoneComponent(bot, radius);
-        if (!targetPos) {
+        const foundPos = findNearestRedstoneComponent(bot, radius);
+        if (!foundPos) {
           return {
             status: 'failure',
             error: {
@@ -268,6 +268,7 @@ export class InteractWithBlockLeaf implements LeafImpl {
             },
           };
         }
+        targetPos = foundPos;
         block = bot.blockAt(targetPos);
       }
 

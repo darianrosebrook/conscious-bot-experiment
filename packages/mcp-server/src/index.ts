@@ -6,10 +6,8 @@
  * @author @darianrosebrook
  */
 
-export {
-  ConsciousBotMCPServer,
-  MCPServerDependencies,
-} from './conscious-bot-mcp-server.js';
+export { ConsciousBotMCPServer } from './conscious-bot-mcp-server.js';
+export type { MCPServerDependencies } from './conscious-bot-mcp-server.js';
 export { demoMCPServer } from './demo-mcp-server.js';
 
 // Re-export core leaf factory types so consumers do not need to depend on core directly

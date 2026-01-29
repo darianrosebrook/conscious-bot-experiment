@@ -218,7 +218,7 @@ export class PlanExecutor extends EventEmitter {
       const bot = this.botAdapter.getBot();
       return {
         success: false,
-        plan: this.currentPlan,
+        plan: this.currentPlan!,
         executedSteps: 0,
         totalSteps: this.currentPlan?.steps.length || 0,
         startTime: this.executionStartTime,
@@ -462,7 +462,7 @@ export class PlanExecutor extends EventEmitter {
 
     steps.forEach((step) => {
       // Infer goal type from step action
-      const actionType = step.action.type.toLowerCase();
+      const actionType = (step.action?.type ?? '').toLowerCase();
 
       if (actionType.includes('mine') || actionType.includes('gather')) {
         signals.push({ type: 'resource_need', value: 80, urgency: 'high' });

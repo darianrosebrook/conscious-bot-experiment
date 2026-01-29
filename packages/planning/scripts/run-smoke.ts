@@ -16,7 +16,7 @@ async function sleep(ms: number) {
 async function main() {
   try {
     // Reduce log noise for smoke
-    process.env.NODE_ENV = process.env.NODE_ENV || 'test';
+    (process.env as Record<string, string | undefined>).NODE_ENV = process.env.NODE_ENV || 'test';
 
     console.log('[smoke] starting planning server...');
     await startServer();
@@ -27,11 +27,11 @@ async function main() {
     const base = 'http://localhost:3002';
 
     const healthRes = await fetch(base + '/health');
-    const health = await healthRes.json();
+    const health = (await healthRes.json()) as { status: string; uptime: number };
     console.log('[smoke] /health:', health.status, 'uptime', health.uptime);
 
     const stateRes = await fetch(base + '/state');
-    const state = await stateRes.json();
+    const state = (await stateRes.json()) as { success: boolean; state?: { tasks?: { current?: unknown[] } } };
     console.log('[smoke] /state success:', state.success);
     console.log('[smoke] current tasks:', state?.state?.tasks?.current?.length ?? 0);
 

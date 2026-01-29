@@ -740,7 +740,7 @@ let socialMemoryManager: SocialMemoryManager | null = null;
       persistToStorage: true,
       storageDirectory: './memory-storage',
     });
-    socialMemoryManager = new SocialMemoryManager(knowledgeGraph, {
+    socialMemoryManager = new SocialMemoryManager(knowledgeGraph as any, {
       enableVerboseLogging: true,
     });
   } catch (error) {

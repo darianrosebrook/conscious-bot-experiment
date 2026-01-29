@@ -522,10 +522,10 @@ export class StateMachineWrapper extends EventEmitter {
 
     // Set up action context for state machine
     this.planStepContext = {
-      stepId: planStep.stepId,
+      stepId: planStep.stepId ?? '',
       actionType: planStep.type,
       parameters: planStep.args,
-      safetyLevel: planStep.safetyLevel,
+      safetyLevel: planStep.safetyLevel ?? 'unknown',
     };
 
     console.log(`🔧 Configured state machine for plan step: ${planStep.type}`, {

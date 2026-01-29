@@ -205,13 +205,6 @@ export class NavigationBridge extends EventEmitter {
     // See docs/planning/dstar-lite-terrain-optimization.md for detailed analysis
     const navConfig: NavigationConfig = this.createDynamicConfig();
 
-    // Store reference to dynamic reconfiguration system
-    this.terrainAnalyzer = new TerrainAnalyzer();
-    this.dynamicReconfigurator = new DynamicReconfigurator(
-      this.terrainAnalyzer,
-      this.navigationSystem
-    );
-
     // Additional configuration for navigation system
     const additionalConfig = {
       optimization: {
@@ -238,6 +231,13 @@ export class NavigationBridge extends EventEmitter {
     Object.assign(navConfig, additionalConfig);
 
     this.navigationSystem = new MockNavigationSystem(navConfig);
+
+    // Store reference to dynamic reconfiguration system
+    this.terrainAnalyzer = new TerrainAnalyzer();
+    this.dynamicReconfigurator = new DynamicReconfigurator(
+      this.terrainAnalyzer,
+      this.navigationSystem
+    );
 
     // Initialize water navigation manager
     this.waterNavigationManager = new WaterNavigationManager(
