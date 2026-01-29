@@ -8,6 +8,7 @@ import type {
   Task,
   Event,
   Memory,
+  Note,
   Environment,
   Screenshot,
   InventoryItem,
@@ -31,6 +32,7 @@ interface DashboardStore extends DashboardState {
   addEvent: (event: Event) => void;
   setEvents: (events: Event[]) => void;
   setMemories: (memories: Memory[]) => void;
+  setNotes: (notes: Note[]) => void;
   setEnvironment: (environment: Environment) => void;
   setCurrentScreenshot: (screenshot: Screenshot) => void;
   setCurrentSession: (sessionId: string) => void;
@@ -69,6 +71,7 @@ const initialState: DashboardState = {
   tasks: [],
   events: [],
   memories: [],
+  notes: [],
   environment: null,
   currentScreenshot: null,
   inventory: [],
@@ -265,6 +268,13 @@ export const useDashboardStore = create<DashboardStore>()(
           const current = get().memories;
           if (!isDeepEqual(current, memories)) {
             set({ memories });
+          }
+        },
+
+        setNotes: (notes) => {
+          const current = get().notes;
+          if (!isDeepEqual(current, notes)) {
+            set({ notes });
           }
         },
 
