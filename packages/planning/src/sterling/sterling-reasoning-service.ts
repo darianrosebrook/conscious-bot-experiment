@@ -1,0 +1,318 @@
+/**
+ * Sterling Reasoning Service
+ *
+ * Higher-level service wrapping SterlingClient with planning-relevant methods.
+ * Provides reachability verification, knowledge graph traversal, and
+ * graceful fallback when Sterling is unavailable.
+ *
+ * @author @darianrosebrook
+ */
+
+import {
+  SterlingClient,
+  type SterlingClientConfig,
+  type SterlingDomain,
+  type SterlingSolveResult,
+  type SterlingHealthStatus,
+  type SterlingSolveStepCallback,
+} from '@conscious-bot/core';
+
+// ============================================================================
+// Types
+// ============================================================================
+
+export interface SterlingReasoningConfig extends SterlingClientConfig {
+  /** Whether to enable the reasoning service. Default: true */
+  enabled?: boolean;
+}
+
+export interface ReachabilityResult {
+  /** Whether the goal is reachable from the given state */
+  reachable: boolean;
+  /** Estimated cost/distance if reachable */
+  estimatedCost: number | null;
+  /** Path length if a solution was found */
+  pathLength: number | null;
+  /** Human-readable reasoning */
+  reasoning: string;
+  /** Duration of the reachability check in ms */
+  durationMs: number;
+}
+
+export interface KGTraversalResult {
+  /** Whether a path was found between the concepts */
+  pathFound: boolean;
+  /** Semantic path as a list of concept labels */
+  path: string[];
+  /** Number of nodes explored */
+  nodesExplored: number;
+  /** Duration of the traversal in ms */
+  durationMs: number;
+}
+
+// ============================================================================
+// Service Implementation
+// ============================================================================
+
+export class SterlingReasoningService {
+  private client: SterlingClient;
+  private enabled: boolean;
+  private initialized = false;
+
+  constructor(config: SterlingReasoningConfig = {}) {
+    this.enabled = config.enabled ?? (process.env.STERLING_ENABLED !== 'false');
+    this.client = new SterlingClient(config);
+
+    // Forward client events
+    this.client.on('connected', () => {
+      console.log('[Sterling] Connected to reasoning server');
+    });
+    this.client.on('disconnected', ({ code, reason }: { code: number; reason: string }) => {
+      console.log(`[Sterling] Disconnected (code=${code}, reason=${reason})`);
+    });
+    this.client.on('reconnected', ({ attempts }: { attempts: number }) => {
+      console.log(`[Sterling] Reconnected after ${attempts} attempt(s)`);
+    });
+    this.client.on('reconnect_failed', ({ attempts }: { attempts: number }) => {
+      console.warn(`[Sterling] Reconnection failed after ${attempts} attempts`);
+    });
+    this.client.on('circuit_open', () => {
+      console.warn('[Sterling] Circuit breaker opened — requests will be rejected');
+    });
+    this.client.on('error', (err: Error) => {
+      console.warn(`[Sterling] Error: ${err.message}`);
+    });
+  }
+
+  // --------------------------------------------------------------------------
+  // Lifecycle
+  // --------------------------------------------------------------------------
+
+  /** Lazily connect to Sterling. Safe to call multiple times. */
+  async initialize(): Promise<void> {
+    if (!this.enabled || this.initialized) return;
+
+    try {
+      await this.client.connect();
+      this.initialized = true;
+    } catch (err) {
+      console.warn(
+        `[Sterling] Failed to connect during initialization: ${
+          err instanceof Error ? err.message : String(err)
+        }`
+      );
+      // Don't throw — Sterling is optional
+    }
+  }
+
+  /** Clean up resources */
+  destroy(): void {
+    this.client.destroy();
+    this.initialized = false;
+  }
+
+  // --------------------------------------------------------------------------
+  // Availability
+  // --------------------------------------------------------------------------
+
+  /** Whether Sterling is enabled AND the client is connected with circuit breaker closed */
+  isAvailable(): boolean {
+    return this.enabled && this.client.isAvailable();
+  }
+
+  /** Get detailed health status */
+  getHealthStatus(): SterlingHealthStatus & { enabled: boolean } {
+    return {
+      enabled: this.enabled,
+      ...this.client.getHealthStatus(),
+    };
+  }
+
+  // --------------------------------------------------------------------------
+  // Reasoning Methods
+  // --------------------------------------------------------------------------
+
+  /**
+   * Verify whether a goal state is reachable from a given state.
+   *
+   * Uses Sterling's graph search to check whether a path exists
+   * from the current state description to the goal description.
+   *
+   * @param domain - The solver domain to use
+   * @param stateDesc - Description or identifier of the current state
+   * @param goalDesc - Description or identifier of the goal state
+   */
+  async verifyReachability(
+    domain: SterlingDomain,
+    stateDesc: string,
+    goalDesc: string
+  ): Promise<ReachabilityResult> {
+    if (!this.isAvailable()) {
+      return {
+        reachable: false,
+        estimatedCost: null,
+        pathLength: null,
+        reasoning: 'Sterling reasoning service unavailable',
+        durationMs: 0,
+      };
+    }
+
+    // Map generic state/goal descriptions to domain-specific params
+    const params = this.buildSolveParams(domain, stateDesc, goalDesc);
+    const result = await this.client.solve(domain, params);
+
+    return {
+      reachable: result.solutionFound,
+      estimatedCost: result.solutionFound
+        ? result.solutionPath.length
+        : null,
+      pathLength: result.solutionFound
+        ? result.solutionPath.length
+        : null,
+      reasoning: result.solutionFound
+        ? `Path found with ${result.solutionPath.length} steps (${result.discoveredNodes.length} nodes explored)`
+        : result.error || 'No path found',
+      durationMs: result.durationMs,
+    };
+  }
+
+  /**
+   * Query the knowledge graph for a semantic path between two concepts.
+   *
+   * Uses the WordNet domain to find paths through the semantic network.
+   *
+   * @param start - Starting concept (e.g. 'dog.n.01' for WordNet synsets)
+   * @param target - Target concept
+   * @param opts - Optional parameters (edge types, max nodes, etc.)
+   */
+  async queryKnowledgeGraph(
+    start: string,
+    target: string,
+    opts: { allowedEdgeTypes?: string[]; maxNodes?: number } = {}
+  ): Promise<KGTraversalResult> {
+    if (!this.isAvailable()) {
+      return {
+        pathFound: false,
+        path: [],
+        nodesExplored: 0,
+        durationMs: 0,
+      };
+    }
+
+    const params: Record<string, unknown> = {
+      startSynset: start,
+      targetSynset: target,
+      maxNodes: opts.maxNodes ?? 5000,
+      useLearning: true,
+    };
+
+    if (opts.allowedEdgeTypes) {
+      params.allowedEdgeTypes = opts.allowedEdgeTypes;
+    }
+
+    const result = await this.client.solve('wordnet', params);
+
+    // Extract concept titles from discovered nodes along the solution path
+    const pathNodeIds = new Set<string>();
+    for (const edge of result.solutionPath) {
+      pathNodeIds.add(edge.source);
+      pathNodeIds.add(edge.target);
+    }
+
+    const path = result.discoveredNodes
+      .filter((n) => pathNodeIds.has(n.id))
+      .sort((a, b) => a.distance - b.distance)
+      .map((n) => n.title || n.id);
+
+    return {
+      pathFound: result.solutionFound,
+      path,
+      nodesExplored: result.discoveredNodes.length,
+      durationMs: result.durationMs,
+    };
+  }
+
+  /**
+   * Pass-through solve for custom domain usage.
+   */
+  async solve(
+    domain: SterlingDomain,
+    params: Record<string, unknown> = {},
+    onStep?: SterlingSolveStepCallback
+  ): Promise<SterlingSolveResult> {
+    if (!this.isAvailable()) {
+      return {
+        solutionFound: false,
+        solutionPath: [],
+        discoveredNodes: [],
+        searchEdges: [],
+        metrics: {},
+        error: 'Sterling reasoning service unavailable',
+        durationMs: 0,
+      };
+    }
+
+    return this.client.solve(domain, params, onStep);
+  }
+
+  /**
+   * Execute a Sterling operation with a fallback value if the service is unavailable.
+   *
+   * @param operation - Async function that uses Sterling
+   * @param fallback - Value to return if Sterling is unavailable or the operation fails
+   */
+  async withFallback<T>(
+    operation: () => Promise<T>,
+    fallback: T
+  ): Promise<T> {
+    if (!this.isAvailable()) {
+      return fallback;
+    }
+
+    try {
+      return await operation();
+    } catch (err) {
+      console.warn(
+        `[Sterling] Operation failed, using fallback: ${
+          err instanceof Error ? err.message : String(err)
+        }`
+      );
+      return fallback;
+    }
+  }
+
+  // --------------------------------------------------------------------------
+  // Private Helpers
+  // --------------------------------------------------------------------------
+
+  private buildSolveParams(
+    domain: SterlingDomain,
+    stateDesc: string,
+    goalDesc: string
+  ): Record<string, unknown> {
+    switch (domain) {
+      case 'wikipedia':
+        return {
+          startTitle: stateDesc,
+          targetTitle: goalDesc,
+          maxNodes: 500,
+          useLearning: true,
+        };
+      case 'wordnet':
+        return {
+          startSynset: stateDesc,
+          targetSynset: goalDesc,
+          maxNodes: 5000,
+          useLearning: true,
+        };
+      default:
+        // Generic params — let the server decide
+        return {
+          start: stateDesc,
+          goal: goalDesc,
+          maxNodes: 5000,
+          useLearning: true,
+        };
+    }
+  }
+}
