@@ -33,6 +33,7 @@ export {
   getRelevantMaterials,
   buildSiteState,
   computeSiteCaps,
+  getBasicShelterTemplate,
 } from './minecraft-building-rules';
 export type {
   BuildingTemplate,

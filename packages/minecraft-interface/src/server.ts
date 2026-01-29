@@ -77,6 +77,11 @@ import {
   BuildStructureLeaf,
   EnvironmentalControlLeaf,
 } from './leaves/world-interaction-leaves';
+import {
+  PrepareSiteLeaf,
+  BuildModuleLeaf,
+  PlaceFeatureLeaf,
+} from './leaves/construction-leaves';
 
 // =============================================================================
 // WebSocket Connection State Tracker
@@ -182,9 +187,12 @@ let minecraftInterface: {
 
 // Thought generation interval
 let thoughtGenerationInterval: NodeJS.Timeout | null = null;
+let hudUpdateInterval: NodeJS.Timeout | null = null;
+let botInstanceSyncInterval: NodeJS.Timeout | null = null;
 let planningCoordinator: any = null;
 let memoryIntegration: MemoryIntegrationService | null = null;
 let isConnecting = false;
+let isRunningPlanningCycle = false;
 let viewerActive = false;
 let autoConnectInterval: NodeJS.Timeout | null = null;
 
@@ -197,7 +205,7 @@ function startThoughtGeneration() {
   }
 
   thoughtGenerationInterval = setInterval(async () => {
-    if (!minecraftInterface) {
+    if (!minecraftInterface || isRunningPlanningCycle) {
       return;
     }
 
@@ -222,16 +230,22 @@ function startThoughtGeneration() {
       minecraftInterface.observationMapper.sendThoughtToCognition(thought, 'status')
         .catch(() => {}); // Fire-and-forget, don't block execution
 
-      // Execute an autonomous planning cycle
+      // Execute an autonomous planning cycle with concurrency guard
+      isRunningPlanningCycle = true;
       console.log('🔄 Starting autonomous planning cycle...');
-      const result = await minecraftInterface.planExecutor.executePlanningCycle();
+      try {
+        const result = await minecraftInterface.planExecutor.executePlanningCycle();
 
-      if (result.success) {
-        console.log(`✅ Planning cycle complete: ${result.executedSteps}/${result.totalSteps} steps executed`);
-      } else {
-        console.log(`⚠️ Planning cycle ended: ${result.error || 'no plan generated'} (${result.executedSteps}/${result.totalSteps} steps)`);
+        if (result.success) {
+          console.log(`✅ Planning cycle complete: ${result.executedSteps}/${result.totalSteps} steps executed`);
+        } else {
+          console.log(`⚠️ Planning cycle ended: ${result.error || 'no plan generated'} (${result.executedSteps}/${result.totalSteps} steps)`);
+        }
+      } finally {
+        isRunningPlanningCycle = false;
       }
     } catch (error) {
+      isRunningPlanningCycle = false;
       console.error('❌ Error in autonomous planning cycle:', error instanceof Error ? error.message : error);
     }
   }, 15000); // Every 15 seconds
@@ -359,8 +373,11 @@ function setupBotStateWebSocket() {
     startThoughtGeneration();
   });
 
-  // Send periodic HUD updates every 5 seconds
-  setInterval(() => {
+  // Send periodic HUD updates every 5 seconds (clear previous to prevent duplicates)
+  if (hudUpdateInterval) {
+    clearInterval(hudUpdateInterval);
+  }
+  hudUpdateInterval = setInterval(() => {
     if (minecraftInterface) {
       try {
         const state = minecraftInterface.botAdapter.getStatus();
@@ -647,6 +664,13 @@ async function registerCoreLeaves() {
       new EnvironmentalControlLeaf(),
     ];
 
+    // Register construction leaves (P0 stubs — no inventory/world mutation)
+    const constructionLeaves = [
+      new PrepareSiteLeaf(),
+      new BuildModuleLeaf(),
+      new PlaceFeatureLeaf(),
+    ];
+
     const allLeaves = [
       ...movementLeaves,
       ...interactionLeaves,
@@ -656,6 +680,7 @@ async function registerCoreLeaves() {
       ...combatLeaves,
       ...farmingLeaves,
       ...worldInteractionLeaves,
+      ...constructionLeaves,
     ];
 
     for (const leaf of allLeaves) {
@@ -2332,6 +2357,7 @@ app.get('/leaves', (req, res) => {
 // Auto-update bot instance in planning server when available
 async function updateBotInstanceInPlanningServer() {
   try {
+    if (!minecraftInterface) return;
     const bot = minecraftInterface.botAdapter.getBot();
     if (bot) {
       // Send only essential bot data that can be serialized
@@ -2402,5 +2428,5 @@ async function updateBotInstanceInPlanningServer() {
   }
 }
 
-// Try to update bot instance periodically
-setInterval(updateBotInstanceInPlanningServer, 30000); // Every 30 seconds (reduced from 10)
+// Try to update bot instance periodically (tracked for cleanup)
+botInstanceSyncInterval = setInterval(updateBotInstanceInPlanningServer, 30000); // Every 30 seconds (reduced from 10)

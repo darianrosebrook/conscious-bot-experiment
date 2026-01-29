@@ -93,6 +93,7 @@ export class MinecraftBuildingSolver {
     const result = await this.sterlingService.solve('building', {
       command: 'solve',
       domain: 'building',
+      contractVersion: 1,
       templateId,
       facing,
       goalModules,
@@ -179,26 +180,102 @@ export class MinecraftBuildingSolver {
   }
 
   /**
+   * Convert a BuildingSolveResult into TaskStep[] with replan sentinel support.
+   *
+   * When result.needsMaterials is present, generates acquisition steps followed
+   * by a replan_building sentinel step. When the executor reaches the sentinel,
+   * it re-invokes the building solver with updated inventory. This avoids
+   * generating stale building steps from a deficit result.
+   *
+   * When result.solved is true, generates concrete building steps directly.
+   */
+  toTaskStepsWithReplan(result: BuildingSolveResult, templateId: string): TaskStep[] {
+    const taskSteps: TaskStep[] = [];
+    let order = 1;
+    const now = Date.now();
+
+    if (result.needsMaterials) {
+      // Acquisition steps
+      for (const [itemName, count] of Object.entries(result.needsMaterials.deficit)) {
+        taskSteps.push({
+          id: `step-${now}-acquire-${order}`,
+          label: `Leaf: minecraft.acquire_material (item=${itemName}, count=${count})`,
+          done: false,
+          order: order++,
+          estimatedDuration: 10000,
+        });
+      }
+      console.log(
+        `[Building] Deficit detected: inserting ${taskSteps.length} acquisition steps + replan sentinel`
+      );
+
+      // Replan sentinel — when executor reaches this, it re-invokes the solver
+      taskSteps.push({
+        id: `step-${now}-replan-${order}`,
+        label: `Leaf: minecraft.replan_building (templateId=${templateId})`,
+        done: false,
+        order: order++,
+        estimatedDuration: 2000,
+      });
+
+      return taskSteps;
+    }
+
+    // Normal case: building steps only
+    for (const step of result.steps) {
+      taskSteps.push({
+        id: `step-${now}-build-${order}`,
+        label: this.stepToLeafLabel(step),
+        done: false,
+        order: order++,
+        estimatedDuration: this.estimateDuration(step.moduleType),
+      });
+    }
+
+    return taskSteps;
+  }
+
+  /**
+   * Get the lastPlanId from the most recent solve call.
+   * Prefer reading planId from task metadata instead of this getter.
+   * @deprecated Use planId from task metadata instead
+   */
+  getLastPlanId(): string | null {
+    return this.lastPlanId;
+  }
+
+  /**
    * Report episode result back to Sterling so path algebra weights update.
    *
    * Uses module IDs (not just a count) so Sterling can target the correct
    * action edges for learning. Includes optional failure identification.
+   *
+   * @param templateId - Template identifier (quarantined for P0 stubs)
+   * @param success - Whether the build completed successfully
+   * @param executedModuleIds - Module IDs that were executed
+   * @param failureAtModuleId - Module where failure occurred (if any)
+   * @param failureReason - Why the build failed (if any)
+   * @param planId - Explicit planId from task metadata (preferred over lastPlanId)
    */
   reportEpisodeResult(
     templateId: string,
     success: boolean,
     executedModuleIds: string[],
     failureAtModuleId?: string,
-    failureReason?: string
+    failureReason?: string,
+    planId?: string | null
   ): void {
     if (!this.sterlingService.isAvailable()) return;
+
+    const effectivePlanId = planId ?? this.lastPlanId;
 
     // Fire-and-forget — don't block on the result
     this.sterlingService
       .solve('building', {
         command: 'report_episode',
         domain: 'building',
-        planId: this.lastPlanId,
+        contractVersion: 1,
+        planId: effectivePlanId,
         templateId,
         success,
         executedModuleIds,

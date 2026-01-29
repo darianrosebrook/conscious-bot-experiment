@@ -99,7 +99,7 @@ import { BehaviorTreeRunner } from './behavior-trees/BehaviorTreeRunner';
 import { CognitiveThoughtProcessor } from './cognitive-thought-processor';
 import { IntegratedPlanningCoordinator } from './integrated-planning-coordinator';
 import { createServiceClients, SterlingClient } from '@conscious-bot/core';
-import { SterlingReasoningService, MinecraftCraftingSolver } from './sterling';
+import { SterlingReasoningService, MinecraftCraftingSolver, MinecraftBuildingSolver } from './sterling';
 
 // Create HTTP clients for inter-service communication
 const serviceClients = createServiceClients();
@@ -107,6 +107,7 @@ const serviceClients = createServiceClients();
 // Sterling reasoning service (optional external dependency)
 let sterlingService: SterlingReasoningService | undefined;
 let minecraftCraftingSolver: MinecraftCraftingSolver | undefined;
+let minecraftBuildingSolver: MinecraftBuildingSolver | undefined;
 import { EnhancedGoalManager } from './goal-formulation/goal-manager';
 import { EnhancedReactiveExecutor } from './reactive-executor/reactive-executor';
 import { EnhancedTaskIntegration } from './task-integration';
@@ -2804,6 +2805,11 @@ async function startServer() {
       minecraftCraftingSolver = new MinecraftCraftingSolver(sterlingService);
       enhancedTaskIntegration.setCraftingSolver(minecraftCraftingSolver);
       console.log('✅ Minecraft crafting solver initialized');
+
+      // Create building solver on top of Sterling service
+      minecraftBuildingSolver = new MinecraftBuildingSolver(sterlingService);
+      enhancedTaskIntegration.setBuildingSolver(minecraftBuildingSolver);
+      console.log('✅ Minecraft building solver initialized');
     } catch (error) {
       console.warn(
         '⚠️ Sterling reasoning service failed to initialize, continuing without it:',

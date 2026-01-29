@@ -11,6 +11,7 @@
 import { EventEmitter } from 'events';
 import { createServiceClients } from '@conscious-bot/core';
 import type { MinecraftCraftingSolver } from './sterling/minecraft-crafting-solver';
+import type { MinecraftBuildingSolver } from './sterling/minecraft-building-solver';
 
 // Cognitive stream integration for thought-to-task conversion
 interface CognitiveThought {
@@ -307,6 +308,15 @@ function resolveRequirement(task: any): any {
       quantity: qty,
     };
   }
+  // Building domain — prefer explicit task type over regex
+  if (task.type === 'building') {
+    return { kind: 'build', structure: 'basic_shelter_5x5', quantity: 1 };
+  }
+  // Regex fallback for building — log when used
+  if (/\bbuild\b.*\bshelter\b|\bhouse\b/.test(ttl)) {
+    console.log('[Building] Regex-routed task to building domain:', ttl);
+    return { kind: 'build', structure: 'basic_shelter_5x5', quantity: 1 };
+  }
   return null;
 }
 
@@ -324,6 +334,7 @@ export class EnhancedTaskIntegration extends EventEmitter {
   private thoughtPollingInterval?: NodeJS.Timeout;
   private minecraftClient: ReturnType<typeof createServiceClients>['minecraft'];
   private craftingSolver?: MinecraftCraftingSolver;
+  private buildingSolver?: MinecraftBuildingSolver;
 
   /**
    * Helper method to make HTTP requests to Minecraft Interface with retry logic
@@ -937,6 +948,13 @@ export class EnhancedTaskIntegration extends EventEmitter {
   }
 
   /**
+   * Set the Sterling building solver for building step generation
+   */
+  setBuildingSolver(solver: MinecraftBuildingSolver): void {
+    this.buildingSolver = solver;
+  }
+
+  /**
    * Add a new task to the system
    */
   async addTask(taskData: Partial<Task>): Promise<Task> {
@@ -1104,6 +1122,11 @@ export class EnhancedTaskIntegration extends EventEmitter {
         task.metadata.actualDuration =
           task.metadata.completedAt -
           (task.metadata.startedAt || task.metadata.createdAt);
+        // Report building episode on completion
+        this.reportBuildingEpisode(task, true);
+      } else if (status === 'failed') {
+        // Report building episode on failure
+        this.reportBuildingEpisode(task, false);
       }
     }
 
@@ -1415,6 +1438,20 @@ export class EnhancedTaskIntegration extends EventEmitter {
             } else if (leaf === 'smelt') {
               verification.verified = await this.verifySmeltedItem();
             } else if (leaf === 'introspect_recipe') {
+              verification.verified = true;
+            } else if (leaf === 'prepare_site' || leaf === 'place_feature') {
+              // P0 stubs: trust leaf output
+              verification.verified = true;
+            } else if (leaf === 'build_module') {
+              // P0: verify leaf reports success (no inventory delta — leaf doesn't mutate)
+              verification.verified = true;
+            } else if (leaf === 'acquire_material') {
+              const item =
+                this.getLeafParamFromLabel(stepLabel, 'item');
+              verification.verified =
+                await this.verifyResourceCollection(item || 'unknown');
+            } else if (leaf === 'replan_building') {
+              // Replan sentinel — always succeeds; executor handles re-invocation
               verification.verified = true;
             } else {
               verification.verified = false;
@@ -2115,6 +2152,18 @@ export class EnhancedTaskIntegration extends EventEmitter {
       }
     }
 
+    // Try Sterling building solver for building tasks
+    if (this.buildingSolver) {
+      try {
+        const steps = await this.generateBuildingStepsFromSterling(taskData);
+        if (steps && steps.length > 0) {
+          return steps;
+        }
+      } catch (error) {
+        console.warn('Sterling building solver failed, falling through:', error);
+      }
+    }
+
     try {
       // Try to get steps from cognitive system
       const steps = await this.generateStepsFromCognitive(taskData);
@@ -2178,6 +2227,103 @@ export class EnhancedTaskIntegration extends EventEmitter {
     if (!result.solved) return [];
 
     return this.craftingSolver.toTaskSteps(result);
+  }
+
+  /**
+   * Generate steps from Sterling building solver for building tasks.
+   *
+   * Uses P0 quarantined templateId ('basic_shelter_5x5__p0stub') so learning
+   * never contaminates the real template digest.
+   */
+  private async generateBuildingStepsFromSterling(
+    taskData: Partial<Task>
+  ): Promise<TaskStep[]> {
+    if (!this.buildingSolver) return [];
+
+    const requirement = resolveRequirement(taskData);
+    if (!requirement || requirement.kind !== 'build') return [];
+
+    const {
+      getBasicShelterTemplate,
+      inventoryForBuilding,
+      buildSiteState,
+    } = await import('./sterling/minecraft-building-rules');
+
+    const template = getBasicShelterTemplate();
+
+    const currentState = (taskData.metadata as any)?.currentState;
+    const inventoryItems = currentState?.inventory || [];
+    const inventory = inventoryForBuilding(inventoryItems);
+
+    // Build a default site state from whatever we have
+    const position = currentState?.position;
+    const siteState = buildSiteState(
+      (currentState?.terrain as any) || 'flat',
+      (currentState?.biome as string) || 'plains',
+      !!(currentState?.treesNearby),
+      !!(currentState?.waterNearby),
+      (currentState?.siteCaps as string) || 'flat_5x5_clear'
+    );
+
+    // P0 quarantine: use stub templateId so learning doesn't contaminate real template
+    const templateId = 'basic_shelter_5x5__p0stub';
+
+    const result = await this.buildingSolver.solveBuildingPlan(
+      templateId,
+      'N',
+      template.defaultGoalModules,
+      inventory,
+      siteState,
+      template.modules.map((m) => ({ ...m, placementFeasible: true })),
+    );
+
+    // Store planId + templateId in task metadata for episode reporting
+    if (taskData.metadata) {
+      (taskData.metadata as any).buildingPlanId = this.buildingSolver.getLastPlanId();
+      (taskData.metadata as any).buildingTemplateId = templateId;
+    }
+
+    return this.buildingSolver.toTaskStepsWithReplan(result, templateId);
+  }
+
+  /**
+   * Report a building episode result to Sterling for learning.
+   *
+   * Reads planId and templateId from task metadata (NOT from solver singleton).
+   * Episode reports are quarantined by templateId ('basic_shelter_5x5__p0stub')
+   * so P0 stubs never contaminate real template learning.
+   */
+  private reportBuildingEpisode(task: Task, success: boolean): void {
+    if (!this.buildingSolver) return;
+    const templateId = (task.metadata as any)?.buildingTemplateId;
+    if (!templateId) return;
+
+    const planId = (task.metadata as any)?.buildingPlanId;
+
+    const completedModuleIds = task.steps
+      .filter((s) => s.done && s.label.includes('build_module'))
+      .map((s) => this.getLeafParamFromLabel(s.label, 'module'))
+      .filter(Boolean) as string[];
+
+    const failedStep = task.steps.find(
+      (s) => !s.done && s.label.includes('minecraft.')
+    );
+    const failedModuleId = failedStep
+      ? this.getLeafParamFromLabel(failedStep.label, 'module')
+      : undefined;
+
+    this.buildingSolver.reportEpisodeResult(
+      templateId,
+      success,
+      completedModuleIds,
+      failedModuleId || undefined,
+      success ? undefined : 'execution_failure',
+      planId,
+    );
+
+    console.log(
+      `[Building] Episode reported: planId=${planId}, success=${success}, modules=${completedModuleIds.length}`
+    );
   }
 
   /**

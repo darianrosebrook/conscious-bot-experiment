@@ -149,3 +149,79 @@ export function computeSiteCaps(
   const clear = clearPercentage >= 90 ? 'clear' : clearPercentage >= 50 ? 'partial' : 'blocked';
   return `${flatness}_${width}x${depth}_${clear}`;
 }
+
+// ============================================================================
+// Hardcoded Templates
+// ============================================================================
+
+/**
+ * Basic 5x5 shelter template with deterministic ordering.
+ *
+ * All arrays are sorted for reproducible digests:
+ * - modules sorted by moduleId alphabetically
+ * - requiresModules sorted alphabetically
+ * - materialsNeeded sorted by name
+ * - goalModules sorted alphabetically
+ *
+ * Returns a frozen object to prevent accidental mutation.
+ */
+export function getBasicShelterTemplate(): BuildingTemplate {
+  const modules: BuildingModuleDefinition[] = [
+    {
+      moduleId: 'clear_site',
+      moduleType: 'prep_site',
+      requiresModules: [],
+      materialsNeeded: [],
+      baseCost: 2.0,
+    },
+    {
+      moduleId: 'door_south',
+      moduleType: 'place_feature',
+      requiresModules: ['walls_cobble_3h'],
+      materialsNeeded: [{ name: 'oak_door', count: 1 }],
+      baseCost: 1.0,
+    },
+    {
+      moduleId: 'foundation_5x5',
+      moduleType: 'apply_module',
+      requiresModules: ['clear_site'],
+      materialsNeeded: [{ name: 'cobblestone', count: 25 }],
+      baseCost: 3.0,
+    },
+    {
+      moduleId: 'lighting_pass',
+      moduleType: 'place_feature',
+      requiresModules: ['roof_slab'],
+      materialsNeeded: [{ name: 'torch', count: 4 }],
+      baseCost: 1.0,
+    },
+    {
+      moduleId: 'place_bed',
+      moduleType: 'place_feature',
+      requiresModules: ['foundation_5x5'],
+      materialsNeeded: [{ name: 'bed', count: 1 }],
+      baseCost: 0.5,
+    },
+    {
+      moduleId: 'roof_slab',
+      moduleType: 'apply_module',
+      requiresModules: ['walls_cobble_3h'],
+      materialsNeeded: [{ name: 'oak_planks', count: 15 }],
+      baseCost: 3.0,
+    },
+    {
+      moduleId: 'walls_cobble_3h',
+      moduleType: 'apply_module',
+      requiresModules: ['foundation_5x5'],
+      materialsNeeded: [{ name: 'cobblestone', count: 20 }],
+      baseCost: 4.0,
+    },
+  ];
+
+  return Object.freeze({
+    templateId: 'basic_shelter_5x5',
+    modules,
+    defaultGoalModules: ['door_south', 'foundation_5x5', 'roof_slab', 'walls_cobble_3h'],
+    facing: 'N',
+  });
+}
