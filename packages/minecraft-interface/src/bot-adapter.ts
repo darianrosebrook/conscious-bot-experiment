@@ -34,7 +34,12 @@ export class BotAdapter extends EventEmitter {
   private readonly chatCooldown = 30000; // 30 seconds between chat responses
   private readonly environmentalCooldown = 15000; // 15 seconds between environmental responses
 
-  // Performance benchmarking
+  // Track intervals and listeners for cleanup on disconnect
+  private activeIntervals: NodeJS.Timeout[] = [];
+  private listenersAttached = false;
+
+  // Performance benchmarking — capped ring buffer for responseTimes
+  private static readonly MAX_RESPONSE_TIMES = 200;
   private performanceMetrics = {
     entityScans: 0,
     chatResponses: 0,
@@ -137,16 +142,31 @@ export class BotAdapter extends EventEmitter {
   }
 
   /**
-   * Disconnect from server
+   * Disconnect from server and clean up all resources
    */
   async disconnect(): Promise<void> {
     this.isShuttingDown = true;
 
+    // Stop safety monitor
+    if (this.safetyMonitor) {
+      this.safetyMonitor.stop();
+      this.safetyMonitor = null;
+    }
+
+    // Clear all tracked intervals
+    for (const interval of this.activeIntervals) {
+      clearInterval(interval);
+    }
+    this.activeIntervals = [];
+
+    // Remove all bot event listeners to prevent stacking on reconnect
     if (this.bot) {
+      this.bot.removeAllListeners();
       this.bot.quit('Disconnecting');
       this.bot = null;
     }
 
+    this.listenersAttached = false;
     this.connectionState = 'disconnected';
     this.emitBotEvent('disconnected', { reason: 'Manual disconnect' });
   }
@@ -255,10 +275,33 @@ export class BotAdapter extends EventEmitter {
   }
 
   /**
+   * Record a response time, keeping the buffer capped
+   */
+  private recordResponseTime(time: number): void {
+    this.performanceMetrics.responseTimes.push(time);
+    if (this.performanceMetrics.responseTimes.length > BotAdapter.MAX_RESPONSE_TIMES) {
+      this.performanceMetrics.responseTimes =
+        this.performanceMetrics.responseTimes.slice(-BotAdapter.MAX_RESPONSE_TIMES);
+    }
+  }
+
+  /**
+   * Track an interval so it can be cleared on disconnect
+   */
+  private trackInterval(interval: NodeJS.Timeout): NodeJS.Timeout {
+    this.activeIntervals.push(interval);
+    return interval;
+  }
+
+  /**
    * Setup bot event handlers for monitoring
    */
   private setupBotEventHandlers(): void {
     if (!this.bot) return;
+
+    // Prevent duplicate listener attachment on reconnect
+    if (this.listenersAttached) return;
+    this.listenersAttached = true;
 
     // Health monitoring
     this.bot.on('health', () => {
@@ -337,12 +380,8 @@ export class BotAdapter extends EventEmitter {
 
       if (this.bot?.entity && this.bot?.entity?.position) {
         lastPosition = this.bot.entity.position.clone();
-        positionCheckInterval = setInterval(() => {
+        positionCheckInterval = this.trackInterval(setInterval(() => {
           if (!this.bot || this.connectionState !== 'spawned') {
-            if (positionCheckInterval) {
-              clearInterval(positionCheckInterval);
-              positionCheckInterval = null;
-            }
             return;
           }
 
@@ -354,15 +393,11 @@ export class BotAdapter extends EventEmitter {
               dimension: this.bot.game.dimension,
             });
           }
-        }, 1000); // Check every second
+        }, 1000)); // Check every second
 
         // Set up periodic inventory check
-        inventoryCheckInterval = setInterval(() => {
+        inventoryCheckInterval = this.trackInterval(setInterval(() => {
           if (!this.bot || this.connectionState !== 'spawned') {
-            if (inventoryCheckInterval) {
-              clearInterval(inventoryCheckInterval);
-              inventoryCheckInterval = null;
-            }
             return;
           }
 
@@ -377,7 +412,7 @@ export class BotAdapter extends EventEmitter {
               })),
             });
           }
-        }, 2000); // Check every 2 seconds
+        }, 2000)); // Check every 2 seconds
       }
     });
 
@@ -704,7 +739,7 @@ export class BotAdapter extends EventEmitter {
             const responseStart = Date.now();
             await this.bot.chat(result.response);
             const responseTime = Date.now() - responseStart;
-            this.performanceMetrics.responseTimes.push(responseTime);
+            this.recordResponseTime(responseTime);
             this.performanceMetrics.chatResponses++;
             console.log(
               `✅ Bot responded: "${result.response}" (${responseTime}ms)`
@@ -738,7 +773,7 @@ export class BotAdapter extends EventEmitter {
     const scanInterval = 10000; // Scan every 10 seconds (reduced frequency)
 
     // Monitor entities and detect new/interesting ones
-    setInterval(async () => {
+    this.trackInterval(setInterval(async () => {
       try {
         // Only scan if enough time has passed since last scan
         const now = Date.now();
@@ -750,7 +785,7 @@ export class BotAdapter extends EventEmitter {
       } catch (error) {
         console.error('❌ Entity detection error:', error);
       }
-    }, 2000); // Check every 2 seconds but only process every 10 seconds
+    }, 2000)); // Check every 2 seconds but only process every 10 seconds
 
     console.log('👁️ Entity detection system activated (throttled)');
   }
@@ -847,7 +882,7 @@ export class BotAdapter extends EventEmitter {
             const responseStart = Date.now();
             await this.bot.chat(result.response);
             const responseTime = Date.now() - responseStart;
-            this.performanceMetrics.responseTimes.push(responseTime);
+            this.recordResponseTime(responseTime);
             this.performanceMetrics.chatResponses++;
             console.log(
               `💬 Bot responded to entity: "${result.response}" (${responseTime}ms)`
@@ -1002,7 +1037,7 @@ export class BotAdapter extends EventEmitter {
 
     // Monitor health changes using the existing health tracking (less frequently)
     let lastHealth = this.bot.health;
-    setInterval(async () => {
+    this.trackInterval(setInterval(async () => {
       try {
         const currentHealth = this.bot.health;
         const maxHealth = 20; // Default max health in Minecraft
@@ -1029,7 +1064,7 @@ export class BotAdapter extends EventEmitter {
       } catch (error) {
         console.error('❌ Error processing health event:', error);
       }
-    }, 5000); // Check every 5 seconds, only for significant changes
+    }, 5000)); // Check every 5 seconds, only for significant changes
 
     console.log('🌍 Environmental event detection activated');
   }
@@ -1093,7 +1128,7 @@ export class BotAdapter extends EventEmitter {
             const responseStart = Date.now();
             await this.bot.chat(result.response);
             const responseTime = Date.now() - responseStart;
-            this.performanceMetrics.responseTimes.push(responseTime);
+            this.recordResponseTime(responseTime);
             this.performanceMetrics.chatResponses++;
             console.log(
               `💬 Bot responded to environmental event: "${result.response}" (${responseTime}ms)`
