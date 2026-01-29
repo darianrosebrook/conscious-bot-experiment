@@ -98,6 +98,10 @@ export interface BuildingSolveResult {
   error?: string;
   /** Out-of-band material deficit (present when materials insufficient) */
   needsMaterials?: BuildingMaterialDeficit;
+  /** Sterling planId for episode reporting — store in task metadata, not on solver */
+  planId?: string | null;
+  /** Observability metadata — does not affect solve behavior */
+  solveMeta?: { bundles: import('./solve-bundle-types').SolveBundle[] };
 }
 
 // ============================================================================

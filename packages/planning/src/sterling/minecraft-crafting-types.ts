@@ -76,4 +76,8 @@ export interface MinecraftCraftingSolveResult {
   totalNodes: number;
   durationMs: number;
   error?: string;
+  /** Sterling planId for episode reporting — store in task metadata, not on solver */
+  planId?: string | null;
+  /** Observability metadata — does not affect solve behavior */
+  solveMeta?: { bundles: import('./solve-bundle-types').SolveBundle[] };
 }

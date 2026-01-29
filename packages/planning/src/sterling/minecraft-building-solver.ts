@@ -11,7 +11,7 @@
  * @author @darianrosebrook
  */
 
-import type { SterlingReasoningService } from './sterling-reasoning-service';
+import { BaseDomainSolver } from './base-domain-solver';
 import type {
   BuildingModule,
   BuildingSiteState,
@@ -19,27 +19,32 @@ import type {
   BuildingSolveStep,
   BuildingMaterialDeficit,
 } from './minecraft-building-types';
+import type { CompatReport } from './solve-bundle-types';
+import {
+  computeBundleInput,
+  computeBundleOutput,
+  createSolveBundle,
+} from './solve-bundle';
+import { parseSearchHealth } from './search-health';
 
-// Re-use TaskStep shape from task-integration (structural match, no import cycle)
-interface TaskStep {
-  id: string;
-  label: string;
-  done: boolean;
-  order: number;
-  estimatedDuration?: number;
-  meta?: Record<string, unknown>;
-}
+import type { TaskStep } from '../types/task-step';
 
 // ============================================================================
 // Solver
 // ============================================================================
 
-export class MinecraftBuildingSolver {
-  private sterlingService: SterlingReasoningService;
-  private lastPlanId: string | null = null;
+export class MinecraftBuildingSolver extends BaseDomainSolver<BuildingSolveResult> {
+  readonly sterlingDomain = 'building' as const;
+  readonly solverId = 'minecraft.building';
 
-  constructor(sterlingService: SterlingReasoningService) {
-    this.sterlingService = sterlingService;
+  protected makeUnavailableResult(): BuildingSolveResult {
+    return {
+      solved: false,
+      steps: [],
+      totalNodes: 0,
+      durationMs: 0,
+      error: 'Sterling reasoning service unavailable',
+    };
   }
 
   /**
@@ -61,15 +66,7 @@ export class MinecraftBuildingSolver {
     modules: BuildingModule[],
     executionMode?: string
   ): Promise<BuildingSolveResult> {
-    if (!this.sterlingService.isAvailable()) {
-      return {
-        solved: false,
-        steps: [],
-        totalNodes: 0,
-        durationMs: 0,
-        error: 'Sterling reasoning service unavailable',
-      };
-    }
+    if (!this.isAvailable()) return this.makeUnavailableResult();
 
     if (modules.length === 0) {
       return {
@@ -91,11 +88,35 @@ export class MinecraftBuildingSolver {
       };
     }
 
+    // Building uses modules, not action rules — no lintRules call.
+    // Empty compat report for bundle computation.
+    const compatReport: CompatReport = {
+      valid: true,
+      issues: [],
+      checkedAt: Date.now(),
+      definitionCount: modules.length,
+    };
+
+    const goalRecord: Record<string, number> = {};
+    for (const gm of goalModules) {
+      goalRecord[gm] = 1;
+    }
+
+    const bundleInput = computeBundleInput({
+      solverId: this.solverId,
+      executionMode,
+      contractVersion: this.contractVersion,
+      definitions: modules,
+      inventory,
+      goal: goalRecord,
+      nearbyBlocks: [],
+    });
+
     // Call Sterling building domain
-    const result = await this.sterlingService.solve('building', {
+    const result = await this.sterlingService.solve(this.sterlingDomain, {
       command: 'solve',
-      domain: 'building',
-      contractVersion: 1,
+      domain: this.sterlingDomain,
+      contractVersion: this.contractVersion,
       templateId,
       facing,
       goalModules,
@@ -107,40 +128,79 @@ export class MinecraftBuildingSolver {
       executionMode: executionMode || undefined,
     });
 
-    // Capture planId for episode reporting
-    this.lastPlanId = (result.metrics?.planId as string) ?? null;
+    // Extract planId — returned in the result for caller to store in task metadata
+    const planId = this.extractPlanId(result);
 
     // Check for needs_materials in metrics
     const needsMaterials = result.metrics?.needsMaterials as BuildingMaterialDeficit | undefined;
 
     if (needsMaterials) {
+      const bundleOutput = computeBundleOutput({
+        planId,
+        solved: false,
+        steps: [],
+        totalNodes: result.discoveredNodes.length,
+        durationMs: result.durationMs,
+        solutionPathLength: 0,
+        searchHealth: parseSearchHealth(result.metrics),
+      });
+      const solveBundle = createSolveBundle(bundleInput, bundleOutput, compatReport);
+
       return {
         solved: false,
         steps: [],
         totalNodes: result.discoveredNodes.length,
         durationMs: result.durationMs,
         needsMaterials,
+        planId,
+        solveMeta: { bundles: [solveBundle] },
       };
     }
 
     if (!result.solutionFound) {
+      const bundleOutput = computeBundleOutput({
+        planId,
+        solved: false,
+        steps: [],
+        totalNodes: result.discoveredNodes.length,
+        durationMs: result.durationMs,
+        solutionPathLength: 0,
+        searchHealth: parseSearchHealth(result.metrics),
+      });
+      const solveBundle = createSolveBundle(bundleInput, bundleOutput, compatReport);
+
       return {
         solved: false,
         steps: [],
         totalNodes: result.discoveredNodes.length,
         durationMs: result.durationMs,
         error: result.error || 'No building solution found',
+        planId,
+        solveMeta: { bundles: [solveBundle] },
       };
     }
 
     // Map Sterling's solution to building steps
     const steps = this.mapSolutionToSteps(result);
 
+    const bundleOutput = computeBundleOutput({
+      planId,
+      solved: true,
+      steps: steps.map((s) => ({ action: s.moduleId })),
+      totalNodes: result.discoveredNodes.length,
+      durationMs: result.durationMs,
+      solutionPathLength: result.solutionPath.length,
+      searchHealth: parseSearchHealth(result.metrics),
+    });
+    const solveBundle = createSolveBundle(bundleInput, bundleOutput, compatReport);
+
     return {
       solved: true,
       steps,
       totalNodes: result.discoveredNodes.length,
       durationMs: result.durationMs,
+      planId,
+      solveMeta: { bundles: [solveBundle] },
     };
   }
 
@@ -248,15 +308,6 @@ export class MinecraftBuildingSolver {
   }
 
   /**
-   * Get the lastPlanId from the most recent solve call.
-   * Prefer reading planId from task metadata instead of this getter.
-   * @deprecated Use planId from task metadata instead
-   */
-  getLastPlanId(): string | null {
-    return this.lastPlanId;
-  }
-
-  /**
    * Report episode result back to Sterling so path algebra weights update.
    *
    * Uses module IDs (not just a count) so Sterling can target the correct
@@ -267,7 +318,8 @@ export class MinecraftBuildingSolver {
    * @param executedModuleIds - Module IDs that were executed
    * @param failureAtModuleId - Module where failure occurred (if any)
    * @param failureReason - Why the build failed (if any)
-   * @param planId - Explicit planId from task metadata (preferred over lastPlanId)
+   * @param planId - planId from the solve result (stored in task metadata)
+   * @param isStub - Whether this is a P0 stub episode
    */
   reportEpisodeResult(
     templateId: string,
@@ -278,31 +330,15 @@ export class MinecraftBuildingSolver {
     planId?: string | null,
     isStub?: boolean
   ): void {
-    if (!this.sterlingService.isAvailable()) return;
-
-    const effectivePlanId = planId ?? this.lastPlanId;
-
-    // Fire-and-forget — don't block on the result
-    this.sterlingService
-      .solve('building', {
-        command: 'report_episode',
-        domain: 'building',
-        contractVersion: 1,
-        planId: effectivePlanId,
-        templateId,
-        success,
-        executedModuleIds,
-        failureAtModuleId,
-        failureReason,
-        isStub: isStub ?? false,
-      })
-      .catch((err) => {
-        console.warn(
-          `[Sterling] Failed to report building episode: ${
-            err instanceof Error ? err.message : String(err)
-          }`
-        );
-      });
+    this.reportEpisode({
+      planId,
+      templateId,
+      success,
+      executedModuleIds,
+      failureAtModuleId,
+      failureReason,
+      isStub: isStub ?? false,
+    });
   }
 
   // --------------------------------------------------------------------------

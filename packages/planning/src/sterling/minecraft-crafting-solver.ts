@@ -7,33 +7,39 @@
  * @author @darianrosebrook
  */
 
-import type { SterlingReasoningService } from './sterling-reasoning-service';
+import { BaseDomainSolver } from './base-domain-solver';
 import type {
   MinecraftCraftingRule,
   MinecraftCraftingSolveResult,
   MinecraftSolveStep,
 } from './minecraft-crafting-types';
 import { buildCraftingRules, inventoryToRecord } from './minecraft-crafting-rules';
+import { lintRules } from './compat-linter';
+import {
+  computeBundleInput,
+  computeBundleOutput,
+  createSolveBundle,
+} from './solve-bundle';
+import { parseSearchHealth } from './search-health';
 
-// Re-use TaskStep shape from task-integration (structural match, no import cycle)
-interface TaskStep {
-  id: string;
-  label: string;
-  done: boolean;
-  order: number;
-  estimatedDuration?: number;
-}
+import type { TaskStep } from '../types/task-step';
 
 // ============================================================================
 // Solver
 // ============================================================================
 
-export class MinecraftCraftingSolver {
-  private sterlingService: SterlingReasoningService;
-  private lastPlanId: string | null = null;
+export class MinecraftCraftingSolver extends BaseDomainSolver<MinecraftCraftingSolveResult> {
+  readonly sterlingDomain = 'minecraft' as const;
+  readonly solverId = 'minecraft.crafting';
 
-  constructor(sterlingService: SterlingReasoningService) {
-    this.sterlingService = sterlingService;
+  protected makeUnavailableResult(): MinecraftCraftingSolveResult {
+    return {
+      solved: false,
+      steps: [],
+      totalNodes: 0,
+      durationMs: 0,
+      error: 'Sterling reasoning service unavailable',
+    };
   }
 
   /**
@@ -50,15 +56,7 @@ export class MinecraftCraftingSolver {
     mcData: any,
     nearbyBlocks: string[] = []
   ): Promise<MinecraftCraftingSolveResult> {
-    if (!this.sterlingService.isAvailable()) {
-      return {
-        solved: false,
-        steps: [],
-        totalNodes: 0,
-        durationMs: 0,
-        error: 'Sterling reasoning service unavailable',
-      };
-    }
+    if (!this.isAvailable()) return this.makeUnavailableResult();
 
     // 1. Build rule set from mcData recipe tree
     const rules = buildCraftingRules(mcData, goalItem);
@@ -78,8 +76,24 @@ export class MinecraftCraftingSolver {
     // 3. Build goal
     const goal: Record<string, number> = { [goalItem]: 1 };
 
+    // 3a. Preflight lint + bundle input capture
+    const compatReport = lintRules(rules);
+    const bundleInput = computeBundleInput({
+      solverId: this.solverId,
+      contractVersion: this.contractVersion,
+      definitions: rules,
+      inventory,
+      goal,
+      nearbyBlocks,
+    });
+    if (compatReport.issues.length > 0) {
+      console.warn(
+        `[Sterling:compat] solverId=${this.solverId} issues=${compatReport.issues.length} codes=[${compatReport.issues.map((i) => i.code).join(',')}]`
+      );
+    }
+
     // 4. Call Sterling
-    const result = await this.sterlingService.solve('minecraft', {
+    const result = await this.sterlingService.solve(this.sterlingDomain, {
       inventory,
       goal,
       nearbyBlocks,
@@ -88,27 +102,53 @@ export class MinecraftCraftingSolver {
       useLearning: true,
     });
 
-    // 5. Capture planId from Sterling's metrics for episode reporting
-    this.lastPlanId = (result.metrics?.planId as string) ?? null;
+    // 5. Extract planId — returned in the result for caller to store in task metadata
+    const planId = this.extractPlanId(result);
 
     // 6. Map Sterling's solution path to crafting steps
     if (!result.solutionFound) {
+      const bundleOutput = computeBundleOutput({
+        planId,
+        solved: false,
+        steps: [],
+        totalNodes: result.discoveredNodes.length,
+        durationMs: result.durationMs,
+        solutionPathLength: 0,
+        searchHealth: parseSearchHealth(result.metrics),
+      });
+      const solveBundle = createSolveBundle(bundleInput, bundleOutput, compatReport);
+
       return {
         solved: false,
         steps: [],
         totalNodes: result.discoveredNodes.length,
         durationMs: result.durationMs,
         error: result.error || 'No solution found',
+        planId,
+        solveMeta: { bundles: [solveBundle] },
       };
     }
 
     const steps = this.mapSolutionToSteps(result, rules);
+
+    const bundleOutput = computeBundleOutput({
+      planId,
+      solved: true,
+      steps,
+      totalNodes: result.discoveredNodes.length,
+      durationMs: result.durationMs,
+      solutionPathLength: result.solutionPath.length,
+      searchHealth: parseSearchHealth(result.metrics),
+    });
+    const solveBundle = createSolveBundle(bundleInput, bundleOutput, compatReport);
 
     return {
       solved: true,
       steps,
       totalNodes: result.discoveredNodes.length,
       durationMs: result.durationMs,
+      planId,
+      solveMeta: { bundles: [solveBundle] },
     };
   }
 
@@ -132,33 +172,24 @@ export class MinecraftCraftingSolver {
 
   /**
    * Report episode result back to Sterling so path algebra weights update.
-   * Includes planId from the most recent solve so Sterling can match the
-   * execution feedback to the correct pending plan.
+   *
+   * @param goalItem - Target item name
+   * @param success - Whether the crafting goal was achieved
+   * @param stepsCompleted - Number of steps completed
+   * @param planId - planId from the solve result (stored in task metadata)
    */
   reportEpisodeResult(
     goalItem: string,
     success: boolean,
-    stepsCompleted: number
+    stepsCompleted: number,
+    planId?: string | null
   ): void {
-    if (!this.sterlingService.isAvailable()) return;
-
-    // Fire-and-forget — don't block on the result
-    this.sterlingService
-      .solve('minecraft', {
-        command: 'report_episode',
-        domain: 'minecraft',
-        planId: this.lastPlanId,
-        goal: goalItem,
-        success,
-        stepsCompleted,
-      })
-      .catch((err) => {
-        console.warn(
-          `[Sterling] Failed to report episode result: ${
-            err instanceof Error ? err.message : String(err)
-          }`
-        );
-      });
+    this.reportEpisode({
+      planId,
+      goal: goalItem,
+      success,
+      stepsCompleted,
+    });
   }
 
   // --------------------------------------------------------------------------
