@@ -735,12 +735,18 @@ async function attemptAutoConnect() {
     // Register core leaves with the capability registry
     await registerCoreLeaves();
 
+    // Setup WebSocket event handlers and start autonomous planning
+    // (must be after initialize() completes, not in 'initialized' event which already fired)
+    setupBotStateWebSocket();
+    startThoughtGeneration();
+
     // Set up event listeners
     minecraftInterface.planExecutor.on('initialized', (event) => {
       // Only log successful auto-connect in development mode
       if (process.env.NODE_ENV === 'development') {
         console.log(' Bot auto-connected to Minecraft server');
       }
+
       // Start Prismarine viewer on first connect with retry logic
       const startViewerWithRetry = async (retryCount = 0) => {
         try {

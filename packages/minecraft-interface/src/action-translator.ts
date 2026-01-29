@@ -251,6 +251,12 @@ export class ActionTranslator {
       case 'navigate':
       case 'move':
       case 'go_to':
+      case 'explore_environment':
+      case 'explore':
+      case 'scout':
+      case 'patrol':
+      case 'wander':
+      case 'look_around':
         return this.createNavigateAction(params);
 
       case 'move_forward':
@@ -595,7 +601,11 @@ export class ActionTranslator {
         if (
           description.includes('move') ||
           description.includes('go') ||
-          description.includes('navigate')
+          description.includes('navigate') ||
+          description.includes('explore') ||
+          description.includes('scout') ||
+          description.includes('patrol') ||
+          description.includes('wander')
         ) {
           return this.createNavigateAction(params);
         }
