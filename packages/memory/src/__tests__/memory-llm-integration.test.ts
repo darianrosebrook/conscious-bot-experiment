@@ -294,6 +294,7 @@ describe.skipIf(!OLLAMA_AVAILABLE)('Complete Memory-LLM Integration Flow', () =>
       user: 'conscious_bot',
       password: 'secure_password',
       database: 'test_db',
+      worldSeed: '12345',
       vectorDbTableName: 'embeddings',
 
       // Embedding configuration

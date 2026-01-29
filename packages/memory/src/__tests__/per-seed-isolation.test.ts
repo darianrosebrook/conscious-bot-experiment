@@ -30,7 +30,7 @@ function createCompleteConfig(
     user: 'conscious_bot',
     password: 'secure_password',
     database: 'conscious_bot',
-    worldSeed: 0,
+    worldSeed: '12345',
     vectorDbTableName: 'memory_chunks',
 
     // Embedding configuration
@@ -130,7 +130,7 @@ describe.skipIf(!OLLAMA_AVAILABLE || !POSTGRES_AVAILABLE)('Per-Seed Database Iso
 
   beforeEach(async () => {
     // Clean up any existing seed databases
-    const seeds = [12345, 67890, 54321];
+    const seeds = ['12345', '67890', '54321'];
 
     for (const seed of seeds) {
       const dbName = `${TEST_DB_CONFIG.database}_seed_${seed}`;
@@ -144,8 +144,8 @@ describe.skipIf(!OLLAMA_AVAILABLE || !POSTGRES_AVAILABLE)('Per-Seed Database Iso
 
   describe('Database Creation and Isolation', () => {
     it('should create separate databases for different seeds', async () => {
-      const seed1 = 12345;
-      const seed2 = 67890;
+      const seed1 = '12345';
+      const seed2 = '67890';
 
       // Create two memory systems with different seeds
       const config1 = {
@@ -207,38 +207,31 @@ describe.skipIf(!OLLAMA_AVAILABLE || !POSTGRES_AVAILABLE)('Per-Seed Database Iso
       await memorySystem2.close();
     });
 
-    it('should use default database when worldSeed is 0', async () => {
-      const config = {
-        ...TEST_DB_CONFIG,
-        worldSeed: 0,
-        vectorDbTableName: 'memory_chunks',
-        embeddingDimension: 768,
-        enablePersistence: true,
-      };
-
-      const memorySystem = new EnhancedMemorySystem(
-        createCompleteConfig({
-          ...config,
-          ollamaHost: process.env.OLLAMA_HOST || 'http://localhost:5002',
-          embeddingModel: 'test-model',
-          defaultGraphWeight: 0.5,
-          defaultVectorWeight: 0.5,
-          maxSearchResults: 10,
-          minSimilarity: 0.1,
-        })
-      );
-
-      expect(memorySystem.getDatabaseName()).toBe(TEST_DB_CONFIG.database);
-      expect(memorySystem.getWorldSeed()).toBe(0);
-
-      await memorySystem.close();
+    it('should reject worldSeed 0', async () => {
+      expect(() => {
+        new EnhancedMemorySystem(
+          createCompleteConfig({
+            ...TEST_DB_CONFIG,
+            worldSeed: '0',
+            vectorDbTableName: 'memory_chunks',
+            embeddingDimension: 768,
+            enablePersistence: true,
+            ollamaHost: process.env.OLLAMA_HOST || 'http://localhost:5002',
+            embeddingModel: 'test-model',
+            defaultGraphWeight: 0.5,
+            defaultVectorWeight: 0.5,
+            maxSearchResults: 10,
+            minSimilarity: 0.1,
+          })
+        );
+      }).toThrow('worldSeed is required and must be non-zero');
     });
   });
 
   describe('Memory Isolation Between Seeds', () => {
     it('should isolate memories between different seeds', async () => {
-      const seed1 = 12345;
-      const seed2 = 67890;
+      const seed1 = '12345';
+      const seed2 = '67890';
 
       // Create memory systems for different seeds
       const memorySystem1 = createEnhancedMemorySystem(
@@ -339,7 +332,7 @@ describe.skipIf(!OLLAMA_AVAILABLE || !POSTGRES_AVAILABLE)('Per-Seed Database Iso
     });
 
     it('should maintain isolation after system restart', async () => {
-      const seed = 54321;
+      const seed = '54321';
 
       // Create first instance and ingest memory
       let memorySystem1 = createEnhancedMemorySystem(
@@ -402,7 +395,7 @@ describe.skipIf(!OLLAMA_AVAILABLE || !POSTGRES_AVAILABLE)('Per-Seed Database Iso
 
   describe('Database Status and Health Checks', () => {
     it('should provide status information including seed details', async () => {
-      const seed = 11111;
+      const seed = '11111';
 
       const memorySystem = createEnhancedMemorySystem(
         createCompleteConfig({
@@ -440,7 +433,7 @@ describe.skipIf(!OLLAMA_AVAILABLE || !POSTGRES_AVAILABLE)('Per-Seed Database Iso
         createCompleteConfig({
           ...TEST_DB_CONFIG,
           host: 'invalid-host',
-          worldSeed: 99999,
+          worldSeed: '99999',
           vectorDbTableName: 'memory_chunks',
           embeddingDimension: 768,
           enablePersistence: true,
@@ -456,7 +449,7 @@ describe.skipIf(!OLLAMA_AVAILABLE || !POSTGRES_AVAILABLE)('Per-Seed Database Iso
       const status = await memorySystem.getStatus();
 
       expect(status.database.status).toBe('disconnected');
-      expect(status.worldSeed).toBe(99999);
+      expect(status.worldSeed).toBe('99999');
 
       await memorySystem.close();
     });

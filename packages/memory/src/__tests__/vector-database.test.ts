@@ -27,6 +27,7 @@ describe.skipIf(!POSTGRES_AVAILABLE)('Enhanced Vector Database', () => {
       user: 'conscious_bot',
       password: 'secure_password',
       database: 'conscious_bot_test',
+      worldSeed: '12345',
       tableName: 'enhanced_memory_chunks_test',
       dimension: 768,
     });

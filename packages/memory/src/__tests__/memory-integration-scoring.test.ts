@@ -112,6 +112,7 @@ describe.skipIf(!OLLAMA_AVAILABLE)('Memory Integration Scoring and Verification'
       user: 'conscious_bot',
       password: 'secure_password',
       database: 'test_db',
+      worldSeed: '12345',
       vectorDbTableName: 'embeddings',
 
       // Embedding configuration

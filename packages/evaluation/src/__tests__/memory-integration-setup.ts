@@ -11,5 +11,5 @@ export async function createMemoryIntegrationFixture(
   seeds: any[],
   config: any = {}
 ) {
-  return createMemoryFixture(seeds, { worldSeed: 12345, ...config });
+  return createMemoryFixture(seeds, { worldSeed: '12345', ...config });
 }

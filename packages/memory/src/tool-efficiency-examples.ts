@@ -19,10 +19,11 @@ export async function toolUsageTrackingExample() {
 
   // Initialize the enhanced memory system
   const memorySystem = new EnhancedMemorySystem({
+    worldSeed: '12345',
     enableToolEfficiencyTracking: true,
     enableBehaviorTreeLearning: true,
     enableCognitivePatternTracking: true,
-  });
+  } as any);
 
   await memorySystem.initialize();
 
@@ -225,9 +226,10 @@ export async function cognitivePatternLearningExample() {
   console.log('🧠 Example 2: Cognitive Processing Pattern Learning');
 
   const memorySystem = new EnhancedMemorySystem({
+    worldSeed: '12345',
     enableToolEfficiencyTracking: true,
     enableCognitivePatternTracking: true,
-  });
+  } as any);
 
   await memorySystem.initialize();
 
@@ -321,9 +323,10 @@ export async function planningStrategyLearningExample() {
   console.log('🎯 Example 3: Planning Strategy Learning');
 
   const memorySystem = new EnhancedMemorySystem({
+    worldSeed: '12345',
     enableToolEfficiencyTracking: true,
     enableCognitivePatternTracking: true,
-  });
+  } as any);
 
   await memorySystem.initialize();
 
@@ -424,9 +427,10 @@ export async function adaptiveToolSelectionExample() {
   console.log('🎛️ Example 4: Adaptive Tool Selection');
 
   const memorySystem = new EnhancedMemorySystem({
+    worldSeed: '12345',
     enableToolEfficiencyTracking: true,
     enableAutoRecommendations: true,
-  });
+  } as any);
 
   await memorySystem.initialize();
 
@@ -533,9 +537,10 @@ export async function behaviorTreeEvolutionExample() {
   console.log('🌳 Example 5: Behavior Tree Evolution');
 
   const memorySystem = new EnhancedMemorySystem({
+    worldSeed: '12345',
     enableToolEfficiencyTracking: true,
     enableBehaviorTreeLearning: true,
-  });
+  } as any);
 
   await memorySystem.initialize();
 

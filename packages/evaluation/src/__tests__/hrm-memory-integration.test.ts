@@ -19,7 +19,7 @@ describe('HRM Evaluation with Memory Integration', () => {
           'When operating in mountainous biomes, prioritize iron pickaxe readiness before exploring resource veins.'
         ),
       ],
-      { worldSeed: 777 }
+      { worldSeed: '777' }
     );
   }, HOOK_TIMEOUT);
 

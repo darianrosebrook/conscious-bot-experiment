@@ -258,7 +258,7 @@ export class EnhancedVectorDatabase {
     user: string;
     password: string;
     database: string;
-    worldSeed: number;
+    worldSeed: string;
     tableName: string;
     dimension: number;
     maxConnections: number;
@@ -272,29 +272,32 @@ export class EnhancedVectorDatabase {
     user?: string;
     password?: string;
     database?: string;
-    worldSeed?: number;
+    worldSeed: string;
     tableName?: string;
     dimension?: number;
     maxConnections?: number;
   }) {
+    if (!config.worldSeed || config.worldSeed === '0') {
+      throw new Error(
+        'worldSeed is required and must be non-zero. Set the WORLD_SEED environment variable to the Minecraft world seed.'
+      );
+    }
+
     this.config = {
       host: 'localhost',
       port: 5432,
       user: 'postgres',
       password: '',
       database: 'conscious_bot',
-      worldSeed: 0,
       tableName: 'enhanced_memory_chunks',
       dimension: 768,
       maxConnections: 10,
       ...config,
     };
 
-    // Generate per-seed database name if worldSeed is provided
-    this.seedDatabase =
-      this.config.worldSeed > 0
-        ? `${this.config.database}_seed_${this.config.worldSeed}`
-        : this.config.database;
+    // Generate per-seed database name (sanitize negative seeds: '-' → 'n')
+    const sanitizedSeed = this.config.worldSeed.replace('-', 'n');
+    this.seedDatabase = `${this.config.database}_seed_${sanitizedSeed}`;
 
     // Build connection string
     const connectionString = `postgresql://${this.config.user}:${this.config.password}@${this.config.host}:${this.config.port}/${this.seedDatabase}`;
@@ -308,9 +311,54 @@ export class EnhancedVectorDatabase {
   }
 
   /**
+   * Auto-create the per-seed database if it doesn't already exist.
+   * Connects to the base database to run CREATE DATABASE, since the
+   * seed-specific database may not exist yet.
+   */
+  private async ensureDatabaseExists(): Promise<void> {
+    // Validate database name (CREATE DATABASE can't use parameterized queries)
+    if (!/^[a-zA-Z0-9_]+$/.test(this.seedDatabase)) {
+      throw new Error(
+        `Invalid database name "${this.seedDatabase}": only alphanumeric and underscore characters are allowed.`
+      );
+    }
+
+    const tempClient = new Client({
+      host: this.config.host,
+      port: this.config.port,
+      user: this.config.user,
+      password: this.config.password,
+      database: this.config.database, // connect to the base database
+    });
+
+    try {
+      await tempClient.connect();
+
+      const result = await tempClient.query(
+        `SELECT 1 FROM pg_database WHERE datname = $1`,
+        [this.seedDatabase]
+      );
+
+      if (result.rowCount === 0) {
+        console.log(
+          `Creating per-seed database: ${this.seedDatabase}`
+        );
+        await tempClient.query(`CREATE DATABASE ${this.seedDatabase}`);
+        console.log(
+          `Per-seed database created: ${this.seedDatabase}`
+        );
+      }
+    } finally {
+      await tempClient.end();
+    }
+  }
+
+  /**
    * Initialize enhanced database with optimized schema
    */
   async initialize(): Promise<void> {
+    await this.ensureDatabaseExists();
+
     const client = await this.pool.connect();
     try {
       // Enable pgvector extension

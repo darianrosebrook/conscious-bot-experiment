@@ -27,11 +27,24 @@ import { normalizeExperienceType } from './utils/experience-normalizer';
 // Enhanced memory system components
 import {
   createEnhancedMemorySystem,
-  DEFAULT_MEMORY_CONFIG,
+  createDefaultMemoryConfig,
 } from './memory-system';
+
+// Mutable world seed — can be updated at runtime via POST /enhanced/seed
+let currentWorldSeed: string = process.env.WORLD_SEED || '';
 
 // Initialize enhanced memory system (lazy initialization)
 let enhancedMemorySystem: any = null;
+
+async function getEnhancedMemorySystem() {
+  if (!enhancedMemorySystem) {
+    enhancedMemorySystem = createEnhancedMemorySystem(
+      createDefaultMemoryConfig(currentWorldSeed)
+    );
+    await enhancedMemorySystem.initialize();
+  }
+  return enhancedMemorySystem;
+}
 
 const app: express.Application = express();
 const port = process.env.PORT ? parseInt(process.env.PORT) : 3001;
@@ -247,9 +260,7 @@ app.post('/memory-context', async (req, res) => {
     const context = req.body;
 
     // Initialize enhanced memory system if needed
-    if (!enhancedMemorySystem) {
-      enhancedMemorySystem = createEnhancedMemorySystem(DEFAULT_MEMORY_CONFIG);
-    }
+    enhancedMemorySystem = await getEnhancedMemorySystem();
 
     // Get memory context
     const memoryContext =
@@ -273,9 +284,7 @@ app.post('/search', async (req, res) => {
     const searchQuery = req.body;
 
     // Initialize enhanced memory system if needed
-    if (!enhancedMemorySystem) {
-      enhancedMemorySystem = createEnhancedMemorySystem(DEFAULT_MEMORY_CONFIG);
-    }
+    enhancedMemorySystem = await getEnhancedMemorySystem();
 
     // Perform hybrid search
     const searchResults = await enhancedMemorySystem.searchMemories({
@@ -306,15 +315,14 @@ app.post('/thought', async (req, res) => {
     const thought = req.body;
 
     // Initialize enhanced memory system if needed
-    if (!enhancedMemorySystem) {
-      enhancedMemorySystem = createEnhancedMemorySystem(DEFAULT_MEMORY_CONFIG);
-    }
+    enhancedMemorySystem = await getEnhancedMemorySystem();
 
     // Store thought as memory
-    const result = await enhancedMemorySystem.ingestMemory({
+    const chunkIds = await enhancedMemorySystem.ingestMemory({
       content: thought.content,
-      type: 'cognitive_thought',
-      metadata: {
+      type: 'thought',
+      source: thought.attribution || 'cognitive-system',
+      customMetadata: {
         thoughtType: thought.type,
         category: thought.category,
         priority: thought.priority,
@@ -323,7 +331,7 @@ app.post('/thought', async (req, res) => {
       },
     });
 
-    res.json({ success: true, id: result.id });
+    res.json({ success: true, id: chunkIds[0], chunkIds });
   } catch (error) {
     console.error('Failed to store thought:', error);
     res.status(500).json({ success: false, error: 'Failed to store thought' });
@@ -681,10 +689,7 @@ app.get('/versioning/stats', (req, res) => {
 app.get('/enhanced/status', async (req, res) => {
   try {
     // Initialize enhanced system if needed
-    if (!enhancedMemorySystem) {
-      enhancedMemorySystem = createEnhancedMemorySystem(DEFAULT_MEMORY_CONFIG);
-      await enhancedMemorySystem.initialize();
-    }
+    enhancedMemorySystem = await getEnhancedMemorySystem();
 
     const status = await enhancedMemorySystem.getStatus();
     res.json({
@@ -703,20 +708,19 @@ app.get('/enhanced/status', async (req, res) => {
 // Get current world seed
 app.get('/enhanced/seed', (req, res) => {
   try {
-    const worldSeed = process.env.WORLD_SEED;
-    if (!worldSeed || parseInt(worldSeed) === 0) {
+    if (!currentWorldSeed || currentWorldSeed === '0') {
       return res.status(500).json({
         success: false,
         message:
           'WORLD_SEED is not set or is 0. Per-seed database isolation requires a valid world seed.',
       });
     }
-    const seedNum = parseInt(worldSeed);
     const baseName = process.env.PG_DATABASE || 'conscious_bot';
+    const sanitizedSeed = currentWorldSeed.replace('-', 'n');
     res.json({
       success: true,
-      worldSeed: seedNum,
-      databaseName: `${baseName}_seed_${seedNum}`,
+      worldSeed: currentWorldSeed,
+      databaseName: `${baseName}_seed_${sanitizedSeed}`,
     });
   } catch (error) {
     res.status(500).json({
@@ -727,14 +731,62 @@ app.get('/enhanced/seed', (req, res) => {
   }
 });
 
+// Set world seed at runtime (switches to a different per-seed database)
+app.post('/enhanced/seed', async (req, res) => {
+  try {
+    const { worldSeed } = req.body;
+    if (!worldSeed || String(worldSeed) === '0') {
+      return res.status(400).json({
+        success: false,
+        message: 'worldSeed is required and must be non-zero.',
+      });
+    }
+
+    const newSeed = String(worldSeed);
+
+    // No-op if seed hasn't changed
+    if (newSeed === currentWorldSeed) {
+      const baseName = process.env.PG_DATABASE || 'conscious_bot';
+      const sanitizedSeed = newSeed.replace('-', 'n');
+      return res.json({
+        success: true,
+        message: 'Seed unchanged.',
+        worldSeed: currentWorldSeed,
+        databaseName: `${baseName}_seed_${sanitizedSeed}`,
+      });
+    }
+
+    // Close existing system so the next request creates one with the new seed
+    if (enhancedMemorySystem) {
+      await enhancedMemorySystem.close();
+      enhancedMemorySystem = null;
+    }
+
+    currentWorldSeed = newSeed;
+    process.env.WORLD_SEED = newSeed;
+
+    const baseName = process.env.PG_DATABASE || 'conscious_bot';
+    const sanitizedSeed = newSeed.replace('-', 'n');
+    res.json({
+      success: true,
+      message: `Seed updated to ${newSeed}. Database will be created on next request.`,
+      worldSeed: currentWorldSeed,
+      databaseName: `${baseName}_seed_${sanitizedSeed}`,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Failed to update world seed',
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
+
 // Get database information
 app.get('/enhanced/database', async (req, res) => {
   try {
     // Initialize enhanced system if needed
-    if (!enhancedMemorySystem) {
-      enhancedMemorySystem = createEnhancedMemorySystem(DEFAULT_MEMORY_CONFIG);
-      await enhancedMemorySystem.initialize();
-    }
+    enhancedMemorySystem = await getEnhancedMemorySystem();
 
     const databaseName = enhancedMemorySystem.getDatabaseName();
     res.json({
@@ -745,7 +797,7 @@ app.get('/enhanced/database', async (req, res) => {
         port: parseInt(process.env.PG_PORT || '5432'),
         user: process.env.PG_USER || 'postgres',
         database: process.env.PG_DATABASE || 'conscious_bot',
-        worldSeed: parseInt(process.env.WORLD_SEED || '0'),
+        worldSeed: currentWorldSeed,
       },
     });
   } catch (error) {
@@ -764,15 +816,13 @@ app.get('/enhanced/database', async (req, res) => {
 // GET /enhanced/stats — Database overview with chunk counts, entity/relationship counts, type distribution
 app.get('/enhanced/stats', async (req, res) => {
   try {
-    if (!enhancedMemorySystem) {
-      enhancedMemorySystem = createEnhancedMemorySystem(DEFAULT_MEMORY_CONFIG);
-    }
+    enhancedMemorySystem = await getEnhancedMemorySystem();
 
     // Always try to get status (works even without full DB init)
     const status = await enhancedMemorySystem.getStatus();
-    const worldSeed = parseInt(process.env.WORLD_SEED || '0');
     const baseName = process.env.PG_DATABASE || 'conscious_bot';
-    const databaseName = status.database?.name || `${baseName}_seed_${worldSeed}`;
+    const sanitizedSeed = currentWorldSeed.replace('-', 'n');
+    const databaseName = status.database?.name || `${baseName}_seed_${sanitizedSeed}`;
 
     // Try to get detailed stats, but fall back gracefully
     let stats: any = null;
@@ -786,7 +836,7 @@ app.get('/enhanced/stats', async (req, res) => {
       success: true,
       data: {
         databaseName,
-        worldSeed,
+        worldSeed: currentWorldSeed,
         totalChunks: stats?.totalMemories ?? status.database?.totalChunks ?? 0,
         entityCount: stats?.typeDistribution
           ? (Object.values(stats.typeDistribution) as number[]).reduce((a: number, b: number) => a + b, 0)
@@ -802,13 +852,13 @@ app.get('/enhanced/stats', async (req, res) => {
   } catch (error) {
     console.error('Failed to get enhanced stats:', error);
     // Even on error, return a minimal response so the UI doesn't break
-    const worldSeed = parseInt(process.env.WORLD_SEED || '0');
     const baseName = process.env.PG_DATABASE || 'conscious_bot';
+    const sanitizedSeed = currentWorldSeed.replace('-', 'n');
     res.json({
       success: true,
       data: {
-        databaseName: `${baseName}_seed_${worldSeed}`,
-        worldSeed,
+        databaseName: `${baseName}_seed_${sanitizedSeed}`,
+        worldSeed: currentWorldSeed,
         totalChunks: 0,
         entityCount: 0,
         relationshipCount: 0,
@@ -823,9 +873,7 @@ app.get('/enhanced/stats', async (req, res) => {
 // GET /enhanced/memories — Browse memory chunks with pagination
 app.get('/enhanced/memories', async (req, res) => {
   try {
-    if (!enhancedMemorySystem) {
-      enhancedMemorySystem = createEnhancedMemorySystem(DEFAULT_MEMORY_CONFIG);
-    }
+    enhancedMemorySystem = await getEnhancedMemorySystem();
 
     const page = parseInt(req.query.page as string) || 1;
     const limit = Math.min(parseInt(req.query.limit as string) || 20, 100);
@@ -876,9 +924,7 @@ app.get('/enhanced/memories', async (req, res) => {
 // GET /enhanced/knowledge-graph — Knowledge graph summary
 app.get('/enhanced/knowledge-graph', async (req, res) => {
   try {
-    if (!enhancedMemorySystem) {
-      enhancedMemorySystem = createEnhancedMemorySystem(DEFAULT_MEMORY_CONFIG);
-    }
+    enhancedMemorySystem = await getEnhancedMemorySystem();
 
     let stats: any = null;
     try {
@@ -915,9 +961,7 @@ app.get('/enhanced/knowledge-graph', async (req, res) => {
 // GET /enhanced/embedding-health — Embedding health metrics
 app.get('/enhanced/embedding-health', async (req, res) => {
   try {
-    if (!enhancedMemorySystem) {
-      enhancedMemorySystem = createEnhancedMemorySystem(DEFAULT_MEMORY_CONFIG);
-    }
+    enhancedMemorySystem = await getEnhancedMemorySystem();
 
     const status = await enhancedMemorySystem.getStatus();
 
@@ -955,10 +999,7 @@ app.post('/enhanced/reset', async (req, res) => {
       });
     }
 
-    if (!enhancedMemorySystem) {
-      enhancedMemorySystem = createEnhancedMemorySystem(DEFAULT_MEMORY_CONFIG);
-      await enhancedMemorySystem.initialize();
-    }
+    enhancedMemorySystem = await getEnhancedMemorySystem();
 
     // Use cleanup with 0 days retention to remove all memories
     const cleaned = await enhancedMemorySystem.cleanup(0);
@@ -982,9 +1023,9 @@ app.post('/enhanced/reset', async (req, res) => {
 app.post('/enhanced/drop', async (req, res) => {
   try {
     const { confirm } = req.body;
-    const worldSeed = parseInt(process.env.WORLD_SEED || '0');
     const baseName = process.env.PG_DATABASE || 'conscious_bot';
-    const expectedName = `${baseName}_seed_${worldSeed}`;
+    const sanitizedSeed = currentWorldSeed.replace('-', 'n');
+    const expectedName = `${baseName}_seed_${sanitizedSeed}`;
 
     if (!confirm || confirm !== expectedName) {
       return res.status(400).json({

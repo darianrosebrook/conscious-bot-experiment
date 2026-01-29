@@ -211,7 +211,7 @@ export interface ReplaySession {
 // Database management types
 export interface DatabaseOverview {
   databaseName: string;
-  worldSeed: number;
+  worldSeed: string | number;
   totalChunks: number;
   entityCount: number;
   relationshipCount: number;

@@ -105,7 +105,7 @@ class MockEmbeddingService {
 export async function createMemoryIntegrationFixture(
   seeds: MemorySeed[] = [],
   options: {
-    worldSeed?: number;
+    worldSeed?: string;
     enableAdvancedFeatures?: boolean;
     enablePersistence?: boolean;
   } = {}
@@ -130,7 +130,7 @@ export async function createMemoryIntegrationFixture(
     user: container.getUsername(),
     password: container.getPassword(),
     database: container.getDatabase(),
-    worldSeed: options.worldSeed ?? 12345,
+    worldSeed: options.worldSeed ?? '12345',
     enablePersistence: options.enablePersistence ?? true,
     enableMemoryDecay: false, // Disable for predictable tests
     enableBehaviorTreeLearning: options.enableAdvancedFeatures ?? false,

@@ -39,7 +39,7 @@ vi.mock('@conscious-bot/memory', () => {
       user: 'conscious_bot',
       password: 'secure_password',
       database: 'conscious_bot',
-      worldSeed: 0,
+      worldSeed: '0',
       vectorDbTableName: 'memory_chunks',
       ollamaHost: process.env.OLLAMA_HOST || 'http://localhost:5002',
       embeddingModel: 'nomic-embed-text',

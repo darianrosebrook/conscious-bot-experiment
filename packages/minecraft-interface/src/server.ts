@@ -156,6 +156,16 @@ app.use(
 );
 app.use(express.json());
 
+// Warn if WORLD_SEED is not set — Mineflayer cannot extract the seed
+// from the server protocol. The seed can be provided later via POST /seed or POST /connect.
+if (!process.env.WORLD_SEED || process.env.WORLD_SEED === '0') {
+  console.warn(
+    'WARNING: WORLD_SEED environment variable is not set or is 0.\n' +
+      'Per-seed database isolation requires the Minecraft world seed.\n' +
+      'You can set it later via POST /seed or by including worldSeed in POST /connect.'
+  );
+}
+
 // Bot configuration
 const botConfig: BotConfig = {
   host: process.env.MINECRAFT_HOST || 'localhost',
@@ -501,6 +511,46 @@ app.get('/health', (req, res) => {
   });
 });
 
+// Set world seed at runtime
+app.post('/seed', async (req, res) => {
+  try {
+    const { worldSeed } = req.body;
+    if (!worldSeed || String(worldSeed) === '0') {
+      return res.status(400).json({
+        success: false,
+        message: 'worldSeed is required and must be non-zero.',
+      });
+    }
+
+    const seedStr = String(worldSeed);
+    botConfig.worldSeed = seedStr;
+    process.env.WORLD_SEED = seedStr;
+
+    // Propagate to memory service
+    try {
+      await fetch(`${process.env.MEMORY_ENDPOINT || 'http://localhost:3001'}/enhanced/seed`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ worldSeed: seedStr }),
+      });
+    } catch {
+      console.warn('⚠️ Failed to propagate seed to memory service');
+    }
+
+    res.json({
+      success: true,
+      message: `World seed updated to ${seedStr}`,
+      worldSeed: seedStr,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Failed to update world seed',
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
+
 // Connect to Minecraft server
 app.post('/connect', async (req, res) => {
   if (isConnecting) {
@@ -513,6 +563,25 @@ app.post('/connect', async (req, res) => {
   isConnecting = true;
 
   try {
+    // Accept optional worldSeed in request body
+    const { worldSeed } = req.body || {};
+    if (worldSeed) {
+      const seedStr = String(worldSeed);
+      botConfig.worldSeed = seedStr;
+      process.env.WORLD_SEED = seedStr;
+      console.log(`🌱 World seed set to ${seedStr} via POST /connect`);
+      // Propagate to memory service
+      try {
+        await fetch(`${process.env.MEMORY_ENDPOINT || 'http://localhost:3001'}/enhanced/seed`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ worldSeed: seedStr }),
+        });
+      } catch {
+        console.warn('⚠️ Failed to propagate seed to memory service');
+      }
+    }
+
     console.log('🔄 Connecting to Minecraft server...');
 
     // Initialize memory integration service

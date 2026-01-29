@@ -53,7 +53,7 @@ export interface EnhancedMemorySystemConfig {
   user?: string;
   password?: string;
   database?: string;
-  worldSeed?: number; // For per-seed database isolation
+  worldSeed: string; // Required — per-seed database isolation (stored as string to preserve precision for large seeds)
   vectorDbTableName?: string;
 
   // Embedding configuration
@@ -158,7 +158,7 @@ export interface MemorySystemStats {
 
 export interface MemorySystemStatus {
   initialized: boolean;
-  worldSeed: number;
+  worldSeed: string;
   database: {
     name: string;
     status: 'connected' | 'disconnected';
@@ -798,7 +798,7 @@ export class EnhancedMemorySystem extends EventEmitter {
 
     return {
       initialized: this.initialized,
-      worldSeed: this.config.worldSeed || 0,
+      worldSeed: this.config.worldSeed,
       database: {
         name: dbStatus.databaseName,
         status: dbStatus.connected ? 'connected' : 'disconnected',
@@ -833,8 +833,8 @@ export class EnhancedMemorySystem extends EventEmitter {
   /**
    * Get the current world seed being used for database isolation
    */
-  getWorldSeed(): number {
-    return this.config.worldSeed || 0;
+  getWorldSeed(): string {
+    return this.config.worldSeed;
   }
 
   /**
@@ -2285,13 +2285,25 @@ export function createEnhancedMemorySystem(
 // Default Configuration
 // ============================================================================
 
-export const DEFAULT_MEMORY_CONFIG: EnhancedMemorySystemConfig = {
+function getRequiredWorldSeed(override?: string): string {
+  const raw = override || process.env.WORLD_SEED;
+  if (!raw || raw === '0') {
+    throw new Error(
+      'WORLD_SEED environment variable is required and must be non-zero. ' +
+        'Set it to the Minecraft world seed to enable per-seed database isolation.'
+    );
+  }
+  return raw;
+}
+
+export function createDefaultMemoryConfig(seedOverride?: string): EnhancedMemorySystemConfig {
+  return {
   host: process.env.PG_HOST || 'localhost',
   port: parseInt(process.env.PG_PORT || '5432'),
   user: process.env.PG_USER || 'conscious_bot',
   password: process.env.PG_PASSWORD || 'secure_password',
   database: process.env.PG_DATABASE || 'conscious_bot',
-  worldSeed: parseInt(process.env.WORLD_SEED || '0'),
+  worldSeed: getRequiredWorldSeed(seedOverride),
   vectorDbTableName: 'memory_chunks',
   ollamaHost: process.env.OLLAMA_HOST || 'http://localhost:5002',
   embeddingModel: process.env.MEMORY_EMBEDDING_MODEL || 'embeddinggemma',
@@ -2374,4 +2386,7 @@ export const DEFAULT_MEMORY_CONFIG: EnhancedMemorySystemConfig = {
   toolEfficiencyCleanupInterval: parseInt(
     process.env.MEMORY_TOOL_CLEANUP_INTERVAL || '3600000'
   ), // 1 hour
-};
+  };
+}
+
+export const DEFAULT_MEMORY_CONFIG: EnhancedMemorySystemConfig = createDefaultMemoryConfig();

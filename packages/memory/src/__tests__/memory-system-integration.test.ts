@@ -37,7 +37,7 @@ describe('Memory System Integration with PostgreSQL + pgvector', () => {
           ['strategy', 'optimization']
         ),
       ],
-      { worldSeed: 12345, enablePersistence: true }
+      { worldSeed: '12345', enablePersistence: true }
     );
   }, TEST_TIMEOUT);
 

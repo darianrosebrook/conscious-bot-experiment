@@ -95,7 +95,7 @@ class MockEmbeddingService {
 
 export async function createMemoryFixture(
   seeds: MemorySeed[] = [],
-  options: { worldSeed?: number } = {}
+  options: { worldSeed?: string } = {}
 ): Promise<MemoryFixture> {
   const container = await new PostgreSqlContainer('ankane/pgvector:0.5.1')
     .withDatabase('conscious_bot')
@@ -110,7 +110,7 @@ export async function createMemoryFixture(
     user: container.getUsername(),
     password: container.getPassword(),
     database: container.getDatabase(),
-    worldSeed: options.worldSeed ?? 12345,
+    worldSeed: options.worldSeed ?? '12345',
     enablePersistence: true,
     enableMemoryDecay: false,
     enableBehaviorTreeLearning: false,
