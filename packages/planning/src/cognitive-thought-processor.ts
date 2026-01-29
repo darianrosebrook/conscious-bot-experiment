@@ -1390,4 +1390,345 @@ export class CognitiveThoughtProcessor extends EventEmitter {
 
     return enhancedTask;
   }
+
+  // ---------------------------------------------------------------------------
+  // Dynamic Context-Based Thought Generation
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Generate thoughts from the current world state context.
+   * Fetches world state from the Minecraft interface and creates thoughts
+   * based on health, inventory, time of day, biome, position, and threats.
+   */
+  private async generateThoughtsFromContext(): Promise<CognitiveThought[]> {
+    const thoughts: CognitiveThought[] = [];
+
+    try {
+      const response = await fetch('http://localhost:3005/health', {
+        signal: AbortSignal.timeout(5000),
+      });
+      if (!response.ok) return thoughts;
+
+      const worldState = (await response.json()) as any;
+      const context = {
+        biome: worldState.biome || 'unknown',
+        time: worldState.time || 'day',
+        environment: worldState.environment || 'surface',
+      };
+
+      // Health-based thoughts
+      if (worldState.health !== undefined && worldState.health < 15) {
+        thoughts.push({
+          type: 'observation',
+          content: `Health is critically low (${worldState.health}/20), need to find food or shelter immediately to survive.`,
+          attribution: 'context-analyzer',
+          context: worldState,
+          category: 'survival',
+          priority: 'high',
+          id: `thought-health-${Date.now()}`,
+          timestamp: Date.now(),
+        });
+      }
+
+      // Inventory-based thoughts
+      if (worldState.inventoryCount === 0) {
+        const advice = this.getInventoryAdvice(context);
+        thoughts.push({
+          type: 'observation',
+          content: `My inventory is empty. I should gather wood and basic materials. ${advice}`,
+          attribution: 'context-analyzer',
+          context: worldState,
+          category: 'resource_gathering',
+          priority: 'medium',
+          id: `thought-inventory-${Date.now()}`,
+          timestamp: Date.now(),
+        });
+      }
+
+      // Time-based thoughts
+      if (worldState.time === 'night') {
+        thoughts.push({
+          type: 'observation',
+          content:
+            'Night time approaching. Visibility will be reduced and hostile mobs will spawn, should consider finding shelter.',
+          attribution: 'context-analyzer',
+          context: worldState,
+          category: 'survival',
+          priority: 'medium',
+          id: `thought-time-${Date.now()}`,
+          timestamp: Date.now(),
+        });
+      }
+
+      // Biome-based thoughts
+      const biomeThought = this.getBiomeOpportunities(worldState.biome, context);
+      if (biomeThought) {
+        thoughts.push(biomeThought);
+      }
+
+      // Position-based thoughts
+      const positionThought = this.analyzePosition(worldState);
+      if (positionThought) {
+        thoughts.push(positionThought);
+      }
+
+      // Threat-based thoughts
+      if (
+        worldState.threats &&
+        Array.isArray(worldState.threats) &&
+        worldState.threats.length > 0
+      ) {
+        thoughts.push({
+          type: 'observation',
+          content: `Detected threats nearby: ${worldState.threats.join(', ')}. I need to stay alert and consider defensive actions.`,
+          attribution: 'context-analyzer',
+          context: worldState,
+          category: 'survival',
+          priority: 'high',
+          id: `thought-threats-${Date.now()}`,
+          timestamp: Date.now(),
+        });
+      }
+
+      // If no urgent thoughts, generate exploration thought
+      if (
+        thoughts.length === 0 ||
+        (worldState.health >= 15 &&
+          worldState.inventoryCount > 0 &&
+          worldState.time !== 'night' &&
+          (!worldState.threats || worldState.threats.length === 0))
+      ) {
+        const biome = worldState.biome || 'unknown';
+        thoughts.push({
+          type: 'observation',
+          content: `In ${biome} biome, consider exploring the area and gathering resources nearby.`,
+          attribution: 'context-analyzer',
+          context: worldState,
+          category: 'exploration',
+          priority: 'low',
+          id: `thought-explore-${Date.now()}`,
+          timestamp: Date.now(),
+        });
+      }
+    } catch (error) {
+      console.warn('generateThoughtsFromContext: failed to fetch world state', error);
+    }
+
+    return thoughts;
+  }
+
+  /**
+   * Generate thoughts from memory system insights and recommendations.
+   */
+  private async generateThoughtsFromMemory(): Promise<CognitiveThought[]> {
+    const thoughts: CognitiveThought[] = [];
+
+    try {
+      const endpoint = this.config.memoryEndpoint || 'http://localhost:3001';
+      const response = await fetch(`${endpoint}/memory-context`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query: 'current situation analysis' }),
+        signal: AbortSignal.timeout(3000),
+      });
+
+      if (!response.ok) return thoughts;
+
+      const memoryData = (await response.json()) as any;
+
+      // Generate thoughts from insights
+      if (memoryData.insights && Array.isArray(memoryData.insights)) {
+        for (const insight of memoryData.insights) {
+          thoughts.push({
+            type: 'reflection',
+            content: `Memory insight: ${insight}`,
+            attribution: 'memory-system',
+            context: memoryData,
+            category: 'analysis',
+            priority: 'high',
+            id: `thought-insight-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+            timestamp: Date.now(),
+          });
+        }
+      }
+
+      // Generate thoughts from recommendations
+      if (memoryData.recommendations && Array.isArray(memoryData.recommendations)) {
+        for (const recommendation of memoryData.recommendations) {
+          thoughts.push({
+            type: 'planning',
+            content: `Memory-based recommendation: ${recommendation}`,
+            attribution: 'memory-system',
+            context: memoryData,
+            category: 'planning',
+            priority: 'high',
+            id: `thought-rec-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+            timestamp: Date.now(),
+          });
+        }
+      }
+    } catch (error) {
+      console.warn('generateThoughtsFromMemory: failed to fetch memory', error);
+    }
+
+    return thoughts;
+  }
+
+  /**
+   * Get context-aware inventory advice based on biome and time of day.
+   */
+  private getInventoryAdvice(context: { biome?: string; time?: string }): string {
+    if (context.time === 'night') {
+      return 'At night, prioritize finding shelter and collecting basic survival items like wood and stone.';
+    }
+
+    switch (context.biome) {
+      case 'desert':
+        return 'In the desert, water and food are scarce. Look for cacti and dead bushes.';
+      case 'forest':
+        return 'Forest biome has abundant wood. Start by chopping trees for wood and crafting tools.';
+      case 'mountain':
+      case 'mountains':
+        return 'Mountains have stone and ores. Gather stone for tools and look for exposed ore veins.';
+      default:
+        return 'Start by gathering wood from nearby trees and crafting basic tools.';
+    }
+  }
+
+  /**
+   * Get biome-specific opportunity thoughts.
+   */
+  private getBiomeOpportunities(
+    biome: string,
+    context: { biome?: string; time?: string }
+  ): CognitiveThought | null {
+    if (!biome) return null;
+
+    const biomeLower = biome.toLowerCase();
+    let content: string;
+    let priority: 'low' | 'medium' | 'high' = 'low';
+
+    switch (biomeLower) {
+      case 'desert':
+        content =
+          'In a desert biome. Scarce water and food sources, but sand is abundant. Cacti provide green dye and can be used as fuel.';
+        priority = 'medium';
+        break;
+      case 'forest':
+        content =
+          'In a forest biome. Abundant wood and food sources available, good for gathering resources and building.';
+        priority = 'low';
+        break;
+      case 'mountain':
+      case 'mountains':
+        content =
+          'In a mountain biome. High elevation with exposed stone and ores. Good for mining but watch for falls.';
+        priority = 'low';
+        break;
+      case 'plains':
+        content =
+          'In a plains biome. Open terrain with good visibility. Animals and tall grass nearby for food and seeds.';
+        priority = 'low';
+        break;
+      case 'cave':
+        content =
+          'In a cave biome. Rich in ores and minerals but dark and dangerous. Need torches for safety.';
+        priority = 'medium';
+        break;
+      default:
+        return null;
+    }
+
+    return {
+      type: 'observation',
+      content,
+      attribution: 'context-analyzer',
+      context,
+      category: 'exploration',
+      priority,
+      id: `thought-biome-${Date.now()}`,
+      timestamp: Date.now(),
+    };
+  }
+
+  /**
+   * Analyze position and elevation to generate thoughts.
+   */
+  private analyzePosition(worldState: any): CognitiveThought | null {
+    if (!worldState?.position) return null;
+
+    const y = worldState.position.y;
+
+    if (y >= 80) {
+      return {
+        type: 'observation',
+        content:
+          'Currently at high elevation (y=' +
+          y +
+          '). Good vantage point for surveying the area, but watch for falls.',
+        attribution: 'context-analyzer',
+        context: worldState,
+        category: 'exploration',
+        priority: 'low',
+        id: `thought-position-${Date.now()}`,
+        timestamp: Date.now(),
+      };
+    }
+
+    if (y < 50) {
+      return {
+        type: 'observation',
+        content:
+          'Currently at underground level (y=' +
+          y +
+          '). Cave exploration opportunities ahead, but be cautious of dark areas and hostile mobs.',
+        attribution: 'context-analyzer',
+        context: worldState,
+        category: 'exploration',
+        priority: 'medium',
+        id: `thought-position-${Date.now()}`,
+        timestamp: Date.now(),
+      };
+    }
+
+    return null;
+  }
+
+  /**
+   * Extract relevant entities/keywords from context for memory queries.
+   */
+  private extractCurrentEntities(context: any): string[] {
+    const entities: string[] = [];
+
+    if (context.environment) {
+      entities.push(context.environment);
+    }
+
+    // Position-based entity extraction
+    if (context.position) {
+      if (context.position.y < 50) {
+        entities.push('cave', 'underground');
+      }
+      if (context.position.y >= 80) {
+        entities.push('mountain', 'elevation');
+      }
+    }
+
+    // Inventory-based entity extraction
+    if (context.inventoryCount === 0) {
+      entities.push('resources', 'gathering');
+    }
+
+    // Biome-based entity extraction
+    if (context.biome) {
+      entities.push(context.biome);
+    }
+
+    // Time-based entity extraction
+    if (context.time) {
+      entities.push(context.time);
+    }
+
+    return entities;
+  }
 }

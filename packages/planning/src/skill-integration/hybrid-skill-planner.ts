@@ -10,7 +10,7 @@
  */
 
 import { EventEmitter } from 'events';
-import { SkillRegistry } from '../../../memory/src/skills';
+import { SkillRegistry } from './skill-planner-adapter';
 import { BehaviorTreeRunner } from '../behavior-trees/BehaviorTreeRunner';
 import {
   SkillPlannerAdapter,
@@ -83,6 +83,7 @@ export class CapabilityRegistry {
 }
 import { Goal, GoalType, GoalStatus } from '../types';
 import { SkillComposerAdapter } from './skill-composer-adapter';
+import { SterlingReasoningService } from '../sterling';
 
 // ============================================================================
 // Types
@@ -114,13 +115,16 @@ export interface HybridPlanningContext extends PlanningContext {
   resources: Record<string, number>;
 }
 
+export type PlanningApproach =
+  | 'skill-based'
+  | 'mcp-capabilities'
+  | 'htn'
+  | 'goap'
+  | 'hybrid'
+  | 'sterling-verified';
+
 export interface HybridPlan extends Plan {
-  planningApproach:
-    | 'skill-based'
-    | 'mcp-capabilities'
-    | 'htn'
-    | 'goap'
-    | 'hybrid';
+  planningApproach: PlanningApproach;
   skillPlan?: SkillPlan;
   mcpCapabilityPlan?: MCPCapabilityPlan;
   hrmPlan?: HRMPlan;
@@ -131,7 +135,7 @@ export interface HybridPlan extends Plan {
 }
 
 export interface PlanningDecision {
-  approach: 'skill-based' | 'mcp-capabilities' | 'htn' | 'goap' | 'hybrid';
+  approach: PlanningApproach;
   reasoning: string;
   confidence: number;
   estimatedLatency: number;
@@ -149,6 +153,7 @@ export class HybridSkillPlanner extends EventEmitter {
   private skillRegistry: SkillRegistry;
   private btRunner: BehaviorTreeRunner;
   private skillComposerAdapter?: SkillComposerAdapter;
+  private sterlingService?: SterlingReasoningService;
 
   constructor(
     skillRegistry: SkillRegistry,
@@ -157,7 +162,8 @@ export class HybridSkillPlanner extends EventEmitter {
     goapPlanner: EnhancedGOAPPlanner,
     mcpRegistry?: EnhancedRegistry,
     mcpDynamicFlow?: DynamicCreationFlow,
-    skillComposerAdapter?: SkillComposerAdapter
+    skillComposerAdapter?: SkillComposerAdapter,
+    sterlingService?: SterlingReasoningService
   ) {
     super();
     this.skillRegistry = skillRegistry;
@@ -182,6 +188,9 @@ export class HybridSkillPlanner extends EventEmitter {
       this.skillComposerAdapter = skillComposerAdapter;
       this.setupSkillComposerEvents();
     }
+
+    // Store optional Sterling reasoning service
+    this.sterlingService = sterlingService;
   }
 
   /**
@@ -346,6 +355,11 @@ export class HybridSkillPlanner extends EventEmitter {
           return await this.executeGOAPPlan(plan, context);
         case 'hybrid':
           return await this.executeHybridPlan(plan, context);
+        case 'sterling-verified':
+          // Sterling-verified plans delegate to HTN or GOAP execution
+          if (plan.hrmPlan) return await this.executeHTNPlan(plan, context);
+          if (plan.goapPlan) return await this.executeGOAPPlan(plan, context);
+          return await this.executeHTNPlan(plan, context);
         default:
           throw new Error(
             `Unknown planning approach: ${plan.planningApproach}`
@@ -392,12 +406,7 @@ export class HybridSkillPlanner extends EventEmitter {
     const goapConfidence = this.calculateGOAPConfidence(goal, context);
 
     // Make decision based on confidence scores and preferences
-    let approach:
-      | 'skill-based'
-      | 'mcp-capabilities'
-      | 'htn'
-      | 'goap'
-      | 'hybrid';
+    let approach: PlanningApproach;
     let reasoning: string;
     let confidence: number;
 
@@ -429,6 +438,13 @@ export class HybridSkillPlanner extends EventEmitter {
       approach = 'goap';
       reasoning = `GOAP suitable for reactive planning with confidence ${goapConfidence.toFixed(2)}`;
       confidence = goapConfidence;
+    } else if (
+      this.sterlingService?.isAvailable() &&
+      (analysis.domain === 'spatial' || analysis.domain === 'logical')
+    ) {
+      approach = 'sterling-verified';
+      reasoning = `Sterling reasoning available for ${analysis.domain} domain — verifying reachability before planning`;
+      confidence = 0.75;
     } else if (
       context.planningPreferences.allowHybrid &&
       (skillConfidence > 0.5 || htnConfidence > 0.5 || mcpConfidence > 0.5)
@@ -505,6 +521,24 @@ export class HybridSkillPlanner extends EventEmitter {
           this.generateSkillPlan(goal, context),
           this.generateHTNPlan(goal, context),
         ]);
+        break;
+      case 'sterling-verified':
+        // Use Sterling to verify reachability, then fall back to HTN for execution
+        if (this.sterlingService?.isAvailable()) {
+          const analysis = this.analyzeGoal(goal, context);
+          const reachability = await this.sterlingService.verifyReachability(
+            analysis.domain === 'spatial' ? 'wikipedia' : 'wordnet',
+            JSON.stringify(context.currentState),
+            goal
+          );
+          if (reachability.reachable) {
+            hrmPlan = await this.generateHTNPlan(goal, context);
+          } else {
+            goapPlan = await this.generateGOAPPlan(goal, context);
+          }
+        } else {
+          hrmPlan = await this.generateHTNPlan(goal, context);
+        }
         break;
     }
 
@@ -1076,15 +1110,16 @@ export class HybridSkillPlanner extends EventEmitter {
   }
 
   private estimatePlanningLatency(
-    approach: 'skill-based' | 'mcp-capabilities' | 'htn' | 'goap' | 'hybrid',
+    approach: PlanningApproach,
     context: HybridPlanningContext
   ): number {
-    const baseLatency = {
+    const baseLatency: Record<PlanningApproach, number> = {
       'skill-based': 100,
       'mcp-capabilities': 300,
       htn: 500,
       goap: 200,
       hybrid: 800,
+      'sterling-verified': 600,
     };
 
     const urgencyMultiplier = {
@@ -1250,7 +1285,7 @@ export class HybridSkillPlanner extends EventEmitter {
   }
 
   private identifyFallbackPlans(
-    approach: 'skill-based' | 'mcp-capabilities' | 'htn' | 'goap' | 'hybrid',
+    approach: PlanningApproach,
     context: HybridPlanningContext
   ): string[] {
     const fallbacks: string[] = [];
@@ -1270,6 +1305,9 @@ export class HybridSkillPlanner extends EventEmitter {
         break;
       case 'hybrid':
         fallbacks.push('mcp-capabilities', 'goap', 'skill-based');
+        break;
+      case 'sterling-verified':
+        fallbacks.push('htn', 'goap', 'skill-based');
         break;
     }
 
@@ -1470,6 +1508,7 @@ export class HybridSkillPlanner extends EventEmitter {
         htn: 0,
         goap: 0,
         hybrid: 0,
+        'sterling-verified': 0,
       },
       averageConfidence: 0.7,
       averageLatency: 500,

@@ -21,7 +21,7 @@ export class SkillRegistry {
     return null;
   }
 
-  recordSkillUsage(skillId: string, success: boolean): void {
+  recordSkillUsage(skillId: string, success: boolean, duration: number): void {
     // Stub implementation
   }
 }

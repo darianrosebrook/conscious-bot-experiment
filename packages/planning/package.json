@@ -3,8 +3,10 @@
   "version": "0.1.0",
   "description": "Planning and goal management system for conscious bot",
   "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "type": "module",
   "scripts": {
-    "build": "tsc -p tsconfig.build.json",
+    "build": "tsc --build --force",
     "dev": "tsx src/modular-server.ts",
     "dev:server": "tsx src/modular-server.ts",
     "dev:watch": "tsc --watch",
@@ -19,6 +21,7 @@
   },
   "dependencies": {
     "@conscious-bot/cognition": "workspace:*",
+    "@conscious-bot/core": "workspace:*",
     "@conscious-bot/executor-contracts": "workspace:*",
     "@conscious-bot/mcp-server": "workspace:*",
     "@conscious-bot/memory": "workspace:*",

@@ -31,7 +31,7 @@ export interface GoalTemplate {
   adaptabilityScore: number; // 0-1, how well it adapts to context
   learningValue: number; // 0-1, potential learning from pursuing
   socialImpact: number; // 0-1, impact on social relationships
-  riskLevel: RiskLevel;
+  riskLevel: GoalRiskLevel;
   tags: string[];
   createdAt: number;
   lastUsed: number;
@@ -40,7 +40,7 @@ export interface GoalTemplate {
 }
 
 export interface ResourceRequirement {
-  type: ResourceType;
+  type: GoalResourceType;
   name: string;
   quantity: number;
   optional: boolean;
@@ -84,7 +84,7 @@ export interface PlanSketchHint {
   context: string; // when this hint applies
   alternatives: string[];
   estimatedTime: number; // minutes
-  riskLevel: RiskLevel;
+  riskLevel: GoalRiskLevel;
 }
 
 export interface GoalInstance {
@@ -214,7 +214,7 @@ export enum GoalCategory {
   EMERGENCY = 'emergency',
 }
 
-export enum ResourceType {
+export enum GoalResourceType {
   MATERIAL = 'material',
   TOOL = 'tool',
   WEAPON = 'weapon',
@@ -229,7 +229,7 @@ export enum ResourceType {
   ENERGY = 'energy',
 }
 
-export enum RiskLevel {
+export enum GoalRiskLevel {
   NONE = 'none',
   LOW = 'low',
   MEDIUM = 'medium',
@@ -878,7 +878,7 @@ export class GoalTemplateManager extends EventEmitter {
         timeEstimate: 30,
         resourceRequirements: [
           {
-            type: ResourceType.BLOCK,
+            type: GoalResourceType.BLOCK,
             name: 'wood',
             quantity: 20,
             optional: false,
@@ -886,7 +886,7 @@ export class GoalTemplateManager extends EventEmitter {
             criticality: 0.9,
           },
           {
-            type: ResourceType.TOOL,
+            type: GoalResourceType.TOOL,
             name: 'axe',
             quantity: 1,
             optional: true,
@@ -942,7 +942,7 @@ export class GoalTemplateManager extends EventEmitter {
             context: 'forest',
             alternatives: ['Find stone outcrop'],
             estimatedTime: 5,
-            riskLevel: RiskLevel.LOW,
+            riskLevel: GoalRiskLevel.LOW,
           },
           {
             type: 'sequence',
@@ -951,13 +951,13 @@ export class GoalTemplateManager extends EventEmitter {
             context: 'always',
             alternatives: [],
             estimatedTime: 15,
-            riskLevel: RiskLevel.LOW,
+            riskLevel: GoalRiskLevel.LOW,
           },
         ],
         adaptabilityScore: 0.7,
         learningValue: 0.6,
         socialImpact: 0.3,
-        riskLevel: RiskLevel.LOW,
+        riskLevel: GoalRiskLevel.LOW,
         tags: ['survival', 'building', 'basic'],
         createdAt: Date.now(),
         lastUsed: 0,

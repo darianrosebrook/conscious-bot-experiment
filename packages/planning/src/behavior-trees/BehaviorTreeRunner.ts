@@ -541,7 +541,7 @@ class BTRun extends EventEmitter {
     // Precedence: node-specific > run options > class/env default
     const maxRetries =
       node.retries ?? this.options.maxRetries ?? this.defaultRetries;
-    const timeout = node.timeout ?? this.options.timeout ?? this.defaultTimeout;
+    const timeout = this.options.timeout ?? node.timeout ?? this.defaultTimeout;
 
     // Check guard conditions
     if (node.guard && this.options.enableGuards) {
@@ -698,8 +698,15 @@ class BTRun extends EventEmitter {
           cost?: number;
           duration?: number;
         };
+        const timeoutPromise = new Promise<never>((_, reject) => {
+          const onAbortForTimeout = () =>
+            reject(new Error(`Action timed out after ${timeout}ms`));
+          opController.signal.addEventListener('abort', onAbortForTimeout, {
+            once: true,
+          });
+        });
         try {
-          result = await executionPromise;
+          result = await Promise.race([executionPromise, timeoutPromise]);
         } finally {
           clearTimeout(timeoutId);
           this.abortController.signal.removeEventListener('abort', onAbort);

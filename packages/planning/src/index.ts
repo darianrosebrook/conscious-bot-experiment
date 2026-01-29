@@ -76,7 +76,7 @@ export {
 } from './integrated-planning-coordinator';
 
 // Types
-export * from './types';
+export * from './types.js';
 
 // Cognitive Thought Processing
 export {
@@ -84,6 +84,26 @@ export {
   type CognitiveThought,
   type CognitiveThoughtProcessorConfig,
 } from './cognitive-thought-processor';
+
+// Sterling reasoning integration
+export { SterlingReasoningService } from './sterling';
+export type {
+  SterlingReasoningConfig,
+  ReachabilityResult,
+  KGTraversalResult,
+} from './sterling';
+
+// Sterling Minecraft crafting domain
+export { MinecraftCraftingSolver } from './sterling';
+export { buildCraftingRules, inventoryToRecord, goalFromTaskRequirement } from './sterling';
+export type {
+  MinecraftCraftingRule,
+  CraftingInventory,
+  CraftingInventoryItem,
+  MinecraftSolveRequest,
+  MinecraftSolveStep,
+  MinecraftCraftingSolveResult,
+} from './sterling';
 
 // Additional exports for minecraft-interface compatibility
 export type { PlanStep, HomeostasisState } from './types';

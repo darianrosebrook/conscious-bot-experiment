@@ -2,7 +2,6 @@
   "extends": "./tsconfig.json",
   "compilerOptions": {
     "baseUrl": ".",
-    // Ensure build uses compiled workspace packages, not src path aliases
     "paths": {}
   },
   "exclude": [
