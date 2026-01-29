@@ -14,23 +14,9 @@ import {
   PlanStep,
   ExecutionContext,
   // WorldSnapshot,
-  PBIError,
   PBIErrorCode,
   DEFAULT_PBI_ACCEPTANCE,
 } from '../types';
-
-// Mock the existing planning system components
-vi.mock('vitest', async () => {
-  const actual = await vi.importActual('vitest');
-  return {
-    ...actual,
-    vi: {
-      ...actual.vi,
-      fn: actual.vi.fn,
-      mock: actual.vi.mock,
-    },
-  };
-});
 
 describe('PBI Integration with Planning System', () => {
   let pbiEnforcer: ReturnType<typeof createPBIEnforcer>;
@@ -220,7 +206,8 @@ describe('PBI Integration with Planning System', () => {
 
         // Should fail gracefully with PBI error
         expect(result.success).toBe(false);
-        expect(result.error).toBeInstanceOf(PBIError);
+        expect(result.error).toBeDefined();
+        expect(result.error?.name).toBe('PBIError');
         expect(result.ttfaMs).toBe(0); // No action attempted
 
         // Should provide clear error information
@@ -278,7 +265,8 @@ describe('PBI Integration with Planning System', () => {
 
       // Should fail due to guard violation
       expect(result.success).toBe(false);
-      expect(result.error).toBeInstanceOf(PBIError);
+      expect(result.error).toBeDefined();
+      expect(result.error?.name).toBe('PBIError');
       expect(result.error?.code).toBe(PBIErrorCode.GUARD_FAILED);
       expect(result.verification.checks.guardCheck).toBe(false);
     });
@@ -532,7 +520,8 @@ describe('PBI Integration with Planning System', () => {
 
       // Should fail due to unknown capability
       expect(result.success).toBe(false);
-      expect(result.error).toBeInstanceOf(PBIError);
+      expect(result.error).toBeDefined();
+      expect(result.error?.name).toBe('PBIError');
       expect(result.error?.code).toBe(PBIErrorCode.UNKNOWN_VERB);
     });
   });
@@ -585,7 +574,8 @@ describe('PBI Integration with Planning System', () => {
 
       // Should fail fast with clear error
       expect(result.success).toBe(false);
-      expect(result.error).toBeInstanceOf(PBIError);
+      expect(result.error).toBeDefined();
+      expect(result.error?.name).toBe('PBIError');
       expect(result.error?.code).toBe(PBIErrorCode.UNKNOWN_VERB);
       expect(result.ttfaMs).toBe(0); // No action attempted
 

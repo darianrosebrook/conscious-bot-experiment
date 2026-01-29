@@ -14,7 +14,9 @@ import {
   EnhancedSearchOptions,
 } from '../vector-database';
 
-describe('Enhanced Vector Database', () => {
+const POSTGRES_AVAILABLE = process.env.POSTGRES_AVAILABLE === 'true';
+
+describe.skipIf(!POSTGRES_AVAILABLE)('Enhanced Vector Database', () => {
   let db: EnhancedVectorDatabase;
 
   beforeAll(async () => {

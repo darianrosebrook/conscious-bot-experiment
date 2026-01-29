@@ -1,5 +1,5 @@
 /**
- * Tests for all 10 skill Behavior Tree definitions
+ * Tests for all 11 skill Behavior Tree definitions
  *
  * Verifies that each BT definition is valid JSON and has the required structure
  * for execution by the BehaviorTreeRunner.
@@ -25,10 +25,11 @@ describe('Skill Behavior Tree Definitions', () => {
     'opt.bridge_gap_safe',
     'opt.biome_probe',
     'opt.emergency_retreat_and_block',
+    'opt.craft_wooden_axe',
   ];
 
   describe('File Structure', () => {
-    it('should have all 10 skill definition files', () => {
+    it('should have all 11 skill definition files', () => {
       const files = fs.readdirSync(definitionsDir);
       const jsonFiles = files.filter((file) => file.endsWith('.json'));
 
@@ -37,7 +38,7 @@ describe('Skill Behavior Tree Definitions', () => {
         (file) => !file.endsWith('.option.json')
       );
 
-      expect(skillFiles).toHaveLength(10);
+      expect(skillFiles).toHaveLength(11);
 
       expectedSkills.forEach((skillId) => {
         const fileName = `${skillId.replace('opt.', '')}.json`;

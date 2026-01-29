@@ -15,15 +15,14 @@ import { DynamicCreationFlow } from '@conscious-bot/core';
 import { SkillRegistry } from '@conscious-bot/memory';
 import { BehaviorTreeRunner } from '../../behavior-trees/BehaviorTreeRunner';
 import { HRMInspiredPlanner } from '../../hierarchical-planner/hrm-inspired-planner';
-import { EnhancedGOAPPlanner } from '../../reactive-executor/enhanced-goap-planner';
+import { EnhancedGOAPPlanner } from '../../reactive-executor/goap-planner';
 
 // Mock dependencies
-vi.mock('../../../../core/src/mcp-capabilities/enhanced-registry');
-vi.mock('../../../../core/src/mcp-capabilities/dynamic-creation-flow');
-vi.mock('../../../../memory/src/skills/SkillRegistry');
+vi.mock('@conscious-bot/core');
+vi.mock('@conscious-bot/memory');
 vi.mock('../../behavior-trees/BehaviorTreeRunner');
 vi.mock('../../hierarchical-planner/hrm-inspired-planner');
-vi.mock('../../reactive-executor/enhanced-goap-planner');
+vi.mock('../../reactive-executor/goap-planner');
 
 describe('MCP Capabilities Integration', () => {
   // Helper function to create properly typed contexts

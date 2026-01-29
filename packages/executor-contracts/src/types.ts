@@ -216,6 +216,7 @@ export class PBIError extends Error {
   ) {
     super(message);
     this.name = 'PBIError';
+    Object.setPrototypeOf(this, PBIError.prototype);
   }
 
   // Getter for code field to allow access as error.code

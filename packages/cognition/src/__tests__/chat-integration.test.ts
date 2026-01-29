@@ -13,6 +13,9 @@
 
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 
+const COGNITION_AVAILABLE = process.env.COGNITION_AVAILABLE === 'true';
+const MINECRAFT_AVAILABLE = process.env.MINECRAFT_AVAILABLE === 'true';
+
 // Test configuration
 const TEST_CONFIG = {
   COGNITION_URL: 'http://localhost:3003',
@@ -156,7 +159,7 @@ function analyzeResponseQuality(response: any): {
   };
 }
 
-describe('Chat Integration Tests', () => {
+describe.skipIf(!COGNITION_AVAILABLE || !MINECRAFT_AVAILABLE)('Chat Integration Tests', () => {
   let initialInventory: any;
   let serverStatus: {
     cognition: boolean;

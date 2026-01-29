@@ -13,7 +13,7 @@ import {
   CapabilityRegistryBuilder,
   BUILT_IN_CAPABILITIES,
 } from '../capability-registry';
-import { PBIError } from '../types';
+import { PBIError, isPBIError } from '../types';
 
 describe('CapabilityRegistry', () => {
   let registry: CapabilityRegistry;
@@ -60,13 +60,16 @@ describe('CapabilityRegistry', () => {
         acceptance: () => true,
       };
 
-      expect(() => {
+      let thrownError: unknown;
+      try {
         registry.register(duplicateCapability);
-      }).toThrow(PBIError);
+      } catch (e) {
+        thrownError = e;
+      }
 
-      expect(() => {
-        registry.register(duplicateCapability);
-      }).toThrow('already registered');
+      expect(thrownError).toBeDefined();
+      expect((thrownError as any).name).toBe('PBIError');
+      expect((thrownError as Error).message).toContain('already registered');
     });
 
     it('should return undefined for non-existent capabilities', () => {

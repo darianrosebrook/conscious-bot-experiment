@@ -10,7 +10,10 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import { Pool } from 'pg';
 
-describe('Infrastructure Health Checks', () => {
+const POSTGRES_AVAILABLE = process.env.POSTGRES_AVAILABLE === 'true';
+const OLLAMA_AVAILABLE = process.env.OLLAMA_AVAILABLE === 'true';
+
+describe.skipIf(!POSTGRES_AVAILABLE && !OLLAMA_AVAILABLE)('Infrastructure Health Checks', () => {
   let pool: Pool;
 
   beforeAll(() => {
@@ -23,13 +26,13 @@ describe('Infrastructure Health Checks', () => {
     });
   });
 
-  it('PostgreSQL is accessible', async () => {
+  it.skipIf(!POSTGRES_AVAILABLE)('PostgreSQL is accessible', async () => {
     const result = await pool.query('SELECT version()');
     expect(result.rows).toHaveLength(1);
     expect(result.rows[0].version).toContain('PostgreSQL');
   });
 
-  it('pgvector extension is installed', async () => {
+  it.skipIf(!POSTGRES_AVAILABLE)('pgvector extension is installed', async () => {
     const result = await pool.query(
       "SELECT * FROM pg_extension WHERE extname = 'vector'"
     );
@@ -37,7 +40,7 @@ describe('Infrastructure Health Checks', () => {
     expect(result.rows[0].extname).toBe('vector');
   });
 
-  it('can create and query vector columns', async () => {
+  it.skipIf(!POSTGRES_AVAILABLE)('can create and query vector columns', async () => {
     await pool.query('DROP TABLE IF EXISTS test_vectors');
     await pool.query(`
       CREATE TABLE test_vectors (
@@ -57,7 +60,7 @@ describe('Infrastructure Health Checks', () => {
     await pool.query('DROP TABLE test_vectors');
   });
 
-  it('Ollama service is accessible', async () => {
+  it.skipIf(!OLLAMA_AVAILABLE)('Ollama service is accessible', async () => {
     const ollamaHost = process.env.OLLAMA_HOST || 'http://localhost:11434';
     const response = await fetch(`${ollamaHost}/api/tags`);
     expect(response.ok).toBe(true);
@@ -67,7 +70,7 @@ describe('Infrastructure Health Checks', () => {
     expect(Array.isArray(data.models)).toBe(true);
   });
 
-  it('nomic-embed-text model is available', async () => {
+  it.skipIf(!OLLAMA_AVAILABLE)('nomic-embed-text model is available', async () => {
     const ollamaHost = process.env.OLLAMA_HOST || 'http://localhost:11434';
     const response = await fetch(`${ollamaHost}/api/tags`);
     const data = (await response.json()) as { models: any[] };
@@ -78,7 +81,7 @@ describe('Infrastructure Health Checks', () => {
     expect(nomicModel).toBeDefined();
   });
 
-  it('can generate embeddings via Ollama', async () => {
+  it.skipIf(!OLLAMA_AVAILABLE)('can generate embeddings via Ollama', async () => {
     const ollamaHost = process.env.OLLAMA_HOST || 'http://localhost:11434';
     const response = await fetch(`${ollamaHost}/api/embeddings`, {
       method: 'POST',

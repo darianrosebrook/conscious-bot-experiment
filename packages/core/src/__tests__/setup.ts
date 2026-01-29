@@ -38,33 +38,37 @@ afterEach(() => {
   /**
    * Create a comprehensive mock bot for testing
    */
-  createMockBot: (overrides: any = {}) => ({
-    entity: {
-      position: { x: 100, y: 64, z: 200 },
-      yaw: 0,
-      ...overrides.entity,
-    },
-    health: 20,
-    food: 20,
-    experience: { level: 1 },
-    inventory: {
-      items: vi.fn().mockReturnValue([]),
-    },
-    chat: vi.fn(),
-    look: vi.fn(),
-    setControlState: vi.fn(),
-    on: vi.fn(),
-    removeListener: vi.fn(),
-    quit: vi.fn(),
-    player: { username: 'TestBot' },
-    time: { timeOfDay: 1000 },
-    entities: {},
-    blockAt: vi.fn().mockReturnValue({ name: 'grass_block' }),
-    world: {
-      getBlock: vi.fn().mockReturnValue({ name: 'grass_block' }),
-    },
-    ...overrides,
-  }),
+  createMockBot: (overrides: any = {}) => {
+    const EventEmitter = require('events');
+    const emitter = new EventEmitter();
+    return Object.assign(emitter, {
+      entity: {
+        position: { x: 100, y: 64, z: 200 },
+        yaw: 0,
+        ...overrides.entity,
+      },
+      health: 20,
+      food: 20,
+      experience: { level: 1 },
+      inventory: {
+        items: vi.fn().mockReturnValue([]),
+      },
+      chat: vi.fn(),
+      look: vi.fn(),
+      setControlState: vi.fn(),
+      loadPlugin: vi.fn(),
+      quit: vi.fn(),
+      player: { username: 'TestBot' },
+      time: { timeOfDay: 1000 },
+      entities: {},
+      blockAt: vi.fn().mockReturnValue({ name: 'grass_block' }),
+      world: {
+        getBlock: vi.fn().mockReturnValue({ name: 'grass_block' }),
+      },
+      pathfinder: { goto: vi.fn().mockResolvedValue(undefined) },
+      ...overrides,
+    });
+  },
 
   /**
    * Create a mock cognitive integration for testing

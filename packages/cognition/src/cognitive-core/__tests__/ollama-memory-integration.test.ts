@@ -18,7 +18,7 @@ import { LLMResponse } from '../memory-aware-llm';
 const OLLAMA_AVAILABLE =
   process.env.OLLAMA_AVAILABLE === 'true' || process.env.CI !== 'true';
 
-describe.skipUnless(OLLAMA_AVAILABLE)(
+describe.skipIf(!OLLAMA_AVAILABLE)(
   'Ollama Memory Integration (Live)',
   () => {
     let memoryAwareLLM: MemoryAwareLLMInterface;

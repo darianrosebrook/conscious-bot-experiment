@@ -14,6 +14,8 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { EnhancedMemorySystem } from '../memory-system';
 
+const OLLAMA_AVAILABLE = process.env.OLLAMA_AVAILABLE === 'true';
+
 // Mock the cognitive systems
 vi.mock('@conscious-bot/cognition', () => {
   const mockCognitiveResponse = {
@@ -93,7 +95,7 @@ vi.mock('@conscious-bot/planning', () => {
   };
 });
 
-describe('Memory Integration Scoring and Verification', () => {
+describe.skipIf(!OLLAMA_AVAILABLE)('Memory Integration Scoring and Verification', () => {
   let memorySystem: EnhancedMemorySystem;
   let mockCognitive: any;
   let mockLLM: any;

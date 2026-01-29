@@ -16,7 +16,9 @@ import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
 import { MemoryAwareLLMInterface } from '../memory-aware-llm';
 import { LLMResponse } from '../llm-interface';
 
-describe('Complete Cognitive Architecture Integration', () => {
+const OLLAMA_AVAILABLE = process.env.OLLAMA_AVAILABLE === 'true';
+
+describe.skipIf(!OLLAMA_AVAILABLE)('Complete Cognitive Architecture Integration', () => {
   let memoryAwareLLM: MemoryAwareLLMInterface;
   let mockMemorySystem: any;
 

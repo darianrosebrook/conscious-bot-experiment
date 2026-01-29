@@ -16,6 +16,9 @@ import { EnhancedVectorDatabase } from '../vector-database';
 import { Pool } from 'pg';
 import { EnhancedMemorySystemConfig } from '../memory-system';
 
+const OLLAMA_AVAILABLE = process.env.OLLAMA_AVAILABLE === 'true';
+const POSTGRES_AVAILABLE = process.env.POSTGRES_AVAILABLE === 'true';
+
 // Helper function to create complete config with all required properties
 function createCompleteConfig(
   baseConfig: Partial<EnhancedMemorySystemConfig>
@@ -101,7 +104,7 @@ const TEST_DB_CONFIG = {
   database: 'test_conscious_bot',
 };
 
-describe('Per-Seed Database Isolation', () => {
+describe.skipIf(!OLLAMA_AVAILABLE || !POSTGRES_AVAILABLE)('Per-Seed Database Isolation', () => {
   let testPool: Pool;
 
   beforeAll(async () => {

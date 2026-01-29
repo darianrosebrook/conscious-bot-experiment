@@ -7,18 +7,25 @@
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { EventEmitter } from 'events';
 
 // Mock mineflayer to avoid requiring Minecraft server
 vi.mock('mineflayer', () => ({
-  createBot: vi.fn(() => ({
-    setControlState: vi.fn(),
-    on: vi.fn(),
-    removeListener: vi.fn(),
-    quit: vi.fn(),
-    blockAt: vi.fn(),
-    entity: { position: { x: 100, y: 64, z: 200 } },
-    world: { getBlock: vi.fn() },
-  })),
+  createBot: vi.fn(() => {
+    const emitter = new EventEmitter();
+    return Object.assign(emitter, {
+      entity: { position: { x: 100, y: 64, z: 200 }, yaw: 0 },
+      health: 20, food: 20, experience: { level: 1 },
+      inventory: { items: vi.fn().mockReturnValue([]) },
+      chat: vi.fn(), look: vi.fn(), setControlState: vi.fn(),
+      loadPlugin: vi.fn(), quit: vi.fn(),
+      player: { username: 'TestBot' }, time: { timeOfDay: 1000 },
+      entities: {},
+      blockAt: vi.fn().mockReturnValue({ name: 'grass_block' }),
+      world: { getBlock: vi.fn().mockReturnValue({ name: 'grass_block' }) },
+      pathfinder: { goto: vi.fn().mockResolvedValue(undefined) },
+    });
+  }),
 }));
 
 import { createBot } from 'mineflayer';
@@ -27,24 +34,15 @@ describe('Simple Movement', () => {
   let mockBot: any;
 
   beforeEach(() => {
-    mockBot = {
-      entity: {
-        position: { x: 100, y: 64, z: 200 },
-        yaw: 0,
-      },
-      setControlState: vi.fn(),
-      on: vi.fn(),
-      removeListener: vi.fn(),
-      quit: vi.fn(),
-      blockAt: vi.fn().mockReturnValue({ name: 'grass_block' }),
-      world: {
-        getBlock: vi.fn().mockReturnValue({ name: 'grass_block' }),
-      },
-    };
-
-    // Reset the mocked createBot function
-    (createBot as any).mockReturnValue(mockBot);
     vi.clearAllMocks();
+    // Get a fresh bot from the mocked createBot (which uses EventEmitter)
+    mockBot = createBot({
+      host: 'localhost',
+      port: 25565,
+      username: 'TestBot',
+      version: '1.20.1',
+      auth: 'offline' as const,
+    });
   });
 
   it('should create bot with pathfinder plugin', () => {

@@ -64,6 +64,7 @@ describe('Arbiter Integration Tests', () => {
       id: 'test-task',
       type: 'reactive',
       priority: 0.8,
+      urgency: 0.7,
       complexity: 'simple',
       context: { test: true },
     };
@@ -74,10 +75,12 @@ describe('Arbiter Integration Tests', () => {
     expect(result).toContain('reflex_response');
   });
 
-  test('should emit events for signal processing', (done) => {
-    arbiter.on('signal-received', (signal) => {
-      expect(signal.type).toBe('threat');
-      done();
+  test('should emit events for signal processing', async () => {
+    const signalPromise = new Promise<void>((resolve) => {
+      arbiter.on('signal-received', (signal) => {
+        expect(signal.type).toBe('threat');
+        resolve();
+      });
     });
 
     const signal: Signal = {
@@ -91,6 +94,7 @@ describe('Arbiter Integration Tests', () => {
     };
 
     arbiter.processSignal(signal);
+    await signalPromise;
   });
 
   test('should track performance metrics', async () => {
@@ -98,6 +102,7 @@ describe('Arbiter Integration Tests', () => {
       id: 'perf-test',
       type: 'reasoning',
       priority: 0.5,
+      urgency: 0.5,
       complexity: 'moderate',
       context: {},
     };

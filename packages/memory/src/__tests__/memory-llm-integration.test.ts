@@ -14,6 +14,8 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { EnhancedMemorySystem } from '../memory-system';
 
+const OLLAMA_AVAILABLE = process.env.OLLAMA_AVAILABLE === 'true';
+
 // Mock the LLM interface completely
 vi.mock('@conscious-bot/cognition', () => {
   const mockLLMResponse = {
@@ -277,7 +279,7 @@ vi.mock('@conscious-bot/cognition', () => {
   };
 });
 
-describe('Complete Memory-LLM Integration Flow', () => {
+describe.skipIf(!OLLAMA_AVAILABLE)('Complete Memory-LLM Integration Flow', () => {
   let memorySystem: EnhancedMemorySystem;
   let mockLLM: any;
 

@@ -17,7 +17,9 @@ import {
 } from '../knowledge-graph-core';
 import { EntityExtractionService } from '../entity-extraction-service';
 
-describe('Enhanced Knowledge Graph Core', () => {
+const POSTGRES_AVAILABLE = process.env.POSTGRES_AVAILABLE === 'true';
+
+describe.skipIf(!POSTGRES_AVAILABLE)('Enhanced Knowledge Graph Core', () => {
   let knowledgeGraph: EnhancedKnowledgeGraphCore;
   let extractionService: EntityExtractionService;
 

@@ -7,8 +7,27 @@
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { EventEmitter } from 'events';
+
+vi.mock('mineflayer', () => ({
+  createBot: vi.fn(() => {
+    const emitter = new EventEmitter();
+    return Object.assign(emitter, {
+      entity: { position: { x: 0, y: 64, z: 0 }, yaw: 0 },
+      health: 20, food: 20, experience: { level: 1 },
+      inventory: { items: vi.fn().mockReturnValue([]) },
+      chat: vi.fn(), look: vi.fn(), setControlState: vi.fn(),
+      loadPlugin: vi.fn(), quit: vi.fn(),
+      player: { username: 'TestBot' }, time: { timeOfDay: 1000 },
+      entities: {},
+      blockAt: vi.fn().mockReturnValue({ name: 'grass_block' }),
+      world: { getBlock: vi.fn().mockReturnValue({ name: 'grass_block' }) },
+      pathfinder: { goto: vi.fn().mockResolvedValue(undefined) },
+    });
+  }),
+}));
+
 import { createBot } from 'mineflayer';
-import { createMinecraftCognitiveIntegration } from '@/minecraft-cognitive-integration';
 
 describe('Bot Connection', () => {
   let mockBot: any;
