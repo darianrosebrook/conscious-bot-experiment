@@ -13,6 +13,7 @@
 
 import { Vec3 } from 'vec3';
 import { EventEmitter } from 'events';
+import type { Bot } from 'mineflayer';
 
 // ============================================================================
 // Types and Interfaces
@@ -494,11 +495,29 @@ export class EnvironmentalDetector extends EventEmitter {
   private hazardDetector: EnvironmentalHazardDetector;
   private currentState: EnvironmentalState | null = null;
   private updateInterval: NodeJS.Timeout | null = null;
+  private bot: Bot | null = null;
+  private mcData: any = null;
 
   constructor() {
     super();
     this.weatherPredictor = new WeatherPredictor();
     this.hazardDetector = new EnvironmentalHazardDetector();
+  }
+
+  /**
+   * Set the bot reference for real world data queries
+   */
+  setBot(bot: Bot): void {
+    this.bot = bot;
+    try {
+      const mcDataModule = require('minecraft-data');
+      const mcDataFn = mcDataModule.default || mcDataModule;
+      if (typeof mcDataFn === 'function') {
+        this.mcData = mcDataFn(bot.version);
+      }
+    } catch {
+      // minecraft-data not available, will use fallbacks
+    }
   }
 
   startMonitoring(updateInterval: number = 5000): void {
@@ -507,7 +526,8 @@ export class EnvironmentalDetector extends EventEmitter {
     }
 
     this.updateInterval = setInterval(() => {
-      this.analyzeEnvironment(new Vec3(0, 64, 0)); // Update with current position
+      const pos = this.bot?.entity?.position ?? new Vec3(0, 64, 0);
+      this.analyzeEnvironment(pos);
     }, updateInterval);
 
     console.log('🌍 Environmental monitoring started');
@@ -551,46 +571,77 @@ export class EnvironmentalDetector extends EventEmitter {
   }
 
   private estimateBiomeFromPosition(position: Vec3): string {
-    // Simple biome estimation based on position characteristics
-    const y = position.y;
+    // Try real bot world query first
+    if (this.bot) {
+      try {
+        const biomeId = (this.bot.world as any).getBiome?.(position);
+        if (typeof biomeId === 'number' && this.mcData) {
+          const biomeData = this.mcData.biomes?.[biomeId];
+          if (biomeData?.name) {
+            return biomeData.name;
+          }
+        }
+      } catch {
+        // fall through to position-based heuristic
+      }
+    }
 
+    // Deterministic position-based fallback (no Math.random)
+    const y = position.y;
     if (y > 100) return 'mountains';
     if (y < 50) return 'ocean';
     if (y > 80) return 'hills';
-
-    // Add some randomness for variety
-    const random = Math.random();
-    if (random < 0.4) return 'plains';
-    if (random < 0.7) return 'forest';
-    return 'desert';
+    return 'plains';
   }
 
-  private estimateDimensionFromPosition(position: Vec3): string {
-    // This would detect actual dimension in real implementation
-    // For now, assume overworld unless position suggests otherwise
-    if (position.y < 0 && Math.random() < 0.1) return 'nether';
-    if (position.y > 200 && Math.random() < 0.05) return 'end';
+  private estimateDimensionFromPosition(_position: Vec3): string {
+    // Use bot.game.dimension when available
+    if (this.bot) {
+      try {
+        const dim = (this.bot as any).game?.dimension;
+        if (typeof dim === 'string') {
+          // Normalize Minecraft dimension strings
+          if (dim.includes('nether')) return 'nether';
+          if (dim.includes('end')) return 'end';
+          return 'overworld';
+        }
+      } catch {
+        // fall through
+      }
+    }
+
     return 'overworld';
   }
 
   private async getCurrentWeather(
     biome: BiomeInfo,
-    position: Vec3
+    _position: Vec3
   ): Promise<WeatherInfo> {
-    // Mock weather data - would integrate with actual weather system
-    const weatherTypes: WeatherInfo['type'][] = [
-      'clear',
-      'rain',
-      'snow',
-      'storm',
-      'fog',
-    ];
-    const type = weatherTypes[Math.floor(Math.random() * weatherTypes.length)];
+    // Determine weather type from bot state
+    let type = 'clear' as WeatherInfo['type'];
+
+    if (this.bot) {
+      try {
+        const isRaining = this.bot.isRaining;
+        const thunderState = (this.bot as any).thunderState;
+        if (thunderState && thunderState > 0) {
+          type = 'storm';
+        } else if (isRaining) {
+          // Map to snow if biome is cold
+          type = biome.temperature < 0.15 ? 'snow' : 'rain';
+        }
+      } catch {
+        // fallback to 'clear'
+      }
+    }
+
+    const intensity =
+      type === 'storm' ? 0.8 : type === 'rain' || type === 'snow' ? 0.5 : 0;
 
     const weather: WeatherInfo = {
       type,
-      intensity: Math.random(),
-      duration: 300 + Math.random() * 1200, // 5-25 minutes
+      intensity,
+      duration: 600, // default estimate
       effects: {
         visibility: type === 'fog' ? 0.3 : type === 'storm' ? 0.6 : 1.0,
         movementSpeed: type === 'snow' ? 0.7 : type === 'rain' ? 0.9 : 1.0,
@@ -600,8 +651,8 @@ export class EnvironmentalDetector extends EventEmitter {
       predictedChanges: this.weatherPredictor.predictWeather(
         {
           type,
-          intensity: 0,
-          duration: 0,
+          intensity,
+          duration: 600,
           effects: {
             visibility: 1,
             movementSpeed: 1,

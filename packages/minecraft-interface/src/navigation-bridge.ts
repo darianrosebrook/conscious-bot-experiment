@@ -372,6 +372,9 @@ export class NavigationBridge extends EventEmitter {
     try {
       console.log('🌍 Initializing environmental monitoring...');
 
+      // Wire bot reference into environmental detector for real data queries
+      environmentalDetector.setBot(this.bot);
+
       // Start environmental monitoring
       environmentalDetector.startMonitoring(3000); // Update every 3 seconds
 
@@ -566,8 +569,16 @@ export class NavigationBridge extends EventEmitter {
     const nearbyBlocks = await this.scanNearbyBlocks();
     obstacles.push(...nearbyBlocks);
 
-    // Check light levels for safety (fallback to 15 for daylight)
-    const currentLight = 15; // Default to daylight, would use this.bot.world.getLight() if available
+    // Check light levels for safety
+    let currentLight = 15;
+    try {
+      const worldLight = (this.bot.world as any).getLight?.(botPos.floored());
+      if (typeof worldLight === 'number') {
+        currentLight = worldLight;
+      }
+    } catch {
+      // fallback to 15
+    }
     lightLevels.set(this.positionToKey(botPos), currentLight);
 
     // Detect safe areas (solid ground)
@@ -760,39 +771,53 @@ export class NavigationBridge extends EventEmitter {
   ): Promise<{ success: boolean; error?: string }> {
     const steps = path.map((p) => new Vec3(p.x, p.y, p.z));
     this.currentPath = steps;
+    const maxReplans = 10;
 
     for (let i = 0; i < steps.length; i++) {
       const step = steps[i];
 
-      // Opportunistic replan before each leg (cheap heuristics only)
-      if (this.shouldReplan(step) && (options.dynamicReplanning ?? true)) {
-        this.replanCount++;
-        // refresh observations
-        const info = await this.gatherWorldInformation(target);
-        this.obstaclesDetected = info.obstacles;
-
-        const updated = await this.planPathWithDStarLite(target);
-        if (!updated.success || !updated.path || updated.path.length === 0) {
-          return { success: false, error: 'Failed to replan path' };
-        }
-        // Replace the remainder with the new plan
-        const rest = updated.path.map((p) => new Vec3(p.x, p.y, p.z));
-        steps.splice(i, steps.length - i, ...rest);
-        this.currentPath = steps;
-      }
-
+      // Attempt to move to the step first
       const moved = await this.moveToStep(
         step,
         options.timeout ?? this.config.pathfindingTimeout
       );
-      if (!moved.success) return moved;
+
+      if (moved.success) {
+        continue;
+      }
+
+      // Move failed — try replanning if enabled and under budget
+      if (this.replanCount >= maxReplans || !(options.dynamicReplanning ?? true)) {
+        return moved;
+      }
+
+      this.replanCount++;
+
+      // refresh observations
+      const info = await this.gatherWorldInformation(target);
+      this.obstaclesDetected = info.obstacles;
+
+      const updated = await this.planPathWithDStarLite(target);
+      if (!updated.success || !updated.path || updated.path.length === 0) {
+        return { success: false, error: 'Failed to replan path after move failure' };
+      }
+      // Replace the remainder with the new plan
+      const rest = updated.path.map((p) => new Vec3(p.x, p.y, p.z));
+      steps.splice(i, steps.length - i, ...rest);
+      this.currentPath = steps;
+      // Retry the current index with the new first step
+      i--;
     }
 
     return { success: true };
   }
 
   /**
-   * Move to a specific step in the path
+   * Move to a specific step in the path using event-driven stuck detection.
+   *
+   * Listens for pathfinder events (goal_reached, path_update, path_reset) and
+   * polls position every 2 s to detect stuck states (~6 s) instead of waiting
+   * for a full timeout.
    */
   private async moveToStep(
     step: Vec3,
@@ -801,84 +826,123 @@ export class NavigationBridge extends EventEmitter {
     if (!this.pf || !(this.bot as any).pathfinder) {
       return { success: false, error: 'Pathfinder plugin not initialized' };
     }
-    // Use simple goals implementation for ES modules compatibility
-    const goals = {
-      GoalNear: class GoalNear {
-        constructor(x: number, y: number, z: number, range: number = 1) {
-          this.x = x;
-          this.y = y;
-          this.z = z;
-          this.range = range;
-        }
-        x: number;
-        y: number;
-        z: number;
-        range: number;
 
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        heuristic(_node: any): number {
-          return 0;
-        }
-
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        isEnd(_endNode: any): boolean {
-          return false;
-        }
-
-        hasChanged(): boolean {
-          return false;
-        }
-
-        isValid(): boolean {
-          return true;
-        }
+    // Simple GoalNear compatible with mineflayer-pathfinder
+    const goal = {
+      x: step.x,
+      y: step.y,
+      z: step.z,
+      rangeSq: 1,
+      heuristic(node: any): number {
+        const dx = step.x - node.x;
+        const dy = step.y - node.y;
+        const dz = step.z - node.z;
+        return Math.sqrt(dx * dx + dy * dy + dz * dz);
+      },
+      isEnd(node: any): boolean {
+        const dx = step.x - node.x;
+        const dy = step.y - node.y;
+        const dz = step.z - node.z;
+        return dx * dx + dy * dy + dz * dz <= 1;
+      },
+      hasChanged(): boolean {
+        return false;
+      },
+      isValid(): boolean {
+        return true;
       },
     };
 
-    console.log('🔍 Using simple goals implementation');
-    console.log('🔍 Goals object:', goals);
-    console.log('🔍 GoalNear available:', !!goals.GoalNear);
-    console.log('🔍 GoalNear type:', typeof goals.GoalNear);
+    return new Promise<{ success: boolean; error?: string }>((resolve) => {
+      let resolved = false;
+      const finish = (result: { success: boolean; error?: string }) => {
+        if (resolved) return;
+        resolved = true;
+        cleanup();
+        resolve(result);
+      };
 
-    if (!goals.GoalNear) {
-      console.error('❌ GoalNear is undefined in goals object');
-      return { success: false, error: 'GoalNear is undefined' };
-    }
+      // --- Position-history sliding window for stuck detection ---
+      const POLL_INTERVAL = 2000; // ms
+      const STUCK_WINDOW = 3; // number of samples (6 s at 2 s intervals)
+      const STUCK_THRESHOLD = 0.5; // blocks
+      const positionHistory: Vec3[] = [];
 
-    const goal = new goals.GoalNear(step.x, step.y, step.z, 1);
-    console.log('✅ Goal created successfully:', !!goal);
+      const stuckPoll = setInterval(() => {
+        if (resolved) return;
+        const pos = this.bot.entity.position.clone();
+        positionHistory.push(pos);
+        if (positionHistory.length > STUCK_WINDOW) {
+          positionHistory.shift();
+        }
+        if (positionHistory.length === STUCK_WINDOW) {
+          const oldest = positionHistory[0];
+          const newest = positionHistory[positionHistory.length - 1];
+          const moved = oldest.distanceTo(newest);
+          if (moved < STUCK_THRESHOLD) {
+            console.log(
+              `🚫 Stuck detected: moved ${moved.toFixed(2)} blocks in ${STUCK_WINDOW * (POLL_INTERVAL / 1000)}s`
+            );
+            try {
+              this.bot.pathfinder.stop();
+            } catch {}
+            finish({ success: false, error: 'Stuck: insufficient movement progress' });
+          }
+        }
+      }, POLL_INTERVAL);
 
-    // Prefer the promise-based API with a hard timeout
-    const result = await Promise.race([
-      (this.bot as any).pathfinder.goto(goal),
-      new Promise<{ success: boolean; error?: string }>((_, reject) =>
-        setTimeout(() => reject(new Error('Step movement timeout')), timeoutMs)
-      ),
-    ]).then(
-      () => ({ success: true }),
-      (e: any) => ({ success: false, error: e?.message ?? String(e) })
-    );
+      // --- Hard timeout safety net ---
+      const hardTimeout = setTimeout(() => {
+        console.log(`⏰ Hard timeout reached (${timeoutMs}ms)`);
+        try {
+          this.bot.pathfinder.stop();
+        } catch {}
+        finish({ success: false, error: 'Step movement timeout' });
+      }, timeoutMs);
 
-    return result;
-  }
+      // --- Pathfinder event listeners ---
+      const onGoalReached = () => {
+        finish({ success: true });
+      };
 
-  /**
-   * Determine if replanning is needed
-   */
-  private shouldReplan(currentStep: Vec3): boolean {
-    if (!this.config.enableDynamicReplanning) return false;
+      const onPathUpdate = (results: any) => {
+        if (results?.status === 'noPath') {
+          console.log('🚫 Path unreachable (noPath)');
+          try {
+            this.bot.pathfinder.stop();
+          } catch {}
+          finish({ success: false, error: 'Path unreachable' });
+        }
+      };
 
-    // If many fresh obstacles are close, prefer a replan
-    const nearby = this.obstaclesDetected.filter(
-      (o) => o.distance < this.config.obstacleDetectionRadius
-    );
-    if (nearby.length > this.config.replanThreshold) return true;
+      const onPathReset = () => {
+        console.log('🔄 Path reset (stuck signal from pathfinder)');
+        try {
+          this.bot.pathfinder.stop();
+        } catch {}
+        finish({ success: false, error: 'Pathfinder stuck (path_reset)' });
+      };
 
-    // If we are diverging too far from next waypoint, also replan
-    const dist = this.bot.entity.position.distanceTo(currentStep);
-    if (dist > 5) return true;
+      // --- Cleanup ---
+      const cleanup = () => {
+        clearInterval(stuckPoll);
+        clearTimeout(hardTimeout);
+        try { this.bot.removeListener('goal_reached' as any, onGoalReached); } catch {}
+        try { this.bot.removeListener('path_update' as any, onPathUpdate); } catch {}
+        try { this.bot.removeListener('path_reset' as any, onPathReset); } catch {}
+      };
 
-    return false;
+      // --- Attach listeners and kick off movement ---
+      this.bot.on('goal_reached' as any, onGoalReached);
+      this.bot.on('path_update' as any, onPathUpdate);
+      this.bot.on('path_reset' as any, onPathReset);
+
+      try {
+        this.bot.pathfinder.setGoal(goal);
+      } catch (err: any) {
+        finish({ success: false, error: err?.message ?? String(err) });
+      }
+    });
   }
 
   /**
@@ -1183,13 +1247,33 @@ export class NavigationBridge extends EventEmitter {
         minZ: Math.min(start.z - 50, target.z - 50),
         maxZ: Math.max(start.z + 50, target.z + 50),
       },
-      // Mock samples to let the D* façade build something plausible
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      isWalkable: (_pos: WorldPosition) => true,
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      getBlockType: (_pos: WorldPosition) => 'stone',
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      isHazardous: (_pos: WorldPosition) => false,
+      isWalkable: (pos: WorldPosition) => {
+        try {
+          const block = this.bot.blockAt(new Vec3(pos.x, pos.y, pos.z));
+          if (!block) return true; // unknown = assume walkable
+          return block.boundingBox !== 'block';
+        } catch {
+          return true;
+        }
+      },
+      getBlockType: (pos: WorldPosition) => {
+        try {
+          const block = this.bot.blockAt(new Vec3(pos.x, pos.y, pos.z));
+          return block?.name ?? 'air';
+        } catch {
+          return 'air';
+        }
+      },
+      isHazardous: (pos: WorldPosition) => {
+        try {
+          const block = this.bot.blockAt(new Vec3(pos.x, pos.y, pos.z));
+          if (!block) return false;
+          const hazardBlocks = ['lava', 'fire', 'cactus', 'magma_block', 'sweet_berry_bush'];
+          return hazardBlocks.some((h) => block.name.includes(h));
+        } catch {
+          return false;
+        }
+      },
     };
     try {
       return this.navigationSystem.buildGraph(worldRegion);
@@ -1237,9 +1321,16 @@ export class NavigationBridge extends EventEmitter {
         target
       );
 
-      // Store prediction result
+      // Store prediction result (capped to prevent unbounded growth)
       const predictionId = `${this.bot.entity.position.x}_${this.bot.entity.position.z}_${target.x}_${target.z}`;
       this.predictionResults.set(predictionId, prediction);
+      if (this.predictionResults.size > 100) {
+        // Evict oldest entries
+        const keys = Array.from(this.predictionResults.keys());
+        for (let i = 0; i < keys.length - 100; i++) {
+          this.predictionResults.delete(keys[i]);
+        }
+      }
 
       // Share successful patterns with social learning system
       if (this.socialLearningEnabled && prediction.confidence > 0.7) {
@@ -1273,15 +1364,54 @@ export class NavigationBridge extends EventEmitter {
    * Generate terrain features for neural network analysis
    */
   private async generateTerrainFeatures(position: Vec3): Promise<any> {
-    // This would integrate with the actual Minecraft world
-    // For now, return mock features based on current world info
-    const lightLevel = 15; // Default daylight
-    const biome = 'plains'; // Default biome
+    // Query real world data with fallbacks
+    let lightLevel = 15;
+    let biome = 'plains';
+    let blockType = 'stone';
+    let hardness = 1.5;
+    let transparency = 0;
+
+    try {
+      const worldLight = (this.bot.world as any).getLight?.(position.floored());
+      if (typeof worldLight === 'number') {
+        lightLevel = worldLight;
+      }
+    } catch {
+      // fallback
+    }
+
+    try {
+      const biomeId = (this.bot.world as any).getBiome?.(position);
+      if (typeof biomeId === 'number') {
+        const mcDataModule = await import('minecraft-data');
+        const mcDataFn = mcDataModule.default || mcDataModule;
+        if (typeof mcDataFn === 'function') {
+          const mcData = mcDataFn(this.bot.version);
+          const biomeData = mcData.biomes?.[biomeId];
+          if (biomeData?.name) {
+            biome = biomeData.name;
+          }
+        }
+      }
+    } catch {
+      // fallback
+    }
+
+    try {
+      const block = this.bot.blockAt(position);
+      if (block) {
+        blockType = block.name;
+        hardness = block.hardness ?? 1.5;
+        transparency = block.transparent ? 1 : 0;
+      }
+    } catch {
+      // fallback
+    }
 
     return {
-      blockType: 'stone',
-      hardness: 1.5,
-      transparency: 0,
+      blockType,
+      hardness,
+      transparency,
       lightLevel,
       biome,
       elevation: position.y,
@@ -1388,6 +1518,11 @@ class TerrainAnalyzer {
 
     const terrainType = await this.performTerrainAnalysis(_position, _radius);
     this.analysisCache.set(cacheKey, terrainType);
+    // Cap cache size
+    if (this.analysisCache.size > 200) {
+      const firstKey = this.analysisCache.keys().next().value;
+      if (firstKey) this.analysisCache.delete(firstKey);
+    }
     this.lastAnalysis = Date.now();
 
     return terrainType;
@@ -1518,6 +1653,8 @@ class DynamicReconfigurator {
     terrain: TerrainType;
     config: NavigationConfig;
   }> = [];
+  private terrainCheckInterval: NodeJS.Timeout | null = null;
+  private static readonly MAX_HISTORY = 50;
 
   constructor(
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -1526,7 +1663,7 @@ class DynamicReconfigurator {
     private _navigationSystem: MockNavigationSystem
   ) {
     // Set up periodic terrain checking during navigation
-    setInterval(() => this.checkTerrainChanges(), 2000); // Check every 2 seconds
+    this.terrainCheckInterval = setInterval(() => this.checkTerrainChanges(), 2000); // Check every 2 seconds
   }
 
   /**

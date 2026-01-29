@@ -72,6 +72,7 @@ export class HybridArbiterIntegration extends EventEmitter {
   private config: HybridArbiterConfig;
 
   private isRunning = false;
+  private isProcessingSignals = false;
   private signalProcessingInterval?: NodeJS.Timeout;
   private currentGoals: HRMGoalCandidate[] = [];
   private gameStateHistory: GameStateSnapshot[] = [];
@@ -140,11 +141,16 @@ export class HybridArbiterIntegration extends EventEmitter {
 
     this.isRunning = true;
 
-    // Start periodic signal processing
-    this.signalProcessingInterval = setInterval(
-      () => this.processGameSignals(),
-      this.config.signalProcessingInterval
-    );
+    // Start periodic signal processing with concurrency guard
+    this.signalProcessingInterval = setInterval(async () => {
+      if (this.isProcessingSignals) return;
+      this.isProcessingSignals = true;
+      try {
+        await this.processGameSignals();
+      } finally {
+        this.isProcessingSignals = false;
+      }
+    }, this.config.signalProcessingInterval);
 
     console.log('🚀 Hybrid Arbiter Integration started');
     this.emit('started');
@@ -159,6 +165,7 @@ export class HybridArbiterIntegration extends EventEmitter {
     }
 
     this.isRunning = false;
+    this.isProcessingSignals = false;
 
     if (this.signalProcessingInterval) {
       clearInterval(this.signalProcessingInterval);
@@ -460,29 +467,42 @@ export class HybridArbiterIntegration extends EventEmitter {
     const health = bot.health || 20;
     const food = bot.food || 20;
 
-    // Get light level
+    // Get light level from world
     let lightLevel = 15;
     try {
-      // Note: getLight method doesn't exist on WorldSync
-      lightLevel = 15; // Default to full light
-    } catch (error) {
-      console.warn('Failed to get light level:', error);
+      const pos = bot.entity.position.floored();
+      const worldLight = (bot.world as any).getLight?.(pos);
+      if (typeof worldLight === 'number') {
+        lightLevel = worldLight;
+      }
+    } catch {
+      // fallback to 15
     }
 
     // Get time of day
     const timeOfDay = bot.time.timeOfDay || 6000;
 
-    // Get weather (simplified)
-    const weather = 'clear'; // Would need to implement weather detection
+    // Get weather from bot state
+    const weather: string = bot.isRaining ? 'rain' : 'clear';
 
-    // Get biome
+    // Get biome via world API + minecraft-data lookup
     let biome = 'plains';
     try {
-      const biomeObj = bot.world.getBiome(bot.entity.position);
-      // Note: biomeObj is a number, not an object with name property
-      biome = 'plains'; // Default biome
-    } catch (error) {
-      console.warn('Failed to get biome:', error);
+      const pos = bot.entity.position;
+      const biomeId = (bot.world as any).getBiome?.(pos);
+      if (typeof biomeId === 'number') {
+        const mcDataModule = await import('minecraft-data');
+        const mcDataFn = mcDataModule.default || mcDataModule;
+        if (typeof mcDataFn === 'function') {
+          const mcData = mcDataFn(bot.version);
+          const biomeData = mcData.biomes?.[biomeId] ?? mcData.biomesByName?.plains;
+          if (biomeData?.name) {
+            biome = biomeData.name;
+          }
+        }
+      }
+    } catch {
+      // fallback to 'plains'
     }
 
     // Get inventory
