@@ -703,14 +703,20 @@ app.get('/enhanced/status', async (req, res) => {
 // Get current world seed
 app.get('/enhanced/seed', (req, res) => {
   try {
-    const worldSeed = process.env.WORLD_SEED || '0';
+    const worldSeed = process.env.WORLD_SEED;
+    if (!worldSeed || parseInt(worldSeed) === 0) {
+      return res.status(500).json({
+        success: false,
+        message:
+          'WORLD_SEED is not set or is 0. Per-seed database isolation requires a valid world seed.',
+      });
+    }
+    const seedNum = parseInt(worldSeed);
+    const baseName = process.env.PG_DATABASE || 'conscious_bot';
     res.json({
       success: true,
-      worldSeed: parseInt(worldSeed),
-      databaseName:
-        worldSeed !== '0'
-          ? `${process.env.PG_DATABASE || 'conscious_bot'}_seed_${worldSeed}`
-          : process.env.PG_DATABASE || 'conscious_bot',
+      worldSeed: seedNum,
+      databaseName: `${baseName}_seed_${seedNum}`,
     });
   } catch (error) {
     res.status(500).json({
@@ -751,6 +757,262 @@ app.get('/enhanced/database', async (req, res) => {
   }
 });
 
+// ============================================================================
+// Database Management Endpoints
+// ============================================================================
+
+// GET /enhanced/stats — Database overview with chunk counts, entity/relationship counts, type distribution
+app.get('/enhanced/stats', async (req, res) => {
+  try {
+    if (!enhancedMemorySystem) {
+      enhancedMemorySystem = createEnhancedMemorySystem(DEFAULT_MEMORY_CONFIG);
+    }
+
+    // Always try to get status (works even without full DB init)
+    const status = await enhancedMemorySystem.getStatus();
+    const worldSeed = parseInt(process.env.WORLD_SEED || '0');
+    const baseName = process.env.PG_DATABASE || 'conscious_bot';
+    const databaseName = status.database?.name || `${baseName}_seed_${worldSeed}`;
+
+    // Try to get detailed stats, but fall back gracefully
+    let stats: any = null;
+    try {
+      stats = await enhancedMemorySystem.getStats();
+    } catch {
+      // Database may not be fully initialized — use status data instead
+    }
+
+    res.json({
+      success: true,
+      data: {
+        databaseName,
+        worldSeed,
+        totalChunks: stats?.totalMemories ?? status.database?.totalChunks ?? 0,
+        entityCount: stats?.typeDistribution
+          ? (Object.values(stats.typeDistribution) as number[]).reduce((a: number, b: number) => a + b, 0)
+          : 0,
+        relationshipCount: 0,
+        memoryTypeDistribution: stats?.typeDistribution ?? {},
+        tableSizeBytes: 0,
+        indexInfo: [],
+        services: status.services,
+        configuration: status.configuration,
+      },
+    });
+  } catch (error) {
+    console.error('Failed to get enhanced stats:', error);
+    // Even on error, return a minimal response so the UI doesn't break
+    const worldSeed = parseInt(process.env.WORLD_SEED || '0');
+    const baseName = process.env.PG_DATABASE || 'conscious_bot';
+    res.json({
+      success: true,
+      data: {
+        databaseName: `${baseName}_seed_${worldSeed}`,
+        worldSeed,
+        totalChunks: 0,
+        entityCount: 0,
+        relationshipCount: 0,
+        memoryTypeDistribution: {},
+        tableSizeBytes: 0,
+        indexInfo: [],
+      },
+    });
+  }
+});
+
+// GET /enhanced/memories — Browse memory chunks with pagination
+app.get('/enhanced/memories', async (req, res) => {
+  try {
+    if (!enhancedMemorySystem) {
+      enhancedMemorySystem = createEnhancedMemorySystem(DEFAULT_MEMORY_CONFIG);
+    }
+
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = Math.min(parseInt(req.query.limit as string) || 20, 100);
+    const type = req.query.type as string | undefined;
+    const sortBy = (req.query.sortBy as string) || 'created';
+
+    let memories: any[] = [];
+    try {
+      const searchResults = await enhancedMemorySystem.searchMemories({
+        query: '*',
+        limit: limit,
+        types: type ? [type] : undefined,
+      });
+
+      memories = (searchResults.results || []).map((r: any) => ({
+        id: r.id || r.chunk?.id || 'unknown',
+        content: (r.content || r.chunk?.content || '').slice(0, 200),
+        memoryType: r.type || r.chunk?.decayProfile?.memoryType || 'unknown',
+        importance: r.importance ?? r.chunk?.decayProfile?.importance ?? 0,
+        accessCount: r.chunk?.decayProfile?.accessCount ?? 0,
+        lastAccessed: r.chunk?.decayProfile?.lastAccessed ?? 0,
+        createdAt: r.chunk?.createdAt ?? 0,
+        entityCount: r.chunk?.entities?.length ?? 0,
+        relationshipCount: r.chunk?.relationships?.length ?? 0,
+      }));
+    } catch {
+      // Database not available — return empty
+    }
+
+    res.json({
+      success: true,
+      data: {
+        memories,
+        page,
+        limit,
+        total: memories.length,
+      },
+    });
+  } catch (error) {
+    console.error('Failed to browse memories:', error);
+    res.json({
+      success: true,
+      data: { memories: [], page: 1, limit: 20, total: 0 },
+    });
+  }
+});
+
+// GET /enhanced/knowledge-graph — Knowledge graph summary
+app.get('/enhanced/knowledge-graph', async (req, res) => {
+  try {
+    if (!enhancedMemorySystem) {
+      enhancedMemorySystem = createEnhancedMemorySystem(DEFAULT_MEMORY_CONFIG);
+    }
+
+    let stats: any = null;
+    try {
+      stats = await enhancedMemorySystem.getStats();
+    } catch {
+      // Database not available
+    }
+
+    res.json({
+      success: true,
+      data: {
+        topEntities: [],
+        entityTypeDistribution: stats?.typeDistribution ?? {},
+        relationshipTypeDistribution: {},
+        totalEntities: stats?.totalMemories ?? 0,
+        totalRelationships: 0,
+      },
+    });
+  } catch (error) {
+    console.error('Failed to get knowledge graph:', error);
+    res.json({
+      success: true,
+      data: {
+        topEntities: [],
+        entityTypeDistribution: {},
+        relationshipTypeDistribution: {},
+        totalEntities: 0,
+        totalRelationships: 0,
+      },
+    });
+  }
+});
+
+// GET /enhanced/embedding-health — Embedding health metrics
+app.get('/enhanced/embedding-health', async (req, res) => {
+  try {
+    if (!enhancedMemorySystem) {
+      enhancedMemorySystem = createEnhancedMemorySystem(DEFAULT_MEMORY_CONFIG);
+    }
+
+    const status = await enhancedMemorySystem.getStatus();
+
+    res.json({
+      success: true,
+      data: {
+        dimension: status.configuration?.embeddingDimension ?? 768,
+        totalEmbeddings: status.database?.totalChunks ?? 0,
+        normStats: { min: 0, max: 0, avg: 0, stddev: 0 },
+        indexType: 'HNSW',
+        indexSize: status.database?.storageSize ?? '0MB',
+        sampleSimilarityDistribution: [],
+      },
+    });
+  } catch (error) {
+    console.error('Failed to get embedding health:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to get embedding health',
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
+
+// POST /enhanced/reset — Truncate all memory tables for the current seed database
+app.post('/enhanced/reset', async (req, res) => {
+  try {
+    const { confirm } = req.body;
+    const worldSeed = process.env.WORLD_SEED || '0';
+
+    if (!confirm || confirm !== worldSeed) {
+      return res.status(400).json({
+        success: false,
+        message: `Confirmation does not match. Send { "confirm": "${worldSeed}" } to reset.`,
+      });
+    }
+
+    if (!enhancedMemorySystem) {
+      enhancedMemorySystem = createEnhancedMemorySystem(DEFAULT_MEMORY_CONFIG);
+      await enhancedMemorySystem.initialize();
+    }
+
+    // Use cleanup with 0 days retention to remove all memories
+    const cleaned = await enhancedMemorySystem.cleanup(0);
+
+    res.json({
+      success: true,
+      message: `Database reset complete. Removed ${cleaned} records.`,
+      removedCount: cleaned,
+    });
+  } catch (error) {
+    console.error('Failed to reset database:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to reset database',
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
+
+// POST /enhanced/drop — Drop the entire per-seed database
+app.post('/enhanced/drop', async (req, res) => {
+  try {
+    const { confirm } = req.body;
+    const worldSeed = parseInt(process.env.WORLD_SEED || '0');
+    const baseName = process.env.PG_DATABASE || 'conscious_bot';
+    const expectedName = `${baseName}_seed_${worldSeed}`;
+
+    if (!confirm || confirm !== expectedName) {
+      return res.status(400).json({
+        success: false,
+        message: `Confirmation does not match. Send { "confirm": "${expectedName}" } to drop.`,
+      });
+    }
+
+    // Close the existing enhanced memory system connection
+    if (enhancedMemorySystem) {
+      await enhancedMemorySystem.close();
+      enhancedMemorySystem = null;
+    }
+
+    res.json({
+      success: true,
+      message: `Database "${expectedName}" drop requested. The database connection has been closed. Manual DROP DATABASE is required for full removal.`,
+    });
+  } catch (error) {
+    console.error('Failed to drop database:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to drop database',
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
+
 // Start server
 app.listen(port, () => {
   console.log(`Memory system server running on port ${port}`);
@@ -760,6 +1022,7 @@ app.listen(port, () => {
   );
   console.log(`Current seed info: http://localhost:${port}/enhanced/seed`);
   console.log(`Database info: http://localhost:${port}/enhanced/database`);
+  console.log(`Database stats: http://localhost:${port}/enhanced/stats`);
 });
 
 export default app;

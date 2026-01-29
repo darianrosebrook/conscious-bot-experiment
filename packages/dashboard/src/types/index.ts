@@ -96,6 +96,17 @@ export interface Memory {
   score?: number; // salience or retrieval score
 }
 
+// Note types
+export interface Note {
+  id: string;
+  ts: string;
+  type: string;
+  title: string;
+  content: string;
+  source: string;
+  confidence: number;
+}
+
 // Screenshot types
 export interface Screenshot {
   id: string;
@@ -197,6 +208,47 @@ export interface ReplaySession {
   screenshots: Screenshot[];
 }
 
+// Database management types
+export interface DatabaseOverview {
+  databaseName: string;
+  worldSeed: number;
+  totalChunks: number;
+  entityCount: number;
+  relationshipCount: number;
+  memoryTypeDistribution: Record<string, number>;
+  tableSizeBytes: number;
+  indexInfo: { name: string; size: string; type: string }[];
+}
+
+export interface MemoryChunkSummary {
+  id: string;
+  content: string;
+  memoryType: string;
+  importance: number;
+  accessCount: number;
+  lastAccessed: number;
+  createdAt: number;
+  entityCount: number;
+  relationshipCount: number;
+}
+
+export interface KnowledgeGraphSummary {
+  topEntities: { name: string; type: string; connectionCount: number }[];
+  entityTypeDistribution: Record<string, number>;
+  relationshipTypeDistribution: Record<string, number>;
+  totalEntities: number;
+  totalRelationships: number;
+}
+
+export interface EmbeddingHealth {
+  dimension: number;
+  totalEmbeddings: number;
+  normStats: { min: number; max: number; avg: number; stddev: number };
+  indexType: string;
+  indexSize: string;
+  sampleSimilarityDistribution: { bucket: string; count: number }[];
+}
+
 // UI State types
 export interface DashboardState {
   isLive: boolean;
@@ -206,6 +258,7 @@ export interface DashboardState {
   tasks: Task[];
   events: Event[];
   memories: Memory[];
+  notes: Note[];
   environment: Environment | null;
   currentScreenshot: Screenshot | null;
   inventory: InventoryItem[];

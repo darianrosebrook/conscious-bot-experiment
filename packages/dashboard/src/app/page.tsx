@@ -5,6 +5,7 @@ import {
   Activity,
   BarChart3,
   Brain,
+  Database,
   FileText,
   History,
   ListChecks,
@@ -14,7 +15,6 @@ import {
   PlayCircle,
   RefreshCw,
   Search,
-  TrendingUp,
   UploadCloud,
 } from 'lucide-react';
 
@@ -28,6 +28,7 @@ import { Pill } from '@/components/pill';
 import { EmptyState } from '@/components/empty-state';
 import { InventoryDisplay } from '@/components/inventory-display';
 import { EvaluationPanel } from '@/components/evaluation-panel';
+import { DatabasePanel } from '@/components/database-panel';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -75,6 +76,9 @@ function ConsciousMinecraftDashboardContent() {
     hud,
     thoughts,
     tasks,
+    events,
+    memories,
+    notes,
     environment,
     inventory,
     plannerData,
@@ -82,12 +86,16 @@ function ConsciousMinecraftDashboardContent() {
     setHud,
     addThought,
     setTasks,
+    setEvents,
+    setMemories,
+    setNotes,
     setEnvironment,
     setInventory,
     setPlannerData,
     loadThoughtsFromServer,
   } = useDashboardStore();
 
+  const [activeTab, setActiveTab] = useState('live');
   const [intrusion, setIntrusion] = useState('');
   const [botState, setBotState] = useState<BotState | null>(null);
   const [botConnections, setBotConnections] = useState<BotConnection[]>([
@@ -740,6 +748,17 @@ function ConsciousMinecraftDashboardContent() {
                 });
               }
             });
+
+            // Update memories store for sidebar rendering
+            const mapped = memoriesData.memories.map((m: any) => ({
+              id: m.id,
+              ts: m.timestamp || new Date().toISOString(),
+              type: m.type || 'episodic',
+              text: m.content || '',
+              tags: m.tags,
+              score: m.score ?? m.salience,
+            }));
+            setMemories(mapped);
           }
         }
 
@@ -767,6 +786,15 @@ function ConsciousMinecraftDashboardContent() {
                 });
               }
             });
+
+            // Update events store for sidebar rendering
+            const mapped = eventsData.events.map((e: any) => ({
+              id: e.id,
+              ts: e.timestamp || new Date().toISOString(),
+              kind: e.type || e.kind || 'unknown',
+              payload: { content: e.content, ...(e.payload || {}) },
+            }));
+            setEvents(mapped);
           }
         }
 
@@ -794,6 +822,18 @@ function ConsciousMinecraftDashboardContent() {
                 });
               }
             });
+
+            // Update notes store for sidebar rendering
+            const mapped = notesData.notes.map((n: any) => ({
+              id: n.id,
+              ts: n.timestamp || new Date().toISOString(),
+              type: n.type || 'reflection',
+              title: n.title || '',
+              content: n.content || '',
+              source: n.source || 'unknown',
+              confidence: n.confidence ?? 0,
+            }));
+            setNotes(mapped);
           }
         }
 
@@ -879,6 +919,9 @@ function ConsciousMinecraftDashboardContent() {
     setInventory,
     thoughts,
     addThought,
+    setEvents,
+    setMemories,
+    setNotes,
     setBotState,
     setBotConnections,
     setHud,
@@ -920,7 +963,7 @@ function ConsciousMinecraftDashboardContent() {
           </div>
           <div className="font-semibold tracking-wide">Cognitive Stream</div>
           <nav className="ml-6 hidden md:flex items-center gap-4 text-sm text-zinc-300">
-            <Tabs defaultValue="live" className="w-auto">
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-auto">
               <TabsList className="bg-zinc-900/50">
                 <TabsTrigger value="live" className="hover:text-zinc-100">
                   Live
@@ -928,14 +971,8 @@ function ConsciousMinecraftDashboardContent() {
                 <TabsTrigger value="evaluation" className="hover:text-zinc-100">
                   Evaluation
                 </TabsTrigger>
-                <TabsTrigger value="memories" className="hover:text-zinc-100">
-                  Memories
-                </TabsTrigger>
-                <TabsTrigger value="events" className="hover:text-zinc-100">
-                  Events
-                </TabsTrigger>
-                <TabsTrigger value="settings" className="hover:text-zinc-100">
-                  Settings
+                <TabsTrigger value="database" className="hover:text-zinc-100">
+                  Database
                 </TabsTrigger>
               </TabsList>
             </Tabs>
@@ -1034,7 +1071,7 @@ function ConsciousMinecraftDashboardContent() {
 
       {/* Main Content with Tabs */}
       <div className="h-[calc(100vh-136px)]">
-        <Tabs defaultValue="live" className="h-full">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="h-full">
           <TabsContent value="live" className="h-full mt-0">
             <div className="grid h-full grid-cols-12 gap-3 p-3">
               {/* Left: Tasks, Planner, Reflective Notes, Environment, Events, Memories */}
@@ -1245,12 +1282,44 @@ function ConsciousMinecraftDashboardContent() {
                   icon={<FileText className="size-4" />}
                   tight
                 >
-                  <EmptyState
-                    icon={FileText}
-                    title="No reflective notes"
-                    description="Reflective insights will appear here as the bot processes experiences."
-                    className="p-3"
-                  />
+                  {notes.length > 0 ? (
+                    <div className="flex flex-col gap-2 p-2">
+                      {notes.slice(0, 5).map((note) => (
+                        <div
+                          key={note.id}
+                          className="rounded-lg border border-zinc-800 bg-zinc-950 p-2.5"
+                        >
+                          <div className="flex items-center justify-between text-[11px] text-zinc-400 mb-1">
+                            <Pill>{note.type}</Pill>
+                            <time className="tabular-nums">
+                              {formatTime(note.ts)}
+                            </time>
+                          </div>
+                          {note.title && (
+                            <div className="text-xs font-medium text-zinc-200 mb-0.5">
+                              {note.title}
+                            </div>
+                          )}
+                          <p className="text-xs text-zinc-300 overflow-hidden text-ellipsis line-clamp-2">
+                            {note.content}
+                          </p>
+                          <div className="flex items-center justify-between mt-1.5">
+                            <Pill>{note.source}</Pill>
+                            <span className="text-[10px] text-zinc-500">
+                              {Math.round(note.confidence * 100)}%
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <EmptyState
+                      icon={FileText}
+                      title="No reflective notes"
+                      description="Reflective insights will appear here as the bot processes experiences."
+                      className="p-3"
+                    />
+                  )}
                 </Section>
 
                 <Section title="Environment" icon={<Map className="size-4" />}>
@@ -1283,19 +1352,68 @@ function ConsciousMinecraftDashboardContent() {
                 </Section>
 
                 <Section title="Events" icon={<History className="size-4" />}>
-                  <EmptyState
-                    icon={History}
-                    title="No events recorded"
-                    description="Events will appear here as the bot interacts with the world."
-                  />
+                  {events.length > 0 ? (
+                    <div className="flex flex-col gap-2">
+                      {events.slice(-8).reverse().map((event) => (
+                        <div
+                          key={event.id}
+                          className="rounded-lg border border-zinc-800 bg-zinc-950 p-2.5"
+                        >
+                          <div className="flex items-center justify-between text-[11px] text-zinc-400 mb-1">
+                            <Pill>{event.kind}</Pill>
+                            <time className="tabular-nums">
+                              {formatTime(event.ts)}
+                            </time>
+                          </div>
+                          <p className="text-xs text-zinc-300 overflow-hidden text-ellipsis line-clamp-2">
+                            {(event.payload?.content as string) ||
+                              (event.payload?.title as string) ||
+                              event.kind}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <EmptyState
+                      icon={History}
+                      title="No events recorded"
+                      description="Events will appear here as the bot interacts with the world."
+                    />
+                  )}
                 </Section>
 
                 <Section title="Memories" icon={<Brain className="size-4" />}>
-                  <EmptyState
-                    icon={Brain}
-                    title="No memories available"
-                    description="Memories will appear here as the bot forms and recalls experiences."
-                  />
+                  {memories.length > 0 ? (
+                    <div className="flex flex-col gap-2">
+                      {memories.slice(-6).reverse().map((memory) => (
+                        <div
+                          key={memory.id}
+                          className="rounded-lg border border-zinc-800 bg-zinc-950 p-2.5"
+                        >
+                          <div className="flex items-center justify-between text-[11px] text-zinc-400 mb-1">
+                            <Pill>{memory.type}</Pill>
+                            <time className="tabular-nums">
+                              {formatTime(memory.ts)}
+                            </time>
+                          </div>
+                          <p className="text-xs text-zinc-300 overflow-hidden text-ellipsis line-clamp-2">
+                            {memory.text}
+                          </p>
+                          {memory.score != null && (
+                            <div className="mt-1 text-[10px] text-zinc-500">
+                              Salience: {Math.round(memory.score * 100)}%
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <EmptyState
+                      icon={Brain}
+                      title="No memories available"
+                      description="Memories will appear here as the bot forms and recalls experiences."
+                    />
+                  )}
                 </Section>
               </aside>
 
@@ -1746,7 +1864,7 @@ function ConsciousMinecraftDashboardContent() {
                 <EvaluationPanel />
               </aside>
 
-              {/* Center: Evaluation Charts and Details */}
+              {/* Center: Evaluation Details */}
               <main className="col-span-12 md:col-span-8 flex flex-col gap-3 overflow-hidden">
                 <Section
                   title="Evaluation Overview"
@@ -1758,67 +1876,21 @@ function ConsciousMinecraftDashboardContent() {
                       <h3 className="text-lg font-semibold text-zinc-200 mb-2">
                         Evaluation Dashboard
                       </h3>
-                      <p className="text-sm text-zinc-400 mb-4">
-                        Real-time monitoring of evaluation metrics, performance
-                        benchmarks, and system health.
-                      </p>
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                        <div className="text-center">
-                          <div className="text-2xl font-bold text-green-500">
-                            87.5%
-                          </div>
-                          <div className="text-xs text-zinc-500">
-                            Overall Score
-                          </div>
-                        </div>
-                        <div className="text-center">
-                          <div className="text-2xl font-bold text-blue-500">
-                            92.3%
-                          </div>
-                          <div className="text-xs text-zinc-500">
-                            Success Rate
-                          </div>
-                        </div>
-                        <div className="text-center">
-                          <div className="text-2xl font-bold text-orange-500">
-                            2.4s
-                          </div>
-                          <div className="text-xs text-zinc-500">
-                            Avg Planning
-                          </div>
-                        </div>
-                        <div className="text-center">
-                          <div className="text-2xl font-bold text-purple-500">
-                            1.8s
-                          </div>
-                          <div className="text-xs text-zinc-500">
-                            Avg Execution
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </Section>
-
-                <Section
-                  title="Performance Trends"
-                  icon={<TrendingUp className="size-4" />}
-                >
-                  <div className="rounded-xl border border-zinc-800 bg-zinc-950 p-6">
-                    <div className="text-center">
-                      <TrendingUp className="size-12 text-zinc-600 mx-auto mb-4" />
-                      <h3 className="text-lg font-semibold text-zinc-200 mb-2">
-                        Performance Analytics
-                      </h3>
                       <p className="text-sm text-zinc-400">
-                        Historical performance data and trend analysis will be
-                        displayed here.
+                        Real-time evaluation metrics and run history are
+                        available in the Evaluation Panel on the left. Select a
+                        run to see detailed results here.
                       </p>
                     </div>
                   </div>
                 </Section>
               </main>
             </div>
+          </TabsContent>
+
+          {/* Database Tab Content */}
+          <TabsContent value="database" className="h-full mt-0">
+            <DatabasePanel />
           </TabsContent>
         </Tabs>
       </div>
