@@ -26,6 +26,7 @@ import {
 } from './hybrid-arbiter-integration';
 // Import real planning coordinator
 import { createIntegratedPlanningCoordinator } from '@conscious-bot/planning';
+import type { Bot } from 'mineflayer';
 import { mineflayer as startMineflayerViewer } from 'prismarine-viewer';
 
 // Import viewer enhancements
@@ -206,24 +207,36 @@ function startThoughtGeneration() {
         return; // Bot not ready
       }
 
-      // Send a simple status thought
-      const success =
-        await minecraftInterface.observationMapper.sendThoughtToCognition(
-          `Bot is active and monitoring environment`,
-          'status'
-        );
+      // Check if already executing a plan — don't overlap
+      const status = minecraftInterface.planExecutor.getExecutionStatus();
+      if (status.isExecuting) {
+        return; // Already running a planning cycle
+      }
 
-      if (success) {
-        console.log('🧠 Status thought sent successfully');
+      // Send a contextual thought to cognition (preserve existing behavior)
+      const worldState = minecraftInterface.observationMapper.mapBotStateToPlanningContext(bot);
+      const healthPct = Math.round((worldState.worldState.health / 20) * 100);
+      const hungerPct = Math.round((worldState.worldState.hunger / 20) * 100);
+      const thought = `Health: ${healthPct}%, Hunger: ${hungerPct}%. Observing environment and deciding next action.`;
+
+      minecraftInterface.observationMapper.sendThoughtToCognition(thought, 'status')
+        .catch(() => {}); // Fire-and-forget, don't block execution
+
+      // Execute an autonomous planning cycle
+      console.log('🔄 Starting autonomous planning cycle...');
+      const result = await minecraftInterface.planExecutor.executePlanningCycle();
+
+      if (result.success) {
+        console.log(`✅ Planning cycle complete: ${result.executedSteps}/${result.totalSteps} steps executed`);
       } else {
-        console.warn('⚠️ Failed to send status thought');
+        console.log(`⚠️ Planning cycle ended: ${result.error || 'no plan generated'} (${result.executedSteps}/${result.totalSteps} steps)`);
       }
     } catch (error) {
-      console.error('❌ Error in thought generation cycle:', error);
+      console.error('❌ Error in autonomous planning cycle:', error instanceof Error ? error.message : error);
     }
-  }, 10000); // Every 10 seconds
+  }, 15000); // Every 15 seconds
 
-  console.log('✅ Automatic thought generation started (10s intervals)');
+  console.log('✅ Autonomous planning loop started (15s intervals)');
 }
 
 /**
@@ -233,7 +246,7 @@ function stopThoughtGeneration() {
   if (thoughtGenerationInterval) {
     clearInterval(thoughtGenerationInterval);
     thoughtGenerationInterval = null;
-    console.log('🛑 Automatic thought generation stopped');
+    console.log('🛑 Autonomous planning loop stopped');
   }
 }
 
@@ -353,8 +366,8 @@ function setupBotStateWebSocket() {
         const state = minecraftInterface.botAdapter.getStatus();
         if (state?.data?.worldState) {
           const hudData = {
-            health: state.data.worldState.health || 0,
-            food: state.data.worldState.hunger || 0,
+            health: state.data.worldState.player?.health ?? 0,
+            food: state.data.worldState.player?.food ?? 0,
             energy: state.data.currentState?.energy || 1,
             safety: state.data.currentState?.safety || 0.9,
             social: state.data.currentState?.social || 0.7,
@@ -1137,12 +1150,72 @@ app.get('/state', async (req, res) => {
       });
     }
 
-    const bot = minecraftInterface.botAdapter.getBot();
+    let bot: Bot | null = null;
+    try {
+      bot = minecraftInterface.botAdapter.getBot();
+    } catch (error) {
+      console.error(
+        '[Minecraft Interface] Failed to get bot instance:',
+        error instanceof Error ? error.message : error
+      );
+      // Return basic state if bot is not available
+      return res.json({
+        success: true,
+        status: 'disconnected',
+        data: {
+          position: { x: 0, y: 64, z: 0 },
+          health: 0,
+          food: 0,
+          inventory: {
+            items: [],
+            totalSlots: 36,
+            usedSlots: 0,
+          },
+        },
+        isAlive: false,
+      });
+    }
+
+    if (!bot) {
+      return res.json({
+        success: true,
+        status: 'disconnected',
+        data: {
+          position: { x: 0, y: 64, z: 0 },
+          health: 0,
+          food: 0,
+          inventory: {
+            items: [],
+            totalSlots: 36,
+            usedSlots: 0,
+          },
+        },
+        isAlive: false,
+      });
+    }
 
     console.log('🔍 [MINECRAFT INTERFACE] Got connected bot, mapping state...');
 
     const gameState =
       minecraftInterface.observationMapper.mapBotStateToPlanningContext(bot);
+
+    // Safely extract inventory state with fallback
+    let inventoryState;
+    try {
+      inventoryState =
+        minecraftInterface.observationMapper.extractInventoryState(bot);
+    } catch (error) {
+      console.error(
+        '[Minecraft Interface] Failed to extract inventory state:',
+        error instanceof Error ? error.message : error
+      );
+      // Fallback to empty inventory
+      inventoryState = {
+        items: [],
+        totalSlots: 36,
+        usedSlots: 0,
+      };
+    }
 
     // Convert to format expected by cognition system
     const convertedState = {
@@ -1177,9 +1250,7 @@ app.get('/state', async (req, res) => {
         },
         health: gameState.worldState.health,
         food: gameState.worldState.hunger,
-        inventory: minecraftInterface.observationMapper.extractInventoryState(
-          gameState.bot
-        ),
+        inventory: inventoryState,
       },
       isAlive: gameState.worldState.health > 0,
     };
