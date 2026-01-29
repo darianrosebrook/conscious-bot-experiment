@@ -275,6 +275,16 @@ export class MinecraftSignalProcessor {
     if (!this.explorationHistory.has(positionKey)) {
       this.explorationHistory.add(positionKey);
 
+      // Cap exploration history to prevent unbounded growth
+      if (this.explorationHistory.size > 10000) {
+        const iter = this.explorationHistory.values();
+        // Remove oldest 1000 entries
+        for (let i = 0; i < 1000; i++) {
+          const val = iter.next().value;
+          if (val) this.explorationHistory.delete(val);
+        }
+      }
+
       return {
         type: 'exploration',
         intensity: 30, // Moderate baseline exploration drive
@@ -1034,6 +1044,20 @@ export class MinecraftSignalProcessor {
     }
 
     this.goalProgressHistory.set(goalId, history);
+
+    // Evict completed goals to prevent unbounded Map growth
+    if (goal.progress >= goal.target) {
+      this.activeGoals.delete(goalId);
+      this.goalProgressHistory.delete(goalId);
+    }
+
+    // Also evict stale goals (no update in 10 minutes)
+    for (const [id, g] of this.activeGoals) {
+      if (currentTime - g.lastUpdate > 600000) {
+        this.activeGoals.delete(id);
+        this.goalProgressHistory.delete(id);
+      }
+    }
   }
 
   /**
