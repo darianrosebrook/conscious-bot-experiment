@@ -1,4 +1,4 @@
-Sterling × Minecraft: Capability Rigs for a General Reasoning Substrate
+# Sterling × Minecraft: Capability Rigs for a General Reasoning Substrate
 
 Purpose
 
@@ -10,7 +10,7 @@ Sterling remains an external Python service providing graph search + learned edg
 
 ⸻
 
-Global invariants (apply to every rig)
+## Global invariants (apply to every rig)
 
 These are not “features.” They are certifiability gates that every rig must satisfy.
 	1.	Deterministic replay
@@ -32,63 +32,63 @@ If time vs risk vs resource burn tradeoffs exist, represent them explicitly (wei
 
 ⸻
 
-Capability rig index (what we will prove)
+## Capability rig index (what we will prove)
 
 Rigs are grouped as “minimal proving suites.” Each rig targets one or more primitives and has a crisp certification plan: signature tests, performance tests, transfer tests.
 
-Rig A: Inventory transformation planning
+### Rig A: Inventory transformation planning
 Proves primitives: 1, 16, 17, 19, 20
 Status: implemented baseline (crafting), needs certification harness tightening
 
-Rig B: Capability gating and legality
+### Rig B: Capability gating and legality
 Proves primitives: 2, 16, 19, 20
 Status: planned (tool tiers + station gating)
 
-Rig C: Temporal planning with capacity and batching
+### Rig C: Temporal planning with capacity and batching
 Proves primitives: 3, 18, 16, 17, 19
 Status: planned (furnaces + burn time + parallel slots)
 
-Rig D: Multi-strategy acquisition with environment-conditioned priors
+### Rig D: Multi-strategy acquisition with environment-conditioned priors
 Proves primitives: 4, 17, 18, 19, 20 (and optionally 10 if risk modeled)
 Status: planned (mine vs trade vs loot vs substitute)
 
-Rig E: Hierarchical planning (macro over micro controllers)
+### Rig E: Hierarchical planning (macro over micro controllers)
 Proves primitives: 5, 16, 17, 19
 Status: planned (waypoints macro + Mineflayer micro)
 
-Rig F: Goal-conditioned valuation under scarcity
+### Rig F: Goal-conditioned valuation under scarcity
 Proves primitives: 6, 18, 16, 17, 19
 Status: planned (keep/drop/store given goals)
 
-Rig G: Feasibility + partial-order structure planning
+### Rig G: Feasibility + partial-order structure planning
 Proves primitives: 7, 16, 17, 19
 Status: planned (shelter build sequencing under support/reachability constraints)
 
-Rig H: Systems synthesis in a deterministic simulator
+### Rig H: Systems synthesis in a deterministic simulator
 Proves primitives: 8, 14, 16, 19
 Status: planned (farm layout first; redstone later)
 
-Rig I: Epistemic planning (belief-state + active sensing)
+### Rig I: Epistemic planning (belief-state + active sensing)
 Proves primitives: 11, 19, 17 (and 13 if commitment decisions included)
 Status: planned (structure localization via probes)
 
-Rig J: Invariant maintenance (receding horizon control)
+### Rig J: Invariant maintenance (receding horizon control)
 Proves primitives: 12, 18, 17, 19
 Status: planned (base light/food/tool buffers)
 
-Rig K: Irreversibility and commitment planning
+### Rig K: Irreversibility and commitment planning
 Proves primitives: 13, 19, 20
 Status: planned (villager trade locking + “verify before commit”)
 
-Rig L: Contingency planning with exogenous events
+### Rig L: Contingency planning with exogenous events
 Proves primitives: 9, 18, 19
 Status: later (nightfall/hunger ticks modeled as forced edges)
 
-Rig M: Risk-aware planning (tail risk)
+### Rig M: Risk-aware planning (tail risk)
 Proves primitives: 10, 18, 17, 19
 Status: later (chance constraints, CVaR-ish objectives)
 
-Rig N: Fault diagnosis and repair (hypotheses → tests → fix)
+### Rig N: Fault diagnosis and repair (hypotheses → tests → fix)
 Proves primitives: 15, 11, 19
 Status: later (jammed system diagnosis)
 
@@ -96,7 +96,7 @@ Note: rigs L–N are “later” not because Minecraft can’t do them, but beca
 
 ⸻
 
-Standard rig template
+## Standard rig template
 
 Each rig below uses the same structure.
 
@@ -111,7 +111,7 @@ H) Common footguns and how this rig avoids them
 
 ⸻
 
-Rig A: Inventory transformation planning (resource → product)
+### Rig A: Inventory transformation planning (resource → product)
 
 A) Primitives and formal signature
 Primary: 1 deterministic transformation planning
@@ -147,7 +147,7 @@ Status: Implemented baseline. Next work is certification hardening: strict valid
 
 ⸻
 
-Rig B: Capability gating and legality
+### Rig B: Capability gating and legality
 
 A) Primitives and formal signature
 Primary: 2 capability gating and legality
@@ -182,7 +182,7 @@ Status: Planned. This is the natural next rig after A.
 
 ⸻
 
-Rig C: Temporal planning with durations, batching, and capacity
+### Rig C: Temporal planning with durations, batching, and capacity
 
 A) Primitives and formal signature
 Primary: 3 temporal planning
@@ -217,7 +217,7 @@ Status: Planned. Comes after B if you want “smelting chains” as a certified 
 
 ⸻
 
-Rig D: Multi-strategy acquisition (alternatives, failure modes, world-conditioned priors)
+### Rig D: Multi-strategy acquisition (alternatives, failure modes, world-conditioned priors)
 
 A) Primitives and formal signature
 Primary: 4 multi-strategy acquisition
@@ -249,7 +249,7 @@ Status: Planned.
 
 ⸻
 
-Rig E: Hierarchical planning (macro policy over micro controllers)
+### Rig E: Hierarchical planning (macro policy over micro controllers)
 
 A) Primitives and formal signature
 Primary: 5 hierarchical planning
@@ -282,7 +282,7 @@ Status: Planned.
 
 ⸻
 
-Rig F: Goal-conditioned valuation under scarcity (keep/drop/allocate)
+### Rig F: Goal-conditioned valuation under scarcity (keep/drop/allocate)
 
 A) Primitives and formal signature
 Primary: 6 valuation under scarcity
@@ -314,7 +314,7 @@ Status: Planned.
 
 ⸻
 
-Rig G: Feasibility under constraints and partial-order structure (build sequencing)
+### Rig G: Feasibility under constraints and partial-order structure (build sequencing)
 
 A) Primitives and formal signature
 Primary: 7 feasibility + partial order
@@ -346,7 +346,7 @@ Status: Planned.
 
 ⸻
 
-Rig H: Systems synthesis (compose components to satisfy a behavioral spec)
+### Rig H: Systems synthesis (compose components to satisfy a behavioral spec)
 
 A) Primitives and formal signature
 Primary: 8 synthesis
@@ -378,7 +378,7 @@ Status: Planned (farm first; redstone later).
 
 ⸻
 
-Rig I: Epistemic planning (belief-state, active sensing)
+### Rig I: Epistemic planning (belief-state, active sensing)
 
 A) Primitives and formal signature
 Primary: 11 epistemic planning
@@ -410,7 +410,7 @@ Status: Planned.
 
 ⸻
 
-Rig J: Invariant maintenance (non-terminal goals; receding horizon)
+### Rig J: Invariant maintenance (non-terminal goals; receding horizon)
 
 A) Primitives and formal signature
 Primary: 12 invariant maintenance
@@ -442,7 +442,7 @@ Status: Planned.
 
 ⸻
 
-Rig K: Irreversibility and commitment planning
+### Rig K: Irreversibility and commitment planning
 
 A) Primitives and formal signature
 Primary: 13 irreversibility
@@ -474,7 +474,7 @@ Status: Planned.
 
 ⸻
 
-Rig L: Contingency planning with exogenous events (policy planning)
+### Rig L: Contingency planning with exogenous events (policy planning)
 
 A) Primitives and formal signature
 Primary: 9 contingency planning
@@ -491,7 +491,7 @@ Status: Later.
 
 ⸻
 
-Rig M: Risk-aware planning (tail risk)
+### Rig M: Risk-aware planning (tail risk)
 
 A) Primitives and formal signature
 Primary: 10 risk-aware
@@ -505,7 +505,7 @@ Status: Later.
 
 ⸻
 
-Rig N: Fault diagnosis and repair
+### Rig N: Fault diagnosis and repair
 
 A) Primitives and formal signature
 Primary: 15 diagnosis/repair
@@ -519,7 +519,7 @@ Status: Later.
 
 ⸻
 
-Implementation priority (capability-first)
+## Implementation priority (capability-first)
 
 Track 1 (tightening what you already have):
 	1.	Rig A certification hardening (validation, canonicalization, trace hashing, execution credit, explanations)
@@ -540,7 +540,7 @@ This ordering is chosen to keep substrate invariants from drifting: temporal and
 
 ⸻
 
-What “done” means for a rig
+## What “done” means for a rig
 
 A rig is not “done” when it returns a plan once. It’s done when it passes:
 	1.	Signature tests
