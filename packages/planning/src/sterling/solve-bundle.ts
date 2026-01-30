@@ -293,11 +293,16 @@ function detectDegeneracyForRationale(
 // ============================================================================
 
 /**
- * Build the default rationale context fields for computeBundleOutput().
+ * Build the rationale context fields for computeBundleOutput().
  *
  * Solvers call this to avoid manually threading 4 fields into every
  * computeBundleOutput() call. Pass the maxNodes constant from the solve
  * payload and the compatReport from preflight linting.
+ *
+ * When objectiveWeights is omitted, DEFAULT_OBJECTIVE_WEIGHTS is used and
+ * source is 'default'. When provided, the caller's weights are used and
+ * source is 'provided'. This allows future solvers to supply non-default
+ * weights without changing the helper interface.
  *
  * Example usage in a solver:
  *   const rationaleCtx = buildDefaultRationaleContext({ compatReport, maxNodes: 5000 });
@@ -306,16 +311,20 @@ function detectDegeneracyForRationale(
 export function buildDefaultRationaleContext(params: {
   compatReport: CompatReport;
   maxNodes: number;
+  objectiveWeights?: ObjectiveWeights;
 }): {
   maxNodes: number;
   objectiveWeightsEffective: ObjectiveWeights;
   objectiveWeightsSource: ObjectiveWeightsSource;
   compatReport: CompatReport;
 } {
+  const hasProvidedWeights = params.objectiveWeights !== undefined;
   return {
     maxNodes: params.maxNodes,
-    objectiveWeightsEffective: DEFAULT_OBJECTIVE_WEIGHTS,
-    objectiveWeightsSource: 'default' as const,
+    objectiveWeightsEffective: hasProvidedWeights
+      ? params.objectiveWeights!
+      : DEFAULT_OBJECTIVE_WEIGHTS,
+    objectiveWeightsSource: hasProvidedWeights ? 'provided' : 'default',
     compatReport: params.compatReport,
   };
 }

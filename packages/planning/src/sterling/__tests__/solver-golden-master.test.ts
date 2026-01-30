@@ -363,7 +363,9 @@ describe('MinecraftCraftingSolver — golden-master', () => {
       const bundle = result.solveMeta!.bundles[0];
       expect(bundle.output.rationale).toBeDefined();
       expect(bundle.output.rationale!.boundingConstraints.maxNodes).toBe(5000);
+      expect(bundle.output.rationale!.boundingConstraints.objectiveWeightsSource).toBe('default');
       expect(bundle.output.rationale!.shapingEvidence.compatValid).toBe(true);
+      expect(bundle.output.rationale!.shapingEvidence.issueCount).toBe(0);
     });
   });
 

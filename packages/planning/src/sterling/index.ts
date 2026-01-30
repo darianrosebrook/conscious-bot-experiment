@@ -115,7 +115,6 @@ export {
   computeBundleOutput,
   createSolveBundle,
   INVENTORY_HASH_CAP,
-  buildDefaultRationaleContext,
 } from './solve-bundle';
 export { lintRules, lintGoal } from './compat-linter';
 export { parseSearchHealth, detectHeuristicDegeneracy } from './search-health';

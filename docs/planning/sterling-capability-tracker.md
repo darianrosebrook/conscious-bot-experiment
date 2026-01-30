@@ -250,16 +250,17 @@ A rig is certified when it passes all three test categories:
 - Fix A: SearchHealth spec (`sterling-search-health-spec.md`) aligned with implementation — `terminationReason` enum, `searchHealthVersion: 1` in example, parser behavior section added.
 - Fix B: `INVENTORY_HASH_CAP` doc comment expanded with semantic boundary warning (audit-only, not for correctness-critical memoization).
 - Fix C: `baseCost` optional semantics clarified — `undefined` means "Sterling default cost." Doc comment on `LintableRule.baseCost`. Module doc updated to "Ten checks."
-- Fix D: Unknown-domain fallback tests added to `compat-linter.test.ts` — 3 tests proving structural checks apply under unknown context, warning behavior documented.
+- Fix D: Unknown-context linter behavior tests added to `compat-linter.test.ts` — 3 tests proving structural checks apply under unknown `solverId`/`executionMode` context. These validate linter behavior, not the WS server's `unknown_domain` error response (which requires a gated E2E test at the `SterlingClient` boundary).
 
 **Milestone 2: Wire SolveRationale into real solver bundles**:
-- Added `buildDefaultRationaleContext()` helper to `solve-bundle.ts` — takes `{ compatReport, maxNodes }`, returns the 4 rationale fields.
+- Added `buildDefaultRationaleContext()` helper to `solve-bundle.ts` — takes `{ compatReport, maxNodes, objectiveWeights? }`, returns the 4 rationale fields. Optional `objectiveWeights` override prevents future clobbering when solvers supply non-default weights.
 - Wired into all 7 `computeBundleOutput()` call sites across 3 solvers:
   - `minecraft-crafting-solver.ts`: 2 call sites, `maxNodes=5000`
   - `minecraft-building-solver.ts`: 3 call sites, `maxNodes=2000`
   - `minecraft-tool-progression-solver.ts`: 2 call sites, `maxNodes=5000`
 - Extracted `maxNodes` literal to a local constant in each solver (no more magic numbers in solve calls vs. rationale).
-- 3 new tests (1/solver) in golden-master files: assert `rationale` is defined, `maxNodes` matches solver constant, `compatValid` matches compat report.
+- 3 new tests (1/solver) in golden-master files: assert `rationale` is defined, `maxNodes` matches solver constant, `compatValid` matches compat report, `issueCount === 0`, `objectiveWeightsSource === 'default'`.
+- Helper is internal to the sterling package (not re-exported from `index.ts`). Solvers import directly from `./solve-bundle`.
 
 **Files changed**: 7 modified (3 solvers, solve-bundle.ts, index.ts, 2 golden-master test files)
 **Test delta**: 213 → 216 (+3 new rationale tests)
