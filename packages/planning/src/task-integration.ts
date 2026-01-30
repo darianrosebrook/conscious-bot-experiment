@@ -16,6 +16,7 @@ import type { MinecraftCraftingSolver } from './sterling/minecraft-crafting-solv
 import type { MinecraftBuildingSolver } from './sterling/minecraft-building-solver';
 import type { MinecraftToolProgressionSolver } from './sterling/minecraft-tool-progression-solver';
 import { resolveRequirement } from './modules/requirements';
+import { CognitionOutbox } from './modules/cognition-outbox';
 
 // Cognitive stream integration for thought-to-task conversion
 interface CognitiveThought {
@@ -179,6 +180,10 @@ export interface Task {
     category: string;
     // Optional requirement snapshot for iteration seven inventory/progress gating
     requirement?: any;
+    /** Epoch ms — task is ineligible for execution until this time (backoff). */
+    nextEligibleAt?: number;
+    /** Machine-readable reason why the task cannot make progress. */
+    blockedReason?: string;
   };
 }
 
@@ -253,6 +258,18 @@ export class EnhancedTaskIntegration extends EventEmitter {
   private minecraftClient: ReturnType<typeof createServiceClients>['minecraft'];
   private solverRegistry = new Map<string, BaseDomainSolver>();
   private _mcDataCache: any = null;
+
+  // Reentrancy guards for thought polling
+  private thoughtPollInFlight = false;
+  private seenThoughtIds = new Set<string>();
+
+  // Non-blocking outbox for cognition side effects
+  private cognitionOutbox = new CognitionOutbox();
+
+  /** Expose the outbox so modular-server can enqueue cognition events. */
+  get outbox(): CognitionOutbox {
+    return this.cognitionOutbox;
+  }
 
   private get craftingSolver(): MinecraftCraftingSolver | undefined {
     return this.solverRegistry.get('minecraft.crafting') as MinecraftCraftingSolver | undefined;
@@ -346,6 +363,10 @@ export class EnhancedTaskIntegration extends EventEmitter {
    * Process actionable thoughts from cognitive stream
    */
   private async processActionableThoughts(): Promise<void> {
+    // Reentrancy guard — skip if a previous poll is still in flight
+    if (this.thoughtPollInFlight) return;
+    this.thoughtPollInFlight = true;
+
     try {
       const actionableThoughts =
         await this.cognitiveStreamClient.getActionableThoughts();
@@ -382,6 +403,8 @@ export class EnhancedTaskIntegration extends EventEmitter {
       }
     } catch (error) {
       console.error(`Error processing actionable thoughts:`, error);
+    } finally {
+      this.thoughtPollInFlight = false;
     }
   }
 
@@ -394,6 +417,19 @@ export class EnhancedTaskIntegration extends EventEmitter {
     try {
       // Skip already processed thoughts
       if (thought.processed) return null;
+
+      // Dedup: skip thoughts we've already seen (cap set at 500)
+      if (this.seenThoughtIds.has(thought.id)) return null;
+      this.seenThoughtIds.add(thought.id);
+      if (this.seenThoughtIds.size > 500) {
+        // Trim oldest entries — Sets iterate in insertion order
+        const iter = this.seenThoughtIds.values();
+        for (let i = 0; i < 100; i++) iter.next();
+        const remaining = new Set<string>();
+        for (const id of iter) remaining.add(id);
+        // Keep the newest entries + the ones we didn't delete
+        this.seenThoughtIds = remaining;
+      }
 
       const content = thought.content.toLowerCase();
 
@@ -621,16 +657,11 @@ export class EnhancedTaskIntegration extends EventEmitter {
    * Mark a thought as processed via cognition service ack endpoint
    */
   private async markThoughtAsProcessed(thoughtId: string): Promise<void> {
-    try {
-      await fetch('http://localhost:3003/api/cognitive-stream/ack', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ thoughtIds: [thoughtId] }),
-        signal: AbortSignal.timeout(5000),
-      });
-    } catch (error) {
-      console.warn('Failed to ack thought as processed:', error);
-    }
+    // Non-blocking: enqueue into the outbox (batched on next flush)
+    this.cognitionOutbox.enqueue(
+      'http://localhost:3003/api/cognitive-stream/ack',
+      { thoughtIds: [thoughtId] }
+    );
   }
 
   /**
@@ -911,6 +942,9 @@ export class EnhancedTaskIntegration extends EventEmitter {
     // Initialize cognitive stream client for thought-to-task conversion
     this.cognitiveStreamClient = new CognitiveStreamClient();
 
+    // Start cognition outbox flush timer
+    this.cognitionOutbox.start();
+
     // Start thought-to-task conversion polling
     this.startThoughtToTaskConversion();
 
@@ -975,6 +1009,15 @@ export class EnhancedTaskIntegration extends EventEmitter {
         requirement, // Add the resolved requirement
       },
     };
+
+    // Check step executability: if no step has a leaf / executable flag,
+    // the task cannot make progress without manual intervention.
+    const hasExecutableStep = task.steps.some(
+      (s) => s.meta?.leaf || s.meta?.executable === true
+    );
+    if (task.steps.length > 0 && !hasExecutableStep) {
+      task.metadata.blockedReason = 'no-executable-plan';
+    }
 
     this.tasks.set(task.id, task);
     this.updateStatistics();
@@ -2116,6 +2159,50 @@ export class EnhancedTaskIntegration extends EventEmitter {
   /**
    * Generate dynamic steps for a task using LLM
    */
+  /**
+   * Derive executor-ready args from step meta's produces/consumes arrays.
+   * Mirrors the logic in modular-server's stepToLeafExecution so that args
+   * are determined once at step-creation time (single source of truth).
+   */
+  private deriveLeafArgs(meta: Record<string, unknown>): Record<string, unknown> | undefined {
+    const leaf = meta.leaf as string | undefined;
+    if (!leaf) return undefined;
+    const produces = (meta.produces as Array<{ name: string; count: number }>) || [];
+    const consumes = (meta.consumes as Array<{ name: string; count: number }>) || [];
+
+    switch (leaf) {
+      case 'dig_block': {
+        const item = produces[0];
+        return { blockType: item?.name || 'oak_log', count: item?.count || 1 };
+      }
+      case 'craft_recipe': {
+        const output = produces[0];
+        return { recipe: output?.name || 'unknown', qty: output?.count || 1 };
+      }
+      case 'smelt': {
+        const output = produces[0];
+        return { item: output?.name || 'unknown' };
+      }
+      case 'place_block': {
+        const consumed = consumes[0];
+        return { item: consumed?.name || 'crafting_table' };
+      }
+      case 'prepare_site':
+      case 'build_module':
+      case 'place_feature':
+      case 'acquire_material': {
+        return {
+          moduleId: meta.moduleId,
+          item: meta.item,
+          count: meta.count,
+          ...((meta as any).args || {}),
+        };
+      }
+      default:
+        return undefined;
+    }
+  }
+
   private async generateDynamicSteps(
     taskData: Partial<Task>
   ): Promise<TaskStep[]> {
@@ -2235,16 +2322,19 @@ export class EnhancedTaskIntegration extends EventEmitter {
     if (!result.solved) return [];
 
     const steps = this.craftingSolver.toTaskSteps(result);
-    return steps.map(s => ({
-      ...s,
-      meta: {
+    return steps.map(s => {
+      const enrichedMeta: Record<string, unknown> = {
         ...s.meta,
         source: 'sterling',
         solverId: this.craftingSolver!.solverId,
         planId: result.planId,
         bundleId: result.solveMeta?.bundles?.[0]?.bundleId,
-      },
-    }));
+        executable: !!s.meta?.leaf,
+      };
+      const args = this.deriveLeafArgs(enrichedMeta);
+      if (args) enrichedMeta.args = args;
+      return { ...s, meta: enrichedMeta };
+    });
   }
 
   /**
@@ -2303,16 +2393,19 @@ export class EnhancedTaskIntegration extends EventEmitter {
     if (!result.solved) return [];
 
     const steps = this.toolProgressionSolver.toTaskSteps(result);
-    return steps.map(s => ({
-      ...s,
-      meta: {
+    return steps.map(s => {
+      const enrichedMeta: Record<string, unknown> = {
         ...s.meta,
         source: 'sterling',
         solverId: this.toolProgressionSolver!.solverId,
         planId: result.planId,
         bundleId: result.solveMeta?.bundles?.[0]?.bundleId,
-      },
-    }));
+        executable: !!s.meta?.leaf,
+      };
+      const args = this.deriveLeafArgs(enrichedMeta);
+      if (args) enrichedMeta.args = args;
+      return { ...s, meta: enrichedMeta };
+    });
   }
 
   /**
@@ -2397,16 +2490,19 @@ export class EnhancedTaskIntegration extends EventEmitter {
     }
 
     const steps = this.buildingSolver.toTaskStepsWithReplan(result, templateId);
-    return steps.map(s => ({
-      ...s,
-      meta: {
+    return steps.map(s => {
+      const enrichedMeta: Record<string, unknown> = {
         ...s.meta,
         source: 'sterling',
         solverId: this.buildingSolver!.solverId,
         planId: result.planId,
         bundleId: result.solveMeta?.bundles?.[0]?.bundleId,
-      },
-    }));
+        executable: !!s.meta?.leaf,
+      };
+      const args = this.deriveLeafArgs(enrichedMeta);
+      if (args) enrichedMeta.args = args;
+      return { ...s, meta: enrichedMeta };
+    });
   }
 
   /**

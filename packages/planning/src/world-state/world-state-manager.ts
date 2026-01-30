@@ -1,4 +1,5 @@
 import { EventEmitter } from 'events';
+import { POLL_TIMEOUT_MS } from '../modules/timeout-policy';
 
 type Vec3 = { x: number; y: number; z: number };
 
@@ -60,13 +61,16 @@ export class WorldStateManager extends EventEmitter {
   async pollOnce(): Promise<void> {
     try {
       const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 2000);
+      const timeout = setTimeout(() => controller.abort(), POLL_TIMEOUT_MS);
       const res = await fetch(`${this.baseUrl}/state`, {
         method: 'GET',
         signal: controller.signal,
       });
       clearTimeout(timeout);
-      if (!res.ok) return;
+      if (!res.ok) {
+        console.warn(`WorldStateManager: poll got HTTP ${res.status} — stale snapshot preserved`);
+        return;
+      }
       const json = (await res.json()) as any;
       const data = json?.data || {};
       const worldState = data.worldState || {};
@@ -110,7 +114,9 @@ export class WorldStateManager extends EventEmitter {
         console.log('WorldStateManager no meaningful change');
       }
     } catch (e) {
-      console.error('WorldStateManager poll error:', e);
+      // Stale-while-revalidate: previous snapshot is intentionally preserved
+      // on fetch failure so downstream consumers always have *some* data.
+      console.warn('WorldStateManager poll failed (stale snapshot preserved):', (e as any)?.message || e);
     }
   }
 

@@ -1,5 +1,7 @@
 // Centralized Minecraft endpoint and resilient HTTP utilities
 
+import { classifyFailure, HEALTH_CHECK_TIMEOUT_MS } from './timeout-policy';
+
 export const MC_ENDPOINT =
   process.env.MINECRAFT_ENDPOINT || 'http://localhost:3005';
 
@@ -51,7 +53,8 @@ export async function mcFetch(
         await new Promise((r) => setTimeout(r, delay));
         continue;
       }
-      mcRecordFailure();
+      // Only trip circuit breaker on server errors, not 4xx (caller bugs)
+      if (res.status >= 500) mcRecordFailure();
       return res;
     } catch (err: any) {
       lastErr = err;
@@ -60,7 +63,10 @@ export async function mcFetch(
         await new Promise((r) => setTimeout(r, delay));
         continue;
       }
-      mcRecordFailure();
+      // AbortError = system busy / timeout — should NOT trip circuit breaker
+      if (classifyFailure(err) !== 'timeout') {
+        mcRecordFailure();
+      }
       throw err;
     }
   }
@@ -110,7 +116,7 @@ export async function checkBotConnection(): Promise<boolean> {
     if (mcCircuitOpen()) return false;
     const response = await mcFetch('/health', {
       method: 'GET',
-      timeoutMs: 2000,
+      timeoutMs: HEALTH_CHECK_TIMEOUT_MS,
     });
     if (response.ok) {
       const status = (await response.json()) as {

@@ -746,6 +746,12 @@ function stepToLeafExecution(
   const meta = step.meta;
   if (!meta?.leaf) return null;
 
+  // If args were pre-derived at step-creation time, pass through directly
+  if (meta.args && typeof meta.args === 'object') {
+    return { leafName: meta.leaf as string, args: meta.args as Record<string, unknown> };
+  }
+
+  // Legacy fallback: derive args from produces/consumes
   const leaf = meta.leaf as string;
   const produces = (meta.produces as Array<{ name: string; count: number }>) || [];
   const consumes = (meta.consumes as Array<{ name: string; count: number }>) || [];
@@ -1569,6 +1575,15 @@ function determineActionType(stepDescription: string): string {
 }
 
 /**
+ * Returns true when the error string indicates the bot is mid-navigation
+ * and the action should be retried next cycle (not counted as a failure).
+ */
+function isNavigatingError(error: string | undefined | null): boolean {
+  if (!error) return false;
+  return /already navigating/i.test(error);
+}
+
+/**
  * Autonomous task executor - Real Action Based Progress
  * Only updates progress when actual bot actions are performed
  */
@@ -1638,21 +1653,19 @@ async function autonomousTaskExecutor() {
         console.log(
           '🧠 [AUTONOMOUS EXECUTOR] Bot is idle — posting lifecycle event to cognition'
         );
+        const prevIdleAt = global.lastIdleEvent || 0;
         global.lastIdleEvent = now;
-        try {
-          await fetch('http://localhost:3003/api/cognitive-stream/events', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              type: 'idle_period',
-              timestamp: now,
-              data: { durationMs: now - (global.lastIdleEvent || now) },
-            }),
-            signal: AbortSignal.timeout(5000),
-          });
-        } catch (e) {
-          console.warn('⚠️ Failed to post idle event to cognition:', e);
-        }
+        enhancedTaskIntegration.outbox.enqueue(
+          'http://localhost:3003/api/cognitive-stream/events',
+          {
+            type: 'idle_period',
+            timestamp: now,
+            data: {
+              durationMs: prevIdleAt ? now - prevIdleAt : 0,
+              activeTaskCount: activeTasks.length,
+            },
+          }
+        );
       }
       return;
     } else {
@@ -1661,8 +1674,26 @@ async function autonomousTaskExecutor() {
       );
     }
 
-    // Execute the highest priority task, prioritizing prerequisite tasks
-    const currentTask = activeTasks[0]; // Tasks are already sorted by priority
+    // Filter out tasks that are blocked or in backoff
+    const eligibleTasks = activeTasks.filter((t) => {
+      // Skip tasks with a blocked reason
+      if (t.metadata?.blockedReason) {
+        return false;
+      }
+      // Skip tasks in exponential backoff
+      if (t.metadata?.nextEligibleAt && Date.now() < t.metadata.nextEligibleAt) {
+        return false;
+      }
+      return true;
+    });
+
+    if (eligibleTasks.length === 0) {
+      console.log('🤖 [AUTONOMOUS EXECUTOR] All active tasks are in backoff or blocked — skipping cycle');
+      return;
+    }
+
+    // Execute the highest priority eligible task, prioritizing prerequisite tasks
+    const currentTask = eligibleTasks[0]; // Tasks are already sorted by priority
 
     console.log(
       `🤖 [AUTONOMOUS EXECUTOR] Executing task: ${currentTask.title} (${currentTask.type})`
@@ -1896,7 +1927,21 @@ async function autonomousTaskExecutor() {
       (s: any) => s.meta?.source === 'sterling' && !s.done
     );
     if (hasSterlingPlan) {
-      const nextStep = currentTask.steps?.find((s: any) => !s.done);
+      // Only consider executable steps (skip narrative / informational steps)
+      const nextStep = currentTask.steps?.find(
+        (s: any) => !s.done && s.meta?.executable !== false
+      );
+
+      // If no executable steps remain but non-done steps exist, the plan is blocked
+      if (!nextStep && currentTask.steps?.some((s: any) => !s.done)) {
+        enhancedTaskIntegration.updateTaskMetadata(currentTask.id, {
+          ...currentTask.metadata,
+          blockedReason: 'no-executable-plan',
+        });
+        console.warn(`⚠️ [Sterling] Task ${currentTask.id} has no remaining executable steps — marking blocked`);
+        return;
+      }
+
       if (nextStep) {
         const leafExec = stepToLeafExecution(nextStep);
         if (leafExec) {
@@ -1910,15 +1955,38 @@ async function autonomousTaskExecutor() {
           if (actionResult?.ok) {
             console.log(`✅ [Sterling] Step ${nextStep.order} completed`);
             await enhancedTaskIntegration.completeTaskStep(currentTask.id, nextStep.id);
+          } else if (isNavigatingError(actionResult?.error)) {
+            // Bot is mid-navigation — retry next cycle, don't count as failure
+            console.log(`🚶 [Sterling] Bot is navigating, will retry next cycle`);
           } else {
             console.warn(
               `⚠️ [Sterling] Step ${nextStep.order} failed: ${actionResult?.error}`
             );
-            // Don't mark done — let retry logic handle it
-            enhancedTaskIntegration.updateTaskMetadata(currentTask.id, {
-              ...currentTask.metadata,
-              retryCount: (currentTask.metadata?.retryCount || 0) + 1,
-            });
+            const newRetryCount = (currentTask.metadata?.retryCount || 0) + 1;
+            const maxRetries = currentTask.metadata?.maxRetries || 3;
+            // Exponential backoff: 1s, 2s, 4s, ... capped at 30s
+            const backoffMs = Math.min(1000 * Math.pow(2, newRetryCount), 30_000);
+
+            if (newRetryCount >= maxRetries) {
+              enhancedTaskIntegration.updateTaskMetadata(currentTask.id, {
+                ...currentTask.metadata,
+                retryCount: newRetryCount,
+                blockedReason: 'max-retries-exceeded',
+              });
+              enhancedTaskIntegration.updateTaskProgress(
+                currentTask.id,
+                currentTask.progress || 0,
+                'failed'
+              );
+              console.log(`❌ [Sterling] Task failed after ${newRetryCount} retries: ${currentTask.title}`);
+            } else {
+              enhancedTaskIntegration.updateTaskMetadata(currentTask.id, {
+                ...currentTask.metadata,
+                retryCount: newRetryCount,
+                nextEligibleAt: Date.now() + backoffMs,
+              });
+              console.log(`🔄 [Sterling] Task in backoff for ${backoffMs}ms (retry ${newRetryCount}/${maxRetries})`);
+            }
           }
           await recomputeProgressAndMaybeComplete(currentTask);
           return; // Sterling handled this execution cycle
@@ -1963,25 +2031,21 @@ async function autonomousTaskExecutor() {
             'completed'
           );
 
-          // Post task_completed event to cognition service
-          try {
-            await fetch('http://localhost:3003/api/cognitive-stream/events', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                type: 'task_completed',
-                timestamp: Date.now(),
-                data: {
-                  taskId: currentTask.id,
-                  taskTitle: currentTask.title,
-                  taskType: currentTask.type,
-                },
-              }),
-              signal: AbortSignal.timeout(5000),
-            });
-          } catch (e) {
-            console.warn('⚠️ Failed to post task_completed event to cognition:', e);
-          }
+          // Post task_completed event to cognition service (non-blocking)
+          enhancedTaskIntegration.outbox.enqueue(
+            'http://localhost:3003/api/cognitive-stream/events',
+            {
+              type: 'task_completed',
+              timestamp: Date.now(),
+              data: {
+                taskId: currentTask.id,
+                taskTitle: currentTask.title,
+                taskType: currentTask.type,
+                completedSteps: execResult.completedSteps || 0,
+                totalSteps: currentTask.steps?.length || 0,
+              },
+            }
+          );
 
           return; // Task completed successfully
         } else {
@@ -2282,12 +2346,25 @@ async function autonomousTaskExecutor() {
 
           return; // Exit early since we successfully executed the leaf
         }
+        // Navigation-busy: retry next cycle, not a failure
+        if (isNavigatingError(actionResult?.error)) {
+          console.log(`🚶 Bot is navigating, will retry next cycle`);
+          return;
+        }
+
         console.error(
           `❌ Leaf execution failed: ${selectedLeaf.leafName} ${actionResult?.error}`
         );
 
         // Increment retry count
         const newRetryCount = retryCount + 1;
+
+        // Exponential backoff
+        const backoffMs = Math.min(1000 * Math.pow(2, newRetryCount), 30_000);
+        enhancedTaskIntegration.updateTaskMetadata(currentTask.id, {
+          ...currentTask.metadata,
+          nextEligibleAt: Date.now() + backoffMs,
+        });
 
         // If resource not found for dig_block, inject exploration step instead of spinning
         if (
@@ -2317,6 +2394,11 @@ async function autonomousTaskExecutor() {
         }
 
         if (newRetryCount >= maxRetries) {
+          enhancedTaskIntegration.updateTaskMetadata(currentTask.id, {
+            ...currentTask.metadata,
+            retryCount: newRetryCount,
+            blockedReason: 'max-retries-exceeded',
+          });
           enhancedTaskIntegration.updateTaskProgress(
             currentTask.id,
             currentTask.progress || 0,
