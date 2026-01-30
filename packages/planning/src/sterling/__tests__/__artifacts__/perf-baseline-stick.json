@@ -1,0 +1,30 @@
+{
+  "meta": {
+    "gitSha": "7b2d1bb125c5d730c55d6a9e055bd638d66a41c1",
+    "sterlingServer": "local (manual — no programmatic version API)",
+    "clientPathway": "raw WebSocket (minimal operator set, not MinecraftCraftingSolver)",
+    "solverId": "minecraft.crafting",
+    "executionMode": "crafting",
+    "contractVersion": 1,
+    "maxNodes": 5000,
+    "objectiveWeightsEffective": {
+      "costWeight": 1,
+      "timeWeight": 0,
+      "riskWeight": 0
+    },
+    "objectiveWeightsSource": "default"
+  },
+  "item": "stick",
+  "solved": true,
+  "nodesExpanded": 4,
+  "frontierPeak": 2,
+  "terminationReason": "goal_found",
+  "solutionPathLength": 3,
+  "branchingEstimate": 1.25,
+  "hMin": 0,
+  "hMax": 4,
+  "hVariance": 3,
+  "pctSameH": 0.75,
+  "searchHealthVersion": 1,
+  "timestamp": "2026-01-30T19:33:19.182Z"
+}

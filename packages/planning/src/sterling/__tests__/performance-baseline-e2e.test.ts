@@ -6,6 +6,19 @@
  * Sterling backend. Proves repeat-solve convergence: after episode
  * feedback, a second solve uses equal or fewer expansions.
  *
+ * Client pathways:
+ * - stick: Raw WebSocket with minimal hand-built operator set (mine, craft).
+ *   This measures backend search performance directly, bypassing the
+ *   MinecraftCraftingSolver rule builder. Acceptable for search baselines
+ *   but does NOT exercise the solver-class bundle pipeline.
+ * - wooden_pickaxe, stone_pickaxe: MinecraftToolProgressionSolver class,
+ *   which exercises the full solver → bundle → searchHealth pipeline.
+ *
+ * Sequential execution: Tests within each describe block run sequentially
+ * (Vitest default for tests within a describe). The describe.sequential()
+ * wrapper enforces this explicitly to prevent file-write races when
+ * multiple workers run.
+ *
  * Prerequisites: Sterling unified server running at ws://localhost:8766
  * Start with: cd sterling && python scripts/utils/sterling_unified_server.py
  *
@@ -15,6 +28,7 @@
 
 import { describe, it, expect, afterAll } from 'vitest';
 import { writeFileSync, mkdirSync } from 'fs';
+import { execSync } from 'child_process';
 import { join } from 'path';
 import { MinecraftToolProgressionSolver } from '../minecraft-tool-progression-solver';
 import { SterlingReasoningService } from '../sterling-reasoning-service';
@@ -28,10 +42,6 @@ const CAP_PREFIX = 'cap:';
 // ---------------------------------------------------------------------------
 
 const shouldRun = !!process.env.STERLING_E2E;
-
-function describeIf(condition: boolean) {
-  return condition ? describe : describe.skip;
-}
 
 // ---------------------------------------------------------------------------
 // Fresh connection per test
@@ -148,7 +158,29 @@ function getTerminal(messages: Record<string, unknown>[]): Record<string, unknow
 // Artifact helpers
 // ---------------------------------------------------------------------------
 
+/** Metadata that makes artifacts interpretable months later without reading code. */
+interface ArtifactMeta {
+  /** conscious-bot git SHA at time of recording */
+  gitSha: string;
+  /** Sterling server identifier (manual — no programmatic server version API yet) */
+  sterlingServer: string;
+  /** Which solver/client pathway produced this baseline */
+  clientPathway: string;
+  /** Solver ID (e.g. 'minecraft.crafting', 'minecraft.tool_progression') */
+  solverId: string;
+  /** Execution mode sent in the wire payload */
+  executionMode: string;
+  /** Contract version */
+  contractVersion: number;
+  /** maxNodes budget for this solve */
+  maxNodes: number;
+  /** Objective weights used (currently always default) */
+  objectiveWeightsEffective: { costWeight: number; timeWeight: number; riskWeight: number };
+  objectiveWeightsSource: string;
+}
+
 interface PerformanceBaseline {
+  meta: ArtifactMeta;
   item: string;
   solved: boolean;
   nodesExpanded: number;
@@ -165,20 +197,52 @@ interface PerformanceBaseline {
 }
 
 interface LearningConvergenceArtifact {
+  meta: ArtifactMeta;
   item: string;
-  solve1: PerformanceBaseline;
-  solve2: PerformanceBaseline;
+  solve1: Omit<PerformanceBaseline, 'meta'>;
+  solve2: Omit<PerformanceBaseline, 'meta'>;
   nodesRatio: number; // solve2.nodesExpanded / solve1.nodesExpanded
   converged: boolean; // nodesRatio <= 1.05
   timestamp: string;
 }
 
-function extractBaseline(
+type BaselineFields = Omit<PerformanceBaseline, 'meta'>;
+
+function getGitSha(): string {
+  try {
+    return execSync('git rev-parse HEAD', { encoding: 'utf-8' }).trim();
+  } catch {
+    return 'unknown';
+  }
+}
+
+const GIT_SHA = getGitSha();
+
+function buildMeta(overrides: {
+  clientPathway: string;
+  solverId: string;
+  executionMode: string;
+  maxNodes: number;
+}): ArtifactMeta {
+  return {
+    gitSha: GIT_SHA,
+    sterlingServer: 'local (manual — no programmatic version API)',
+    clientPathway: overrides.clientPathway,
+    solverId: overrides.solverId,
+    executionMode: overrides.executionMode,
+    contractVersion: 1,
+    maxNodes: overrides.maxNodes,
+    objectiveWeightsEffective: { costWeight: 1.0, timeWeight: 0.0, riskWeight: 0.0 },
+    objectiveWeightsSource: 'default',
+  };
+}
+
+function extractBaselineFields(
   item: string,
   searchHealth: SearchHealthMetrics,
   solutionPathLength: number,
   solved: boolean
-): PerformanceBaseline {
+): BaselineFields {
   return {
     item,
     solved,
@@ -209,7 +273,26 @@ function writeArtifact(filename: string, data: unknown): void {
 // Stick baseline (crafting domain, raw WS)
 // ===========================================================================
 
-describeIf(shouldRun)('A.5 Performance baseline: stick', () => {
+const describeSeqIf = (condition: boolean) =>
+  condition ? describe.sequential : describe.skip;
+
+// ===========================================================================
+// Stick baseline (crafting domain, raw WS — NOT MinecraftCraftingSolver)
+//
+// Uses a hand-built minimal operator set sent directly to Sterling via raw
+// WebSocket. This measures backend search performance without the solver-class
+// rule builder or mcData. Acceptable for search baselines; does NOT exercise
+// the solver-class bundle pipeline.
+// ===========================================================================
+
+describeSeqIf(shouldRun)('A.5 Performance baseline: stick', () => {
+  const STICK_META = buildMeta({
+    clientPathway: 'raw WebSocket (minimal operator set, not MinecraftCraftingSolver)',
+    solverId: 'minecraft.crafting',
+    executionMode: 'crafting',
+    maxNodes: 5000,
+  });
+
   const STICK_RULES = [
     {
       action: 'mine:oak_log',
@@ -261,25 +344,28 @@ describeIf(shouldRun)('A.5 Performance baseline: stick', () => {
     expect(result.type).toBe('complete');
     expect(result.solved).toBe(true);
 
-    const sh = result.searchHealth as SearchHealthMetrics | undefined;
+    // Raw WS: searchHealth is inside metrics, not at top level
+    const metrics = result.metrics as Record<string, unknown> | undefined;
+    const sh = metrics?.searchHealth as SearchHealthMetrics | undefined;
     expect(sh).toBeDefined();
 
     const steps = result.steps as Array<Record<string, unknown>>;
-    const baseline = extractBaseline('stick', sh!, steps.length, true);
+    const fields = extractBaselineFields('stick', sh!, steps.length, true);
 
     // Structural assertions (not value-pinning)
-    expect(baseline.nodesExpanded).toBeGreaterThan(0);
-    expect(baseline.frontierPeak).toBeGreaterThanOrEqual(0);
-    expect(baseline.terminationReason).toBe('goal_found');
-    expect(baseline.solutionPathLength).toBeGreaterThan(0);
-    expect(baseline.searchHealthVersion).toBe(1);
+    expect(fields.nodesExpanded).toBeGreaterThan(0);
+    expect(fields.frontierPeak).toBeGreaterThanOrEqual(0);
+    expect(fields.terminationReason).toBe('goal_found');
+    expect(fields.solutionPathLength).toBeGreaterThan(0);
+    expect(fields.searchHealthVersion).toBe(1);
 
+    const baseline: PerformanceBaseline = { meta: STICK_META, ...fields };
     writeArtifact('perf-baseline-stick.json', baseline);
     console.log(
-      `[A.5] stick: nodesExpanded=${baseline.nodesExpanded}` +
-      ` frontierPeak=${baseline.frontierPeak}` +
-      ` pathLen=${baseline.solutionPathLength}` +
-      ` branching=${baseline.branchingEstimate.toFixed(1)}`
+      `[A.5] stick: nodesExpanded=${fields.nodesExpanded}` +
+      ` frontierPeak=${fields.frontierPeak}` +
+      ` pathLen=${fields.solutionPathLength}` +
+      ` branching=${fields.branchingEstimate.toFixed(1)}`
     );
   });
 
@@ -300,7 +386,8 @@ describeIf(shouldRun)('A.5 Performance baseline: stick', () => {
 
     const result1 = getTerminal(messages1);
     expect(result1.solved).toBe(true);
-    const sh1 = result1.searchHealth as SearchHealthMetrics;
+    const metrics1 = result1.metrics as Record<string, unknown>;
+    const sh1 = metrics1?.searchHealth as SearchHealthMetrics;
     expect(sh1).toBeDefined();
     const steps1 = result1.steps as Array<Record<string, unknown>>;
     const planId1 = result1.planId as string;
@@ -339,21 +426,24 @@ describeIf(shouldRun)('A.5 Performance baseline: stick', () => {
 
     const result2 = getTerminal(messages2);
     expect(result2.solved).toBe(true);
-    const sh2 = result2.searchHealth as SearchHealthMetrics;
+    // Raw WS: searchHealth is inside metrics, not at top level
+    const metrics2 = result2.metrics as Record<string, unknown> | undefined;
+    const sh2 = metrics2?.searchHealth as SearchHealthMetrics | undefined;
     expect(sh2).toBeDefined();
     const steps2 = result2.steps as Array<Record<string, unknown>>;
 
-    const baseline1 = extractBaseline('stick', sh1, steps1.length, true);
-    const baseline2 = extractBaseline('stick', sh2, steps2.length, true);
+    const fields1 = extractBaselineFields('stick', sh1, steps1.length, true);
+    const fields2 = extractBaselineFields('stick', sh2, steps2.length, true);
 
     const nodesRatio = sh1.nodesExpanded > 0
       ? sh2.nodesExpanded / sh1.nodesExpanded
       : 1.0;
 
     const artifact: LearningConvergenceArtifact = {
+      meta: STICK_META,
       item: 'stick',
-      solve1: baseline1,
-      solve2: baseline2,
+      solve1: fields1,
+      solve2: fields2,
       nodesRatio,
       converged: nodesRatio <= 1.05,
       timestamp: new Date().toISOString(),
@@ -375,7 +465,14 @@ describeIf(shouldRun)('A.5 Performance baseline: stick', () => {
 // Wooden pickaxe baseline (tool progression solver)
 // ===========================================================================
 
-describeIf(shouldRun)('A.5 Performance baseline: wooden_pickaxe', () => {
+describeSeqIf(shouldRun)('A.5 Performance baseline: wooden_pickaxe', () => {
+  const WP_META = buildMeta({
+    clientPathway: 'MinecraftToolProgressionSolver (solver-class bundle pipeline)',
+    solverId: 'minecraft.tool_progression',
+    executionMode: 'tool_progression',
+    maxNodes: 5000,
+  });
+
   it('records baseline metrics for wooden_pickaxe solve', async () => {
     const { solver, available } = await freshToolProgressionSolver();
     if (!available) {
@@ -393,24 +490,25 @@ describeIf(shouldRun)('A.5 Performance baseline: wooden_pickaxe', () => {
     const sh = bundle.output.searchHealth;
     expect(sh).toBeDefined();
 
-    const baseline = extractBaseline(
+    const fields = extractBaselineFields(
       'wooden_pickaxe',
       sh!,
       bundle.output.searchStats.solutionPathLength,
       true
     );
 
-    expect(baseline.nodesExpanded).toBeGreaterThan(0);
-    expect(baseline.terminationReason).toBe('goal_found');
-    expect(baseline.solutionPathLength).toBeGreaterThan(0);
-    expect(baseline.searchHealthVersion).toBe(1);
+    expect(fields.nodesExpanded).toBeGreaterThan(0);
+    expect(fields.terminationReason).toBe('goal_found');
+    expect(fields.solutionPathLength).toBeGreaterThan(0);
+    expect(fields.searchHealthVersion).toBe(1);
 
+    const baseline: PerformanceBaseline = { meta: WP_META, ...fields };
     writeArtifact('perf-baseline-wooden-pickaxe.json', baseline);
     console.log(
-      `[A.5] wooden_pickaxe: nodesExpanded=${baseline.nodesExpanded}` +
-      ` frontierPeak=${baseline.frontierPeak}` +
-      ` pathLen=${baseline.solutionPathLength}` +
-      ` branching=${baseline.branchingEstimate.toFixed(1)}`
+      `[A.5] wooden_pickaxe: nodesExpanded=${fields.nodesExpanded}` +
+      ` frontierPeak=${fields.frontierPeak}` +
+      ` pathLen=${fields.solutionPathLength}` +
+      ` branching=${fields.branchingEstimate.toFixed(1)}`
     );
   });
 
@@ -447,11 +545,11 @@ describeIf(shouldRun)('A.5 Performance baseline: wooden_pickaxe', () => {
     const bundle2 = result2.solveMeta!.bundles[0];
     const sh2 = bundle2.output.searchHealth!;
 
-    const baseline1 = extractBaseline(
+    const fields1 = extractBaselineFields(
       'wooden_pickaxe', sh1,
       bundle1.output.searchStats.solutionPathLength, true
     );
-    const baseline2 = extractBaseline(
+    const fields2 = extractBaselineFields(
       'wooden_pickaxe', sh2,
       bundle2.output.searchStats.solutionPathLength, true
     );
@@ -461,9 +559,10 @@ describeIf(shouldRun)('A.5 Performance baseline: wooden_pickaxe', () => {
       : 1.0;
 
     const artifact: LearningConvergenceArtifact = {
+      meta: WP_META,
       item: 'wooden_pickaxe',
-      solve1: baseline1,
-      solve2: baseline2,
+      solve1: fields1,
+      solve2: fields2,
       nodesRatio,
       converged: nodesRatio <= 1.05,
       timestamp: new Date().toISOString(),
@@ -484,7 +583,14 @@ describeIf(shouldRun)('A.5 Performance baseline: wooden_pickaxe', () => {
 // Stone pickaxe baseline (tool progression solver, multi-tier)
 // ===========================================================================
 
-describeIf(shouldRun)('A.5 Performance baseline: stone_pickaxe', () => {
+describeSeqIf(shouldRun)('A.5 Performance baseline: stone_pickaxe', () => {
+  const SP_META = buildMeta({
+    clientPathway: 'MinecraftToolProgressionSolver (solver-class bundle pipeline, multi-tier)',
+    solverId: 'minecraft.tool_progression',
+    executionMode: 'tool_progression',
+    maxNodes: 5000,
+  });
+
   it('records baseline metrics for stone_pickaxe solve', async () => {
     const { solver, available } = await freshToolProgressionSolver();
     if (!available) {
@@ -509,23 +615,23 @@ describeIf(shouldRun)('A.5 Performance baseline: stone_pickaxe', () => {
       expect(sh).toBeDefined();
 
       const tierLabel = i === 0 ? 'stone_pickaxe:wooden_tier' : 'stone_pickaxe:stone_tier';
-      const baseline = extractBaseline(
+      const fields = extractBaselineFields(
         tierLabel,
         sh!,
         bundle.output.searchStats.solutionPathLength,
         bundle.output.solved
       );
 
-      expect(baseline.nodesExpanded).toBeGreaterThan(0);
-      expect(baseline.searchHealthVersion).toBe(1);
+      expect(fields.nodesExpanded).toBeGreaterThan(0);
+      expect(fields.searchHealthVersion).toBe(1);
 
-      allBaselines.push(baseline);
+      allBaselines.push({ meta: SP_META, ...fields });
       console.log(
-        `[A.5] ${tierLabel}: nodesExpanded=${baseline.nodesExpanded}` +
-        ` frontierPeak=${baseline.frontierPeak}` +
-        ` pathLen=${baseline.solutionPathLength}` +
-        ` termination=${baseline.terminationReason}` +
-        ` branching=${baseline.branchingEstimate.toFixed(1)}`
+        `[A.5] ${tierLabel}: nodesExpanded=${fields.nodesExpanded}` +
+        ` frontierPeak=${fields.frontierPeak}` +
+        ` pathLen=${fields.solutionPathLength}` +
+        ` termination=${fields.terminationReason}` +
+        ` branching=${fields.branchingEstimate.toFixed(1)}`
       );
     }
 
@@ -575,12 +681,12 @@ describeIf(shouldRun)('A.5 Performance baseline: stone_pickaxe', () => {
       const sh2 = bundles2[i].output.searchHealth!;
       const tierLabel = i === 0 ? 'stone_pickaxe:wooden_tier' : 'stone_pickaxe:stone_tier';
 
-      const baseline1 = extractBaseline(
+      const fields1 = extractBaselineFields(
         tierLabel, sh1,
         bundles1[i].output.searchStats.solutionPathLength,
         bundles1[i].output.solved
       );
-      const baseline2 = extractBaseline(
+      const fields2 = extractBaselineFields(
         tierLabel, sh2,
         bundles2[i].output.searchStats.solutionPathLength,
         bundles2[i].output.solved
@@ -591,9 +697,10 @@ describeIf(shouldRun)('A.5 Performance baseline: stone_pickaxe', () => {
         : 1.0;
 
       const artifact: LearningConvergenceArtifact = {
+        meta: SP_META,
         item: tierLabel,
-        solve1: baseline1,
-        solve2: baseline2,
+        solve1: fields1,
+        solve2: fields2,
         nodesRatio,
         converged: nodesRatio <= 1.05,
         timestamp: new Date().toISOString(),

@@ -1,0 +1,30 @@
+{
+  "meta": {
+    "gitSha": "7b2d1bb125c5d730c55d6a9e055bd638d66a41c1",
+    "sterlingServer": "local (manual — no programmatic version API)",
+    "clientPathway": "MinecraftToolProgressionSolver (solver-class bundle pipeline)",
+    "solverId": "minecraft.tool_progression",
+    "executionMode": "tool_progression",
+    "contractVersion": 1,
+    "maxNodes": 5000,
+    "objectiveWeightsEffective": {
+      "costWeight": 1,
+      "timeWeight": 0,
+      "riskWeight": 0
+    },
+    "objectiveWeightsSource": "default"
+  },
+  "item": "wooden_pickaxe",
+  "solved": true,
+  "nodesExpanded": 50,
+  "frontierPeak": 48,
+  "terminationReason": "goal_found",
+  "solutionPathLength": 8,
+  "branchingEstimate": 3,
+  "hMin": 0,
+  "hMax": 1,
+  "hVariance": 0.0196,
+  "pctSameH": 0.98,
+  "searchHealthVersion": 1,
+  "timestamp": "2026-01-30T19:33:20.332Z"
+}
