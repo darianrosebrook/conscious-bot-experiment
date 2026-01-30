@@ -1,6 +1,7 @@
 # Sterling searchHealth Instrumentation Spec
 
-**Status**: Spec — not yet implemented in the Python backend.
+**Status**: Implemented (2026-01-29). Python `SearchHealthAccumulator` in `core/search_health.py` uses Welford's online algorithm (O(1) per expansion) instead of list accumulation. `searchHealthVersion: 1` field required. `terminationReason` enum: `goal_found` | `max_nodes` | `frontier_exhausted` | `error` (old values `goal`/`no_solution` are rejected by the TypeScript parser). Verified end-to-end: wooden pickaxe produces healthy metrics, iron tier triggers degeneracy detection.
+
 **Purpose**: Define the minimal instrumentation the Sterling A\* loop must emit so the TypeScript solver can detect heuristic degeneracy and surface search quality in SolveBundle artifacts.
 
 ## What the TypeScript side already has
@@ -28,6 +29,7 @@ The `complete` message must include a `metrics.searchHealth` object:
   "metrics": {
     "planId": "...",
     "searchHealth": {
+      "searchHealthVersion": 1,
       "nodesExpanded": 93,
       "frontierPeak": 42,
       "hMin": 0.0,
@@ -37,7 +39,7 @@ The `complete` message must include a `metrics.searchHealth` object:
       "fMin": 5.0,
       "fMax": 28.0,
       "pctSameH": 0.23,
-      "terminationReason": "goal",
+      "terminationReason": "goal_found",
       "branchingEstimate": 3.2
     }
   }
@@ -48,6 +50,7 @@ The `complete` message must include a `metrics.searchHealth` object:
 
 | Field | Type | Description | How to compute |
 |---|---|---|---|
+| `searchHealthVersion` | int | Protocol version (must be `1`; unknown versions rejected by parser) | Hard-coded to `1` |
 | `nodesExpanded` | int | Total nodes popped from the priority queue | Increment counter on each `heappop` |
 | `frontierPeak` | int | Maximum size the open set reached | Track `max(len(open_set))` after each `heappush` |
 | `hMin` | float | Minimum h(n) observed across expanded nodes | `min(h_values)` |
@@ -57,7 +60,7 @@ The `complete` message must include a `metrics.searchHealth` object:
 | `fMin` | float | Minimum f(n) = g(n) + h(n) observed | `min(f_values)` |
 | `fMax` | float | Maximum f(n) observed | `max(f_values)` |
 | `pctSameH` | float | Fraction of expanded nodes sharing the modal h value (0..1) | Count the most frequent h value, divide by `nodesExpanded` |
-| `terminationReason` | string | One of: `"goal"`, `"max_nodes"`, `"no_solution"` | Set based on why the loop exited |
+| `terminationReason` | string | One of: `"goal_found"`, `"max_nodes"`, `"frontier_exhausted"`, `"error"` | Set based on why the loop exited |
 | `branchingEstimate` | float | Effective branching factor estimate | `total_successors_generated / nodesExpanded` |
 
 ## Where to instrument in the Python A\* loop
@@ -102,7 +105,7 @@ if nodes_expanded > 0:
         "fMin": min(f_values),
         "fMax": max(f_values),
         "pctSameH": modal_h_count / nodes_expanded,
-        "terminationReason": termination_reason,  # "goal" | "max_nodes" | "no_solution"
+        "terminationReason": termination_reason,  # "goal_found" | "max_nodes" | "frontier_exhausted" | "error"
         "branchingEstimate": total_successors / nodes_expanded if nodes_expanded > 0 else 0.0,
     }
 else:
@@ -129,6 +132,15 @@ complete_msg = {
 - If memory is a concern for very large solves, use running accumulators (Welford's online variance algorithm) instead of storing all values. The modal h computation (`pctSameH`) still requires a counter.
 - The instrumentation adds O(1) work per node expansion. No additional search overhead.
 
+## Parser behavior: versioned and warns-on-partial
+
+The TypeScript parser (`search-health.ts`) enforces these contracts:
+
+- **Version gate**: If `searchHealthVersion` is present and not `1`, the parser returns `undefined` and warns in non-production. Unknown future versions are safely ignored (forward-compat).
+- **All-or-nothing fields**: All 11 numeric/enum fields must be present and valid. If any field is missing, NaN, or Infinity, the parser returns `undefined`.
+- **Partial-present warning**: If the `searchHealth` object exists but has fewer than 11 valid fields, the parser warns with the count of valid fields (e.g., `"Partial fields present (2/11)"`). This aids debugging when the Python side emits an incomplete payload.
+- **Old enum rejection**: The old `terminationReason` values `"goal"` and `"no_solution"` are not accepted. Only `"goal_found"`, `"max_nodes"`, `"frontier_exhausted"`, and `"error"` are valid.
+
 ## Validation criteria
 
 Once the Python side emits `searchHealth`, the TypeScript E2E test should be updated:
@@ -137,7 +149,7 @@ Once the Python side emits `searchHealth`, the TypeScript E2E test should be upd
 - expect(bundle.output.searchHealth).toBeUndefined();
 + expect(bundle.output.searchHealth).toBeDefined();
 + expect(bundle.output.searchHealth!.nodesExpanded).toBeGreaterThan(0);
-+ expect(bundle.output.searchHealth!.terminationReason).toBe('goal');
++ expect(bundle.output.searchHealth!.terminationReason).toBe('goal_found');
 ```
 
 ## Known degeneracy cases

@@ -18,8 +18,10 @@ import {
   computeBundleInput,
   computeBundleOutput,
   createSolveBundle,
+  INVENTORY_HASH_CAP,
 } from '../solve-bundle';
-import type { CompatReport } from '../solve-bundle-types';
+import type { CompatReport, ObjectiveWeights, SearchHealthMetrics } from '../solve-bundle-types';
+import { DEFAULT_OBJECTIVE_WEIGHTS } from '../solve-bundle-types';
 
 // ============================================================================
 // canonicalize
@@ -188,6 +190,21 @@ describe('hashInventoryState', () => {
     const inv2 = { oak_log: 3, stick: 2 };
     expect(hashInventoryState(inv1)).toBe(hashInventoryState(inv2));
   });
+
+  it('clamps counts above INVENTORY_HASH_CAP to the cap (100 === 200)', () => {
+    expect(hashInventoryState({ oak_log: 100 }))
+      .toBe(hashInventoryState({ oak_log: 200 }));
+  });
+
+  it('distinguishes counts below cap (63 !== 64)', () => {
+    expect(hashInventoryState({ oak_log: 63 }))
+      .not.toBe(hashInventoryState({ oak_log: 64 }));
+  });
+
+  it('treats at-cap equal to above-cap (64 === 65)', () => {
+    expect(hashInventoryState({ oak_log: 64 }))
+      .toBe(hashInventoryState({ oak_log: 65 }));
+  });
 });
 
 // ============================================================================
@@ -261,6 +278,46 @@ describe('computeBundleInput', () => {
 });
 
 // ============================================================================
+// objectiveWeights in computeBundleInput
+// ============================================================================
+
+describe('objectiveWeights in computeBundleInput', () => {
+  const baseParams = {
+    solverId: 'test.solver',
+    contractVersion: 1,
+    definitions: [{ action: 'craft:test', produces: [] }],
+    inventory: {},
+    goal: { test: 1 },
+    nearbyBlocks: [],
+  };
+
+  it('captures provided objectiveWeights correctly', () => {
+    const weights: ObjectiveWeights = { costWeight: 0.5, timeWeight: 0.3, riskWeight: 0.2 };
+    const input = computeBundleInput({ ...baseParams, objectiveWeights: weights });
+
+    expect(input.objectiveWeightsProvided).toEqual(weights);
+    expect(input.objectiveWeightsEffective).toEqual(weights);
+    expect(input.objectiveWeightsSource).toBe('provided');
+  });
+
+  it('uses DEFAULT_OBJECTIVE_WEIGHTS when objectiveWeights omitted', () => {
+    const input = computeBundleInput(baseParams);
+
+    expect(input.objectiveWeightsProvided).toBeUndefined();
+    expect(input.objectiveWeightsEffective).toEqual(DEFAULT_OBJECTIVE_WEIGHTS);
+    expect(input.objectiveWeightsSource).toBe('default');
+  });
+
+  it('DEFAULT_OBJECTIVE_WEIGHTS has expected values', () => {
+    expect(DEFAULT_OBJECTIVE_WEIGHTS).toEqual({
+      costWeight: 1.0,
+      timeWeight: 0.0,
+      riskWeight: 0.0,
+    });
+  });
+});
+
+// ============================================================================
 // createSolveBundle
 // ============================================================================
 
@@ -325,5 +382,85 @@ describe('createSolveBundle', () => {
     // The hash doesn't change even though timestamps differ between calls
     const bundle2 = createSolveBundle(makeInput(), makeOutput(), makeCompatReport());
     expect(bundle.bundleHash).toBe(bundle2.bundleHash);
+  });
+});
+
+// ============================================================================
+// computeBundleOutput rationale
+// ============================================================================
+
+describe('computeBundleOutput rationale', () => {
+  const baseParams = {
+    planId: 'plan-rationale-1' as string | null,
+    solved: true,
+    steps: [{ action: 'craft:stick' }],
+    totalNodes: 42,
+    durationMs: 100,
+    solutionPathLength: 1,
+  };
+
+  const sampleSearchHealth: SearchHealthMetrics = {
+    nodesExpanded: 42,
+    frontierPeak: 20,
+    hMin: 0,
+    hMax: 10,
+    hMean: 5,
+    hVariance: 4,
+    fMin: 0,
+    fMax: 10,
+    pctSameH: 0.3,
+    terminationReason: 'goal_found',
+    branchingEstimate: 3.2,
+  };
+
+  it('rationale is undefined when maxNodes not provided (backward compat)', () => {
+    const output = computeBundleOutput(baseParams);
+    expect(output.rationale).toBeUndefined();
+  });
+
+  it('rationale is populated when maxNodes provided', () => {
+    const output = computeBundleOutput({
+      ...baseParams,
+      maxNodes: 5000,
+    });
+
+    expect(output.rationale).toBeDefined();
+    expect(output.rationale!.boundingConstraints.maxNodes).toBe(5000);
+    expect(output.rationale!.boundingConstraints.objectiveWeightsSource).toBe('default');
+    expect(output.rationale!.boundingConstraints.objectiveWeightsEffective).toEqual(DEFAULT_OBJECTIVE_WEIGHTS);
+  });
+
+  it('rationale with searchHealth data populates searchEffort and termination', () => {
+    const output = computeBundleOutput({
+      ...baseParams,
+      maxNodes: 5000,
+      searchHealth: sampleSearchHealth,
+      objectiveWeightsEffective: { costWeight: 0.8, timeWeight: 0.2, riskWeight: 0.0 },
+      objectiveWeightsSource: 'provided' as const,
+    });
+
+    expect(output.rationale).toBeDefined();
+    expect(output.rationale!.searchEffort.nodesExpanded).toBe(42);
+    expect(output.rationale!.searchEffort.frontierPeak).toBe(20);
+    expect(output.rationale!.searchEffort.branchingEstimate).toBe(3.2);
+    expect(output.rationale!.searchTermination.terminationReason).toBe('goal_found');
+    expect(output.rationale!.searchTermination.isDegenerate).toBe(false);
+    expect(output.rationale!.searchTermination.degeneracyReasons).toEqual([]);
+  });
+
+  it('objectiveWeightsSource correctly reflects provided vs default', () => {
+    const outputProvided = computeBundleOutput({
+      ...baseParams,
+      maxNodes: 5000,
+      objectiveWeightsEffective: { costWeight: 0.5, timeWeight: 0.5 },
+      objectiveWeightsSource: 'provided' as const,
+    });
+    expect(outputProvided.rationale!.boundingConstraints.objectiveWeightsSource).toBe('provided');
+
+    const outputDefault = computeBundleOutput({
+      ...baseParams,
+      maxNodes: 5000,
+    });
+    expect(outputDefault.rationale!.boundingConstraints.objectiveWeightsSource).toBe('default');
   });
 });

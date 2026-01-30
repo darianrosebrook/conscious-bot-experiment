@@ -19,6 +19,7 @@ import {
   computeBundleInput,
   computeBundleOutput,
   createSolveBundle,
+  buildDefaultRationaleContext,
 } from './solve-bundle';
 import { parseSearchHealth } from './search-health';
 
@@ -77,7 +78,9 @@ export class MinecraftCraftingSolver extends BaseDomainSolver<MinecraftCraftingS
     const goal: Record<string, number> = { [goalItem]: 1 };
 
     // 3a. Preflight lint + bundle input capture
+    const maxNodes = 5000;
     const compatReport = lintRules(rules);
+    const rationaleCtx = buildDefaultRationaleContext({ compatReport, maxNodes });
     const bundleInput = computeBundleInput({
       solverId: this.solverId,
       contractVersion: this.contractVersion,
@@ -100,7 +103,7 @@ export class MinecraftCraftingSolver extends BaseDomainSolver<MinecraftCraftingS
       goal,
       nearbyBlocks,
       rules,
-      maxNodes: 5000,
+      maxNodes,
       useLearning: true,
     });
 
@@ -117,6 +120,7 @@ export class MinecraftCraftingSolver extends BaseDomainSolver<MinecraftCraftingS
         durationMs: result.durationMs,
         solutionPathLength: 0,
         searchHealth: parseSearchHealth(result.metrics),
+        ...rationaleCtx,
       });
       const solveBundle = createSolveBundle(bundleInput, bundleOutput, compatReport);
 
@@ -141,6 +145,7 @@ export class MinecraftCraftingSolver extends BaseDomainSolver<MinecraftCraftingS
       durationMs: result.durationMs,
       solutionPathLength: result.solutionPath.length,
       searchHealth: parseSearchHealth(result.metrics),
+      ...rationaleCtx,
     });
     const solveBundle = createSolveBundle(bundleInput, bundleOutput, compatReport);
 

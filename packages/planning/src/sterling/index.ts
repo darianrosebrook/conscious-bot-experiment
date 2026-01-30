@@ -96,7 +96,11 @@ export type {
   SearchHealthMetrics,
   DegeneracyReport,
   ContentHash,
+  ObjectiveWeights,
+  ObjectiveWeightsSource,
+  SolveRationale,
 } from './solve-bundle-types';
+export { DEFAULT_OBJECTIVE_WEIGHTS } from './solve-bundle-types';
 export type { LintableRule, LintContext } from './compat-linter';
 export {
   canonicalize,
@@ -110,6 +114,8 @@ export {
   computeBundleInput,
   computeBundleOutput,
   createSolveBundle,
+  INVENTORY_HASH_CAP,
+  buildDefaultRationaleContext,
 } from './solve-bundle';
 export { lintRules, lintGoal } from './compat-linter';
 export { parseSearchHealth, detectHeuristicDegeneracy } from './search-health';

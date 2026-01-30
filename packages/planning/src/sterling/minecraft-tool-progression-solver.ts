@@ -41,6 +41,7 @@ import {
   computeBundleInput,
   computeBundleOutput,
   createSolveBundle,
+  buildDefaultRationaleContext,
 } from './solve-bundle';
 import { parseSearchHealth } from './search-health';
 
@@ -183,6 +184,9 @@ export class MinecraftToolProgressionSolver extends BaseDomainSolver<ToolProgres
         );
       }
 
+      const maxNodes = 5000;
+      const rationaleCtx = buildDefaultRationaleContext({ compatReport, maxNodes });
+
       // Build initial state: inventory + current capabilities
       const initialState = { ...inventory };
       if (runningTier) {
@@ -218,7 +222,7 @@ export class MinecraftToolProgressionSolver extends BaseDomainSolver<ToolProgres
         inventory: initialState,
         goal: tierGoalRecord,
         rules,
-        maxNodes: 5000,
+        maxNodes,
         useLearning: true,
       });
 
@@ -235,6 +239,7 @@ export class MinecraftToolProgressionSolver extends BaseDomainSolver<ToolProgres
           durationMs: result.durationMs,
           solutionPathLength: 0,
           searchHealth: parseSearchHealth(result.metrics),
+          ...rationaleCtx,
         });
         tierBundles.push(createSolveBundle(bundleInput, bundleOutput, compatReport));
 
@@ -265,6 +270,7 @@ export class MinecraftToolProgressionSolver extends BaseDomainSolver<ToolProgres
         durationMs: result.durationMs,
         solutionPathLength: result.solutionPath.length,
         searchHealth: parseSearchHealth(result.metrics),
+        ...rationaleCtx,
       });
       tierBundles.push(createSolveBundle(bundleInput, bundleOutput, compatReport));
 

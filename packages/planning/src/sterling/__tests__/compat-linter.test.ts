@@ -14,7 +14,7 @@ import { buildToolProgressionRules } from '../minecraft-tool-progression-rules';
 // Helpers
 // ============================================================================
 
-function makeRule(overrides: Partial<LintableRule> = {}): LintableRule {
+function makeRule(overrides: Partial<LintableRule> & { baseCost?: number } = {}): LintableRule {
   return {
     action: 'craft:test',
     actionType: 'craft',
@@ -277,6 +277,64 @@ describe('lintRules', () => {
     });
   });
 
+  // --- INVALID_BASE_COST ---
+  describe('INVALID_BASE_COST', () => {
+    it('flags NaN baseCost', () => {
+      const rule = makeRule({ baseCost: NaN });
+      const issue = findIssueByCode([rule], 'INVALID_BASE_COST');
+      expect(issue).toBeDefined();
+      expect(issue!.severity).toBe('error');
+    });
+
+    it('flags Infinity baseCost', () => {
+      const rule = makeRule({ baseCost: Infinity });
+      const issue = findIssueByCode([rule], 'INVALID_BASE_COST');
+      expect(issue).toBeDefined();
+    });
+
+    it('flags -Infinity baseCost', () => {
+      const rule = makeRule({ baseCost: -Infinity });
+      const issue = findIssueByCode([rule], 'INVALID_BASE_COST');
+      expect(issue).toBeDefined();
+    });
+
+    it('flags zero baseCost', () => {
+      const rule = makeRule({ baseCost: 0 });
+      const issue = findIssueByCode([rule], 'INVALID_BASE_COST');
+      expect(issue).toBeDefined();
+    });
+
+    it('flags negative baseCost', () => {
+      const rule = makeRule({ baseCost: -5 });
+      const issue = findIssueByCode([rule], 'INVALID_BASE_COST');
+      expect(issue).toBeDefined();
+    });
+
+    it('flags baseCost above max (1000)', () => {
+      const rule = makeRule({ baseCost: 1001 });
+      const issue = findIssueByCode([rule], 'INVALID_BASE_COST');
+      expect(issue).toBeDefined();
+    });
+
+    it('accepts baseCost at max (1000)', () => {
+      const rule = makeRule({ baseCost: 1000 });
+      const issue = findIssueByCode([rule], 'INVALID_BASE_COST');
+      expect(issue).toBeUndefined();
+    });
+
+    it('accepts valid positive baseCost (5.0)', () => {
+      const rule = makeRule({ baseCost: 5.0 });
+      const issue = findIssueByCode([rule], 'INVALID_BASE_COST');
+      expect(issue).toBeUndefined();
+    });
+
+    it('skips check when baseCost is undefined/omitted', () => {
+      const rule = makeRule(); // no baseCost
+      const issue = findIssueByCode([rule], 'INVALID_BASE_COST');
+      expect(issue).toBeUndefined();
+    });
+  });
+
   // --- Report shape ---
   describe('report shape', () => {
     it('returns valid: true for clean rules', () => {
@@ -347,6 +405,130 @@ describe('regression gate: actual rule builders', () => {
     });
     const errors = report.issues.filter((i) => i.severity === 'error');
     expect(errors).toHaveLength(0);
+  });
+});
+
+// ============================================================================
+// Adversarial negative: wrong cap token (documented limitation)
+// ============================================================================
+
+describe('adversarial negative: wrong cap token', () => {
+  it('does not detect semantic cap mismatch (documented limitation)', () => {
+    // Rule has tier-gated product (cobblestone) with WRONG cap token
+    // (cap:has_stone_pickaxe instead of cap:has_wooden_pickaxe).
+    // The structural linter is satisfied (invariant pair exists)
+    // but the semantic error is not caught.
+    const rule: LintableRule = {
+      action: 'tp:mine:cobblestone',
+      actionType: 'mine',
+      produces: [
+        { name: 'cobblestone', count: 4 },
+        { name: 'cap:has_stone_pickaxe', count: 1 }, // WRONG cap (should be wooden)
+      ],
+      consumes: [
+        { name: 'cap:has_stone_pickaxe', count: 1 }, // WRONG cap (should be wooden)
+      ],
+      requires: [
+        { name: 'cap:has_stone_pickaxe', count: 1 }, // WRONG cap (should be wooden)
+      ],
+    };
+
+    const report = lintRules([rule], {
+      executionMode: 'tool_progression',
+      solverId: 'minecraft.tool_progression',
+    });
+
+    // Structural linter is satisfied: invariant pair exists
+    const mineRequiresIssue = report.issues.find(
+      i => i.code === 'MINE_REQUIRES_NO_INVARIANT'
+    );
+    expect(mineRequiresIssue).toBeUndefined();
+
+    const tierGatedIssue = report.issues.find(
+      i => i.code === 'MINE_TIERGATED_NO_INVARIANT'
+    );
+    expect(tierGatedIssue).toBeUndefined();
+
+    // The semantic error (wrong cap token) is NOT caught.
+    // This is an explicitly documented limitation of the structural linter:
+    // semantic cap validation requires domain knowledge the linter does not possess.
+    const errors = report.issues.filter(i => i.severity === 'error');
+    expect(errors).toHaveLength(0);
+  });
+});
+
+// ============================================================================
+// Unknown-domain fallback behavior
+// ============================================================================
+
+describe('unknown-domain fallback behavior', () => {
+  it('structural checks still apply for unknown executionMode/solverId', () => {
+    // An unknown domain should NOT bypass structural validation.
+    // Rules with structural errors must still be flagged regardless of context.
+    const badRule: LintableRule = {
+      action: 'mine:cobblestone',
+      actionType: 'mine',
+      produces: [{ name: 'cobblestone', count: 4 }],
+      consumes: [],
+      requires: [],
+    };
+
+    const unknownContext: LintContext = {
+      executionMode: 'alien_domain_xyz',
+      solverId: 'unknown.solver.999',
+    };
+
+    const report = lintRules([badRule], unknownContext);
+
+    // MINE_TIERGATED_NO_INVARIANT must still fire — unknown domain
+    // does not exempt rules from structural checks.
+    const tierIssue = report.issues.find(
+      i => i.code === 'MINE_TIERGATED_NO_INVARIANT'
+    );
+    expect(tierIssue).toBeDefined();
+    expect(report.valid).toBe(false);
+  });
+
+  it('PLACE_ACTION_UNNAMESPACED warning suppressed by any solverId (even unknown)', () => {
+    // Providing _any_ solverId suppresses the warning. This is intentional:
+    // the warning exists to catch completely unattributed place rules,
+    // not to validate domain correctness.
+    const rule: LintableRule = {
+      action: 'place:crafting_table',
+      actionType: 'place',
+      produces: [{ name: 'cap:has_crafting_table', count: 1 }],
+      consumes: [],
+      requires: [],
+    };
+
+    const unknownContext: LintContext = {
+      solverId: 'unknown.solver.999',
+    };
+
+    const report = lintRules([rule], unknownContext);
+    const namespaceWarning = report.issues.find(
+      i => i.code === 'PLACE_ACTION_UNNAMESPACED'
+    );
+    expect(namespaceWarning).toBeUndefined();
+  });
+
+  it('empty context triggers PLACE_ACTION_UNNAMESPACED for place rules', () => {
+    // With no context at all, place rules get the unnamespaced warning.
+    // This is the fail-open escape hatch — but it's a WARNING, not silent.
+    const rule: LintableRule = {
+      action: 'place:crafting_table',
+      actionType: 'place',
+      produces: [{ name: 'cap:has_crafting_table', count: 1 }],
+      consumes: [],
+      requires: [],
+    };
+
+    const report = lintRules([rule]); // no context
+    const namespaceWarning = report.issues.find(
+      i => i.code === 'PLACE_ACTION_UNNAMESPACED'
+    );
+    expect(namespaceWarning).toBeDefined();
+    expect(namespaceWarning!.severity).toBe('warning');
   });
 });
 

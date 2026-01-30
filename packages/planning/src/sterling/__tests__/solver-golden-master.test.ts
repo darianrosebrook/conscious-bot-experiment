@@ -12,6 +12,7 @@ import type { MinecraftCraftingSolveResult } from '../minecraft-crafting-types';
 import type { BuildingSolveResult } from '../minecraft-building-types';
 import type { SterlingReasoningService } from '../sterling-reasoning-service';
 import { canonicalize } from '../solve-bundle';
+import { buildCraftingRules } from '../minecraft-crafting-rules';
 
 // ---------------------------------------------------------------------------
 // Mock SterlingReasoningService
@@ -181,6 +182,72 @@ describe('MinecraftCraftingSolver — golden-master', () => {
   });
 
   // ===========================================================================
+  // credit assignment: solve does not auto-report (Invariant 5)
+  // ===========================================================================
+
+  describe('credit assignment: solve does not auto-report', () => {
+    const mcData = {
+      itemsByName: {
+        stick: { id: 1, name: 'stick' },
+        oak_planks: { id: 2, name: 'oak_planks' },
+      },
+      items: {
+        1: { id: 1, name: 'stick' },
+        2: { id: 2, name: 'oak_planks' },
+      },
+      recipes: {
+        1: [
+          {
+            result: { id: 1, count: 4 },
+            ingredients: [2, 2],
+          },
+        ],
+      },
+    };
+
+    it('solved path never calls reportEpisodeResult or sends report_episode', async () => {
+      (service.solve as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        solutionFound: true,
+        solutionPath: [{ source: 'A', target: 'B' }],
+        discoveredNodes: ['A', 'B'],
+        searchEdges: [{ source: 'A', target: 'B', label: { action: 'craft:stick' } }],
+        metrics: { planId: 'plan-credit-1' },
+        durationMs: 10,
+      });
+
+      const reportSpy = vi.spyOn(solver, 'reportEpisodeResult');
+
+      await solver.solveCraftingGoal('stick', [], mcData, []);
+
+      // reportEpisodeResult was never called by the solver internally
+      expect(reportSpy).not.toHaveBeenCalled();
+
+      // service.solve was called exactly once — for the solve, not for report_episode
+      expect(service.solve).toHaveBeenCalledTimes(1);
+      const call = (service.solve as ReturnType<typeof vi.fn>).mock.calls[0];
+      expect(call[1]).not.toHaveProperty('command', 'report_episode');
+
+      reportSpy.mockRestore();
+    });
+
+    it('unsolved path never calls reportEpisodeResult or sends report_episode', async () => {
+      // Default mock returns solutionFound: false
+      const reportSpy = vi.spyOn(solver, 'reportEpisodeResult');
+
+      await solver.solveCraftingGoal('stick', [], mcData, []);
+
+      expect(reportSpy).not.toHaveBeenCalled();
+
+      // service.solve was called exactly once — for the solve
+      expect(service.solve).toHaveBeenCalledTimes(1);
+      const call = (service.solve as ReturnType<typeof vi.fn>).mock.calls[0];
+      expect(call[1]).not.toHaveProperty('command', 'report_episode');
+
+      reportSpy.mockRestore();
+    });
+  });
+
+  // ===========================================================================
   // solveMeta evidence — proves bundle wiring runs on every solve path
   // ===========================================================================
 
@@ -280,6 +347,24 @@ describe('MinecraftCraftingSolver — golden-master', () => {
       expect(result1.solveMeta!.bundles[0].bundleHash)
         .toBe(result2.solveMeta!.bundles[0].bundleHash);
     });
+
+    it('solved bundle includes rationale with correct maxNodes and compat', async () => {
+      (service.solve as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        solutionFound: true,
+        solutionPath: [{ source: 'A', target: 'B' }],
+        discoveredNodes: ['A', 'B'],
+        searchEdges: [{ source: 'A', target: 'B', label: { action: 'craft:stick' } }],
+        metrics: { planId: 'plan-rationale-c' },
+        durationMs: 10,
+      });
+
+      const result = await solver.solveCraftingGoal('stick', [], mcData, []);
+
+      const bundle = result.solveMeta!.bundles[0];
+      expect(bundle.output.rationale).toBeDefined();
+      expect(bundle.output.rationale!.boundingConstraints.maxNodes).toBe(5000);
+      expect(bundle.output.rationale!.shapingEvidence.compatValid).toBe(true);
+    });
   });
 
   // ===========================================================================
@@ -328,6 +413,130 @@ describe('MinecraftCraftingSolver — golden-master', () => {
       // Canonical snapshot — if this changes, the diff proves intentionality
       const snapshot = canonicalize(stablePayload);
       expect(snapshot).toMatchSnapshot();
+    });
+  });
+
+  // ===========================================================================
+  // client payload generation is stateless across solves (Invariant 4)
+  // ===========================================================================
+
+  describe('client payload generation is stateless across solves', () => {
+    const mcData = {
+      itemsByName: {
+        stick: { id: 1, name: 'stick' },
+        oak_planks: { id: 2, name: 'oak_planks' },
+      },
+      items: {
+        1: { id: 1, name: 'stick' },
+        2: { id: 2, name: 'oak_planks' },
+      },
+      recipes: {
+        1: [
+          {
+            result: { id: 1, count: 4 },
+            ingredients: [2, 2],
+          },
+        ],
+      },
+    };
+
+    it('identical inputs produce byte-equivalent wire payloads across solves', async () => {
+      await solver.solveCraftingGoal('stick', [], mcData, ['oak_log']);
+      await solver.solveCraftingGoal('stick', [], mcData, ['oak_log']);
+
+      expect(service.solve).toHaveBeenCalledTimes(2);
+      const calls = (service.solve as ReturnType<typeof vi.fn>).mock.calls;
+      const payload1 = calls[0][1];
+      const payload2 = calls[1][1];
+
+      expect(canonicalize(payload1)).toBe(canonicalize(payload2));
+    });
+
+    it('learning event does not contaminate subsequent solve payloads', async () => {
+      await solver.solveCraftingGoal('stick', [], mcData, ['oak_log']);
+
+      const firstCallPayload = (service.solve as ReturnType<typeof vi.fn>).mock.calls[0][1];
+
+      // Simulate learning event: report an episode result
+      solver.reportEpisodeResult('stick', true, 1, 'plan-learn-1');
+
+      await solver.solveCraftingGoal('stick', [], mcData, ['oak_log']);
+
+      // Call 0 = first solve, Call 1 = reportEpisodeResult, Call 2 = second solve
+      const thirdCallPayload = (service.solve as ReturnType<typeof vi.fn>).mock.calls[2][1];
+
+      expect(canonicalize(firstCallPayload)).toBe(canonicalize(thirdCallPayload));
+    });
+  });
+
+  // ===========================================================================
+  // A.1: Composite goal test — wire format supports multi-item goals
+  // ===========================================================================
+
+  describe('composite goal format', () => {
+    it('wire payload goal field is Record<string, number> supporting multiple items', () => {
+      const compositeGoal = { stick: 4, crafting_table: 1 };
+      const canonical = canonicalize(compositeGoal);
+      // Deterministic output proves the wire format works for multi-item goals
+      expect(canonical).toBe('{"crafting_table":1,"stick":4}');
+      // solveCraftingGoal currently builds single-item goals, but the wire format
+      // already supports composites — this test documents that capability.
+    });
+  });
+
+  // ===========================================================================
+  // A.2: Substitute-allowed variant test — recipe variants
+  // ===========================================================================
+
+  describe('substitute-allowed variant rules', () => {
+    // mcData with two recipe variants for stick (contrived but proves variant wiring)
+    const mcDataWithVariants = {
+      itemsByName: {
+        stick: { id: 1, name: 'stick' },
+        oak_planks: { id: 2, name: 'oak_planks' },
+        birch_planks: { id: 3, name: 'birch_planks' },
+      },
+      items: {
+        1: { id: 1, name: 'stick' },
+        2: { id: 2, name: 'oak_planks' },
+        3: { id: 3, name: 'birch_planks' },
+      },
+      recipes: {
+        1: [
+          { result: { id: 1, count: 4 }, ingredients: [2, 2] },
+          { result: { id: 1, count: 4 }, ingredients: [3, 3] },
+        ],
+      },
+    };
+
+    it('buildCraftingRules generates variant rules for multiple recipe variants', () => {
+      const rules = buildCraftingRules(mcDataWithVariants, 'stick');
+
+      // Should have at least two craft:stick variants
+      const stickRules = rules.filter(r => r.action.startsWith('craft:stick'));
+      expect(stickRules.length).toBeGreaterThanOrEqual(2);
+
+      // One uses oak_planks, the other uses birch_planks
+      const usesOak = stickRules.some(r =>
+        r.consumes.some(c => c.name === 'oak_planks')
+      );
+      const usesBirch = stickRules.some(r =>
+        r.consumes.some(c => c.name === 'birch_planks')
+      );
+      expect(usesOak).toBe(true);
+      expect(usesBirch).toBe(true);
+    });
+
+    it('both variant rules appear in the wire payload sent to Sterling', async () => {
+      await solver.solveCraftingGoal('stick', [], mcDataWithVariants, []);
+
+      expect(service.solve).toHaveBeenCalledTimes(1);
+      const call = (service.solve as ReturnType<typeof vi.fn>).mock.calls[0];
+      const payload = call[1];
+      const ruleActions = (payload.rules as Array<{ action: string }>).map(r => r.action);
+
+      const stickVariants = ruleActions.filter(a => a.startsWith('craft:stick'));
+      expect(stickVariants.length).toBeGreaterThanOrEqual(2);
     });
   });
 });
@@ -609,6 +818,30 @@ describe('MinecraftBuildingSolver — golden-master', () => {
       expect(bundle.output.solved).toBe(false);
       expect(bundle.output.searchStats.solutionPathLength).toBe(0);
       expect(bundle.bundleId).toMatch(/^minecraft\.building:[0-9a-f]{16}$/);
+    });
+
+    it('solved bundle includes rationale with correct maxNodes and compat', async () => {
+      (service.solve as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        solutionFound: true,
+        solutionPath: [{ source: 'S0', target: 'S1' }],
+        discoveredNodes: ['S0', 'S1'],
+        searchEdges: [],
+        metrics: {
+          planId: 'bld-plan-rationale',
+          steps: [{ moduleId: 'walls_1', moduleType: 'apply_module', materialsNeeded: [], resultingProgress: 1, resultingInventory: {} }],
+        },
+        durationMs: 20,
+      });
+
+      const result = await solver.solveBuildingPlan(
+        'basic_shelter_5x5', 'N', ['walls_1'], { cobblestone: 50 }, siteState, modules
+      );
+
+      const bundle = result.solveMeta!.bundles[0];
+      expect(bundle.output.rationale).toBeDefined();
+      expect(bundle.output.rationale!.boundingConstraints.maxNodes).toBe(2000);
+      expect(bundle.output.rationale!.shapingEvidence.compatValid).toBe(true);
+      expect(bundle.output.rationale!.shapingEvidence.issueCount).toBe(0);
     });
 
     it('needsMaterials path attaches solveMeta with solved=false', async () => {

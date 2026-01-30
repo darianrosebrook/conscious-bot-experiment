@@ -24,6 +24,7 @@ import {
   computeBundleInput,
   computeBundleOutput,
   createSolveBundle,
+  buildDefaultRationaleContext,
 } from './solve-bundle';
 import { parseSearchHealth } from './search-health';
 
@@ -90,12 +91,14 @@ export class MinecraftBuildingSolver extends BaseDomainSolver<BuildingSolveResul
 
     // Building uses modules, not action rules — no lintRules call.
     // Empty compat report for bundle computation.
+    const maxNodes = 2000;
     const compatReport: CompatReport = {
       valid: true,
       issues: [],
       checkedAt: Date.now(),
       definitionCount: modules.length,
     };
+    const rationaleCtx = buildDefaultRationaleContext({ compatReport, maxNodes });
 
     const goalRecord: Record<string, number> = {};
     for (const gm of goalModules) {
@@ -121,7 +124,7 @@ export class MinecraftBuildingSolver extends BaseDomainSolver<BuildingSolveResul
       inventory,
       siteState,
       modules,
-      maxNodes: 2000,
+      maxNodes,
       useLearning: true,
       executionMode: executionMode || undefined,
     });
@@ -141,6 +144,7 @@ export class MinecraftBuildingSolver extends BaseDomainSolver<BuildingSolveResul
         durationMs: result.durationMs,
         solutionPathLength: 0,
         searchHealth: parseSearchHealth(result.metrics),
+        ...rationaleCtx,
       });
       const solveBundle = createSolveBundle(bundleInput, bundleOutput, compatReport);
 
@@ -164,6 +168,7 @@ export class MinecraftBuildingSolver extends BaseDomainSolver<BuildingSolveResul
         durationMs: result.durationMs,
         solutionPathLength: 0,
         searchHealth: parseSearchHealth(result.metrics),
+        ...rationaleCtx,
       });
       const solveBundle = createSolveBundle(bundleInput, bundleOutput, compatReport);
 
@@ -189,6 +194,7 @@ export class MinecraftBuildingSolver extends BaseDomainSolver<BuildingSolveResul
       durationMs: result.durationMs,
       solutionPathLength: result.solutionPath.length,
       searchHealth: parseSearchHealth(result.metrics),
+      ...rationaleCtx,
     });
     const solveBundle = createSolveBundle(bundleInput, bundleOutput, compatReport);
 

@@ -679,6 +679,31 @@ describe('MinecraftToolProgressionSolver', () => {
       expect(bundle.bundleId).toMatch(/^minecraft\.tool_progression:[0-9a-f]{16}$/);
     });
 
+    it('solved bundle includes rationale with correct maxNodes and compat', async () => {
+      (service.solve as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        solutionFound: true,
+        solutionPath: [
+          { source: 'S0', target: 'S1' },
+          { source: 'S1', target: 'S2' },
+        ],
+        discoveredNodes: ['S0', 'S1', 'S2'],
+        searchEdges: [
+          { source: 'S0', target: 'S1', label: { action: 'tp:mine:oak_log' } },
+          { source: 'S1', target: 'S2', label: { action: 'tp:upgrade:wooden_pickaxe' } },
+        ],
+        metrics: { planId: 'tp-plan-rationale' },
+        durationMs: 25,
+      });
+
+      const result = await solver.solveToolProgression('wooden_pickaxe', {}, []);
+
+      const bundle = result.solveMeta!.bundles[0];
+      expect(bundle.output.rationale).toBeDefined();
+      expect(bundle.output.rationale!.boundingConstraints.maxNodes).toBe(5000);
+      expect(bundle.output.rationale!.shapingEvidence.compatValid).toBe(true);
+      expect(bundle.output.rationale!.boundingConstraints.objectiveWeightsSource).toBe('default');
+    });
+
     it('unsolved path attaches solveMeta with solved=false', async () => {
       // Default mock returns solutionFound: false
       const result = await solver.solveToolProgression('wooden_pickaxe', {}, []);
@@ -814,6 +839,106 @@ describe('MinecraftToolProgressionSolver', () => {
 
       const snapshot = canonicalize(stablePayload);
       expect(snapshot).toMatchSnapshot();
+    });
+  });
+
+  // ===========================================================================
+  // B.2: Path-walk legality proof
+  // ===========================================================================
+
+  describe('path-walk legality proof', () => {
+    it('wooden_pickaxe solution path violates no capability gates', async () => {
+      // Build the actual rules for wooden_pickaxe
+      const { rules } = buildToolProgressionRules(
+        'wooden_pickaxe', 'pickaxe', null, 'wooden', []
+      );
+
+      // Build rule lookup
+      const rulesByAction = new Map<string, typeof rules[number]>();
+      for (const rule of rules) {
+        rulesByAction.set(rule.action, rule);
+      }
+
+      // Mock a solved wooden_pickaxe result with realistic steps.
+      // The path must include place:crafting_table to produce cap:has_crafting_table
+      // before the upgrade rule can fire (requires cap:has_crafting_table).
+      //
+      // Resource accounting (wooden_pickaxe needs 3 oak_planks + 2 sticks):
+      //   mine:oak_log → 3 logs
+      //   craft:oak_planks x3 → 12 planks - 3 logs = 0 logs, 12 planks
+      //   craft:stick → 4 sticks - 2 planks = 10 planks, 4 sticks
+      //   craft:crafting_table → 1 table - 4 planks = 6 planks, 4 sticks, 1 table
+      //   place:crafting_table → cap:has_crafting_table (table still in inv)
+      //   upgrade:wooden_pickaxe → -3 planks -2 sticks = 3 planks, 2 sticks, 1 pickaxe
+      (service.solve as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        solutionFound: true,
+        solutionPath: [
+          { source: 'S0', target: 'S1' },
+          { source: 'S1', target: 'S2' },
+          { source: 'S2', target: 'S3' },
+          { source: 'S3', target: 'S4' },
+          { source: 'S4', target: 'S5' },
+          { source: 'S5', target: 'S6' },
+          { source: 'S6', target: 'S7' },
+          { source: 'S7', target: 'S8' },
+        ],
+        discoveredNodes: ['S0', 'S1', 'S2', 'S3', 'S4', 'S5', 'S6', 'S7', 'S8'],
+        searchEdges: [
+          { source: 'S0', target: 'S1', label: { action: 'tp:mine:oak_log' } },
+          { source: 'S1', target: 'S2', label: { action: 'tp:craft:oak_planks' } },
+          { source: 'S2', target: 'S3', label: { action: 'tp:craft:oak_planks' } },
+          { source: 'S3', target: 'S4', label: { action: 'tp:craft:oak_planks' } },
+          { source: 'S4', target: 'S5', label: { action: 'tp:craft:stick' } },
+          { source: 'S5', target: 'S6', label: { action: 'tp:craft:crafting_table' } },
+          { source: 'S6', target: 'S7', label: { action: 'place:crafting_table' } },
+          { source: 'S7', target: 'S8', label: { action: 'tp:upgrade:wooden_pickaxe' } },
+        ],
+        metrics: { planId: 'tp-walk-test' },
+        durationMs: 20,
+      });
+
+      const result = await solver.solveToolProgression('wooden_pickaxe', {}, []);
+      expect(result.solved).toBe(true);
+      expect(result.steps.length).toBeGreaterThan(0);
+
+      // Walk each step, accumulating inventory (including cap: tokens for requires)
+      const inventory: Record<string, number> = {};
+
+      for (const step of result.steps) {
+        const rule = rulesByAction.get(step.action);
+        if (!rule) continue; // skip steps that don't map to rules
+
+        // Assert every requires item exists in accumulated inventory
+        for (const req of rule.requires) {
+          const available = inventory[req.name] ?? 0;
+          expect(
+            available,
+            `Step '${step.action}' requires '${req.name}' x${req.count} but inventory has ${available}`
+          ).toBeGreaterThanOrEqual(req.count);
+        }
+
+        // Assert every consumes item has sufficient count
+        for (const consumed of rule.consumes) {
+          const available = inventory[consumed.name] ?? 0;
+          expect(
+            available,
+            `Step '${step.action}' consumes '${consumed.name}' x${consumed.count} but inventory has ${available}`
+          ).toBeGreaterThanOrEqual(consumed.count);
+        }
+
+        // Apply: consume items
+        for (const consumed of rule.consumes) {
+          inventory[consumed.name] = (inventory[consumed.name] ?? 0) - consumed.count;
+        }
+
+        // Apply: produce items
+        for (const produced of rule.produces) {
+          inventory[produced.name] = (inventory[produced.name] ?? 0) + produced.count;
+        }
+      }
+
+      // Final inventory should contain the target tool
+      expect(inventory['wooden_pickaxe']).toBeGreaterThanOrEqual(1);
     });
   });
 });

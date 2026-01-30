@@ -25,10 +25,27 @@ import type {
   SolveBundle,
   CompatReport,
   SearchHealthMetrics,
+  ObjectiveWeights,
+  ObjectiveWeightsSource,
+  SolveRationale,
 } from './solve-bundle-types';
+import { DEFAULT_OBJECTIVE_WEIGHTS } from './solve-bundle-types';
 
 /** Package version — keep in sync with package.json */
 const CODE_VERSION = '0.1.0';
+
+/**
+ * Inventory counts above this value are clamped for hash identity purposes.
+ * Sterling treats large stacks equivalently — this prevents trivial hash
+ * divergence when inventory counts differ only in excess quantities.
+ *
+ * IMPORTANT: This cap applies to audit-trail hashing (SolveBundle identity)
+ * only. Do NOT use this cap for correctness-critical memoization or solver
+ * state where goals may require counts above the cap. Two inventories with
+ * 64 and 200 of an item will produce the same hash but are semantically
+ * different for planning purposes.
+ */
+export const INVENTORY_HASH_CAP = 64;
 
 // ============================================================================
 // Canonicalization
@@ -135,7 +152,7 @@ export function hashInventoryState(inventory: Record<string, number>): ContentHa
   const filtered: Record<string, number> = {};
   for (const [key, value] of Object.entries(inventory)) {
     if (value !== 0) {
-      filtered[key] = value;
+      filtered[key] = Math.min(value, INVENTORY_HASH_CAP);
     }
   }
   return contentHash(canonicalize(filtered));
@@ -170,7 +187,12 @@ export function computeBundleInput(params: {
   goal: Record<string, number>;
   nearbyBlocks: string[];
   tierMatrixVersion?: string;
+  objectiveWeights?: ObjectiveWeights;
 }): SolveBundleInput {
+  const objectiveWeightsProvided = params.objectiveWeights;
+  const objectiveWeightsEffective = objectiveWeightsProvided ?? DEFAULT_OBJECTIVE_WEIGHTS;
+  const objectiveWeightsSource: ObjectiveWeightsSource = objectiveWeightsProvided ? 'provided' : 'default';
+
   return {
     solverId: params.solverId,
     executionMode: params.executionMode,
@@ -182,6 +204,9 @@ export function computeBundleInput(params: {
     codeVersion: CODE_VERSION,
     tierMatrixVersion: params.tierMatrixVersion,
     definitionCount: params.definitions.length,
+    objectiveWeightsProvided,
+    objectiveWeightsEffective,
+    objectiveWeightsSource,
   };
 }
 
@@ -193,10 +218,45 @@ export function computeBundleOutput(params: {
   durationMs: number;
   solutionPathLength: number;
   searchHealth?: SearchHealthMetrics;
+  maxNodes?: number;
+  objectiveWeightsEffective?: ObjectiveWeights;
+  objectiveWeightsSource?: ObjectiveWeightsSource;
+  compatReport?: CompatReport;
 }): SolveBundleOutput {
   const searchHealth = params.searchHealth
     ? { ...params.searchHealth, searchHealthVersion: 1 }
     : undefined;
+
+  let rationale: SolveRationale | undefined;
+  if (params.maxNodes !== undefined) {
+    const sh = params.searchHealth;
+    const degeneracy = sh ? detectDegeneracyForRationale(sh) : { isDegenerate: false, degeneracyReasons: [] as string[] };
+    const compat = params.compatReport;
+
+    rationale = {
+      boundingConstraints: {
+        maxNodes: params.maxNodes,
+        objectiveWeightsEffective: params.objectiveWeightsEffective ?? DEFAULT_OBJECTIVE_WEIGHTS,
+        objectiveWeightsSource: params.objectiveWeightsSource ?? 'default',
+      },
+      searchEffort: {
+        nodesExpanded: sh?.nodesExpanded ?? 0,
+        frontierPeak: sh?.frontierPeak ?? 0,
+        branchingEstimate: sh?.branchingEstimate ?? 0,
+      },
+      searchTermination: {
+        terminationReason: sh?.terminationReason ?? 'unknown',
+        isDegenerate: degeneracy.isDegenerate,
+        degeneracyReasons: degeneracy.degeneracyReasons,
+      },
+      shapingEvidence: {
+        compatValid: compat?.valid ?? true,
+        issueCount: compat?.issues.length ?? 0,
+        errorCodes: compat?.issues.filter(i => i.severity === 'error').map(i => i.code) ?? [],
+      },
+    };
+  }
+
   return {
     planId: params.planId,
     solved: params.solved,
@@ -207,6 +267,56 @@ export function computeBundleOutput(params: {
       solutionPathLength: params.solutionPathLength,
     },
     searchHealth,
+    rationale,
+  };
+}
+
+/** Internal degeneracy detection for rationale — mirrors search-health.ts logic */
+function detectDegeneracyForRationale(
+  health: SearchHealthMetrics
+): { isDegenerate: boolean; degeneracyReasons: string[] } {
+  const reasons: string[] = [];
+  if (health.pctSameH > 0.5) {
+    reasons.push(`heuristic not discriminating: ${(health.pctSameH * 100).toFixed(0)}% of nodes share the modal h value`);
+  }
+  if (health.hVariance === 0 && health.nodesExpanded > 10) {
+    reasons.push(`constant heuristic: zero h variance across ${health.nodesExpanded} expanded nodes`);
+  }
+  if (health.branchingEstimate > 8 && health.terminationReason === 'max_nodes') {
+    reasons.push(`unguided search blowup: branching estimate ${health.branchingEstimate.toFixed(1)} with max_nodes termination`);
+  }
+  return { isDegenerate: reasons.length > 0, degeneracyReasons: reasons };
+}
+
+// ============================================================================
+// Rationale Context Helper
+// ============================================================================
+
+/**
+ * Build the default rationale context fields for computeBundleOutput().
+ *
+ * Solvers call this to avoid manually threading 4 fields into every
+ * computeBundleOutput() call. Pass the maxNodes constant from the solve
+ * payload and the compatReport from preflight linting.
+ *
+ * Example usage in a solver:
+ *   const rationaleCtx = buildDefaultRationaleContext({ compatReport, maxNodes: 5000 });
+ *   const bundleOutput = computeBundleOutput({ ...baseParams, ...rationaleCtx });
+ */
+export function buildDefaultRationaleContext(params: {
+  compatReport: CompatReport;
+  maxNodes: number;
+}): {
+  maxNodes: number;
+  objectiveWeightsEffective: ObjectiveWeights;
+  objectiveWeightsSource: ObjectiveWeightsSource;
+  compatReport: CompatReport;
+} {
+  return {
+    maxNodes: params.maxNodes,
+    objectiveWeightsEffective: DEFAULT_OBJECTIVE_WEIGHTS,
+    objectiveWeightsSource: 'default' as const,
+    compatReport: params.compatReport,
   };
 }
 

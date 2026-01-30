@@ -36,6 +36,12 @@ export interface SolveBundleInput {
   tierMatrixVersion?: string;
   /** Rule count or module count */
   definitionCount: number;
+  /** Caller-supplied objective weights (undefined if none provided) */
+  objectiveWeightsProvided?: ObjectiveWeights;
+  /** Always populated: provided values or DEFAULT_OBJECTIVE_WEIGHTS */
+  objectiveWeightsEffective: ObjectiveWeights;
+  /** Whether weights were explicitly provided or defaulted */
+  objectiveWeightsSource: ObjectiveWeightsSource;
 }
 
 /** Output snapshot captured after a Sterling solve call */
@@ -50,6 +56,8 @@ export interface SolveBundleOutput {
     solutionPathLength: number;
   };
   searchHealth?: SearchHealthMetrics;
+  /** Structured explanation of the solve outcome (populated when maxNodes is provided) */
+  rationale?: SolveRationale;
 }
 
 /** Content-addressed audit trail for a single solve round-trip */
@@ -64,6 +72,27 @@ export interface SolveBundle {
   output: SolveBundleOutput;
   compatReport: CompatReport;
 }
+
+// ============================================================================
+// Multi-Objective Weights
+// ============================================================================
+
+/** Weights for multi-objective optimization (cost/time/risk tradeoff) */
+export interface ObjectiveWeights {
+  costWeight?: number;
+  timeWeight?: number;
+  riskWeight?: number;
+}
+
+/** Default single-objective weights: cost-only optimization */
+export const DEFAULT_OBJECTIVE_WEIGHTS: ObjectiveWeights = {
+  costWeight: 1.0,
+  timeWeight: 0.0,
+  riskWeight: 0.0,
+};
+
+/** Whether objective weights were explicitly provided or defaulted */
+export type ObjectiveWeightsSource = 'provided' | 'default';
 
 // ============================================================================
 // Compat Linter
@@ -111,4 +140,32 @@ export interface SearchHealthMetrics {
 export interface DegeneracyReport {
   isDegenerate: boolean;
   reasons: string[];
+}
+
+// ============================================================================
+// Solve Rationale (Explanation Infrastructure)
+// ============================================================================
+
+/** Structured explanation of a solve outcome — attached to SolveBundleOutput */
+export interface SolveRationale {
+  boundingConstraints: {
+    maxNodes: number;
+    objectiveWeightsEffective: ObjectiveWeights;
+    objectiveWeightsSource: ObjectiveWeightsSource;
+  };
+  searchEffort: {
+    nodesExpanded: number;
+    frontierPeak: number;
+    branchingEstimate: number;
+  };
+  searchTermination: {
+    terminationReason: string;
+    isDegenerate: boolean;
+    degeneracyReasons: string[];
+  };
+  shapingEvidence: {
+    compatValid: boolean;
+    issueCount: number;
+    errorCodes: string[];
+  };
 }

@@ -6,7 +6,7 @@
  * test assertions. Returns structured CompatReport with stable error
  * codes for queryability.
  *
- * Nine checks:
+ * Ten checks:
  * - UNSUPPORTED_ACTION_TYPE: actionType not in {craft, mine, smelt, place}
  * - INVALID_PLACE_ID: place action doesn't match place:<item>
  * - MINE_REQUIRES_NO_INVARIANT: mine rule has requires without consume+produce invariant
@@ -16,6 +16,7 @@
  * - INVALID_ITEM_COUNT: item count not a positive integer
  * - DUPLICATE_ACTION_ID: two rules share same action ID
  * - PLACE_HAS_CONSUMES: place rule has non-empty consumes (double-decrement)
+ * - INVALID_BASE_COST: baseCost defined but not a finite number > 0 and <= 1000
  *
  * @author @darianrosebrook
  */
@@ -32,6 +33,14 @@ export interface LintableRule {
   produces: Array<{ name: string; count: number }>;
   consumes: Array<{ name: string; count: number }>;
   requires: Array<{ name: string; count: number }>;
+  /**
+   * Optional explicit cost for this rule. When undefined, Sterling applies
+   * its own default cost for the action type (typically 1.0 for craft/mine/smelt,
+   * backend-determined for place). When defined, must be a finite number > 0
+   * and <= MAX_BASE_COST (1000). The linter only validates baseCost when present;
+   * omitting it is the normal case for most rules.
+   */
+  baseCost?: number;
 }
 
 export interface LintContext {
@@ -52,6 +61,8 @@ const TIER_GATED_PRODUCTS = new Set([
 ]);
 
 const VALID_ACTION_TYPES = new Set(['craft', 'mine', 'smelt', 'place']);
+
+const MAX_BASE_COST = 1000;
 
 // ============================================================================
 // Linter
@@ -190,6 +201,25 @@ export function lintRules(rules: LintableRule[], context?: LintContext): CompatR
           code: 'INVALID_ITEM_COUNT',
           ruleAction: rule.action,
           message: `Item '${item.name}' in ${item.field} has invalid count: ${item.count} (must be positive integer)`,
+        });
+      }
+    }
+
+    // INVALID_BASE_COST — only fires when baseCost is explicitly defined
+    if (rule.baseCost !== undefined) {
+      const cost = rule.baseCost;
+      if (
+        typeof cost !== 'number' ||
+        Number.isNaN(cost) ||
+        !Number.isFinite(cost) ||
+        cost <= 0 ||
+        cost > MAX_BASE_COST
+      ) {
+        issues.push({
+          severity: 'error',
+          code: 'INVALID_BASE_COST',
+          ruleAction: rule.action,
+          message: `baseCost ${cost} is invalid (must be a finite number > 0 and <= ${MAX_BASE_COST})`,
         });
       }
     }
