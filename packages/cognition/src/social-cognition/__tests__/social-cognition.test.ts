@@ -14,14 +14,7 @@ import { SocialLearner } from '../social-learner';
 import { RelationshipManager } from '../relationship-manager';
 import {
   Entity,
-  Observation,
-  Action,
   AgentInteraction,
-  SocialContext,
-  MentalState,
-  Intention,
-  Belief,
-  Emotion,
 } from '../types';
 
 // Mock LLM Interface for testing
@@ -137,14 +130,14 @@ describe('Social Cognition Module', () => {
 
   describe('Agent Modeler', () => {
     it('should create agent models from observations', async () => {
-      const entity: Entity = {
+      const entity = {
         id: 'player_123',
         name: 'Alex',
         type: 'player',
         position: { x: 100, y: 64, z: 200 },
-      };
+      } as any as Entity;
 
-      const observations: Observation[] = [
+      const observations = [
         {
           id: 'obs_1',
           agentId: 'player_123',
@@ -171,7 +164,7 @@ describe('Social Cognition Module', () => {
         },
       ];
 
-      const model = await agentModeler.createAgentModel(entity, observations);
+      const model = await agentModeler.createAgentModel(entity, observations as any);
 
       expect(model).toBeDefined();
       expect(model.agentId).toBe('player_123');
@@ -187,14 +180,14 @@ describe('Social Cognition Module', () => {
     });
 
     it('should update agent models with new observations', async () => {
-      const entity: Entity = {
+      const entity = {
         id: 'player_456',
         name: 'Sam',
         type: 'player',
         position: { x: 150, y: 64, z: 250 },
-      };
+      } as any as Entity;
 
-      const initialObservations: Observation[] = [
+      const initialObservations = [
         {
           id: 'obs_1',
           agentId: 'player_456',
@@ -205,9 +198,9 @@ describe('Social Cognition Module', () => {
         },
       ];
 
-      await agentModeler.createAgentModel(entity, initialObservations);
+      await agentModeler.createAgentModel(entity, initialObservations as any);
 
-      const newObservations: Observation[] = [
+      const newObservations = [
         {
           id: 'obs_2',
           agentId: 'player_456',
@@ -228,7 +221,7 @@ describe('Social Cognition Module', () => {
 
       const update = await agentModeler.updateAgentModel(
         'player_456',
-        newObservations
+        newObservations as any
       );
 
       expect(update.updated).toBe(true);
@@ -242,7 +235,7 @@ describe('Social Cognition Module', () => {
     });
 
     it('should track interaction history', () => {
-      const interaction: AgentInteraction = {
+      const interaction = {
         id: 'interaction_1',
         agentId: 'player_123',
         otherAgentId: 'player_456',
@@ -252,7 +245,7 @@ describe('Social Cognition Module', () => {
         outcome: 'positive',
         duration: 5000,
         context: 'cooperation',
-      };
+      } as any as AgentInteraction;
 
       agentModeler.addInteraction(interaction);
 
@@ -274,14 +267,14 @@ describe('Social Cognition Module', () => {
 
   describe('Theory of Mind Engine', () => {
     it('should infer mental states from observations', async () => {
-      const entity: Entity = {
+      const entity = {
         id: 'player_789',
         name: 'TestPlayer',
         type: 'player',
         position: { x: 100, y: 64, z: 200 },
-      };
+      } as any as Entity;
 
-      const observations: Observation[] = [
+      const observations = [
         {
           id: 'obs_1',
           agentId: 'player_789',
@@ -301,7 +294,7 @@ describe('Social Cognition Module', () => {
       ];
 
       // Create agent model first
-      await agentModeler.createAgentModel(entity, observations);
+      await agentModeler.createAgentModel(entity, observations as any);
 
       const mentalState = await theoryOfMindEngine.inferMentalState(
         'player_789',
@@ -321,14 +314,14 @@ describe('Social Cognition Module', () => {
     });
 
     it('should predict agent intentions', async () => {
-      const entity: Entity = {
+      const entity = {
         id: 'player_456',
         name: 'TestPlayer456',
         type: 'player',
         position: { x: 150, y: 64, z: 250 },
-      };
+      } as any as Entity;
 
-      const observations: Observation[] = [
+      const observations = [
         {
           id: 'obs_1',
           agentId: 'player_456',
@@ -340,9 +333,9 @@ describe('Social Cognition Module', () => {
       ];
 
       // Create agent model first
-      await agentModeler.createAgentModel(entity, observations);
+      await agentModeler.createAgentModel(entity, observations as any);
 
-      const context: SocialContext = {
+      const context = {
         agentId: 'player_123',
         otherAgentId: 'player_456',
         situation: 'resource_competition',
@@ -353,24 +346,24 @@ describe('Social Cognition Module', () => {
 
       const predictions = await theoryOfMindEngine.predictIntentions(
         'player_456',
-        context
+        context as any
       );
 
       expect(predictions).toBeDefined();
       expect(predictions.length).toBeGreaterThan(0);
       expect(predictions[0].confidence).toBeGreaterThan(0);
-      expect(predictions[0].reasoning).toBeDefined();
+      expect((predictions[0] as any).reasoning).toBeDefined();
     });
 
     it('should simulate perspective taking', async () => {
-      const entity: Entity = {
+      const entity = {
         id: 'player_456',
         name: 'TestPlayer456',
         type: 'player',
         position: { x: 150, y: 64, z: 250 },
-      };
+      } as any as Entity;
 
-      const observations: Observation[] = [
+      const observations = [
         {
           id: 'obs_1',
           agentId: 'player_456',
@@ -382,7 +375,7 @@ describe('Social Cognition Module', () => {
       ];
 
       // Create agent model first
-      await agentModeler.createAgentModel(entity, observations);
+      await agentModeler.createAgentModel(entity, observations as any);
 
       const situation = {
         agentId: 'player_123',
@@ -409,7 +402,7 @@ describe('Social Cognition Module', () => {
 
   describe('Social Learner', () => {
     it('should learn behaviors from observations', async () => {
-      const observations: Observation[] = [
+      const observations = [
         {
           id: 'obs_1',
           agentId: 'player_123',
@@ -453,7 +446,7 @@ describe('Social Cognition Module', () => {
     });
 
     it('should infer social norms', async () => {
-      const interactions: AgentInteraction[] = [
+      const interactions = [
         {
           id: 'int_1',
           agentId: 'player_123',
@@ -478,7 +471,7 @@ describe('Social Cognition Module', () => {
         },
       ];
 
-      const norms = await socialLearner.inferNorms(interactions);
+      const norms = await socialLearner.inferNorms(interactions as any);
 
       expect(norms).toBeDefined();
       expect(norms.length).toBeGreaterThan(0);
@@ -489,7 +482,7 @@ describe('Social Cognition Module', () => {
 
   describe('Relationship Manager', () => {
     it('should track relationship development', async () => {
-      const interaction: AgentInteraction = {
+      const interaction = {
         id: 'int_1',
         agentId: 'player_123',
         otherAgentId: 'player_456',
@@ -499,7 +492,7 @@ describe('Social Cognition Module', () => {
         outcome: 'positive',
         duration: 7200000,
         context: 'cooperation',
-      };
+      } as any;
 
       const relationship = await relationshipManager.updateRelationship(
         'player_123',
@@ -515,7 +508,7 @@ describe('Social Cognition Module', () => {
     });
 
     it('should calculate trust scores', async () => {
-      const interactions: AgentInteraction[] = [
+      const interactions = [
         {
           id: 'int_1',
           agentId: 'player_123',
@@ -579,14 +572,14 @@ describe('Social Cognition Module', () => {
   describe('Integration Features', () => {
     it('should integrate components for comprehensive social analysis', async () => {
       // Create agent model
-      const entity: Entity = {
+      const entity = {
         id: 'player_999',
         name: 'Jordan',
         type: 'player',
         position: { x: 200, y: 64, z: 300 },
-      };
+      } as any as Entity;
 
-      const observations: Observation[] = [
+      const observations = [
         {
           id: 'obs_1',
           agentId: 'player_999',
@@ -605,19 +598,19 @@ describe('Social Cognition Module', () => {
         },
       ];
 
-      const model = await agentModeler.createAgentModel(entity, observations);
+      const model = await agentModeler.createAgentModel(entity, observations as any);
 
       // Infer mental state
       const mentalState = await theoryOfMindEngine.inferMentalState(
         'player_999',
-        observations
+        observations as any
       );
 
       // Learn behaviors
       const learnedBehaviors = await socialLearner.learnBehaviors(observations);
 
       // Track relationship
-      const interaction: AgentInteraction = {
+      const interaction = {
         id: 'int_1',
         agentId: 'player_123',
         otherAgentId: 'player_999',
@@ -627,7 +620,7 @@ describe('Social Cognition Module', () => {
         outcome: 'positive',
         duration: 1800000,
         context: 'cooperation',
-      };
+      } as any;
 
       const relationship = await relationshipManager.updateRelationship(
         'player_123',
@@ -653,7 +646,7 @@ describe('Social Cognition Module', () => {
     it('should handle complex social scenarios', async () => {
       // Simulate a complex social scenario with multiple agents
       const agents = ['player_A', 'player_B', 'player_C'];
-      const interactions: AgentInteraction[] = [];
+      const interactions: any[] = [];
 
       // Create interaction network
       for (let i = 0; i < agents.length; i++) {
@@ -695,12 +688,12 @@ describe('Social Cognition Module', () => {
 
   describe('Error Handling and Edge Cases', () => {
     it('should handle missing or invalid observations gracefully', async () => {
-      const entity: Entity = {
+      const entity = {
         id: 'player_invalid',
         name: 'Invalid',
         type: 'player',
         position: { x: 0, y: 0, z: 0 },
-      };
+      } as any as Entity;
 
       const model = await agentModeler.createAgentModel(entity, []);
 
@@ -711,7 +704,7 @@ describe('Social Cognition Module', () => {
     });
 
     it('should handle conflicting observations', async () => {
-      const observations: Observation[] = [
+      const observations = [
         {
           id: 'obs_1',
           agentId: 'player_conflict',
@@ -736,8 +729,8 @@ describe('Social Cognition Module', () => {
           name: 'Conflict',
           type: 'player',
           position: { x: 0, y: 0, z: 0 },
-        },
-        observations
+        } as any as Entity,
+        observations as any
       );
 
       expect(model).toBeDefined();
@@ -749,14 +742,14 @@ describe('Social Cognition Module', () => {
 
       // Create multiple agents simultaneously
       const promises = Array.from({ length: 10 }, (_, i) => {
-        const entity: Entity = {
+        const entity = {
           id: `player_${i}`,
           name: `Player${i}`,
           type: 'player',
           position: { x: i * 10, y: 64, z: i * 10 },
-        };
+        } as any as Entity;
 
-        const observations: Observation[] = [
+        const observations = [
           {
             id: `obs_${i}`,
             agentId: `player_${i}`,
@@ -767,7 +760,7 @@ describe('Social Cognition Module', () => {
           },
         ];
 
-        return agentModeler.createAgentModel(entity, observations);
+        return agentModeler.createAgentModel(entity, observations as any);
       });
 
       const models = await Promise.all(promises);

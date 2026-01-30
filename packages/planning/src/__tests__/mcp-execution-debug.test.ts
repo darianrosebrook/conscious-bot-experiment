@@ -91,7 +91,7 @@ describe('MCP Execution Debug Tests', () => {
       };
 
       // Find suitable option using the same logic as the autonomous executor
-      const suitableOption = mcpOptions.find((option) => {
+      const suitableOption = mcpOptions.find((option: any) => {
         // First try exact match with leafMapping
         if (leafMapping[taskType] && option.id === leafMapping[taskType]) {
           return true;
@@ -114,7 +114,7 @@ describe('MCP Execution Debug Tests', () => {
     it('should execute MCP option when found', async () => {
       const mcpOptions = await mockMCPIntegration.listOptions('all');
       const suitableOption = mcpOptions.find(
-        (opt) => opt.name === 'gather_wood@1'
+        (opt: any) => opt.name === 'gather_wood@1'
       );
 
       expect(suitableOption).toBeDefined();
@@ -169,7 +169,7 @@ describe('MCP Execution Debug Tests', () => {
 
       // 3. Find suitable option
       const suitableOption = mcpOptions.find(
-        (opt) => opt.name === 'gather_wood@1'
+        (opt: any) => opt.name === 'gather_wood@1'
       );
       expect(suitableOption).toBeDefined();
 

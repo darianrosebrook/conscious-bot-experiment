@@ -1,3 +1,6 @@
+# Standalone Postgres for the memory package.
+# NOTE: Binds port 5432 — do not run simultaneously with the root docker-compose.yml
+# which also binds 5432. Full-system devs should use the root compose file instead.
 version: '3.8'
 
 services:
@@ -19,19 +22,5 @@ services:
       timeout: 5s
       retries: 5
 
-  ollama:
-    image: ollama/ollama:latest
-    container_name: memory-ollama
-    ports:
-      - "11434:11434"
-    volumes:
-      - ollama_data:/root/.ollama
-    healthcheck:
-      test: ["CMD", "ollama", "list"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
 volumes:
   postgres_data:
-  ollama_data:

@@ -204,7 +204,7 @@ describe('Simple Actions', () => {
     const blockAtFeet = bot.blockAt(pos);
 
     expect(blockAtFeet).toBeDefined();
-    expect(blockAtFeet.name).toBe('grass_block');
+    expect(blockAtFeet!.name).toBe('grass_block');
   });
 
   it('should validate bot functionality', async () => {

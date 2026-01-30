@@ -634,7 +634,7 @@ describe('Advanced Self-Model Components', () => {
       ];
 
       const themeExtraction =
-        await narrativeIntelligence.extractThemes(experiences);
+        await narrativeIntelligence.extractThemes(experiences as any);
 
       expect(themeExtraction.length).toBeGreaterThan(0);
       expect(themeExtraction[0]).toBeDefined();
@@ -705,7 +705,7 @@ describe('Advanced Self-Model Components', () => {
       ];
 
       const characterArc =
-        await narrativeIntelligence.analyzeCharacterArc(experiences);
+        await narrativeIntelligence.analyzeCharacterArc(experiences as any);
 
       expect(characterArc.arcType).toBeDefined();
       expect(characterArc.growthAreas.length).toBeGreaterThanOrEqual(0);
@@ -779,7 +779,7 @@ describe('Advanced Self-Model Components', () => {
 
       const commitment = contractSystem.getCommitment(commitmentId);
       expect(commitment).toBeDefined();
-      expect(commitment!.title).toBe('Daily Reflection');
+      expect((commitment as any).title).toBe('Daily Reflection');
       expect(commitment!.status).toBe(CommitmentStatus.ACTIVE);
       expect(commitment!.progress).toBe(0);
     });
@@ -832,7 +832,7 @@ describe('Advanced Self-Model Components', () => {
 
       const promise = contractSystem.getPromise(promiseId);
       expect(promise).toBeDefined();
-      expect(promise!.title).toBe('Help Newcomer');
+      expect((promise as any).title).toBe('Help Newcomer');
       expect(promise!.recipient).toBe('newbie_player_123');
       expect(promise!.status).toBe(PromiseStatus.PENDING);
     });
@@ -901,7 +901,7 @@ describe('Advanced Self-Model Components', () => {
       const contract = contractSystem.getContract(contractId);
       expect(contract).toBeDefined();
       expect(contract!.title).toBe('Learning Partnership');
-      expect(contract!.type).toBe(ContractType.LEARNING);
+      expect((contract as any).type).toBe(ContractType.LEARNING);
       expect(contract!.parties).toContain('player_789');
     });
 
@@ -1058,6 +1058,7 @@ describe('Advanced Self-Model Components', () => {
               {
                 id: `exp-${i}`,
                 description: `Experience ${i}`,
+                outcome: `Outcome ${i}`,
                 timestamp: Date.now(),
               },
             ],
@@ -1098,13 +1099,14 @@ describe('Advanced Self-Model Components', () => {
         {
           id: 'integration-exp-001',
           description: 'Applied analysis insights to improve decision-making',
+          outcome: 'Improved decision-making process',
           timestamp: Date.now(),
           insights: identityAnalysis.recommendations,
         },
       ];
 
       const storySynthesis = await narrativeIntelligence.synthesizeStory(
-        experiences,
+        experiences as any,
         'self-improvement-arc'
       );
 
@@ -1123,7 +1125,7 @@ describe('Advanced Self-Model Components', () => {
       expect(commitmentId).toBeDefined();
 
       const commitment = contractSystem.getCommitment(commitmentId);
-      expect(commitment!.steps.length).toBeGreaterThan(0);
+      expect((commitment as any).steps.length).toBeGreaterThan(0);
       expect(storySynthesis.themes.length).toBeGreaterThan(0);
     });
   });

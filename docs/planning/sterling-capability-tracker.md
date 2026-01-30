@@ -49,7 +49,7 @@ These are certifiability gates. Every rig must satisfy all of them before it can
 | **A**: Inventory transformation | 1, 16, 17, 19, 20 | DONE (all certification items complete including A.5 performance baselines) | Track 1 |
 | **B**: Capability gating | 2, 16, 19, 20 | DONE (full tier progression + certification tests) | Track 1 |
 | **C**: Temporal planning | 3, 16, 17, 18, 19 | NOT STARTED | Track 1 |
-| **D**: Multi-strategy acquisition | 4, 17, 18, 19, 20 | NOT STARTED | Track 2 |
+| **D**: Multi-strategy acquisition (learning-benchmark candidate) | 4, 17, 18, 19, 20 | NOT STARTED | Track 2 |
 | **E**: Hierarchical planning | 5, 16, 17, 19 | NOT STARTED | Track 2 |
 | **F**: Valuation under scarcity | 6, 16, 17, 18, 19 | NOT STARTED | Track 2 |
 | **G**: Feasibility + partial order | 7, 16, 17, 19 | PARTIAL (P0 building solver stub) | Track 2 |
@@ -60,6 +60,42 @@ These are certifiability gates. Every rig must satisfy all of them before it can
 | **L**: Contingency planning | 9, 18, 19 | NOT STARTED | Later |
 | **M**: Risk-aware planning | 10, 17, 18, 19 | NOT STARTED | Later |
 | **N**: Fault diagnosis | 11, 15, 19 | NOT STARTED | Later |
+
+---
+
+## Next milestones (post Rig A certification)
+
+These are the highest-leverage follow-ons implied by the A.5 baseline + interpretation pass. They are intentionally separated from "Rig done" criteria so we don't accidentally certify "stability" as "learning efficacy."
+
+- [ ] **M1 — Learning-sensitive benchmark suite (learning efficacy, not just stability)**
+  - **Goal**: make "learning helps" testable with a measurable gradient while keeping semantics unchanged.
+  - **Design requirements**:
+    - Multiple near-equal plan families (so preference/ordering matters).
+    - Repeated exposure to a consistent outcome signal (so a single episode isn't drowned out).
+    - Improvement is visible in **search effort** (nodesExpanded/frontierPeak), not in "cheating" semantics.
+  - **Candidate shapes**:
+    - Substitute-rich crafting (two legal branches with meaningfully different costs).
+    - Multi-strategy acquisition (mine vs trade vs loot) with equivalent goal validity but different effort profiles.
+  - **Acceptance**: Over N episodes, `nodesExpanded` and/or `frontierPeak` trends downward (or strategy frequency shifts toward lower-effort plans) while the reachable transition set is provably unchanged.
+
+- [ ] **M2 — Heuristic degeneracy fix (dependency-aware lower bounds)**
+  - **Goal**: move from near-binary "done/not-done" heuristics to cost-to-go structure that buys real search efficiency.
+  - **Direction**: prerequisite-graph lower bounds (relaxed planning over a dependency DAG, pattern DB over subgoals, or equivalent admissible/near-admissible approximation).
+  - **Target improvements (observable in SearchHealth)**:
+    - `hVariance` increases meaningfully.
+    - `pctSameH` drops sharply (aim well below 0.5 on nontrivial solves).
+    - `nodesExpanded` and `frontierPeak` decrease for equal `solutionPathLength` and termination reason.
+
+- [ ] **M3 — Preserve "certification truthfulness" as a first-class gate**
+  - **Goal**: keep the standard established in A.5 ("stability ≠ efficacy") as new rigs add complexity.
+  - **Scope**:
+    - Explanation schema evolution (structured evidence fields, not prose; consider "why not that plan" as v2).
+    - Multi-objective wiring (ObjectiveWeights on the Sterling wire payload, plus tests that weights are explicitly declared and never smuggled).
+    - Negative tests around credit assignment / learning semantics as new domains expand.
+
+- [ ] **M4 — Start Rig C with the spine in place (temporal planning stress test)**
+  - **Goal**: durations/batching/capacity will make heuristic weakness painfully visible; that's desirable because it forces M2 to "pay rent."
+  - **Acceptance**: Rig C reaches its first certified sub-slice (C.1–C.3) with baseline artifacts emitted using the same harness shape as A.5.
 
 ---
 
@@ -216,7 +252,7 @@ Completed in the P0–P2 hardening sprint (2026-01-29). This underpins every rig
 These rigs are documented in [sterling-minecraft-domains.md](./sterling-minecraft-domains.md) with full rig templates. Implementation follows Track 2 (D–K) and Later (L–N) priority ordering.
 
 ### Track 2 order (after A–C certified):
-1. **Rig D** — Multi-strategy acquisition (mine vs trade vs loot)
+1. **Rig D** — Multi-strategy acquisition (mine vs trade vs loot) — primary candidate for a learning-sensitive benchmark (multiple legal strategies, stable outcome signal)
 2. **Rig E** — Hierarchical macro/micro (waypoint routing + Mineflayer local)
 3. **Rig F** — Valuation under scarcity (keep/drop/store)
 4. **Rig G** — Feasibility hardening (see above)
@@ -252,14 +288,22 @@ A rig is certified when it passes all three test categories:
 - 3 stability tests: solve → episode report → re-solve, assert `nodesExpanded2 <= nodesExpanded1 * 1.05` (proves no regression; does not prove learning efficacy)
 - Stone pickaxe records per-tier metrics (wooden_tier + stone_tier separately)
 - Artifacts committed to `__artifacts__/perf-baseline-*.json` and `perf-convergence-*.json` with full `ArtifactMeta` (gitSha, clientPathway, solverId, executionMode, contractVersion, maxNodes, objectiveWeights)
+- Fixed E2E convergence harness to read `result.metrics.searchHealth` (raw WS and solver-class payload shape) and re-generated committed artifacts.
 - Sequential execution (`describe.sequential`) prevents file-write races
 - No `durationMs` assertions (nondeterministic)
 - Key finding: solver-class heuristic shows `pctSameH ≈ 0.98–0.995` (near-degenerate). Heuristic has insufficient resolution for single-key goals — A\* degrades to near-uniform-cost search. Primary improvement lever: dependency-aware cost lower bounds.
+
+**Interpretation findings (from committed artifacts)**:
+- The solver-class heuristic is close to binary on these problems: very high `pctSameH` with near-zero variance implies A\* behaves close to uniform-cost search (the open set grows, but the heuristic does not meaningfully rank candidates).
+- Stone-tier runs inflate `frontierPeak` relative to `nodesExpanded`, consistent with branching under weak discrimination (open set swells because many nodes tie on h).
+- "Convergence" artifacts with ratios at 1.0 should be read as **stability/no-regression**. They do not demonstrate learning efficacy on these tasks; learning-sensitive benchmarks are required for that claim.
+- Stick is a weak comparator (tiny operator set, tiny sample size). It's useful as a smoke test for wiring, not as an efficiency benchmark.
 
 **Tightening changes**:
 - `buildDefaultRationaleContext()` accepts optional `objectiveWeights` override
 - Helper removed from public `index.ts` exports (internal to sterling package)
 - Rationale tests tightened: `issueCount === 0` and `objectiveWeightsSource === 'default'` symmetrically across all 3 solvers
+- Verified hash stability under irrelevant variation: `CompatReport.checkedAt` does not affect bundle hashing (changing timestamps must not change `bundleHash`).
 - Fix D tracker entry clarified (linter-context tests, not server fallback)
 
 **Files changed**: 1 new test file, 5 modified files

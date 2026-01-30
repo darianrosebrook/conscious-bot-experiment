@@ -8,7 +8,8 @@
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import { WorkingLeafFactory } from '../working-leaf-factory';
-import { LeafImpl, LeafSpec } from '../leaf-factory';
+import { LeafImpl } from '../leaf-factory';
+import { LeafSpec } from '../leaf-contracts';
 
 // Simple mock leaf for testing
 class SimpleMockLeaf implements LeafImpl {

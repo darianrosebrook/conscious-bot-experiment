@@ -4,10 +4,12 @@
  * @author @darianrosebrook
  */
 
+import { vi, beforeAll, afterAll } from 'vitest';
+
 // Global test setup
 beforeAll(() => {
   // Set up any global test configuration
-  process.env.NODE_ENV = 'test';
+  (process.env as any).NODE_ENV = 'test';
 
   // Mock console methods to reduce noise in tests
   vi.spyOn(console, 'log').mockImplementation(() => {});

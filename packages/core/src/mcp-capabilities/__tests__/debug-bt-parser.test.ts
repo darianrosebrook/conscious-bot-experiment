@@ -51,7 +51,7 @@ describe('BT-DSL Parser Debug', () => {
 
     // Manual implementation to work around LeafFactory bug
     const internalRegistry = (leafFactory as any).registry as Map<string, any>;
-    const manualLeaves = [];
+    const manualLeaves: any[] = [];
     for (const [key, leaf] of internalRegistry.entries()) {
       const atIndex = key.indexOf('@');
       if (atIndex >= 0) {

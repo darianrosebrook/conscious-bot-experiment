@@ -14,6 +14,27 @@ export function parseRequiredQuantityFromTitle(title: string | undefined, fallba
 }
 
 export function resolveRequirement(task: any): TaskRequirement | null {
+  // Prefer structured requirement candidate from thought extraction
+  const candidate = task?.parameters?.requirementCandidate;
+  if (candidate && candidate.kind && candidate.outputPattern) {
+    if (candidate.kind === 'craft') {
+      return {
+        kind: 'craft',
+        outputPattern: candidate.outputPattern,
+        quantity: candidate.quantity || 1,
+        proxyPatterns: candidate.proxyPatterns || [],
+      };
+    }
+    if (candidate.kind === 'collect') {
+      return {
+        kind: 'collect',
+        patterns: [candidate.outputPattern],
+        quantity: candidate.quantity || 1,
+      };
+    }
+  }
+
+  // Existing regex-based resolution follows
   const ttl = (task.title || '').toLowerCase();
 
   // Tool progression — detect tier-specific tool tasks BEFORE generic crafting
@@ -42,14 +63,33 @@ export function resolveRequirement(task: any): TaskRequirement | null {
     };
   }
 
-  // Prefer explicit crafting intent
-  if (task.type === 'crafting' && /pickaxe/.test(ttl)) {
-    return {
-      kind: 'craft',
-      outputPattern: 'wooden_pickaxe',
-      quantity: 1,
-      proxyPatterns: ['oak_log', '_log', ' log', 'plank', 'stick'],
-    };
+  // Crafting intent — route to Sterling crafting solver
+  if (task.type === 'crafting' || /\bcraft\b|\bmake\b/.test(ttl)) {
+    // Detect specific craftable items from title
+    const craftableMatch = ttl.match(
+      /\b(wooden[_ ]?pickaxe|wooden[_ ]?axe|wooden[_ ]?shovel|wooden[_ ]?hoe|wooden[_ ]?sword|crafting[_ ]?table|stick|planks?|chest|furnace|torch|boat|bowl|bucket|shield|ladder|fence|door)\b/
+    );
+    if (craftableMatch) {
+      const rawItem = craftableMatch[1].replace(/\s+/g, '_');
+      // Normalize common aliases
+      const outputPattern =
+        rawItem === 'planks' || rawItem === 'plank' ? 'oak_planks' : rawItem;
+      return {
+        kind: 'craft',
+        outputPattern,
+        quantity: 1,
+        proxyPatterns: ['oak_log', '_log', ' log', 'plank', 'stick'],
+      };
+    }
+    // Fallback for "craft a pickaxe" without tier qualifier → wooden_pickaxe
+    if (/pickaxe/.test(ttl)) {
+      return {
+        kind: 'craft',
+        outputPattern: 'wooden_pickaxe',
+        quantity: 1,
+        proxyPatterns: ['oak_log', '_log', ' log', 'plank', 'stick'],
+      };
+    }
   }
   // Gathering/mining rules
   if (task.type === 'gathering' || /\bgather\b|\bcollect\b/.test(ttl)) {

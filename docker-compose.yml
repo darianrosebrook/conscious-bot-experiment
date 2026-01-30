@@ -1,0 +1,54 @@
+# Full-system Docker services for conscious-bot.
+# Provides Postgres (with pgvector) and a Minecraft server.
+#
+# NOTE: Binds port 5432 — do not run simultaneously with
+# packages/memory/docker/docker-compose.yml which also binds 5432.
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: conscious-bot-postgres
+    environment:
+      POSTGRES_USER: conscious_bot
+      POSTGRES_PASSWORD: secure_password
+      POSTGRES_DB: conscious_bot
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./packages/memory/docker/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "conscious_bot"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  minecraft:
+    image: itzg/minecraft-server:latest
+    container_name: conscious-bot-minecraft
+    environment:
+      EULA: "TRUE"
+      VERSION: "1.20.1"
+      ONLINE_MODE: "FALSE"
+      GAMEMODE: survival
+      DIFFICULTY: normal
+      SPAWN_PROTECTION: "0"
+      VIEW_DISTANCE: "10"
+      MEMORY: 2G
+      ENABLE_COMMAND_BLOCK: "TRUE"
+      EXISTING_OPS_FILE: SYNCHRONIZE
+    ports:
+      - "25565:25565"
+    volumes:
+      - minecraft_data:/data
+      - ./minecraft-config/ops.json:/data/ops.json:ro
+    healthcheck:
+      test: mc-health
+      interval: 5s
+      timeout: 10s
+      retries: 40
+      start_period: 60s
+
+volumes:
+  postgres_data:
+  minecraft_data:

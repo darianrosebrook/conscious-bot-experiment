@@ -86,7 +86,7 @@ describe('Dynamic Thought Generation Tests', () => {
 
       expect(thoughts.length).toBeGreaterThan(0);
 
-      const healthThoughts = thoughts.filter((t) =>
+      const healthThoughts = thoughts.filter((t: any) =>
         t.content.includes('Health is critically low')
       );
       expect(healthThoughts.length).toBeGreaterThan(0);
@@ -115,7 +115,7 @@ describe('Dynamic Thought Generation Tests', () => {
         thoughtProcessor as any
       ).generateThoughtsFromContext();
 
-      const inventoryThoughts = thoughts.filter((t) =>
+      const inventoryThoughts = thoughts.filter((t: any) =>
         t.content.includes('inventory is empty')
       );
       expect(inventoryThoughts.length).toBeGreaterThan(0);
@@ -147,7 +147,7 @@ describe('Dynamic Thought Generation Tests', () => {
         thoughtProcessor as any
       ).generateThoughtsFromContext();
 
-      const nightThoughts = thoughts.filter((t) =>
+      const nightThoughts = thoughts.filter((t: any) =>
         t.content.includes('Night time')
       );
       expect(nightThoughts.length).toBeGreaterThan(0);
@@ -177,7 +177,7 @@ describe('Dynamic Thought Generation Tests', () => {
         thoughtProcessor as any
       ).generateThoughtsFromContext();
 
-      const biomeThoughts = thoughts.filter((t) =>
+      const biomeThoughts = thoughts.filter((t: any) =>
         t.content.includes('desert')
       );
       expect(biomeThoughts.length).toBeGreaterThan(0);
@@ -206,7 +206,7 @@ describe('Dynamic Thought Generation Tests', () => {
         thoughtProcessor as any
       ).generateThoughtsFromContext();
 
-      const positionThoughts = thoughts.filter((t) =>
+      const positionThoughts = thoughts.filter((t: any) =>
         t.content.includes('high elevation')
       );
       expect(positionThoughts.length).toBeGreaterThan(0);
@@ -235,7 +235,7 @@ describe('Dynamic Thought Generation Tests', () => {
         thoughtProcessor as any
       ).generateThoughtsFromContext();
 
-      const undergroundThoughts = thoughts.filter((t) =>
+      const undergroundThoughts = thoughts.filter((t: any) =>
         t.content.includes('underground level')
       );
       expect(undergroundThoughts.length).toBeGreaterThan(0);
@@ -263,7 +263,7 @@ describe('Dynamic Thought Generation Tests', () => {
 
       expect(thoughts.length).toBeGreaterThan(0);
 
-      const memoryInsights = thoughts.filter((t) =>
+      const memoryInsights = thoughts.filter((t: any) =>
         t.content.includes('Memory insight:')
       );
       expect(memoryInsights.length).toBeGreaterThan(0);
@@ -284,7 +284,7 @@ describe('Dynamic Thought Generation Tests', () => {
         thoughtProcessor as any
       ).generateThoughtsFromMemory();
 
-      const recommendations = thoughts.filter((t) =>
+      const recommendations = thoughts.filter((t: any) =>
         t.content.includes('Memory-based recommendation:')
       );
       expect(recommendations.length).toBeGreaterThan(0);
@@ -389,18 +389,18 @@ describe('Dynamic Thought Generation Tests', () => {
 
       // Should generate high-priority survival thoughts
       const survivalThoughts = thoughts.filter(
-        (t) => t.category === 'survival'
+        (t: any) => t.category === 'survival'
       );
       expect(survivalThoughts.length).toBeGreaterThan(0);
 
       // Should include health concerns
-      const healthThoughts = thoughts.filter((t) =>
+      const healthThoughts = thoughts.filter((t: any) =>
         t.content.includes('Health is critically low')
       );
       expect(healthThoughts.length).toBeGreaterThan(0);
 
       // Should include threat awareness
-      const threatThoughts = thoughts.filter((t) =>
+      const threatThoughts = thoughts.filter((t: any) =>
         t.content.includes('threats')
       );
       expect(threatThoughts.length).toBeGreaterThan(0);
@@ -433,12 +433,12 @@ describe('Dynamic Thought Generation Tests', () => {
 
       // Should generate exploration-focused thoughts
       const explorationThoughts = thoughts.filter(
-        (t) => t.category === 'exploration'
+        (t: any) => t.category === 'exploration'
       );
       expect(explorationThoughts.length).toBeGreaterThan(0);
 
       // Should include biome-specific opportunities
-      const biomeThoughts = thoughts.filter((t) =>
+      const biomeThoughts = thoughts.filter((t: any) =>
         t.content.includes('forest')
       );
       expect(biomeThoughts.length).toBeGreaterThan(0);
@@ -467,12 +467,12 @@ describe('Dynamic Thought Generation Tests', () => {
       ).generateThoughtsFromContext();
 
       const highPriorityThoughts = thoughts.filter(
-        (t) => t.priority === 'high'
+        (t: any) => t.priority === 'high'
       );
       expect(highPriorityThoughts.length).toBeGreaterThan(0);
 
       // Health concerns should be highest priority
-      const healthThoughts = highPriorityThoughts.filter((t) =>
+      const healthThoughts = highPriorityThoughts.filter((t: any) =>
         t.content.includes('Health is critically low')
       );
       expect(healthThoughts.length).toBeGreaterThan(0);
@@ -500,7 +500,7 @@ describe('Dynamic Thought Generation Tests', () => {
         thoughtProcessor as any
       ).generateThoughtsFromContext();
 
-      thoughts.forEach((thought) => {
+      thoughts.forEach((thought: any) => {
         expect(thought).toHaveProperty('type');
         expect(thought).toHaveProperty('content');
         expect(thought).toHaveProperty('attribution');
@@ -538,12 +538,12 @@ describe('Dynamic Thought Generation Tests', () => {
         thoughtProcessor as any
       ).generateThoughtsFromContext();
 
-      const priorities = thoughts.map((t) => t.priority);
-      const highPriorityCount = priorities.filter((p) => p === 'high').length;
+      const priorities = thoughts.map((t: any) => t.priority);
+      const highPriorityCount = priorities.filter((p: any) => p === 'high').length;
       const mediumPriorityCount = priorities.filter(
-        (p) => p === 'medium'
+        (p: any) => p === 'medium'
       ).length;
-      const lowPriorityCount = priorities.filter((p) => p === 'low').length;
+      const lowPriorityCount = priorities.filter((p: any) => p === 'low').length;
 
       // Should have a mix of priorities based on context
       expect(
@@ -551,9 +551,9 @@ describe('Dynamic Thought Generation Tests', () => {
       ).toBeGreaterThan(0);
 
       // Night time should generate some medium-priority thoughts
-      const nightThoughts = thoughts.filter((t) => t.content.includes('Night'));
+      const nightThoughts = thoughts.filter((t: any) => t.content.includes('Night'));
       expect(nightThoughts.length).toBeGreaterThan(0);
-      expect(nightThoughts.some((t) => t.priority === 'medium')).toBe(true);
+      expect(nightThoughts.some((t: any) => t.priority === 'medium')).toBe(true);
     });
   });
 });

@@ -27,7 +27,7 @@ import {
   WaterEnvironment,
   WaterNavigationStrategyResult,
 } from '../water-navigation-manager.js';
-import { NavigationConfig } from '../navigation-bridge.js';
+import { NavigationConfig } from '../types.js';
 
 // Mock bot
 const createMockBot = (): Bot =>

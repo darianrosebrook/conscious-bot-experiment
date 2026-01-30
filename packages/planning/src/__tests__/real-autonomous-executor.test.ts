@@ -116,7 +116,7 @@ describe('Real Autonomous Executor Tests', () => {
     expect(mcpOptions.length).toBeGreaterThan(0);
 
     // 3. Check if we can find suitable options for gathering tasks
-    const gatheringTask = activeTasks.find((task) => task.type === 'gathering');
+    const gatheringTask = activeTasks.find((task: any) => task.type === 'gathering');
     expect(gatheringTask).toBeDefined();
     console.log('🎯 Found gathering task:', gatheringTask?.title);
 
@@ -136,7 +136,7 @@ describe('Real Autonomous Executor Tests', () => {
     };
 
     // Find suitable option using the same logic as the autonomous executor
-    const suitableOption = mcpOptions.find((option) => {
+    const suitableOption = mcpOptions.find((option: any) => {
       // First try exact match with leafMapping
       if (leafMapping[taskType] && option.id === leafMapping[taskType]) {
         return true;

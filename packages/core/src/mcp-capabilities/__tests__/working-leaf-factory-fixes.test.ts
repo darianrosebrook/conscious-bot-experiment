@@ -12,7 +12,7 @@
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import { WorkingLeafFactory } from '../working-leaf-factory.js';
-import { LeafImpl, LeafSpec } from '../leaf-factory.js';
+import { LeafImpl } from '../leaf-factory.js';
 import { LeafContext } from '../leaf-contracts.js';
 
 // Mock leaf implementations for testing
@@ -28,6 +28,8 @@ const createMockLeaf = (
     description: `Test leaf ${name}`,
     inputSchema,
     outputSchema,
+    timeoutMs: 5000,
+    retries: 1,
     rateLimitPerMin: 10,
     permissions: ['movement'],
   },

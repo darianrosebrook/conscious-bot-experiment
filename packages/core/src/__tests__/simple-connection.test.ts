@@ -127,7 +127,7 @@ describe('Simple Connection', () => {
         resolve();
       });
 
-      mockBot.once('error', (error) => {
+      mockBot.once('error', (error: any) => {
         clearTimeout(timeout);
         reject(error);
       });

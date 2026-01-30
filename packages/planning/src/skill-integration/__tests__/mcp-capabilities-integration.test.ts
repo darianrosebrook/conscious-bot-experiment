@@ -30,8 +30,8 @@ describe('MCP Capabilities Integration', () => {
     overrides: Partial<HybridPlanningContext> = {}
   ): HybridPlanningContext => ({
     skillRegistry: mockSkillRegistry,
-    mcpRegistry: mockRegistry,
-    mcpDynamicFlow: mockDynamicFlow,
+    mcpRegistry: mockRegistry as any,
+    mcpDynamicFlow: mockDynamicFlow as any,
     worldState: {},
     availableResources: {},
     currentState: {
@@ -70,7 +70,7 @@ describe('MCP Capabilities Integration', () => {
     constraints: [],
     domain: 'minecraft',
     ...overrides,
-  });
+  } as any);
 
   let hybridPlanner: HybridSkillPlanner;
   let mockRegistry: EnhancedRegistry;
@@ -171,8 +171,8 @@ describe('MCP Capabilities Integration', () => {
       mockBtRunner,
       mockHrmPlanner,
       mockGoapPlanner,
-      mockRegistry,
-      mockDynamicFlow
+      mockRegistry as any,
+      mockDynamicFlow as any
     );
   });
 
@@ -288,7 +288,7 @@ describe('MCP Capabilities Integration', () => {
 
   describe('MCP Capabilities Adapter', () => {
     it('should find applicable capabilities for goals', async () => {
-      const adapter = new MCPCapabilitiesAdapter(mockRegistry, mockDynamicFlow);
+      const adapter = new MCPCapabilitiesAdapter(mockRegistry as any, mockDynamicFlow as any);
 
       const context = {
         leafContext: {} as any,
@@ -334,7 +334,7 @@ describe('MCP Capabilities Integration', () => {
         },
         goal: 'torch the corridor',
         resources: {},
-      };
+      } as any;
 
       const plan = await adapter.generateCapabilityPlan(
         'torch the corridor',
@@ -367,7 +367,7 @@ describe('MCP Capabilities Integration', () => {
         status: 'shadow',
       });
 
-      const adapter = new MCPCapabilitiesAdapter(mockRegistry, mockDynamicFlow);
+      const adapter = new MCPCapabilitiesAdapter(mockRegistry as any, mockDynamicFlow as any);
 
       const context = {
         leafContext: {} as any,
@@ -413,7 +413,7 @@ describe('MCP Capabilities Integration', () => {
         },
         goal: 'opt.experimental_mining',
         resources: {},
-      };
+      } as any;
 
       const plan = await adapter.generateCapabilityPlan(
         'opt.experimental_mining',
@@ -472,16 +472,14 @@ describe('MCP Capabilities Integration', () => {
         availableCapabilities: [],
         registry: mockRegistry,
         dynamicFlow: mockDynamicFlow,
-        // Ensure MCP registry is properly set for confidence calculation
-        mcpRegistry: mockRegistry,
-      };
+      } as any;
 
       const result = await hybridPlanner.plan(goal, context);
 
       // The hybrid planner should use MCP capabilities when available
       expect(result.plan.planningApproach).toBe('mcp-capabilities');
       expect(result.plan.nodes).toHaveLength(1);
-      expect(result.plan.nodes[0].source).toBe('mcp-capability');
+      expect((result.plan.nodes[0] as any).source).toBe('mcp-capability');
     });
   });
 });

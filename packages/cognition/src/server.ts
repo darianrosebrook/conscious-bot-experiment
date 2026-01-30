@@ -2933,6 +2933,48 @@ app.post('/thought-generated', async (req: Request, res: Response) => {
   }
 });
 
+// ── POST /api/cognitive-stream/events ──
+// Accepts BotLifecycleEvent and generates a thought via the event-driven generator
+app.post('/api/cognitive-stream/events', async (req, res) => {
+  try {
+    const event = req.body; // { type, timestamp, data }
+    if (!event.type || !event.timestamp) {
+      return res.status(400).json({ error: 'Missing type or timestamp' });
+    }
+    const thought = await eventDrivenThoughtGenerator.generateThoughtForEvent(event);
+    res.json({
+      success: true,
+      thoughtGenerated: !!thought,
+      thoughtId: thought?.id || null,
+    });
+  } catch (error) {
+    console.error('Error processing lifecycle event:', error);
+    res.status(500).json({ error: 'Failed to process event' });
+  }
+});
+
+// ── POST /api/cognitive-stream/ack ──
+// Marks thoughts as processed in cognition's own store
+app.post('/api/cognitive-stream/ack', async (req, res) => {
+  try {
+    const { thoughtIds } = req.body; // string[]
+    if (!Array.isArray(thoughtIds)) {
+      return res.status(400).json({ error: 'thoughtIds must be an array' });
+    }
+    const idSet = new Set(thoughtIds);
+    let acked = 0;
+    for (const thought of cognitiveThoughts) {
+      if (idSet.has(thought.id) && !thought.processed) {
+        thought.processed = true;
+        acked++;
+      }
+    }
+    res.json({ success: true, ackedCount: acked });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to ack thoughts' });
+  }
+});
+
 // Listen for thought generation events and forward them to dashboard
 eventDrivenThoughtGenerator.on(
   'thoughtGenerated',
@@ -2948,6 +2990,24 @@ eventDrivenThoughtGenerator.on(
         '-',
         data.thought.content.substring(0, 60)
       );
+
+      // Store in cognitiveThoughts so /api/cognitive-stream/recent can poll them
+      cognitiveThoughts.push({
+        id: data.thought.id,
+        type: data.thought.type,
+        content: data.thought.content,
+        attribution: data.thought.attribution,
+        context: data.thought.context,
+        metadata: data.thought.metadata,
+        timestamp: data.thought.timestamp,
+        processed: data.thought.processed || false,
+      });
+
+      // Cap cognitiveThoughts as a bounded ring buffer
+      const MAX_COGNITIVE_THOUGHTS = 200;
+      if (cognitiveThoughts.length > MAX_COGNITIVE_THOUGHTS) {
+        cognitiveThoughts = cognitiveThoughts.slice(-MAX_COGNITIVE_THOUGHTS);
+      }
 
       // Forward to dashboard
       await fetch('http://localhost:3000/api/ws/cognitive-stream', {

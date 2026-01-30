@@ -93,7 +93,7 @@ describe('TaskBootstrapper', () => {
     const bootstrapper = new TaskBootstrapper({
       memoryEndpoint: 'http://memory.local',
       llmEndpoint: null,
-      fetchImpl: fetchMock,
+      fetchImpl: fetchMock as any,
       environmentProvider,
     });
 
@@ -135,7 +135,7 @@ describe('TaskBootstrapper', () => {
     const bootstrapper = new TaskBootstrapper({
       memoryEndpoint: 'http://memory.local',
       llmEndpoint: null,
-      fetchImpl: fetchMock,
+      fetchImpl: fetchMock as any,
       environmentProvider,
     });
 
@@ -215,7 +215,7 @@ describe('TaskBootstrapper', () => {
     const bootstrapper = new TaskBootstrapper({
       memoryEndpoint: 'http://memory.local',
       llmEndpoint: 'http://llm.local',
-      fetchImpl: fetchMock,
+      fetchImpl: fetchMock as any,
       environmentProvider,
     });
 
@@ -260,7 +260,7 @@ describe('TaskBootstrapper', () => {
     const bootstrapper = new TaskBootstrapper({
       memoryEndpoint: 'http://memory.local',
       llmEndpoint: 'http://llm.local',
-      fetchImpl: fetchMock,
+      fetchImpl: fetchMock as any,
       environmentProvider,
     });
 

@@ -210,7 +210,7 @@ export function createMockLeafContext(
 /**
  * Creates a mock enhanced registry for testing
  */
-export function createMockEnhancedRegistry(): vi.Mocked<EnhancedRegistry> {
+export function createMockEnhancedRegistry(): import('vitest').Mocked<EnhancedRegistry> {
   return {
     registerLeaf: vi
       .fn()
@@ -231,7 +231,7 @@ export function createMockEnhancedRegistry(): vi.Mocked<EnhancedRegistry> {
 /**
  * Creates a mock leaf factory for testing
  */
-export function createMockLeafFactory(): vi.Mocked<LeafFactory> {
+export function createMockLeafFactory(): import('vitest').Mocked<LeafFactory> {
   return {
     register: vi.fn().mockReturnValue({ ok: true, id: 'mock_leaf@1.0.0' }),
     get: vi.fn().mockReturnValue(createMockLeaf()),
@@ -244,7 +244,7 @@ export function createMockLeafFactory(): vi.Mocked<LeafFactory> {
 /**
  * Creates a mock BT-DSL parser for testing
  */
-export function createMockBTDSLParser(): vi.Mocked<BTDSLParser> {
+export function createMockBTDSLParser(): import('vitest').Mocked<BTDSLParser> {
   return {
     parse: vi.fn().mockReturnValue({
       valid: true,
@@ -259,7 +259,7 @@ export function createMockBTDSLParser(): vi.Mocked<BTDSLParser> {
 /**
  * Creates a mock dynamic creation flow for testing
  */
-export function createMockDynamicCreationFlow(): vi.Mocked<DynamicCreationFlow> {
+export function createMockDynamicCreationFlow(): import('vitest').Mocked<DynamicCreationFlow> {
   return {
     detectImpasse: vi.fn().mockReturnValue(false),
     requestOptionProposals: vi.fn().mockResolvedValue([]),

@@ -95,6 +95,12 @@ def api_tags():
             "model": embedding_model_name,
             "size": 0,
         })
+        # Backward-compat alias so lookups for the old Ollama model name succeed
+        models.append({
+            "name": "nomic-embed-text",
+            "model": embedding_model_name,
+            "size": 0,
+        })
     return jsonify({"models": models})
 
 

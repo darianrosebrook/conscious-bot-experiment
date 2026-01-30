@@ -35,21 +35,25 @@ describe('PBIEnforcer', () => {
 
   it('should handle basic plan step validation', () => {
     const planStep: PlanStep = {
-      id: 'test-step',
-      capability: 'test',
-      parameters: {},
-      expectedDuration: 1000,
-      retryPolicy: {
-        maxRetries: 3,
-        backoffMs: 100,
-      },
+      stepId: 'test-step',
+      type: 'test',
+      args: {},
+      expectedDurationMs: 1000,
     };
 
     const context: ExecutionContext = {
-      worldState: {},
-      availableResources: {},
-      executionConstraints: {},
-      metadata: {},
+      threatLevel: 0,
+      hostileCount: 0,
+      nearLava: false,
+      lavaDistance: 100,
+      resourceValue: 0,
+      detourDistance: 0,
+      subgoalUrgency: 0,
+      estimatedTimeToSubgoal: 0,
+      commitmentStrength: 0,
+      timeOfDay: 'day',
+      lightLevel: 15,
+      airLevel: 300,
     };
 
     // This should not throw an error for basic validation
@@ -69,19 +73,15 @@ describe('PBIEnforcer', () => {
 
     it('should handle basic plan step structure', () => {
       const planStep: PlanStep = {
-        id: 'test-step',
-        capability: 'test-capability',
-        parameters: { param1: 'value1' },
-        expectedDuration: 1000,
-        retryPolicy: {
-          maxRetries: 3,
-          backoffMs: 100,
-        },
+        stepId: 'test-step',
+        type: 'test-capability',
+        args: { param1: 'value1' },
+        expectedDurationMs: 1000,
       };
 
-      expect(planStep.id).toBe('test-step');
-      expect(planStep.capability).toBe('test-capability');
-      expect(planStep.parameters).toEqual({ param1: 'value1' });
+      expect(planStep.stepId).toBe('test-step');
+      expect(planStep.type).toBe('test-capability');
+      expect(planStep.args).toEqual({ param1: 'value1' });
     });
   });
 });

@@ -174,6 +174,14 @@ export class MinecraftCraftingSolver extends BaseDomainSolver<MinecraftCraftingS
       done: false,
       order: index + 1,
       estimatedDuration: this.estimateDuration(step.actionType),
+      meta: {
+        domain: 'crafting',
+        leaf: this.actionTypeToLeaf(step.actionType),
+        action: step.action,
+        actionType: step.actionType,
+        produces: step.produces,
+        consumes: step.consumes,
+      },
     }));
   }
 
@@ -268,6 +276,19 @@ export class MinecraftCraftingSolver extends BaseDomainSolver<MinecraftCraftingS
     }
 
     return steps;
+  }
+
+  /**
+   * Map action type to the corresponding BT leaf name.
+   */
+  private actionTypeToLeaf(actionType: string): string {
+    switch (actionType) {
+      case 'mine': return 'dig_block';
+      case 'craft': return 'craft_recipe';
+      case 'smelt': return 'smelt';
+      case 'place': return 'place_block';
+      default: return actionType;
+    }
   }
 
   /**

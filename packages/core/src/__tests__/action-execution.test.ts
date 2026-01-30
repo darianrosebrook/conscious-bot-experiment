@@ -8,7 +8,7 @@
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { createBot } from 'mineflayer';
-import { createMinecraftCognitiveIntegration } from '@/minecraft-cognitive-integration';
+// Removed: import from '@/minecraft-cognitive-integration' -- path alias not configured, import unused
 
 describe('Action Execution', () => {
   let mockBot: any;

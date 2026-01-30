@@ -9,6 +9,7 @@
  */
 
 import { EventEmitter } from 'events';
+import { createRequire } from 'module';
 import { createServiceClients } from '@conscious-bot/core';
 import type { BaseDomainSolver } from './sterling/base-domain-solver';
 import type { MinecraftCraftingSolver } from './sterling/minecraft-crafting-solver';
@@ -251,6 +252,7 @@ export class EnhancedTaskIntegration extends EventEmitter {
   private thoughtPollingInterval?: NodeJS.Timeout;
   private minecraftClient: ReturnType<typeof createServiceClients>['minecraft'];
   private solverRegistry = new Map<string, BaseDomainSolver>();
+  private _mcDataCache: any = null;
 
   private get craftingSolver(): MinecraftCraftingSolver | undefined {
     return this.solverRegistry.get('minecraft.crafting') as MinecraftCraftingSolver | undefined;
@@ -262,6 +264,49 @@ export class EnhancedTaskIntegration extends EventEmitter {
 
   private get toolProgressionSolver(): MinecraftToolProgressionSolver | undefined {
     return this.solverRegistry.get('minecraft.tool_progression') as MinecraftToolProgressionSolver | undefined;
+  }
+
+  /**
+   * Lazy-load minecraft-data for Sterling solvers.
+   * Cached after first load since the game version doesn't change at runtime.
+   */
+  /**
+   * Public accessor for server endpoints that need mcData.
+   */
+  getMcDataPublic(): any {
+    return this.getMcData();
+  }
+
+  private getMcData(): any {
+    if (!this._mcDataCache) {
+      try {
+        // minecraft-data is a transitive dep via mineflayer in the workspace.
+        // Use createRequire since this file runs in ESM context under tsx.
+        const esmRequire = createRequire(import.meta.url);
+        const mcDataLoader = esmRequire('minecraft-data');
+        this._mcDataCache = mcDataLoader('1.20.1');
+      } catch (err) {
+        console.warn('⚠️ minecraft-data not available for Sterling solvers:', err instanceof Error ? err.message : err);
+        return null;
+      }
+    }
+    return this._mcDataCache;
+  }
+
+  /**
+   * Fetch current inventory and nearby blocks from the bot for Sterling solvers.
+   */
+  private async fetchBotContext(): Promise<{ inventory: any[]; nearbyBlocks: any[] }> {
+    try {
+      const stateRes = await this.minecraftRequest('/state', { timeout: 3000 });
+      if (!stateRes.ok) return { inventory: [], nearbyBlocks: [] };
+      const stateData = (await stateRes.json()) as any;
+      const inventory = stateData?.data?.data?.inventory?.items || [];
+      const nearbyBlocks = stateData?.data?.worldState?.nearbyBlocks || [];
+      return { inventory, nearbyBlocks };
+    } catch {
+      return { inventory: [], nearbyBlocks: [] };
+    }
   }
 
   /**
@@ -419,7 +464,30 @@ export class EnhancedTaskIntegration extends EventEmitter {
         parameters.blockType = this.extractBlockType(content);
       }
 
-      // Create the task
+      // Add structured requirement candidate so resolveRequirement() doesn't re-parse
+      if (actionType === 'crafting') {
+        const itemName = this.extractItemType(content);
+        if (itemName) {
+          parameters.requirementCandidate = {
+            kind: 'craft',
+            outputPattern: itemName,
+            quantity: 1,
+            extractionMethod: 'thought-content',
+          };
+        }
+      } else if (actionType === 'gathering') {
+        const resource = this.extractResourceType(content);
+        if (resource) {
+          parameters.requirementCandidate = {
+            kind: 'collect',
+            outputPattern: resource,
+            quantity: 1,
+            extractionMethod: 'thought-content',
+          };
+        }
+      }
+
+      // Create the task (empty steps array — addTask() will synthesize via Sterling)
       const task: Task = {
         id: `cognitive-task-${thought.id}-${Date.now()}`,
         title: taskTitle,
@@ -430,14 +498,7 @@ export class EnhancedTaskIntegration extends EventEmitter {
         progress: 0,
         status: 'pending',
         source: 'autonomous' as const,
-        steps: [
-          {
-            id: `step-1-${Date.now()}`,
-            label: `Execute: ${taskTitle}`,
-            done: false,
-            order: 1,
-          },
-        ],
+        steps: [],
         parameters,
         metadata: {
           createdAt: Date.now(),
@@ -557,28 +618,18 @@ export class EnhancedTaskIntegration extends EventEmitter {
   }
 
   /**
-   * Mark a thought as processed in the cognitive stream
+   * Mark a thought as processed via cognition service ack endpoint
    */
   private async markThoughtAsProcessed(thoughtId: string): Promise<void> {
     try {
-      const response = await fetch(
-        `http://localhost:3000/api/ws/cognitive-stream`,
-        {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ thoughtId }),
-          signal: AbortSignal.timeout(5000),
-        }
-      );
-
-      if (!response.ok) {
-        console.warn(
-          'Failed to mark thought as processed:',
-          response.statusText
-        );
-      }
+      await fetch('http://localhost:3003/api/cognitive-stream/ack', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ thoughtIds: [thoughtId] }),
+        signal: AbortSignal.timeout(5000),
+      });
     } catch (error) {
-      console.warn('Failed to mark thought as processed:', error);
+      console.warn('Failed to ack thought as processed:', error);
     }
   }
 
@@ -911,7 +962,7 @@ export class EnhancedTaskIntegration extends EventEmitter {
       progress: 0,
       status: 'pending',
       source: taskData.source || 'manual',
-      steps: taskData.steps || steps,
+      steps: (taskData.steps && taskData.steps.length > 0) ? taskData.steps : steps,
       parameters: taskData.parameters || {},
       metadata: {
         createdAt: Date.now(),
@@ -2145,18 +2196,24 @@ export class EnhancedTaskIntegration extends EventEmitter {
 
     if (!goalItem) return [];
 
-    // Get current inventory from task metadata if available
-    const currentState = (taskData.metadata as any)?.currentState;
-    const inventoryItems = currentState?.inventory || [];
-    const nearbyBlocks = currentState?.nearbyBlocks || [];
+    // Get current inventory and nearby blocks — prefer task metadata, fall back to live bot state
+    let inventoryItems = (taskData.metadata as any)?.currentState?.inventory;
+    let nearbyBlocks = (taskData.metadata as any)?.currentState?.nearbyBlocks;
 
-    // We need mcData to build rules — get it from task metadata or fall through
-    const mcData = (taskData.metadata as any)?.mcData;
+    if (!inventoryItems || !nearbyBlocks) {
+      const botCtx = await this.fetchBotContext();
+      inventoryItems = inventoryItems || botCtx.inventory;
+      nearbyBlocks = nearbyBlocks || botCtx.nearbyBlocks;
+    }
+
+    // Load mcData — prefer task metadata, fall back to lazy-loaded cache
+    const mcData = (taskData.metadata as any)?.mcData || this.getMcData();
     if (!mcData) {
-      // No mcData available — can't build crafting rules
+      console.warn('⚠️ Cannot invoke Sterling crafting solver — minecraft-data unavailable');
       return [];
     }
 
+    console.log(`🔧 [Sterling] Invoking crafting solver for goal: ${goalItem}`);
     const result = await this.craftingSolver.solveCraftingGoal(
       goalItem,
       inventoryItems,
@@ -2169,9 +2226,25 @@ export class EnhancedTaskIntegration extends EventEmitter {
       (taskData.metadata as any).craftingPlanId = result.planId;
     }
 
+    if (result.solved) {
+      console.log(`✅ [Sterling] Crafting solver found plan: ${result.planId} (${result.steps?.length || 0} steps)`);
+    } else {
+      console.log(`❌ [Sterling] Crafting solver: no solution for ${goalItem}`);
+    }
+
     if (!result.solved) return [];
 
-    return this.craftingSolver.toTaskSteps(result);
+    const steps = this.craftingSolver.toTaskSteps(result);
+    return steps.map(s => ({
+      ...s,
+      meta: {
+        ...s.meta,
+        source: 'sterling',
+        solverId: this.craftingSolver!.solverId,
+        planId: result.planId,
+        bundleId: result.solveMeta?.bundles?.[0]?.bundleId,
+      },
+    }));
   }
 
   /**
@@ -2190,11 +2263,16 @@ export class EnhancedTaskIntegration extends EventEmitter {
 
     const targetTool = requirement.targetTool as string;
 
-    // Get current inventory from task metadata
-    const currentState = (taskData.metadata as any)?.currentState;
-    const inventoryItems: Array<{ name: string; count: number } | null | undefined> =
-      currentState?.inventory || [];
-    const nearbyBlocks: string[] = currentState?.nearbyBlocks || [];
+    // Get current inventory — prefer task metadata, fall back to live bot state
+    let inventoryItems: Array<{ name: string; count: number } | null | undefined> =
+      (taskData.metadata as any)?.currentState?.inventory;
+    let nearbyBlocks: string[] = (taskData.metadata as any)?.currentState?.nearbyBlocks;
+
+    if (!inventoryItems || !nearbyBlocks) {
+      const botCtx = await this.fetchBotContext();
+      inventoryItems = inventoryItems || botCtx.inventory;
+      nearbyBlocks = nearbyBlocks || botCtx.nearbyBlocks;
+    }
 
     // Convert inventory array to record
     const inventory: Record<string, number> = {};
@@ -2224,7 +2302,17 @@ export class EnhancedTaskIntegration extends EventEmitter {
 
     if (!result.solved) return [];
 
-    return this.toolProgressionSolver.toTaskSteps(result);
+    const steps = this.toolProgressionSolver.toTaskSteps(result);
+    return steps.map(s => ({
+      ...s,
+      meta: {
+        ...s.meta,
+        source: 'sterling',
+        solverId: this.toolProgressionSolver!.solverId,
+        planId: result.planId,
+        bundleId: result.solveMeta?.bundles?.[0]?.bundleId,
+      },
+    }));
   }
 
   /**
@@ -2308,7 +2396,17 @@ export class EnhancedTaskIntegration extends EventEmitter {
       (taskData.metadata as any).buildingReplanCount = replanCount + 1;
     }
 
-    return this.buildingSolver.toTaskStepsWithReplan(result, templateId);
+    const steps = this.buildingSolver.toTaskStepsWithReplan(result, templateId);
+    return steps.map(s => ({
+      ...s,
+      meta: {
+        ...s.meta,
+        source: 'sterling',
+        solverId: this.buildingSolver!.solverId,
+        planId: result.planId,
+        bundleId: result.solveMeta?.bundles?.[0]?.bundleId,
+      },
+    }));
   }
 
   /**

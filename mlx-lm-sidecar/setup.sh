@@ -22,4 +22,25 @@ echo "Installing dependencies..."
 "$VENV_DIR/bin/pip" install --upgrade pip
 "$VENV_DIR/bin/pip" install -r "$SCRIPT_DIR/requirements.txt"
 
+echo "Verifying model cache..."
+"$VENV_DIR/bin/python" -c "
+from huggingface_hub import snapshot_download
+import os
+cache_dir = os.path.expanduser('~/.cache/huggingface/hub')
+gen = os.path.join(cache_dir, 'models--mlx-community--gemma-3n-E2B-it-lm-4bit')
+emb = os.path.join(cache_dir, 'models--mlx-community--embeddinggemma-300m-4bit')
+missing = []
+if not os.path.isdir(gen):
+    missing.append('mlx-community/gemma-3n-E2B-it-lm-4bit')
+if not os.path.isdir(emb):
+    missing.append('mlx-community/embeddinggemma-300m-4bit')
+if missing:
+    print(f'Downloading missing models: {missing}')
+    for m in missing:
+        snapshot_download(m)
+    print('Models downloaded.')
+else:
+    print('All models cached.')
+"
+
 echo "MLX-LM sidecar setup complete."

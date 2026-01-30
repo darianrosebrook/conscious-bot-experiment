@@ -76,7 +76,7 @@ describe('Version Compatibility', () => {
         resolve();
       });
 
-      mockBot.once('error', (error) => {
+      mockBot.once('error', (error: any) => {
         clearTimeout(timeout);
         reject(error);
       });
@@ -98,7 +98,7 @@ describe('Version Compatibility', () => {
     };
 
     const errorPromise = new Promise<void>((resolve) => {
-      mockBot.once('error', (error: Error) => {
+      mockBot.once('error', (error: any) => {
         expect(error).toBeInstanceOf(Error);
         resolve();
       });

@@ -7,7 +7,7 @@
  * @author @darianrosebrook
  */
 
-import { vi } from 'vitest';
+import { vi, type Mocked } from 'vitest';
 import {
   Plan,
   PlanStep,
@@ -27,7 +27,7 @@ import { EnhancedReactiveExecutor } from '../reactive-executor/reactive-executor
 /**
  * Creates a mock integrated planning coordinator for testing
  */
-export function createMockIntegratedPlanningCoordinator(): vi.Mocked<IntegratedPlanningCoordinator> {
+export function createMockIntegratedPlanningCoordinator(): Mocked<IntegratedPlanningCoordinator> {
   return {
     planAndExecute: vi.fn().mockResolvedValue({
       primaryPlan: createMockPlan(),
@@ -45,7 +45,7 @@ export function createMockIntegratedPlanningCoordinator(): vi.Mocked<IntegratedP
 /**
  * Creates a mock enhanced goal manager for testing
  */
-export function createMockEnhancedGoalManager(): vi.Mocked<EnhancedGoalManager> {
+export function createMockEnhancedGoalManager(): Mocked<EnhancedGoalManager> {
   return {
     // Real methods from EnhancedGoalManager
     formulateGoals: vi.fn().mockResolvedValue({
@@ -119,7 +119,7 @@ export function createMockEnhancedGoalManager(): vi.Mocked<EnhancedGoalManager> 
 /**
  * Creates a mock enhanced reactive executor for testing
  */
-export function createMockEnhancedReactiveExecutor(): vi.Mocked<EnhancedReactiveExecutor> {
+export function createMockEnhancedReactiveExecutor(): Mocked<EnhancedReactiveExecutor> {
   return {
     isExecuting: vi.fn().mockReturnValue(false),
     executeNextTask: vi.fn().mockResolvedValue({ success: true }),

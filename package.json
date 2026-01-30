@@ -36,7 +36,13 @@
     "audit:quality-gates": "node docs/audit/verification-system.ts",
     "audit:integration-map": "node docs/audit/integration-mapper.ts",
     "audit:comprehensive": "node docs/audit/reporting-system.ts",
-    "audit:working-specs": "node docs/audit/audit-runner.ts --validate-specs"
+    "audit:working-specs": "node docs/audit/audit-runner.ts --validate-specs",
+    "e2e": "bash scripts/run-e2e.sh",
+    "e2e:teardown": "bash scripts/run-e2e.sh --teardown",
+    "docker:up": "docker compose up -d",
+    "docker:down": "docker compose down",
+    "docker:ps": "docker compose ps",
+    "docker:logs": "docker compose logs -f"
   },
   "workspaces": [
     "packages/*",

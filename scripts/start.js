@@ -440,6 +440,86 @@ async function setupMLXEnvironment() {
   } catch (error) {
     log(' ❌ Failed to install MLX dependencies', colors.red);
   }
+
+  // Verify MLX models are cached
+  log(' 🔍 Verifying MLX model cache...', colors.purple);
+  try {
+    execSync(
+      `cd ${mlxDir} && ./venv-mlx/bin/python -c "
+import os, sys
+cache = os.path.expanduser('~/.cache/huggingface/hub')
+gen = os.path.join(cache, 'models--mlx-community--gemma-3n-E2B-it-lm-4bit')
+emb = os.path.join(cache, 'models--mlx-community--embeddinggemma-300m-4bit')
+missing = []
+if not os.path.isdir(gen): missing.append('generation (gemma-3n-E2B-it-lm-4bit)')
+if not os.path.isdir(emb): missing.append('embedding (embeddinggemma-300m-4bit)')
+if missing:
+    print('MISSING: ' + ', '.join(missing))
+    sys.exit(1)
+print('OK')
+"`,
+      { stdio: 'pipe', shell: true, encoding: 'utf-8' }
+    );
+    log(' ✅ MLX models are cached locally', colors.green);
+  } catch (error) {
+    log(' ⚠️  Some MLX models are not cached — first startup will download them', colors.yellow);
+    log('     Run: cd mlx-lm-sidecar && bash setup.sh to pre-download', colors.cyan);
+  }
+}
+
+// Docker compose management
+async function startDockerServices() {
+  log('\n🐳 Starting Docker services...', colors.cyan);
+
+  // Check if Docker is available
+  try {
+    execSync('docker --version', { stdio: 'ignore' });
+  } catch {
+    log(' ⚠️  Docker is not installed or not in PATH — skipping Docker services', colors.yellow);
+    return;
+  }
+
+  // Check if Docker daemon is running
+  try {
+    execSync('docker info', { stdio: 'ignore' });
+  } catch {
+    log(' ⚠️  Docker daemon is not running — skipping Docker services', colors.yellow);
+    return;
+  }
+
+  try {
+    execSync('docker compose up -d', { stdio: 'inherit', cwd: process.cwd() });
+    log(' ✅ Docker compose started', colors.green);
+  } catch (error) {
+    log(` ⚠️  docker compose up failed: ${error.message}`, colors.yellow);
+    return;
+  }
+
+  // Wait for Postgres healthcheck
+  log(' ⏳ Waiting for Postgres...', colors.cyan);
+  let pgReady = false;
+  for (let i = 0; i < 30; i++) {
+    try {
+      execSync('docker exec conscious-bot-postgres pg_isready -U conscious_bot -q', { stdio: 'ignore' });
+      pgReady = true;
+      break;
+    } catch {
+      await wait(2000);
+    }
+  }
+  if (pgReady) {
+    log(' ✅ Postgres is ready', colors.green);
+  } else {
+    log(' ⚠️  Postgres did not become ready in time', colors.yellow);
+  }
+
+  // Log Minecraft status (non-blocking — it's optional)
+  try {
+    execSync('docker exec conscious-bot-minecraft mc-health', { stdio: 'ignore' });
+    log(' ✅ Minecraft server is ready', colors.green);
+  } catch {
+    log(' ℹ️  Minecraft server is still starting (non-blocking)', colors.yellow);
+  }
 }
 
 // Main function
@@ -477,6 +557,14 @@ async function main() {
 
   // Step 3b: Setup MLX-LM sidecar environment
   await setupMLXEnvironment();
+
+  // Step 3c: Start Docker services (Postgres + Minecraft)
+  const skipDocker = process.argv.includes('--skip-docker');
+  if (skipDocker) {
+    log('\n🐳 Skipping Docker services (--skip-docker)', colors.yellow);
+  } else {
+    await startDockerServices();
+  }
 
   // Step 4: Kill existing processes
   log('\n🔄 Cleaning up existing processes...', colors.cyan);
@@ -783,6 +871,34 @@ async function main() {
   } catch {
     log(`  ℹ️  Sterling reasoning server not available at ${sterlingUrl} (optional)`, colors.yellow);
     log('     To enable: cd /path/to/sterling && source venv/bin/activate && python scripts/utils/sterling_unified_server.py', colors.cyan);
+  }
+
+  // Minecraft server (external or Docker-managed)
+  const mcHost = process.env.MINECRAFT_HOST || 'localhost';
+  const mcPort = parseInt(process.env.MINECRAFT_PORT || '25565', 10);
+  try {
+    const net = await import('net');
+    await new Promise((resolve, reject) => {
+      const sock = new net.default.Socket();
+      const timer = setTimeout(() => {
+        sock.destroy();
+        reject(new Error('timeout'));
+      }, 3000);
+      sock.connect(mcPort, mcHost, () => {
+        clearTimeout(timer);
+        sock.destroy();
+        resolve();
+      });
+      sock.on('error', (err) => {
+        clearTimeout(timer);
+        sock.destroy();
+        reject(err);
+      });
+    });
+    log(`  ✅ Minecraft server available at ${mcHost}:${mcPort}`, colors.green);
+  } catch {
+    log(`  ℹ️  Minecraft server not available at ${mcHost}:${mcPort} (optional)`, colors.yellow);
+    log('     To enable: pnpm docker:up (or start a Minecraft 1.20.1 server manually)', colors.cyan);
   }
 
   // Step 11: Display status and URLs

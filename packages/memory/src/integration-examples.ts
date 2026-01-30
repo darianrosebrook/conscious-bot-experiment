@@ -33,6 +33,7 @@ export interface CognitiveTask {
   priority: number;
   deadline?: number;
   context: Record<string, any>;
+  metadata?: Record<string, any>;
 }
 
 // Placeholder classes - these would normally come from @conscious-bot/core
@@ -460,7 +461,7 @@ export async function memoryDrivenGoalFormulationExample() {
 
   for (const signal of memorySignals.generatedSignals) {
     console.log(
-      `   🔍 Memory signal: ${signal.memoryType} (${signal.intensity.toFixed(2)} intensity)`
+      `   🔍 Memory signal: ${signal.memoryType} (${(signal.intensity ?? 0).toFixed(2)} intensity)`
     );
 
     // The need generator would:

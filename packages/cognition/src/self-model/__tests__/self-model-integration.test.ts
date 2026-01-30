@@ -146,14 +146,16 @@ describe('Self-Model Integration', () => {
           magnitude: 0.4,
           description:
             'Reinforced curiosity trait through extensive exploration',
-          evidence: 'Explored 5 new biomes in one day',
+          evidence: ['Explored 5 new biomes in one day'],
+          timestamp: Date.now(),
         },
         {
           aspect: IdentityAspect.VALUES,
           type: ImpactType.REINFORCEMENT,
           magnitude: 0.3,
           description: 'Demonstrated commitment to Safety First value',
-          evidence: 'Avoided dangerous areas and warned others',
+          evidence: ['Avoided dangerous areas and warned others'],
+          timestamp: Date.now(),
         },
       ];
 
@@ -440,7 +442,7 @@ describe('Self-Model Integration', () => {
         conflictExperience,
         {
           timestamp: Date.now(),
-          context: 'Time-pressured delivery mission',
+          location: 'Time-pressured delivery mission',
           outcomes: ['Arrived safely but late', 'Maintained safety standards'],
         }
       );

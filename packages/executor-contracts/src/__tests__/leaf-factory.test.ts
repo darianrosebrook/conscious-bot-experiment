@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { LeafFactory, createLeafFactory } from '../leaf-factory';
-import { createLeafContext, ExecErrorCode } from '../leaf-interfaces';
+import { createLeafContext, ExecErrorCode, LeafPermission, LeafSpec } from '../leaf-interfaces';
 
 describe('LeafFactory', () => {
   it('registers run-only leaves using their declared version', async () => {
@@ -27,7 +27,7 @@ describe('LeafFactory', () => {
         },
         timeoutMs: 10_000,
         retries: 1,
-        permissions: ['movement', 'dig'],
+        permissions: ['movement', 'dig'] as LeafPermission[],
       },
       async run() {
         return {
@@ -45,7 +45,7 @@ describe('LeafFactory', () => {
       outputSchema: leafImpl.spec.outputSchema,
       timeoutMs: leafImpl.spec.timeoutMs,
       retries: leafImpl.spec.retries,
-      permissions: leafImpl.spec.permissions,
+      permissions: leafImpl.spec.permissions as LeafPermission[],
       implementation: leafImpl as any,
     });
 
@@ -81,7 +81,7 @@ describe('LeafFactory', () => {
       },
     };
 
-    const spec = {
+    const spec: LeafSpec = {
       name: 'sense_light_level',
       version: '1.0.0',
       description: 'Sense the light level',
@@ -89,7 +89,7 @@ describe('LeafFactory', () => {
       outputSchema: leafImpl.spec.outputSchema,
       timeoutMs: leafImpl.spec.timeoutMs,
       retries: leafImpl.spec.retries,
-      permissions: leafImpl.spec.permissions,
+      permissions: leafImpl.spec.permissions as LeafPermission[],
       implementation: leafImpl as any,
     };
 
@@ -101,7 +101,7 @@ describe('LeafFactory', () => {
 
   it('surfaces execution errors when the leaf handler is missing', async () => {
     const factory = new LeafFactory();
-    const spec = {
+    const spec: LeafSpec = {
       name: 'broken_leaf',
       version: '1.0.0',
       description: 'Intentionally broken leaf',
@@ -139,7 +139,7 @@ describe('LeafFactory', () => {
 
   it('should handle leaf without run method', async () => {
     const factory = new LeafFactory();
-    const spec = {
+    const spec: LeafSpec = {
       name: 'incomplete_leaf',
       version: '1.0.0',
       description: 'Leaf without run method',
@@ -177,7 +177,7 @@ describe('LeafFactory', () => {
 
   it('should handle exceptions during leaf execution', async () => {
     const factory = new LeafFactory();
-    const spec = {
+    const spec: LeafSpec = {
       name: 'simple_leaf',
       version: '1.0.0',
       description: 'Simple leaf for testing',

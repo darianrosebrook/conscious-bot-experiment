@@ -1,5 +1,6 @@
 mlx>=0.22.0
 mlx-lm>=0.22.0
 mlx-embeddings>=0.0.3
+huggingface_hub>=0.20.0
 flask>=3.0
 flask-cors>=4.0

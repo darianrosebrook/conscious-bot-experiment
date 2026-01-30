@@ -47,11 +47,9 @@ describe('Simple Test Server', () => {
     server = app.listen(0); // Use random available port
   });
 
-  afterAll((done) => {
+  afterAll(async () => {
     if (server) {
-      server.close(done);
-    } else {
-      done();
+      await new Promise<void>((resolve) => server.close(() => resolve()));
     }
   });
 

@@ -53,7 +53,7 @@ export class PrepareSiteLeaf implements LeafImpl {
     },
     timeoutMs: 5000,
     retries: 0,
-    permissions: [],
+    permissions: ['sense'],
   };
 
   async run(ctx: LeafContext, args: any): Promise<LeafResult> {
@@ -146,7 +146,7 @@ export class BuildModuleLeaf implements LeafImpl {
     },
     timeoutMs: 10000,
     retries: 0, // Not 2 — avoids double-consume trap when stubs graduate
-    permissions: [],
+    permissions: ['sense', 'container.read'],
   };
 
   async run(ctx: LeafContext, args: any): Promise<LeafResult> {
@@ -273,7 +273,7 @@ export class PlaceFeatureLeaf implements LeafImpl {
     },
     timeoutMs: 8000,
     retries: 0,
-    permissions: [],
+    permissions: ['sense', 'container.read'],
   };
 
   async run(ctx: LeafContext, args: any): Promise<LeafResult> {

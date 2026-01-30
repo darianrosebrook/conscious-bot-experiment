@@ -65,7 +65,7 @@ describe('MCP contract coverage', () => {
     );
     expect(pactRegister).toBeDefined();
 
-    const registerArgs = pactRegister!.request.arguments;
+    const registerArgs = pactRegister!.request.arguments as any;
     const registerResult = await integration.registerOption({
       id: registerArgs.id,
       name: registerArgs.name,
@@ -75,7 +75,7 @@ describe('MCP contract coverage', () => {
     });
 
     expect(registerResult.success).toBe(true);
-    expect(registerResult.data).toBe(pactRegister!.response.optionId);
+    expect(registerResult.data).toBe((pactRegister!.response as any).optionId);
 
     const pactListTools = contract.interactions.find(
       (interaction) =>
@@ -84,7 +84,7 @@ describe('MCP contract coverage', () => {
     expect(pactListTools).toBeDefined();
 
     const tools = await integration.listTools();
-    const expectedToolName = pactListTools!.response.tools[0].name;
+    const expectedToolName = (pactListTools!.response as any).tools[0].name;
     expect(tools).toContain(expectedToolName);
   });
 });

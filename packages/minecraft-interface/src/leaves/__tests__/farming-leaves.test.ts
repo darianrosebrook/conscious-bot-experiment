@@ -69,7 +69,7 @@ describe('Farming Leaves', () => {
         position: new Vec3(5, 64, 5),
       };
 
-      vi.spyOn(mockBot, 'blockAt').mockReturnValue(mockBlock);
+      vi.spyOn(mockBot, 'blockAt').mockReturnValue(mockBlock as any);
       vi.spyOn(mockBot, 'equip').mockResolvedValue(undefined);
       vi.spyOn(mockBot, 'dig').mockResolvedValue(undefined);
 
@@ -86,9 +86,9 @@ describe('Farming Leaves', () => {
       const result = await leaf.run(ctx, { position: { x: 5, y: 64, z: 5 } });
 
       expect(result.status).toBe('success');
-      expect(result.result?.success).toBe(true);
-      expect(result.result?.toolUsed).toBe('wooden_hoe');
-      expect(result.result?.soilTilled).toBe(true);
+      expect((result.result as any)?.success).toBe(true);
+      expect((result.result as any)?.toolUsed).toBe('wooden_hoe');
+      expect((result.result as any)?.soilTilled).toBe(true);
       expect(mockBot.equip).toHaveBeenCalledWith(
         expect.objectContaining({ name: 'wooden_hoe' }),
         'hand'
@@ -107,7 +107,7 @@ describe('Farming Leaves', () => {
         position: new Vec3(5, 64, 5),
       };
 
-      vi.spyOn(mockBot, 'blockAt').mockReturnValue(mockBlock);
+      vi.spyOn(mockBot, 'blockAt').mockReturnValue(mockBlock as any);
 
       const ctx = {
         bot: mockBot,
@@ -189,7 +189,7 @@ describe('Farming Leaves', () => {
         position: new Vec3(5, 64, 5),
       };
 
-      vi.spyOn(mockBot, 'blockAt').mockReturnValue(mockBlock);
+      vi.spyOn(mockBot, 'blockAt').mockReturnValue(mockBlock as any);
       vi.spyOn(mockBot, 'placeBlock').mockResolvedValue(undefined);
 
       const ctx = {
@@ -208,9 +208,9 @@ describe('Farming Leaves', () => {
       });
 
       expect(result.status).toBe('success');
-      expect(result.result?.success).toBe(true);
-      expect(result.result?.cropType).toBe('wheat');
-      expect(result.result?.seedsUsed).toBe(1);
+      expect((result.result as any)?.success).toBe(true);
+      expect((result.result as any)?.cropType).toBe('wheat');
+      expect((result.result as any)?.seedsUsed).toBe(1);
       expect(mockBot.placeBlock).toHaveBeenCalledWith(
         mockBlock,
         new Vec3(0, 1, 0)
@@ -228,7 +228,7 @@ describe('Farming Leaves', () => {
         position: new Vec3(5, 64, 5),
       };
 
-      vi.spyOn(mockBot, 'blockAt').mockReturnValue(mockBlock);
+      vi.spyOn(mockBot, 'blockAt').mockReturnValue(mockBlock as any);
 
       const ctx = {
         bot: mockBot,
@@ -267,8 +267,8 @@ describe('Farming Leaves', () => {
       };
 
       vi.spyOn(mockBot, 'blockAt')
-        .mockReturnValueOnce(mockBlock)
-        .mockReturnValueOnce(mockCropBlock);
+        .mockReturnValueOnce(mockBlock as any)
+        .mockReturnValueOnce(mockCropBlock as any);
 
       const ctx = {
         bot: mockBot,
@@ -349,7 +349,7 @@ describe('Farming Leaves', () => {
         position: new Vec3(5, 64, 5),
       };
 
-      vi.spyOn(mockBot, 'blockAt').mockReturnValue(mockCropBlock);
+      vi.spyOn(mockBot, 'blockAt').mockReturnValue(mockCropBlock as any);
       vi.spyOn(mockBot, 'dig').mockResolvedValue(undefined);
 
       const ctx = {
@@ -365,8 +365,8 @@ describe('Farming Leaves', () => {
       const result = await leaf.run(ctx, { position: { x: 5, y: 64, z: 5 } });
 
       expect(result.status).toBe('success');
-      expect(result.result?.success).toBe(true);
-      expect(result.result?.cropType).toBe('wheat');
+      expect((result.result as any)?.success).toBe(true);
+      expect((result.result as any)?.cropType).toBe('wheat');
       // Mock returns empty harvest, but successful harvest should still work
       expect(mockBot.dig).toHaveBeenCalledWith(mockCropBlock);
     });
@@ -382,7 +382,7 @@ describe('Farming Leaves', () => {
         position: new Vec3(5, 64, 5),
       };
 
-      vi.spyOn(mockBot, 'blockAt').mockReturnValue(mockCropBlock);
+      vi.spyOn(mockBot, 'blockAt').mockReturnValue(mockCropBlock as any);
 
       const ctx = {
         bot: mockBot,
@@ -413,7 +413,7 @@ describe('Farming Leaves', () => {
         position: new Vec3(5, 64, 5),
       };
 
-      vi.spyOn(mockBot, 'blockAt').mockReturnValue(mockBlock);
+      vi.spyOn(mockBot, 'blockAt').mockReturnValue(mockBlock as any);
 
       const ctx = {
         bot: mockBot,
@@ -463,9 +463,9 @@ describe('Farming Leaves', () => {
       const result = await leaf.run(ctx, {});
 
       expect(result.status).toBe('success');
-      expect(result.result?.success).toBe(true);
-      expect(result.result?.action).toBe('maintain');
-      expect(result.result?.operationsCompleted).toBe(0); // No operations available in mock
+      expect((result.result as any)?.success).toBe(true);
+      expect((result.result as any)?.action).toBe('maintain');
+      expect((result.result as any)?.operationsCompleted).toBe(0); // No operations available in mock
     });
 
     it('should handle till action', async () => {
@@ -479,7 +479,7 @@ describe('Farming Leaves', () => {
         position: new Vec3(5, 64, 5),
       };
 
-      vi.spyOn(mockBot, 'blockAt').mockReturnValue(mockBlock);
+      vi.spyOn(mockBot, 'blockAt').mockReturnValue(mockBlock as any);
       vi.spyOn(mockBot, 'equip').mockResolvedValue(undefined);
       vi.spyOn(mockBot, 'dig').mockResolvedValue(undefined);
 
@@ -496,9 +496,9 @@ describe('Farming Leaves', () => {
       const result = await leaf.run(ctx, { action: 'till', maxOperations: 1 });
 
       expect(result.status).toBe('success');
-      expect(result.result?.success).toBe(true);
-      expect(result.result?.action).toBe('till');
-      expect(result.result?.details.tilled).toBeGreaterThanOrEqual(0);
+      expect((result.result as any)?.success).toBe(true);
+      expect((result.result as any)?.action).toBe('till');
+      expect((result.result as any)?.details.tilled).toBeGreaterThanOrEqual(0);
     });
 
     it('should handle plant action', async () => {
@@ -512,7 +512,7 @@ describe('Farming Leaves', () => {
         position: new Vec3(5, 64, 5),
       };
 
-      vi.spyOn(mockBot, 'blockAt').mockReturnValue(mockBlock);
+      vi.spyOn(mockBot, 'blockAt').mockReturnValue(mockBlock as any);
       vi.spyOn(mockBot, 'placeBlock').mockResolvedValue(undefined);
 
       const ctx = {
@@ -532,9 +532,9 @@ describe('Farming Leaves', () => {
       });
 
       expect(result.status).toBe('success');
-      expect(result.result?.success).toBe(true);
-      expect(result.result?.action).toBe('plant');
-      expect(result.result?.details.planted).toBeGreaterThanOrEqual(0);
+      expect((result.result as any)?.success).toBe(true);
+      expect((result.result as any)?.action).toBe('plant');
+      expect((result.result as any)?.details.planted).toBeGreaterThanOrEqual(0);
     });
 
     it('should handle harvest action', async () => {
@@ -548,7 +548,7 @@ describe('Farming Leaves', () => {
         position: new Vec3(5, 64, 5),
       };
 
-      vi.spyOn(mockBot, 'blockAt').mockReturnValue(mockCropBlock);
+      vi.spyOn(mockBot, 'blockAt').mockReturnValue(mockCropBlock as any);
       vi.spyOn(mockBot, 'dig').mockResolvedValue(undefined);
 
       const ctx = {
@@ -567,9 +567,9 @@ describe('Farming Leaves', () => {
       });
 
       expect(result.status).toBe('success');
-      expect(result.result?.success).toBe(true);
-      expect(result.result?.action).toBe('harvest');
-      expect(result.result?.details.harvested).toBeGreaterThanOrEqual(0);
+      expect((result.result as any)?.success).toBe(true);
+      expect((result.result as any)?.action).toBe('harvest');
+      expect((result.result as any)?.details.harvested).toBeGreaterThanOrEqual(0);
     });
 
     it('should reject unknown action', async () => {

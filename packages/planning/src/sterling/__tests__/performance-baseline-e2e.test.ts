@@ -255,7 +255,7 @@ function extractBaselineFields(
     hMax: searchHealth.hMax,
     hVariance: searchHealth.hVariance,
     pctSameH: searchHealth.pctSameH,
-    searchHealthVersion: searchHealth.searchHealthVersion,
+    searchHealthVersion: searchHealth.searchHealthVersion ?? 0,
     timestamp: new Date().toISOString(),
   };
 }
@@ -433,10 +433,10 @@ describeSeqIf(shouldRun)('A.5 Performance baseline: stick', () => {
     const steps2 = result2.steps as Array<Record<string, unknown>>;
 
     const fields1 = extractBaselineFields('stick', sh1, steps1.length, true);
-    const fields2 = extractBaselineFields('stick', sh2, steps2.length, true);
+    const fields2 = extractBaselineFields('stick', sh2!, steps2.length, true);
 
     const nodesRatio = sh1.nodesExpanded > 0
-      ? sh2.nodesExpanded / sh1.nodesExpanded
+      ? sh2!.nodesExpanded / sh1.nodesExpanded
       : 1.0;
 
     const artifact: LearningConvergenceArtifact = {
@@ -452,12 +452,12 @@ describeSeqIf(shouldRun)('A.5 Performance baseline: stick', () => {
     writeArtifact('perf-convergence-stick.json', artifact);
 
     console.log(
-      `[A.5] stick convergence: nodes1=${sh1.nodesExpanded} nodes2=${sh2.nodesExpanded}` +
+      `[A.5] stick convergence: nodes1=${sh1.nodesExpanded} nodes2=${sh2!.nodesExpanded}` +
       ` ratio=${nodesRatio.toFixed(3)} converged=${artifact.converged}`
     );
 
     // Tolerance: second solve should expand at most 5% more nodes
-    expect(sh2.nodesExpanded).toBeLessThanOrEqual(sh1.nodesExpanded * 1.05);
+    expect(sh2!.nodesExpanded).toBeLessThanOrEqual(sh1.nodesExpanded * 1.05);
   });
 });
 

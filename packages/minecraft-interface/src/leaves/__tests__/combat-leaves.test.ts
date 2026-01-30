@@ -96,10 +96,10 @@ describe('Combat Leaves', () => {
 
       // In test mode, should return success with mock entity data
       expect(result.status).toBe('success');
-      expect(result.result?.success).toBe(true);
-      expect(result.result?.targetEntity.type).toBe('zombie');
-      expect(result.result?.combatDuration).toBe(100);
-      expect(result.result?.damageDealt).toBe(0);
+      expect((result.result as any)?.success).toBe(true);
+      expect((result.result as any)?.targetEntity.type).toBe('zombie');
+      expect((result.result as any)?.combatDuration).toBe(100);
+      expect((result.result as any)?.damageDealt).toBe(0);
     });
 
     it('should handle test scenario with specific entity ID', async () => {
@@ -119,9 +119,9 @@ describe('Combat Leaves', () => {
 
       // In test mode, should return success with specific entity data
       expect(result.status).toBe('success');
-      expect(result.result?.targetEntity.type).toBe('skeleton');
-      expect(result.result?.targetEntity.id).toBe(2);
-      expect(result.result?.combatDuration).toBe(100);
+      expect((result.result as any)?.targetEntity.type).toBe('skeleton');
+      expect((result.result as any)?.targetEntity.id).toBe(2);
+      expect((result.result as any)?.combatDuration).toBe(100);
     });
 
     it('should reject non-hostile entities', async () => {
@@ -182,8 +182,8 @@ describe('Combat Leaves', () => {
       const result = await leaf.run(ctx, {});
 
       expect(result.status).toBe('success');
-      expect(result.result?.success).toBe(true);
-      expect(result.result?.weaponEquipped).toBe('diamond_sword');
+      expect((result.result as any)?.success).toBe(true);
+      expect((result.result as any)?.weaponEquipped).toBe('diamond_sword');
       expect(mockBot.equip).toHaveBeenCalledWith(
         expect.objectContaining({ name: 'diamond_sword' }),
         'hand'
@@ -208,7 +208,7 @@ describe('Combat Leaves', () => {
       const result = await leaf.run(ctx, { preferredType: 'bow' });
 
       expect(result.status).toBe('success');
-      expect(result.result?.weaponEquipped).toBe('bow');
+      expect((result.result as any)?.weaponEquipped).toBe('bow');
       expect(mockBot.equip).toHaveBeenCalledWith(
         expect.objectContaining({ name: 'bow' }),
         'hand'
@@ -244,7 +244,7 @@ describe('Combat Leaves', () => {
       const result = await leaf.run(ctx, { fallbackToHand: true });
 
       expect(result.status).toBe('success');
-      expect(result.result?.weaponEquipped).toBe('hand');
+      expect((result.result as any)?.weaponEquipped).toBe('hand');
       expect(botWithoutWeapons.unequip).toHaveBeenCalledWith('hand');
     });
   });
@@ -279,9 +279,9 @@ describe('Combat Leaves', () => {
       const result = await leaf.run(ctx, {});
 
       expect(result.status).toBe('success');
-      expect(result.result?.success).toBe(true);
-      expect(result.result?.retreated).toBe(false);
-      expect(result.result?.threatsDetected).toBe(0);
+      expect((result.result as any)?.success).toBe(true);
+      expect((result.result as any)?.retreated).toBe(false);
+      expect((result.result as any)?.threatsDetected).toBe(0);
     });
 
     it('should retreat from detected threats', async () => {
@@ -303,10 +303,10 @@ describe('Combat Leaves', () => {
       const result = await leaf.run(ctx, { retreatDistance: 10 });
 
       expect(result.status).toBe('success');
-      expect(result.result?.success).toBe(true);
-      expect(result.result?.retreated).toBe(true);
-      expect(result.result?.threatsDetected).toBe(2); // zombie and skeleton
-      expect(result.result?.retreatDistance).toBe(10);
+      expect((result.result as any)?.success).toBe(true);
+      expect((result.result as any)?.retreated).toBe(true);
+      expect((result.result as any)?.threatsDetected).toBe(2); // zombie and skeleton
+      expect((result.result as any)?.retreatDistance).toBe(10);
       expect(mockBot.setControlState).toHaveBeenCalledWith('forward', true);
       expect(mockBot.setControlState).toHaveBeenCalledWith('sprint', true);
     });
@@ -343,9 +343,9 @@ describe('Combat Leaves', () => {
       });
 
       expect(result.status).toBe('success');
-      expect(result.result?.success).toBe(true);
-      expect(result.result?.itemUsed).toBe('healing_potion');
-      expect(result.result?.quantityUsed).toBe(1);
+      expect((result.result as any)?.success).toBe(true);
+      expect((result.result as any)?.itemUsed).toBe('healing_potion');
+      expect((result.result as any)?.quantityUsed).toBe(1);
       expect(mockBot.equip).toHaveBeenCalled();
       expect(mockBot.activateItem).toHaveBeenCalledWith(true);
     });

@@ -21,81 +21,204 @@ The system demonstrates how tightly coupled feedback loops – from low-level se
 ## Quick Start
 
 ### Prerequisites
+
 - **Node.js** >= 18.0.0
 - **pnpm** >= 8.0.0
-- **Minecraft Server** (for testing the bot)
-- **PostgreSQL** >= 12.0.0 (with pgvector extension for enhanced memory)
-- **Ollama** (optional, for local embedding generation)
+- **Docker** (provides PostgreSQL + pgvector and Minecraft server)
+- **Apple Silicon Mac** (required for MLX-LM sidecar — generation + embeddings)
+- **Python 3.11** (for Sapient HRM bridge)
 
 ### Environment Setup
 
-#### Per-Seed Memory Database Configuration
+Copy the included `.env` file or create one at the project root:
 
-The enhanced memory system creates **separate databases per Minecraft world seed** to prevent cross-contamination between different world states. This ensures that memories, knowledge graphs, and experiences remain isolated per seed.
-
-**Required Environment Variables:**
 ```bash
-# PostgreSQL Configuration
-PG_HOST=localhost          # PostgreSQL host
-PG_PORT=5432              # PostgreSQL port
-PG_USER=your_username     # PostgreSQL username
-PG_PASSWORD=your_password # PostgreSQL password
-PG_DATABASE=conscious_bot # Base database name
+# PostgreSQL (managed by Docker)
+PG_HOST=localhost
+PG_PORT=5432
+PG_USER=conscious_bot
+PG_PASSWORD=secure_password
+PG_DATABASE=conscious_bot
+POSTGRES_HOST=localhost
+POSTGRES_PORT=5432
+POSTGRES_USER=conscious_bot
+POSTGRES_PASSWORD=secure_password
+POSTGRES_DB=conscious_bot
 
-# MLX-LM Sidecar (local LLM inference + embeddings on Apple Silicon)
+# Minecraft world seed (required — isolates memory per world)
+WORLD_SEED=-7587506821205466402
+
+# MLX-LM Sidecar (replaces Ollama for generation + embeddings)
 OLLAMA_HOST=http://localhost:5002
+OLLAMA_DEFAULT_MODEL=embeddinggemma
+MEMORY_EMBEDDING_MODEL=embeddinggemma
+MEMORY_EMBEDDING_DIMENSIONS=768
 MLX_LM_MODEL=gemma3n:e2b
 MLX_EMBEDDING_MODEL=embeddinggemma
+MLX_LM_SIDECAR_PORT=5002
 
-# World Seed Configuration
-WORLD_SEED=1234567890     # Minecraft world seed (integer)
+# Service endpoints
+CORE_ENDPOINT=http://localhost:3007
+MEMORY_ENDPOINT=http://localhost:3001
+PLANNING_ENDPOINT=http://localhost:3002
+COGNITION_ENDPOINT=http://localhost:3003
+WORLD_ENDPOINT=http://localhost:3004
+MINECRAFT_ENDPOINT=http://localhost:3005
+DASHBOARD_ENDPOINT=http://localhost:3000
+
+# Minecraft server
+MINECRAFT_HOST=localhost
+MINECRAFT_PORT=25565
+MINECRAFT_VERSION=1.20.1
+MINECRAFT_USERNAME=ConsciousBot
+
+# Sterling reasoning server (optional)
+STERLING_WS_URL=ws://localhost:8766
+STERLING_DIR=../sterling
 ```
 
-**Database Setup:**
-```bash
-# 1. Install PostgreSQL and pgvector extension
-# Ubuntu/Debian:
-sudo apt install postgresql-16 postgresql-contrib postgresql-server-dev-16
-# Then enable pgvector as per https://github.com/pgvector/pgvector
+#### Per-Seed Memory Database Isolation
 
-# 2. Create base database
-createdb conscious_bot
+The enhanced memory system creates **separate databases per Minecraft world seed** to prevent cross-contamination between different world states. The `WORLD_SEED` environment variable is required. Changing the seed creates an entirely new memory database, isolating experiences between different world instances. Databases are created automatically on first run (e.g. `conscious_bot_seed_n7587506821205466402`).
 
-# 3. The system will automatically create per-seed databases like:
-# - conscious_bot_seed_1234567890 (for memory chunks and vectors)
-# - conscious_bot_seed_1234567890_graph (for knowledge graph)
-```
+### Installation
 
-**Important:** The memory system automatically generates database names from your `WORLD_SEED`. Changing the seed creates an entirely new memory database, isolating experiences between different world instances.
-
-### Installation & Development
 ```bash
 # Clone the repository
 git clone https://github.com/your-username/conscious-bot.git
 cd conscious-bot
 
-# Install dependencies
+# Install Node.js dependencies
 pnpm install
 
-# Start all services (dashboard, core, minecraft interface, cognition, memory, world, planning, optional HRM)
-pnpm dev
-
-# Check server status
-pnpm status
-
-# Stop all services
-pnpm kill
-
-# Or start individual services
-pnpm run dev:dashboard      # Web dashboard
-pnpm run dev:minecraft      # Minecraft bot interface
-pnpm run dev:cognition      # Cognitive systems
-pnpm run dev:memory         # Memory systems
-pnpm run dev:world          # World perception & navigation
-pnpm run dev:planning       # Planning systems
+# Set up the MLX-LM sidecar (Apple Silicon only — downloads ~2 GB of models on first run)
+cd mlx-lm-sidecar && bash setup.sh && cd ..
 ```
 
+### Starting the System
+
+The recommended way to bring up the full system:
+
+```bash
+# 1. Start Docker services (PostgreSQL + pgvector, Minecraft server)
+pnpm docker:up
+
+# 2. Start all application services (builds, then launches 9 services in dependency order)
+pnpm dev
+```
+
+`pnpm dev` runs `scripts/start.js`, which:
+1. Checks system requirements (Node.js, pnpm, Python 3.11, Apple Silicon)
+2. Sets up Python venvs for HRM and MLX-LM (installs pip deps, verifies model cache)
+3. Starts Docker services (PostgreSQL + Minecraft)
+4. Kills any leftover processes and checks port availability
+5. Installs Node.js deps and builds all packages
+6. Starts 9 services in dependency order, health-checking each before proceeding
+
+#### Other Commands
+
+```bash
+pnpm status          # Health status of all services
+pnpm kill            # Stop all running services and free ports
+pnpm test            # Run all tests
+pnpm type-check      # TypeScript type checking
+pnpm e2e             # Run E2E test suites (starts Docker, Sterling, MLX automatically)
+pnpm e2e:teardown    # Same, but tears down Docker afterward
+pnpm docker:down     # Stop Docker services
+pnpm docker:logs     # Tail Docker logs
+```
+
+#### Starting Individual Services
+
+```bash
+pnpm run dev:dashboard      # Web dashboard (port 3000)
+pnpm run dev:memory         # Memory systems (port 3001)
+pnpm run dev:planning       # Planning systems (port 3002)
+pnpm run dev:cognition      # Cognitive systems (port 3003)
+pnpm run dev:world          # World perception (port 3004)
+pnpm run dev:minecraft      # Minecraft bot interface (port 3005)
+pnpm --filter @conscious-bot/core run dev:server   # Core API (port 3007)
+# Python services are started automatically by pnpm dev (scripts/start.js)
+```
+
+### Services & Ports
+
+| Service | Port | Description |
+|---------|------|-------------|
+| Dashboard | `http://localhost:3000` | Next.js 15 web monitoring and control interface |
+| Memory API | `http://localhost:3001` | Memory storage, vector search, GraphRAG retrieval |
+| Planning API | `http://localhost:3002` | Task planning, goal management, embedded MCP at `/mcp` |
+| Cognition API | `http://localhost:3003` | LLM integration, cognitive reasoning, inner dialogue |
+| World API | `http://localhost:3004` | World state management, perception, navigation |
+| Minecraft Interface | `http://localhost:3005` | Mineflayer bot control, WebSocket state streaming |
+| Core API | `http://localhost:3007` | Capability registry, signal processing |
+| Sapient HRM | `http://localhost:5001` | Python HRM bridge for hierarchical reasoning |
+| MLX-LM Sidecar | `http://localhost:5002` | Local LLM generation + embeddings (Apple Silicon) |
+| PostgreSQL | `localhost:5432` | pgvector-enabled database (Docker) |
+| Minecraft Server | `localhost:25565` | Vanilla 1.20.1 server (Docker) |
+
+### Observing the Bot (Spectator Mode)
+
+The Minecraft server runs in offline mode, so you can connect with any username without a Mojang account. The Docker configuration pre-configures operator permissions and enables command blocks.
+
+#### Connecting with the Minecraft Client
+
+1. Open **Minecraft Java Edition 1.20.1**
+2. Go to **Multiplayer** > **Add Server**
+3. Enter server address: `localhost:25565`
+4. Join the server
+
+#### Switching to Spectator Mode
+
+Once connected, you are automatically an operator (if your username matches the one in `minecraft-config/ops.json`). To observe the bot without interfering:
+
+```
+/gamemode spectator
+```
+
+In spectator mode you can:
+- Fly freely through the world
+- Pass through blocks
+- Left-click on the bot (`ConsciousBot`) to lock your camera to its perspective and see what it sees
+- Press `Shift` to detach from the bot's viewpoint
+- Use the scroll wheel to cycle between nearby entities
+
+To return to normal play:
+```
+/gamemode survival
+```
+
+#### Adding More Operators
+
+To allow other users to use spectator mode, add entries to `minecraft-config/ops.json`:
+
+```json
+[
+  {
+    "uuid": "<offline-uuid>",
+    "name": "<username>",
+    "level": 4,
+    "bypassesPlayerLimit": true
+  }
+]
+```
+
+Since the server runs in offline mode, generate the UUID with:
+```python
+import hashlib, uuid
+name = "YourUsername"
+data = ("OfflinePlayer:" + name).encode("utf-8")
+md5 = hashlib.md5(data).digest()
+b = bytearray(md5)
+b[6] = (b[6] & 0x0f) | 0x30
+b[8] = (b[8] & 0x3f) | 0x80
+print(uuid.UUID(bytes=bytes(b)))
+```
+
+Then restart the Minecraft container: `pnpm docker:up`
+
 ### Testing
+
 ```bash
 # Run all tests
 pnpm test
@@ -106,63 +229,10 @@ pnpm --filter @conscious-bot/planning test
 
 # Type checking
 pnpm type-check
+
+# E2E tests (starts Docker, Sterling, MLX sidecar automatically)
+pnpm e2e
 ```
-
-### Server Management
-
-The project includes robust server management scripts to handle the multi-service architecture.
-
-#### **Start All Services**
-```bash
-pnpm dev
-```
-- Automatically kills any existing server processes
-- Frees up occupied ports (3000-3007, 5001)
-- Starts 7 core services (+ optional HRM) in parallel
-- Provides real-time logging with service identification
-
-#### **Check Server Status**
-```bash
-pnpm status
-```
-- Shows health status of all services
-- Displays process information and port usage
-- Provides summary statistics
-- Checks server responsiveness
-
-#### **Stop All Services**
-```bash
-pnpm kill
-```
-- Terminates all running server processes
-- Frees all occupied ports
-- Cleans up background processes
-
-#### **Individual Service Control**
-```bash
-# Start specific services
-pnpm run dev:dashboard      # Web dashboard (port 3000)
-pnpm run dev:minecraft      # Minecraft interface (port 3005)
-pnpm run dev:cognition      # Cognitive systems (port 3003)
-pnpm run dev:memory         # Memory systems (port 3001)
-pnpm run dev:world          # World perception (port 3004)
-pnpm run dev:planning       # Planning systems (port 3002)
-pnpm --filter @conscious-bot/core run dev:server   # Core API (port 3007)
-# Optional
-# Sapient HRM python bridge (port 5001) started by pnpm dev via scripts/start.js
-```
-
-### Services & Ports
-
-- Dashboard: `http://localhost:3000`
-- Memory API: `http://localhost:3001`
-- Planning API: `http://localhost:3002` (exposes planning endpoints and embedded MCP under `/mcp`)
-- Cognition API: `http://localhost:3003`
-- World API: `http://localhost:3004`
-- Minecraft Interface: `http://localhost:3005`
-- MCP (embedded by Planning): `http://localhost:3002/mcp` (no separate process required)
-- Core API: `http://localhost:3007`
-- Sapient HRM (optional): `http://localhost:5001`
 
 ### MCP Integration & Tool Execution
 
@@ -187,14 +257,37 @@ The `@conscious-bot/executor-contracts` package provides:
 - **Capability Registry**: Built-in capabilities with safety permissions and rate limiting
 
 ### Architecture Overview
-The system is organized into 11 core packages with a dependency-aware architecture:
+
+The system is organized into 11 TypeScript packages, 2 Python sidecars, and Docker-managed infrastructure:
+
+```
+┌──────────────────────────────────────────────────────────────────┐
+│  Dashboard (:3000)                                               │
+│  Next.js 15 — real-time monitoring, cognitive stream, database   │
+├──────────────────────────────────────────────────────────────────┤
+│  Minecraft Interface (:3005)     Cognition (:3003)               │
+│  Mineflayer bot + WebSocket      LLM inner voice + reflection    │
+├──────────────────────────────────────────────────────────────────┤
+│  Planning (:3002)                Safety                          │
+│  HTN + GOAP + MCP integration    Constitutional filter + monitor │
+├──────────────────────────────────────────────────────────────────┤
+│  Memory (:3001)          World (:3004)        Core (:3007)       │
+│  pgvector + GraphRAG     Perception + nav     Capability registry│
+├──────────────────────────────────────────────────────────────────┤
+│  Executor Contracts (shared interfaces — no runtime)             │
+├──────────────────────────────────────────────────────────────────┤
+│  Python Sidecars                 Docker Infrastructure           │
+│  MLX-LM (:5002) gen+embed       PostgreSQL+pgvector (:5432)     │
+│  Sapient HRM (:5001)            Minecraft Server (:25565)        │
+└──────────────────────────────────────────────────────────────────┘
+```
 
 #### Core Infrastructure Packages
 - **`packages/executor-contracts/`** - Shared interfaces and execution contracts (Plan-Body Interface enforcement)
 - **`packages/core/`** - Central coordination and signal processing
 - **`packages/mcp-server/`** - Model Context Protocol server for tool capabilities
 
-#### Cognitive System Packages  
+#### Cognitive System Packages
 - **`packages/world/`** - Perception, navigation, and sensorimotor systems
 - **`packages/memory/`** - Episodic, semantic, and working memory
 - **`packages/planning/`** - Hierarchical and reactive planning with MCP integration
@@ -206,18 +299,29 @@ The system is organized into 11 core packages with a dependency-aware architectu
 - **`packages/dashboard/`** - Web monitoring interface
 - **`packages/evaluation/`** - Performance metrics and testing
 
+#### Python Sidecars
+- **`mlx-lm-sidecar/`** - MLX-LM inference server (Apple Silicon): text generation (`gemma-3n-E2B-it-lm-4bit`) and embeddings (`embeddinggemma-300m-4bit`) via Ollama-compatible REST API
+- **`sapient-hrm/`** - Sapient Hierarchical Reasoning Model bridge (Python 3.11)
+
+#### Docker Infrastructure
+- **PostgreSQL + pgvector** - Vector-enabled database for memory storage (768-dim embeddings, HNSW indexing)
+- **Minecraft Server** - Vanilla 1.20.1 server (offline mode, cheats enabled, operator pre-configured)
+
 #### Dependency Architecture
 The package architecture follows strict dependency rules to prevent circular dependencies:
 ```
 executor-contracts (foundation)
     ↑
-  core, mcp-server 
+  core, mcp-server
     ↑
   planning → memory, world
-    ↑  
+    ↑
   cognition, safety, minecraft-interface
     ↑
   dashboard, evaluation
+
+Python sidecars (MLX-LM, HRM) are independent processes
+  accessed via HTTP — no TypeScript dependency coupling
 ```
 
 This layered approach ensures clean separation of concerns and reliable builds while enabling shared contracts for tool execution.
@@ -381,18 +485,14 @@ The conscious bot project has achieved **95% implementation completion** with co
 
 ### Current Status
 
-**✅ Operational Status:**
-- **All Services Running**: 6/6 servers operational and healthy
-- **High Test Coverage**: 89.7% test success rate (131 PASS, 15 FAIL)
-- **Integration Complete**: All major modules integrated and communicating
-- **Performance Stable**: Systems performing within expected parameters
+**Operational Status:**
+- **All Services Running**: 9 application services + 2 Docker containers operational
+- **MLX-LM Sidecar**: Local LLM generation (gemma-3n-E2B) and embeddings (embeddinggemma) on Apple Silicon — replaces Ollama
+- **Docker Infrastructure**: PostgreSQL with pgvector and Minecraft 1.20.1 server managed via `docker compose`
+- **Dashboard**: Next.js 15 interface connects to all backend services for real-time monitoring
+- **Spectator Mode**: Minecraft server configured with operator permissions for human observation
 
-**🟡 Minor Issues Being Addressed:**
-- **Test Failures**: 15 failing tests being investigated and resolved
-- **Documentation Updates**: Ensuring alignment between docs and implementation
-- **Performance Optimization**: Ongoing improvements to navigation and perception systems
-
-**Current Focus**: Maintaining operational stability while addressing remaining test failures.
+**Current Focus**: E2E test hardening, Sterling solver integration, and MLX sidecar reliability.
 
 ### 🧠 **Identity Memory System** (Latest Addition)
 
@@ -611,7 +711,7 @@ flowchart TD
 #### Additional Integration Status
 | **Evaluation → All Modules** | 🔄 Partial | Basic metrics complete, advanced assessment needed |
 | **Minecraft Interface** | ✅ Complete | Full integration with comprehensive testing |
-| **Service Management** | ✅ Complete | All 8 servers running and healthy |
+| **Service Management** | ✅ Complete | All 9 services + Docker infrastructure running and healthy |
 
 ### Recent Major Improvements
 

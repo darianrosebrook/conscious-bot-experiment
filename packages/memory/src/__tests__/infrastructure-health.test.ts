@@ -70,24 +70,35 @@ describe.skipIf(!POSTGRES_AVAILABLE && !OLLAMA_AVAILABLE)('Infrastructure Health
     expect(Array.isArray(data.models)).toBe(true);
   });
 
-  it.skipIf(!OLLAMA_AVAILABLE)('nomic-embed-text model is available', async () => {
+  it.skipIf(!OLLAMA_AVAILABLE)('embeddinggemma model is available', async () => {
     const ollamaHost = process.env.OLLAMA_HOST || 'http://localhost:5002';
     const response = await fetch(`${ollamaHost}/api/tags`);
     const data = (await response.json()) as { models: any[] };
 
-    const nomicModel = data.models.find((m: any) =>
-      m.name.includes('nomic-embed-text')
+    const embeddingModel = data.models.find((m: any) =>
+      m.name.includes('embeddinggemma')
     );
-    expect(nomicModel).toBeDefined();
+    expect(embeddingModel).toBeDefined();
   });
 
-  it.skipIf(!OLLAMA_AVAILABLE)('can generate embeddings via Ollama', async () => {
+  it.skipIf(!OLLAMA_AVAILABLE)('gemma3n:e2b generation model is available', async () => {
+    const ollamaHost = process.env.OLLAMA_HOST || 'http://localhost:5002';
+    const response = await fetch(`${ollamaHost}/api/tags`);
+    const data = (await response.json()) as { models: any[] };
+
+    const generationModel = data.models.find((m: any) =>
+      m.name.includes('gemma3n:e2b')
+    );
+    expect(generationModel).toBeDefined();
+  });
+
+  it.skipIf(!OLLAMA_AVAILABLE)('can generate embeddings via MLX sidecar', async () => {
     const ollamaHost = process.env.OLLAMA_HOST || 'http://localhost:5002';
     const response = await fetch(`${ollamaHost}/api/embeddings`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: 'nomic-embed-text',
+        model: 'embeddinggemma',
         prompt: 'test embedding generation',
       }),
     });

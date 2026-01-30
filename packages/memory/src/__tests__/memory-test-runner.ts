@@ -760,8 +760,9 @@ export class MemoryTestRunner {
   }
 
   private detectEnvironment(): 'development' | 'staging' | 'production' {
-    if (process.env.NODE_ENV === 'production') return 'production';
-    if (process.env.NODE_ENV === 'staging') return 'staging';
+    const env = process.env.NODE_ENV as string;
+    if (env === 'production') return 'production';
+    if (env === 'staging') return 'staging';
     return 'development';
   }
 

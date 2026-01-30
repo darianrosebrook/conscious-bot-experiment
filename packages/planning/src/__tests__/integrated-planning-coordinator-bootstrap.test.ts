@@ -91,11 +91,12 @@ describe('IntegratedPlanningCoordinator task bootstrap integration', () => {
       });
 
     const routingDecision: RoutingDecision = {
-      selectedModule: 'hrm' as any,
+      taskType: 'navigation',
       confidence: 0.9,
+      router: 'hrm_structured',
       reasoning: 'bootstrap-test',
-      alternatives: [],
-      timestamp: Date.now(),
+      expectedLatency: 100,
+      complexity: 3,
     };
 
     vi.spyOn(coordinator as any, 'performCognitiveRouting').mockResolvedValue(

@@ -19,9 +19,8 @@ describe('Action Task Execution Fix', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     executor = new EnhancedReactiveExecutor({
-      memoryConfig: { enableRemoteSources: false },
       capabilities: [],
-    });
+    } as any);
   });
 
   it('should handle action task type with wood gathering', async () => {

@@ -51,7 +51,7 @@ function createMockLeaf(
       outputSchema: { type: 'object', properties: {} },
       timeoutMs: 1000,
       retries: 0,
-      permissions: ['test'],
+      permissions: ['sense' as any],
       composition: {
         inputTypes,
         outputTypes,
@@ -525,7 +525,7 @@ describe('SkillComposer', () => {
       ).rejects.toThrow('No compatible combinations found');
     });
 
-    it('should emit events for monitoring', (done) => {
+    it('should emit events for monitoring', async () => {
       const leaf = createMockLeaf(
         'test_leaf',
         'test_leaf',
@@ -535,13 +535,16 @@ describe('SkillComposer', () => {
         2
       );
 
-      composer.on('skillComposed', (skill) => {
-        expect(skill.name).toBe('Composed: move to safety');
-        done();
+      const skillComposed = new Promise<void>((resolve) => {
+        composer.on('skillComposed', (skill) => {
+          expect(skill.name).toBe('Composed: move to safety');
+          resolve();
+        });
       });
 
       composer.registerLeaf(leaf);
-      composer.composeLeaves('move to safety', testContext);
+      await composer.composeLeaves('move to safety', testContext);
+      await skillComposed;
     });
   });
 });

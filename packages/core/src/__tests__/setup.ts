@@ -11,7 +11,7 @@ import { beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
 // Set up global test environment
 beforeAll(() => {
   // Set up any global test configuration
-  process.env.NODE_ENV = 'test';
+  (process.env as any).NODE_ENV = 'test';
 });
 
 afterAll(() => {

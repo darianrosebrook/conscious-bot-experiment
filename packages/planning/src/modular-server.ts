@@ -737,6 +737,69 @@ async function recomputeProgressAndMaybeComplete(task: any) {
 }
 
 /**
+ * Extract executable leaf + args from a Sterling-generated task step's meta.
+ * Returns null if the step has no machine-readable meta.
+ */
+function stepToLeafExecution(
+  step: any
+): { leafName: string; args: Record<string, unknown> } | null {
+  const meta = step.meta;
+  if (!meta?.leaf) return null;
+
+  const leaf = meta.leaf as string;
+  const produces = (meta.produces as Array<{ name: string; count: number }>) || [];
+  const consumes = (meta.consumes as Array<{ name: string; count: number }>) || [];
+
+  switch (leaf) {
+    case 'dig_block': {
+      const item = produces[0];
+      return {
+        leafName: 'dig_block',
+        args: { blockType: item?.name || 'oak_log', count: item?.count || 1 },
+      };
+    }
+    case 'craft_recipe': {
+      const output = produces[0];
+      return {
+        leafName: 'craft_recipe',
+        args: { recipe: output?.name || 'unknown', qty: output?.count || 1 },
+      };
+    }
+    case 'smelt': {
+      const output = produces[0];
+      return {
+        leafName: 'smelt',
+        args: { item: output?.name || 'unknown' },
+      };
+    }
+    case 'place_block': {
+      const consumed = consumes[0];
+      return {
+        leafName: 'place_block',
+        args: { item: consumed?.name || 'crafting_table' },
+      };
+    }
+    case 'prepare_site':
+    case 'build_module':
+    case 'place_feature':
+    case 'acquire_material': {
+      // Building domain — pass through meta fields
+      return {
+        leafName: leaf,
+        args: {
+          moduleId: meta.moduleId,
+          item: meta.item,
+          count: meta.count,
+          ...((meta as any).args || {}),
+        },
+      };
+    }
+    default:
+      return null;
+  }
+}
+
+/**
  * Wait for bot connection by polling health until timeout
  */
 // connection helpers imported from modules/mc-client
@@ -1570,13 +1633,26 @@ async function autonomousTaskExecutor() {
         global.lastNoTasksLog = now;
       }
 
-      // Emit idle period event for thought generation (simplified)
+      // Post idle event to cognition service for thought generation
       if (!global.lastIdleEvent || now - global.lastIdleEvent > 300000) {
         console.log(
-          '🧠 [AUTONOMOUS EXECUTOR] Bot is idle - could trigger reflection here'
+          '🧠 [AUTONOMOUS EXECUTOR] Bot is idle — posting lifecycle event to cognition'
         );
-        // TODO: Add idle event generation later
         global.lastIdleEvent = now;
+        try {
+          await fetch('http://localhost:3003/api/cognitive-stream/events', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              type: 'idle_period',
+              timestamp: now,
+              data: { durationMs: now - (global.lastIdleEvent || now) },
+            }),
+            signal: AbortSignal.timeout(5000),
+          });
+        } catch (e) {
+          console.warn('⚠️ Failed to post idle event to cognition:', e);
+        }
       }
       return;
     } else {
@@ -1815,6 +1891,45 @@ async function autonomousTaskExecutor() {
       console.warn('Inventory progress estimation failed:', e);
     }
 
+    // ── Sterling-first execution: if task has solver-generated steps, run them ──
+    const hasSterlingPlan = currentTask.steps?.some(
+      (s: any) => s.meta?.source === 'sterling' && !s.done
+    );
+    if (hasSterlingPlan) {
+      const nextStep = currentTask.steps?.find((s: any) => !s.done);
+      if (nextStep) {
+        const leafExec = stepToLeafExecution(nextStep);
+        if (leafExec) {
+          console.log(
+            `🏗️ [Sterling] Executing step ${nextStep.order}: ${nextStep.label} → ${leafExec.leafName}`
+          );
+          const actionResult = await toolExecutor.execute(
+            `minecraft.${leafExec.leafName}`,
+            leafExec.args
+          );
+          if (actionResult?.ok) {
+            console.log(`✅ [Sterling] Step ${nextStep.order} completed`);
+            await enhancedTaskIntegration.completeTaskStep(currentTask.id, nextStep.id);
+          } else {
+            console.warn(
+              `⚠️ [Sterling] Step ${nextStep.order} failed: ${actionResult?.error}`
+            );
+            // Don't mark done — let retry logic handle it
+            enhancedTaskIntegration.updateTaskMetadata(currentTask.id, {
+              ...currentTask.metadata,
+              retryCount: (currentTask.metadata?.retryCount || 0) + 1,
+            });
+          }
+          await recomputeProgressAndMaybeComplete(currentTask);
+          return; // Sterling handled this execution cycle
+        } else {
+          console.warn(
+            `⚠️ [Sterling] Step ${nextStep.order} has no executable meta — falling through to MCP`
+          );
+        }
+      }
+    }
+
     // Track if task was executed successfully
     let executionResult = false;
 
@@ -1847,6 +1962,26 @@ async function autonomousTaskExecutor() {
             currentTask.id,
             'completed'
           );
+
+          // Post task_completed event to cognition service
+          try {
+            await fetch('http://localhost:3003/api/cognitive-stream/events', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                type: 'task_completed',
+                timestamp: Date.now(),
+                data: {
+                  taskId: currentTask.id,
+                  taskTitle: currentTask.title,
+                  taskType: currentTask.type,
+                },
+              }),
+              signal: AbortSignal.timeout(5000),
+            });
+          } catch (e) {
+            console.warn('⚠️ Failed to post task_completed event to cognition:', e);
+          }
 
           return; // Task completed successfully
         } else {
@@ -2749,7 +2884,7 @@ serverConfig.addEndpoint('post', '/sterling/crafting/solve', async (req, res) =>
   }
 
   try {
-    const { goalItem, inventory, nearbyBlocks, mcData } = req.body;
+    const { goalItem, inventory, nearbyBlocks, mcData: clientMcData } = req.body;
     if (!goalItem) {
       res.status(400).json({ error: 'goalItem is required' });
       return;
@@ -2759,10 +2894,20 @@ serverConfig.addEndpoint('post', '/sterling/crafting/solve', async (req, res) =>
       ? inventory
       : Object.entries(inventory || {}).map(([name, count]) => ({ name, count: count as number }));
 
+    // Load mcData server-side if not provided by client
+    let mcData = clientMcData;
+    if (!mcData || Object.keys(mcData).length === 0) {
+      mcData = enhancedTaskIntegration.getMcDataPublic();
+      if (!mcData) {
+        res.status(500).json({ error: 'minecraft-data not available on server' });
+        return;
+      }
+    }
+
     const result = await minecraftCraftingSolver.solveCraftingGoal(
       goalItem,
       inventoryItems,
-      mcData || {},
+      mcData,
       nearbyBlocks || []
     );
 
