@@ -8,12 +8,22 @@ This directory contains golden bundle artifacts from solver-class E2E tests.
 
 ### Performance baselines (A.5)
 
-- `perf-baseline-stick.json` — Search metrics for stick crafting (nodesExpanded, frontierPeak, terminationReason, solutionPathLength, branchingEstimate).
-- `perf-baseline-wooden-pickaxe.json` — Search metrics for wooden_pickaxe tool progression.
-- `perf-baseline-stone-pickaxe.json` — Per-tier search metrics for stone_pickaxe (wooden_tier + stone_tier).
-- `perf-convergence-stick.json` — Learning convergence proof: solve1 vs solve2 node counts after episode report.
-- `perf-convergence-wooden-pickaxe.json` — Learning convergence for wooden_pickaxe.
-- `perf-convergence-stone-pickaxe.json` — Per-tier learning convergence for stone_pickaxe.
+- `perf-baseline-stick.json` — Search metrics for stick crafting via **raw WebSocket** (minimal 3-rule operator set, not MinecraftCraftingSolver). Useful as a floor/health check, not directly comparable to solver-class baselines due to different client pathway and operator count.
+- `perf-baseline-wooden-pickaxe.json` — Search metrics for wooden_pickaxe via **MinecraftToolProgressionSolver** (full solver-class bundle pipeline).
+- `perf-baseline-stone-pickaxe.json` — Per-tier search metrics for stone_pickaxe (wooden_tier + stone_tier) via **MinecraftToolProgressionSolver**.
+- `perf-convergence-stick.json` — Learning stability check: solve1 vs solve2 node counts after episode report (raw WebSocket pathway).
+- `perf-convergence-wooden-pickaxe.json` — Learning stability check for wooden_pickaxe (solver-class pathway).
+- `perf-convergence-stone-pickaxe.json` — Per-tier learning stability check for stone_pickaxe.
+
+#### Interpreting convergence artifacts
+
+Convergence artifacts demonstrate **stability** (no regression after episode reporting), not **efficacy** (learning improves search). A `nodesRatio` of exactly 1.0 means the episode report had no observable effect on the subsequent solve — the search is deterministic and the learning update did not alter tie-breaking or node ordering for these problems. This is the expected baseline behavior; learning efficacy evidence requires a separate learning-sensitive benchmark with problems that have multiple near-tied plans.
+
+#### Interpreting heuristic metrics
+
+For solver-class items (wooden_pickaxe, stone_pickaxe), the baselines show `hMin=0, hMax=1, pctSameH≈0.98–0.995`. This indicates the heuristic has insufficient resolution relative to the goal representation — it effectively returns a binary "goal satisfied / not satisfied" signal, so A\* degrades toward uniform-cost search. The solver succeeds because problems are small enough for brute-force expansion within the node budget. Improving heuristic resolution (e.g., dependency-aware cost lower bounds) is the primary lever for scaling to larger items. A successful heuristic improvement should show up as reduced `nodesExpanded`, increased `hVariance`, and reduced `frontierPeak`, while `solutionPathLength` stays the same or improves.
+
+The stick baseline shows wider heuristic range (`hMin=0, hMax=4, hVariance=3.0`) because it operates on a 3-rule operator set with quantity-structured goals, not because raw WebSocket gets a fundamentally different heuristic. With only 4 nodes expanded, the heuristic statistics are too small a sample to be meaningful as a quality comparator.
 
 ## Regeneration
 

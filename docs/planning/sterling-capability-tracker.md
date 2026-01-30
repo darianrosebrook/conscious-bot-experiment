@@ -115,7 +115,7 @@ Completed in the P0–P2 hardening sprint (2026-01-29). This underpins every rig
 - [x] **A.2 — Substitute-allowed variant**: `buildCraftingRules()` with two recipe variants generates both variant rules. Both appear in wire payload.
 - [x] **A.3 — Count-capping in inventory hash**: `INVENTORY_HASH_CAP = 64`. Three tests: above-cap equal, below-cap differs, at-cap equals above-cap.
 - [x] **A.4 — Explanation skeleton**: `SolveRationale` type, `computeBundleOutput` populates it when `maxNodes` provided. Backward-compatible (undefined without maxNodes). 4 tests.
-- [x] **A.5 — Performance baseline**: `performance-baseline-e2e.test.ts` — 6 E2E tests (gated `STERLING_E2E=1`) recording nodesExpanded, frontierPeak, terminationReason, solutionPathLength, branchingEstimate for stick, wooden_pickaxe, and stone_pickaxe (per-tier). Learning convergence tests prove `nodesExpanded2 <= nodesExpanded1 * 1.05` after episode report. Artifact JSONs written to `__artifacts__/perf-baseline-*.json` and `perf-convergence-*.json`.
+- [x] **A.5 — Performance baseline**: `performance-baseline-e2e.test.ts` — 6 E2E tests (gated `STERLING_E2E=1`) recording nodesExpanded, frontierPeak, terminationReason, solutionPathLength, branchingEstimate for stick (raw WS), wooden_pickaxe, and stone_pickaxe (per-tier, both solver-class). Learning **stability** tests prove `nodesExpanded2 <= nodesExpanded1 * 1.05` after episode report. Note: convergence ratios of exactly 1.0 demonstrate stability (no regression), not efficacy (learning improves search). Learning efficacy requires a separate learning-sensitive benchmark. Artifact JSONs committed to `__artifacts__/perf-baseline-*.json` and `perf-convergence-*.json` with full `ArtifactMeta` (gitSha, clientPathway, solverId, executionMode, contractVersion, maxNodes, objectiveWeights).
 - [x] **A.6 — Transfer test skeleton**: `transfer-bom-assembly.test.ts` — non-Minecraft BOM domain (gadget_assembled, widget_refined, widget_raw). Linter, hashing, bundle capture all work. 5 tests.
 
 ---
@@ -237,7 +237,7 @@ These rigs are documented in [sterling-minecraft-domains.md](./sterling-minecraf
 A rig is certified when it passes all three test categories:
 
 1. **Signature tests** — Legality, determinism, boundedness, canonicalization, validation/hardening. All global invariants satisfied.
-2. **Performance tests** — Repeat solves improve (fewer expansions / faster completion) without destabilizing correctness. Learning does not alter semantics.
+2. **Performance tests** — Search effort is bounded and stable across repeat solves (no regression). Learning does not alter semantics. Note: current baselines prove stability, not learning efficacy. Learning-sensitive benchmarks (problems with multiple near-tied plans) are a separate milestone.
 3. **Transfer tests** — Same formal signature runs on at least one non-Minecraft surface with the same invariants and harness.
 
 ---
@@ -248,11 +248,13 @@ A rig is certified when it passes all three test categories:
 
 **A.5 Performance baseline E2E tests**:
 - New file: `performance-baseline-e2e.test.ts` — 6 tests gated behind `STERLING_E2E=1`
-- 3 baseline tests (stick, wooden_pickaxe, stone_pickaxe): record `nodesExpanded`, `frontierPeak`, `terminationReason`, `solutionPathLength`, `branchingEstimate` per solve
-- 3 convergence tests: solve → episode report → re-solve, assert `nodesExpanded2 <= nodesExpanded1 * 1.05`
+- 3 baseline tests (stick via raw WS, wooden_pickaxe and stone_pickaxe via solver-class): record `nodesExpanded`, `frontierPeak`, `terminationReason`, `solutionPathLength`, `branchingEstimate` per solve
+- 3 stability tests: solve → episode report → re-solve, assert `nodesExpanded2 <= nodesExpanded1 * 1.05` (proves no regression; does not prove learning efficacy)
 - Stone pickaxe records per-tier metrics (wooden_tier + stone_tier separately)
-- Artifacts written to `__artifacts__/perf-baseline-*.json` and `perf-convergence-*.json`
+- Artifacts committed to `__artifacts__/perf-baseline-*.json` and `perf-convergence-*.json` with full `ArtifactMeta` (gitSha, clientPathway, solverId, executionMode, contractVersion, maxNodes, objectiveWeights)
+- Sequential execution (`describe.sequential`) prevents file-write races
 - No `durationMs` assertions (nondeterministic)
+- Key finding: solver-class heuristic shows `pctSameH ≈ 0.98–0.995` (near-degenerate). Heuristic has insufficient resolution for single-key goals — A\* degrades to near-uniform-cost search. Primary improvement lever: dependency-aware cost lower bounds.
 
 **Tightening changes**:
 - `buildDefaultRationaleContext()` accepts optional `objectiveWeights` override
