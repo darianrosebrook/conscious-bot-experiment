@@ -94,6 +94,8 @@ export class MinecraftCraftingSolver extends BaseDomainSolver<MinecraftCraftingS
 
     // 4. Call Sterling
     const result = await this.sterlingService.solve(this.sterlingDomain, {
+      contractVersion: this.contractVersion,
+      solverId: this.solverId,
       inventory,
       goal,
       nearbyBlocks,

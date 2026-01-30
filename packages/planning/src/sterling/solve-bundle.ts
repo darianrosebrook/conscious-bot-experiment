@@ -194,6 +194,9 @@ export function computeBundleOutput(params: {
   solutionPathLength: number;
   searchHealth?: SearchHealthMetrics;
 }): SolveBundleOutput {
+  const searchHealth = params.searchHealth
+    ? { ...params.searchHealth, searchHealthVersion: 1 }
+    : undefined;
   return {
     planId: params.planId,
     solved: params.solved,
@@ -203,7 +206,7 @@ export function computeBundleOutput(params: {
       durationMs: params.durationMs,
       solutionPathLength: params.solutionPathLength,
     },
-    searchHealth: params.searchHealth,
+    searchHealth,
   };
 }
 

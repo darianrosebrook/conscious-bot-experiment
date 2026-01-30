@@ -315,6 +315,8 @@ describe('MinecraftCraftingSolver — golden-master', () => {
 
       // Capture the payload fields that Sterling sees
       const stablePayload = {
+        contractVersion: payload.contractVersion,
+        solverId: payload.solverId,
         inventory: payload.inventory,
         goal: payload.goal,
         nearbyBlocks: payload.nearbyBlocks,

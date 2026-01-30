@@ -24,7 +24,7 @@ describe('parseSearchHealth', () => {
       fMin: 0,
       fMax: 15,
       pctSameH: 0.3,
-      terminationReason: 'goal',
+      terminationReason: 'goal_found',
       branchingEstimate: 3.5,
     },
   };
@@ -41,7 +41,7 @@ describe('parseSearchHealth', () => {
     expect(result!.fMin).toBe(0);
     expect(result!.fMax).toBe(15);
     expect(result!.pctSameH).toBe(0.3);
-    expect(result!.terminationReason).toBe('goal');
+    expect(result!.terminationReason).toBe('goal_found');
     expect(result!.branchingEstimate).toBe(3.5);
   });
 
@@ -86,6 +86,71 @@ describe('parseSearchHealth', () => {
     };
     expect(parseSearchHealth(bad)).toBeUndefined();
   });
+
+  it('returns undefined for unknown searchHealthVersion', () => {
+    const bad = {
+      searchHealth: {
+        ...validMetrics.searchHealth,
+        searchHealthVersion: 2,
+      },
+    };
+    expect(parseSearchHealth(bad)).toBeUndefined();
+  });
+
+  it('parses successfully with searchHealthVersion: 1', () => {
+    const good = {
+      searchHealth: {
+        ...validMetrics.searchHealth,
+        searchHealthVersion: 1,
+      },
+    };
+    const result = parseSearchHealth(good);
+    expect(result).toBeDefined();
+    expect(result!.searchHealthVersion).toBe(1);
+  });
+
+  it('returns undefined with partial fields present (warns in non-production)', () => {
+    const partial = {
+      searchHealth: {
+        nodesExpanded: 100,
+        frontierPeak: 50,
+        // missing hMin, hMax, hMean, hVariance, fMin, fMax, pctSameH, terminationReason, branchingEstimate
+      },
+    };
+    expect(parseSearchHealth(partial)).toBeUndefined();
+  });
+
+  it('accepts old enum values as invalid (goal, no_solution)', () => {
+    const oldGoal = {
+      searchHealth: {
+        ...validMetrics.searchHealth,
+        terminationReason: 'goal',
+      },
+    };
+    expect(parseSearchHealth(oldGoal)).toBeUndefined();
+
+    const oldNoSolution = {
+      searchHealth: {
+        ...validMetrics.searchHealth,
+        terminationReason: 'no_solution',
+      },
+    };
+    expect(parseSearchHealth(oldNoSolution)).toBeUndefined();
+  });
+
+  it('accepts all new terminationReason values', () => {
+    for (const reason of ['goal_found', 'max_nodes', 'frontier_exhausted', 'error']) {
+      const metrics = {
+        searchHealth: {
+          ...validMetrics.searchHealth,
+          terminationReason: reason,
+        },
+      };
+      const result = parseSearchHealth(metrics);
+      expect(result).toBeDefined();
+      expect(result!.terminationReason).toBe(reason);
+    }
+  });
 });
 
 // ============================================================================
@@ -103,7 +168,7 @@ describe('detectHeuristicDegeneracy', () => {
     fMin: 0,
     fMax: 15,
     pctSameH: 0.2,
-    terminationReason: 'goal',
+    terminationReason: 'goal_found',
     branchingEstimate: 3.5,
   };
 
@@ -155,7 +220,7 @@ describe('detectHeuristicDegeneracy', () => {
     const report = detectHeuristicDegeneracy({
       ...healthyMetrics,
       branchingEstimate: 12,
-      terminationReason: 'goal',
+      terminationReason: 'goal_found',
     });
     expect(report.reasons.some((r) => r.includes('unguided search blowup'))).toBe(false);
   });

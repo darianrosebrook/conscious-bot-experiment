@@ -1,2 +1,5 @@
 # E2E bundle artifacts — generated, not committed
 *.json
+
+# Exception: golden bundle artifact committed for determinism verification
+!e2e-wooden-pickaxe-bundle.json

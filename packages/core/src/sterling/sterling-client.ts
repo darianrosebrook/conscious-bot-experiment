@@ -490,7 +490,14 @@ export class SterlingClient extends EventEmitter {
 
           case 'error':
             cleanup();
-            error = msg.message;
+            error = msg.code
+              ? `[${msg.code}] ${msg.message}`
+              : msg.message;
+            if (msg.code === 'unknown_domain') {
+              console.error(
+                `[Sterling] Unknown domain error: domain=${msg.domain ?? 'unknown'} message=${msg.message}`
+              );
+            }
             this.recordFailure();
             resolve({
               solutionFound: false,

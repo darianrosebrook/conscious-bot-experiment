@@ -21,8 +21,10 @@ import { describe, it, expect, afterAll } from 'vitest';
 import { writeFileSync, mkdirSync } from 'fs';
 import { join } from 'path';
 import { MinecraftToolProgressionSolver } from '../minecraft-tool-progression-solver';
+import { MinecraftBuildingSolver } from '../minecraft-building-solver';
 import { SterlingReasoningService } from '../sterling-reasoning-service';
 import { contentHash, canonicalize } from '../solve-bundle';
+import { detectHeuristicDegeneracy } from '../search-health';
 
 const STERLING_URL = 'ws://localhost:8766';
 
@@ -123,8 +125,20 @@ describeIf(shouldRun)('ToolProgressionSolver — solver-class E2E', () => {
     // Content-addressed bundleId
     expect(bundle.bundleId).toMatch(/^minecraft\.tool_progression:[0-9a-f]{16}$/);
 
-    // searchHealth should be undefined until Python emits it
-    expect(bundle.output.searchHealth).toBeUndefined();
+    // searchHealth should be present now that Python emits it
+    expect(bundle.output.searchHealth).toBeDefined();
+    const sh = bundle.output.searchHealth!;
+    expect(sh.nodesExpanded).toBeGreaterThan(0);
+    expect(sh.frontierPeak).toBeGreaterThanOrEqual(0);
+    expect(sh.hMin).toBeLessThanOrEqual(sh.hMax);
+    expect(sh.hVariance).toBeGreaterThanOrEqual(0);
+    expect(sh.pctSameH).toBeGreaterThanOrEqual(0);
+    expect(sh.pctSameH).toBeLessThanOrEqual(1);
+    expect(['goal_found', 'max_nodes', 'frontier_exhausted', 'error']).toContain(
+      sh.terminationReason
+    );
+    expect(sh.branchingEstimate).toBeGreaterThanOrEqual(0);
+    expect(sh.searchHealthVersion).toBe(1);
 
     // Export bundle artifact for post-run inspection
     const artifactDir = join(__dirname, '__artifacts__');
@@ -195,5 +209,114 @@ describeIf(shouldRun)('ToolProgressionSolver — solver-class E2E', () => {
     // nondeterministic output fields (durationMs, totalNodes, planId) that
     // differ per run. Deterministic bundle ID invariant is proven by the
     // unit-level golden-master tests instead.
+  });
+});
+
+// ===========================================================================
+// Building Solver E2E (1.1)
+// ===========================================================================
+
+describeIf(shouldRun)('BuildingSolver — solver-class E2E', () => {
+  it('minimal building scenario populates solveMeta.bundles', async () => {
+    const { solver: tpSolver, available } = await freshSolver();
+    if (!available) {
+      console.log('  [SKIPPED] Sterling server not available');
+      return;
+    }
+
+    // Use the same service connection for the building solver
+    const service = new SterlingReasoningService({
+      url: STERLING_URL,
+      enabled: true,
+      solveTimeout: 30000,
+      connectTimeout: 5000,
+      maxReconnectAttempts: 1,
+    });
+    await service.initialize();
+    await new Promise((r) => setTimeout(r, 500));
+    services.push(service);
+
+    const solver = new MinecraftBuildingSolver(service);
+
+    if (!service.isAvailable()) {
+      console.log('  [SKIPPED] Sterling server not available for building');
+      return;
+    }
+
+    const result = await solver.solveBuildingPlan(
+      'basic_shelter_5x5__e2e',
+      'N',
+      ['walls_1'],
+      { cobblestone: 50, oak_log: 10 },
+      { terrain: 'flat', biome: 'plains', hasTreesNearby: false, hasWaterNearby: false, siteCaps: 'flat_5x5_clear' },
+      [{ moduleId: 'walls_1', moduleType: 'apply_module', requiresModules: [], materialsNeeded: [{ name: 'cobblestone', count: 24 }], placementFeasible: true, baseCost: 1 }]
+    );
+
+    // Accept both solved and needsMaterials as valid E2E proof
+    expect(result.solveMeta).toBeDefined();
+    expect(result.solveMeta!.bundles.length).toBeGreaterThanOrEqual(1);
+
+    const bundle = result.solveMeta!.bundles[0];
+    expect(bundle.input.solverId).toBe('minecraft.building');
+    expect(bundle.input.definitionHash).toMatch(/^[0-9a-f]{16}$/);
+    expect(bundle.bundleId).toMatch(/^minecraft\.building:[0-9a-f]{16}$/);
+
+    // If solved, check searchHealth
+    if (result.solved && bundle.output.searchHealth) {
+      expect(bundle.output.searchHealth.nodesExpanded).toBeGreaterThan(0);
+      expect(bundle.output.searchHealth.searchHealthVersion).toBe(1);
+    }
+  });
+});
+
+// ===========================================================================
+// Iron-tier searchHealth experiments (1.3)
+// ===========================================================================
+
+describeIf(shouldRun)('ToolProgressionSolver — iron-tier searchHealth', () => {
+  it('iron_pickaxe multi-tier solve has searchHealth per bundle', async () => {
+    const { solver, available } = await freshSolver();
+    if (!available) {
+      console.log('  [SKIPPED] Sterling server not available');
+      return;
+    }
+
+    const result = await solver.solveToolProgression(
+      'iron_pickaxe',
+      {},
+      ['stone', 'cobblestone', 'iron_ore', 'coal']
+    );
+
+    // Multi-tier solve may or may not succeed depending on search limits
+    expect(result.solveMeta).toBeDefined();
+    expect(result.solveMeta!.bundles.length).toBeGreaterThanOrEqual(1);
+
+    for (const bundle of result.solveMeta!.bundles) {
+      // Each bundle should have searchHealth
+      if (bundle.output.searchHealth) {
+        const sh = bundle.output.searchHealth;
+        expect(sh.nodesExpanded).toBeGreaterThan(0);
+        expect(sh.searchHealthVersion).toBe(1);
+
+        // Degeneracy detection experiment
+        const degReport = detectHeuristicDegeneracy(sh);
+        console.log(
+          `[Iron-tier E2E] tier bundle goalHash=${bundle.input.goalHash.slice(0, 8)}` +
+          ` nodes=${sh.nodesExpanded} pctSameH=${sh.pctSameH.toFixed(2)}` +
+          ` branching=${sh.branchingEstimate.toFixed(1)}` +
+          ` degenerate=${degReport.isDegenerate}`
+        );
+        if (degReport.isDegenerate) {
+          console.log(`  reasons: ${degReport.reasons.join('; ')}`);
+        }
+      }
+    }
+
+    // Each tier bundle should have a distinct goalHash
+    if (result.solveMeta!.bundles.length >= 2) {
+      const goalHashes = result.solveMeta!.bundles.map((b) => b.input.goalHash);
+      const unique = new Set(goalHashes);
+      expect(unique.size).toBe(goalHashes.length);
+    }
   });
 });

@@ -102,8 +102,10 @@ export interface SearchHealthMetrics {
   fMax: number;
   /** Fraction of nodes sharing the modal h value (0..1) */
   pctSameH: number;
-  terminationReason: 'goal' | 'max_nodes' | 'no_solution';
+  terminationReason: 'goal_found' | 'max_nodes' | 'frontier_exhausted' | 'error';
   branchingEstimate: number;
+  /** Protocol version — absent in pre-emission bundles */
+  searchHealthVersion?: number;
 }
 
 export interface DegeneracyReport {

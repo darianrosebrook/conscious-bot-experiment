@@ -42,6 +42,8 @@ export type SterlingDomain =
   | 'wikipedia'
   | 'wordnet'
   | 'cube'
+  | 'minecraft'
+  | 'building'
   | string;
 
 /** Client-to-server command */
@@ -108,6 +110,10 @@ export interface SterlingCompleteMessage {
 export interface SterlingErrorMessage {
   type: 'error';
   message: string;
+  /** Error code for structured error handling (e.g. 'unknown_domain') */
+  code?: string;
+  /** Domain that triggered the error, if applicable */
+  domain?: string;
 }
 
 export interface SterlingPongMessage {

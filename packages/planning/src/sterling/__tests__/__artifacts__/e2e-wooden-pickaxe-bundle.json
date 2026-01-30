@@ -1,0 +1,47 @@
+{
+  "bundleId": "minecraft.tool_progression:9adf4148328e47d9",
+  "bundleHash": "9adf4148328e47d9",
+  "timestamp": 1769791903319,
+  "input": {
+    "solverId": "minecraft.tool_progression",
+    "executionMode": "tool_progression",
+    "contractVersion": 1,
+    "definitionHash": "4eefcb27d561b88e",
+    "initialStateHash": "44136fa355b3678a",
+    "goalHash": "434499496f98b8bd",
+    "nearbyBlocksHash": "4f53cda18c2baa0c",
+    "codeVersion": "0.1.0",
+    "tierMatrixVersion": "1.20.0",
+    "definitionCount": 6
+  },
+  "output": {
+    "planId": "cfec50983857e03e",
+    "solved": true,
+    "stepsDigest": "8a5f0cb28696d987",
+    "searchStats": {
+      "totalNodes": 98,
+      "durationMs": 994,
+      "solutionPathLength": 8
+    },
+    "searchHealth": {
+      "nodesExpanded": 50,
+      "frontierPeak": 48,
+      "hMin": 0,
+      "hMax": 1,
+      "hMean": 0.98,
+      "hVariance": 0.0196,
+      "fMin": 1,
+      "fMax": 13.5,
+      "pctSameH": 0.98,
+      "terminationReason": "goal_found",
+      "branchingEstimate": 3,
+      "searchHealthVersion": 1
+    }
+  },
+  "compatReport": {
+    "valid": true,
+    "issues": [],
+    "checkedAt": 1769791902315,
+    "definitionCount": 6
+  }
+}
