@@ -3,3 +3,7 @@
 
 # Exception: golden bundle artifact committed for determinism verification
 !e2e-wooden-pickaxe-bundle.json
+
+# Exception: performance baseline artifacts committed for regression tracking
+!perf-baseline-*.json
+!perf-convergence-*.json

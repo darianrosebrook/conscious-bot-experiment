@@ -6,6 +6,15 @@ This directory contains golden bundle artifacts from solver-class E2E tests.
 
 - `e2e-wooden-pickaxe-bundle.json` — Bundle from `wooden_pickaxe` solve against a live Sterling backend. Used for determinism verification: two runs should produce identical `stepsDigest` and `input.*Hash` fields.
 
+### Performance baselines (A.5)
+
+- `perf-baseline-stick.json` — Search metrics for stick crafting (nodesExpanded, frontierPeak, terminationReason, solutionPathLength, branchingEstimate).
+- `perf-baseline-wooden-pickaxe.json` — Search metrics for wooden_pickaxe tool progression.
+- `perf-baseline-stone-pickaxe.json` — Per-tier search metrics for stone_pickaxe (wooden_tier + stone_tier).
+- `perf-convergence-stick.json` — Learning convergence proof: solve1 vs solve2 node counts after episode report.
+- `perf-convergence-wooden-pickaxe.json` — Learning convergence for wooden_pickaxe.
+- `perf-convergence-stone-pickaxe.json` — Per-tier learning convergence for stone_pickaxe.
+
 ## Regeneration
 
 ```bash
@@ -43,5 +52,9 @@ Blocking follow-up: CI integration requires a Sterling Docker container or servi
 
 To verify locally:
 ```bash
+# Solver-class E2E (bundle evidence)
 STERLING_E2E=1 npx vitest run packages/planning/src/sterling/__tests__/solver-class-e2e.test.ts
+
+# Performance baselines (A.5)
+STERLING_E2E=1 npx vitest run packages/planning/src/sterling/__tests__/performance-baseline-e2e.test.ts
 ```
