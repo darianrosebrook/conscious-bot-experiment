@@ -7,32 +7,6 @@
       "emotionalState": "cautious",
       "confidence": 0.35,
       "cognitiveSystem": "environmental-fallback",
-      "observationId": "obs-1769667109474-nfo7c"
-    },
-    "metadata": {
-      "thoughtType": "environmental",
-      "source": "entity",
-      "observationId": "obs-1769667109474-nfo7c",
-      "fallback": true,
-      "botPosition": {
-        "x": -115,
-        "y": 105,
-        "z": 165
-      },
-      "timestamp": 1769667109474
-    },
-    "id": "thought-1769667124485-w952u1d",
-    "timestamp": 1769667124485,
-    "processed": false
-  },
-  {
-    "type": "environmental",
-    "content": "I remain aware of my surroundings and continue monitoring.",
-    "attribution": "self",
-    "context": {
-      "emotionalState": "cautious",
-      "confidence": 0.35,
-      "cognitiveSystem": "environmental-fallback",
       "observationId": "obs-1769667110468-p91pv"
     },
     "metadata": {
@@ -26032,6 +26006,23 @@
     },
     "id": "thought-1769669112447-q8o1kn8",
     "timestamp": 1769669112447,
+    "processed": false
+  },
+  {
+    "type": "status",
+    "content": "Health: 100%, Hunger: 100%. Observing environment and deciding next action.",
+    "attribution": "self",
+    "context": {
+      "emotionalState": "neutral",
+      "confidence": 0.5,
+      "cognitiveSystem": "minecraft-interface"
+    },
+    "metadata": {
+      "thoughtType": "status",
+      "source": "minecraft-interface"
+    },
+    "id": "thought-1769811850850-v1hj8vo",
+    "timestamp": 1769811850850,
     "processed": false
   }
 ]

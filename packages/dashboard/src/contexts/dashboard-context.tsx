@@ -504,7 +504,7 @@ class ServiceDiscovery {
   }
 
   /**
-   * Get all healthy service endpoints
+   * Get all healthy service endpoints (async — probes each service).
    */
   async getHealthyEndpoints(): Promise<ServiceEndpoints> {
     const endpoints = await this.discoverServices();
@@ -567,6 +567,21 @@ class ServiceDiscovery {
             },
     };
   }
+
+  /**
+   * Synchronous default endpoints (no health probing).
+   * Used for the initial defaultConfig so the module avoids top-level await.
+   */
+  getDefaultEndpoints(): ServiceEndpoints {
+    return this.createEndpoints({
+      minecraft: `http://localhost:${this.DEFAULT_PORTS.minecraft}`,
+      cognition: `http://localhost:${this.DEFAULT_PORTS.cognition}`,
+      memory: `http://localhost:${this.DEFAULT_PORTS.memory}`,
+      planning: `http://localhost:${this.DEFAULT_PORTS.planning}`,
+      world: `http://localhost:${this.DEFAULT_PORTS.world}`,
+      evaluation: `http://localhost:${this.DEFAULT_PORTS.evaluation}`,
+    });
+  }
 }
 
 // Legacy routes for backward compatibility
@@ -600,7 +615,7 @@ const defaultConfig: DashboardConfig = {
     enabled: true,
     healthCheckInterval: 30000, // 30 seconds
   },
-  endpoints: await ServiceDiscovery.getInstance().getHealthyEndpoints(),
+  endpoints: ServiceDiscovery.getInstance().getDefaultEndpoints(),
   api: {
     baseUrl: '',
     timeout: 10000,
