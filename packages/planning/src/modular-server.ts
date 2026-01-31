@@ -81,7 +81,7 @@ import {
   computeRequirementSnapshot,
 } from './modules/requirements';
 import { logOptimizer } from './modules/logging';
-import { validateLeafArgs } from './modules/leaf-arg-contracts';
+import { validateLeafArgs, normalizeLeafArgs } from './modules/leaf-arg-contracts';
 
 // Extend global interface for rate limiting variables
 declare global {
@@ -607,6 +607,22 @@ async function injectNextAcquisitionStep(
   goalItem: string,
   qty: number
 ): Promise<boolean> {
+  // Deduplicate: skip if an active child task for this parent+item already exists
+  const activeTasks = enhancedTaskIntegration.getActiveTasks();
+  const existingChild = activeTasks.find(
+    (t: any) =>
+      t.metadata?.parentTaskId === parentTask.id &&
+      (t.parameters?.recipe === goalItem ||
+        t.parameters?.blockType === goalItem ||
+        t.title?.toLowerCase().includes(goalItem.replace(/_/g, ' ')))
+  );
+  if (existingChild) {
+    console.log(
+      `⏭️ [Prereq] Skipping duplicate: active child "${existingChild.title}" already exists for parent ${parentTask.id}`
+    );
+    return false;
+  }
+
   const step = await planNextAcquisitionStep(goalItem, qty);
   if (!step) return false;
   const t = await enhancedTaskIntegration.addTask({
@@ -631,18 +647,37 @@ async function injectNextAcquisitionStep(
   return Boolean(t);
 }
 
+/** Cap-aware prereq injection for craft steps.
+ *  Centralizes the prereqInjectionCount check so all call sites get the cap. */
 async function injectDynamicPrereqForCraft(task: any): Promise<boolean> {
+  // Enforce cap at this layer — all call sites go through here
+  const prereqAttempts = (task.metadata as any)?.prereqInjectionCount || 0;
+  if (prereqAttempts >= 3) {
+    console.log(
+      `⛔ [Prereq] Cap reached (${prereqAttempts}/3) for task ${task.id}, refusing injection`
+    );
+    return false;
+  }
+
   const title = (task.title || '').toLowerCase();
   const recipe =
     task.parameters?.recipe ||
     inferRecipeFromTitle(task.title) ||
     (title.includes('pickaxe') ? 'wooden_pickaxe' : null);
   if (!recipe) return false;
-  return await injectNextAcquisitionStep(
+  const injected = await injectNextAcquisitionStep(
     task,
     recipe,
     task.parameters?.qty || 1
   );
+  if (injected) {
+    // Increment cap counter on successful injection
+    enhancedTaskIntegration.updateTaskMetadata(task.id, {
+      ...task.metadata,
+      prereqInjectionCount: prereqAttempts + 1,
+    });
+  }
+  return injected;
 }
 
 async function injectDynamicPrereqForMine(task: any): Promise<boolean> {
@@ -784,10 +819,11 @@ function stepToLeafExecution(
       };
     }
     case 'smelt': {
-      const output = produces[0];
+      // Smelt contract requires { input: string } — derive from consumes (input), not produces (output)
+      const consumed = consumes[0];
       return {
         leafName: 'smelt',
-        args: { item: output?.name || 'unknown' },
+        args: { input: consumed?.name || 'unknown' },
       };
     }
     case 'place_block': {
@@ -800,6 +836,7 @@ function stepToLeafExecution(
     case 'prepare_site':
     case 'build_module':
     case 'place_feature':
+    case 'building_step':
     case 'acquire_material': {
       // Building domain — pass through meta fields
       return {
@@ -1964,6 +2001,8 @@ async function autonomousTaskExecutor() {
       if (nextStep) {
         const leafExec = stepToLeafExecution(nextStep);
         if (leafExec) {
+          // Normalize legacy arg shapes before validation (e.g., smelt { item } → { input })
+          normalizeLeafArgs(leafExec.leafName, leafExec.args);
           // Validate args before execution (strict mode: reject unknown leaves)
           const validationError = validateLeafArgs(leafExec.leafName, leafExec.args, true);
           if (validationError) {
@@ -1986,17 +2025,9 @@ async function autonomousTaskExecutor() {
                   console.log(
                     `🪵 [Executor] Missing ${input.item} (have ${have}, need ${input.count}) for ${leafExec.args.recipe}. Injecting prerequisite.`
                   );
-                  const prereqAttempts = (currentTask.metadata as any)?.prereqInjectionCount || 0;
-                  if (prereqAttempts < 3) {
-                    const injected = await injectDynamicPrereqForCraft(currentTask);
-                    if (injected) {
-                      enhancedTaskIntegration.updateTaskMetadata(currentTask.id, {
-                        ...currentTask.metadata,
-                        prereqInjectionCount: prereqAttempts + 1,
-                      });
-                      return; // Execute prerequisite first
-                    }
-                  }
+                  // Cap + increment handled inside injectDynamicPrereqForCraft
+                  const injected = await injectDynamicPrereqForCraft(currentTask);
+                  if (injected) return; // Execute prerequisite first
                   break;
                 }
               }
@@ -2023,21 +2054,10 @@ async function autonomousTaskExecutor() {
             );
 
             // For craft failures, try injecting prerequisite acquisition steps
+            // Cap + increment handled inside injectDynamicPrereqForCraft
             if (leafExec.leafName === 'craft_recipe') {
-              const prereqAttempts = (currentTask.metadata as any)?.prereqInjectionCount || 0;
-              if (prereqAttempts < 3) {
-                const injected = await injectDynamicPrereqForCraft(currentTask);
-                if (injected) {
-                  enhancedTaskIntegration.updateTaskMetadata(currentTask.id, {
-                    ...currentTask.metadata,
-                    prereqInjectionCount: prereqAttempts + 1,
-                  });
-                  console.log(
-                    `🔧 [Executor] Prerequisite task created for ${currentTask.title} (attempt ${prereqAttempts + 1}/3)`
-                  );
-                  return; // Execute prerequisite first, then retry craft
-                }
-              }
+              const injected = await injectDynamicPrereqForCraft(currentTask);
+              if (injected) return; // Execute prerequisite first, then retry craft
             }
 
             const newRetryCount = (currentTask.metadata?.retryCount || 0) + 1;

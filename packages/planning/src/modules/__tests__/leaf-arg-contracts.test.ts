@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { validateLeafArgs, requirementToLeafMeta, requirementToFallbackPlan, KNOWN_LEAVES } from '../leaf-arg-contracts';
+import { validateLeafArgs, normalizeLeafArgs, requirementToLeafMeta, requirementToFallbackPlan, KNOWN_LEAVES } from '../leaf-arg-contracts';
 
 describe('validateLeafArgs', () => {
   it('accepts valid dig_block args with blockType', () => {
@@ -32,6 +32,10 @@ describe('validateLeafArgs', () => {
 
   it('rejects smelt without input', () => {
     expect(validateLeafArgs('smelt', {})).toBe('smelt requires input (string)');
+  });
+
+  it('rejects smelt with item instead of input (pre-normalization)', () => {
+    expect(validateLeafArgs('smelt', { item: 'iron_ore' })).toBe('smelt requires input (string)');
   });
 
   it('accepts valid place_block args', () => {
@@ -84,6 +88,62 @@ describe('validateLeafArgs', () => {
   it('rejects replan_exhausted without templateId', () => {
     expect(validateLeafArgs('replan_exhausted', {})).toBe('replan_exhausted requires templateId (string)');
   });
+
+  it('accepts valid prepare_site args', () => {
+    expect(validateLeafArgs('prepare_site', { moduleId: 'basic_shelter_5x5' })).toBeNull();
+  });
+
+  it('rejects prepare_site without moduleId', () => {
+    expect(validateLeafArgs('prepare_site', {})).toBe('prepare_site requires moduleId (string)');
+  });
+
+  it('accepts valid place_feature args', () => {
+    expect(validateLeafArgs('place_feature', { moduleId: 'door_oak' })).toBeNull();
+  });
+
+  it('rejects place_feature without moduleId', () => {
+    expect(validateLeafArgs('place_feature', {})).toBe('place_feature requires moduleId (string)');
+  });
+
+  it('accepts valid building_step args', () => {
+    expect(validateLeafArgs('building_step', { moduleId: 'custom_step' })).toBeNull();
+  });
+
+  it('rejects building_step without moduleId', () => {
+    expect(validateLeafArgs('building_step', {})).toBe('building_step requires moduleId (string)');
+  });
+});
+
+describe('normalizeLeafArgs', () => {
+  it('converts smelt { item } to { input }', () => {
+    const args: Record<string, unknown> = { item: 'iron_ore' };
+    normalizeLeafArgs('smelt', args);
+    expect(args).toEqual({ input: 'iron_ore' });
+  });
+
+  it('does not overwrite existing smelt { input }', () => {
+    const args: Record<string, unknown> = { input: 'iron_ore', item: 'gold_ore' };
+    normalizeLeafArgs('smelt', args);
+    expect(args.input).toBe('iron_ore');
+  });
+
+  it('is a no-op for smelt with correct args', () => {
+    const args: Record<string, unknown> = { input: 'iron_ore' };
+    normalizeLeafArgs('smelt', args);
+    expect(args).toEqual({ input: 'iron_ore' });
+  });
+
+  it('is a no-op for non-smelt leaves', () => {
+    const args: Record<string, unknown> = { item: 'oak_log' };
+    normalizeLeafArgs('place_block', args);
+    expect(args).toEqual({ item: 'oak_log' });
+  });
+
+  it('smelt with legacy { item } passes validation after normalization', () => {
+    const args: Record<string, unknown> = { item: 'iron_ore' };
+    normalizeLeafArgs('smelt', args);
+    expect(validateLeafArgs('smelt', args)).toBeNull();
+  });
 });
 
 describe('requirementToLeafMeta', () => {
@@ -130,12 +190,13 @@ describe('requirementToLeafMeta', () => {
 });
 
 describe('KNOWN_LEAVES', () => {
-  it('contains all 8 expected leaf names', () => {
+  it('contains all 11 expected leaf names', () => {
     const expected = [
       'dig_block', 'craft_recipe', 'smelt', 'place_block', 'build_module',
       'acquire_material', 'replan_building', 'replan_exhausted',
+      'prepare_site', 'place_feature', 'building_step',
     ];
-    expect(KNOWN_LEAVES.size).toBe(8);
+    expect(KNOWN_LEAVES.size).toBe(11);
     for (const leaf of expected) {
       expect(KNOWN_LEAVES.has(leaf)).toBe(true);
     }

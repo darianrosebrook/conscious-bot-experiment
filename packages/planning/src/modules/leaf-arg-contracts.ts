@@ -68,10 +68,40 @@ const CONTRACTS: Record<string, LeafArgContract> = {
       return null;
     },
   },
+  prepare_site: {
+    leafName: 'prepare_site',
+    validate: (args) => {
+      if (!args.moduleId || typeof args.moduleId !== 'string') return 'prepare_site requires moduleId (string)';
+      return null;
+    },
+  },
+  place_feature: {
+    leafName: 'place_feature',
+    validate: (args) => {
+      if (!args.moduleId || typeof args.moduleId !== 'string') return 'place_feature requires moduleId (string)';
+      return null;
+    },
+  },
+  building_step: {
+    leafName: 'building_step',
+    validate: (args) => {
+      if (!args.moduleId || typeof args.moduleId !== 'string') return 'building_step requires moduleId (string)';
+      return null;
+    },
+  },
 };
 
 /** Canonical set of leaves the executor may run. Unknown leaves are rejected in strict mode. */
 export const KNOWN_LEAVES = new Set(Object.keys(CONTRACTS));
+
+/** Normalize legacy arg shapes to canonical form before validation.
+ *  Mutates the args object in place. Call before validateLeafArgs. */
+export function normalizeLeafArgs(leafName: string, args: Record<string, unknown>): void {
+  if (leafName === 'smelt' && !args.input && typeof args.item === 'string') {
+    args.input = args.item;
+    delete args.item;
+  }
+}
 
 /** Returns null if leaf+args are valid, error string otherwise.
  *  strictMode=true rejects unknown leaves (use at execution boundary). */

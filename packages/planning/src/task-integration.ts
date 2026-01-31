@@ -439,8 +439,10 @@ export class EnhancedTaskIntegration extends EventEmitter {
 
       const content = thought.content.toLowerCase();
 
-      // Try structured [GOAL: ...] tag first — takes priority over keyword heuristics
-      const goalMatch = thought.content.match(
+      // Try structured [GOAL: ...] tag — takes priority over keyword heuristics.
+      // Only match within the last 100 chars to avoid false positives from incidental references.
+      const tail = thought.content.slice(-100);
+      const goalMatch = tail.match(
         /\[GOAL:\s*(collect|mine|craft|build)\s+([\w]+)(?:\s+(\d+))?\]/i
       );
 
@@ -599,9 +601,15 @@ export class EnhancedTaskIntegration extends EventEmitter {
         }
       }
 
+      // Deterministic task ID from thought.id + extraction method — stable for dedup and replay
+      const extractionMethod = parameters.requirementCandidate?.extractionMethod || actionType;
+      const contentHash = Array.from(thought.content.slice(0, 80)).reduce(
+        (h, c) => ((h << 5) - h + c.charCodeAt(0)) | 0, 0
+      ).toString(36).replace('-', 'n');
+
       // Create the task (empty steps array — addTask() will synthesize via Sterling)
       const task: Task = {
-        id: `cognitive-task-${thought.id}-${Date.now()}`,
+        id: `cognitive-task-${thought.id}-${extractionMethod}-${contentHash}`,
         title: taskTitle,
         description: taskDescription,
         type: actionType,
@@ -657,12 +665,32 @@ export class EnhancedTaskIntegration extends EventEmitter {
     target: string;
     quantity: number;
   } | null> {
+    const VALID_KINDS = new Set(['collect', 'mine', 'craft', 'build']);
     const VALID_TARGETS = new Set([
       'oak_log', 'birch_log', 'spruce_log', 'iron_ore', 'cobblestone',
       'diamond_ore', 'coal_ore', 'stone', 'wooden_pickaxe', 'stone_pickaxe',
       'iron_pickaxe', 'crafting_table', 'wooden_axe', 'wooden_sword',
       'furnace', 'chest', 'oak_planks', 'stick',
     ]);
+
+    /** Validate parsed JSON against known kinds and targets. */
+    const validateParsed = (parsed: any): {
+      kind: 'collect' | 'mine' | 'craft' | 'build';
+      target: string;
+      quantity: number;
+    } | null => {
+      if (!parsed.kind || !parsed.target) return null;
+      // Normalize target: strip quotes/punctuation, underscorify spaces
+      const normalizedTarget = String(parsed.target)
+        .toLowerCase().trim()
+        .replace(/['"]/g, '')
+        .replace(/\s+/g, '_');
+      if (!VALID_KINDS.has(parsed.kind)) return null;
+      if (!VALID_TARGETS.has(normalizedTarget)) return null;
+      const qty = typeof parsed.quantity === 'number' && parsed.quantity > 0
+        ? parsed.quantity : 1;
+      return { kind: parsed.kind, target: normalizedTarget, quantity: qty };
+    };
 
     try {
       // Lazy-init: reuse a single LLMInterface instance for structured extraction
@@ -684,18 +712,16 @@ Reply with exactly: {"kind":"...","target":"...","quantity":N}`,
 
       // Try to parse full response as JSON first (preferred)
       try {
-        const parsed = JSON.parse(text);
-        if (parsed.kind && parsed.target && VALID_TARGETS.has(parsed.target)) {
-          return { kind: parsed.kind, target: parsed.target, quantity: parsed.quantity || 1 };
-        }
+        const result = validateParsed(JSON.parse(text));
+        if (result) return result;
       } catch {
         // Fall back to regex extraction if response includes preamble
         const match = text.match(/\{[^}]+\}/);
         if (match) {
-          const parsed = JSON.parse(match[0]);
-          if (parsed.kind && parsed.target && VALID_TARGETS.has(parsed.target)) {
-            return { kind: parsed.kind, target: parsed.target, quantity: parsed.quantity || 1 };
-          }
+          try {
+            const result = validateParsed(JSON.parse(match[0]));
+            if (result) return result;
+          } catch { /* malformed JSON fragment */ }
         }
       }
     } catch { /* MLX sidecar unavailable — fall through to heuristic */ }
@@ -2311,8 +2337,9 @@ Reply with exactly: {"kind":"...","target":"...","quantity":N}`,
         return { recipe: output?.name || 'unknown', qty: output?.count || 1 };
       }
       case 'smelt': {
-        const output = produces[0];
-        return { item: output?.name || 'unknown' };
+        // Smelt contract requires { input: string } — derive from consumes (input), not produces (output)
+        const consumed = consumes[0];
+        return { input: consumed?.name || 'unknown' };
       }
       case 'place_block': {
         const consumed = consumes[0];
@@ -2321,6 +2348,7 @@ Reply with exactly: {"kind":"...","target":"...","quantity":N}`,
       case 'prepare_site':
       case 'build_module':
       case 'place_feature':
+      case 'building_step':
       case 'acquire_material': {
         return {
           moduleId: meta.moduleId,
