@@ -42,6 +42,16 @@ export class ThreatPerceptionManager {
   private safetyMonitor: AutomaticSafetyMonitor;
   private raycastEngine: RaycastEngine;
   private raycastConfig: SensingConfig;
+  private lastAssessmentLogAt = 0;
+  private assessmentLogThrottleMs = 2000;
+  private lastLosLogAt = new Map<string, number>();
+  private losLogThrottleMs = 2000;
+  private losSuppressedCount = new Map<string, number>();
+  private losSuppressedByType = new Map<string, number>();
+  private lastLosSummaryAt = 0;
+  private losSummaryIntervalMs = 5000;
+  private observationLogDebug =
+    process.env.OBSERVATION_LOG_DEBUG === '1';
 
   constructor(
     bot: Bot,
@@ -81,6 +91,7 @@ export class ThreatPerceptionManager {
     // Safe default: No threats detected
     const threats: ThreatEntity[] = [];
     let maxThreatLevel = 0;
+    const now = Date.now();
 
     try {
       // Get current bot health for context
@@ -108,9 +119,21 @@ export class ThreatPerceptionManager {
         if (this.config.lineOfSightRequired) {
           hasLineOfSight = await this.checkLineOfSight(entity.position);
           if (!hasLineOfSight) {
-            console.log(
-              `🚫 No line-of-sight to ${entity.name} at distance ${distance.toFixed(1)} - ignoring`
-            );
+            if (this.observationLogDebug && this.shouldLogLos(entityId, now)) {
+              console.log(
+                `[ThreatPerception] 🚫 no line-of-sight to ${entity.name} at ${distance.toFixed(1)} - ignoring`
+              );
+            } else {
+              this.losSuppressedCount.set(
+                entityId,
+                (this.losSuppressedCount.get(entityId) ?? 0) + 1
+              );
+              const typeKey = entity.name || entity.type || 'unknown';
+              this.losSuppressedByType.set(
+                typeKey,
+                (this.losSuppressedByType.get(typeKey) ?? 0) + 1
+              );
+            }
             continue;
           }
         }
@@ -159,9 +182,14 @@ export class ThreatPerceptionManager {
         botHealth
       );
 
-      console.log(
-        `🧠 Localized threat assessment: ${threats.length} threats, level: ${overallThreatLevel}`
-      );
+      if (now - this.lastAssessmentLogAt >= this.assessmentLogThrottleMs) {
+        console.log(
+          `[ThreatPerception] 🧠 localized threat assessment: ${threats.length} threats, level: ${overallThreatLevel}`
+        );
+        this.lastAssessmentLogAt = now;
+      }
+
+      this.maybeLogLosSummary(now);
       return { threats, overallThreatLevel, recommendedAction };
     } catch (error) {
       console.error('Error in threat assessment:', error);
@@ -273,6 +301,33 @@ export class ThreatPerceptionManager {
     if (level === 'high') return health < 10 ? 'flee' : 'find_shelter';
     if (level === 'medium') return 'find_shelter';
     return 'none';
+  }
+
+  private shouldLogLos(entityId: string, now: number): boolean {
+    const last = this.lastLosLogAt.get(entityId) ?? 0;
+    if (now - last < this.losLogThrottleMs) return false;
+    this.lastLosLogAt.set(entityId, now);
+    return true;
+  }
+
+  private maybeLogLosSummary(now: number): void {
+    if (now - this.lastLosSummaryAt < this.losSummaryIntervalMs) return;
+    let suppressedTotal = 0;
+    for (const count of this.losSuppressedCount.values()) {
+      suppressedTotal += count;
+    }
+    if (suppressedTotal > 0) {
+      const byType = Array.from(this.losSuppressedByType.entries())
+        .map(([type, count]) => `${type}:${count}`)
+        .join(', ');
+      console.log(
+        `[ThreatPerception] suppressed ${suppressedTotal} LOS logs in last ${this.losSummaryIntervalMs}ms` +
+          (byType ? ` (${byType})` : '')
+      );
+      this.losSuppressedCount.clear();
+      this.losSuppressedByType.clear();
+    }
+    this.lastLosSummaryAt = now;
   }
 
   /**

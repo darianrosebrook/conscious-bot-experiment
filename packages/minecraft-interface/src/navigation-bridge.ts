@@ -161,6 +161,7 @@ export class NavigationBridge extends EventEmitter {
   private replanCount = 0;
   private obstaclesDetected: ObstacleInfo[] = [];
   private navigationGraphBuilt = false;
+  private lastLogAt = new Map<string, number>();
   private raycastEngine: RaycastEngine;
   private raycastConfig: SensingConfig;
 
@@ -457,27 +458,31 @@ export class NavigationBridge extends EventEmitter {
       return this.createFailureResult('Already navigating', targetVec3);
     }
 
-    // Debug pathfinder state
-    console.log('🧭 NavigationBridge state check:', {
-      usePathfinding: this.config.usePathfinding,
-      hasBotPathfinder: !!(this.bot as any).pathfinder,
-      hasPf: !!this.pf,
-      hasMovements: !!this.movements,
-      timestamp: Date.now(),
-    });
+    // Debug pathfinder state (throttled)
+    if (this.shouldLog('nav-bridge-state', 1000)) {
+      console.log('[NavigationBridge] 🧭 state check:', {
+        usePathfinding: this.config.usePathfinding,
+        hasBotPathfinder: !!(this.bot as any).pathfinder,
+        hasPf: !!this.pf,
+        hasMovements: !!this.movements,
+        timestamp: Date.now(),
+      });
+    }
 
     // Wait for pathfinder to be ready if needed
     if (!this.isPathfinderReady()) {
-      console.log('🔄 Waiting for pathfinder to be ready...');
+      if (this.shouldLog('nav-bridge-wait-ready', 1000)) {
+        console.log('[NavigationBridge] 🔄 waiting for pathfinder to be ready...');
+      }
       const ready = await this.waitForPathfinderReady(10000); // Wait up to 10 seconds
       if (!ready) {
-        console.log('❌ NavigationBridge pathfinder not ready after timeout');
+      console.log('[NavigationBridge] ❌ pathfinder not ready after timeout');
         return this.createFailureResult(
           'Pathfinder plugin not ready after timeout',
           targetVec3
         );
       }
-      console.log('✅ NavigationBridge pathfinder ready');
+      console.log('[NavigationBridge] ✅ pathfinder ready');
     }
 
     if (
@@ -485,7 +490,7 @@ export class NavigationBridge extends EventEmitter {
       !(this.bot as any).pathfinder ||
       !this.pf
     ) {
-      console.log('❌ NavigationBridge pathfinder check failed');
+      console.log('[NavigationBridge] ❌ pathfinder check failed');
       return this.createFailureResult(
         'Pathfinder plugin not initialized',
         targetVec3
@@ -1069,6 +1074,18 @@ export class NavigationBridge extends EventEmitter {
       botId: this.botId,
       environmentalState: environmentalDetector.getCurrentState() || undefined,
     };
+  }
+
+  isNavigationActive(): boolean {
+    return this.isNavigating;
+  }
+
+  private shouldLog(key: string, intervalMs: number): boolean {
+    const now = Date.now();
+    const last = this.lastLogAt.get(key) ?? 0;
+    if (now - last < intervalMs) return false;
+    this.lastLogAt.set(key, now);
+    return true;
   }
 
   /**

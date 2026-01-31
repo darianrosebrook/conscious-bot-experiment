@@ -116,6 +116,11 @@ export class ActionTranslator {
   private stateMachineWrapper?: StateMachineWrapper;
   private raycastEngine: RaycastEngine;
   private raycastConfig: SensingConfig;
+  private lastNavTargetKey: string | null = null;
+  private lastNavAttemptAt = 0;
+  private navDebounceMs = 1500;
+  private navLogThrottleMs = 1000;
+  private lastLogAt = new Map<string, number>();
 
   constructor(
     bot: Bot,
@@ -1833,19 +1838,97 @@ export class ActionTranslator {
     action: NavigateAction,
     timeout: number
   ): Promise<{ success: boolean; data?: any; error?: string }> {
-    const { target, range, sprint } = action.parameters;
+    const params: any = action?.parameters ?? {};
+    const { range, sprint } = params;
 
+    const coerceVec3 = (raw: any): Vec3 | null => {
+      const t = raw?.target ?? raw?.position ?? raw?.destination ?? raw?.goal ?? raw;
+      if (!t) return null;
+      if (t instanceof Vec3) return t;
+      if (Array.isArray(t) && t.length >= 3) {
+        const [x, y, z] = t;
+        if ([x, y, z].every((n) => Number.isFinite(Number(n)))) {
+          return new Vec3(Number(x), Number(y), Number(z));
+        }
+        return null;
+      }
+      if (typeof t === 'object') {
+        const x = Number((t as any).x);
+        const y = Number((t as any).y);
+        const z = Number((t as any).z);
+        if ([x, y, z].every((n) => Number.isFinite(n))) {
+          return new Vec3(x, y, z);
+        }
+      }
+      return null;
+    };
+
+    let targetVec: Vec3 | null = null;
     try {
-      console.log(
-        `🧭 executeNavigate called with target: ${target.x}, ${target.y}, ${target.z}`
-      );
-      console.log('🔍 ActionTranslator state:', {
-        hasNavigationBridge: !!this.navigationBridge,
-        hasBot: !!this.bot,
-        botSpawned: !!this.bot.entity?.position,
-        botPathfinder: !!(this.bot as any).pathfinder,
-        timestamp: Date.now(),
-      });
+      const now = Date.now();
+      if (this.navigationBridge?.isNavigationActive()) {
+        if (this.shouldLog('nav-gated', this.navLogThrottleMs)) {
+          console.log(
+            `[ActionTranslator] 🧭 navigate gated: already navigating`
+          );
+        }
+        return {
+          success: false,
+          error: 'Already navigating',
+        };
+      }
+
+      targetVec = coerceVec3(params);
+      if (!targetVec) {
+        if (this.shouldLog('nav-invalid-target', 1000)) {
+          console.error(
+            `[ActionTranslator] ❌ Invalid navigation target (missing/NaN coordinates)`
+          );
+        }
+        return {
+          success: false,
+          error: 'Invalid navigation target',
+          data: { targetReached: false },
+        };
+      }
+
+      const targetKey = `${targetVec.x.toFixed(2)},${targetVec.y.toFixed(
+        2
+      )},${targetVec.z.toFixed(2)}`;
+
+      if (
+        this.lastNavTargetKey === targetKey &&
+        now - this.lastNavAttemptAt < this.navDebounceMs
+      ) {
+        if (this.shouldLog('nav-debounce', this.navLogThrottleMs)) {
+          console.log(
+            `[ActionTranslator] 🧭 navigate debounced: ${targetKey} (${now -
+              this.lastNavAttemptAt}ms)`
+          );
+        }
+        return {
+          success: false,
+          error: 'Debounced duplicate navigate',
+        };
+      }
+
+      this.lastNavTargetKey = targetKey;
+      this.lastNavAttemptAt = now;
+
+      if (this.shouldLog('nav-execute', this.navLogThrottleMs)) {
+        console.log(
+          `[ActionTranslator] 🧭 executeNavigate called with target: ${targetVec.x}, ${targetVec.y}, ${targetVec.z}`
+        );
+      }
+      if (this.shouldLog('nav-state', this.navLogThrottleMs)) {
+        console.log('[ActionTranslator] 🔍 state:', {
+          hasNavigationBridge: !!this.navigationBridge,
+          hasBot: !!this.bot,
+          botSpawned: !!this.bot.entity?.position,
+          botPathfinder: !!(this.bot as any).pathfinder,
+          timestamp: Date.now(),
+        });
+      }
 
       if (!this.navigationBridge) {
         console.error(
@@ -1858,12 +1941,14 @@ export class ActionTranslator {
         };
       }
 
-      console.log(
-        `🧭 Using D* Lite navigation to target: ${target.x}, ${target.y}, ${target.z}`
-      );
+      if (this.shouldLog('nav-dstar', this.navLogThrottleMs)) {
+        console.log(
+          `[ActionTranslator] 🧭 Using D* Lite navigation to target: ${targetVec.x}, ${targetVec.y}, ${targetVec.z}`
+        );
+      }
 
       // Use D* Lite navigation bridge for intelligent pathfinding
-      const navigationResult = await this.navigationBridge.navigateTo(target, {
+      const navigationResult = await this.navigationBridge.navigateTo(targetVec, {
         timeout: timeout,
         useRaycasting: true,
         dynamicReplanning: true,
@@ -1875,7 +1960,7 @@ export class ActionTranslator {
 
       if (navigationResult.success) {
         console.log(
-          `✅ D* Lite navigation successful: ${navigationResult.pathLength} steps, ${navigationResult.replans} replans`
+          `[ActionTranslator] ✅ D* Lite navigation successful: ${navigationResult.pathLength} steps, ${navigationResult.replans} replans`
         );
 
         if (sprint) {
@@ -1895,7 +1980,11 @@ export class ActionTranslator {
           },
         };
       } else {
-        console.log(`❌ D* Lite navigation failed: ${navigationResult.error}`);
+        if (this.shouldLog('nav-fail', this.navLogThrottleMs)) {
+          console.log(
+            `[ActionTranslator] ❌ D* Lite navigation failed: ${navigationResult.error}`
+          );
+        }
 
         if (sprint) {
           this.bot.setControlState('sprint', false);
@@ -1915,20 +2004,28 @@ export class ActionTranslator {
         };
       }
     } catch (error) {
-      console.error(`❌ D* Lite navigation error:`, error);
+      const msg = error instanceof Error ? error.message : String(error);
+      if (this.shouldLog('nav-error', 1000)) {
+        console.error(`[ActionTranslator] ❌ D* Lite navigation error: ${msg}`);
+        if (process.env.NAV_DEBUG_STACK === '1' && error instanceof Error) {
+          console.error(error.stack);
+        }
+      }
 
       if (sprint) {
         this.bot.setControlState('sprint', false);
       }
 
+      const pos = this.bot.entity?.position;
+      const finalPos = pos?.clone ? pos.clone() : undefined;
       return {
         success: false,
-        error:
-          error instanceof Error ? error.message : 'Unknown navigation error',
+        error: msg || 'Unknown navigation error',
         data: {
           targetReached: false,
-          finalPosition: this.bot.entity.position.clone(),
-          distanceRemaining: this.bot.entity.position.distanceTo(target),
+          finalPosition: finalPos,
+          distanceRemaining:
+            pos && targetVec ? pos.distanceTo(targetVec) : undefined,
         },
       };
     }
@@ -1984,6 +2081,14 @@ export class ActionTranslator {
         error: error instanceof Error ? error.message : String(error),
       };
     }
+  }
+
+  private shouldLog(key: string, intervalMs: number): boolean {
+    const now = Date.now();
+    const last = this.lastLogAt.get(key) ?? 0;
+    if (now - last < intervalMs) return false;
+    this.lastLogAt.set(key, now);
+    return true;
   }
 
   /**

@@ -24,6 +24,9 @@ export function createServer(
 ): express.Application {
   const app: express.Application = express();
   app.use(express.json());
+  let systemReady = process.env.SYSTEM_READY_ON_BOOT === '1';
+  let readyAt: string | null = systemReady ? new Date().toISOString() : null;
+  let readySource: string | null = systemReady ? 'env' : null;
 
   // ============================================================================
   // Capability Registration Endpoints
@@ -329,6 +332,23 @@ export function createServer(
         capabilityList: '/capabilities',
       },
     });
+  });
+
+  // ============================================================================
+  // Startup Readiness Endpoint
+  // ============================================================================
+  app.get('/system/ready', (_req, res) => {
+    res.json({ ready: systemReady, readyAt, source: readySource });
+  });
+
+  app.post('/system/ready', (req, res) => {
+    if (!systemReady) {
+      systemReady = true;
+      readyAt = new Date().toISOString();
+      readySource =
+        typeof req.body?.source === 'string' ? req.body.source : 'startup';
+    }
+    res.json({ ready: systemReady, readyAt, accepted: true });
   });
 
   // ============================================================================

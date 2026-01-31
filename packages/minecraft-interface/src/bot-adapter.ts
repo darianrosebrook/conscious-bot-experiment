@@ -37,6 +37,8 @@ export class BotAdapter extends EventEmitter {
   // Track intervals and listeners for cleanup on disconnect
   private activeIntervals: NodeJS.Timeout[] = [];
   private listenersAttached = false;
+  private lastDeathMessage: string | null = null;
+  private lastDeathMessageAt = 0;
 
   // Performance benchmarking — capped ring buffer for responseTimes
   private static readonly MAX_RESPONSE_TIMES = 200;
@@ -136,7 +138,14 @@ export class BotAdapter extends EventEmitter {
 
       this.bot.once('end', (reason) => {
         this.connectionState = 'disconnected';
-        this.emitBotEvent('disconnected', { reason });
+        this.emitBotEvent('disconnected', {
+          reason,
+          deathMessage:
+            this.lastDeathMessage &&
+            Date.now() - this.lastDeathMessageAt < 30000
+              ? this.lastDeathMessage
+              : undefined,
+        });
 
         if (!this.isShuttingDown && this.config.autoReconnect) {
           this.attemptReconnect();
@@ -283,9 +292,14 @@ export class BotAdapter extends EventEmitter {
    */
   private recordResponseTime(time: number): void {
     this.performanceMetrics.responseTimes.push(time);
-    if (this.performanceMetrics.responseTimes.length > BotAdapter.MAX_RESPONSE_TIMES) {
+    if (
+      this.performanceMetrics.responseTimes.length >
+      BotAdapter.MAX_RESPONSE_TIMES
+    ) {
       this.performanceMetrics.responseTimes =
-        this.performanceMetrics.responseTimes.slice(-BotAdapter.MAX_RESPONSE_TIMES);
+        this.performanceMetrics.responseTimes.slice(
+          -BotAdapter.MAX_RESPONSE_TIMES
+        );
     }
   }
 
@@ -384,39 +398,43 @@ export class BotAdapter extends EventEmitter {
 
       if (this.bot?.entity && this.bot?.entity?.position) {
         lastPosition = this.bot.entity.position.clone();
-        positionCheckInterval = this.trackInterval(setInterval(() => {
-          if (!this.bot || this.connectionState !== 'spawned') {
-            return;
-          }
+        positionCheckInterval = this.trackInterval(
+          setInterval(() => {
+            if (!this.bot || this.connectionState !== 'spawned') {
+              return;
+            }
 
-          const currentPosition = this.bot.entity.position;
-          if (currentPosition.distanceTo(lastPosition) > 0.5) {
-            lastPosition = currentPosition.clone();
-            this.emitBotEvent('position_changed', {
-              position: currentPosition.clone(),
-              dimension: this.bot.game.dimension,
-            });
-          }
-        }, 1000)); // Check every second
+            const currentPosition = this.bot.entity.position;
+            if (currentPosition.distanceTo(lastPosition) > 0.5) {
+              lastPosition = currentPosition.clone();
+              this.emitBotEvent('position_changed', {
+                position: currentPosition.clone(),
+                dimension: this.bot.game.dimension,
+              });
+            }
+          }, 1000)
+        ); // Check every second
 
         // Set up periodic inventory check
-        inventoryCheckInterval = this.trackInterval(setInterval(() => {
-          if (!this.bot || this.connectionState !== 'spawned') {
-            return;
-          }
+        inventoryCheckInterval = this.trackInterval(
+          setInterval(() => {
+            if (!this.bot || this.connectionState !== 'spawned') {
+              return;
+            }
 
-          const currentHash = this.getInventoryHash();
-          if (currentHash !== lastInventoryHash) {
-            lastInventoryHash = currentHash;
-            this.emitBotEvent('inventory_changed', {
-              items: this.bot.inventory.items().map((item) => ({
-                name: item.name,
-                count: item.count,
-                slot: item.slot,
-              })),
-            });
-          }
-        }, 2000)); // Check every 2 seconds
+            const currentHash = this.getInventoryHash();
+            if (currentHash !== lastInventoryHash) {
+              lastInventoryHash = currentHash;
+              this.emitBotEvent('inventory_changed', {
+                items: this.bot.inventory.items().map((item) => ({
+                  name: item.name,
+                  count: item.count,
+                  slot: item.slot,
+                })),
+              });
+            }
+          }, 2000)
+        ); // Check every 2 seconds
       }
     });
 
@@ -460,6 +478,15 @@ export class BotAdapter extends EventEmitter {
       }
     });
 
+    this.bot.on('message', (message) => {
+      if (!this.bot) return;
+      const text = String((message as any)?.toString?.() ?? message);
+      if (this.isDeathMessage(text, this.bot.username)) {
+        this.lastDeathMessage = text;
+        this.lastDeathMessageAt = Date.now();
+      }
+    });
+
     // Entity detection and response
     this.setupEntityDetection();
 
@@ -484,6 +511,12 @@ export class BotAdapter extends EventEmitter {
       // Only include position if entity exists
       if (this.bot?.entity && this.bot?.entity?.position) {
         deathData.position = this.bot.entity.position.clone();
+      }
+      if (
+        this.lastDeathMessage &&
+        Date.now() - this.lastDeathMessageAt < 30000
+      ) {
+        deathData.deathMessage = this.lastDeathMessage;
       }
 
       this.emitBotEvent('error', deathData);
@@ -654,6 +687,37 @@ export class BotAdapter extends EventEmitter {
     this.config = { ...this.config, ...newConfig };
   }
 
+  private isDeathMessage(text: string, username: string): boolean {
+    if (!text || !username) return false;
+    const escaped = username.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const patterns = [
+      'was slain by',
+      'was shot by',
+      'was burned to death',
+      'went up in flames',
+      'tried to swim in lava',
+      'hit the ground too hard',
+      'fell',
+      'drowned',
+      'blew up',
+      'was blown up',
+      'starved',
+      'suffocated',
+      'was killed by',
+      'was pricked to death',
+      'was squashed',
+      'was withered',
+      'fell out of the world',
+      'experienced kinetic energy',
+      'died',
+    ];
+    const pattern = new RegExp(
+      `\\b${escaped}\\b.*(${patterns.join('|')})`,
+      'i'
+    );
+    return pattern.test(text);
+  }
+
   /**
    * Get current configuration
    */
@@ -779,19 +843,21 @@ export class BotAdapter extends EventEmitter {
     const scanInterval = 10000; // Scan every 10 seconds (reduced frequency)
 
     // Monitor entities and detect new/interesting ones
-    this.trackInterval(setInterval(async () => {
-      try {
-        // Only scan if enough time has passed since last scan
-        const now = Date.now();
-        if (now - this.lastEntityScan < scanInterval) return;
+    this.trackInterval(
+      setInterval(async () => {
+        try {
+          // Only scan if enough time has passed since last scan
+          const now = Date.now();
+          if (now - this.lastEntityScan < scanInterval) return;
 
-        await this.detectAndRespondToEntities();
-        this.lastEntityScan = now;
-        this.performanceMetrics.entityScans++;
-      } catch (error) {
-        console.error('❌ Entity detection error:', error);
-      }
-    }, 2000)); // Check every 2 seconds but only process every 10 seconds
+          await this.detectAndRespondToEntities();
+          this.lastEntityScan = now;
+          this.performanceMetrics.entityScans++;
+        } catch (error) {
+          console.error('❌ Entity detection error:', error);
+        }
+      }, 2000)
+    ); // Check every 2 seconds but only process every 10 seconds
 
     console.log('👁️ Entity detection system activated (throttled)');
   }
@@ -807,16 +873,12 @@ export class BotAdapter extends EventEmitter {
 
     try {
       // Get nearby entities
-      const nearbyEntities = Object.values(bot.entities).filter(
-        (entity) => {
-          const distance = entity.position.distanceTo(bot.entity.position);
-          return (
-            distance <= 15 &&
-            entity.name !== 'item' &&
-            entity !== bot.entity
-          );
-        }
-      );
+      const nearbyEntities = Object.values(bot.entities).filter((entity) => {
+        const distance = entity.position.distanceTo(bot.entity.position);
+        return (
+          distance <= 15 && entity.name !== 'item' && entity !== bot.entity
+        );
+      });
 
       if (nearbyEntities.length === 0) return;
 
@@ -882,7 +944,10 @@ export class BotAdapter extends EventEmitter {
           shouldCreateTask?: boolean;
           taskSuggestion?: string;
         };
-        console.log(`✅ Entity processed by cognition system:`, result);
+        console.warn(
+          `[DEBUG] ✅ Entity processed by cognition system:`,
+          result
+        );
 
         // If cognition suggests a response, execute it (with throttling)
         if (result.shouldRespond && result.response) {
@@ -893,12 +958,12 @@ export class BotAdapter extends EventEmitter {
             const responseTime = Date.now() - responseStart;
             this.recordResponseTime(responseTime);
             this.performanceMetrics.chatResponses++;
-            console.log(
+            console.warn(
               `💬 Bot responded to entity: "${result.response}" (${responseTime}ms)`
             );
             this.lastChatResponse = now;
           } else {
-            console.log(
+            console.warn(
               `💬 Entity response throttled (cooldown: ${(this.chatCooldown - (now - this.lastChatResponse)) / 1000}s)`
             );
           }
@@ -984,9 +1049,9 @@ export class BotAdapter extends EventEmitter {
 
       if (response.ok) {
         const result = await response.json();
-        console.log(`✅ Created task from entity encounter:`, result);
+        console.warn(`[DEBUG] ✅ Created task from entity encounter:`, result);
       } else {
-        console.log(`⚠️ Failed to create task: ${response.status}`);
+        console.warn(`[DEBUG] ⚠️ Failed to create task: ${response.status}`);
       }
     } catch (error) {
       console.error('❌ Error creating task from entity:', error);
@@ -1046,35 +1111,37 @@ export class BotAdapter extends EventEmitter {
 
     // Monitor health changes using the existing health tracking (less frequently)
     let lastHealth = this.bot.health;
-    this.trackInterval(setInterval(async () => {
-      try {
-        if (!this.bot) return;
-        const currentHealth = this.bot.health;
-        const maxHealth = 20; // Default max health in Minecraft
+    this.trackInterval(
+      setInterval(async () => {
+        try {
+          if (!this.bot) return;
+          const currentHealth = this.bot.health;
+          const maxHealth = 20; // Default max health in Minecraft
 
-        // Only process significant health changes
-        if (Math.abs(currentHealth - lastHealth) >= 2) {
-          if (currentHealth < lastHealth) {
-            await this.processEnvironmentalEvent('health_loss', {
-              previousHealth: lastHealth,
-              currentHealth: currentHealth,
-              maxHealth: maxHealth,
-              damage: lastHealth - currentHealth,
-            });
-          } else if (currentHealth > lastHealth) {
-            await this.processEnvironmentalEvent('health_gain', {
-              previousHealth: lastHealth,
-              currentHealth: currentHealth,
-              maxHealth: maxHealth,
-              healing: currentHealth - lastHealth,
-            });
+          // Only process significant health changes
+          if (Math.abs(currentHealth - lastHealth) >= 2) {
+            if (currentHealth < lastHealth) {
+              await this.processEnvironmentalEvent('health_loss', {
+                previousHealth: lastHealth,
+                currentHealth: currentHealth,
+                maxHealth: maxHealth,
+                damage: lastHealth - currentHealth,
+              });
+            } else if (currentHealth > lastHealth) {
+              await this.processEnvironmentalEvent('health_gain', {
+                previousHealth: lastHealth,
+                currentHealth: currentHealth,
+                maxHealth: maxHealth,
+                healing: currentHealth - lastHealth,
+              });
+            }
+            lastHealth = currentHealth;
           }
-          lastHealth = currentHealth;
+        } catch (error) {
+          console.error('❌ Error processing health event:', error);
         }
-      } catch (error) {
-        console.error('❌ Error processing health event:', error);
-      }
-    }, 5000)); // Check every 5 seconds, only for significant changes
+      }, 5000)
+    ); // Check every 5 seconds, only for significant changes
 
     console.log('🌍 Environmental event detection activated');
   }
@@ -1232,9 +1299,12 @@ export class BotAdapter extends EventEmitter {
 
       if (response.ok) {
         const result = await response.json();
-        console.log(`✅ Created task from environmental event:`, result);
+        console.warn(
+          `[DEBUG] ✅ Created task from environmental event:`,
+          result
+        );
       } else {
-        console.log(`⚠️ Failed to create task: ${response.status}`);
+        console.warn(`[DEBUG] ⚠️ Failed to create task: ${response.status}`);
       }
     } catch (error) {
       console.error('❌ Error creating task from environmental event:', error);
@@ -1283,8 +1353,8 @@ export class BotAdapter extends EventEmitter {
    */
   logPerformanceMetrics() {
     const metrics = this.getPerformanceMetrics();
-    console.log(`
-🤖 Reactive Consciousness Performance Report:
+    console.warn(`
+[DEBUG] 🤖 Reactive Consciousness Performance Report:
 ══════════════════════════════════════════════════════
 ⏱️  Uptime: ${metrics.uptime}s
 👁️  Entity Scans: ${metrics.entityScans} (${metrics.scansPerMinute}/min)
@@ -1297,7 +1367,7 @@ export class BotAdapter extends EventEmitter {
    • Chat Cooldown: ${metrics.throttling.chatCooldown}s
    • Environmental Cooldown: ${metrics.throttling.environmentalCooldown}s
 
-══════════════════════════════════════════════════════
+[DEBUG] ══════════════════════════════════════════════════════
     `);
   }
 

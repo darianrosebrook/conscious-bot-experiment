@@ -39,6 +39,17 @@ export class AutomaticSafetyMonitor extends EventEmitter {
   private lastHealth = 20;
   private lastPosition: any = null;
   private monitoringInterval: NodeJS.Timeout | null = null;
+  private lastLogAt = new Map<string, number>();
+  private lastEmergencyAt = new Map<string, number>();
+  private lastEntityObservation = new Map<string, { lastSeen: number; lastDistance: number }>();
+  private readonly logThrottleMs = 1000;
+  private readonly waterLogThrottleMs = 5000;
+  private readonly emergencyCooldownMs = 1000;
+  private readonly entityObservationCooldownMs = 1000;
+  private readonly entityDistanceDelta = 0.5;
+  private observationLogDebug = process.env.OBSERVATION_LOG_DEBUG === '1';
+  private lastWaterStrategyKey: string | null = null;
+  private lastWaterStrategyLogAt = 0;
 
   constructor(
     bot: Bot,
@@ -126,9 +137,12 @@ export class AutomaticSafetyMonitor extends EventEmitter {
 
     // If health dropped significantly, trigger emergency response
     if (healthDrop > 2 && health < this.config.healthThreshold) {
-      console.log(
-        `🚨 Health dropped from ${this.lastHealth + healthDrop} to ${health}! Triggering emergency response`
-      );
+      if (this.shouldLog('health-drop', this.logThrottleMs)) {
+        console.log(
+          `[SafetyMonitor] 🚨 Health dropped from ${this.lastHealth +
+            healthDrop} to ${health}! Triggering emergency response`
+        );
+      }
       await this.triggerEmergencyResponse('health_drop', {
         health,
         healthDrop,
@@ -137,7 +151,11 @@ export class AutomaticSafetyMonitor extends EventEmitter {
 
     // If health is critically low, flee immediately
     if (health < 8) {
-      console.log(`🚨 Critical health (${health})! Fleeing immediately`);
+      if (this.shouldLog('critical-health', this.logThrottleMs)) {
+        console.log(
+          `[SafetyMonitor] 🚨 Critical health (${health})! Fleeing immediately`
+        );
+      }
       await this.triggerEmergencyResponse('critical_health', { health });
     }
   }
@@ -149,13 +167,23 @@ export class AutomaticSafetyMonitor extends EventEmitter {
   private async handleEntityMovement(entity: any): Promise<void> {
     // Lightweight check for immediate threats (<3 blocks) to maintain reactivity
     if (this.isHostileEntity(entity)) {
+      if (!entity?.position) return;
       const distance = this.bot.entity.position.distanceTo(entity.position);
+      const entityKey = this.getEntityKey(entity);
+      if (!this.shouldHandleEntity(entityKey, distance)) {
+        return;
+      }
       if (distance < 3) {
-        console.log(
-          `🚨 Immediate threat: ${entity.name} at ${distance.toFixed(1)} blocks! Triggering response`
-        );
+        if (this.shouldLog('immediate-threat', this.logThrottleMs)) {
+          console.log(
+            `[SafetyMonitor] 🚨 Immediate threat: ${entity.name} at ${distance.toFixed(
+              1
+            )} blocks! Triggering response`
+          );
+        }
         await this.triggerEmergencyResponse('hostile_nearby', {
           entity: entity.name,
+          entityId: entityKey,
           distance: distance,
         });
       }
@@ -170,15 +198,21 @@ export class AutomaticSafetyMonitor extends EventEmitter {
       const threatAssessment = await this.assessThreats();
 
       if (threatAssessment.threatLevel === 'critical') {
-        console.log(
-          '🚨 Critical threat level detected! Taking immediate action'
-        );
+        if (this.shouldLog('critical-threat', this.logThrottleMs)) {
+          console.log(
+            '[SafetyMonitor] 🚨 Critical threat level detected! Taking immediate action'
+          );
+        }
         await this.triggerEmergencyResponse(
           'critical_threat',
           threatAssessment
         );
       } else if (threatAssessment.threatLevel === 'high') {
-        console.log('⚠️ High threat level detected! Taking defensive action');
+        if (this.shouldLog('high-threat', this.logThrottleMs)) {
+          console.log(
+            '[SafetyMonitor] ⚠️ High threat level detected! Taking defensive action'
+          );
+        }
         await this.triggerEmergencyResponse('high_threat', threatAssessment);
       }
     } catch (error) {
@@ -213,7 +247,20 @@ export class AutomaticSafetyMonitor extends EventEmitter {
     reason: string,
     context: any
   ): Promise<void> {
-    console.log(`🚨 Emergency response triggered: ${reason}`, context);
+    if (!this.shouldTriggerEmergency(reason, context)) {
+      if (this.shouldLog('emergency-suppressed', this.logThrottleMs)) {
+        console.log(
+          `[SafetyMonitor] 🚫 Emergency response suppressed (cooldown): ${reason}`
+        );
+      }
+      return;
+    }
+    if (this.shouldLog(`emergency-${reason}`, this.logThrottleMs)) {
+      console.log(
+        `[SafetyMonitor] 🚨 Emergency response triggered: ${reason}`,
+        context
+      );
+    }
 
     try {
       const threatAssessment = await this.assessThreats();
@@ -232,7 +279,9 @@ export class AutomaticSafetyMonitor extends EventEmitter {
           break;
 
         default:
-          console.log('No emergency action needed');
+          if (this.shouldLog('no-emergency', this.logThrottleMs)) {
+            console.log('[SafetyMonitor] No emergency action needed');
+          }
       }
 
       this.emit('emergency-response', {
@@ -251,24 +300,40 @@ export class AutomaticSafetyMonitor extends EventEmitter {
    * Flee from threats
    */
   private async fleeFromThreats(): Promise<void> {
-    console.log('🏃 Fleeing from threats...');
+    if (this.shouldLog('flee', this.logThrottleMs)) {
+      console.log('[SafetyMonitor] 🏃 Fleeing from threats...');
+    }
 
     try {
       // Move away from current position
       const currentPos = this.bot.entity.position;
       const fleeDirection = this.calculateFleeDirection();
+      const fleeTarget = this.computeFleeTarget(currentPos, fleeDirection);
 
-      // Move in the flee direction
-      await this.actionTranslator.executeAction({
-        type: 'move_forward',
-        parameters: {
-          distance: this.config.maxFleeDistance,
-          direction: fleeDirection,
-        },
-        timeout: 10000,
-      });
+      if (fleeTarget) {
+        await this.actionTranslator.executeAction({
+          type: 'navigate',
+          parameters: {
+            target: fleeTarget,
+            range: 2,
+            sprint: true,
+          },
+          timeout: 12000,
+        });
+      } else {
+        await this.actionTranslator.executeAction({
+          type: 'move_forward',
+          parameters: {
+            distance: this.config.maxFleeDistance,
+            direction: fleeDirection,
+          },
+          timeout: 10000,
+        });
+      }
 
-      console.log('✅ Flee action completed');
+      if (this.shouldLog('flee-complete', this.logThrottleMs)) {
+        console.log('[SafetyMonitor] ✅ Flee action completed');
+      }
     } catch (error) {
       console.error('Flee action failed:', error);
     }
@@ -305,9 +370,13 @@ export class AutomaticSafetyMonitor extends EventEmitter {
     if (block && block.type !== 0) {
       // Block type 0 is air
       if (block.name.includes('water')) {
-        console.log(
-          `💧 Bot is in water block: ${block.name} at ${pos.x.toFixed(1)}, ${pos.y.toFixed(1)}, ${pos.z.toFixed(1)}`
-        );
+        if (this.shouldLog('water-block', this.logThrottleMs)) {
+          console.log(
+            `[SafetyMonitor] 💧 Bot is in water block: ${block.name} at ${pos.x.toFixed(
+              1
+            )}, ${pos.y.toFixed(1)}, ${pos.z.toFixed(1)}`
+          );
+        }
         return true;
       }
     }
@@ -319,9 +388,13 @@ export class AutomaticSafetyMonitor extends EventEmitter {
           const checkPos = pos.offset(dx, dy, dz);
           const checkBlock = this.bot.blockAt(checkPos);
           if (checkBlock && checkBlock.name.includes('water')) {
-            console.log(
-              `💧 Bot is near water block: ${checkBlock.name} at ${checkPos.x.toFixed(1)}, ${checkPos.y.toFixed(1)}, ${checkPos.z.toFixed(1)}`
-            );
+            if (this.shouldLog('water-near', this.logThrottleMs)) {
+              console.log(
+                `[SafetyMonitor] 💧 Bot is near water block: ${checkBlock.name} at ${checkPos.x.toFixed(
+                  1
+                )}, ${checkPos.y.toFixed(1)}, ${checkPos.z.toFixed(1)}`
+              );
+            }
             return true;
           }
         }
@@ -666,9 +739,9 @@ export class AutomaticSafetyMonitor extends EventEmitter {
     const pitThreshold = 8; // Number of walls needed to consider it a pit
     const isPit = wallCount >= pitThreshold;
 
-    if (isPit) {
+    if (isPit && this.shouldLog('pit-detected', this.logThrottleMs)) {
       console.log(
-        `🕳️ Bot appears to be in a pit with ${wallCount} walls above`
+        `[SafetyMonitor] 🕳️ Bot appears to be in a pit with ${wallCount} walls above`
       );
     }
 
@@ -724,16 +797,22 @@ export class AutomaticSafetyMonitor extends EventEmitter {
     }
 
     if (bestEscapePos) {
-      console.log(
-        `🛤️ Found escape position: ${bestEscapePos.x.toFixed(1)}, ${bestEscapePos.y.toFixed(1)}, ${bestEscapePos.z.toFixed(1)}`
-      );
+      if (this.shouldLog('pit-escape', this.logThrottleMs)) {
+        console.log(
+          `[SafetyMonitor] 🛤️ Found escape position: ${bestEscapePos.x.toFixed(
+            1
+          )}, ${bestEscapePos.y.toFixed(1)}, ${bestEscapePos.z.toFixed(1)}`
+        );
+      }
       return bestEscapePos;
     }
 
     // If no good escape found, try to go up
-    console.log(
-      `⚠️ No good escape found, trying to go up from current position`
-    );
+    if (this.shouldLog('pit-no-escape', this.logThrottleMs)) {
+      console.log(
+        `[SafetyMonitor] ⚠️ No good escape found, trying to go up from current position`
+      );
+    }
     return { x: pos.x, y: pos.y + 3, z: pos.z };
   }
 
@@ -745,22 +824,33 @@ export class AutomaticSafetyMonitor extends EventEmitter {
     let totalX = 0,
       totalZ = 0;
 
-    console.log(
-      `🏃 Calculating flee direction from position: ${botPos.x.toFixed(1)}, ${botPos.y.toFixed(1)}, ${botPos.z.toFixed(1)}`
-    );
+    if (this.shouldLog('flee-direction', this.logThrottleMs)) {
+      console.log(
+        `[SafetyMonitor] 🏃 Calculating flee direction from position: ${botPos.x.toFixed(
+          1
+        )}, ${botPos.y.toFixed(1)}, ${botPos.z.toFixed(1)}`
+      );
+    }
 
     // Enhanced water navigation with intelligent strategy selection and buoyancy
     if (this.isInWater()) {
       const waterEnv = this.analyzeWaterEnvironment();
       const waterStrategy = this.selectWaterNavigationStrategy(waterEnv);
 
-      console.log(`🌊 Water navigation strategy: ${waterStrategy.strategy}`, {
-        reasoning: waterStrategy.reasoning,
-        waterDepth: waterEnv.waterDepth,
-        hasCurrent: waterEnv.hasCurrent,
-        safeSurfaces: waterEnv.safeSurfacePositions.length,
-        buoyancyStrategy: waterStrategy.buoyancyStrategy,
-      });
+      const strategyKey = `${waterStrategy.strategy}:${waterStrategy.buoyancyStrategy}:${Math.round(
+        waterEnv.waterDepth
+      )}:${waterEnv.hasCurrent ? 'current' : 'still'}`;
+      const now = Date.now();
+      if (
+        this.lastWaterStrategyKey !== strategyKey ||
+        now - this.lastWaterStrategyLogAt > this.waterLogThrottleMs
+      ) {
+        console.log(
+          `[SafetyMonitor] 🌊 WaterNav ${waterStrategy.strategy} (${waterStrategy.buoyancyStrategy}) depth=${waterEnv.waterDepth} current=${waterEnv.hasCurrent} safeSurfaces=${waterEnv.safeSurfacePositions.length}`
+        );
+        this.lastWaterStrategyKey = strategyKey;
+        this.lastWaterStrategyLogAt = now;
+      }
 
       const fleeVector = {
         x: waterStrategy.targetPosition.x - botPos.x,
@@ -774,26 +864,45 @@ export class AutomaticSafetyMonitor extends EventEmitter {
           case 'float_up':
             // Emphasize upward movement for surface escape
             fleeVector.y = Math.max(fleeVector.y, waterEnv.waterDepth * 0.5);
-            console.log(`🆙 Applying buoyancy - emphasizing upward movement`);
+            if (this.observationLogDebug && this.shouldLog('buoyancy-float', this.logThrottleMs)) {
+              console.log(
+                '[SafetyMonitor] 🆙 Applying buoyancy - emphasizing upward movement'
+              );
+            }
             break;
           case 'controlled_sink':
             // Reduce upward movement for controlled descent
             fleeVector.y = Math.min(fleeVector.y, waterEnv.waterDepth * 0.2);
-            console.log(
-              `⚖️ Applying controlled buoyancy - moderating movement`
-            );
+            if (this.observationLogDebug && this.shouldLog('buoyancy-sink', this.logThrottleMs)) {
+              console.log(
+                '[SafetyMonitor] ⚖️ Applying controlled buoyancy - moderating movement'
+              );
+            }
             break;
           case 'neutral_buoyancy':
             // Balance movement to maintain current depth
             fleeVector.y = 0;
-            console.log(`🔄 Applying neutral buoyancy - maintaining depth`);
+            if (this.observationLogDebug && this.shouldLog('buoyancy-neutral', this.logThrottleMs)) {
+              console.log(
+                '[SafetyMonitor] 🔄 Applying neutral buoyancy - maintaining depth'
+              );
+            }
             break;
         }
       }
 
-      console.log(
-        `💧 Water navigation - ${waterStrategy.strategy.replace('_', ' ')} with ${waterStrategy.buoyancyStrategy}: ${waterStrategy.targetPosition.x.toFixed(1)}, ${waterStrategy.targetPosition.y.toFixed(1)}, ${waterStrategy.targetPosition.z.toFixed(1)}`
-      );
+      if (this.observationLogDebug && this.shouldLog('water-nav-target', this.logThrottleMs)) {
+        console.log(
+          `[SafetyMonitor] 💧 Water navigation - ${waterStrategy.strategy.replace(
+            '_',
+            ' '
+          )} with ${waterStrategy.buoyancyStrategy}: ${waterStrategy.targetPosition.x.toFixed(
+            1
+          )}, ${waterStrategy.targetPosition.y.toFixed(1)}, ${waterStrategy.targetPosition.z.toFixed(
+            1
+          )}`
+        );
+      }
 
       // Normalize the vector
       const magnitude = Math.sqrt(
@@ -811,7 +920,9 @@ export class AutomaticSafetyMonitor extends EventEmitter {
     // Check if we're in a pit or low area and need to move upward
     const isInPit = this.checkIfInPit();
     if (isInPit) {
-      console.log(`🕳️ In pit - moving upward to escape`);
+      if (this.shouldLog('pit-up', this.logThrottleMs)) {
+        console.log('[SafetyMonitor] 🕳️ In pit - moving upward to escape');
+      }
       const escapePos = this.findEscapePosition();
       const fleeVector = {
         x: escapePos.x - botPos.x,
@@ -910,6 +1021,72 @@ export class AutomaticSafetyMonitor extends EventEmitter {
     // Adjust based on distance (closer = more threatening)
     const distanceFactor = Math.max(0, 1 - distance / 10);
     return baseThreat * distanceFactor;
+  }
+
+  private shouldLog(key: string, intervalMs: number): boolean {
+    const now = Date.now();
+    const last = this.lastLogAt.get(key) ?? 0;
+    if (now - last < intervalMs) return false;
+    this.lastLogAt.set(key, now);
+    return true;
+  }
+
+  private shouldTriggerEmergency(reason: string, context: any): boolean {
+    const entity = context?.entity ?? context?.threats?.[0]?.type;
+    const entityId = context?.entityId;
+    const key = entityId ? `${reason}:${entityId}` : entity ? `${reason}:${entity}` : reason;
+    const now = Date.now();
+    const last = this.lastEmergencyAt.get(key) ?? 0;
+    if (now - last < this.emergencyCooldownMs) return false;
+    this.lastEmergencyAt.set(key, now);
+    return true;
+  }
+
+  private getEntityKey(entity: any): string {
+    if (entity?.id != null) return `${entity.id}`;
+    const name = entity?.name ?? 'unknown';
+    const pos = entity?.position;
+    if (pos) {
+      return `${name}:${pos.x.toFixed(1)},${pos.y.toFixed(1)},${pos.z.toFixed(1)}`;
+    }
+    return `${name}:unknown`;
+  }
+
+  private shouldHandleEntity(entityKey: string, distance: number): boolean {
+    const now = Date.now();
+    const last = this.lastEntityObservation.get(entityKey);
+    if (last) {
+      const age = now - last.lastSeen;
+      const movedCloser = last.lastDistance - distance > this.entityDistanceDelta;
+      if (age < this.entityObservationCooldownMs && !movedCloser) {
+        return false;
+      }
+    }
+    this.lastEntityObservation.set(entityKey, { lastSeen: now, lastDistance: distance });
+    return true;
+  }
+
+  private computeFleeTarget(
+    currentPos: Vec3,
+    direction: { x: number; y: number; z: number }
+  ): Vec3 | null {
+    const magnitude = Math.sqrt(
+      direction.x ** 2 + direction.y ** 2 + direction.z ** 2
+    );
+    if (!Number.isFinite(magnitude) || magnitude === 0) return null;
+
+    const scale = this.config.maxFleeDistance;
+    const target = new Vec3(
+      currentPos.x + direction.x * scale,
+      currentPos.y + direction.y * scale,
+      currentPos.z + direction.z * scale
+    );
+
+    const block = this.bot.blockAt(target);
+    if (block && block.boundingBox === 'block') {
+      target.y += 1;
+    }
+    return target;
   }
 
   /**

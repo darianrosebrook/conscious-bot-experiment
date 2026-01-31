@@ -182,6 +182,10 @@ const memorySystem = {
   },
 };
 
+let systemReady = process.env.SYSTEM_READY_ON_BOOT === '1';
+let readyAt: string | null = systemReady ? new Date().toISOString() : null;
+let readySource: string | null = systemReady ? 'env' : null;
+
 // Health check endpoint
 app.get('/health', (req, res) => {
   res.json({
@@ -196,6 +200,21 @@ app.get('/health', (req, res) => {
       endpoints: ['/enhanced/status', '/enhanced/seed', '/enhanced/database'],
     },
   });
+});
+
+// Startup readiness endpoint
+app.get('/system/ready', (_req, res) => {
+  res.json({ ready: systemReady, readyAt, source: readySource });
+});
+
+app.post('/system/ready', (req, res) => {
+  if (!systemReady) {
+    systemReady = true;
+    readyAt = new Date().toISOString();
+    readySource =
+      typeof req.body?.source === 'string' ? req.body.source : 'startup';
+  }
+  res.json({ ready: systemReady, readyAt, accepted: true });
 });
 
 // Get memory system state

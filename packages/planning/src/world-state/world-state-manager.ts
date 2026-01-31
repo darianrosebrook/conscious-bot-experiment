@@ -1,5 +1,6 @@
 import { EventEmitter } from 'events';
 import { POLL_TIMEOUT_MS } from '../modules/timeout-policy';
+import { isSystemReady } from '../startup-barrier';
 
 type Vec3 = { x: number; y: number; z: number };
 
@@ -29,6 +30,7 @@ export class WorldStateManager extends EventEmitter {
   private baseUrl: string;
   private snapshot: WorldStateSnapshot = { ts: 0, connected: false };
   private pollHandle?: NodeJS.Timeout;
+  private lastNotReadyLogAt = 0;
 
   constructor(baseUrl: string) {
     super();
@@ -59,6 +61,16 @@ export class WorldStateManager extends EventEmitter {
   }
 
   async pollOnce(): Promise<void> {
+    if (!isSystemReady()) {
+      const now = Date.now();
+      if (now - this.lastNotReadyLogAt > 5000) {
+        console.log(
+          'WorldStateManager waiting for system readiness; poll skipped'
+        );
+        this.lastNotReadyLogAt = now;
+      }
+      return;
+    }
     try {
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), POLL_TIMEOUT_MS);

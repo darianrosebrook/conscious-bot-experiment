@@ -205,11 +205,21 @@ let isConnecting = false;
 let isRunningPlanningCycle = false;
 let viewerActive = false;
 let autoConnectInterval: NodeJS.Timeout | null = null;
+let systemReady = process.env.SYSTEM_READY_ON_BOOT === '1';
+let readyAt: string | null = systemReady ? new Date().toISOString() : null;
+let readySource: string | null = systemReady ? 'env' : null;
+let pendingThoughtGeneration = false;
 
 /**
  * Start automatic thought generation from bot experiences
  */
 function startThoughtGeneration() {
+  if (!systemReady) {
+    pendingThoughtGeneration = true;
+    console.log('⏸️ Waiting for system readiness; autonomous loop paused');
+    return;
+  }
+
   if (thoughtGenerationInterval) {
     clearInterval(thoughtGenerationInterval);
   }
@@ -261,6 +271,18 @@ function startThoughtGeneration() {
   }, 15000); // Every 15 seconds
 
   console.log('✅ Autonomous planning loop started (15s intervals)');
+}
+
+function tryStartThoughtGeneration(reason: string) {
+  if (!systemReady) {
+    pendingThoughtGeneration = true;
+    console.log(
+      `⏸️ Deferring autonomous planning loop until system readiness (${reason})`
+    );
+    return;
+  }
+  pendingThoughtGeneration = false;
+  startThoughtGeneration();
 }
 
 /**
@@ -344,7 +366,7 @@ function setupBotStateWebSocket() {
 
     // Start thought generation when bot spawns
     console.log('🤖 Bot spawned, starting thought generation...');
-    startThoughtGeneration();
+    tryStartThoughtGeneration('bot spawned');
   });
 
   minecraftInterface.botAdapter.on('warning', (data) => {
@@ -509,6 +531,29 @@ app.get('/health', (req, res) => {
     connectionState: minecraftInterface?.botAdapter.getConnectionState(),
     isAlive,
   });
+});
+
+// Startup readiness endpoint
+app.get('/system/ready', (_req, res) => {
+  res.json({ ready: systemReady, readyAt, source: readySource });
+});
+
+app.post('/system/ready', (req, res) => {
+  if (!systemReady) {
+    systemReady = true;
+    readyAt = new Date().toISOString();
+    readySource =
+      typeof req.body?.source === 'string' ? req.body.source : 'startup';
+  }
+
+  if (pendingThoughtGeneration) {
+    const bot = minecraftInterface?.botAdapter.getBot();
+    if (bot?.entity) {
+      tryStartThoughtGeneration('system ready');
+    }
+  }
+
+  res.json({ ready: systemReady, readyAt, accepted: true });
 });
 
 // Set world seed at runtime

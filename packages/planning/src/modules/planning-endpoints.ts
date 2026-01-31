@@ -10,6 +10,7 @@
 import { Router, Request, Response } from 'express';
 import { MinecraftExecutor } from '../reactive-executor/minecraft-executor';
 import { PlanStatus, PlanStepStatus, ActionType } from '../types';
+import { getSystemReadyState, markSystemReady } from '../startup-barrier';
 
 export interface PlanningSystem {
   goalFormulation: {
@@ -51,6 +52,18 @@ export function createPlanningEndpoints(
       uptime: process.uptime(),
       memory: process.memoryUsage(),
     });
+  });
+
+  // GET/POST /system/ready - Startup readiness barrier
+  router.get('/system/ready', (_req: Request, res: Response) => {
+    res.json(getSystemReadyState());
+  });
+
+  router.post('/system/ready', (req: Request, res: Response) => {
+    const source =
+      typeof req.body?.source === 'string' ? req.body.source : 'startup';
+    markSystemReady(source);
+    res.json({ ...getSystemReadyState(), accepted: true });
   });
 
   // GET /planner - Get planning system status

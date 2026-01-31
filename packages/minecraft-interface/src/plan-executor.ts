@@ -9,7 +9,7 @@
 
 import { EventEmitter } from 'events';
 import { Bot } from 'mineflayer';
-import { Plan, PlanStep, PlanningContext } from './types';
+import { Plan, PlanStep, PlanningContext, MinecraftAction } from './types';
 
 // Minimal type definitions to avoid circular dependency
 export interface IntegratedPlanningCoordinator {
@@ -53,6 +53,7 @@ export class PlanExecutor extends EventEmitter {
   private currentStepIndex = 0;
   private isExecuting = false;
   private executionStartTime = 0;
+  private lastValidationLogAt = 0;
   private performanceMetrics: PerformanceMetrics;
 
   constructor(
@@ -279,6 +280,33 @@ export class PlanExecutor extends EventEmitter {
         do {
           stepResult = await this.executeStep(step);
 
+          if (
+            !stepResult.success &&
+            stepResult.error &&
+            this.isNonRetriableError(stepResult.error)
+          ) {
+            break;
+          }
+
+          if (
+            !stepResult.success &&
+            stepResult.error &&
+            this.isNavigationBusyError(stepResult.error) &&
+            retryCount < maxRetries
+          ) {
+            retryCount++;
+            const backoffMs = Math.min(2000, 500 * retryCount);
+            this.emit('stepRetry', {
+              step,
+              stepIndex,
+              retryCount,
+              error: stepResult.error,
+              timestamp: Date.now(),
+            });
+            await new Promise((resolve) => setTimeout(resolve, backoffMs));
+            continue;
+          }
+
           if (!stepResult.success && retryCount < maxRetries) {
             retryCount++;
             this.emit('stepRetry', {
@@ -396,8 +424,28 @@ export class PlanExecutor extends EventEmitter {
       throw new Error('ActionTranslator not available');
     }
 
+    const validation = this.validateAndNormalizeStep(step);
+    if (!validation.ok) {
+      if (this.shouldLogValidation()) {
+        console.warn(
+          `[PlanExecutor] Invalid plan step: ${validation.error} (type=${step.action?.type ?? 'none'})`
+        );
+      }
+      return {
+        success: false,
+        action: validation.fallbackAction,
+        startTime: Date.now(),
+        endTime: Date.now(),
+        error: validation.error,
+        data: {
+          reasonCode: 'INVALID_PLAN_STEP',
+          validation: validation.details,
+        },
+      };
+    }
+
     return this.recordOperation('stepExecution', async () => {
-      return await this.actionTranslator!.executePlanStep(step);
+      return await this.actionTranslator!.executePlanStep(validation.step);
     });
   }
 
@@ -746,6 +794,98 @@ export class PlanExecutor extends EventEmitter {
     // This would be called periodically to measure actual network latency
     // For now, it's a placeholder method
     this.networkLatency = Math.random() * 100 + 10; // Simulate 10-110ms latency
+  }
+
+  private isNavigationBusyError(error: string): boolean {
+    return (
+      error.includes('Already navigating') ||
+      error.includes('Debounced duplicate navigate')
+    );
+  }
+
+  private isNonRetriableError(error: string): boolean {
+    return (
+      error.includes('Invalid navigation target') ||
+      error.includes('Step action is required')
+    );
+  }
+
+  private validateAndNormalizeStep(step: PlanStep): {
+    ok: boolean;
+    step: PlanStep;
+    error?: string;
+    details?: Record<string, any>;
+    fallbackAction: MinecraftAction;
+  } {
+    const fallbackAction: MinecraftAction = {
+      type: 'wait',
+      parameters: { durationMs: 0 },
+    };
+
+    if (!step.action || !step.action.type) {
+      return {
+        ok: false,
+        step,
+        error: 'Step action is required',
+        details: { stepId: step.id },
+        fallbackAction,
+      };
+    }
+
+    const actionType = step.action.type.toLowerCase();
+    if (actionType === 'navigate' || actionType === 'move_to') {
+      const params: any = step.action.parameters ?? {};
+      const raw =
+        params.target ??
+        params.position ??
+        params.destination ??
+        params.goal ??
+        params;
+      let x: number | null = null;
+      let y: number | null = null;
+      let z: number | null = null;
+
+      if (Array.isArray(raw) && raw.length >= 3) {
+        x = Number(raw[0]);
+        y = Number(raw[1]);
+        z = Number(raw[2]);
+      } else if (raw && typeof raw === 'object') {
+        x = Number((raw as any).x);
+        y = Number((raw as any).y);
+        z = Number((raw as any).z);
+      }
+
+      if (![x, y, z].every((n) => Number.isFinite(n))) {
+        return {
+          ok: false,
+          step,
+          error: 'Invalid navigation target',
+          details: { actionType, stepId: step.id },
+          fallbackAction,
+        };
+      }
+
+      const normalized: PlanStep = {
+        ...step,
+        action: {
+          ...step.action,
+          parameters: {
+            ...params,
+            target: { x, y, z },
+          },
+        },
+      };
+      return { ok: true, step: normalized, fallbackAction };
+    }
+
+    return { ok: true, step, fallbackAction };
+  }
+
+  private shouldLogValidation(): boolean {
+    const now = Date.now();
+    if (now - this.lastValidationLogAt < 1000) return false;
+    this.lastValidationLogAt = now;
+    return true;
   }
 
   // CPU usage tracking

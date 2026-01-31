@@ -72,6 +72,11 @@ export class WaterNavigationManager extends EventEmitter<WaterNavigationEvents> 
   private currentWaterEnv: WaterEnvironment | null = null;
   private lastWaterAnalysis = 0;
   private buoyancyState: BuoyancyStrategy = 'neutral_buoyancy';
+  private observationLogDebug =
+    process.env.OBSERVATION_LOG_DEBUG === '1';
+  private waterLogThrottleMs = 5000;
+  private lastWaterLogAt = new Map<string, number>();
+  private lastStrategyKey: string | null = null;
   private navigationHistory: Array<{
     strategy: WaterNavigationStrategy;
     success: boolean;
@@ -660,7 +665,9 @@ export class WaterNavigationManager extends EventEmitter<WaterNavigationEvents> 
 
     this.buoyancyState = strategy;
 
-    console.log(`🆙 Applying buoyancy strategy: ${strategy}`);
+    if (this.shouldLog('buoyancy', this.waterLogThrottleMs)) {
+      console.log(`🆙 WaterNav buoyancy strategy: ${strategy}`);
+    }
 
     // In a real implementation, this would control bot movement patterns
     // For now, we just emit the strategy change
@@ -672,22 +679,26 @@ export class WaterNavigationManager extends EventEmitter<WaterNavigationEvents> 
     // Simulate different movement patterns based on buoyancy strategy
     switch (strategy) {
       case 'float_up':
-        // Emphasize upward movement
-        console.log('🆙 Buoyancy: Float up - emphasizing upward movement');
+        if (this.observationLogDebug) {
+          console.log('🆙 Buoyancy: Float up - emphasizing upward movement');
+        }
         break;
       case 'controlled_sink':
-        // Moderate movement to control descent
-        console.log(
-          '⚖️ Buoyancy: Controlled sink - moderating vertical movement'
-        );
+        if (this.observationLogDebug) {
+          console.log(
+            '⚖️ Buoyancy: Controlled sink - moderating vertical movement'
+          );
+        }
         break;
       case 'neutral_buoyancy':
-        // Maintain current depth
-        console.log('🔄 Buoyancy: Neutral - maintaining current depth');
+        if (this.observationLogDebug) {
+          console.log('🔄 Buoyancy: Neutral - maintaining current depth');
+        }
         break;
       case 'active_swimming':
-        // Active propulsion
-        console.log('🏊 Buoyancy: Active swimming - full propulsion control');
+        if (this.observationLogDebug) {
+          console.log('🏊 Buoyancy: Active swimming - full propulsion control');
+        }
         break;
     }
   }
@@ -700,7 +711,14 @@ export class WaterNavigationManager extends EventEmitter<WaterNavigationEvents> 
     // In a real implementation, this would execute specific movement patterns
     // For now, we simulate different execution strategies
 
-    console.log(`🏊 Executing movement strategy: ${strategy}`);
+    const strategyKey = `${strategy}:${this.buoyancyState}`;
+    if (
+      this.lastStrategyKey !== strategyKey ||
+      this.shouldLog('water-strategy', this.waterLogThrottleMs)
+    ) {
+      console.log(`🏊 WaterNav strategy: ${strategy}`);
+      this.lastStrategyKey = strategyKey;
+    }
 
     switch (strategy) {
       case 'surface_escape':
@@ -718,6 +736,14 @@ export class WaterNavigationManager extends EventEmitter<WaterNavigationEvents> 
       default:
         return { success: false, reason: 'Unknown strategy' };
     }
+  }
+
+  private shouldLog(key: string, throttleMs: number): boolean {
+    const now = Date.now();
+    const last = this.lastWaterLogAt.get(key) ?? 0;
+    if (now - last < throttleMs) return false;
+    this.lastWaterLogAt.set(key, now);
+    return true;
   }
 
   private async executeSurfaceEscape(

@@ -211,6 +211,16 @@ class CognitiveStreamLogger {
 // Initialize the cognitive stream logger
 const cognitiveLogger = CognitiveStreamLogger.getInstance();
 
+const observationLogDebug = process.env.OBSERVATION_LOG_DEBUG === '1';
+
+function logObservation(message: string, payload?: unknown): void {
+  if (observationLogDebug && payload !== undefined) {
+    console.log(message, payload);
+  } else {
+    console.log(message);
+  }
+}
+
 const llmInterface = new LLMInterface();
 const observationReasoner = new ObservationReasoner(llmInterface, {
   disabled: process.env.COGNITION_LLM_OBSERVATION_DISABLED === 'true',
@@ -1277,6 +1287,10 @@ socialAwarenessManager.on('chatConsiderationGenerated', (result: any) => {
   sendThoughtToCognitiveStream(chatConsiderationThought);
 });
 
+let systemReady = process.env.SYSTEM_READY_ON_BOOT === '1';
+let readyAt: string | null = systemReady ? new Date().toISOString() : null;
+let readySource: string | null = systemReady ? 'env' : null;
+
 // Health check endpoint
 app.get('/health', (req, res) => {
   res.json({
@@ -1285,6 +1299,21 @@ app.get('/health', (req, res) => {
     timestamp: Date.now(),
     version: '0.1.0',
   });
+});
+
+// Startup readiness endpoint
+app.get('/system/ready', (_req, res) => {
+  res.json({ ready: systemReady, readyAt, source: readySource });
+});
+
+app.post('/system/ready', (req, res) => {
+  if (!systemReady) {
+    systemReady = true;
+    readyAt = new Date().toISOString();
+    readySource =
+      typeof req.body?.source === 'string' ? req.body.source : 'startup';
+  }
+  res.json({ ready: systemReady, readyAt, accepted: true });
 });
 
 // Start thought generation endpoint
@@ -1469,7 +1498,7 @@ app.post('/process', async (req, res) => {
   try {
     const { type, content, metadata } = req.body;
 
-    console.log(`Processing ${type} request:`, { content, metadata });
+    logObservation(`Processing ${type} request`, { content, metadata });
 
     if (type === 'intrusion') {
       // Use enhanced intrusive thought processor to generate internal thought
@@ -1523,7 +1552,7 @@ app.post('/process', async (req, res) => {
       });
     } else if (type === 'environmental_awareness') {
       // Process environmental awareness (entity detection, events, etc.)
-      console.log('Processing environmental awareness:', { content, metadata });
+      logObservation('Processing environmental awareness', { content, metadata });
 
       try {
         // The minecraft interface sends data directly in req.body, not in req.body.observation
@@ -1699,7 +1728,7 @@ app.post('/process', async (req, res) => {
       }
     } else if (type === 'social_interaction') {
       // Process social interaction (chat from players, etc.)
-      console.log('Processing social interaction:', { content, metadata });
+      logObservation('Processing social interaction', { content, metadata });
 
       try {
         // Create an internal thought about the social interaction
@@ -1800,7 +1829,7 @@ app.post('/process', async (req, res) => {
       }
     } else if (type === 'environmental_event') {
       // Process environmental events (block changes, item pickups, health changes, etc.)
-      console.log('Processing environmental event:', { content, metadata });
+      logObservation('Processing environmental event', { content, metadata });
 
       try {
         // Create an internal thought about the environmental event
@@ -1889,7 +1918,7 @@ app.post('/process', async (req, res) => {
       }
     } else if (type === 'external_chat') {
       // Process external chat message
-      console.log('Processing external chat message:', { content, metadata });
+      logObservation('Processing external chat message', { content, metadata });
 
       try {
         // Get actual inventory data

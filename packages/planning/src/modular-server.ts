@@ -129,10 +129,13 @@ export class EnhancedRegistry {
 }
 import { WorldStateManager } from './world-state/world-state-manager';
 import { WorldKnowledgeIntegrator } from './world-state/world-knowledge-integrator';
+import {
+  isSystemReady,
+  waitForSystemReady,
+} from './startup-barrier';
 
 // Centralized Minecraft endpoint and resilient HTTP utilities
 const worldStateManager = new WorldStateManager(MC_ENDPOINT);
-worldStateManager.startPolling(3000); // Poll every 3 seconds for testing
 const worldKnowledge = new WorldKnowledgeIntegrator(worldStateManager);
 worldStateManager.on('updated', (snapshot) => {
   try {
@@ -141,6 +144,19 @@ worldStateManager.on('updated', (snapshot) => {
     console.warn('WorldKnowledge update failed:', (e as any)?.message);
   }
 });
+
+function startWorldStatePolling() {
+  worldStateManager.startPolling(3000); // Poll every 3 seconds for testing
+}
+
+if (isSystemReady()) {
+  startWorldStatePolling();
+} else {
+  waitForSystemReady().then(() => {
+    console.log('✅ System readiness received; starting world state polling');
+    startWorldStatePolling();
+  });
+}
 
 // simple low-discrepancy sampler for exploration (deterministic per tick)
 function halton(index: number, base: number) {
@@ -3472,47 +3488,59 @@ async function startServer() {
     await serverConfig.start();
     console.log('✅ Server started successfully');
 
-    // Start autonomous task executor (singleton; supports hot-reload)
-    console.log('🚀 Starting autonomous task executor...');
-    console.log(
-      '📊 Enhanced task integration has',
-      enhancedTaskIntegration.getActiveTasks().length,
-      'active tasks'
-    );
-    console.log('🔧 Initializing autonomous executor state...');
-    if (global.__planningInterval) clearInterval(global.__planningInterval);
-    global.__planningInterval = setInterval(async () => {
-      try {
-        console.log('⏰ Autonomous executor timer fired...');
-        console.log(
-          '📊 Current task count:',
-          enhancedTaskIntegration.getActiveTasks().length
-        );
-        const st = global.__planningExecutorState!;
-        // exponential backoff while breaker is open
-        if (st?.breaker === 'open') {
-          const elapsed = Date.now() - (st.lastAttempt || 0);
-          if (elapsed < BOT_BREAKER_OPEN_MS) return;
-          st.breaker = 'half-open';
-        }
+    const startAutonomousExecutor = () => {
+      // Start autonomous task executor (singleton; supports hot-reload)
+      console.log('🚀 Starting autonomous task executor...');
+      console.log(
+        '📊 Enhanced task integration has',
+        enhancedTaskIntegration.getActiveTasks().length,
+        'active tasks'
+      );
+      console.log('🔧 Initializing autonomous executor state...');
+      if (global.__planningInterval) clearInterval(global.__planningInterval);
+      global.__planningInterval = setInterval(async () => {
         try {
-          await autonomousTaskExecutor();
+          console.log('⏰ Autonomous executor timer fired...');
+          console.log(
+            '📊 Current task count:',
+            enhancedTaskIntegration.getActiveTasks().length
+          );
+          const st = global.__planningExecutorState!;
+          // exponential backoff while breaker is open
+          if (st?.breaker === 'open') {
+            const elapsed = Date.now() - (st.lastAttempt || 0);
+            if (elapsed < BOT_BREAKER_OPEN_MS) return;
+            st.breaker = 'half-open';
+          }
+          try {
+            await autonomousTaskExecutor();
+          } catch (error) {
+            const s = global.__planningExecutorState!;
+            s.failures = Math.min(s.failures + 1, 100);
+            const backoff = Math.min(
+              2 ** s.failures * 250,
+              EXECUTOR_MAX_BACKOFF_MS
+            );
+            console.warn(
+              `Autonomous executor error (${s.failures}); backoff ${backoff}ms`
+            );
+            await new Promise((r) => setTimeout(r, backoff));
+          }
         } catch (error) {
-          const s = global.__planningExecutorState!;
-          s.failures = Math.min(s.failures + 1, 100);
-          const backoff = Math.min(
-            2 ** s.failures * 250,
-            EXECUTOR_MAX_BACKOFF_MS
-          );
-          console.warn(
-            `Autonomous executor error (${s.failures}); backoff ${backoff}ms`
-          );
-          await new Promise((r) => setTimeout(r, backoff));
+          console.error('[MCP] Failed to start autonomous task executor:', error);
         }
-      } catch (error) {
-        console.error('[MCP] Failed to start autonomous task executor:', error);
-      }
-    }, EXECUTOR_POLL_MS);
+      }, EXECUTOR_POLL_MS);
+    };
+
+    if (isSystemReady()) {
+      startAutonomousExecutor();
+    } else {
+      console.log('⏸️ Waiting for system readiness before starting executor...');
+      waitForSystemReady().then(() => {
+        console.log('✅ System readiness received; starting executor');
+        startAutonomousExecutor();
+      });
+    }
 
     // Start cognitive thought processor (DISABLED - using event-driven system instead)
     // try {
