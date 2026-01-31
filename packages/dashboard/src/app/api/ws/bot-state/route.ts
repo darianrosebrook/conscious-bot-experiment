@@ -29,85 +29,72 @@ export const GET = async (req: NextRequest) => {
     const isSSE = accept?.includes('text/event-stream');
     const isJSON = accept?.includes('application/json');
 
-    // If it's a JSON request, return a single response
+    // If it's a JSON request, return a single response (degraded state on timeout/errors)
     if (isJSON) {
+      const BOT_STATE_TIMEOUT_MS = 4000;
+      const opts = {
+        method: 'GET' as const,
+        headers: { 'Content-Type': 'application/json' },
+        signal: AbortSignal.timeout(BOT_STATE_TIMEOUT_MS),
+      };
+
+      let minecraftData: unknown = null;
+      let cognitionData: unknown = null;
+      let worldData: unknown = null;
+
       try {
-        // Fetch bot state from Minecraft interface
-        const minecraftResponse = await fetch('http://localhost:3005/state', {
-          method: 'GET',
-          headers: { 'Content-Type': 'application/json' },
-          signal: AbortSignal.timeout(5000), // 5 second timeout
-        });
-
-        // Fetch cognition state
-        const cognitionResponse = await fetch('http://localhost:3003/state', {
-          method: 'GET',
-          headers: { 'Content-Type': 'application/json' },
-          signal: AbortSignal.timeout(5000), // 5 second timeout
-        });
-
-        // Fetch world state
-        const worldResponse = await fetch('http://localhost:3004/state', {
-          method: 'GET',
-          headers: { 'Content-Type': 'application/json' },
-          signal: AbortSignal.timeout(5000), // 5 second timeout
-        });
-
-        const minecraftData = minecraftResponse.ok
-          ? await minecraftResponse.json()
-          : null;
-
-        const cognitionData = cognitionResponse.ok
-          ? await cognitionResponse.json()
-          : null;
-        const worldData = worldResponse.ok ? await worldResponse.json() : null;
-
-        const botState = {
-          type: 'bot_state_update',
-          timestamp: Date.now(),
-          data: {
-            connected: minecraftData?.success || false,
-            inventory: minecraftData?.data?.worldState?.inventory?.items || minecraftData?.data?.data?.inventory?.items || [],
-            position: minecraftData?.data?.worldState?.player?.position ?? minecraftData?.data?.data?.position ?? null,
-            vitals: minecraftData?.data?.worldState
-              ? {
-                  health: minecraftData.data.worldState.player?.health ?? minecraftData.data.data?.health ?? 0,
-                  hunger: minecraftData.data.worldState.player?.food ?? minecraftData.data.data?.food ?? 0,
-                  stamina: 100, // Default stamina value
-                  sleep: 100, // Default sleep value
-                }
-              : null,
-            intero: {
-              stress: 20, // Default — cognition service doesn't expose interoceptive values
-              focus: 80,
-              curiosity: 75,
-            },
-            mood: 'neutral',
-            environment: worldData || null,
-            cognition: cognitionData
-              ? { ...cognitionData }
-              : { error: 'Cognition service unavailable' },
-          },
-        };
-
-        return new Response(JSON.stringify(botState), {
-          headers: {
-            'Content-Type': 'application/json',
-            'Cache-Control': 'no-cache',
-          },
-        });
-      } catch (error) {
-        console.error('Error fetching bot state for JSON request:', error);
-        return new Response(
-          JSON.stringify({ error: 'Failed to fetch bot state' }),
-          {
-            status: 500,
-            headers: {
-              'Content-Type': 'application/json',
-            },
-          }
-        );
+        const minecraftResponse = await fetch('http://localhost:3005/state', opts);
+        minecraftData = minecraftResponse.ok ? await minecraftResponse.json() : null;
+      } catch (e) {
+        if (process.env.NODE_ENV === 'development' && !(globalThis as unknown as { botStateMinecraftLogged?: boolean }).botStateMinecraftLogged) {
+          console.warn('[Dashboard] Minecraft state unavailable (timeout or error), returning degraded state');
+          (globalThis as unknown as { botStateMinecraftLogged?: boolean }).botStateMinecraftLogged = true;
+        }
       }
+
+      try {
+        const cognitionResponse = await fetch('http://localhost:3003/state', opts);
+        cognitionData = cognitionResponse.ok ? await cognitionResponse.json() : null;
+      } catch {
+        cognitionData = null;
+      }
+
+      try {
+        const worldResponse = await fetch('http://localhost:3004/state', opts);
+        worldData = worldResponse.ok ? await worldResponse.json() : null;
+      } catch {
+        worldData = null;
+      }
+
+      const m = minecraftData as { success?: boolean; data?: { worldState?: { inventory?: { items?: unknown[] }; player?: { position?: unknown; health?: number; food?: number } }; data?: { inventory?: { items?: unknown[] }; position?: unknown; health?: number; food?: number } } } | null;
+      const botState = {
+        type: 'bot_state_update',
+        timestamp: Date.now(),
+        data: {
+          connected: m?.success ?? false,
+          inventory: m?.data?.worldState?.inventory?.items ?? m?.data?.data?.inventory?.items ?? [],
+          position: m?.data?.worldState?.player?.position ?? m?.data?.data?.position ?? null,
+          vitals: m?.data?.worldState
+            ? {
+                health: m.data.worldState.player?.health ?? m.data.data?.health ?? 0,
+                hunger: m.data.worldState.player?.food ?? m.data.data?.food ?? 0,
+                stamina: 100,
+                sleep: 100,
+              }
+            : null,
+          intero: { stress: 20, focus: 80, curiosity: 75 },
+          mood: 'neutral',
+          environment: worldData ?? null,
+          cognition: cognitionData != null ? { ...(cognitionData as object) } : { error: 'Cognition service unavailable' },
+        },
+      };
+
+      return new Response(JSON.stringify(botState), {
+        headers: {
+          'Content-Type': 'application/json',
+          'Cache-Control': 'no-cache',
+        },
+      });
     }
 
     // If it's not SSE, return an error

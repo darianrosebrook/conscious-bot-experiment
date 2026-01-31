@@ -107,10 +107,16 @@ export function useCognitiveStream() {
     return Math.min(delay, 30000); // Cap at 30 seconds
   }, []);
 
-  // Initialize SSE connection with better error handling and reconnection
+  // Initialize SSE connection with better error handling and reconnection.
+  // Use absolute URL so the SSE connection targets the same origin as the page
+  // (avoids GET/POST ending up on different hosts, e.g. localhost vs 127.0.0.1).
   useEffect(() => {
     const connectEventSource = () => {
-      const url = config.routes.cognitiveStreamSSE();
+      const path = '/api/ws/cognitive-stream';
+      const url =
+        typeof window !== 'undefined'
+          ? `${window.location.origin}${path}`
+          : config.routes.cognitiveStreamSSE();
       console.log('Connecting to cognitive stream SSE:', url);
 
       try {

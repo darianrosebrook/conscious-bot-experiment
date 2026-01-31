@@ -21,6 +21,7 @@ import {
 import { useDashboardStore } from '@/stores/dashboard-store';
 import { useWebSocket } from '@/hooks/useWebSocket';
 import { useCognitiveStream } from '@/hooks/use-cognitive-stream';
+import { useBotStateSSE } from '@/hooks/use-bot-state-sse';
 import { formatTime } from '@/lib/utils';
 import { HudMeter } from '@/components/hud-meter';
 import { Section } from '@/components/section';
@@ -379,13 +380,45 @@ function ConsciousMinecraftDashboardContent() {
     console.log('Bot state WebSocket connection closed');
   }, []);
 
-  // WebSocket connection for real-time bot state updates
+  // WebSocket connection for real-time bot state updates (Minecraft interface)
   const botStateWebSocket = useWebSocket({
     url: 'ws://localhost:3005',
     onMessage: handleWebSocketMessage,
     onError: handleWebSocketError,
     onOpen: handleWebSocketOpen,
     onClose: handleWebSocketClose,
+  });
+
+  // When WebSocket is disconnected, stream bot state over SSE from dashboard API
+  const handleBotStateSSE = useCallback(
+    (msg: { data?: { connected?: boolean; inventory?: unknown[]; position?: [number, number, number] | null; vitals?: { health?: number; hunger?: number; food?: number; stamina?: number; sleep?: number } | null; intero?: { stress?: number; focus?: number; curiosity?: number }; mood?: string } }) => {
+      const d = msg?.data;
+      if (!d) return;
+      if (d.vitals || d.intero || d.mood) {
+        setHud({
+          ts: new Date().toISOString(),
+          vitals: d.vitals || { health: 20, hunger: 20, stamina: 100, sleep: 100 },
+          intero: d.intero || { stress: 20, focus: 80, curiosity: 75 },
+          mood: d.mood || 'neutral',
+        });
+      }
+      if (d.inventory) setInventory(d.inventory as Array<{ name: string; count: number; displayName: string }>);
+      setBotState({
+        position: d.position ? { x: d.position[0], y: d.position[1], z: d.position[2] } : undefined,
+        health: d.vitals?.health ?? d.vitals?.hunger ?? d.vitals?.food,
+        food: d.vitals?.hunger ?? d.vitals?.food,
+        inventory: (d.inventory as Array<{ name: string; count: number; displayName: string }>) || [],
+      });
+      setBotConnections([
+        { name: 'minecraft-bot', connected: d.connected ?? false, viewerActive: false, viewerUrl: 'http://localhost:3006' },
+      ]);
+    },
+    [setHud, setInventory, setBotState, setBotConnections]
+  );
+
+  useBotStateSSE({
+    enabled: !botStateWebSocket.isConnected,
+    onMessage: handleBotStateSSE,
   });
 
   // Use the cognitive stream hook for proper SSE connection management
@@ -702,6 +735,58 @@ function ConsciousMinecraftDashboardContent() {
     loadThoughtsFromServer,
   ]);
 
+  // Poll tasks so the list updates without refresh (SSE/push not used for tasks)
+  const TASK_POLL_MS = 15000;
+  useEffect(() => {
+    const pollTasks = async () => {
+      try {
+        const res = await fetch('/api/tasks', { signal: AbortSignal.timeout(8000) });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.tasks && Array.isArray(data.tasks)) setTasks(data.tasks);
+        }
+      } catch {
+        // Non-fatal; next poll will retry
+      }
+    };
+    const interval = setInterval(pollTasks, TASK_POLL_MS);
+    return () => clearInterval(interval);
+  }, [setTasks]);
+
+  // Poll thought history so thoughts update when SSE has no connections or drops
+  const THOUGHTS_POLL_MS = 20000;
+  useEffect(() => {
+    const mergeNewThoughts = async () => {
+      try {
+        const currentIds = new Set(useDashboardStore.getState().thoughts.map((t) => t.id));
+        const res = await fetch('/api/ws/cognitive-stream/history?limit=100', {
+          signal: AbortSignal.timeout(5000),
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+        if (!data.thoughts || !Array.isArray(data.thoughts)) return;
+        for (const t of data.thoughts) {
+          if (!t?.id || !t.content || currentIds.has(t.id)) continue;
+          currentIds.add(t.id);
+          const type = (t.type === 'self' || t.type === 'reflection' || t.type === 'intrusion' || t.type === 'intrusive' ? t.type : 'reflection') as 'self' | 'reflection' | 'intrusion' | 'intrusive';
+          const attribution = t.attribution === 'external' ? 'external' : t.attribution === 'intrusive' ? 'intrusive' : 'self';
+          addThought({
+            id: t.id,
+            ts: new Date(t.timestamp).toISOString(),
+            text: t.content,
+            type,
+            attribution,
+            thoughtType: t.metadata?.thoughtType || t.type,
+          });
+        }
+      } catch {
+        // Non-fatal; next poll will retry
+      }
+    };
+    const interval = setInterval(mergeNewThoughts, THOUGHTS_POLL_MS);
+    return () => clearInterval(interval);
+  }, [addThought]);
+
   // Periodic refresh of bot state and connection status
   useEffect(() => {
     const refreshBotState = async () => {
@@ -912,8 +997,8 @@ function ConsciousMinecraftDashboardContent() {
       }
     };
 
-    // Refresh every 60 seconds for more responsive viewer status updates
-    const interval = setInterval(refreshBotState, 60000);
+    // Refresh every 20 seconds so status/tasks/thoughts feel live without full reload
+    const interval = setInterval(refreshBotState, 20000);
     return () => clearInterval(interval);
   }, [
     setInventory,

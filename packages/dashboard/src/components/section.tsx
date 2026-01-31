@@ -43,7 +43,7 @@ export function Section({
         className={cn(
           "px-3",
           tight ? "py-2" : "py-3",
-          fullHeight && "flex-1 overflow-hidden"
+          fullHeight && "flex-1 min-h-0 overflow-y-auto flex flex-col"
         )}
       >
         {children}

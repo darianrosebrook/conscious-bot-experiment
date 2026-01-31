@@ -52,7 +52,10 @@ const ObservationTaskSchema = z.object({
 
 const ObservationActionsSchema = z.object({
   shouldRespond: z.boolean(),
-  response: z.string().min(1).optional(),
+  response: z
+    .union([z.string().min(1), z.null()])
+    .optional()
+    .transform((v) => (v ?? '') as string),
   shouldCreateTask: z.boolean(),
   tasks: z.array(ObservationTaskSchema).default([]),
 });
@@ -204,7 +207,7 @@ export class ObservationReasoner {
         actions: {
           shouldRespond: insight.actions.shouldRespond,
           shouldCreateTask: insight.actions.shouldCreateTask,
-          response: insight.actions.response?.trim() || undefined,
+          response: insight.actions.response?.trim() ?? '',
           tasks:
             insight.actions.tasks?.map((task) => ({
               ...task,
@@ -281,7 +284,7 @@ export class ObservationReasoner {
       actions: {
         shouldRespond: false,
         shouldCreateTask: false,
-        response: undefined,
+        response: '',
         tasks: [],
       },
       fallback: true,
