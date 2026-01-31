@@ -82,6 +82,7 @@ import {
 } from './modules/requirements';
 import { logOptimizer } from './modules/logging';
 import { validateLeafArgs, normalizeLeafArgs } from './modules/leaf-arg-contracts';
+import { normalizeStepExecutability, isExecutableStep } from './modules/executable-step';
 
 // Extend global interface for rate limiting variables
 declare global {
@@ -268,6 +269,61 @@ const EXECUTOR_MAX_BACKOFF_MS = Number(
   process.env.EXECUTOR_MAX_BACKOFF_MS || 60_000
 );
 const BOT_BREAKER_OPEN_MS = Number(process.env.BOT_BREAKER_OPEN_MS || 15_000);
+const BUILD_EXEC_BUDGET_DISABLED =
+  String(process.env.BUILD_EXEC_BUDGET_DISABLED || '') === '1';
+const BUILD_EXEC_MAX_ATTEMPTS = Number(
+  process.env.BUILD_EXEC_MAX_ATTEMPTS || 5
+);
+const BUILD_EXEC_MIN_INTERVAL_MS = Number(
+  process.env.BUILD_EXEC_MIN_INTERVAL_MS || 5000
+);
+const BUILD_EXEC_MAX_ELAPSED_MS = Number(
+  process.env.BUILD_EXEC_MAX_ELAPSED_MS || 120000
+);
+const DASHBOARD_STREAM_URL = process.env.DASHBOARD_ENDPOINT
+  ? `${process.env.DASHBOARD_ENDPOINT}/api/ws/cognitive-stream`
+  : 'http://localhost:3000/api/ws/cognitive-stream';
+
+const executorEventThrottle = new Map<string, number>();
+const BUILDING_LEAVES = new Set([
+  'prepare_site',
+  'build_module',
+  'place_feature',
+  'building_step',
+]);
+
+function shouldEmitExecutorEvent(key: string, throttleMs = 2000): boolean {
+  const now = Date.now();
+  const last = executorEventThrottle.get(key) ?? 0;
+  if (now - last < throttleMs) return false;
+  executorEventThrottle.set(key, now);
+  return true;
+}
+
+function emitExecutorBudgetEvent(
+  taskId: string,
+  stepId: string,
+  leafName: string,
+  reason: string,
+  extra: Record<string, any> = {}
+): void {
+  if (!shouldEmitExecutorEvent(`budget:${taskId}:${reason}`, 3000)) return;
+  try {
+    enhancedTaskIntegration.outbox.enqueue(DASHBOARD_STREAM_URL, {
+      type: 'executor_budget',
+      timestamp: Date.now(),
+      data: {
+        taskId,
+        stepId,
+        leafName,
+        reason,
+        ...extra,
+      },
+    });
+  } catch {
+    // best-effort; no hard failure
+  }
+}
 
 // Initialize tool executor that connects to Minecraft interface
 // If MCP_ONLY env var is set ("true"), skip direct /action fallback in favor of MCP tools
@@ -799,6 +855,7 @@ function normalizeStepAuthority(step: any): void {
   }
 }
 
+
 /**
  * Extract executable leaf + args from a Sterling-generated task step's meta.
  * Returns null if the step has no machine-readable meta.
@@ -824,7 +881,7 @@ function stepToLeafExecution(
       const item = produces[0];
       return {
         leafName: 'dig_block',
-        args: { blockType: item?.name || 'oak_log', count: item?.count || 1 },
+        args: { blockType: item?.name || 'oak_log' },
       };
     }
     case 'craft_recipe': {
@@ -868,6 +925,22 @@ function stepToLeafExecution(
     default:
       return null;
   }
+}
+
+function getStepBudgetState(task: any, stepId: string) {
+  const meta = task.metadata || {};
+  const budgets = meta.executionBudget || {};
+  const existing = budgets[stepId] || null;
+  if (existing) return { meta, budgets, state: existing, created: false };
+  const state = { attempts: 0, firstAt: Date.now(), lastAt: 0 };
+  budgets[stepId] = state;
+  return { meta, budgets, state, created: true };
+}
+
+function persistStepBudget(task: any, budgets: Record<string, any>) {
+  const meta = task.metadata || {};
+  const nextMeta = { ...meta, executionBudget: budgets };
+  enhancedTaskIntegration.updateTaskMetadata(task.id, nextMeta);
 }
 
 /**
@@ -1987,21 +2060,19 @@ async function autonomousTaskExecutor() {
       console.warn('Inventory progress estimation failed:', e);
     }
 
-    // ── Executable-plan execution: if task has authorized executable steps, run them ──
-    // Normalize authority on all steps (migrates meta.source → meta.authority)
-    currentTask.steps?.forEach((s: any) => normalizeStepAuthority(s));
+    // ── Executable-plan execution: if task has executable steps, run them ──
+    // Normalize authority and executability on all steps
+    currentTask.steps?.forEach((s: any) => {
+      normalizeStepAuthority(s);
+      normalizeStepExecutability(s);
+    });
 
-    const AUTHORIZED_SOURCES = new Set(['sterling', 'fallback-macro']);
     const hasExecutablePlan = currentTask.steps?.some(
-      (s: any) => s.meta?.executable === true
-        && AUTHORIZED_SOURCES.has(s.meta?.authority)
-        && !s.done
+      (s: any) => isExecutableStep(s) && !s.done
     );
     if (hasExecutablePlan) {
       const nextStep = currentTask.steps?.find(
-        (s: any) => !s.done
-          && s.meta?.executable === true
-          && AUTHORIZED_SOURCES.has(s.meta?.authority)
+        (s: any) => !s.done && isExecutableStep(s)
       );
 
       // If no executable steps remain but non-done steps exist, the plan is blocked
@@ -2017,6 +2088,61 @@ async function autonomousTaskExecutor() {
       if (nextStep) {
         const leafExec = stepToLeafExecution(nextStep);
         if (leafExec) {
+          const stepId = String(nextStep.id || nextStep.order || 'unknown');
+          if (!BUILD_EXEC_BUDGET_DISABLED && BUILDING_LEAVES.has(leafExec.leafName)) {
+            const now = Date.now();
+            const { budgets, state, created } = getStepBudgetState(currentTask, stepId);
+            let budgetDirty = created;
+            const elapsed = now - (state.firstAt || now);
+            if (elapsed > BUILD_EXEC_MAX_ELAPSED_MS) {
+              enhancedTaskIntegration.updateTaskMetadata(currentTask.id, {
+                ...currentTask.metadata,
+                blockedReason: `budget-exhausted:time:${leafExec.leafName}`,
+              });
+              emitExecutorBudgetEvent(
+                currentTask.id,
+                stepId,
+                leafExec.leafName,
+                'max_elapsed',
+                { elapsedMs: elapsed }
+              );
+              return;
+            }
+            if (state.attempts >= BUILD_EXEC_MAX_ATTEMPTS) {
+              enhancedTaskIntegration.updateTaskMetadata(currentTask.id, {
+                ...currentTask.metadata,
+                blockedReason: `budget-exhausted:attempts:${leafExec.leafName}`,
+              });
+              emitExecutorBudgetEvent(
+                currentTask.id,
+                stepId,
+                leafExec.leafName,
+                'max_attempts',
+                { attempts: state.attempts }
+              );
+              return;
+            }
+            if (state.lastAt && now - state.lastAt < BUILD_EXEC_MIN_INTERVAL_MS) {
+              const delay = BUILD_EXEC_MIN_INTERVAL_MS - (now - state.lastAt);
+              enhancedTaskIntegration.updateTaskMetadata(currentTask.id, {
+                ...currentTask.metadata,
+                nextEligibleAt: now + delay,
+              });
+              emitExecutorBudgetEvent(
+                currentTask.id,
+                stepId,
+                leafExec.leafName,
+                'rate_limited',
+                { delayMs: delay }
+              );
+              return;
+            }
+            state.attempts = (state.attempts || 0) + 1;
+            state.lastAt = now;
+            budgetDirty = true;
+            if (budgetDirty) persistStepBudget(currentTask, budgets);
+          }
+
           // Normalize legacy arg shapes before validation (e.g., smelt { item } → { input })
           normalizeLeafArgs(leafExec.leafName, leafExec.args);
           // Validate args before execution (strict mode: reject unknown leaves)

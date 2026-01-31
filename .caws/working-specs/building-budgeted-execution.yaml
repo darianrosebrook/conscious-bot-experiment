@@ -1,0 +1,45 @@
+id: EXEC-2403
+title: "Budgeted and rate-limited building execution"
+risk_tier: 2
+scope:
+  in:
+    - "budgeted execution for building leaves (prepare_site/place_feature/build_module/building_step)"
+    - "rate-limit building leaf executions per step"
+    - "emit budget/limit events to dashboard stream"
+  out:
+    - "changing building algorithms"
+    - "modifying planner outputs"
+invariants:
+  - "Building leaves execute only within defined budgets"
+  - "Rate limiting does not alter non-building leaves"
+  - "Dashboard stream receives budget-limit events"
+acceptance:
+  - id: A1
+    given: "building step executes repeatedly"
+    when: "budget attempts exceeded"
+    then: "task is blocked with budget-exhausted reason and no further execution"
+  - id: A2
+    given: "building step executes too frequently"
+    when: "min interval not met"
+    then: "step is deferred and nextEligibleAt is set"
+  - id: A3
+    given: "budget or rate limit is triggered"
+    when: "executor handles the step"
+    then: "dashboard stream receives a budget event"
+non_functional:
+  a11y: []
+  perf:
+    api_p95_ms: 200
+  security:
+    - "no change"
+contracts:
+  - type: openapi
+    path: "contracts/building-exec-budget.yaml#/paths/~1internal~1executor~1budget"
+observability:
+  logs:
+    - "[Executor] budget limit"
+  metrics: []
+  traces: []
+migrations: []
+rollback:
+  - "set BUILD_EXEC_BUDGET_DISABLED=1 to disable budget checks"
