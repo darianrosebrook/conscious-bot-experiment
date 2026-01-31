@@ -927,8 +927,8 @@ flowchart TD
     STEPS -->|"path 1"| STERLING_TP["Sterling Tool Progression<br/>task-integration.ts:2210<br/>meta.executable = !!meta.leaf"]
     STEPS -->|"path 2"| STERLING_CR["Sterling Crafting Solver<br/>task-integration.ts:2222<br/>meta.executable = !!meta.leaf"]
     STEPS -->|"path 3"| STERLING_BL["Sterling Building Solver<br/>task-integration.ts:2234<br/>meta.executable = !!meta.leaf"]
-    STEPS -->|"path 4 (fallback)"| COG_STEPS["generateStepsFromCognitive()<br/>task-integration.ts:2560<br/>⚠ MISSING meta.leaf"]
-    STEPS -->|"path 5 (last resort)"| INTEL_STEPS["generateIntelligentSteps()<br/>task-integration.ts:2607<br/>⚠ MISSING meta.leaf"]
+    STEPS -->|"path 4 (fallback)"| COG_STEPS["generateStepsFromCognitive()<br/>task-integration.ts:2580<br/>narrative/display only"]
+    STEPS -->|"path 5 (last resort)"| INTEL_STEPS["generateIntelligentSteps()<br/>task-integration.ts:2645<br/>→ generateLeafMappedSteps()"]
 
     %% Executability Check
     STERLING_TP --> EXEC_CHECK
@@ -940,32 +940,44 @@ flowchart TD
     EXEC_CHECK["Executability Check<br/>task-integration.ts:1015<br/>step.meta?.leaf || meta?.executable"]
 
     EXEC_CHECK -->|"has executable steps"| QUEUE["Task Queue<br/>modular-server.ts:1665"]
-    EXEC_CHECK -->|"no executable steps"| BLOCKED["blockedReason: no-executable-plan<br/>⚠ KNOWN BUG"]
+    EXEC_CHECK -->|"no executable steps"| BLOCKED["blockedReason: no-executable-plan"]
 
     %% Execution
     QUEUE --> EXECUTOR["Executor Loop (10s)<br/>modular-server.ts:249<br/>stepToLeafExecution()"]
-    EXECUTOR -->|"MCP tool call"| MI["Minecraft Interface :3005<br/>bot.dig(), bot.navigate(), etc."]
+    EXECUTOR -->|"authority check +<br/>arg validation"| VALIDATE["validateLeafArgs()<br/>leaf-arg-contracts.ts"]
+    VALIDATE -->|"valid"| MI["Minecraft Interface :3005<br/>bot.dig(), bot.navigate(), etc."]
+    VALIDATE -->|"invalid"| ARG_BLOCK["blockedReason: invalid-args"]
 
     %% Styling
-    classDef bug fill:#dc143c,stroke:#8b0000,color:#fff;
     classDef sterling fill:#2e8b57,stroke:#1b4332,color:#fff;
     classDef fallback fill:#ffa500,stroke:#cc5500,color:#000;
+    classDef validation fill:#4682b4,stroke:#2c5f8a,color:#fff;
 
-    class BLOCKED,COG_STEPS,INTEL_STEPS bug;
     class STERLING_TP,STERLING_CR,STERLING_BL sterling;
+    class COG_STEPS fallback;
+    class INTEL_STEPS,VALIDATE validation;
 ```
 
-### Known Bug: Executor Inaction (Cognitive Tasks Blocked)
+### Fallback Macro Planner (Cognitive Task Execution)
 
-**Status:** Open, documented for external review.
+**Status:** Resolved. Previously "Known Bug: Executor Inaction" — cognitive tasks were always blocked.
 
-**Root cause:** When Sterling symbolic solvers cannot handle a thought (most free-form cognitive thoughts like "I should gather wood"), the system falls back to `generateStepsFromCognitive()` (`task-integration.ts:2560`) or `generateIntelligentSteps()` (`task-integration.ts:2607`). Both produce steps **without** `meta.leaf` or `meta.executable` fields.
+**How it works now:** When Sterling symbolic solvers cannot handle a thought (e.g., "I should gather wood"), the system uses the **fallback-macro planner** to produce executable steps:
 
-The executability check at `task-integration.ts:1015` then marks these tasks with `blockedReason: 'no-executable-plan'`, and the executor loop at `modular-server.ts:1665` filters them out. Result: the bot generates thoughts and creates tasks, but never executes any cognitive-originated actions.
+1. **Requirement resolution** (`requirements.ts`): `resolveRequirement()` maps task type/title/candidate to a structured `TaskRequirement` (collect, mine, craft, build, tool_progression).
 
-**Sterling solver steps work correctly** because they set `meta.executable = !!s.meta?.leaf` (e.g., `task-integration.ts:2325`).
+2. **Leaf arg mapping** (`leaf-arg-contracts.ts`): `requirementToLeafMeta()` maps the requirement to a validated `{ leaf, args }` pair (e.g., `{ leaf: 'dig_block', args: { blockType: 'oak_log', count: 8 } }`).
 
-**Fix needed:** `generateStepsFromCognitive()` and `generateIntelligentSteps()` must set `meta.executable: true` and a valid `meta.leaf` on returned steps so the executor recognizes them as actionable.
+3. **Step generation** (`task-integration.ts`): `generateLeafMappedSteps()` emits steps with `meta.authority: 'fallback-macro'`, `meta.executable: true`, and validated `meta.args`.
+
+4. **Executor dispatch** (`modular-server.ts`): The executor accepts steps from `AUTHORIZED_SOURCES` (`sterling` and `fallback-macro`), validates args via `validateLeafArgs()` before execution, and rejects steps with invalid args (marking them blocked rather than sending junk to the bot).
+
+**Cognitive steps remain narrative/display only** — `generateStepsFromCognitive()` returns steps without execution metadata. Execution authority comes exclusively from Sterling or the fallback-macro planner.
+
+**Limitations:**
+- Fallback steps don't plan prerequisites (e.g., `craft_recipe wooden_pickaxe` will fail if materials are missing). Failed steps use the existing backoff + retry logic.
+- No `move_to` emission — requires coordinates unavailable at planning time. Navigation is handled by Sterling or by leaves with built-in pathfinding (e.g., `dig_block` searches a 10-block cube).
+- The correct long-term fix is routing more tasks through Sterling (which handles prerequisites), not making the fallback planner smarter.
 
 ### Inter-Service Communication
 

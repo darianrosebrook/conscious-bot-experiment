@@ -15,7 +15,8 @@ import type { BaseDomainSolver } from './sterling/base-domain-solver';
 import type { MinecraftCraftingSolver } from './sterling/minecraft-crafting-solver';
 import type { MinecraftBuildingSolver } from './sterling/minecraft-building-solver';
 import type { MinecraftToolProgressionSolver } from './sterling/minecraft-tool-progression-solver';
-import { resolveRequirement } from './modules/requirements';
+import { resolveRequirement, parseRequiredQuantityFromTitle } from './modules/requirements';
+import { requirementToLeafMeta } from './modules/leaf-arg-contracts';
 import { CognitionOutbox } from './modules/cognition-outbox';
 
 // Cognitive stream integration for thought-to-task conversion
@@ -517,10 +518,27 @@ export class EnhancedTaskIntegration extends EventEmitter {
           parameters.requirementCandidate = {
             kind: 'collect',
             outputPattern: resource,
-            quantity: 1,
+            quantity: parseRequiredQuantityFromTitle(taskTitle, 8),
             extractionMethod: 'thought-content',
           };
         }
+      } else if (actionType === 'mining') {
+        const blockType = this.extractBlockType(content);
+        if (blockType) {
+          parameters.requirementCandidate = {
+            kind: 'mine',
+            outputPattern: blockType,
+            quantity: parseRequiredQuantityFromTitle(taskTitle, 3),
+            extractionMethod: 'thought-content',
+          };
+        }
+      } else if (actionType === 'building') {
+        parameters.requirementCandidate = {
+          kind: 'build',
+          outputPattern: 'basic_shelter_5x5',
+          quantity: 1,
+          extractionMethod: 'thought-content',
+        };
       }
 
       // Create the task (empty steps array — addTask() will synthesize via Sterling)
@@ -577,24 +595,26 @@ export class EnhancedTaskIntegration extends EventEmitter {
    * Extract resource type from content
    */
   private extractResourceType(content: string): string {
-    if (content.includes('wood') || content.includes('log')) return 'wood';
-    if (content.includes('iron')) return 'iron';
-    if (content.includes('stone')) return 'stone';
-    if (content.includes('food')) return 'food';
-    return 'general';
+    if (content.includes('wood') || content.includes('log')) return 'oak_log';
+    if (content.includes('iron')) return 'iron_ore';
+    if (content.includes('stone')) return 'cobblestone';
+    if (content.includes('diamond')) return 'diamond_ore';
+    if (content.includes('food')) return 'bread';
+    return 'oak_log';
   }
 
   /**
    * Extract item type from content
    */
   private extractItemType(content: string): string {
-    if (content.includes('pickaxe')) return 'pickaxe';
-    if (content.includes('sword')) return 'sword';
-    if (content.includes('axe')) return 'axe';
-    if (content.includes('shovel')) return 'shovel';
+    if (content.includes('pickaxe')) return 'wooden_pickaxe';
+    if (content.includes('sword')) return 'wooden_sword';
+    if (content.includes('axe')) return 'wooden_axe';
+    if (content.includes('shovel')) return 'wooden_shovel';
     if (content.includes('table')) return 'crafting_table';
-    if (content.includes('tools')) return 'tools';
-    return 'item';
+    if (content.includes('planks') || content.includes('plank')) return 'oak_planks';
+    if (content.includes('stick')) return 'stick';
+    return 'oak_planks';
   }
 
   /**
@@ -2586,12 +2606,15 @@ export class EnhancedTaskIntegration extends EventEmitter {
 
       const data = (await response.json()) as any;
       if (data.steps && Array.isArray(data.steps)) {
+        const taskId = taskData.id || 'unknown';
         return data.steps.map((step: any, index: number) => ({
-          id: `step-${Date.now()}-${index + 1}`,
+          id: `step-cognitive-${taskId}-${index + 1}`,
           label: step.label,
           done: false,
           order: index + 1,
           estimatedDuration: step.estimatedDuration || 3000,
+          // Cognitive steps are narrative/display only — NOT executable.
+          // Execution authority comes from Sterling or fallback-macro planner.
         }));
       }
     } catch (error) {
@@ -2602,23 +2625,86 @@ export class EnhancedTaskIntegration extends EventEmitter {
   }
 
   /**
-   * Generate intelligent steps based on task type and content
+   * Generate leaf-mapped steps from resolved requirement.
+   * Uses requirement resolution (not label regex) and validates through
+   * the leaf arg contract before marking executable.
+   */
+  private generateLeafMappedSteps(taskData: Partial<Task>): TaskStep[] {
+    const requirement = resolveRequirement(taskData);
+    if (!requirement) return [];
+
+    const leafMeta = requirementToLeafMeta(requirement);
+    if (!leafMeta) return [];
+
+    const taskId = taskData.id || 'unknown';
+
+    if (requirement.kind === 'collect' || requirement.kind === 'mine') {
+      // dig_block with blockType (no pos) does a 10-block cube search
+      return [{
+        id: `step-fallback-${taskId}-1`,
+        label: `${requirement.kind === 'mine' ? 'Mine' : 'Collect'} ${requirement.patterns?.[0] || 'resource'}`,
+        done: false,
+        order: 1,
+        estimatedDuration: 10000,
+        meta: {
+          source: 'fallback-macro',
+          leaf: leafMeta.leaf,
+          executable: true,
+          authority: 'fallback-macro',
+          args: leafMeta.args,
+        },
+      }];
+    }
+
+    if (requirement.kind === 'craft') {
+      return [{
+        id: `step-fallback-${taskId}-1`,
+        label: `Craft ${requirement.outputPattern}`,
+        done: false,
+        order: 1,
+        estimatedDuration: 5000,
+        meta: {
+          source: 'fallback-macro',
+          leaf: leafMeta.leaf,
+          executable: true,
+          authority: 'fallback-macro',
+          args: leafMeta.args,
+        },
+      }];
+    }
+
+    if (requirement.kind === 'build') {
+      return [{
+        id: `step-fallback-${taskId}-1`,
+        label: `Build ${requirement.structure}`,
+        done: false,
+        order: 1,
+        estimatedDuration: 15000,
+        meta: {
+          source: 'fallback-macro',
+          leaf: leafMeta.leaf,
+          executable: true,
+          authority: 'fallback-macro',
+          args: leafMeta.args,
+        },
+      }];
+    }
+
+    return [];
+  }
+
+  /**
+   * Generate intelligent steps based on task type and content.
+   * Delegates to leaf-mapped steps when a valid requirement mapping exists;
+   * returns empty otherwise (triggering blockedReason: 'no-executable-plan').
    */
   private generateIntelligentSteps(taskData: Partial<Task>): TaskStep[] {
-    // Instead of hardcoded templates, generate minimal dynamic steps
-    // This ensures the bot uses its own reasoning rather than predefined patterns
-    const taskTitle = taskData.title || 'Unknown Task';
+    const leafSteps = this.generateLeafMappedSteps(taskData);
+    if (leafSteps.length > 0) return leafSteps;
 
-    // Create a single dynamic step that encourages the bot to think about the task
-    const dynamicStep = {
-      id: `step-${Date.now()}-1`,
-      label: `Plan and execute: ${taskTitle}`,
-      done: false,
-      order: 1,
-      estimatedDuration: 5000,
-    };
-
-    return [dynamicStep];
+    // No valid mapping — empty return will trigger blockedReason: 'no-executable-plan'
+    // in addTask(), which is the correct outcome for tasks we can't execute
+    return [];
   }
 
   /**

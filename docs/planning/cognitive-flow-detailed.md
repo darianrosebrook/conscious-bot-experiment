@@ -4,7 +4,7 @@ This document explains the design decisions behind our autonomous bot's cognitiv
 
 This section extends the "why" behind each architectural choice and makes the handoff from **brain → body** explicit, so plans reliably become actions. Where relevant, it borrows the **capability discipline** from MCP while keeping **behavior trees (BTs)** as our execution substrate.
 
-> **Last updated:** January 2026. See "Known Bugs" section at the end for current executor inaction issue.
+> **Last updated:** January 2026. Executor inaction bug resolved — see "Resolved Bugs" section at the end.
 
 ## Running Service Topology
 
@@ -71,9 +71,10 @@ The brain of the system — deciding what to do and how to do it:
   - Tool progression solver: `packages/planning/src/sterling/minecraft-tool-progression-solver.ts`
   - Sterling service: `packages/planning/src/sterling/sterling-reasoning-service.ts`
 
-- **Cognitive/LLM Fallback**: When Sterling solvers cannot handle a thought, the system falls back to LLM-based step generation.
-  - Cognitive step generation: `task-integration.ts:2560` (`generateStepsFromCognitive()`)
-  - Intelligent fallback: `task-integration.ts:2607` (`generateIntelligentSteps()`)
+- **Cognitive/LLM Fallback**: When Sterling solvers cannot handle a thought, the system uses a two-tier fallback:
+  - Cognitive step generation: `task-integration.ts:2580` (`generateStepsFromCognitive()`) — narrative/display only, NOT executable
+  - Fallback-macro planner: `task-integration.ts:2624` (`generateLeafMappedSteps()`) — maps resolved requirements to validated leaf steps via `leaf-arg-contracts.ts`
+  - Intelligent fallback: `task-integration.ts:2645` (`generateIntelligentSteps()`) — delegates to `generateLeafMappedSteps()`; returns empty if no valid mapping exists
 
 ### Execution Layer
 Components that turn plans into actions:
@@ -81,6 +82,8 @@ Components that turn plans into actions:
 - **Modular Server Executor**: The main autonomous loop that selects tasks, finds executable steps, and dispatches them to the Minecraft Interface.
   - Executor loop: `packages/planning/src/modular-server.ts:249` (10s poll interval)
   - Step-to-leaf mapping: `modular-server.ts:743` (`stepToLeafExecution()`)
+  - Authority allowlist: `AUTHORIZED_SOURCES` = `sterling`, `fallback-macro` — only steps from these sources are dispatched
+  - Pre-execution arg validation: `validateLeafArgs()` from `leaf-arg-contracts.ts` blocks invalid args before they reach the bot
   - Task selection with backoff/blocked filtering: `modular-server.ts:1665`
   - MCP tool execution: `modular-server.ts:257`
 
@@ -1247,43 +1250,29 @@ This approach ensures that the existing functionality continues to work while ad
 
 ---
 
-## Known Bugs
+## Resolved Bugs
 
-### BUG: Executor Inaction — Cognitive Tasks Always Blocked
+### RESOLVED: Executor Inaction — Cognitive Tasks Always Blocked
 
-**Status:** Open, pending fix.
+**Status:** Fixed.
 
-**Symptom:** The bot generates thoughts and creates tasks from them, but never executes any actions. All tasks appear with `blockedReason: 'no-executable-plan'`. Planning logs show: "All active tasks are in backoff or blocked — skipping cycle."
+**Previous symptom:** The bot generated thoughts and created tasks, but never executed any actions. All tasks appeared with `blockedReason: 'no-executable-plan'`.
 
-**Root cause chain:**
+**Resolution:** A fallback-macro planner was introduced alongside a leaf arg contract validator:
 
-1. **Thought → Task conversion** (`task-integration.ts:414`): `convertThoughtToTask()` creates tasks with `steps: []`.
+1. **Extract helpers fixed** (`task-integration.ts`): `extractResourceType()`, `extractItemType()` now return valid Minecraft item IDs (e.g., `oak_log` instead of `wood`, `wooden_pickaxe` instead of `pickaxe`).
 
-2. **Step generation** (`task-integration.ts:2206`): `generateDynamicSteps()` tries Sterling solvers first (crafting, building, tool-progression), but most free-form cognitive thoughts like "I should gather wood" don't match Sterling solver input requirements, so they fall through to the LLM fallback.
+2. **Requirement candidate extraction extended** (`task-integration.ts:514-537`): `convertThoughtToTask()` now emits `requirementCandidate` for `mining` and `building` action types (previously only `crafting` and `gathering`).
 
-3. **LLM fallback steps lack meta fields** (`task-integration.ts:2589-2595`): `generateStepsFromCognitive()` returns steps structured as:
-   ```typescript
-   { id, label, done, order, estimatedDuration }
-   // MISSING: meta: { leaf: '...', executable: true }
-   ```
-   Same problem in `generateIntelligentSteps()` at `task-integration.ts:2607`.
+3. **Requirement resolution extended** (`requirements.ts`): `resolveRequirement()` handles `mine` and `build` candidates from thought extraction.
 
-4. **Executability check** (`task-integration.ts:1015-1020`):
-   ```typescript
-   const hasExecutableStep = task.steps.some(
-     s => s.meta?.leaf || s.meta?.executable === true
-   );
-   if (task.steps.length > 0 && !hasExecutableStep) {
-     task.metadata.blockedReason = 'no-executable-plan';
-   }
-   ```
-   Since no cognitive steps have `meta.leaf` or `meta.executable`, ALL cognitive tasks get blocked.
+4. **Leaf arg contracts** (`modules/leaf-arg-contracts.ts`, new): `validateLeafArgs()` validates arg shape for known leaves; `requirementToLeafMeta()` maps resolved requirements to validated `{ leaf, args }` pairs.
 
-5. **Executor filters blocked tasks** (`modular-server.ts:1665-1692`): Tasks with `blockedReason` are excluded from the execution cycle. Zero eligible tasks remain.
+5. **Fallback-macro step generation** (`task-integration.ts`): `generateLeafMappedSteps()` produces executable steps with `meta.authority: 'fallback-macro'` and validated args. `generateIntelligentSteps()` delegates to it; returns empty (correctly triggering `blockedReason`) when no valid mapping exists.
 
-**Why Sterling steps work:** Sterling solver enrichment sets `meta.executable = !!s.meta?.leaf` (see `task-integration.ts:2325`, `:2396`, `:2500`).
+6. **Executor dispatch broadened** (`modular-server.ts`): `AUTHORIZED_SOURCES` allowlist (`sterling`, `fallback-macro`) replaced hardcoded `source === 'sterling'` check. Pre-execution arg validation via `validateLeafArgs()` blocks invalid args.
 
-**Fix needed:** `generateStepsFromCognitive()` and `generateIntelligentSteps()` must set `meta: { executable: true, leaf: '<action_name>' }` on returned steps, mapping LLM-suggested actions to registered MCP tool names (e.g., `move_to`, `dig_block`, `craft_item`).
+**Cognitive steps remain narrative/display only** — execution authority comes from Sterling or the fallback-macro planner, not from label-based inference.
 
 ---
 

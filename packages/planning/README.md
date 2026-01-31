@@ -27,8 +27,18 @@ This package provides hierarchical and reactive planning, MCP integration, and a
 
 - Runs every ~10s to discover and execute the highest-priority task.
 - Prefers MCP-registered Behavior Tree options and validates results against actual game state.
-- Uses inventory-based progress gating and completion checks to avoid “fake completion”.
+- Uses inventory-based progress gating and completion checks to avoid "fake completion".
 - Injects prerequisite steps (e.g., gather wood) and retries with backoff when needed.
+- Accepts steps from authorized sources only (`sterling`, `fallback-macro`) and validates leaf args before dispatch.
+
+### Fallback-Macro Planner
+
+When Sterling solvers cannot handle a task (e.g., free-form cognitive thoughts like "gather wood"), the fallback-macro planner produces executable steps:
+
+- Resolves task requirements via `resolveRequirement()` (collect, mine, craft, build, tool_progression)
+- Maps requirements to validated leaf args via `requirementToLeafMeta()` in `modules/leaf-arg-contracts.ts`
+- Emits steps with `meta.authority: 'fallback-macro'` and `meta.executable: true`
+- Pre-execution arg validation prevents junk from reaching the bot
 
 ### Inventory-Gated Progress
 

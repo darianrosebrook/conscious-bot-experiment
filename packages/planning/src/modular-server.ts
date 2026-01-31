@@ -81,6 +81,7 @@ import {
   computeRequirementSnapshot,
 } from './modules/requirements';
 import { logOptimizer } from './modules/logging';
+import { validateLeafArgs } from './modules/leaf-arg-contracts';
 
 // Extend global interface for rate limiting variables
 declare global {
@@ -1922,14 +1923,18 @@ async function autonomousTaskExecutor() {
       console.warn('Inventory progress estimation failed:', e);
     }
 
-    // ── Sterling-first execution: if task has solver-generated steps, run them ──
-    const hasSterlingPlan = currentTask.steps?.some(
-      (s: any) => s.meta?.source === 'sterling' && !s.done
+    // ── Executable-plan execution: if task has authorized executable steps, run them ──
+    const AUTHORIZED_SOURCES = new Set(['sterling', 'fallback-macro']);
+    const hasExecutablePlan = currentTask.steps?.some(
+      (s: any) => s.meta?.executable === true
+        && AUTHORIZED_SOURCES.has(s.meta?.authority || s.meta?.source)
+        && !s.done
     );
-    if (hasSterlingPlan) {
-      // Only consider executable steps (skip narrative / informational steps)
+    if (hasExecutablePlan) {
       const nextStep = currentTask.steps?.find(
-        (s: any) => !s.done && s.meta?.executable !== false
+        (s: any) => !s.done
+          && s.meta?.executable === true
+          && AUTHORIZED_SOURCES.has(s.meta?.authority || s.meta?.source)
       );
 
       // If no executable steps remain but non-done steps exist, the plan is blocked
@@ -1938,29 +1943,41 @@ async function autonomousTaskExecutor() {
           ...currentTask.metadata,
           blockedReason: 'no-executable-plan',
         });
-        console.warn(`⚠️ [Sterling] Task ${currentTask.id} has no remaining executable steps — marking blocked`);
+        console.warn(`⚠️ [Executor] Task ${currentTask.id} has no remaining executable steps — marking blocked`);
         return;
       }
 
       if (nextStep) {
         const leafExec = stepToLeafExecution(nextStep);
         if (leafExec) {
+          // Validate args before execution
+          const validationError = validateLeafArgs(leafExec.leafName, leafExec.args);
+          if (validationError) {
+            console.warn(`⚠️ [Executor] Invalid args for ${leafExec.leafName}: ${validationError}`);
+            enhancedTaskIntegration.updateTaskMetadata(currentTask.id, {
+              ...currentTask.metadata,
+              blockedReason: `invalid-args: ${validationError}`,
+            });
+            return;
+          }
+
+          const stepAuthority = nextStep.meta?.authority || nextStep.meta?.source || 'unknown';
           console.log(
-            `🏗️ [Sterling] Executing step ${nextStep.order}: ${nextStep.label} → ${leafExec.leafName}`
+            `🏗️ [Executor:${stepAuthority}] Executing step ${nextStep.order}: ${nextStep.label} → ${leafExec.leafName}`
           );
           const actionResult = await toolExecutor.execute(
             `minecraft.${leafExec.leafName}`,
             leafExec.args
           );
           if (actionResult?.ok) {
-            console.log(`✅ [Sterling] Step ${nextStep.order} completed`);
+            console.log(`✅ [Executor] Step ${nextStep.order} completed`);
             await enhancedTaskIntegration.completeTaskStep(currentTask.id, nextStep.id);
           } else if (isNavigatingError(actionResult?.error)) {
             // Bot is mid-navigation — retry next cycle, don't count as failure
-            console.log(`🚶 [Sterling] Bot is navigating, will retry next cycle`);
+            console.log(`🚶 [Executor] Bot is navigating, will retry next cycle`);
           } else {
             console.warn(
-              `⚠️ [Sterling] Step ${nextStep.order} failed: ${actionResult?.error}`
+              `⚠️ [Executor] Step ${nextStep.order} failed: ${actionResult?.error}`
             );
             const newRetryCount = (currentTask.metadata?.retryCount || 0) + 1;
             const maxRetries = currentTask.metadata?.maxRetries || 3;
@@ -1978,21 +1995,21 @@ async function autonomousTaskExecutor() {
                 currentTask.progress || 0,
                 'failed'
               );
-              console.log(`❌ [Sterling] Task failed after ${newRetryCount} retries: ${currentTask.title}`);
+              console.log(`❌ [Executor] Task failed after ${newRetryCount} retries: ${currentTask.title}`);
             } else {
               enhancedTaskIntegration.updateTaskMetadata(currentTask.id, {
                 ...currentTask.metadata,
                 retryCount: newRetryCount,
                 nextEligibleAt: Date.now() + backoffMs,
               });
-              console.log(`🔄 [Sterling] Task in backoff for ${backoffMs}ms (retry ${newRetryCount}/${maxRetries})`);
+              console.log(`🔄 [Executor] Task in backoff for ${backoffMs}ms (retry ${newRetryCount}/${maxRetries})`);
             }
           }
           await recomputeProgressAndMaybeComplete(currentTask);
-          return; // Sterling handled this execution cycle
+          return; // Executor handled this execution cycle
         } else {
           console.warn(
-            `⚠️ [Sterling] Step ${nextStep.order} has no executable meta — falling through to MCP`
+            `⚠️ [Executor] Step ${nextStep.order} has no executable meta — falling through to MCP`
           );
         }
       }

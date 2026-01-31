@@ -32,6 +32,20 @@ export function resolveRequirement(task: any): TaskRequirement | null {
         quantity: candidate.quantity || 1,
       };
     }
+    if (candidate.kind === 'mine') {
+      return {
+        kind: 'mine',
+        patterns: [candidate.outputPattern],
+        quantity: candidate.quantity || 1,
+      };
+    }
+    if (candidate.kind === 'build') {
+      return {
+        kind: 'build',
+        structure: candidate.outputPattern,
+        quantity: 1,
+      };
+    }
   }
 
   // Existing regex-based resolution follows
