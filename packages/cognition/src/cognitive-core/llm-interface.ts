@@ -182,7 +182,12 @@ Keep responses brief (1-2 sentences) and focused on:
 - What I'm observing (resources, threats, opportunities)
 - What I'm planning (next steps, strategies)
 
-Consider your current situation and prioritize survival and progress. Be direct and avoid verbose explanations.`;
+Consider your current situation and prioritize survival and progress. Be direct and avoid verbose explanations.
+
+When expressing an action intention, end your thought with a goal tag like:
+[GOAL: collect oak_log 8] or [GOAL: craft wooden_pickaxe 1] or [GOAL: mine iron_ore 3]
+Valid actions: collect, mine, craft, build
+This helps downstream systems understand your intent.`;
 
     const prompt = `Current situation: ${situation}
 

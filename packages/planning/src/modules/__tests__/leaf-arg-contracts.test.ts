@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { validateLeafArgs, requirementToLeafMeta } from '../leaf-arg-contracts';
+import { validateLeafArgs, requirementToLeafMeta, requirementToFallbackPlan, KNOWN_LEAVES } from '../leaf-arg-contracts';
 
 describe('validateLeafArgs', () => {
   it('accepts valid dig_block args with blockType', () => {
@@ -50,8 +50,39 @@ describe('validateLeafArgs', () => {
     expect(validateLeafArgs('build_module', {})).toBe('build_module requires moduleId (string)');
   });
 
-  it('passes through unknown leaf names (no contract to validate)', () => {
+  it('passes through unknown leaf names in non-strict mode (default)', () => {
     expect(validateLeafArgs('unknown_leaf', {})).toBeNull();
+    expect(validateLeafArgs('unknown_leaf', {}, false)).toBeNull();
+  });
+
+  it('rejects unknown leaf names in strict mode', () => {
+    const error = validateLeafArgs('unknown_leaf', {}, true);
+    expect(error).toContain('unknown leaf');
+    expect(error).toContain('KNOWN_LEAVES');
+  });
+
+  it('accepts valid acquire_material args', () => {
+    expect(validateLeafArgs('acquire_material', { item: 'oak_log' })).toBeNull();
+  });
+
+  it('rejects acquire_material without item', () => {
+    expect(validateLeafArgs('acquire_material', {})).toBe('acquire_material requires item (string)');
+  });
+
+  it('accepts valid replan_building args', () => {
+    expect(validateLeafArgs('replan_building', { templateId: 'basic_shelter' })).toBeNull();
+  });
+
+  it('rejects replan_building without templateId', () => {
+    expect(validateLeafArgs('replan_building', {})).toBe('replan_building requires templateId (string)');
+  });
+
+  it('accepts valid replan_exhausted args', () => {
+    expect(validateLeafArgs('replan_exhausted', { templateId: 'basic_shelter' })).toBeNull();
+  });
+
+  it('rejects replan_exhausted without templateId', () => {
+    expect(validateLeafArgs('replan_exhausted', {})).toBe('replan_exhausted requires templateId (string)');
   });
 });
 
@@ -95,5 +126,78 @@ describe('requirementToLeafMeta', () => {
   it('defaults quantity to 1 when not provided', () => {
     const result = requirementToLeafMeta({ kind: 'collect', patterns: ['oak_log'] });
     expect(result).toEqual({ leaf: 'dig_block', args: { blockType: 'oak_log', count: 1 } });
+  });
+});
+
+describe('KNOWN_LEAVES', () => {
+  it('contains all 8 expected leaf names', () => {
+    const expected = [
+      'dig_block', 'craft_recipe', 'smelt', 'place_block', 'build_module',
+      'acquire_material', 'replan_building', 'replan_exhausted',
+    ];
+    expect(KNOWN_LEAVES.size).toBe(8);
+    for (const leaf of expected) {
+      expect(KNOWN_LEAVES.has(leaf)).toBe(true);
+    }
+  });
+});
+
+describe('requirementToFallbackPlan', () => {
+  it('maps collect requirement to 1-step dig_block plan', () => {
+    const result = requirementToFallbackPlan({ kind: 'collect', patterns: ['oak_log'], quantity: 8 });
+    expect(result).toEqual([
+      { leaf: 'dig_block', args: { blockType: 'oak_log', count: 8 }, label: 'Collect oak_log' },
+    ]);
+  });
+
+  it('maps mine requirement to 1-step dig_block plan', () => {
+    const result = requirementToFallbackPlan({ kind: 'mine', patterns: ['iron_ore'], quantity: 3 });
+    expect(result).toEqual([
+      { leaf: 'dig_block', args: { blockType: 'iron_ore', count: 3 }, label: 'Mine iron_ore' },
+    ]);
+  });
+
+  it('maps craft requirement to 1-step craft plan (prereq injection handles materials)', () => {
+    const result = requirementToFallbackPlan({ kind: 'craft', outputPattern: 'wooden_pickaxe' });
+    expect(result).toHaveLength(1);
+    expect(result![0]).toEqual({
+      leaf: 'craft_recipe', args: { recipe: 'wooden_pickaxe', qty: 1 }, label: 'Craft wooden_pickaxe',
+    });
+  });
+
+  it('maps craft with quantity to 1-step craft plan', () => {
+    const result = requirementToFallbackPlan({ kind: 'craft', outputPattern: 'crafting_table', quantity: 2 });
+    expect(result).toHaveLength(1);
+    expect(result![0]).toEqual({
+      leaf: 'craft_recipe', args: { recipe: 'crafting_table', qty: 2 }, label: 'Craft crafting_table',
+    });
+  });
+
+  it('maps build requirement to 1-step build_module plan', () => {
+    const result = requirementToFallbackPlan({ kind: 'build', structure: 'basic_shelter_5x5' });
+    expect(result).toEqual([
+      { leaf: 'build_module', args: { moduleId: 'basic_shelter_5x5' }, label: 'Build basic_shelter_5x5' },
+    ]);
+  });
+
+  it('returns null for unknown requirement kind', () => {
+    expect(requirementToFallbackPlan({ kind: 'unknown' })).toBeNull();
+  });
+
+  it('returns null for collect with empty patterns', () => {
+    expect(requirementToFallbackPlan({ kind: 'collect', patterns: [], quantity: 1 })).toBeNull();
+  });
+
+  it('returns null for craft without outputPattern', () => {
+    expect(requirementToFallbackPlan({ kind: 'craft' })).toBeNull();
+  });
+
+  it('returns null for build without structure', () => {
+    expect(requirementToFallbackPlan({ kind: 'build' })).toBeNull();
+  });
+
+  it('defaults quantity to 1 when not provided', () => {
+    const result = requirementToFallbackPlan({ kind: 'collect', patterns: ['oak_log'] });
+    expect(result![0].args.count).toBe(1);
   });
 });

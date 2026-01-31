@@ -36,9 +36,26 @@ This package provides hierarchical and reactive planning, MCP integration, and a
 When Sterling solvers cannot handle a task (e.g., free-form cognitive thoughts like "gather wood"), the fallback-macro planner produces executable steps:
 
 - Resolves task requirements via `resolveRequirement()` (collect, mine, craft, build, tool_progression)
-- Maps requirements to validated leaf args via `requirementToLeafMeta()` in `modules/leaf-arg-contracts.ts`
+- Maps requirements to validated fallback plans via `requirementToFallbackPlan()` in `modules/leaf-arg-contracts.ts`
 - Emits steps with `meta.authority: 'fallback-macro'` and `meta.executable: true`
-- Pre-execution arg validation prevents junk from reaching the bot
+- Craft plans are single-step; the executor's prereq injection handles missing materials via recipe introspection at execution time
+- Pre-execution arg validation in strict mode rejects unknown leaves via `KNOWN_LEAVES` allowlist
+
+### Thought-to-Task Pipeline
+
+Cognitive thoughts are converted to actionable tasks with structured requirement extraction:
+
+1. **Goal tags** — the LLM is prompted to emit `[GOAL: collect oak_log 8]` tags; these take priority over keyword heuristics
+2. **Keyword heuristics** — content-based classification (gather/craft/mine/build/explore/farm)
+3. **LLM structured extraction** — when heuristics say "general" and no goal tag exists, the cognition service's MLX adapter extracts `{kind, target, quantity}` from ambiguous text
+4. Each path produces a `requirementCandidate` in `task.parameters`; `resolveRequirement()` maps it to the canonical `TaskRequirement` shape
+
+### Authority and Execution
+
+- Steps must have `meta.authority ∈ {sterling, fallback-macro}` to be executed
+- Sterling steps set `meta.source = 'sterling'`; the executor normalizes this to `meta.authority` before dispatch
+- `validateLeafArgs(leaf, args, strictMode=true)` at the executor boundary rejects unknown leaves
+- Prerequisite injection for craft steps: if materials are missing, `injectDynamicPrereqForCraft()` creates a gathering subtask (capped at 3 attempts per task via `metadata.prereqInjectionCount`)
 
 ### Inventory-Gated Progress
 

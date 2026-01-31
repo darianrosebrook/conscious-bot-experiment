@@ -47,12 +47,43 @@ const CONTRACTS: Record<string, LeafArgContract> = {
       return null;
     },
   },
+  acquire_material: {
+    leafName: 'acquire_material',
+    validate: (args) => {
+      if (!args.item || typeof args.item !== 'string') return 'acquire_material requires item (string)';
+      return null;
+    },
+  },
+  replan_building: {
+    leafName: 'replan_building',
+    validate: (args) => {
+      if (!args.templateId || typeof args.templateId !== 'string') return 'replan_building requires templateId (string)';
+      return null;
+    },
+  },
+  replan_exhausted: {
+    leafName: 'replan_exhausted',
+    validate: (args) => {
+      if (!args.templateId || typeof args.templateId !== 'string') return 'replan_exhausted requires templateId (string)';
+      return null;
+    },
+  },
 };
 
-/** Returns null if leaf+args are valid, error string otherwise. */
-export function validateLeafArgs(leafName: string, args: Record<string, unknown>): string | null {
+/** Canonical set of leaves the executor may run. Unknown leaves are rejected in strict mode. */
+export const KNOWN_LEAVES = new Set(Object.keys(CONTRACTS));
+
+/** Returns null if leaf+args are valid, error string otherwise.
+ *  strictMode=true rejects unknown leaves (use at execution boundary). */
+export function validateLeafArgs(
+  leafName: string,
+  args: Record<string, unknown>,
+  strictMode = false
+): string | null {
   const contract = CONTRACTS[leafName];
-  if (!contract) return null; // Unknown leaves pass through — only known leaves are validated
+  if (!contract) {
+    return strictMode ? `unknown leaf '${leafName}' — not in KNOWN_LEAVES allowlist` : null;
+  }
   return contract.validate(args);
 }
 
@@ -86,4 +117,40 @@ export function requirementToLeafMeta(
     default:
       return null;
   }
+}
+
+/** Maps requirement → fallback plan steps. Returns null if no valid mapping exists.
+ *  Craft plans are single-step (craft only); the executor's prereq injection
+ *  handles missing materials via recipe introspection at execution time. */
+export function requirementToFallbackPlan(
+  requirement: { kind: string; patterns?: string[]; outputPattern?: string;
+    structure?: string; quantity?: number }
+): Array<{ leaf: string; args: Record<string, unknown>; label: string }> | null {
+  if (requirement.kind === 'collect' || requirement.kind === 'mine') {
+    const blockType = requirement.patterns?.[0];
+    if (!blockType) return null;
+    const args = { blockType, count: requirement.quantity || 1 };
+    if (validateLeafArgs('dig_block', args)) return null; // invalid args
+    return [{ leaf: 'dig_block', args,
+      label: `${requirement.kind === 'mine' ? 'Mine' : 'Collect'} ${blockType}` }];
+  }
+
+  if (requirement.kind === 'craft') {
+    const recipe = requirement.outputPattern;
+    if (!recipe) return null;
+    const craftArgs = { recipe, qty: requirement.quantity || 1 };
+    if (validateLeafArgs('craft_recipe', craftArgs)) return null;
+    return [{ leaf: 'craft_recipe', args: craftArgs,
+      label: `Craft ${recipe}` }];
+  }
+
+  if (requirement.kind === 'build') {
+    const moduleId = requirement.structure;
+    if (!moduleId) return null;
+    const args = { moduleId };
+    if (validateLeafArgs('build_module', args)) return null;
+    return [{ leaf: 'build_module', args, label: `Build ${moduleId}` }];
+  }
+
+  return null;
 }

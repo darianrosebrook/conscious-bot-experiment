@@ -2657,6 +2657,8 @@ function generateIntelligentFallbackSteps(task: any): any[] {
   }
 }
 
+/** @deprecated Planning service no longer calls this endpoint (Phase 2, Change C).
+ *  Kept for dashboard/external consumers. Do not add new callers. */
 // POST /generate-steps - Generate task steps from cognitive system
 app.post('/generate-steps', async (req, res) => {
   try {

@@ -737,6 +737,17 @@ async function recomputeProgressAndMaybeComplete(task: any) {
   }
 }
 
+/** Normalize step authority: canonicalize meta.source → meta.authority for known sources. */
+function normalizeStepAuthority(step: any): void {
+  if (!step.meta) return;
+  if (!step.meta.authority && step.meta.source) {
+    // One-time migration: promote source to authority for known authorized sources
+    if (step.meta.source === 'sterling' || step.meta.source === 'fallback-macro') {
+      step.meta.authority = step.meta.source;
+    }
+  }
+}
+
 /**
  * Extract executable leaf + args from a Sterling-generated task step's meta.
  * Returns null if the step has no machine-readable meta.
@@ -1924,17 +1935,20 @@ async function autonomousTaskExecutor() {
     }
 
     // ── Executable-plan execution: if task has authorized executable steps, run them ──
+    // Normalize authority on all steps (migrates meta.source → meta.authority)
+    currentTask.steps?.forEach((s: any) => normalizeStepAuthority(s));
+
     const AUTHORIZED_SOURCES = new Set(['sterling', 'fallback-macro']);
     const hasExecutablePlan = currentTask.steps?.some(
       (s: any) => s.meta?.executable === true
-        && AUTHORIZED_SOURCES.has(s.meta?.authority || s.meta?.source)
+        && AUTHORIZED_SOURCES.has(s.meta?.authority)
         && !s.done
     );
     if (hasExecutablePlan) {
       const nextStep = currentTask.steps?.find(
         (s: any) => !s.done
           && s.meta?.executable === true
-          && AUTHORIZED_SOURCES.has(s.meta?.authority || s.meta?.source)
+          && AUTHORIZED_SOURCES.has(s.meta?.authority)
       );
 
       // If no executable steps remain but non-done steps exist, the plan is blocked
@@ -1950,8 +1964,8 @@ async function autonomousTaskExecutor() {
       if (nextStep) {
         const leafExec = stepToLeafExecution(nextStep);
         if (leafExec) {
-          // Validate args before execution
-          const validationError = validateLeafArgs(leafExec.leafName, leafExec.args);
+          // Validate args before execution (strict mode: reject unknown leaves)
+          const validationError = validateLeafArgs(leafExec.leafName, leafExec.args, true);
           if (validationError) {
             console.warn(`⚠️ [Executor] Invalid args for ${leafExec.leafName}: ${validationError}`);
             enhancedTaskIntegration.updateTaskMetadata(currentTask.id, {
@@ -1961,7 +1975,35 @@ async function autonomousTaskExecutor() {
             return;
           }
 
-          const stepAuthority = nextStep.meta?.authority || nextStep.meta?.source || 'unknown';
+          // Pre-check: for craft steps, verify recipe inputs are available
+          if (leafExec.leafName === 'craft_recipe' && leafExec.args.recipe) {
+            const recipeInfo = await introspectRecipe(leafExec.args.recipe as string);
+            if (recipeInfo) {
+              const inv = await fetchInventorySnapshot();
+              for (const input of recipeInfo.inputs) {
+                const have = getCount(inv, input.item);
+                if (have < input.count) {
+                  console.log(
+                    `🪵 [Executor] Missing ${input.item} (have ${have}, need ${input.count}) for ${leafExec.args.recipe}. Injecting prerequisite.`
+                  );
+                  const prereqAttempts = (currentTask.metadata as any)?.prereqInjectionCount || 0;
+                  if (prereqAttempts < 3) {
+                    const injected = await injectDynamicPrereqForCraft(currentTask);
+                    if (injected) {
+                      enhancedTaskIntegration.updateTaskMetadata(currentTask.id, {
+                        ...currentTask.metadata,
+                        prereqInjectionCount: prereqAttempts + 1,
+                      });
+                      return; // Execute prerequisite first
+                    }
+                  }
+                  break;
+                }
+              }
+            }
+          }
+
+          const stepAuthority = nextStep.meta?.authority || 'unknown';
           console.log(
             `🏗️ [Executor:${stepAuthority}] Executing step ${nextStep.order}: ${nextStep.label} → ${leafExec.leafName}`
           );
@@ -1979,6 +2021,25 @@ async function autonomousTaskExecutor() {
             console.warn(
               `⚠️ [Executor] Step ${nextStep.order} failed: ${actionResult?.error}`
             );
+
+            // For craft failures, try injecting prerequisite acquisition steps
+            if (leafExec.leafName === 'craft_recipe') {
+              const prereqAttempts = (currentTask.metadata as any)?.prereqInjectionCount || 0;
+              if (prereqAttempts < 3) {
+                const injected = await injectDynamicPrereqForCraft(currentTask);
+                if (injected) {
+                  enhancedTaskIntegration.updateTaskMetadata(currentTask.id, {
+                    ...currentTask.metadata,
+                    prereqInjectionCount: prereqAttempts + 1,
+                  });
+                  console.log(
+                    `🔧 [Executor] Prerequisite task created for ${currentTask.title} (attempt ${prereqAttempts + 1}/3)`
+                  );
+                  return; // Execute prerequisite first, then retry craft
+                }
+              }
+            }
+
             const newRetryCount = (currentTask.metadata?.retryCount || 0) + 1;
             const maxRetries = currentTask.metadata?.maxRetries || 3;
             // Exponential backoff: 1s, 2s, 4s, ... capped at 30s

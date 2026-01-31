@@ -4,7 +4,7 @@ This document explains the design decisions behind our autonomous bot's cognitiv
 
 This section extends the "why" behind each architectural choice and makes the handoff from **brain → body** explicit, so plans reliably become actions. Where relevant, it borrows the **capability discipline** from MCP while keeping **behavior trees (BTs)** as our execution substrate.
 
-> **Last updated:** January 2026. Executor inaction bug resolved — see "Resolved Bugs" section at the end.
+> **Last updated:** January 2026. Phase 2 integration gaps closed — see "Resolved Bugs" section at the end.
 
 ## Running Service Topology
 
@@ -71,10 +71,11 @@ The brain of the system — deciding what to do and how to do it:
   - Tool progression solver: `packages/planning/src/sterling/minecraft-tool-progression-solver.ts`
   - Sterling service: `packages/planning/src/sterling/sterling-reasoning-service.ts`
 
-- **Cognitive/LLM Fallback**: When Sterling solvers cannot handle a thought, the system uses a two-tier fallback:
-  - Cognitive step generation: `task-integration.ts:2580` (`generateStepsFromCognitive()`) — narrative/display only, NOT executable
-  - Fallback-macro planner: `task-integration.ts:2624` (`generateLeafMappedSteps()`) — maps resolved requirements to validated leaf steps via `leaf-arg-contracts.ts`
-  - Intelligent fallback: `task-integration.ts:2645` (`generateIntelligentSteps()`) — delegates to `generateLeafMappedSteps()`; returns empty if no valid mapping exists
+- **Fallback-Macro Planner**: When Sterling solvers cannot handle a thought, the fallback-macro planner produces executable steps:
+  - Fallback plan generation: `modules/leaf-arg-contracts.ts` (`requirementToFallbackPlan()`) — maps resolved requirements to validated leaf step plans
+  - Leaf-mapped step synthesis: `task-integration.ts` (`generateLeafMappedSteps()`) — wraps fallback plans into executable `TaskStep[]` with `meta.authority: 'fallback-macro'`
+  - Intelligent fallback: `task-integration.ts` (`generateIntelligentSteps()`) — delegates to `generateLeafMappedSteps()`; returns empty (correctly triggering `blockedReason: 'no-executable-plan'`) when no valid mapping exists
+  - Craft plans are single-step; the executor's prereq injection handles missing materials via recipe introspection at execution time
 
 ### Execution Layer
 Components that turn plans into actions:
@@ -82,8 +83,10 @@ Components that turn plans into actions:
 - **Modular Server Executor**: The main autonomous loop that selects tasks, finds executable steps, and dispatches them to the Minecraft Interface.
   - Executor loop: `packages/planning/src/modular-server.ts:249` (10s poll interval)
   - Step-to-leaf mapping: `modular-server.ts:743` (`stepToLeafExecution()`)
-  - Authority allowlist: `AUTHORIZED_SOURCES` = `sterling`, `fallback-macro` — only steps from these sources are dispatched
-  - Pre-execution arg validation: `validateLeafArgs()` from `leaf-arg-contracts.ts` blocks invalid args before they reach the bot
+  - Authority normalization: `normalizeStepAuthority()` promotes `meta.source` → `meta.authority` for known sources (`sterling`, `fallback-macro`) before dispatch
+  - Authority allowlist: `AUTHORIZED_SOURCES` = `sterling`, `fallback-macro` — only steps with `meta.authority` in this set are dispatched (no `meta.source` fallback)
+  - Pre-execution arg validation: `validateLeafArgs(leaf, args, strictMode=true)` from `leaf-arg-contracts.ts` — strict mode rejects unknown leaves not in `KNOWN_LEAVES`
+  - Prerequisite injection for craft steps: `injectDynamicPrereqForCraft()` creates gathering subtasks when materials are missing, capped at 3 attempts per task via `metadata.prereqInjectionCount`
   - Task selection with backoff/blocked filtering: `modular-server.ts:1665`
   - MCP tool execution: `modular-server.ts:257`
 
@@ -542,7 +545,6 @@ flowchart TD
   MI <-->|"GET /state, POST /action"| PLAN
   PLAN --> TASK_INT
   TASK_INT -->|"GET /api/cognitive-stream/recent"| COG
-  TASK_INT -->|"POST /generate-steps"| COG
   TASK_INT --> STERLING
   STERLING --> EXEC
   EXEC -->|"MCP tool calls"| MI
@@ -1254,25 +1256,41 @@ This approach ensures that the existing functionality continues to work while ad
 
 ### RESOLVED: Executor Inaction — Cognitive Tasks Always Blocked
 
-**Status:** Fixed.
+**Status:** Fixed (Phase 1 + Phase 2).
 
 **Previous symptom:** The bot generated thoughts and created tasks, but never executed any actions. All tasks appeared with `blockedReason: 'no-executable-plan'`.
 
-**Resolution:** A fallback-macro planner was introduced alongside a leaf arg contract validator:
+**Resolution (Phase 1):** A fallback-macro planner was introduced alongside a leaf arg contract validator:
 
 1. **Extract helpers fixed** (`task-integration.ts`): `extractResourceType()`, `extractItemType()` now return valid Minecraft item IDs (e.g., `oak_log` instead of `wood`, `wooden_pickaxe` instead of `pickaxe`).
 
-2. **Requirement candidate extraction extended** (`task-integration.ts:514-537`): `convertThoughtToTask()` now emits `requirementCandidate` for `mining` and `building` action types (previously only `crafting` and `gathering`).
+2. **Requirement candidate extraction extended** (`task-integration.ts`): `convertThoughtToTask()` now emits `requirementCandidate` for `mining` and `building` action types (previously only `crafting` and `gathering`).
 
 3. **Requirement resolution extended** (`requirements.ts`): `resolveRequirement()` handles `mine` and `build` candidates from thought extraction.
 
-4. **Leaf arg contracts** (`modules/leaf-arg-contracts.ts`, new): `validateLeafArgs()` validates arg shape for known leaves; `requirementToLeafMeta()` maps resolved requirements to validated `{ leaf, args }` pairs.
+4. **Leaf arg contracts** (`modules/leaf-arg-contracts.ts`): `validateLeafArgs()` validates arg shape for known leaves; `requirementToFallbackPlan()` maps resolved requirements to validated fallback step plans.
 
-5. **Fallback-macro step generation** (`task-integration.ts`): `generateLeafMappedSteps()` produces executable steps with `meta.authority: 'fallback-macro'` and validated args. `generateIntelligentSteps()` delegates to it; returns empty (correctly triggering `blockedReason`) when no valid mapping exists.
+5. **Fallback-macro step generation** (`task-integration.ts`): `generateLeafMappedSteps()` uses `requirementToFallbackPlan()` to produce executable steps with `meta.authority: 'fallback-macro'` and validated args.
 
 6. **Executor dispatch broadened** (`modular-server.ts`): `AUTHORIZED_SOURCES` allowlist (`sterling`, `fallback-macro`) replaced hardcoded `source === 'sterling'` check. Pre-execution arg validation via `validateLeafArgs()` blocks invalid args.
 
-**Cognitive steps remain narrative/display only** — execution authority comes from Sterling or the fallback-macro planner, not from label-based inference.
+**Resolution (Phase 2):** Remaining integration gaps closed:
+
+7. **Cognitive step generation removed** (`task-integration.ts`): `generateStepsFromCognitive()` deleted from the pipeline — it produced narrative-only steps that were never executable and blocked the fallback-macro path.
+
+8. **Authority normalization** (`modular-server.ts`): `normalizeStepAuthority()` canonicalizes `meta.source` → `meta.authority` for known sources. Executor checks `meta.authority` only (no `meta.source` fallback).
+
+9. **Strict leaf validation** (`modular-server.ts`): `validateLeafArgs(leaf, args, strictMode=true)` at the executor boundary rejects unknown leaves not in `KNOWN_LEAVES`.
+
+10. **KNOWN_LEAVES expanded** (`leaf-arg-contracts.ts`): Covers all 8 leaves: `dig_block`, `craft_recipe`, `smelt`, `place_block`, `build_module`, `acquire_material`, `replan_building`, `replan_exhausted`.
+
+11. **Prerequisite injection** (`modular-server.ts`): Pre-check (before craft execution) and post-failure (after craft failure) paths inject gathering subtasks via `injectDynamicPrereqForCraft()`, capped at 3 attempts per task.
+
+12. **Goal tag extraction** (`llm-interface.ts` + `task-integration.ts`): LLM prompted to emit `[GOAL: collect oak_log 8]` tags; parsed with regex and takes priority over keyword heuristics.
+
+13. **LLM structured intent extraction** (`task-integration.ts`): When heuristic says 'general' and no goal tag exists, the MLX sidecar (via cognition's `LLMInterface`) extracts structured `{kind, target, quantity}` from ambiguous text. Validates against `VALID_TARGETS` allowlist.
+
+**Execution authority comes from Sterling or the fallback-macro planner, never from label-based inference.**
 
 ---
 
@@ -1280,7 +1298,7 @@ This approach ensures that the existing functionality continues to work while ad
 
 ```
 Planning :3002 ──GET /api/cognitive-stream/recent──► Cognition :3003
-Planning :3002 ──POST /generate-steps─────────────► Cognition :3003
+Planning :3002 ──POST /generate-steps─────────────► Cognition :3003  [DEPRECATED — no longer called by planning]
 Planning :3002 ──POST /api/cognitive-stream/ack───► Cognition :3003
 Planning :3002 ──GET /state───────────────────────► Minecraft Interface :3005
 Planning :3002 ──POST /action─────────────────────► Minecraft Interface :3005

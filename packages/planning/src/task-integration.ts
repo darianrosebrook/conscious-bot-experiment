@@ -16,7 +16,7 @@ import type { MinecraftCraftingSolver } from './sterling/minecraft-crafting-solv
 import type { MinecraftBuildingSolver } from './sterling/minecraft-building-solver';
 import type { MinecraftToolProgressionSolver } from './sterling/minecraft-tool-progression-solver';
 import { resolveRequirement, parseRequiredQuantityFromTitle } from './modules/requirements';
-import { requirementToLeafMeta } from './modules/leaf-arg-contracts';
+import { requirementToFallbackPlan } from './modules/leaf-arg-contracts';
 import { CognitionOutbox } from './modules/cognition-outbox';
 
 // Cognitive stream integration for thought-to-task conversion
@@ -185,6 +185,8 @@ export interface Task {
     nextEligibleAt?: number;
     /** Machine-readable reason why the task cannot make progress. */
     blockedReason?: string;
+    /** Tracks how many times prerequisite injection has been attempted (capped at 3). */
+    prereqInjectionCount?: number;
   };
 }
 
@@ -263,6 +265,9 @@ export class EnhancedTaskIntegration extends EventEmitter {
   // Reentrancy guards for thought polling
   private thoughtPollInFlight = false;
   private seenThoughtIds = new Set<string>();
+
+  // Lazy-initialized LLMInterface for structured intent extraction (MLX sidecar)
+  private _extractionLlm: any = null;
 
   // Non-blocking outbox for cognition side effects
   private cognitionOutbox = new CognitionOutbox();
@@ -434,51 +439,68 @@ export class EnhancedTaskIntegration extends EventEmitter {
 
       const content = thought.content.toLowerCase();
 
+      // Try structured [GOAL: ...] tag first — takes priority over keyword heuristics
+      const goalMatch = thought.content.match(
+        /\[GOAL:\s*(collect|mine|craft|build)\s+([\w]+)(?:\s+(\d+))?\]/i
+      );
+
       // Extract action type from thought content
       let actionType = 'general';
       let taskTitle = thought.content;
       let taskDescription = thought.content;
 
-      // Determine action type based on content
-      if (
-        content.includes('gather') ||
-        content.includes('collect') ||
-        content.includes('wood') ||
-        content.includes('log')
-      ) {
-        actionType = 'gathering';
-        taskTitle = this.extractActionTitle(content, 'gather');
-      } else if (
-        content.includes('craft') ||
-        content.includes('build') ||
-        content.includes('make') ||
-        content.includes('create')
-      ) {
-        actionType = 'crafting';
-        taskTitle = this.extractActionTitle(content, 'craft');
-      } else if (
-        content.includes('mine') ||
-        content.includes('dig') ||
-        content.includes('ore')
-      ) {
-        actionType = 'mining';
-        taskTitle = this.extractActionTitle(content, 'mine');
-      } else if (
-        content.includes('explore') ||
-        content.includes('search') ||
-        content.includes('scout')
-      ) {
-        actionType = 'exploration';
-        taskTitle = this.extractActionTitle(content, 'explore');
-      } else if (
-        content.includes('farm') ||
-        content.includes('plant') ||
-        content.includes('harvest')
-      ) {
-        actionType = 'farming';
-        taskTitle = this.extractActionTitle(content, 'farm');
-      } else {
-        taskTitle = thought.content;
+      if (goalMatch) {
+        const [, kind, , ] = goalMatch;
+        const kindLower = kind.toLowerCase() as 'collect' | 'mine' | 'craft' | 'build';
+        const kindToType: Record<string, string> = {
+          collect: 'gathering', mine: 'mining', craft: 'crafting', build: 'building',
+        };
+        actionType = kindToType[kindLower] || 'general';
+        taskTitle = this.extractActionTitle(content, kindLower);
+      }
+
+      // Determine action type based on content (skipped if goal tag already matched)
+      if (!goalMatch) {
+        if (
+          content.includes('gather') ||
+          content.includes('collect') ||
+          content.includes('wood') ||
+          content.includes('log')
+        ) {
+          actionType = 'gathering';
+          taskTitle = this.extractActionTitle(content, 'gather');
+        } else if (
+          content.includes('craft') ||
+          content.includes('build') ||
+          content.includes('make') ||
+          content.includes('create')
+        ) {
+          actionType = 'crafting';
+          taskTitle = this.extractActionTitle(content, 'craft');
+        } else if (
+          content.includes('mine') ||
+          content.includes('dig') ||
+          content.includes('ore')
+        ) {
+          actionType = 'mining';
+          taskTitle = this.extractActionTitle(content, 'mine');
+        } else if (
+          content.includes('explore') ||
+          content.includes('search') ||
+          content.includes('scout')
+        ) {
+          actionType = 'exploration';
+          taskTitle = this.extractActionTitle(content, 'explore');
+        } else if (
+          content.includes('farm') ||
+          content.includes('plant') ||
+          content.includes('harvest')
+        ) {
+          actionType = 'farming';
+          taskTitle = this.extractActionTitle(content, 'farm');
+        } else {
+          taskTitle = thought.content;
+        }
       }
 
       // Create task parameters based on action type
@@ -541,6 +563,42 @@ export class EnhancedTaskIntegration extends EventEmitter {
         };
       }
 
+      // If goal tag was parsed, override requirementCandidate (takes priority over heuristic).
+      // Note: outputPattern is the generic "what do you want" field in the candidate.
+      // resolveRequirement() maps it to the type-specific shape:
+      //   collect/mine → patterns: [outputPattern]
+      //   build → structure: outputPattern
+      //   craft → outputPattern (pass-through)
+      if (goalMatch) {
+        const [, kind, target, qtyStr] = goalMatch;
+        const kindLower = kind.toLowerCase();
+        const qty = qtyStr ? parseInt(qtyStr, 10) : undefined;
+        parameters.requirementCandidate = {
+          kind: kindLower,
+          outputPattern: target.toLowerCase(),
+          quantity: qty || (kindLower === 'mine' ? 3 : kindLower === 'collect' ? 8 : 1),
+          extractionMethod: 'goal-tag',
+        };
+      }
+
+      // If heuristic says 'general' and no goal tag, try LLM structured extraction
+      if (actionType === 'general' && !goalMatch) {
+        const structured = await this.extractStructuredIntent(thought.content);
+        if (structured) {
+          const kindToType: Record<string, string> = {
+            collect: 'gathering', mine: 'mining', craft: 'crafting', build: 'building',
+          };
+          actionType = kindToType[structured.kind] || actionType;
+          taskTitle = this.extractActionTitle(content, structured.kind);
+          parameters.requirementCandidate = {
+            kind: structured.kind,
+            outputPattern: structured.target,
+            quantity: structured.quantity,
+            extractionMethod: 'llm-structured',
+          };
+        }
+      }
+
       // Create the task (empty steps array — addTask() will synthesize via Sterling)
       const task: Task = {
         id: `cognitive-task-${thought.id}-${Date.now()}`,
@@ -589,6 +647,59 @@ export class EnhancedTaskIntegration extends EventEmitter {
       }
     }
     return content;
+  }
+
+  /** Extract structured intent from ambiguous thought text via local LLM.
+   *  Only called when heuristic says 'general' and no goal tag parsed.
+   *  Routes through cognition's LLMInterface (MLX sidecar). Returns null on failure. */
+  private async extractStructuredIntent(content: string): Promise<{
+    kind: 'collect' | 'mine' | 'craft' | 'build';
+    target: string;
+    quantity: number;
+  } | null> {
+    const VALID_TARGETS = new Set([
+      'oak_log', 'birch_log', 'spruce_log', 'iron_ore', 'cobblestone',
+      'diamond_ore', 'coal_ore', 'stone', 'wooden_pickaxe', 'stone_pickaxe',
+      'iron_pickaxe', 'crafting_table', 'wooden_axe', 'wooden_sword',
+      'furnace', 'chest', 'oak_planks', 'stick',
+    ]);
+
+    try {
+      // Lazy-init: reuse a single LLMInterface instance for structured extraction
+      if (!this._extractionLlm) {
+        const { LLMInterface } = await import('@conscious-bot/cognition');
+        this._extractionLlm = new LLMInterface({ temperature: 0.1, maxTokens: 80, timeout: 3000, retries: 0 });
+      }
+
+      const response = await this._extractionLlm.generateResponse(
+        `Extract the Minecraft goal from this thought. Reply with ONLY valid JSON, nothing else.
+Valid kinds: collect, mine, craft, build
+Valid targets: ${[...VALID_TARGETS].join(', ')}
+
+Thought: "${content}"
+
+Reply with exactly: {"kind":"...","target":"...","quantity":N}`,
+      );
+      const text = (response.text || '').trim();
+
+      // Try to parse full response as JSON first (preferred)
+      try {
+        const parsed = JSON.parse(text);
+        if (parsed.kind && parsed.target && VALID_TARGETS.has(parsed.target)) {
+          return { kind: parsed.kind, target: parsed.target, quantity: parsed.quantity || 1 };
+        }
+      } catch {
+        // Fall back to regex extraction if response includes preamble
+        const match = text.match(/\{[^}]+\}/);
+        if (match) {
+          const parsed = JSON.parse(match[0]);
+          if (parsed.kind && parsed.target && VALID_TARGETS.has(parsed.target)) {
+            return { kind: parsed.kind, target: parsed.target, quantity: parsed.quantity || 1 };
+          }
+        }
+      }
+    } catch { /* MLX sidecar unavailable — fall through to heuristic */ }
+    return null;
   }
 
   /**
@@ -2263,24 +2374,11 @@ export class EnhancedTaskIntegration extends EventEmitter {
     }
 
     // Fallback-macro planner: requirement-driven leaf-mapped steps
-    // This runs BEFORE cognitive steps because cognitive steps are narrative-only
-    // (no meta.leaf/executable) and would block the task if returned first.
     const leafSteps = this.generateLeafMappedSteps(taskData);
     if (leafSteps.length > 0) return leafSteps;
 
-    // Cognitive steps are narrative/display only — NOT executable.
-    // They are useful for dashboard display but cannot drive the executor.
-    // Only returned if no leaf-mapped plan is available.
-    try {
-      const steps = await this.generateStepsFromCognitive(taskData);
-      if (steps && steps.length > 0) {
-        return steps;
-      }
-    } catch (error) {
-      // Cognitive system unavailable — fall through
-    }
-
-    // No executable plan available — return empty to trigger blockedReason
+    // No executable plan available — return empty to trigger blockedReason.
+    // Tasks with steps: [] get blockedReason: 'no-executable-plan' at addTask().
     return [];
   }
 
@@ -2580,56 +2678,6 @@ export class EnhancedTaskIntegration extends EventEmitter {
   }
 
   /**
-   * Generate steps from cognitive system
-   */
-  private async generateStepsFromCognitive(
-    taskData: Partial<Task>
-  ): Promise<TaskStep[]> {
-    try {
-      const response = await fetch('http://localhost:3003/generate-steps', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          task: {
-            title: taskData.title,
-            type: taskData.type,
-            description: taskData.description,
-            priority: taskData.priority,
-            category: taskData.metadata?.category,
-          },
-          context: {
-            currentState: (taskData.metadata as any)?.currentState,
-            environment: (taskData.metadata as any)?.environment,
-          },
-        }),
-        signal: AbortSignal.timeout(5000),
-      });
-
-      if (!response.ok) {
-        throw new Error(`Cognitive system responded with ${response.status}`);
-      }
-
-      const data = (await response.json()) as any;
-      if (data.steps && Array.isArray(data.steps)) {
-        const taskId = taskData.id || 'unknown';
-        return data.steps.map((step: any, index: number) => ({
-          id: `step-cognitive-${taskId}-${index + 1}`,
-          label: step.label,
-          done: false,
-          order: index + 1,
-          estimatedDuration: step.estimatedDuration || 3000,
-          // Cognitive steps are narrative/display only — NOT executable.
-          // Execution authority comes from Sterling or fallback-macro planner.
-        }));
-      }
-    } catch (error) {
-      // Failed to generate steps from cognitive system: ${error}
-    }
-
-    return [];
-  }
-
-  /**
    * Generate leaf-mapped steps from resolved requirement.
    * Uses requirement resolution (not label regex) and validates through
    * the leaf arg contract before marking executable.
@@ -2638,64 +2686,24 @@ export class EnhancedTaskIntegration extends EventEmitter {
     const requirement = resolveRequirement(taskData);
     if (!requirement) return [];
 
-    const leafMeta = requirementToLeafMeta(requirement);
-    if (!leafMeta) return [];
+    const plan = requirementToFallbackPlan(requirement);
+    if (!plan || plan.length === 0) return [];
 
     const taskId = taskData.id || 'unknown';
-
-    if (requirement.kind === 'collect' || requirement.kind === 'mine') {
-      // dig_block with blockType (no pos) does a 10-block cube search
-      return [{
-        id: `step-fallback-${taskId}-1`,
-        label: `${requirement.kind === 'mine' ? 'Mine' : 'Collect'} ${requirement.patterns?.[0] || 'resource'}`,
-        done: false,
-        order: 1,
-        estimatedDuration: 10000,
-        meta: {
-          source: 'fallback-macro',
-          leaf: leafMeta.leaf,
-          executable: true,
-          authority: 'fallback-macro',
-          args: leafMeta.args,
-        },
-      }];
-    }
-
-    if (requirement.kind === 'craft') {
-      return [{
-        id: `step-fallback-${taskId}-1`,
-        label: `Craft ${requirement.outputPattern}`,
-        done: false,
-        order: 1,
-        estimatedDuration: 5000,
-        meta: {
-          source: 'fallback-macro',
-          leaf: leafMeta.leaf,
-          executable: true,
-          authority: 'fallback-macro',
-          args: leafMeta.args,
-        },
-      }];
-    }
-
-    if (requirement.kind === 'build') {
-      return [{
-        id: `step-fallback-${taskId}-1`,
-        label: `Build ${requirement.structure}`,
-        done: false,
-        order: 1,
-        estimatedDuration: 15000,
-        meta: {
-          source: 'fallback-macro',
-          leaf: leafMeta.leaf,
-          executable: true,
-          authority: 'fallback-macro',
-          args: leafMeta.args,
-        },
-      }];
-    }
-
-    return [];
+    return plan.map((step, index) => ({
+      id: `step-fallback-${taskId}-${index + 1}`,
+      label: step.label,
+      done: false,
+      order: index + 1,
+      estimatedDuration: step.leaf === 'dig_block' ? 10000
+        : step.leaf === 'craft_recipe' ? 5000 : 15000,
+      meta: {
+        authority: 'fallback-macro',
+        leaf: step.leaf,
+        executable: true,
+        args: step.args,
+      },
+    }));
   }
 
 
