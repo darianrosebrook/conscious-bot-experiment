@@ -530,10 +530,11 @@ export const GET = async (req: NextRequest) => {
         try {
           // Process external chat and bot responses only
           // Thought generation is now handled by bot lifecycle events
-          const thoughts = [(await generateThoughts()) || []].concat(
-            await processExternalChat(),
-            await processBotResponses()
-          );
+          const thoughts = [
+            ...(await generateThoughts() || []),
+            ...(await processExternalChat() || []),
+            ...(await processBotResponses() || []),
+          ];
 
           if (thoughts.length > 0) {
             // Only log in development mode
@@ -666,6 +667,22 @@ export const POST = async (req: NextRequest) => {
 
     if (!content || content.trim().length === 0) {
       return new Response('Thought content is required', { status: 400 });
+    }
+
+    // Deduplicate: skip if identical content+type was added within the last 30s
+    const trimmedContent = content.trim();
+    const recentCutoff = Date.now() - 30_000;
+    const duplicate = thoughtHistory.find(
+      (old) =>
+        old.content === trimmedContent &&
+        old.type === (type || 'intrusive') &&
+        old.timestamp > recentCutoff
+    );
+    if (duplicate) {
+      return new Response(
+        JSON.stringify({ success: true, deduplicated: true, id: duplicate.id }),
+        { headers: { 'Content-Type': 'application/json' } }
+      );
     }
 
     // Add the thought to the history

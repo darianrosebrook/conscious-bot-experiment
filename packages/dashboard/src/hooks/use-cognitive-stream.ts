@@ -140,12 +140,16 @@ export function useCognitiveStream() {
           const payload: CognitiveStreamMessage = JSON.parse(event.data);
 
           if (
-            payload?.type === 'cognitive_thoughts' &&
+            (payload?.type === 'cognitive_thoughts' ||
+              payload?.type === 'cognitive_stream_init') &&
             Array.isArray(payload.data?.thoughts)
           ) {
             const thoughts = payload.data.thoughts as CognitiveThought[];
 
             for (const thought of thoughts) {
+              // Skip malformed or empty thoughts
+              if (!thought?.id || !thought.content) continue;
+
               const parsed = new Date(thought.timestamp);
               const ts = isNaN(parsed.getTime())
                 ? new Date().toISOString()

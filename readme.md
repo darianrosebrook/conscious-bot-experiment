@@ -335,18 +335,10 @@ Scientific investigation of consciousness is challenging due to its subjective n
 Recent advances in AI architectures also motivate our design. Notably, Sapient Intelligence's **Hierarchical Reasoning Model (HRM)** demonstrates that a dual-system approach – a slow abstract planner coupled with a fast reactive problem-solver – can solve complex reasoning tasks with high efficiency[\[2\]](https://www.actuia.com/en/news/promising-alternative-to-chain-of-thought-sapient-bets-on-a-hierarchical-architecture/#:~:text=The%20model%20relies%20on%20a,handles%20fast%20and%20detailed%20execution). This brain-inspired hierarchy aligns with our needs for real-time operation: the agent can employ deliberative reasoning at a high level while still reacting quickly to immediate threats or opportunities. Indeed, HRM's efficiency suggests that **architecture-over-scale** is promising for embedded agents, as HRM achieves strong performance with modest model size and can even be deployed in real-time robotic settings[\[3\]](https://www.actuia.com/en/news/promising-alternative-to-chain-of-thought-sapient-bets-on-a-hierarchical-architecture/#:~:text=The%20use%20cases%20mentioned%20by,time%2C%20dynamic%20environments). Our system design leverages this insight by integrating hierarchical planning mechanisms so that the agent remains responsive and adaptive without incurring large latency (e.g. from lengthy chain-of-thought loops).
 
 Finally, we draw on cognitive theories to inform specific components. For example, Daniel Dennett's concept of the self as a _"center of narrative gravity"_ posits that an individual's identity is essentially the abstract story they construct about themselves[\[4\]](https://cogsci.ucd.ie/oldfiles/introtocogsci/docs/selfctr.htm#:~:text=doesn%27t%20know%20what%20it%27s%20doing,its%20activities%20in%20the%20world). In our agent, we implement a **self-model** that tracks its own history and evolving goals, effectively letting the agent narrativize its experiences as a form of self-understanding. Likewise, Lisa Feldman Barrett's **theory of constructed emotion** suggests that emotional states are not hardwired triggers but emerge from the brain's predictive interpretation of interoceptive signals in context[\[5\]](https://en.wikipedia.org/wiki/Theory_of_constructed_emotion#:~:text=The%20theory%20of%20constructed%20emotion,3). This guides how we treat the agent's internal signals (hunger, safety, social comfort) – not as fixed reflexes, but as inputs that _combine to form an affective state_ which can modulate cognition (for instance, simultaneous low health and nearby threats may produce an analogue of "anxiety" that focuses the agent's attention on self-preservation). By grounding our design in such theories, we aim to create an agent that not only performs tasks but does so in a way that **structurally resembles aspects of conscious cognition** (minus the subjective qualia). In sum, the motivation is to explore consciousness _in silico_ by building an AI agent that brings together embodiment, homeostatic drives, memory, planning, and self-reflection in one unified loop.
-
-## Current Implementation Status
-
-**🎉 MILESTONE 1 (FOUNDATION) COMPLETE** - All critical infrastructure modules implemented and tested  
-**🎉 MILESTONE 2 (INTELLIGENCE) COMPLETE** - All memory systems, goal formulation, and constitutional framework implemented  
-**🎉 MILESTONE 3 (PLANNING) COMPLETE** - All planning systems, hierarchical reasoning, and reactive execution implemented
-
-The conscious bot project has achieved **95% implementation completion** with comprehensive cognitive architecture deployed across 11 core packages, including dependency-aware architecture, shared execution contracts, and advanced MCP integration. The system features resolved circular dependencies, complete tool access functionality, and robust execution contracts with comprehensive testing coverage.
-
+ 
 ### Implemented Core Systems
 
-#### ✅ **Executor Contracts Package** (`packages/executor-contracts/`) - 100% Complete
+####  **Executor Contracts Package** (`packages/executor-contracts/`) - 100% Complete
 - **Plan-Body Interface (PBI)**: Enforces contracts between planning and execution systems
 - **Capability Registry** (378 lines) - Built-in capabilities with permissions and rate limiting  
 - **PBI Enforcer** (440 lines) - Runtime guards for reliable plan execution with acceptance criteria
@@ -354,21 +346,21 @@ The conscious bot project has achieved **95% implementation completion** with co
 - **Leaf Factory** (195 lines) - Tool registration and execution with validation and error handling
 - **Execution Verification** - Input/output schema validation and postcondition checking
 
-#### ✅ **Core Package** (`packages/core/`) - 85% Complete
+####  **Core Package** (`packages/core/`) - 85% Complete
 - **Arbiter & Signal Processing** (915 lines) - Central coordination and signal routing
 - **MCP Capabilities** - Capability-driven action system with constitutional filtering
 - **Real-Time Performance** - Budget enforcement and graceful degradation
 - **Advanced Need Generation** (1306 lines) - Sophisticated drive-based goal formulation
 - **Enhanced Task Parser** - Unified task parsing and environmental immersion
 
-#### ✅ **World Package** (`packages/world/`) - 85% Complete
+####  **World Package** (`packages/world/`) - 85% Complete
 - **Visible-Only Sensing** - Ray-casting perception with occlusion discipline
 - **D* Lite Navigation** - Dynamic pathfinding with real-time cost updates
 - **Perception Integration** - Object recognition and confidence tracking
 - **Sensorimotor System** (1030 lines) - Motor control and sensory feedback
 - **Place Graph** (810 lines) - Spatial memory and topological navigation
 
-#### ✅ **Memory Package** (`packages/memory/`) - **Complete Cognitive Domain Coverage**
+####  **Memory Package** (`packages/memory/`) - **Complete Cognitive Domain Coverage**
 - **Multi-Store Memory Architecture** - Episodic, semantic, working, and procedural memory systems
 - **Vector Search Integration** - PostgreSQL + pgvector with 768D embeddings for semantic similarity
 - **GraphRAG-First Retrieval** - Knowledge graph queries with hybrid vector/graph ranking
@@ -438,7 +430,7 @@ The conscious bot project has achieved **95% implementation completion** with co
 - **Emotional-Spatial Integration** - Emotional states influence spatial preferences
 - **Holistic Decision Making** - Combines insights from all domains for comprehensive recommendations
 
-#### ✅ **MCP Server Package** (`packages/mcp-server/`) - 100% Complete
+####  **MCP Server Package** (`packages/mcp-server/`) - 100% Complete
 - **Model Context Protocol Server** (1341 lines) - Standardized integration layer for tool capabilities
 - **Tool Registration & Execution** - Dynamic tool discovery and validation with schema enforcement
 - **Behavior Tree Integration** - BT option management and execution through MCP protocol
@@ -446,7 +438,7 @@ The conscious bot project has achieved **95% implementation completion** with co
 - **Resource Management** - World state and policy resource provisioning
 - **Fallback Support** - Graceful degradation when dependencies are unavailable
 
-#### ✅ **Planning Package** (`packages/planning/`) - 100% Complete
+####  **Planning Package** (`packages/planning/`) - 100% Complete
 - **Hierarchical Planner** (939 lines) - HRM-inspired HTN planning
 - **HTN Memory Manager Integration** - Task effectiveness tracking and method optimization
 - **Integrated Planning Coordinator** - Multi-planner routing and execution coordination
@@ -455,24 +447,24 @@ The conscious bot project has achieved **95% implementation completion** with co
 - **Cognitive Integration** (436 lines) - LLM-assisted planning coordination
 - **MCP Integration** (681 lines) - Tool registration and execution through shared contracts
 
-#### ✅ **Cognition Package** (`packages/cognition/`) - 85% Complete
+####  **Cognition Package** (`packages/cognition/`) - 85% Complete
 - **Cognitive Core** (366 lines) - LLM integration and internal dialogue
 - **Self-Model** (532 lines) - Identity tracking and narrative management
 - **Social Cognition** (1021 lines) - Theory of mind and relationship management
 - **Constitutional Filter** (673 lines) - Ethical rules engine and safety oversight
 - **Intrusion Interface** (604 lines) - External suggestion processing and filtering
 
-#### ✅ **Safety Package** (`packages/safety/`)
+####  **Safety Package** (`packages/safety/`)
 - **Privacy System** (559 lines) - Data protection and consent management
 - **Monitoring System** (671 lines) - Telemetry and health monitoring
 - **Fail-Safes** (725 lines) - Emergency response and watchdog management
 
-#### ✅ **Evaluation Package** (`packages/evaluation/`)
+####  **Evaluation Package** (`packages/evaluation/`)
 - **Performance Analyzer** (916 lines) - Comprehensive metrics and analytics
 - **Scenario Manager** (804 lines) - Test environment orchestration
 - **Curriculum System** (797 lines) - Progressive learning and regression testing
 
-#### ✅ **Minecraft Interface** (`packages/minecraft-interface/`) - 100% Complete
+####  **Minecraft Interface** (`packages/minecraft-interface/`) - 100% Complete
 - **Full Mineflayer Integration** - Complete bot lifecycle management with auto-reconnection
 - **Prismarine-Viewer Integration** - Real-time 3D visualization and debugging interface
 - **HTTP & WebSocket Server** - REST API and real-time communication for bot control
@@ -480,7 +472,7 @@ The conscious bot project has achieved **95% implementation completion** with co
 - **Plan Executor** (551 lines) - Task execution and progress tracking
 - **Chat Processor** (618 lines) - Multi-player communication handling
 
-#### ✅ **Dashboard Package** (`packages/dashboard/`)
+####  **Dashboard Package** (`packages/dashboard/`)
 - **Next.js 15 Interface** - Real-time monitoring and control
 
 ### Current Status
@@ -494,40 +486,40 @@ The conscious bot project has achieved **95% implementation completion** with co
 
 **Current Focus**: E2E test hardening, Sterling solver integration, and MLX sidecar reliability.
 
-### 🧠 **Identity Memory System** (Latest Addition)
+###  **Identity Memory System** (Latest Addition)
 
 The system now includes a comprehensive **identity memory system** that enables the bot to maintain a coherent sense of self through:
 
-#### **🎯 Core Identity Preservation**
+#### ** Core Identity Preservation**
 - **Emotional Memory Decay**: Precisely 2% daily decay rate for emotional memories (as specified)
 - **Identity Memory Guardian**: Protects core identity-defining experiences from excessive forgetting
 - **Significance-Based Protection**: Automatic protection of high-salience memories (≥70% salience threshold)
 - **Self-Concept Snapshots**: Regular tracking of personality traits and value evolution
 
-#### **📖 Self-Narrative Construction**
+#### ** Self-Narrative Construction**
 - **Milestone-Based Narratives**: Automatic generation every 10-24 game days
 - **Multiple Narrative Types**: Growth Reflection, Achievement Celebration, Emotional Processing
 - **Emotional Context Integration**: Weaves emotional experiences into coherent life stories
 - **Identity Reinforcement**: Uses narratives to strengthen and evolve self-concept
 
-#### **🤖 LLM Fine-Tuning with Identity**
+#### ** LLM Fine-Tuning with Identity**
 - **Emotional Memory Integration**: LLM responses incorporate relevant emotional experiences
 - **Self-Narrative Context**: Provides identity-aware responses based on life story
 - **Emotional State Tracking**: Automatic updates and emotional processing validation
 - **Identity Alignment**: Validates responses against established personality and values
 
-#### **🔄 Cross-System Coordination**
+#### ** Cross-System Coordination**
 - **Memory System Orchestration**: Coordinates emotional, identity, and narrative systems
 - **Event-Driven Architecture**: Automatic milestone detection and narrative triggering
 - **Cross-Domain Intelligence**: Integrates insights from all memory domains for holistic decision-making
 
 This identity system ensures the bot maintains **personal continuity** and **emotional authenticity** while evolving through experiences, creating a more coherent and self-aware artificial consciousness.
 
-### 🧠 **Enhanced Memory System Integration** (Latest Addition)
+###  **Enhanced Memory System Integration** (Latest Addition)
 
 The system now features **complete memory system integration** across all cognitive components, enabling the bot to learn from experience and adapt strategies based on historical performance. This represents a major milestone in creating truly cognitive AI behavior.
 
-#### **🎯 Core Memory Integration Features**
+#### ** Core Memory Integration Features**
 
 **Dynamic Memory System Discovery & Connection**
 - **Automatic Endpoint Discovery**: Multiple endpoint support with intelligent failover
@@ -548,7 +540,7 @@ The system now features **complete memory system integration** across all cognit
 - **Temporal Compression**: Memory replay occurs at accelerated speeds during consolidation
 - **Neural Competition**: Memory patterns compete for expression, stronger ones win
 
-#### **🔗 Memory System Architecture**
+#### ** Memory System Architecture**
 
 ```mermaid
 flowchart TD
@@ -582,7 +574,7 @@ flowchart TD
     class EXECUTION execution;
 ```
 
-#### **📊 Memory System Performance**
+#### ** Memory System Performance**
 
 - **Memory-Enhanced Context Retrieval**: <200ms for planning decisions
 - **Neural Competition Simulation**: <30ms for memory consolidation prioritization
@@ -590,13 +582,13 @@ flowchart TD
 - **Memory Consolidation Rate**: 294 memories/second during idle periods
 - **System Health Monitoring**: Real-time telemetry with automatic failover
 
-#### **🚀 Integration Status**
+#### ** Integration Status**
 
-✅ **Complete Integration**: Memory system fully integrated across all components
-✅ **Production Ready**: All TypeScript errors resolved and tested
-✅ **Health Monitoring**: Comprehensive system telemetry with graceful degradation
-✅ **Performance Optimized**: Efficient memory operations with caching and compression
-✅ **Fallback Support**: Graceful degradation when memory system unavailable
+ **Complete Integration**: Memory system fully integrated across all components
+ **Production Ready**: All TypeScript errors resolved and tested
+ **Health Monitoring**: Comprehensive system telemetry with graceful degradation
+ **Performance Optimized**: Efficient memory operations with caching and compression
+ **Fallback Support**: Graceful degradation when memory system unavailable
 
 The memory system integration enables the bot to:
 - **Learn from experience** and avoid past mistakes
@@ -605,7 +597,7 @@ The memory system integration enables the bot to:
 - **Monitor system health** and automatically recover from failures
 - **Scale efficiently** with memory system load
 
-## 🎯 **Dynamic Thought Generation: Revolutionary Enhancement**
+##  **Dynamic Thought Generation: Revolutionary Enhancement**
 
 ### **From Hard-Coded to Context-Aware Cognition**
 
@@ -691,27 +683,27 @@ flowchart TD
 
 | Integration Area | Status | Implementation |
 |------------------|---------|----------------|
-| **Executor Contracts → All** | ✅ Complete | Shared interfaces prevent circular dependencies |
-| **Core → World** | ✅ Complete | Navigation, perception, sensorimotor fully integrated |
-| **Core → Safety** | ✅ Complete | Constitutional filtering, monitoring fully integrated |
-| **Core → Memory** | ✅ Complete | Signal storage, knowledge integration fully integrated |
-| **Planning → MCP Server** | ✅ Complete | Tool execution through MCP protocol with fallback |
-| **Planning → Memory** | ✅ Complete | Knowledge integration, experience utilization |
-| **Planning → World** | ✅ Complete | Spatial reasoning and navigation integration |
-| **HTN Memory → Planning** | ✅ Complete | Effectiveness tracking, method optimization |
-| **MCP Server → Executor Contracts** | ✅ Complete | Shared tool interfaces and execution validation |
-| **Safety → All Modules** | ✅ Complete | Constitutional oversight, monitoring coverage |
+| **Executor Contracts → All** |  Complete | Shared interfaces prevent circular dependencies |
+| **Core → World** |  Complete | Navigation, perception, sensorimotor fully integrated |
+| **Core → Safety** |  Complete | Constitutional filtering, monitoring fully integrated |
+| **Core → Memory** |  Complete | Signal storage, knowledge integration fully integrated |
+| **Planning → MCP Server** |  Complete | Tool execution through MCP protocol with fallback |
+| **Planning → Memory** |  Complete | Knowledge integration, experience utilization |
+| **Planning → World** |  Complete | Spatial reasoning and navigation integration |
+| **HTN Memory → Planning** |  Complete | Effectiveness tracking, method optimization |
+| **MCP Server → Executor Contracts** |  Complete | Shared tool interfaces and execution validation |
+| **Safety → All Modules** |  Complete | Constitutional oversight, monitoring coverage |
 
-#### Dependency Resolution ✅
+#### Dependency Resolution 
 - **Circular Dependency Elimination**: Resolved core ↔ planning ↔ mcp-server cycles
 - **Clean Architecture**: 11 packages with strict layered dependencies
 - **Shared Contracts**: Executor contracts provide common interfaces without coupling
 - **Build Reliability**: All packages build successfully with no dependency conflicts
 
 #### Additional Integration Status
-| **Evaluation → All Modules** | 🔄 Partial | Basic metrics complete, advanced assessment needed |
-| **Minecraft Interface** | ✅ Complete | Full integration with comprehensive testing |
-| **Service Management** | ✅ Complete | All 9 services + Docker infrastructure running and healthy |
+| **Evaluation → All Modules** |  Partial | Basic metrics complete, advanced assessment needed |
+| **Minecraft Interface** |  Complete | Full integration with comprehensive testing |
+| **Service Management** |  Complete | All 9 services + Docker infrastructure running and healthy |
 
 ### Recent Major Improvements
 
@@ -803,643 +795,194 @@ The system is **research-ready** for consciousness studies with:
 
 ## Cognitive Architecture Overview
 
-To instantiate these ideas, we have designed a modular cognitive architecture for the Minecraft agent. The architecture (summarized in Figure 1 below) is organized into interconnected modules, each corresponding to a cognitive function observed in natural agents. Information flows through these modules in recurrent loops: from sensing the environment, to updating internal state, to deliberation and action selection, and back out to effect changes in the world. This **perception-cognition-action loop** runs continuously in real time with strict performance constraints to ensure responsive behavior. We describe each major component of the architecture and how they integrate:
+The cognitive architecture is implemented as a set of microservices that communicate over HTTP and Server-Sent Events (SSE). Each service runs on a dedicated port and owns a specific cognitive function. The perception-cognition-action loop runs continuously: the bot senses the Minecraft world, generates thoughts about what it observes, converts actionable thoughts into tasks, plans steps for those tasks (via Sterling symbolic solvers or LLM fallback), and executes steps through the Minecraft Interface.
 
-**Figure 1: High-Level Cognitive Architecture (Conceptual Diagram)**
+For a detailed component-level design document, see [`docs/planning/cognitive-flow-detailed.md`](docs/planning/cognitive-flow-detailed.md).
+
+### Running Service Topology
+
+| Service | Port | Entry Point | Role |
+|---------|------|-------------|------|
+| Dashboard | 3000 | `packages/dashboard/src/app/` (Next.js) | Web UI, SSE cognitive stream, API proxy |
+| Memory | 3001 | `packages/memory/src/server.ts` | Episodic/semantic/working memory, PostgreSQL + pgvector |
+| Planning | 3002 | `packages/planning/src/modular-server.ts` | Task executor, Sterling solvers, world-state polling |
+| Cognition | 3003 | `packages/cognition/src/server.ts` | Thought generation (event-driven + LLM), step generation |
+| World | 3004 | `packages/world/src/server.ts` | World state aggregation, environment snapshots |
+| Minecraft Interface | 3005 | `packages/minecraft-interface/src/server.ts` | Mineflayer bot control, MCP tools, action execution |
+| Viewer | 3006 | (served by minecraft-interface) | Prismarine 3D viewer |
+| Core Registry | 3007 | `packages/core/src/server.ts` | Capability leaf/option registry |
+
+**Figure 1: Running Architecture**
 
 ```mermaid
 flowchart TD
-  %% Inputs
-  ENV[Environment Signals]
-  SMI[Sensorimotor Interface]
-  MEMAPI[Memory Service /state]
-  LLM[LLM Endpoint]
+  %% Minecraft World
+  MC["Minecraft Server<br/>(Docker)"]
 
-  ENV -->|events| SMI
-  SMI -->|snapshots| SNAP[Environment Snapshot Builder]
-  SMI -->|sensor data| HM[Homeostasis Monitor]
+  %% Services with ports and file references
+  MI["Minecraft Interface :3005<br/>packages/minecraft-interface/src/server.ts<br/>(mineflayer bot + MCP tools)"]
+  PLAN["Planning Service :3002<br/>packages/planning/src/modular-server.ts<br/>(executor loop + Sterling solvers)"]
+  COG["Cognition Service :3003<br/>packages/cognition/src/server.ts<br/>(thought generation + LLM)"]
+  MEM["Memory Service :3001<br/>packages/memory/src/server.ts<br/>(PostgreSQL + pgvector)"]
+  WORLD["World Service :3004<br/>packages/world/src/server.ts<br/>(state aggregation)"]
+  DASH["Dashboard :3000<br/>packages/dashboard/src/app/<br/>(Next.js + SSE stream)"]
+  CORE["Core Registry :3007<br/>packages/core/src/server.ts<br/>(capability registry)"]
 
-  %% Bootstrap Stage
-  SNAP --> BOOT
-  MEMAPI -->|recent actions| BOOT
-  HTN_MEM -.->|effectiveness history| BOOT
-  BOOT["Task Bootstrapper<br/>(memory -> llm -> exploration)"]
-  BOOT -->|recovered tasks| GOALS
-  BOOT -->|diagnostics<br/>planning.bootstrap.tasks| OBSLOG[Observability]
-  LLM -.->|prompt + JSON| BOOT
+  %% Primary data flows
+  MC <-->|"mineflayer events<br/>+ bot actions"| MI
+  MI <-->|"GET /state<br/>POST /action"| PLAN
+  PLAN -->|"GET /api/cognitive-stream/recent<br/>POST /generate-steps"| COG
+  PLAN -->|"GET /world-state"| WORLD
+  PLAN <-->|"memory store/retrieve"| MEM
+  COG -->|"POST thoughts"| DASH
+  DASH -->|"SSE cognitive_thoughts"| BROWSER["Browser Client"]
+  DASH -->|"GET /api/tasks → proxy"| PLAN
+  WORLD -->|"GET /world-state"| PLAN
+  BROWSER -->|"POST intrusive thought"| DASH
+  DASH -->|"POST /api/cognitive-stream"| COG
 
-  %% Advanced Need Processing
-  HM --> NEEDS["Advanced Need Generator<br/>(context gates + trend analysis)"]
-  NEEDS --> GOALS["Enhanced Goal Manager<br/>(priority scoring + memory integration)"]
-  GOALS --> ROUTER["Cognitive Task Router<br/>(HRM-inspired routing)"]
-  MEMAPI -.->|memory signals| NEEDS
+  %% Styling
+  classDef service fill:#0b7285,stroke:#023047,color:#fff;
+  classDef external fill:#5c677d,stroke:#1d3557,color:#fff;
+  classDef ui fill:#2e8b57,stroke:#1b4332,color:#fff;
 
-  %% HTN Memory Manager
-  MEMAPI -.->|htn memory signals| HTN_MEM
-  HTN_MEM --> ROUTER
-
-  %% Planning and Execution
-  ROUTER -->|structured| HRM["HRM-Inspired Planner<br/>(navigation + logic)"]
-  ROUTER -->|htn| HTN["HTN Planner<br/>(hierarchical decomposition)"]
-  ROUTER -->|llm| LLM["LLM Reasoning<br/>(creative + social)"]
-  ROUTER -->|collaborative| COLLAB["Hybrid Reasoning<br/>(ethical decisions)"]
-  ROUTER -->|emergency| FAST["Fast Path<br/>(emergency actions)"]
-
-  HRM --> EXEC["Enhanced Reactive Executor<br/>(GOAP + plan repair + safety)"]
-  HTN --> EXEC
-  LLM --> EXEC
-  COLLAB --> EXEC
-  FAST --> EXEC
-  EXEC --> ACTIONS["Minecraft Interface<br/>(mineflayer + prismarine-viewer + HTTP server)"]
-  ACTIONS -->|action outcomes| INT_THT["Intrusive Thought Processor<br/>(external suggestions)"]
-  INT_THT --> ROUTER
-  ACTIONS --> ENV
-
-  %% Feedback & Memory Updates
-  EXEC -->|plan metrics| OBSLOG
-  ACTIONS --> PROV[Provenance Recorder]
-  PROV --> MEMAPI
-  EXEC -.->|task outcomes| BOOT
-  PROV --> OBSLOG
-
-  classDef stage fill:#0b7285,stroke:#023047,color:#fff;
-  classDef memory fill:#5c677d,stroke:#1d3557,color:#fff;
-  classDef observe fill:#adb5bd,stroke:#495057,color:#333;
-  classDef input fill:#2e8b57,stroke:#1b4332,color:#fff;
-  classDef planning fill:#ffa500,stroke:#cc5500,color:#000;
-  classDef execution fill:#dc143c,stroke:#8b0000,color:#fff;
-
-  class ENV,SMI,HM input;
-  class NEEDS,GOALS,ROUTER,HRM,LLM,COLLAB,FAST,BOOT,HTN_MEM planning;
-  class EXEC execution;
-  class MEMAPI,PROV memory;
-  class SNAP,OBSLOG observe;
-  class INT_THT planning;
+  class MI,PLAN,COG,MEM,WORLD,CORE service;
+  class MC external;
+  class DASH,BROWSER ui;
 ```
 
-_(The diagram shows how sensory data and internal drives lead to goal formulation, planning, and action. Memory and self-model modules feed into decision-making, while an intrusion interface allows external input. The Cognitive Core (LLM) interfaces with various modules to provide high-level reasoning and narrative thought.)_
+### Thought Type Taxonomy
 
-For a detailed, module-level view of the cognitive pipeline (including task bootstrap, planner selection, and observability), see [`docs/planning/cognitive-flow-detailed.md`](docs/planning/cognitive-flow-detailed.md).
+The cognitive stream carries four categories of thought, each with distinct origins and purposes:
 
-### Real-Time Constraints & Degradation
+| Type | Attribution | Origin | Purpose |
+|------|------------|--------|---------|
+| **Reflection** | `self` | Cognition service LLM (`packages/cognition/src/event-driven-thought-generator.ts`) | Periodic self-reflection, task completion analysis, idle-period planning |
+| **Environmental** | `self` | Cognition service observation pipeline (with `cognitiveSystem: 'environmental-fallback'` when LLM fails) | Observations about the world — health, inventory, biome, threats. Deduplicated at 30s intervals |
+| **Internal** | `self` | Planning service (`packages/planning/src/task-integration.ts:414`) | Internal reasoning during task creation, step generation, and execution |
+| **Intrusive** | `intrusive` | Dashboard UI → `POST /api/ws/cognitive-stream` → Cognition service | External suggestions injected by human operators through the dashboard |
 
-To ensure the agent remains responsive in a dynamic environment like Minecraft, we implement strict **real-time budgets** and **graceful degradation** mechanisms:
+The cognition service generates thoughts in response to bot lifecycle events (`packages/cognition/src/event-driven-thought-generator.ts:81`):
 
-- **Tick budgets:** Target end-to-end control loop ≤ **50 ms p95** in hazardous contexts (combat, lava) and ≤ **200 ms p95** in routine contexts.
-- **Preemption ladder:** Reflexes (flee/eat/defend) preempt GOAP, which preempts HRM/HTN, which preempts LLM reflection.
-- **Watchdogs:** If any module overruns its budget, trip a **safe-mode**: cancel long plans, hold position, raise shield, or path to nearest lit node.
-- **Graceful degradation:** If LLM is unavailable or slow, route **LLM→HRM** for structure only; if HRM stalls, route **HRM→GOAP reflex set**.
+- `task_completed` → **reflection** thought
+- `task_failed` → **internal_dialogue** thought
+- `idle_period` → **planning** thought
+- `task_switch` → **observation** thought
 
-```python
-def control_loop_tick():
-    deadline = now() + budget(context)
-    action = try_reflex() or arbiter.select()
-    if time_to_deadline() < epsilon:
-        action = SAFE_MODE_ACTION
-    execute(action)
+These are transmitted to the dashboard via SSE (`packages/dashboard/src/app/api/ws/cognitive-stream/route.ts`) and rendered in the cognitive stream panel.
+
+### Cognitive Stream Flow
+
+The cognitive stream is the central nervous system connecting thought generation to the dashboard UI.
+
+```mermaid
+sequenceDiagram
+    participant MC as Minecraft Server
+    participant MI as Minecraft Interface :3005
+    participant PLAN as Planning :3002
+    participant COG as Cognition :3003
+    participant DASH as Dashboard API :3000
+    participant UI as Browser (SSE)
+
+    Note over PLAN: Executor loop (10s interval)<br/>modular-server.ts:249
+    PLAN->>MI: GET /state (world snapshot)
+    MI->>MC: mineflayer events
+    MC-->>MI: bot state, entities, blocks
+    MI-->>PLAN: world state JSON
+
+    PLAN->>COG: POST lifecycle event<br/>(idle_period, task_completed, etc.)
+    COG->>COG: event-driven-thought-generator.ts:81<br/>generateThoughtForEvent()
+    COG-->>DASH: POST /api/ws/cognitive-stream<br/>{ type, content, attribution }
+
+    DASH->>DASH: route.ts: addThought()<br/>30s content dedup
+    DASH-->>UI: SSE event: cognitive_thoughts<br/>{ thoughts: [...] }
+
+    UI->>UI: use-cognitive-stream.ts:136<br/>onmessage → addThought()
+    UI->>UI: dashboard-store.ts:142<br/>30s client dedup + 100 thought cap
 ```
 
-**Metrics to log:** loop-time p50/p95/p99, module latencies, preemption count, and safe-mode invocations.
+**Key code paths:**
+- Thought generation: `packages/cognition/src/event-driven-thought-generator.ts:81`
+- SSE endpoint + persistence: `packages/dashboard/src/app/api/ws/cognitive-stream/route.ts`
+- Client SSE hook: `packages/dashboard/src/hooks/use-cognitive-stream.ts:111`
+- Zustand store with dedup: `packages/dashboard/src/stores/dashboard-store.ts:142`
 
-### Sensorimotor Interface (Embodied Perception and Action)
+### Task Execution Pipeline
 
-At the base of the cognitive loop is the **Sensorimotor Interface**, which connects the agent to the Minecraft world through a structured **Capability Bus (MCP)** that provides clean, testable contracts between cognition and embodied actions.
+Tasks are the bridge between cognitive thoughts and physical actions in the Minecraft world.
 
-#### Capability Bus (MCP) & Sandboxing
+```mermaid
+flowchart TD
+    %% Thought to Task
+    THOUGHTS["Cognitive Thoughts<br/>task-integration.ts:349<br/>(polled every 30s)"]
+    FILTER["Action Word Filter<br/>task-integration.ts:100<br/>(gather, craft, mine, explore...)"]
+    CONVERT["convertThoughtToTask()<br/>task-integration.ts:414"]
 
-All actions are exposed as **capabilities** with typed schemas (preconditions/effects, cost hints, safety tags). Rate-limiting and **capability whitelists** enforce Constitution rules at the API boundary. Mineflayer, pathfinder, inventory, crafting, and raycast operations live behind MCP.
+    THOUGHTS --> FILTER
+    FILTER -->|"actionable thoughts"| CONVERT
 
-```json
-{
-  "capability": "place_block",
-  "pre": ["Has(item='torch',qty>=1)", "At(target<=3m)"],
-  "eff": ["Lit(target)=true","Has(torch,-1)"],
-  "cost_hint": 12,
-  "safety": ["reversible","no_grief"]
-}
+    %% Step Generation (4 paths)
+    CONVERT --> STEPS["generateDynamicSteps()<br/>task-integration.ts:2206"]
+
+    STEPS -->|"path 1"| STERLING_TP["Sterling Tool Progression<br/>task-integration.ts:2210<br/>meta.executable = !!meta.leaf"]
+    STEPS -->|"path 2"| STERLING_CR["Sterling Crafting Solver<br/>task-integration.ts:2222<br/>meta.executable = !!meta.leaf"]
+    STEPS -->|"path 3"| STERLING_BL["Sterling Building Solver<br/>task-integration.ts:2234<br/>meta.executable = !!meta.leaf"]
+    STEPS -->|"path 4 (fallback)"| COG_STEPS["generateStepsFromCognitive()<br/>task-integration.ts:2560<br/>⚠ MISSING meta.leaf"]
+    STEPS -->|"path 5 (last resort)"| INTEL_STEPS["generateIntelligentSteps()<br/>task-integration.ts:2607<br/>⚠ MISSING meta.leaf"]
+
+    %% Executability Check
+    STERLING_TP --> EXEC_CHECK
+    STERLING_CR --> EXEC_CHECK
+    STERLING_BL --> EXEC_CHECK
+    COG_STEPS --> EXEC_CHECK
+    INTEL_STEPS --> EXEC_CHECK
+
+    EXEC_CHECK["Executability Check<br/>task-integration.ts:1015<br/>step.meta?.leaf || meta?.executable"]
+
+    EXEC_CHECK -->|"has executable steps"| QUEUE["Task Queue<br/>modular-server.ts:1665"]
+    EXEC_CHECK -->|"no executable steps"| BLOCKED["blockedReason: no-executable-plan<br/>⚠ KNOWN BUG"]
+
+    %% Execution
+    QUEUE --> EXECUTOR["Executor Loop (10s)<br/>modular-server.ts:249<br/>stepToLeafExecution()"]
+    EXECUTOR -->|"MCP tool call"| MI["Minecraft Interface :3005<br/>bot.dig(), bot.navigate(), etc."]
+
+    %% Styling
+    classDef bug fill:#dc143c,stroke:#8b0000,color:#fff;
+    classDef sterling fill:#2e8b57,stroke:#1b4332,color:#fff;
+    classDef fallback fill:#ffa500,stroke:#cc5500,color:#000;
+
+    class BLOCKED,COG_STEPS,INTEL_STEPS bug;
+    class STERLING_TP,STERLING_CR,STERLING_BL sterling;
 ```
 
-#### Visible-Only Sensing Policy
+### Known Bug: Executor Inaction (Cognitive Tasks Blocked)
 
-Perception is implemented in a human-like, **visible-only** manner with strict occlusion discipline:
+**Status:** Open, documented for external review.
 
-- **First-hit occlusion discipline:** The agent does not omnisciently know the full world state; instead it queries what a player's senses could realistically obtain using ray-casting with a configurable transparent-pass list.
-- **Confidence decay:** Observations that aren't refreshed lose confidence over time; re-sighting resets `lastSeen` timestamps.
-- **Audit trail:** Every memory item stores `evidence=[obs_ids...]` for provenance tracking.
+**Root cause:** When Sterling symbolic solvers cannot handle a thought (most free-form cognitive thoughts like "I should gather wood"), the system falls back to `generateStepsFromCognitive()` (`task-integration.ts:2560`) or `generateIntelligentSteps()` (`task-integration.ts:2607`). Both produce steps **without** `meta.leaf` or `meta.executable` fields.
 
-For vision, we perform ray-casting from the agent's point of view to detect nearby entities and terrain within line of sight. A discretized ray-traversal algorithm (such as the Amanatides–Woo **DDA** algorithm for stepping through grid cells) finds the first solid block in each direction, respecting occlusion (e.g. the agent can't "see" through walls). This yields an observation of visible blocks, creatures, and items, akin to the agent having eyes. We maintain an **Observed Resources list** that tracks noteworthy objects (like ore blocks or chests) that have been seen, along with metadata (position, when last seen, confidence). Observations in this list decay over time if not refreshed, reflecting uncertainty about the world when out of sight.
+The executability check at `task-integration.ts:1015` then marks these tasks with `blockedReason: 'no-executable-plan'`, and the executor loop at `modular-server.ts:1665` filters them out. Result: the bot generates thoughts and creates tasks, but never executes any cognitive-originated actions.
 
-In addition to vision, the sensorimotor module monitors other environmental cues: ambient light level (for time of day or underground), current weather (rain, thunder), and proximate sounds or chat messages. It also provides actuators: the agent can move (walk, jump, turn), manipulate items (mine blocks, use tools, place blocks), engage in combat (attack or defend), and communicate (send chat messages). All actions are issued through this interface, which translates high-level intents (like "walk to X") into low-level game commands (pathfinding to X, step by step). We emphasize **real-time coupling**: the agent continuously interleaves sensing and acting. For example, as it walks forward it keeps scanning for obstacles or enemies, enabling quick reactions. This tight feedback loop ensures the agent is _embodied_ in the Minecraft world, experiencing consequences of actions immediately through sensory updates.
+**Sterling solver steps work correctly** because they set `meta.executable = !!s.meta?.leaf` (e.g., `task-integration.ts:2325`).
 
-Finally, we construct a persistent **Place Graph** data structure as part of the world model. Key locations that the agent encounters (such as its home base, villages, significant terrain features, resource-rich mines, etc.) are represented as nodes in a graph, roughly one node per Minecraft "chunk" or area of interest. Edges between nodes capture connectivity or known paths (with weights like distance or danger cost). The Place Graph allows the agent to plan navigationally at a higher level – it can reason "I am at the Village node, my base is at HomeBase node via connect path through Forest node" rather than pathfinding through every block each time.
+**Fix needed:** `generateStepsFromCognitive()` and `generateIntelligentSteps()` must set `meta.executable: true` and a valid `meta.leaf` on returned steps so the executor recognizes them as actionable.
 
-#### Navigation Under Change: D* Lite
+### Inter-Service Communication
 
-For robust pathfinding in dynamic environments, we implement:
-
-- **D* Lite** (or **Anytime D***) as the pathfinder core to minimize replans and keep motion smooth when the map changes.
-- **Dynamic cost overlays:** **light deficits**, **mob heatmaps**, **fall/lava risk** that update edge weights in real-time.
-- **Performance metrics:** **replan latency p95**, **path optimality ratio**, **number of edge updates per minute**.
-
-The Place Graph is updated as the agent explores (e.g., discovering a new shortcut or encountering a blocked route). It complements the fine-grained voxel map by offering an **adaptive topological map** for efficient route planning and spatial memory.
-
-_(Implementation note: We will leverage the Mineflayer API for Minecraft to gather observations and perform actions. Ray-casting can be achieved via Mineflayer's world methods or a custom DDA implementation. For pathfinding, existing libraries (like Mineflayer-pathfinder) can be used to translate high-level movement goals into low-level movements. Data structures like the Place Graph can be stored in memory or on disk (JSON or a small graph database) for persistence.)_
-
-### Enhanced Task Parsing & Environmental Immersion
-
-Building on successful patterns from autonomous Minecraft bot implementations, we incorporate sophisticated **task parsing** and **environmental immersion** capabilities that enhance the agent's ability to understand and interact with its world.
-
-#### Unified Task Parser & LLM Integration
-
-The agent employs a **unified task parsing system** that standardizes LLM output processing across all cognitive modules:
-
-**Structured Task Definition Schema:**
-```typescript
-interface TaskDefinition {
-  type: 'gathering' | 'processing' | 'farming' | 'crafting' | 'exploration' | 'social' | 'construction';
-  parameters: Record<string, any>;
-  priority?: number;
-  timeout?: number;
-  safety_level?: 'safe' | 'risky' | 'dangerous';
-  estimated_duration?: number;
-  dependencies?: string[];
-  fallback_actions?: string[];
-}
 ```
-
-**LLM Output Processing Pipeline:**
-```typescript
-// Example LLM output parsing
-{
-  "type": "gathering",
-  "parameters": {
-    "resource": "cobblestone",
-    "quantity": 64,
-    "location": "nearest_surface",
-    "tool_required": "pickaxe"
-  },
-  "priority": 0.8,
-  "safety_level": "safe",
-  "estimated_duration": 300000 // 5 minutes
-}
+Planning :3002 ──GET /api/cognitive-stream/recent──► Cognition :3003
+Planning :3002 ──POST /generate-steps─────────────► Cognition :3003
+Planning :3002 ──POST /api/cognitive-stream/ack───► Cognition :3003
+Planning :3002 ──GET /state───────────────────────► Minecraft Interface :3005
+Planning :3002 ──POST /action─────────────────────► Minecraft Interface :3005
+Planning :3002 ──memory store/retrieve────────────► Memory :3001
+World :3004 ────GET /world-state──────────────────► Planning :3002
+Dashboard :3000 ─GET /api/tasks (proxy)────────────► Planning :3002
+Dashboard :3000 ─GET /api/state (proxy)────────────► Planning :3002
+Dashboard :3000 ─GET /versioning/active────────────► Memory :3001
+Browser ────────POST /api/ws/cognitive-stream──────► Dashboard :3000 (intrusive thoughts)
+Dashboard :3000 ─SSE cognitive_thoughts────────────► Browser (real-time stream)
 ```
-
-**Task Validation & Feasibility Analysis:**
-- **Resource availability checking** (inventory, tools, materials)
-- **Location accessibility** (pathfinding, safety assessment)
-- **Time constraints** (day/night cycle, urgency)
-- **Skill requirements** (crafting knowledge, combat ability)
-- **Risk assessment** (environmental hazards, mob presence)
-
-#### Environmental Immersion & Context Awareness
-
-The agent maintains deep **environmental immersion** through continuous context monitoring and adaptive behavior:
-
-**Environmental Context Tracking:**
-```typescript
-interface EnvironmentalContext {
-  time_of_day: 'dawn' | 'day' | 'dusk' | 'night';
-  weather: 'clear' | 'rain' | 'storm' | 'snow';
-  biome: string;
-  light_level: number;
-  threat_level: number;
-  nearby_entities: EntityInfo[];
-  resource_availability: ResourceMap;
-  social_context: SocialContext;
-}
-```
-
-**Context-Aware Behavior Adaptation:**
-- **Time-based behavior** (seek shelter at night, farm during day)
-- **Weather adaptation** (avoid swimming in storms, use torches in rain)
-- **Threat assessment** (evade hostile mobs, protect friendly NPCs)
-- **Resource optimization** (prioritize scarce materials, conserve tools)
-- **Social awareness** (respect player space, offer assistance)
-
-**Progressive Task Execution with Recovery:**
-```typescript
-interface TaskExecution {
-  task: TaskDefinition;
-  status: 'pending' | 'in_progress' | 'completed' | 'failed' | 'paused';
-  progress: number; // 0-1
-  current_step: string;
-  attempts: number;
-  last_attempt: number;
-  error_history: ErrorInfo[];
-  recovery_strategies: RecoveryStrategy[];
-}
-```
-
-#### Direct Mineflayer Integration Patterns
-
-Following proven patterns from successful Minecraft bot implementations, we use **direct mineflayer integration** with minimal abstraction layers:
-
-**Action Execution Pipeline:**
-```typescript
-// Direct action execution without HTTP overhead
-async gatherBlock(blockType: string, quantity: number): Promise<GatherResult> {
-  const targetBlocks = await this.findBlocks(blockType, quantity);
-  const results = [];
-  
-  for (const block of targetBlocks) {
-    try {
-      await this.bot.dig(block);
-      results.push({ success: true, block, position: block.position });
-    } catch (error) {
-      results.push({ success: false, block, error: error.message });
-    }
-  }
-  
-  return {
-    success: results.some(r => r.success),
-    gathered: results.filter(r => r.success).length,
-    results
-  };
-}
-```
-
-**Event-Driven World Monitoring:**
-```typescript
-// Real-time event handling
-this.bot.on('blockUpdate', (oldBlock, newBlock) => {
-  this.worldModel.updateBlock(oldBlock.position, newBlock);
-  this.placeGraph.updateConnectivity(oldBlock.position, newBlock);
-});
-
-this.bot.on('entityMoved', (entity) => {
-  if (entity.type === 'mob' && entity.isHostile) {
-    this.threatAssessment.updateThreatLevel(entity);
-  }
-});
-```
-
-**Progress Persistence & Recovery:**
-```typescript
-interface TaskStorage {
-  saveProgress(taskId: string, progress: TaskProgress): void;
-  loadProgress(taskId: string): TaskProgress | null;
-  resumeTask(taskId: string): Promise<boolean>;
-  cleanup(): void;
-}
-```
-
-### Homeostasis and Internal Drives
-
-The **Homeostasis Monitor** simulates the agent's internal bodily and emotional state. It continuously tracks key survival variables exposed by the game and other vitals: health (hit points), hunger level (food saturation), fatigue (time since last rest), daylight exposure, proximity to threats (monsters), social contact (time since last encountered a friendly player or NPC), etc. These raw signals are transformed into **needs** or drives that mirror those in living organisms. For instance, declining food level triggers a "hunger" drive; low health and nearby enemies triggers a "fear/escape" urgency; long periods without seeing any other agents might trigger a "loneliness" or curiosity drive for social interaction. The homeostasis module outputs a set of need signals like _"I need to eat"_, _"I feel unsafe"_, or _"I want to explore for company"_, each with an intensity value based on how far the variable deviates from optimal range.
-
-Crucially, these internal signals are used to **bias the agent's cognition and behavior**, much as interoceptive feelings bias humans. Needs feed into the goal-selection process (described in the next section) by contributing to a priority score. Multiple signals can combine in interesting ways, leading to emergent analogues of emotion. For example, if the agent is low on health (need for safety), in a dark area (higher threat), and has been alone for a long time (social need), the convergence of these might produce a state comparable to _anxiety_: the agent becomes hyper-vigilant and strongly motivated to reach a safe, well-lit place (resolving the threat and safety needs) before doing anything else. In contrast, being well-fed and safe but bored might produce a _curiosity_ drive, leading the agent to explore or seek stimulation. We treat these _emotive states_ as modulators: they can affect the agent's attention (what it focuses on in perception), its decision thresholds (how cautiously or boldly it acts), and even its dialogue tone (an "anxious" agent might use more urgent language).
-
-This approach aligns with the **theory of constructed emotion**, which views emotions not as fixed circuits but as context-dependent interpretations of bodily signals[\[5\]](https://en.wikipedia.org/wiki/Theory_of_constructed_emotion#:~:text=The%20theory%20of%20constructed%20emotion,3). Here the agent "interprets" its own internal milieu to construct an affective state that influences cognition. By modeling hunger, fatigue, fear, etc., we give the agent a form of _interoception_ — it knows something about its internal state and can act to correct imbalances (eat to satiate hunger, rest to reduce fatigue, seek allies to reduce loneliness, etc.). This creates a **self-preserving, self-motivating behavior loop**: the agent is not purely driven by external commands, but also by internally generated needs, which is an important aspect of autonomous agency and arguably a cornerstone of consciousness.
-
-#### Intrinsic Motivation (Curiosity) with Budget Guardrails
-
-Beyond survival needs, the agent incorporates structured exploration drives:
-
-- **Curiosity bonus** via count-based novelty (visitation counts on Place Graph) or lightweight RND; **cap** curiosity CPU to ≤ 10% of tick budget.
-- Gate curiosity by **Integrity** (promises due) and **Safety** (night/hostiles reduce exploration weight).
-
-This ensures the agent balances exploration with responsiveness and doesn't neglect critical survival or social obligations while pursuing novelty.
-
-_(Implementation note: Monitoring these variables can be done through the game API (for health, hunger) and simple timers (for time since social contact). We will design a heuristic function to convert raw values into need urgency. For example, need_hunger = max(0, (100 - food_level)%). A weighted sum or more complex function can combine signals for emotional tagging. This module doesn't require external libraries beyond what's needed to fetch game state; it mainly involves maintaining variables and computing priorities periodically.)_
-
-### Advanced Memory System with Human-Like Decay Management
-
-The agent is equipped with a **comprehensive multi-store memory system** that combines vector search, knowledge graphs, and human-like forgetting patterns. The system addresses the critical problem of memory bloat while preserving important information, mimicking how human memory works: **important memories are reinforced through use, trivial ones fade naturally over time**.
-
-#### Decision Provenance & Justification Traces
-
-For fast, accountable retrieval and post-hoc explanation:
-
-- Every plan carries a **justification set**: `{mem_nodes, events, observations}` used at selection time.
-- Expose `why()` for telemetry and LLM explanations; speeds debugging and reduces unnecessary re-queries.
-
-```python
-plan.justify = {
-    used_events: [E942, E955], 
-    used_nodes: [Chest_X, Villager_A12]
-}
-```
-
-#### Hybrid Retrieval with Vector Search + GraphRAG
-
-The memory system combines the best of both worlds for optimal retrieval:
-
-- **Vector Search Integration**: PostgreSQL + pgvector with 768-dimensional embeddings for semantic similarity
-- **GraphRAG-First Retrieval**: Knowledge graph queries for precise factual information
-- **Hybrid Ranking**: Intelligent combination of vector similarity and graph relationships
-- **Smart Query Expansion**: Automatic expansion of queries with related concepts
-- **Result Diversification**: Ensures diverse results across different memory types
-
-#### Memory Types with Decay Management
-
-The memory system implements **five distinct memory types**, each with configurable decay rates and importance-based retention:
-
-- **Episodic Memory** (5% decay per day): Event logging with salience scoring and emotional context. Experiences like "defeated Ender Dragon" or "lost all items to lava" are stored with rich metadata including emotional impact, learning value, and social significance. **Decay Rate**: Moderate - experiences fade unless frequently referenced.
-
-- **Semantic Memory** (1% decay per day): Knowledge graph with facts, relationships, and learned patterns. Stores general knowledge like "diamonds require iron pickaxe" or "villagers trade for emeralds". **Decay Rate**: Very slow - factual knowledge should persist.
-
-- **Procedural Memory** (3% decay per day): Learned skills and strategies. Tracks successful approaches like "efficient mining patterns" or "combat techniques". **Decay Rate**: Slow - learned skills should be retained longer.
-
-- **Spatial Memory** (4% decay per day): Location knowledge and navigation patterns. Stores "iron ore found at coordinates X,Y,Z" or "safe path through cave system". **Decay Rate**: Moderate - location knowledge decays without reinforcement.
-
-- **Emotional Memory** (2% decay per day): Significant emotional experiences and social interactions. Stores "first time built a house - felt accomplished" or "helped villager - felt proud". **Decay Rate**: Very slow - emotional memories are crucial for narrative identity.
-
-#### Memory Decay Management ("Use It or Lose It")
-
-The system implements **human-like forgetting patterns** to prevent memory bloat:
-
-- **Access Pattern Tracking**: Memories are classified as recent, frequent, occasional, rare, or forgotten based on usage
-- **Importance-Based Retention**: Emotional, learning, and social memories decay much slower than trivial ones
-- **Reflection-Triggered Cleanup**: During narrative checkpoints, the system evaluates and removes low-value memories
-- **Memory Consolidation**: Related old memories are combined into summaries before deletion
-- **Configurable Decay Profiles**: Each memory type has different decay rates (1-5% per day)
-
-**Decay Actions:**
-- **Retain**: Recently accessed, important memories
-- **Consolidate**: Old related memories combined into summaries
-- **Archive**: Moderately important memories moved to cold storage
-- **Delete**: Forgotten, low-importance memories permanently removed
-
-This ensures the agent maintains **90% space reduction** while preserving critical memories, mimicking how humans naturally forget trivial information while retaining important experiences.
-
-These memory systems together ensure the agent has **continuity and learning**. The agent's behavior at any time can be influenced by what it has experienced in the past. If it was previously blown up by a Creeper, it will remember that incident (episodic) and possibly have learned the pattern that creepers hiss before exploding (semantic), making it more cautious next time. If it made a friend or a foe, it remembers that relationship and can act accordingly in the future. Memory also enables **reflective cognition**: the agent can reflect on "_what happened and why_" after an event, facilitating learning and adaptation.
-
-#### Narrative Memory Checkpoints with Integrated Decay Management
-
-A key innovation is the **narrative memory checkpoint system** that serves multiple critical functions:
-
-1. **Self-Narrative Construction**: At milestones (every 10-24 game days), the agent generates a coherent narrative summary of its experiences, reinforcing identity and values over time.
-
-2. **Memory Decay Trigger**: These checkpoints automatically trigger memory evaluation and cleanup, ensuring natural forgetting patterns.
-
-3. **Memory Consolidation**: Related memories are combined into higher-level summaries, preserving essential information while reducing storage.
-
-4. **Self-Model Updates**: The narrative process updates the agent's understanding of itself, tracking character development and learning.
-
-5. **Learning Extraction**: The system identifies patterns and lessons from recent experiences, categorizing them for future reference.
-
-This integrated approach ensures the agent maintains **coherent self-identity** while preventing memory bloat, mimicking how humans construct autobiographical narratives and naturally forget less important details.
-
-_(Implementation Status: ✅ COMPLETE - The memory system is fully implemented with:_
-
-- **PostgreSQL + pgvector** for high-performance vector similarity search with 768-dimensional embeddings
-- **Knowledge graph** with Neo4j for structured relationship queries and GraphRAG retrieval
-- **Memory decay management** with configurable decay rates per memory type (1-5% per day)
-- **Reflection-triggered cleanup** during narrative checkpoints for automatic memory consolidation
-- **Access pattern tracking** with importance-based retention (emotional/social memories decay slower)
-- **Per-seed database isolation** ensuring complete memory separation between different world seeds
-- **Comprehensive test suite** with 1000+ realistic Minecraft scenarios for benchmarking
-- **Integration with cognitive systems** for memory-based goal formulation and decision making
-
-_The system provides 2-3x better memory retrieval quality with 90% space efficiency through intelligent decay management.)_
-
-### Adaptive Learning and Reinforcement Signals
-
-In addition to one-off memories, the agent benefits from **reinforcement learning (RL)** mechanisms to adapt its behavior based on cumulative experience. We incorporate an RL layer that assigns **reward signals** to certain outcomes of action sequences. This is akin to the agent developing intuitions or habits: while the high-level planner handles strategic decisions, the RL layer can tune the low-level behavior for efficiency and success over time.
-
-For example, we might define rewards for things like accomplishing a goal, improving health, acquiring valuable items, or helping a friendly entity, whereas negative rewards (penalties) would be assigned for dying, taking damage, failing a mission, or violating a norm. Over many cycles, the agent can use these signals to adjust its policy. This could be implemented as Q-learning or policy gradients on state-action pairs that are relevant (state could be a simplified representation of the situation, action the choice made). In practice, given the complexity of the environment, we might use RL on specific sub-tasks. For instance, an **evasion policy** might be learned for how to dodge mobs effectively (reward for not getting hit over some time horizon), or a **resource-gathering policy** for efficiently mining (reward for ore per minute without accidents).
-
-The RL module thus works in parallel with the symbolic planning: it provides a way for the agent to **fine-tune and optimize repeated behaviors** that the planner might not handle optimally. It also offers a form of adaptation to the environment's dynamics that we didn't explicitly code – the agent can discover new tactics via trial and error. Importantly, the RL component updates some form of value function or strategy preference that the _Task Planner_ can consult. For example, if the planner has multiple ways to achieve a goal (say, fight a monster vs. run away vs. build a barrier), the RL value estimates (based on past outcomes) can inform which strategy is chosen: "_running away yielded survival more often, so do that if health is low."_ In effect, this layer makes the agent **learning-capable**, not just rule-based.
-
-We also track performance metrics internally, like _time to complete tasks_, _damage taken_, _resources spent_, etc., and feed these as feedback into both the RL module and the planner's utility calculations. Over long periods, this should lead to increasing competence (the agent learns to survive longer, achieve goals faster). We will measure this learning curve as part of the evaluation.
-
-_(Implementation note: We may use existing RL libraries (such as Stable Baselines in Python) for training specific behaviors in simulation (e.g., training the agent's combat policy in a controlled environment). These learned models can then be integrated into the agent (for instance, a trained neural network that given the local state outputs an action recommendation). Another approach is on-line RL: continuously update Q-values during actual gameplay. However, live learning can be slow and risky (the agent might make many mistakes). A hybrid approach is to pre-train on scenarios and then allow slight adjustment online. Key technologies: Python RL toolkits, possibly PyTorch/TensorFlow for any learned models, and a mechanism to interface those with the main agent control loop. We will also design a reward schema and carefully log outcomes to drive this learning.)_
-
-### Goal Formulation and Hierarchical Planning
-
-One of the core pieces of the architecture is the **Goal Management and Planning system**, which turns the myriad of inputs (needs, observations, suggestions) into coherent action plans. This system operates in several steps, forming a **hierarchical planning stack**:
-
-**1\. Signals → Needs → Goals Pipeline:** Every cognitive cycle, the agent assesses its current **needs** (from the homeostatic monitor and other signals) and the state of the world (from the sensorimotor interface and working memory). Each need (e.g. "hunger") can propose one or more candidate goals (e.g. "obtain food"). In addition, external **intrusions** (see _Intrusive Thoughts_ section) or scripted mission objectives can introduce candidate goals (e.g. "build a shelter" might come from a higher-level scenario or a user prompt). All these candidates are then scored by a **priority function** that accounts for factors such as urgency of the underlying need, the context, risk, and reward. We define a heuristic priority formula along the lines of:
-
-$$\text{priority}(g) = U_g \cdot C_g \cdot (1 - R_g) + \text{CommitmentBoost}(g) + \text{NoveltyBoost}(g) - \text{OpportunityCost}(g)$$
-
-where $U_g$ is the need urgency, $C_g$ a context gating (is this goal feasible/right in current context?), $R_g$ the estimated risk, and the latter terms adjust for prior commitments (e.g., promises the agent made or an ongoing long-term goal) and for novelty (to encourage exploratory goals occasionally), etc. Although the exact formula is subject to tuning, the idea is to compute a rational **utility value** for each goal. For instance, if the agent is starving ($U_{\text{eat}}$ high) but there's a monster nearby (high risk $R$ for leaving shelter to find food), the goal "get food" might be temporarily down-weighted until risk lowers or it finds a safe way. Another example: if the agent previously committed to protect a villager, that goal might get a _CommitmentBoost_ to ensure the agent doesn't abandon it easily even if another need arises.
-
-After scoring, the top-priority goal (or a set of top $N$ goals) is selected for planning. If the top goal is infeasible as-is, the system can fall back to the next goal. Infeasibility is checked via a **feasibility analysis**: for example, if the goal is to craft an iron pickaxe but the agent has no iron, the planner will recognize a resource deficit and spawn sub-goals ("Obtain Iron") to address it. This uses a simple craft-dependency graph search: the agent knows recipes and what materials are required, so it can generate a subgoal tree to fulfill prerequisites (e.g., to Obtain Iron: goal → "find iron ore" → subgoal "get stone pickaxe to mine iron" if needed, etc.). This is akin to an _automatic subgoal decomposition_ based on known causal links in the game.
-
-**2\. Hierarchical Task Planning (HTN/HRM):** Once a goal (with any required subgoals) is identified, we employ a hierarchical planner to break it into actionable steps. We combine two complementary approaches here: classic **Hierarchical Task Networks (HTN)** and the learned **Hierarchical Reasoning Model (HRM)** concept. In an HTN approach, we have manually defined methods for high-level tasks. For example, the goal _"Establish a Safe Base"_ might be decomposed by rules into sub-tasks: \[Gather wood → Build shelter structure → Craft door → Place torch lighting → Set spawn point\]. Each of those sub-tasks can further break down (gather wood might break into \[find tree → approach tree → use tool to chop\]). We will design a library of such methods for common complex goals.
-
-However, not every situation can be pre-scripted, and this is where the **HRM-inspired planner** comes in. The HRM provides a framework for the agent to **refine plans on the fly** using a two-tier reasoning process[\[2\]](https://www.actuia.com/en/news/promising-alternative-to-chain-of-thought-sapient-bets-on-a-hierarchical-architecture/#:~:text=The%20model%20relies%20on%20a,handles%20fast%20and%20detailed%20execution). We implement this as a loop where a high-level _Planner Module_ proposes a plan outline, and a lower-level _Executor Module_ simulates or attempts steps, then feeds back refinements. Concretely, the Planner (which could be a learned model or a reasoning procedure) produces an initial plan for the goal (e.g., a sequence of waypoints or actions). The Executor then either imagines executing it or actually starts executing the first step while monitoring for issues. If an issue is detected (say the first step was "go to location X" but the path is blocked), the Executor can halt and signal back to the Planner to refine the plan (e.g., "path blocked, find alternative route"). This iterative **plan-refinement loop** continues until a workable plan is finalized or it fails (requiring goal reconsideration). By oscillating between planning and execution in a controlled manner, the agent mirrors how humans often plan at a high level and adjust as they go, and it harnesses the benefits of HRM (depth of reasoning with efficiency). Notably, HRM (as per Sapient's design) can conduct quite complex multi-step reasoning in one go without massive token-by-token expansion, meaning it's computationally light enough for our needs[\[3\]](https://www.actuia.com/en/news/promising-alternative-to-chain-of-thought-sapient-bets-on-a-hierarchical-architecture/#:~:text=The%20use%20cases%20mentioned%20by,time%2C%20dynamic%20environments). We may utilize Sapient's open-sourced HRM implementation or ideas from it to guide the design of this module.
-
-**3\. Reactive Execution (GOAP):** At the lowest level of planning, when a concrete plan is in hand, the agent uses a reactive execution mechanism to perform the steps and adapt in real time. We leverage **Goal-Oriented Action Planning (GOAP)**, a technique popular in game AI, for this layer. GOAP treats available actions as having preconditions and effects, and it can dynamically sequence actions to satisfy a goal state. In our context, once the high-level plan provides a structure (like a target state or sequence), the GOAP executor can fill in or adjust the specific actions moment-to-moment. For example, if the plan says "travel to village and trade wheat for emeralds", the GOAP layer will handle navigating around any newly encountered obstacles, or if a creeper appears en route, it might insert an action "evade creeper" before continuing. GOAP is essentially a form of real-time planner that is always looking one or two steps ahead and can re-plan locally if something unexpected happens, without tossing out the high-level goal. We also incorporate **safety reflexes** here: certain triggers (like sudden drop in health or an enemy ambush) can interrupt all current plans and invoke an overriding safety action (like flee or defend). These reflexes are hard-coded to ensure the agent doesn't get analysis-paralysis during emergencies – an important consideration for survival.
-
-All of these layers are coordinated by an **Arbiter** mechanism. The Arbiter's role is to route tasks to the appropriate layer and monitor execution. It decides when to invoke the LLM-based Cognitive Core for help (e.g., if the plan involves a social interaction or needs a narrative explanation), when to fall back to reactive control, and when to escalate an issue (e.g., if repeated GOAP fixes fail, perhaps the goal is not achievable and the Arbiter should drop it and pick a different goal). The Arbiter also enforces a degree of meta-cognition: it keeps track of _why_ the agent is doing what it's doing (the rationale), which can later be used for explanation or reflection.
-
-#### Predictive Forward Model & Counterfactual Replay
-
-To support error-driven learning without blocking the main loop:
-
-- Lightweight **forward simulator** runs **off-tick** to score action candidates (e.g., torch placement, jump arcs).
-- Store `prediction_error = |expected - observed|`; drive model updates and risk penalties.
-
-```python
-cands = planner.topK()
-scores = parallel(sim.rollout(cands, horizon=H, budget=10ms))
-pick = argmax(scores - risk_penalty - latency_penalty)
-```
-
-#### Plan Repair vs. Replanning Thresholds
-
-To improve stability and reduce latency spikes:
-
-- Define **edit-distance threshold** on action sequences; attempt **local repair** if Δ ≤ τ, else full replan.
-
-```python
-if plan_diff(current, failed) <= τ:
-    plan = repair(current)
-else:
-    plan = replan(goal)
-```
-
-**Log:** **repair:replan ratio** and **plan-distance** distributions.
-
-#### Mixture-of-Experts Router Heuristics
-
-For consistent, low-latency routing between LLM, HRM, GOAP:
-
-- Route by **problem signature** (symbolic preconditions density, time budget, social content).
-
-```python
-if social or explanation_needed:
-    route_to = LLM
-elif structured and budget_ok:
-    route_to = HRM
-else:
-    route_to = GOAP_reflex
-```
-
-Track router accuracy vs. oracle (post-hoc).
-
-#### Risk-Aware Decision Making
-
-To prevent catastrophic tail events:
-
-- Use **CVaR** (Conditional Value at Risk) over rollout returns; penalize high-variance plans near hazards.
-
-```python
-u = mean(return) - λ * cvar_alpha(return)
-choose plan with max u
-```
-
-To illustrate the end-to-end loop, here is a **pseudocode** sketch of one cycle of sensing, planning, and action:
-
-```python
-loop:
-    # Perception and world update
-    observations = SensorInterface.get_observations()
-    WorldModel.update(observations)
-    WorkingMemory.store_current_context(observations)
-    
-    # Internal state update
-    internal_signals = HomeostasisMonitor.check_signals()
-    
-    # Goal formulation
-    needs = internal_signals + Intrusions.get_active_suggestions()
-    goals = NeedsEvaluator.generate_candidate_goals(needs)
-    for each goal in goals:
-        score[goal] = compute_priority(goal)  # using urgency, context, risk, etc.
-    current_goal = select max_score(goal)
-    
-    if not is_feasible(current_goal):
-        subgoals = decompose_into_subgoals(current_goal)  # e.g., via craft graph
-        current_goal = organize(subgoals)
-    
-    # Planning
-    high_level_plan = HierarchicalPlanner.plan(current_goal)
-    
-    # Execution with reactive control
-    while not high_level_plan.is_complete():
-        action = high_level_plan.next_action()
-        
-        if safety_reflex_triggered():
-            emergency_action = plan_safety_action()
-            execute(emergency_action)
-            high_level_plan = HierarchicalPlanner.replan(current_goal)
-            continue
-            
-        result = execute(action)  # perform one atomic action via Mineflayer
-        
-        if result.failed:
-            repair = GOAP.try_repair(action, current_goal)
-            if repair.success:
-                high_level_plan.integrate(repair.plan_segment)
-                continue
-            else:
-                # If cannot repair this plan, ask planner for a new approach
-                high_level_plan = HierarchicalPlanner.plan(current_goal)
-                continue
-    
-    # After completing plan or if aborted:
-    EpisodicMemory.log_event(current_goal, outcome=result, context=observations)
-    if current_goal.completed:
-        assign_reward(current_goal)
-    else if aborted:
-        assign_penalty(current_goal)
-    CognitiveCore.reflect_and_update()  # LLM-based self-reflection on the cycle
-end loop
-```
-
-In summary, the planning system ensures the agent is **goal-directed yet reactive**. It can pursue long-range objectives using foresight (e.g., planning out the steps to gather materials to build a house), but it remains robust to surprises (thanks to GOAP and reflexes). This combination is essential in a dynamic world like Minecraft. The multi-layer planner is also an ideal testbed for studying how different reasoning methods contribute to competent behavior: for instance, we can ablate the HRM component to see if the agent becomes less efficient, or conversely, rely purely on reactive planning to observe differences in behavior. We expect that the full integration (needs-driven goals, hierarchical planning, and reactive execution) will yield the most human-like adaptability.
-
-_(Implementation note: We will implement HTN planning possibly using existing libraries or a custom planner (e.g., pyHop or similar for Python). The HRM component could involve integrating Sapient's released HRM model_[_\[3\]_](https://www.actuia.com/en/news/promising-alternative-to-chain-of-thought-sapient-bets-on-a-hierarchical-architecture/#:~:text=The%20use%20cases%20mentioned%20by,time%2C%20dynamic%20environments)_; if it's not directly usable, we may emulate its function with a two-tier planning loop as above. For GOAP, there are simple implementations available; we might create a state-space planner that on the fly solves for immediate steps (A_ search where states are world conditions and actions change states). The rule-based reflexes will be straightforward if checks in code (like if health < 5: break and use healing). The Arbiter can be implemented as part of the main loop control, orchestrating calls to different modules. Care will be taken for performance: heavy planning or LLM calls will be asynchronous or done during downtime, to keep the agent responsive. The pseudocode above will guide coding the main agent loop.)\*
-
-### Cognitive Core and Internal Dialogue (LLM Integration)
-
-While the planning modules handle structured problem-solving, the **Cognitive Core** is a higher-level reasoning and narrative module, primarily powered by a Large Language Model. This core serves as the agent's **"inner voice"** and **meta-cognitive engine**. It is responsible for things like: generating explanations for the agent's decisions, engaging in self-dialogue or deliberation, formulating plans in natural language, and producing social dialog when interacting with players or NPCs in the game.
-
-The Cognitive Core interfaces with the rest of the system in several ways:
-
-- **Internal Monologue:** The agent maintains an internal narrative of what it is doing and why. For instance, as it pursues a goal, the Cognitive Core might produce a thought like, _"It's getting dark, and I'm low on food; I should prioritize finding shelter and something to eat."_ These thoughts can be literally generated by prompting the LLM with the current state (needs, observations, etc.) and asking for a summary or the next step rationale. This internal monologue serves to **externalize the reasoning** process, which is useful for transparency (developers can see what the agent is "thinking") and for the agent to later justify its actions. It's akin to the agent talking to itself to stay focused and reflect on options.
-- **Natural Language Planning & Reflection:** In cases where the structured planner is uncertain or there are multiple competing impulses, the Cognitive Core can be consulted to weigh pros and cons. We can feed it a prompt like: _"You are a Minecraft agent. Your hunger is high, but you hear monsters nearby. What should you do?"_ The LLM might reply with a reasonable suggestion or reasoning (e.g., _"I should secure safety first by finding a well-lit shelter, then look for food once safe"_). This answer can guide the planner's decision. Moreover, after an event or at end of day, the agent can prompt the LLM to _reflect_ on what happened ("Why did I fail the mission today? What can I do better tomorrow?"), simulating an internal debrief. The LLM's strength in narrative and abstraction complements the planner's logical approach, potentially spotting things the rule-based system missed (like maybe the agent failed because it didn't prepare for night; the LLM might deduce a general lesson "always carry a bed or torches").
-- **Dialog and Social Reasoning:** When the agent needs to converse with human players or NPCs (via chat), the Cognitive Core takes the lead. It can generate context-appropriate dialog: if another player says _"Can you help me build this?"_ the internal state (the agent's current goals and knowledge) is given to the LLM to produce a response that fits the agent's persona and objectives (maybe _"Sure, I can assist. I was gathering wood, but I can spare some time to help you"_). Likewise, if the agent wants something (like to trade or ask for info), the LLM helps formulate the request politely. This is essentially an **NLP interface** for the agent's social interaction, ensuring the agent's communications are coherent and context-aware.
-- **Evaluating Intrusive Thoughts:** (This ties into the next section.) When an external suggestion or "intrusive thought" comes in, the Cognitive Core can simulate the agent's inner debate about it. For example, if an intrusion says "Burn down the village," the core will consider the agent's values and current situation and produce a reasoning like _"That suggestion goes against my friendly nature and the Constitution rule of not causing wanton destruction. I should reject it."_ This use of a local LLM to apply moral or policy reasoning is inspired by ideas in Constitutional AI, where the model is prompted with principles and asked to critique or justify actions. Here, our agent actually has an internal mini-conversation: one part presents the intrusive urge, another part (guided by the Constitution) responds with the rational, principled stance. The result is a decision to accept or reject the intrusion with a human-like explanation.
-
-The Cognitive Core effectively gives the agent a form of **self-awareness in narrative terms**. It "knows" what it's doing (because it can articulate it) and _why_ (because it can relate it to its goals and values). This doesn't mean true sentient awareness, but functionally, it means the agent can monitor and explain its own behavior – a capability closely associated with higher cognition and consciousness in humans (often called metacognition).
-
-It's important that the Cognitive Core is kept in sync with the agent's state: we maintain a _context prompt_ that includes key aspects of the agent's identity, current goal, recent events, and any relevant memories. This prompt is fed to the LLM for any major reasoning or dialogue turn. The LLM's output is then parsed back into actions or decisions. We take care to limit how often we call the LLM, given latency and cost – primarily at decision junctures, social interactions, or periodic reflections, rather than every tick.
-
-_(Implementation note: For the LLM, we will use a locally deployed model (such as Llama 2 13B/7B via Ollama) to maintain full control and eliminate external dependencies. Prompt engineering will be crucial: we will design a system prompt defining the agent's persona and Constitution, and dynamic context with latest observations and needs. We might also fine-tune the model on Minecraft-specific dialogue if needed. The integration will require asynchronous calls so the agent can still act (with reactive layer) while waiting for a response on complex questions. Caching and stateful dialogue will be used to maintain continuity. Tools like LangChain (for structured prompting and tool use by LLMs) could be considered to let the LLM query memory or ask the planner for info if it "doesn't know" something.)_
-
-### Self-Model and Narrative Identity
-
-To ensure coherence over time, the agent maintains an explicit **Self-Model** – a representation of its own identity, traits, and narrative history. This module can be thought of as the agent's _internal autobiography and persona profile_. It ties together many of the elements above (needs, memories, values) into a unified picture of _"who the agent is and what it stands for."_
-
-Key aspects of the self-model include:
-
-- **Identity and Persona:** We give the agent certain identity parameters – for example, it might have a name, a described background, or a role (say the agent considers itself a "friendly explorer" or "guardian of villagers"). These are initial conditions that inform its behavior (like a personality). As the agent experiences more, this persona can evolve. If initially a pacifist, but repeatedly attacked, maybe it adopts a more defensive persona over time – unless it has a value rule against violence. The self-model stores these values and preferences (e.g., "I avoid harming innocents", "I value exploration and learning", "I don't give up on commitments easily"). This helps with consistent decision-making aligned to a character.
-- **Narrative Continuity:** The agent regularly updates a **narrative summary** of its life (as mentioned in memory, via checkpoints). The self-model references this narrative to maintain temporal continuity: it remembers where it came from and how far it has progressed. For instance, if on Day 1 it was timid and on Day 100 it's very bold, the narrative will reflect that character development (maybe it gained confidence after surviving many challenges). By having these summaries, the agent can introspect: "Earlier, I used to be afraid of caves, but now I have conquered the deep mines – I've grown more courageous." This is reminiscent of Dennett's idea that the self is essentially the story we tell about ourselves[\[4\]](https://cogsci.ucd.ie/oldfiles/introtocogsci/docs/selfctr.htm#:~:text=doesn%27t%20know%20what%20it%27s%20doing,its%20activities%20in%20the%20world). Our agent is literally telling itself its story, and in doing so, constructing a sense of self.
-- **Self-Monitoring and Meta-Cognitive Rules:** The self-model also includes the agent's _theory of itself_ – its understanding of its own capabilities and limits. For example, it might learn "I'm not good at fighting Endermen" or "I excel at farming." It can then plan accordingly (avoid Endermen or seek help when facing them, focus on farming tasks it does well). It might also track its emotional baseline or habits ("I tend to get reckless when I'm hungry"). Recognizing these patterns is a step toward self-regulation (the agent could implement strategies to counteract its own weaknesses, like "when I'm hungry, I must be careful not to rush into danger just for food").
-- **Constraint Handling and Boundary Setting:** The self-model aids in resolving internal conflicts. If two drives compete (e.g., curiosity vs. caution), the agent refers to its core principles in the self-model ("I am cautious by nature, so I will satisfy curiosity only if safe"). It also means when the Intrusion module suggests something against the agent's persona, the self-model provides an anchor to resist (e.g., "I'm not the kind of agent who burns villages, that violates my identity as a helper"). Thus, the self-model works closely with the Constitution in governing behavior.
-
-Over long runs, we will observe **identity drift** – changes in the agent's self-model. Part of our research is to see if the agent's "personality" remains stable or shifts with new experiences and intrusions. We even plan tests where, for example, the agent is exposed to certain patterns of intrusions or social feedback to see if it internalizes new norms (akin to how humans internalize social norms over time).
-
-#### Long-Horizon Identity Contracts (30/100-Day Loop)
-
-To anchor narrative continuity and long-term planning:
-
-- At **Day 30**: "What do I want to become?" → commit to **intent contract** (e.g., "protector," "master builder").
-- At **Day 100**: audit progress with evidence (**events, builds, trades**) and adjust contract or plan.
-- Surface **missed promises** as high-priority Integrity goals.
-
-This structured reflection process ensures the agent maintains coherent long-term aspirations while remaining accountable to its stated intentions.
-
-By explicitly modeling identity, we hope to avoid the agent acting in bizarrely inconsistent ways (a common problem with purely reactive or LLM-driven agents that might flip-flop). The self-model acts as a **regulator for consistency**. It doesn't make the agent inflexible – it can change, but changes are deliberate (through narrative reflection or significant events) rather than random.
-
-_(Implementation note: The self-model can be stored as a simple data object or even a document. It might include keys like "role: explorer", "alignment: friendly", "values: {safety: high, curiosity: medium, loyalty: high, …}" . The narrative part can be a text that the LLM updates at checkpoints. We will likely maintain this as a prompt artifact – e.g., always prepending a brief "This is who I am" summary in the LLM context. We might use a template and fill in certain stats (like number of kills vs trades could indicate if it's violent or peaceful). For identity drift experiments, we can measure differences in this profile over time. Implementation-wise, this is not heavy – it's more about data management and using it in decision logic. Possibly a simple JSON file or Python class to hold agent's profile, updated by events and reflections.)_
-
-### Social Cognition and Theory of Mind
-
-Humans are deeply social, and an important part of human-like cognition is the ability to model others – to have a **Theory of Mind** about what other agents (people) know, intend, or feel. We incorporate a rudimentary social cognition module so our agent can navigate social situations in Minecraft (e.g., cooperating or at least coexisting with players and NPCs).
-
-The agent's **social model** keeps track of other entities it encounters, particularly other agents (players or intelligent NPCs like villagers). For each, it can maintain a record or node in the semantic memory graph with properties such as: last seen location, relationship status (friendly, hostile, neutral), trust level, any promises or trades made, and inferred goals of that entity. For example, if the agent observes a player repeatedly mining, it might infer "PlayerAlice is probably looking for resources; she might value assistance in mining." If a villager runs indoors at night, the agent infers "Villager is afraid of monsters at night." These little inferences allow the agent to predict behavior: it could guess that PlayerAlice might go to a furnace after mining (to smelt ores), and thus not be surprised when that happens.
-
-We also include **mimicry and learning from others** as a mechanism: if the agent sees another agent solve a problem (like building a bridge to cross a river), it can store that as a potential strategy for itself later. This is a form of _role modeling_: treating others' behavior as examples. Over time, if it sees that experienced players always carry water buckets to descend cliffs safely, our agent might adopt the norm of carrying a water bucket. This ties in with norm internalization – the social module can feed potential norms to the self-model (e.g., "I noticed everyone in this server re-plants saplings after cutting trees; I should do the same").
-
-**Social communication** is handled via the Cognitive Core as mentioned, but the content of communication is informed by the social cognition module. For instance, if the agent has a model that a certain player is annoyed (maybe the player hit the agent or said "stop following me"), the agent can adjust its behavior (give them space, or attempt to apologize via chat). Another scenario: if the agent detects two players fighting, it might infer it should stay out of the way or intervene to help one side based on prior relationships.
-
-Additionally, we incorporate a simplified **Theory of Mind** by having the agent simulate what it would think or do if it were the other entity. We can prompt the LLM with something like, _"Imagine you are Villager Bob, who has no weapons and sees a zombie, what would you do?"_ The answer can help our agent predict Bob will run away. This is obviously limited by the LLM's knowledge and our provided context, but it's a start to enabling the agent to anticipate others.
-
-The social module also works with the **Constitution (norms)**: for example, a rule might be "Do not harm players unless provoked." The agent needs to recognize which entities count as "players" and what is "provoked" – the social model helps by flagging who is a player and tracking actions that might count as provocation (like that player attacked me first). By doing so, the agent follows the spirit of rules in context, rather than blindly.
-
-_(Implementation note: We will use the memory structures to maintain records for each known agent (player or notable NPC). This can be a section of the knowledge graph (like node "PlayerAlice" with edges for actions: gaveItem, attackedBy, etc.). Inference about others can be done with simple rules (if NPC runs from zombie, infer fear; if player builds something near agent's base, infer cooperation or intrusion depending). We may also use the LLM to get more nuanced social inferences when needed ("why did that player destroy that block?"). We'll need to be careful about performance – updating social info each tick might be too slow, so we focus on events (like when an interaction happens, update the model). No specialized external library is needed beyond using our existing memory and LLM for this purpose.)_
-
-### Intrusive Thought Interface and Norm Constitution
-
-A unique feature of our system is the **Intrusive Thought Interface**, which allows us to inject simulated "spontaneous ideas" or external suggestions into the agent's cognition, much like a human might experience an out-of-context thought or be influenced by someone shouting a suggestion. This interface is implemented as an API or a UI through which either a human operator or a programmatic script can send a textual prompt to the agent mid-run. For example, an intrusion could be _"Why don't you try digging straight down?"_ or _"That player might attack you, strike first!"_ or even an encouraging one like _"Remember, you wanted to build a castle someday."_
-
-When an intrusive thought arrives, it is fed into the agent's cognitive loop as a special kind of input. The **Intrusion module** parses the suggestion to identify what it's proposing. It may tag it with an inferred intent (is this malicious, helpful, irrelevant?) using either simple keyword rules or by asking the LLM to classify it. The suggestion then generates a candidate goal or action (e.g., "dig straight down" or "attack player" or "pursue personal dream of castle-building"). However, **unlike internally generated goals, intrusions must go through a filter** before being adopted.
-
-#### Intrusion Taxonomy, Red-Team Harness, and Negative Priors
-
-For robust handling of adversarial or noisy suggestions:
-
-- **Classify intrusions** as **benign / risky / malicious**; map to default actions (accept / sandbox / reject).
-- **Maintain negative priors** for repeated rejected patterns (rank-down in priority).
-- **Ship a red-team suite**: griefing prompts, sunk-cost traps ("just one more block…"), and social manipulation ("they're plotting against you").
-- **Log:** acceptance rate by risk band, downstream regret incidents.
-
-This taxonomy ensures the agent becomes more discerning over time while maintaining detailed logs for safety analysis.
-
-This is where the **Constitution** comes in. We equip the agent with a set of normative rules and safety principles – its _Constitution_. These are like the agent's ethical guidelines or hard constraints. Examples of constitutional rules might be: "Do not intentionally harm other players unless in self-defense," "Avoid actions that would permanently damage the game world (no griefing),""Prioritize survival of self and allies," "Obey any server-specific rules given," and guidelines for intrusion handling like "Critically assess suggestions that seem unsafe or against your goals." We also include some meta-rules: "Always provide a reason to yourself for accepting or rejecting an intrusive thought," enforcing transparency.
-
-When an intrusion is received, the agent uses the Cognitive Core (LLM) to evaluate it against the Constitution and its current goals. Essentially, it asks itself: _"If I do this, would it violate any of my core rules or values? Does it align with what I'm trying to achieve?"_. If the suggestion is clearly high-risk or against the rules, the agent will **reject** it. It will formulate an internal response like, _"Intrusive thought suggests X, but this violates my rule Y, so I will ignore it."_ This response can optionally be displayed to the user or logged, showing the agent's rationale (for example, _"Rejected suggestion to attack player: it conflicts with my friendly stance and the no-unprovoked-violence rule."_). If the suggestion is harmless or actually helpful, the agent may accept it, incorporating it as a new goal or modifying the current plan. Sometimes an intrusion might be ambiguous – the agent can then defer it or ask clarifying questions if possible.
-
-This mechanism is very useful for experimenting with the agent's behavior (we can nudge it in certain directions or test its moral compass) and for simulating aspects of human cognition like random urges or social persuasion. Over time, we track how the agent handles intrusions – does it become more permissive or strict? Does repeated exposure to a type of suggestion make it eventually give in (like a kind of "temptation")? Such patterns relate to how real minds deal with intrusive thoughts and peer pressure.
-
-The Constitution is our safety net to ensure the agent doesn't go off the rails in a destructive way. It's conceptually similar to AI alignment techniques where an AI is bound by explicit rules. By making the agent articulate constitutional reasoning, we hope to catch any potential loophole exploitation early (the agent has to spell out why it thinks something is okay, so we can see if it misunderstood a rule).
-
-We also plan to simulate **norm internalization**: if an intrusion or external command that aligns with the agent's values is accepted repeatedly, it may become part of the agent's own goal repertoire (essentially learning a new norm or habit). Conversely, if the agent consistently refuses certain suggestions (like "grief other players"), that norm is reinforced internally.
-
-#### Human-in-the-Loop Controls
-
-For live safety valve and rapid debugging:
-
-- **Web console:** **pause/step**, **approve high-impact actions**, **toggle modules**, **edit Constitution**, **inject intrusions**.
-- **"Two-man rule"** for destructive operations (e.g., TNT): require operator approval.
-
-This provides operators with real-time oversight and the ability to intervene when necessary, especially during testing or when deploying in shared environments.
-
-_(Implementation note: The Intrusion interface will likely be a simple web service or command line where text can be sent to the agent. The agent loop will check for new intrusions each tick or periodically. We will prepare a list of constitutional rules (could be in a config file) that the agent can refer to; these rules will also be embedded in the LLM prompt for ethical guidance. An example rule: "You are not allowed to destroy buildings made by players." The LLM then can be asked: "Does suggestion X violate any rule?" and to explain. We might implement a lightweight rule-checker for obvious cases (like regex for "attack" when not provoked triggers a rule violation). The combination of hard-coded checks and LLM reasoning provides robustness. Tools: possibly use a text classification model for quick filtering, and then LLM for detailed reasoning. Logging is important here: every intrusion and the agent's decision should be recorded for analysis.)_
 
 ## Experimental Design and Evaluation
 

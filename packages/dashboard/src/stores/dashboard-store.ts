@@ -162,14 +162,14 @@ export const useDashboardStore = create<DashboardStore>()(
               return state; // Don't add duplicate
             }
 
-            // Also check for duplicate content within a short time window (5 seconds)
-            // But allow optimistic updates to be replaced
-            const fiveSecondsAgo = new Date(Date.now() - 5000).toISOString();
+            // Also check for duplicate content within a 30-second window
+            // Prevents repetitive fallback observations from flooding the stream
+            const thirtySecondsAgo = new Date(Date.now() - 30000).toISOString();
             const recentDuplicate = state.thoughts.find(
               (t) =>
                 t.text === thoughtWithId.text &&
                 t.type === thoughtWithId.type &&
-                t.ts > fiveSecondsAgo &&
+                t.ts > thirtySecondsAgo &&
                 !t.optimistic // Don't prevent optimistic updates from being replaced
             );
 

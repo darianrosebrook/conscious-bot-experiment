@@ -4,6 +4,21 @@ This document explains the design decisions behind our autonomous bot's cognitiv
 
 This section extends the "why" behind each architectural choice and makes the handoff from **brain → body** explicit, so plans reliably become actions. Where relevant, it borrows the **capability discipline** from MCP while keeping **behavior trees (BTs)** as our execution substrate.
 
+> **Last updated:** January 2026. See "Known Bugs" section at the end for current executor inaction issue.
+
+## Running Service Topology
+
+| Service | Port | Entry Point | Role |
+|---------|------|-------------|------|
+| Dashboard | 3000 | `packages/dashboard/src/app/` (Next.js) | Web UI, SSE cognitive stream, API proxy |
+| Memory | 3001 | `packages/memory/src/server.ts` | Episodic/semantic/working memory (PostgreSQL + pgvector) |
+| Planning | 3002 | `packages/planning/src/modular-server.ts` | Task executor, Sterling solvers, world-state polling |
+| Cognition | 3003 | `packages/cognition/src/server.ts` | Thought generation (event-driven + LLM), step generation |
+| World | 3004 | `packages/world/src/server.ts` | World state aggregation |
+| Minecraft Interface | 3005 | `packages/minecraft-interface/src/server.ts` | Mineflayer bot control, MCP tools |
+| Viewer | 3006 | (served by minecraft-interface) | Prismarine 3D viewer |
+| Core Registry | 3007 | `packages/core/src/server.ts` | Capability leaf/option registry |
+
 ## Architectural Thesis
 
 * **Hybrid reasoning is not optional**: Minecraft is a mixed environment—structured subgoals (HTN/HRM), dynamic physics (GOAP-style repair), and ambiguous social/creative work (LLM). Each approach has known blind spots; the router's job is to keep us within the convex hull of their strengths.
@@ -15,51 +30,70 @@ This section extends the "why" behind each architectural choice and makes the ha
 ### Input Processing Layer
 Components that gather and interpret environmental and cognitive inputs:
 
-- **Intrusive Thought Processor**: Handles external suggestions and commands from users or other systems, converting natural language into structured tasks while applying safety filters and ethical validation.
+- **Intrusive Thought Processor**: Handles external suggestions from the dashboard UI. Users type a message in the dashboard → `POST /api/ws/cognitive-stream` → forwarded to Cognition service. Implemented in:
+  - Dashboard POST handler: `packages/dashboard/src/app/api/ws/cognitive-stream/route.ts` (POST section)
+  - Client hook: `packages/dashboard/src/hooks/use-cognitive-stream.ts:241` (`sendIntrusiveThought()`)
 
-- **Environment Signals**: Raw sensory data from Minecraft (blocks, entities, weather, time) that provides the foundation for situational awareness.
+- **Environment Signals**: Raw sensory data from Minecraft via mineflayer (blocks, entities, weather, time). Polled by the Planning service's WorldStateManager.
+  - World state polling: `packages/planning/src/world-state/world-state-manager.ts:63`
+  - Minecraft Interface state endpoint: `packages/minecraft-interface/src/server.ts` (`GET /state`)
 
-- **Sensorimotor Interface**: The bridge between raw environmental data and cognitive processing, handling input filtering and action execution.
+- **Sensorimotor Interface**: The bridge between raw environmental data and cognitive processing, via the Minecraft Interface service (:3005).
+  - Server: `packages/minecraft-interface/src/server.ts`
+  - MCP tool executor: `packages/planning/src/modular-server.ts:257`
 
-- **Homeostasis Monitor**: Tracks the bot's internal state (health, hunger, inventory) and environmental threats to ensure survival needs are prioritized.
+- **Homeostasis Monitor**: Tracks the bot's internal state (health, hunger, inventory) and environmental threats. Drives thought generation in the Cognition service.
+  - Event-driven thought generator: `packages/cognition/src/event-driven-thought-generator.ts:81`
 
 ### Memory & Learning Layer
 Systems that store experiences and enable learning:
 
-- **Memory Service**: Persistent storage and retrieval of episodic memories, plans, and learning data. Provides the foundation for experience-based decision making.
+- **Memory Service** (:3001): Persistent storage and retrieval of episodic memories, plans, and learning data. PostgreSQL + pgvector for vector similarity search.
+  - Server: `packages/memory/src/server.ts`
 
-- **Provenance Recorder**: Maintains detailed audit trails of decisions and actions for accountability and debugging.
+- **Provenance Recorder**: Maintains audit trails of decisions and actions.
 
-- **HTN Memory Manager**: Specialized memory system that tracks task effectiveness and method performance across executions, enabling the system to learn which approaches work best for specific situations.
+- **HTN Memory Manager**: Tracks task effectiveness and method performance across executions.
 
 ### Planning & Reasoning Layer
-The brain of the system - deciding what to do and how to do it:
+The brain of the system — deciding what to do and how to do it:
 
-- **Task Bootstrapper**: Recovers unfinished tasks from memory or generates new exploration goals when no clear objectives exist. This ensures the bot always has purposeful behavior.
+- **Task Integration** (thought-to-task conversion): Polls cognition service every 30s for actionable thoughts, converts them to tasks, generates steps.
+  - Main file: `packages/planning/src/task-integration.ts`
+  - Thought polling: `task-integration.ts:349` (`startThoughtToTaskConversion()`)
+  - Action word filter: `task-integration.ts:100`
+  - Conversion: `task-integration.ts:414` (`convertThoughtToTask()`)
+  - Step generation: `task-integration.ts:2206` (`generateDynamicSteps()`)
 
-- **Advanced Need Generator**: Processes context-aware needs using trend analysis and memory integration. Context gates consider environmental factors, temporal patterns, and social context to determine urgency.
+- **Sterling Symbolic Solvers**: WebSocket-based symbolic reasoning for structured Minecraft tasks.
+  - Crafting solver: `packages/planning/src/sterling/minecraft-crafting-solver.ts`
+  - Building solver: `packages/planning/src/sterling/minecraft-building-solver.ts`
+  - Tool progression solver: `packages/planning/src/sterling/minecraft-tool-progression-solver.ts`
+  - Sterling service: `packages/planning/src/sterling/sterling-reasoning-service.ts`
 
-- **Cognitive Task Router**: Routes tasks to appropriate reasoning systems based on characteristics like complexity, time-sensitivity, and historical success patterns. This is inspired by Hierarchical Reasoning Modules (HRM) research.
-
-- **Planning Systems**:
-  - **HTN Planner**: Hierarchical Task Network planning with memory-integrated effectiveness tracking. Breaks complex goals into manageable subtasks and learns from success/failure patterns.
-  - **HRM Planner**: Structured, logic-based planning for navigation, puzzles, and resource optimization where predictable outcomes are needed.
-  - **LLM Reasoning**: Natural language processing for creative tasks, social interaction, and open-ended queries where structured planning is insufficient.
-  - **Collaborative Reasoning**: Hybrid approach combining structured logic with narrative understanding for complex ethical decisions.
+- **Cognitive/LLM Fallback**: When Sterling solvers cannot handle a thought, the system falls back to LLM-based step generation.
+  - Cognitive step generation: `task-integration.ts:2560` (`generateStepsFromCognitive()`)
+  - Intelligent fallback: `task-integration.ts:2607` (`generateIntelligentSteps()`)
 
 ### Execution Layer
 Components that turn plans into actions:
 
-- **Enhanced Reactive Executor**: GOAP-based (Goal-Oriented Action Planning) execution system that builds action sequences and repairs plans when conditions change unexpectedly.
-  - [EnhancedReactiveExecutor](../packages/planning/src/reactive-executor/enhanced-reactive-executor.ts)
-  - [EnhancedGOAPPlanner](../packages/planning/src/reactive-executor/enhanced-goap-planner.ts)
-- **Minecraft Interface**: Integration layer using Mineflayer for bot control, Prismarine-Viewer for 3D visualization, and HTTP server for external monitoring and control.
-  - [MinecraftInterface](../packages/minecraft-interface/src/server.ts)
-  - [Mineflayer Integration](../packages/minecraft-interface/src/)
-- **PBI Executor Contracts**: Runtime enforcement of plan-body interface contracts
-  - [PBI Enforcer](../packages/executor-contracts/src/pbi-enforcer.ts)
-  - [Capability Registry](../packages/executor-contracts/src/capability-registry.ts)
-  - [PBI Types](../packages/executor-contracts/src/types.ts)
+- **Modular Server Executor**: The main autonomous loop that selects tasks, finds executable steps, and dispatches them to the Minecraft Interface.
+  - Executor loop: `packages/planning/src/modular-server.ts:249` (10s poll interval)
+  - Step-to-leaf mapping: `modular-server.ts:743` (`stepToLeafExecution()`)
+  - Task selection with backoff/blocked filtering: `modular-server.ts:1665`
+  - MCP tool execution: `modular-server.ts:257`
+
+- **Enhanced Reactive Executor**: GOAP-based execution system for plan repair.
+  - [EnhancedReactiveExecutor](../../packages/planning/src/reactive-executor/enhanced-reactive-executor.ts)
+  - [EnhancedGOAPPlanner](../../packages/planning/src/reactive-executor/enhanced-goap-planner.ts)
+
+- **Minecraft Interface** (:3005): Mineflayer bot control, action execution, Prismarine-Viewer for 3D visualization.
+  - [Server](../../packages/minecraft-interface/src/server.ts)
+
+- **PBI Executor Contracts**: Runtime enforcement of plan-body interface contracts.
+  - [PBI Enforcer](../../packages/executor-contracts/src/pbi-enforcer.ts)
+  - [Capability Registry](../../packages/executor-contracts/src/capability-registry.ts)
 
 ## Component Coupling and Contracts
 
@@ -187,11 +221,34 @@ type CapabilitySpec = {
 * **Rate-limited updates**: avoid thrashing the router/executor.
 * **Edge detection**: emit on **change** ("fell below 6 hearts"), not on every tick.
 
-## 🎯 **Dynamic Thought Generation: Context-Aware Cognitive Processing**
+## Thought Type Taxonomy
 
-### **Revolutionary Enhancement: From Static to Dynamic Thinking**
+Before diving into dynamic thought generation, it's important to understand the four categories of thought that flow through the system:
 
-The cognitive architecture now features **dynamic thought generation** that creates thoughts based on real-time context and memory integration, rather than relying on hard-coded or pre-loaded understanding. This represents a fundamental shift from static rule-based thinking to adaptive, situation-aware cognitive processing.
+| Type | Attribution | Origin | Code Reference |
+|------|------------|--------|----------------|
+| **Reflection** | `self` | Cognition service LLM, triggered by bot lifecycle events (task completion, idle periods) | `packages/cognition/src/event-driven-thought-generator.ts:81` |
+| **Environmental** | `self` | Cognition service observation pipeline. Falls back to generic "I remain aware..." text when LLM fails (`cognitiveSystem: 'environmental-fallback'`) | `packages/cognition/src/event-driven-thought-generator.ts` |
+| **Internal** | `self` | Planning service internal reasoning during task creation, step generation, execution | `packages/planning/src/task-integration.ts:414` |
+| **Intrusive** | `intrusive` | External human operator input via dashboard UI → `POST /api/ws/cognitive-stream` | `packages/dashboard/src/hooks/use-cognitive-stream.ts:241` |
+
+**Lifecycle events that trigger thoughts** (`event-driven-thought-generator.ts:174`):
+- `task_completed` → **reflection** type
+- `task_failed` → **internal_dialogue** type
+- `idle_period` → **planning** type
+- `task_switch` → **observation** type
+- `day_start` / `day_end` → environmental awareness
+
+**Dashboard thought subtypes** (`packages/dashboard/src/types/index.ts:28`):
+- `ThoughtType = 'self' | 'reflection' | 'intrusion' | 'intrusive'`
+
+**Deduplication**: Environmental fallback observations are deduplicated at 30-second intervals on both server (`route.ts` POST handler) and client (`dashboard-store.ts:167`).
+
+---
+
+## Dynamic Thought Generation: Context-Aware Cognitive Processing
+
+The cognitive architecture features **dynamic thought generation** that creates thoughts based on real-time context and memory integration, rather than relying on hard-coded or pre-loaded understanding.
 
 ### **Dynamic Thought Generation Architecture**
 
@@ -460,99 +517,49 @@ The dynamic thought generation system integrates seamlessly with the existing co
 
 ```mermaid
 flowchart TD
-  %% Inputs
-  ENV[Environment Signals]
-  SMI[Sensorimotor Interface]
-  MEMAPI["Enhanced Memory System<br/>/state, /telemetry, /health"]
-  LLM[LLM Endpoint]
-  ITP["Intrusive Thought<br/>Processor<br/>(external suggestions)"]
+  %% Services with code references
+  MC["Minecraft Server<br/>(Docker)"]
+  MI["Minecraft Interface :3005<br/>minecraft-interface/src/server.ts"]
+  PLAN["Planning Service :3002<br/>planning/src/modular-server.ts"]
+  COG["Cognition Service :3003<br/>cognition/src/server.ts"]
+  MEM["Memory Service :3001<br/>memory/src/server.ts"]
+  WORLD["World Service :3004<br/>world/src/server.ts"]
+  DASH["Dashboard :3000<br/>dashboard/src/app/"]
+  CORE["Core Registry :3007<br/>core/src/server.ts"]
 
-  ENV -->|events| SMI
-  SMI -->|snapshots| SNAP[Environment Snapshot Builder]
-  SMI -->|sensor data| HM[Homeostasis Monitor]
-  ITP -->|parsed tasks| BOOT
+  %% Key internal components
+  TASK_INT["Task Integration<br/>planning/src/task-integration.ts<br/>(thought→task conversion)"]
+  STERLING["Sterling Solvers<br/>planning/src/sterling/<br/>(crafting, building, tool-progression)"]
+  EXEC["Executor Loop<br/>modular-server.ts:249<br/>(10s poll, step dispatch)"]
+  THOUGHT_GEN["Thought Generator<br/>cognition/src/event-driven-<br/>thought-generator.ts:81"]
+  SSE["SSE Stream<br/>dashboard/src/app/api/ws/<br/>cognitive-stream/route.ts"]
 
-  %% Enhanced Memory Integration
-  MEMAPI -->|episodic memories| SMI
-  MEMAPI -->|semantic knowledge| SMI
-  MEMAPI -->|working memory| SMI
-  MEMAPI -->|neuroscience consolidation| SMI
-  MEMAPI -->|memory-enhanced context| BOOT
-  MEMAPI -->|memory search results| NEEDS
-  MEMAPI -->|historical performance| HTN_MEM
-  MEMAPI -->|memory system health| OBSLOG
+  %% Data flows
+  MC <-->|"mineflayer"| MI
+  MI <-->|"GET /state, POST /action"| PLAN
+  PLAN --> TASK_INT
+  TASK_INT -->|"GET /api/cognitive-stream/recent"| COG
+  TASK_INT -->|"POST /generate-steps"| COG
+  TASK_INT --> STERLING
+  STERLING --> EXEC
+  EXEC -->|"MCP tool calls"| MI
+  COG --> THOUGHT_GEN
+  THOUGHT_GEN -->|"POST thoughts"| SSE
+  SSE -->|"SSE events"| BROWSER["Browser Client"]
+  BROWSER -->|"POST intrusive thought"| SSE
+  PLAN <--> MEM
+  WORLD -->|"GET /world-state"| PLAN
+  DASH -->|"proxy /api/tasks"| PLAN
 
-  %% HTN Memory Manager with Memory Integration
-  HTN_MEM["HTN Memory Manager<br/>(method effectiveness tracking)"]
-  HTN_MEM --> ROUTER
+  classDef service fill:#0b7285,stroke:#023047,color:#fff;
+  classDef internal fill:#ffa500,stroke:#cc5500,color:#000;
+  classDef ui fill:#2e8b57,stroke:#1b4332,color:#fff;
+  classDef external fill:#5c677d,stroke:#1d3557,color:#fff;
 
-  %% Bootstrap Stage with Memory Enhancement
-  SNAP --> BOOT
-  BOOT["Task Bootstrapper<br/>(memory -> llm -> exploration)"]
-  BOOT -->|recovered tasks| GOALS
-  BOOT -->|diagnostics<br/>planning.bootstrap.tasks| OBSLOG[Observability]
-  LLM -.->|prompt + JSON| BOOT
-
-  %% Advanced Need Processing with Memory Enhancement
-  HM --> NEEDS["Advanced Need Generator<br/>(context gates + trend analysis + memory)"]
-  NEEDS --> GOALS["Enhanced Goal Manager<br/>(priority scoring + memory integration)"]
-  GOALS --> ROUTER["Cognitive Task Router<br/>(HRM-inspired routing + memory priors)"]
-  MEMAPI -.->|memory signals| NEEDS
-  MEMAPI -.->|historical patterns| GOALS
-  MEMAPI -.->|success/failure data| ROUTER
-
-  %% Planning and Execution with Memory Integration
-  ROUTER -->|structured| HRM["HRM-Inspired Planner<br/>(navigation + logic + memory context)"]
-  ROUTER -->|htn| HTN["HTN Planner<br/>(hierarchical decomposition + effectiveness tracking)"]
-  ROUTER -->|llm| LLM["LLM Reasoning<br/>(creative + social + memory context)"]
-  ROUTER -->|collaborative| COLLAB["Hybrid Reasoning<br/>(ethical decisions + memory insights)"]
-  ROUTER -->|emergency| FAST["Fast Path<br/>(emergency actions + memory recall)"]
-
-  HRM --> EXEC["Enhanced Reactive Executor<br/>(GOAP + plan repair + memory-enhanced context)"]
-  HTN --> EXEC
-  LLM --> EXEC
-  COLLAB --> EXEC
-  FAST --> EXEC
-
-  %% Memory-Enhanced Execution Flow
-  EXEC -->|memory context requests| MEMAPI
-  MEMAPI -->|memory-enhanced context| EXEC
-  MEMAPI -->|neuroscience consolidation| EXEC
-
-  EXEC --> ACTIONS["Minecraft Interface<br/>(mineflayer + prismarine-viewer + HTTP server)"]
-  ACTIONS -->|action outcomes| INT_THT
-  ACTIONS --> ENV
-
-  %% Feedback & Memory Updates with Neuroscience Features
-  EXEC -->|plan metrics| OBSLOG
-  ACTIONS --> PROV[Provenance Recorder]
-  PROV --> MEMAPI
-  EXEC -.->|task outcomes| BOOT
-  PROV --> OBSLOG
-
-  %% Neuroscience-Inspired Memory Consolidation
-  MEMAPI -->|SWR tagging| MEMAPI
-  MEMAPI -->|cognitive map tracking| MEMAPI
-  MEMAPI -->|memory consolidation| MEMAPI
-  MEMAPI -->|importance-based decay| MEMAPI
-
-  classDef stage fill:#0b7285,stroke:#023047,color:#fff;
-  classDef memory fill:#5c677d,stroke:#1d3557,color:#fff;
-  classDef observe fill:#adb5bd,stroke:#495057,color:#333;
-  classDef input fill:#2e8b57,stroke:#1b4332,color:#fff;
-  classDef planning fill:#ffa500,stroke:#cc5500,color:#000;
-  classDef execution fill:#dc143c,stroke:#8b0000,color:#fff;
-  classDef thought fill:#e9c46a,stroke:#e76f51,color:#000;
-  classDef htn_memory fill:#9d4edd,stroke:#7b2cbf,color:#fff;
-  classDef neuroscience fill:#e91e63,stroke:#ad1457,color:#fff;
-
-  class ENV,SMI,HM input;
-  class NEEDS,GOALS,ROUTER,HRM,HTN,LLM,COLLAB,FAST,BOOT,HTN_MEM planning;
-  class EXEC execution;
-  class MEMAPI,PROV memory;
-  class SNAP,OBSLOG observe;
-  class ITP thought;
-  class INT_THT thought;
+  class MI,PLAN,COG,MEM,WORLD,CORE service;
+  class TASK_INT,STERLING,EXEC,THOUGHT_GEN,SSE internal;
+  class DASH,BROWSER ui;
+  class MC external;
 ```
  
 
@@ -1237,4 +1244,62 @@ The executor-contracts package can be integrated incrementally:
 4. **Phase 4**: Implement full acceptance testing and verification
 
 This approach ensures that the existing functionality continues to work while adding the reliability guarantees of the PBI contracts.
- 
+
+---
+
+## Known Bugs
+
+### BUG: Executor Inaction — Cognitive Tasks Always Blocked
+
+**Status:** Open, pending fix.
+
+**Symptom:** The bot generates thoughts and creates tasks from them, but never executes any actions. All tasks appear with `blockedReason: 'no-executable-plan'`. Planning logs show: "All active tasks are in backoff or blocked — skipping cycle."
+
+**Root cause chain:**
+
+1. **Thought → Task conversion** (`task-integration.ts:414`): `convertThoughtToTask()` creates tasks with `steps: []`.
+
+2. **Step generation** (`task-integration.ts:2206`): `generateDynamicSteps()` tries Sterling solvers first (crafting, building, tool-progression), but most free-form cognitive thoughts like "I should gather wood" don't match Sterling solver input requirements, so they fall through to the LLM fallback.
+
+3. **LLM fallback steps lack meta fields** (`task-integration.ts:2589-2595`): `generateStepsFromCognitive()` returns steps structured as:
+   ```typescript
+   { id, label, done, order, estimatedDuration }
+   // MISSING: meta: { leaf: '...', executable: true }
+   ```
+   Same problem in `generateIntelligentSteps()` at `task-integration.ts:2607`.
+
+4. **Executability check** (`task-integration.ts:1015-1020`):
+   ```typescript
+   const hasExecutableStep = task.steps.some(
+     s => s.meta?.leaf || s.meta?.executable === true
+   );
+   if (task.steps.length > 0 && !hasExecutableStep) {
+     task.metadata.blockedReason = 'no-executable-plan';
+   }
+   ```
+   Since no cognitive steps have `meta.leaf` or `meta.executable`, ALL cognitive tasks get blocked.
+
+5. **Executor filters blocked tasks** (`modular-server.ts:1665-1692`): Tasks with `blockedReason` are excluded from the execution cycle. Zero eligible tasks remain.
+
+**Why Sterling steps work:** Sterling solver enrichment sets `meta.executable = !!s.meta?.leaf` (see `task-integration.ts:2325`, `:2396`, `:2500`).
+
+**Fix needed:** `generateStepsFromCognitive()` and `generateIntelligentSteps()` must set `meta: { executable: true, leaf: '<action_name>' }` on returned steps, mapping LLM-suggested actions to registered MCP tool names (e.g., `move_to`, `dig_block`, `craft_item`).
+
+---
+
+## Inter-Service API Reference
+
+```
+Planning :3002 ──GET /api/cognitive-stream/recent──► Cognition :3003
+Planning :3002 ──POST /generate-steps─────────────► Cognition :3003
+Planning :3002 ──POST /api/cognitive-stream/ack───► Cognition :3003
+Planning :3002 ──GET /state───────────────────────► Minecraft Interface :3005
+Planning :3002 ──POST /action─────────────────────► Minecraft Interface :3005
+Planning :3002 ──memory store/retrieve────────────► Memory :3001
+World :3004 ────GET /world-state──────────────────► Planning :3002
+Dashboard :3000 ─GET /api/tasks (proxy)────────────► Planning :3002
+Dashboard :3000 ─GET /api/state (proxy)────────────► Planning :3002
+Dashboard :3000 ─GET /versioning/active────────────► Memory :3001
+Browser ────────POST /api/ws/cognitive-stream──────► Dashboard :3000
+Dashboard :3000 ─SSE cognitive_thoughts────────────► Browser
+```
