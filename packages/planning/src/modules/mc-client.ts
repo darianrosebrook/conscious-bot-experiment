@@ -1,6 +1,10 @@
 // Centralized Minecraft endpoint and resilient HTTP utilities
 
-import { classifyFailure, HEALTH_CHECK_TIMEOUT_MS } from './timeout-policy';
+import {
+  classifyFailure,
+  HEALTH_CHECK_TIMEOUT_MS,
+  FailureKind,
+} from './timeout-policy';
 
 export const MC_ENDPOINT =
   process.env.MINECRAFT_ENDPOINT || 'http://localhost:3005';
@@ -36,14 +40,15 @@ export async function mcFetch(
   const baseDelay = 300;
   let lastErr: any;
   for (let attempt = 0; attempt <= retries; attempt++) {
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
     try {
       const controller = new AbortController();
-      const timeout = setTimeout(
+      timeoutId = setTimeout(
         () => controller.abort(),
         init.timeoutMs ?? 10_000
       );
       const res = await fetch(url, { ...init, signal: controller.signal });
-      clearTimeout(timeout);
+      clearTimeout(timeoutId);
       if (res.ok) {
         mcRecordSuccess();
         return res;
@@ -57,16 +62,20 @@ export async function mcFetch(
       if (res.status >= 500) mcRecordFailure();
       return res;
     } catch (err: any) {
+      if (timeoutId) clearTimeout(timeoutId);
       lastErr = err;
+      const kind = classifyFailure(err);
+      if (kind === 'timeout') {
+        // AbortError = system busy / timeout — do NOT retry or trip breaker
+        throw err;
+      }
       if (attempt < retries) {
         const delay = baseDelay * Math.pow(2, attempt) + Math.random() * 100;
         await new Promise((r) => setTimeout(r, delay));
         continue;
       }
-      // AbortError = system busy / timeout — should NOT trip circuit breaker
-      if (classifyFailure(err) !== 'timeout') {
-        mcRecordFailure();
-      }
+      // AbortError = system busy / timeout — already thrown above; record failure for other kinds
+      mcRecordFailure();
       throw err;
     }
   }
@@ -112,8 +121,21 @@ export async function waitForBotConnection(
 }
 
 export async function checkBotConnection(): Promise<boolean> {
-  try {
-    if (mcCircuitOpen()) return false;
+  const detailed = await checkBotConnectionDetailed();
+  return detailed.ok;
+}
+
+const HEALTH_CHECK_RETRY_DELAY_MS = 800;
+
+export async function checkBotConnectionDetailed(): Promise<{
+  ok: boolean;
+  failureKind?: FailureKind;
+}> {
+  const attempt = async (): Promise<{
+    ok: boolean;
+    failureKind?: FailureKind;
+  }> => {
+    if (mcCircuitOpen()) return { ok: false, failureKind: 'unknown' };
     const response = await mcFetch('/health', {
       method: 'GET',
       timeoutMs: HEALTH_CHECK_TIMEOUT_MS,
@@ -123,14 +145,40 @@ export async function checkBotConnection(): Promise<boolean> {
         status?: string;
         botStatus?: { connected?: boolean };
       };
-      return (
-        status.status === 'connected' || status.botStatus?.connected === true
-      );
+      const connected =
+        status.status === 'connected' || status.botStatus?.connected === true;
+      return { ok: connected };
     }
-    return false;
+    return {
+      ok: false,
+      failureKind: classifyFailure(undefined, response.status),
+    };
+  };
+
+  try {
+    return await attempt();
   } catch (error) {
-    console.warn('Bot connection check failed:', error);
-    return false;
+    const failureKind = classifyFailure(error);
+    if (failureKind === 'timeout') {
+      await new Promise((r) =>
+        setTimeout(r, HEALTH_CHECK_RETRY_DELAY_MS)
+      );
+      try {
+        return await attempt();
+      } catch (retryError) {
+        const retryKind = classifyFailure(retryError);
+        console.warn('Bot connection check failed after retry:', {
+          error: retryError,
+          failureKind: retryKind,
+        });
+        return { ok: false, failureKind: retryKind };
+      }
+    }
+    console.warn('Bot connection check failed:', {
+      error,
+      failureKind,
+    });
+    return { ok: false, failureKind };
   }
 }
 

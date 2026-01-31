@@ -15,7 +15,11 @@ import type { BaseDomainSolver } from './sterling/base-domain-solver';
 import type { MinecraftCraftingSolver } from './sterling/minecraft-crafting-solver';
 import type { MinecraftBuildingSolver } from './sterling/minecraft-building-solver';
 import type { MinecraftToolProgressionSolver } from './sterling/minecraft-tool-progression-solver';
-import { resolveRequirement, parseRequiredQuantityFromTitle } from './modules/requirements';
+import {
+  resolveRequirement,
+  parseRequiredQuantityFromTitle,
+  requirementsEquivalent,
+} from './modules/requirements';
 import { requirementToFallbackPlan } from './modules/leaf-arg-contracts';
 import { CognitionOutbox } from './modules/cognition-outbox';
 
@@ -233,6 +237,16 @@ export interface ActionVerification {
   verified: boolean;
   timestamp: number;
 }
+
+/** Per-step snapshot for before/after verification (position, inventory by item). */
+export type StepSnapshot = {
+  position?: { x: number; y: number; z: number };
+  food?: number;
+  health?: number;
+  inventoryTotal?: number;
+  inventoryByName?: Record<string, number>;
+  ts: number;
+};
 
 export interface EnhancedTaskIntegrationConfig {
   enableRealTimeUpdates: boolean;
@@ -947,17 +961,25 @@ Reply with exactly: {"kind":"...","target":"...","quantity":N}`,
     return await this.cognitiveStreamClient.getActionableThoughts();
   }
 
-  // Ephemeral per-step snapshot to compare before/after state
-  private _stepStartSnapshots: Map<
-    string,
-    {
-      position?: { x: number; y: number; z: number };
-      food?: number;
-      health?: number;
-      inventoryTotal?: number;
-      ts: number;
+  // Ephemeral per-step snapshot to compare before/after state (key: `${taskId}-${stepId}`)
+  private _stepStartSnapshots: Map<string, StepSnapshot> = new Map();
+
+  private canonicalItemId(raw: unknown): string {
+    return String(raw ?? '')
+      .toLowerCase()
+      .trim()
+      .replace(/\s+/g, '_');
+  }
+
+  private buildInventoryIndex(inventory: any[]): Record<string, number> {
+    const idx: Record<string, number> = {};
+    for (const it of inventory ?? []) {
+      const name = this.canonicalItemId(it?.name ?? it?.type);
+      if (!name) continue;
+      idx[name] = (idx[name] || 0) + (it?.count || 0);
     }
-  > = new Map();
+    return idx;
+  }
 
   /**
    * Update the current (first incomplete) step label to include a leaf and its parameters
@@ -1201,7 +1223,8 @@ Reply with exactly: {"kind":"...","target":"...","quantity":N}`,
   }
 
   /**
-   * Find similar existing tasks to prevent duplicates
+   * Find similar existing tasks to prevent duplicates (by title/similarity and by
+   * requirement equivalence so the same goal is not added under multiple parent tasks).
    */
   private findSimilarTask(taskData: Partial<Task>): Task | null {
     const title = taskData.title?.toLowerCase() || '';
@@ -1231,6 +1254,19 @@ Reply with exactly: {"kind":"...","target":"...","quantity":N}`,
 
         if (similarity > 0.7) {
           // 70% similarity threshold
+          return task;
+        }
+      }
+    }
+
+    // Check for same resolved requirement: avoid adding a second task that would
+    // execute the same steps (e.g. "collect oak_log" under "Find wood" and "Secure shelter")
+    const incomingReq = resolveRequirement(taskData);
+    if (incomingReq) {
+      for (const task of this.tasks.values()) {
+        if (task.status !== 'pending' && task.status !== 'active') continue;
+        const existingReq = task.metadata?.requirement ?? resolveRequirement(task);
+        if (requirementsEquivalent(incomingReq, existingReq)) {
           return task;
         }
       }
@@ -1366,6 +1402,15 @@ Reply with exactly: {"kind":"...","target":"...","quantity":N}`,
 
     // Verify action was actually performed if verification is enabled
     if (this.config.enableActionVerification) {
+      // Allow game state (e.g. inventory) to settle after dig/collect before verification
+      const leaf = step.meta?.leaf as string | undefined;
+      const isDigOrCollect =
+        leaf === 'dig_block' ||
+        leaf === 'acquire_material' ||
+        /^(?:collect|mine|gather)\s+.+\s*\(\d+\/\d+\)$/i.test(step.label);
+      if (isDigOrCollect) {
+        await new Promise((r) => setTimeout(r, 1500));
+      }
       const verification = await this.verifyActionCompletion(
         taskId,
         stepId,
@@ -1517,31 +1562,213 @@ Reply with exactly: {"kind":"...","target":"...","quantity":N}`,
   }
 
   /**
-   * Verify that an action was actually completed
+   * Contract-based verification by leaf: uses meta.leaf + args (and optional meta.produces),
+   * delta checks where applicable, and retries within timeout for eventual consistency.
+   */
+  private async verifyByLeaf(
+    taskId: string,
+    stepId: string,
+    leaf: string,
+    args: Record<string, any>,
+    step: TaskStep
+  ): Promise<boolean> {
+    const timeout =
+      this.config.actionVerificationTimeout ?? 10000;
+    const leafId = leaf.toLowerCase().trim();
+
+    const produces = (step.meta?.produces as Array<{
+      name: string;
+      count: number;
+    }>) || [];
+    const producedItem = produces[0]?.name;
+    const producedCount = produces[0]?.count ?? 1;
+
+    switch (leafId) {
+      case 'move_to':
+      case 'step_forward_safely':
+      case 'follow_entity':
+        return this.retryUntil(
+          () => this.verifyMovement(taskId, stepId, 0.75),
+          timeout
+        );
+
+      case 'dig_block': {
+        const blockType = this.canonicalItemId(
+          args.blockType ?? producedItem ?? 'oak_log'
+        );
+        const minDelta = Math.max(1, producedCount);
+        // Pathfinding + break + pickup can take longer; use extended timeout
+        const digTimeout = Math.max(timeout, 20000);
+        return this.retryUntil(
+          () =>
+            this.verifyInventoryDelta(
+              taskId,
+              stepId,
+              blockType,
+              minDelta
+            ),
+          digTimeout
+        );
+      }
+
+      case 'pickup_item':
+        return this.retryUntil(
+          () => this.verifyPickupFromInventoryDelta(taskId, stepId),
+          timeout
+        );
+
+      case 'craft_recipe': {
+        const recipe = this.canonicalItemId(
+          args.recipe ?? producedItem ?? 'unknown'
+        );
+        const qty = Number(args.qty ?? producedCount ?? 1);
+        return this.retryUntil(
+          () =>
+            this.verifyInventoryDelta(
+              taskId,
+              stepId,
+              recipe,
+              Math.max(1, qty)
+            ),
+          timeout
+        );
+      }
+
+      case 'smelt': {
+        const out = this.canonicalItemId(producedItem ?? '');
+        if (!out)
+          return this.retryUntil(() => this.verifySmeltedItem(), timeout);
+        return this.retryUntil(
+          () =>
+            this.verifyInventoryDelta(
+              taskId,
+              stepId,
+              out,
+              Math.max(1, producedCount)
+            ),
+          timeout
+        );
+      }
+
+      case 'place_block': {
+        const item = this.canonicalItemId(
+          args.item ?? args.blockType ?? 'crafting_table'
+        );
+        return this.retryUntil(
+          () => this.verifyNearbyBlock(item),
+          timeout
+        );
+      }
+
+      case 'place_torch_if_needed':
+        return this.retryUntil(
+          () => this.verifyNearbyBlock('torch'),
+          timeout
+        );
+
+      case 'retreat_and_block': {
+        const moved = await this.verifyMovement(taskId, stepId, 0.75);
+        const placed = await this.verifyNearbyBlock();
+        return moved || placed;
+      }
+
+      case 'consume_food':
+        return this.retryUntil(
+          () => this.verifyConsumeFood(taskId, stepId),
+          timeout
+        );
+
+      case 'sense_hostiles':
+      case 'get_light_level':
+      case 'wait':
+      case 'look_at':
+      case 'turn_left':
+      case 'turn_right':
+      case 'jump':
+      case 'chat':
+        return true;
+
+      case 'introspect_recipe':
+      case 'prepare_site':
+      case 'place_feature':
+      case 'build_module':
+      case 'replan_building':
+        return true;
+
+      case 'acquire_material': {
+        const item = this.canonicalItemId(
+          args.item ?? args.blockType ?? producedItem ?? 'unknown'
+        );
+        const acquireTimeout = Math.max(timeout, 20000);
+        return this.retryUntil(
+          () =>
+            this.verifyInventoryDelta(taskId, stepId, item, 1),
+          acquireTimeout
+        );
+      }
+
+      default:
+        return false;
+    }
+  }
+
+  /**
+   * Verify that an action was actually completed. Leaf-first: when step.meta.leaf
+   * exists, verify by contract (verifyByLeaf). Non-executable steps are skipped.
+   * Legacy label-based switch used only when no leaf is present.
    */
   private async verifyActionCompletion(
     taskId: string,
     stepId: string,
     step: TaskStep
   ): Promise<ActionVerification> {
+    const leaf = step.meta?.leaf as string | undefined;
     const verification: ActionVerification = {
       taskId,
       stepId,
-      actionType: step.label.toLowerCase(),
+      actionType: String(leaf ?? step.label ?? '').toLowerCase(),
       expectedResult: this.getExpectedResultForStep(step),
       verified: false,
       timestamp: Date.now(),
     };
 
     try {
-      // Check if bot is connected and can perform actions
       if (!(await this.isBotConnected())) {
-        verification.verified = false;
         verification.actualResult = { error: 'Bot not connected' };
+        this.actionVerifications.set(`${taskId}-${stepId}`, verification);
         return verification;
       }
 
-      // Verify based on step type
+      const executable =
+        step.meta?.executable === true || !!leaf;
+      if (!executable) {
+        verification.verified = true;
+        verification.actualResult = {
+          skipped: true,
+          reason: 'non-executable step',
+        };
+        this.actionVerifications.set(`${taskId}-${stepId}`, verification);
+        return verification;
+      }
+
+      if (leaf) {
+        verification.verified = await this.verifyByLeaf(
+          taskId,
+          stepId,
+          leaf,
+          (step.meta?.args as Record<string, any>) ?? {},
+          step
+        );
+        if (!verification.verified)
+          verification.actualResult = {
+            error: 'Leaf verification failed or unknown leaf',
+            leaf,
+          };
+        this.actionVerifications.set(`${taskId}-${stepId}`, verification);
+        return verification;
+      }
+
+      // Legacy: label-based verification when no meta.leaf
       const stepLabel = step.label.toLowerCase();
       switch (stepLabel) {
         case 'locate nearby wood':
@@ -1550,7 +1777,7 @@ Reply with exactly: {"kind":"...","target":"...","quantity":N}`,
           break;
         case 'move to resource location':
         case 'move to location':
-          verification.verified = await this.verifyMovement();
+          verification.verified = await this.verifyMovement(taskId, stepId);
           break;
         case 'collect wood safely':
         case 'collect resources safely':
@@ -1571,17 +1798,38 @@ Reply with exactly: {"kind":"...","target":"...","quantity":N}`,
         case 'create the item':
           verification.verified = await this.verifyItemCreation();
           break;
-        default:
+        default: {
+          // Prefer step.meta.leaf when present (e.g. fallback-macro steps like "Collect oak_log (1/8)")
+          const metaLeaf = step.meta?.leaf as string | undefined;
+          const metaArgs = step.meta?.args as Record<string, unknown> | undefined;
+          if (metaLeaf === 'dig_block' || metaLeaf === 'acquire_material') {
+            const resource =
+              (metaArgs?.blockType as string) || (metaArgs?.item as string);
+            const resourceName = resource ? String(resource) : 'wood';
+            verification.verified =
+              await this.verifyResourceCollection(resourceName);
+            break;
+          }
+          // Fallback: parse "Collect X (n/m)" / "Mine X (n/m)" / "Gather X (n/m)" from label
+          const collectMatch = stepLabel.match(
+            /^(?:collect|mine|gather)\s+(.+?)\s*\(\d+\/\d+\)$/
+          );
+          if (collectMatch) {
+            const resourceName = collectMatch[1].trim() || 'wood';
+            verification.verified =
+              await this.verifyResourceCollection(resourceName);
+            break;
+          }
           // Handle MCP leaf-labeled steps like "Leaf: minecraft.move_to"
           if (stepLabel.startsWith('leaf: minecraft.')) {
             const leaf = stepLabel.replace('leaf: minecraft.', '').trim();
             if (leaf === 'move_to') {
-              verification.verified = await this.verifyMovement();
+              verification.verified = await this.verifyMovement(taskId, stepId);
             } else if (
               leaf === 'step_forward_safely' ||
               leaf === 'follow_entity'
             ) {
-              verification.verified = await this.verifyMovement();
+              verification.verified = await this.verifyMovement(taskId, stepId);
             } else if (leaf === 'dig_block') {
               // Prefer blockType/item in label when available
               const bt =
@@ -1603,7 +1851,7 @@ Reply with exactly: {"kind":"...","target":"...","quantity":N}`,
             } else if (leaf === 'place_torch_if_needed') {
               verification.verified = await this.verifyNearbyBlock('torch');
             } else if (leaf === 'retreat_and_block') {
-              const moved = await this.verifyMovement();
+              const moved = await this.verifyMovement(taskId, stepId);
               const placed = await this.verifyNearbyBlock();
               verification.verified = moved || placed;
             } else if (leaf === 'consume_food') {
@@ -1656,6 +1904,7 @@ Reply with exactly: {"kind":"...","target":"...","quantity":N}`,
               error: 'Unknown step type - requires manual verification',
             };
           }
+        }
       }
 
       this.actionVerifications.set(`${taskId}-${stepId}`, verification);
@@ -1754,43 +2003,95 @@ Reply with exactly: {"kind":"...","target":"...","quantity":N}`,
   }
 
   /**
-   * Verify movement
+   * Verify movement using step baseline (taskId-stepId). Does not delete snapshot.
    */
-  private async verifyMovement(): Promise<boolean> {
+  private async verifyMovement(
+    taskId: string,
+    stepId: string,
+    minDist = 0.75
+  ): Promise<boolean> {
     try {
-      // Check bot position to see if it changed from step start (if available)
+      const start = this._stepStartSnapshots.get(
+        `${taskId}-${stepId}`
+      ) as StepSnapshot | undefined;
+
       const response = await this.minecraftRequest('/health', {
         timeout: 5000,
       });
-
       if (!response.ok) return false;
 
       const data = (await response.json()) as any;
-      const position = data.botStatus?.position;
-      if (!position) return false;
+      const p = data?.botStatus?.position;
+      if (
+        !p ||
+        typeof p.x !== 'number' ||
+        typeof p.y !== 'number' ||
+        typeof p.z !== 'number'
+      )
+        return false;
 
-      if (this._stepStartSnapshots.size > 0) {
-        const lastEntry = Array.from(this._stepStartSnapshots.entries()).pop();
-        if (lastEntry) {
-          const [key, start] = lastEntry as [string, any];
-          if (start?.position) {
-            const dx = (position.x ?? 0) - start.position.x;
-            const dy = (position.y ?? 0) - start.position.y;
-            const dz = (position.z ?? 0) - start.position.z;
-            const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
-            this._stepStartSnapshots.delete(key);
-            return dist >= 0.5;
-          }
-        }
+      if (start?.position) {
+        const dx = p.x - start.position.x;
+        const dy = p.y - start.position.y;
+        const dz = p.z - start.position.z;
+        const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
+        return dist >= minDist;
       }
-      // Fallback: require at least a non-zero velocity or position change can't be verified
-      const vel = data.botStatus?.velocity;
-      if (vel && Math.abs(vel.x) + Math.abs(vel.y) + Math.abs(vel.z) > 0) {
-        return true;
-      }
+
+      // Fallback: weak signal from velocity
+      const vel = data?.botStatus?.velocity;
+      return !!(
+        vel &&
+        Math.abs(vel.x) + Math.abs(vel.y) + Math.abs(vel.z) > 0
+      );
+    } catch {
       return false;
-    } catch (error) {
-      // Failed to verify movement: ${error}
+    }
+  }
+
+  /**
+   * Retry a predicate until it returns true or timeout. Handles eventual consistency.
+   */
+  private async retryUntil(
+    fn: () => Promise<boolean>,
+    timeoutMs: number,
+    intervalMs = 400
+  ): Promise<boolean> {
+    const start = Date.now();
+    while (Date.now() - start < timeoutMs) {
+      if (await fn()) return true;
+      await new Promise((r) => setTimeout(r, intervalMs));
+    }
+    return false;
+  }
+
+  /**
+   * Verify inventory increased by at least minDelta for itemId since step start (delta-based).
+   */
+  private async verifyInventoryDelta(
+    taskId: string,
+    stepId: string,
+    itemId: string,
+    minDelta = 1
+  ): Promise<boolean> {
+    try {
+      const start = this._stepStartSnapshots.get(
+        `${taskId}-${stepId}`
+      ) as StepSnapshot | undefined;
+
+      const res = await this.minecraftRequest('/inventory', { timeout: 4000 });
+      if (!res.ok) return false;
+
+      const data = (await res.json()) as any;
+      const inventory = data?.data || [];
+      const afterIdx = this.buildInventoryIndex(inventory);
+
+      const target = this.canonicalItemId(itemId);
+      const before = start?.inventoryByName?.[target] ?? 0;
+      const after = afterIdx[target] ?? 0;
+
+      return after - before >= minDelta;
+    } catch {
       return false;
     }
   }
@@ -1919,9 +2220,11 @@ Reply with exactly: {"kind":"...","target":"...","quantity":N}`,
       const data = (await response.json()) as any;
       const inventory = data.data || [];
 
-      // Check if we have the expected resource type
+      // Check if we have the expected resource type (support both .type and .name from minecraft interface)
       const resourceItems = inventory.filter((item: any) => {
-        const itemName = item.type?.toLowerCase() || '';
+        const itemName = (
+          (item.type ?? item.name) ?? ''
+        ).toString().toLowerCase();
         const resourceName = resourceType.toLowerCase();
 
         if (resourceName === 'wood') {
@@ -2141,9 +2444,10 @@ Reply with exactly: {"kind":"...","target":"...","quantity":N}`,
   }
 
   /**
-   * Start a task step
+   * Start a task step and capture a before-snapshot for verification.
+   * Awaits snapshot capture so verifyInventoryDelta has a baseline when the step completes.
    */
-  startTaskStep(taskId: string, stepId: string): boolean {
+  async startTaskStep(taskId: string, stepId: string): Promise<boolean> {
     const task = this.tasks.get(taskId);
     if (!task) {
       return false;
@@ -2156,43 +2460,44 @@ Reply with exactly: {"kind":"...","target":"...","quantity":N}`,
 
     step.startedAt = Date.now();
 
-    // Capture bot snapshot at step start for verification
-    (async () => {
-      try {
-        const [healthRes, invRes] = await Promise.all([
-          this.minecraftRequest('/health', { timeout: 3000 }),
-          this.minecraftRequest('/inventory', { timeout: 3000 }),
-        ]);
+    // Capture bot snapshot at step start for verification (key: taskId-stepId).
+    // Await so verification has a baseline when completeTaskStep runs.
+    const key = `${taskId}-${stepId}`;
+    try {
+      const [healthRes, invRes] = await Promise.all([
+        this.minecraftRequest('/health', { timeout: 3000 }),
+        this.minecraftRequest('/inventory', { timeout: 3000 }),
+      ]);
 
-        const snap: any = { ts: Date.now() };
-        if (healthRes.ok) {
-          const data = (await healthRes.json()) as any;
-          const p = data?.botStatus?.position;
-          if (
-            p &&
-            typeof p.x === 'number' &&
-            typeof p.y === 'number' &&
-            typeof p.z === 'number'
-          ) {
-            snap.position = { x: p.x, y: p.y, z: p.z };
-          }
-          const food = data?.botStatus?.food;
-          if (typeof food === 'number') snap.food = food;
-          const health = data?.botStatus?.health;
-          if (typeof health === 'number') snap.health = health;
+      const snap: StepSnapshot = { ts: Date.now() };
+      if (healthRes.ok) {
+        const data = (await healthRes.json()) as any;
+        const p = data?.botStatus?.position;
+        if (
+          p &&
+          typeof p.x === 'number' &&
+          typeof p.y === 'number' &&
+          typeof p.z === 'number'
+        ) {
+          snap.position = { x: p.x, y: p.y, z: p.z };
         }
-        if (invRes.ok) {
-          const invData = (await invRes.json()) as any;
-          const inventory = invData?.data || [];
-          snap.inventoryTotal = Array.isArray(inventory)
-            ? inventory.reduce((s: number, it: any) => s + (it?.count || 0), 0)
-            : 0;
-        }
-        this._stepStartSnapshots.set(`${taskId}-${stepId}`, snap);
-      } catch {
-        // Ignore snapshot creation errors to avoid blocking task execution
+        const food = data?.botStatus?.food;
+        if (typeof food === 'number') snap.food = food;
+        const health = data?.botStatus?.health;
+        if (typeof health === 'number') snap.health = health;
       }
-    })();
+      if (invRes.ok) {
+        const invData = (await invRes.json()) as any;
+        const inventory = invData?.data || [];
+        snap.inventoryTotal = Array.isArray(inventory)
+          ? inventory.reduce((s: number, it: any) => s + (it?.count || 0), 0)
+          : 0;
+        snap.inventoryByName = this.buildInventoryIndex(inventory);
+      }
+      this._stepStartSnapshots.set(key, snap);
+    } catch {
+      // Snapshot creation failed; verification may use before=0 (no baseline)
+    }
 
     // Update task status to active if it was pending
     if (task.status === 'pending') {

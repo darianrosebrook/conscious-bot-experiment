@@ -13,6 +13,41 @@ export function parseRequiredQuantityFromTitle(title: string | undefined, fallba
   return m ? Math.max(1, parseInt(m[1], 10)) : fallback;
 }
 
+/**
+ * Returns true if two requirements represent the same goal (same kind and same
+ * target items/structure), so we can deduplicate tasks that would execute the
+ * same steps (e.g. multiple "collect oak_log" tasks from different parent intents).
+ */
+export function requirementsEquivalent(
+  a: TaskRequirement | null | undefined,
+  b: TaskRequirement | null | undefined
+): boolean {
+  if (!a || !b || a.kind !== b.kind) return false;
+  switch (a.kind) {
+    case 'collect':
+    case 'mine': {
+      if (b.kind !== 'collect' && b.kind !== 'mine') return false;
+      const aPat = [...a.patterns].sort().join(',');
+      const bPat = [...b.patterns].sort().join(',');
+      return aPat === bPat;
+    }
+    case 'craft': {
+      if (b.kind !== 'craft') return false;
+      return a.outputPattern === b.outputPattern;
+    }
+    case 'build': {
+      if (b.kind !== 'build') return false;
+      return a.structure === b.structure;
+    }
+    case 'tool_progression': {
+      if (b.kind !== 'tool_progression') return false;
+      return a.targetTool === b.targetTool;
+    }
+    default:
+      return false;
+  }
+}
+
 export function resolveRequirement(task: any): TaskRequirement | null {
   // Prefer structured requirement candidate from thought extraction
   const candidate = task?.parameters?.requirementCandidate;

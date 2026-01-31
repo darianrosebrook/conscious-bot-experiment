@@ -50,6 +50,7 @@ import {
   mcFetch,
   mcPostJson,
   checkBotConnection,
+  checkBotConnectionDetailed,
   waitForBotConnection,
   getBotPosition,
   executeTask,
@@ -473,11 +474,14 @@ async function executeActionWithBotCheck(action: any, signal?: AbortSignal) {
       };
     }
     // Check if bot is connected
-    const botConnected = await checkBotConnection();
-    if (!botConnected) {
+    const botConnection = await checkBotConnectionDetailed();
+    if (!botConnection.ok) {
       return {
         ok: false,
-        error: 'Bot not connected',
+        error:
+          botConnection.failureKind === 'timeout'
+            ? 'Bot connection timed out'
+            : 'Bot not connected',
         data: null,
         environmentDeltas: {},
       };
@@ -1904,12 +1908,14 @@ async function autonomousTaskExecutor() {
 
     // Circuit breaker around bot health
     console.log(`🤖 [AUTONOMOUS EXECUTOR] Checking bot connection...`);
-    const botConnected = await checkBotConnection();
-    console.log(`🤖 [AUTONOMOUS EXECUTOR] Bot connected: ${botConnected}`);
+    const botConnection = await checkBotConnectionDetailed();
+    console.log(
+      `🤖 [AUTONOMOUS EXECUTOR] Bot connected: ${botConnection.ok}`
+    );
 
-    if (!botConnected) {
+    if (!botConnection.ok) {
       const st = global.__planningExecutorState;
-      if (st.breaker === 'closed') {
+      if (st.breaker === 'closed' && botConnection.failureKind !== 'timeout') {
         st.breaker = 'open';
         console.warn('⛔ Bot unavailable — opening circuit');
       }
@@ -2180,13 +2186,30 @@ async function autonomousTaskExecutor() {
           console.log(
             `🏗️ [Executor:${stepAuthority}] Executing step ${nextStep.order}: ${nextStep.label} → ${leafExec.leafName}`
           );
+          // Capture before-snapshot so verification can detect inventory delta
+          await enhancedTaskIntegration.startTaskStep(currentTask.id, nextStep.id);
           const actionResult = await toolExecutor.execute(
             `minecraft.${leafExec.leafName}`,
             leafExec.args
           );
           if (actionResult?.ok) {
-            console.log(`✅ [Executor] Step ${nextStep.order} completed`);
-            await enhancedTaskIntegration.completeTaskStep(currentTask.id, nextStep.id);
+            const stepCompleted = await enhancedTaskIntegration.completeTaskStep(
+              currentTask.id,
+              nextStep.id
+            );
+            if (stepCompleted) {
+              console.log(`✅ [Executor] Step ${nextStep.order} completed`);
+            } else {
+              // Verification failed (e.g. inventory not updated yet); back off to avoid spin loop
+              const backoffMs = 5000;
+              enhancedTaskIntegration.updateTaskMetadata(currentTask.id, {
+                ...currentTask.metadata,
+                nextEligibleAt: Date.now() + backoffMs,
+              });
+              console.warn(
+                `⚠️ [Executor] Step ${nextStep.order} verification failed; backing off ${backoffMs}ms`
+              );
+            }
           } else if (isNavigatingError(actionResult?.error)) {
             // Bot is mid-navigation — retry next cycle, don't count as failure
             console.log(`🚶 [Executor] Bot is navigating, will retry next cycle`);

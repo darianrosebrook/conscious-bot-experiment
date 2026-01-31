@@ -31,6 +31,8 @@ export class WorldStateManager extends EventEmitter {
   private snapshot: WorldStateSnapshot = { ts: 0, connected: false };
   private pollHandle?: NodeJS.Timeout;
   private lastNotReadyLogAt = 0;
+  private pollInFlight = false;
+  private lastPollSkipAt = 0;
 
   constructor(baseUrl: string) {
     super();
@@ -71,36 +73,56 @@ export class WorldStateManager extends EventEmitter {
       }
       return;
     }
+    if (this.pollInFlight) {
+      const now = Date.now();
+      if (now - this.lastPollSkipAt > 3000) {
+        console.log('WorldStateManager poll skipped (in-flight)');
+        this.lastPollSkipAt = now;
+      }
+      return;
+    }
+    this.pollInFlight = true;
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
     try {
       const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), POLL_TIMEOUT_MS);
+      timeoutId = setTimeout(() => controller.abort(), POLL_TIMEOUT_MS);
       const res = await fetch(`${this.baseUrl}/state`, {
         method: 'GET',
         signal: controller.signal,
       });
-      clearTimeout(timeout);
+      clearTimeout(timeoutId);
+      timeoutId = undefined;
       if (!res.ok) {
-        console.warn(`WorldStateManager: poll got HTTP ${res.status} — stale snapshot preserved`);
+        console.warn(
+          `WorldStateManager: poll got HTTP ${res.status} — stale snapshot preserved`
+        );
         return;
       }
       const json = (await res.json()) as any;
       const data = json?.data || {};
       const worldState = data.worldState || {};
       const player = worldState.player || {};
+      // Minecraft interface /state returns inventory at data.data.inventory (object with .items) or data.data.inventory as array
+      const nested = data.data as { inventory?: CachedInventoryItem[] | { items?: CachedInventoryItem[] } } | undefined;
 
-      // Extract inventory items
+      // Extract inventory items: data.inventory | data.data.inventory | data.data.inventory.items | worldState.inventory.items
       const inv = Array.isArray(data.inventory)
         ? (data.inventory as CachedInventoryItem[])
-        : Array.isArray(worldState.inventory?.items)
-          ? (worldState.inventory.items as CachedInventoryItem[])
-          : [];
+        : Array.isArray(nested?.inventory)
+          ? (nested.inventory as CachedInventoryItem[])
+          : Array.isArray(nested?.inventory?.items)
+            ? (nested.inventory.items as CachedInventoryItem[])
+            : Array.isArray(worldState.inventory?.items)
+              ? (worldState.inventory.items as CachedInventoryItem[])
+              : [];
 
       const prev = this.snapshot;
+      const inner = nested as { position?: Vec3; health?: number } | undefined;
       this.snapshot = {
         ts: Date.now(),
         connected: json?.status === 'connected' || json?.isAlive === true,
-        agentPosition: data.position || player.position,
-        agentHealth: data.health || player.health,
+        agentPosition: data.position || inner?.position || player.position,
+        agentHealth: data.health ?? inner?.health ?? player.health,
         inventory: inv,
         nearbyEntities: worldState.nearbyEntities || [],
         timeOfDay: worldState.timeOfDay,
@@ -128,7 +150,13 @@ export class WorldStateManager extends EventEmitter {
     } catch (e) {
       // Stale-while-revalidate: previous snapshot is intentionally preserved
       // on fetch failure so downstream consumers always have *some* data.
-      console.warn('WorldStateManager poll failed (stale snapshot preserved):', (e as any)?.message || e);
+      console.warn(
+        'WorldStateManager poll failed (stale snapshot preserved):',
+        (e as any)?.message || e
+      );
+    } finally {
+      if (timeoutId !== undefined) clearTimeout(timeoutId);
+      this.pollInFlight = false;
     }
   }
 
