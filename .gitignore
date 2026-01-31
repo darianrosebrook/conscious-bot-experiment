@@ -120,3 +120,6 @@ build/
 .env.development.local
 .env.test.local
 .env.production.local
+
+# Dashboard data snapshots
+packages/dashboard/data/cognitive-thoughts*.json

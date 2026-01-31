@@ -10,6 +10,12 @@
 import { Bot } from 'mineflayer';
 import { Vec3 } from 'vec3';
 import { AutomaticSafetyMonitor } from './automatic-safety-monitor';
+import {
+  RaycastEngine,
+  validateSensingConfig,
+  SensingConfig,
+  Orientation,
+} from '@conscious-bot/world';
 
 export interface ThreatEntity {
   id: string;
@@ -26,6 +32,7 @@ export interface PerceptionConfig {
   lineOfSightRequired: boolean;
   persistenceWindowMs: number; // e.g., 5 minutes to avoid re-detection
   raycastTimeoutMs: number;
+  fieldOfViewDegrees: number;
 }
 
 export class ThreatPerceptionManager {
@@ -33,6 +40,8 @@ export class ThreatPerceptionManager {
   private config: PerceptionConfig;
   private knownThreats = new Map<string, ThreatEntity>();
   private safetyMonitor: AutomaticSafetyMonitor;
+  private raycastEngine: RaycastEngine;
+  private raycastConfig: SensingConfig;
 
   constructor(
     bot: Bot,
@@ -46,8 +55,18 @@ export class ThreatPerceptionManager {
       lineOfSightRequired: true,
       persistenceWindowMs: 300000, // 5 minutes
       raycastTimeoutMs: 2000,
+      fieldOfViewDegrees: 90,
       ...config,
     };
+    this.raycastConfig = validateSensingConfig({
+      maxDistance: this.config.maxDetectionRadius,
+      fovDegrees: this.config.fieldOfViewDegrees,
+      angularResolution: 6,
+      panoramicSweep: false,
+      maxRaysPerTick: 120,
+      tickBudgetMs: 5,
+    });
+    this.raycastEngine = new RaycastEngine(this.raycastConfig, bot as any);
   }
 
   /**
@@ -159,53 +178,33 @@ export class ThreatPerceptionManager {
    * Check line-of-sight using the world package's raycasting system.
    */
   private async checkLineOfSight(targetPos: Vec3): Promise<boolean> {
-    try {
-      const botPos = this.bot.entity.position;
-      const direction = targetPos.minus(botPos).normalize();
-      const rayLength = targetPos.distanceTo(botPos);
+    const observer = this.getEyePosition();
+    const orientation = this.getOrientation();
+    const rayLength = targetPos.distanceTo(observer);
 
-      // Use the world package's raycasting API
-      const worldUrl = process.env.WORLD_SERVICE_URL || 'http://localhost:3004';
-
-      const response = await fetch(`${worldUrl}/api/perception/raycast`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          origin: { x: botPos.x, y: botPos.y, z: botPos.z },
-          direction: { x: direction.x, y: direction.y, z: direction.z },
-          maxDistance: rayLength,
-          algorithm: 'mineflayer', // Use Mineflayer integration
-        }),
-      });
-
-      if (!response.ok) {
-        console.log(`World raycast API failed, falling back to basic check`);
-        return this.fallbackLineOfSightCheck(targetPos);
+    return this.raycastEngine.hasLineOfSight(
+      { x: observer.x, y: observer.y, z: observer.z },
+      { x: targetPos.x, y: targetPos.y, z: targetPos.z },
+      {
+        maxDistance: rayLength,
+        orientation,
+        fovDegrees: this.config.fieldOfViewDegrees,
+        requireFov: true,
+        algorithm: 'mineflayer',
+        assumeBlockedOnError: true,
       }
-
-      const result = (await response.json()) as {
-        hit: { distance: number } | null;
-      };
-      return result.hit === null || result.hit.distance >= rayLength;
-    } catch (error) {
-      console.log(
-        `Raycast failed for ${targetPos} - falling back to basic check:`,
-        error
-      );
-      return this.fallbackLineOfSightCheck(targetPos);
-    }
+    );
   }
 
-  /**
-   * Fallback line-of-sight check using basic block detection
-   */
-  private fallbackLineOfSightCheck(targetPos: Vec3): boolean {
-    try {
-      const blockAtTarget = this.bot.blockAt(targetPos);
-      return !blockAtTarget || blockAtTarget.type === 0; // Direct path assumed if no solid block
-    } catch (error) {
-      return false; // Safe default: Assume no line-of-sight on error
-    }
+  private getEyePosition(): Vec3 {
+    return this.bot.entity.position.offset(0, this.bot.entity.height, 0);
+  }
+
+  private getOrientation(): Orientation {
+    return {
+      yaw: this.bot.entity.yaw,
+      pitch: this.bot.entity.pitch,
+    };
   }
 
   /**

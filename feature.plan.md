@@ -76,3 +76,36 @@
 
 ## Risk & Tier
 - Tier 2: change spans cross-package dependency graph and planning runtime behavior; contract + integration tests mitigate.
+
+# Feature Plan: LOS-241 Centralize line-of-sight sensing via raycast engine
+
+## Design Sketch
+```
+[Bot Pose + FoV] -> [RaycastEngine]
+       |                |
+       |                +--> sweepOccluders (FoV cone)
+       |                +--> hasLineOfSight (occlusion + FoV)
+       v
+[Navigation Bridge] / [Threat Perception] / [Env Scan]
+```
+- Replace omniscient radius scans with FoV-bounded raycast sweeps.
+- Centralize LOS decisions in `RaycastEngine` with Mineflayer raycast + DDA fallback.
+
+## Test Matrix
+- **Unit**: `hasLineOfSight` denies targets outside FoV (A4).
+- **Unit**: `hasLineOfSight` denies occluded targets via Mineflayer hit (A4).
+- **Unit**: `sweepOccluders` dedupes hits (perf sanity).
+- **Integration**: navigation obstacle detection uses raycast sweep, not radius scan (A1/A4).
+- **Integration**: threat perception ignores occluded entities (A4).
+
+## Data Plan
+- Mock raycast hits with deterministic positions.
+- Synthetic block names (no PII).
+
+## Observability Plan
+- Log raycast sweep summary (rays, hit rate) in navigation/threat paths when enabled.
+- Metric counters for LOS checks and raycast hits (if metrics client available).
+
+## Risk & Tier
+- Tier 2: affects perception pipeline used by navigation and threat detection.
+- Mitigations: unit tests for LOS/FoV, conservative error handling.

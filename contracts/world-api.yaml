@@ -1,0 +1,100 @@
+openapi: 3.0.3
+info:
+  title: World Perception API
+  version: 0.1.0
+paths:
+  /api/perception/raycast:
+    post:
+      summary: Perform a line-of-sight raycast
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [origin, direction, maxDistance]
+              properties:
+                origin:
+                  type: object
+                  required: [x, y, z]
+                  properties:
+                    x: { type: number }
+                    y: { type: number }
+                    z: { type: number }
+                direction:
+                  type: object
+                  required: [x, y, z]
+                  properties:
+                    x: { type: number }
+                    y: { type: number }
+                    z: { type: number }
+                maxDistance:
+                  type: number
+                algorithm:
+                  type: string
+                  enum: [mineflayer, dda]
+      responses:
+        '200':
+          description: Raycast result
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [hit]
+                properties:
+                  hit:
+                    nullable: true
+                    oneOf:
+                      - type: object
+                        required: [distance]
+                        properties:
+                          distance: { type: number }
+                      - type: 'null'
+  /api/perception/visual-field:
+    post:
+      summary: Query visible observations within a field of view
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                position:
+                  type: object
+                  required: [x, y, z]
+                  properties:
+                    x: { type: number }
+                    y: { type: number }
+                    z: { type: number }
+                radius:
+                  type: number
+                fieldOfView:
+                  type: object
+                  properties:
+                    horizontal: { type: number }
+                    vertical: { type: number }
+      responses:
+        '200':
+          description: Visual field observations
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  observations:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        type: { type: string }
+                        blockType: { type: string }
+                        itemId: { type: string }
+                        position:
+                          type: object
+                          required: [x, y, z]
+                          properties:
+                            x: { type: number }
+                            y: { type: number }
+                            z: { type: number }
+                        distance: { type: number }

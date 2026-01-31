@@ -18,6 +18,7 @@ invariants:
   - "Game events processed in real-time"
   - "Inventory management maintains accuracy"
   - "Cognitive coordination preserves intent"
+  - "Perception uses line-of-sight and FoV constraints"
 acceptance:
   - id: A1
     given: "minecraft server connection"
@@ -31,6 +32,10 @@ acceptance:
     given: "real-time game events"
     when: "event processing happens"
     then: "events handled appropriately with cognitive system updates"
+  - id: A4
+    given: "environment scan request"
+    when: "bot scans for target blocks"
+    then: "only FoV-visible blocks are reported"
 non_functional:
   a11y: ["bot status feedback", "action confirmation"]
   perf:

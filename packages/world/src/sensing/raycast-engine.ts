@@ -22,6 +22,7 @@ import {
   validateSweepResult,
   distance,
   normalize,
+  isInFrustum,
   orientationToDirection,
 } from '../types';
 
@@ -316,6 +317,107 @@ export class RaycastEngine
     return hit ? hit.distance >= distance - 0.5 : true;
   }
 
+  /**
+   * Check if a target is within the observer's field of view.
+   */
+  isWithinFov(
+    observer: Vec3,
+    orientation: Orientation,
+    target: Vec3,
+    fovDegrees: number,
+    maxDistance?: number
+  ): boolean {
+    const fovRadians = (fovDegrees * Math.PI) / 180;
+    const frustum = {
+      position: observer,
+      orientation,
+      fovRadians,
+      nearPlane: 0.1,
+      farPlane: maxDistance ?? Number.POSITIVE_INFINITY,
+    };
+    return isInFrustum(target, frustum);
+  }
+
+  /**
+   * Determine line-of-sight between observer and target.
+   */
+  hasLineOfSight(
+    observer: Vec3,
+    target: Vec3,
+    options: {
+      maxDistance?: number;
+      orientation?: Orientation;
+      fovDegrees?: number;
+      requireFov?: boolean;
+      algorithm?: 'mineflayer' | 'dda';
+      tolerance?: number;
+      assumeBlockedOnError?: boolean;
+    } = {}
+  ): boolean {
+    const direction = {
+      x: target.x - observer.x,
+      y: target.y - observer.y,
+      z: target.z - observer.z,
+    };
+    const distanceToTarget = Math.sqrt(
+      direction.x ** 2 + direction.y ** 2 + direction.z ** 2
+    );
+
+    if (distanceToTarget === 0) return true;
+
+    if (options.maxDistance && distanceToTarget > options.maxDistance) {
+      return false;
+    }
+
+    if (
+      options.requireFov &&
+      options.orientation &&
+      options.fovDegrees
+    ) {
+      const inFov = this.isWithinFov(
+        observer,
+        options.orientation,
+        target,
+        options.fovDegrees,
+        options.maxDistance ?? distanceToTarget
+      );
+      if (!inFov) return false;
+    }
+
+    const normalizedDirection = {
+      x: direction.x / distanceToTarget,
+      y: direction.y / distanceToTarget,
+      z: direction.z / distanceToTarget,
+    };
+
+    const tolerance = options.tolerance ?? 0.5;
+
+    try {
+      let hit: RaycastHit | null = null;
+
+      if (options.algorithm === 'dda' || !this.bot) {
+        hit = this.ddaRaycast(observer, normalizedDirection, distanceToTarget, {
+          algorithm: 'dda',
+          maxSteps: 256,
+          earlyExit: true,
+          recordPath: false,
+        });
+      } else {
+        hit = this.mineflayerRaycast(
+          observer,
+          normalizedDirection,
+          distanceToTarget
+        );
+      }
+
+      if (!hit) return true;
+      return hit.distance >= distanceToTarget - tolerance;
+    } catch (error) {
+      if (options.assumeBlockedOnError) return false;
+      return true;
+    }
+  }
+
   getVisibleBlocks(
     observer: Vec3,
     maxDistance: number
@@ -370,6 +472,35 @@ export class RaycastEngine
     }
 
     return blocks;
+  }
+
+  /**
+   * Sweep rays and return occluding hits (first solid block per ray).
+   */
+  sweepOccluders(
+    origin: Vec3,
+    orientation: Orientation,
+    config: SensingConfig
+  ): RaycastHit[] {
+    const hits: RaycastHit[] = [];
+    const directions = this.generateSweepDirections(orientation, config);
+    const maxRays = Math.min(directions.length, config.maxRaysPerTick);
+    const seen = new Set<string>();
+
+    for (let i = 0; i < maxRays; i++) {
+      const direction = directions[i];
+      const hit = this.raycast(origin, direction, config.maxDistance);
+      if (!hit) continue;
+
+      const key = `${Math.floor(hit.position.x)},${Math.floor(
+        hit.position.y
+      )},${Math.floor(hit.position.z)}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      hits.push(hit);
+    }
+
+    return hits;
   }
 
   updateWorld(blocks: Array<{ position: Vec3; blockType: string }>): void {

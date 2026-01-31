@@ -18,6 +18,7 @@ invariants:
   - "Ray-cast perception maintains accuracy >95%"
   - "Spatial reasoning handles all world geometries"
   - "Real-time updates preserve temporal consistency"
+  - "Line-of-sight checks respect FoV and occlusion"
 acceptance:
   - id: A1
     given: "complex world geometry with obstacles"
@@ -31,6 +32,10 @@ acceptance:
     given: "ray-cast perception query"
     when: "spatial reasoning processes"
     then: ">95% accuracy maintained across all scenarios"
+  - id: A4
+    given: "target outside FoV or behind occluder"
+    when: "line-of-sight check runs"
+    then: "target is not considered visible"
 non_functional:
   a11y: ["navigation feedback", "perception status"]
   perf:

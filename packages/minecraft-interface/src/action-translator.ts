@@ -10,6 +10,12 @@
 import { Bot } from 'mineflayer';
 import { pathfinder, Movements } from 'mineflayer-pathfinder';
 import { Vec3 } from 'vec3';
+import {
+  RaycastEngine,
+  validateSensingConfig,
+  SensingConfig,
+  Orientation,
+} from '@conscious-bot/world';
 
 // Simple inline goal classes for ES modules compatibility
 class SimpleGoalNear {
@@ -108,6 +114,8 @@ export class ActionTranslator {
   private movements: Movements;
   private navigationBridge!: NavigationBridge;
   private stateMachineWrapper?: StateMachineWrapper;
+  private raycastEngine: RaycastEngine;
+  private raycastConfig: SensingConfig;
 
   constructor(
     bot: Bot,
@@ -121,6 +129,15 @@ export class ActionTranslator {
       maxRetries: config.maxRetries || 3,
     };
     this.stateMachineWrapper = stateMachineWrapper;
+    this.raycastConfig = validateSensingConfig({
+      maxDistance: 32,
+      fovDegrees: 90,
+      angularResolution: 6,
+      panoramicSweep: false,
+      maxRaysPerTick: 160,
+      tickBudgetMs: 5,
+    });
+    this.raycastEngine = new RaycastEngine(this.raycastConfig, bot as any);
 
     // Initialize pathfinder only if bot is spawned
     if (bot.entity && bot.entity.position) {
@@ -2226,109 +2243,26 @@ export class ActionTranslator {
     );
 
     try {
-      // Try using the world service's perception system first
-      const worldUrl = process.env.WORLD_SERVICE_URL || 'http://localhost:3004';
+      const scanResult = this.scanVisibleForTargetBlock(
+        targetBlock,
+        Math.min(radius, this.raycastConfig.maxDistance),
+        timeout
+      );
 
-      const response = await fetch(`${worldUrl}/api/perception/visual-field`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          center: {
-            x: this.bot.entity.position.x,
-            y: this.bot.entity.position.y,
-            z: this.bot.entity.position.z,
-          },
-          radius: Math.min(radius, 30), // Limit radius for performance
-          types: ['blocks'],
-        }),
-        signal: AbortSignal.timeout(Math.min(timeout, 10000)),
-      });
-
-      if (response.ok) {
-        const perceptionResult = (await response.json()) as {
-          observations?: Array<{
-            type: string;
-            blockType?: string;
-            position: { x: number; y: number; z: number };
-            distance: number;
-          }>;
-        };
-
-        const targetBlocks =
-          perceptionResult.observations?.filter(
-            (obs) => obs.blockType === targetBlock
-          ) || [];
-
-        if (targetBlocks.length > 0) {
-          // Find the closest block
-          const closestBlock = targetBlocks.reduce((closest, current) =>
+      if (scanResult.foundBlocks.length > 0) {
+        const closestBlock = scanResult.foundBlocks.reduce(
+          (closest, current) =>
             current.distance < closest.distance ? current : closest
-          );
-
-          console.log(
-            `✅ Found ${targetBlocks.length} ${targetBlock} blocks, closest at ${closestBlock.distance.toFixed(1)} blocks`
-          );
-
-          return {
-            success: true,
-            data: {
-              foundBlocks: targetBlocks.length,
-              closestBlock: {
-                position: closestBlock.position,
-                distance: closestBlock.distance,
-                blockType: targetBlock,
-              },
-            },
-          };
-        }
-      } else {
-        console.log(`World perception API failed, falling back to basic scan`);
-      }
-
-      // Fallback: Simple scan using mineflayer's block finding
-      const startTime = Date.now();
-      const foundBlocks: Array<{ position: Vec3; distance: number }> = [];
-
-      // Scan in a radius around the bot
-      const scanRadius = Math.min(radius, 20);
-      for (let x = -scanRadius; x <= scanRadius; x += 2) {
-        for (let z = -scanRadius; z <= scanRadius; z += 2) {
-          for (let y = -5; y <= 5; y++) {
-            const pos = this.bot.entity.position.offset(x, y, z);
-            const block = this.bot.blockAt(pos);
-
-            if (block && block.name === targetBlock) {
-              const distance = pos.distanceTo(this.bot.entity.position);
-              foundBlocks.push({ position: pos, distance });
-
-              // Limit results for performance
-              if (foundBlocks.length >= 10) break;
-            }
-
-            // Timeout check
-            if (Date.now() - startTime > timeout) {
-              return {
-                success: false,
-                error: `Scan timeout after ${Math.round((Date.now() - startTime) / 1000)}s`,
-              };
-            }
-          }
-        }
-      }
-
-      if (foundBlocks.length > 0) {
-        const closestBlock = foundBlocks.reduce((closest, current) =>
-          current.distance < closest.distance ? current : closest
         );
 
         console.log(
-          `✅ Basic scan found ${foundBlocks.length} ${targetBlock} blocks, closest at ${closestBlock.distance.toFixed(1)} blocks`
+          `✅ Found ${scanResult.foundBlocks.length} ${targetBlock} blocks in FoV, closest at ${closestBlock.distance.toFixed(1)} blocks`
         );
 
         return {
           success: true,
           data: {
-            foundBlocks: foundBlocks.length,
+            foundBlocks: scanResult.foundBlocks.length,
             closestBlock: {
               position: closestBlock.position,
               distance: closestBlock.distance,
@@ -2350,6 +2284,72 @@ export class ActionTranslator {
         error: `Scan failed: ${error instanceof Error ? error.message : String(error)}`,
       };
     }
+  }
+
+  private scanVisibleForTargetBlock(
+    targetBlock: string,
+    maxDistance: number,
+    timeout: number
+  ): { foundBlocks: Array<{ position: Vec3; distance: number }> } {
+    const startTime = Date.now();
+    const origin = this.getEyePosition();
+    const orientation = this.getOrientation();
+    const targets = this.buildTargetNameSet(targetBlock);
+
+    const sweepConfig = {
+      ...this.raycastConfig,
+      maxDistance,
+      fovDegrees: 90,
+      panoramicSweep: false,
+    };
+
+    const hits = this.raycastEngine.sweepOccluders(
+      { x: origin.x, y: origin.y, z: origin.z },
+      orientation,
+      sweepConfig
+    );
+
+    const foundBlocks: Array<{ position: Vec3; distance: number }> = [];
+    const seen = new Set<string>();
+
+    for (const hit of hits) {
+      if (Date.now() - startTime > timeout) break;
+      if (!targets.has(this.normalizeBlockName(hit.blockId))) continue;
+
+      const position = new Vec3(hit.position.x, hit.position.y, hit.position.z);
+      const key = `${Math.floor(position.x)},${Math.floor(
+        position.y
+      )},${Math.floor(position.z)}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+
+      foundBlocks.push({
+        position,
+        distance: this.bot.entity.position.distanceTo(position),
+      });
+    }
+
+    return { foundBlocks };
+  }
+
+  private buildTargetNameSet(targetBlock: string): Set<string> {
+    const normalized = this.normalizeBlockName(targetBlock);
+    return new Set([normalized]);
+  }
+
+  private normalizeBlockName(name: string): string {
+    return name.startsWith('minecraft:') ? name.slice('minecraft:'.length) : name;
+  }
+
+  private getEyePosition(): Vec3 {
+    return this.bot.entity.position.offset(0, this.bot.entity.height, 0);
+  }
+
+  private getOrientation(): Orientation {
+    return {
+      yaw: this.bot.entity.yaw,
+      pitch: this.bot.entity.pitch,
+    };
   }
 
   /**

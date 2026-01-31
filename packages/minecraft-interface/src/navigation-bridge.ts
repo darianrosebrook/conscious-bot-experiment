@@ -23,6 +23,12 @@ import {
 } from './environmental-detector.js';
 import { WaterNavigationManager } from './water-navigation-manager.js';
 import { LongJourneyNavigator } from './long-journey-navigator.js';
+import {
+  RaycastEngine,
+  validateSensingConfig,
+  SensingConfig,
+  Orientation,
+} from '@conscious-bot/world';
 
 // Import D* Lite components from world package
 // Temporarily comment out to use local types
@@ -155,6 +161,8 @@ export class NavigationBridge extends EventEmitter {
   private replanCount = 0;
   private obstaclesDetected: ObstacleInfo[] = [];
   private navigationGraphBuilt = false;
+  private raycastEngine: RaycastEngine;
+  private raycastConfig: SensingConfig;
 
   // mineflayer-pathfinder wiring
   private pf?: any;
@@ -200,6 +208,16 @@ export class NavigationBridge extends EventEmitter {
       usePathfinding: true,
       ...config,
     };
+
+    this.raycastConfig = validateSensingConfig({
+      maxDistance: this.config.maxRaycastDistance,
+      fovDegrees: 90,
+      angularResolution: 6,
+      panoramicSweep: false,
+      maxRaysPerTick: 160,
+      tickBudgetMs: 5,
+    });
+    this.raycastEngine = new RaycastEngine(this.raycastConfig, this.bot as any);
 
     // Configure dynamic D* Lite with terrain-aware parameter switching
     // See docs/planning/dstar-lite-terrain-optimization.md for detailed analysis
@@ -566,7 +584,7 @@ export class NavigationBridge extends EventEmitter {
     }
 
     // Use bot's field of view to detect nearby obstacles
-    const nearbyBlocks = await this.scanNearbyBlocks();
+    const nearbyBlocks = await this.scanVisibleObstacles();
     obstacles.push(...nearbyBlocks);
 
     // Check light levels for safety
@@ -603,63 +621,77 @@ export class NavigationBridge extends EventEmitter {
     const obstacles: ObstacleInfo[] = [];
     const hazards: Vec3[] = [];
 
-    // Mineflayer exposes world.raycast(start, dir, maxDistance, matcher?)
-    const hit = (this.bot as any).world?.raycast?.(
-      start,
-      direction,
+    const origin = start.offset(0, this.bot.entity.height, 0);
+    const normalized = direction.normalize();
+    const hit = this.raycastEngine.raycast(
+      { x: origin.x, y: origin.y, z: origin.z },
+      { x: normalized.x, y: normalized.y, z: normalized.z },
       this.config.maxRaycastDistance
     );
-    if (hit?.block) {
-      const block = hit.block;
-      const distance = start.distanceTo(hit.position);
-      const severity = this.classifyObstacle(block.name, distance);
+    if (hit) {
+      const distance = hit.distance;
+      const blockType = hit.blockId;
+      const severity = this.classifyObstacle(blockType, distance);
+      const hitPos = new Vec3(hit.position.x, hit.position.y, hit.position.z);
 
       obstacles.push({
-        position: hit.position,
-        blockType: block.name,
+        position: hitPos,
+        blockType,
         distance,
         severity,
       });
-      if (this.isHazard(block.name)) hazards.push(hit.position);
+      if (this.isHazard(blockType)) hazards.push(hitPos);
     }
     return { obstacles, hazards };
   }
 
   /**
-   * Scan nearby blocks using bot's legitimate field of view
+   * Scan visible obstacles using raycast engine FOV sweep
    */
-  private async scanNearbyBlocks(): Promise<ObstacleInfo[]> {
+  private async scanVisibleObstacles(): Promise<ObstacleInfo[]> {
     const obstacles: ObstacleInfo[] = [];
-    const botPos = this.bot.entity.position;
-    const radius = this.config.obstacleDetectionRadius;
+    const origin = this.getEyePosition();
+    const orientation = this.getOrientation();
 
-    // Scan in a sphere around the bot
-    for (let x = -radius; x <= radius; x++) {
-      for (let y = -radius; y <= radius; y++) {
-        for (let z = -radius; z <= radius; z++) {
-          const pos = botPos.offset(x, y, z);
-          const block = this.bot.blockAt(pos);
+    const sweepConfig = {
+      ...this.raycastConfig,
+      maxDistance: this.config.obstacleDetectionRadius,
+      fovDegrees: 90,
+      panoramicSweep: false,
+    };
 
-          if (
-            block?.name &&
-            block.name !== 'air' &&
-            this.isObstacle(block.name)
-          ) {
-            const distance = botPos.distanceTo(pos);
-            const severity = this.classifyObstacle(block.name, distance);
+    const hits = this.raycastEngine.sweepOccluders(
+      { x: origin.x, y: origin.y, z: origin.z },
+      orientation,
+      sweepConfig
+    );
 
-            obstacles.push({
-              position: pos,
-              blockType: block.name,
-              distance,
-              severity,
-            });
-          }
-        }
-      }
+    for (const hit of hits) {
+      if (!this.isObstacle(hit.blockId)) continue;
+      const hitPos = new Vec3(hit.position.x, hit.position.y, hit.position.z);
+      const distance = this.bot.entity.position.distanceTo(hitPos);
+      const severity = this.classifyObstacle(hit.blockId, distance);
+
+      obstacles.push({
+        position: hitPos,
+        blockType: hit.blockId,
+        distance,
+        severity,
+      });
     }
 
     return obstacles;
+  }
+
+  private getEyePosition(): Vec3 {
+    return this.bot.entity.position.offset(0, this.bot.entity.height, 0);
+  }
+
+  private getOrientation(): Orientation {
+    return {
+      yaw: this.bot.entity.yaw,
+      pitch: this.bot.entity.pitch,
+    };
   }
 
   /**
