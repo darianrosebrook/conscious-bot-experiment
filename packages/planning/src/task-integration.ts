@@ -625,7 +625,7 @@ export class EnhancedTaskIntegration extends EventEmitter {
     if (content.includes('coal')) return 'coal_ore';
     if (content.includes('stone')) return 'stone';
     if (content.includes('diamond')) return 'diamond_ore';
-    return 'ore';
+    return 'stone';
   }
 
   /**
@@ -2262,21 +2262,26 @@ export class EnhancedTaskIntegration extends EventEmitter {
       }
     }
 
+    // Fallback-macro planner: requirement-driven leaf-mapped steps
+    // This runs BEFORE cognitive steps because cognitive steps are narrative-only
+    // (no meta.leaf/executable) and would block the task if returned first.
+    const leafSteps = this.generateLeafMappedSteps(taskData);
+    if (leafSteps.length > 0) return leafSteps;
+
+    // Cognitive steps are narrative/display only — NOT executable.
+    // They are useful for dashboard display but cannot drive the executor.
+    // Only returned if no leaf-mapped plan is available.
     try {
-      // Try to get steps from cognitive system
       const steps = await this.generateStepsFromCognitive(taskData);
       if (steps && steps.length > 0) {
         return steps;
       }
     } catch (error) {
-      console.warn(
-        'Failed to generate steps from cognitive system, using fallback:',
-        error
-      );
+      // Cognitive system unavailable — fall through
     }
 
-    // Fallback to intelligent step generation based on task type
-    return this.generateIntelligentSteps(taskData);
+    // No executable plan available — return empty to trigger blockedReason
+    return [];
   }
 
   /**
@@ -2693,26 +2698,6 @@ export class EnhancedTaskIntegration extends EventEmitter {
     return [];
   }
 
-  /**
-   * Generate intelligent steps based on task type and content.
-   * Delegates to leaf-mapped steps when a valid requirement mapping exists;
-   * returns empty otherwise (triggering blockedReason: 'no-executable-plan').
-   */
-  private generateIntelligentSteps(taskData: Partial<Task>): TaskStep[] {
-    const leafSteps = this.generateLeafMappedSteps(taskData);
-    if (leafSteps.length > 0) return leafSteps;
-
-    // No valid mapping — empty return will trigger blockedReason: 'no-executable-plan'
-    // in addTask(), which is the correct outcome for tasks we can't execute
-    return [];
-  }
-
-  /**
-   * Generate default steps for a task (fallback)
-   */
-  private generateDefaultSteps(taskData: Partial<Task>): TaskStep[] {
-    return this.generateIntelligentSteps(taskData);
-  }
 
   /**
    * Update task statistics
