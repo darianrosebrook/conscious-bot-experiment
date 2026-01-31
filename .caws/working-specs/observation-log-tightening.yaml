@@ -1,0 +1,48 @@
+id: OBS-2402
+title: "Tighten observation logging without behavior loss"
+risk_tier: 2
+scope:
+  in:
+    - "throttle and aggregate ThreatPerception LOS logs"
+    - "reduce water navigation log volume via strategy-level summaries"
+    - "gate verbose entity observation dumps behind debug flag"
+  out:
+    - "changing decision logic or behavior heuristics"
+    - "removing critical error logs"
+invariants:
+  - "Observation behavior remains unchanged"
+  - "Critical warnings/errors still emit"
+  - "Logs remain actionable with summary context"
+acceptance:
+  - id: A1
+    given: "repeated LOS checks for same entity"
+    when: "threat assessment runs"
+    then: "logs are aggregated or throttled to <= 1 per window"
+  - id: A2
+    given: "water navigation loop"
+    when: "strategy is stable"
+    then: "logs emit summary at a bounded rate"
+  - id: A3
+    given: "entity observation dumps"
+    when: "debug flag is not set"
+    then: "multi-line metadata dumps are suppressed"
+non_functional:
+  a11y: []
+  perf:
+    api_p95_ms: 200
+  security:
+    - "no change"
+contracts:
+  - type: openapi
+    path: "contracts/observation-log-throttle.yaml#/paths/~1internal~1log-controls"
+observability:
+  logs:
+    - "[ThreatPerception] suppressed LOS logs"
+    - "[WaterNav] summary"
+    - "[Cognition] entity observation suppressed"
+  metrics: []
+  traces: []
+migrations: []
+rollback:
+  - "set OBSERVATION_LOG_DEBUG=1 to restore verbose logs"
+  - "revert logging changes"

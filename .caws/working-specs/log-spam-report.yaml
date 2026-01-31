@@ -1,0 +1,40 @@
+id: LOG-1001
+title: "Run log spam analysis report"
+risk_tier: 3
+scope:
+  in:
+    - "analyze run.log message frequency and timing"
+    - "produce JSON report with counts, spans, and rates"
+    - "produce markdown narrative with findings and recommendations"
+  out:
+    - "code changes to bot behavior or logging"
+    - "performance optimizations beyond reporting"
+invariants:
+  - "report is derived solely from run.log"
+  - "no modification to run.log"
+acceptance:
+  - id: A1
+    given: "run.log present in repo root"
+    when: "report is generated"
+    then: "log-spam-report.json exists in repo root with counts and timing"
+  - id: A2
+    given: "run.log present in repo root"
+    when: "report is generated"
+    then: "log-spam-report.md exists in repo root with findings and recommendations"
+  - id: A3
+    given: "high-frequency navigation logs"
+    when: "report is generated"
+    then: "D* Lite spam is quantified with counts and rate per minute"
+non_functional:
+  a11y: ["markdown headings and lists are readable in plain text"]
+  perf: { api_p95_ms: 500 }
+  security: ["no new PII beyond existing log content"]
+contracts:
+  - type: openapi
+    path: "contracts/log-spam-report.yaml#/components/schemas/LogSpamReport"
+observability:
+  logs: ["report generation summary emitted to console (ad-hoc)"]
+  metrics: []
+  traces: []
+migrations: []
+rollback: ["delete generated report files"]

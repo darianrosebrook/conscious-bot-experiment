@@ -1,0 +1,39 @@
+id: SAFE-2002
+title: "Throttle safety and water navigation log spam"
+risk_tier: 2
+scope:
+  in:
+    - "rate-limit emergency threat and flee logging"
+    - "throttle water navigation diagnostics"
+    - "add cooldowns to emergency response triggers"
+  out:
+    - "behavior changes to threat assessment logic"
+    - "pathfinding algorithm modifications"
+invariants:
+  - "emergency response still triggers on real threats"
+  - "logs remain available but throttled"
+acceptance:
+  - id: A1
+    given: "repeated immediate threat signals"
+    when: "safety monitor runs"
+    then: "emergency response logs are throttled and cooldowned"
+  - id: A2
+    given: "water navigation diagnostics"
+    when: "safety monitor handles water"
+    then: "water logs are rate-limited"
+non_functional:
+  a11y: []
+  perf: { api_p95_ms: 500 }
+  security: ["no new external calls"]
+contracts:
+  - type: openapi
+    path: "contracts/safety-log-throttle.yaml#/components/schemas/SafetyLogThrottle"
+observability:
+  logs:
+    - "[SafetyMonitor] throttled emergency response"
+    - "[SafetyMonitor] water navigation throttled"
+  metrics: []
+  traces: []
+migrations: []
+rollback:
+  - "revert throttling changes"

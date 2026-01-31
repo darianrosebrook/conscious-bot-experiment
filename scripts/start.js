@@ -62,6 +62,7 @@ const services = [
     args: ['--filter', '@conscious-bot/core', 'run', 'dev:server'],
     port: 3007,
     healthUrl: 'http://localhost:3007/health',
+    readyUrl: 'http://localhost:3007/system/ready',
     description: 'Core API and capability registry',
     priority: 1, // Start first
     dependencies: [], // No dependencies
@@ -72,6 +73,7 @@ const services = [
     args: ['--filter', '@conscious-bot/memory', 'run', 'dev:server'],
     port: 3001,
     healthUrl: 'http://localhost:3001/health',
+    readyUrl: 'http://localhost:3001/system/ready',
     description: 'Memory storage and retrieval system',
     priority: 2, // Start after core
     dependencies: ['Core API'],
@@ -82,6 +84,7 @@ const services = [
     args: ['--filter', '@conscious-bot/world', 'run', 'dev:server'],
     port: 3004,
     healthUrl: 'http://localhost:3004/health',
+    readyUrl: 'http://localhost:3004/system/ready',
     description: 'World state management and simulation',
     priority: 2, // Start after core
     dependencies: ['Core API'],
@@ -92,6 +95,7 @@ const services = [
     args: ['--filter', '@conscious-bot/cognition', 'run', 'dev:server'],
     port: 3003,
     healthUrl: 'http://localhost:3003/health',
+    readyUrl: 'http://localhost:3003/system/ready',
     description: 'Cognitive reasoning and decision making',
     priority: 3, // Start after core services
     dependencies: ['Core API'],
@@ -102,6 +106,7 @@ const services = [
     args: ['--filter', '@conscious-bot/planning', 'run', 'dev:server'],
     port: 3002,
     healthUrl: 'http://localhost:3002/health',
+    readyUrl: 'http://localhost:3002/system/ready',
     description: 'Task planning and execution coordination',
     priority: 4, // Start after core and memory/world
     dependencies: ['Core API', 'Memory', 'World'],
@@ -117,6 +122,7 @@ const services = [
     ],
     port: 3005,
     healthUrl: 'http://localhost:3005/health',
+    readyUrl: 'http://localhost:3005/system/ready',
     description: 'Minecraft bot interface and control',
     priority: 5, // Start after planning
     dependencies: ['Core API', 'Planning'],
@@ -201,6 +207,25 @@ function getServiceColor(serviceName) {
     'Sapient HRM': colors.cyan,
   };
   return colorMap[serviceName] || colors.reset;
+}
+
+async function postJson(url, body, timeoutMs = 4000) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body || {}),
+      signal: controller.signal,
+    });
+    if (!res.ok) {
+      throw new Error(`HTTP ${res.status}`);
+    }
+    return await res.json().catch(() => ({}));
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 function checkPort(port) {
@@ -834,6 +859,55 @@ async function main() {
       'SUCCESS',
       colors.green
     );
+  }
+
+  // Step 9b: Broadcast readiness barrier to services that support it
+  const healthByService = new Map(
+    healthResults.map((r) => [r.service, r.status])
+  );
+  const readinessTargets = processes
+    .map((p) => p.service)
+    .filter((service) => service.readyUrl);
+  const unhealthyTargets = readinessTargets.filter(
+    (service) => healthByService.get(service.name) !== 'healthy'
+  );
+  const forceReady = process.env.FORCE_SYSTEM_READY === '1';
+
+  if (unhealthyTargets.length > 0 && !forceReady) {
+    logWithTimestamp(
+      `\n⚠️  Readiness broadcast skipped; unhealthy services: ${unhealthyTargets
+        .map((s) => s.name)
+        .join(', ')}`,
+      'WARN',
+      colors.yellow
+    );
+    logWithTimestamp(
+      '   Set FORCE_SYSTEM_READY=1 to override',
+      'INFO',
+      colors.cyan
+    );
+  } else {
+    logWithTimestamp('\n🚦 Broadcasting system readiness...', 'INFO', colors.cyan);
+    const payload = {
+      ready: true,
+      services: readinessTargets.map((s) => s.name),
+      timestamp: Date.now(),
+      source: 'scripts/start.js',
+    };
+    for (const service of readinessTargets) {
+      try {
+        await postJson(service.readyUrl, payload, 4000);
+        logService(service.name, 'Readiness acknowledged', 'HEALTH');
+      } catch (error) {
+        logService(
+          service.name,
+          `Readiness push failed: ${error.message}`,
+          'WARN'
+        );
+      }
+      await wait(200);
+    }
+    logWithTimestamp('✅ Readiness broadcast complete', 'SUCCESS', colors.green);
   }
 
   // Step 10: Check optional external services

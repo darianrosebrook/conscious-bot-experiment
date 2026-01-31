@@ -1,0 +1,24 @@
+openapi: 3.0.3
+info:
+  title: Navigation Spam Control
+  version: 1.0.0
+paths:
+  /navigation-spam-control:
+    get:
+      summary: Navigation spam control config/status
+      responses:
+        '200':
+          description: Status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NavigationSpamControl'
+components:
+  schemas:
+    NavigationSpamControl:
+      type: object
+      required: [debounce_ms, throttle_ms, gating_enabled]
+      properties:
+        debounce_ms: { type: integer }
+        throttle_ms: { type: integer }
+        gating_enabled: { type: boolean }

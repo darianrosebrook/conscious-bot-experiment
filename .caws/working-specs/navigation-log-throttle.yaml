@@ -1,0 +1,50 @@
+id: NAV-2001
+title: "Throttle navigation and perception log spam"
+risk_tier: 2
+scope:
+  in:
+    - "gate navigation actions while a prior navigation is active"
+    - "debounce duplicate navigate commands within a short window"
+    - "rate-limit perception and navigation debug logs"
+    - "add scoped logging tags where missing"
+  out:
+    - "pathfinding algorithm changes"
+    - "planner strategy changes beyond retry/backoff handling"
+    - "behavioral changes unrelated to navigation/perception"
+invariants:
+  - "navigation actions do not start if a prior navigation is active"
+  - "log output is reduced without removing critical errors"
+  - "no changes to bot safety constraints"
+acceptance:
+  - id: A1
+    given: "navigate called while isNavigating true"
+    when: "ActionTranslator handles navigate"
+    then: "navigation request is gated and does not call navigateTo"
+  - id: A2
+    given: "duplicate navigate target within debounce window"
+    when: "ActionTranslator handles navigate"
+    then: "request is suppressed with a single log entry"
+  - id: A3
+    given: "repeated line-of-sight failures"
+    when: "ThreatPerceptionManager runs"
+    then: "logs are rate-limited and aggregated"
+  - id: A4
+    given: "navigation failure due to already navigating"
+    when: "PlanExecutor retries"
+    then: "retry uses backoff and avoids tight loops"
+non_functional:
+  a11y: []
+  perf: { api_p95_ms: 500 }
+  security: ["no new PII", "no new external calls"]
+contracts:
+  - type: openapi
+    path: "contracts/navigation-throttle.yaml#/components/schemas/NavigationSpamControl"
+observability:
+  logs:
+    - "[ActionTranslator] navigate gated (already navigating)"
+    - "[ThreatPerception] suppressed LOS logs (count/window)"
+  metrics: []
+  traces: []
+migrations: []
+rollback:
+  - "revert log throttling and gating changes"

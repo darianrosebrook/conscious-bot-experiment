@@ -1,0 +1,23 @@
+openapi: 3.0.3
+info:
+  title: Safety Log Throttle
+  version: 1.0.0
+paths:
+  /safety-log-throttle:
+    get:
+      summary: Safety log throttle settings
+      responses:
+        '200':
+          description: Settings
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SafetyLogThrottle'
+components:
+  schemas:
+    SafetyLogThrottle:
+      type: object
+      required: [emergency_cooldown_ms, log_throttle_ms]
+      properties:
+        emergency_cooldown_ms: { type: integer }
+        log_throttle_ms: { type: integer }

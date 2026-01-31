@@ -1,0 +1,58 @@
+openapi: 3.0.3
+info:
+  title: Startup Readiness API
+  version: 0.1.0
+paths:
+  /system/ready:
+    get:
+      summary: Get system readiness state
+      responses:
+        '200':
+          description: Readiness state
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ready:
+                    type: boolean
+                  readyAt:
+                    type: string
+                    nullable: true
+                  source:
+                    type: string
+                    nullable: true
+    post:
+      summary: Signal system readiness
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                ready:
+                  type: boolean
+                services:
+                  type: array
+                  items:
+                    type: string
+                timestamp:
+                  type: integer
+                source:
+                  type: string
+      responses:
+        '200':
+          description: Readiness accepted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ready:
+                    type: boolean
+                  readyAt:
+                    type: string
+                    nullable: true
+                  accepted:
+                    type: boolean

@@ -1,0 +1,54 @@
+id: SYS-2401
+title: "Startup readiness barrier for service synchronization"
+risk_tier: 2
+scope:
+  in:
+    - "add /system/ready readiness endpoint to core services"
+    - "gate early startup loops until readiness broadcast"
+    - "broadcast readiness from scripts/start.js after health checks"
+  out:
+    - "replacing existing health checks"
+    - "distributed service discovery"
+    - "multi-host orchestration"
+invariants:
+  - "No autonomous planning loop runs before system readiness"
+  - "Readiness broadcast is idempotent and safe to repeat"
+  - "Health checks remain available regardless of readiness state"
+acceptance:
+  - id: A1
+    given: "all services report healthy"
+    when: "startup script completes health checks"
+    then: "it POSTs /system/ready to all services that support readiness"
+  - id: A2
+    given: "planning service has started"
+    when: "system readiness has not been signaled"
+    then: "autonomous executor timer does not start"
+  - id: A3
+    given: "world service has started"
+    when: "system readiness has not been signaled"
+    then: "world-state polling does not run"
+  - id: A4
+    given: "minecraft interface has spawned a bot"
+    when: "system readiness has not been signaled"
+    then: "autonomous planning loop does not start until readiness"
+non_functional:
+  a11y: []
+  perf:
+    api_p95_ms: 200
+  security:
+    - "readiness endpoints are intended for local startup only"
+contracts:
+  - type: openapi
+    path: "contracts/startup-ready.yaml#/paths/~1system~1ready"
+observability:
+  logs:
+    - "[Startup] readiness broadcast summary"
+    - "[Planning] waiting for system readiness"
+    - "[World] waiting for system readiness"
+    - "[Minecraft Interface] waiting for system readiness"
+  metrics: []
+  traces: []
+migrations: []
+rollback:
+  - "set SYSTEM_READY_ON_BOOT=1 to bypass readiness gating"
+  - "revert /system/ready endpoints and broadcast"

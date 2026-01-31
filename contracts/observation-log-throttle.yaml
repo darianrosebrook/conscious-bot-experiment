@@ -1,0 +1,18 @@
+openapi: 3.0.3
+info:
+  title: Observation Log Controls
+  version: 0.1.0
+paths:
+  /internal/log-controls:
+    get:
+      summary: Get current log control flags
+      responses:
+        '200':
+          description: Log control flags
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  observationLogDebug:
+                    type: boolean

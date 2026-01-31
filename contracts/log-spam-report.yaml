@@ -1,0 +1,86 @@
+openapi: 3.0.3
+info:
+  title: Log Spam Report
+  version: 1.0.0
+paths:
+  /log-spam-report:
+    get:
+      summary: Get log spam report
+      responses:
+        '200':
+          description: Report
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LogSpamReport'
+components:
+  schemas:
+    LogSpamReport:
+      type: object
+      required:
+        - generated_at
+        - source
+        - span
+        - totals
+        - top_messages
+        - dstar_summary
+      properties:
+        generated_at:
+          type: string
+          format: date-time
+        source:
+          type: object
+          required: [path, total_lines]
+          properties:
+            path: { type: string }
+            total_lines: { type: integer }
+        span:
+          type: object
+          required: [start, end, duration_s]
+          properties:
+            start: { type: string, format: date-time, nullable: true }
+            end: { type: string, format: date-time, nullable: true }
+            duration_s: { type: number, nullable: true }
+        totals:
+          type: object
+          required: [records, unscoped_lines, timestamped_lines]
+          properties:
+            records: { type: integer }
+            unscoped_lines: { type: integer }
+            timestamped_lines: { type: integer }
+        top_messages:
+          type: array
+          items:
+            type: object
+            required: [message, count]
+            properties:
+              message: { type: string }
+              count: { type: integer }
+              first_ts: { type: string, format: date-time, nullable: true }
+              last_ts: { type: string, format: date-time, nullable: true }
+              duration_s: { type: number, nullable: true }
+              rate_per_min: { type: number, nullable: true }
+              components:
+                type: array
+                items:
+                  type: object
+                  required: [component, count]
+                  properties:
+                    component: { type: string }
+                    count: { type: integer }
+        dstar_summary:
+          type: object
+          required: [using_dstar, execute_navigate, already_navigating]
+          properties:
+            using_dstar: { $ref: '#/components/schemas/MessageSummary' }
+            execute_navigate: { $ref: '#/components/schemas/MessageSummary' }
+            already_navigating: { $ref: '#/components/schemas/MessageSummary' }
+    MessageSummary:
+      type: object
+      required: [count]
+      properties:
+        count: { type: integer }
+        first_ts: { type: string, format: date-time, nullable: true }
+        last_ts: { type: string, format: date-time, nullable: true }
+        duration_s: { type: number, nullable: true }
+        rate_per_min: { type: number, nullable: true }
