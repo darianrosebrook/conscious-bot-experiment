@@ -60,3 +60,33 @@ Executor
 
 ## Observability Plan
 - Dashboard stream event: executor_budget
+
+---
+
+# Feature Plan: PLN-418 Abort/Timeout Loop Hardening
+
+## Design Sketch
+
+Sequence (health + world-state):
+
+1) WorldStateManager pollOnce checks in-flight guard → skips if busy
+2) Fetch /state with timeout → always clear timeout → update snapshot
+3) checkBotConnectionDetailed returns { ok, failureKind }
+4) Planner opens breaker only on non-timeout failures
+
+## Test Matrix
+
+- Unit
+  - WorldStateManager does not overlap polls (A1)
+  - checkBotConnectionDetailed returns timeout failure kind (A2)
+  - mcFetch clears timeout + no retry on timeout (A3)
+- Integration
+  - Planner breaker remains closed on timeout-only health checks (A2)
+
+## Data Plan
+
+- Mock fetch with AbortError injection and delayed resolution.
+
+## Observability Plan
+
+- Logs: poll skipped (in-flight), health failure kind

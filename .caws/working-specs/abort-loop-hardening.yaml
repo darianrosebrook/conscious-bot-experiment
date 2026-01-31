@@ -1,0 +1,48 @@
+id: PLN-418
+title: "Abort/timeout loop hardening for planning + world-state"
+risk_tier: 2
+scope:
+  in:
+    - "Prevent overlapping world-state polls"
+    - "Avoid opening planning bot breaker on timeout-only health checks"
+    - "Ensure mc-client timeouts are cleared and timeout retries are bounded"
+    - "Expose failure kinds for health checks"
+  out:
+    - "Changes to Minecraft interface server behavior"
+    - "New planning features or task semantics"
+invariants:
+  - "Timeout-only failures never open the bot breaker"
+  - "World-state polling never overlaps in-flight requests"
+  - "Timeout timers are always cleared after mc-client requests"
+acceptance:
+  - id: A1
+    given: "world-state poll in flight"
+    when:  "pollOnce is called again"
+    then:  "second call is skipped and no overlapping fetch occurs"
+  - id: A2
+    given: "health check request times out"
+    when:  "planner evaluates bot connectivity"
+    then:  "breaker remains closed and no circuit open log is emitted"
+  - id: A3
+    given: "mc-client request times out"
+    when:  "mcFetch handles the error"
+    then:  "timeout timer is cleared and no extra retry is scheduled"
+non_functional:
+  a11y: []
+  perf:
+    api_p95_ms: 250
+  security:
+    - "No new external inputs without validation"
+contracts:
+  - type: openapi
+    path: "contracts/minecraft-interface-health.yaml"
+observability:
+  logs:
+    - "world-state poll skipped due to in-flight"
+    - "health check failure kind"
+  metrics:
+    - "world_state_poll_skip_count"
+  traces: []
+migrations: []
+rollback:
+  - "Revert world-state in-flight guard and breaker gating"

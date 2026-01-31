@@ -1,0 +1,81 @@
+openapi: 3.0.3
+info:
+  title: Minecraft Interface Health API
+  version: 0.1.0
+paths:
+  /health:
+    get:
+      summary: Health status of the minecraft-interface service and bot
+      responses:
+        "200":
+          description: Health response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                  botStatus:
+                    type: object
+                    properties:
+                      connected:
+                        type: boolean
+                      position:
+                        type: object
+                        properties:
+                          x: { type: number }
+                          y: { type: number }
+                          z: { type: number }
+                additionalProperties: true
+  /state:
+    get:
+      summary: World state snapshot
+      responses:
+        "200":
+          description: World state response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                  isAlive:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      position:
+                        type: object
+                        properties:
+                          x: { type: number }
+                          y: { type: number }
+                          z: { type: number }
+                      health:
+                        type: number
+                      worldState:
+                        type: object
+                        properties:
+                          timeOfDay:
+                            type: number
+                          weather:
+                            type: string
+                          dimension:
+                            type: string
+                          biome:
+                            type: string
+                          nearbyEntities:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                type: { type: string }
+                                position:
+                                  type: object
+                                  properties:
+                                    x: { type: number }
+                                    y: { type: number }
+                                    z: { type: number }
+                                distance: { type: number }
+                additionalProperties: true
