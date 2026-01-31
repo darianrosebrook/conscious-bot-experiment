@@ -20,10 +20,6 @@ import {
   ObservationMapper,
   MemoryIntegrationService,
 } from './index';
-import {
-  HybridArbiterIntegration,
-  HybridArbiterConfig,
-} from './hybrid-arbiter-integration';
 // Import real planning coordinator
 import { createIntegratedPlanningCoordinator } from '@conscious-bot/planning';
 import type { Bot } from 'mineflayer';

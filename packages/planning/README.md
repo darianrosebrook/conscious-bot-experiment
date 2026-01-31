@@ -29,7 +29,7 @@ This package provides hierarchical and reactive planning, MCP integration, and a
 - Prefers MCP-registered Behavior Tree options and validates results against actual game state.
 - Uses inventory-based progress gating and completion checks to avoid "fake completion".
 - Injects prerequisite steps (e.g., gather wood) and retries with backoff when needed.
-- Accepts steps from authorized sources only (`sterling`, `fallback-macro`) and validates leaf args before dispatch.
+- Dispatches any step with `meta.executable: true` and validates leaf args before dispatch.
 
 ### Fallback-Macro Planner
 
@@ -38,6 +38,7 @@ When Sterling solvers cannot handle a task (e.g., free-form cognitive thoughts l
 - Resolves task requirements via `resolveRequirement()` (collect, mine, craft, build, tool_progression)
 - Maps requirements to validated fallback plans via `requirementToFallbackPlan()` in `modules/leaf-arg-contracts.ts`
 - Emits steps with `meta.authority: 'fallback-macro'` and `meta.executable: true`
+- Collect/mine plans emit multiple `dig_block` steps (capped) to match quantity
 - Craft plans are single-step; the executor's prereq injection handles missing materials via recipe introspection at execution time
 - Pre-execution arg validation in strict mode rejects unknown leaves via `KNOWN_LEAVES` allowlist
 
@@ -52,8 +53,8 @@ Cognitive thoughts are converted to actionable tasks with structured requirement
 
 ### Authority and Execution
 
-- Steps must have `meta.authority ∈ {sterling, fallback-macro}` to be executed
-- Sterling steps set `meta.source = 'sterling'`; the executor normalizes this to `meta.authority` before dispatch
+- Steps execute when `meta.executable === true` (authority is for tracing/auditing only)
+- Sterling steps set `meta.source = 'sterling'`; the executor normalizes this to `meta.authority` for logging
 - `validateLeafArgs(leaf, args, strictMode=true)` at the executor boundary rejects unknown leaves
 - Prerequisite injection for craft steps: if materials are missing, `injectDynamicPrereqForCraft()` creates a gathering subtask (capped at 3 attempts per task via `metadata.prereqInjectionCount`)
 
@@ -91,4 +92,3 @@ Run tests:
 ```
 pnpm --filter @conscious-bot/planning test
 ```
-

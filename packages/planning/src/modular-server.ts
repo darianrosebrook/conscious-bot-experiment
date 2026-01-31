@@ -2231,6 +2231,28 @@ async function autonomousTaskExecutor() {
           await recomputeProgressAndMaybeComplete(currentTask);
           return; // Executor handled this execution cycle
         } else {
+          const hasExecProvenance =
+            !!nextStep.meta?.authority ||
+            !!nextStep.meta?.leaf ||
+            nextStep.meta?.executable === true;
+          if (hasExecProvenance) {
+            const blockedReason = 'executable-step-no-leaf-binding';
+            enhancedTaskIntegration.updateTaskMetadata(currentTask.id, {
+              ...currentTask.metadata,
+              blockedReason,
+              lastBindingFailure: {
+                stepId: nextStep.id,
+                order: nextStep.order,
+                leaf: nextStep.meta?.leaf as string | undefined,
+                authority: nextStep.meta?.authority as string | undefined,
+                at: Date.now(),
+              },
+            });
+            console.warn(
+              `⚠️ [Executor] Step ${nextStep.order} has no leaf binding — blocking task (no MCP fallback)`
+            );
+            return;
+          }
           console.warn(
             `⚠️ [Executor] Step ${nextStep.order} has no executable meta — falling through to MCP`
           );
@@ -2444,7 +2466,7 @@ async function autonomousTaskExecutor() {
 
       const availableLeaves = await getAvailableLeaves();
       const leafConfig = leafMapping[currentTask.type];
-      // Build HRM/LLM-inspired candidate set based on intent + inventory
+      // Build Sterling/LLM-inspired candidate set based on intent + inventory
       const intent = `${(currentTask.title || '').toLowerCase()} ${(
         currentTask.description || ''
       ).toLowerCase()}`;

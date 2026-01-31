@@ -1,7 +1,7 @@
 /**
- * Action Executor for Hybrid Arbiter Integration
+ * Action Executor
  *
- * Bridges high-level goals from the HybridHRMArbiter with the existing
+ * Bridges high-level goals from the planning coordinator (Sterling) with the
  * leaf-based action system for concrete Minecraft execution.
  *
  * @author @darianrosebrook

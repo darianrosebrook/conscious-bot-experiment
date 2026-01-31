@@ -89,7 +89,13 @@ class CognitiveStreamLogger {
           response.status
         );
       }
-    } catch (error) {
+    } catch (error: unknown) {
+      const cause = error && typeof error === 'object' && 'cause' in error ? (error as { cause?: { code?: string } }).cause : undefined;
+      const isRefused = cause?.code === 'ECONNREFUSED' || (error instanceof Error && error.message?.includes('ECONNREFUSED'));
+      if (isRefused) {
+        // Dashboard not ready yet (startup race); avoid log spam
+        return;
+      }
       console.warn('❌ Error sending log to cognitive stream:', error);
     }
   }
@@ -222,8 +228,12 @@ function logObservation(message: string, payload?: unknown): void {
 }
 
 const llmInterface = new LLMInterface();
+const observationTimeoutMs = process.env.COGNITION_OBSERVATION_TIMEOUT_MS
+  ? parseInt(process.env.COGNITION_OBSERVATION_TIMEOUT_MS, 10)
+  : 35000;
 const observationReasoner = new ObservationReasoner(llmInterface, {
   disabled: process.env.COGNITION_LLM_OBSERVATION_DISABLED === 'true',
+  timeoutMs: observationTimeoutMs,
 });
 
 const app = express.default();
@@ -1629,19 +1639,23 @@ app.post('/process', async (req, res) => {
             processed: true,
           };
 
-          const cognitiveStreamResponse = await fetch(
-            'http://localhost:3000/api/ws/cognitive-stream',
-            {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(internalThought),
-            }
-          );
-
-          if (!cognitiveStreamResponse.ok) {
-            console.warn(
-              '❌ Failed to send observation thought to cognitive stream'
+          const isGenericFallback =
+            insight.fallback &&
+            insight.thought.text === ObservationReasoner.GENERIC_FALLBACK_THOUGHT;
+          if (!isGenericFallback) {
+            const cognitiveStreamResponse = await fetch(
+              'http://localhost:3000/api/ws/cognitive-stream',
+              {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(internalThought),
+              }
             );
+            if (!cognitiveStreamResponse.ok) {
+              console.warn(
+                '❌ Failed to send observation thought to cognitive stream'
+              );
+            }
           }
 
           const primaryTask = insight.actions.tasks?.[0];
@@ -3081,6 +3095,32 @@ app.listen(port, () => {
     });
 
   console.log(startupMessage);
+
+  // One-off LLM backend health check so operators see MLX/Ollama connectivity
+  setTimeout(() => {
+    const cfg = llmInterface.getConfig();
+    const host = cfg.host ?? 'localhost';
+    const port = cfg.port ?? 5002;
+    const healthUrl = `http://${host}:${port}/health`;
+    fetch(healthUrl, { signal: AbortSignal.timeout(5000) })
+      .then((r) => {
+        if (r.ok) {
+          console.log(
+            `[Cognition] LLM backend (MLX/Ollama) reachable at ${healthUrl}`
+          );
+        } else {
+          console.warn(
+            `[Cognition] LLM backend at ${healthUrl} returned ${r.status} - observation reasoning may fall back`
+          );
+        }
+      })
+      .catch(() => {
+        console.warn(
+          `[Cognition] LLM backend not reachable at ${healthUrl} - start the MLX sidecar (e.g. pnpm start) or set COGNITION_LLM_HOST/PORT. Observation reasoning will use fallback until it is.`
+        );
+      });
+  }, 2000);
+
   console.log(
     `📊 Cognitive metrics endpoint: http://localhost:${port}/metrics`
   );

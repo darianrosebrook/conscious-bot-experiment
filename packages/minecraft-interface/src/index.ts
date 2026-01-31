@@ -63,14 +63,6 @@ export { createDefaultBotConfig, validateBotConfig } from './utils';
 // Mineflayer Extensions Integration
 export * from './extensions';
 
-// Hybrid Arbiter Integration
-export {
-  HybridArbiterIntegration,
-  type HybridArbiterConfig,
-  type GameStateSnapshot,
-  type SignalGenerationResult,
-} from './hybrid-arbiter-integration';
-
 // Action Executor
 export {
   ActionExecutor,

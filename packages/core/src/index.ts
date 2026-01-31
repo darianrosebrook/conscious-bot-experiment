@@ -17,19 +17,6 @@ export { SignalProcessor } from './signal-processor';
 export { PerformanceMonitor } from './performance-monitor';
 export type { TrackingSession } from './performance-monitor';
 
-// Hybrid HRM Integration
-export { HybridHRMArbiter } from './hybrid-hrm-arbiter';
-export type {
-  HRMSignal,
-  NeedScore,
-  HRMGoalTemplate,
-  HRMGoalCandidate,
-  HRMPerformanceBudgets,
-  CachedResult,
-  SignalBatch,
-  OptimizationStats,
-} from './hybrid-hrm-arbiter';
-
 // Advanced Components
 export { AdvancedNeedGenerator } from './advanced-need-generator';
 export { GoalTemplateManager } from './goal-template-manager';

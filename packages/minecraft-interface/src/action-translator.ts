@@ -781,8 +781,8 @@ export class ActionTranslator {
         position = params.position;
       }
     } else if (params.blockType) {
-      // Find nearest block of specified type
-      position = this.findNearestBlock(params.blockType);
+      // Find nearest *visible* block so we do not plan to dig through obstacles
+      position = this.findNearestVisibleBlock(params.blockType);
     } else {
       throw new Error('Mining action requires position or blockType parameter');
     }
@@ -1253,10 +1253,10 @@ export class ActionTranslator {
       // Resolve parameters and infer a target position when only a blockType is provided
       let parameters = { ...action.parameters } as any;
 
-      // If a blockType is provided without an explicit position, find the nearest match
+      // If a blockType is provided without an explicit position, find the nearest *visible* block
       if (!parameters.pos && parameters.blockType) {
         try {
-          const targetPos = this.findNearestBlock(parameters.blockType);
+          const targetPos = this.findNearestVisibleBlock(parameters.blockType);
           parameters.pos = { x: targetPos.x, y: targetPos.y, z: targetPos.z };
           // Also set an expectation so the leaf can validate
           if (!parameters.expect) parameters.expect = parameters.blockType;
@@ -1264,7 +1264,7 @@ export class ActionTranslator {
           return {
             success: false,
             error:
-              e instanceof Error ? e.message : 'No matching block found nearby',
+              e instanceof Error ? e.message : 'No visible matching block found nearby',
           };
         }
       }
@@ -1277,17 +1277,45 @@ export class ActionTranslator {
           y: Math.floor(botPos.y),
           z: Math.floor(botPos.z),
         };
-        // If caller specified a blockType, prefer the nearest matching block instead of digging air
+        // If caller specified a blockType, prefer the nearest *visible* matching block
         if (parameters.blockType) {
           try {
-            const targetPos = this.findNearestBlock(parameters.blockType);
+            const targetPos = this.findNearestVisibleBlock(parameters.blockType);
             parameters.pos = { x: targetPos.x, y: targetPos.y, z: targetPos.z };
             if (!parameters.expect) parameters.expect = parameters.blockType;
           } catch (e) {
-            // Keep "current" if no nearby match was found; the leaf will validate
+            // Keep "current" if no visible match was found; the leaf will validate
           }
         }
       }
+
+      // Validate line-of-sight before digging: do not dig blocks the bot cannot see
+      if (parameters.pos && typeof parameters.pos.x === 'number') {
+        const blockPos = new Vec3(parameters.pos.x, parameters.pos.y, parameters.pos.z);
+        const observer = this.getEyePosition();
+        const blockCenter = {
+          x: blockPos.x + 0.5,
+          y: blockPos.y + 0.5,
+          z: blockPos.z + 0.5,
+        };
+        const hasLos = this.raycastEngine.hasLineOfSight(observer, blockCenter, {
+          maxDistance: this.raycastConfig.maxDistance,
+          assumeBlockedOnError: true,
+        });
+        if (!hasLos) {
+          return {
+            success: false,
+            error: 'Block not visible (occluded); cannot dig through obstacles',
+          };
+        }
+      }
+
+      // Pass LOS validator so the leaf can enforce visibility when it resolves position itself
+      (context as any).hasLineOfSight = (obs: { x: number; y: number; z: number }, tgt: { x: number; y: number; z: number }) =>
+        this.raycastEngine.hasLineOfSight(obs, tgt, {
+          maxDistance: this.raycastConfig.maxDistance,
+          assumeBlockedOnError: true,
+        });
 
       // Execute the dig block leaf
       const result = await digBlockLeaf.run(context, parameters);
@@ -1349,6 +1377,24 @@ export class ActionTranslator {
         return {
           success: false,
           error: `Expected ${blockType}, found ${block.name}`,
+        };
+      }
+
+      // Do not dig blocks the bot cannot see (e.g. stone behind two layers of dirt)
+      const observer = this.getEyePosition();
+      const blockCenter = {
+        x: position.x + 0.5,
+        y: position.y + 0.5,
+        z: position.z + 0.5,
+      };
+      const hasLos = this.raycastEngine.hasLineOfSight(observer, blockCenter, {
+        maxDistance: this.raycastConfig.maxDistance,
+        assumeBlockedOnError: true,
+      });
+      if (!hasLos) {
+        return {
+          success: false,
+          error: 'Block not visible (occluded); cannot dig through obstacles',
         };
       }
 
@@ -1842,7 +1888,8 @@ export class ActionTranslator {
     const { range, sprint } = params;
 
     const coerceVec3 = (raw: any): Vec3 | null => {
-      const t = raw?.target ?? raw?.position ?? raw?.destination ?? raw?.goal ?? raw;
+      const t =
+        raw?.target ?? raw?.position ?? raw?.destination ?? raw?.goal ?? raw;
       if (!t) return null;
       if (t instanceof Vec3) return t;
       if (Array.isArray(t) && t.length >= 3) {
@@ -1902,8 +1949,9 @@ export class ActionTranslator {
       ) {
         if (this.shouldLog('nav-debounce', this.navLogThrottleMs)) {
           console.log(
-            `[ActionTranslator] 🧭 navigate debounced: ${targetKey} (${now -
-              this.lastNavAttemptAt}ms)`
+            `[ActionTranslator] 🧭 navigate debounced: ${targetKey} (${
+              now - this.lastNavAttemptAt
+            }ms)`
           );
         }
         return {
@@ -1948,11 +1996,14 @@ export class ActionTranslator {
       }
 
       // Use D* Lite navigation bridge for intelligent pathfinding
-      const navigationResult = await this.navigationBridge.navigateTo(targetVec, {
-        timeout: timeout,
-        useRaycasting: true,
-        dynamicReplanning: true,
-      });
+      const navigationResult = await this.navigationBridge.navigateTo(
+        targetVec,
+        {
+          timeout: timeout,
+          useRaycasting: true,
+          dynamicReplanning: true,
+        }
+      );
 
       if (sprint) {
         this.bot.setControlState('sprint', true);
@@ -2443,7 +2494,9 @@ export class ActionTranslator {
   }
 
   private normalizeBlockName(name: string): string {
-    return name.startsWith('minecraft:') ? name.slice('minecraft:'.length) : name;
+    return name.startsWith('minecraft:')
+      ? name.slice('minecraft:'.length)
+      : name;
   }
 
   private getEyePosition(): Vec3 {
@@ -3462,7 +3515,8 @@ export class ActionTranslator {
   // ==================== Helper Methods ====================
 
   /**
-   * Find nearest block of specified type
+   * Find nearest block of specified type (any block in range, no visibility check).
+   * Prefer findNearestVisibleBlock for dig targets so the bot only targets blocks it can see.
    */
   private findNearestBlock(blockType: string): Vec3 {
     const bot = this.bot;
@@ -3489,6 +3543,26 @@ export class ActionTranslator {
     }
 
     throw new Error(`No ${blockType} found within 10 blocks`);
+  }
+
+  /**
+   * Find nearest block of specified type that the bot can actually see (line-of-sight).
+   * Uses raycast sweep so only unoccluded blocks are considered; prevents digging through dirt/stone.
+   */
+  private findNearestVisibleBlock(blockType: string): Vec3 {
+    const timeout = 3000;
+    const result = this.scanVisibleForTargetBlock(
+      blockType,
+      this.raycastConfig.maxDistance,
+      timeout
+    );
+    if (result.foundBlocks.length === 0) {
+      throw new Error(`No visible ${blockType} found within ${this.raycastConfig.maxDistance} blocks`);
+    }
+    const closest = result.foundBlocks.reduce(
+      (a, b) => (a.distance < b.distance ? a : b)
+    );
+    return closest.position;
   }
 
   /**

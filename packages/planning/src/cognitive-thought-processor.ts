@@ -932,6 +932,7 @@ export class CognitiveThoughtProcessor extends EventEmitter {
       'processing current situation',
       'no content available',
       'status refreshed',
+      'i remain aware of my surroundings and continue monitoring',
     ];
 
     return genericPatterns.some((pattern) =>

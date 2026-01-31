@@ -2,7 +2,7 @@
 
 ## Abstract
 
-We propose and implement a unified cognitive architecture that integrates **embodied sensory feedback**, **hierarchical planning**, **long-term memory**, and **language-based reflection** to explore proto-conscious behaviors in an artificial agent. Using the rich yet controlled world of **Minecraft**, we have built an agent that perceives and acts through an embodied sensorimotor interface, maintains internal homeostatic drives, remembers and learns from past experiences, and deliberates using both algorithmic planners and a language-model "inner voice." 
+We propose and implement a unified cognitive architecture that integrates **embodied sensory feedback**, **hierarchical planning**, **long-term memory**, and **language-based reflection** to explore proto-conscious behaviors in an artificial agent. Utilizing capability-specific rigs for the STERLING reasoning engine, we can utilize the sandbox world of Minecraft as a proving ground of these capabilities. We have built an agent that perceives and acts through an embodied sensorimotor interface, maintains internal homeostatic drives, remembers and learns from past experiences, and deliberates using both algorithmic planners and a hybrid language-model "inner voice." 
 
 **Key implemented components include:**
 - **Visible-range world model** with ray-cast perception and D* Lite navigation
@@ -10,7 +10,7 @@ We propose and implement a unified cognitive architecture that integrates **embo
 - **Memory system integration** across all cognitive components with real-time context enhancement and adaptive planning
 - **Identity memory system** with emotional preservation (2% daily decay), self-narrative construction, and LLM fine-tuning
 - **Signal→need→goal pipeline** for drive-based goal formulation with advanced priority scoring
-- **Hybrid planner** combining HRM-inspired hierarchical task decomposition and enhanced GOAP reactive execution with HTN effectiveness tracking
+- **Hybrid planner** combining Sterling symbolic reasoning with hierarchical task decomposition and HTN effectiveness tracking
 - **Constitutional filter** with ethical rules engine and safety oversight
 - **Intrusive thought processor** with natural language parsing, MCP integration, and actionable task generation
 - **Social cognition** with theory of mind and relationship management
@@ -26,7 +26,7 @@ The system demonstrates how tightly coupled feedback loops – from low-level se
 - **pnpm** >= 8.0.0
 - **Docker** (provides PostgreSQL + pgvector and Minecraft server)
 - **Apple Silicon Mac** (required for MLX-LM sidecar — generation + embeddings)
-- **Python 3.11** (for Sapient HRM bridge)
+- **Python 3** (for MLX-LM sidecar; Sterling uses its own repo)
 
 ### Environment Setup
 
@@ -72,7 +72,7 @@ MINECRAFT_PORT=25565
 MINECRAFT_VERSION=1.20.1
 MINECRAFT_USERNAME=ConsciousBot
 
-# Sterling reasoning server (optional)
+# Sterling reasoning server (clone ../sterling to enable)
 STERLING_WS_URL=ws://localhost:8766
 STERLING_DIR=../sterling
 ```
@@ -108,12 +108,12 @@ pnpm dev
 ```
 
 `pnpm dev` runs `scripts/start.js`, which:
-1. Checks system requirements (Node.js, pnpm, Python 3.11, Apple Silicon)
-2. Sets up Python venvs for HRM and MLX-LM (installs pip deps, verifies model cache)
+1. Checks system requirements (Node.js, pnpm, Apple Silicon for MLX)
+2. Sets up Python venv for MLX-LM (installs pip deps, verifies model cache)
 3. Starts Docker services (PostgreSQL + Minecraft)
 4. Kills any leftover processes and checks port availability
 5. Installs Node.js deps and builds all packages
-6. Starts 9 services in dependency order, health-checking each before proceeding
+6. Starts services in dependency order (Sterling when ../sterling exists), health-checking each before proceeding
 
 #### Other Commands
 
@@ -152,7 +152,7 @@ pnpm --filter @conscious-bot/core run dev:server   # Core API (port 3007)
 | World API | `http://localhost:3004` | World state management, perception, navigation |
 | Minecraft Interface | `http://localhost:3005` | Mineflayer bot control, WebSocket state streaming |
 | Core API | `http://localhost:3007` | Capability registry, signal processing |
-| Sapient HRM | `http://localhost:5001` | Python HRM bridge for hierarchical reasoning |
+| Sterling | `ws://localhost:8766` | Symbolic reasoning (crafting, building, tool progression); clone ../sterling to enable |
 | MLX-LM Sidecar | `http://localhost:5002` | Local LLM generation + embeddings (Apple Silicon) |
 | PostgreSQL | `localhost:5432` | pgvector-enabled database (Docker) |
 | Minecraft Server | `localhost:25565` | Vanilla 1.20.1 server (Docker) |
@@ -278,7 +278,7 @@ The system is organized into 11 TypeScript packages, 2 Python sidecars, and Dock
 ├──────────────────────────────────────────────────────────────────┤
 │  Python Sidecars                 Docker Infrastructure           │
 │  MLX-LM (:5002) gen+embed       PostgreSQL+pgvector (:5432)     │
-│  Sapient HRM (:5001)            Minecraft Server (:25565)        │
+│  Sterling (:8766) when present  Minecraft Server (:25565)        │
 └──────────────────────────────────────────────────────────────────┘
 ```
 
@@ -301,7 +301,7 @@ The system is organized into 11 TypeScript packages, 2 Python sidecars, and Dock
 
 #### Python Sidecars
 - **`mlx-lm-sidecar/`** - MLX-LM inference server (Apple Silicon): text generation (`gemma-3n-E2B-it-lm-4bit`) and embeddings (`embeddinggemma-300m-4bit`) via Ollama-compatible REST API
-- **`sapient-hrm/`** - Sapient Hierarchical Reasoning Model bridge (Python 3.11)
+- **Sterling** (separate repo at `../sterling`) - Symbolic reasoning server for crafting, building, and tool progression (started by `scripts/start.js` when present)
 
 #### Docker Infrastructure
 - **PostgreSQL + pgvector** - Vector-enabled database for memory storage (768-dim embeddings, HNSW indexing)
@@ -320,8 +320,8 @@ executor-contracts (foundation)
     ↑
   dashboard, evaluation
 
-Python sidecars (MLX-LM, HRM) are independent processes
-  accessed via HTTP — no TypeScript dependency coupling
+Python sidecars (MLX-LM; Sterling in separate repo) are independent processes
+  accessed via HTTP/WebSocket — no TypeScript dependency coupling
 ```
 
 This layered approach ensures clean separation of concerns and reliable builds while enabling shared contracts for tool execution.
@@ -332,7 +332,7 @@ Scientific investigation of consciousness is challenging due to its subjective n
 
 **Minecraft** is chosen as the experimental world because it offers a _bounded but open-ended_ environment with rich interactive dynamics. The game provides concrete embodied pressures (hunger, danger, day-night cycles), opportunities for tool use and building, social interaction with other players or villagers, and a wide range of possible goals. Yet, it is constrained enough to be computationally manageable and allows instrumenting the agent's perceptions and actions via the Mineflayer API. This makes Minecraft an ideal "sandbox" for testing theories of integrated cognition: the agent must survive, gather resources, build shelters, interact socially, etc., all in real-time. This environment lets us probe how an AI might develop **autonomous agency and situational awareness** when it must continuously sense and act in order to thrive.
 
-Recent advances in AI architectures also motivate our design. Notably, Sapient Intelligence's **Hierarchical Reasoning Model (HRM)** demonstrates that a dual-system approach – a slow abstract planner coupled with a fast reactive problem-solver – can solve complex reasoning tasks with high efficiency[\[2\]](https://www.actuia.com/en/news/promising-alternative-to-chain-of-thought-sapient-bets-on-a-hierarchical-architecture/#:~:text=The%20model%20relies%20on%20a,handles%20fast%20and%20detailed%20execution). This brain-inspired hierarchy aligns with our needs for real-time operation: the agent can employ deliberative reasoning at a high level while still reacting quickly to immediate threats or opportunities. Indeed, HRM's efficiency suggests that **architecture-over-scale** is promising for embedded agents, as HRM achieves strong performance with modest model size and can even be deployed in real-time robotic settings[\[3\]](https://www.actuia.com/en/news/promising-alternative-to-chain-of-thought-sapient-bets-on-a-hierarchical-architecture/#:~:text=The%20use%20cases%20mentioned%20by,time%2C%20dynamic%20environments). Our system design leverages this insight by integrating hierarchical planning mechanisms so that the agent remains responsive and adaptive without incurring large latency (e.g. from lengthy chain-of-thought loops).
+Our system design uses a **dual-system** approach: a symbolic reasoning engine (**Sterling**) for structured subgoals (crafting, building, tool progression) coupled with reactive planning and an LLM "inner voice" for open-ended reasoning. Sterling is the proving ground for this architecture; the agent remains responsive and adaptive without incurring large latency from lengthy chain-of-thought loops.
 
 Finally, we draw on cognitive theories to inform specific components. For example, Daniel Dennett's concept of the self as a _"center of narrative gravity"_ posits that an individual's identity is essentially the abstract story they construct about themselves[\[4\]](https://cogsci.ucd.ie/oldfiles/introtocogsci/docs/selfctr.htm#:~:text=doesn%27t%20know%20what%20it%27s%20doing,its%20activities%20in%20the%20world). In our agent, we implement a **self-model** that tracks its own history and evolving goals, effectively letting the agent narrativize its experiences as a form of self-understanding. Likewise, Lisa Feldman Barrett's **theory of constructed emotion** suggests that emotional states are not hardwired triggers but emerge from the brain's predictive interpretation of interoceptive signals in context[\[5\]](https://en.wikipedia.org/wiki/Theory_of_constructed_emotion#:~:text=The%20theory%20of%20constructed%20emotion,3). This guides how we treat the agent's internal signals (hunger, safety, social comfort) – not as fixed reflexes, but as inputs that _combine to form an affective state_ which can modulate cognition (for instance, simultaneous low health and nearby threats may produce an analogue of "anxiety" that focuses the agent's attention on self-preservation). By grounding our design in such theories, we aim to create an agent that not only performs tasks but does so in a way that **structurally resembles aspects of conscious cognition** (minus the subjective qualia). In sum, the motivation is to explore consciousness _in silico_ by building an AI agent that brings together embodiment, homeostatic drives, memory, planning, and self-reflection in one unified loop.
  
@@ -439,7 +439,7 @@ Finally, we draw on cognitive theories to inform specific components. For exampl
 - **Fallback Support** - Graceful degradation when dependencies are unavailable
 
 ####  **Planning Package** (`packages/planning/`) - 100% Complete
-- **Hierarchical Planner** (939 lines) - HRM-inspired HTN planning
+- **Hierarchical Planner** (939 lines) - Sterling + HTN planning
 - **HTN Memory Manager Integration** - Task effectiveness tracking and method optimization
 - **Integrated Planning Coordinator** - Multi-planner routing and execution coordination
 - **Reactive Executor** (590 lines) - Enhanced GOAP with plan repair
@@ -733,7 +733,7 @@ flowchart TD
 - **Performance Benchmarking**: Real-time performance monitoring and optimization
 
 #### **Advanced Planning Systems**
-- **HRM-Inspired Planning**: Hierarchical reasoning model integration for complex task decomposition
+- **Sterling / Hierarchical Planning**: Symbolic reasoning (crafting, building, tool progression) with HTN-style task decomposition
 - **Enhanced GOAP**: Goal-oriented action planning with advanced plan repair capabilities
 - **Cognitive Router**: Intelligent routing between planning strategies based on problem complexity
 
@@ -1046,7 +1046,7 @@ We will collect a broad set of **quantitative and qualitative metrics** to evalu
 - **Affective and Predictive Indicators:**
 - _Affective State Appropriateness:_ Whenever we log an "emotion-like" state (as per homeostasis, e.g., agent flagged as anxious, curious, etc.), we check if its behavior matched that state (did "anxious" state correlate with more checking surroundings, retreating to safe zones?). We can compute correlation between an emotion signal and certain behaviors (like "fear signal" vs "distance kept from mobs"). A high correlation in expected directions would support that our emotion model is influencing behavior as designed.
 - _Prediction Error Delta:_ If we implement predictive simulations, we measure the average error between predicted outcomes and actual outcomes. For example, if the agent predicted it could jump from a height and lose 2 hearts but it lost 5, that's a big error. Tracking this over time: is the agent getting better at predicting (error reducing)? That would indicate learning an internal model of the world. If error remains high, perhaps the predictive module needs improvement.
-- _Latency and Real-Time Performance:_ We monitor the agent's reaction time to critical events (like how quickly does it respond when a creeper appears?). To satisfy real-time operation, these should be within human-like ranges (a few hundred milliseconds perhaps). If using HRM/LLM, we ensure planning episodes are not causing large stalls. We will measure loop cycle time and possibly use profiling to keep the system efficient.
+- _Latency and Real-Time Performance:_ We monitor the agent's reaction time to critical events (like how quickly does it respond when a creeper appears?). To satisfy real-time operation, these should be within human-like ranges (a few hundred milliseconds perhaps). If using Sterling/LLM, we ensure planning episodes are not causing large stalls. We will measure loop cycle time and possibly use profiling to keep the system efficient.
 
 All metrics will be gathered via automated logs where possible. For subjective ones (like narrative coherence), we'll rely on human judgment or proxy measures (like local LLM-based evaluation of text). By analyzing these metrics, we aim to validate our core research questions: Does the integration of these cognitive components yield emergent properties akin to consciousness (like self-consistency, goal-directed adaptive behavior, reflective learning)? And importantly, where does it fail? The failure modes (e.g., if memory fails and it repeats mistakes, or if conflicting drives lead to oscillation) are just as informative, guiding future refinements.
 
@@ -1060,7 +1060,7 @@ While the design is high-level, implementing this architecture will require inte
 - **Perception and World Model:** If needed, we will write a custom **ray-casting utility** (or use Mineflayer's methods) to implement the visible-only view. The Place Graph can be managed via a simple graph library; if using Python, **NetworkX** could be used to store graph nodes/edges and run pathfinding on the high-level graph. Alternatively, even a SQL or NoSQL store could work for places (each node as an entry, with connections). Real-time updates here must be efficient; we will likely limit graph updates to chunk-level events (e.g., when the agent enters a new chunk or finds a landmark).
 - **Memory Storage:** For the semantic memory graph and episodic log, a **graph database** like **Neo4j** could be very useful for complex queries (it supports Cypher queries to find relationships). However, Neo4j introduces overhead; a lighter solution might be using an in-memory graph and dumping to disk. We'll explore using **RDF stores** or even just Python objects with indices. For episodic memory, a simple log file plus an in-memory cache of recent events might suffice. Summarization (narrative checkpoints) will rely on the local LLM (so a call to our Ollama-hosted model with a prompt of recent events to get a summary). We will need to implement memory **consolidation** routines that likely run during periods when the agent is idle or sleeping in-game.
 - **Reinforcement Learning Module:** If we incorporate learning components, libraries like **Stable Baselines3** (for Python) can provide implementations of Q-learning, PPO, etc. We might use those to train in simulation. For integrating a learned policy into the live agent, we'll use saved neural network models and load them (e.g., a PyTorch model that given state returns action probabilities). We have to ensure inference is fast (PyTorch or TensorFlow should be fine with a small network on CPU). We'll also design a reward logging system to feed back into training if on-line. This area may need tuning and potentially running separate training scripts.
-- **Hierarchical Planning:** There are existing planners for HTN (e.g., **pyhop** for HTN in Python is a simple one, or SHOP2 if needed) and for GOAP (though GOAP can be custom-coded with A_). We might also represent planning problems in PDDL (Planning Domain Definition Language) and use a planner, but that might be overkill. Given our domain is relatively constrained, a custom planner with hardcoded methods might be easier to integrate. The_ _Sapient HRM_\* concept is more abstract; interestingly, Sapient released code for HRM[\[8\]](https://www.actuia.com/en/news/promising-alternative-to-chain-of-thought-sapient-bets-on-a-hierarchical-architecture/#:~:text=can%20be%20embedded%20in%20robots,time%2C%20dynamic%20environments). It is likely in Python (given arXiv and GitHub references). We can review that codebase for inspiration or even see if their model can be repurposed for parts of our agent's reasoning (for instance, solving a puzzle or optimizing some sub-problem). At minimum, the idea of two-tier recurrent reasoning will be implemented via our Planner-Executor loop. We'll use asynchronous execution for planning so that the agent doesn't freeze; e.g., do heavy planning in a thread or gradually refine plan across ticks.
+- **Hierarchical Planning:** We use **Sterling** (symbolic reasoning server) for structured subgoals (crafting, building, tool progression) and HTN-style decomposition. The Planner-Executor loop implements two-tier reasoning; heavy planning runs asynchronously so the agent doesn't freeze (e.g., plan in a thread or refine across ticks).
 - **Language Model (LLM):** For the cognitive core, we will deploy a local LLM using **Ollama** to run models like Llama 2 13B/7B locally. This ensures full control, eliminates external dependencies, and removes ongoing API costs. We will implement resource optimization and caching to manage the computational requirements. The integration will use asynchronous calls to prevent blocking the main agent loop. There are frameworks like **LangChain** or **LlamaIndex** which could help manage context (especially connecting the LLM to our memory retrieval). We will also likely need an **embedding-based retrieval** for long-term memory: e.g., use text embeddings to find relevant past events or knowledge to include in prompts. Libraries like **FAISS** or **Chromadb** can help store and query embeddings of memory entries.
 - **User/Intrusion Interface:** This could be a simple web application where we display the agent's status and allow input of intrusive thoughts. Perhaps we'll use a Python web framework like **Flask** or FastAPI to serve a page and handle websocket messages to the agent in real time. Alternatively, an in-game interface (like a special Minecraft book or command) could inject suggestions, but a web dashboard is easier for development. The interface will also show the agent's inner monologue (for transparency) and allow toggling modules (for ablation tests). Using modern JS frameworks (React/Vue) is an option if we want a nice UI, but not strictly needed.
 - **Constitution Rules Engine:** The rules themselves will be defined in a config (YAML or JSON). For enforcement, we can simply code checks in Python for specific forbidden actions (e.g., intercept the planner if it generates a forbidden goal). For more complex or generalized checking, we might implement a mini expert system or just rely on the LLM (with a system prompt: "Never break rule X" plus asking it to self-censor plans). To be safe, a dual approach is best: hard constraints in code for clear cases, and LLM reasoning for subtle cases. For content moderation, we can implement custom filtering rules specific to our game domain to catch obviously disallowed outputs from the LLM (though our domain is game actions, not toxic text, so more about game ethics).
@@ -1079,7 +1079,7 @@ While the design is high-level, implementing this architecture will require inte
 - Caching results: e.g., if we already planned a route recently, reuse it unless environment changed.
 - Using efficient data structures for memory queries (indices, etc.).
 - Possibly lowering the frequency of certain checks (the homeostasis might run every second rather than every tick, etc.).
-- HRM's promise is less token-intensive reasoning, which we will leverage to reduce reliance on long chain-of-thought dialogues.
+- Sterling (symbolic reasoning) offers less token-intensive reasoning for structured tasks, reducing reliance on long chain-of-thought dialogues.
 
 With careful engineering, we expect the agent to maintain a reasonable responsiveness (perhaps a planning cycle in complex cases might take a second or two, which in Minecraft terms is okay if the agent is in a safe spot; during combat, it will rely on reflexes which are fast).
 

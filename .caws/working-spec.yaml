@@ -1,57 +1,50 @@
-id: MCB-482
-title: "LLM-driven observation reasoning for Minecraft interface"
+id: FEAT-3071
+title: "Executor dispatch by executable metadata + fallback planning hardening"
 risk_tier: 2
 scope:
   in:
-    - "Replace hardcoded entity/environment thoughts in bot adapter with LLM-generated insights"
-    - "Augment cognition service environmental_awareness pipeline to consume structured observations and return action guidance"
-    - "Wire planning task suggestions to use LLM-provided structured actions when available"
+    - "Executor dispatch uses meta.executable (authority no longer blocks)"
+    - "Fallback planner emits multi-step dig_block plan for collect/mine"
+    - "Non-blocking cognition posts in minecraft-interface event handlers"
+    - "Timeout/backoff tuning for planning↔minecraft calls"
+    - "Tests for executable dispatch + fallback plans"
   out:
-    - "Overhauling chat conversation flow or external social reasoning modules"
-    - "Introducing new Minecraft behaviours beyond observation-driven reactions"
-    - "Persisting long-term memory summaries of every observation"
+    - "Full planner rewrite or legacy GOAP removal"
+    - "Schema migrations"
 invariants:
-  - "Observation payloads sent from minecraft-interface must include entity/event metadata and current bot vitals"
-  - "LLM outputs are validated as JSON with thought + action fields; invalid responses trigger deterministic fallback"
-  - "Generated planning tasks must reference the originating observation id for auditability"
+  - "Only steps with meta.executable === true are dispatched"
+  - "Fallback steps use canonical leaf arg schema"
+  - "Hot loops do not await telemetry/ack posts"
 acceptance:
   - id: A1
-    given: "A nearby entity is detected within observation radius"
-    when: "bot-adapter processes the entity"
-    then: "it calls cognition environmental_awareness endpoint with structured payload and receives an LLM-authored thought"
+    given: "task steps with meta.executable true but non-sterling authority"
+    when: "executor runs"
+    then: "steps dispatch successfully without authority gating"
   - id: A2
-    given: "Cognition returns action suggestions for an observation"
-    when: "bot-adapter handles the insight"
-    then: "it respects chat/task throttles and forwards structured tasks to the planning service with observation metadata"
+    given: "collect/mine requirement and Sterling returns []"
+    when: "fallback planner runs"
+    then: "produces multi-step dig_block plan with valid args"
   - id: A3
-    given: "LLM generation times out or produces invalid output"
-    when: "cognition processes the observation"
-    then: "a safe fallback thought is emitted, no unsafe actions are queued, and the failure is logged with metrics"
+    given: "chat/environmental events"
+    when: "cognition post fails or stalls"
+    then: "bot loop remains responsive; errors logged"
 non_functional:
-  a11y:
-    - "Server-side change; ensure dashboard cognitive stream renders new thought metadata without regression"
+  a11y: []
   perf:
-    api_p95_ms: 400
-    lcp_ms: 2500
+    api_p95_ms: 250
   security:
-    - "Scrub sensitive coordinates before logging; no raw auth tokens in prompts"
+    - "No new external inputs without validation"
 contracts:
   - type: openapi
-    path: "contracts/cognition-observation.yaml#/components/schemas/ObservationInsight"
-  - type: openapi
-    path: "contracts/cognition-observation.yaml#/paths/~1process/post"
+    path: "contracts/planning-executor.yaml#/components/schemas/ExecutableStep"
 observability:
   logs:
-    - "cognition.observation.llm_request"
-    - "cognition.observation.fallback"
-    - "minecraft.observation.forwarded"
+    - "executor dispatch source/leaf"
+    - "fallback plan chosen"
   metrics:
-    - "cognition_observation_llm_latency_ms"
-    - "cognition_observation_fallback_total"
-    - "minecraft_observation_tasks_created"
-  traces:
-    - "observation.reasoning.pipeline"
+    - "executor_dispatch_count"
+    - "fallback_plan_count"
+  traces: []
 migrations: []
 rollback:
-  - "Set COGNITION_LLM_OBSERVATION_DISABLED=true to bypass LLM reasoning and revert to deterministic strings"
-  - "Feature flag minecraft interface to skip structured observation payloads via USE_LEGACY_ENTITY_THOUGHTS=true"
+  - "Feature flag to restore authority gate"

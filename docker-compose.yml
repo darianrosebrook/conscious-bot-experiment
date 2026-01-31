@@ -30,13 +30,14 @@ services:
       EULA: "TRUE"
       VERSION: "1.20.1"
       ONLINE_MODE: "FALSE"
-      GAMEMODE: survival
+      GAMEMODE: survival 
       DIFFICULTY: normal
       SPAWN_PROTECTION: "0"
       VIEW_DISTANCE: "10"
       MEMORY: 2G
       ENABLE_COMMAND_BLOCK: "TRUE"
       EXISTING_OPS_FILE: SYNCHRONIZE
+      LEVEL_TYPE: "flat"
     ports:
       - "25565:25565"
     volumes:

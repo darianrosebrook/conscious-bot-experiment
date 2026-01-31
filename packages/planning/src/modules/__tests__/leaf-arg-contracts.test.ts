@@ -149,12 +149,12 @@ describe('normalizeLeafArgs', () => {
 describe('requirementToLeafMeta', () => {
   it('maps collect requirement to dig_block', () => {
     const result = requirementToLeafMeta({ kind: 'collect', patterns: ['oak_log'], quantity: 8 });
-    expect(result).toEqual({ leaf: 'dig_block', args: { blockType: 'oak_log', count: 8 } });
+    expect(result).toEqual({ leaf: 'dig_block', args: { blockType: 'oak_log' } });
   });
 
   it('maps mine requirement to dig_block', () => {
     const result = requirementToLeafMeta({ kind: 'mine', patterns: ['iron_ore'], quantity: 3 });
-    expect(result).toEqual({ leaf: 'dig_block', args: { blockType: 'iron_ore', count: 3 } });
+    expect(result).toEqual({ leaf: 'dig_block', args: { blockType: 'iron_ore' } });
   });
 
   it('maps craft requirement to craft_recipe', () => {
@@ -185,7 +185,7 @@ describe('requirementToLeafMeta', () => {
 
   it('defaults quantity to 1 when not provided', () => {
     const result = requirementToLeafMeta({ kind: 'collect', patterns: ['oak_log'] });
-    expect(result).toEqual({ leaf: 'dig_block', args: { blockType: 'oak_log', count: 1 } });
+    expect(result).toEqual({ leaf: 'dig_block', args: { blockType: 'oak_log' } });
   });
 });
 
@@ -204,18 +204,24 @@ describe('KNOWN_LEAVES', () => {
 });
 
 describe('requirementToFallbackPlan', () => {
-  it('maps collect requirement to 1-step dig_block plan', () => {
+  it('maps collect requirement to multi-step dig_block plan', () => {
     const result = requirementToFallbackPlan({ kind: 'collect', patterns: ['oak_log'], quantity: 8 });
-    expect(result).toEqual([
-      { leaf: 'dig_block', args: { blockType: 'oak_log', count: 8 }, label: 'Collect oak_log' },
-    ]);
+    expect(result).toHaveLength(8);
+    expect(result![0]).toEqual({
+      leaf: 'dig_block',
+      args: { blockType: 'oak_log' },
+      label: 'Collect oak_log (1/8)',
+    });
   });
 
-  it('maps mine requirement to 1-step dig_block plan', () => {
+  it('maps mine requirement to multi-step dig_block plan', () => {
     const result = requirementToFallbackPlan({ kind: 'mine', patterns: ['iron_ore'], quantity: 3 });
-    expect(result).toEqual([
-      { leaf: 'dig_block', args: { blockType: 'iron_ore', count: 3 }, label: 'Mine iron_ore' },
-    ]);
+    expect(result).toHaveLength(3);
+    expect(result![0]).toEqual({
+      leaf: 'dig_block',
+      args: { blockType: 'iron_ore' },
+      label: 'Mine iron_ore (1/3)',
+    });
   });
 
   it('maps craft requirement to 1-step craft plan (prereq injection handles materials)', () => {
@@ -259,6 +265,8 @@ describe('requirementToFallbackPlan', () => {
 
   it('defaults quantity to 1 when not provided', () => {
     const result = requirementToFallbackPlan({ kind: 'collect', patterns: ['oak_log'] });
-    expect(result![0].args.count).toBe(1);
+    expect(result).toEqual([
+      { leaf: 'dig_block', args: { blockType: 'oak_log' }, label: 'Collect oak_log' },
+    ]);
   });
 });

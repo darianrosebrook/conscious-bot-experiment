@@ -27,8 +27,6 @@
     "type-check": "turbo type-check",
     "agent:dev": "pnpm --filter @conscious-bot/agent dev",
     "core:dev": "pnpm --filter @conscious-bot/core dev",
-    "hrm:train": "cd sapient-hrm && python pretrain.py",
-    "hrm:eval": "cd sapient-hrm && python evaluate.py",
     "audit": "node docs/audit/audit-runner.ts",
     "audit:architecture": "node docs/audit/audit-runner.ts architecture",
     "audit:integration": "node docs/audit/audit-runner.ts integration",
@@ -50,6 +48,7 @@
   ],
   "devDependencies": {
     "@types/node": "^20.19.17",
+    "ws": "^8.18.0",
     "@typescript-eslint/eslint-plugin": "^6.21.0",
     "@typescript-eslint/parser": "^6.21.0",
     "concurrently": "^8.2.2",
@@ -71,12 +70,13 @@
     "minecraft",
     "embodied-ai",
     "reasoning",
-    "hrm"
+    "sterling"
   ],
   "author": "@darianrosebrook",
   "license": "MIT",
   "dependencies": {
-    "canvas": "^3.2.0"
+    "canvas": "^3.2.0",
+    "pnpm": "10.15.0"
   },
   "pnpm": {
     "overrides": {

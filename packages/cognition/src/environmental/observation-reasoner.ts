@@ -106,7 +106,7 @@ export class ObservationReasoner {
   constructor(llm: LLMInterface, options: ObservationReasonerOptions = {}) {
     this.llm = llm;
     this.disabled = options.disabled ?? false;
-    this.timeoutMs = options.timeoutMs ?? 15000; // Increased timeout for better reliability
+    this.timeoutMs = options.timeoutMs ?? 35000; // MLX/cold inference can take 20–40s; avoid premature fallback
     this.redactPrecision = options.redactPrecision ?? 0.5;
   }
 
@@ -132,29 +132,42 @@ export class ObservationReasoner {
     const prompt = this.buildPrompt(sanitised);
 
     const startTime = Date.now();
+    const abortController = new AbortController();
+    const timeoutId = setTimeout(
+      () => abortController.abort(),
+      this.timeoutMs
+    );
 
     try {
       console.log(
         `[ObservationReasoner] Calling LLM with prompt: ${prompt.prompt.substring(0, 100)}...`
       );
 
+      const llmPromise = this.llm.generateResponse(prompt.prompt, undefined, {
+        systemPrompt: prompt.system,
+        temperature: 0.35,
+        maxTokens: 512,
+        signal: abortController.signal,
+      });
+      llmPromise.catch(() => {}); // Swallow AbortError when we timeout so no unhandled rejection
+
+      const timeoutPromise = new Promise<LLMResponse>((_, reject) =>
+        setTimeout(
+          () => reject(new Error('LLM observation reasoning timed out')),
+          this.timeoutMs
+        )
+      );
+
       const llmResponse = await Promise.race<LLMResponse>([
-        this.llm.generateResponse(prompt.prompt, undefined, {
-          systemPrompt: prompt.system,
-          temperature: 0.35,
-          maxTokens: 512,
-        }),
-        new Promise<LLMResponse>((_, reject) =>
-          setTimeout(
-            () => reject(new Error('LLM observation reasoning timed out')),
-            this.timeoutMs
-          )
-        ),
+        llmPromise,
+        timeoutPromise,
       ]);
 
       console.log(
         `[ObservationReasoner] LLM response received: ${llmResponse.text.substring(0, 100)}...`
       );
+
+      clearTimeout(timeoutId);
 
       const insight = this.parseLLMResponse(llmResponse.text);
 
@@ -202,6 +215,7 @@ export class ObservationReasoner {
         llmResponse,
       };
     } catch (error) {
+      clearTimeout(timeoutId);
       const reason =
         error instanceof Error ? error.message : 'Unknown observation error';
       console.log(
@@ -276,6 +290,10 @@ export class ObservationReasoner {
     };
   }
 
+  /** Generic fallback when no entity/environment context; used to avoid posting to cognitive stream. */
+  static readonly GENERIC_FALLBACK_THOUGHT =
+    'I remain aware of my surroundings and continue monitoring.';
+
   private buildFallbackThought(payload: ObservationPayload): string {
     if (payload.category === 'entity' && payload.entity) {
       const name = payload.entity.displayName || payload.entity.name;
@@ -292,7 +310,7 @@ export class ObservationReasoner {
       return `Environmental change detected: ${descriptor}. Monitoring situation.`;
     }
 
-    return 'I remain aware of my surroundings and continue monitoring.';
+    return ObservationReasoner.GENERIC_FALLBACK_THOUGHT;
   }
 
   private sanitiseObservation(

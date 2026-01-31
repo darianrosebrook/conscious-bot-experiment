@@ -17,9 +17,6 @@ export { DynamicCreationFlow } from './dynamic-creation-flow';
 export type { ImpasseResult } from './dynamic-creation-flow';
 export type { RegistryStatus, ShadowRunResult } from './types';
 
-// Hybrid HRM Integration
-export { HybridHRMRouter } from './hybrid-hrm-integration';
-
 // Leaf Contract System
 export { createLeafContext } from './leaf-contracts';
 

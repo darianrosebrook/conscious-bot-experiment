@@ -140,6 +140,10 @@ Status: planned (farm layout first; redstone later)
 Proves primitives: Epistemic planning (11), Audit-grade explanations (19), Credit assignment tied to execution, not plans (17) (and Irreversibility and commitment planning (13) if commitment decisions included)
 Status: planned (structure localization via probes)
 
+### Rig I-ext: Entity belief tracking and saliency (epistemic + invariant coupling)
+Proves primitives: Entity belief maintenance and saliency under partial observability (21), Epistemic planning (11), Invariant maintenance (12), Risk-aware planning (10), Representation invariance and state canonicalization (16), Credit assignment tied to execution, not plans (17), Audit-grade explanations (19)
+Status: planned (tracking kernel + delta-gated event bus)
+
 ### Rig J: Invariant maintenance (receding horizon control)
 Proves primitives: Invariant maintenance (12), Multi-objective optimization and preference articulation (18), Credit assignment tied to execution, not plans (17), Audit-grade explanations (19)
 Status: planned (base light/food/tool buffers)
@@ -540,6 +544,94 @@ Status: Planned.
 
 ---
 
+## Rig I-ext: Entity belief tracking and saliency (epistemic + invariant coupling)
+
+A) Primitives and formal signature
+
+Primary:
+- Entity belief maintenance and saliency under partial observability (21)
+
+Also:
+- Epistemic planning (11), Invariant maintenance (12), Risk-aware planning (10), Representation invariance and state canonicalization (16), Credit assignment tied to execution, not plans (17), Audit-grade explanations (19)
+
+Signature:
+- TrackSet: bounded set of track hypotheses (track_id; class belief distribution incl. unknown; kinematic belief with uncertainty; last_seen bucket; visibility mode {visible/inferred/lost}; derived threat/opportunity scores with declared weights)
+- EvidenceBatch: time-stamped evidence with sensor metadata (FOV/LOS, distance, occlusion markers) and association features
+- AttentionBudget: explicit compute + sensing budgets (attention is modeled, not implicit)
+- Operators: TRACK_UPDATE (deterministic association + fusion), DECAY (uncertainty growth; confidence drifts toward unknown), SALIENCY_DIFF (bounded typed deltas with hysteresis + cooldown), ACTIVE_SENSE_REQUEST (turn/scan/reacquire), FIELD_SYNTHESIZE (optional; emits compressed hazard regions, not full grids)
+
+Critical boundary: this rig proves the perception → belief → delta contract, not a specific filter algorithm.
+
+B) Minecraft proving tasks
+
+1) Persistence under occlusion
+Entity enters FOV, leaves behind wall, reappears. Must maintain a single track with decayed uncertainty (no "novel spawn" spam).
+
+2) Association under ID noise (anti-cheat harness)
+Disable or perturb engine entity IDs in the evidence payload for a subset of trials; association must rely on kinematics + features, not ID equality.
+
+3) Saliency gating
+Stable entity for N ticks produces ~0 downstream events after warmup. Only meaningful deltas (closing distance, reclassification, sudden appearance/loss) propagate.
+
+4) Active sensing as first-class action
+If a high-threat track transitions to inferred/lost below threshold, emit a reacquire query (turn/scan/relocate) instead of silently proceeding.
+
+5) Risk propagation and avoidance
+Threat scores produce a compressed hazard summary consumed by navigation/planning (avoid hot zones without LLM-per-tick interpretation).
+
+6) Execution-grounded updates
+If death occurs, only penalize tracking when pre-death evidence indicates a preventable miss (track existed + high confidence + risk budget violation). Otherwise mark cause as unobserved/unknown (no noisy blame).
+
+C) State representation
+
+Canonical planning state must remain compact:
+- Track canonical form: bucketed pose; bucketed velocity; class distribution quantized; recency tier (bucketed last_seen); visibility enum; threat/opportunity buckets
+- Deterministic ordering: sort tracks by track_id for hashing/iteration
+- Boundedness: cap track count; evict lowest priority (threat×recency×relevance) first
+
+Important: provenance is audit data, not state equivalence. Keep evidence ring buffers in the trace bundle, but exclude raw evidence/provenance IDs from the planning state hash.
+
+D) Operators
+
+Evidence ingestion: FOV scan batches, targeted LOS raycast confirmations, proximity/attack events (as evidence), optional audio cues.
+Belief updates: deterministic association, filter update, decay, merge/split rules (bounded), eviction (policy-driven).
+Sensing actions (edges): turn-to(bearing), sector-scan(region), move-to-vantage(position), all explicitly budgeted.
+
+E) Certification gates
+
+Boundedness: TrackSet.size <= TRACK_CAP always; eviction is deterministic under ties.
+Event sparsity: after warmup, events/tick <= MAX_EVENTS_PER_TICK in stable scenes (with hysteresis + cooldowns).
+Uncertainty honesty: when unobserved, class confidence drifts toward unknown and pose uncertainty grows.
+Separation: raw detections never directly create tasks; only SALIENCY_DIFF outputs cross into cognition/planning.
+Determinism: identical evidence streams (after canonical ordering + timestamp bucketing) yield identical TrackSet hash and identical emitted events.
+Anti-ID reliance: association accuracy remains above baseline under ID perturbation harness.
+
+F) Performance measurements
+
+- Track identity persistence (reappearance association rate)
+- Event efficiency (events per tick after warmup)
+- Reacquire success rate (lost high-threat tracks recovered via sensing queries)
+- Safety outcomes (deaths preceded by ignored hazard summary; false positives from stale tracks)
+- Attribution precision (penalties applied only when evidence supports preventability)
+
+G) Transfer tests
+
+Robotics surface: tracks from cone sensors; active sensing as gimbal/path commands; same decay/saliency semantics.
+Security monitoring: actors across intermittent camera coverage; PTZ reacquire as sensing actions; stable scenes emit ~0.
+Infrastructure diagnosis: services/incidents as tracks; probes as evidence; decay by staleness; diagnostic queries as active sensing.
+
+H) Footguns avoided
+
+- Trusting external IDs as ground truth (explicit ID-noise proving task).
+- Mixing audit provenance into canonical state hashing (trace-only provenance).
+- Full-grid risk fields in planning state (use compressed hazard regions).
+- Event storms from threshold jitter (hysteresis + cooldown gates).
+- Penalizing "unknown cause" failures (execution-grounded preventability check).
+
+Status: Planned. Conceptually placed after Rig I, but depends on Rig J's invariant semantics.
+
+---
+
 ## Rig J: Invariant maintenance (non-terminal goals; receding horizon)
 
 A) Primitives and formal signature
@@ -692,7 +784,8 @@ Track 2 (widening representational power once A–C are solid):
 2. Rig E (hierarchical macro/micro)
 3. Rig I (epistemic)
 4. Rig J (invariant maintenance)
-5. Rig K (irreversibility)
+5. Rig I-ext (entity belief tracking)
+6. Rig K (irreversibility)
 
 Later (policy, risk, diagnosis):
 - Rig L → Rig M → Rig N

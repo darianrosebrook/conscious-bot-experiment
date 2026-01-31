@@ -1,7 +1,7 @@
 /**
- * LLM Integration System - Real Ollama integration with HRM principles
+ * LLM Integration System - Real Ollama integration
  *
- * Implements real LLM integration with Ollama, incorporating HRM's dual-system
+ * Implements real LLM integration with Ollama using a dual-system
  * architecture for hierarchical reasoning and option proposal generation.
  *
  * @author @darianrosebrook
@@ -39,7 +39,7 @@ export type LLMCapability =
   | 'narrative_construction';
 
 /**
- * HRM-inspired dual-system reasoning configuration
+ * Dual-system reasoning configuration (abstract planner + detailed executor)
  */
 export interface HRMReasoningConfig {
   // High-level abstract planning (System 2)
@@ -85,7 +85,7 @@ export interface OllamaResponse {
 }
 
 /**
- * LLM reasoning result with HRM structure
+ * LLM reasoning result with dual-system structure
  */
 export interface LLMReasoningResult {
   abstractPlan?: string;
@@ -173,7 +173,7 @@ export const AVAILABLE_MODELS: LLMModel[] = [
 ];
 
 /**
- * Default HRM reasoning configuration
+ * Default dual-system reasoning configuration
  */
 export const DEFAULT_HRM_CONFIG: HRMReasoningConfig = {
   abstractPlanner: {
@@ -314,11 +314,11 @@ export class OllamaClient {
 }
 
 // ============================================================================
-// HRM-Inspired LLM Interface
+// Dual-system LLM Interface
 // ============================================================================
 
 /**
- * HRM-inspired LLM interface with dual-system reasoning
+ * LLM interface with dual-system reasoning (abstract + detailed)
  */
 export class HRMLLMInterface {
   private ollamaClient: OllamaClient;
@@ -335,7 +335,7 @@ export class HRMLLMInterface {
   }
 
   /**
-   * Propose new options using HRM dual-system reasoning
+   * Propose new options using dual-system reasoning
    */
   async proposeOption(request: {
     taskId: string;

@@ -6,9 +6,12 @@
  * Single command to start the entire conscious bot system:
  * - Installs dependencies
  * - Builds all packages
- * - Starts all services
+ * - Starts sidecars (MLX-LM, Sterling when ../sterling exists)
+ * - Starts all pnpm servers (Core, Memory, World, Cognition, Planning, Minecraft Interface, Dashboard)
  * - Provides health monitoring
  * - Handles graceful shutdown
+ *
+ * Sterling: set STERLING_DIR or clone Sterling to ../sterling to enable.
  *
  * @author @darianrosebrook
  */
@@ -20,6 +23,24 @@ import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+const projectRoot = path.dirname(__dirname);
+
+// Sterling repo path (sibling of conscious-bot by default)
+const sterlingDir = path.resolve(
+  projectRoot,
+  process.env.STERLING_DIR || path.join('..', 'sterling')
+);
+const sterlingPython = path.join(sterlingDir, '.venv', 'bin', 'python');
+const sterlingScript = path.join(
+  sterlingDir,
+  'scripts',
+  'utils',
+  'sterling_unified_server.py'
+);
+const sterlingAvailable =
+  fs.existsSync(sterlingDir) &&
+  fs.existsSync(sterlingPython) &&
+  fs.existsSync(sterlingScript);
 
 // Load .env file if present
 const envPath = path.join(path.dirname(__dirname), '.env');
@@ -54,7 +75,7 @@ const colors = {
 };
 
 // Service configuration with startup dependencies
-const services = [
+let services = [
   // Core infrastructure services (start first)
   {
     name: 'Core API',
@@ -140,19 +161,6 @@ const services = [
     priority: 2, // Before Cognition and Memory need it
     dependencies: [],
   },
-  {
-    name: 'Sapient HRM',
-    command: 'bash',
-    args: [
-      '-c',
-      'cd sapient-hrm && ./venv-hrm-py311/bin/python hrm_bridge.py --port 5001',
-    ],
-    port: 5001,
-    healthUrl: 'http://localhost:5001/health',
-    description: 'Python HRM model for hierarchical reasoning',
-    priority: 6, // Start after core services
-    dependencies: [],
-  },
   // Dashboard should start last for monitoring all services
   {
     name: 'Dashboard',
@@ -165,6 +173,22 @@ const services = [
     dependencies: ['Core API', 'Planning', 'Minecraft Interface'],
   },
 ];
+
+if (sterlingAvailable) {
+  services.push({
+    name: 'Sterling',
+    command: sterlingPython,
+    args: [sterlingScript],
+    port: 8766,
+    healthUrl: null, // WebSocket server; use wsUrl for readiness
+    wsUrl: process.env.STERLING_WS_URL || 'ws://127.0.0.1:8766',
+    description:
+      'Sterling symbolic reasoning server (crafting, building, tool progression)',
+    priority: 2,
+    dependencies: [],
+    cwd: sterlingDir,
+  });
+}
 
 // Utility functions
 function log(message, color = colors.reset) {
@@ -204,7 +228,7 @@ function getServiceColor(serviceName) {
     World: colors.magenta,
     Planning: colors.red,
     'MLX-LM Sidecar': colors.purple,
-    'Sapient HRM': colors.cyan,
+    Sterling: colors.cyan,
   };
   return colorMap[serviceName] || colors.reset;
 }
@@ -263,6 +287,95 @@ function killProcessesByPattern(pattern) {
     return true;
   } catch {
     return false;
+  }
+}
+
+async function waitForPort(port, serviceName, maxAttempts = 60) {
+  const net = await import('net');
+  return new Promise((resolve, reject) => {
+    let attempts = 0;
+    const startTime = Date.now();
+
+    const tryConnect = () => {
+      attempts++;
+      const socket = new net.Socket();
+      const timeout = setTimeout(() => {
+        socket.destroy();
+        if (attempts >= maxAttempts) {
+          reject(
+            new Error(
+              `Port ${port} not listening after ${((Date.now() - startTime) / 1000).toFixed(1)}s`
+            )
+          );
+        } else {
+          setTimeout(tryConnect, 2000);
+        }
+      }, 2000);
+
+      socket.connect(port, '127.0.0.1', () => {
+        clearTimeout(timeout);
+        socket.destroy();
+        resolve();
+      });
+      socket.on('error', () => {
+        clearTimeout(timeout);
+        socket.destroy();
+        if (attempts >= maxAttempts) {
+          reject(
+            new Error(
+              `Port ${port} not listening after ${((Date.now() - startTime) / 1000).toFixed(1)}s`
+            )
+          );
+        } else {
+          setTimeout(tryConnect, 2000);
+        }
+      });
+    };
+
+    tryConnect();
+  });
+}
+
+/**
+ * Wait for a WebSocket server to accept connections (proper handshake, then close).
+ * Use for WebSocket-only services (e.g. Sterling) to avoid "invalid HTTP request" errors
+ * that occur when a raw TCP probe connects and closes without sending a handshake.
+ */
+async function waitForWebSocket(wsUrl, serviceName, maxAttempts = 60) {
+  const { default: WebSocket } = await import('ws');
+  const startTime = Date.now();
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      await new Promise((resolve, reject) => {
+        const ws = new WebSocket(wsUrl, { handshakeTimeout: 5000 });
+        const timeout = setTimeout(() => {
+          try {
+            ws.close();
+          } catch (_) {}
+          reject(new Error('timeout'));
+        }, 5000);
+
+        ws.on('open', () => {
+          clearTimeout(timeout);
+          ws.close();
+          resolve();
+        });
+        ws.on('error', (err) => {
+          clearTimeout(timeout);
+          reject(err);
+        });
+      });
+      return;
+    } catch (err) {
+      if (attempt >= maxAttempts) {
+        const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+        throw new Error(
+          `WebSocket ${serviceName} not ready after ${elapsed}s`
+        );
+      }
+      await new Promise((r) => setTimeout(r, 2000));
+    }
   }
 }
 
@@ -334,80 +447,6 @@ async function waitForService(url, serviceName, maxAttempts = 60) {
 
 function wait(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-async function setupPythonEnvironment() {
-  log('\n🐍 Setting up Python 3.11 environment for HRM...', colors.cyan);
-
-  const hrmDir = path.join(process.cwd(), 'sapient-hrm');
-  const venvPath = path.join(hrmDir, 'venv-hrm-py311');
-
-  // Check if Python 3.11 is available
-  try {
-    execSync('python3.11 --version', { stdio: 'ignore' });
-    log(' ✅ Python 3.11 is available', colors.green);
-  } catch {
-    log(
-      ' ❌ Python 3.11 is not available. Please install Python 3.11 first.',
-      colors.red
-    );
-    log('   On macOS: brew install python@3.11', colors.cyan);
-    process.exit(1);
-  }
-
-  // Create virtual environment if it doesn't exist
-  if (!fs.existsSync(venvPath)) {
-    log(' 📦 Creating Python 3.11 virtual environment...', colors.cyan);
-    try {
-      execSync(`cd ${hrmDir} && python3.11 -m venv venv-hrm-py311`, {
-        stdio: 'inherit',
-      });
-      log(' ✅ Virtual environment created', colors.green);
-    } catch (error) {
-      log(' ❌ Failed to create virtual environment', colors.red);
-      process.exit(1);
-    }
-  } else {
-    log(' ✅ Virtual environment already exists', colors.green);
-  }
-
-  // Install Python dependencies
-  log(' 📦 Installing Python dependencies...', colors.cyan);
-  try {
-    execSync(
-      `cd ${hrmDir} && source venv-hrm-py311/bin/activate && pip install --upgrade pip`,
-      {
-        stdio: 'inherit',
-        shell: true,
-      }
-    );
-    execSync(
-      `cd ${hrmDir} && source venv-hrm-py311/bin/activate && pip install -r requirements.txt`,
-      {
-        stdio: 'inherit',
-        shell: true,
-      }
-    );
-    log(' ✅ Python dependencies installed', colors.green);
-  } catch (error) {
-    log(' ❌ Failed to install Python dependencies', colors.red);
-    process.exit(1);
-  }
-
-  // Test HRM import
-  log(' 🔍 Testing HRM model import...', colors.cyan);
-  try {
-    execSync(
-      `cd ${hrmDir} && source venv-hrm-py311/bin/activate && python3.11 -c "from models.hrm.hrm_act_v1 import HierarchicalReasoningModel_ACTV1; print('HRM model import successful')"`,
-      {
-        stdio: 'inherit',
-        shell: true,
-      }
-    );
-    log(' ✅ HRM model import successful', colors.green);
-  } catch (error) {
-    log(' ⚠️  HRM model import failed, will use mock model', colors.yellow);
-  }
 }
 
 async function setupMLXEnvironment() {
@@ -577,13 +616,10 @@ async function main() {
     process.exit(1);
   }
 
-  // Step 3: Setup Python environment
-  await setupPythonEnvironment();
-
-  // Step 3b: Setup MLX-LM sidecar environment
+  // Step 3: Setup MLX-LM sidecar environment
   await setupMLXEnvironment();
 
-  // Step 3c: Start Docker services (Postgres + Minecraft)
+  // Step 3b: Start Docker services (Postgres + Minecraft)
   const skipDocker = process.argv.includes('--skip-docker');
   if (skipDocker) {
     log('\n🐳 Skipping Docker services (--skip-docker)', colors.yellow);
@@ -600,10 +636,9 @@ async function main() {
     'node.*dev.js',
     'pnpm.*dev',
     'minecraft-interface',
-    'python3.*hrm_bridge.py',
-    'hrm_bridge.py',
     'python3.*mlx_server.py',
     'mlx_server.py',
+    'sterling_unified_server.py',
   ];
 
   for (const pattern of processPatterns) {
@@ -657,6 +692,12 @@ async function main() {
 
   // Step 8: Start services in priority order with dependency checking
   log('\n🚀 Starting services in dependency order...', colors.cyan);
+  if (!sterlingAvailable) {
+    log(
+      `  Sterling repo not found at ${sterlingDir}, skipping Sterling service`,
+      colors.yellow
+    );
+  }
   log('');
 
   const processes = [];
@@ -690,13 +731,12 @@ async function main() {
 
     const child = spawn(service.command, service.args, {
       stdio: 'pipe',
-      shell: true,
-      cwd:
-        service.name === 'Sapient HRM'
-          ? `${process.cwd()}/sapient-hrm`
-          : service.name === 'MLX-LM Sidecar'
-            ? `${process.cwd()}/mlx-lm-sidecar`
-            : process.cwd(),
+      shell: service.cwd ? false : true,
+      cwd: service.cwd
+        ? service.cwd
+        : service.name === 'MLX-LM Sidecar'
+          ? `${process.cwd()}/mlx-lm-sidecar`
+          : process.cwd(),
       env: { ...process.env, FORCE_COLOR: '1' },
     });
 
@@ -736,8 +776,14 @@ async function main() {
       const startupDelay = service.priority <= 3 ? 5000 : 3000;
       await wait(startupDelay);
 
-      // Check if service is healthy
-      await waitForService(service.healthUrl, service.name, 30); // 30 attempts = 60 seconds max
+      // Check if service is healthy (HTTP healthUrl, WebSocket wsUrl, or TCP port)
+      if (service.healthUrl) {
+        await waitForService(service.healthUrl, service.name, 30);
+      } else if (service.wsUrl) {
+        await waitForWebSocket(service.wsUrl, service.name, 30);
+      } else if (service.port) {
+        await waitForPort(service.port, service.name, 30);
+      }
 
       // Only mark as started if health check passes
       startedServices.add(service.name);
@@ -769,7 +815,13 @@ async function main() {
   // Check services with improved error handling
   for (const { service } of processes) {
     try {
-      await waitForService(service.healthUrl, service.name);
+      if (service.healthUrl) {
+        await waitForService(service.healthUrl, service.name);
+      } else if (service.wsUrl) {
+        await waitForWebSocket(service.wsUrl, service.name);
+      } else if (service.port) {
+        await waitForPort(service.port, service.name);
+      }
       healthResults.push({ service: service.name, status: 'healthy' });
       logService(service.name, 'Health check passed', 'HEALTH');
     } catch (error) {
@@ -910,41 +962,44 @@ async function main() {
     logWithTimestamp('✅ Readiness broadcast complete', 'SUCCESS', colors.green);
   }
 
-  // Step 10: Check optional external services
+  // Step 10: Check optional external services (Sterling is now started by this script when available)
   log('\n🔍 Checking optional external services...', colors.cyan);
 
-  // Sterling reasoning server (external, not managed by us)
   const sterlingUrl = process.env.STERLING_WS_URL || 'ws://localhost:8766';
-  try {
-    const { default: WS } = await import('ws');
-    await new Promise((resolve, reject) => {
-      const ws = new WS(sterlingUrl, { handshakeTimeout: 3000 });
-      const timer = setTimeout(() => {
-        ws.terminate();
-        reject(new Error('timeout'));
-      }, 4000);
-      ws.on('open', () => {
-        ws.send(JSON.stringify({ command: 'ping' }));
-        ws.on('message', (data) => {
-          try {
-            const msg = JSON.parse(data.toString());
-            if (msg.type === 'pong') {
-              clearTimeout(timer);
-              ws.close();
-              resolve();
-            }
-          } catch {}
+  if (sterlingAvailable) {
+    try {
+      const { default: WS } = await import('ws');
+      await new Promise((resolve, reject) => {
+        const ws = new WS(sterlingUrl, { handshakeTimeout: 3000 });
+        const timer = setTimeout(() => {
+          ws.terminate();
+          reject(new Error('timeout'));
+        }, 4000);
+        ws.on('open', () => {
+          ws.send(JSON.stringify({ command: 'ping' }));
+          ws.on('message', (data) => {
+            try {
+              const msg = JSON.parse(data.toString());
+              if (msg.type === 'pong') {
+                clearTimeout(timer);
+                ws.close();
+                resolve();
+              }
+            } catch {}
+          });
+        });
+        ws.on('error', (err) => {
+          clearTimeout(timer);
+          reject(err);
         });
       });
-      ws.on('error', (err) => {
-        clearTimeout(timer);
-        reject(err);
-      });
-    });
-    log(`  ✅ Sterling reasoning server available at ${sterlingUrl}`, colors.green);
-  } catch {
-    log(`  ℹ️  Sterling reasoning server not available at ${sterlingUrl} (optional)`, colors.yellow);
-    log('     To enable: cd /path/to/sterling && source venv/bin/activate && python scripts/utils/sterling_unified_server.py', colors.cyan);
+      log(`  ✅ Sterling reasoning server available at ${sterlingUrl}`, colors.green);
+    } catch {
+      log(`  ℹ️  Sterling started but not responding at ${sterlingUrl} yet (optional)`, colors.yellow);
+    }
+  } else {
+    log(`  ℹ️  Sterling not started (repo not found at ${sterlingDir})`, colors.yellow);
+    log('     To enable: clone Sterling to ../sterling or set STERLING_DIR', colors.cyan);
   }
 
   // Minecraft server (external or Docker-managed)
@@ -984,8 +1039,9 @@ async function main() {
   logWithTimestamp('📊 Service Status:', 'INFO', colors.blue);
 
   for (const service of services) {
+    const scheme = service.healthUrl == null ? 'ws' : 'http';
     logWithTimestamp(
-      `  ${service.name}:     http://localhost:${service.port}`,
+      `  ${service.name}:     ${scheme}://localhost:${service.port}`,
       'INFO',
       colors.cyan
     );
@@ -1009,11 +1065,6 @@ async function main() {
     colors.cyan
   );
   logWithTimestamp(
-    '  Sapient HRM:   http://localhost:5001',
-    'INFO',
-    colors.cyan
-  );
-  logWithTimestamp(
     '  MLX-LM Sidecar: http://localhost:5002',
     'INFO',
     colors.cyan
@@ -1032,18 +1083,6 @@ async function main() {
   );
   logWithTimestamp(
     '  Get status: curl http://localhost:3005/status',
-    'INFO',
-    colors.cyan
-  );
-  logWithTimestamp('', 'INFO');
-  logWithTimestamp('🧠 HRM Commands:', 'INFO', colors.yellow);
-  logWithTimestamp(
-    '  Health check: curl http://localhost:5001/health',
-    'INFO',
-    colors.cyan
-  );
-  logWithTimestamp(
-    '  Test reasoning: curl -X POST http://localhost:5001/reason -H "Content-Type: application/json" -d \'{"task": "test", "context": {}}\'',
     'INFO',
     colors.cyan
   );

@@ -1,0 +1,32 @@
+openapi: 3.0.3
+info:
+  title: Planning Executor Contracts
+  version: 0.1.0
+components:
+  schemas:
+    ExecutableStep:
+      type: object
+      required: [id, label, meta]
+      properties:
+        id:
+          type: string
+        label:
+          type: string
+        order:
+          type: integer
+        done:
+          type: boolean
+        meta:
+          type: object
+          required: [executable]
+          properties:
+            executable:
+              type: boolean
+            leaf:
+              type: string
+            authority:
+              type: string
+            source:
+              type: string
+            args:
+              type: object

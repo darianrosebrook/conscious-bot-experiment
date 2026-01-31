@@ -25,11 +25,15 @@ export class LLMInterface {
       provider: 'mlx',
       model: 'gemma3n:e2b',
       fallbackModel: 'qwen3:4b',
-      host: 'localhost',
-      port: 5002,
+      host: process.env.COGNITION_LLM_HOST ?? 'localhost',
+      port: process.env.COGNITION_LLM_PORT
+        ? parseInt(process.env.COGNITION_LLM_PORT, 10)
+        : 5002,
       maxTokens: 2048,
       temperature: 0.7,
-      timeout: 30000,
+      timeout: process.env.COGNITION_LLM_TIMEOUT_MS
+        ? parseInt(process.env.COGNITION_LLM_TIMEOUT_MS, 10)
+        : 45000,
       retries: 2,
     };
 
@@ -60,6 +64,7 @@ export class LLMInterface {
       temperature?: number;
       maxTokens?: number;
       systemPrompt?: string;
+      signal?: AbortSignal;
     }
   ): Promise<LLMResponse> {
     if (!prompt?.trim()) {
@@ -81,6 +86,7 @@ export class LLMInterface {
       const response = await this.callOllama(model, fullPrompt, {
         temperature,
         maxTokens,
+        signal: options?.signal,
       });
 
       const endTime = performance.now();
@@ -104,6 +110,10 @@ export class LLMInterface {
         timestamp: Date.now(),
       };
     } catch (error) {
+      // Do not log or retry when caller aborted (e.g. observation timeout)
+      if (error instanceof Error && error.name === 'AbortError') {
+        throw error;
+      }
       console.error('LLM generation failed:', error);
 
       // Retry with exponential backoff
@@ -122,6 +132,7 @@ export class LLMInterface {
           const response = await this.callOllama(model, fullPrompt, {
             temperature,
             maxTokens,
+            signal: options?.signal,
           });
 
           const endTime = performance.now();
@@ -361,6 +372,7 @@ How should I respond?`;
     options: {
       temperature: number;
       maxTokens: number;
+      signal?: AbortSignal;
     }
   ): Promise<any> {
     const requestBody = {
@@ -375,6 +387,8 @@ How should I respond?`;
 
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), this.config.timeout);
+    const onCallerAbort = () => controller.abort();
+    options.signal?.addEventListener('abort', onCallerAbort);
 
     try {
       const response = await fetch(`${this.baseUrl}/api/generate`, {
@@ -387,6 +401,7 @@ How should I respond?`;
       });
 
       clearTimeout(timeoutId);
+      options.signal?.removeEventListener('abort', onCallerAbort);
 
       if (!response.ok) {
         throw new Error(
@@ -397,6 +412,7 @@ How should I respond?`;
       return await response.json();
     } catch (error) {
       clearTimeout(timeoutId);
+      options.signal?.removeEventListener('abort', onCallerAbort);
       throw error;
     }
   }

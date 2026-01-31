@@ -471,7 +471,7 @@ export class BotAdapter extends EventEmitter {
       // Process incoming chat messages through cognition system (but not our own messages)
       if (!isOwnMessage && username !== 'unknown') {
         try {
-          await this.processIncomingChat(username, message);
+          void this.processIncomingChat(username, message);
         } catch (error) {
           console.error('❌ Failed to process incoming chat:', error);
         }
@@ -1073,7 +1073,7 @@ export class BotAdapter extends EventEmitter {
             newBlock?.position &&
             this.isWithinObservationRadius(newBlock.position)
           ) {
-            await this.processEnvironmentalEvent('block_break', {
+            void this.processEnvironmentalEvent('block_break', {
               oldBlock: oldBlock?.name || 'unknown',
               newBlock: newBlock?.name || 'unknown',
               position: newBlock?.position || { x: 0, y: 0, z: 0 },
@@ -1096,7 +1096,7 @@ export class BotAdapter extends EventEmitter {
               collected?.position &&
               this.isWithinObservationRadius(collected.position)
             ) {
-              await this.processEnvironmentalEvent('item_pickup', {
+              void this.processEnvironmentalEvent('item_pickup', {
                 item: collected.name || 'unknown',
                 count: collected.count || 1,
                 position: collected.position || { x: 0, y: 0, z: 0 },
@@ -1121,14 +1121,14 @@ export class BotAdapter extends EventEmitter {
           // Only process significant health changes
           if (Math.abs(currentHealth - lastHealth) >= 2) {
             if (currentHealth < lastHealth) {
-              await this.processEnvironmentalEvent('health_loss', {
+              void this.processEnvironmentalEvent('health_loss', {
                 previousHealth: lastHealth,
                 currentHealth: currentHealth,
                 maxHealth: maxHealth,
                 damage: lastHealth - currentHealth,
               });
             } else if (currentHealth > lastHealth) {
-              await this.processEnvironmentalEvent('health_gain', {
+              void this.processEnvironmentalEvent('health_gain', {
                 previousHealth: lastHealth,
                 currentHealth: currentHealth,
                 maxHealth: maxHealth,

@@ -1,0 +1,444 @@
+{
+  "generated_at": "2026-01-31T03:12:55.197952+00:00",
+  "source": {
+    "path": "run.log",
+    "total_lines": 11448
+  },
+  "span": {
+    "start": "2026-01-31T02:50:23.254000+00:00",
+    "end": "2026-01-31T02:53:31.607000+00:00",
+    "duration_s": 188.353
+  },
+  "totals": {
+    "records": 11412,
+    "timestamped_lines": 72,
+    "unscoped_lines": 10380
+  },
+  "top_messages": [
+    {
+      "message": "\ud83e\udded executeNavigate called with target: <n>, <n>, <n>",
+      "count": 736,
+      "first_ts": "2026-01-31T02:51:24.141000+00:00",
+      "last_ts": "2026-01-31T02:51:27.769000+00:00",
+      "duration_s": 3.628,
+      "rate_per_min": 12171.99558985667,
+      "components": [
+        {
+          "component": "UNSCOPED",
+          "count": 723
+        },
+        {
+          "component": "Minecraft Interface",
+          "count": 13
+        }
+      ]
+    },
+    {
+      "message": "\ud83d\udd0d ActionTranslator state: {",
+      "count": 735,
+      "first_ts": "2026-01-31T02:51:24.141000+00:00",
+      "last_ts": "2026-01-31T02:51:27.769000+00:00",
+      "duration_s": 3.628,
+      "rate_per_min": 12155.457552370452,
+      "components": [
+        {
+          "component": "UNSCOPED",
+          "count": 720
+        },
+        {
+          "component": "Minecraft Interface",
+          "count": 15
+        }
+      ]
+    },
+    {
+      "message": "\ud83e\udded Using D* Lite navigation to target: <n>, <n>, <n>",
+      "count": 735,
+      "first_ts": "2026-01-31T02:51:24.141000+00:00",
+      "last_ts": "2026-01-31T02:51:27.769000+00:00",
+      "duration_s": 3.628,
+      "rate_per_min": 12155.457552370452,
+      "components": [
+        {
+          "component": "UNSCOPED",
+          "count": 730
+        },
+        {
+          "component": "Minecraft Interface",
+          "count": 5
+        }
+      ]
+    },
+    {
+      "message": "\u274c D* Lite navigation failed: Already navigating",
+      "count": 734,
+      "first_ts": "2026-01-31T02:51:27.769000+00:00",
+      "last_ts": "2026-01-31T02:51:27.769000+00:00",
+      "duration_s": 0.0,
+      "rate_per_min": null,
+      "components": [
+        {
+          "component": "UNSCOPED",
+          "count": 725
+        },
+        {
+          "component": "Minecraft Interface",
+          "count": 9
+        }
+      ]
+    },
+    {
+      "message": "\ud83d\udeab No line-of-sight to creeper at distance <n> - ignoring",
+      "count": 57,
+      "first_ts": "2026-01-31T02:51:10.774000+00:00",
+      "last_ts": "2026-01-31T02:51:27.769000+00:00",
+      "duration_s": 16.995,
+      "rate_per_min": 201.23565754633717,
+      "components": [
+        {
+          "component": "UNSCOPED",
+          "count": 29
+        },
+        {
+          "component": "Minecraft Interface",
+          "count": 28
+        }
+      ]
+    },
+    {
+      "message": "\ud83d\udd0d [MINECRAFT INTERFACE] Got connected bot, mapping state...",
+      "count": 38,
+      "first_ts": "2026-01-31T02:51:06.768000+00:00",
+      "last_ts": "2026-01-31T02:51:27.769000+00:00",
+      "duration_s": 21.001,
+      "rate_per_min": 108.56625874958334,
+      "components": [
+        {
+          "component": "Minecraft Interface",
+          "count": 38
+        }
+      ]
+    },
+    {
+      "message": "```json",
+      "count": 38,
+      "first_ts": "2026-01-31T02:51:10.774000+00:00",
+      "last_ts": "2026-01-31T02:51:27.769000+00:00",
+      "duration_s": 16.995,
+      "rate_per_min": 134.15710503089144,
+      "components": [
+        {
+          "component": "UNSCOPED",
+          "count": 38
+        }
+      ]
+    },
+    {
+      "message": "<n>.<n> - - [<n>/Jan/<n> <n>:<n>:<n>] \"POST /api/generate HTTP/<n>\" <n> -",
+      "count": 33,
+      "first_ts": "2026-01-31T02:51:10.774000+00:00",
+      "last_ts": "2026-01-31T02:51:27.769000+00:00",
+      "duration_s": 16.995,
+      "rate_per_min": 116.50485436893204,
+      "components": [
+        {
+          "component": "MLX-LM Sidecar",
+          "count": 33
+        }
+      ]
+    },
+    {
+      "message": "WorldStateManager poll failed (stale snapshot preserved): This operation was aborted",
+      "count": 33,
+      "first_ts": "2026-01-31T02:51:27.769000+00:00",
+      "last_ts": "2026-01-31T02:51:27.769000+00:00",
+      "duration_s": 0.0,
+      "rate_per_min": null,
+      "components": [
+        {
+          "component": "Planning",
+          "count": 33
+        }
+      ]
+    },
+    {
+      "message": "POST /api/ws/cognitive-stream received: {",
+      "count": 32,
+      "first_ts": "2026-01-31T02:51:14.635000+00:00",
+      "last_ts": "2026-01-31T02:51:27.769000+00:00",
+      "duration_s": 13.134,
+      "rate_per_min": 146.18547281863863,
+      "components": [
+        {
+          "component": "Dashboard",
+          "count": 32
+        }
+      ]
+    },
+    {
+      "message": "\ud83e\udde0 Entity thought: \"I notice a iron_golem <n> blocks away\"",
+      "count": 31,
+      "first_ts": "2026-01-31T02:51:10.774000+00:00",
+      "last_ts": "2026-01-31T02:51:27.769000+00:00",
+      "duration_s": 16.995,
+      "rate_per_min": 109.44395410414828,
+      "components": [
+        {
+          "component": "Minecraft Interface",
+          "count": 19
+        },
+        {
+          "component": "UNSCOPED",
+          "count": 12
+        }
+      ]
+    },
+    {
+      "message": "Processing environmental_awareness request: {",
+      "count": 31,
+      "first_ts": "2026-01-31T02:51:10.774000+00:00",
+      "last_ts": "2026-01-31T02:51:27.769000+00:00",
+      "duration_s": 16.995,
+      "rate_per_min": 109.44395410414828,
+      "components": [
+        {
+          "component": "Cognition",
+          "count": 31
+        }
+      ]
+    },
+    {
+      "message": "Processing environmental awareness: {",
+      "count": 31,
+      "first_ts": "2026-01-31T02:51:10.774000+00:00",
+      "last_ts": "2026-01-31T02:51:27.769000+00:00",
+      "duration_s": 16.995,
+      "rate_per_min": 109.44395410414828,
+      "components": [
+        {
+          "component": "Cognition",
+          "count": 25
+        },
+        {
+          "component": "UNSCOPED",
+          "count": 6
+        }
+      ]
+    },
+    {
+      "message": "Details: {",
+      "count": 31,
+      "first_ts": "2026-01-31T02:51:10.774000+00:00",
+      "last_ts": "2026-01-31T02:51:27.769000+00:00",
+      "duration_s": 16.995,
+      "rate_per_min": 109.44395410414828,
+      "components": [
+        {
+          "component": "UNSCOPED",
+          "count": 31
+        }
+      ]
+    },
+    {
+      "message": "POST /api/ws/cognitive-stream <n> in <n>ms",
+      "count": 31,
+      "first_ts": "2026-01-31T02:51:14.635000+00:00",
+      "last_ts": "2026-01-31T02:51:27.769000+00:00",
+      "duration_s": 13.134,
+      "rate_per_min": 141.6171767930562,
+      "components": [
+        {
+          "component": "Dashboard",
+          "count": 31
+        }
+      ]
+    },
+    {
+      "message": "\ud83d\udeab No line-of-sight to zombie at distance <n> - ignoring",
+      "count": 30,
+      "first_ts": "2026-01-31T02:51:10.774000+00:00",
+      "last_ts": "2026-01-31T02:51:27.769000+00:00",
+      "duration_s": 16.995,
+      "rate_per_min": 105.9135039717564,
+      "components": [
+        {
+          "component": "UNSCOPED",
+          "count": 26
+        },
+        {
+          "component": "Minecraft Interface",
+          "count": 4
+        }
+      ]
+    },
+    {
+      "message": "\ud83d\udeab No line-of-sight to skeleton at distance <n> - ignoring",
+      "count": 29,
+      "first_ts": "2026-01-31T02:51:10.774000+00:00",
+      "last_ts": "2026-01-31T02:51:27.769000+00:00",
+      "duration_s": 16.995,
+      "rate_per_min": 102.38305383936452,
+      "components": [
+        {
+          "component": "UNSCOPED",
+          "count": 22
+        },
+        {
+          "component": "Minecraft Interface",
+          "count": 7
+        }
+      ]
+    },
+    {
+      "message": "[ObservationReasoner] Calling LLM with prompt: Observation: General environmental awareness",
+      "count": 22,
+      "first_ts": "2026-01-31T02:51:10.774000+00:00",
+      "last_ts": "2026-01-31T02:51:27.769000+00:00",
+      "duration_s": 16.995,
+      "rate_per_min": 77.66990291262135,
+      "components": [
+        {
+          "component": "Cognition",
+          "count": 22
+        }
+      ]
+    },
+    {
+      "message": "[ObservationReasoner] LLM response received: ",
+      "count": 19,
+      "first_ts": "2026-01-31T02:51:10.774000+00:00",
+      "last_ts": "2026-01-31T02:51:27.769000+00:00",
+      "duration_s": 16.995,
+      "rate_per_min": 67.07855251544572,
+      "components": [
+        {
+          "component": "Cognition",
+          "count": 19
+        }
+      ]
+    },
+    {
+      "message": "[AuditLogger] No active session, entry not logged",
+      "count": 18,
+      "first_ts": "2026-01-31T02:51:10.774000+00:00",
+      "last_ts": "2026-01-31T02:51:27.769000+00:00",
+      "duration_s": 16.995,
+      "rate_per_min": 63.54810238305384,
+      "components": [
+        {
+          "component": "Cognition",
+          "count": 18
+        }
+      ]
+    },
+    {
+      "message": "Stopping service...",
+      "count": 18,
+      "first_ts": "2026-01-31T02:53:31.426000+00:00",
+      "last_ts": "2026-01-31T02:53:31.428000+00:00",
+      "duration_s": 0.002,
+      "rate_per_min": 540000.0,
+      "components": [
+        {
+          "component": "Core API",
+          "count": 2
+        },
+        {
+          "component": "Memory",
+          "count": 2
+        },
+        {
+          "component": "World",
+          "count": 2
+        },
+        {
+          "component": "MLX-LM Sidecar",
+          "count": 2
+        },
+        {
+          "component": "Cognition",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "message": "\u2705 Entity processed by cognition system: {",
+      "count": 17,
+      "first_ts": "2026-01-31T02:51:14.635000+00:00",
+      "last_ts": "2026-01-31T02:51:27.769000+00:00",
+      "duration_s": 13.134,
+      "rate_per_min": 77.66103243490178,
+      "components": [
+        {
+          "component": "Minecraft Interface",
+          "count": 17
+        }
+      ]
+    },
+    {
+      "message": "\ud83d\udc40 Detected <n> nearby entities",
+      "count": 16,
+      "first_ts": "2026-01-31T02:51:10.774000+00:00",
+      "last_ts": "2026-01-31T02:51:27.769000+00:00",
+      "duration_s": 16.995,
+      "rate_per_min": 56.487202118270076,
+      "components": [
+        {
+          "component": "Minecraft Interface",
+          "count": 16
+        }
+      ]
+    },
+    {
+      "message": "\ud83e\udde0 Localized threat assessment: <n> threats, level: low",
+      "count": 16,
+      "first_ts": "2026-01-31T02:51:10.774000+00:00",
+      "last_ts": "2026-01-31T02:51:27.769000+00:00",
+      "duration_s": 16.995,
+      "rate_per_min": 56.487202118270076,
+      "components": [
+        {
+          "component": "UNSCOPED",
+          "count": 16
+        }
+      ]
+    },
+    {
+      "message": "\u23f0 Autonomous executor timer fired...",
+      "count": 15,
+      "first_ts": "2026-01-31T02:51:06.768000+00:00",
+      "last_ts": "2026-01-31T02:51:27.769000+00:00",
+      "duration_s": 21.001,
+      "rate_per_min": 42.85510213799343,
+      "components": [
+        {
+          "component": "Planning",
+          "count": 15
+        }
+      ]
+    }
+  ],
+  "dstar_summary": {
+    "using_dstar": {
+      "count": 735,
+      "first_ts": "2026-01-31T02:51:24.141000+00:00",
+      "last_ts": "2026-01-31T02:51:27.769000+00:00",
+      "duration_s": 3.628,
+      "rate_per_min": 12155.457552370452
+    },
+    "execute_navigate": {
+      "count": 736,
+      "first_ts": "2026-01-31T02:51:24.141000+00:00",
+      "last_ts": "2026-01-31T02:51:27.769000+00:00",
+      "duration_s": 3.628,
+      "rate_per_min": 12171.99558985667
+    },
+    "already_navigating": {
+      "count": 734,
+      "first_ts": "2026-01-31T02:51:27.769000+00:00",
+      "last_ts": "2026-01-31T02:51:27.769000+00:00",
+      "duration_s": 0.0,
+      "rate_per_min": null
+    }
+  }
+}

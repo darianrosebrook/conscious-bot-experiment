@@ -21,7 +21,7 @@ This section extends the "why" behind each architectural choice and makes the ha
 
 ## Architectural Thesis
 
-* **Hybrid reasoning is not optional**: Minecraft is a mixed environment—structured subgoals (HTN/HRM), dynamic physics (GOAP-style repair), and ambiguous social/creative work (LLM). Each approach has known blind spots; the router's job is to keep us within the convex hull of their strengths.
+* **Hybrid reasoning is not optional**: Minecraft is a mixed environment—structured subgoals (HTN, Sterling), dynamic physics (GOAP-style repair), and ambiguous social/creative work (LLM). Each approach has known blind spots; the router's job is to keep us within the convex hull of their strengths.
 * **Plans are only potential energy**: The only thing that matters is whether a plan reliably **activates** into world-changing actions. Our core job is to turn "intent" into a **serializable, testable, interruptible action stream**.
 * **Safety is an end-to-end property**: Input filters, route constraints, execution guards, and post-hoc provenance together form our "defense-in-depth." No single layer carries the whole burden.
 
@@ -124,7 +124,7 @@ type Intent = {
 
 **Design Rationale**
 
-* Normalization here lets **Cognitive Task Router** compare apples to apples across HRM/HTN/LLM options.
+* Normalization here lets **Cognitive Task Router** compare apples to apples across Sterling/HTN/LLM options.
 * Safety gating early ("allowed: boolean") reduces wasted planner cycles.
 
 ---
@@ -576,7 +576,7 @@ Our design follows a **hierarchical cognitive architecture** inspired by researc
 
 1. **Separation of Concerns**: Each layer has a distinct responsibility, making the system easier to understand, test, and maintain.
 
-2. **Robustness Through Redundancy**: Multiple reasoning systems (HTN, HRM, LLM) ensure the bot can adapt when one approach fails.
+2. **Robustness Through Redundancy**: Multiple reasoning systems (HTN, Sterling, LLM) ensure the bot can adapt when one approach fails.
 
 3. **Learning Integration**: Memory systems are embedded throughout, enabling continuous improvement rather than static behavior.
 
@@ -589,10 +589,10 @@ Our design follows a **hierarchical cognitive architecture** inspired by researc
 - **Alternative considered**: Direct LLM integration (rejected due to lack of safety filtering)
 - **Key benefit**: Allows systematic testing of the bot's ability to handle both helpful and harmful suggestions
 
-**Multi-Modal Planning (HTN + HRM + LLM)**
+**Multi-Modal Planning (HTN + Sterling + LLM)**
 - **Why multiple systems**: No single planning approach works for all scenarios:
   - HTN excels at structured, hierarchical tasks with clear subtasks
-  - HRM provides reliable logic for navigation and resource optimization
+  - Sterling provides reliable logic for crafting, building, and tool progression; HTN for navigation and resource optimization
   - LLM handles creative, social, and ambiguous situations
 - **Routing strategy**: Cognitive Task Router selects based on task characteristics and historical performance
 
@@ -850,7 +850,7 @@ const enhancedThought = {
 
 **Routing matrix (sketch)**
 
-| Feature / Task traits                    | HRM | HTN | LLM | Collaborative | Fast Path |
+| Feature / Task traits                    | Sterling | HTN | LLM | Collaborative | Fast Path |
 | ---------------------------------------- | :-: | :-: | :-: | :-----------: | :-------: |
 | Deterministic navigation                 |  ✓  |  –  |  –  |       –       |     –     |
 | Multi-step crafting/building             |  –  |  ✓  |  –  |       –       |     –     |
@@ -861,7 +861,7 @@ const enhancedThought = {
 
 **Memory-conditioned priors**
 
-* If **HTN Memory Manager** shows low success for method M in biome B at night, reduce its prior; prefer HRM/LLM or alternate HTN method bindings.
+* If **HTN Memory Manager** shows low success for method M in biome B at night, reduce its prior; prefer Sterling/LLM or alternate HTN method bindings.
 
 ## How Components Work Together
 
@@ -877,7 +877,7 @@ External Suggestions → Intrusive Thought Processor → Task Bootstrapper → N
 
 3. **Intelligent Routing**: CognitiveTaskRouter analyzes the task and selects the appropriate reasoning system:
    - **HTN Planner** for structured, hierarchical tasks
-   - **HRM Planner** for navigation and resource optimization
+   - **Sterling** for crafting/building/tool progression; **HTN** for navigation and resource optimization
    - **LLM Reasoning** for creative or social tasks
    - **Fast Path** for emergencies
 
@@ -901,10 +901,10 @@ External Suggestions → Intrusive Thought Processor → Task Bootstrapper → N
 
 3. **Task Routing**:
    - Health crisis triggers Fast Path routing
-   - CognitiveTaskRouter selects HRM Planner for reliable shelter construction
+   - CognitiveTaskRouter selects Sterling/HTN for reliable shelter construction
 
 4. **Planning**:
-   - HRM Planner creates sequence: find shelter → build basic protection → gather minimal wood
+   - Planner creates sequence: find shelter → build basic protection → gather minimal wood
    - HTN Planner breaks this into subtasks with effectiveness tracking
 
 5. **Execution**:
@@ -990,7 +990,7 @@ Our system uses **event-driven architecture** for loose coupling between compone
 | Task Type | Reasoning System | Why This Choice |
 |-----------|-----------------|-----------------|
 | **Structured tasks** (build shelter, gather resources) | HTN Planner | Reliable decomposition into proven subtasks |
-| **Navigation/puzzles** | HRM Planner | Logic-based spatial reasoning with predictable outcomes |
+| **Navigation/puzzles** | Sterling/HTN | Logic-based spatial reasoning with predictable outcomes |
 | **Creative/social tasks** | LLM Reasoning | Natural language understanding and creative problem-solving |
 | **Ethical dilemmas** | Collaborative | Combines structured logic with narrative understanding |
 | **Emergencies** | Fast Path | Pre-defined responses for time-critical situations |
@@ -1095,7 +1095,7 @@ The system demonstrates that complex autonomous behavior can be achieved through
 * **Symptom**: Alternating "goal\_reached/path\_stop" without net motion.
 * **Likely cause**: Goal tolerance too tight; dynamic obstacles.
 * **Detect**: > 3 reversals within 10s.
-* **Fix**: Expand tolerance; switch to "approach + raycast check"; drop to HRM nav.
+* **Fix**: Expand tolerance; switch to "approach + raycast check"; drop to Sterling/HTN nav.
 
 **FM-05: Double-Dispatch**
 

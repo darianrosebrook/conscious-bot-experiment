@@ -711,7 +711,11 @@ export class DigBlockLeaf implements LeafImpl {
       } else if (blockType || expect) {
         const namePattern = String(blockType || expect);
         const origin = bot.entity.position.clone();
-        // Simple expanding cube search up to 10 blocks
+        const eyePos = origin.offset(0, bot.entity.height ?? 1.62, 0);
+        const hasLineOfSight = (ctx as any).hasLineOfSight as
+          | ((obs: { x: number; y: number; z: number }, tgt: { x: number; y: number; z: number }) => boolean)
+          | undefined;
+        // Expanding cube search: prefer blocks the bot can actually see (no digging through dirt/stone)
         outer: for (let r = 1; r <= 10; r++) {
           for (let dx = -r; dx <= r; dx++) {
             for (let dy = -r; dy <= r; dy++) {
@@ -719,6 +723,14 @@ export class DigBlockLeaf implements LeafImpl {
                 const p = origin.offset(dx, dy, dz);
                 const b = bot.blockAt(p);
                 if (b && b.name && b.name.includes(namePattern)) {
+                  if (hasLineOfSight) {
+                    const blockCenter = {
+                      x: p.x + 0.5,
+                      y: p.y + 0.5,
+                      z: p.z + 0.5,
+                    };
+                    if (!hasLineOfSight(eyePos, blockCenter)) continue;
+                  }
                   resolvedPos = p;
                   break outer;
                 }
@@ -792,6 +804,34 @@ export class DigBlockLeaf implements LeafImpl {
             timeouts: 0,
           },
         };
+      }
+
+      // Do not dig blocks the bot cannot see (occluded by dirt, stone, etc.)
+      const hasLineOfSight = (ctx as any).hasLineOfSight as
+        | ((obs: { x: number; y: number; z: number }, tgt: { x: number; y: number; z: number }) => boolean)
+        | undefined;
+      if (hasLineOfSight) {
+        const eyePos = bot.entity.position.offset(0, bot.entity.height ?? 1.62, 0);
+        const blockCenter = {
+          x: targetPos.x + 0.5,
+          y: targetPos.y + 0.5,
+          z: targetPos.z + 0.5,
+        };
+        if (!hasLineOfSight(eyePos, blockCenter)) {
+          return {
+            status: 'failure',
+            error: {
+              code: 'world.invalidPosition',
+              retryable: true,
+              detail: 'Block not visible (occluded); cannot dig through obstacles',
+            },
+            metrics: {
+              durationMs: ctx.now() - startTime,
+              retries: 0,
+              timeouts: 0,
+            },
+          };
+        }
       }
 
       // Equip appropriate tool if specified

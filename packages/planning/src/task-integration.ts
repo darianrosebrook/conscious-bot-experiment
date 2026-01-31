@@ -36,6 +36,8 @@ interface CognitiveThought {
     intensity?: number;
     llmConfidence?: number;
     model?: string;
+    /** Observation fallback; do not convert to tasks */
+    fallback?: boolean;
   };
   id: string;
   timestamp: number;
@@ -92,6 +94,9 @@ class CognitiveStreamClient {
     return recentThoughts.filter((thought) => {
       // Skip already processed thoughts
       if (thought.processed) return false;
+
+      // Skip observation fallbacks; they are non-actionable and would spam the task queue
+      if (thought.metadata?.fallback === true) return false;
 
       // Only process thoughts from last 5 minutes
       if (now - thought.timestamp > 5 * 60 * 1000) return false;
@@ -187,6 +192,14 @@ export interface Task {
     blockedReason?: string;
     /** Tracks how many times prerequisite injection has been attempted (capped at 3). */
     prereqInjectionCount?: number;
+    /** When blockedReason is set due to missing leaf binding, details of the step that failed. */
+    lastBindingFailure?: {
+      stepId: string;
+      order: number;
+      leaf?: string;
+      authority?: string;
+      at: number;
+    };
   };
 }
 
@@ -2330,7 +2343,7 @@ Reply with exactly: {"kind":"...","target":"...","quantity":N}`,
     switch (leaf) {
       case 'dig_block': {
         const item = produces[0];
-        return { blockType: item?.name || 'oak_log', count: item?.count || 1 };
+        return { blockType: item?.name || 'oak_log' };
       }
       case 'craft_recipe': {
         const output = produces[0];

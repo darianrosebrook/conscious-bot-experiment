@@ -126,7 +126,7 @@ export function requirementToLeafMeta(
     case 'mine': {
       const blockType = requirement.patterns?.[0];
       if (!blockType) return null;
-      const args = { blockType, count: requirement.quantity || 1 };
+      const args = { blockType };
       const err = validateLeafArgs('dig_block', args);
       return err ? null : { leaf: 'dig_block', args };
     }
@@ -150,6 +150,7 @@ export function requirementToLeafMeta(
 }
 
 /** Maps requirement → fallback plan steps. Returns null if no valid mapping exists.
+ *  Collect/mine plans emit repeated dig_block steps (capped) for quantity.
  *  Craft plans are single-step (craft only); the executor's prereq injection
  *  handles missing materials via recipe introspection at execution time. */
 export function requirementToFallbackPlan(
@@ -159,10 +160,16 @@ export function requirementToFallbackPlan(
   if (requirement.kind === 'collect' || requirement.kind === 'mine') {
     const blockType = requirement.patterns?.[0];
     if (!blockType) return null;
-    const args = { blockType, count: requirement.quantity || 1 };
+    const maxSteps = 8;
+    const desired = requirement.quantity || 1;
+    const count = Math.max(1, Math.min(desired, maxSteps));
+    const args = { blockType };
     if (validateLeafArgs('dig_block', args)) return null; // invalid args
-    return [{ leaf: 'dig_block', args,
-      label: `${requirement.kind === 'mine' ? 'Mine' : 'Collect'} ${blockType}` }];
+    return Array.from({ length: count }, (_, idx) => ({
+      leaf: 'dig_block',
+      args: { blockType },
+      label: `${requirement.kind === 'mine' ? 'Mine' : 'Collect'} ${blockType}${count > 1 ? ` (${idx + 1}/${count})` : ''}`,
+    }));
   }
 
   if (requirement.kind === 'craft') {
