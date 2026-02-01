@@ -1326,11 +1326,9 @@ class ConsciousBotMCPServer extends Server {
           Math.max(0, totalSlots - normalizedItems.length);
 
         const snapshot = {
-          position:
-            worldState.player?.position ??
+          position: worldState.player?.position ??
             worldState.playerPosition ??
-            worldState.agentPosition ??
-            { x: 0, y: 64, z: 0 },
+            worldState.agentPosition ?? { x: 0, y: 64, z: 0 },
           biome: worldState.biome || 'plains',
           time: worldState.timeOfDay ?? worldState.time ?? 0,
           lightLevel: worldState.lightLevel ?? 15,

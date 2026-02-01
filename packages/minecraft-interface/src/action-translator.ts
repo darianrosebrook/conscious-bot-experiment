@@ -1039,7 +1039,10 @@ export class ActionTranslator {
 
       // Try to use the leaf system first
       const craftRecipeLeaf = leafFactory.get('craft_recipe');
-      if (craftRecipeLeaf && (craftRecipeLeaf as any)?.spec?.placeholder !== true) {
+      if (
+        craftRecipeLeaf &&
+        (craftRecipeLeaf as any)?.spec?.placeholder !== true
+      ) {
         try {
           // Create leaf context
           const context = {
@@ -2935,9 +2938,14 @@ export class ActionTranslator {
     action: MinecraftAction,
     timeout: number
   ): Promise<{ success: boolean; data?: any; error?: string }> {
-    const { message } = action.parameters;
+    let { message } = action.parameters;
 
     try {
+      // Cap outbound chat length
+      if (message && message.length > 256) {
+        const lastSpace = message.slice(0, 256).lastIndexOf(' ');
+        message = lastSpace > 180 ? message.slice(0, lastSpace) + '...' : message.slice(0, 253) + '...';
+      }
       await this.bot.chat(message);
       return {
         success: true,

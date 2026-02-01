@@ -733,7 +733,9 @@ export class EnvironmentalDetector extends EventEmitter {
     const biomes = BiomeDatabase.getAllBiomes().length; // Using this as proxy
     const dimensions = DimensionDatabase.getAllDimensions().length;
     const weatherPatterns = this.weatherPredictor['weatherPatterns'].size;
-    const hazards = Object.keys((this.hazardDetector as any)['hazardSeverity'] ?? {}).length;
+    const hazards = Object.keys(
+      (this.hazardDetector as any)['hazardSeverity'] ?? {}
+    ).length;
 
     return {
       biomesAnalyzed: biomes,

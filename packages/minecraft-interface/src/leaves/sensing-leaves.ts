@@ -333,7 +333,13 @@ export class ChatLeaf implements LeafImpl {
       }
 
       // Format message with target if specified
-      const formattedMessage = target ? `/msg ${target} ${message}` : message;
+      let formattedMessage = target ? `/msg ${target} ${message}` : message;
+
+      // Cap outbound chat length
+      if (formattedMessage.length > 256) {
+        const lastSpace = formattedMessage.slice(0, 256).lastIndexOf(' ');
+        formattedMessage = lastSpace > 180 ? formattedMessage.slice(0, lastSpace) + '...' : formattedMessage.slice(0, 253) + '...';
+      }
 
       // Send the message
       await bot.chat(formattedMessage);

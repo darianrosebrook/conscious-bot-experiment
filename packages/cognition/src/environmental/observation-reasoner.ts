@@ -2,6 +2,9 @@ import { LLMInterface, LLMResponse } from '../cognitive-core/llm-interface';
 import { getLLMConfig } from '../config/llm-token-config';
 import { z } from 'zod';
 import { auditLogger } from '../audit/thought-action-audit-logger';
+import { logStressAtBoundary } from '../stress-boundary-logger';
+import { getInteroState } from '../interoception-store';
+import { buildStressContext } from '../stress-axis-computer';
 
 const Vec3Schema = z.object({
   x: z.number(),
@@ -133,11 +136,15 @@ export class ObservationReasoner {
     }
 
     const sanitised = this.sanitiseObservation(parsed);
-    const prompt = this.buildPrompt(sanitised);
+    const stressContext = buildStressContext(getInteroState().stressAxes);
+    const prompt = this.buildPrompt(sanitised, stressContext);
 
     const startTime = Date.now();
     const abortController = new AbortController();
-    const abortTimeoutId = setTimeout(() => abortController.abort(), this.timeoutMs);
+    const abortTimeoutId = setTimeout(
+      () => abortController.abort(),
+      this.timeoutMs
+    );
 
     try {
       console.log(
@@ -198,6 +205,10 @@ export class ObservationReasoner {
           duration: Date.now() - startTime,
         }
       );
+
+      logStressAtBoundary('observation_thought', {
+        thoughtSummary: insight.thought.text.slice(0, 200),
+      });
 
       return {
         observationId,
@@ -403,7 +414,7 @@ export class ObservationReasoner {
     };
   }
 
-  private buildPrompt(sanitised: SanitisedObservation) {
+  private buildPrompt(sanitised: SanitisedObservation, stressContext?: string) {
     const system = `
 Take the observation and decide what stands out most.
 
@@ -431,8 +442,9 @@ Rules:
 - No extra keys. No text outside JSON.
 `.trim();
 
+    const situationLine = stressContext ? `\nCurrent situation: ${stressContext}` : '';
     const prompt = `Observation: ${sanitised.summary}
-Details: ${JSON.stringify(sanitised.details, null, 2)}
+Details: ${JSON.stringify(sanitised.details, null, 2)}${situationLine}
 
 Generate your JSON response:`;
 

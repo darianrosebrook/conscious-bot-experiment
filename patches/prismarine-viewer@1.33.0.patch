@@ -50,6 +50,68 @@ index 89454526bd0c58e167fa4cc787cf1892ea26297f..510e545e62a86a8f8398df13fb8218a6
  
      this.mesh = new THREE.Object3D()
      for (const [name, jsonModel] of Object.entries(e.geometry)) {
+diff --git a/viewer/lib/utils.web.js b/viewer/lib/utils.web.js
+index 72d715b90ee64aa339159de4b2e3471180c02266..03b5d5ba1ca716182746b24b0db1c77ad3e61875 100644
+--- a/viewer/lib/utils.web.js
++++ b/viewer/lib/utils.web.js
+@@ -2,25 +2,49 @@
+ const THREE = require('three')
+ 
+ const textureCache = {}
+-function loadTexture (texture, cb) {
+-  if (!textureCache[texture]) {
+-    textureCache[texture] = new THREE.TextureLoader().load(texture)
++function loadTexture (url, cb) {
++  const resolved = url.startsWith('/') ? url : (typeof window !== 'undefined' && window.location ? new URL(url, window.location.origin).pathname : '/' + url.replace(/^\//, ''))
++  if (textureCache[resolved]) {
++    cb(textureCache[resolved])
++    return
+   }
+-  cb(textureCache[texture])
++  if (textureCache[resolved] === null) {
++    cb(null)
++    return
++  }
++  const loader = new THREE.TextureLoader()
++  loader.load(
++    resolved,
++    (tex) => {
++      textureCache[resolved] = tex
++      cb(tex)
++    },
++    undefined,
++    (err) => {
++      console.warn('[prismarine-viewer] Texture load failed:', resolved, err)
++      textureCache[resolved] = null
++      cb(null)
++    }
++  )
+ }
+ 
+ function loadJSON (url, callback) {
++  const resolved = url.startsWith('/') ? url : (typeof window !== 'undefined' && window.location ? new URL(url, window.location.origin).pathname : '/' + url.replace(/^\//, ''))
+   const xhr = new XMLHttpRequest()
+-  xhr.open('GET', url, true)
++  xhr.open('GET', resolved, true)
+   xhr.responseType = 'json'
+   xhr.onload = function () {
+-    const status = xhr.status
+-    if (status === 200) {
++    if (xhr.status === 200) {
+       callback(xhr.response)
+     } else {
+-      throw new Error(url + ' not found')
++      console.warn('[prismarine-viewer] JSON load failed:', resolved, xhr.status)
++      callback(null)
+     }
+   }
++  xhr.onerror = function () {
++    console.warn('[prismarine-viewer] JSON load error:', resolved)
++    callback(null)
++  }
+   xhr.send()
+ }
+ 
 diff --git a/viewer/lib/viewer.js b/viewer/lib/viewer.js
 index db02d904690f4066555dbea72b00dd11fbd99640..b63729acd40c6b4e059c74ab22e224cab2295128 100644
 --- a/viewer/lib/viewer.js
@@ -126,3 +188,71 @@ index db02d904690f4066555dbea72b00dd11fbd99640..b63729acd40c6b4e059c74ab22e224ca
      this.domElement.addEventListener('pointerdown', (evt) => {
        const raycaster = new THREE.Raycaster()
        const mouse = new THREE.Vector2()
+diff --git a/viewer/lib/worldrenderer.js b/viewer/lib/worldrenderer.js
+index 744224a71ec6d73b3da405df9f8a5fdd55dfbd66..4b6891684b482140bf118933bde025de7bb7d84d 100644
+--- a/viewer/lib/worldrenderer.js
++++ b/viewer/lib/worldrenderer.js
+@@ -21,7 +21,14 @@ class WorldRenderer {
+     this.blockStatesData = undefined
+     this.texturesDataUrl = undefined
+ 
+-    this.material = new THREE.MeshLambertMaterial({ vertexColors: true, transparent: true, alphaTest: 0.1 })
++    this.material = new THREE.MeshPhongMaterial({
++      vertexColors: true,
++      transparent: true,
++      alphaTest: 0.1,
++      specular: 0x333333,
++      shininess: 15,
++      flatShading: false
++    })
+ 
+     this.workers = []
+     for (let i = 0; i < numWorkers; i++) {
+@@ -87,24 +94,39 @@ class WorldRenderer {
+   }
+ 
+   updateTexturesData () {
+-    loadTexture(this.texturesDataUrl || `textures/${this.version}.png`, texture => {
++    const url = this.texturesDataUrl || `/textures/${this.version}.png`
++    loadTexture(url, texture => {
++      if (!texture) return
+       texture.magFilter = THREE.NearestFilter
+       texture.minFilter = THREE.NearestFilter
+       texture.flipY = false
++      texture.generateMipmaps = false
+       this.material.map = texture
+     })
+ 
+     const loadBlockStates = () => {
+-      return new Promise(resolve => {
++      return new Promise((resolve, reject) => {
+         if (this.blockStatesData) return resolve(this.blockStatesData)
+-        return loadJSON(`blocksStates/${this.version}.json`, resolve)
++        const blockStatesUrl = `/blocksStates/${this.version}.json`
++        loadJSON(blockStatesUrl, (data) => {
++          if (data) {
++            this.blockStatesData = data
++            resolve(data)
++          } else {
++            reject(new Error('blocksStates load failed: ' + blockStatesUrl))
++          }
++        })
+       })
+     }
+-    loadBlockStates().then((blockStates) => {
+-      for (const worker of this.workers) {
+-        worker.postMessage({ type: 'blockStates', json: blockStates })
+-      }
+-    })
++    loadBlockStates()
++      .then((blockStates) => {
++        for (const worker of this.workers) {
++          worker.postMessage({ type: 'blockStates', json: blockStates })
++        }
++      })
++      .catch((err) => {
++        console.warn('[prismarine-viewer] blocksStates load failed:', err)
++      })
+   }
+ 
+   addColumn (x, z, chunk) {

@@ -1,0 +1,23 @@
+{
+  "name": "@conscious-bot/testkits",
+  "version": "0.1.0",
+  "description": "Conformance test kits for Sterling primitive capsule contracts",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "type-check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@conscious-bot/planning": "workspace:*"
+  },
+  "peerDependencies": {
+    "vitest": "^3.2.x"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.0.0",
+    "vitest": "^3.2.4"
+  }
+}

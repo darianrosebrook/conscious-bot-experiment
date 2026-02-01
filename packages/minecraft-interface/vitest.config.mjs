@@ -16,6 +16,7 @@ export default defineConfig({
     alias: {
       '@conscious-bot/core': path.resolve(__dirname, '../core/dist'),
       '@conscious-bot/planning': path.resolve(__dirname, '../planning/dist'),
+      '@conscious-bot/testkits': path.resolve(__dirname, '../testkits'),
     },
   },
 });

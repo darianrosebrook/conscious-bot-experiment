@@ -11,7 +11,9 @@ const fs = require('fs');
 function run() {
   try {
     const webpack = require('webpack');
-    const pvRoot = path.dirname(require.resolve('prismarine-viewer/package.json'));
+    const pvRoot = path.dirname(
+      require.resolve('prismarine-viewer/package.json')
+    );
     const configPath = path.join(pvRoot, 'webpack.config.js');
     if (!fs.existsSync(configPath)) return;
     process.chdir(pvRoot);

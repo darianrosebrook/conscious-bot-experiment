@@ -194,3 +194,148 @@ components:
           enum: [llm, fallback]
         metadata:
           type: object
+    # ── Saliency Delta Stream Contract ───────────────────────────
+    SaliencyDeltaRequest:
+      type: object
+      required: [request_version, type, bot_id, stream_id, seq, tick_id, saliency_events]
+      description: >-
+        Belief-stream envelope sent by minecraft-interface at 1Hz.
+        Routes via request_version discriminator to the saliency reasoner.
+      properties:
+        request_version:
+          type: string
+          const: saliency_delta
+        type:
+          type: string
+          const: environmental_awareness
+        bot_id:
+          type: string
+          description: >-
+            Stable bot identity (e.g. 'bot-steve'). Does not change across
+            restarts. Used by cognition to key per-bot state without regex
+            parsing of stream_id.
+        stream_id:
+          type: string
+          description: >-
+            Ephemeral stream identity. Changes on every bot instantiation
+            (e.g. 'bot-steve-1', 'bot-steve-2'). Cognition uses (bot_id, stream_id)
+            to detect restarts.
+        seq:
+          type: integer
+          description: Monotonically increasing sequence number per stream_id.
+        tick_id:
+          type: integer
+          description: Monotonic tick counter from the belief ingestion loop.
+        snapshot:
+          $ref: '#/components/schemas/TrackSetSnapshot'
+        saliency_events:
+          type: array
+          items:
+            $ref: '#/components/schemas/SaliencyDelta'
+    SaliencyDelta:
+      type: object
+      required: [type, trackId, classLabel, threatLevel, distBucket]
+      properties:
+        type:
+          type: string
+          enum: [new_threat, track_lost, reclassified, movement_bucket_change]
+        trackId:
+          type: string
+          description: Content-addressed track identifier.
+        classLabel:
+          type: string
+        threatLevel:
+          type: string
+          enum: [none, low, medium, high, critical]
+        distBucket:
+          type: integer
+        prev:
+          type: object
+          properties:
+            threatLevel:
+              type: string
+              enum: [none, low, medium, high, critical]
+            distBucket:
+              type: integer
+        track:
+          $ref: '#/components/schemas/TrackSummary'
+          description: >-
+            Full track state, included on new_threat so cognition can hydrate
+            without waiting for the next snapshot. Required for new_threat deltas;
+            absence is treated as a schema violation (fail-closed).
+    LineOfSight:
+      type: string
+      enum: [visible, occluded, unknown]
+      description: Line-of-sight evidence quality vocabulary.
+    EvidenceItem:
+      type: object
+      required: [engineId, kind, kindEnum, posBucketX, posBucketY, posBucketZ, distBucket, los]
+      properties:
+        engineId:
+          type: integer
+        kind:
+          type: string
+        kindEnum:
+          type: integer
+        posBucketX:
+          type: integer
+        posBucketY:
+          type: integer
+        posBucketZ:
+          type: integer
+        distBucket:
+          type: integer
+        los:
+          $ref: '#/components/schemas/LineOfSight'
+        features:
+          type: object
+          additionalProperties: true
+    TrackSetSnapshot:
+      type: object
+      required: [tickId, tracks]
+      properties:
+        tickId:
+          type: integer
+        tracks:
+          type: array
+          items:
+            $ref: '#/components/schemas/TrackSummary'
+    TrackSummary:
+      type: object
+      required: [trackId, classLabel, kindEnum, posBucketX, posBucketY, posBucketZ, distBucket, visibility, threatLevel, confidence, firstSeenTick, lastSeenTick]
+      properties:
+        trackId:
+          type: string
+        classLabel:
+          type: string
+        kindEnum:
+          type: integer
+        posBucketX:
+          type: integer
+        posBucketY:
+          type: integer
+        posBucketZ:
+          type: integer
+        distBucket:
+          type: integer
+        visibility:
+          type: string
+          enum: [visible, inferred, lost]
+        threatLevel:
+          type: string
+          enum: [none, low, medium, high, critical]
+        confidence:
+          type: number
+          minimum: 0
+          maximum: 1
+        pUnknown:
+          type: number
+          minimum: 0
+          maximum: 1
+          description: >-
+            Classification uncertainty: probability mass representing
+            "don't know what this is". When > 0.5, threatLevel drops to 'none'.
+        firstSeenTick:
+          type: integer
+        lastSeenTick:
+          type: integer

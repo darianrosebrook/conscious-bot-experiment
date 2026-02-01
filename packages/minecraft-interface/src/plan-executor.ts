@@ -197,7 +197,8 @@ export class PlanExecutor extends EventEmitter {
       // TODO(rig-planning): Replace with proper Sterling solver integration when planning rigs are implemented.
       if (!this.currentPlan) {
         // Check if this is the legacy retired case (expected) vs actual planning failure
-        const isLegacyRetired = (planningResult as any).isLegacyRetired === true;
+        const isLegacyRetired =
+          (planningResult as any).isLegacyRetired === true;
         const errorMsg = isLegacyRetired
           ? 'Legacy planning retired — awaiting rig implementation'
           : planningResult.error || 'No plan available for execution';

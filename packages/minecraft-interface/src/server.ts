@@ -290,7 +290,9 @@ function startThoughtGeneration() {
           // Send status thought only when the cycle had at least one step, to avoid flooding the cognitive stream when there is no plan
           if (result.executedSteps > 0) {
             const worldState =
-              minecraftInterface.observationMapper.mapBotStateToPlanningContext(bot);
+              minecraftInterface.observationMapper.mapBotStateToPlanningContext(
+                bot
+              );
             const healthPct = Math.round(
               ((worldState.worldState?.health ?? 0) / 20) * 100
             );
@@ -306,7 +308,9 @@ function startThoughtGeneration() {
           // INTERMEDIATE FIX: Throttle "no plan" log messages to once per minute
           // TODO(rig-planning): Remove this throttling when proper planning rigs are implemented
           const now = Date.now();
-          const isLegacyRetired = result.error?.includes('Legacy planning retired');
+          const isLegacyRetired = result.error?.includes(
+            'Legacy planning retired'
+          );
           if (isLegacyRetired) {
             // Only log legacy retired message once per minute
             if (now - lastNoPlanLogTime >= NO_PLAN_LOG_THROTTLE_MS) {
@@ -464,6 +468,18 @@ function setupBotStateWebSocket() {
     });
     broadcastBotStateUpdate('respawned', data);
 
+    // Halve stress axes in cognition (sleep/respawn reset)
+    const cognitionUrl =
+      process.env.COGNITION_SERVICE_URL || 'http://localhost:3003';
+    resilientFetch(`${cognitionUrl}/stress/reset`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ spawnPosition: data.position }),
+      label: 'cognition/stress-reset',
+    }).catch((err) => {
+      console.warn('Failed to call cognition stress reset:', err);
+    });
+
     // Restart thought generation when bot respawns
     console.log('Bot respawned, restarting thought generation...');
     startThoughtGeneration();
@@ -473,11 +489,31 @@ function setupBotStateWebSocket() {
   if (hudUpdateInterval) {
     clearInterval(hudUpdateInterval);
   }
-  hudUpdateInterval = setInterval(() => {
+  const cognitionUrlForHud =
+    process.env.COGNITION_SERVICE_URL || 'http://localhost:3003';
+  hudUpdateInterval = setInterval(async () => {
     if (minecraftInterface) {
       try {
         const state = minecraftInterface.botAdapter.getStatus();
         if (state?.data?.worldState) {
+          let intero: {
+            stress?: number;
+            focus?: number;
+            curiosity?: number;
+          } | undefined;
+          try {
+            const r = await fetch(`${cognitionUrlForHud}/state`, {
+              signal: AbortSignal.timeout(1000),
+            });
+            if (r.ok) {
+              const c = (await r.json()) as {
+                intero?: { stress?: number; focus?: number; curiosity?: number };
+              };
+              if (c?.intero) intero = c.intero;
+            }
+          } catch {
+            // Ignore; use derived values if cognition unavailable
+          }
           const hudData = {
             health: state.data.worldState.player?.health ?? 0,
             food: state.data.worldState.player?.food ?? 0,
@@ -487,6 +523,7 @@ function setupBotStateWebSocket() {
             achievement: state.data.currentState?.achievement || 0.4,
             curiosity: state.data.currentState?.curiosity || 0.6,
             creativity: state.data.currentState?.creativity || 0.5,
+            intero,
           };
 
           console.log('Sending periodic HUD update:', hudData);
@@ -502,22 +539,43 @@ function setupBotStateWebSocket() {
     }
   }, 5000);
 
-  // Push bot state to dashboard so SSE clients get updates without dashboard polling
+  // Push bot state to dashboard so SSE clients get updates without dashboard polling.
+  // Include cognition intero so stress meter reflects real backend values.
   const dashboardUrl = process.env.DASHBOARD_URL || 'http://localhost:3000';
+  const cognitionUrl =
+    process.env.COGNITION_SERVICE_URL || 'http://localhost:3003';
   if (dashboardPushInterval) clearInterval(dashboardPushInterval);
   dashboardPushInterval = setInterval(async () => {
     if (!minecraftInterface) return;
     try {
-      const r = await fetch(`http://localhost:${port}/state`, {
-        signal: AbortSignal.timeout(2000),
-      });
-      if (!r.ok) return;
-      const data = (await r.json()) as { success?: boolean; data?: unknown };
+      const [mcRes, cognitionRes] = await Promise.all([
+        fetch(`http://localhost:${port}/state`, {
+          signal: AbortSignal.timeout(2000),
+        }),
+        fetch(`${cognitionUrl}/state`, {
+          signal: AbortSignal.timeout(1500),
+        }).catch(() => null),
+      ]);
+      if (!mcRes.ok) return;
+      const data = (await mcRes.json()) as { success?: boolean; data?: unknown };
       if (!data?.success || !data?.data) return;
+      let cognition: {
+        intero?: { stress?: number; focus?: number; curiosity?: number };
+      } | null = null;
+      if (cognitionRes?.ok) {
+        try {
+          const c = (await cognitionRes.json()) as {
+            intero?: { stress?: number; focus?: number; curiosity?: number };
+          };
+          if (c?.intero) cognition = c;
+        } catch {
+          // Ignore parse errors
+        }
+      }
       await fetch(`${dashboardUrl}/api/ws/bot-state`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ data }),
+        body: JSON.stringify({ data, cognition }),
         signal: AbortSignal.timeout(3000),
       });
     } catch {
@@ -900,9 +958,7 @@ async function registerCoreLeaves() {
     for (const leaf of allLeaves) {
       const result = leafFactory.register(leaf);
       if (result.ok) {
-        console.log(
-          `Registered leaf: ${leaf.spec.name}@${leaf.spec.version}`
-        );
+        console.log(`Registered leaf: ${leaf.spec.name}@${leaf.spec.version}`);
       } else {
         console.warn(
           `⚠️ Failed to register leaf: ${leaf.spec.name}@${leaf.spec.version}: ${result.error}`
@@ -1210,7 +1266,13 @@ app.post('/chat', async (req, res) => {
     }
 
     // Format message with target if specified
-    const formattedMessage = target ? `/msg ${target} ${message}` : message;
+    let formattedMessage = target ? `/msg ${target} ${message}` : message;
+
+    // Cap outbound chat length
+    if (formattedMessage.length > 256) {
+      const lastSpace = formattedMessage.slice(0, 256).lastIndexOf(' ');
+      formattedMessage = lastSpace > 180 ? formattedMessage.slice(0, lastSpace) + '...' : formattedMessage.slice(0, 253) + '...';
+    }
 
     // Send the chat message
     await bot.chat(formattedMessage);
@@ -1312,6 +1374,22 @@ app.get('/safety', (req, res) => {
   }
 });
 
+// Detect current biome from mineflayer bot world data
+function detectBiome(bot: any): string {
+  try {
+    const pos = bot.entity?.position;
+    if (!pos) return 'unknown';
+    const biomeId = (bot.world as any).getBiome?.(pos);
+    if (typeof biomeId === 'number') {
+      const mcDataModule = require('minecraft-data');
+      const mcData = (mcDataModule.default || mcDataModule)(bot.version);
+      const biomeData = mcData?.biomes?.[biomeId];
+      if (biomeData?.name) return biomeData.name;
+    }
+  } catch { /* fall through */ }
+  return 'unknown';
+}
+
 // Get bot state
 app.get('/state', async (req, res) => {
   try {
@@ -1333,9 +1411,7 @@ app.get('/state', async (req, res) => {
       // Only log once per minute to avoid spam
       const now = Date.now();
       if (!global.lastStateLog || now - global.lastStateLog > 60000) {
-        console.log(
-          '[MINECRAFT INTERFACE] Bot not connected, returning 503'
-        );
+        console.log('[MINECRAFT INTERFACE] Bot not connected, returning 503');
         global.lastStateLog = now;
       }
       return res.status(503).json({
@@ -1476,7 +1552,8 @@ app.get('/state', async (req, res) => {
       });
     }
 
-    // Convert to format expected by cognition system
+    // Convert to format expected by cognition system — use real ws fields
+    const biome = detectBiome(bot);
     const convertedState = {
       worldState: {
         player: {
@@ -1487,18 +1564,22 @@ app.get('/state', async (req, res) => {
           },
           health: ws.health,
           food: ws.hunger,
-          experience: 0, // Not in the converted state
-          gameMode: 'survival', // Default
-          dimension: 'overworld', // Default
+          experience: ws._minecraftState?.player?.experience ?? 0,
+          gameMode: ws._minecraftState?.player?.gameMode ?? 'survival',
+          dimension: ws._minecraftState?.player?.dimension ?? 'overworld',
         },
         environment: {
-          timeOfDay:
-            gameState.timeConstraints?.urgency === 'night' ? 18000 : 6000,
-          weather: 'clear',
-          biome: 'plains',
+          timeOfDay: ws.timeOfDay,
+          weather: ws.weather,
+          biome,
+          nearbyLogs: ws.nearbyLogs ?? 0,
+          nearbyOres: ws.nearbyOres ?? 0,
+          nearbyWater: ws.nearbyWater ?? 0,
+          nearbyHostiles: ws.nearbyHostiles ?? 0,
+          nearbyPassives: ws.nearbyPassives ?? 0,
         },
-        nearbyEntities: [],
-        nearbyBlocks: [],
+        nearbyEntities: (ws._minecraftState?.environment?.nearbyEntities ?? []).slice(0, 10),
+        nearbyBlocks: [],  // keep empty — block list is large and not needed by cognition
       },
       status: 'connected',
       data: {
@@ -1510,6 +1591,16 @@ app.get('/state', async (req, res) => {
         health: ws.health,
         food: ws.hunger,
         inventory: inventoryState,
+        // Environment data surfaced for cognition to read directly
+        timeOfDay: ws.timeOfDay,
+        weather: ws.weather,
+        biome,
+        dimension: ws._minecraftState?.player?.dimension ?? 'overworld',
+        nearbyHostiles: ws.nearbyHostiles ?? 0,
+        nearbyPassives: ws.nearbyPassives ?? 0,
+        nearbyLogs: ws.nearbyLogs ?? 0,
+        nearbyOres: ws.nearbyOres ?? 0,
+        nearbyWater: ws.nearbyWater ?? 0,
       },
       isAlive: ws.health > 0,
     };

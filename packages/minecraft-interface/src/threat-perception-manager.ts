@@ -50,8 +50,7 @@ export class ThreatPerceptionManager {
   private losSuppressedByType = new Map<string, number>();
   private lastLosSummaryAt = 0;
   private losSummaryIntervalMs = 5000;
-  private observationLogDebug =
-    process.env.OBSERVATION_LOG_DEBUG === '1';
+  private observationLogDebug = process.env.OBSERVATION_LOG_DEBUG === '1';
 
   constructor(
     bot: Bot,
@@ -204,8 +203,9 @@ export class ThreatPerceptionManager {
 
   /**
    * Check line-of-sight using the world package's raycasting system.
+   * Public for use as evidence enrichment by entity belief system.
    */
-  private async checkLineOfSight(targetPos: Vec3): Promise<boolean> {
+  async checkLineOfSight(targetPos: Vec3): Promise<boolean> {
     const observer = this.getEyePosition();
     const orientation = this.getOrientation();
     const rayLength = targetPos.distanceTo(observer);
@@ -254,8 +254,9 @@ export class ThreatPerceptionManager {
 
   /**
    * Calculate threat level with contextual factors.
+   * Public for use as evidence enrichment by entity belief system.
    */
-  private calculateContextualThreatLevel(
+  calculateContextualThreatLevel(
     entity: any,
     distance: number,
     botHealth: number

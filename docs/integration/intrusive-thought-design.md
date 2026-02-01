@@ -16,13 +16,17 @@ Links point to the implementing file and line(s). Update this section as impleme
 | **Dashboard: accept provenance, persist on thoughts** | Implemented | [packages/dashboard/src/app/api/ws/cognitive-stream/route.ts](packages/dashboard/src/app/api/ws/cognitive-stream/route.ts#L797-L854) – extract provenance, intrusive dedup by canonical content + 8 min |
 | **Dashboard: types (provenance, Interoception)** | Implemented | [packages/dashboard/src/types/index.ts](packages/dashboard/src/types/index.ts#L14-L23) – `Interoception` (stress, focus, curiosity); [L39](packages/dashboard/src/types/index.ts#L39) – `Thought.provenance` |
 | **Dashboard: UI display CoT vs Intrusive** | Implemented | Store and hooks use `provenance`; UI can filter/label (see dashboard store and cognitive-stream route). |
-| **Consideration step (accept/resist before task)** | Not implemented | Desired in [§2.3 Current vs desired flow](#23-current-vs-desired-flow) |
-| **Stress / interoception backend (cognition)** | Not implemented | Design in [§3.2 Desired: Single Source of Truth](#32-desired-single-source-of-truth-for-stress-and-interoception), [§3.3 Multi-Axis Stress Model](#33-multi-axis-stress-model-gating-not-poor-choices-signal) |
-| **Stress updates from intrusive-thought outcome** | Not implemented | After resist → decrease stress; accept + detrimental/beneficial → adjust (see [§3.2](#32-desired-single-source-of-truth-for-stress-and-interoception)) |
-| **Cognition `/state` exposes intero (stress axes)** | Not implemented | Dashboard bot-state should consume from cognition `/state` (see [§3.2](#32-desired-single-source-of-truth-for-stress-and-interoception)) |
-| **Sleep reset / halve stress axes** | Not implemented | [§3.3](#33-multi-axis-stress-model-gating-not-poor-choices-signal) |
-| **Hexagonal grid stress heatmap (dashboard)** | Not implemented | [§4.3 Stress state: hexagonal grid heatmap](#43-stress-state-hexagonal-grid-heatmap-dashboard); reference: agent-agency `HexagonHeatmap.tsx` |
-| **Observational research: log stress at decision boundaries** | Not implemented | [§3.3 Observational research tracking](#33-multi-axis-stress-model-gating-not-poor-choices-signal) |
+| **Consideration step (accept/resist before task)** | Implemented | [packages/cognition/src/server.ts](packages/cognition/src/server.ts#L1589-L1627) – `runConsiderationStep`; gated by `ENABLE_CONSIDERATION_STEP=true`; resist returns early with `recorded: true` |
+| **Stress / interoception backend (cognition)** | Implemented | [packages/cognition/src/interoception-store.ts](packages/cognition/src/interoception-store.ts) – 6-axis `StressAxes` interface, weighted composite, `setStressAxes`, `decayStressAxes`, `setStressAxis`; [packages/cognition/src/server.ts](packages/cognition/src/server.ts) GET `/state` includes `intero` with `stressAxes` |
+| **Stress axis computer (world state → axes)** | Implemented | [packages/cognition/src/stress-axis-computer.ts](packages/cognition/src/stress-axis-computer.ts) – `computeStressAxes`, `blendAxes`, `buildStressContext`, `buildWorldStateSnapshot`; integrated in cognition server periodic thought loop |
+| **Stress updates from intrusive-thought outcome** | Implemented | [packages/cognition/src/interoception-store.ts](packages/cognition/src/interoception-store.ts) `updateStressFromIntrusion` targets `stressAxes.situational`; recomputes composite |
+| **Cognition `/state` exposes intero (stress axes)** | Implemented | [packages/cognition/src/server.ts](packages/cognition/src/server.ts) – `intero: getInteroState()` returns `stress`, `focus`, `curiosity`, `stressAxes` |
+| **Dashboard bot-state consumes intero** | Implemented | [packages/dashboard/src/app/api/ws/bot-state/route.ts](packages/dashboard/src/app/api/ws/bot-state/route.ts) `buildBotStatePayload`; fallback includes `stressAxes` defaults |
+| **Sleep reset / halve stress axes** | Implemented | [packages/cognition/src/server.ts](packages/cognition/src/server.ts) POST `/stress/reset` accepts `spawnPosition`, resets `msSinceLastRest`; `halveStressAxes()` gives time/healthHunger 0.3x, others 0.5x; [packages/minecraft-interface/src/server.ts](packages/minecraft-interface/src/server.ts) forwards `spawnPosition` on `respawned` |
+| **Hexagonal grid stress heatmap (dashboard)** | Implemented | [packages/dashboard/src/components/stress-hex-heatmap.tsx](packages/dashboard/src/components/stress-hex-heatmap.tsx) – 6-sector mapping by dominant axis when `stressAxes` present; axis labels around perimeter; fallback to focus-based sectors |
+| **Stress context in LLM prompts** | Implemented | [packages/cognition/src/stress-axis-computer.ts](packages/cognition/src/stress-axis-computer.ts) `buildStressContext` → natural-language fragments (never says "stress"); injected into: observation-reasoner, thought-generator (idle + social), consideration step, periodic thought loop |
+| **Stress meter uses real cognition intero** | Implemented | [packages/minecraft-interface/src/server.ts](packages/minecraft-interface/src/server.ts) – dashboard push and hud_update include cognition intero; [packages/dashboard/src/app/page.tsx](packages/dashboard/src/app/page.tsx) – hud_update prefers `hudData.intero` when present |
+| **Observational research: log stress at decision boundaries** | Implemented | [packages/cognition/src/stress-boundary-logger.ts](packages/cognition/src/stress-boundary-logger.ts) – `logStressAtBoundary` includes `axisVector: [time, situational, healthHunger, resource, protection, locationDistance]` for CSV extraction |
 
 ---
 
@@ -87,7 +91,7 @@ So for the bot: we should **nudge** it to decide what to do with the thought (ac
 ### 3.1 Current Architecture
 
 - **Health:** Source of truth is the Minecraft bot (`bot.health` 0–20). It flows from minecraft-interface (bot-adapter emits `health_changed`, `/state` returns `worldState.player.health`) to cognition (observation payloads include `bot.health`) and to the dashboard (bot-state route fetches minecraft `/state` and builds `vitals.health`). Health is used for survival logic, observation context, and HUD display.
-- **Stress (and interoception):** Only in dashboard types (`Interoception`: stress, focus, curiosity). The dashboard bot-state route **hardcodes** `intero: { stress: 20, focus: 80, curiosity: 75 }`; there is no backend that stores or updates stress. The dashboard also derives stress from minecraft `hud_update` (e.g. `(1 - safety) * 100`) when that event is received, but the main bot-state SSE/JSON path uses the hardcoded intero.
+- **Stress (and interoception):** Cognition owns interoception in [interoception-store.ts](packages/cognition/src/interoception-store.ts). The dashboard receives real intero from: (1) bot-state SSE/JSON route (fetches cognition `/state`), (2) minecraft-interface push to dashboard (includes cognition), (3) hud_update over WebSocket (includes cognition intero when available). Falls back to derived values from safety/curiosity or defaults only when cognition is unavailable.
 - **Cognition `/state`:** Returns cognitiveCore, constitutionalFilter, intrusionInterface, selfModel, socialCognition—no vitals, no interoception. So cognition does not currently expose or own stress.
 
 ### 3.2 Desired: Single Source of Truth for Stress (and Interoception)
@@ -123,7 +127,14 @@ Stress must **not** be presented to the bot as "you are stressed, therefore make
 
 Implementation reference: `agent-agency/apps/agent_management_dashboard/src/components/HexagonHeatmap.tsx` (axial coords, `hexRing`/`hexSpiral`, `hexPath`, color by value). Adapt so that (1) value per hex = dwell frequency or visit count for that state, (2) one hex is marked as "current" with a distinct outline (e.g. `strokeWidth` and/or `stroke` color).
 
-**Internal representation (unchanged):** The bot still receives the six axes as structured context (e.g. `{ timeStress: 0.2, situationalStress: 0.8, healthStress: 0.1, ... }`), not a single "stress level." Prompts describe the situation (e.g. "Low on food, far from spawn, no immediate threats") rather than "You are stressed." Each axis is 0 (calm) to 1 (high stress). For gating, pass the full vector; for the hex grid, derive current cell from the vector and accumulate dwell/visit counts per cell for the heat styling.
+**Current hex grid axes (dashboard):** The live heatmap is implemented in [packages/dashboard/src/components/stress-hex-heatmap.tsx](packages/dashboard/src/components/stress-hex-heatmap.tsx). It uses two dimensions:
+
+- **Radial (center to edge):** **Composite stress** 0–100 (weighted mean of 6 axes). Ring 0 = stress 0–19 (center), ring 1 = 20–39, ring 2 = 40–59, ring 3 = 60–79, ring 4 = 80–100 (edge). Center = lowest stress band.
+- **Angular (6 directions on each ring):** When `stressAxes` is available, sector is determined by the **dominant axis** (highest value): 0=Time, 1=Situational, 2=Health/Hunger, 3=Resource, 4=Protection, 5=Location. Axis labels are rendered around the hex perimeter. When `stressAxes` is absent, falls back to focus-based sector mapping.
+
+**Why "neutral" is not the center tile:** Default interoception is stress 20, focus 80. Stress 20 falls in ring 1 (bucket 20–39), so the current state is drawn one hex out from center. The center (ring 0) is reserved for the lowest stress band (0–19). So neutral appears one step from center by design.
+
+**Internal representation (implemented):** The six axes are stored in `InteroState.stressAxes` (each 0–100). A weighted composite (`stress`) is computed for backward compatibility. The `buildStressContext()` function in `stress-axis-computer.ts` converts axes to natural-language situational fragments (e.g. "I need to address my health or hunger soon.", "I'm far from anywhere familiar or safe.") — it never uses the word "stress". These fragments are injected into LLM prompts at five sites: observation reasoner, idle thought, social consideration, internal thought generation, and the consideration step. Axis weights: situational 0.25, healthHunger 0.20, time/resource/protection 0.15 each, locationDistance 0.10.
 
 **Sleep reset:** After the bot sleeps (or respawns at bed), apply a **reset or halving** of stress axes (e.g. all axes multiplied by 0.5, or time/situational reset to baseline). This models recovery and prevents unbounded accumulation. Exact rule (full reset vs halve vs per-axis) can be tuned.
 
@@ -169,8 +180,8 @@ Stress is a **multi-axis vector** (time, situational, health/hunger, resource, p
 ### 4.3 Stress state: hexagonal grid heatmap (dashboard)
 
 - **Widget:** A hexagonal grid heatmap shows the bot's stress state over time. Center = relatively low stress; edges = high stress. Cell color/heat = how often the bot has been in that state (dwell or visit count). The **current** stress state is indicated by a **thick, visible outline** around the corresponding grid cell.
-- **Reference implementation:** Borrow structure and styling from `agent-agency/apps/agent_management_dashboard/src/components/HexagonHeatmap.tsx` (axial coords, `hexSpiral`, `hexPath`, color by value). Adapt so value per hex = dwell frequency for that stress bucket, and one hex is marked current with a distinct outline (e.g. `strokeWidth` + stroke color).
-- **Data:** Backend supplies stress axes (and optionally pre-aggregated dwell per cell). Dashboard maps current vector to current cell and renders outline; accumulates or receives visit counts for heat styling.
+- **6-sector mapping:** When `stressAxes` is available from cognition, the angular sector is determined by the **dominant axis** (highest-valued of the 6 axes). Sector labels (Time, Situational, Health, Resource, Protection, Location) are rendered as small SVG text around the hex perimeter. When `stressAxes` is absent (e.g. cognition offline), falls back to focus-based mapping.
+- **Data:** Backend supplies `intero` with `stressAxes` via GET `/state`. Dashboard maps current composite stress to ring, dominant axis to sector, and accumulates dwell/visit counts per cell for heat styling.
 
 ### 4.4 Implementation notes (provenance and deduplication)
 

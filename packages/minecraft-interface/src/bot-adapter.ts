@@ -15,6 +15,11 @@ import { AutomaticSafetyMonitor } from './automatic-safety-monitor';
 import { resilientFetch } from '@conscious-bot/core';
 import { ActionTranslator } from './action-translator';
 import mcData from 'minecraft-data';
+import { BeliefBus, buildEvidenceBatch, TICK_INTERVAL_MS, EMIT_INTERVAL_MS, type BeliefStreamEnvelope } from './entity-belief';
+import { assessReflexThreats, ReflexArbitrator } from './reflex';
+
+/** Module-level monotonic counter for ephemeral stream_id (deterministic, no Date.now()) */
+let botInstanceCounter = 0;
 
 export class BotAdapter extends EventEmitter {
   private bot: Bot | null = null;
@@ -31,8 +36,10 @@ export class BotAdapter extends EventEmitter {
 
   // Throttling state
   private lastChatResponse = 0;
+  private lastSocialChatResponse = 0;
   private lastEnvironmentalResponse = 0;
-  private readonly chatCooldown = 30000; // 30 seconds between chat responses
+  private readonly chatCooldown = 30000; // 30 seconds between autonomous/environmental chat responses
+  private readonly socialChatCooldown = 5000; // 5 seconds between player-directed chat responses
   private readonly environmentalCooldown = 15000; // 15 seconds between environmental responses
 
   // Track intervals and listeners for cleanup on disconnect
@@ -40,6 +47,12 @@ export class BotAdapter extends EventEmitter {
   private listenersAttached = false;
   private lastDeathMessage: string | null = null;
   private lastDeathMessageAt = 0;
+
+  // Entity belief system (replaces per-entity /process POSTs)
+  private beliefBus: BeliefBus;
+  private beliefTickId = 0;
+  private emitSeq = 0;
+  private reflexArbitrator: ReflexArbitrator;
 
   // Performance benchmarking — capped ring buffer for responseTimes
   private static readonly MAX_RESPONSE_TIMES = 200;
@@ -55,6 +68,11 @@ export class BotAdapter extends EventEmitter {
   constructor(config: BotConfig) {
     super();
     this.config = config;
+    const instanceNonce = ++botInstanceCounter;
+    const botId = `bot-${config.username}`;
+    const streamId = `${botId}-${instanceNonce}`;
+    this.beliefBus = new BeliefBus(botId, streamId);
+    this.reflexArbitrator = new ReflexArbitrator();
 
     // Handle error events to prevent unhandled errors
     this.on('error', (error) => {
@@ -489,8 +507,13 @@ export class BotAdapter extends EventEmitter {
       }
     });
 
-    // Entity detection and response
-    this.setupEntityDetection();
+    // Entity belief system (replaces per-entity /process POSTs)
+    if (process.env.LEGACY_ENTITY_PROCESS === '1') {
+      this.setupEntityDetection();
+    } else {
+      this.setupBeliefIngestion();
+      this.setupCognitionEmission();
+    }
 
     // Environmental event detection
     this.setupEnvironmentalEventDetection();
@@ -728,6 +751,33 @@ export class BotAdapter extends EventEmitter {
   }
 
   /**
+   * Sanitize outbound chat text: strip wrapping quotes, collapse whitespace, cap at 256 chars.
+   */
+  private sanitizeOutboundChat(text: string): string {
+    let cleaned = text.replace(/\n/g, ' ').replace(/\s+/g, ' ').trim();
+    // Strip wrapping quotes the LLM sometimes adds (up to 2 layers)
+    for (let i = 0; i < 2; i++) {
+      if (
+        (cleaned.startsWith('"') && cleaned.endsWith('"')) ||
+        (cleaned.startsWith("'") && cleaned.endsWith("'"))
+      ) {
+        cleaned = cleaned.slice(1, -1).trim();
+      } else if (cleaned.startsWith('"') || cleaned.startsWith("'")) {
+        cleaned = cleaned.slice(1).trim();
+      } else if (cleaned.endsWith('"') || cleaned.endsWith("'")) {
+        cleaned = cleaned.slice(0, -1).trim();
+      } else {
+        break;
+      }
+    }
+    if (cleaned.length > 256) {
+      const lastSpace = cleaned.slice(0, 256).lastIndexOf(' ');
+      cleaned = lastSpace > 180 ? cleaned.slice(0, lastSpace) + '...' : cleaned.slice(0, 253) + '...';
+    }
+    return cleaned;
+  }
+
+  /**
    * Process incoming chat messages through cognition system
    */
   private async processIncomingChat(
@@ -771,22 +821,23 @@ export class BotAdapter extends EventEmitter {
         };
         console.log(`🧠 Cognition system processed chat:`, result);
 
-        // If cognition system suggests a response, send it (with throttling)
+        // If cognition system suggests a response, send it (with social cooldown)
         if (result.shouldRespond && result.response) {
           const now = Date.now();
-          if (now - this.lastChatResponse >= this.chatCooldown) {
+          if (now - this.lastSocialChatResponse >= this.socialChatCooldown) {
             const responseStart = Date.now();
-            await this.bot?.chat(result.response);
+            await this.bot?.chat(this.sanitizeOutboundChat(result.response));
             const responseTime = Date.now() - responseStart;
             this.recordResponseTime(responseTime);
             this.performanceMetrics.chatResponses++;
             console.log(
               `✅ Bot responded: "${result.response}" (${responseTime}ms)`
             );
-            this.lastChatResponse = now;
+            this.lastSocialChatResponse = now;
+            this.lastChatResponse = now; // Also bump general cooldown to avoid double-talking
           } else {
             console.log(
-              `💬 Chat response throttled (cooldown: ${(this.chatCooldown - (now - this.lastChatResponse)) / 1000}s)`
+              `💬 Social chat response throttled (cooldown: ${(this.socialChatCooldown - (now - this.lastSocialChatResponse)) / 1000}s)`
             );
           }
         }
@@ -829,6 +880,95 @@ export class BotAdapter extends EventEmitter {
     ); // Check every 2 seconds but only process every 10 seconds
 
     console.log('👁️ Entity detection system activated (throttled)');
+  }
+
+  /**
+   * Set up belief ingestion loop (5Hz / 200ms).
+   * Builds EvidenceBatch from bot.entities and feeds into BeliefBus.
+   */
+  private setupBeliefIngestion(): void {
+    if (!this.bot) return;
+
+    this.beliefBus.forceSnapshot(); // First snapshot on connect
+
+    this.trackInterval(
+      setInterval(() => {
+        if (!this.bot?.entity) return;
+        try {
+          this.beliefTickId++;
+          const batch = buildEvidenceBatch(this.bot as any, this.beliefTickId);
+          this.beliefBus.ingest(batch);
+
+          // Reflex assessment: read snapshot every tick, act immediately
+          const snapshot = this.beliefBus.getCurrentSnapshot();
+          const reflexAssessment = assessReflexThreats(snapshot);
+
+          if (reflexAssessment.hasCriticalThreat) {
+            this.reflexArbitrator.enterReflexMode(
+              `critical_threat:${reflexAssessment.threats[0]?.classLabel}`,
+              this.beliefTickId
+            );
+          }
+
+          this.reflexArbitrator.tickUpdate(this.beliefTickId);
+        } catch (error) {
+          console.error('[BeliefBus] ingestion error:', error);
+        }
+      }, TICK_INTERVAL_MS)
+    );
+
+    console.log('[BeliefBus] Entity belief ingestion activated (5Hz)');
+  }
+
+  /**
+   * Set up cognition emission loop (1Hz / 1000ms).
+   * Flushes deltas, optionally includes snapshot, sends single POST.
+   */
+  private setupCognitionEmission(): void {
+    if (!this.bot) return;
+
+    this.trackInterval(
+      setInterval(async () => {
+        if (!this.bot?.entity) return;
+        if (!this.beliefBus.hasContent()) return;
+
+        try {
+          const envelope = this.beliefBus.buildEnvelope(this.emitSeq++);
+
+          const cognitionUrl =
+            process.env.COGNITION_SERVICE_URL || 'http://localhost:3003';
+          const response = await resilientFetch(`${cognitionUrl}/process`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(envelope),
+            timeoutMs: 10000,
+            label: 'cognition/process-belief-envelope',
+          });
+
+          if (response?.ok) {
+            const result = (await response.json()) as {
+              shouldRespond?: boolean;
+              response?: string;
+              shouldCreateTask?: boolean;
+              taskSuggestion?: string;
+            };
+
+            if (result.shouldRespond && result.response) {
+              const now = Date.now();
+              if (now - this.lastChatResponse >= this.chatCooldown) {
+                await this.bot?.chat(this.sanitizeOutboundChat(result.response));
+                this.lastChatResponse = now;
+                this.performanceMetrics.chatResponses++;
+              }
+            }
+          }
+        } catch (error) {
+          console.error('[BeliefBus] emission error:', error);
+        }
+      }, EMIT_INTERVAL_MS)
+    );
+
+    console.log('[BeliefBus] Cognition emission activated (1Hz)');
   }
 
   private lastEntityScan = 0;
@@ -960,7 +1100,7 @@ export class BotAdapter extends EventEmitter {
           const now = Date.now();
           if (now - this.lastChatResponse >= this.chatCooldown) {
             const responseStart = Date.now();
-            await this.bot?.chat(result.response);
+            await this.bot?.chat(this.sanitizeOutboundChat(result.response));
             const responseTime = Date.now() - responseStart;
             this.recordResponseTime(responseTime);
             this.performanceMetrics.chatResponses++;
@@ -1165,7 +1305,10 @@ export class BotAdapter extends EventEmitter {
       // INTERMEDIATE FIX: Throttle environmental /process calls to prevent LLM overload
       // TODO(rig-I-primitive-21): Replace with proper observation batching
       const now = Date.now();
-      if (now - this.lastEnvironmentalProcessCall < this.ENVIRONMENTAL_PROCESS_THROTTLE_MS) {
+      if (
+        now - this.lastEnvironmentalProcessCall <
+        this.ENVIRONMENTAL_PROCESS_THROTTLE_MS
+      ) {
         // Skip this event - we're throttling /process calls
         return;
       }
@@ -1222,7 +1365,7 @@ export class BotAdapter extends EventEmitter {
             this.environmentalCooldown
           ) {
             const responseStart = Date.now();
-            await this.bot?.chat(result.response);
+            await this.bot?.chat(this.sanitizeOutboundChat(result.response));
             const responseTime = Date.now() - responseStart;
             this.recordResponseTime(responseTime);
             this.performanceMetrics.chatResponses++;

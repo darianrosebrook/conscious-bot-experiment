@@ -11,6 +11,9 @@ import { Bot } from 'mineflayer';
 import { Vec3 } from 'vec3';
 import { ActionTranslator } from './action-translator';
 import { ThreatPerceptionManager } from './threat-perception-manager';
+import type { BeliefBus } from './entity-belief/belief-bus';
+import { assessReflexThreats } from './reflex/reflex-safety';
+import type { ReflexArbitrator } from './reflex/reflex-arbitrator';
 
 export interface SafetyMonitorConfig {
   healthThreshold: number; // Trigger emergency response when health drops below this
@@ -50,6 +53,8 @@ export class AutomaticSafetyMonitor extends EventEmitter {
   private observationLogDebug = process.env.OBSERVATION_LOG_DEBUG === '1';
   private lastWaterStrategyKey: string | null = null;
   private lastWaterStrategyLogAt = 0;
+  private beliefBus: BeliefBus | null = null;
+  private reflexArbitrator: ReflexArbitrator | null = null;
 
   constructor(
     bot: Bot,
@@ -75,6 +80,16 @@ export class AutomaticSafetyMonitor extends EventEmitter {
       lineOfSightRequired: true,
       persistenceWindowMs: 300000,
     });
+  }
+
+  /**
+   * Inject belief system references for snapshot-based threat assessment.
+   * When set, performSafetyCheck reads from belief snapshot instead of
+   * direct entity scan.
+   */
+  setBeliefSystem(beliefBus: BeliefBus, reflexArbitrator: ReflexArbitrator): void {
+    this.beliefBus = beliefBus;
+    this.reflexArbitrator = reflexArbitrator;
   }
 
   /**
@@ -195,6 +210,31 @@ export class AutomaticSafetyMonitor extends EventEmitter {
    */
   private async performSafetyCheck(): Promise<void> {
     try {
+      // Use belief snapshot when available (no duplicate entity scan)
+      if (this.beliefBus) {
+        const snapshot = this.beliefBus.getCurrentSnapshot();
+        const reflexResult = assessReflexThreats(snapshot);
+
+        if (reflexResult.hasCriticalThreat) {
+          if (this.shouldLog('critical-threat', this.logThrottleMs)) {
+            console.log(
+              '[SafetyMonitor] Critical threat from belief snapshot'
+            );
+          }
+          await this.triggerEmergencyResponse('critical_threat', {
+            threatLevel: 'critical',
+            threats: reflexResult.threats.map((t) => ({
+              type: t.classLabel,
+              distance: t.distBucket * 2,
+              threatLevel: 100,
+            })),
+            recommendedAction: 'flee',
+          });
+        }
+        return;
+      }
+
+      // Legacy fallback: direct entity scan via ThreatPerceptionManager
       const threatAssessment = await this.assessThreats();
 
       if (threatAssessment.threatLevel === 'critical') {

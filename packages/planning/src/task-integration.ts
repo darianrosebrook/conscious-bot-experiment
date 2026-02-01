@@ -203,9 +203,7 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
       }
 
       // Log the task lifecycle event
-      console.log(
-        `Task lifecycle event: ${eventType} for task: ${task.title}`
-      );
+      console.log(`Task lifecycle event: ${eventType} for task: ${task.title}`);
     } catch (error) {
       console.warn('⚠️ Failed to emit lifecycle event:', error);
     }
