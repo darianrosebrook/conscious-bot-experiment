@@ -73,10 +73,10 @@ export function inferRequirementFromEndpointParams(
     return { kind, outputPattern: params.blockType, quantity: params.quantity || 1 };
   }
 
-  // { resourceType: 'wood' } → collect oak_log
+  // { resourceType: 'wood' } → collect any log type via suffix pattern
   if (typeof params.resourceType === 'string') {
     const resourceMap: Record<string, string> = {
-      wood: 'oak_log',
+      wood: '_log',
       stone: 'stone',
       iron: 'iron_ore',
     };

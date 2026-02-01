@@ -49,11 +49,11 @@ describe('inferRequirementFromEndpointParams', () => {
     expect(result).toEqual({ kind: 'craft', outputPattern: 'stick', quantity: 4 });
   });
 
-  it('resourceType:wood → kind:collect, outputPattern:oak_log', () => {
+  it('resourceType:wood → kind:collect, outputPattern:_log (any wood)', () => {
     const result = inferRequirementFromEndpointParams({
       parameters: { resourceType: 'wood' },
     });
-    expect(result).toEqual({ kind: 'collect', outputPattern: 'oak_log', quantity: 1 });
+    expect(result).toEqual({ kind: 'collect', outputPattern: '_log', quantity: 1 });
   });
 
   it('resourceType:stone → kind:collect, outputPattern:stone', () => {
@@ -67,7 +67,7 @@ describe('inferRequirementFromEndpointParams', () => {
     const result = inferRequirementFromEndpointParams({
       parameters: { resourceType: 'wood', targetQuantity: 8 },
     });
-    expect(result).toEqual({ kind: 'collect', outputPattern: 'oak_log', quantity: 8 });
+    expect(result).toEqual({ kind: 'collect', outputPattern: '_log', quantity: 8 });
   });
 
   it('type:crafting + empty parameters → null (400 path)', () => {

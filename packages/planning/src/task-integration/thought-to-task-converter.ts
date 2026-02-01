@@ -90,12 +90,22 @@ export function extractActionTitle(
 }
 
 export function extractResourceType(content: string): string {
-  if (content.includes('wood') || content.includes('log')) return 'oak_log';
+  // Specific wood types take priority over generic "wood"
+  if (content.includes('oak')) return 'oak_log';
+  if (content.includes('birch')) return 'birch_log';
+  if (content.includes('spruce')) return 'spruce_log';
+  if (content.includes('jungle')) return 'jungle_log';
+  if (content.includes('acacia')) return 'acacia_log';
+  if (content.includes('dark oak') || content.includes('dark_oak')) return 'dark_oak_log';
+  if (content.includes('mangrove')) return 'mangrove_log';
+  if (content.includes('cherry')) return 'cherry_log';
+  // Generic "wood" or "log" → suffix pattern that matches any wood type
+  if (content.includes('wood') || content.includes('log')) return '_log';
   if (content.includes('iron')) return 'iron_ore';
   if (content.includes('stone')) return 'cobblestone';
   if (content.includes('diamond')) return 'diamond_ore';
   if (content.includes('food')) return 'bread';
-  return 'oak_log';
+  return '_log';
 }
 
 export function extractItemType(content: string): string {

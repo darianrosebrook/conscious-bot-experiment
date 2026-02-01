@@ -64,7 +64,10 @@ export function inferRecipeFromTitle(title: string): string | null {
 export function inferBlockTypeFromTitle(title: string): string | null {
   const t = (title || '').toLowerCase();
   if (t.includes('iron')) return 'iron_ore';
-  if (t.includes('wood') || t.includes('log')) return 'oak_log';
+  if (t.includes('oak')) return 'oak_log';
+  if (t.includes('birch')) return 'birch_log';
+  if (t.includes('spruce')) return 'spruce_log';
+  if (t.includes('wood') || t.includes('log')) return '_log';
   if (t.includes('stone') || t.includes('cobble')) return 'stone';
   return null;
 }
