@@ -1,6 +1,6 @@
 # Rig Documentation Enrichment Status
 
-**Last updated**: 2026-01-31
+**Last updated**: 2026-01-31 (Track 3 enrichment complete)
 
 **Purpose**: Track which rigs have been enriched with concrete implementation details, code anchors, pivots, transfer surfaces, and certification tests.
 
@@ -27,10 +27,10 @@ A rig is considered **ENRICHED** when it has:
 |-------|------|----------|---------|-------------|
 | **Track 1** (Certification) | 3 | 3 | 0 | 0 |
 | **Track 2** (Belief + Perception) | 3 | 3 | 0 | 0 |
-| **Track 3** (Widening) | 6 | 0 | 6 | 0 |
-| **Total** | 12 | 6 | 6 | 0 |
+| **Track 3** (Widening) | 6 | 6 | 0 | 0 |
+| **Total** | 12 | 12 | 0 | 0 |
 
-**Progress**: 6/12 enriched (50%); 6 partial (D, E, F, G, H, K). Track 1-2: 100% enriched. Track 3: 100% partial (investigation complete).
+**Progress**: 12/12 enriched (100%). Track 1-2: 100% enriched. Track 3: 100% enriched (2026-01-31).
 
 ---
 
@@ -168,115 +168,115 @@ A rig is considered **ENRICHED** when it has:
 
 ### Rig D: Multi-Strategy (P4)
 
-**Status**: ⚠️ **PARTIAL** (investigation complete; implementation pending)
+**Status**: ✅ **ENRICHED** (2026-01-31)
 
 **What exists**:
 - ✅ Section 4a: Current code anchors (verified 2025-01-31)
-- ✅ Investigation outcome: Single solve path; no strategy families; no availability predicates
+- ✅ Section 4b: conscious-bot vs Sterling split
+- ✅ Section 7: Implementation pivots (4 pivots; see APPROACH for full text)
+- ✅ Section 8: 3 transfer surfaces (supply chain, robotics, Minecraft)
+- ✅ Section 9: 5 concrete certification tests (TypeScript)
+- ✅ Section 10: Definition of done (testable)
+- ✅ Section 11: Implementation files summary
 
-**What's missing for ENRICHED**:
-- ❌ conscious-bot vs Sterling split; implementation pivots; transfer surfaces; concrete tests
+**Next action**: None (complete); ready for implementation when Track 1-2 complete.
 
-**Next action**: Add conscious-bot split; pivots; transfer surfaces; certification tests when Track 1-2 complete.
-
-**Priority**: 🟢 **MEDIUM** (defer until Track 1-2 complete)
-
-**Estimated effort**: 4-5 hours
+**Priority**: 🟢 **MEDIUM**
 
 ---
 
 ### Rig E: Hierarchical Planning (P5)
 
-**Status**: ⚠️ **PARTIAL** (investigation complete; implementation pending)
+**Status**: ✅ **ENRICHED** (2026-01-31)
 
 **What exists**:
 - ✅ Section 4a: Current code anchors (verified 2025-01-31)
-- ✅ Investigation outcome: plan-decomposer is stub; sterling-planner flat; no macro/micro separation
+- ✅ Section 4b: conscious-bot vs Sterling split
+- ✅ Section 7: Implementation pivots (5 pivots)
+- ✅ Section 8: 3 transfer surfaces (logistics, manufacturing, Minecraft)
+- ✅ Section 9: 5 concrete certification tests (TypeScript)
+- ✅ Section 10: Definition of done (testable)
+- ✅ Section 11: Implementation files summary
 
-**What's missing for ENRICHED**:
-- ❌ conscious-bot vs Sterling split; implementation pivots; transfer surfaces; concrete tests
+**Next action**: None (complete); ready for implementation when Track 1-2 complete.
 
-**Next action**: Add conscious-bot split; pivots; transfer surfaces; certification tests when Track 1-2 complete.
-
-**Priority**: 🟢 **MEDIUM** (defer until Track 1-2 complete)
-
-**Estimated effort**: 5-6 hours (hierarchical semantics complex)
+**Priority**: 🟢 **MEDIUM**
 
 ---
 
 ### Rig F: Valuation under Scarcity (P6)
 
-**Status**: ⚠️ **PARTIAL** (investigation complete; implementation pending)
+**Status**: ✅ **ENRICHED** (2026-01-31)
 
 **What exists**:
 - ✅ Section 4a: Current code anchors (verified 2025-01-31)
-- ✅ Investigation outcome: inventory from fetchBotContext; no capacity model, value function, or drop rationale
+- ✅ Section 4b: conscious-bot vs Sterling split
+- ✅ Section 7: Implementation pivots (5 pivots)
+- ✅ Section 8: 3 transfer surfaces (warehouse, cache eviction, Minecraft)
+- ✅ Section 9: 5 concrete certification tests (TypeScript)
+- ✅ Section 10: Definition of done (testable)
+- ✅ Section 11: Implementation files summary
 
-**What's missing for ENRICHED**:
-- ❌ conscious-bot vs Sterling split; implementation pivots; transfer surfaces; concrete tests
+**Next action**: None (complete); ready for implementation when Track 1-2 complete.
 
-**Next action**: Add conscious-bot split; pivots; transfer surfaces; certification tests when Track 1-2 complete.
-
-**Priority**: 🟢 **MEDIUM** (defer until Track 1-2 complete)
-
-**Estimated effort**: 4-5 hours
+**Priority**: 🟢 **MEDIUM**
 
 ---
 
 ### Rig G: Partial-Order Structure (P7)
 
-**Status**: ⚠️ **PARTIAL** (investigation complete; implementation pending)
+**Status**: ✅ **ENRICHED** (2026-01-31)
 
 **What exists**:
 - ✅ Section 4a: Current code anchors (verified 2025-01-31)
-- ✅ Investigation outcome: Plan output is list; building domain has requiresModules; no DAG or support constraints
+- ✅ Section 4b: conscious-bot vs Sterling split
+- ✅ Section 7: Implementation pivots (5 pivots)
+- ✅ Section 8: 3 transfer surfaces (build systems, assembly, Minecraft building)
+- ✅ Section 9: 5 concrete certification tests (TypeScript)
+- ✅ Section 10: Definition of done (testable)
+- ✅ Section 11: Implementation files summary
 
-**What's missing for ENRICHED**:
-- ❌ conscious-bot vs Sterling split; implementation pivots; transfer surfaces; concrete tests
+**Next action**: None (complete); ready for implementation when Track 1-2 complete.
 
-**Next action**: Add conscious-bot split; pivots; transfer surfaces; certification tests when Track 1-2 complete.
-
-**Priority**: 🟢 **MEDIUM** (defer until Track 1-2 complete)
-
-**Estimated effort**: 5-6 hours (partial-order semantics complex)
+**Priority**: 🟢 **MEDIUM**
 
 ---
 
 ### Rig H: Systems Synthesis (P8)
 
-**Status**: ⚠️ **PARTIAL** (investigation complete; implementation pending)
+**Status**: ✅ **ENRICHED** (2026-01-31)
 
 **What exists**:
 - ✅ Section 4a: Current code anchors (verified 2025-01-31)
-- ✅ Investigation outcome: building domain is template-based; no design exploration, simulator, or motif reuse
+- ✅ Section 4b: conscious-bot vs Sterling split
+- ✅ Section 7: Implementation pivots (5 pivots)
+- ✅ Section 8: 3 transfer surfaces (farm layout, redstone, Minecraft building)
+- ✅ Section 9: 5 concrete certification tests (TypeScript)
+- ✅ Section 10: Definition of done (testable)
+- ✅ Section 11: Implementation files summary
 
-**What's missing for ENRICHED**:
-- ❌ conscious-bot vs Sterling split; implementation pivots; transfer surfaces; concrete tests
+**Next action**: None (complete); ready for implementation when Track 1-2 complete.
 
-**Next action**: Add conscious-bot split; pivots; transfer surfaces; certification tests when Track 1-2 complete.
-
-**Priority**: 🟢 **MEDIUM** (defer until Track 1-2 complete)
-
-**Estimated effort**: 6-7 hours (synthesis + evaluation complex)
+**Priority**: 🟢 **MEDIUM**
 
 ---
 
 ### Rig K: Irreversibility (P13)
 
-**Status**: ⚠️ **PARTIAL** (investigation complete; implementation pending)
+**Status**: ✅ **ENRICHED** (2026-01-31)
 
 **What exists**:
 - ✅ Section 4a: Current code anchors (verified 2025-01-31)
-- ✅ Investigation outcome: no irreversibility tags on operators; no verification-before-commit; villager/trade in action-translator
+- ✅ Section 4b: conscious-bot vs Sterling split
+- ✅ Section 7: Implementation pivots (5 pivots)
+- ✅ Section 8: 3 transfer surfaces (contract signing, deployment, Minecraft villager trade)
+- ✅ Section 9: 5 concrete certification tests (TypeScript)
+- ✅ Section 10: Definition of done (testable)
+- ✅ Section 11: Implementation files summary
 
-**What's missing for ENRICHED**:
-- ❌ conscious-bot vs Sterling split; implementation pivots; transfer surfaces; concrete tests
+**Next action**: None (complete); ready for implementation when Track 1-2 complete.
 
-**Next action**: Add conscious-bot split; pivots; transfer surfaces; certification tests when Track 1-2 complete.
-
-**Priority**: 🟢 **MEDIUM** (defer until Track 1-2 complete)
-
-**Estimated effort**: 4-5 hours
+**Priority**: 🟢 **MEDIUM**
 
 ---
 
@@ -342,17 +342,15 @@ A rig is considered **ENRICHED** when it has:
 
 ---
 
-### Phase 3: Track 3 enrichment (DEFERRED)
+### Phase 3: Track 3 enrichment (COMPLETE)
 
 **Goal**: All Track 3 rigs (D, E, F, G, H, K) enriched for widening capabilities.
 
-**Status**: 0/6 complete
+**Status**: 6/6 complete (2026-01-31)
 
-**Estimated effort**: 28-34 hours total (4-7 hours per rig)
+**Completed**: Rig D, E, F, G, H, K each have conscious-bot vs Sterling split, implementation pivots, transfer surfaces, 5 concrete certification tests, definition of done, implementation files summary.
 
-**Trigger**: Defer until Tracks 1-2 are implemented and proven in Minecraft rig.
-
-**Rationale**: Foundational primitives (determinism, capability gating, temporal, epistemic, invariant) must be certified before widening to multi-strategy, hierarchical, valuation, partial-order, synthesis, irreversibility.
+**Rationale**: Enrichment complete; implementation deferred until Tracks 1-2 are implemented and proven in Minecraft rig.
 
 ---
 
@@ -382,7 +380,7 @@ Track 1 + Track 2 implementation (parallel)
                                 ├─> Tracks 1-2 PROVEN
                                 │
 Phase 3 (Track 3 enrichment)   │
-└─ 6 rigs × 4-7h = 28-34h ─────┴─> Track 3 READY FOR IMPLEMENTATION
+└─ 6 rigs enriched ───────────┴─> Track 3 READY FOR IMPLEMENTATION (2026-01-31)
 ```
 
 **Progress update (2026-01-31)**:
@@ -507,23 +505,17 @@ Before marking a rig as **ENRICHED**, it must pass this checklist:
 ## Summary
 
 **Current state**:
-- 2 of 12 rigs enriched (Rig B, Rig I-ext)
-- 1 rig has baseline (Rig A)
-- 9 rigs need full enrichment
+- 12 of 12 rigs enriched (Tracks 1, 2, 3 complete)
+- All rigs have: code anchors, conscious-bot vs Sterling split, implementation pivots, transfer surfaces, concrete certification tests, definition of done, implementation files summary
 
 **Immediate priorities**:
-1. Enrich Rig A (Track 1) - 3-4 hours
-2. Enrich Rig C (Track 1) - 4-5 hours
-3. Enrich Rig I (Track 2) - 5-6 hours
-4. Enrich Rig J (Track 2) - 4-5 hours
-
-**Total to unblock Tracks 1-2**: 16-20 hours
+- Implement Track 1 (Rigs A, B, C) then Track 2 (Rigs I, I-ext, J); Track 3 (D, E, F, G, H, K) when Tracks 1-2 are proven
 
 **Benefit**:
-- Sterling team can implement P1-P3, P11, P21, P12 without ambiguity
-- conscious-bot team can implement rigs A-C, I, I-ext, J with explicit file paths
+- Sterling team can implement P1-P21 without ambiguity
+- conscious-bot team can implement all 12 rigs with explicit file paths
 - Parallel development without constant clarification questions
 - Domain-agnosticism proven through transfer surfaces
 - Certification tests ready to run as implementation proceeds
 
-**Next action**: Assign Track 1 enrichment (Rigs A, C) to unblock Sterling determinism work.
+**Next action**: Proceed to implementation per track priority (Track 1, then Track 2, then Track 3).

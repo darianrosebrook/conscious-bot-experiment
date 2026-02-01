@@ -2,7 +2,7 @@
 
 **Primitive**: P5 — Hierarchical planning (macro policy over micro solvers)
 
-**Status**: Planned (Track 3, after A-D)
+**Status**: ENRICHED (2026-01-31)
 
 ---
 
@@ -71,6 +71,18 @@ With proper hierarchy:
 
 **Gap:** No macro state, macro planner, or macro-edge semantics. No feedback from micro to macro costs. Hierarchical separation would require new macro layer above sterling-planner.
 
+### 4b. conscious-bot vs Sterling split
+
+| Responsibility | Owner | Location |
+|----------------|-------|----------|
+| Macro state (contexts, waypoints) | conscious-bot | `packages/planning/src/hierarchical/macro-state.ts` (new) |
+| Macro planner (choose macro structure) | conscious-bot | `packages/planning/src/hierarchical/macro-planner.ts` (new) |
+| Macro edge cost updates from micro outcomes | conscious-bot | `packages/planning/src/hierarchical/feedback.ts` (new) |
+| Micro delegation (pathfinding, block interaction) | conscious-bot | minecraft-interface + reactive-executor |
+| Sub-solve for complex micro tasks (optional) | Sterling | Receives micro subgoal; returns steps |
+
+**Contract:** conscious-bot owns macro layer; invokes Sterling only for micro subproblems when needed. Feedback from execution updates macro edge costs in conscious-bot.
+
 ---
 
 ## 5. What to implement / change
@@ -114,7 +126,139 @@ With proper hierarchy:
 
 ---
 
-## 7. Order of work (suggested)
+## 7. Implementation pivots
+
+| Pivot | Problem | Acceptance |
+|-------|---------|------------|
+| 1 Macro state is abstract only | Concrete positions in macro state explode search | Macro nodes are context IDs (e.g. at_mine, at_base); no (x,y,z) in macro state. |
+| 2 Bounded macro horizon | Unbounded macro depth causes non-termination | MAX_MACRO_DEPTH (e.g. 20); macro planner stops at bound. |
+| 3 Deterministic slot ordering | Non-deterministic macro edge order breaks replay | Macro edges sorted by (contextId, targetId) before cost lookup. |
+| 4 Feedback only on execution | Updating costs on plan success misattributes | Macro edge cost updated only when micro execution completes (success/failure). |
+| 5 Single micro controller per macro edge | Multiple concurrent micro controllers complicate attribution | One active micro task per macro step; completion triggers feedback. |
+
+---
+
+## 8. Transfer surfaces (domain-agnosticism proof)
+
+### 8.1 Logistics (region-level planning)
+
+**Surface:** Macro: regions (warehouse A, port B, store C); micro: local routing within region. Feedback: delivery success/failure updates region-to-region cost.
+
+- **Prove:** Same macro/micro separation; feedback updates macro costs only.
+
+### 8.2 Manufacturing (stage-level planning)
+
+**Surface:** Macro: stages (cut, assemble, finish); micro: machine operations within stage. Feedback: stage failure increases stage cost.
+
+- **Prove:** Same bounded horizon; deterministic slot ordering.
+
+### 8.3 Minecraft (location + activity)
+
+**Surface:** Macro: at_base, at_mine, traveling_to_X; micro: pathfinding, mining, crafting. Feedback: micro failure increases macro edge cost.
+
+- **Prove:** Direct mapping to sterling-planner; macro layer above generateDynamicSteps.
+
+---
+
+## 9. Concrete certification tests
+
+### Test 1: Macro state abstract
+
+```ts
+describe('Rig E - macro state abstract', () => {
+  it('macro nodes are context IDs only', () => {
+    const state = createMacroState({ currentContext: 'at_mine', targetContext: 'at_base' });
+    expect(state.currentContext).toBe('at_mine');
+    expect('x' in state).toBe(false);
+    expect('y' in state).toBe(false);
+  });
+});
+```
+
+### Test 2: Bounded macro depth
+
+```ts
+describe('Rig E - bounded macro depth', () => {
+  it('macro planner stops at MAX_MACRO_DEPTH', () => {
+    const plan = runMacroPlanner(goal, worldState, { maxDepth: 20 });
+    expect(plan.steps.length).toBeLessThanOrEqual(20);
+  });
+});
+```
+
+### Test 3: Deterministic slot ordering
+
+```ts
+describe('Rig E - deterministic slot ordering', () => {
+  it('same macro graph yields same edge order', () => {
+    const graph = buildMacroGraph(goal);
+    const order1 = getMacroEdgeOrder(graph);
+    const order2 = getMacroEdgeOrder(graph);
+    expect(order1).toEqual(order2);
+    expect(order1).toEqual([...order1].sort((a, b) => (a.contextId + a.targetId).localeCompare(b.contextId + b.targetId)));
+  });
+});
+```
+
+### Test 4: Feedback on execution only
+
+```ts
+describe('Rig E - feedback on execution only', () => {
+  it('macro edge cost unchanged after plan generation', () => {
+    const costs = getMacroEdgeCosts();
+    runMacroPlanner(goal, worldState);
+    expect(getMacroEdgeCosts()).toEqual(costs);
+  });
+
+  it('macro edge cost increases after micro failure', () => {
+    const costsBefore = getMacroEdgeCost('at_base', 'at_mine');
+    reportMicroOutcome({ from: 'at_base', to: 'at_mine', success: false });
+    const costsAfter = getMacroEdgeCost('at_base', 'at_mine');
+    expect(costsAfter).toBeGreaterThan(costsBefore);
+  });
+});
+```
+
+### Test 5: Micro delegation
+
+```ts
+describe('Rig E - micro delegation', () => {
+  it('macro step invokes micro controller once', () => {
+    const invocations: string[] = [];
+    const controller = { execute: (step: MacroStep) => { invocations.push(step.id); return Promise.resolve({ success: true }); } };
+    await executeMacroStep({ id: 'go_to_mine', from: 'at_base', to: 'at_mine' }, controller);
+    expect(invocations).toEqual(['go_to_mine']);
+  });
+});
+```
+
+---
+
+## 10. Definition of "done" (testable)
+
+- **Macro/micro separation:** Clear boundary; macro state has no concrete positions (Test 1).
+- **Bounded horizon:** MAX_MACRO_DEPTH enforced (Test 2).
+- **Deterministic ordering:** Same graph yields same edge order (Test 3).
+- **Feedback on execution only:** Macro costs update only from micro outcomes (Test 4).
+- **Single micro per macro step:** One invocation per macro step (Test 5).
+- **Tests:** All 5 certification test blocks pass.
+
+---
+
+## 11. Implementation files summary
+
+| Action | Path |
+|--------|------|
+| New | `packages/planning/src/hierarchical/macro-state.ts` |
+| New | `packages/planning/src/hierarchical/macro-planner.ts` |
+| New | `packages/planning/src/hierarchical/feedback.ts` |
+| Modify | `packages/planning/src/hierarchical-planner/plan-decomposer.ts` — replace stub with macro planner call |
+| Modify | `packages/planning/src/task-integration/sterling-planner.ts` — macro layer above generateDynamicSteps |
+| Modify | `packages/planning/src/reactive-executor/reactive-executor.ts` — report micro outcome to feedback |
+
+---
+
+## 12. Order of work (suggested)
 
 1. **Define macro state** with location contexts and activity states.
 2. **Define macro edges** that invoke micro controllers.
@@ -125,7 +269,7 @@ With proper hierarchy:
 
 ---
 
-## 8. Dependencies and risks
+## 13. Dependencies and risks
 
 - **Rig A-D**: Builds on operators, legality, temporal, and strategies.
 - **Abstraction granularity**: Too coarse = poor plans; too fine = no benefit.
@@ -134,17 +278,7 @@ With proper hierarchy:
 
 ---
 
-## 9. Definition of "done"
-
-- **Macro/micro separation**: Clear boundary between layers.
-- **Sub-solver delegation**: Micro controllers handle local execution.
-- **Feedback works**: Micro failures increase macro edge costs.
-- **Efficiency**: Long-horizon goals are tractable (don't plan every block).
-- **Tests**: Macro re-plans when micro repeatedly fails; hierarchical beats flat.
-
----
-
-## 10. Cross-references
+## 14. Cross-references
 
 - **Companion approach**: `RIG_E_HIERARCHICAL_PLANNING_APPROACH.md`
 - **Capability primitives**: `capability-primitives.md` (P5)

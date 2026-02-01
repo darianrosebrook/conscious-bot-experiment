@@ -2,7 +2,7 @@
 
 **Primitive**: P6 — Goal-conditioned valuation under scarcity (keep/drop/allocate)
 
-**Status**: Planned (Track 3)
+**Status**: ENRICHED (2026-01-31)
 
 ---
 
@@ -69,6 +69,18 @@ With proper valuation:
 
 **Gap:** No capacity model (slots free), no goal-conditioned value function, no drop/keep operators, no explanation output. Valuation would require new `valuation/` module and domain extension.
 
+### 4b. conscious-bot vs Sterling split
+
+| Responsibility | Owner | Location |
+|----------------|-------|----------|
+| Capacity model (slots free, holdings) | conscious-bot | `packages/planning/src/valuation/capacity-model.ts` (new) |
+| Goal-conditioned value function | conscious-bot | `packages/planning/src/valuation/value-function.ts` (new) |
+| Drop/keep operators and rationale | conscious-bot | `packages/planning/src/valuation/drop-rationale.ts` (new) |
+| Pass goal + capacity to Sterling | conscious-bot | Extend fetchBotContext / solve payload |
+| Solve with capacity constraints (optional) | Sterling | Receives capacity + goal; returns steps + drop rationale |
+
+**Contract:** conscious-bot extracts capacity and goal; computes or passes value conditioning; Sterling (if used) returns steps and optional drop rationale. Explanation is conscious-bot responsibility.
+
 ---
 
 ## 5. What to implement / change
@@ -112,7 +124,135 @@ With proper valuation:
 
 ---
 
-## 7. Order of work (suggested)
+## 7. Implementation pivots
+
+| Pivot | Problem | Acceptance |
+|-------|---------|------------|
+| 1 Value buckets only | Raw values cause state explosion | value(item, goal) returns integer bucket (e.g. 0-10). |
+| 2 Bounded hypothesis set | Too many goals bloat value table | Max N active goals (e.g. 5); value undefined for others. |
+| 3 Drop rationale required | Silent drops are unexplainable | Every drop decision includes rationale (item, goal, value). |
+| 4 Capacity from real state | Fake capacity causes wrong drops | slots_free from real inventory; no mock in production. |
+| 5 Deterministic value for same (item, goal) | Non-determinism breaks replay | Same (item, goal) yields same value bucket. |
+
+---
+
+## 8. Transfer surfaces (domain-agnosticism proof)
+
+### 8.1 Warehouse (slot allocation)
+
+**Surface:** Limited shelf slots; value per SKU depends on current orders (goal). Drop lowest-value SKU when full; rationale: "dropped X to make room for Y (order Z)."
+
+- **Prove:** Same value buckets, capacity from real state, drop rationale.
+
+### 8.2 Cache eviction (memory allocation)
+
+**Surface:** Limited cache slots; value per entry depends on current query pattern (goal). Evict lowest-value entry; rationale: "evicted key X (value N) for key Y (query Z)."
+
+- **Prove:** Same bounded hypothesis set; deterministic value for same (item, goal).
+
+### 8.3 Minecraft (inventory slots)
+
+**Surface:** 36 slots; value per item depends on current task (build armor, build base). Drop cobble when full to pick up iron; rationale: "dropped 32 cobble (goal: iron armor) to pick up 8 iron."
+
+- **Prove:** Direct mapping to fetchBotContext; capacity from buildInventoryIndex extension.
+
+---
+
+## 9. Concrete certification tests
+
+### Test 1: Value buckets
+
+```ts
+describe('Rig F - value buckets', () => {
+  it('value returns integer bucket in [0, VALUE_MAX]', () => {
+    const v = value('iron_ingot', { goalId: 'build_armor' });
+    expect(Number.isInteger(v)).toBe(true);
+    expect(v).toBeGreaterThanOrEqual(0);
+    expect(v).toBeLessThanOrEqual(VALUE_MAX);
+  });
+
+  it('same (item, goal) yields same value', () => {
+    expect(value('iron_ingot', { goalId: 'build_armor' })).toBe(value('iron_ingot', { goalId: 'build_armor' }));
+  });
+});
+```
+
+### Test 2: Capacity from real state
+
+```ts
+describe('Rig F - capacity from real state', () => {
+  it('slots_free from inventory length', () => {
+    const inv = buildInventoryIndex([{ name: 'cobblestone', count: 32 }]);
+    const cap = buildCapacityModel(inv, { maxSlots: 36 });
+    expect(cap.slotsFree).toBe(35);
+  });
+});
+```
+
+### Test 3: Drop rationale required
+
+```ts
+describe('Rig F - drop rationale required', () => {
+  it('every drop decision includes rationale', () => {
+    const decision = decideDrop({ inventory: fullInv, goal: { goalId: 'build_armor' }, capacity: cap });
+    expect(decision.rationale).toBeDefined();
+    expect(decision.rationale).toContain('dropped');
+    expect(decision.rationale).toMatch(/goal|value/);
+  });
+});
+```
+
+### Test 4: Goal-conditioned value shift
+
+```ts
+describe('Rig F - goal-conditioned value shift', () => {
+  it('same item has different value per goal', () => {
+    const vArmor = value('cobblestone', { goalId: 'build_armor' });
+    const vBase = value('cobblestone', { goalId: 'build_base' });
+    expect(vBase).toBeGreaterThan(vArmor);
+  });
+});
+```
+
+### Test 5: Bounded hypothesis set
+
+```ts
+describe('Rig F - bounded hypothesis set', () => {
+  it('value undefined for goal beyond MAX_ACTIVE_GOALS', () => {
+    const goals = Array.from({ length: 10 }, (_, i) => ({ goalId: `goal_${i}` }));
+    setActiveGoals(goals.slice(0, 5));
+    expect(value('iron_ingot', goals[6])).toBeUndefined();
+  });
+});
+```
+
+---
+
+## 10. Definition of "done" (testable)
+
+- **Capacity-aware:** Planner knows slots free (Test 2).
+- **Goal-conditioned values:** Same item different value per goal (Test 4).
+- **Value buckets:** Integer, bounded, deterministic (Test 1).
+- **Drop rationale:** Every drop includes rationale (Test 3).
+- **Bounded goals:** Max N active goals for value (Test 5).
+- **Tests:** All 5 certification test blocks pass.
+
+---
+
+## 11. Implementation files summary
+
+| Action | Path |
+|--------|------|
+| New | `packages/planning/src/valuation/capacity-model.ts` |
+| New | `packages/planning/src/valuation/value-function.ts` |
+| New | `packages/planning/src/valuation/drop-rationale.ts` |
+| Modify | `packages/planning/src/task-integration/sterling-planner.ts` — pass capacity + goal to solve |
+| Modify | `packages/planning/src/task-integration.ts` — extend buildInventoryIndex with slot count |
+| Modify | `packages/planning/src/modular-server.ts` — hook drop decisions with rationale |
+
+---
+
+## 12. Order of work (suggested)
 
 1. **Add capacity fields** to world state (slots free, holdings).
 2. **Define value function** with goal-conditioned multipliers.
@@ -123,7 +263,7 @@ With proper valuation:
 
 ---
 
-## 8. Dependencies and risks
+## 13. Dependencies and risks
 
 - **Rig A-E**: Builds on operators, legality, temporal, strategies, hierarchy.
 - **Value function complexity**: Too complex = hard to explain; too simple = poor decisions.
@@ -132,17 +272,7 @@ With proper valuation:
 
 ---
 
-## 9. Definition of "done"
-
-- **Capacity-aware**: Planner knows when inventory is constrained.
-- **Goal-conditioned values**: Same item has different value per goal.
-- **Optimal drops**: Lowest-value items dropped first.
-- **Explainable**: Every sacrifice includes rationale.
-- **Tests**: Goal change shifts values; explanations are accurate.
-
----
-
-## 10. Cross-references
+## 14. Cross-references
 
 - **Companion approach**: `RIG_F_VALUATION_SCARCITY_APPROACH.md`
 - **Capability primitives**: `capability-primitives.md` (P6)

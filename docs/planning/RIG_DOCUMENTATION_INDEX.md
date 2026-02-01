@@ -84,7 +84,7 @@ Per-rig checklist: what each document set provides. Use this to identify gaps be
 | J | Plan 2 | Plan 3 (verified 3a) | Plan 5 | Plan 7, Approach 2 | Approach 4 | Plan 1 |
 | K | Plan 3.1 | Plan 4 (verified 4a) | Plan 5 | Approach 2 | Plan 4a | Plan 1 |
 
-**Investigation verification added (2025-01-31):** All 12 rigs have verified investigation outcomes and current code anchors (section 4a). Rig A–C, I, J, I-ext, B are ENRICHED. Rig D, E, F, G, H, K are PARTIAL (investigation complete; implementation pivots, transfer surfaces, tests pending when Track 1-2 complete). See `RIG_ENRICHMENT_STATUS.md` for status.
+**Enrichment status (2026-01-31):** All 12 rigs are ENRICHED. Each has: verified investigation outcomes and code anchors (section 4a/4b), conscious-bot vs Sterling split, implementation pivots, transfer surfaces, 5 concrete certification tests, definition of done, implementation files summary. See `RIG_ENRICHMENT_STATUS.md` for status.
 
 ---
 

@@ -2,7 +2,7 @@
 
 **Primitive**: P4 — Multi-strategy acquisition (alternative methods, different failure modes)
 
-**Status**: Planned (Track 3, after A-C are solid)
+**Status**: ENRICHED (2026-01-31)
 
 ---
 
@@ -70,6 +70,18 @@ With proper multi-strategy:
 
 **Gap:** No strategy families, availability predicates, or strategy priors. Single rule set per goal; no alternative acquisition methods (trade, loot, salvage).
 
+### 4b. conscious-bot vs Sterling split
+
+| Responsibility | Owner | Location |
+|----------------|-------|----------|
+| Strategy families, mapping to operator sets | conscious-bot | `packages/planning/src/strategies/strategy-families.ts` (new) |
+| Availability extraction from world state | conscious-bot | `packages/planning/src/strategies/availability.ts` (new) |
+| Strategy selection (availability + priors); filter rules | conscious-bot | `packages/planning/src/strategies/strategy-selector.ts` (new) |
+| Prior storage and updates from execution only | conscious-bot | `packages/planning/src/strategies/strategy-priors.ts` (new) |
+| Solve with pre-filtered rules | Sterling | Receives rules for selected strategy only |
+
+**Contract:** conscious-bot selects strategy, fetches rules for that strategy, sends to Sterling. Prior updates happen on execution outcome only, not on plan success.
+
 ---
 
 ## 5. What to implement / change
@@ -113,7 +125,164 @@ With proper multi-strategy:
 
 ---
 
-## 7. Order of work (suggested)
+## 7. Implementation pivots
+
+See `RIG_D_MULTI_STRATEGY_APPROACH.md` section 3 for full pivot text. Summary:
+
+| Pivot | Problem | Acceptance |
+|-------|---------|------------|
+| 1 Prior updates only on execution | Plan success would reinforce hypothetical success | Prior unchanged by plan; only execution updates. |
+| 2 Context-keyed priors | Global priors overfit to one biome | Priors differ by biome/area (e.g. plains:village vs cave:mine). |
+| 3 Availability from real world state | Fake/stale flags cause wrong selection | Availability from `extractAvailability(worldState)`; no mock flags in production. |
+| 4 Bounded priors | Priors drift to 0 or 1 | Prior in [PRIOR_MIN, PRIOR_MAX] (e.g. 0.05, 0.95). |
+
+---
+
+## 8. Transfer surfaces (domain-agnosticism proof)
+
+### 8.1 Supply chain (source selection)
+
+**Surface:** Multiple suppliers for same part; availability (lead time, stock); learning which supplier performs in which region.
+
+- **Strategies:** domestic, import, spot market, salvage
+- **Availability:** lead time, stock level, quality certification
+- **Priors:** per-region, per-part; updated on delivery success/failure
+- **Prove:** Same selection semantics, bounded priors, context-keyed learning
+
+### 8.2 Robotics (tool selection)
+
+**Surface:** Multiple tools achieve same task; availability (tool mounted, calibration); learning which tool works in which workspace.
+
+- **Strategies:** tool_A, tool_B, manual
+- **Availability:** tool present, calibrated, workspace clearance
+- **Priors:** per-workspace; updated on task success/failure
+- **Prove:** Availability-conditioned selection; execution-only prior updates
+
+### 8.3 Minecraft (iron acquisition)
+
+**Surface:** mine_smelt, trade, loot, salvage; villager_nearby, chest_known, ore_visible; biome/area priors.
+
+- **Prove:** Direct mapping to current code anchors; strategy selection before `sterlingService.solve()`.
+
+---
+
+## 9. Concrete certification tests
+
+### Test 1: Strategy availability
+
+```ts
+describe('Rig D - strategy availability', () => {
+  it('disables strategies with no availability', () => {
+    const worldState = createWorldState({ villager_nearby: false });
+    const selections = selectStrategy({ item: 'iron_ingot', count: 1 }, worldState, defaultPriors);
+    const tradeStrategy = selections.find(s => s.strategyId === 'iron_trade');
+    expect(tradeStrategy?.availabilityScore).toBe(0);
+    expect(tradeStrategy?.effectiveCost).toBeGreaterThan(100);
+  });
+});
+```
+
+### Test 2: Prior learning on execution only
+
+```ts
+describe('Rig D - prior learning on execution only', () => {
+  it('boosts prior on successful execution', () => {
+    const initialPriors = createDefaultPriors();
+    const initialPrior = getPrior('iron_trade', { biome: 'plains', areaType: 'village' }, initialPriors);
+    const updatedPriors = reportStrategyOutcome({
+      strategyId: 'iron_trade',
+      context: { biome: 'plains', areaType: 'village' },
+      startTick: 0,
+      endTick: 100,
+      success: true,
+      itemsAcquired: 10,
+    }, initialPriors);
+    const newPrior = getPrior('iron_trade', { biome: 'plains', areaType: 'village' }, updatedPriors);
+    expect(newPrior).toBeGreaterThan(initialPrior);
+  });
+
+  it('does not change prior after plan generation', () => {
+    const priors = createDefaultPriors();
+    const before = getPrior('iron_trade', { biome: 'plains', areaType: 'village' }, priors);
+    selectStrategy({ item: 'iron_ingot', count: 1 }, worldState, priors);
+    const after = getPrior('iron_trade', { biome: 'plains', areaType: 'village' }, priors);
+    expect(after).toBe(before);
+  });
+});
+```
+
+### Test 3: Bounded priors
+
+```ts
+describe('Rig D - bounded priors', () => {
+  it('clamps priors to [PRIOR_MIN, PRIOR_MAX]', () => {
+    let priors = createDefaultPriors();
+    for (let i = 0; i < 50; i++) {
+      priors = reportStrategyOutcome({ strategyId: 'iron_trade', context: { biome: 'plains', areaType: 'village' }, startTick: 0, endTick: 10, success: false, itemsAcquired: 0 }, priors);
+    }
+    const p = getPrior('iron_trade', { biome: 'plains', areaType: 'village' }, priors);
+    expect(p).toBeGreaterThanOrEqual(PRIOR_MIN);
+    expect(p).toBeLessThanOrEqual(PRIOR_MAX);
+  });
+});
+```
+
+### Test 4: Context-keyed priors
+
+```ts
+describe('Rig D - context-keyed priors', () => {
+  it('allows different priors per context', () => {
+    let priors = createDefaultPriors();
+    priors = reportStrategyOutcome({ strategyId: 'iron_trade', context: { biome: 'plains', areaType: 'village' }, startTick: 0, endTick: 10, success: true, itemsAcquired: 10 }, priors);
+    priors = reportStrategyOutcome({ strategyId: 'iron_trade', context: { biome: 'cave', areaType: 'mine' }, startTick: 0, endTick: 100, success: false, itemsAcquired: 0 }, priors);
+    const villagePrior = getPrior('iron_trade', { biome: 'plains', areaType: 'village' }, priors);
+    const cavePrior = getPrior('iron_trade', { biome: 'cave', areaType: 'mine' }, priors);
+    expect(villagePrior).toBeGreaterThan(cavePrior);
+  });
+});
+```
+
+### Test 5: Availability from world state
+
+```ts
+describe('Rig D - availability from world state', () => {
+  it('villager_nearby true only when entity in world state', () => {
+    const withVillager = createWorldState({ nearbyEntities: [{ type: 'villager' }] });
+    const withoutVillager = createWorldState({ nearbyEntities: [] });
+    expect(extractAvailability(withVillager).villager_nearby).toBe(true);
+    expect(extractAvailability(withoutVillager).villager_nearby).toBe(false);
+  });
+});
+```
+
+---
+
+## 10. Definition of "done" (testable)
+
+- **Multiple strategies available:** Solver considers alternatives for same goal.
+- **Availability-conditioned:** Unavailable strategies are not proposed.
+- **Learning on execution only:** Priors shift only from execution outcomes (Tests 2, 4).
+- **Context-aware:** Priors are context-sensitive, not global (Test 4).
+- **Bounded priors:** Priors in [PRIOR_MIN, PRIOR_MAX] (Test 3).
+- **Tests:** All 5 certification test blocks pass; pivot acceptance table satisfied.
+
+---
+
+## 11. Implementation files summary
+
+| Action | Path |
+|--------|------|
+| New | `packages/planning/src/strategies/strategy-families.ts` |
+| New | `packages/planning/src/strategies/availability.ts` |
+| New | `packages/planning/src/strategies/strategy-priors.ts` |
+| New | `packages/planning/src/strategies/execution-tracking.ts` |
+| Modify | `packages/planning/src/task-integration/sterling-planner.ts` — call strategy selector before solve |
+| Modify | `packages/planning/src/sterling/minecraft-crafting-solver.ts` — accept pre-filtered rules |
+| Modify | `packages/planning/src/reactive-executor/reactive-executor.ts` — report strategy outcome hook |
+
+---
+
+## 12. Order of work (suggested)
 
 1. **Define strategy families** for iron acquisition (mine, trade, loot, salvage).
 2. **Add availability predicates** to world state.
@@ -124,7 +293,7 @@ With proper multi-strategy:
 
 ---
 
-## 8. Dependencies and risks
+## 13. Dependencies and risks
 
 - **Rig A-C**: Builds on operators, legality, and temporal modeling.
 - **Availability accuracy**: Bot must provide accurate availability info.
@@ -133,17 +302,7 @@ With proper multi-strategy:
 
 ---
 
-## 9. Definition of "done"
-
-- **Multiple strategies available**: Solver considers alternatives for same goal.
-- **Availability-conditioned**: Unavailable strategies are not proposed.
-- **Learning works**: Priors shift based on execution outcomes.
-- **Context-aware**: Priors are context-sensitive, not global.
-- **Tests**: Strategy selection adapts to availability; failures update priors.
-
----
-
-## 10. Cross-references
+## 14. Cross-references
 
 - **Companion approach**: `RIG_D_MULTI_STRATEGY_APPROACH.md`
 - **Capability primitives**: `capability-primitives.md` (P4)
