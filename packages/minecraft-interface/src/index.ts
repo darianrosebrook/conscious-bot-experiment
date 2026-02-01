@@ -83,7 +83,7 @@ import { IntegratedPlanningCoordinator } from './plan-executor';
  */
 export async function createMinecraftInterface(
   config: BotConfig,
-  planningCoordinator: IntegratedPlanningCoordinator
+  planningCoordinator?: IntegratedPlanningCoordinator
 ): Promise<{
   botAdapter: BotAdapter;
   observationMapper: ObservationMapper;
@@ -110,7 +110,7 @@ export async function createMinecraftInterface(
  */
 export async function createMinecraftInterfaceWithoutConnect(
   config: BotConfig,
-  planningCoordinator: IntegratedPlanningCoordinator
+  planningCoordinator?: IntegratedPlanningCoordinator
 ): Promise<{
   botAdapter: BotAdapter;
   observationMapper: ObservationMapper;

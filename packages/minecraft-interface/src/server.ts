@@ -20,37 +20,6 @@ import {
   ObservationMapper,
   MemoryIntegrationService,
 } from './index';
-// INTERMEDIATE FIX: Legacy IntegratedPlanningCoordinator retired — replaced by Sterling solvers.
-// This stub provides a no-op implementation satisfying the local IntegratedPlanningCoordinator interface.
-// TODO(rig-planning): Replace with proper Sterling solver integration when planning rigs are implemented.
-// The stub returns a valid structure with primaryPlan: null to avoid "no plan available" errors.
-import type { IntegratedPlanningCoordinator } from './plan-executor';
-function createIntegratedPlanningCoordinator(
-  _config?: any
-): IntegratedPlanningCoordinator {
-  return {
-    plan: async () => ({
-      success: false,
-      primaryPlan: null,
-      error: 'Legacy planning retired — use Sterling solvers',
-      planningLatency: 0,
-    }),
-    executePlan: async () => ({
-      success: false,
-      primaryPlan: null,
-      error: 'Legacy planning retired — use Sterling solvers',
-      planningLatency: 0,
-    }),
-    planAndExecute: async () => ({
-      success: false,
-      primaryPlan: null,
-      error: 'Legacy planning retired — use Sterling solvers',
-      planningLatency: 0,
-      // INTERMEDIATE FIX: Return valid structure so executePlanningCycle doesn't throw
-      isLegacyRetired: true,
-    }),
-  };
-}
 import type { Bot } from 'mineflayer';
 import { mineflayer as startMineflayerViewer } from 'prismarine-viewer';
 import { resilientFetch } from '@conscious-bot/core';
@@ -230,10 +199,8 @@ let thoughtGenerationInterval: NodeJS.Timeout | null = null;
 let hudUpdateInterval: NodeJS.Timeout | null = null;
 let dashboardPushInterval: NodeJS.Timeout | null = null;
 let botInstanceSyncInterval: NodeJS.Timeout | null = null;
-let planningCoordinator: any = null;
 let memoryIntegration: MemoryIntegrationService | null = null;
 let isConnecting = false;
-let isRunningPlanningCycle = false;
 let viewerActive = false;
 let autoConnectInterval: NodeJS.Timeout | null = null;
 let systemReady = process.env.SYSTEM_READY_ON_BOOT === '1';
@@ -241,18 +208,14 @@ let readyAt: string | null = systemReady ? new Date().toISOString() : null;
 let readySource: string | null = systemReady ? 'env' : null;
 let pendingThoughtGeneration = false;
 
-// INTERMEDIATE FIX: Throttle "no plan" log messages to avoid spam
-// TODO(rig-planning): Remove this throttling when proper planning rigs are implemented
-let lastNoPlanLogTime = 0;
-const NO_PLAN_LOG_THROTTLE_MS = 60000; // Only log "no plan" once per minute
-
 /**
- * Start automatic thought generation from bot experiences
+ * Start observation broadcast — sends periodic bot status to cognition service.
+ * Replaces the retired planning loop: execution now flows through the planning server (port 3002).
  */
-function startThoughtGeneration() {
+function startObservationBroadcast() {
   if (!systemReady) {
     pendingThoughtGeneration = true;
-    console.log('Waiting for system readiness; autonomous loop paused');
+    console.log('Waiting for system readiness; observation broadcast paused');
     return;
   }
 
@@ -260,111 +223,67 @@ function startThoughtGeneration() {
     clearInterval(thoughtGenerationInterval);
   }
 
+  // Track cognition reachability to avoid log spam (state-change pattern)
+  let cognitionState: 'up' | 'down' = 'down';
+
   thoughtGenerationInterval = setInterval(async () => {
-    if (!minecraftInterface || isRunningPlanningCycle) {
-      return;
-    }
+    if (!minecraftInterface) return;
 
     try {
       const bot = minecraftInterface.botAdapter.getBot();
-      if (!bot.entity) {
-        return; // Bot not ready
-      }
+      if (!bot.entity) return;
 
-      // Check if already executing a plan — don't overlap
-      const status = minecraftInterface.planExecutor.getExecutionStatus();
-      if (status.isExecuting) {
-        return; // Already running a planning cycle
-      }
-
-      // Execute an autonomous planning cycle with concurrency guard
-      isRunningPlanningCycle = true;
-      // INTERMEDIATE FIX: Only log cycle start in debug mode to reduce spam
-      if (process.env.DEBUG_PLANNING === 'true') {
-        console.log('Starting autonomous planning cycle...');
-      }
-      try {
-        const result =
-          await minecraftInterface.planExecutor.executePlanningCycle();
-
-        if (result.success) {
-          console.log(
-            `Planning cycle complete: ${result.executedSteps}/${result.totalSteps} steps executed`
-          );
-          // Send status thought only when the cycle had at least one step, to avoid flooding the cognitive stream when there is no plan
-          if (result.executedSteps > 0) {
-            const worldState =
-              minecraftInterface.observationMapper.mapBotStateToPlanningContext(
-                bot
-              );
-            const healthPct = Math.round(
-              ((worldState.worldState?.health ?? 0) / 20) * 100
-            );
-            const hungerPct = Math.round(
-              ((worldState.worldState?.hunger ?? 0) / 20) * 100
-            );
-            const thought = `Health: ${healthPct}%, Hunger: ${hungerPct}%. Observing environment and deciding next action.`;
-            minecraftInterface.observationMapper
-              .sendThoughtToCognition(thought, 'status')
-              .catch(() => {}); // Fire-and-forget, don't block execution
-          }
-        } else {
-          // INTERMEDIATE FIX: Throttle "no plan" log messages to once per minute
-          // TODO(rig-planning): Remove this throttling when proper planning rigs are implemented
-          const now = Date.now();
-          const isLegacyRetired = result.error?.includes(
-            'Legacy planning retired'
-          );
-          if (isLegacyRetired) {
-            // Only log legacy retired message once per minute
-            if (now - lastNoPlanLogTime >= NO_PLAN_LOG_THROTTLE_MS) {
-              lastNoPlanLogTime = now;
-              console.log(
-                '[Planning] Legacy planning retired — awaiting rig implementation (throttled, next log in 60s)'
-              );
-            }
-          } else if (process.env.DEBUG_PLANNING === 'true') {
-            // Log other planning errors only in debug mode
-            console.log(
-              `Planning cycle ended: ${result.error || 'no plan generated'} (${result.executedSteps}/${result.totalSteps} steps)`
-            );
-          }
-        }
-      } finally {
-        isRunningPlanningCycle = false;
-      }
-    } catch (error) {
-      isRunningPlanningCycle = false;
-      console.error(
-        'Error in autonomous planning cycle:',
-        error instanceof Error ? error.message : error
+      const worldState =
+        minecraftInterface.observationMapper.mapBotStateToPlanningContext(bot);
+      const healthPct = Math.round(
+        ((worldState.worldState?.health ?? 0) / 20) * 100
       );
-    }
-  }, 15000); // Every 15 seconds
+      const hungerPct = Math.round(
+        ((worldState.worldState?.hunger ?? 0) / 20) * 100
+      );
+      const thought = `Health: ${healthPct}%, Hunger: ${hungerPct}%. Observing environment.`;
 
-  console.log('Autonomous planning loop started (15s intervals)');
+      await minecraftInterface.observationMapper.sendThoughtToCognition(
+        thought,
+        'status'
+      );
+
+      if (cognitionState === 'down') {
+        console.log('[Observation] Cognition service reachable');
+        cognitionState = 'up';
+      }
+    } catch {
+      if (cognitionState !== 'down') {
+        console.warn('[Observation] Cognition service unreachable');
+        cognitionState = 'down';
+      }
+      // Silent on repeated failures — state-change logging only
+    }
+  }, 30_000); // 30s interval (status updates, not planning)
+
+  console.log('Observation broadcast started (30s intervals)');
 }
 
-function tryStartThoughtGeneration(reason: string) {
+function tryStartObservationBroadcast(reason: string) {
   if (!systemReady) {
     pendingThoughtGeneration = true;
     console.log(
-      `Deferring autonomous planning loop until system readiness (${reason})`
+      `Deferring observation broadcast until system readiness (${reason})`
     );
     return;
   }
   pendingThoughtGeneration = false;
-  startThoughtGeneration();
+  startObservationBroadcast();
 }
 
 /**
  * Stop automatic thought generation
  */
-function stopThoughtGeneration() {
+function stopObservationBroadcast() {
   if (thoughtGenerationInterval) {
     clearInterval(thoughtGenerationInterval);
     thoughtGenerationInterval = null;
-    console.log('Autonomous planning loop stopped');
+    console.log('Observation broadcast stopped');
   }
 }
 
@@ -434,7 +353,7 @@ function setupBotStateWebSocket() {
 
     // Stop thought generation when bot disconnects
     console.log('Bot disconnected, stopping thought generation...');
-    stopThoughtGeneration();
+    stopObservationBroadcast();
   });
 
   minecraftInterface.botAdapter.on('spawned', (data) => {
@@ -446,7 +365,7 @@ function setupBotStateWebSocket() {
 
     // Start thought generation when bot spawns
     console.log('🤖 Bot spawned, starting thought generation...');
-    tryStartThoughtGeneration('bot spawned');
+    tryStartObservationBroadcast('bot spawned');
   });
 
   minecraftInterface.botAdapter.on('warning', (data) => {
@@ -466,7 +385,7 @@ function setupBotStateWebSocket() {
 
       // Stop thought generation when bot dies
       console.log('💀 Bot died, stopping thought generation...');
-      stopThoughtGeneration();
+      stopObservationBroadcast();
     }
     broadcastBotStateUpdate('error', data);
   });
@@ -494,7 +413,7 @@ function setupBotStateWebSocket() {
 
     // Restart thought generation when bot respawns
     console.log('Bot respawned, restarting thought generation...');
-    startThoughtGeneration();
+    startObservationBroadcast();
   });
 
   // Send periodic HUD updates every 5 seconds (clear previous to prevent duplicates)
@@ -715,7 +634,7 @@ app.post('/system/ready', (req, res) => {
   if (pendingThoughtGeneration) {
     const bot = minecraftInterface?.botAdapter.getBot();
     if (bot?.entity) {
-      tryStartThoughtGeneration('system ready');
+      tryStartObservationBroadcast('system ready');
     }
   }
 
@@ -816,38 +735,8 @@ app.post('/connect', async (req, res) => {
       );
     }
 
-    // Initialize planning coordinator with proper configuration
-    planningCoordinator = createIntegratedPlanningCoordinator({
-      hrmConfig: {
-        maxRefinements: 3,
-        qualityThreshold: 0.7,
-        hrmLatencyTarget: 100,
-        enableIterativeRefinement: true,
-      },
-      htnConfig: {
-        maxDecompositionDepth: 5,
-        methodCacheSize: 100,
-        preferenceWeights: { gathering: 0.8, crafting: 0.9, exploration: 0.6 },
-      },
-      goapConfig: {
-        maxPlanLength: 10,
-        planningBudgetMs: 5000,
-        repairThreshold: 0.5,
-      },
-      coordinatorConfig: {
-        routingStrategy: 'hybrid',
-        fallbackTimeout: 3000,
-        enablePlanMerging: true,
-        enableCrossValidation: true,
-        enableTaskBootstrap: true,
-      },
-    });
-
-    // Create minecraft interface
-    minecraftInterface = await createMinecraftInterface(
-      botConfig,
-      planningCoordinator
-    );
+    // Create minecraft interface (no local planning coordinator — execution flows through planning server)
+    minecraftInterface = await createMinecraftInterface(botConfig);
 
     // Setup WebSocket event handlers for real-time updates
     setupBotStateWebSocket();
@@ -855,7 +744,6 @@ app.post('/connect', async (req, res) => {
     // Leaves already registered on server startup; skip duplicate
     console.log('Connected to Minecraft server');
     console.log('Memory integration initialized');
-    console.log('Planning coordinator initialized');
 
     res.json({
       success: true,
@@ -1019,38 +907,8 @@ async function attemptAutoConnect() {
     }
     isConnecting = true;
 
-    // Create planning coordinator with proper configuration
-    planningCoordinator = createIntegratedPlanningCoordinator({
-      hrmConfig: {
-        maxRefinements: 3,
-        qualityThreshold: 0.7,
-        hrmLatencyTarget: 100,
-        enableIterativeRefinement: true,
-      },
-      htnConfig: {
-        maxDecompositionDepth: 5,
-        methodCacheSize: 100,
-        preferenceWeights: { gathering: 0.8, crafting: 0.9, exploration: 0.6 },
-      },
-      goapConfig: {
-        maxPlanLength: 10,
-        planningBudgetMs: 5000,
-        repairThreshold: 0.5,
-      },
-      coordinatorConfig: {
-        routingStrategy: 'hybrid',
-        fallbackTimeout: 3000,
-        enablePlanMerging: true,
-        enableCrossValidation: true,
-        enableTaskBootstrap: true,
-      },
-    });
-
-    // Create full minecraft interface
-    minecraftInterface = await createMinecraftInterfaceWithoutConnect(
-      botConfig,
-      planningCoordinator
-    );
+    // Create minecraft interface (no local planning coordinator — execution flows through planning server)
+    minecraftInterface = await createMinecraftInterfaceWithoutConnect(botConfig);
 
     // Manually initialize the plan executor to connect to Minecraft
     await minecraftInterface.planExecutor.initialize();
@@ -1059,7 +917,7 @@ async function attemptAutoConnect() {
     // Setup WebSocket event handlers and start autonomous planning
     // (must be after initialize() completes, not in 'initialized' event which already fired)
     setupBotStateWebSocket();
-    startThoughtGeneration();
+    startObservationBroadcast();
 
     // Start Prismarine viewer now that bot is connected and spawned.
     // Previously this was inside the 'initialized' event handler, but that event

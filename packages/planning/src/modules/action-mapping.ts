@@ -374,7 +374,14 @@ export function mapBTActionToMinecraft(
           action: 'assess_threats',
         },
       };
+    case 'place_workstation':
+      return {
+        type: 'place_workstation',
+        parameters: {
+          workstation: args.workstation || 'crafting_table',
+        },
+      };
     default:
-      return { type: tool, parameters: args, debug: debugInfo };
+      return { type: normalizedTool, parameters: args, debug: debugInfo };
   }
 }

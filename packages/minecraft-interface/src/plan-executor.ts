@@ -46,7 +46,7 @@ export class PlanExecutor extends EventEmitter {
   private observationMapper: ObservationMapper;
   private actionTranslator: ActionTranslator | null = null;
   private stateMachineWrapper: StateMachineWrapper | null = null;
-  private planningCoordinator: IntegratedPlanningCoordinator;
+  private planningCoordinator: IntegratedPlanningCoordinator | null;
   private config: BotConfig;
 
   private currentPlan: Plan | null = null;
@@ -58,12 +58,12 @@ export class PlanExecutor extends EventEmitter {
 
   constructor(
     config: BotConfig,
-    planningCoordinator: IntegratedPlanningCoordinator
+    planningCoordinator?: IntegratedPlanningCoordinator
   ) {
     super();
 
     this.config = config;
-    this.planningCoordinator = planningCoordinator;
+    this.planningCoordinator = planningCoordinator ?? null;
     this.botAdapter = new BotAdapter(config);
     this.observationMapper = new ObservationMapper(config);
 
@@ -147,6 +147,22 @@ export class PlanExecutor extends EventEmitter {
   ): Promise<PlanExecutionResult> {
     if (!this.actionTranslator) {
       throw new Error('PlanExecutor not initialized. Call initialize() first.');
+    }
+
+    if (!this.planningCoordinator) {
+      this.isExecuting = false;
+      return {
+        success: false,
+        plan: null as any,
+        executedSteps: 0,
+        totalSteps: 0,
+        startTime: Date.now(),
+        endTime: Date.now(),
+        actionResults: [],
+        repairAttempts: 0,
+        finalWorldState: {} as any,
+        error: 'No planning coordinator — use planning server',
+      };
     }
 
     this.isExecuting = true;
@@ -487,6 +503,10 @@ export class PlanExecutor extends EventEmitter {
     repairedPlan?: Plan;
     error?: string;
   }> {
+    if (!this.planningCoordinator) {
+      return { success: false, error: 'No planning coordinator available for repair' };
+    }
+
     try {
       // Get current world state
       const currentContext = this.observeCurrentState();

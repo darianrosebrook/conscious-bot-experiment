@@ -128,6 +128,7 @@ import {
   parseGeofenceConfig,
   StepRateLimiter,
   initExecutorAbortController,
+  getExecutorAbortSignal,
   emergencyStopExecutor,
   type ExecutorConfig,
 } from './server/autonomous-executor';
@@ -552,7 +553,8 @@ async function executeActionWithBotCheck(action: any, signal?: AbortSignal) {
     const post = await mcPostJson<any>(
       '/action',
       { type: action.type, parameters: action.parameters },
-      action.timeout || 15_000
+      action.timeout || 15_000,
+      signal,
     );
 
     if (!post.ok) {
@@ -1668,6 +1670,23 @@ async function autonomousTaskExecutor() {
       }
     }
 
+    // Defense-in-depth: verify bot is actually spawned, not just HTTP-reachable
+    try {
+      const healthRes = await mcFetch('/health', { method: 'GET', timeoutMs: 3000 });
+      if (healthRes.ok) {
+        const healthData = (await healthRes.json()) as { connectionState?: string };
+        if (healthData.connectionState !== 'spawned') {
+          console.log('[Executor] Bot reachable but not spawned — skipping cycle');
+          return;
+        }
+      }
+    } catch {
+      // If health fetch fails here, the earlier checkBotConnectionDetailed passed,
+      // so this is a transient issue — skip rather than dispatch to an unready bot
+      console.log('[Executor] Health re-check failed — skipping cycle');
+      return;
+    }
+
     // Check crafting table prerequisite for crafting tasks
     if (
       currentTask.type === 'crafting' &&
@@ -1985,7 +2004,8 @@ async function autonomousTaskExecutor() {
           );
           const actionResult = await toolExecutor.execute(
             toolName,
-            leafExec.args
+            leafExec.args,
+            getExecutorAbortSignal(),
           );
           if (actionResult?.ok) {
             const stepCompleted = await taskIntegration.completeTaskStep(
@@ -2500,7 +2520,8 @@ async function autonomousTaskExecutor() {
         // Execute the leaf via the Minecraft Interface action API
         const actionResult = await toolExecutor.execute(
           mcpToolName,
-          selectedLeaf.args || {}
+          selectedLeaf.args || {},
+          getExecutorAbortSignal(),
         );
 
         if (actionResult?.ok) {
@@ -3596,31 +3617,33 @@ async function startServer() {
         `leafAllowlist=${executorConfig.leafAllowlist.size} leaves` +
         `${geofenceConfig.enabled ? `, geofence=${geofenceConfig.radius}b around (${geofenceConfig.center.x},${geofenceConfig.center.z})` : ''})`
       );
-      const startExecutor = () => {
+      console.log(`[Pipeline] Cognition: ${process.env.COGNITION_SERVICE_URL || 'http://localhost:3003'}`);
+      console.log(`[Pipeline] MC interface: ${MC_ENDPOINT}`);
+
+      let executorStarted = false;
+      const tryStartExecutor = () => {
+        if (executorStarted) return;
+        if (process.env.ENABLE_PLANNING_EXECUTOR !== '1') return;
+        if (!isSystemReady()) return;
+        if (!readiness.executorReady) return;
+        executorStarted = true;
+        console.log('[Planning] Starting executor — system ready and dependencies reachable');
         startAutonomousExecutorScheduler(autonomousTaskExecutor, {
           pollMs: EXECUTOR_POLL_MS,
           maxBackoffMs: EXECUTOR_MAX_BACKOFF_MS,
           breakerOpenMs: BOT_BREAKER_OPEN_MS,
         });
       };
-      if (executorConfig.enabled && readiness.executorReady) {
-        if (isSystemReady()) {
-          startExecutor();
-        } else {
-          waitForSystemReady().then(() => {
-            if (process.env.ENABLE_PLANNING_EXECUTOR === '1') {
-              startExecutor();
-            }
-          });
-        }
-      } else if (executorConfig.enabled) {
-        console.log('[Planning] Executor enabled but not ready — will start when minecraft is reachable');
-        // Fall back to system-ready gating: re-probe will detect minecraft
-        waitForSystemReady().then(() => {
-          if (process.env.ENABLE_PLANNING_EXECUTOR === '1') {
-            startExecutor();
-          }
-        });
+
+      // Attempt immediate start
+      tryStartExecutor();
+
+      if (!executorStarted) {
+        console.log('[Planning] Executor enabled but not ready — will start when dependencies are reachable');
+        // Re-check when system becomes ready
+        waitForSystemReady().then(() => tryStartExecutor());
+        // Re-check when readiness monitor detects a state change
+        readiness.onChange(() => tryStartExecutor());
       }
     } else {
       console.log('[Planning] Executor disabled (set ENABLE_PLANNING_EXECUTOR=1 to enable)');
