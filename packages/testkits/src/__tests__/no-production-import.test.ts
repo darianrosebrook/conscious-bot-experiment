@@ -111,6 +111,8 @@ describe('domain boundary guards', () => {
     'packages/testkits/src/p21/p21a-conformance-suite.ts',
     'packages/testkits/src/p21/p21b-conformance-suite.ts',
     'packages/testkits/src/capability-proof-manifest.ts',
+    'packages/testkits/src/p21/run-handle.ts',
+    'packages/testkits/src/p21/invariant-ids.ts',
   ];
 
   it('no domain vocabulary in capsule/contract code (comments excluded)', () => {

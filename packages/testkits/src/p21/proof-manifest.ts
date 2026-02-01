@@ -4,6 +4,13 @@
  * Runtime-safe (no vitest imports). Populates the primitive-agnostic
  * CapabilityProofManifest with P21-specific invariant descriptions,
  * extension info, and the invariant constant arrays.
+ *
+ * These generators produce **certification truth** (which invariants are
+ * proven across surfaces) but cannot determine **execution truth** (which
+ * invariants failed at runtime). Execution-facing fields (run_passed,
+ * invariants_failed, invariants_not_started) are set to safe defaults
+ * here and must be overwritten by patchExecutionResults() using the
+ * run-handle before the manifest is written to disk.
  */
 
 import type {
@@ -179,8 +186,9 @@ export function generateP21AManifest(opts: {
     status: 'not_started' as const,
   }));
 
-  const passedIds = invariants.filter((i) => i.status === 'proven').map((i) => i.id);
-  const failedIds = invariants.filter((i) => i.status !== 'proven').map((i) => i.id);
+  // Certification truth: derived from surfaceResults (proof across surfaces)
+  const provenIds = invariants.filter((i) => i.status === 'proven').map((i) => i.id);
+  const allIds = invariants.map((i) => i.id);
 
   const provingSurfaceIds = surfaceResults ? [...surfaceResults.keys()] : [];
 
@@ -201,10 +209,14 @@ export function generateP21AManifest(opts: {
     invariants,
     extensions,
     results: {
-      passed: failedIds.length === 0,
-      invariants_passed: passedIds,
-      invariants_failed: failedIds,
+      // Certification truth (derived from invariant catalog)
+      fully_proven: provenIds.length === invariants.length,
+      invariants_passed: provenIds,
       runner: 'vitest@3.x',
+      // Execution truth defaults — must be overwritten by patchExecutionResults()
+      run_passed: true,
+      invariants_failed: [],
+      invariants_not_started: allIds.filter((id) => !provenIds.includes(id)),
     },
   };
 }
@@ -238,8 +250,9 @@ export function generateP21BManifest(opts: {
     return { ...inv, provingSurfaces: surfaces, status };
   });
 
-  const passedIds = invariants.filter((i) => i.status === 'proven').map((i) => i.id);
-  const failedIds = invariants.filter((i) => i.status !== 'proven').map((i) => i.id);
+  // Certification truth: derived from surfaceResults (proof across surfaces)
+  const provenIds = invariants.filter((i) => i.status === 'proven').map((i) => i.id);
+  const allIds = invariants.map((i) => i.id);
 
   const provingSurfaceIds = surfaceResults ? [...surfaceResults.keys()] : [];
 
@@ -259,10 +272,14 @@ export function generateP21BManifest(opts: {
     invariants,
     extensions: [],
     results: {
-      passed: failedIds.length === 0,
-      invariants_passed: passedIds,
-      invariants_failed: failedIds,
+      // Certification truth (derived from invariant catalog)
+      fully_proven: provenIds.length === invariants.length,
+      invariants_passed: provenIds,
       runner: 'vitest@3.x',
+      // Execution truth defaults — must be overwritten by patchExecutionResults()
+      run_passed: true,
+      invariants_failed: [],
+      invariants_not_started: allIds.filter((id) => !provenIds.includes(id)),
     },
   };
 }

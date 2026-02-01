@@ -278,6 +278,66 @@ Extensions are the mechanism for optional capability enrichment. To prevent exte
 
 ---
 
+## G2. Known Constraints
+
+### Workspace alias resolution
+
+Tests must run via per-package vitest configs. Running vitest from the repo root with `--filter` depends on cwd for config selection, which can cause workspace alias resolution failures (e.g., `@conscious-bot/testkits` not resolving correctly when vitest is invoked from the wrong cwd).
+
+### Canonical test invocation
+
+The canonical one-command invocation for all P21 suites from repo root is:
+
+```bash
+pnpm test:p21
+```
+
+This delegates to package-local scripts:
+- `pnpm --filter @conscious-bot/testkits test:p21` — runs testkits P21 suite (reference security, truthfulness tripwire, needle-breaks, determinism canary)
+- `pnpm --filter @conscious-bot/minecraft-interface test:p21` — runs Minecraft P21-A and P21-B proving surfaces
+
+For the full workspace test (includes testkits via turbo):
+```bash
+pnpm test
+```
+
+### Manifest truthfulness
+
+Proof manifest artifacts reflect actual test outcomes through a two-phase pipeline:
+
+1. **`generateP21*Manifest({ surfaceResults })`** produces **certification truth**: which invariants are proven across surfaces (`invariants_passed`, `fully_proven`). The generator has no access to execution failures — it only sees which invariants appeared in `surfaceResults` (the set of passes).
+
+2. **`patchExecutionResults(handle, manifest)`** overwrites **execution truth** fields from the run-handle: `run_passed`, `invariants_failed`, `invariants_not_started`. The run-handle is the sole authority on which invariants were exercised and whether they passed or failed. This step is required — without it, failures are invisible to the manifest (they appear as `not_started` rather than `fail`).
+
+3. **`assertManifestTruthfulness(handle, manifest)`** is a tripwire that validates handle↔manifest consistency:
+   - **Certification consistency**: every handle `pass` must appear in `invariants_passed`; no handle `fail` may appear in `invariants_passed`
+   - **Execution consistency**: if the handle has failures, `run_passed` must be false and `invariants_failed` must contain exactly those IDs; if no failures, `run_passed` must be true and `invariants_failed` must be empty. This catches omitted `patchExecutionResults()` calls.
+
+4. **Truthfulness test** (`proof-artifact-truthfulness.test.ts`) validates the full pipeline, including:
+   - All-pass runs (P21A with conditional invariants, P21B)
+   - Blank template regression (surfaceResults omitted)
+   - Failing run propagation (handle failures → `run_passed=false`, `invariants_failed` populated)
+   - Missing `patchExecutionResults` detection (tripwire throws)
+
+#### Manifest results semantics
+
+The manifest `results` object separates execution truth from certification truth:
+
+**Execution truth** (sourced from run-handle via `patchExecutionResults`):
+
+- **`run_passed`**: true when no exercised invariant failed. Conditional invariants left as `not_started` (e.g., INV-4b in non-predictive mode, INV-10 without `id_robustness` extension) do not cause this to be false. This answers: "did this conformance run pass?"
+- **`invariants_failed`**: IDs of invariants that were executed and failed (handle status `fail`). Empty when the run passes. In a single-surface run, this is the definitive list of failures.
+- **`invariants_not_started`**: IDs of invariants not exercised in this run (handle status `not_started`). Includes conditional invariants not activated by the current mode/extension configuration.
+
+**Certification truth** (sourced from `surfaceResults` in the generator):
+
+- **`fully_proven`**: true when every catalog invariant has status `proven`. This is a strict completeness signal — it goes false when any invariant, including conditional ones not exercised, is not proven. This answers: "does this artifact prove the entire invariant catalog?"
+- **`invariants_passed`**: IDs of invariants proven across all declaring surfaces.
+
+`fully_proven` may remain false even when `run_passed` is true, when the catalog includes conditional invariants that were not activated by the current surface's mode/extension configuration.
+
+---
+
 ## H. Final Claim Statement
 
 This tranche certifies `p21.a` on surfaces {Minecraft TrackSet, Reference Security} under {conservative, trackCap=64, hysteresisBudget=4} with no extensions; certifies `p21.b` on surface {Minecraft BeliefBus} with {deltaCap=32, snapshotIntervalTicks=25}. Extensions `risk_components_v1`, `id_robustness`, `predictive_model` are defined but not certified on any surface.

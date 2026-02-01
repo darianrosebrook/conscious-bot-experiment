@@ -86,12 +86,18 @@ export interface CapabilityProofManifest {
   extensions: ExtensionEvidence[];
   /** Aggregate results */
   results: {
-    /** Whether all active invariants passed */
-    passed: boolean;
-    /** IDs of invariants that passed */
+    /** True if no executed invariant failed (all exercised invariants passed).
+     *  Conditional invariants left as not_started do not cause this to be false. */
+    run_passed: boolean;
+    /** True if every catalog invariant is proven (strict completeness signal).
+     *  False when any invariant — including conditional ones not exercised — is not proven. */
+    fully_proven: boolean;
+    /** IDs of invariants that were proven */
     invariants_passed: string[];
-    /** IDs of invariants that failed */
+    /** IDs of invariants that were executed and failed */
     invariants_failed: string[];
+    /** IDs of invariants that were not exercised in this run */
+    invariants_not_started: string[];
     /** Test runner identity, e.g., "vitest@3.x" */
     runner: string;
     /** Runtime environment descriptor, e.g., "node@22.x / darwin-arm64" */

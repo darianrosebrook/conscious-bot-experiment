@@ -7,7 +7,9 @@
   "type": "module",
   "scripts": {
     "build": "tsc",
-    "type-check": "tsc --noEmit"
+    "type-check": "tsc --noEmit",
+    "test": "vitest run",
+    "test:p21": "vitest run src/p21/__tests__"
   },
   "dependencies": {
     "@conscious-bot/planning": "workspace:*"

@@ -11,8 +11,12 @@
  */
 
 import { createHash } from 'crypto';
-import { describe, it, expect } from 'vitest';
+import { writeFileSync, mkdirSync } from 'fs';
+import path from 'path';
+import { describe, it, expect, afterAll } from 'vitest';
 import { runP21AConformanceSuite } from '../p21a-conformance-suite';
+import { generateP21AManifest } from '../proof-manifest';
+import { createSurfaceResultsFromHandle, finalizeManifest } from '../manifest-helpers';
 import { SECURITY_DOMAIN_CLASSIFIER } from '../../../../planning/src/sterling/primitives/p21/p21-reference-fixtures';
 import type {
   P21ImplementationAdapter,
@@ -381,8 +385,10 @@ class ReferenceTrackSet implements P21ImplementationAdapter {
 
 // ── Run the P21-A conformance suite ─────────────────────────────────
 
-runP21AConformanceSuite({
-  name: 'Reference Security Domain',
+const SURFACE_NAME = 'Reference Security Domain';
+
+const handle = runP21AConformanceSuite({
+  name: SURFACE_NAME,
   createAdapter: (classifier) => new ReferenceTrackSet(classifier, 64),
   classifier: SECURITY_DOMAIN_CLASSIFIER,
   trackCap: 64,
@@ -391,4 +397,44 @@ runP21AConformanceSuite({
   mode: 'conservative',
   hysteresisBudget: 4,
   declaredExtensions: [],
+});
+
+// ── Manifest emission ───────────────────────────────────────────────
+
+const MANIFEST_DIR = process.env.PROOF_ARTIFACT_DIR
+  ?? path.resolve(__dirname, '../../../../..', '.proof-artifacts');
+
+afterAll(() => {
+  const surfaceResults = createSurfaceResultsFromHandle(handle);
+  const manifest = generateP21AManifest({
+    contract_version: '1.0.0',
+    adapters: [{ name: SURFACE_NAME, path: __filename }],
+    config: {
+      trackCap: 64,
+      sparsityBudget: 0,
+      uncertaintyThreshold: 0.5,
+      mode: 'conservative',
+      hysteresisBudget: 4,
+      declaredExtensions: [],
+    },
+    surfaceResults,
+  });
+  manifest.results.timestamp = new Date().toISOString();
+  manifest.results.runtime = `node@${process.versions.node} / ${process.platform}-${process.arch}`;
+
+  // Patch execution truth from handle and validate consistency
+  finalizeManifest(handle, manifest);
+
+  const surfaceSlug = SURFACE_NAME.toLowerCase().replace(/\s+/g, '-');
+  const filename = `${manifest.capability_id.replace('.', '-')}-${surfaceSlug}-${process.pid}.json`;
+
+  try {
+    mkdirSync(MANIFEST_DIR, { recursive: true });
+    writeFileSync(path.join(MANIFEST_DIR, filename), JSON.stringify(manifest, null, 2));
+  } catch (err) {
+    if (process.env.PROOF_ARTIFACT_STRICT === '1') {
+      throw err;
+    }
+    console.warn(`[proof-artifact] Failed to write manifest: ${err}`);
+  }
 });
