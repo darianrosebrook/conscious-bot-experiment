@@ -567,7 +567,9 @@ export class SterlingPlanner {
       'stub'
     );
 
-    if (taskData.metadata) {
+    // Ensure metadata exists so solver-produced signals are never dropped
+    taskData.metadata ??= {} as any;
+    {
       (taskData.metadata as any).buildingPlanId = result.planId;
       (taskData.metadata as any).buildingTemplateId = templateId;
 

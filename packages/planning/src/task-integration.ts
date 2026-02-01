@@ -588,11 +588,15 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
 
     // Check step executability: if no step has a leaf / executable flag,
     // the task cannot make progress without manual intervention.
-    const hasExecutableStep = task.steps.some(
-      (s) => s.meta?.leaf || s.meta?.executable === true
-    );
-    if (task.steps.length > 0 && !hasExecutableStep) {
-      task.metadata.blockedReason = 'no-executable-plan';
+    // Skip when blockedSentinel already set an explicit reason — never overwrite
+    // a solver-provided block with a generic 'no-executable-plan'.
+    if (!blockedSentinel) {
+      const hasExecutableStep = task.steps.some(
+        (s) => s.meta?.leaf || s.meta?.executable === true
+      );
+      if (task.steps.length > 0 && !hasExecutableStep) {
+        task.metadata.blockedReason = 'no-executable-plan';
+      }
     }
 
     this.taskStore.setTask(task);
