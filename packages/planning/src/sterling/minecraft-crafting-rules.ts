@@ -131,12 +131,15 @@ export function buildCraftingRules(
     // If any recipe requires a table, add a place:crafting_table rule
     const anyNeedsTable = Array.from(rules.values()).some(r => r.needsTable);
     if (anyNeedsTable && !rules.has('place:crafting_table')) {
+      // IMPORTANT: consumes MUST be empty for place rules. Sterling's apply_rule()
+      // internally decrements the placed item. If we also list it in consumes,
+      // it gets double-decremented — requiring 2 crafting tables to place 1.
       rules.set('place:crafting_table', {
         action: 'place:crafting_table',
         actionType: 'place',
         produces: [], // doesn't produce inventory items; enables table access
-        consumes: [{ name: 'crafting_table', count: 1 }],
-        requires: [],
+        consumes: [],
+        requires: [{ name: 'crafting_table', count: 1 }],
         needsTable: false,
         needsFurnace: false,
         baseCost: 1.5,
