@@ -536,3 +536,78 @@ needing atomic multi-field updates must mutate all fields before calling
 | File | Tests |
 |------|-------|
 | `packages/planning/src/task-integration/__tests__/goal-protocol-integration.test.ts` | 27 tests: status hooks, management hold protocol, origin isolation, manual_pause wall, observer-snapshot consistency, self-effect partitioning, cross-task routing, clone isolation |
+| `packages/planning/src/task-integration/__tests__/protocol-effects-drain.test.ts` | 3 tests: error containment, global serialization, async caller ordering |
+
+## J. Long-horizon hardening backlog
+
+Items below are follow-ups from the v1 wiring review. They move
+invariant preservation from "by convention + tests" toward "by
+construction." Prioritized by leverage.
+
+### P0: Refactor TaskManagementHandler to return patches
+
+**Why:** The handler persists internally (`taskStore.setTask()` at
+`task-management-handler.ts:171`). This forces `handleManagementAction`
+to pre-condition hold state, clone snapshots for rollback, and reason
+about reference semantics. The workaround works but is fragile.
+
+**Target state:** `handle()` returns `{ decision, taskId, patch }` without
+calling `setTask()`. The wrapper applies patch + hold atomically in one
+`setTask()`. This deletes: preconditioning, rollback, `cloneHold` usage
+in the management path, and the "synchronous micro-window" class of bugs.
+
+**Signals to start:** Any new management action type, any bug where
+rollback restores the wrong state, or any need for batching multiple
+task updates in one commit.
+
+### P1: Enforce "no direct setTask" as an architectural rule
+
+**Why:** Protocol correctness depends on writes going through mutators
+(`updateTaskStatus`, `handleManagementAction`) that fire hooks and
+maintain invariants. Direct `taskStore.setTask()` calls bypass all of
+that. Today this is enforced by convention.
+
+**Options:**
+- Lint rule flagging `taskStore.setTask` outside of `task-integration.ts`
+- Route writes through a `TaskMutator` interface that's easy to spy on
+  and can later support transactional semantics
+- Restrict `setTask` visibility to a narrower interface
+
+### P1: Property-based fuzz sequencing for protocol interleavings
+
+**Why:** Hand-authored integration tests cover known scenarios.
+Long-horizon breakage comes from novel interleavings: random sequences
+of runtime status changes, management actions, goal protocol effects,
+and progress updates.
+
+**Shape:** Generate random event sequences, apply them, assert
+`detectIllegalStates(task) === []` at every commit boundary for all
+goal-bound tasks. This catches illegal combinations without requiring
+anticipation.
+
+### P1: Wire verifier registry + world state provider
+
+**Why:** `enableVerifierRegistry()` exists but is never called in runtime
+bootstrap. `updateTaskProgress` doesn't pass world state to hooks.
+Completion verification is syntactically wired but semantically hollow.
+
+**When:** When real completion checking is needed (verifying a build
+goal is actually satisfied in the Minecraft world state).
+
+### P2: Ban `require()` in TS sources
+
+**Why:** Dynamic `require('./...')` broke Vitest module resolution when
+test coverage expanded to execute those branches. The fix was converting
+to static ESM imports. A lint rule or CI grep prevents recurrence.
+
+**Shape:** ESLint `no-restricted-syntax` rule or
+`grep -r 'require(' packages/planning/src/ --include='*.ts'` in CI.
+
+### Deferred: Copy-on-write TaskStore
+
+**Not yet needed.** Current reference-based semantics are correct given
+the "mutate before setTask" discipline + test coverage. Invest in COW
+only if:
+- Multiple independent observers mutate tasks concurrently
+- Tasks are accessed across async boundaries that leak references widely
+- "Impossible states" appear between mutations prior to `setTask()`
