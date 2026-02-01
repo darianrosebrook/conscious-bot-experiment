@@ -142,6 +142,16 @@ enhancedViewer.on('error', (error) => {
 });
 ```
 
+## POV Switcher and Right-Click Orbit (patched)
+
+The viewer client includes a POV switcher and right-click orbit controls:
+
+- **POV toggle**: Click the "1st" / "3rd" button (top-right) or press F5 to switch between first-person (camera follows bot) and third-person (orbit around bot).
+- **Right-click orbit**: In third-person mode, both left-click and right-click drag orbit the camera around the bot. Middle-click scrolls (dolly/zoom).
+- **Third-person orbit**: Camera orbits around bot position with smooth damping.
+
+The patched client is applied via `patches/prismarine-viewer-lib-index.patched.js` and copied during the postinstall rebuild step.
+
 ## Future Improvements
 
 Potential enhancements for future versions:

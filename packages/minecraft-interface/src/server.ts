@@ -199,7 +199,7 @@ const botConfig: BotConfig = {
     ? parseInt(process.env.MINECRAFT_PORT)
     : 25565,
   username: process.env.MINECRAFT_USERNAME || 'Sterling',
-  version: process.env.MINECRAFT_VERSION || '1.21.9',
+  version: process.env.MINECRAFT_VERSION || '1.21.4',
   auth: 'offline',
 
   // World configuration for memory versioning
@@ -496,18 +496,24 @@ function setupBotStateWebSocket() {
       try {
         const state = minecraftInterface.botAdapter.getStatus();
         if (state?.data?.worldState) {
-          let intero: {
-            stress?: number;
-            focus?: number;
-            curiosity?: number;
-          } | undefined;
+          let intero:
+            | {
+                stress?: number;
+                focus?: number;
+                curiosity?: number;
+              }
+            | undefined;
           try {
             const r = await fetch(`${cognitionUrlForHud}/state`, {
               signal: AbortSignal.timeout(1000),
             });
             if (r.ok) {
               const c = (await r.json()) as {
-                intero?: { stress?: number; focus?: number; curiosity?: number };
+                intero?: {
+                  stress?: number;
+                  focus?: number;
+                  curiosity?: number;
+                };
               };
               if (c?.intero) intero = c.intero;
             }
@@ -557,7 +563,10 @@ function setupBotStateWebSocket() {
         }).catch(() => null),
       ]);
       if (!mcRes.ok) return;
-      const data = (await mcRes.json()) as { success?: boolean; data?: unknown };
+      const data = (await mcRes.json()) as {
+        success?: boolean;
+        data?: unknown;
+      };
       if (!data?.success || !data?.data) return;
       let cognition: {
         intero?: { stress?: number; focus?: number; curiosity?: number };
@@ -1036,46 +1045,40 @@ async function attemptAutoConnect() {
     setupBotStateWebSocket();
     startThoughtGeneration();
 
-    // Set up event listeners
-    minecraftInterface.planExecutor.on('initialized', (event) => {
-      // Only log successful auto-connect in development mode
-      if (process.env.NODE_ENV === 'development') {
-        console.log(' Bot auto-connected to Minecraft server');
-      }
-
-      // Start Prismarine viewer on first connect with retry logic
-      const startViewerWithRetry = async (retryCount = 0) => {
-        try {
-          if (!minecraftInterface) {
-            return;
-          }
-          const bot = minecraftInterface.botAdapter.getBot();
-          if (bot && !viewerActive) {
-            const viewerCheck = minecraftInterface.botAdapter.canStartViewer();
-            if (viewerCheck.canStart) {
-              startViewerSafely(bot, viewerPort);
-            } else if (retryCount < 3) {
-              // Retry after 2 seconds if not ready
-              setTimeout(() => startViewerWithRetry(retryCount + 1), 2000);
-            } else {
-              console.log(
-                'Viewer auto-start failed after retries:',
-                viewerCheck.reason
-              );
-            }
-          }
-        } catch (err) {
-          console.error('Failed to start Prismarine viewer:', err);
-          viewerActive = false;
-          // Retry once more after error
-          if (retryCount < 1) {
-            setTimeout(() => startViewerWithRetry(retryCount + 1), 3000);
+    // Start Prismarine viewer now that bot is connected and spawned.
+    // Previously this was inside the 'initialized' event handler, but that event
+    // fires during initialize() — before the handler is registered — so it was never reached.
+    const startViewerWithRetry = async (retryCount = 0) => {
+      try {
+        if (!minecraftInterface) {
+          return;
+        }
+        const bot = minecraftInterface.botAdapter.getBot();
+        if (bot && !viewerActive) {
+          const viewerCheck = minecraftInterface.botAdapter.canStartViewer();
+          if (viewerCheck.canStart) {
+            startViewerSafely(bot, viewerPort);
+          } else if (retryCount < 3) {
+            // Retry after 2 seconds if not ready
+            setTimeout(() => startViewerWithRetry(retryCount + 1), 2000);
+          } else {
+            console.log(
+              'Viewer auto-start failed after retries:',
+              viewerCheck.reason
+            );
           }
         }
-      };
+      } catch (err) {
+        console.error('Failed to start Prismarine viewer:', err);
+        viewerActive = false;
+        // Retry once more after error
+        if (retryCount < 1) {
+          setTimeout(() => startViewerWithRetry(retryCount + 1), 3000);
+        }
+      }
+    };
 
-      startViewerWithRetry();
-    });
+    startViewerWithRetry();
 
     minecraftInterface.planExecutor.on('shutdown', () => {
       // Only log disconnections in development mode
@@ -1271,7 +1274,10 @@ app.post('/chat', async (req, res) => {
     // Cap outbound chat length
     if (formattedMessage.length > 256) {
       const lastSpace = formattedMessage.slice(0, 256).lastIndexOf(' ');
-      formattedMessage = lastSpace > 180 ? formattedMessage.slice(0, lastSpace) + '...' : formattedMessage.slice(0, 253) + '...';
+      formattedMessage =
+        lastSpace > 180
+          ? formattedMessage.slice(0, lastSpace) + '...'
+          : formattedMessage.slice(0, 253) + '...';
     }
 
     // Send the chat message
@@ -1386,7 +1392,9 @@ function detectBiome(bot: any): string {
       const biomeData = mcData?.biomes?.[biomeId];
       if (biomeData?.name) return biomeData.name;
     }
-  } catch { /* fall through */ }
+  } catch {
+    /* fall through */
+  }
   return 'unknown';
 }
 
@@ -1448,7 +1456,7 @@ app.get('/state', async (req, res) => {
           server: {
             playerCount: 1,
             difficulty: executionStatus?.bot?.server?.difficulty || 'normal',
-            version: executionStatus?.bot?.server?.version || '1.21.9',
+            version: executionStatus?.bot?.server?.version || '1.21.4',
           },
         },
         planningContext: {
@@ -1578,8 +1586,10 @@ app.get('/state', async (req, res) => {
           nearbyHostiles: ws.nearbyHostiles ?? 0,
           nearbyPassives: ws.nearbyPassives ?? 0,
         },
-        nearbyEntities: (ws._minecraftState?.environment?.nearbyEntities ?? []).slice(0, 10),
-        nearbyBlocks: [],  // keep empty — block list is large and not needed by cognition
+        nearbyEntities: (
+          ws._minecraftState?.environment?.nearbyEntities ?? []
+        ).slice(0, 10),
+        nearbyBlocks: [], // keep empty — block list is large and not needed by cognition
       },
       status: 'connected',
       data: {

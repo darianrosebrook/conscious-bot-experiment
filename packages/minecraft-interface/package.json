@@ -59,7 +59,8 @@
     "test:bot:all": "npx tsx bin/test-bot.ts --save --output=bot-test-results.json",
     "test:manual": "npx tsx bin/test-manual.ts",
     "test:curl": "./bin/test-curl.sh",
-    "test:curl:quick": "./bin/test-curl.sh --quick"
+    "test:curl:quick": "./bin/test-curl.sh --quick",
+    "test:p21": "vitest run src/entity-belief/__tests__/p21-conformance-minecraft.test.ts src/entity-belief/__tests__/p21b-conformance-minecraft.test.ts"
   },
   "dependencies": {
     "@conscious-bot/core": "workspace:*",
@@ -85,8 +86,6 @@
     "ws": "^8.18.3"
   },
   "devDependencies": {
-    "webpack": "^5.95.0",
-    "webpack-cli": "^6.0.0",
     "@types/cors": "^2.8.19",
     "@types/express": "^4.17.23",
     "@types/js-yaml": "^4.0.9",
@@ -94,7 +93,9 @@
     "@types/ws": "^8.18.1",
     "tsx": "^4.20.5",
     "typescript": "^5.9.2",
-    "vitest": "^3.2.4"
+    "vitest": "^3.2.4",
+    "webpack": "^5.95.0",
+    "webpack-cli": "^6.0.0"
   },
   "keywords": [
     "minecraft",

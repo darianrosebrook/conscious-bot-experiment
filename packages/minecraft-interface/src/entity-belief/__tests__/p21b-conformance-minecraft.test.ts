@@ -6,7 +6,15 @@
  * emission path satisfies all 4 P21-B emission-protocol invariants.
  */
 
-import { runP21BConformanceSuite } from '@conscious-bot/testkits/src/p21';
+import { afterAll } from 'vitest';
+import { writeFileSync, mkdirSync } from 'fs';
+import path from 'path';
+import {
+  runP21BConformanceSuite,
+  generateP21BManifest,
+  createSurfaceResultsFromHandle,
+  finalizeManifest,
+} from '@conscious-bot/testkits/src/p21';
 import type {
   P21EmissionAdapter,
   P21EvidenceBatch,
@@ -131,10 +139,48 @@ function createMinecraftEmissionAdapter(): P21EmissionAdapter {
 
 // ── Run the P21-B conformance suite ─────────────────────────────────
 
-runP21BConformanceSuite({
-  name: 'Minecraft BeliefBus',
+const SURFACE_NAME = 'Minecraft BeliefBus';
+
+const handle = runP21BConformanceSuite({
+  name: SURFACE_NAME,
   createEmissionAdapter: createMinecraftEmissionAdapter,
   riskLabel: 'zombie',
   deltaCap: MAX_SALIENCY_EVENTS_PER_EMISSION,
   snapshotIntervalTicks: SNAPSHOT_INTERVAL_TICKS,
+});
+
+// ── Manifest emission ───────────────────────────────────────────────
+
+const MANIFEST_DIR = process.env.PROOF_ARTIFACT_DIR
+  ?? path.resolve(__dirname, '../../../../..', '.proof-artifacts');
+
+afterAll(() => {
+  const surfaceResults = createSurfaceResultsFromHandle(handle);
+  const manifest = generateP21BManifest({
+    contract_version: '1.0.0',
+    adapters: [{ name: SURFACE_NAME, path: __filename }],
+    config: {
+      deltaCap: MAX_SALIENCY_EVENTS_PER_EMISSION,
+      snapshotIntervalTicks: SNAPSHOT_INTERVAL_TICKS,
+    },
+    surfaceResults,
+  });
+  manifest.results.timestamp = new Date().toISOString();
+  manifest.results.runtime = `node@${process.versions.node} / ${process.platform}-${process.arch}`;
+
+  // Patch execution truth from handle and validate consistency
+  finalizeManifest(handle, manifest);
+
+  const surfaceSlug = SURFACE_NAME.toLowerCase().replace(/\s+/g, '-');
+  const filename = `${manifest.capability_id.replace('.', '-')}-${surfaceSlug}-${process.pid}.json`;
+
+  try {
+    mkdirSync(MANIFEST_DIR, { recursive: true });
+    writeFileSync(path.join(MANIFEST_DIR, filename), JSON.stringify(manifest, null, 2));
+  } catch (err) {
+    if (process.env.PROOF_ARTIFACT_STRICT === '1') {
+      throw err;
+    }
+    console.warn(`[proof-artifact] Failed to write manifest: ${err}`);
+  }
 });

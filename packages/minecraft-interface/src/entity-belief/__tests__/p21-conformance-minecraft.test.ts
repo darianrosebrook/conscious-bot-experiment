@@ -9,7 +9,15 @@
  * The vitest alias resolves this to the local workspace package source.
  */
 
-import { runP21AConformanceSuite } from '@conscious-bot/testkits/src/p21';
+import { afterAll } from 'vitest';
+import { writeFileSync, mkdirSync } from 'fs';
+import path from 'path';
+import {
+  runP21AConformanceSuite,
+  generateP21AManifest,
+  createSurfaceResultsFromHandle,
+  finalizeManifest,
+} from '@conscious-bot/testkits/src/p21';
 import { MOB_DOMAIN_CLASSIFIER } from '../../../../planning/src/sterling/primitives/p21/p21-reference-fixtures';
 import type {
   P21ImplementationAdapter,
@@ -104,7 +112,7 @@ function toCapsuleTrack(track: TrackSummary): P21TrackSummary {
     pUnknown: track.pUnknown,
     firstSeenTick: track.firstSeenTick,
     lastSeenTick: track.lastSeenTick,
-  };
+  } satisfies P21TrackSummary;
 }
 
 /** Create a P21ImplementationAdapter wrapping a Minecraft TrackSet. */
@@ -135,8 +143,12 @@ function createMinecraftAdapter(classifier: P21RiskClassifier): P21Implementatio
 
 // ── Run the P21-A conformance suite ─────────────────────────────────
 
-runP21AConformanceSuite({
-  name: 'Minecraft TrackSet',
+// ── Run the P21-A conformance suite ─────────────────────────────────
+
+const SURFACE_NAME = 'Minecraft TrackSet';
+
+const handle = runP21AConformanceSuite({
+  name: SURFACE_NAME,
   createAdapter: createMinecraftAdapter,
   classifier: MOB_DOMAIN_CLASSIFIER,
   trackCap: TRACK_CAP,
@@ -145,4 +157,44 @@ runP21AConformanceSuite({
   mode: 'conservative',
   hysteresisBudget: 4,
   declaredExtensions: [],
+});
+
+// ── Manifest emission ───────────────────────────────────────────────
+
+const MANIFEST_DIR = process.env.PROOF_ARTIFACT_DIR
+  ?? path.resolve(__dirname, '../../../../..', '.proof-artifacts');
+
+afterAll(() => {
+  const surfaceResults = createSurfaceResultsFromHandle(handle);
+  const manifest = generateP21AManifest({
+    contract_version: '1.0.0',
+    adapters: [{ name: SURFACE_NAME, path: __filename }],
+    config: {
+      trackCap: TRACK_CAP,
+      sparsityBudget: 0,
+      uncertaintyThreshold: 0.5,
+      mode: 'conservative',
+      hysteresisBudget: 4,
+      declaredExtensions: [],
+    },
+    surfaceResults,
+  });
+  manifest.results.timestamp = new Date().toISOString();
+  manifest.results.runtime = `node@${process.versions.node} / ${process.platform}-${process.arch}`;
+
+  // Patch execution truth from handle and validate consistency
+  finalizeManifest(handle, manifest);
+
+  const surfaceSlug = SURFACE_NAME.toLowerCase().replace(/\s+/g, '-');
+  const filename = `${manifest.capability_id.replace('.', '-')}-${surfaceSlug}-${process.pid}.json`;
+
+  try {
+    mkdirSync(MANIFEST_DIR, { recursive: true });
+    writeFileSync(path.join(MANIFEST_DIR, filename), JSON.stringify(manifest, null, 2));
+  } catch (err) {
+    if (process.env.PROOF_ARTIFACT_STRICT === '1') {
+      throw err;
+    }
+    console.warn(`[proof-artifact] Failed to write manifest: ${err}`);
+  }
 });

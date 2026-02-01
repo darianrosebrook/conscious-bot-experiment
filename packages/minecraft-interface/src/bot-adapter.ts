@@ -15,7 +15,13 @@ import { AutomaticSafetyMonitor } from './automatic-safety-monitor';
 import { resilientFetch } from '@conscious-bot/core';
 import { ActionTranslator } from './action-translator';
 import mcData from 'minecraft-data';
-import { BeliefBus, buildEvidenceBatch, TICK_INTERVAL_MS, EMIT_INTERVAL_MS, type BeliefStreamEnvelope } from './entity-belief';
+import {
+  BeliefBus,
+  buildEvidenceBatch,
+  TICK_INTERVAL_MS,
+  EMIT_INTERVAL_MS,
+  type BeliefStreamEnvelope,
+} from './entity-belief';
 import { assessReflexThreats, ReflexArbitrator } from './reflex';
 
 /** Module-level monotonic counter for ephemeral stream_id (deterministic, no Date.now()) */
@@ -772,7 +778,10 @@ export class BotAdapter extends EventEmitter {
     }
     if (cleaned.length > 256) {
       const lastSpace = cleaned.slice(0, 256).lastIndexOf(' ');
-      cleaned = lastSpace > 180 ? cleaned.slice(0, lastSpace) + '...' : cleaned.slice(0, 253) + '...';
+      cleaned =
+        lastSpace > 180
+          ? cleaned.slice(0, lastSpace) + '...'
+          : cleaned.slice(0, 253) + '...';
     }
     return cleaned;
   }
@@ -956,7 +965,9 @@ export class BotAdapter extends EventEmitter {
             if (result.shouldRespond && result.response) {
               const now = Date.now();
               if (now - this.lastChatResponse >= this.chatCooldown) {
-                await this.bot?.chat(this.sanitizeOutboundChat(result.response));
+                await this.bot?.chat(
+                  this.sanitizeOutboundChat(result.response)
+                );
                 this.lastChatResponse = now;
                 this.performanceMetrics.chatResponses++;
               }
