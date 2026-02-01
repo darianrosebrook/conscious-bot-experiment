@@ -311,8 +311,7 @@ export class ReactiveExecutor implements IReactiveExecutor {
         maxMemories: 5,
       };
 
-      const memoryContext =
-        await this.memoryClient.getMemoryContext(context);
+      const memoryContext = await this.memoryClient.getMemoryContext(context);
 
       // Add plan-specific memory analysis
       const planMemory = {

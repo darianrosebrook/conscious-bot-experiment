@@ -256,6 +256,8 @@ export interface DashboardState {
   hud: HudData | null;
   thoughts: Thought[];
   tasks: Task[];
+  /** True when /api/tasks returned fallback: true (planning unavailable). */
+  tasksFallback: boolean;
   events: Event[];
   memories: Memory[];
   notes: Note[];

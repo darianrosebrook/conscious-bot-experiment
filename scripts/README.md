@@ -1,204 +1,133 @@
-# Conscious Bot Startup Scripts
+# Scripts Documentation
 
-This directory contains scripts for managing the Conscious Bot system startup and development environment.
+## Start Script Output Modes
 
-## Quick Start
+The `start.js` script supports multiple output modes for different use cases:
 
-To start the entire Conscious Bot system with a single command:
+### Usage
 
 ```bash
+# Default verbose mode (shows all logs)
 pnpm start
-# or
-pnpm dev
+node scripts/start.js
+
+# Quiet mode (minimal output, errors only)
+pnpm start:quiet
+node scripts/start.js --quiet
+
+# Progress mode (dynamic progress bars)
+pnpm start:progress
+node scripts/start.js --progress
+
+# Debug mode (extra verbose)
+pnpm start:debug
+node scripts/start.js --debug
+
+# Production mode (no debug logs)
+pnpm start:production
+node scripts/start.js --production
 ```
 
-This will:
-- ✅ Check system requirements (Node.js 18+, pnpm)
-- 🔄 Clean up existing processes
-- 📦 Install dependencies
-- 🔨 Build all packages
-- 🚀 Start all services
-- 🔍 Monitor service health
-- 🎉 Provide status and URLs
+### Output Mode Comparison
 
-## Available Scripts
+| Mode | Use Case | Output Level | MLX Install | Service Logs |
+|------|----------|--------------|-------------|--------------|
+| **verbose** | Development (default) | Full | Visible | All prefixed |
+| **quiet** | CI/Scripts | Errors only | Hidden | Errors only |
+| **progress** | Interactive dev | Progress bars | Hidden | In-place updates |
+| **debug** | Troubleshooting | Extra verbose | Visible | All + debug |
+| **production** | Production deploy | Info + errors | Hidden | No debug |
 
-### `start.js` / `dev` - Main Startup Script
-The primary script for starting the entire system. Handles everything from dependency installation to service monitoring.
+### Progress Mode Example
 
-**Usage:**
+```
+✔ System Requirements (Node.js v22.19.0) [1s]
+✔ MLX-LM Sidecar (Ready) [8s]
+✔ Docker Services (Running) [5s]
+✔ Cleanup (Complete) [2s]
+✔ Dependencies (Installed) [4s]
+✔ Build (Complete) [18s]
+⠸ Starting Services [12s]
+  ✔ Core API (Port 3007)
+  ✔ Memory (Port 3001)
+  ✔ World (Port 3004)
+  ⠸ Cognition (Port 3003) - Waiting for health check...
+  ⠋ Planning (Port 3002) - Starting...
+  ⠋ Minecraft Interface (Port 3005)
+  ⠋ Dashboard (Port 3000)
+```
+
+### Benefits
+
+**Verbose Mode:**
+- Traditional sequential logging
+- Easy to grep and pipe
+- Good for debugging specific services
+- Full visibility into all operations
+
+**Quiet Mode:**
+- Minimal noise for CI pipelines
+- Only shows critical errors and success
+- Fast startup feedback
+- Good for automated scripts
+
+**Progress Mode:**
+- Clean, modern interface
+- Real-time status updates
+- No log spam
+- Shows timing for each step
+- Best for interactive development
+
+**Debug Mode:**
+- Shows all internal operations
+- Includes timing information
+- Service-specific color coding
+- Detailed health check logs
+
+**Production Mode:**
+- Structured logging only
+- No debug/verbose output
+- Performance-optimized
+- Suitable for production deployments
+
+### Implementation Details
+
+The output mode is controlled by:
+- Command line flags (`--quiet`, `--progress`, etc.)
+- Stored in `OUTPUT_MODE` constant
+- All logging functions check mode before output
+- Progress mode uses `listr2` for dynamic updates
+
+### Service Output Handling
+
+In verbose/debug modes, service output is prefixed:
+```
+[Core API] Server listening on port 3007
+[Memory] Connected to database
+[Planning] Task queue initialized
+```
+
+In progress mode, service output is captured but not displayed (available in logs if needed).
+
+In quiet mode, only errors are shown:
+```
+[Core API] ERROR: Failed to connect to database
+```
+
+### Customization
+
+To add new output modes, edit `scripts/start.js`:
+
+1. Add flag parsing in the args section
+2. Update `OUTPUT_MODE` constant
+3. Add mode-specific behavior in logging functions
+4. Add corresponding npm script in `package.json`
+
+### Dependencies
+
+Progress mode requires:
 ```bash
-pnpm start
+pnpm add -D listr2 cli-progress ora
 ```
 
-**Features:**
-- System requirement validation
-- Process cleanup
-- Dependency management
-- Package building
-- Service orchestration
-- Health monitoring
-- Graceful shutdown
-
-### `start-servers.js` - Legacy Server Manager
-Legacy script for starting services without full system setup.
-
-**Usage:**
-```bash
-node scripts/start-servers.js
-```
-
-### `dev.js` - Development Environment
-Alternative development startup with enhanced monitoring.
-
-**Usage:**
-```bash
-node scripts/dev.js
-```
-
-### `kill-servers.js` - Process Cleanup
-Kills all running Conscious Bot processes.
-
-**Usage:**
-```bash
-pnpm kill
-```
-
-### `status.js` - Service Status
-Shows the status of all running services.
-
-**Usage:**
-```bash
-pnpm status
-```
-
-## Service Ports
-
-| Service | Port | Description |
-|---------|------|-------------|
-| Dashboard | 3000 | Web dashboard for monitoring and control |
-| Minecraft Interface | 3005 | Minecraft bot interface and control |
-| Cognition | 3003 | Cognitive reasoning and decision making |
-| Memory | 3001 | Memory storage and retrieval system |
-| World | 3004 | World state management and simulation |
-| Planning | 3002 | Task planning and execution coordination |
-
-## Quick Commands
-
-### Start the system
-```bash
-pnpm start
-```
-
-### Stop all services
-```bash
-pnpm kill
-```
-
-### Check service status
-```bash
-pnpm status
-```
-
-### Start individual services
-```bash
-pnpm dev:dashboard      # Dashboard only
-pnpm dev:minecraft      # Minecraft interface only
-pnpm dev:cognition      # Cognition service only
-pnpm dev:memory         # Memory service only
-pnpm dev:world          # World service only
-pnpm dev:planning       # Planning service only
-```
-
-## Minecraft Integration
-
-Once the system is running, you can interact with the Minecraft bot:
-
-```bash
-# Connect the bot to Minecraft
-curl -X POST http://localhost:3005/connect
-
-# Disconnect the bot
-curl -X POST http://localhost:3005/disconnect
-
-# Get bot status
-curl http://localhost:3005/status
-```
-
-## Troubleshooting
-
-### Port Conflicts
-If you see port conflicts, run:
-```bash
-pnpm kill
-```
-Then try starting again.
-
-### Node.js Version
-Ensure you have Node.js 18 or higher:
-```bash
-node --version
-```
-
-### pnpm Installation
-If pnpm is not installed:
-```bash
-npm install -g pnpm
-```
-
-### Build Issues
-If packages fail to build:
-```bash
-pnpm clean
-pnpm install
-pnpm build
-```
-
-## Development
-
-### Adding New Services
-To add a new service to the startup script:
-
-1. Add the service configuration to the `services` array in `start.js`
-2. Include the service in the package.json scripts
-3. Update this README with the new service information
-
-### Modifying Service Configuration
-Edit the `services` array in `start.js` to modify:
-- Service names and descriptions
-- Port assignments
-- Health check URLs
-- Startup commands
-
-## Architecture
-
-The startup system uses:
-- **Process Management**: Spawns and monitors child processes
-- **Health Monitoring**: HTTP health checks for service readiness
-- **Graceful Shutdown**: SIGTERM/SIGKILL handling for clean exits
-- **Port Management**: Automatic port conflict detection and resolution
-- **Dependency Management**: Automatic installation and building
-
-## Environment Variables
-
-The following environment variables can be set:
-- `FORCE_COLOR=1`: Enable colored output
-- `NODE_ENV`: Set to 'development' for dev mode
-- `PORT`: Override default ports (not recommended)
-
-## Logging
-
-All services output is prefixed with the service name:
-```
-[Dashboard] Ready on http://localhost:3000
-[Minecraft Interface] Server started on port 3005
-[Cognition] Health check passed
-```
-
-## Error Handling
-
-The startup script includes comprehensive error handling:
-- System requirement validation
-- Process cleanup on failures
-- Graceful degradation for health check failures
-- Clear error messages with resolution steps
+These are already installed in the project.

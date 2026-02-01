@@ -38,7 +38,11 @@ async function clearThoughtFiles() {
     const entries = await fs.readdir(thoughtsDir, { withFileTypes: true });
     for (const ent of entries) {
       if (ent.isDirectory()) {
-        const filePath = path.join(thoughtsDir, ent.name, 'cognitive-thoughts.json');
+        const filePath = path.join(
+          thoughtsDir,
+          ent.name,
+          'cognitive-thoughts.json'
+        );
         try {
           await fs.writeFile(filePath, JSON.stringify([], null, 2), 'utf-8');
           cleared.push(filePath);
@@ -89,11 +93,15 @@ async function main() {
       console.log(`Database reset: ${result.message}`);
     } catch (err) {
       console.error('Database reset failed:', err.message);
-      console.error('Ensure memory service is running (port 3001) and WORLD_SEED matches.');
+      console.error(
+        'Ensure memory service is running (port 3001) and WORLD_SEED matches.'
+      );
       process.exit(1);
     }
   } else {
-    console.log('\nTo also reset memory tables, run: node scripts/clear-cognitive-state.js --db');
+    console.log(
+      '\nTo also reset memory tables, run: node scripts/clear-cognitive-state.js --db'
+    );
   }
 
   console.log('\nDone. Restart or refresh the dashboard for a clean stream.');

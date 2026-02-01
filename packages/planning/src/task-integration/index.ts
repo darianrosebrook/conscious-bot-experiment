@@ -16,4 +16,7 @@ export {
   type ConvertThoughtToTaskDeps,
 } from './thought-to-task-converter';
 export { TaskStore } from './task-store';
-export { SterlingPlanner, type SterlingPlannerOptions } from './sterling-planner';
+export {
+  SterlingPlanner,
+  type SterlingPlannerOptions,
+} from './sterling-planner';

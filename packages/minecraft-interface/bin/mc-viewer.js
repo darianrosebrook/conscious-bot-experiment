@@ -195,7 +195,7 @@ async function main() {
         prefix: '', // No prefix for cleaner URLs
       });
       console.log(` Viewer started on port ${config.viewerPort}`);
-      console.log(`📊 Enhanced rendering enabled: viewDistance=8`);
+      console.log('Enhanced rendering enabled: viewDistance=8');
       // Apply enhanced viewer features for better entity rendering and lighting
       try {
         const enhancedViewer = applyViewerEnhancements(bot, {
@@ -208,7 +208,7 @@ async function main() {
         });
         // Log enhanced viewer status
         enhancedViewer.on('started', () => {
-          console.log('✅ Enhanced viewer features activated');
+          console.log('Enhanced viewer features activated');
         });
         enhancedViewer.on('error', (error) => {
           // Only log non-critical errors

@@ -28,6 +28,7 @@ interface DashboardStore extends DashboardState {
   clearThoughts: () => void;
   loadThoughtsFromServer: () => Promise<void>;
   setTasks: (tasks: Task[]) => void;
+  setTasksFallback: (fallback: boolean) => void;
   updateTask: (id: string, updates: Partial<Task>) => void;
   addTask: (task: Task) => void;
   addEvent: (event: Event) => void;
@@ -70,6 +71,7 @@ const initialState: DashboardState = {
   hud: null,
   thoughts: [],
   tasks: [],
+  tasksFallback: false,
   events: [],
   memories: [],
   notes: [],
@@ -227,6 +229,8 @@ export const useDashboardStore = create<DashboardStore>()(
             set({ tasks });
           }
         },
+
+        setTasksFallback: (fallback) => set({ tasksFallback: fallback }),
 
         updateTask: (id, updates) =>
           set((state) => {

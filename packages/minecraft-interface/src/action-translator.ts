@@ -120,7 +120,7 @@ export class ActionTranslator {
   private lastNavTargetKey: string | null = null;
   private lastNavAttemptAt = 0;
   private navDebounceMs = 1500;
-  private navLogThrottleMs = 1000;
+  private navLogThrottleMs = 5000; // 5 seconds between identical nav logs
   private lastLogAt = new Map<string, number>();
 
   constructor(
@@ -1039,7 +1039,7 @@ export class ActionTranslator {
 
       // Try to use the leaf system first
       const craftRecipeLeaf = leafFactory.get('craft_recipe');
-      if (craftRecipeLeaf) {
+      if (craftRecipeLeaf && (craftRecipeLeaf as any)?.spec?.placeholder !== true) {
         try {
           // Create leaf context
           const context = {
@@ -1214,6 +1214,13 @@ export class ActionTranslator {
         return {
           success: false,
           error: 'Dig block leaf not found',
+        };
+      }
+      if ((digBlockLeaf as any)?.spec?.placeholder === true) {
+        return {
+          success: false,
+          error:
+            'Placeholder leaf cannot be executed; real leaf must be registered by minecraft-interface.',
         };
       }
 

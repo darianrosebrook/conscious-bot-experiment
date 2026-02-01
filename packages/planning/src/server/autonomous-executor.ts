@@ -64,10 +64,7 @@ export function startAutonomousExecutor(
         const s = global.__planningExecutorState;
         if (s) {
           s.failures = Math.min(s.failures + 1, 100);
-          const backoff = Math.min(
-            2 ** s.failures * 250,
-            opts.maxBackoffMs
-          );
+          const backoff = Math.min(2 ** s.failures * 250, opts.maxBackoffMs);
           console.warn(
             `Autonomous executor error (${s.failures}); backoff ${backoff}ms`
           );

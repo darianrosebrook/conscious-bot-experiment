@@ -13,6 +13,13 @@
  *
  * Sterling: set STERLING_DIR or clone Sterling to ../sterling to enable.
  *
+ * Usage:
+ *   node scripts/start.js                  # Default (verbose)
+ *   node scripts/start.js --quiet          # Minimal output
+ *   node scripts/start.js --progress       # Progress bars (listr2)
+ *   node scripts/start.js --debug          # Extra verbose
+ *   node scripts/start.js --production     # Production mode (no dev logs)
+ *
  * @author @darianrosebrook
  */
 
@@ -24,6 +31,27 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const projectRoot = path.dirname(__dirname);
+
+// Parse command line arguments
+const args = process.argv.slice(2);
+const OUTPUT_MODE = args.includes('--quiet') ? 'quiet'
+  : args.includes('--progress') ? 'progress'
+  : args.includes('--debug') ? 'debug'
+  : args.includes('--production') ? 'production'
+  : 'verbose';
+
+// Dynamically import listr2 only if needed
+let Listr = null;
+if (OUTPUT_MODE === 'progress') {
+  try {
+    const listrModule = await import('listr2');
+    Listr = listrModule.Listr;
+  } catch (err) {
+    console.error('listr2 not installed. Run: pnpm add -D listr2');
+    console.error('Falling back to verbose mode');
+    OUTPUT_MODE = 'verbose';
+  }
+}
 
 // Sterling repo path (sibling of conscious-bot by default)
 const sterlingDir = path.resolve(
@@ -190,20 +218,27 @@ if (sterlingAvailable) {
   });
 }
 
-// Utility functions
+// Utility functions with output mode support
 function log(message, color = colors.reset) {
+  if (OUTPUT_MODE === 'quiet') return;
+  if (OUTPUT_MODE === 'progress') return; // Handled by listr2
   console.log(`${color}${message}${colors.reset}`);
 }
 
 function logBanner() {
+  if (OUTPUT_MODE === 'quiet' || OUTPUT_MODE === 'progress') return;
   log('', colors.reset);
-  log('🧠 Conscious Bot System', colors.bold + colors.blue);
+  log('Conscious Bot System', colors.bold + colors.blue);
   log('========================', colors.blue);
   log('', colors.reset);
 }
 
 // Enhanced logging with structured format
 function logWithTimestamp(message, level = 'INFO', color = colors.reset) {
+  if (OUTPUT_MODE === 'quiet' && level !== 'ERROR' && level !== 'SUCCESS') return;
+  if (OUTPUT_MODE === 'progress') return; // Handled by listr2
+  if (OUTPUT_MODE === 'production' && level === 'DEBUG') return;
+  
   const timestamp = new Date().toISOString();
   const logEntry = `[${timestamp}] [${level}] ${message}`;
   console.log(`${color}${logEntry}${colors.reset}`);
@@ -211,6 +246,10 @@ function logWithTimestamp(message, level = 'INFO', color = colors.reset) {
 
 // Service-specific logging with consistent format
 function logService(serviceName, message, level = 'INFO') {
+  if (OUTPUT_MODE === 'quiet' && level !== 'ERROR') return;
+  if (OUTPUT_MODE === 'progress') return; // Handled by listr2
+  if (OUTPUT_MODE === 'production' && level === 'DEBUG') return;
+  
   const timestamp = new Date().toISOString();
   const color = getServiceColor(serviceName);
   const logEntry = `[${timestamp}] [${serviceName}] [${level}] ${message}`;
@@ -448,7 +487,7 @@ function wait(ms) {
 }
 
 async function setupMLXEnvironment() {
-  log('\n🧠 Setting up MLX-LM sidecar environment...', colors.purple);
+  log('\nSetting up MLX-LM sidecar environment...', colors.purple);
 
   const mlxDir = path.join(process.cwd(), 'mlx-lm-sidecar');
   const venvPath = path.join(mlxDir, 'venv-mlx');
@@ -487,33 +526,34 @@ async function setupMLXEnvironment() {
       execSync(`cd ${mlxDir} && python3 -m venv venv-mlx`, {
         stdio: 'inherit',
       });
-      log(' ✅ MLX virtual environment created', colors.green);
+      log(' MLX virtual environment created', colors.green);
     } catch (error) {
-      log(' ❌ Failed to create MLX virtual environment', colors.red);
+      log(' Failed to create MLX virtual environment', colors.red);
       return;
     }
   } else {
-    log(' ✅ MLX virtual environment already exists', colors.green);
+    log(' MLX virtual environment already exists', colors.green);
   }
 
   // Install Python dependencies
-  log(' 📦 Installing MLX dependencies...', colors.purple);
+  log(' Installing MLX dependencies...', colors.purple);
   try {
-    execSync(`cd ${mlxDir} && ./venv-mlx/bin/pip install --upgrade pip`, {
-      stdio: 'inherit',
+    const pipStdio = OUTPUT_MODE === 'quiet' || OUTPUT_MODE === 'production' ? 'pipe' : 'inherit';
+    execSync(`cd ${mlxDir} && ./venv-mlx/bin/pip install -q --upgrade pip`, {
+      stdio: pipStdio,
       shell: true,
     });
-    execSync(`cd ${mlxDir} && ./venv-mlx/bin/pip install -r requirements.txt`, {
-      stdio: 'inherit',
+    execSync(`cd ${mlxDir} && ./venv-mlx/bin/pip install -q -r requirements.txt`, {
+      stdio: pipStdio,
       shell: true,
     });
-    log(' ✅ MLX dependencies installed', colors.green);
+    log(' MLX dependencies installed', colors.green);
   } catch (error) {
-    log(' ❌ Failed to install MLX dependencies', colors.red);
+    log(' Failed to install MLX dependencies', colors.red);
   }
 
   // Verify MLX models are cached
-  log(' 🔍 Verifying MLX model cache...', colors.purple);
+  log(' Verifying MLX model cache...', colors.purple);
   try {
     execSync(
       `cd ${mlxDir} && ./venv-mlx/bin/python -c "
@@ -531,7 +571,7 @@ print('OK')
 "`,
       { stdio: 'pipe', shell: true, encoding: 'utf-8' }
     );
-    log(' ✅ MLX models are cached locally', colors.green);
+    log(' MLX models are cached locally', colors.green);
   } catch (error) {
     log(
       ' ⚠️  Some MLX models are not cached — first startup will download them',
@@ -572,7 +612,7 @@ async function startDockerServices() {
 
   try {
     execSync('docker compose up -d', { stdio: 'inherit', cwd: process.cwd() });
-    log(' ✅ Docker compose started', colors.green);
+    log(' Docker compose started', colors.green);
   } catch (error) {
     log(` ⚠️  docker compose up failed: ${error.message}`, colors.yellow);
     return;
@@ -594,7 +634,7 @@ async function startDockerServices() {
     }
   }
   if (pgReady) {
-    log(' ✅ Postgres is ready', colors.green);
+    log(' Postgres is ready', colors.green);
   } else {
     log(' ⚠️  Postgres did not become ready in time', colors.yellow);
   }
@@ -604,7 +644,7 @@ async function startDockerServices() {
     execSync('docker exec conscious-bot-minecraft mc-health', {
       stdio: 'ignore',
     });
-    log(' ✅ Minecraft server is ready', colors.green);
+    log(' Minecraft server is ready', colors.green);
   } catch {
     log(
       ' ℹ️  Minecraft server is still starting (non-blocking)',
@@ -613,31 +653,208 @@ async function startDockerServices() {
   }
 }
 
-// Main function
+// Main function with output mode routing
 async function main() {
+  if (OUTPUT_MODE === 'progress' && Listr) {
+    return await mainWithProgress();
+  }
+  return await mainVerbose();
+}
+
+// Progress bar mode using listr2
+async function mainWithProgress() {
+  const processes = [];
+  
+  const tasks = new Listr([
+    {
+      title: 'System Requirements',
+      task: async (ctx, task) => {
+        const nodeVersion = process.version;
+        const nodeMajor = parseInt(nodeVersion.slice(1).split('.')[0]);
+        if (nodeMajor < 18) {
+          throw new Error(`Node.js ${nodeVersion} not supported. Need 18+`);
+        }
+        try {
+          execSync('pnpm --version', { stdio: 'ignore' });
+        } catch {
+          throw new Error('pnpm not installed');
+        }
+        task.title = `System Requirements (Node.js ${nodeVersion})`;
+      },
+    },
+    {
+      title: 'MLX-LM Sidecar',
+      task: async (ctx, task) => {
+        const mlxDir = path.join(process.cwd(), 'mlx-lm-sidecar');
+        const venvPath = path.join(mlxDir, 'venv-mlx');
+        
+        if (!fs.existsSync(venvPath)) {
+          task.output = 'Creating virtual environment...';
+          execSync(`cd ${mlxDir} && python3 -m venv venv-mlx`, { stdio: 'pipe' });
+        }
+        
+        task.output = 'Installing dependencies...';
+        execSync(`cd ${mlxDir} && ./venv-mlx/bin/pip install -q --upgrade pip`, { stdio: 'pipe' });
+        execSync(`cd ${mlxDir} && ./venv-mlx/bin/pip install -q -r requirements.txt`, { stdio: 'pipe' });
+        
+        task.title = 'MLX-LM Sidecar (Ready)';
+      },
+    },
+    {
+      title: 'Docker Services',
+      skip: () => process.argv.includes('--skip-docker'),
+      task: async (ctx, task) => {
+        task.output = 'Starting Postgres and Minecraft...';
+        execSync('docker compose up -d', { cwd: projectRoot, stdio: 'pipe' });
+        await wait(2000);
+        task.title = 'Docker Services (Running)';
+      },
+    },
+    {
+      title: 'Cleanup',
+      task: async (ctx, task) => {
+        task.output = 'Killing existing processes...';
+        const processPatterns = [
+          'tsx src/server.ts', 'next dev', 'node.*dev.js', 'pnpm.*dev',
+          'minecraft-interface', 'python3.*mlx_server.py', 'mlx_server.py',
+          'sterling_unified_server.py',
+        ];
+        for (const pattern of processPatterns) {
+          killProcessesByPattern(pattern);
+        }
+        for (const service of services) {
+          killProcessesByPort(service.port);
+        }
+        await wait(2000);
+        task.title = 'Cleanup (Complete)';
+      },
+    },
+    {
+      title: 'Dependencies',
+      task: async (ctx, task) => {
+        task.output = 'Installing Node.js packages...';
+        execSync('pnpm install', { stdio: 'pipe' });
+        task.title = 'Dependencies (Installed)';
+      },
+    },
+    {
+      title: 'Build',
+      task: async (ctx, task) => {
+        task.output = 'Building packages...';
+        execSync('pnpm build', { stdio: 'pipe' });
+        task.title = 'Build (Complete)';
+      },
+    },
+    {
+      title: 'Starting Services',
+      task: (ctx, task) => {
+        const sortedServices = [...services].sort((a, b) => a.priority - b.priority);
+        return task.newListr(
+          sortedServices.map((service) => ({
+            title: service.name,
+            task: async (ctx, subtask) => {
+              subtask.output = `Starting on port ${service.port}...`;
+              
+              const baseEnv = { ...process.env, FORCE_COLOR: '1' };
+              if (service.name === 'Memory' && !baseEnv.WORLD_SEED) {
+                baseEnv.MEMORY_DEV_DEFAULT_SEED = 'true';
+              }
+              if (service.name === 'Minecraft Interface') {
+                baseEnv.MINECRAFT_VERSION = '1.21.9';
+              }
+              
+              const child = spawn(service.command, service.args, {
+                stdio: 'pipe',
+                shell: service.cwd ? false : true,
+                cwd: service.cwd || process.cwd(),
+                env: baseEnv,
+              });
+              
+              processes.push({ child, service });
+              
+              subtask.output = 'Waiting for health check...';
+              await wait(service.priority <= 3 ? 5000 : 3000);
+              
+              if (service.healthUrl) {
+                await waitForService(service.healthUrl, service.name, 30);
+              } else if (service.wsUrl) {
+                await waitForWebSocket(service.wsUrl, service.name, 30);
+              } else if (service.port) {
+                await waitForPort(service.port, service.name, 30);
+              }
+              
+              subtask.title = `${service.name} (Port ${service.port})`;
+            },
+          })),
+          { concurrent: false, exitOnError: false }
+        );
+      },
+    },
+  ], {
+    concurrent: false,
+    rendererOptions: { collapse: false, collapseErrors: false, showTimer: true },
+  });
+  
+  try {
+    await tasks.run();
+    
+    console.log('\n\nConscious Bot System Ready');
+    console.log('==========================\n');
+    services.forEach((s) => {
+      console.log(`  ${s.name.padEnd(20)} http://localhost:${s.port}`);
+    });
+    console.log('\nPress Ctrl+C to stop all services\n');
+    
+    // Graceful shutdown
+    const cleanup = async () => {
+      console.log('\n\nShutting down services...');
+      for (const { child, service } of processes) {
+        console.log(`  Stopping ${service.name}...`);
+        child.kill('SIGTERM');
+      }
+      await wait(2000);
+      for (const { child } of processes) {
+        if (!child.killed) child.kill('SIGKILL');
+      }
+      process.exit(0);
+    };
+    
+    process.on('SIGINT', cleanup);
+    process.on('SIGTERM', cleanup);
+    
+    // Keep running
+    await new Promise(() => {});
+  } catch (err) {
+    console.error('Startup failed:', err);
+    process.exit(1);
+  }
+}
+
+// Verbose mode (original implementation)
+async function mainVerbose() {
   logBanner();
 
   // Step 1: Check Node.js version
-  log('🔍 Checking system requirements...', colors.cyan);
+  log('Checking system requirements...', colors.cyan);
   const nodeVersion = process.version;
   const nodeMajor = parseInt(nodeVersion.slice(1).split('.')[0]);
 
   if (nodeMajor < 18) {
     log(
-      ` ❌ Node.js version ${nodeVersion} is not supported. Please use Node.js 18 or higher.`,
+      ` Node.js version ${nodeVersion} is not supported. Please use Node.js 18 or higher.`,
       colors.red
     );
     process.exit(1);
   }
-  log(` ✅ Node.js ${nodeVersion} is supported`, colors.green);
+  log(` Node.js ${nodeVersion} is supported`, colors.green);
 
   // Step 2: Check if pnpm is available
   try {
     execSync('pnpm --version', { stdio: 'ignore' });
-    log(' ✅ pnpm is available', colors.green);
+    log(' pnpm is available', colors.green);
   } catch {
     log(
-      ' ❌ pnpm is not installed. Please install pnpm first: npm install -g pnpm',
+      ' pnpm is not installed. Please install pnpm first: npm install -g pnpm',
       colors.red
     );
     process.exit(1);
@@ -655,7 +872,7 @@ async function main() {
   }
 
   // Step 4: Kill existing processes
-  log('\n🔄 Cleaning up existing processes...', colors.cyan);
+  log('\nCleaning up existing processes...', colors.cyan);
 
   const processPatterns = [
     'tsx src/server.ts',
@@ -679,7 +896,7 @@ async function main() {
   await wait(2000);
 
   // Step 5: Check port availability
-  log('\n🔍 Checking port availability...', colors.cyan);
+  log('\nChecking port availability...', colors.cyan);
   const portConflicts = [];
 
   for (const service of services) {
@@ -698,22 +915,24 @@ async function main() {
   }
 
   // Step 6: Install dependencies
-  log('\n📦 Installing Node.js dependencies...', colors.cyan);
+  log('\nInstalling Node.js dependencies...', colors.cyan);
   try {
-    execSync('pnpm install', { stdio: 'inherit' });
-    log(' ✅ Node.js dependencies installed', colors.green);
+    const installStdio = OUTPUT_MODE === 'quiet' || OUTPUT_MODE === 'production' ? 'pipe' : 'inherit';
+    execSync('pnpm install', { stdio: installStdio });
+    log(' Node.js dependencies installed', colors.green);
   } catch (error) {
-    log(' ❌ Failed to install Node.js dependencies', colors.red);
+    log(' Failed to install Node.js dependencies', colors.red);
     process.exit(1);
   }
 
   // Step 7: Build packages
-  log('\n🔨 Building packages...', colors.cyan);
+  log('\nBuilding packages...', colors.cyan);
   try {
-    execSync('pnpm build', { stdio: 'inherit' });
-    log(' ✅ Packages built successfully', colors.green);
+    const buildStdio = OUTPUT_MODE === 'quiet' || OUTPUT_MODE === 'production' ? 'pipe' : 'inherit';
+    execSync('pnpm build', { stdio: buildStdio });
+    log(' Packages built successfully', colors.green);
   } catch (error) {
-    log(' ❌ Failed to build packages', colors.red);
+    log(' Failed to build packages', colors.red);
     process.exit(1);
   }
 
@@ -841,7 +1060,7 @@ async function main() {
   log('\n⏳ Waiting for services to start...', colors.cyan);
   await wait(8000); // Give services time to initialize
 
-  log('\n🔍 Checking service health...', colors.cyan);
+  log('\nChecking service health...', colors.cyan);
 
   const healthResults = [];
   const failedServices = [];
@@ -877,12 +1096,12 @@ async function main() {
   }
 
   // Summary of health checks
-  log('\n📊 Health Check Summary:', colors.blue);
+  log('\nHealth Check Summary:', colors.blue);
   for (const result of healthResults) {
     if (result.status === 'healthy') {
-      log(`  ✅ ${result.service}`, colors.green);
+      log(`  ${result.service}`, colors.green);
     } else {
-      log(`  ❌ ${result.service}: ${result.error}`, colors.red);
+      log(`  ${result.service}: ${result.error}`, colors.red);
     }
   }
 
@@ -903,7 +1122,7 @@ async function main() {
     );
 
     logWithTimestamp(
-      '\n💡 Troubleshooting suggestions:',
+      '\nTroubleshooting suggestions:',
       'INFO',
       colors.yellow
     );
@@ -941,7 +1160,7 @@ async function main() {
     );
   } else {
     logWithTimestamp(
-      '\n🎉 All services passed health checks!',
+      '\nAll services passed health checks!',
       'SUCCESS',
       colors.green
     );
@@ -974,7 +1193,7 @@ async function main() {
     );
   } else {
     logWithTimestamp(
-      '\n🚦 Broadcasting system readiness...',
+      '\nBroadcasting system readiness...',
       'INFO',
       colors.cyan
     );
@@ -998,14 +1217,14 @@ async function main() {
       await wait(200);
     }
     logWithTimestamp(
-      '✅ Readiness broadcast complete',
+      'Readiness broadcast complete',
       'SUCCESS',
       colors.green
     );
   }
 
   // Step 10: Check optional external services (Sterling is now started by this script when available)
-  log('\n🔍 Checking optional external services...', colors.cyan);
+  log('\nChecking optional external services...', colors.cyan);
 
   const sterlingUrl = process.env.STERLING_WS_URL || 'ws://localhost:8766';
   if (sterlingAvailable) {
@@ -1036,7 +1255,7 @@ async function main() {
         });
       });
       log(
-        `  ✅ Sterling reasoning server available at ${sterlingUrl}`,
+        `  Sterling reasoning server available at ${sterlingUrl}`,
         colors.green
       );
     } catch {
@@ -1078,7 +1297,7 @@ async function main() {
         reject(err);
       });
     });
-    log(`  ✅ Minecraft server available at ${mcHost}:${mcPort}`, colors.green);
+    log(`  Minecraft server available at ${mcHost}:${mcPort}`, colors.green);
   } catch {
     log(
       `  ℹ️  Minecraft server not available at ${mcHost}:${mcPort} (optional)`,
@@ -1092,11 +1311,11 @@ async function main() {
 
   // Step 11: Display status and URLs
   logWithTimestamp(
-    '\n🎉 Conscious Bot System is running!',
+    '\nConscious Bot System is running!',
     'SUCCESS',
     colors.green
   );
-  logWithTimestamp('📊 Service Status:', 'INFO', colors.blue);
+  logWithTimestamp('Service Status:', 'INFO', colors.blue);
 
   for (const service of services) {
     const scheme = service.healthUrl == null ? 'ws' : 'http';
@@ -1108,7 +1327,7 @@ async function main() {
   }
 
   logWithTimestamp('', 'INFO');
-  logWithTimestamp('🔗 Quick Actions:', 'INFO', colors.blue);
+  logWithTimestamp('Quick Actions:', 'INFO', colors.blue);
   logWithTimestamp(
     '  Dashboard:     http://localhost:3000',
     'INFO',
@@ -1130,7 +1349,7 @@ async function main() {
     colors.cyan
   );
   logWithTimestamp('', 'INFO');
-  logWithTimestamp('🎮 Minecraft Commands:', 'INFO', colors.yellow);
+  logWithTimestamp('Minecraft Commands:', 'INFO', colors.yellow);
   logWithTimestamp(
     '  Connect bot: curl -X POST http://localhost:3005/connect',
     'INFO',
@@ -1147,14 +1366,14 @@ async function main() {
     colors.cyan
   );
   logWithTimestamp('', 'INFO');
-  logWithTimestamp('🛑 To stop all services:', 'INFO', colors.yellow);
+  logWithTimestamp('To stop all services:', 'INFO', colors.yellow);
   logWithTimestamp('  Press Ctrl+C or run: pnpm kill', 'INFO', colors.cyan);
   logWithTimestamp('', 'INFO');
 
   // Step 12: Handle graceful shutdown
   const cleanup = async () => {
     logWithTimestamp(
-      '\n🛑 Shutting down Conscious Bot System...',
+      '\nShutting down Conscious Bot System...',
       'SHUTDOWN',
       colors.yellow
     );
@@ -1181,7 +1400,7 @@ async function main() {
       killProcessesByPort(service.port);
     }
 
-    logWithTimestamp('✅ All services stopped', 'SUCCESS', colors.green);
+    logWithTimestamp('All services stopped', 'SUCCESS', colors.green);
     logWithTimestamp('👋 Goodbye!', 'INFO', colors.blue);
     process.exit(0);
   };
@@ -1191,7 +1410,7 @@ async function main() {
 
   // Keep the script running
   logWithTimestamp(
-    '💡 Services are running. Press Ctrl+C to stop.',
+    'Services are running. Press Ctrl+C to stop.',
     'INFO',
     colors.green
   );
@@ -1199,6 +1418,7 @@ async function main() {
 
 // Run the main function
 main().catch((error) => {
-  logWithTimestamp(`❌ Error: ${error.message}`, 'ERROR', colors.red);
+  const msg = OUTPUT_MODE === 'quiet' ? error.message : `Error: ${error.message}`;
+  console.error(`\x1b[31m${msg}\x1b[0m`);
   process.exit(1);
 });

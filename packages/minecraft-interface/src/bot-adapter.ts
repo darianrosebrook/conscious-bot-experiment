@@ -230,19 +230,20 @@ export class BotAdapter extends EventEmitter {
   }
 
   /**
-   * Initialize safety monitor
+   * Initialize safety monitor with an external ActionTranslator
+   * This should be called by PlanExecutor after it creates the shared ActionTranslator
+   * to avoid duplicate ActionTranslator/NavigationBridge instances.
    */
-  private initializeSafetyMonitor(): void {
+  initializeSafetyMonitor(actionTranslator: ActionTranslator): void {
     if (!this.bot) return;
 
-    try {
-      // Create action translator for safety monitor
-      const actionTranslator = new ActionTranslator(this.bot, {
-        actionTimeout: 10000,
-        pathfindingTimeout: 15000,
-        maxRetries: 3,
-      });
+    // Prevent duplicate initialization
+    if (this.safetyMonitor) {
+      console.log('🛡️ Safety monitor already initialized, skipping');
+      return;
+    }
 
+    try {
       this.safetyMonitor = new AutomaticSafetyMonitor(
         this.bot,
         actionTranslator,
@@ -389,8 +390,8 @@ export class BotAdapter extends EventEmitter {
 
     // Position monitoring will be set up after bot spawns
     this.bot.once('spawn', () => {
-      // Initialize safety monitor after spawn
-      this.initializeSafetyMonitor();
+      // NOTE: Safety monitor initialization moved to PlanExecutor.initialize()
+      // to share the same ActionTranslator and avoid duplicate NavigationBridge instances
 
       // Set up position monitoring after spawn
       let lastPosition: any = null;
@@ -724,39 +725,6 @@ export class BotAdapter extends EventEmitter {
    */
   getConfig(): BotConfig {
     return { ...this.config };
-  }
-
-  /**
-   * Initialize the bot with safety monitoring
-   */
-  private async initializeBot(): Promise<void> {
-    if (!this.bot) return;
-
-    // Initialize safety monitor
-    if (this.actionTranslator) {
-      const actionTranslator =
-        new (require('./action-translator').ActionTranslator)(this.bot, {
-          actionTimeout: 10000,
-          maxRetries: 3,
-        });
-
-      this.safetyMonitor = new AutomaticSafetyMonitor(
-        this.bot,
-        this.actionTranslator,
-        {
-          healthThreshold: 15,
-          checkInterval: 2000,
-          autoFleeEnabled: true,
-          autoShelterEnabled: true,
-          maxFleeDistance: 20,
-        }
-      );
-
-      // Start automatic safety monitoring
-      this.safetyMonitor.start();
-
-      console.log('🛡️ Automatic safety monitoring enabled');
-    }
   }
 
   /**

@@ -505,5 +505,7 @@ export type MockIntegratedPlanningCoordinator = ReturnType<
   typeof createMockIntegratedPlanningCoordinator
 >;
 export type MockGoalManager = ReturnType<typeof createMockGoalManager>;
-export type MockReactiveExecutor = ReturnType<typeof createMockReactiveExecutor>;
+export type MockReactiveExecutor = ReturnType<
+  typeof createMockReactiveExecutor
+>;
 export type MockPlanningSystem = ReturnType<typeof createMockPlanningSystem>;

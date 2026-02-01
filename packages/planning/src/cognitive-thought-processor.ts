@@ -1260,19 +1260,11 @@ export class CognitiveThoughtProcessor extends EventEmitter {
   }
 
   /**
-   * Get recent task history for memory context
+   * Get recent task history for memory context.
+   * PLACEHOLDER: real task history not integrated; returns empty until task store or planning API is wired.
    */
-  private getRecentTaskHistory(limit: number): any[] {
-    // This would normally come from the task history
-    // For now, return placeholder data
-    return Array.from(this.recentTaskKeys.entries())
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, limit)
-      .map(([key, ts]) => ({
-        key,
-        timestamp: ts,
-        type: (key.split('_')[0] as 'low' | 'medium' | 'high') || 'medium',
-      }));
+  private getRecentTaskHistory(_limit: number): any[] {
+    return [];
   }
 
   /**

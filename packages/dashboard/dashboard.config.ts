@@ -79,8 +79,6 @@ export interface DashboardConfig {
     refreshInterval: number;
     maxThoughts: number;
     maxEvents: number;
-    enableMockData: boolean;
-    mockDataFallback: boolean;
   };
   features: {
     evaluation: boolean;
@@ -296,8 +294,6 @@ export const defaultConfig: DashboardConfig = {
     ),
     maxThoughts: parseInt(process.env.DASHBOARD_MAX_THOUGHTS || '1000'),
     maxEvents: parseInt(process.env.DASHBOARD_MAX_EVENTS || '500'),
-    enableMockData: process.env.DASHBOARD_ENABLE_MOCK_DATA === 'true',
-    mockDataFallback: process.env.DASHBOARD_MOCK_DATA_FALLBACK !== 'false',
   },
   features: {
     evaluation: process.env.DASHBOARD_ENABLE_EVALUATION !== 'false',

@@ -121,7 +121,7 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
       }
     }, 30000); // 30 seconds
 
-    console.log('🧠 Started thought-to-task conversion polling');
+    console.log('[Thought-to-task] Started conversion polling');
   }
 
   private trimSeenThoughtIds(): void {
@@ -173,7 +173,6 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
     );
   }
 
-
   /**
    * Update task status
    */
@@ -205,7 +204,7 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
 
       // Log the task lifecycle event
       console.log(
-        `✅ Task lifecycle event: ${eventType} for task: ${task.title}`
+        `Task lifecycle event: ${eventType} for task: ${task.title}`
       );
     } catch (error) {
       console.warn('⚠️ Failed to emit lifecycle event:', error);
@@ -273,9 +272,9 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
    * Get count of active tasks
    */
   private async getActiveTasksCount(): Promise<number> {
-    const activeTasks = this.taskStore.getAllTasks().filter(
-      (task) => task.status === 'pending' || task.status === 'active'
-    );
+    const activeTasks = this.taskStore
+      .getAllTasks()
+      .filter((task) => task.status === 'pending' || task.status === 'active');
     return activeTasks.length;
   }
 
@@ -300,7 +299,7 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
     const idx: Record<string, number> = {};
     const raw = Array.isArray(inventory)
       ? inventory
-      : (inventory as any)?.items ?? [];
+      : ((inventory as any)?.items ?? []);
     for (const it of raw) {
       let name = this.canonicalItemId(it?.name ?? it?.type);
       if (!name) continue;
@@ -711,11 +710,15 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
       const expectedItem = req?.item ?? req?.outputPattern;
       if (expectedItem) {
         try {
-          const response = await this.minecraftRequest('/inventory', { timeout: 5000 });
+          const response = await this.minecraftRequest('/inventory', {
+            timeout: 5000,
+          });
           if (response.ok) {
             const data = (await response.json()) as any;
             const raw = data?.data;
-            const inventory: any[] = Array.isArray(raw) ? raw : raw?.items ?? [];
+            const inventory: any[] = Array.isArray(raw)
+              ? raw
+              : (raw?.items ?? []);
             const target = expectedItem.toLowerCase();
             const expectedQty = req?.quantity ?? 1;
 
@@ -737,7 +740,10 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
             }
           }
         } catch (error) {
-          console.warn('Failed final inventory gate for task completion:', error);
+          console.warn(
+            'Failed final inventory gate for task completion:',
+            error
+          );
         }
       }
 
@@ -946,7 +952,9 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
         );
         return setResult(
           passed ? 'verified' : 'failed',
-          passed ? undefined : { error: 'Leaf verification failed', leaf: effectiveLeaf }
+          passed
+            ? undefined
+            : { error: 'Leaf verification failed', leaf: effectiveLeaf }
         );
       }
 
@@ -969,9 +977,10 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
    * This is the single place where labels are parsed — verification itself never
    * inspects labels.
    */
-  private deriveLeafAndArgs(
-    step: TaskStep
-  ): { effectiveLeaf: string | undefined; effectiveArgs: Record<string, any> } {
+  private deriveLeafAndArgs(step: TaskStep): {
+    effectiveLeaf: string | undefined;
+    effectiveArgs: Record<string, any>;
+  } {
     // 1. Structured metadata — preferred path
     const metaLeaf = step.meta?.leaf as string | undefined;
     if (metaLeaf) {
@@ -987,13 +996,20 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
     if (label.startsWith('leaf: minecraft.')) {
       const afterPrefix = step.label.slice('Leaf: minecraft.'.length).trim();
       const parenIdx = afterPrefix.indexOf('(');
-      const leafName = parenIdx >= 0 ? afterPrefix.slice(0, parenIdx).trim() : afterPrefix.trim();
+      const leafName =
+        parenIdx >= 0
+          ? afterPrefix.slice(0, parenIdx).trim()
+          : afterPrefix.trim();
       const args: Record<string, any> = {};
       if (parenIdx >= 0) {
-        const paramStr = afterPrefix.slice(parenIdx + 1, afterPrefix.lastIndexOf(')'));
+        const paramStr = afterPrefix.slice(
+          parenIdx + 1,
+          afterPrefix.lastIndexOf(')')
+        );
         for (const part of paramStr.split(',')) {
           const [k, ...rest] = part.split('=');
-          if (k?.trim()) args[k.trim()] = rest.join('=').trim().replace(/^"|"$/g, '');
+          if (k?.trim())
+            args[k.trim()] = rest.join('=').trim().replace(/^"|"$/g, '');
         }
       }
       return { effectiveLeaf: leafName.toLowerCase(), effectiveArgs: args };
@@ -1012,18 +1028,33 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
     }
 
     // 4. Well-known legacy labels → synthetic leaf mappings
-    const LEGACY_LABEL_MAP: Record<string, { leaf: string; args?: Record<string, any> }> = {
-      'locate nearby wood':       { leaf: 'sense_hostiles' },  // observational — auto-pass
-      'locate nearby resources':  { leaf: 'sense_hostiles' },
+    const LEGACY_LABEL_MAP: Record<
+      string,
+      { leaf: string; args?: Record<string, any> }
+    > = {
+      'locate nearby wood': { leaf: 'sense_hostiles' }, // observational — auto-pass
+      'locate nearby resources': { leaf: 'sense_hostiles' },
       'move to resource location': { leaf: 'move_to' },
-      'move to location':         { leaf: 'move_to' },
-      'collect wood safely':      { leaf: 'dig_block', args: { blockType: 'oak_log' } },
-      'collect resources safely': { leaf: 'dig_block', args: { blockType: 'oak_log' } },
-      'store collected items':    { leaf: 'wait' },  // no-op — items are already in inventory
-      'check required materials': { leaf: 'wait' },  // observational
-      'gather missing materials': { leaf: 'dig_block', args: { blockType: 'oak_log' } },
-      'access crafting interface': { leaf: 'place_block', args: { item: 'crafting_table' } },
-      'create the item':          { leaf: 'craft_recipe' },
+      'move to location': { leaf: 'move_to' },
+      'collect wood safely': {
+        leaf: 'dig_block',
+        args: { blockType: 'oak_log' },
+      },
+      'collect resources safely': {
+        leaf: 'dig_block',
+        args: { blockType: 'oak_log' },
+      },
+      'store collected items': { leaf: 'wait' }, // no-op — items are already in inventory
+      'check required materials': { leaf: 'wait' }, // observational
+      'gather missing materials': {
+        leaf: 'dig_block',
+        args: { blockType: 'oak_log' },
+      },
+      'access crafting interface': {
+        leaf: 'place_block',
+        args: { item: 'crafting_table' },
+      },
+      'create the item': { leaf: 'craft_recipe' },
     };
 
     const mapped = LEGACY_LABEL_MAP[label];
@@ -1052,11 +1083,17 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
         return { moved: true, distance: '>0' };
       case 'dig_block':
       case 'acquire_material':
-        return { collected: true, item: effectiveArgs.blockType ?? effectiveArgs.item };
+        return {
+          collected: true,
+          item: effectiveArgs.blockType ?? effectiveArgs.item,
+        };
       case 'craft_recipe':
         return { crafted: true, recipe: effectiveArgs.recipe };
       case 'place_block':
-        return { placed: true, item: effectiveArgs.item ?? effectiveArgs.blockType };
+        return {
+          placed: true,
+          item: effectiveArgs.item ?? effectiveArgs.blockType,
+        };
       case 'consume_food':
         return { consumed: true, foodDelta: '>0' };
       case 'smelt':
@@ -1166,7 +1203,7 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
 
       const data = (await res.json()) as any;
       const raw = data?.data;
-      const inventory = Array.isArray(raw) ? raw : raw?.items ?? [];
+      const inventory = Array.isArray(raw) ? raw : (raw?.items ?? []);
       const afterIdx = this.buildInventoryIndex(inventory);
 
       const acceptedNames = this.getInventoryNamesForVerification(itemId);
@@ -1198,7 +1235,7 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
       if (!res.ok) return false;
       const data = (await res.json()) as any;
       const raw = data?.data;
-      const inventory = Array.isArray(raw) ? raw : raw?.items ?? [];
+      const inventory = Array.isArray(raw) ? raw : (raw?.items ?? []);
       const total = Array.isArray(inventory)
         ? inventory.reduce((s: number, it: any) => s + (it?.count || 0), 0)
         : 0;
@@ -1344,7 +1381,7 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
       if (invRes.ok) {
         const invData = (await invRes.json()) as any;
         const raw = invData?.data;
-        const inventory = Array.isArray(raw) ? raw : raw?.items ?? [];
+        const inventory = Array.isArray(raw) ? raw : (raw?.items ?? []);
         snap.inventoryTotal = inventory.reduce(
           (s: number, it: any) => s + (it?.count || 0),
           0
@@ -1375,7 +1412,8 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
    */
   getActiveTasks(): Task[] {
     // Return active/pending tasks sorted by priority (desc) then createdAt (asc)
-    return this.taskStore.getAllTasks()
+    return this.taskStore
+      .getAllTasks()
       .filter((task) => task.status === 'active' || task.status === 'pending')
       .sort((a, b) => {
         if (a.priority !== b.priority) return b.priority - a.priority;
@@ -1548,12 +1586,17 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
     const task = this.taskStore.getTask(taskId);
     if (!task) return { success: false };
 
-    let botCtx: { inventory: any[]; nearbyBlocks: string[] };
+    let botCtx: {
+      inventory: any[];
+      nearbyBlocks: any[];
+      _unavailable?: boolean;
+    };
     try {
       botCtx = await this.sterlingPlanner.fetchBotContext();
     } catch {
       return { success: false };
     }
+    if (botCtx._unavailable) return { success: false };
 
     const updatedTask: Partial<Task> = {
       ...task,
@@ -1657,5 +1700,4 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
   getConfig(): TaskIntegrationConfig {
     return { ...this.config };
   }
-
 }

@@ -34,6 +34,7 @@ export class WorldStateManager extends EventEmitter {
   private lastNotReadyLogAt = 0;
   private pollInFlight = false;
   private lastPollSkipAt = 0;
+  private lastNoMeaningfulChangeLogAt = 0;
 
   constructor(baseUrl: string) {
     super();
@@ -135,21 +136,24 @@ export class WorldStateManager extends EventEmitter {
         dangerLevel: 0, // Calculate based on environment
       };
 
-      // Debug logging
-      console.log('WorldStateManager poll result:', {
-        connected: this.snapshot.connected,
-        hasPosition: !!this.snapshot.agentPosition,
-        position: this.snapshot.agentPosition,
-        health: this.snapshot.agentHealth,
-        inventoryCount: this.snapshot.inventory?.length || 0,
-      });
-
+      // Only log on meaningful changes to reduce log spam
       if (this.hasMeaningfulChange(prev, this.snapshot)) {
-        console.log('WorldStateManager emitting update');
+        console.log('[WorldStateManager] State update:', {
+          connected: this.snapshot.connected,
+          position: this.snapshot.agentPosition,
+          health: this.snapshot.agentHealth,
+          inventoryCount: this.snapshot.inventory?.length || 0,
+        });
         this.emit('updated', this.getSnapshot());
-      } else {
-        console.log('WorldStateManager no meaningful change');
+      } else if (process.env.DEBUG_WORLD_STATE === 'true') {
+        const now = Date.now();
+        if (now - this.lastNoMeaningfulChangeLogAt > 60000) {
+          console.log('WorldStateManager no meaningful change');
+          this.lastNoMeaningfulChangeLogAt = now;
+        }
       }
+      // Verbose logging removed - enable for debugging specific state issues:
+      // console.log('WorldStateManager poll result:', { ... });
     } catch (e) {
       // Stale-while-revalidate: previous snapshot is intentionally preserved
       // on fetch failure so downstream consumers always have *some* data.

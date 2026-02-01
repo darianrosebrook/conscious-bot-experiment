@@ -74,6 +74,7 @@ function ConsciousMinecraftDashboardContent() {
     hud,
     thoughts,
     tasks,
+    tasksFallback,
     events,
     memories,
     notes,
@@ -84,6 +85,7 @@ function ConsciousMinecraftDashboardContent() {
     setHud,
     addThought,
     setTasks,
+    setTasksFallback,
     updateTask,
     addTask,
     addEvent,
@@ -625,6 +627,7 @@ function ConsciousMinecraftDashboardContent() {
         if (tasksRes.ok) {
           const tasksData = await tasksRes.json();
           setTasks(tasksData.tasks || []);
+          setTasksFallback(!!tasksData.fallback);
         }
 
         // Fetch planner data
@@ -872,7 +875,8 @@ function ConsciousMinecraftDashboardContent() {
         });
         if (res.ok) {
           const data = await res.json();
-          if (data.tasks && Array.isArray(data.tasks)) setTasks(data.tasks);
+          setTasks(Array.isArray(data.tasks) ? data.tasks : []);
+          setTasksFallback(!!data.fallback);
         }
       } catch {
         // Non-fatal; next poll will retry
@@ -1594,7 +1598,11 @@ function ConsciousMinecraftDashboardContent() {
                     <EmptyState
                       icon={ListChecks}
                       title="No tasks available"
-                      description="Tasks will appear here when the bot is actively planning or executing goals."
+                      description={
+                        tasksFallback
+                          ? 'Planning system temporarily unavailable.'
+                          : 'Tasks will appear here when the bot is actively planning or executing goals.'
+                      }
                     />
                   )}
                 </Section>
@@ -2173,7 +2181,7 @@ function ConsciousMinecraftDashboardContent() {
                         } else if (isSystemEvent) {
                           borderColor = 'border-indigo-600/50';
                           bgColor = 'bg-indigo-950/20';
-                          prefix = '🔄 ';
+                          prefix = '';
                           typeLabel = 'system_event';
                           textColor = 'text-indigo-200';
                           // iconColor = 'text-indigo-400';
@@ -2187,7 +2195,7 @@ function ConsciousMinecraftDashboardContent() {
                         } else if (isTaskCreation) {
                           borderColor = 'border-emerald-600/50';
                           bgColor = 'bg-emerald-950/20';
-                          prefix = '✅ ';
+                          prefix = '';
                           typeLabel = 'task_creation';
                           textColor = 'text-emerald-200';
                           // iconColor = 'text-emerald-400';

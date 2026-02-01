@@ -35,7 +35,9 @@ export async function createSterlingBootstrap(
   let sterlingService: SterlingReasoningService | undefined;
   let minecraftCraftingSolver: MinecraftCraftingSolver | undefined;
   let minecraftBuildingSolver: MinecraftBuildingSolver | undefined;
-  let minecraftToolProgressionSolver: MinecraftToolProgressionSolver | undefined;
+  let minecraftToolProgressionSolver:
+    | MinecraftToolProgressionSolver
+    | undefined;
 
   try {
     sterlingService = new SterlingReasoningService();

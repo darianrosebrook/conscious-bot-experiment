@@ -9,7 +9,10 @@ import type { Task } from '../types/task';
 import type { CognitiveStreamThought } from '../modules/cognitive-stream-client';
 import { parseRequiredQuantityFromTitle } from '../modules/requirements';
 
-export function extractActionTitle(content: string, actionType: string): string {
+export function extractActionTitle(
+  content: string,
+  actionType: string
+): string {
   const sentences = content.split(/[.!?]/);
   for (const sentence of sentences) {
     if (sentence.toLowerCase().includes(actionType)) {
@@ -34,7 +37,8 @@ export function extractItemType(content: string): string {
   if (content.includes('axe')) return 'wooden_axe';
   if (content.includes('shovel')) return 'wooden_shovel';
   if (content.includes('table')) return 'crafting_table';
-  if (content.includes('planks') || content.includes('plank')) return 'oak_planks';
+  if (content.includes('planks') || content.includes('plank'))
+    return 'oak_planks';
   if (content.includes('stick')) return 'stick';
   return 'oak_planks';
 }
@@ -212,7 +216,11 @@ export async function convertThoughtToTask(
 
     if (goalMatch) {
       const [, kind] = goalMatch;
-      const kindLower = (kind || '').toLowerCase() as 'collect' | 'mine' | 'craft' | 'build';
+      const kindLower = (kind || '').toLowerCase() as
+        | 'collect'
+        | 'mine'
+        | 'craft'
+        | 'build';
       const kindToType: Record<string, string> = {
         collect: 'gathering',
         mine: 'mining',

@@ -539,12 +539,11 @@ export class EnvironmentalDetector extends EventEmitter {
       this.updateInterval = null;
     }
 
-    console.log('🌍 Environmental monitoring stopped');
+    console.log('Environmental monitoring stopped');
   }
 
   async analyzeEnvironment(position: Vec3): Promise<EnvironmentalState> {
-    // This would integrate with actual Minecraft world data
-    // For now, return mock data based on position
+    // Best-effort environment state; uses position-based heuristics when real world query is unavailable.
     const biomeName = this.estimateBiomeFromPosition(position);
     const biome =
       BiomeDatabase.getBiome(biomeName) || BiomeDatabase.getBiome('plains')!;

@@ -60,7 +60,11 @@ export {
 } from './reactive-executor/safety-reflexes';
 
 // Capability-aware routing
-export { routeActionPlan, type CapabilityRoute, type PlanBackend } from './modules/action-plan-backend';
+export {
+  routeActionPlan,
+  type CapabilityRoute,
+  type PlanBackend,
+} from './modules/action-plan-backend';
 export type { RouteOptions } from './modules/action-plan-backend';
 
 // Solve contract types
@@ -93,7 +97,11 @@ export type {
 
 // Sterling Minecraft crafting domain
 export { MinecraftCraftingSolver } from './sterling';
-export { buildCraftingRules, inventoryToRecord, goalFromTaskRequirement } from './sterling';
+export {
+  buildCraftingRules,
+  inventoryToRecord,
+  goalFromTaskRequirement,
+} from './sterling';
 export type {
   MinecraftCraftingRule,
   CraftingInventory,
@@ -107,11 +115,18 @@ export type {
 export type { PlanStep, HomeostasisState, PlanningContext } from './types';
 
 // Interfaces and bootstrap for dependency injection
-export type { ITaskIntegration, IGoalManager, IReactiveExecutor } from './interfaces';
+export type {
+  ITaskIntegration,
+  IGoalManager,
+  IReactiveExecutor,
+} from './interfaces';
 export { createPlanningBootstrap } from './modules/planning-bootstrap';
 
 // Task integration and integrations (used by modular-server; backward-compat aliases)
-export { TaskIntegration, type TaskIntegrationConfig } from './task-integration';
+export {
+  TaskIntegration,
+  type TaskIntegrationConfig,
+} from './task-integration';
 /** @deprecated Use TaskIntegration */
 export { TaskIntegration as EnhancedTaskIntegration } from './task-integration';
 /** @deprecated Use TaskIntegrationConfig */

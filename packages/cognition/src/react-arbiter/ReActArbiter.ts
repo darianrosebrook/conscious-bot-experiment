@@ -302,24 +302,14 @@ export class ReActArbiter {
    * This is used for task decomposition outside of the ReAct loop
    */
   async generateTaskSteps(task: any): Promise<string> {
-    const prompt = `Generate specific, actionable steps for the following task:
+    const prompt = `
+Turn this into 3–6 steps I can do in the world, in order.
 
-TASK: ${task.title}
-DESCRIPTION: ${task.description || 'No description provided'}
-TYPE: ${task.type || 'general'}
+Task: ${task.title}
+${task.description ? `Context: ${task.description}` : ''}
 
-Generate 3-6 specific steps that break down this task into actionable components. Each step should be:
-- Specific and actionable
-- In the order they should be performed
-- Realistic for a Minecraft bot to execute
-
-Format your response as a numbered list, like:
-1. First step description
-2. Second step description
-3. Third step description
-...etc.
-
-Focus on the actual actions needed, not generic planning steps.`;
+Write a numbered list. Each step must be a concrete action (move/look/collect/mine/craft/build/use), not planning talk. Keep steps short.
+`.trim();
 
     try {
       const response = await this.llm.generateResponse(prompt, undefined, {

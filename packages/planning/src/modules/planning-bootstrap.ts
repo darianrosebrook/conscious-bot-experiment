@@ -55,7 +55,8 @@ export function createPlanningBootstrap(
     new TaskIntegration({ ...DEFAULT_TASK_CONFIG, ...config?.taskIntegration });
 
   const goalManager = overrides?.goalManager ?? new GoalManager();
-  const reactiveExecutor = overrides?.reactiveExecutor ?? new ReactiveExecutor();
+  const reactiveExecutor =
+    overrides?.reactiveExecutor ?? new ReactiveExecutor();
 
   return { taskIntegration, goalManager, reactiveExecutor };
 }

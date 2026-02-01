@@ -1,5 +1,5 @@
-import { type ClassValue, clsx } from "clsx";
-import { twMerge } from "tailwind-merge";
+import { type ClassValue, clsx } from 'clsx';
+import { twMerge } from 'tailwind-merge';
 
 /** Only logs when NEXT_PUBLIC_DEBUG_DASHBOARD=1 to reduce browser console noise */
 export function debugLog(...args: unknown[]): void {
@@ -40,14 +40,14 @@ export function formatRelativeTime(ts: string): string {
   const diffHours = Math.floor(diffMinutes / 60);
 
   if (diffSeconds < 60) {
-    return "just now";
-  } 
+    return 'just now';
+  }
   if (diffMinutes < 60) {
     return `${diffMinutes}m ago`;
-  } 
+  }
   if (diffHours < 24) {
     return `${diffHours}h ago`;
-  } 
+  }
   return time.toLocaleDateString();
 }
 
@@ -59,23 +59,32 @@ export function formatRelativeTime(ts: string): string {
  */
 export function getHudColor(value: number, type: string): string {
   // For stress-like metrics (lower is better)
-  if (type.includes('stress') || type.includes('fatigue') || type.includes('anxiety')) {
-    if (value <= 10) return "bg-green-500"; // Green for low stress
-    if (value <= 50) return "bg-yellow-500"; // Yellow for moderate stress
-    return "bg-red-500"; // Red for high stress
+  if (
+    type.includes('stress') ||
+    type.includes('fatigue') ||
+    type.includes('anxiety')
+  ) {
+    if (value <= 10) return 'bg-green-500'; // Green for low stress
+    if (value <= 50) return 'bg-yellow-500'; // Yellow for moderate stress
+    return 'bg-red-500'; // Red for high stress
   }
-  
+
   // For health-like metrics (higher is better)
-  if (type.includes('health') || type.includes('energy') || type.includes('happiness') || type.includes('hunger')) {
-    if (value >= 80) return "bg-green-500"; // Green for high health
-    if (value >= 50) return "bg-yellow-500"; // Yellow for moderate health
-    return "bg-red-500"; // Red for low health
+  if (
+    type.includes('health') ||
+    type.includes('energy') ||
+    type.includes('happiness') ||
+    type.includes('hunger')
+  ) {
+    if (value >= 80) return 'bg-green-500'; // Green for high health
+    if (value >= 50) return 'bg-yellow-500'; // Yellow for moderate health
+    return 'bg-red-500'; // Red for low health
   }
-  
+
   // Default behavior (higher is better)
-  if (value >= 80) return "bg-green-500";
-  if (value >= 50) return "bg-yellow-500";
-  return "bg-red-500";
+  if (value >= 80) return 'bg-green-500';
+  if (value >= 50) return 'bg-yellow-500';
+  return 'bg-red-500';
 }
 
 /**

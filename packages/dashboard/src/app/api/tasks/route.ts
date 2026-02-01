@@ -163,113 +163,16 @@ export async function GET(_request: NextRequest) {
   } catch (error) {
     console.error('Error fetching planning data:', error);
 
-    // Enhanced graceful fallback with better error handling and user feedback
-    const isDevelopment = process.env.NODE_ENV === 'development';
     const errorMessage =
       error instanceof Error ? error.message : 'Unknown error';
-    const errorType =
-      error instanceof Error ? error.constructor.name : 'UnknownError';
 
-    if (isDevelopment) {
-      // Development mode: Show detailed service status and recovery steps
-      return NextResponse.json({
-        tasks: [
-          {
-            id: `service-unavailable-${Date.now()}`,
-            title: `Planning service unavailable (${errorType})`,
-            priority: 1.0,
-            progress: 0,
-            source: 'system' as const,
-            steps: [
-              {
-                id: 'step-1',
-                label: `Diagnose error: ${errorMessage}`,
-                done: false,
-                error: true,
-              },
-              {
-                id: 'step-2',
-                label: 'Check planning service status',
-                done: false,
-                action: 'check_service',
-              },
-              {
-                id: 'step-3',
-                label: 'Restart planning service if needed',
-                done: false,
-                action: 'restart_service',
-              },
-              {
-                id: 'step-4',
-                label: 'Verify network connectivity',
-                done: false,
-                action: 'check_network',
-              },
-              {
-                id: 'step-5',
-                label: 'Check service logs for details',
-                done: false,
-                action: 'check_logs',
-              },
-            ],
-          },
-          {
-            id: `fallback-tasks-${Date.now()}`,
-            title: 'System fallback tasks',
-            priority: 0.5,
-            progress: 0,
-            source: 'system' as const,
-            steps: [
-              { id: 'step-1', label: 'Maintain system stability', done: true },
-              { id: 'step-2', label: 'Monitor service health', done: false },
-              {
-                id: 'step-3',
-                label: 'Prepare for service recovery',
-                done: false,
-              },
-            ],
-          },
-        ],
-        timestamp: new Date().toISOString(),
-        status: 'degraded',
-        error: errorMessage,
-        errorType,
-        fallback: true,
-        recoverySteps: [
-          'Check planning service logs',
-          'Verify service dependencies',
-          'Restart planning service',
-          'Check network connectivity',
-          'Verify configuration files',
-        ],
-      });
-    }
-
-    // Production mode: Graceful degradation with minimal but informative fallback
     return NextResponse.json({
-      tasks: [
-        {
-          id: `system-maintenance-${Date.now()}`,
-          title: 'System maintenance in progress',
-          priority: 0.3,
-          progress: 0,
-          source: 'system' as const,
-          steps: [
-            { id: 'step-1', label: 'System monitoring active', done: true },
-            {
-              id: 'step-2',
-              label: 'Service recovery in progress',
-              done: false,
-            },
-            { id: 'step-3', label: 'Normal operation resuming', done: false },
-          ],
-        },
-      ],
-      timestamp: new Date().toISOString(),
-      status: 'maintenance',
+      tasks: [],
       fallback: true,
-      message:
-        'Planning system temporarily unavailable. Normal operation will resume shortly.',
+      status: 'degraded',
+      error: errorMessage,
+      message: 'Planning system temporarily unavailable.',
+      timestamp: new Date().toISOString(),
     });
   }
 }

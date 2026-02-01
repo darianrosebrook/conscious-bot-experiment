@@ -99,11 +99,18 @@ export interface ReactiveExecutorMetrics {
   actionQueue: any[];
 }
 
-export type { SafetyAction, ExecutionSnapshot, ReflexMCPBus } from './safety-reflexes';
+export type {
+  SafetyAction,
+  ExecutionSnapshot,
+  ReflexMCPBus,
+} from './safety-reflexes';
 export { SafetyReflexes } from './safety-reflexes';
 
 // Static import for SafetyReflexes (avoids CJS require resolution issues in vitest/ESM)
-import { SafetyReflexes as _SafetyReflexes, type SafetyAction as _SafetyAction } from './safety-reflexes';
+import {
+  SafetyReflexes as _SafetyReflexes,
+  type SafetyAction as _SafetyAction,
+} from './safety-reflexes';
 
 /**
  * Stub for GOAPPlanner — provides safety reflex passthrough only.
@@ -135,7 +142,10 @@ export class GOAPPlanner {
   }
 
   /** Safety reflex passthrough — delegates to standalone SafetyReflexes. */
-  checkSafetyReflexes(state: WorldState, context: ExecutionContext): _SafetyAction | null {
+  checkSafetyReflexes(
+    state: WorldState,
+    context: ExecutionContext
+  ): _SafetyAction | null {
     return this.safetyReflexes.checkReflexes({
       health: state.getHealth(),
       hunger: state.getHunger(),
@@ -151,31 +161,63 @@ export class GOAPPlanner {
   }
 
   /** Safety reflex passthrough. */
-  async executeSafetyReflex(reflex: _SafetyAction, mcp: MCPBus): Promise<ActionResult> {
+  async executeSafetyReflex(
+    reflex: _SafetyAction,
+    mcp: MCPBus
+  ): Promise<ActionResult> {
     this.metrics.reflexActivations++;
     const startTime = performance.now();
     try {
       await this.safetyReflexes.executeReflex(reflex, mcp as any);
-      return { success: true, duration: performance.now() - startTime, resourcesConsumed: {}, resourcesGained: {} };
+      return {
+        success: true,
+        duration: performance.now() - startTime,
+        resourcesConsumed: {},
+        resourcesGained: {},
+      };
     } catch (err) {
-      return { success: false, duration: performance.now() - startTime, resourcesConsumed: {}, resourcesGained: {}, error: (err as Error).message };
+      return {
+        success: false,
+        duration: performance.now() - startTime,
+        resourcesConsumed: {},
+        resourcesGained: {},
+        error: (err as Error).message,
+      };
     }
   }
 
   /** No-op — GOAP planning is retired. Returns null. */
-  planTo(_goal: Goal, _state: WorldState, _context: ExecutionContext): GOAPPlan | null {
+  planTo(
+    _goal: Goal,
+    _state: WorldState,
+    _context: ExecutionContext
+  ): GOAPPlan | null {
     return null;
   }
 
-  getMetrics(): ReactiveExecutorMetrics { return this.metrics; }
-  getCurrentAction(): any { return this.metrics.currentAction || null; }
-  getActionQueue(): any[] { return this.metrics.actionQueue || []; }
+  getMetrics(): ReactiveExecutorMetrics {
+    return this.metrics;
+  }
+  getCurrentAction(): any {
+    return this.metrics.currentAction || null;
+  }
+  getActionQueue(): any[] {
+    return this.metrics.actionQueue || [];
+  }
 
   /** No-op stub — GOAP execution is retired. */
-  isExecuting(): boolean { return this.metrics.isExecuting; }
+  isExecuting(): boolean {
+    return this.metrics.isExecuting;
+  }
   /** No-op stub — returns empty result. */
   async executeNextAction(): Promise<ActionResult> {
-    return { success: false, duration: 0, resourcesConsumed: {}, resourcesGained: {}, error: 'GOAP execution retired' };
+    return {
+      success: false,
+      duration: 0,
+      resourcesConsumed: {},
+      resourcesGained: {},
+      error: 'GOAP execution retired',
+    };
   }
 }
 
@@ -185,14 +227,28 @@ export class GOAPPlanner {
  */
 export class PlanRepair {
   /** No-op stub — repair is now handled by Sterling re-solve. */
-  handleFailure(_plan: GOAPPlan, _failedAction: any, _state: WorldState, _context: ExecutionContext, _planner?: any): { type: 'repaired' | 'replanned' | 'failed'; plan?: GOAPPlan; editDistance?: number } {
+  handleFailure(
+    _plan: GOAPPlan,
+    _failedAction: any,
+    _state: WorldState,
+    _context: ExecutionContext,
+    _planner?: any
+  ): {
+    type: 'repaired' | 'replanned' | 'failed';
+    plan?: GOAPPlan;
+    editDistance?: number;
+  } {
     return { type: 'failed' };
   }
   /** No-op stub — returns empty metrics. */
   getMetrics(): Record<string, any> {
     return { repairAttempts: 0, repairSuccesses: 0, avgEditDistance: 0 };
   }
-  attemptRepair(_plan: GOAPPlan, _state: WorldState, _context: ExecutionContext): { type: 'failed'; plan?: undefined } {
+  attemptRepair(
+    _plan: GOAPPlan,
+    _state: WorldState,
+    _context: ExecutionContext
+  ): { type: 'failed'; plan?: undefined } {
     return { type: 'failed' };
   }
 }

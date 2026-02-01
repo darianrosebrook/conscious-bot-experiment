@@ -124,6 +124,10 @@ export class PlanExecutor extends EventEmitter {
         this.stateMachineWrapper
       );
 
+      // Initialize safety monitor with the shared ActionTranslator
+      // This avoids creating duplicate ActionTranslator/NavigationBridge instances
+      this.botAdapter.initializeSafetyMonitor(this.actionTranslator);
+
       this.emit('initialized', {
         bot: this.botAdapter.getStatus(),
         timestamp: Date.now(),

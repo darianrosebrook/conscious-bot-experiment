@@ -122,8 +122,6 @@ export interface DashboardConfig {
     refreshInterval: number;
     maxThoughts: number;
     maxEvents: number;
-    enableMockData: boolean;
-    mockDataFallback: boolean;
   };
 
   // Feature flags
@@ -631,8 +629,6 @@ const defaultConfig: DashboardConfig = {
     refreshInterval: 10000, // 10 seconds
     maxThoughts: 1000,
     maxEvents: 500,
-    enableMockData: false,
-    mockDataFallback: true,
   },
   features: {
     evaluation: true,

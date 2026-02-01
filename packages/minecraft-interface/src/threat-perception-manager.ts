@@ -43,9 +43,9 @@ export class ThreatPerceptionManager {
   private raycastEngine: RaycastEngine;
   private raycastConfig: SensingConfig;
   private lastAssessmentLogAt = 0;
-  private assessmentLogThrottleMs = 2000;
+  private assessmentLogThrottleMs = 30000; // 30 seconds - reduce log spam
   private lastLosLogAt = new Map<string, number>();
-  private losLogThrottleMs = 2000;
+  private losLogThrottleMs = 30000; // 30 seconds - reduce log spam
   private losSuppressedCount = new Map<string, number>();
   private losSuppressedByType = new Map<string, number>();
   private lastLosSummaryAt = 0;
@@ -184,7 +184,7 @@ export class ThreatPerceptionManager {
 
       if (now - this.lastAssessmentLogAt >= this.assessmentLogThrottleMs) {
         console.log(
-          `[ThreatPerception] 🧠 localized threat assessment: ${threats.length} threats, level: ${overallThreatLevel}`
+          `[ThreatPerception] localized threat assessment: ${threats.length} threats, level: ${overallThreatLevel}`
         );
         this.lastAssessmentLogAt = now;
       }

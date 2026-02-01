@@ -233,7 +233,7 @@ let pendingThoughtGeneration = false;
 function startThoughtGeneration() {
   if (!systemReady) {
     pendingThoughtGeneration = true;
-    console.log('⏸️ Waiting for system readiness; autonomous loop paused');
+    console.log('Waiting for system readiness; autonomous loop paused');
     return;
   }
 
@@ -258,35 +258,35 @@ function startThoughtGeneration() {
         return; // Already running a planning cycle
       }
 
-      // Send a contextual thought to cognition (preserve existing behavior)
-      const worldState =
-        minecraftInterface.observationMapper.mapBotStateToPlanningContext(bot);
-      const healthPct = Math.round(
-        ((worldState.worldState?.health ?? 0) / 20) * 100
-      );
-      const hungerPct = Math.round(
-        ((worldState.worldState?.hunger ?? 0) / 20) * 100
-      );
-      const thought = `Health: ${healthPct}%, Hunger: ${hungerPct}%. Observing environment and deciding next action.`;
-
-      minecraftInterface.observationMapper
-        .sendThoughtToCognition(thought, 'status')
-        .catch(() => {}); // Fire-and-forget, don't block execution
-
       // Execute an autonomous planning cycle with concurrency guard
       isRunningPlanningCycle = true;
-      console.log('🔄 Starting autonomous planning cycle...');
+      console.log('Starting autonomous planning cycle...');
       try {
         const result =
           await minecraftInterface.planExecutor.executePlanningCycle();
 
         if (result.success) {
           console.log(
-            `✅ Planning cycle complete: ${result.executedSteps}/${result.totalSteps} steps executed`
+            `Planning cycle complete: ${result.executedSteps}/${result.totalSteps} steps executed`
           );
+          // Send status thought only when the cycle had at least one step, to avoid flooding the cognitive stream when there is no plan
+          if (result.executedSteps > 0) {
+            const worldState =
+              minecraftInterface.observationMapper.mapBotStateToPlanningContext(bot);
+            const healthPct = Math.round(
+              ((worldState.worldState?.health ?? 0) / 20) * 100
+            );
+            const hungerPct = Math.round(
+              ((worldState.worldState?.hunger ?? 0) / 20) * 100
+            );
+            const thought = `Health: ${healthPct}%, Hunger: ${hungerPct}%. Observing environment and deciding next action.`;
+            minecraftInterface.observationMapper
+              .sendThoughtToCognition(thought, 'status')
+              .catch(() => {}); // Fire-and-forget, don't block execution
+          }
         } else {
           console.log(
-            `⚠️ Planning cycle ended: ${result.error || 'no plan generated'} (${result.executedSteps}/${result.totalSteps} steps)`
+            `Planning cycle ended: ${result.error || 'no plan generated'} (${result.executedSteps}/${result.totalSteps} steps)`
           );
         }
       } finally {
@@ -295,20 +295,20 @@ function startThoughtGeneration() {
     } catch (error) {
       isRunningPlanningCycle = false;
       console.error(
-        '❌ Error in autonomous planning cycle:',
+        'Error in autonomous planning cycle:',
         error instanceof Error ? error.message : error
       );
     }
   }, 15000); // Every 15 seconds
 
-  console.log('✅ Autonomous planning loop started (15s intervals)');
+  console.log('Autonomous planning loop started (15s intervals)');
 }
 
 function tryStartThoughtGeneration(reason: string) {
   if (!systemReady) {
     pendingThoughtGeneration = true;
     console.log(
-      `⏸️ Deferring autonomous planning loop until system readiness (${reason})`
+      `Deferring autonomous planning loop until system readiness (${reason})`
     );
     return;
   }
@@ -323,7 +323,7 @@ function stopThoughtGeneration() {
   if (thoughtGenerationInterval) {
     clearInterval(thoughtGenerationInterval);
     thoughtGenerationInterval = null;
-    console.log('🛑 Autonomous planning loop stopped');
+    console.log('Autonomous planning loop stopped');
   }
 }
 
@@ -388,7 +388,7 @@ function setupBotStateWebSocket() {
     broadcastBotStateUpdate('disconnected', data);
 
     // Stop thought generation when bot disconnects
-    console.log('🔌 Bot disconnected, stopping thought generation...');
+    console.log('Bot disconnected, stopping thought generation...');
     stopThoughtGeneration();
   });
 
@@ -432,7 +432,7 @@ function setupBotStateWebSocket() {
     broadcastBotStateUpdate('respawned', data);
 
     // Restart thought generation when bot respawns
-    console.log('🔄 Bot respawned, restarting thought generation...');
+    console.log('Bot respawned, restarting thought generation...');
     startThoughtGeneration();
   });
 
@@ -458,8 +458,8 @@ function setupBotStateWebSocket() {
 
           console.log('Sending periodic HUD update:', hudData);
           broadcastBotStateUpdate('hud_update', hudData);
-        } else {
-          console.log('No world state available for HUD update');
+        } else if (process.env.DEBUG_HUD === 'true') {
+          console.debug('No world state available for HUD update');
         }
       } catch (error) {
         console.error('Failed to send periodic HUD update:', error);
@@ -636,7 +636,7 @@ app.post('/seed', async (req, res) => {
       }
     );
     if (memoryResponse?.ok) {
-      console.log('✅ Seed propagated to memory service');
+      console.log('Seed propagated to memory service');
     }
 
     res.json({
@@ -683,11 +683,11 @@ app.post('/connect', async (req, res) => {
         }
       );
       if (memoryResponse?.ok) {
-        console.log('✅ Seed propagated to memory service');
+        console.log('Seed propagated to memory service');
       }
     }
 
-    console.log('🔄 Connecting to Minecraft server...');
+    console.log('Connecting to Minecraft server...');
 
     // Initialize memory integration service
     memoryIntegration = new MemoryIntegrationService(botConfig, {
@@ -697,7 +697,7 @@ app.post('/connect', async (req, res) => {
     // Activate memory namespace for this world
     const memoryActivated = await memoryIntegration.activateWorldMemory();
     if (memoryActivated) {
-      console.log('✅ Memory namespace activated for world');
+      console.log('Memory namespace activated for world');
     } else {
       console.warn(
         '⚠️ Failed to activate memory namespace, continuing without memory integration'
@@ -741,9 +741,9 @@ app.post('/connect', async (req, res) => {
     setupBotStateWebSocket();
 
     // Leaves already registered on server startup; skip duplicate
-    console.log('✅ Connected to Minecraft server');
-    console.log('✅ Memory integration initialized');
-    console.log('✅ Planning coordinator initialized');
+    console.log('Connected to Minecraft server');
+    console.log('Memory integration initialized');
+    console.log('Planning coordinator initialized');
 
     res.json({
       success: true,
@@ -751,7 +751,7 @@ app.post('/connect', async (req, res) => {
       memoryIntegration: memoryActivated,
     });
   } catch (error) {
-    console.error('❌ Failed to connect:', error);
+    console.error('Failed to connect:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to connect to Minecraft server',
@@ -762,10 +762,20 @@ app.post('/connect', async (req, res) => {
   }
 });
 
+// Module-level flag to prevent duplicate leaf registration
+let coreLeavesRegistered = false;
+
 /**
  * Register core leaves with the local leaf factory
+ * This function is idempotent - calling it multiple times has no effect after the first call.
  */
 async function registerCoreLeaves() {
+  // Idempotency guard - prevent duplicate registration
+  if (coreLeavesRegistered) {
+    console.log('📝 Core leaves already registered, skipping');
+    return;
+  }
+
   try {
     console.log('📝 Registering core leaves...');
 
@@ -858,7 +868,7 @@ async function registerCoreLeaves() {
       const result = leafFactory.register(leaf);
       if (result.ok) {
         console.log(
-          `✅ Registered leaf: ${leaf.spec.name}@${leaf.spec.version}`
+          `Registered leaf: ${leaf.spec.name}@${leaf.spec.version}`
         );
       } else {
         console.warn(
@@ -868,13 +878,16 @@ async function registerCoreLeaves() {
     }
 
     console.log(
-      `✅ Registered ${allLeaves.length} core leaves with local leaf factory`
+      `Registered ${allLeaves.length} core leaves with local leaf factory`
     );
 
     // Store the leaf factory globally so it can be used by the action executor
     (global as any).minecraftLeafFactory = leafFactory;
+
+    // Mark as registered to prevent duplicate registration
+    coreLeavesRegistered = true;
   } catch (error) {
-    console.error('❌ Failed to register core leaves:', error);
+    console.error('Failed to register core leaves:', error);
     throw error;
   }
 }
@@ -1169,7 +1182,7 @@ app.post('/chat', async (req, res) => {
     // Send the chat message
     await bot.chat(formattedMessage);
 
-    console.log(`✅ Bot sent chat message: "${formattedMessage}"`);
+    console.log(`Bot sent chat message: "${formattedMessage}"`);
 
     res.json({
       success: true,
@@ -1181,7 +1194,7 @@ app.post('/chat', async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('❌ Failed to send chat message:', error);
+    console.error('Failed to send chat message:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to send chat message',
@@ -1288,7 +1301,7 @@ app.get('/state', async (req, res) => {
       const now = Date.now();
       if (!global.lastStateLog || now - global.lastStateLog > 60000) {
         console.log(
-          '🔍 [MINECRAFT INTERFACE] Bot not connected, returning 503'
+          '[MINECRAFT INTERFACE] Bot not connected, returning 503'
         );
         global.lastStateLog = now;
       }
@@ -1347,6 +1360,7 @@ app.get('/state', async (req, res) => {
         status: isAlive ? 'connected' : 'dead',
         data: basicState,
         isAlive,
+        _meta: { minimal: true, reason: 'bot_unavailable' },
       });
     }
 
@@ -1358,7 +1372,7 @@ app.get('/state', async (req, res) => {
         '[Minecraft Interface] Failed to get bot instance:',
         error instanceof Error ? error.message : error
       );
-      // Return basic state if bot is not available
+      // Return minimal state if bot is not available; consumers can check _meta.minimal
       return res.json({
         success: true,
         status: 'disconnected',
@@ -1373,6 +1387,7 @@ app.get('/state', async (req, res) => {
           },
         },
         isAlive: false,
+        _meta: { minimal: true, reason: 'disconnected' },
       });
     }
 
@@ -1391,10 +1406,13 @@ app.get('/state', async (req, res) => {
           },
         },
         isAlive: false,
+        _meta: { minimal: true, reason: 'disconnected' },
       });
     }
 
-    console.log('🔍 [MINECRAFT INTERFACE] Got connected bot, mapping state...');
+    // Verbose logging removed - this endpoint is polled frequently
+    // Enable for debugging specific state issues:
+    // console.log('🔍 [MINECRAFT INTERFACE] Got connected bot, mapping state...');
 
     const gameState =
       minecraftInterface.observationMapper.mapBotStateToPlanningContext(bot);
@@ -1469,7 +1487,7 @@ app.get('/state', async (req, res) => {
       !global.lastConvertedStateLog ||
       now - global.lastConvertedStateLog > 30000
     ) {
-      console.log('🔍 [MINECRAFT INTERFACE] Bot state updated:', {
+      console.log('[MINECRAFT INTERFACE] Bot state updated:', {
         position: convertedState.data.position,
         health: convertedState.data.health,
         inventoryItems: convertedState.data.inventory?.items?.length || 0,
@@ -1496,7 +1514,7 @@ app.get('/state', async (req, res) => {
 // Get inventory
 app.get('/inventory', async (req, res) => {
   try {
-    console.log('🔍 [MINECRAFT INTERFACE] /inventory endpoint called');
+    console.log('[MINECRAFT INTERFACE] /inventory endpoint called');
 
     const botStatus = minecraftInterface?.botAdapter.getStatus();
     const executionStatus =
@@ -1511,7 +1529,7 @@ app.get('/inventory', async (req, res) => {
 
     if (!isConnected) {
       console.log(
-        '🔍 [MINECRAFT INTERFACE] Inventory - Bot not connected, returning 503'
+        '[MINECRAFT INTERFACE] Inventory - Bot not connected, returning 503'
       );
       return res.status(503).json({
         success: false,
@@ -1610,8 +1628,8 @@ app.post('/action', async (req, res) => {
 
     // Create ActionTranslator directly
     const { ActionTranslator } = await import('./action-translator');
-    console.log('🔧 Creating ActionTranslator for request...');
-    console.log('🔍 Bot state for ActionTranslator:', {
+    console.log('Creating ActionTranslator for request...');
+    console.log('Bot state for ActionTranslator:', {
       hasBot: !!bot,
       hasEntity: !!bot.entity,
       hasPosition: !!bot.entity?.position,
@@ -1622,7 +1640,7 @@ app.post('/action', async (req, res) => {
       actionTimeout: 15000,
       pathfindingTimeout: 30000,
     });
-    console.log('✅ ActionTranslator created for request');
+    console.log('ActionTranslator created for request');
 
     // Execute the action directly instead of as a plan step
     const action = {
@@ -2202,7 +2220,7 @@ function startViewerSafely(bot: any, port: number) {
 
       // Log enhanced viewer status
       enhancedViewer.on('started', () => {
-        console.log('✅ Enhanced viewer features activated');
+        console.log('Enhanced viewer features activated');
       });
 
       enhancedViewer.on('error', (error) => {
@@ -2285,7 +2303,7 @@ server.listen(port, async () => {
   try {
     await registerCoreLeaves();
   } catch (error) {
-    console.error('❌ Failed to register leaves on startup:', error);
+    console.error('Failed to register leaves on startup:', error);
   }
 
   // Attempt to start viewer if bot is already connected - DISABLED to prevent conflicts
@@ -2594,7 +2612,7 @@ async function updateBotInstanceInPlanningServer() {
       );
 
       if (response?.ok) {
-        console.log('✅ Bot instance updated in planning server');
+        console.log('Bot instance updated in planning server');
       } else if (response) {
         console.warn(
           '⚠️ Failed to update bot instance in planning server:',

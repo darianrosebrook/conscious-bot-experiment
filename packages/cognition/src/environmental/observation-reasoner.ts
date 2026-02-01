@@ -264,6 +264,7 @@ export class ObservationReasoner {
     return ObservationInsightSchema.parse(parsedJson);
   }
 
+  /** Fallback insight; downstream should filter or display fallbacks differently (e.g. by thought.source === 'fallback'). */
   private createFallback(
     payload: ObservationPayload,
     observationId: string | undefined,
@@ -388,35 +389,32 @@ export class ObservationReasoner {
   }
 
   private buildPrompt(sanitised: SanitisedObservation) {
-    const system = `You are the cognition module for a Minecraft agent. Analyse observations and respond with a strict JSON object.
+    const system = `
+Take the observation and decide what stands out most.
 
-The JSON MUST match this exact format:
+Return ONLY valid JSON that matches this exact shape:
 {
   "thought": {
-    "text": "Your first-person observation (be concise, max 120 chars)",
-    "confidence": 0.8,
-    "categories": ["environmental", "entity", "social"]
+    "text": "<one short first-person sentence, max 120 chars>",
+    "confidence": <number 0..1>,
+    "categories": ["environmental" | "entity" | "social" | "threat"]
   },
   "actions": {
-    "shouldRespond": false,
-    "shouldCreateTask": false,
-    "response": null,
-    "tasks": []
+    "shouldRespond": <boolean>,
+    "shouldCreateTask": <boolean>,
+    "response": <string|null>,
+    "tasks": [{"description": "<short imperative>"}]
   }
 }
 
-Example responses:
-- For rabbits nearby: {"thought": {"text": "I notice rabbits nearby", "confidence": 0.7, "categories": ["environmental"]}, "actions": {"shouldRespond": false, "shouldCreateTask": false}}
-- For dangerous mobs: {"thought": {"text": "Hostile mob detected", "confidence": 0.9, "categories": ["threat"]}, "actions": {"shouldRespond": false, "shouldCreateTask": true, "tasks": [{"description": "Monitor hostile mob"}]}}
-- For interesting events: {"thought": {"text": "Environmental change observed", "confidence": 0.6, "categories": ["environmental"]}, "actions": {"shouldRespond": false, "shouldCreateTask": false}}
-
 Rules:
-- Always respond with valid JSON
-- Use first-person perspective for thoughts
-- Keep thoughts concise (<= 120 characters)
-- Only set shouldRespond=true for social interactions
-- Only create tasks when concrete action is needed
-- Do not include any text outside the JSON`;
+- "thought.text" is only what I notice, not a plan.
+- Use category "threat" for danger, pursuit, damage, or immediate hazard.
+- Set shouldRespond=true only if it's a social interaction directed at me.
+- Set shouldCreateTask=true only if something requires action soon (threat, hunger, injury, lost, blocked).
+- If shouldCreateTask=false, tasks must be [].
+- No extra keys. No text outside JSON.
+`.trim();
 
     const prompt = `Observation: ${sanitised.summary}
 Details: ${JSON.stringify(sanitised.details, null, 2)}

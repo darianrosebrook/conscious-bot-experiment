@@ -305,10 +305,7 @@ async function generateThoughts(): Promise<CognitiveThought[]> {
       ];
     });
   } catch (error) {
-    console.warn(
-      'Cognition service unavailable, using fallback thoughts:',
-      error
-    );
+    console.warn('Cognition service unavailable; returning no thoughts.', error);
     return [];
   }
 }
@@ -387,15 +384,15 @@ async function processExternalChat(): Promise<CognitiveThought[]> {
             );
 
             if (minecraftResponse.ok) {
-              console.log('✅ Bot response sent to minecraft server');
+              console.log('Bot response sent to minecraft server');
             } else {
               console.error(
-                '❌ Failed to send bot response to minecraft server'
+                'Failed to send bot response to minecraft server'
               );
             }
           } catch (error) {
             console.error(
-              '❌ Error sending bot response to minecraft server:',
+              'Error sending bot response to minecraft server:',
               error
             );
           }
@@ -644,7 +641,11 @@ export const DELETE = async () => {
       const entries = await fs.readdir(thoughtsDir, { withFileTypes: true });
       for (const ent of entries) {
         if (ent.isDirectory()) {
-          const filePath = path.join(thoughtsDir, ent.name, 'cognitive-thoughts.json');
+          const filePath = path.join(
+            thoughtsDir,
+            ent.name,
+            'cognitive-thoughts.json'
+          );
           try {
             await fs.writeFile(filePath, JSON.stringify([], null, 2));
             cleared.push(filePath);
@@ -926,7 +927,7 @@ async function cleanupOldBackups(): Promise<void> {
       }
     }
   } catch (error) {
-    console.error('❌ Error during backup cleanup:', error);
+    console.error('Error during backup cleanup:', error);
   }
 }
 
@@ -979,7 +980,7 @@ async function cleanupMainThoughtsFile(): Promise<void> {
       await cleanupOldBackups();
     }
   } catch (error) {
-    console.error('❌ Error during main file cleanup:', error);
+    console.error('Error during main file cleanup:', error);
   }
 }
 
@@ -1029,7 +1030,7 @@ async function cleanupTurboLogs(): Promise<void> {
       }
     }
   } catch (error) {
-    console.error('❌ Error during turbo log cleanup:', error);
+    console.error('Error during turbo log cleanup:', error);
   }
 }
 
@@ -1041,7 +1042,7 @@ setInterval(async () => {
     await cleanupMainThoughtsFile();
     await cleanupTurboLogs();
   } catch (error) {
-    console.error('❌ Error in cleanup interval:', error);
+    console.error('Error in cleanup interval:', error);
   }
 }, 300000); // Run cleanup every 5 minutes
 
@@ -1104,7 +1105,7 @@ const Logger = {
   debug: (message: string, component?: string, ...args: any[]) => {
     if (shouldLog('debug', component)) {
       console.log(
-        `🐛 [DEBUG][${component?.toUpperCase() || 'APP'}] ${message}`,
+        `[DEBUG][${component?.toUpperCase() || 'APP'}] ${message}`,
         ...args
       );
     }
@@ -1131,7 +1132,7 @@ const Logger = {
   error: (message: string, component?: string, ...args: any[]) => {
     if (shouldLog('error', component)) {
       console.error(
-        `❌ [ERROR][${component?.toUpperCase() || 'APP'}] ${message}`,
+        `[ERROR][${component?.toUpperCase() || 'APP'}] ${message}`,
         ...args
       );
     }
@@ -1144,8 +1145,8 @@ const Logger = {
     ...args: any[]
   ) => {
     if (shouldLog(level, 'planning')) {
-      const icons = { debug: '🐛', info: '📋', warn: '⚠️', error: '❌' };
-      console.log(`${icons[level]} [PLANNING] ${message}`, ...args);
+      const prefix = level === 'warn' ? '⚠️ ' : level === 'error' ? '🚫 ' : '';
+      console.log(`${prefix}[PLANNING] ${message}`, ...args);
     }
   },
 
@@ -1155,8 +1156,8 @@ const Logger = {
     ...args: any[]
   ) => {
     if (shouldLog(level, 'minecraft')) {
-      const icons = { debug: '🎮', info: '🌍', warn: '⚠️', error: '❌' };
-      console.log(`${icons[level]} [MINECRAFT] ${message}`, ...args);
+      const prefix = level === 'warn' ? '⚠️ ' : level === 'error' ? '🚫 ' : '';
+      console.log(`${prefix}[MINECRAFT] ${message}`, ...args);
     }
   },
 
@@ -1166,8 +1167,8 @@ const Logger = {
     ...args: any[]
   ) => {
     if (shouldLog(level, 'cognition')) {
-      const icons = { debug: '🧠', info: '💭', warn: '⚠️', error: '❌' };
-      console.log(`${icons[level]} [COGNITION] ${message}`, ...args);
+      const prefix = level === 'warn' ? '⚠️ ' : level === 'error' ? '🚫 ' : '';
+      console.log(`${prefix}[COGNITION] ${message}`, ...args);
     }
   },
 
@@ -1177,8 +1178,8 @@ const Logger = {
     ...args: any[]
   ) => {
     if (shouldLog(level, 'dashboard')) {
-      const icons = { debug: '🖥️', info: '📊', warn: '⚠️', error: '❌' };
-      console.log(`${icons[level]} [DASHBOARD] ${message}`, ...args);
+      const prefix = level === 'warn' ? '⚠️ ' : level === 'error' ? '🚫 ' : '';
+      console.log(`${prefix}[DASHBOARD] ${message}`, ...args);
     }
   },
 };

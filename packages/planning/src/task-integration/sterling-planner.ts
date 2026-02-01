@@ -122,19 +122,25 @@ export class SterlingPlanner {
     return this._mcDataCache;
   }
 
+  /**
+   * Fetches bot inventory and nearby blocks from Minecraft interface.
+   * Callers must check _unavailable: when true, inventory/nearbyBlocks must not be used.
+   */
   async fetchBotContext(): Promise<{
     inventory: any[];
     nearbyBlocks: any[];
+    _unavailable?: boolean;
   }> {
     try {
       const stateRes = await this.minecraftGet('/state').catch(() => null);
-      if (!stateRes?.ok) return { inventory: [], nearbyBlocks: [] };
+      if (!stateRes?.ok)
+        return { inventory: [], nearbyBlocks: [], _unavailable: true };
       const stateData = (await stateRes.json()) as any;
       const inventory = stateData?.data?.data?.inventory?.items || [];
       const nearbyBlocks = stateData?.data?.worldState?.nearbyBlocks || [];
       return { inventory, nearbyBlocks };
     } catch {
-      return { inventory: [], nearbyBlocks: [] };
+      return { inventory: [], nearbyBlocks: [], _unavailable: true };
     }
   }
 
@@ -244,6 +250,7 @@ export class SterlingPlanner {
     let nearbyBlocks = (taskData.metadata as any)?.currentState?.nearbyBlocks;
     if (!inventoryItems || !nearbyBlocks) {
       const botCtx = await this.fetchBotContext();
+      if (botCtx._unavailable) return [];
       inventoryItems = inventoryItems || botCtx.inventory;
       nearbyBlocks = nearbyBlocks || botCtx.nearbyBlocks;
     }
@@ -294,13 +301,15 @@ export class SterlingPlanner {
     if (!requirement || requirement.kind !== 'tool_progression') return [];
 
     const targetTool = requirement.targetTool as string;
-    let inventoryItems: Array<{ name: string; count: number } | null | undefined> =
-      (taskData.metadata as any)?.currentState?.inventory;
+    let inventoryItems: Array<
+      { name: string; count: number } | null | undefined
+    > = (taskData.metadata as any)?.currentState?.inventory;
     let nearbyBlocks: string[] = (taskData.metadata as any)?.currentState
       ?.nearbyBlocks;
 
     if (!inventoryItems || !nearbyBlocks) {
       const botCtx = await this.fetchBotContext();
+      if (botCtx._unavailable) return [];
       inventoryItems = inventoryItems || botCtx.inventory;
       nearbyBlocks = nearbyBlocks || botCtx.nearbyBlocks;
     }
@@ -410,10 +419,7 @@ export class SterlingPlanner {
       (taskData.metadata as any).buildingReplanCount = replanCount + 1;
     }
 
-    const steps = this.buildingSolver.toTaskStepsWithReplan(
-      result,
-      templateId
-    );
+    const steps = this.buildingSolver.toTaskStepsWithReplan(result, templateId);
     return steps.map((s) => {
       const enrichedMeta: Record<string, unknown> = {
         ...s.meta,

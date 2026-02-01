@@ -8,11 +8,7 @@ import {
   resolveRequirement,
   requirementsEquivalent,
 } from '../modules/requirements';
-import type {
-  Task,
-  TaskProgress,
-  TaskStatistics,
-} from '../types/task';
+import type { Task, TaskProgress, TaskStatistics } from '../types/task';
 
 function calculateTitleSimilarity(title1: string, title2: string): number {
   const words1 = title1.split(/\s+/);
@@ -174,11 +170,15 @@ export class TaskStore {
   updateStatistics(): void {
     const tasks = this.getAllTasks();
     this.statistics.totalTasks = tasks.length;
-    this.statistics.activeTasks = tasks.filter((t) => t.status === 'active').length;
+    this.statistics.activeTasks = tasks.filter(
+      (t) => t.status === 'active'
+    ).length;
     this.statistics.completedTasks = tasks.filter(
       (t) => t.status === 'completed'
     ).length;
-    this.statistics.failedTasks = tasks.filter((t) => t.status === 'failed').length;
+    this.statistics.failedTasks = tasks.filter(
+      (t) => t.status === 'failed'
+    ).length;
 
     const completedOrFailed =
       this.statistics.completedTasks + this.statistics.failedTasks;

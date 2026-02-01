@@ -541,8 +541,10 @@ export class EnvironmentIntegration extends EventEmitter {
       0
     );
 
-    if ((totalAvailable as number) < 10 && (totalNearby as number) < 5) return 'high';
-    if ((totalAvailable as number) < 20 && (totalNearby as number) < 10) return 'medium';
+    if ((totalAvailable as number) < 10 && (totalNearby as number) < 5)
+      return 'high';
+    if ((totalAvailable as number) < 20 && (totalNearby as number) < 10)
+      return 'medium';
     return 'low';
   }
 

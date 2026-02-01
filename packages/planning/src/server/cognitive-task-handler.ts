@@ -44,7 +44,9 @@ export function detectActionableSteps(thoughtContent: string): boolean {
 /**
  * Extract actionable steps from cognitive reflection content (sentence-level).
  */
-export function extractActionableSteps(content: string): Array<{ label: string; estimatedDuration?: number }> {
+export function extractActionableSteps(
+  content: string
+): Array<{ label: string; estimatedDuration?: number }> {
   const steps: Array<{ label: string; estimatedDuration?: number }> = [];
   const sentences = content.split(/[.!?]+/).filter((s) => s.trim().length > 0);
   const stepTerms = [
@@ -107,7 +109,13 @@ export function determineActionType(stepDescription: string): string {
  * steps are found; only marks completed when no actionable steps are found.
  */
 export async function convertCognitiveReflectionToTasks(
-  cognitiveTask: { id: string; title?: string; priority?: number; urgency?: number; parameters?: { thoughtContent?: string } },
+  cognitiveTask: {
+    id: string;
+    title?: string;
+    priority?: number;
+    urgency?: number;
+    parameters?: { thoughtContent?: string };
+  },
   taskIntegration: ITaskIntegration
 ): Promise<void> {
   try {

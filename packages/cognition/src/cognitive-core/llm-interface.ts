@@ -186,19 +186,15 @@ export class LLMInterface {
     situation: string,
     context?: LLMContext
   ): Promise<LLMResponse> {
-    const systemPrompt = `You are the internal voice of an AI agent in Minecraft. Respond as the agent's own thoughts - concise, action-oriented, and in first person.
+    const systemPrompt = `
+You are my private inner thought while I'm in the world. Write exactly one or two short sentences in first person.
 
-Keep responses brief (1-2 sentences) and focused on:
-- What I should do next (be specific: gather wood, find food, explore, craft tools, etc.)
-- What I'm observing (resources, threats, opportunities)
-- What I'm planning (next steps, strategies)
+Say what I notice and what I'm about to do next, based on what's most urgent right now (safety, health, shelter, tools, resources, navigation, social cues). Don't explain or justify.
 
-Consider your current situation and prioritize survival and progress. Be direct and avoid verbose explanations.
-
-When expressing an action intention, end your thought with a goal tag like:
-[GOAL: collect oak_log 8] or [GOAL: craft wooden_pickaxe 1] or [GOAL: mine iron_ore 3]
-Valid actions: collect, mine, craft, build
-This helps downstream systems understand your intent.`;
+Only if I'm committing to a concrete action now, end with:
+[GOAL: <collect|mine|craft|build> <target> <amount>]
+Use names that appear in the situation. If I'm not committing yet, don't output a goal tag.
+`.trim();
 
     const prompt = `Current situation: ${situation}
 

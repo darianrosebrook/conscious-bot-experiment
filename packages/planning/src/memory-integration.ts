@@ -98,29 +98,45 @@ export class MemoryIntegration extends EventEmitter {
       return; // Don't discover too frequently
     }
 
-    // Try multiple endpoints in order of preference
+    // Detect if running in container environment
+    const isContainerEnv =
+      process.env.DOCKER_HOST ||
+      process.env.KUBERNETES_SERVICE_HOST ||
+      process.env.CONTAINER_ENV === 'true';
+
+    // Build endpoint list based on environment
+    // In local dev, skip Docker/K8s hostnames to avoid log spam
     const potentialEndpoints: string[] = [
       process.env.MEMORY_ENDPOINT || 'http://localhost:3001',
       'http://localhost:3001',
-      'http://memory:3001',
       'http://127.0.0.1:3001',
-      'http://conscious-bot-memory:3001',
     ];
+
+    // Only add container-specific hostnames when running in containers
+    if (isContainerEnv) {
+      potentialEndpoints.push('http://memory:3001');
+      potentialEndpoints.push('http://conscious-bot-memory:3001');
+    }
 
     const discovered: string[] = [];
 
+    // Use single-attempt checks for discovery (no retries)
+    // Full retry logic is used when actually communicating with the discovered endpoint
     for (const endpoint of potentialEndpoints) {
       const response = await resilientFetch(
         `${endpoint.replace(/\/$/, '')}/health`,
         {
           method: 'GET',
           timeoutMs: 2000,
-          label: `memory/${endpoint}`,
+          maxRetries: 0, // Single attempt for discovery - reduces log spam
+          label: `memory-discovery/${endpoint}`,
         }
       );
 
       if (response?.ok) {
         discovered.push(endpoint);
+        // Found a working endpoint, stop checking others
+        break;
       }
     }
 

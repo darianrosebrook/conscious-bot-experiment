@@ -445,7 +445,9 @@ function buildObservationPayload(
             entity.threatLevel ??
             metadata?.threatLevel ??
             inferThreatLevel(
-              typeof entity.name === 'string' ? entity.name : metadata?.entityType
+              typeof entity.name === 'string'
+                ? entity.name
+                : metadata?.entityType
             ),
           distance:
             coerceNumber(entity.distance ?? metadata?.distance) ?? undefined,
@@ -932,7 +934,7 @@ function startThoughtGeneration() {
     }
   }, 60000); // 60 seconds
 
-  console.log('✅ Enhanced thought generator started with 60-second intervals');
+  console.log('Enhanced thought generator started with 60-second intervals');
 }
 
 function stopThoughtGeneration() {
@@ -955,7 +957,7 @@ function stopThoughtGeneration() {
         console.warn('Failed to log thought generation stop:', error);
       });
 
-    console.log('🛑 Enhanced thought generator stopped');
+    console.log('Enhanced thought generator stopped');
   }
 }
 
@@ -2024,7 +2026,7 @@ app.post('/process', async (req, res) => {
 
         const responseText =
           response.thoughts ||
-          `Hello ${metadata?.sender || 'Player'}! I received your message: "${content}". How can I help you in this Minecraft world?`;
+          `What now?`;
 
         // Generate cognitive thoughts about the interaction
         const cognitiveThought = await enhancedThoughtGenerator.generateThought(
@@ -3190,14 +3192,14 @@ app.listen(port, () => {
   );
   console.log(`🧠 Cognitive stream endpoints:`);
   console.log(
-    `  📋 Get recent thoughts: http://localhost:${port}/api/cognitive-stream/recent`
+    `  Get recent thoughts: http://localhost:${port}/api/cognitive-stream/recent`
   );
   console.log(
     `  ✅ Mark thoughts processed: http://localhost:${port}/api/cognitive-stream/:id/processed`
   );
   console.log(`🧠 Social memory endpoints:`);
   console.log(
-    `  📋 Get remembered entities: http://localhost:${port}/social-memory/entities`
+    `  Get remembered entities: http://localhost:${port}/social-memory/entities`
   );
   console.log(
     `  🔍 Search entities by fact: http://localhost:${port}/social-memory/search`
@@ -3231,7 +3233,7 @@ app.get('/api/cognitive-stream/recent', async (req, res) => {
     // Also get thoughts from enhanced thought generator (limit to recent ones)
     const generatedThoughts = enhancedThoughtGenerator.getThoughtHistory(5); // Only get the 5 most recent
     console.log(
-      `📋 Enhanced thought generator has ${generatedThoughts.length} recent thoughts`
+      `Enhanced thought generator has ${generatedThoughts.length} recent thoughts`
     );
 
     // Combine all thoughts
