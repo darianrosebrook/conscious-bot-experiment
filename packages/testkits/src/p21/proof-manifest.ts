@@ -217,6 +217,7 @@ export function generateP21AManifest(opts: {
       run_passed: true,
       invariants_failed: [],
       invariants_not_started: allIds.filter((id) => !provenIds.includes(id)),
+      execution_patched: false,
     },
   };
 }
@@ -280,6 +281,7 @@ export function generateP21BManifest(opts: {
       run_passed: true,
       invariants_failed: [],
       invariants_not_started: allIds.filter((id) => !provenIds.includes(id)),
+      execution_patched: false,
     },
   };
 }

@@ -154,12 +154,14 @@ describe('proof artifact truthfulness', () => {
     });
 
     // Before patching: generator defaults are wrong for execution truth
+    expect(manifest.results.execution_patched).toBe(false);
     expect(manifest.results.run_passed).toBe(true); // generator can't know about failures
     expect(manifest.results.invariants_failed).toEqual([]); // generator can't know
 
     // After patching: execution truth from handle
     patchExecutionResults(fakeHandle, manifest);
 
+    expect(manifest.results.execution_patched).toBe(true);
     expect(manifest.results.run_passed).toBe(false);
     expect(manifest.results.invariants_failed).toEqual(['P21B-INV-02']);
     expect(manifest.results.invariants_not_started).toEqual(['P21B-INV-04']);
@@ -199,9 +201,9 @@ describe('proof artifact truthfulness', () => {
       surfaceResults,
     });
 
-    // Deliberately skip patchExecutionResults — tripwire must catch this
+    // Deliberately skip patchExecutionResults — tripwire catches via execution_patched sentinel
     expect(() => assertManifestTruthfulness(fakeHandle, manifest)).toThrow(
-      /Manifest execution regression/,
+      /execution_patched is false/,
     );
   });
 

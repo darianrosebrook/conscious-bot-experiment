@@ -28,6 +28,7 @@ export function patchExecutionResults(handle: P21RunHandle, manifest: Capability
   manifest.results.run_passed = handleFailedIds.length === 0;
   manifest.results.invariants_failed = handleFailedIds;
   manifest.results.invariants_not_started = handleNotStartedIds;
+  manifest.results.execution_patched = true;
 }
 
 /**
@@ -51,8 +52,8 @@ export function assertManifestTruthfulness(handle: P21RunHandle, manifest: Capab
   const handleIds = new Set(Object.keys(handle.status));
   const catalogIds = new Set(manifest.invariants.map((inv) => inv.id));
 
-  const inHandleNotCatalog = [...handleIds].filter((id) => !catalogIds.has(id));
-  const inCatalogNotHandle = [...catalogIds].filter((id) => !handleIds.has(id));
+  const inHandleNotCatalog = [...handleIds].filter((id) => !catalogIds.has(id)).sort();
+  const inCatalogNotHandle = [...catalogIds].filter((id) => !handleIds.has(id)).sort();
 
   if (inHandleNotCatalog.length > 0 || inCatalogNotHandle.length > 0) {
     const parts: string[] = [];
@@ -68,41 +69,56 @@ export function assertManifestTruthfulness(handle: P21RunHandle, manifest: Capab
   }
 
   // ── Certification consistency ──────────────────────────────────────
+  //
+  // Use per-surface provingSurfaces (not results.invariants_passed) so
+  // this check remains correct with multi-surface manifests where an
+  // invariant can be 'partial' (passed on this surface but not all).
 
   const passedIds = handle.passedIds();
-  const manifestPassedSet = new Set(manifest.results.invariants_passed);
+  const manifestSurfacePassSet = new Set(
+    manifest.invariants
+      .filter((inv) => inv.provingSurfaces.includes(handle.surfaceName))
+      .map((inv) => inv.id),
+  );
 
-  // Every invariant the handle recorded as 'pass' must appear in the manifest's passed list.
-  // If not, surfaceResults was likely omitted (blank template regression).
+  // Every invariant the handle recorded as 'pass' must appear in this
+  // surface's provingSurfaces. If not, surfaceResults was likely omitted.
   const missingFromManifest: string[] = [];
   for (const id of passedIds) {
-    if (!manifestPassedSet.has(id)) {
+    if (!manifestSurfacePassSet.has(id)) {
       missingFromManifest.push(id);
     }
   }
   if (missingFromManifest.length > 0) {
     throw new Error(
-      `Manifest wiring regression: handle shows ${missingFromManifest.join(', ')} as passed but manifest does not include them in invariants_passed. Was surfaceResults omitted from generateManifest()?`,
+      `Manifest wiring regression: surface=${handle.surfaceName} missing_pass=[${missingFromManifest.join(', ')}] — handle recorded these as passed but manifest does not list this surface in their provingSurfaces. Was surfaceResults omitted from generateManifest()?`,
     );
   }
 
-  // Every invariant the handle recorded as 'fail' must NOT appear in the manifest's passed list.
+  // Every invariant the handle recorded as 'fail' must NOT appear in
+  // this surface's provingSurfaces.
   const handleFailedIds = Object.entries(handle.status)
     .filter(([, s]) => s === 'fail')
     .map(([id]) => id);
   const falselyPassed: string[] = [];
   for (const id of handleFailedIds) {
-    if (manifestPassedSet.has(id)) {
+    if (manifestSurfacePassSet.has(id)) {
       falselyPassed.push(id);
     }
   }
   if (falselyPassed.length > 0) {
     throw new Error(
-      `Manifest wiring regression: handle shows ${falselyPassed.join(', ')} as failed but manifest lists them as passed`,
+      `Manifest wiring regression: surface=${handle.surfaceName} falsely_passed=[${falselyPassed.join(', ')}] — handle recorded these as failed but manifest lists this surface in their provingSurfaces`,
     );
   }
 
   // ── Execution consistency ──────────────────────────────────────────
+
+  if (!manifest.results.execution_patched) {
+    throw new Error(
+      'Manifest execution regression: execution_patched is false. Was patchExecutionResults() or finalizeManifest() called?',
+    );
+  }
 
   // run_passed must track handle failures
   if (handleFailedIds.length > 0) {
@@ -138,11 +154,19 @@ export function assertManifestTruthfulness(handle: P21RunHandle, manifest: Capab
  * the truthfulness tripwire. Call this after generateP21*Manifest()
  * and before writing the manifest to disk.
  *
+ * Fail-closed on double call: throws if execution_patched is already
+ * true, preventing silent re-patching that could mask ordering bugs.
+ *
  * Replaces the two-call sequence:
  *   patchExecutionResults(handle, manifest);
  *   assertManifestTruthfulness(handle, manifest);
  */
 export function finalizeManifest(handle: P21RunHandle, manifest: CapabilityProofManifest): void {
+  if (manifest.results.execution_patched) {
+    throw new Error(
+      'finalizeManifest called twice: execution_patched is already true. This likely indicates a wiring bug in the afterAll hook.',
+    );
+  }
   patchExecutionResults(handle, manifest);
   assertManifestTruthfulness(handle, manifest);
 }

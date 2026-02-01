@@ -19,7 +19,18 @@ export interface InvariantEvidence {
   suiteFile: string;
   /** Names of proving surfaces where this invariant has been certified */
   provingSurfaces: string[];
-  /** Current certification status */
+  /**
+   * Certification status derived from surfaceResults (proof across surfaces).
+   * This is NOT execution status. An invariant that executed and failed will
+   * still show 'not_started' here (because it never appeared in surfaceResults).
+   *
+   * Execution truth is sourced from the run-handle and recorded in:
+   *  - results.run_passed
+   *  - results.invariants_failed
+   *  - results.invariants_not_started
+   * Execution passes are implied (catalog IDs minus failed minus not_started),
+   * not redundantly stored as a list.
+   */
   status: 'proven' | 'partial' | 'not_started';
   /** Extension that must be declared for this invariant to activate (null for base) */
   extensionDependency?: string;
@@ -98,6 +109,11 @@ export interface CapabilityProofManifest {
     invariants_failed: string[];
     /** IDs of invariants that were not exercised in this run */
     invariants_not_started: string[];
+    /** True after patchExecutionResults() has been called. Artifacts written
+     *  with execution_patched=false should not be trusted for run_passed or
+     *  invariants_failed — those fields contain generator defaults, not
+     *  execution truth. */
+    execution_patched: boolean;
     /** Test runner identity, e.g., "vitest@3.x" */
     runner: string;
     /** Runtime environment descriptor, e.g., "node@22.x / darwin-arm64" */

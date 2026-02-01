@@ -123,7 +123,10 @@ grep -r "@conscious-bot/testkits" packages/ --include="*.ts" -l
 | File | Purpose |
 |------|---------|
 | `packages/testkits/src/capability-proof-manifest.ts` | Primitive-agnostic `CapabilityProofManifest` type |
-| `packages/testkits/src/p21/proof-manifest.ts` | `generateP21AManifest()`, `generateP21BManifest()` |
+| `packages/testkits/src/p21/proof-manifest.ts` | `generateP21AManifest()`, `generateP21BManifest()` — certification truth only |
+| `packages/testkits/src/p21/manifest-helpers.ts` | `patchExecutionResults()`, `assertManifestTruthfulness()`, `finalizeManifest()` |
+| `packages/testkits/src/p21/run-handle.ts` | `P21RunHandle` type and `createRunHandle()` factory |
+| `packages/testkits/src/p21/invariant-ids.ts` | Canonical `P21A_INVARIANT_IDS`, `P21B_INVARIANT_IDS`, `CONDITIONAL_INVARIANTS` |
 
 ### Convention
 
@@ -223,6 +226,10 @@ grep -r "from.*@conscious-bot/minecraft\|require.*@conscious-bot/minecraft" \
 | `packages/minecraft-interface/.../p21-type-equivalence.test.ts` | Type drift tripwire |
 | `packages/testkits/src/capability-proof-manifest.ts` | Primitive-agnostic proof manifest |
 | `packages/testkits/src/p21/proof-manifest.ts` | P21 proof manifest generators |
+| `packages/testkits/src/p21/manifest-helpers.ts` | Execution patching, truthfulness tripwire, `finalizeManifest()` |
+| `packages/testkits/src/p21/run-handle.ts` | `P21RunHandle` type and `createRunHandle()` factory |
+| `packages/testkits/src/p21/invariant-ids.ts` | Canonical invariant ID arrays and conditional set |
+| `packages/testkits/src/p21/__tests__/proof-artifact-truthfulness.test.ts` | Truthfulness tripwire tests |
 | `docs/planning/p21-closeout-packet.md` | This file |
 | `docs/planning/templates/capability-closeout-template.md` | Reusable A–H template |
 
@@ -303,21 +310,25 @@ pnpm test
 
 ### Manifest truthfulness
 
-Proof manifest artifacts reflect actual test outcomes through a two-phase pipeline:
+Proof manifest artifacts reflect actual test outcomes through a two-phase pipeline with an `execution_patched` sentinel to prevent unfinalized manifests from being trusted:
 
-1. **`generateP21*Manifest({ surfaceResults })`** produces **certification truth**: which invariants are proven across surfaces (`invariants_passed`, `fully_proven`). The generator has no access to execution failures — it only sees which invariants appeared in `surfaceResults` (the set of passes).
+1. **`generateP21*Manifest({ surfaceResults })`** produces **certification truth**: which invariants are proven across surfaces (`invariants_passed`, `fully_proven`). The generator has no access to execution failures — it only sees which invariants appeared in `surfaceResults` (the set of passes). Execution-facing fields are set to safe defaults (`run_passed: true`, `invariants_failed: []`, `execution_patched: false`).
 
-2. **`patchExecutionResults(handle, manifest)`** overwrites **execution truth** fields from the run-handle: `run_passed`, `invariants_failed`, `invariants_not_started`. The run-handle is the sole authority on which invariants were exercised and whether they passed or failed. This step is required — without it, failures are invisible to the manifest (they appear as `not_started` rather than `fail`).
+2. **`patchExecutionResults(handle, manifest)`** overwrites **execution truth** fields from the run-handle: `run_passed`, `invariants_failed`, `invariants_not_started`, and sets `execution_patched: true`. The run-handle is the sole authority on which invariants were exercised and whether they passed or failed. This step is required — without it, failures are invisible to the manifest (they appear as `not_started` rather than `fail`).
 
-3. **`assertManifestTruthfulness(handle, manifest)`** is a tripwire that validates handle↔manifest consistency:
-   - **Certification consistency**: every handle `pass` must appear in `invariants_passed`; no handle `fail` may appear in `invariants_passed`
-   - **Execution consistency**: if the handle has failures, `run_passed` must be false and `invariants_failed` must contain exactly those IDs; if no failures, `run_passed` must be true and `invariants_failed` must be empty. This catches omitted `patchExecutionResults()` calls.
+3. **`assertManifestTruthfulness(handle, manifest)`** is a tripwire that validates handle↔manifest consistency across three tiers:
+   - **ID alignment**: handle status keys must match manifest invariant catalog IDs exactly (sorted diff in error messages for CI greppability)
+   - **Certification consistency**: uses per-invariant `provingSurfaces.includes(handle.surfaceName)` (not `results.invariants_passed`) to remain correct with multi-surface manifests where an invariant can be `partial`. Every handle `pass` must appear in this surface's provingSurfaces; no handle `fail` may appear. Error messages use structured format: `surface=<name> missing_pass=[...]` / `falsely_passed=[...]`
+   - **Execution consistency**: requires `execution_patched` to be `true` (fails closed if sentinel is false). If the handle has failures, `run_passed` must be false and `invariants_failed` must contain exactly those IDs; if no failures, `run_passed` must be true and `invariants_failed` must be empty.
 
-4. **Truthfulness test** (`proof-artifact-truthfulness.test.ts`) validates the full pipeline, including:
+4. **`finalizeManifest(handle, manifest)`** is the atomic call-site helper that all proving surfaces use in their `afterAll` hooks. It combines `patchExecutionResults` + `assertManifestTruthfulness` into a single call. Fail-closed on double call: throws if `execution_patched` is already `true`, preventing silent re-patching that could mask ordering bugs.
+
+5. **Truthfulness test** (`proof-artifact-truthfulness.test.ts`) validates the full pipeline, including:
    - All-pass runs (P21A with conditional invariants, P21B)
    - Blank template regression (surfaceResults omitted)
    - Failing run propagation (handle failures → `run_passed=false`, `invariants_failed` populated)
-   - Missing `patchExecutionResults` detection (tripwire throws)
+   - Missing `patchExecutionResults` detection (tripwire catches via `execution_patched` sentinel)
+   - `execution_patched` sentinel transition (`false` before patch, `true` after)
 
 #### Manifest results semantics
 
@@ -326,8 +337,9 @@ The manifest `results` object separates execution truth from certification truth
 **Execution truth** (sourced from run-handle via `patchExecutionResults`):
 
 - **`run_passed`**: true when no exercised invariant failed. Conditional invariants left as `not_started` (e.g., INV-4b in non-predictive mode, INV-10 without `id_robustness` extension) do not cause this to be false. This answers: "did this conformance run pass?"
-- **`invariants_failed`**: IDs of invariants that were executed and failed (handle status `fail`). Empty when the run passes. In a single-surface run, this is the definitive list of failures.
-- **`invariants_not_started`**: IDs of invariants not exercised in this run (handle status `not_started`). Includes conditional invariants not activated by the current mode/extension configuration.
+- **`invariants_failed`**: IDs of invariants that were executed and failed (handle status `fail`). Empty when the run passes. Sorted for deterministic artifact output.
+- **`invariants_not_started`**: IDs of invariants not exercised in this run (handle status `not_started`). Includes conditional invariants not activated by the current mode/extension configuration. Sorted for deterministic artifact output.
+- **`execution_patched`**: `true` after `patchExecutionResults()` has been called. Artifacts with `execution_patched: false` should not be trusted — `run_passed` and `invariants_failed` contain generator defaults, not execution truth. The tripwire fails closed if this sentinel is false.
 
 **Certification truth** (sourced from `surfaceResults` in the generator):
 
