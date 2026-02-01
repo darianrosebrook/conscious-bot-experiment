@@ -4,13 +4,19 @@
  * @author @darianrosebrook
  */
 
+export type MutationOrigin = 'runtime' | 'protocol';
+
+export interface MutationOptions {
+  origin?: MutationOrigin;
+}
+
 export interface ITaskIntegration {
   addTask(taskData: Partial<any>): Promise<any>;
   getActiveTasks(): any[];
   getTasks(filters?: { status?: string }): any[];
   updateTaskMetadata(taskId: string, metadata: Record<string, any>): void;
-  updateTaskProgress(taskId: string, progress: number, status?: string): void;
-  updateTaskStatus(taskId: string, status: string): Promise<void>;
+  updateTaskProgress(taskId: string, progress: number, status?: string, options?: MutationOptions): void;
+  updateTaskStatus(taskId: string, status: string, options?: MutationOptions): Promise<void>;
   completeTaskStep(taskId: string, stepId: string): Promise<boolean>;
   startTaskStep(taskId: string, stepId: string, options?: { dryRun?: boolean }): Promise<boolean>;
   regenerateSteps(taskId: string, options?: any): Promise<any>;
@@ -27,6 +33,8 @@ export interface ITaskIntegration {
     feedbackStore?: any;
   }): void;
   readonly isHierarchicalPlannerConfigured: boolean;
+  enableGoalResolver(resolver?: any): void;
+  readonly isGoalResolverConfigured: boolean;
   getMcDataPublic(): any;
   on(event: string, listener: (...args: any[]) => void): this;
   emit(event: string, ...args: any[]): boolean;

@@ -18,7 +18,7 @@ import {
   CognitiveStreamClient,
   type CognitiveStreamThought,
 } from './modules/cognitive-stream-client';
-import type { ITaskIntegration } from './interfaces/task-integration';
+import type { ITaskIntegration, MutationOptions } from './interfaces/task-integration';
 import type {
   Task,
   TaskProgress,
@@ -39,8 +39,12 @@ import { adviseExecution } from './constraints/execution-advisor';
 import type { RigGMetadata } from './constraints/execution-advisor';
 import { buildDefaultMinecraftGraph } from './hierarchical/macro-planner';
 import { FeedbackStore } from './hierarchical/feedback';
+import { GoalResolver, type AtomicResolveOutcome } from './goals/goal-resolver';
+import { computeProvisionalKey } from './goals/goal-identity';
+import type { GoalBinding } from './goals/goal-binding-types';
 
 export type { TaskStep } from './types/task-step';
+export type { MutationOrigin, MutationOptions } from './interfaces/task-integration';
 import type { TaskStep } from './types/task-step';
 
 export type {
@@ -74,6 +78,7 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
   private seenThoughtIds = new Set<string>();
 
   private cognitionOutbox = new CognitionOutbox();
+  private goalResolver?: GoalResolver;
 
   get outbox(): CognitionOutbox {
     return this.cognitionOutbox;
@@ -221,12 +226,20 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
   /**
    * Update task status
    */
-  async updateTaskStatus(taskId: string, status: string): Promise<void> {
+  async updateTaskStatus(taskId: string, status: string, options?: MutationOptions): Promise<void> {
     const task = this.taskStore.getTask(taskId);
     if (task) {
       const previousStatus = task.status;
       task.status = status as any;
       console.log(`Updated task ${taskId} status to ${status}`);
+
+      // Persist status change
+      this.taskStore.setTask(task);
+
+      // Unblock parent when prerequisite children reach terminal state
+      if (status === 'completed' || status === 'failed') {
+        this.tryUnblockParent(task);
+      }
 
       // Emit lifecycle events for thought generation
       await this.emitLifecycleEvent(task, status, previousStatus);
@@ -559,11 +572,190 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
     return this.sterlingPlanner.isHierarchicalConfigured;
   }
 
+  // ---------------------------------------------------------------------------
+  // Goal resolver integration
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Infer goalType from partial task data.
+   * Returns null if the task doesn't map to a recognized goal type.
+   */
+  private inferGoalType(taskData: Partial<Task>): string | null {
+    // Explicit goalType in parameters takes priority
+    if (taskData.parameters?.goalType) return taskData.parameters.goalType;
+
+    // Infer from task type/title for building tasks
+    const title = (taskData.title || '').toLowerCase();
+    const type = (taskData.type || '').toLowerCase();
+
+    if (type === 'building' || title.includes('build')) {
+      if (title.includes('shelter')) return 'build_shelter';
+      if (title.includes('structure')) return 'build_structure';
+      return 'build_shelter'; // Default building goal type
+    }
+
+    return null;
+  }
+
+  /**
+   * Route a goal-sourced task through GoalResolver.
+   * Returns the existing or newly created Task, or null to fall through.
+   */
+  private async resolveGoalTask(
+    goalType: string,
+    taskData: Partial<Task>,
+  ): Promise<Task | null> {
+    if (!this.goalResolver) return null;
+
+    // Extract bot position from task parameters or use origin
+    const botPosition = taskData.parameters?.botPosition ?? { x: 0, y: 64, z: 0 };
+    const verifier = taskData.parameters?.verifier ?? `verify_${goalType}_v0`;
+
+    const outcome = await this.goalResolver.resolveOrCreate(
+      {
+        goalType,
+        intentParams: taskData.parameters?.intentParams,
+        botPosition,
+        verifier,
+      },
+      {
+        getAllTasks: () => this.taskStore.getAllTasks(),
+        storeTask: (task: Task) => {
+          this.taskStore.setTask(task);
+          return task;
+        },
+        generateTaskId: () =>
+          taskData.id || `task-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        generateInstanceId: () =>
+          `ginst-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      },
+    );
+
+    if (outcome.action === 'continue') {
+      // Existing non-terminal task matches — return it
+      const existing = this.taskStore.getTask(outcome.taskId);
+      if (existing) return existing;
+      // Task disappeared between resolve and fetch — fall through
+      return null;
+    }
+
+    if (outcome.action === 'already_satisfied') {
+      // Completed task still satisfies this goal — return it
+      const existing = this.taskStore.getTask(outcome.taskId);
+      if (existing) return existing;
+      return null;
+    }
+
+    // action === 'created': GoalResolver created a skeleton task with goalBinding.
+    // Now we need to enrich it with steps via the normal planning pipeline.
+    const created = this.taskStore.getTask(outcome.taskId);
+    if (!created) return null;
+
+    // Generate steps for the goal-bound task
+    const goalStepResult = await this.sterlingPlanner.generateDynamicSteps(taskData);
+    const steps = goalStepResult.steps;
+    const blockedSentinel = steps.length === 1 && steps[0].meta?.blocked === true;
+
+    created.steps = taskData.steps && taskData.steps.length > 0 ? taskData.steps : steps;
+
+    // Propagate solver metadata
+    if (taskData.metadata?.solver) {
+      created.metadata.solver = { ...taskData.metadata.solver };
+    }
+
+    // Handle blocked sentinel
+    if (blockedSentinel) {
+      const reason = (steps[0].meta?.blockedReason as string) || 'solver_unavailable';
+      created.status = 'pending_planning';
+      created.metadata.blockedReason = reason;
+      created.steps = [];
+    }
+
+    // Check step executability
+    if (!blockedSentinel) {
+      const hasExecutableStep = created.steps.some(
+        (s) => s.meta?.leaf || s.meta?.executable === true
+      );
+      if (created.steps.length > 0 && !hasExecutableStep) {
+        created.metadata.blockedReason = 'no-executable-plan';
+      }
+    }
+
+    // Seed stepsDigest
+    if (created.steps.length > 0 && !blockedSentinel) {
+      try {
+        const { hashSteps } = await import('./sterling/solve-bundle');
+        const digest = hashSteps(
+          created.steps.map((s) => ({ action: s.label || s.id }))
+        );
+        created.metadata.solver ??= {};
+        created.metadata.solver.stepsDigest = digest;
+      } catch {
+        // hashSteps unavailable — digest seeding is best-effort
+      }
+    }
+
+    // Persist enriched task
+    this.taskStore.setTask(created);
+    this.taskStore.updateStatistics();
+    this.emit('taskAdded', created);
+    if (created.priority >= 0.8) {
+      this.emit('taskLifecycleEvent', { type: 'high_priority_added', taskId: created.id, task: created });
+    }
+    if (blockedSentinel) {
+      this.emit('taskLifecycleEvent', {
+        type: 'solver_unavailable',
+        taskId: created.id,
+        task: created,
+        reason: created.metadata.blockedReason,
+      });
+    }
+
+    if (this.config.enableRealTimeUpdates) {
+      this.notifyDashboard('taskAdded', created);
+    }
+
+    return created;
+  }
+
+  /**
+   * Wire the GoalResolver for goal-sourced task deduplication.
+   *
+   * When enabled, addTask() intercepts tasks with source='goal' and routes
+   * them through GoalResolver.resolveOrCreate() before creating a new task.
+   * This enforces the uniqueness invariant: at most one non-terminal task
+   * per (goalType, goalKey).
+   *
+   * @see docs/internal/goal-binding-protocol.md §C
+   */
+  enableGoalResolver(resolver?: GoalResolver): void {
+    this.goalResolver = resolver ?? new GoalResolver();
+    console.log('[TaskIntegration] Goal resolver enabled');
+  }
+
+  /**
+   * Check whether the goal resolver is configured.
+   */
+  get isGoalResolverConfigured(): boolean {
+    return this.goalResolver !== undefined;
+  }
+
   async addTask(taskData: Partial<Task>): Promise<Task> {
+    // Goal-sourced task interception: route through GoalResolver when enabled
+    if (this.goalResolver && taskData.source === 'goal' && taskData.type === 'building') {
+      const goalType = this.inferGoalType(taskData);
+      if (goalType) {
+        const resolved = await this.resolveGoalTask(goalType, taskData);
+        if (resolved) return resolved;
+        // If resolved is null, fall through to normal addTask path
+      }
+    }
+
     const existingTask = this.taskStore.findSimilarTask(taskData);
     if (existingTask) return existingTask;
 
-    const steps = await this.sterlingPlanner.generateDynamicSteps(taskData);
+    const stepResult = await this.sterlingPlanner.generateDynamicSteps(taskData);
+    const steps = stepResult.steps;
 
     // Detect blocked sentinel from solver (e.g., Rig E solver not implemented)
     const blockedSentinel = steps.length === 1 && steps[0].meta?.blocked === true;
@@ -599,8 +791,19 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
         tags: taskData.metadata?.tags || [],
         category: taskData.metadata?.category || 'general',
         requirement, // Add the resolved requirement
+        // Propagate sub-task lineage fields from builder / caller
+        parentTaskId: taskData.metadata?.parentTaskId,
       },
     };
+
+    // Propagate builder-produced metadata fields (subtaskKey, taskProvenance)
+    const incomingMeta = taskData.metadata as any;
+    if (incomingMeta?.subtaskKey) {
+      (task.metadata as any).subtaskKey = incomingMeta.subtaskKey;
+    }
+    if (incomingMeta?.taskProvenance) {
+      (task.metadata as any).taskProvenance = incomingMeta.taskProvenance;
+    }
 
     // Propagate solver-produced metadata via the solver namespace.
     // Solvers store outputs on taskData.metadata.solver during step generation;
@@ -608,6 +811,26 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
     // solver outputs never require key-by-key enumeration here.
     if (taskData.metadata?.solver) {
       task.metadata.solver = { ...taskData.metadata.solver };
+    }
+
+    // Store solve observability from step generation result
+    if (stepResult.noStepsReason) {
+      task.metadata.solver ??= {};
+      task.metadata.solver.noStepsReason = stepResult.noStepsReason;
+      task.metadata.solver.routeBackend = stepResult.route?.backend;
+      task.metadata.solver.routeRig = stepResult.route?.requiredRig;
+    }
+
+    // Invariant guard: internal sub-tasks MUST carry requirementCandidate
+    if (
+      stepResult.noStepsReason === 'no-requirement' &&
+      taskData.source === 'autonomous' &&
+      (taskData as any).metadata?.parentTaskId
+    ) {
+      console.error(
+        `[INVARIANT VIOLATION] Internal sub-task "${taskData.title}" has no requirementCandidate. ` +
+        `Parent: ${(taskData as any).metadata.parentTaskId}. Fix the sub-task creation site.`
+      );
     }
 
     // Blocked sentinel: solver explicitly reported it cannot plan (e.g., Rig E not implemented)
@@ -703,7 +926,8 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
   updateTaskProgress(
     taskId: string,
     progress: number,
-    status?: Task['status']
+    status?: Task['status'],
+    options?: MutationOptions,
   ): boolean {
     const task = this.taskStore.getTask(taskId);
     if (!task) {
@@ -735,10 +959,14 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
         // Report building episode on completion
         this.reportBuildingEpisode(task, true);
         this.emit('taskLifecycleEvent', { type: 'completed', taskId, task });
+        // Unblock parent when all prerequisite children are done
+        this.tryUnblockParent(task);
       } else if (status === 'failed') {
         // Report building episode on failure
         this.reportBuildingEpisode(task, false);
         this.emit('taskLifecycleEvent', { type: 'failed', taskId, task });
+        // Unblock parent even on failure (prereq no longer active)
+        this.tryUnblockParent(task);
       }
     }
 
@@ -1713,6 +1941,39 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
     return this.taskStore.getAllTaskProgress();
   }
 
+  /**
+   * When a child task completes or fails, check whether its parent should be
+   * unblocked. Clears `blockedReason: 'waiting_on_prereq'` on the parent when
+   * all sibling prerequisite tasks are terminal (completed or failed).
+   */
+  private tryUnblockParent(completedTask: Task): void {
+    const parentId = completedTask.metadata?.parentTaskId;
+    if (!parentId) return;
+
+    const parent = this.taskStore.getTask(parentId);
+    if (!parent) return;
+    if (parent.metadata?.blockedReason !== 'waiting_on_prereq') return;
+
+    // Check if all sibling tasks with same parentTaskId are terminal
+    const siblings = this.taskStore.getAllTasks().filter(
+      (t) =>
+        t.metadata?.parentTaskId === parentId &&
+        t.id !== completedTask.id
+    );
+    const allTerminal = siblings.every(
+      (t) => t.status === 'completed' || t.status === 'failed'
+    );
+
+    if (allTerminal) {
+      parent.metadata.blockedReason = undefined;
+      parent.metadata.updatedAt = Date.now();
+      this.taskStore.setTask(parent);
+      console.log(
+        `[Prereq] Unblocked parent ${parentId}: all prerequisite children are terminal`
+      );
+    }
+  }
+
   private reportBuildingEpisode(task: Task, success: boolean): void {
     if (!this.buildingSolver) return;
     const templateId = task.metadata.solver?.buildingTemplateId;
@@ -1918,8 +2179,9 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
       } as any,
     };
 
-    const newSteps =
+    const stepResult =
       await this.sterlingPlanner.generateDynamicSteps(updatedTask);
+    const newSteps = stepResult.steps;
     if (!newSteps || newSteps.length === 0) return { success: false };
 
     const { hashSteps } = await import('./sterling/solve-bundle');
