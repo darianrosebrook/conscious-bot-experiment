@@ -100,6 +100,14 @@ const CONTRACTS: Record<string, LeafArgContract> = {
       return null;
     },
   },
+  collect_items: {
+    leafName: 'collect_items',
+    validate: (args) => {
+      if (args.itemName !== undefined && typeof args.itemName !== 'string')
+        return 'collect_items: itemName must be a string if provided';
+      return null;
+    },
+  },
 };
 
 /** Canonical set of leaves the executor may run. Unknown leaves are rejected in strict mode. */
@@ -161,7 +169,7 @@ export function requirementToLeafMeta(
 }
 
 /** Maps requirement → fallback plan steps. Returns null if no valid mapping exists.
- *  Collect/mine plans emit repeated dig_block steps (capped) for quantity.
+ *  Collect/mine plans emit dig_block + collect_items pairs (capped) for quantity.
  *  Craft plans are single-step (craft only); the executor's prereq injection
  *  handles missing materials via recipe introspection at execution time. */
 export function requirementToFallbackPlan(
@@ -174,13 +182,24 @@ export function requirementToFallbackPlan(
     const maxSteps = 8;
     const desired = requirement.quantity || 1;
     const count = Math.max(1, Math.min(desired, maxSteps));
-    const args = { blockType };
-    if (validateLeafArgs('dig_block', args)) return null; // invalid args
-    return Array.from({ length: count }, (_, idx) => ({
-      leaf: 'dig_block',
-      args: { blockType },
-      label: `${requirement.kind === 'mine' ? 'Mine' : 'Collect'} ${blockType}${count > 1 ? ` (${idx + 1}/${count})` : ''}`,
-    }));
+    const digArgs = { blockType };
+    if (validateLeafArgs('dig_block', digArgs)) return null; // invalid args
+    const verb = requirement.kind === 'mine' ? 'Mine' : 'Collect';
+    const steps: Array<{ leaf: string; args: Record<string, unknown>; label: string }> = [];
+    for (let idx = 0; idx < count; idx++) {
+      const suffix = count > 1 ? ` (${idx + 1}/${count})` : '';
+      steps.push({
+        leaf: 'dig_block',
+        args: { blockType },
+        label: `${verb} ${blockType}${suffix}`,
+      });
+      steps.push({
+        leaf: 'collect_items',
+        args: { itemName: blockType, radius: 8, maxItems: 1 },
+        label: `Pick up ${blockType}${suffix}`,
+      });
+    }
+    return steps;
   }
 
   if (requirement.kind === 'craft') {

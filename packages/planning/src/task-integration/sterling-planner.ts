@@ -469,9 +469,11 @@ export class SterlingPlanner {
       estimatedDuration:
         step.leaf === 'dig_block'
           ? 10000
-          : step.leaf === 'craft_recipe'
+          : step.leaf === 'collect_items'
             ? 5000
-            : 15000,
+            : step.leaf === 'craft_recipe'
+              ? 5000
+              : 15000,
       meta: {
         authority: 'fallback-macro',
         leaf: step.leaf,

@@ -134,6 +134,20 @@ describe('validateLeafArgs', () => {
   it('rejects building_step without moduleId', () => {
     expect(validateLeafArgs('building_step', {})).toBe('building_step requires moduleId (string)');
   });
+
+  it('accepts valid collect_items args with itemName', () => {
+    expect(validateLeafArgs('collect_items', { itemName: 'oak_log', radius: 8 })).toBeNull();
+  });
+
+  it('accepts collect_items with no args (all optional)', () => {
+    expect(validateLeafArgs('collect_items', {})).toBeNull();
+  });
+
+  it('rejects collect_items with non-string itemName', () => {
+    expect(validateLeafArgs('collect_items', { itemName: 42 })).toBe(
+      'collect_items: itemName must be a string if provided'
+    );
+  });
 });
 
 describe('normalizeLeafArgs', () => {
@@ -212,13 +226,13 @@ describe('requirementToLeafMeta', () => {
 });
 
 describe('KNOWN_LEAVES', () => {
-  it('contains all 12 expected leaf names', () => {
+  it('contains all 13 expected leaf names', () => {
     const expected = [
       'dig_block', 'craft_recipe', 'smelt', 'place_block', 'place_workstation',
       'build_module', 'acquire_material', 'replan_building', 'replan_exhausted',
-      'prepare_site', 'place_feature', 'building_step',
+      'prepare_site', 'place_feature', 'building_step', 'collect_items',
     ];
-    expect(KNOWN_LEAVES.size).toBe(12);
+    expect(KNOWN_LEAVES.size).toBe(13);
     for (const leaf of expected) {
       expect(KNOWN_LEAVES.has(leaf)).toBe(true);
     }
@@ -226,24 +240,56 @@ describe('KNOWN_LEAVES', () => {
 });
 
 describe('requirementToFallbackPlan', () => {
-  it('maps collect requirement to multi-step dig_block plan', () => {
+  it('maps collect requirement to dig_block + collect_items pairs', () => {
     const result = requirementToFallbackPlan({ kind: 'collect', patterns: ['oak_log'], quantity: 8 });
-    expect(result).toHaveLength(8);
+    expect(result).toHaveLength(16); // 8 dig + 8 collect
     expect(result![0]).toEqual({
       leaf: 'dig_block',
       args: { blockType: 'oak_log' },
       label: 'Collect oak_log (1/8)',
     });
+    expect(result![1]).toEqual({
+      leaf: 'collect_items',
+      args: { itemName: 'oak_log', radius: 8, maxItems: 1 },
+      label: 'Pick up oak_log (1/8)',
+    });
+    // Verify last pair
+    expect(result![14]).toEqual({
+      leaf: 'dig_block',
+      args: { blockType: 'oak_log' },
+      label: 'Collect oak_log (8/8)',
+    });
+    expect(result![15]).toEqual({
+      leaf: 'collect_items',
+      args: { itemName: 'oak_log', radius: 8, maxItems: 1 },
+      label: 'Pick up oak_log (8/8)',
+    });
   });
 
-  it('maps mine requirement to multi-step dig_block plan', () => {
+  it('maps mine requirement to dig_block + collect_items pairs', () => {
     const result = requirementToFallbackPlan({ kind: 'mine', patterns: ['iron_ore'], quantity: 3 });
-    expect(result).toHaveLength(3);
+    expect(result).toHaveLength(6); // 3 dig + 3 collect
     expect(result![0]).toEqual({
       leaf: 'dig_block',
       args: { blockType: 'iron_ore' },
       label: 'Mine iron_ore (1/3)',
     });
+    expect(result![1]).toEqual({
+      leaf: 'collect_items',
+      args: { itemName: 'iron_ore', radius: 8, maxItems: 1 },
+      label: 'Pick up iron_ore (1/3)',
+    });
+  });
+
+  it('alternates dig_block and collect_items steps', () => {
+    const result = requirementToFallbackPlan({ kind: 'collect', patterns: ['oak_log'], quantity: 3 });
+    expect(result).toHaveLength(6);
+    const leafSequence = result!.map(s => s.leaf);
+    expect(leafSequence).toEqual([
+      'dig_block', 'collect_items',
+      'dig_block', 'collect_items',
+      'dig_block', 'collect_items',
+    ]);
   });
 
   it('maps craft requirement to 1-step craft plan (prereq injection handles materials)', () => {
@@ -289,6 +335,7 @@ describe('requirementToFallbackPlan', () => {
     const result = requirementToFallbackPlan({ kind: 'collect', patterns: ['oak_log'] });
     expect(result).toEqual([
       { leaf: 'dig_block', args: { blockType: 'oak_log' }, label: 'Collect oak_log' },
+      { leaf: 'collect_items', args: { itemName: 'oak_log', radius: 8, maxItems: 1 }, label: 'Pick up oak_log' },
     ]);
   });
 });
