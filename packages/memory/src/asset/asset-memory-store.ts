@@ -30,7 +30,8 @@ export type EvidenceEventType =
   | 'failed_verify'
   | 'failed_use'
   | 'merged'
-  | 'budget_denied';
+  | 'budget_denied'
+  | 'execution_failed';
 
 export interface Vec3i {
   x: number;
@@ -133,6 +134,11 @@ export function chunkFromPos(p: Vec3i): ChunkPos {
   return { cx: Math.floor(p.x / 16), cz: Math.floor(p.z / 16) };
 }
 
+/**
+ * 3D Euclidean distance between two block positions.
+ * Used consistently for all spatial comparisons: resolveByPosition,
+ * findNearest ranking, place-vs-reuse radius, and adapter sanity checks.
+ */
 export function dist(a: Vec3i, b: Vec3i): number {
   const dx = a.x - b.x;
   const dy = a.y - b.y;
@@ -148,8 +154,30 @@ export function computeEvidenceDigest(
   return sha16(canon);
 }
 
+/**
+ * Canonical success mapping for evidence event types.
+ * success=true: events that represent positive interaction outcomes.
+ * success=false: events that represent failures or neutral non-outcomes.
+ */
+export function isSuccessEvent(eventType: EvidenceEventType): boolean {
+  switch (eventType) {
+    case 'observed':
+    case 'verified':
+    case 'used':
+    case 'placed':
+    case 'merged':
+      return true;
+    case 'failed_verify':
+    case 'failed_use':
+    case 'execution_failed':
+    case 'budget_denied':
+      return false;
+  }
+}
+
 // ── Verifier callback type ─────────────────────────────────────────
 
+// eslint-disable-next-line no-unused-vars
 export type VerifyFn = (claim: AssetClaim, atPos: Vec3i) => boolean;
 
 // ── Input type for upsertClaim ─────────────────────────────────────
@@ -169,6 +197,14 @@ export type UpsertClaimInput = Omit<
   firstSeenTick: number;
   firstSeenMs: number;
 };
+
+// ── Upsert result ─────────────────────────────────────────────────
+
+export interface UpsertResult {
+  claim: AssetClaim;
+  /** True if a new claim was created (with auto-observed entry). False if existing claim returned. */
+  created: boolean;
+}
 
 // ── Place-vs-reuse gate result ─────────────────────────────────────
 
@@ -197,6 +233,17 @@ export class ReferenceAssetMemoryStore {
     return Array.from(this.byId.values());
   }
 
+  /**
+   * Returns the tickId of the last evidence entry for a claim,
+   * or -Infinity if the claim doesn't exist.
+   * Used by the wiring layer to clamp tick offsets against the ledger head.
+   */
+  lastEvidenceTick(assetId: string): number {
+    const claim = this.byId.get(assetId);
+    if (!claim || claim.evidence.length === 0) return -Infinity;
+    return claim.evidence[claim.evidence.length - 1]!.tickId;
+  }
+
   private chunkKey(dimension: string, chunk: ChunkPos): string {
     return `${dimension}:${chunk.cx},${chunk.cz}`;
   }
@@ -221,19 +268,22 @@ export class ReferenceAssetMemoryStore {
     for (const k of keys) this.typeIndex.get(k)?.delete(claim.assetId);
   }
 
-  upsertClaim(input: UpsertClaimInput): AssetClaim {
+  upsertClaim(input: UpsertClaimInput): UpsertResult {
+    // Identity fields only: assetType, subType, owner, dimension, blockPos.
+    // Non-identity fields (tags, verifyMethod, interactRadius, firstSeenTick)
+    // are excluded so that the same block observed at different times or with
+    // different policy attributes merges into one claim.
     const stable = JSON.stringify({
       assetType: input.assetType,
       subType: input.subType,
       owner: input.owner,
       dimension: input.location.dimension,
-      chunk: input.location.chunkPos ?? chunkFromPos(input.location.blockPos),
-      firstSeenTick: input.firstSeenTick,
+      blockPos: input.location.blockPos,
     });
     const assetId = `asset_${sha16(stable)}`;
 
     const existing = this.byId.get(assetId);
-    if (existing) return existing;
+    if (existing) return { claim: existing, created: false };
 
     const entryFields = {
       timestampMs: input.firstSeenMs,
@@ -271,7 +321,7 @@ export class ReferenceAssetMemoryStore {
 
     this.byId.set(assetId, claim);
     this.addToIndex(claim);
-    return claim;
+    return { claim, created: true };
   }
 
   appendEvidence(assetId: string, fields: Omit<EvidenceEntry, 'chain'>): AssetClaim {
@@ -538,6 +588,53 @@ export class ReferenceAssetMemoryStore {
       if (ok) return claim;
     }
     return null;
+  }
+
+  /**
+   * Read-only spatial lookup: find a claim near a position without
+   * triggering verify-on-use or mutating any state.
+   * Used by the evidence adapter to resolve attribution.
+   */
+  resolveByPosition(opts: {
+    dimension: string;
+    pos: Vec3i;
+    subType?: string;
+    assetType?: AssetType;
+    maxDistance?: number;
+  }): AssetClaim | null {
+    const maxDist = opts.maxDistance ?? 2;
+    const fromChunk = chunkFromPos(opts.pos);
+    const chunkRadius = Math.max(1, Math.ceil(maxDist / 16));
+    const candidates: AssetClaim[] = [];
+
+    for (let dx = -chunkRadius; dx <= chunkRadius; dx++) {
+      for (let dz = -chunkRadius; dz <= chunkRadius; dz++) {
+        const ck = this.chunkKey(opts.dimension, {
+          cx: fromChunk.cx + dx,
+          cz: fromChunk.cz + dz,
+        });
+        const ids = this.chunkIndex.get(ck);
+        if (!ids) continue;
+        for (const id of ids) {
+          const claim = this.byId.get(id);
+          if (!claim) continue;
+          if (opts.subType && claim.subType !== opts.subType) continue;
+          if (opts.assetType && claim.assetType !== opts.assetType) continue;
+          if (dist(opts.pos, claim.location.blockPos) <= maxDist) {
+            candidates.push(claim);
+          }
+        }
+      }
+    }
+
+    if (candidates.length === 0) return null;
+    // Prefer exact match, then nearest
+    candidates.sort((a, b) => {
+      const da = dist(opts.pos, a.location.blockPos);
+      const db = dist(opts.pos, b.location.blockPos);
+      return da - db;
+    });
+    return candidates[0]!;
   }
 
   enforceBudget(
