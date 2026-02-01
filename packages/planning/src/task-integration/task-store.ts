@@ -34,6 +34,23 @@ function createEmptyStatistics(): TaskStatistics {
 /** Regex to strip [GOAL:...] tags from display titles */
 const GOAL_TAG_STRIP = /\s*\[GOAL:[^\]]*\](?:\s*\d+\w*)?/gi;
 
+/**
+ * Atomicity contract: this store is reference-based, NOT copy-on-write.
+ *
+ * - `getTask()` returns a direct reference to the stored Task object.
+ *   Mutations to the returned object are immediately visible to all
+ *   holders of that reference and to subsequent `getTask()` calls.
+ * - `setTask()` stores the reference as-is (no cloning).
+ * - `setTask()` is the commit boundary for store-driven observers (code
+ *   that discovers tasks via `getAllTasks()` / `getTasks()`). Reference
+ *   holders from prior `getTask()` calls see mutations immediately —
+ *   there is no isolation between reads.
+ *
+ * Callers that need atomic multi-field updates (e.g., status + hold state)
+ * should mutate all fields on the in-memory Task object BEFORE calling
+ * `setTask()`. See TaskIntegration.updateTaskStatus for the canonical
+ * example of this pattern.
+ */
 export class TaskStore {
   private tasks = new Map<string, Task>();
   private taskHistory: Task[] = [];

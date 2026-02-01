@@ -16,6 +16,7 @@ import type { GoalBinding, GoalHoldReason } from './goal-binding-types';
 import { reduceTaskEvent, reduceGoalEvent, type SyncEffect, type TaskEvent, type GoalEvent } from './goal-task-sync';
 import { checkCompletion, applyCompletionOutcome, type CompletionCheckOutcome } from './completion-checker';
 import type { VerifierRegistry, VerificationWorldState } from './verifier-registry';
+import { applyHold, clearHold } from './goal-binding-normalize';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -151,7 +152,6 @@ export function applySyncEffects(
       case 'apply_hold': {
         const task = deps.getTask(effect.taskId);
         if (task) {
-          const { applyHold } = require('./goal-binding-normalize');
           applyHold(task, {
             reason: effect.reason,
             heldAt: Date.now(),
@@ -167,7 +167,6 @@ export function applySyncEffects(
       case 'clear_hold': {
         const task = deps.getTask(effect.taskId);
         if (task) {
-          const { clearHold } = require('./goal-binding-normalize');
           clearHold(task);
           deps.setTask(task);
           applied++;
@@ -175,12 +174,26 @@ export function applySyncEffects(
         break;
       }
 
+      case 'update_goal_priority':
+        // Goal reprioritization is signalled but not applied here —
+        // priority propagation is managed separately by the caller.
+        // Explicitly handled to avoid fail-closed warning.
+        break;
+
       case 'noop':
         // No action
         break;
 
-      default:
+      default: {
+        // Fail-closed: warn on unknown effect types so new SyncEffect
+        // variants are not silently dropped.
+        const _exhaustive: never = effect;
+        console.warn(
+          `[applySyncEffects] Unhandled effect type: ${(effect as any).type}. ` +
+          `This effect was silently dropped. Add a case for it.`,
+        );
         break;
+      }
     }
   }
 

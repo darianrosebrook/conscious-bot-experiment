@@ -27,7 +27,8 @@ import {
 import type { SyncEffect } from '../../goals/goal-task-sync';
 import { onGoalAction } from '../../goals/goal-lifecycle-hooks';
 import { createGoalBinding, computeProvisionalKey } from '../../goals/goal-identity';
-import { applyHold, clearHold, syncHoldToTaskFields, detectIllegalStates } from '../../goals/goal-binding-normalize';
+import { applyHold, clearHold, cloneHold, syncHoldToTaskFields, detectIllegalStates } from '../../goals/goal-binding-normalize';
+import { partitionSelfHoldEffects, applySelfHoldEffects } from '../../goals/effect-partitioning';
 import { GoalStatus } from '../../types';
 import type { VerifierRegistry } from '../../goals/verifier-registry';
 import { TaskStore } from '../task-store';
@@ -41,6 +42,7 @@ import type { GoalTagV1 } from '@conscious-bot/cognition';
 class GoalProtocolHarness {
   readonly taskStore = new TaskStore();
   private managementHandler = new TaskManagementHandler(this.taskStore);
+
   private verifierRegistry?: VerifierRegistry;
   readonly goalStatusUpdates: Array<{ goalId: string; status: string; reason?: string }> = [];
   private idCounter = 0;
@@ -56,17 +58,24 @@ class GoalProtocolHarness {
     const previousStatus = task.status;
     const origin = options?.origin ?? 'runtime';
 
-    // Compute hook result before persist (same as real implementation)
-    let hookResult: ReturnType<typeof onTaskStatusChanged> | undefined;
+    // Partition and apply self-targeted hold effects before persist.
+    // Uses the same production helpers as TaskIntegration.updateTaskStatus.
+    let remainingEffects: SyncEffect[] = [];
     if (origin === 'runtime') {
       const binding = (task.metadata as any).goalBinding as GoalBinding | undefined;
       if (binding) {
-        hookResult = onTaskStatusChanged(
+        const hookResult = onTaskStatusChanged(
           { ...task, status: status as Task['status'] },
           previousStatus,
           status as Task['status'],
           { verifierRegistry: this.verifierRegistry },
         );
+
+        if (hookResult.syncEffects.length > 0) {
+          const { self, remaining } = partitionSelfHoldEffects(taskId, hookResult.syncEffects);
+          remainingEffects = remaining;
+          applySelfHoldEffects(task, self);
+        }
       }
     }
 
@@ -74,9 +83,9 @@ class GoalProtocolHarness {
     task.metadata.updatedAt = Date.now();
     this.taskStore.setTask(task);
 
-    // Apply goal protocol effects
-    if (hookResult && hookResult.syncEffects.length > 0) {
-      this.applyGoalProtocolEffects(hookResult.syncEffects);
+    // Apply remaining protocol effects (targeting other tasks/goals)
+    if (remainingEffects.length > 0) {
+      this.applyGoalProtocolEffects(remainingEffects);
     }
   }
 
@@ -116,39 +125,65 @@ class GoalProtocolHarness {
   // ---------------------------------------------------------------------------
 
   handleManagementAction(goal: GoalTagV1, sourceThoughtId?: string): ManagementResult {
+    // Pre-condition hold state BEFORE calling handle() so the handler's
+    // persist includes both status + hold atomically. Mirrors TaskIntegration.
+    const targetId = goal.targetId;
+    type PreAction = 'hold_applied' | 'hold_cleared' | 'none';
+    let preAction: PreAction = 'none';
+    let savedHold: GoalBinding['hold'] | undefined;
+
+    if (targetId) {
+      const task = this.taskStore.getTask(targetId);
+      if (task) {
+        const binding = (task.metadata as any).goalBinding as GoalBinding | undefined;
+        if (binding) {
+          if (goal.action === 'pause') {
+            savedHold = cloneHold(binding.hold);
+            applyHold(task, {
+              reason: 'manual_pause',
+              heldAt: Date.now(),
+              resumeHints: [],
+              nextReviewAt: Date.now() + 5 * 60 * 1000,
+            });
+            syncHoldToTaskFields(task);
+            preAction = 'hold_applied';
+          } else if (goal.action === 'resume' && binding.hold) {
+            savedHold = cloneHold(binding.hold);
+            clearHold(task);
+            syncHoldToTaskFields(task);
+            preAction = 'hold_cleared';
+          } else if (goal.action === 'cancel' && binding.hold) {
+            savedHold = cloneHold(binding.hold);
+            clearHold(task);
+            syncHoldToTaskFields(task);
+            preAction = 'hold_cleared';
+          }
+        }
+      }
+    }
+
     const result = this.managementHandler.handle(goal, sourceThoughtId);
 
-    if (result.decision !== 'applied' || !result.affectedTaskId) return result;
-
-    const task = this.taskStore.getTask(result.affectedTaskId);
-    if (!task) return result;
-
-    const binding = (task.metadata as any).goalBinding as GoalBinding | undefined;
-    if (!binding) return result;
-
-    if (result.action === 'pause' && result.newStatus === 'paused') {
-      applyHold(task, {
-        reason: 'manual_pause',
-        heldAt: Date.now(),
-        resumeHints: [],
-        nextReviewAt: Date.now() + 5 * 60 * 1000,
-      });
-      syncHoldToTaskFields(task);
-      this.taskStore.setTask(task);
-    }
-
-    if (result.action === 'resume' && result.previousStatus === 'paused') {
-      clearHold(task);
-      syncHoldToTaskFields(task);
-      this.taskStore.setTask(task);
-    }
-
-    if (result.action === 'cancel') {
-      if (binding.hold) {
-        clearHold(task);
-        syncHoldToTaskFields(task);
-        this.taskStore.setTask(task);
+    // Roll back if action was rejected
+    if (preAction !== 'none' && result.decision !== 'applied') {
+      const task = this.taskStore.getTask(targetId!);
+      if (task) {
+        const binding = (task.metadata as any).goalBinding as GoalBinding | undefined;
+        if (binding) {
+          if (preAction === 'hold_applied') {
+            if (savedHold) {
+              applyHold(task, savedHold);
+            } else {
+              clearHold(task);
+            }
+          } else if (preAction === 'hold_cleared' && savedHold) {
+            applyHold(task, savedHold);
+          }
+          syncHoldToTaskFields(task);
+          this.taskStore.setTask(task);
+        }
       }
+      return result;
     }
 
     return result;
@@ -183,6 +218,15 @@ class GoalProtocolHarness {
     }
 
     return count;
+  }
+
+  /**
+   * Public accessor for tests — invokes the private applyGoalProtocolEffects.
+   * Tests call this to verify the routing invariant (update_task_status
+   * effects go through updateTaskStatus with origin:'protocol').
+   */
+  applyEffectsForTest(effects: SyncEffect[]): number {
+    return this.applyGoalProtocolEffects(effects);
   }
 
   // ---------------------------------------------------------------------------
@@ -468,6 +512,65 @@ describe('Goal Protocol Integration', () => {
       expect(updated.status).toBe('paused');
       expect(updated.metadata.goalBinding).toBeUndefined();
     });
+
+    it('rejected pause restores prior hold (does not destroy preempted hold)', () => {
+      const task = harness.createGoalBoundTask({ goalId: 'g1', status: 'active' });
+
+      // Apply a preempted hold (simulating goal-level preemption) and pause task
+      applyHold(task, {
+        reason: 'preempted',
+        heldAt: Date.now(),
+        resumeHints: ['wait for higher-priority goal to complete'],
+        nextReviewAt: Date.now() + 10 * 60 * 1000,
+      });
+      syncHoldToTaskFields(task);
+      task.status = 'paused';
+      harness.taskStore.setTask(task);
+
+      // Attempt to pause an already-paused task → handler rejects (invalid_transition)
+      const result = harness.handleManagementAction({
+        action: 'pause',
+        target: task.title,
+        targetId: task.id,
+        amount: null,
+      } as GoalTagV1);
+
+      expect(result.decision).toBe('invalid_transition');
+
+      // Prior preempted hold must be restored, not destroyed
+      const updated = harness.taskStore.getTask(task.id)!;
+      expect(updated.status).toBe('paused');
+      const binding = updated.metadata.goalBinding as GoalBinding;
+      expect(binding.hold).toBeDefined();
+      expect(binding.hold!.reason).toBe('preempted');
+      expect(binding.hold!.resumeHints).toEqual(['wait for higher-priority goal to complete']);
+    });
+
+    it('cloneHold isolates rollback snapshot from post-snapshot mutations', () => {
+      const task = harness.createGoalBoundTask({ goalId: 'g1', status: 'active' });
+
+      // Apply a hold with mutable resumeHints
+      applyHold(task, {
+        reason: 'preempted',
+        heldAt: Date.now(),
+        resumeHints: ['a'],
+        nextReviewAt: Date.now() + 10 * 60 * 1000,
+      });
+      syncHoldToTaskFields(task);
+      task.status = 'paused';
+      harness.taskStore.setTask(task);
+
+      // Clone the hold (simulating what preconditioning does)
+      const binding = task.metadata.goalBinding as GoalBinding;
+      const snapshot = cloneHold(binding.hold);
+
+      // Mutate the original hold's resumeHints AFTER snapshot
+      binding.hold!.resumeHints.push('b');
+
+      // Snapshot must be isolated — still ['a'], not ['a', 'b']
+      expect(snapshot!.resumeHints).toEqual(['a']);
+      expect(binding.hold!.resumeHints).toEqual(['a', 'b']);
+    });
   });
 
   // -------------------------------------------------------------------------
@@ -637,6 +740,374 @@ describe('Goal Protocol Integration', () => {
       expect(afterResume.status).toBe('pending');
       expect((afterResume.metadata.goalBinding as GoalBinding).hold).toBeUndefined();
       expect(detectIllegalStates(afterResume)).toEqual([]);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // Test E: Observer-snapshot — no illegal states at setTask boundaries
+  // Scope: proves consistency at persist-event boundaries for exercised
+  // scenarios. Does NOT guarantee no intermediate-reference observers can
+  // see stale state (store is reference-based, not copy-on-write).
+  // -------------------------------------------------------------------------
+
+  describe('observer-snapshot: consistent state at setTask boundaries', () => {
+    it('every setTask call during updateTaskStatus produces consistent state', async () => {
+      const task = harness.createGoalBoundTask({ goalId: 'g1', status: 'active' });
+      const violations: Array<{ taskId: string; state: string; violations: any[] }> = [];
+
+      // Spy on setTask to inspect state at every persist boundary
+      const originalSetTask = harness.taskStore.setTask.bind(harness.taskStore);
+      vi.spyOn(harness.taskStore, 'setTask').mockImplementation((t: Task) => {
+        const binding = t.metadata.goalBinding as GoalBinding | undefined;
+        if (binding) {
+          const v = detectIllegalStates(t);
+          // Filter out done_but_not_completed (expected before verifier runs)
+          const unexpected = v.filter(viol => viol.rule !== 'done_but_not_completed');
+          if (unexpected.length > 0) {
+            violations.push({
+              taskId: t.id,
+              state: t.status,
+              violations: unexpected,
+            });
+          }
+        }
+        originalSetTask(t);
+      });
+
+      // Transition: active → completed (protocol-driven, no hold involved)
+      await harness.updateTaskStatus(task.id, 'completed');
+
+      // Transition: active → failed (protocol-driven, no hold involved)
+      const task2 = harness.createGoalBoundTask({ goalId: 'g2', status: 'active' });
+      await harness.updateTaskStatus(task2.id, 'failed');
+
+      expect(violations).toEqual([]);
+      vi.restoreAllMocks();
+    });
+
+    it('every setTask call during management pause produces consistent state', () => {
+      const task = harness.createGoalBoundTask({ goalId: 'g1', status: 'active' });
+      const violations: Array<{ taskId: string; state: string; violations: any[] }> = [];
+
+      const originalSetTask = harness.taskStore.setTask.bind(harness.taskStore);
+      vi.spyOn(harness.taskStore, 'setTask').mockImplementation((t: Task) => {
+        const binding = t.metadata.goalBinding as GoalBinding | undefined;
+        if (binding) {
+          const v = detectIllegalStates(t);
+          const unexpected = v.filter(viol => viol.rule !== 'done_but_not_completed');
+          if (unexpected.length > 0) {
+            violations.push({
+              taskId: t.id,
+              state: t.status,
+              violations: unexpected,
+            });
+          }
+        }
+        originalSetTask(t);
+      });
+
+      // Management pause should persist status + hold atomically
+      harness.handleManagementAction({
+        action: 'pause',
+        target: task.title,
+        targetId: task.id,
+        amount: null,
+      } as GoalTagV1);
+
+      expect(violations).toEqual([]);
+      vi.restoreAllMocks();
+    });
+
+    it('every setTask call during management resume produces consistent state', () => {
+      const task = harness.createGoalBoundTask({ goalId: 'g1', status: 'active' });
+
+      // First, pause normally (pre-observer)
+      harness.handleManagementAction({
+        action: 'pause',
+        target: task.title,
+        targetId: task.id,
+        amount: null,
+      } as GoalTagV1);
+
+      const violations: Array<{ taskId: string; state: string; violations: any[] }> = [];
+
+      const originalSetTask = harness.taskStore.setTask.bind(harness.taskStore);
+      vi.spyOn(harness.taskStore, 'setTask').mockImplementation((t: Task) => {
+        const binding = t.metadata.goalBinding as GoalBinding | undefined;
+        if (binding) {
+          const v = detectIllegalStates(t);
+          const unexpected = v.filter(viol => viol.rule !== 'done_but_not_completed');
+          if (unexpected.length > 0) {
+            violations.push({
+              taskId: t.id,
+              state: t.status,
+              violations: unexpected,
+            });
+          }
+        }
+        originalSetTask(t);
+      });
+
+      // Management resume should persist status + clear hold
+      harness.handleManagementAction({
+        action: 'resume',
+        target: task.title,
+        targetId: task.id,
+        amount: null,
+      } as GoalTagV1);
+
+      expect(violations).toEqual([]);
+      vi.restoreAllMocks();
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // Test F: Self-effect partitioning — tests the production helpers
+  // (partitionSelfHoldEffects, applySelfHoldEffects) that both
+  // TaskIntegration.updateTaskStatus and the harness import.
+  // -------------------------------------------------------------------------
+
+  describe('self-effect partitioning (production helpers)', () => {
+    it('partitionSelfHoldEffects separates self-targeted hold effects from others', () => {
+      const taskId = 'task_target';
+      const effects: SyncEffect[] = [
+        { type: 'apply_hold', taskId, reason: 'preempted', nextReviewAt: Date.now() + 300_000 },
+        { type: 'update_goal_status', goalId: 'g1', status: GoalStatus.SUSPENDED, reason: 'test' },
+        { type: 'clear_hold', taskId: 'task_other' },
+        { type: 'update_task_status', taskId: 'task_other', status: 'paused', reason: 'cascade' },
+        { type: 'noop', reason: 'no-op' },
+      ];
+
+      const { self, remaining } = partitionSelfHoldEffects(taskId, effects);
+
+      // Only the apply_hold targeting taskId should be in self
+      expect(self).toHaveLength(1);
+      expect(self[0].type).toBe('apply_hold');
+      if (self[0].type === 'apply_hold') {
+        expect(self[0].taskId).toBe(taskId);
+      }
+
+      // Everything else is remaining — including clear_hold for a different task
+      expect(remaining).toHaveLength(4);
+      expect(remaining.map(e => e.type)).toEqual([
+        'update_goal_status',
+        'clear_hold',
+        'update_task_status',
+        'noop',
+      ]);
+    });
+
+    it('partitionSelfHoldEffects handles clear_hold targeting self', () => {
+      const taskId = 'task_target';
+      const effects: SyncEffect[] = [
+        { type: 'clear_hold', taskId },
+        { type: 'update_task_status', taskId, status: 'pending', reason: 'resumed' },
+      ];
+
+      const { self, remaining } = partitionSelfHoldEffects(taskId, effects);
+
+      expect(self).toHaveLength(1);
+      expect(self[0].type).toBe('clear_hold');
+      expect(remaining).toHaveLength(1);
+      expect(remaining[0].type).toBe('update_task_status');
+    });
+
+    it('partitionSelfHoldEffects returns empty self when no hold effects target self', () => {
+      const effects: SyncEffect[] = [
+        { type: 'update_goal_status', goalId: 'g1', status: GoalStatus.COMPLETED, reason: 'done' },
+        { type: 'noop', reason: 'progress' },
+      ];
+
+      const { self, remaining } = partitionSelfHoldEffects('task_x', effects);
+
+      expect(self).toHaveLength(0);
+      expect(remaining).toHaveLength(2);
+    });
+
+    it('applySelfHoldEffects applies hold to in-memory task', () => {
+      const task = harness.createGoalBoundTask({ goalId: 'g1', status: 'active' });
+      const now = 1700000000000;
+      const reviewAt = now + 300_000;
+
+      const selfEffects: SyncEffect[] = [
+        { type: 'apply_hold', taskId: task.id, reason: 'preempted', nextReviewAt: reviewAt },
+      ];
+
+      applySelfHoldEffects(task, selfEffects, now);
+
+      const binding = task.metadata.goalBinding as GoalBinding;
+      expect(binding.hold).toBeDefined();
+      expect(binding.hold!.reason).toBe('preempted');
+      expect(binding.hold!.heldAt).toBe(now);
+      expect(binding.hold!.nextReviewAt).toBe(reviewAt);
+    });
+
+    it('applySelfHoldEffects clears hold from in-memory task', () => {
+      const task = harness.createGoalBoundTask({ goalId: 'g1', status: 'active' });
+      applyHold(task, {
+        reason: 'preempted',
+        heldAt: Date.now(),
+        resumeHints: [],
+        nextReviewAt: Date.now() + 300_000,
+      });
+
+      const selfEffects: SyncEffect[] = [
+        { type: 'clear_hold', taskId: task.id },
+      ];
+
+      applySelfHoldEffects(task, selfEffects);
+
+      const binding = task.metadata.goalBinding as GoalBinding;
+      expect(binding.hold).toBeUndefined();
+    });
+
+    it('hold is present at setTask boundary when self-effects applied before persist', () => {
+      const task = harness.createGoalBoundTask({ goalId: 'g1', status: 'active' });
+      const reviewAt = Date.now() + 300_000;
+
+      const effects: SyncEffect[] = [
+        { type: 'apply_hold', taskId: task.id, reason: 'preempted', nextReviewAt: reviewAt },
+        { type: 'update_goal_status', goalId: 'g1', status: GoalStatus.SUSPENDED, reason: 'test' },
+      ];
+
+      // Use production helpers to partition and apply
+      const { self, remaining } = partitionSelfHoldEffects(task.id, effects);
+      applySelfHoldEffects(task, self);
+
+      let holdPresentAtPersist = false;
+      const originalSetTask = harness.taskStore.setTask.bind(harness.taskStore);
+      vi.spyOn(harness.taskStore, 'setTask').mockImplementation((t: Task) => {
+        if (t.id === task.id) {
+          const binding = (t.metadata as any).goalBinding as GoalBinding | undefined;
+          holdPresentAtPersist = binding?.hold?.reason === 'preempted';
+        }
+        originalSetTask(t);
+      });
+
+      task.status = 'paused';
+      harness.taskStore.setTask(task);
+
+      expect(holdPresentAtPersist).toBe(true);
+      expect(remaining).toHaveLength(1);
+      expect(remaining[0].type).toBe('update_goal_status');
+
+      vi.restoreAllMocks();
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // Test G: Cross-task effect routing invariant
+  // Calls applyEffectsForTest (which delegates to the private
+  // applyGoalProtocolEffects), spies on updateTaskStatus to prove
+  // that update_task_status effects route through the mutator with
+  // origin:'protocol'. This enforces the routing, not just demonstrates it.
+  // -------------------------------------------------------------------------
+
+  describe('cross-task effect routing via applyGoalProtocolEffects', () => {
+    it('goal_paused effects route update_task_status through updateTaskStatus with origin:protocol', () => {
+      const t1 = harness.createGoalBoundTask({ goalId: 'g1', status: 'active' });
+      const t2 = harness.createGoalBoundTask({ goalId: 'g1', status: 'active' });
+
+      // Produce known effects via onGoalAction
+      const allTasks = [
+        harness.taskStore.getTask(t1.id)!,
+        harness.taskStore.getTask(t2.id)!,
+      ];
+      const hookResult = onGoalAction(
+        { type: 'goal_paused', goalId: 'g1', reason: 'preempted' },
+        allTasks,
+      );
+
+      // Verify the reducer produced the expected effects
+      const holdEffects = hookResult.syncEffects.filter(e => e.type === 'apply_hold');
+      const statusEffects = hookResult.syncEffects.filter(e => e.type === 'update_task_status');
+      expect(holdEffects.length).toBe(2);
+      expect(statusEffects.length).toBe(2);
+
+      // Spy on updateTaskStatus BEFORE feeding effects through the production path
+      const statusUpdateCalls: Array<{ taskId: string; status: string; origin?: string }> = [];
+      const originalUpdate = harness.updateTaskStatus.bind(harness);
+      vi.spyOn(harness, 'updateTaskStatus').mockImplementation(
+        async (taskId: string, status: string, options?: MutationOptions) => {
+          statusUpdateCalls.push({ taskId, status, origin: options?.origin });
+          return originalUpdate(taskId, status, options);
+        },
+      );
+
+      // Feed ALL effects through the production applyGoalProtocolEffects
+      // via the public test accessor — this IS the code under test.
+      const applied = harness.applyEffectsForTest(hookResult.syncEffects);
+
+      // Verify update_task_status effects were routed through updateTaskStatus
+      expect(statusUpdateCalls.length).toBe(2);
+      for (const call of statusUpdateCalls) {
+        expect(call.origin).toBe('protocol');
+        expect(call.status).toBe('paused');
+      }
+
+      // Verify final state is consistent
+      for (const taskId of [t1.id, t2.id]) {
+        const updated = harness.taskStore.getTask(taskId)!;
+        expect(updated.status).toBe('paused');
+        const binding = updated.metadata.goalBinding as GoalBinding;
+        expect(binding.hold).toBeDefined();
+        expect(binding.hold!.reason).toBe('preempted');
+      }
+
+      // No hooks re-fired (origin:protocol suppresses re-entrancy)
+      expect(harness.goalStatusUpdates.length).toBe(0);
+
+      // Effect count: 2 hold + 2 status = 4 (noops excluded)
+      expect(applied).toBe(4);
+
+      vi.restoreAllMocks();
+    });
+
+    it('goal_cancelled effects route through applyGoalProtocolEffects correctly', () => {
+      const t1 = harness.createGoalBoundTask({ goalId: 'g1', status: 'active' });
+
+      // Pause t1 with a hold
+      applyHold(t1, {
+        reason: 'preempted',
+        heldAt: Date.now(),
+        resumeHints: [],
+        nextReviewAt: Date.now() + 300_000,
+      });
+      t1.status = 'paused';
+      harness.taskStore.setTask(t1);
+
+      // Produce cancel effects
+      const allTasks = [harness.taskStore.getTask(t1.id)!];
+      const hookResult = onGoalAction(
+        { type: 'goal_cancelled', goalId: 'g1', reason: 'user requested' },
+        allTasks,
+      );
+
+      // Spy on updateTaskStatus
+      const statusUpdateCalls: Array<{ taskId: string; status: string; origin?: string }> = [];
+      const originalUpdate = harness.updateTaskStatus.bind(harness);
+      vi.spyOn(harness, 'updateTaskStatus').mockImplementation(
+        async (taskId: string, status: string, options?: MutationOptions) => {
+          statusUpdateCalls.push({ taskId, status, origin: options?.origin });
+          return originalUpdate(taskId, status, options);
+        },
+      );
+
+      // Feed through production path
+      harness.applyEffectsForTest(hookResult.syncEffects);
+
+      // Status effect routed through updateTaskStatus with protocol origin
+      expect(statusUpdateCalls.length).toBe(1);
+      expect(statusUpdateCalls[0].origin).toBe('protocol');
+      expect(statusUpdateCalls[0].status).toBe('failed');
+
+      // Final state: failed, no hold
+      const updated = harness.taskStore.getTask(t1.id)!;
+      expect(updated.status).toBe('failed');
+      const binding = updated.metadata.goalBinding as GoalBinding;
+      expect(binding.hold).toBeUndefined();
+
+      vi.restoreAllMocks();
     });
   });
 });

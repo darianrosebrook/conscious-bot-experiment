@@ -458,21 +458,81 @@ These combinations must be asserted impossible in tests:
 
 ---
 
+## I. Runtime integration wiring
+
+The goal-binding protocol is a pure coordination layer (`goals/`). It
+connects to the execution substrate via `TaskIntegration` in
+`task-integration.ts`. The wiring follows three principles:
+
+### Origin-gated hooks
+
+Mutators (`updateTaskStatus`, `updateTaskProgress`) accept an optional
+`origin: 'runtime' | 'protocol'` parameter. Lifecycle hooks fire only when
+`origin === 'runtime'`. Protocol-originated mutations (effects from the
+reducer) pass `origin: 'protocol'` to prevent re-entrant loops.
+
+### Self-effect partitioning
+
+When a status change on a goal-bound task produces hold/clear_hold effects
+targeting the *same* task, those effects are applied to the in-memory task
+object **before** the `setTask()` commit. This prevents transient illegal
+states (paused-without-hold) visible to store observers. Cross-task and
+goal-status effects apply **after** the commit.
+
+Production helpers: `partitionSelfHoldEffects()` and
+`applySelfHoldEffects()` in `goals/effect-partitioning.ts`.
+
+### Management preconditioning
+
+`handleManagementAction()` pre-applies hold metadata before calling
+`TaskManagementHandler.handle()`, so the handler's internal `setTask()`
+includes both status and hold atomically. On rejection, the prior hold is
+restored from a cloned snapshot (`cloneHold()` in
+`goals/goal-binding-normalize.ts`).
+
+This is a workaround for the handler persisting internally. The cleaner
+model is to refactor `TaskManagementHandler.handle()` to return a patch
+without persisting, letting the wrapper apply atomically. Remove
+preconditioning once the handler returns patches.
+
+### Atomicity contract
+
+`TaskStore` is reference-based (not copy-on-write). `getTask()` returns a
+direct reference; mutations are immediately visible to all reference
+holders. `setTask()` is the commit boundary only for store-driven observers
+(code that discovers tasks via `getAllTasks()` / `getTasks()`). Callers
+needing atomic multi-field updates must mutate all fields before calling
+`setTask()`.
+
 ## File map
 
-### New files
+### Goal protocol files (`packages/planning/src/goals/`)
 
 | File | Purpose |
 |------|---------|
-| `packages/planning/src/building/goal-resolver.ts` | `resolveOrCreateBuildGoal()`, goalKey computation (phase A/B), candidate scoring, atomic lock |
-| `packages/planning/src/building/activation-reactor.ts` | Event-driven reactivation + periodic review + budget enforcement + manual_pause wall |
-| `packages/planning/src/building/shelter-verifier.ts` | `verify_shelter_v0()`, hard/soft requirement checks, footprint-bounded, existence-first |
-| `packages/planning/src/building/goal-task-sync.ts` | Task → Goal synchronization reducer, illegal state assertions |
+| `goal-binding-types.ts` | GoalBinding, GoalHold, GoalAnchors type definitions |
+| `goal-binding-normalize.ts` | Hold lifecycle helpers (applyHold, clearHold, cloneHold), field sync, illegal state detection |
+| `goal-identity.ts` | Provisional key computation, GoalBinding factory |
+| `goal-resolver.ts` | Candidate scoring, dry resolution, atomic resolveOrCreate with per-key mutex |
+| `goal-task-sync.ts` | Task→Goal / Goal→Task synchronization reducer (SyncEffect union) |
+| `goal-lifecycle-hooks.ts` | Hook functions (onTaskStatusChanged, onTaskProgressUpdated, onGoalAction), applySyncEffects |
+| `effect-partitioning.ts` | partitionSelfHoldEffects, applySelfHoldEffects — extracted for testability |
+| `activation-reactor.ts` | Event-driven reactivation, periodic review, budget enforcement, manual_pause wall |
+| `completion-checker.ts` | Completion verification orchestration |
+| `verifier-registry.ts` | Verifier lookup by name |
+| `keyed-mutex.ts` | Per-key async mutex for resolver atomicity |
 
 ### Modified files
 
 | File | Changes |
 |------|---------|
-| `packages/planning/src/types/task.ts` | Add `metadata.goalBinding` namespace (GoalBinding, GoalHoldReason types) |
-| `packages/planning/src/task-integration.ts` | Goal resolver integration in `addTask()` for goal-bound tasks, hold protocol in status transitions, field synchronization on pause/resume |
-| `packages/planning/src/goal-formulation/goal-manager.ts` | Emit goalId when spawning tasks, read Task status via binding instead of maintaining competing state |
+| `packages/planning/src/types/task.ts` | `metadata.goalBinding` namespace (GoalBinding, GoalHoldReason types) |
+| `packages/planning/src/task-integration.ts` | Origin-gated hooks, self-effect partitioning, applyGoalProtocolEffects, handleManagementAction with hold preconditioning, goalId population |
+| `packages/planning/src/task-integration/task-store.ts` | Atomicity contract documentation |
+| `packages/planning/src/interfaces/task-integration.ts` | MutationOrigin type, options parameter on mutators |
+
+### Integration tests
+
+| File | Tests |
+|------|-------|
+| `packages/planning/src/task-integration/__tests__/goal-protocol-integration.test.ts` | 27 tests: status hooks, management hold protocol, origin isolation, manual_pause wall, observer-snapshot consistency, self-effect partitioning, cross-task routing, clone isolation |

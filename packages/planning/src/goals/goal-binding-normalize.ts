@@ -174,6 +174,22 @@ export function clearHold(task: Task): void {
   syncHoldToTaskFields(task);
 }
 
+/**
+ * Clone a GoalHold for rollback safety — isolates from future mutations.
+ * Shallow clone is sufficient: all fields are primitives except resumeHints
+ * (string[]) and holdWitness (flat object), both of which are copied.
+ *
+ * If GoalHold gains nested structure, deepen the clone here (single edit).
+ */
+export function cloneHold(hold: GoalHold | undefined): GoalHold | undefined {
+  if (!hold) return undefined;
+  return {
+    ...hold,
+    resumeHints: [...hold.resumeHints],
+    holdWitness: hold.holdWitness ? { ...hold.holdWitness } : undefined,
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Completion helpers
 // ---------------------------------------------------------------------------

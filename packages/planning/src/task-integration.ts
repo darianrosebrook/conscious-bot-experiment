@@ -51,7 +51,8 @@ import {
 } from './goals/goal-lifecycle-hooks';
 import type { SyncEffect } from './goals/goal-task-sync';
 import type { VerifierRegistry } from './goals/verifier-registry';
-import { applyHold, clearHold, syncHoldToTaskFields } from './goals/goal-binding-normalize';
+import { applyHold, clearHold, cloneHold, syncHoldToTaskFields } from './goals/goal-binding-normalize';
+import { partitionSelfHoldEffects, applySelfHoldEffects } from './goals/effect-partitioning';
 import { GoalStatus } from './types';
 
 export type { TaskStep } from './types/task-step';
@@ -87,6 +88,20 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
 
   private thoughtPollInFlight = false;
   private seenThoughtIds = new Set<string>();
+
+  /**
+   * Serial promise chain for protocol effects. All protocol-induced status
+   * mutations flow through this drain regardless of whether the caller is
+   * async or sync. Prevents overlapping protocol applications.
+   *
+   * Intentionally global (not partitioned by goalId or taskId): the status
+   * mutations from lifecycle hooks can target any task/goal, so a per-entity
+   * drain risks ordering violations across entities. If throughput becomes
+   * a bottleneck, the clean escape hatch is a partitioned drain keyed by
+   * goalId (since goal-scoped effects dominate). Don't partition without
+   * auditing cross-goal effect ordering first.
+   */
+  private protocolEffectsDrain: Promise<void> = Promise.resolve();
 
   private cognitionOutbox = new CognitionOutbox();
   private goalResolver?: GoalResolver;
@@ -255,27 +270,33 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
       const origin = options?.origin ?? 'runtime';
 
       // Goal-binding protocol: compute hook result before persist so that
-      // hold/clear_hold effects targeting THIS task can be applied atomically.
+      // hold/clear_hold effects targeting THIS task can be applied atomically
+      // with the status change. This prevents transient illegal states
+      // (e.g., paused without hold) from being visible to observers.
       let hookResult: ReturnType<typeof onTaskStatusChanged> | undefined;
+      let remainingEffects: SyncEffect[] = [];
       if (origin === 'runtime') {
         const binding = (task.metadata as any).goalBinding as GoalBinding | undefined;
         if (binding) {
-          // Pre-compute effects before mutating status (hooks need old+new)
-          // We temporarily set the new status to compute effects, then apply
-          // self-targeted hold effects to the task object before persist.
           hookResult = onTaskStatusChanged(
             { ...task, status: status as Task['status'] },
             previousStatus,
             status as Task['status'],
             { verifierRegistry: this.verifierRegistry },
           );
+
+          if (hookResult && hookResult.syncEffects.length > 0) {
+            const { self, remaining } = partitionSelfHoldEffects(taskId, hookResult.syncEffects);
+            remainingEffects = remaining;
+            applySelfHoldEffects(task, self);
+          }
         }
       }
 
       task.status = status as any;
       console.log(`Updated task ${taskId} status to ${status}`);
 
-      // Persist status change
+      // Persist status change (with any self-targeted hold effects already applied)
       this.taskStore.setTask(task);
 
       // Unblock parent when prerequisite children reach terminal state
@@ -283,9 +304,11 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
         this.tryUnblockParent(task);
       }
 
-      // Apply goal protocol effects (after persist, targeting other tasks/goals)
-      if (hookResult && hookResult.syncEffects.length > 0) {
-        this.applyGoalProtocolEffects(hookResult.syncEffects);
+      // Apply remaining protocol effects (targeting other tasks/goals) after persist.
+      // Scheduled through the global drain so protocol effects never overlap.
+      // Awaited so cascading status changes complete before lifecycle events fire.
+      if (remainingEffects.length > 0) {
+        await this.scheduleGoalProtocolEffects(remainingEffects);
       }
 
       // Emit lifecycle events for thought generation
@@ -808,6 +831,21 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
 
   // ---------------------------------------------------------------------------
   // Goal-binding protocol: effect application
+  //
+  // Atomicity contract: consistency is defined at taskStore.setTask()
+  // boundaries. TaskStore is reference-based (getTask returns the stored
+  // object, not a clone), so mutations to a task object are immediately
+  // visible to any code holding a reference. The setTask call is the
+  // "commit point" for event-driven observers (e.g., store subscribers).
+  //
+  // To prevent transient illegal states at commit boundaries:
+  // - Self-targeted hold/clear_hold effects are applied to the in-memory
+  //   task BEFORE the setTask that changes status.
+  // - Cross-task/goal effects are applied AFTER the originating persist.
+  //
+  // For a hard guarantee against reference-leaking observers, TaskStore
+  // would need copy-on-write semantics (getTask returns clones, setTask
+  // swaps references). This is not currently implemented.
   // ---------------------------------------------------------------------------
 
   /**
@@ -818,7 +856,7 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
    * suppresses re-entering goal hooks). Metadata effects (hold, clear_hold,
    * goal_status) apply directly to the store.
    */
-  private applyGoalProtocolEffects(effects: SyncEffect[]): number {
+  private async applyGoalProtocolEffects(effects: SyncEffect[]): Promise<number> {
     // Separate status effects (route through mutators) from metadata effects (direct store)
     const statusEffects: SyncEffect[] = [];
     const otherEffects: SyncEffect[] = [];
@@ -827,7 +865,10 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
       else otherEffects.push(e);
     }
 
-    // Apply metadata effects (hold, clear_hold, goal_status) via store
+    // Apply metadata effects (hold, clear_hold, goal_status) via store.
+    // Contained: applySyncEffects may throw (e.g. ESM require() inside
+    // goal-binding-normalize). Failures here should not skip status effects.
+    let count = 0;
     const deps: EffectApplierDeps = {
       getTask: (id) => this.taskStore.getTask(id),
       setTask: (t) => this.taskStore.setTask(t),
@@ -843,17 +884,72 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
             this.emit('goalStatusUpdate', { goalId, status, reason });
           },
     };
-    let count = applySyncEffects(otherEffects, deps);
+    try {
+      count += applySyncEffects(otherEffects, deps);
+    } catch (err) {
+      // applySyncEffects iterates effects sequentially — it may have mutated
+      // some tasks before throwing. count underreports what actually changed.
+      console.error('[TaskIntegration] applySyncEffects failed:', {
+        effectTypes: otherEffects.map((e) => e.type),
+        effectCount: otherEffects.length,
+        mayBePartial: true,
+        error: err instanceof Error ? err.message : err,
+        errorName: err instanceof Error ? err.name : undefined,
+        stack: err instanceof Error ? err.stack : undefined,
+      });
+    }
 
-    // Apply status effects through TaskIntegration mutators (with hook suppression)
+    // Apply status effects through TaskIntegration mutators (with hook suppression).
+    // Best-effort: each effect is awaited individually so lifecycle events, parent
+    // unblocking, and cascading hooks complete in order. Errors are contained per-effect
+    // so one failing mutation doesn't block the rest.
     for (const e of statusEffects) {
       if (e.type === 'update_task_status') {
-        this.updateTaskStatus(e.taskId, e.status, { origin: 'protocol' });
-        count++;
+        try {
+          await this.updateTaskStatus(e.taskId, e.status, { origin: 'protocol' });
+          count++;
+        } catch (err) {
+          console.error('[TaskIntegration] Protocol status effect failed:', {
+            taskId: e.taskId,
+            targetStatus: e.status,
+            error: err instanceof Error ? err.message : err,
+            errorName: err instanceof Error ? err.name : undefined,
+            stack: err instanceof Error ? err.stack : undefined,
+          });
+        }
       }
     }
 
     return count;
+  }
+
+  /**
+   * Schedule protocol effects onto the global drain queue.
+   *
+   * ALL protocol effects flow through here regardless of caller context.
+   * Returns a promise that resolves with the count of applied effects,
+   * so async callers can await causal ordering while sync callers can
+   * fire-and-forget via the drain.
+   */
+  private scheduleGoalProtocolEffects(effects: SyncEffect[]): Promise<number> {
+    // Fast-path: no effects → no queue churn.
+    if (effects.length === 0) return Promise.resolve(0);
+
+    const batch = this.protocolEffectsDrain.then(() =>
+      this.applyGoalProtocolEffects(effects)
+    );
+    // Advance the drain past this batch (void return, errors contained).
+    this.protocolEffectsDrain = batch.then(
+      () => {},
+      (err) => {
+        console.error('[TaskIntegration] Protocol effects drain error:', {
+          error: err instanceof Error ? err.message : err,
+          errorName: err instanceof Error ? err.name : undefined,
+          stack: err instanceof Error ? err.stack : undefined,
+        });
+      },
+    );
+    return batch;
   }
 
   // ---------------------------------------------------------------------------
@@ -866,49 +962,90 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
    * Management "pause" uses hold reason 'manual_pause' (not 'preempted').
    * Effects are task-scoped (only the targeted task), not goal-scoped.
    * Does NOT use onGoalAction (which is goal-scoped by design).
+   *
+   * NOTE: Preconditioning is a workaround for the handler doing internal
+   * persistence via taskStore.setTask(). The cleaner model is to refactor
+   * TaskManagementHandler.handle() to return a patch (decision + proposed
+   * mutations) without persisting, letting this wrapper apply the patch
+   * atomically with hold state. Remove preconditioning once the handler
+   * returns patches instead of persisting internally.
    */
   handleManagementAction(
     goal: GoalTagV1,
     sourceThoughtId?: string,
   ): ManagementResult {
+    // Pre-condition hold state on goal-bound tasks BEFORE calling handle().
+    // The handler mutates status and persists via taskStore.setTask() —
+    // by adjusting hold metadata first, the handler's single persist includes
+    // both the status change AND the correct hold state, preventing transient
+    // illegal states (paused-without-hold, pending-with-hold) visible to observers.
+    const targetId = goal.targetId;
+    type PreAction = 'hold_applied' | 'hold_cleared' | 'none';
+    let preAction: PreAction = 'none';
+    let savedHold: GoalBinding['hold'] | undefined;
+
+    if (targetId) {
+      const task = this.taskStore.getTask(targetId);
+      if (task) {
+        const binding = (task.metadata as any).goalBinding as GoalBinding | undefined;
+        if (binding) {
+          if (goal.action === 'pause') {
+            // Snapshot existing hold before overwriting — rollback must
+            // restore the prior hold, not just clear (else we destroy
+            // preempted/materials_missing holds on rejection).
+            // Overwrite IS intentional: manual_pause supersedes any prior
+            // hold reason. Clone isolates from future mutations.
+            savedHold = cloneHold(binding.hold);
+            // Pre-apply manual_pause hold so handler persists status=paused + hold
+            applyHold(task, {
+              reason: 'manual_pause',
+              heldAt: Date.now(),
+              resumeHints: [],
+              nextReviewAt: Date.now() + 5 * 60 * 1000,
+            });
+            syncHoldToTaskFields(task);
+            preAction = 'hold_applied';
+          } else if (goal.action === 'resume' && binding.hold) {
+            // Pre-clear hold so handler persists status=pending without hold
+            savedHold = cloneHold(binding.hold);
+            clearHold(task);
+            syncHoldToTaskFields(task);
+            preAction = 'hold_cleared';
+          } else if (goal.action === 'cancel' && binding.hold) {
+            // Pre-clear hold so handler persists status=failed without hold
+            savedHold = cloneHold(binding.hold);
+            clearHold(task);
+            syncHoldToTaskFields(task);
+            preAction = 'hold_cleared';
+          }
+        }
+      }
+    }
+
     const result = this.managementHandler.handle(goal, sourceThoughtId);
 
-    if (result.decision !== 'applied' || !result.affectedTaskId) {
-      return result;
-    }
-
-    const task = this.taskStore.getTask(result.affectedTaskId);
-    if (!task) return result;
-
-    const binding = (task.metadata as any).goalBinding as GoalBinding | undefined;
-    if (!binding) return result;
-
-    // Apply hold protocol for goal-bound tasks
-    if (result.action === 'pause' && result.newStatus === 'paused') {
-      // Management pause = manual_pause (hard wall: cannot be auto-cleared)
-      applyHold(task, {
-        reason: 'manual_pause',
-        heldAt: Date.now(),
-        resumeHints: [],
-        nextReviewAt: Date.now() + 5 * 60 * 1000,
-      });
-      syncHoldToTaskFields(task);
-      this.taskStore.setTask(task);
-    }
-
-    if (result.action === 'resume' && result.previousStatus === 'paused') {
-      clearHold(task);
-      syncHoldToTaskFields(task);
-      this.taskStore.setTask(task);
-    }
-
-    if (result.action === 'cancel') {
-      // Clear any existing hold before task goes to failed
-      if (binding.hold) {
-        clearHold(task);
-        syncHoldToTaskFields(task);
-        this.taskStore.setTask(task);
+    // If pre-conditioned but action was rejected, roll back
+    if (preAction !== 'none' && result.decision !== 'applied') {
+      const task = this.taskStore.getTask(targetId!);
+      if (task) {
+        const binding = (task.metadata as any).goalBinding as GoalBinding | undefined;
+        if (binding) {
+          if (preAction === 'hold_applied') {
+            // Restore prior hold (may have been preempted/materials_missing)
+            // or clear if there was no prior hold.
+            if (savedHold) {
+              applyHold(task, savedHold);
+            } else {
+              clearHold(task);
+            }
+          } else if (preAction === 'hold_cleared' && savedHold) {
+            applyHold(task, savedHold);
+          }
+          syncHoldToTaskFields(task);
+          this.taskStore.setTask(task);
+        }
       }
+      return result;
     }
 
     return result;
@@ -928,7 +1065,14 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
     const existingTask = this.taskStore.findSimilarTask(taskData);
     if (existingTask) return existingTask;
 
-    const stepResult = await this.sterlingPlanner.generateDynamicSteps(taskData);
+    // Advisory actions are NL-parsed cognitive intent markers that cannot produce
+    // deterministic requirementCandidate values. Skip step generation entirely —
+    // they serve as observable markers, not executable plans.
+    const isAdvisory = taskData.type === 'advisory_action';
+
+    const stepResult = isAdvisory
+      ? { steps: [], noStepsReason: 'advisory-skip' as const, route: undefined }
+      : await this.sterlingPlanner.generateDynamicSteps(taskData);
     const steps = stepResult.steps;
 
     // Detect blocked sentinel from solver (e.g., Rig E solver not implemented)
@@ -995,16 +1139,24 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
       task.metadata.solver.routeRig = stepResult.route?.requiredRig;
     }
 
-    // Invariant guard: internal sub-tasks MUST carry requirementCandidate
+    // Invariant guard: internal sub-tasks MUST carry requirementCandidate.
+    // advisory_action tasks are exempt — they intentionally skip step generation.
     if (
       stepResult.noStepsReason === 'no-requirement' &&
       taskData.source === 'autonomous' &&
+      !isAdvisory &&
       (taskData as any).metadata?.parentTaskId
     ) {
       console.error(
         `[INVARIANT VIOLATION] Internal sub-task "${taskData.title}" has no requirementCandidate. ` +
         `Parent: ${(taskData as any).metadata.parentTaskId}. Fix the sub-task creation site.`
       );
+    }
+
+    // Advisory actions are NL-parsed cognitive markers — non-executable by design.
+    // Mark them blocked so the executor's eligibility filter skips them.
+    if (isAdvisory) {
+      task.metadata.blockedReason = 'advisory_action';
     }
 
     // Blocked sentinel: solver explicitly reported it cannot plan (e.g., Rig E not implemented)
@@ -1171,7 +1323,10 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
           { verifierRegistry: this.verifierRegistry },
         );
         if (hookResult.syncEffects.length > 0) {
-          this.applyGoalProtocolEffects(hookResult.syncEffects);
+          // updateTaskProgress is sync — schedule onto the global drain so
+          // protocol effects serialize with effects from all callers.
+          // void: intentionally not awaited; drain handles settlement.
+          void this.scheduleGoalProtocolEffects(hookResult.syncEffects);
         }
       }
     }
