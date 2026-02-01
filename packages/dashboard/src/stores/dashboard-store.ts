@@ -52,6 +52,31 @@ const GOAL_TAG_STRIP_RE = /\s*\[GOAL:[^\]]*\](?:\s*\d+\w*)?/gi;
 const stripGoalTags = (text: string) =>
   text.replace(GOAL_TAG_STRIP_RE, '').trim() || text;
 
+/** Wrapper patterns that embed the real content in quotes. */
+const WRAPPER_PATTERNS: { re: RegExp; group: number }[] = [
+  { re: /^(?:Processing intrusive thought|Thought processing started):\s*"(.+)"\.?$/i, group: 1 },
+  { re: /^From thought\s+"(.+?)"\s*[—–-]\s*.+$/i, group: 1 },
+  { re: /^Social interaction:\s*Chat from\s+\S+:\s*"(.+)"$/i, group: 1 },
+];
+
+/** Clean display text: strip GOAL tags, unwrap wrapper sentences, collapse whitespace. */
+const cleanDisplayText = (text: string): string => {
+  if (!text) return text;
+  let display = text.replace(GOAL_TAG_STRIP_RE, '').trim();
+  for (const { re, group } of WRAPPER_PATTERNS) {
+    const m = display.match(re);
+    if (m?.[group]) {
+      display = m[group].trim();
+      break;
+    }
+  }
+  display = display.replace(/\s+/g, ' ').trim();
+  if (display.length >= 2 && display.startsWith('"') && display.endsWith('"')) {
+    display = display.slice(1, -1).trim();
+  }
+  return display || text;
+};
+
 const PERSIST_CONFIG = {
   name: 'conscious-bot-dashboard-state',
   partialize: (state: DashboardStore) => ({
@@ -65,7 +90,7 @@ const PERSIST_CONFIG = {
     // inventory: state.inventory,
     // plannerData: state.plannerData,
   }),
-  // Strip residual [GOAL:] tags from persisted thoughts on rehydration
+  // Clean persisted thoughts on rehydration
   // (handles thoughts stored before the displayContent pipeline was added)
   merge: (persistedState: any, currentState: DashboardStore): DashboardStore => {
     if (!persistedState) return currentState;
@@ -73,7 +98,7 @@ const PERSIST_CONFIG = {
     if (Array.isArray(merged.thoughts)) {
       merged.thoughts = merged.thoughts.map((t: any) => ({
         ...t,
-        text: typeof t.text === 'string' ? stripGoalTags(t.text) : t.text,
+        text: typeof t.text === 'string' ? cleanDisplayText(t.text) : t.text,
       }));
     }
     return merged;
@@ -127,7 +152,7 @@ const isDeepEqual = (a: any, b: any): boolean => {
     if (!isDeepEqual(a[key], b[key])) return false;
   }
 
-  return false;
+  return true;
 };
 
 // =============================================================================
@@ -183,14 +208,55 @@ export const useDashboardStore = create<DashboardStore>()(
               return state; // Don't add duplicate
             }
 
-            // Also check for duplicate content within a 30-second window
-            // Prevents repetitive fallback observations from flooding the stream
-            const thirtySecondsAgo = new Date(Date.now() - 30000).toISOString();
+            // If this is a server-confirmed thought, replace any matching optimistic thought
+            // (optimistic thoughts have a different ID like "optimistic-..." so ID match won't catch this)
+            if (!thoughtWithId.optimistic) {
+              const matchingOptimistic = state.thoughts.find(
+                (t) =>
+                  t.optimistic &&
+                  t.text === thoughtWithId.text &&
+                  t.type === thoughtWithId.type
+              );
+              if (matchingOptimistic) {
+                const newThoughts = state.thoughts
+                  .map((t) => (t.id === matchingOptimistic.id ? thoughtWithId : t))
+                  .slice(-100);
+                return { thoughts: newThoughts };
+              }
+            }
+
+            // Pipeline echo dedup: catch near-identical content (case-insensitive)
+            // within 15 seconds regardless of type — the cognition pipeline re-emits
+            // the same content under different types (e.g. intrusive → reflection)
+            const echoCutoff = new Date(Date.now() - 15_000).toISOString();
+            const canonical = (thoughtWithId.text || '').toLowerCase().replace(/\s+/g, ' ').trim();
+            if (!thoughtWithId.optimistic && canonical) {
+              const echoMatch = state.thoughts.find(
+                (t) =>
+                  !t.optimistic &&
+                  t.ts > echoCutoff &&
+                  (t.text || '').toLowerCase().replace(/\s+/g, ' ').trim() === canonical
+              );
+              if (echoMatch) {
+                return state; // pipeline echo — skip
+              }
+            }
+
+            // Check for duplicate content — use a longer window for environmental/awareness messages
+            const text = thoughtWithId.text || '';
+            const lowerText = text.toLowerCase().trim();
+            const isEnvironmental =
+              thoughtWithId.thoughtType === 'environmental' ||
+              thoughtWithId.thoughtType === 'idle-reflection' ||
+              lowerText.startsWith('awareness:') ||
+              lowerText === 'maintaining awareness of surroundings.';
+            const dedupWindowMs = isEnvironmental ? 120_000 : 30_000; // 2 min vs 30s
+            const cutoff = new Date(Date.now() - dedupWindowMs).toISOString();
             const recentDuplicate = state.thoughts.find(
               (t) =>
                 t.text === thoughtWithId.text &&
                 t.type === thoughtWithId.type &&
-                t.ts > thirtySecondsAgo &&
+                t.ts > cutoff &&
                 !t.optimistic // Don't prevent optimistic updates from being replaced
             );
 
@@ -218,11 +284,6 @@ export const useDashboardStore = create<DashboardStore>()(
 
         // Load thoughts from server (for initial load)
         loadThoughtsFromServer: async () => {
-          // Strip residual [GOAL:] routing tags from display text
-          const GOAL_TAG_STRIP = /\s*\[GOAL:[^\]]*\](?:\s*\d+\w*)?/gi;
-          const stripGoalTags = (text: string) =>
-            text.replace(GOAL_TAG_STRIP, '').trim() || text;
-
           try {
             const response = await fetch('/api/ws/cognitive-stream/history');
             if (response.ok) {
@@ -231,7 +292,7 @@ export const useDashboardStore = create<DashboardStore>()(
                 const serverThoughts = data.thoughts.map((thought: any) => ({
                   id: thought.id,
                   ts: new Date(thought.timestamp).toISOString(),
-                  text: stripGoalTags(thought.displayContent || thought.content),
+                  text: cleanDisplayText(thought.displayContent || thought.content),
                   type: thought.type || 'reflection',
                   attribution: thought.attribution || 'self',
                   thoughtType: thought.metadata?.thoughtType || thought.type,

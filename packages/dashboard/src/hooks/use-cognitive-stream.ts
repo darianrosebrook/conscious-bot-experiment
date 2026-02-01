@@ -50,9 +50,45 @@ interface IntrusiveThoughtRequest {
 // =============================================================================
 
 /** Strip [GOAL:] routing tags — these are for the planner, not for display. */
-const GOAL_TAG_STRIP = /\s*\[GOAL:[^\]]*\](?:\s*\d+\w*)?/gi;
-function stripGoalTags(text: string): string {
-  return text.replace(GOAL_TAG_STRIP, '').trim() || text;
+const GOAL_TAG_RE = /\s*\[GOAL:[^\]]*\](?:\s*\d+\w*)?/gi;
+
+/**
+ * Unwrap wrapper sentences that embed the real content in quotes, and strip GOAL tags.
+ * Examples:
+ *   'Processing intrusive thought: "gather wood [GOAL: collect oak_log 8]"' → 'gather wood'
+ *   'From thought "mine iron" — bucket Short, cap 240000ms.' → 'mine iron'
+ *   'Social interaction: Chat from Player: "hello"' → 'hello'
+ */
+const WRAPPER_PATTERNS: { re: RegExp; group: number }[] = [
+  { re: /^(?:Processing intrusive thought|Thought processing started):\s*"(.+)"\.?$/i, group: 1 },
+  { re: /^From thought\s+"(.+?)"\s*[—–-]\s*.+$/i, group: 1 },
+  { re: /^Social interaction:\s*Chat from\s+\S+:\s*"(.+)"$/i, group: 1 },
+];
+
+function cleanDisplayText(text: string): string {
+  if (!text) return text;
+
+  // Strip GOAL tags everywhere (including inside quoted substrings)
+  let display = text.replace(GOAL_TAG_RE, '').trim();
+
+  // Try to unwrap known wrapper patterns
+  for (const { re, group } of WRAPPER_PATTERNS) {
+    const m = display.match(re);
+    if (m?.[group]) {
+      display = m[group].trim();
+      break;
+    }
+  }
+
+  // Collapse whitespace
+  display = display.replace(/\s+/g, ' ').trim();
+
+  // Remove leading/trailing quotes wrapping the entire string
+  if (display.length >= 2 && display.startsWith('"') && display.endsWith('"')) {
+    display = display.slice(1, -1).trim();
+  }
+
+  return display || text;
 }
 
 function mapThoughtType(type: string): ThoughtType {
@@ -161,7 +197,22 @@ export function useCognitiveStream() {
               payload?.type === 'cognitive_stream_init') &&
             Array.isArray(payload.data?.thoughts)
           ) {
-            const thoughts = payload.data.thoughts as CognitiveThought[];
+            let thoughts = payload.data.thoughts as CognitiveThought[];
+
+            // For initial load, deduplicate the batch: collapse repeated identical
+            // messages and keep only the most recent occurrence of each.
+            if (payload.type === 'cognitive_stream_init') {
+              const seen = new Map<string, CognitiveThought>();
+              for (const t of thoughts) {
+                const key = `${t.type}::${(t.content || '').trim()}`;
+                seen.set(key, t); // later occurrence overwrites earlier
+              }
+              thoughts = [...seen.values()].sort(
+                (a, b) =>
+                  (typeof a.timestamp === 'number' ? a.timestamp : 0) -
+                  (typeof b.timestamp === 'number' ? b.timestamp : 0)
+              );
+            }
 
             for (const thought of thoughts) {
               // Skip malformed or empty thoughts
@@ -174,7 +225,7 @@ export function useCognitiveStream() {
               addThought({
                 id: thought.id,
                 ts,
-                text: stripGoalTags(thought.displayContent || thought.content),
+                text: cleanDisplayText(thought.displayContent || thought.content),
                 type: mapThoughtType(thought.type),
                 attribution: mapAttribution(thought.attribution),
                 thoughtType: thought.metadata?.thoughtType || thought.type,
@@ -260,8 +311,8 @@ export function useCognitiveStream() {
       const trimmedText = text.trim();
       if (!trimmedText) return false;
 
-      // Strip [GOAL:] tags from display text (tags are for routing, not display)
-      const displayText = stripGoalTags(trimmedText);
+      // Clean display text (strip GOAL tags, unwrap wrappers)
+      const displayText = cleanDisplayText(trimmedText);
 
       // Optimistic UI update - immediately add the thought to the UI
       const optimisticThought = {

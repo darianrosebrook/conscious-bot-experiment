@@ -2220,30 +2220,36 @@ function ConsciousMinecraftDashboardContent() {
                         'system_log',
                         'environmental',
                         'status', // minecraft-interface sends type 'status' for health/hunger updates
+                        'idle-reflection', // repetitive awareness messages
                       ];
                       const isStatusOrEnvironmental = (
                         t: (typeof thoughts)[0]
                       ) => {
-                        const kind = (
-                          t.thoughtType ||
-                          t.type ||
-                          ''
-                        ).toLowerCase();
-                        if (STATUS_TYPES.includes(kind)) return true;
+                        // Check both thoughtType and type — either can indicate status/environmental
+                        const thoughtType = (t.thoughtType || '').toLowerCase();
+                        const rawType = (t.type || '').toLowerCase();
+                        if (STATUS_TYPES.includes(thoughtType) || STATUS_TYPES.includes(rawType))
+                          return true;
                         // Content fallback: status-like messages that lost their type
                         const text = (t.text || '').trim().toLowerCase();
                         return (
                           text.startsWith('health:') ||
                           text.startsWith('system status:') ||
+                          text.startsWith('awareness:') ||
+                          text === 'maintaining awareness of surroundings.' ||
                           /observing\s+environment\s+and\s+deciding/.test(text)
                         );
                       };
-                      const cognitiveThoughts = thoughts.filter(
-                        (t) => !isStatusOrEnvironmental(t)
-                      );
-                      const statusEnvironmentalThoughts = thoughts.filter(
-                        isStatusOrEnvironmental
-                      );
+                      const sortByTime = (
+                        a: (typeof thoughts)[0],
+                        b: (typeof thoughts)[0]
+                      ) => (a.ts || '').localeCompare(b.ts || '');
+                      const cognitiveThoughts = thoughts
+                        .filter((t) => !isStatusOrEnvironmental(t))
+                        .sort(sortByTime);
+                      const statusEnvironmentalThoughts = thoughts
+                        .filter(isStatusOrEnvironmental)
+                        .sort(sortByTime);
 
                       const renderThoughtCard = (
                         thought: (typeof thoughts)[0]

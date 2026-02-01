@@ -731,6 +731,58 @@ function cleanMarkdownArtifacts(text: string): string {
   return cleaned;
 }
 
+/** Strip [GOAL:] tags from anywhere in text, including inside quoted substrings. */
+const GOAL_TAG_RE = /\s*\[GOAL:[^\]]*\](?:\s*\d+\w*)?/gi;
+
+/**
+ * Unwrap wrapper sentences that embed the real content in quotes.
+ * Examples:
+ *   'Processing intrusive thought: "gather wood"' → 'gather wood'
+ *   'Thought processing started: "mine iron"' → 'mine iron'
+ *   'From thought "mine iron" — bucket Short, cap 240000ms.' → 'mine iron'
+ */
+const WRAPPER_PATTERNS: { re: RegExp; group: number }[] = [
+  { re: /^(?:Processing intrusive thought|Thought processing started):\s*"(.+)"\.?$/i, group: 1 },
+  { re: /^From thought\s+"(.+?)"\s*[—–-]\s*.+$/i, group: 1 },
+  { re: /^Social interaction:\s*Chat from\s+\S+:\s*"(.+)"$/i, group: 1 },
+];
+
+/**
+ * Produce clean display text:
+ * 1. Strip [GOAL:] tags (including inside embedded quotes).
+ * 2. Unwrap wrapper sentences to extract the real content.
+ * 3. Collapse whitespace and trim.
+ */
+function cleanDisplayContent(text: string): string {
+  if (!text) return text;
+
+  // Strip GOAL tags everywhere (they can appear inside quoted substrings)
+  let display = text.replace(GOAL_TAG_RE, '').trim();
+
+  // Try to unwrap known wrapper patterns
+  for (const { re, group } of WRAPPER_PATTERNS) {
+    const m = display.match(re);
+    if (m?.[group]) {
+      display = m[group].trim();
+      break;
+    }
+  }
+
+  // Collapse whitespace
+  display = display.replace(/\s+/g, ' ').trim();
+
+  // Remove leading/trailing quotes that wrap the entire string
+  if (
+    display.length >= 2 &&
+    display.startsWith('"') &&
+    display.endsWith('"')
+  ) {
+    display = display.slice(1, -1).trim();
+  }
+
+  return display || text;
+}
+
 /**
  * Check if content is a generic fallback message
  */
@@ -746,6 +798,17 @@ function isGenericFallback(text: string): boolean {
   return GENERIC_PATTERNS.some(
     (pattern) => lower === pattern || lower.startsWith(pattern + ':')
   );
+}
+
+/**
+ * Check if content is a repetitive environmental/awareness message.
+ * These arrive frequently with identical or near-identical content
+ * (e.g. "Awareness: 2 neutral nearby", "Awareness: 1 hostile ...").
+ */
+function isRepetitiveEnvironmental(text: string, type: string): boolean {
+  if (type === 'environmental') return true;
+  const lower = text.toLowerCase().trim();
+  return lower.startsWith('awareness:') || lower.startsWith('system status:');
 }
 
 export const POST = async (req: NextRequest) => {
@@ -797,6 +860,29 @@ export const POST = async (req: NextRequest) => {
     }
 
     const trimmedContent = cleanedContent.trim();
+
+    // Deduplicate repetitive environmental/awareness messages (2-minute window)
+    // These messages repeat frequently with identical content (e.g. "Awareness: 2 neutral nearby")
+    if (isRepetitiveEnvironmental(trimmedContent, type || '')) {
+      const envCutoff = Date.now() - 120_000; // 2 minutes
+      const recentEnv = thoughtHistory.find(
+        (old) =>
+          old.content === trimmedContent &&
+          old.timestamp > envCutoff
+      );
+      if (recentEnv) {
+        return new Response(
+          JSON.stringify({
+            success: true,
+            deduplicated: true,
+            id: recentEnv.id,
+            reason: 'environmental_dedup',
+          }),
+          { headers: { 'Content-Type': 'application/json' } }
+        );
+      }
+    }
+
     const provenance = (body.metadata &&
       (body.metadata as { provenance?: string }).provenance) as
       | 'chain-of-thought'
@@ -831,6 +917,29 @@ export const POST = async (req: NextRequest) => {
       }
     }
 
+    // Deduplicate pipeline echo thoughts: when the cognition pipeline processes
+    // an intrusive thought it re-emits near-identical content under different types
+    // (e.g. type:"reflection" thoughtType:"intrusive"). Catch these by matching on
+    // canonicalized content alone within a short window, regardless of type.
+    const echoCutoff = Date.now() - 10_000; // 10 seconds
+    const canonicalContent = trimmedContent.toLowerCase().replace(/\s+/g, ' ').trim();
+    const pipelineEcho = thoughtHistory.find(
+      (old) =>
+        old.timestamp > echoCutoff &&
+        old.content.toLowerCase().replace(/\s+/g, ' ').trim() === canonicalContent
+    );
+    if (pipelineEcho) {
+      return new Response(
+        JSON.stringify({
+          success: true,
+          deduplicated: true,
+          id: pipelineEcho.id,
+          reason: 'pipeline_echo_dedup',
+        }),
+        { headers: { 'Content-Type': 'application/json' } }
+      );
+    }
+
     // Deduplicate: skip if identical content+type was added within the last 30s
     const recentCutoff = Date.now() - 30_000;
     const duplicate = thoughtHistory.find(
@@ -847,12 +956,11 @@ export const POST = async (req: NextRequest) => {
     }
 
     // Compute display content: prefer explicit displayContent from payload,
-    // otherwise strip any residual [GOAL:] tags from the cleaned content.
-    const GOAL_TAG_STRIP = /\s*\[GOAL:[^\]]*\](?:\s*\d+\w*)?/gi;
+    // otherwise clean the content (strips GOAL tags, unwraps wrapper sentences).
     const resolvedDisplayContent =
       (displayContent && typeof displayContent === 'string'
-        ? displayContent.trim()
-        : null) || trimmedContent.replace(GOAL_TAG_STRIP, '').trim();
+        ? cleanDisplayContent(displayContent)
+        : null) || cleanDisplayContent(trimmedContent);
 
     // Add the thought to the history (use cleaned content)
     const newThought = addThought({
