@@ -25,12 +25,12 @@ A rig is considered **ENRICHED** when it has:
 
 | Track | Rigs | Enriched | Partial | Not Started |
 |-------|------|----------|---------|-------------|
-| **Track 1** (Certification) | 3 | 2 | 0 | 1 |
-| **Track 2** (Belief + Perception) | 3 | 1 | 0 | 2 |
-| **Track 3** (Widening) | 6 | 0 | 0 | 6 |
-| **Total** | 12 | 3 | 0 | 9 |
+| **Track 1** (Certification) | 3 | 3 | 0 | 0 |
+| **Track 2** (Belief + Perception) | 3 | 3 | 0 | 0 |
+| **Track 3** (Widening) | 6 | 0 | 2 | 4 |
+| **Total** | 12 | 6 | 2 | 4 |
 
-**Progress**: 3/12 enriched (25%) | Track 1: 67% complete
+**Progress**: 6/12 enriched (50%); 2 partial (D, G). Track 1-2: 100% enriched.
 
 ---
 
@@ -38,7 +38,7 @@ A rig is considered **ENRICHED** when it has:
 
 ### Rig A: Certification Hardening (P1)
 
-**Status**: ✅ **ENRICHED** (2026-01-31)
+**Status**: ✅ **ENRICHED** (2025-01-31)
 
 **What exists**:
 - ✅ Target invariant and formal signature
@@ -83,27 +83,24 @@ A rig is considered **ENRICHED** when it has:
 
 ### Rig C: Temporal Planning (P3)
 
-**Status**: 🔴 **NOT STARTED** (needs full enrichment)
+**Status**: ✅ **ENRICHED** (2025-01-31)
 
 **What exists**:
-- ✅ Target invariant (basic)
-- ✅ Formal signature (basic)
-- ✅ High-level problem statement
-- ⚠️ Abstract "what to implement"
+- ✅ Target invariant and formal signature
+- ✅ Section 3: Current code anchors with file paths, line numbers (verified 2025-01-31)
+- ✅ Section 4: conscious-bot vs Sterling split
+- ✅ Section 5: Detailed "what to implement" with file paths, types, determinism rules
+- ✅ Section 6: 5 implementation pivots with code and acceptance checks
+- ✅ Section 7: 3 transfer surfaces (CI/CD, manufacturing, cloud)
+- ✅ Section 8: 5 concrete certification tests (TypeScript)
+- ✅ Section 9: Definition of done with acceptance checklist
+- ✅ Section 11: Implementation files summary
 
-**What's missing for ENRICHED**:
-- ❌ Section 3: Current code anchors
-- ❌ Section 4: conscious-bot vs Sterling split
-- ❌ Section 6: Implementation pivots
-- ❌ Section 7: Transfer surfaces
-- ❌ Section 8: Concrete certification tests
-- ❌ Section 9: Updated definition of done
+**Companion approach**: ✅ **ENRICHED** (code anchors updated with verified line numbers)
 
-**Next action**: Full enrichment pass using Rig B as template.
+**Next action**: None (complete); ready for implementation.
 
 **Priority**: 🔴 **CRITICAL** (blocks Track 1 completion)
-
-**Estimated effort**: 4-5 hours (less baseline than Rig A; temporal semantics are complex)
 
 ---
 
@@ -111,21 +108,19 @@ A rig is considered **ENRICHED** when it has:
 
 ### Rig I: Epistemic Planning (P11)
 
-**Status**: 🔴 **NOT STARTED** (needs enrichment)
+**Status**: ✅ **ENRICHED** (2025-01-31)
 
 **What exists**:
-- ✅ Target invariant (basic)
-- ✅ Formal signature (basic)
-- ✅ High-level problem statement
+- ✅ Target invariant and formal signature
+- ✅ Section 3a: Current code anchors (verified 2025-01-31)
+- ✅ Section 4: conscious-bot vs Sterling split
+- ✅ Section 7: 5 implementation pivots with code and acceptance checks
+- ✅ Section 8: 3 transfer surfaces (diagnostic, medical, search-and-rescue)
+- ✅ Section 9: 4 concrete certification tests (TypeScript)
 
-**What's missing for ENRICHED**:
-- ❌ All sections 3-9 (no concrete details)
+**Next action**: None (complete); ready for implementation.
 
-**Next action**: Full enrichment pass using Rig I-ext as template (related primitive).
-
-**Priority**: 🟡 **HIGH** (needed for Track 2)
-
-**Estimated effort**: 5-6 hours (can reuse patterns from I-ext)
+**Priority**: 🟡 **HIGH** (needed for Track 2; foundation for I-ext)
 
 ---
 
@@ -153,21 +148,19 @@ A rig is considered **ENRICHED** when it has:
 
 ### Rig J: Invariant Maintenance (P12)
 
-**Status**: 🔴 **NOT STARTED** (needs enrichment)
+**Status**: ✅ **ENRICHED** (2025-01-31)
 
 **What exists**:
-- ✅ Target invariant (basic)
-- ✅ Formal signature (basic)
-- ✅ High-level problem statement
+- ✅ Target invariant and formal signature
+- ✅ Section 3a: Current code anchors (verified 2025-01-31)
+- ✅ Section 4: conscious-bot vs Sterling split
+- ✅ Section 7: 5 implementation pivots with acceptance checks
+- ✅ Section 8: 3 transfer surfaces (vehicle, HVAC, Minecraft)
+- ✅ Section 9: 4 concrete certification tests (TypeScript)
 
-**What's missing for ENRICHED**:
-- ❌ All sections 3-9 (no concrete details)
-
-**Next action**: Full enrichment pass using Rig I-ext patterns.
+**Next action**: None (complete); ready for implementation.
 
 **Priority**: 🟡 **HIGH** (needed for Track 2; complements I-ext)
-
-**Estimated effort**: 4-5 hours (invariant semantics simpler than epistemic)
 
 ---
 
@@ -175,13 +168,18 @@ A rig is considered **ENRICHED** when it has:
 
 ### Rig D: Multi-Strategy (P4)
 
-**Status**: 🔴 **NOT STARTED**
+**Status**: ⚠️ **PARTIAL** (investigation complete; implementation pending)
+
+**What exists**:
+- ✅ Section 4a: Current code anchors (verified 2025-01-31)
+- ✅ Investigation outcome: Single solve path; no strategy families; no availability predicates
+
+**What's missing for ENRICHED**:
+- ❌ conscious-bot vs Sterling split; implementation pivots; transfer surfaces; concrete tests
+
+**Next action**: Add conscious-bot split; pivots; transfer surfaces; certification tests when Track 1-2 complete.
 
 **Priority**: 🟢 **MEDIUM** (defer until Track 1-2 complete)
-
-**What's missing**: All enrichment sections 3-9
-
-**Next action**: Defer; enrich after Track 1-2 proven.
 
 **Estimated effort**: 4-5 hours
 
@@ -217,13 +215,18 @@ A rig is considered **ENRICHED** when it has:
 
 ### Rig G: Partial-Order Structure (P7)
 
-**Status**: 🔴 **NOT STARTED**
+**Status**: ⚠️ **PARTIAL** (investigation complete; implementation pending)
+
+**What exists**:
+- ✅ Section 4a: Current code anchors (verified 2025-01-31)
+- ✅ Investigation outcome: Plan output is list; building domain has requiresModules; no DAG or support constraints
+
+**What's missing for ENRICHED**:
+- ❌ conscious-bot vs Sterling split; implementation pivots; transfer surfaces; concrete tests
+
+**Next action**: Add conscious-bot split; pivots; transfer surfaces; certification tests when Track 1-2 complete.
 
 **Priority**: 🟢 **MEDIUM** (defer until Track 1-2 complete)
-
-**What's missing**: All enrichment sections 3-9
-
-**Next action**: Defer; enrich after Track 1-2 proven.
 
 **Estimated effort**: 5-6 hours (partial-order semantics complex)
 

@@ -56,7 +56,19 @@ With proper multi-strategy:
 | World state | `packages/planning/src/task-integration.ts` | `getInventoryForSterling()`; where availability (villager, chest) would be fetched |
 | Execution reporting | `packages/planning/src/` or minecraft-interface | Where step success/failure is reported; where to hook prior updates |
 
-**Outcome:** Confirm single solve path; strategy selection happens before `sterlingService.solve()`; execution outcomes have a reporting hook.
+**Investigation outcome (verified 2025-01-31):** Single solve path exists. `buildCraftingRules(mcData, goalItem)` (minecraft-crafting-rules.ts:58) produces one rule set per goal; no strategy families. `solveCraftingGoal` (minecraft-crafting-solver.ts:54-63) calls `buildCraftingRules` and passes rules to Sterling; no availability filtering. World state: `sterling-planner.fetchBotContext()` (sterling-planner.ts:129-145) returns inventory + nearbyBlocks; no villager_trade_available or chest_known. Execution reporting: task-integration and reactive-executor emit step events; no strategy-prior update hook. Strategy selection would gate before `sterlingService.solve()` (minecraft-crafting-solver.ts:98); availability would extend fetchBotContext or add availability model.
+
+### 4a. Current code anchors (verified 2025-01-31)
+
+| File | Line(s) | What |
+|------|---------|------|
+| `packages/planning/src/sterling/minecraft-crafting-rules.ts` | 58, 73-80, 194 | `buildCraftingRules(mcData, goalItem)`: single rule set; `addMineRule`; no strategy families. |
+| `packages/planning/src/sterling/minecraft-crafting-solver.ts` | 54-63, 98 | `solveCraftingGoal()`: builds rules, sends to Sterling; no strategy selection or availability filter. |
+| `packages/planning/src/task-integration/sterling-planner.ts` | 129-145, 266 | `fetchBotContext()`: inventory + nearbyBlocks; `generateStepsFromSterling()` calls craftingSolver; no availability. |
+| `packages/planning/src/sterling/sterling-reasoning-service.ts` | solve() | Sterling receives rules; no strategy priors. |
+| `packages/planning/src/reactive-executor/reactive-executor.ts` | step execution | Step success/failure; no prior-update hook. |
+
+**Gap:** No strategy families, availability predicates, or strategy priors. Single rule set per goal; no alternative acquisition methods (trade, loot, salvage).
 
 ---
 

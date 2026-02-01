@@ -56,7 +56,18 @@ With proper partial-order:
 | Execution | `packages/planning/src/reactive-executor/` | How steps are executed; order dependency; where linearization happens |
 | World state | world-state-manager, minecraft-interface | Block placement state; support check data source |
 
-**Outcome:** Confirm plan output format; where building constraints live; where execution order is determined.
+**Investigation outcome (verified 2025-01-31):** Plan output is list of steps. `MinecraftBuildingSolver.solveBuildingPlan` (minecraft-building-solver.ts:61-80) returns `BuildingSolveResult` with `steps: BuildingSolveStep[]`; Sterling returns solution path as ordered list. Building domain: `BuildingModule` has `requiresModules` (dependency); `siteState` has `placementFeasible`; no support constraints or partial-order DAG. Execution: reactive-executor (reactive-executor.ts) executes steps in order; no linearization from DAG. World state: world-state-manager (WorldStateSnapshot) has nearbyBlocks; no block placement or support check. Plan format would change from `steps[]` to DAG (nodes + edges); execution would need topological linearization.
+
+### 4a. Current code anchors (verified 2025-01-31)
+
+| File | Line(s) | What |
+|------|---------|------|
+| `packages/planning/src/sterling/minecraft-building-solver.ts` | 61-80, 68-69 | `solveBuildingPlan()`: returns `steps: []`; Sterling returns ordered steps; no DAG. |
+| `packages/planning/src/sterling/minecraft-building-types.ts` | BuildingModule, BuildingSolveStep | `requiresModules` for dependency; step as flat object; no ordering edges. |
+| `packages/planning/src/reactive-executor/reactive-executor.ts` | step execution | Executes steps in list order; no partial-order linearization. |
+| `packages/planning/src/world-state/world-state-manager.ts` | 16-27 | `WorldStateSnapshot`: nearbyBlocks; no block placement map or support check. |
+
+**Gap:** No partial-order DAG; no support constraints; no feasibility check for floating blocks; execution assumes total order.
 
 ---
 

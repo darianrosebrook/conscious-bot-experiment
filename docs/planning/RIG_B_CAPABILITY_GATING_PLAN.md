@@ -56,6 +56,8 @@ With proper capability gating:
 | Solver call | `packages/planning/src/sterling/minecraft-crafting-solver.ts` | Where rules are sent to Sterling; pre-filter point |
 | Inventory/placement | task-integration | getInventoryForSterling; placed stations source |
 
+**Investigation outcome (verified 2025-01-31):** `MinecraftCraftingRule` (minecraft-crafting-types.ts:31-48) has no `requiredCapabilities`. `buildCraftingRules` and `addMineRule` (minecraft-crafting-rules.ts:58-152) build rules without capability tagging. Solver (minecraft-crafting-solver.ts:98-108) sends rules to Sterling without filtering. Inventory comes from sterling-planner.fetchBotContext (sterling-planner.ts:129-145) via task-integration; no capability derivation. Filter point: before `sterlingService.solve()` in crafting-solver.
+
 **Outcome:** Confirm rule shape extensibility; where to filter before Sterling; capability derivation data source.
 
 ---

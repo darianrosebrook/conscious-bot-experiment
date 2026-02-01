@@ -100,6 +100,24 @@ Rig I provides the **epistemic semantics** that Rig I-ext builds upon:
 
 ---
 
+## 3b. Current code anchors (what exists today)
+
+**Verified 2025-01-31.** No belief state or probe operators exist. Integration points where epistemic semantics would be added:
+
+| Location | Line(s) | What |
+|----------|---------|------|
+| `packages/planning/src/goal-formulation/goal-manager.ts` | 85-119 | `formulateGoals()`: signals → needs → goals → priority. Inject probe-selection step before goalGenerator or extend signalProcessor. |
+| `packages/planning/src/goal-formulation/advanced-signal-processor.ts` | 21-33 | `SignalType`: HUNGER, SAFETY_THREAT, etc. Add hypothesis/certainty signals. |
+| `packages/planning/src/goal-formulation/homeostasis-monitor.ts` | 46-81 | `sample()`: HomeostasisState. Replace or extend with belief-update semantics. |
+| `packages/planning/src/signal-extraction-pipeline.ts` | 89-100 | `extractSignals()`: Evidence extraction. Feed into belief layer. |
+| `packages/world/src/perception/confidence-tracker.ts` | 52-75 | `recordObservation()`, confidence decay. Aligns with DECAY; probe operators would call this. |
+| `packages/cognition/src/environmental/observation-reasoner.ts` | `reason()` | Single observation → insight. No expectedInformationGain. |
+| `packages/minecraft-interface/src/observation-mapper.ts` | 491-530 | `toHomeostasisState()`: Evidence from player. |
+
+**conscious-bot vs Sterling split:** Belief state, probe operators, belief update, entropy tracking live in conscious-bot (new `epistemic/` module). Sterling (optional): epistemic-planning domain with belief distribution in state; probe actions as operators. Implement belief layer in conscious-bot first; Sterling integration when epistemic domain is defined.
+
+---
+
 ## 4. Belief state design
 
 ### 4.1 Hypothesis representation

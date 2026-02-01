@@ -49,12 +49,16 @@ Rig C requires **both** conscious-bot and Sterling changes. Temporal state flows
 
 ## 3. Current code anchors (what exists today)
 
+**Verified 2025-01-31.**
+
 | Location | Line(s) | What |
 |----------|---------|------|
-| `packages/planning/src/sterling/minecraft-crafting-types.ts` | 54–61 | `MinecraftSolveRequest`: `inventory`, `goal`, `nearbyBlocks`, `rules`. No `currentTickBucket`, `slots`. |
 | `packages/planning/src/sterling/minecraft-crafting-types.ts` | 31–48 | `MinecraftCraftingRule`: no `durationTicks`. |
-| `packages/planning/src/sterling/minecraft-crafting-solver.ts` | 98–107 | `solve()` receives `inventory`, `goal`, `rules`. No temporal params. |
-| `packages/planning/src/task-integration.ts` | 333–340 | `getInventoryForSterling()`; no slot/placeable state. |
+| `packages/planning/src/sterling/minecraft-crafting-types.ts` | 54–61 | `MinecraftSolveRequest`: `inventory`, `goal`, `nearbyBlocks`, `rules`. No `currentTickBucket`, `slots`. |
+| `packages/planning/src/sterling/minecraft-crafting-solver.ts` | 98–108 | `solve()` receives `inventory`, `goal`, `rules`. No temporal params. |
+| `packages/planning/src/task-integration/sterling-planner.ts` | 129–145 | `fetchBotContext()`: fetches inventory + nearbyBlocks from `/state`. No slot state. |
+| `packages/planning/src/task-integration.ts` | 84–89 | Delegates to `sterlingPlanner.fetchBotContext()`. |
+| `packages/planning/src/world-state/world-state-manager.ts` | 16–27 | `WorldStateSnapshot`: `agentPosition`, `inventory`, `nearbyEntities`, `timeOfDay`. No furnace slots. |
 
 **Exact code to extend (solve request):**
 

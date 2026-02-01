@@ -47,16 +47,72 @@ This keeps the system legible and gives one place to enforce "no bypasses."
 
 ### 2.1 Current data flow (entity → cognition → planning)
 
-| Step | Location | What to verify |
-|------|----------|----------------|
-| Entity enumeration | `packages/minecraft-interface/src/bot-adapter.ts` | `detectAndRespondToEntities()` uses `Object.values(bot.entities)`; no TrackSet, no association across ticks. |
-| Per-entity POST | Same file | `processEntity(entity)` builds a thought string and POSTs to Cognition `/process` with `type: 'environmental_awareness'`. Each entity = one request. |
-| Cognition entrypoint | `packages/cognition/src/server.ts` + `observation-reasoner.ts` | How `/process` routes to `ObservationReasoner`; whether any batching or delta semantics exist. |
-| Contract | `contracts/cognition-observation.yaml` | Request is per-observation (entity snapshot); no concept of EvidenceBatch, TrackSet, or saliency delta. |
-| Planning consumption | `packages/planning/src/task-integration.ts` | `getActionableThoughts()` filters `metadata.fallback`; thoughts still originate from per-entity observations. |
-| Thought pipeline | `packages/planning/src/cognitive-thought-processor.ts` | Uses type `observation`; confirm no other path injects raw detections. |
+| Step | Location | Verified (2025-01-31) |
+|------|----------|------------------------|
+| Entity enumeration | `packages/minecraft-interface/src/bot-adapter.ts` 865-889 | `_detectAndRespondToEntitiesImpl()` uses `Object.values(bot.entities)`; no TrackSet; no association across ticks. |
+| Per-entity POST | Same file 894-942 | `processEntity(entity)` throttles 30s, builds thought, POSTs to Cognition `/process` with `type: 'environmental_awareness'`. One request per entity. |
+| Cognition entrypoint | `packages/cognition/src/server.ts` 1528, 1590 | `/process` routes `environmental_awareness` to `buildObservationPayload` → `observationReasoner.reason()`. No batching; no delta semantics. |
+| Contract | `contracts/cognition-observation.yaml` | Request is per-observation; no EvidenceBatch, TrackSet, or saliency delta. |
+| Planning consumption | `packages/planning/src/modules/cognitive-stream-client.ts` 134-158 | `getActionableThoughts()` filters `metadata.fallback`; fetches from cognition `/api/cognitive-stream/recent`. Entity thoughts from `/process` do **not** reach planning (they go to dashboard only). |
+| Thought pipeline | `packages/planning/src/cognitive-thought-processor.ts` | Uses type `observation`; no raw-detection path. |
 
-**Investigation outcome:** Confirm the only path from "entity detected" to "task/thought" is the bot-adapter → Cognition `/process` → cognitive stream → task-integration. Document this as the boundary where the invariant must hold: "no raw detections past this point."
+**Investigation outcome (verified 2025-01-31):** The only path from "entity detected" to cognition is bot-adapter → Cognition `/process` with `type: 'environmental_awareness'`. Per-entity POSTs drive one LLM (or fallback) call each; throttling (30s per entity, 15s per environmental event) mitigates but does not eliminate spam. Entity-detection thoughts are POSTed to the dashboard cognitive-stream but are **not** stored in cognition's `cognitiveThoughts`; planning fetches from cognition's `/api/cognitive-stream/recent`, which returns `cognitiveThoughts` (populated by enhanced thought generator, intrusive processor, event-driven generator). Entity thoughts from `/process` thus flow to dashboard for display but do **not** reach planning's `getActionableThoughts()`. The boundary where the invariant must hold: "no raw detections past bot-adapter → cognition `/process`" (the per-entity POST loop).
+
+### 2.1a Investigation findings (verified flow and call sites)
+
+**Entity → Cognition path**
+
+| Step | File | Line(s) | Verified behavior |
+|------|------|---------|-------------------|
+| Entity scan timer | `packages/minecraft-interface/src/bot-adapter.ts` | 815–832 | `setInterval(2000)`; calls `detectAndRespondToEntities()` when `now - lastEntityScan >= scanInterval` (10s). |
+| Entity enumeration | Same | 865–889 | `_detectAndRespondToEntitiesImpl()`: `Object.values(bot.entities)` (unordered), filter `distance <= 15`, `entity.name !== 'item'`, `entity !== bot.entity`. |
+| Per-entity POST | Same | 894–942 | `processEntity(entity)`: Throttle 30s (`ENTITY_PROCESS_THROTTLE_MS`). POST to `${cognitionUrl}/process` with `type: 'environmental_awareness'`, `content: thought`, `metadata: { entityType, entityId, distance, position, botPosition, timestamp }`. One request per entity. |
+| Environmental events | Same | 1157–1202 | `processEnvironmentalEvent()`: Throttle 15s. POST to `/process` with `type: 'environmental_event'`. Separate from entity path. |
+| Cognition entrypoint | `packages/cognition/src/server.ts` | 1528, 1590 | `app.post('/process')`; `type === 'environmental_awareness'` branch. |
+| Observation build | Same | 370–456, 1600–1603 | `buildObservationPayload(raw, metadata)` maps bot-adapter flat metadata to `ObservationPayload`; `entityFromMetadata` when `raw.entity` absent. |
+| LLM/fallback | `packages/cognition/src/environmental/observation-reasoner.ts` | `reason(payload)` | One LLM (or fallback) call per request. |
+| Thought output | `packages/cognition/src/server.ts` | 1676–1692 | If not generic fallback, POST `internalThought` to `${dashboardUrl}/api/ws/cognitive-stream`. Does **not** push to `cognitiveThoughts`. |
+| Planning fetch | `packages/planning/src/modules/cognitive-stream-client.ts` | 103, 134–158 | `getRecentThoughts()` fetches `${baseUrl}/api/cognitive-stream/recent` (baseUrl = COGNITION_ENDPOINT 3003). `getActionableThoughts()` filters `metadata.fallback`, processed, age. |
+| Planning source | `packages/cognition/src/server.ts` | 3217–3231 | `/api/cognitive-stream/recent` returns `cognitiveThoughts` + `enhancedThoughtGenerator.getThoughtHistory()`. `cognitiveThoughts` is **not** populated by environmental_awareness path. |
+
+**All call sites of Cognition `/process` with environmental awareness types**
+
+| Caller | Type | Location |
+|--------|------|----------|
+| Bot-adapter `processEntity` | `environmental_awareness` | `bot-adapter.ts:919-923` |
+| Bot-adapter `processEnvironmentalEvent` | `environmental_event` | `bot-adapter.ts:1184-1188` |
+| Dashboard cognitive-stream `processExternalChat` | `external_chat` | `dashboard/.../cognitive-stream/route.ts:331` |
+| Dashboard intrusive API | `intrusion` | `dashboard/api/intrusive/route.ts:32` |
+
+**Contract**: `contracts/cognition-observation.yaml` defines `ObservationRequest` with `type: const: environmental_awareness`, `observation: ObservationPayload`. Bot-adapter sends `type`, `content`, `metadata` (flat); cognition's `buildObservationPayload` maps to `ObservationPayload` when `observation` is absent.
+
+**Verified flow diagram:**
+
+```mermaid
+flowchart LR
+    subgraph bot-adapter
+        A["Object.values bot.entities"]
+        B["filter distance <= 15"]
+        C["for each: processEntity"]
+    end
+    subgraph cognition
+        D["/process environmental_awareness"]
+        E[buildObservationPayload]
+        F[observationReasoner.reason]
+        G["POST to dashboard"]
+    end
+    subgraph planning
+        H["/api/cognitive-stream/recent"]
+        I[getActionableThoughts]
+    end
+    A --> B --> C
+    C -->|"1 POST per entity"| D
+    D --> E --> F --> G
+    H -->|cognitiveThoughts only| I
+    G -.->|"dashboard only"| DASH[(dashboard stream)]
+```
+
+Entity thoughts from `/process` flow to dashboard only; planning receives thoughts from `cognitiveThoughts` (enhanced/intrusive/event-driven generators), not entity-detection.
 
 ### 2.2 Existing building blocks (reuse vs. extend)
 
@@ -76,7 +132,7 @@ This keeps the system legible and gives one place to enforce "no bypasses."
 - **world-api.yaml:** "Visible observations" could be formalized as EvidenceBatch (timestamped, FOV/LOS, occlusion, association features) for the belief layer input.
 - **New contract (candidate):** `entity-belief-api.yaml` or an extension defining: TrackSet canonical form, EvidenceBatch, SALIENCY_DIFF payload (bounded events), and the rule that cognition receives only the latter.
 
-**Investigation outcome:** List all call sites of Cognition `/process` with `environmental_awareness`; then design a minimal delta API that planning/cognition can consume without per-entity traffic.
+**Investigation outcome (verified 2025-01-31):** Call sites listed in 2.1a. Bot-adapter sends `type: 'environmental_awareness'` with flat `metadata` (entityType, entityId, distance, position, botPosition, timestamp); cognition's `buildObservationPayload` (server.ts:370-456) maps this to `ObservationPayload` when `raw.observation` is absent. No `request_version`; no delta or snapshot schema. Design a minimal delta API that planning/cognition can consume without per-entity traffic.
 
 ---
 

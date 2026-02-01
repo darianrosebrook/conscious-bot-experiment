@@ -82,17 +82,20 @@ Rig J proves **Primitive 12** (Invariant maintenance / receding-horizon control)
 
 ---
 
-## 4. Current code anchors
+## 4. Current code anchors (verified 2025-01-31)
 
 ### 4.1 Relevant existing code
 
-**Bot state extraction** (tool durability, food, etc.):
-- `packages/minecraft-interface/src/bot-adapter.ts` — has access to `bot.food`, `bot.health`, tool inventory
-- `packages/minecraft-interface/src/world-state-builder.ts` — builds world state for planning
+| Location | Line(s) | What |
+|----------|---------|------|
+| `packages/minecraft-interface/src/bot-adapter.ts` | 631-632, 649-650 | `bot.health`, `bot.food` in state emission. |
+| `packages/minecraft-interface/src/observation-mapper.ts` | 149-150, 434-435, 491-530 | `health`, `food`; `toHomeostasisState()` maps player to health/hunger/safety/energy. |
+| `packages/planning/src/goal-formulation/homeostasis-monitor.ts` | 46-81 | `sample()`: HomeostasisState (health, hunger, shelterStability, etc.). No drift model. |
+| `packages/planning/src/goal-formulation/goal-manager.ts` | 93-98 | `homeostasisMonitor.sample()` → signalProcessor. No proactive maintenance emission. |
+| `packages/minecraft-interface/src/threat-perception-manager.ts` | 97-98, 163-175 | `botHealth`; emits `low_health_self` when health <= 6. Hazard-like; not InvariantVector. |
+| `packages/planning/src/world-state/world-state-manager.ts` | 16-27 | `WorldStateSnapshot`: agentHealth, inventory, timeOfDay. No light_coverage, food_buffer, tool_health. |
 
-**Cognition goal handling**:
-- `packages/cognition/src/server.ts` — handles goal requests
-- `packages/planning/src/task-integration.ts` — integrates planning with cognition
+**Gap:** No InvariantVector, DriftModel, MaintenanceOperator, or HorizonSolver. Maintenance is reactive. I-ext hazard summary feeds threat_exposure when I-ext is implemented.
 
 ### 4.2 New modules to create
 

@@ -85,20 +85,20 @@ Sterling is **not** the rig. It provides graph search and learned edge ordering 
 
 ## 3. Current code anchors (what exists today)
 
-These are the primary call sites and contracts that currently push raw detections into cognition. **Exact file paths and line numbers** are given so changes can be located and verified.
+These are the primary call sites and contracts that currently push raw detections into cognition. **Exact file paths and line numbers** are given so changes can be located and verified. **Verified 2025-01-31.**
 
 ### 3.1 Minecraft interface — raw entity to cognition
 
 | Location | Line(s) | What |
 |----------|---------|------|
-| `packages/minecraft-interface/src/bot-adapter.ts` | 839–864 | `setupEntityDetection()` calls `detectAndRespondToEntities()` every 10s (scanInterval 10000). |
-| Same file | 870–895 | `detectAndRespondToEntities()` uses `Object.values(bot.entities)` (unordered), filters by distance <= 15, then **for (const entity of nearbyEntities) { await this.processEntity(entity); }**. |
-| Same file | 899–939 | `processEntity(entity: any)` builds a thought string, then **POSTs to `${cognitionUrl}/process`** with `type: 'environmental_awareness'`, `content`, `metadata: { entityType, entityId, distance, position, botPosition, timestamp }`. One HTTP request per entity. |
+| `packages/minecraft-interface/src/bot-adapter.ts` | 815–832 | `setupEntityDetection()`: `setInterval(2000)`; calls `detectAndRespondToEntities()` when `now - lastEntityScan >= scanInterval` (10s). |
+| Same file | 845–860, 865–889 | `detectAndRespondToEntities()` guards `isScanning`; `_detectAndRespondToEntitiesImpl()` uses `Object.values(bot.entities)` (unordered), filters `distance <= 15`, `entity.name !== 'item'`, then **for (const entity of nearbyEntities) { await this.processEntity(entity); }**. |
+| Same file | 894–942 | `processEntity(entity: any)`: Throttles 30s (`ENTITY_PROCESS_THROTTLE_MS`). Builds thought, then **POSTs to `${cognitionUrl}/process`** with `type: 'environmental_awareness'`, `content`, `metadata: { entityType, entityId, distance, position, botPosition, timestamp }`. One HTTP request per entity. |
 
 **Exact code to remove or replace (bot-adapter):**
 
 ```ts
-// REMOVE or REPLACE: packages/minecraft-interface/src/bot-adapter.ts lines 876-890
+// REMOVE or REPLACE: packages/minecraft-interface/src/bot-adapter.ts lines 870-885
 const nearbyEntities = Object.values(bot.entities).filter((entity) => {
   const distance = entity.position.distanceTo(bot.entity.position);
   return (
@@ -112,8 +112,8 @@ for (const entity of nearbyEntities) {
 ```
 
 ```ts
-// REMOVE or BYPASS for environmental path: packages/minecraft-interface/src/bot-adapter.ts lines 915-938
-const response = await fetch(`${cognitionUrl}/process`, {
+// REMOVE or BYPASS for environmental path: packages/minecraft-interface/src/bot-adapter.ts lines 919-942
+const response = await resilientFetch(`${cognitionUrl}/process`, {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify({
@@ -137,12 +137,13 @@ const response = await fetch(`${cognitionUrl}/process`, {
 
 | Location | Line(s) | What |
 |----------|---------|------|
-| `packages/cognition/src/server.ts` | 1507 | `app.post('/process', ...)` entrypoint. |
-| Same file | 1509 | Destructures `{ type, content, metadata }` from `req.body`. |
-| Same file | 1563–1576 | `else if (type === 'environmental_awareness')`: builds observation via `buildObservationPayload(rawObservation, rawObservation?.metadata)` (line 375: `function buildObservationPayload(raw, metadata)`). |
-| Same file | 1581 | `observationReasoner.reason(observation)` — one LLM (or fallback) call per request. |
-| Same file | 1645–1657 | If not generic fallback, POSTs thought to cognitive stream. |
-| Same file | 1665–1676 | Response shape: `type: 'environmental_awareness'`, `thought`, `actions`, `fallback`, etc. |
+| `packages/cognition/src/server.ts` | 1528 | `app.post('/process', ...)` entrypoint. |
+| Same file | 1531 | Destructures `{ type, content, metadata }` from `req.body`. |
+| Same file | 1590–1603 | `else if (type === 'environmental_awareness')`: builds observation via `buildObservationPayload(rawObservation, rawObservation?.metadata)`. |
+| Same file | 370–456 | `function buildObservationPayload(raw, metadata)` maps bot-adapter flat metadata to `ObservationPayload`. |
+| Same file | 1611 | `observationReasoner.reason(observation)` — one LLM (or fallback) call per request. |
+| Same file | 1676–1692 | If not generic fallback, POSTs thought to dashboard cognitive stream. Does **not** push to `cognitiveThoughts`. |
+| Same file | 1697–1712 | Response shape: `type: 'environmental_awareness'`, `thought`, `actions`, `fallback`, etc. |
 
 **Exact code to extend (cognition server):**
 
@@ -153,10 +154,12 @@ const response = await fetch(`${cognitionUrl}/process`, {
 
 | Location | Line(s) | What |
 |----------|---------|------|
-| `packages/cognition/src/environmental/observation-reasoner.ts` | 112 | `async reason(payload: ObservationPayload): Promise<ObservationInsight>`. |
-| Same file | 113 | `ObservationPayloadSchema.parse(payload)` — expects single observation with `category`, `bot`, `entity` or `event`, `timestamp`. |
+| `packages/cognition/src/environmental/observation-reasoner.ts` | `reason(payload)` | `async reason(payload: ObservationPayload): Promise<ObservationInsight>`. |
+| Same file | schema parse | `ObservationPayloadSchema.parse(payload)` — expects single observation with `category`, `bot`, `entity` or `event`, `timestamp`. |
 
 Legacy path continues to use `ObservationPayload` (single entity/snapshot). New path must use a **different** type (e.g. `SaliencyDeltaPayload`) and a separate handler so that implementers cannot accidentally pass raw entity payloads to the delta path.
+
+**Planning integration note:** Planning fetches from cognition's `/api/cognitive-stream/recent` via `CognitiveStreamClient` (`packages/planning/src/modules/cognitive-stream-client.ts:103`). That endpoint returns `cognitiveThoughts`, which is populated by `enhancedThoughtGenerator`, `intrusiveThoughtProcessor`, and `eventDrivenThoughtGenerator` — **not** by the `environmental_awareness` path. Entity-detection thoughts from `/process` are POSTed to the dashboard cognitive stream only; they do **not** reach planning's `getActionableThoughts()`. The spam source is cognition `/process` (one LLM call per entity) and dashboard traffic.
 
 ### 3.3 Contract — current request schema
 
@@ -171,11 +174,22 @@ Legacy path continues to use `ObservationPayload` (single entity/snapshot). New 
 
 | Location | Line(s) | What |
 |----------|---------|------|
-| `packages/planning/src/task-integration.ts` | 89–99 | `getActionableThoughts()` filters: `thought.metadata?.fallback === true` → skip. Thoughts still originate from per-entity observations today. |
+| `packages/planning/src/modules/cognitive-stream-client.ts` | 134–158 | `getActionableThoughts()` filters: `thought.metadata?.fallback === true` → skip; also filters processed, age, and actionable words. Fetches from cognition `/api/cognitive-stream/recent`. |
+| `packages/planning/src/task-integration.ts` | 136–163 | `processActionableThoughts()` calls `getActionableThoughts()`, passes to `convertThoughtToTask()`. |
+| Note | — | Entity thoughts from bot-adapter `/process` go to dashboard only; they do **not** enter cognition's `cognitiveThoughts` and thus do **not** reach planning. Spam is at cognition `/process` (LLM load) and dashboard. |
 
-No change required to this filter for the boundary milestone; the filter remains. The **source** of thoughts (delta-driven vs legacy) will change once bot-adapter sends only deltas/snapshots.
+### 3.5 Additional /process-related call sites
 
-### 3.5 Threat perception — second source of truth
+| Caller | Type | Location | Notes |
+|--------|------|----------|-------|
+| Bot-adapter `processEnvironmentalEvent` | `environmental_event` | `bot-adapter.ts:1157-1202` | Throttled 15s; health/block events. |
+| Dashboard cognitive-stream `processExternalChat` | `external_chat` | `dashboard/.../cognitive-stream/route.ts:331` | Chat processing. |
+| Dashboard intrusive API | `intrusion` | `dashboard/api/intrusive/route.ts:32` | Intrusive thought injection. |
+| Cognition `process-nearby-entities` | N/A | `cognition/server.ts:2205` | Separate endpoint; social consideration; accepts raw entity array. |
+
+No change required to the fallback filter for the boundary milestone; the filter remains. The **source** of thoughts (delta-driven vs legacy) will change once bot-adapter sends only deltas/snapshots.
+
+### 3.6 Threat perception — second source of truth
 
 | Location | Line(s) | What |
 |----------|---------|------|
@@ -186,7 +200,7 @@ No change required to this filter for the boundary milestone; the filter remains
 
 ---
 
-## 3.6 DO and DO NOT (implementation rules)
+## 3.7 DO and DO NOT (implementation rules)
 
 Use these rules to avoid implementing the boundary incorrectly.
 

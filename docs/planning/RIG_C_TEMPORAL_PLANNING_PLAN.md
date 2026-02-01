@@ -2,7 +2,7 @@
 
 **Primitive**: P3 — Temporal planning with durations, batching, and capacity
 
-**Status**: ENRICHED (2026-01-31)
+**Status**: ENRICHED (2025-01-31)
 
 ---
 
@@ -31,6 +31,8 @@ The system must:
 ---
 
 ## 3. Current code anchors
+
+**Investigation outcome (verified 2025-01-31):** Temporal planning flow: goal → task-integration → sterling-planner → crafting-solver → Sterling. `fetchBotContext` lives in sterling-planner (not task-integration). No temporal state (`currentTickBucket`, `slots`) exists; `MinecraftSolveRequest` and `MinecraftCraftingRule` lack duration/slot fields. WorldStateSnapshot has no furnace slot tracking.
 
 ### 3.1 `MinecraftCraftingRule` — no `durationTicks`
 
@@ -92,16 +94,18 @@ const result = await this.sterlingService.solve(this.sterlingDomain, {
 
 ### 3.4 Bot context fetching — no slot/placement state
 
-**File**: `packages/planning/src/task-integration.ts:401-411`
+**File**: `packages/planning/src/task-integration/sterling-planner.ts:129-145`
 
 ```ts
-private async fetchBotContext(): Promise<{
+async fetchBotContext(): Promise<{
   inventory: any[];
   nearbyBlocks: any[];
+  _unavailable?: boolean;
 }> {
   try {
-    const stateRes = await this.minecraftRequest('/state', { timeout: 3000 });
-    if (!stateRes.ok) return { inventory: [], nearbyBlocks: [] };
+    const stateRes = await this.minecraftGet('/state').catch(() => null);
+    if (!stateRes?.ok)
+      return { inventory: [], nearbyBlocks: [], _unavailable: true };
     const stateData = (await stateRes.json()) as any;
     const inventory = stateData?.data?.data?.inventory?.items || [];
     const nearbyBlocks = stateData?.data?.worldState?.nearbyBlocks || [];
@@ -109,7 +113,7 @@ private async fetchBotContext(): Promise<{
     // MISSING: slot states (furnace readyAt, crafting table availability)
 ```
 
-**Gap**: Returns inventory and nearby blocks only. No slot state (which furnaces are active, when they finish).
+**Gap**: Returns inventory and nearby blocks only. No slot state (which furnaces are active, when they finish). Task-integration delegates to `sterlingPlanner.fetchBotContext()` at `task-integration.ts:88`.
 
 ### 3.5 Rule building — no duration tagging or batch operators
 
