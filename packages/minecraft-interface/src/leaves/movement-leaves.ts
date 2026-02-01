@@ -81,7 +81,7 @@ export class MoveToLeaf implements LeafImpl {
           type: 'number',
           minimum: 1000,
           maximum: 300000,
-          default: 30000,
+          description: 'Override timeout in ms. Default scales by distance (~3s/block, min 15s).',
         },
       },
       required: ['pos'],
@@ -122,7 +122,18 @@ export class MoveToLeaf implements LeafImpl {
     const goalType: 'GoalBlock' | 'GoalNear' | 'GoalFollow' =
       args?.goal ?? 'GoalNear';
     const range = goalType === 'GoalBlock' ? 0 : (args?.range ?? 1);
-    const timeoutMs = Math.min(Math.max(args?.timeout ?? 30000, 1000), 300000);
+
+    // Scale timeout by distance: ~3s per block, minimum 15s, max 5 min.
+    // Explicit args.timeout or args.timeoutMs override the distance calculation.
+    const explicitTimeout = args?.timeout ?? args?.timeoutMs;
+    let timeoutMs: number;
+    if (explicitTimeout != null) {
+      timeoutMs = Math.min(Math.max(explicitTimeout, 1000), 300_000);
+    } else {
+      const botPos = bot.entity?.position;
+      const distance = botPos ? botPos.distanceTo(target) : 30;
+      timeoutMs = Math.min(Math.max(distance * 3000, 15_000), 300_000);
+    }
 
     // Ensure pathfinder plugin and movements are configured
     if (!bot.pathfinder) bot.loadPlugin(pathfinder);

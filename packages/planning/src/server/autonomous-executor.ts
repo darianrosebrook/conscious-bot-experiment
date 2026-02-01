@@ -39,12 +39,65 @@ export interface ExecutorConfig {
 }
 
 // ---------------------------------------------------------------------------
+// Geofence configuration + guard
+// ---------------------------------------------------------------------------
+
+export interface GeofenceConfig {
+  enabled: boolean;
+  center: { x: number; z: number }; // horizontal only (Y unconstrained by default)
+  radius: number;                    // Chebyshev distance (square, not circle)
+  yRange?: { min: number; max: number }; // optional vertical constraint
+}
+
+export function parseGeofenceConfig(): GeofenceConfig {
+  const raw = process.env.EXECUTOR_GEOFENCE_CENTER; // format: "x,z" or "x,y,z"
+  if (!raw) return { enabled: false, center: { x: 0, z: 0 }, radius: 100 };
+  const parts = raw.split(',').map(Number);
+  const radius = Number(process.env.EXECUTOR_GEOFENCE_RADIUS || 100);
+
+  if (parts.length === 2) {
+    const [x, z] = parts;
+    return { enabled: !isNaN(x) && !isNaN(z) && radius > 0, center: { x, z }, radius };
+  }
+  if (parts.length === 3) {
+    const [x, , z] = parts; // x, _y, z — y is ignored for center
+    const yRangeRaw = process.env.EXECUTOR_GEOFENCE_Y_RANGE;
+    const parsedYRange = yRangeRaw ? (() => {
+      const [min, max] = yRangeRaw.split(',').map(Number);
+      return !isNaN(min) && !isNaN(max) ? { min, max } : undefined;
+    })() : undefined;
+    return {
+      enabled: !isNaN(x) && !isNaN(z) && radius > 0,
+      center: { x, z },
+      radius,
+      yRange: parsedYRange,
+    };
+  }
+  return { enabled: false, center: { x: 0, z: 0 }, radius: 100 };
+}
+
+export function isInsideGeofence(
+  position: { x: number; y?: number; z: number },
+  config: GeofenceConfig,
+): boolean {
+  if (!config.enabled) return true;
+  const insideXZ = Math.abs(position.x - config.center.x) <= config.radius
+    && Math.abs(position.z - config.center.z) <= config.radius;
+  if (!insideXZ) return false;
+  if (config.yRange && position.y !== undefined) {
+    return position.y >= config.yRange.min && position.y <= config.yRange.max;
+  }
+  return true;
+}
+
+// ---------------------------------------------------------------------------
 // Executor guard decision pipeline
 // ---------------------------------------------------------------------------
 //
 // The guard ordering is a **contract**. Both execution paths (primary plan
 // and MCP fallback) in modular-server.ts must follow this exact sequence:
 //
+//   0. geofence — fail-closed: block if position unknown OR outside fence
 //   1. allowlist — terminally block unknown leaves (free, no budget)
 //   2. shadow   — observe without mutating (never throttled)
 //   3. rate     — live-only throttle (canExecute check, no record)
@@ -63,6 +116,8 @@ export interface ExecutorConfig {
  * Tells the caller what to do without performing side effects.
  */
 export type GuardDecision =
+  | { action: 'block_unknown_position' }  // geofence enabled but position unknown
+  | { action: 'block_outside_geofence' }
   | { action: 'block_unknown_leaf' }
   | { action: 'shadow_observe' }
   | { action: 'rate_limited' }
@@ -76,12 +131,27 @@ export type GuardDecision =
  * @param toolName      Canonical tool name (e.g. 'minecraft.dig_block')
  * @param config        Executor configuration
  * @param rateLimiter   Rate limiter instance (canExecute is checked, record is NOT called)
+ * @param geofence      Optional geofence context (position + config)
  */
 export function evaluateGuards(
   toolName: string,
   config: ExecutorConfig,
   rateLimiter: StepRateLimiter,
+  geofence?: {
+    position: { x: number; y?: number; z: number } | undefined | null;
+    config: GeofenceConfig;
+  },
 ): GuardDecision {
+  // 0. Geofence (fail-closed)
+  if (geofence?.config.enabled) {
+    if (!geofence.position) {
+      return { action: 'block_unknown_position' };
+    }
+    if (!isInsideGeofence(geofence.position, geofence.config)) {
+      return { action: 'block_outside_geofence' };
+    }
+  }
+
   // 1. Leaf allowlist (terminally block unknown leaves)
   if (!config.leafAllowlist.has(toolName)) {
     return { action: 'block_unknown_leaf' };
@@ -228,4 +298,32 @@ export function stopAutonomousExecutor(): void {
     clearInterval(global.__planningInterval);
     global.__planningInterval = undefined;
   }
+}
+
+// ---------------------------------------------------------------------------
+// Emergency stop
+// ---------------------------------------------------------------------------
+
+let _executorAbortController: AbortController | null = null;
+
+export function initExecutorAbortController(): AbortController {
+  _executorAbortController = new AbortController();
+  return _executorAbortController;
+}
+
+export function getExecutorAbortSignal(): AbortSignal | undefined {
+  return _executorAbortController?.signal;
+}
+
+/**
+ * Emergency stop: aborts in-flight HTTP requests and stops the executor loop.
+ *
+ * Note: abort only cancels outbound HTTP requests. If a leaf action has already
+ * been dispatched to the MC bot, the bot-side effect may continue. This is a
+ * "stop issuing new actions" primitive, not "undo last action."
+ */
+export function emergencyStopExecutor(): void {
+  _executorAbortController?.abort();
+  stopAutonomousExecutor();
+  console.warn('[executor] EMERGENCY STOP — new actions halted, in-flight HTTP aborted');
 }

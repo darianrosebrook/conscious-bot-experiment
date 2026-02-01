@@ -125,7 +125,10 @@ import {
 import {
   startAutonomousExecutor as startAutonomousExecutorScheduler,
   parseExecutorConfig,
+  parseGeofenceConfig,
   StepRateLimiter,
+  initExecutorAbortController,
+  emergencyStopExecutor,
   type ExecutorConfig,
 } from './server/autonomous-executor';
 
@@ -147,7 +150,8 @@ import { MCPLeafRegistry } from './modules/capability-registry';
 export { MCPLeafRegistry } from './modules/capability-registry';
 import { WorldStateManager } from './world-state/world-state-manager';
 import { WorldKnowledgeIntegrator } from './world-state/world-knowledge-integrator';
-import { isSystemReady, waitForSystemReady } from './startup-barrier';
+import { isSystemReady, waitForSystemReady, setReadinessMonitor } from './startup-barrier';
+import { ReadinessMonitor } from './server/execution-readiness';
 
 // Centralized Minecraft endpoint and resilient HTTP utilities
 const worldStateManager = new WorldStateManager(MC_ENDPOINT);
@@ -340,6 +344,7 @@ const executorConfig: ExecutorConfig = (() => {
   return cfg;
 })();
 const stepRateLimiter = new StepRateLimiter(executorConfig.maxStepsPerMinute);
+const geofenceConfig = parseGeofenceConfig();
 
 const executorEventThrottle = new Map<string, number>();
 const BUILDING_LEAVES = new Set([
@@ -3200,6 +3205,17 @@ serverConfig.addEndpoint(
   }
 );
 
+// Emergency stop endpoint
+serverConfig.addEndpoint('post', '/executor/stop', (_req, res) => {
+  const token = process.env.EXECUTOR_EMERGENCY_TOKEN;
+  if (token && (_req.headers as Record<string, string | undefined>)['x-emergency-token'] !== token) {
+    res.status(403).json({ error: 'Invalid emergency token' });
+    return;
+  }
+  emergencyStopExecutor();
+  res.json({ success: true, message: 'Executor stopped' });
+});
+
 // Main server startup function
 async function startServer() {
   try {
@@ -3550,6 +3566,21 @@ async function startServer() {
     await serverConfig.start();
     console.log('✅ Server started successfully');
 
+    // --- Service readiness gate (never blocks boot) ---
+    const readiness = new ReadinessMonitor({ executionRequired: ['minecraft'] });
+    const readinessResult = await readiness.probe();
+    setReadinessMonitor(readiness);
+
+    console.log('[Planning:startup] Service readiness:',
+      Object.entries(readinessResult.services)
+        .map(([name, s]) => `${name}=${s.state}(${s.latencyMs}ms)`)
+        .join(', ')
+    );
+    console.log('[Planning:startup] Executor ready:', readinessResult.executorReady);
+
+    // Start slow re-probe (every 2 minutes, state-change logging only)
+    readiness.startMonitoring(120_000);
+
     // Phase 0 prerequisite for EXECUTOR_MODE=live:
     //   The action-translator dispatch boundary (minecraft-interface executeAction)
     //   must handle every step type that solvers emit. Currently, craft/smelt/building
@@ -3558,10 +3589,12 @@ async function startServer() {
     //   0c: boundary conformance test) are merged, live mode will execute actions that
     //   the minecraft-interface silently rejects. Shadow mode is safe regardless.
     if (executorConfig.enabled) {
+      initExecutorAbortController();
       console.log(
         `[Planning] Executor enabled (mode=${executorConfig.mode}, ` +
         `maxSteps/min=${executorConfig.maxStepsPerMinute}, ` +
-        `leafAllowlist=${executorConfig.leafAllowlist.size} leaves)`
+        `leafAllowlist=${executorConfig.leafAllowlist.size} leaves` +
+        `${geofenceConfig.enabled ? `, geofence=${geofenceConfig.radius}b around (${geofenceConfig.center.x},${geofenceConfig.center.z})` : ''})`
       );
       const startExecutor = () => {
         startAutonomousExecutorScheduler(autonomousTaskExecutor, {
@@ -3570,9 +3603,19 @@ async function startServer() {
           breakerOpenMs: BOT_BREAKER_OPEN_MS,
         });
       };
-      if (isSystemReady()) {
-        startExecutor();
-      } else {
+      if (executorConfig.enabled && readiness.executorReady) {
+        if (isSystemReady()) {
+          startExecutor();
+        } else {
+          waitForSystemReady().then(() => {
+            if (process.env.ENABLE_PLANNING_EXECUTOR === '1') {
+              startExecutor();
+            }
+          });
+        }
+      } else if (executorConfig.enabled) {
+        console.log('[Planning] Executor enabled but not ready — will start when minecraft is reachable');
+        // Fall back to system-ready gating: re-probe will detect minecraft
         waitForSystemReady().then(() => {
           if (process.env.ENABLE_PLANNING_EXECUTOR === '1') {
             startExecutor();

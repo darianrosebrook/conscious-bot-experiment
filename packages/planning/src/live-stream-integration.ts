@@ -120,6 +120,8 @@ export class LiveStreamIntegration extends EventEmitter {
   private miniMapData: MiniMapData | null = null;
   private updateTimer: NodeJS.Timeout | null = null;
   private screenshotTimer: NodeJS.Timeout | null = null;
+  private _mcState: 'up' | 'down' = 'down';
+  private _dashState: 'up' | 'down' = 'down';
 
   constructor(config: Partial<LiveStreamIntegrationConfig> = {}) {
     super();
@@ -186,6 +188,11 @@ export class LiveStreamIntegration extends EventEmitter {
         console.log('Screenshot not available');
       }
 
+      if (this._mcState === 'down') {
+        console.log('[livestream] MC interface UP');
+        this._mcState = 'up';
+      }
+
       this.liveStreamData = {
         connected: true,
         streamUrl: `${this.config.minecraftEndpoint}/stream`,
@@ -199,7 +206,10 @@ export class LiveStreamIntegration extends EventEmitter {
 
       return this.liveStreamData;
     } catch (error) {
-      console.error('Failed to get live stream data:', error);
+      if (this._mcState !== 'down') {
+        console.warn('[livestream] MC interface DOWN:', error instanceof Error ? error.message : error);
+        this._mcState = 'down';
+      }
       this.liveStreamData = {
         connected: false,
         streamQuality: 'low',
@@ -572,8 +582,8 @@ export class LiveStreamIntegration extends EventEmitter {
           this.emit('miniMapUpdated', miniMapData);
           this.notifyDashboard('miniMapUpdated', miniMapData);
         }
-      } catch (error) {
-        console.error('Error in periodic live stream update:', error);
+      } catch {
+        // Inner methods (getLiveStreamData, updateMiniMapData) handle their own state-change logging.
       }
     }, this.config.updateInterval);
   }
@@ -627,8 +637,15 @@ export class LiveStreamIntegration extends EventEmitter {
         },
         body: JSON.stringify({ event, data }),
       });
+      if (this._dashState === 'down') {
+        console.log('[livestream] Dashboard UP');
+        this._dashState = 'up';
+      }
     } catch (error) {
-      console.error('Failed to notify dashboard:', error);
+      if (this._dashState !== 'down') {
+        console.warn('[livestream] Dashboard DOWN:', error instanceof Error ? error.message : error);
+        this._dashState = 'down';
+      }
     }
   }
 

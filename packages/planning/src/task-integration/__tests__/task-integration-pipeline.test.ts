@@ -999,3 +999,102 @@ describe('Rig E blocked reason refinement', () => {
     expect(task.metadata.blockedReason).toBe('rig_e_solver_unimplemented');
   });
 });
+
+// ---------------------------------------------------------------------------
+// Advisory action bypass: type='advisory_action' skips step generation
+// ---------------------------------------------------------------------------
+
+describe('advisory_action step generation bypass', () => {
+  let ti: TaskIntegration;
+
+  beforeEach(() => {
+    ti = new TaskIntegration();
+  });
+
+  it('advisory_action task gets empty steps with advisory-skip reason', async () => {
+    const task = await ti.addTask(makeTaskData({
+      title: 'Craft something',
+      type: 'advisory_action',
+      source: 'autonomous',
+      parameters: { action: 'craft_recipe' },
+      metadata: {
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+        retryCount: 0,
+        maxRetries: 1,
+        childTaskIds: [],
+        tags: ['cognitive', 'advisory'],
+        category: 'advisory_action',
+        parentTaskId: 'cog-parent',
+        taskProvenance: {
+          builder: 'convertCognitiveReflectionToTasks',
+          source: 'cognitive_reflection',
+        },
+      },
+    }));
+
+    expect(task.steps).toEqual([]);
+    expect(task.metadata.solver?.noStepsReason).toBe('advisory-skip');
+    expect(task.status).toBe('pending');
+    // Advisory tasks are blocked from executor selection
+    expect(task.metadata.blockedReason).toBe('advisory_action');
+  });
+
+  it('advisory_action does not trigger invariant guard', async () => {
+    const consoleSpy = vi.spyOn(console, 'error');
+
+    await ti.addTask(makeTaskData({
+      title: 'Advisory gather',
+      type: 'advisory_action',
+      source: 'autonomous',
+      parameters: { action: 'gather_resources' },
+      metadata: {
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+        retryCount: 0,
+        maxRetries: 1,
+        childTaskIds: [],
+        tags: ['cognitive', 'advisory'],
+        category: 'advisory_action',
+        parentTaskId: 'cog-parent-2',
+      },
+    }));
+
+    // Should NOT see invariant violation for advisory_action
+    const invariantCalls = consoleSpy.mock.calls.filter(
+      (call) => typeof call[0] === 'string' && call[0].includes('INVARIANT VIOLATION')
+    );
+    expect(invariantCalls).toHaveLength(0);
+
+    consoleSpy.mockRestore();
+  });
+
+  it('non-advisory autonomous sub-task without candidate triggers invariant guard', async () => {
+    const consoleSpy = vi.spyOn(console, 'error');
+
+    await ti.addTask(makeTaskData({
+      title: 'Broken sub-task',
+      type: 'gathering',
+      source: 'autonomous',
+      parameters: {},
+      metadata: {
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+        retryCount: 0,
+        maxRetries: 3,
+        childTaskIds: [],
+        tags: [],
+        category: 'gathering',
+        parentTaskId: 'some-parent',
+      },
+    }));
+
+    const invariantCalls = consoleSpy.mock.calls.filter(
+      (call) => typeof call[0] === 'string' && call[0].includes('INVARIANT VIOLATION')
+    );
+    expect(invariantCalls).toHaveLength(1);
+    expect(invariantCalls[0][0]).toContain('Broken sub-task');
+
+    consoleSpy.mockRestore();
+  });
+});

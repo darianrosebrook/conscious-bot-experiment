@@ -17,7 +17,7 @@ import {
   generateP21AManifest,
   createSurfaceResultsFromHandle,
   finalizeManifest,
-} from '@conscious-bot/testkits/src/p21';
+} from '@conscious-bot/testkits';
 import { MOB_DOMAIN_CLASSIFIER } from '../../../../planning/src/sterling/primitives/p21/p21-reference-fixtures';
 import type {
   P21ImplementationAdapter,

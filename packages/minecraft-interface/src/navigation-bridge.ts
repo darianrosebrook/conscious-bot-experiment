@@ -167,6 +167,7 @@ export class NavigationBridge extends EventEmitter {
 
   // mineflayer-pathfinder wiring
   private pf?: any;
+  private pfGoals?: any;
   public movements?: any;
 
   // Stored-promise readiness (replaces event-only pattern to avoid race)
@@ -205,7 +206,7 @@ export class NavigationBridge extends EventEmitter {
     this.botId = `bot_${Math.random().toString(36).substr(2, 9)}`;
     this.config = {
       maxRaycastDistance: 32,
-      pathfindingTimeout: 30_000,
+      pathfindingTimeout: 60_000,
       replanThreshold: 5,
       obstacleDetectionRadius: 8,
       enableDynamicReplanning: true,
@@ -297,7 +298,9 @@ export class NavigationBridge extends EventEmitter {
       // Use dynamic import for ES modules compatibility
       const pathfinderModule = await import('mineflayer-pathfinder');
       this.pf = pathfinderModule;
-      console.log('✅ mineflayer-pathfinder loaded:', !!this.pf);
+      // Dynamic import may put `goals` on the default export rather than top-level
+      this.pfGoals = pathfinderModule.goals ?? (pathfinderModule as any).default?.goals;
+      console.log('✅ mineflayer-pathfinder loaded:', !!this.pf, 'goals:', !!this.pfGoals);
 
       if (!(this.bot as any).pathfinder) {
         console.log('🔧 Loading pathfinder plugin...');
@@ -533,13 +536,17 @@ export class NavigationBridge extends EventEmitter {
       this.currentPath = pathResult.path.map((p) => new Vec3(p.x, p.y, p.z));
 
       // 3) Execute with optional dynamic replanning
+      // Scale timeout by distance: ~3s/block with a 15s minimum
+      const distance = this.bot.entity.position.distanceTo(targetVec3);
+      const distanceTimeout = Math.max(15_000, Math.ceil(distance * 3000));
+      const baseTimeout = options.timeout ?? this.config.pathfindingTimeout;
       const executionResult = await this.executePathWithReplanning(
         pathResult.path,
         targetVec3,
         {
           dynamicReplanning:
             options.dynamicReplanning ?? this.config.enableDynamicReplanning,
-          timeout: options.timeout ?? this.config.pathfindingTimeout,
+          timeout: Math.max(baseTimeout, distanceTimeout),
         }
       );
 
@@ -811,47 +818,64 @@ export class NavigationBridge extends EventEmitter {
     target: Vec3,
     options: { dynamicReplanning?: boolean; timeout?: number }
   ): Promise<{ success: boolean; error?: string }> {
-    const steps = path.map((p) => new Vec3(p.x, p.y, p.z));
-    this.currentPath = steps;
-    const maxReplans = 10;
+    this.currentPath = path.map((p) => new Vec3(p.x, p.y, p.z));
 
-    for (let i = 0; i < steps.length; i++) {
-      const step = steps[i];
+    // Delegate the full route to mineflayer-pathfinder's A* which understands
+    // jumps, drops, and real terrain. Use a retry loop: if a single moveToStep
+    // attempt times out or gets stuck but made progress, re-issue from the
+    // current position. This handles complex terrain where the pathfinder may
+    // need multiple A* invocations to find a viable route.
+    const totalTimeout = options.timeout ?? this.config.pathfindingTimeout;
+    const MAX_ATTEMPTS = 5;
+    const CLOSE_ENOUGH = 3; // blocks
+    const startTime = Date.now();
 
-      // Attempt to move to the step first
-      const moved = await this.moveToStep(
-        step,
-        options.timeout ?? this.config.pathfindingTimeout
+    for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+      const dist = this.bot.entity.position.distanceTo(target);
+      if (dist <= CLOSE_ENOUGH) {
+        return { success: true };
+      }
+
+      const elapsed = Date.now() - startTime;
+      const remaining = totalTimeout - elapsed;
+      if (remaining <= 5000) {
+        return { success: false, error: 'Navigation timeout (overall)' };
+      }
+
+      // Per-attempt timeout: use remaining time but cap at 30s per attempt
+      const attemptTimeout = Math.min(remaining, 30_000);
+      const posBefore = this.bot.entity.position.clone();
+      const result = await this.moveToStep(target, attemptTimeout);
+
+      if (result.success) return result;
+
+      // Check if we made progress
+      const posAfter = this.bot.entity.position.clone();
+      const progress = posBefore.distanceTo(posAfter);
+      const distAfter = posAfter.distanceTo(target);
+
+      if (distAfter <= CLOSE_ENOUGH) {
+        return { success: true };
+      }
+
+      // If we didn't make meaningful progress, stop retrying
+      if (progress < 2) {
+        return {
+          success: false,
+          error: result.error ?? 'No progress after retry',
+        };
+      }
+
+      // Ensure pathfinder is fully stopped before retrying
+      try { this.bot.pathfinder.stop(); } catch {}
+      await new Promise((r) => setTimeout(r, 500));
+
+      console.log(
+        `🔄 Retry ${attempt + 1}/${MAX_ATTEMPTS}: moved ${progress.toFixed(1)} blocks, ${distAfter.toFixed(1)} from target`
       );
-
-      if (moved.success) {
-        continue;
-      }
-
-      // Move failed — try replanning if enabled and under budget
-      if (this.replanCount >= maxReplans || !(options.dynamicReplanning ?? true)) {
-        return moved;
-      }
-
-      this.replanCount++;
-
-      // refresh observations
-      const info = await this.gatherWorldInformation(target);
-      this.obstaclesDetected = info.obstacles;
-
-      const updated = await this.planPathWithDStarLite(target);
-      if (!updated.success || !updated.path || updated.path.length === 0) {
-        return { success: false, error: 'Failed to replan path after move failure' };
-      }
-      // Replace the remainder with the new plan
-      const rest = updated.path.map((p) => new Vec3(p.x, p.y, p.z));
-      steps.splice(i, steps.length - i, ...rest);
-      this.currentPath = steps;
-      // Retry the current index with the new first step
-      i--;
     }
 
-    return { success: true };
+    return { success: false, error: 'Max navigation attempts reached' };
   }
 
   /**
@@ -865,35 +889,15 @@ export class NavigationBridge extends EventEmitter {
     step: Vec3,
     timeoutMs: number
   ): Promise<{ success: boolean; error?: string }> {
-    if (!this.pf || !(this.bot as any).pathfinder) {
+    if (!this.pf || !this.pfGoals || !(this.bot as any).pathfinder) {
       return { success: false, error: 'Pathfinder plugin not initialized' };
     }
 
-    // Simple GoalNear compatible with mineflayer-pathfinder
-    const goal = {
-      x: step.x,
-      y: step.y,
-      z: step.z,
-      rangeSq: 1,
-      heuristic(node: any): number {
-        const dx = step.x - node.x;
-        const dy = step.y - node.y;
-        const dz = step.z - node.z;
-        return Math.sqrt(dx * dx + dy * dy + dz * dz);
-      },
-      isEnd(node: any): boolean {
-        const dx = step.x - node.x;
-        const dy = step.y - node.y;
-        const dz = step.z - node.z;
-        return dx * dx + dy * dy + dz * dz <= 1;
-      },
-      hasChanged(): boolean {
-        return false;
-      },
-      isValid(): boolean {
-        return true;
-      },
-    };
+    // Use GoalNear with range=2 for normal terrain navigation.
+    // GoalNear includes Y in distance calculation, which works well when the
+    // caller provides an accurate Y. For cases where Y is uncertain, the
+    // "close enough" check in stuck detection handles it.
+    const goal = new this.pfGoals.GoalNear(step.x, step.y, step.z, 2);
 
     return new Promise<{ success: boolean; error?: string }>((resolve) => {
       let resolved = false;
@@ -922,13 +926,25 @@ export class NavigationBridge extends EventEmitter {
           const newest = positionHistory[positionHistory.length - 1];
           const moved = oldest.distanceTo(newest);
           if (moved < STUCK_THRESHOLD) {
-            console.log(
-              `🚫 Stuck detected: moved ${moved.toFixed(2)} blocks in ${STUCK_WINDOW * (POLL_INTERVAL / 1000)}s`
-            );
-            try {
-              this.bot.pathfinder.stop();
-            } catch {}
-            finish({ success: false, error: 'Stuck: insufficient movement progress' });
+            // Check if we're close enough to the target to call it success
+            const distToTarget = newest.distanceTo(step);
+            if (distToTarget <= 3) {
+              console.log(
+                `✅ Close enough to target (${distToTarget.toFixed(2)} blocks), treating as success`
+              );
+              try {
+                this.bot.pathfinder.stop();
+              } catch {}
+              finish({ success: true });
+            } else {
+              console.log(
+                `🚫 Stuck detected: moved ${moved.toFixed(2)} blocks in ${STUCK_WINDOW * (POLL_INTERVAL / 1000)}s, ${distToTarget.toFixed(1)} blocks from target`
+              );
+              try {
+                this.bot.pathfinder.stop();
+              } catch {}
+              finish({ success: false, error: 'Stuck: insufficient movement progress' });
+            }
           }
         }
       }, POLL_INTERVAL);
@@ -957,12 +973,20 @@ export class NavigationBridge extends EventEmitter {
         }
       };
 
+      let pathResetCount = 0;
+      const MAX_PATH_RESETS = 5;
       const onPathReset = () => {
-        console.log('🔄 Path reset (stuck signal from pathfinder)');
-        try {
-          this.bot.pathfinder.stop();
-        } catch {}
-        finish({ success: false, error: 'Pathfinder stuck (path_reset)' });
+        pathResetCount++;
+        console.log(`🔄 Path reset #${pathResetCount} (pathfinder replanning)`);
+        // path_reset is normal on complex terrain — pathfinder recalculates
+        // automatically. Only treat as stuck if it resets excessively.
+        if (pathResetCount >= MAX_PATH_RESETS) {
+          console.log(`🚫 Too many path resets (${pathResetCount}), giving up`);
+          try {
+            this.bot.pathfinder.stop();
+          } catch {}
+          finish({ success: false, error: 'Pathfinder stuck (excessive path resets)' });
+        }
       };
 
       // --- Cleanup ---

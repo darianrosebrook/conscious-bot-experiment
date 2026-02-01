@@ -1,7 +1,27 @@
+import type { ReadinessMonitor } from './server/execution-readiness';
+
 let systemReady = process.env.SYSTEM_READY_ON_BOOT === '1';
 let readyAt: string | null = systemReady ? new Date().toISOString() : null;
 let readySource: string | null = systemReady ? 'env' : null;
 const waiters: Array<() => void> = [];
+
+// ---------------------------------------------------------------------------
+// ReadinessMonitor singleton
+// ---------------------------------------------------------------------------
+
+let _readinessMonitor: ReadinessMonitor | null = null;
+
+export function setReadinessMonitor(monitor: ReadinessMonitor): void {
+  _readinessMonitor = monitor;
+}
+
+export function getReadinessMonitor(): ReadinessMonitor | null {
+  return _readinessMonitor;
+}
+
+export function isServiceReachable(name: string): boolean {
+  return _readinessMonitor?.isUp(name) ?? false;
+}
 
 export function isSystemReady(): boolean {
   return systemReady;

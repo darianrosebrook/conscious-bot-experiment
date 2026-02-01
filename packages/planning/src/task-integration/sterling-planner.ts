@@ -27,7 +27,7 @@ import type { MicroOutcome } from '../hierarchical/macro-state';
 export interface StepGenerationResult {
   steps: TaskStep[];
   noStepsReason?: 'no-requirement' | 'unplannable' | 'solver-error' | 'solver-unsolved'
-    | 'context-unavailable' | 'compiler-empty' | 'blocked-sentinel';
+    | 'context-unavailable' | 'compiler-empty' | 'blocked-sentinel' | 'advisory-skip';
   route?: { backend: string; requiredRig: string | null; reason: string };
   planId?: string;
 }

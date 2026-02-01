@@ -495,8 +495,8 @@ export class SmeltLeaf implements LeafImpl {
         timeoutMs: {
           type: 'integer',
           minimum: 1000,
-          maximum: 180000,
-          default: 90000,
+          maximum: 720000,
+          description: 'Override timeout in ms. Default scales by qty (~12s/item, min 30s).',
         },
       },
       required: ['input'],
@@ -529,8 +529,13 @@ export class SmeltLeaf implements LeafImpl {
       input,
       fuel = 'coal',
       qty = 1,
-      timeoutMs = this.spec.timeoutMs,
     } = args;
+    // Smelting takes ~10s per item in Minecraft. Scale timeout accordingly:
+    // 12s/item (with overhead) + 10s for furnace interaction, minimum 30s.
+    const defaultTimeout = Math.max(30_000, qty * 12_000 + 10_000);
+    const timeoutMs = args.timeoutMs != null
+      ? Math.min(Math.max(args.timeoutMs, 1000), 720_000)
+      : defaultTimeout;
     const bot = ctx.bot;
 
     // Get mcData from bot

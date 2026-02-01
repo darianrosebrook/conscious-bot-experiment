@@ -14,7 +14,7 @@ import {
   generateP21BManifest,
   createSurfaceResultsFromHandle,
   finalizeManifest,
-} from '@conscious-bot/testkits/src/p21';
+} from '@conscious-bot/testkits';
 import type {
   P21EmissionAdapter,
   P21EvidenceBatch,

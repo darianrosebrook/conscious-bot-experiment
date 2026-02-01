@@ -49,6 +49,51 @@ export interface ResilientFetchOptions extends RequestInit {
   throwOnFinalFailure?: boolean;
   /** Optional label for logging. Default: url */
   label?: string;
+  /** Suppress all failure logging. For discovery probes. Default: false */
+  silent?: boolean;
+}
+
+// ---------------------------------------------------------------------------
+// Bounded dedup map with error-class keying
+// ---------------------------------------------------------------------------
+
+/** Max entries in the dedup map. Entries evicted FIFO when full. */
+const DEDUP_MAX_ENTRIES = 64;
+/** Minimum ms between duplicate warns for the same label+errorKind. */
+const DEDUP_COOLDOWN_MS = 60_000;
+
+const _dedupMap = new Map<string, number>(); // key → last-log-timestamp
+
+function _classifyError(error: unknown): string {
+  if (error instanceof Error) {
+    const cause = (error as { cause?: any }).cause;
+    const code = (error as any).code ?? cause?.code;
+    if (code && typeof code === 'string') return code; // ECONNREFUSED, ETIMEDOUT, etc.
+    if (error.name === 'AbortError') return 'timeout';
+    if (error.message?.includes('fetch failed')) return 'fetch_failed';
+  }
+  return 'unknown';
+}
+
+function _shouldLog(label: string, errorKind: string): boolean {
+  const key = `${label}:${errorKind}`;
+  const now = Date.now();
+  const last = _dedupMap.get(key) ?? 0;
+  if (now - last < DEDUP_COOLDOWN_MS) return false;
+
+  // Evict oldest entries if map is full
+  if (_dedupMap.size >= DEDUP_MAX_ENTRIES && !_dedupMap.has(key)) {
+    const oldest = _dedupMap.keys().next().value;
+    if (oldest) _dedupMap.delete(oldest);
+  }
+
+  _dedupMap.set(key, now);
+  return true;
+}
+
+/** Test-only: reset dedup state between tests. */
+export function _resetLogDedup(): void {
+  _dedupMap.clear();
 }
 
 /**
@@ -66,6 +111,7 @@ export async function resilientFetch(
     timeoutMs = 10000,
     throwOnFinalFailure = false,
     label = url,
+    silent = false,
     ...init
   } = options;
 
@@ -92,9 +138,14 @@ export async function resilientFetch(
       }
       const delay = Math.min(backoff, maxBackoffMs);
       if (attempt < maxRetries) {
-        console.warn(
-          `[resilient-fetch] ${label} unavailable (attempt ${attempt + 1}/${maxRetries + 1}), retrying in ${delay}ms`
-        );
+        if (!silent) {
+          const kind = _classifyError(error);
+          if (_shouldLog(label, kind)) {
+            console.warn(
+              `[resilient-fetch] ${label} unavailable (attempt ${attempt + 1}/${maxRetries + 1}), retrying in ${delay}ms [${kind}]`
+            );
+          }
+        }
         await sleep(delay);
         backoff *= 2;
       }
@@ -102,10 +153,15 @@ export async function resilientFetch(
   }
 
   if (!throwOnFinalFailure) {
-    console.warn(
-      `[resilient-fetch] ${label} unavailable after ${maxRetries + 1} attempts:`,
-      lastError instanceof Error ? lastError.message : lastError
-    );
+    if (!silent) {
+      const kind = _classifyError(lastError);
+      if (_shouldLog(label, kind)) {
+        console.warn(
+          `[resilient-fetch] ${label} unavailable after ${maxRetries + 1} attempts [${kind}]:`,
+          lastError instanceof Error ? lastError.message : lastError
+        );
+      }
+    }
     return null;
   }
   throw lastError;

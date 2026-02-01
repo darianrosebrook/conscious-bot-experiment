@@ -501,6 +501,9 @@ importers:
         specifier: ^8.18.3
         version: 8.19.0
     devDependencies:
+      '@conscious-bot/testkits':
+        specifier: workspace:*
+        version: link:../testkits
       '@types/cors':
         specifier: ^2.8.19
         version: 2.8.19

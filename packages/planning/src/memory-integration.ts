@@ -71,6 +71,7 @@ export class MemoryIntegration extends EventEmitter {
   private discoveredEndpoints: string[] = [];
   private lastDiscovery: number = 0;
   private readonly DISCOVERY_INTERVAL = 30000; // 30 seconds
+  private _lastDiscoveryState: 'up' | 'down' = 'down';
 
   constructor(config: Partial<MemoryIntegrationConfig> = {}) {
     super();
@@ -129,6 +130,7 @@ export class MemoryIntegration extends EventEmitter {
           method: 'GET',
           timeoutMs: 2000,
           maxRetries: 0, // Single attempt for discovery - reduces log spam
+          silent: true,
           label: `memory-discovery/${endpoint}`,
         }
       );
@@ -143,20 +145,22 @@ export class MemoryIntegration extends EventEmitter {
     if (discovered.length > 0) {
       this.discoveredEndpoints = discovered;
       const chosen = discovered[0];
+      if (this._lastDiscoveryState === 'down') {
+        console.log('[memory] Discovery: endpoint UP →', chosen);
+        this._lastDiscoveryState = 'up';
+      }
       if (
         !this.config.memorySystemEndpoint ||
         !discovered.includes(this.config.memorySystemEndpoint)
       ) {
         this.config.memorySystemEndpoint = chosen;
-        if (process.env.NODE_ENV === 'development') {
-          console.log(`[Planning] Memory discovery: using ${chosen}`);
-        }
         this.emit('memorySystemDiscovered', this.config.memorySystemEndpoint);
       }
-    } else if (process.env.NODE_ENV === 'development') {
-      console.log(
-        `[Planning] Memory discovery: no endpoint available (tried ${potentialEndpoints.length} URLs)`
-      );
+    } else {
+      if (this._lastDiscoveryState === 'up') {
+        console.warn('[memory] Discovery: endpoint DOWN');
+        this._lastDiscoveryState = 'down';
+      }
     }
 
     this.lastDiscovery = Date.now();

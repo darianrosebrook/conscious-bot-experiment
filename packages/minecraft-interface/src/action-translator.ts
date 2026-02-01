@@ -114,7 +114,7 @@ import { StateMachineWrapper } from './extensions/state-machine-wrapper';
  * Used by the LeafFactory-first dispatch path in executeAction.
  * If an action type is not in this map, it is tried as-is against LeafFactory.
  */
-const ACTION_TYPE_TO_LEAF: Record<string, string> = {
+export const ACTION_TYPE_TO_LEAF: Record<string, string> = {
   // move_to: uses legacy executeNavigate handler (D* Lite NavigationBridge)
   // MoveToLeaf exists for direct leaf-level usage but REST dispatch uses proven D* Lite path
   craft: 'craft_recipe',
@@ -210,9 +210,10 @@ export class ActionTranslator {
     if (!this.navigationBridge) return false;
     const ready = await this.navigationBridge.waitForPathfinderReady(timeoutMs);
     if (ready && this.navigationBridge.movements) {
-      this.movements = this.navigationBridge.movements;
-      this.movements.scafoldingBlocks = [];
-      this.movements.canDig = false;
+      const m = this.navigationBridge.movements;
+      m.scafoldingBlocks = [];
+      m.canDig = false;
+      this.movements = m;
     }
     return ready;
   }
@@ -1362,10 +1363,14 @@ export class ActionTranslator {
     }
 
     try {
+      // Use the leaf's declared timeout as a floor — never go below it
+      const leafTimeout = (leaf as any)?.spec?.timeoutMs;
+      const effectiveTimeout = leafTimeout ? Math.max(leafTimeout, timeout) : timeout;
+
       const context = this.createLeafContext();
       const result = await leaf.run(context, {
         ...action.parameters,
-        timeoutMs: timeout,
+        timeoutMs: effectiveTimeout,
       });
 
       return {

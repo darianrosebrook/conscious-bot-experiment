@@ -37,6 +37,7 @@ const createMockFarmingBot = (): Bot =>
     dig: vi.fn(),
     equip: vi.fn(),
     placeBlock: vi.fn(),
+    activateBlock: vi.fn(),
   }) as any;
 
 describe('Farming Leaves', () => {
@@ -71,7 +72,7 @@ describe('Farming Leaves', () => {
 
       vi.spyOn(mockBot, 'blockAt').mockReturnValue(mockBlock as any);
       vi.spyOn(mockBot, 'equip').mockResolvedValue(undefined);
-      vi.spyOn(mockBot, 'dig').mockResolvedValue(undefined);
+      vi.spyOn(mockBot, 'activateBlock' as any).mockResolvedValue(undefined);
 
       const ctx = {
         bot: mockBot,
@@ -93,7 +94,7 @@ describe('Farming Leaves', () => {
         expect.objectContaining({ name: 'wooden_hoe' }),
         'hand'
       );
-      expect(mockBot.dig).toHaveBeenCalledWith(mockBlock);
+      expect((mockBot as any).activateBlock).toHaveBeenCalledWith(mockBlock);
     });
 
     it('should reject non-tillable soil', async () => {

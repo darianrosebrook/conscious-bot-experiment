@@ -154,13 +154,9 @@ export class WorldStateManager extends EventEmitter {
       }
       // Verbose logging removed - enable for debugging specific state issues:
       // console.log('WorldStateManager poll result:', { ... });
-    } catch (e) {
-      // Stale-while-revalidate: previous snapshot is intentionally preserved
-      // on fetch failure so downstream consumers always have *some* data.
-      console.warn(
-        'WorldStateManager poll failed (stale snapshot preserved):',
-        (e as any)?.message || e
-      );
+    } catch {
+      // resilientFetch already rate-limits its own warn via dedup.
+      // Suppress here to avoid double-logging.
     } finally {
       this.pollInFlight = false;
     }

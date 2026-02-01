@@ -1777,7 +1777,7 @@ app.post('/action', async (req, res) => {
     }
 
     // Reuse a single ActionTranslator per bot to avoid re-initializing pathfinder/Movements
-    const { ActionTranslator } = await import('./action-translator');
+    const { ActionTranslator, ACTION_TYPE_TO_LEAF } = await import('./action-translator');
     if (!(global as any)._cachedActionTranslator || (global as any)._cachedActionTranslatorBot !== bot) {
       (global as any)._cachedActionTranslator = new ActionTranslator(bot, {
         actionTimeout: 15000,
@@ -1799,11 +1799,26 @@ app.post('/action', async (req, res) => {
       }
     }
 
-    // Execute the action directly instead of as a plan step
+    // Resolve timeout from the leaf's declared spec.timeoutMs when available.
+    // Movement actions get a longer budget; NavigationBridge handles
+    // per-attempt timeouts internally.
+    const isMovement = MOVEMENT_ACTIONS.has(type);
+    let actionTimeout = isMovement ? 120_000 : 15_000;
+
+    // Look up leaf-declared timeout if available
+    const leafFactory = (global as any).minecraftLeafFactory;
+    if (leafFactory && !isMovement) {
+      const leafName = ACTION_TYPE_TO_LEAF[type] ?? type;
+      const leaf = leafFactory.get(leafName);
+      if (leaf?.spec?.timeoutMs) {
+        actionTimeout = leaf.spec.timeoutMs;
+      }
+    }
+
     const action = {
       type: type as any,
       parameters: parameters || {},
-      timeout: 15000,
+      timeout: actionTimeout,
     };
 
     const result = await actionTranslator.executeAction(action);

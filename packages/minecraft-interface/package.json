@@ -86,6 +86,7 @@
     "ws": "^8.18.3"
   },
   "devDependencies": {
+    "@conscious-bot/testkits": "workspace:*",
     "@types/cors": "^2.8.19",
     "@types/express": "^4.17.23",
     "@types/js-yaml": "^4.0.9",

@@ -1,5 +1,5 @@
 /**
- * Tests for ExecutorConfig parsing and StepRateLimiter.
+ * Tests for ExecutorConfig parsing, StepRateLimiter, geofence, and emergency stop.
  *
  * @author @darianrosebrook
  */
@@ -9,8 +9,13 @@ import {
   parseExecutorConfig,
   StepRateLimiter,
   evaluateGuards,
+  parseGeofenceConfig,
+  isInsideGeofence,
+  initExecutorAbortController,
+  emergencyStopExecutor,
   type ExecutorConfig,
   type GuardDecision,
+  type GeofenceConfig,
 } from '../autonomous-executor';
 
 // ---------------------------------------------------------------------------
@@ -291,5 +296,165 @@ describe('unknown-leaf terminality', () => {
     // Simulate the executor's step selection logic
     const nextStep = steps.find((s) => !s.done && isExecutableStep(s));
     expect(nextStep?.id).toBe('s2'); // s1 is blocked, s3 is done
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Geofence: parseGeofenceConfig
+// ---------------------------------------------------------------------------
+
+describe('parseGeofenceConfig', () => {
+  const originalEnv = { ...process.env };
+
+  afterEach(() => {
+    process.env = { ...originalEnv };
+  });
+
+  it('parses "100,200" → center: {x:100, z:200}, enabled', () => {
+    process.env.EXECUTOR_GEOFENCE_CENTER = '100,200';
+    process.env.EXECUTOR_GEOFENCE_RADIUS = '50';
+    const cfg = parseGeofenceConfig();
+    expect(cfg.enabled).toBe(true);
+    expect(cfg.center).toEqual({ x: 100, z: 200 });
+    expect(cfg.radius).toBe(50);
+  });
+
+  it('no env → enabled=false', () => {
+    delete process.env.EXECUTOR_GEOFENCE_CENTER;
+    const cfg = parseGeofenceConfig();
+    expect(cfg.enabled).toBe(false);
+  });
+
+  it('"NaN,100" → enabled=false (NaN handling)', () => {
+    process.env.EXECUTOR_GEOFENCE_CENTER = 'NaN,100';
+    const cfg = parseGeofenceConfig();
+    expect(cfg.enabled).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Geofence: isInsideGeofence
+// ---------------------------------------------------------------------------
+
+describe('isInsideGeofence', () => {
+  const fence: GeofenceConfig = {
+    enabled: true,
+    center: { x: 0, z: 0 },
+    radius: 100,
+  };
+
+  it('inside x/z square → true', () => {
+    expect(isInsideGeofence({ x: 50, z: 50 }, fence)).toBe(true);
+  });
+
+  it('outside x/z square → false', () => {
+    expect(isInsideGeofence({ x: 150, z: 0 }, fence)).toBe(false);
+  });
+
+  it('on edge → true (exactly at radius)', () => {
+    expect(isInsideGeofence({ x: 100, z: 100 }, fence)).toBe(true);
+  });
+
+  it('disabled fence → true (always passes)', () => {
+    const disabled: GeofenceConfig = { ...fence, enabled: false };
+    expect(isInsideGeofence({ x: 999, z: 999 }, disabled)).toBe(true);
+  });
+
+  it('with yRange inside → true', () => {
+    const fenceY: GeofenceConfig = { ...fence, yRange: { min: 0, max: 128 } };
+    expect(isInsideGeofence({ x: 0, y: 64, z: 0 }, fenceY)).toBe(true);
+  });
+
+  it('with yRange outside → false', () => {
+    const fenceY: GeofenceConfig = { ...fence, yRange: { min: 0, max: 128 } };
+    expect(isInsideGeofence({ x: 0, y: 200, z: 0 }, fenceY)).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// evaluateGuards with geofence
+// ---------------------------------------------------------------------------
+
+describe('evaluateGuards + geofence', () => {
+  const makeConfig = (overrides?: Partial<ExecutorConfig>): ExecutorConfig => ({
+    enabled: true,
+    mode: 'live',
+    maxStepsPerMinute: 6,
+    failureCooldownMs: 10_000,
+    leafAllowlist: new Set(['minecraft.dig_block', 'minecraft.craft_recipe']),
+    ...overrides,
+  });
+
+  const fence: GeofenceConfig = {
+    enabled: true,
+    center: { x: 0, z: 0 },
+    radius: 100,
+  };
+
+  it('geofence enabled, position null → block_unknown_position (fail-closed)', () => {
+    const limiter = new StepRateLimiter(6);
+    const result = evaluateGuards('minecraft.dig_block', makeConfig(), limiter, {
+      position: null,
+      config: fence,
+    });
+    expect(result.action).toBe('block_unknown_position');
+  });
+
+  it('geofence enabled, outside → block_outside_geofence', () => {
+    const limiter = new StepRateLimiter(6);
+    const result = evaluateGuards('minecraft.dig_block', makeConfig(), limiter, {
+      position: { x: 200, z: 200 },
+      config: fence,
+    });
+    expect(result.action).toBe('block_outside_geofence');
+  });
+
+  it('geofence enabled, inside → passes to allowlist', () => {
+    const limiter = new StepRateLimiter(6);
+    const result = evaluateGuards('minecraft.dig_block', makeConfig(), limiter, {
+      position: { x: 50, z: 50 },
+      config: fence,
+    });
+    // Should pass geofence and reach await_rig_g (known leaf, live mode, budget available)
+    expect(result.action).toBe('await_rig_g');
+  });
+
+  it('geofence disabled → passes to allowlist (backward-compatible)', () => {
+    const limiter = new StepRateLimiter(6);
+    const disabledFence: GeofenceConfig = { ...fence, enabled: false };
+    const result = evaluateGuards('minecraft.dig_block', makeConfig(), limiter, {
+      position: null, // position unknown but fence disabled
+      config: disabledFence,
+    });
+    expect(result.action).toBe('await_rig_g');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Emergency stop
+// ---------------------------------------------------------------------------
+
+describe('emergencyStopExecutor', () => {
+  it('aborts signal', () => {
+    const controller = initExecutorAbortController();
+    expect(controller.signal.aborted).toBe(false);
+
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    emergencyStopExecutor();
+
+    expect(controller.signal.aborted).toBe(true);
+    warnSpy.mockRestore();
+  });
+
+  it('clears interval', () => {
+    // Set a dummy interval
+    global.__planningInterval = setInterval(() => {}, 999999);
+    expect(global.__planningInterval).toBeDefined();
+
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    emergencyStopExecutor();
+
+    expect(global.__planningInterval).toBeUndefined();
+    warnSpy.mockRestore();
   });
 });
