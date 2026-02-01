@@ -8,6 +8,7 @@
  */
 
 import { LLMConfig, LLMConfigSchema, LLMContext, LLMResponse } from '../types';
+import { sanitizeLLMOutput } from '../llm-output-sanitizer';
 
 // Export LLMContext for use by other modules
 export type { LLMContext, LLMResponse } from '../types';
@@ -103,9 +104,11 @@ export class LLMInterface {
         );
       }
 
+      const sanitized = sanitizeLLMOutput(response.response);
+
       return {
         id: `llm-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-        text: response.response,
+        text: sanitized.text,
         model,
         tokensUsed: completionTokens,
         latency: latencyMs,
@@ -117,6 +120,8 @@ export class LLMInterface {
             completionTokens,
             totalTokens: promptTokens + completionTokens,
           },
+          extractedGoal: sanitized.goalTag ?? undefined,
+          sanitizationFlags: sanitized.flags,
         },
         timestamp: Date.now(),
       };
@@ -147,10 +152,11 @@ export class LLMInterface {
           });
 
           const endTime = performance.now();
+          const retrySanitized = sanitizeLLMOutput(response.response);
 
           return {
             id: `llm-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-            text: response.response,
+            text: retrySanitized.text,
             model,
             tokensUsed: response.eval_count || 0,
             latency: endTime - startTime,
@@ -165,6 +171,8 @@ export class LLMInterface {
                   (response.eval_count || 0),
               },
               retryAttempt: attempt,
+              extractedGoal: retrySanitized.goalTag ?? undefined,
+              sanitizationFlags: retrySanitized.flags,
             },
             timestamp: Date.now(),
           };
@@ -195,7 +203,8 @@ export class LLMInterface {
    */
   async generateInternalThought(
     situation: string,
-    context?: LLMContext
+    context?: LLMContext,
+    options?: { stressContext?: string }
   ): Promise<LLMResponse> {
     const systemPrompt = `
 You are my private inner thought while I'm in the world. Write exactly one or two short sentences in first person.
@@ -207,7 +216,11 @@ Only if I'm committing to a concrete action now, end with:
 Use names that appear in the situation. If I'm not committing yet, don't output a goal tag.
 `.trim();
 
-    const prompt = `Current situation: ${situation}
+    const situationWithContext = options?.stressContext
+      ? `${situation} ${options.stressContext}`
+      : situation;
+
+    const prompt = `Current situation: ${situationWithContext}
 
 ${context?.currentGoals ? `Current goals: ${context.currentGoals.join(', ')}` : ''}
 ${

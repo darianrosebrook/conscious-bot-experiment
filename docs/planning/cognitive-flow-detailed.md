@@ -480,6 +480,43 @@ private analyzePosition(worldState: any): CognitiveThought | null {
 }
 ```
 
+### **LLM Output Sanitization Pipeline**
+
+All LLM-generated text passes through a deterministic sanitization pipeline at the `generateResponse()` boundary in `LLMInterface`, ensuring every downstream consumer (planning signal extraction, intrusive thought parsing, social awareness, internal dialogue, dashboard) receives clean text.
+
+**Module:** `packages/cognition/src/llm-output-sanitizer.ts`
+
+**Pipeline steps (in order):**
+
+| Step | Function | What it does |
+|------|----------|--------------|
+| 1 | `stripCodeFences()` | Removes `` ``` `` / `` ```lang `` wrappers; preserves single backticks for item names like `` `oak_log` `` |
+| 2 | `stripSystemPromptLeaks()` | Detects and removes leaked system prompt fragments ("You are my private inner thought...", etc.) |
+| 3 | `extractGoalTag()` | Extracts structured `[GOAL: action target amount]` tags into `GoalTag` objects; handles malformed/split variants |
+| 4 | `truncateDegeneration()` | N-gram repetition detection (trigrams 3+, consecutive identical words 4+); truncates at repetition boundary |
+| 5 | `stripTrailingGarbage()` | Removes trailing standalone numbers and incomplete sentence fragments |
+| 6 | `normalizeWhitespace()` | Collapses whitespace runs, trims |
+
+**Integration points:**
+- Applied in `llm-interface.ts` `generateResponse()` at both primary and retry return paths
+- `SanitizationFlags` and `extractedGoal` are attached to `LLMResponse.metadata` for observability
+- `thought-generator.ts` plumbs `extractedGoal` into `CognitiveThought.metadata` for all 4 generation methods (idle, task, social, event)
+- Dashboard `cleanMarkdownArtifacts()` remains as defense-in-depth (no-op on pre-cleaned text)
+- `isUsableContent()` exported separately for callers that want quality gating
+
+**Goal tag extraction output:**
+```typescript
+interface GoalTag {
+  action: string;   // collect, mine, craft, build, find, explore, etc.
+  target: string;   // oak_log, stone, wooden_pickaxe, shelter, etc.
+  amount: number | null;
+}
+```
+
+**Future consideration:** The regex pipeline could be augmented by a distilled CoreML classifier (~0.62M params, ~0.4ms inference) for semantic quality scoring. See `isUsableContent()` in the module for details.
+
+---
+
 ### **Integration with Cognitive Architecture**
 
 The dynamic thought generation system integrates seamlessly with the existing cognitive architecture:

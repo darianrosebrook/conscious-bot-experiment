@@ -83,13 +83,15 @@ flowchart TB
     Avail["LLM available?"]
     Prompt["buildPrompt(), sanitiseObservation()"]
     CallLLM["LLMInterface.generateResponse()"]
+    Sanitize["sanitizeLLMOutput()"]
     Abort["AbortController 35s timeout"]
     Parse["parseLLMResponse()"]
     Fallback["createFallback()"]
     Avail -->|no| Fallback
     Avail -->|yes| Prompt
     Prompt --> CallLLM
-    CallLLM --> Abort
+    CallLLM --> Sanitize
+    Sanitize --> Abort
     Abort -->|ok| Parse
     Abort -->|timeout/abort| Fallback
   end
@@ -156,6 +158,29 @@ flowchart TB
 
 - The **planning cycle** runs every 15s. It builds **signals** from the bot and **context**, then calls **planningCoordinator.planAndExecute(signals, context)**.
 - In the current **Minecraft Interface server**, the coordinator is a **stub** that always returns failure and **no primaryPlan**. So "No plan available for execution" is expected until the real Planning service (3002) is wired as the coordinator.
+
+---
+
+## LLM Output Sanitization
+
+All LLM responses are sanitized at the `generateResponse()` return boundary in `LLMInterface` before any consumer sees them. This ensures clean text reaches the cognitive stream, planning signal extraction, intrusive thought parsing, and the dashboard.
+
+**Module:** `packages/cognition/src/llm-output-sanitizer.ts`
+
+**Pipeline (applied in order):**
+1. **Strip code fences** — Removes `` ``` `` / `` ```lang `` wrappers the LLM sometimes emits
+2. **Strip system prompt leaks** — Removes regurgitated prompt fragments ("You are my private inner thought...")
+3. **Extract goal tag** — Parses `[GOAL: action target amount]` into structured `GoalTag`; removes tag from text
+4. **Truncate degeneration** — Detects trigram repetition (3+) and consecutive identical words (4+); truncates
+5. **Strip trailing garbage** — Removes trailing standalone numbers and incomplete sentence fragments
+6. **Normalize whitespace** — Collapses runs, trims
+
+**Metadata propagation:**
+- `LLMResponse.metadata.extractedGoal` — Structured goal if a `[GOAL:]` tag was found
+- `LLMResponse.metadata.sanitizationFlags` — What was cleaned (code fences, leaks, degeneration, garbage, lengths)
+- `CognitiveThought.metadata.extractedGoal` — Plumbed through all 4 thought generation methods
+
+The dashboard's `cleanMarkdownArtifacts()` remains as defense-in-depth but is effectively a no-op on pre-cleaned text.
 
 ---
 
@@ -244,6 +269,7 @@ flowchart TB
 | Entity detection -> POST Cognition /process | Works | Requests are sent; often timeout on client side |
 | Cognition /process -> ObservationReasoner | Works | Observations parsed and reasoned |
 | ObservationReasoner -> MLX | Partial | Some 200s; many aborted, fallback used |
+| LLM output sanitization | Works | Deterministic regex pipeline at generateResponse() boundary; strips fences, leaks, degeneration, garbage; extracts goal tags |
 | Cognition -> Dashboard cognitive stream | Works | Thoughts (including fallback) reach Dashboard |
 | Cognition response -> Minecraft Interface | Broken | Client aborts before response; no task suggestion received |
 | Planning cycle -> planAndExecute | Broken | Stub coordinator; no plan ever returned |

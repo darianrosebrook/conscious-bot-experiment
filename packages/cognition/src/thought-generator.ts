@@ -10,6 +10,8 @@
 import { EventEmitter } from 'events';
 import { LLMInterface } from './cognitive-core/llm-interface';
 import { auditLogger } from './audit/thought-action-audit-logger';
+import { getInteroState } from './interoception-store';
+import { buildStressContext } from './stress-axis-computer';
 
 /**
  * Thought Deduplicator - Prevents repetitive thoughts to improve performance
@@ -89,6 +91,7 @@ export interface ThoughtContext {
       timestamp: number;
     }>;
   };
+  stressContext?: string;
 }
 
 export interface CognitiveThought {
@@ -147,6 +150,7 @@ export interface CognitiveThought {
     llmConfidence?: number;
     model?: string;
     error?: string;
+    extractedGoal?: { action: string; target: string; amount: number | null };
   };
   category?:
     | 'task-related'
@@ -347,6 +351,7 @@ export class EnhancedThoughtGenerator extends EventEmitter {
   ): Promise<CognitiveThought> {
     try {
       const situation = this.buildIdleSituation(context);
+      const stressCtxForLLM = context.stressContext || buildStressContext(getInteroState().stressAxes) || undefined;
 
       // Add timeout wrapper to prevent hanging
       const response = await Promise.race([
@@ -356,7 +361,7 @@ export class EnhancedThoughtGenerator extends EventEmitter {
             context.recentEvents?.map((event) => ({ description: event })) ||
             [],
           agentState: context.currentState,
-        }),
+        }, { stressContext: stressCtxForLLM }),
         new Promise<never>(
           (_, reject) =>
             setTimeout(() => reject(new Error('LLM timeout')), 45000) // 45s timeout
@@ -383,6 +388,7 @@ export class EnhancedThoughtGenerator extends EventEmitter {
           intensity: 0.4,
           llmConfidence: response.confidence,
           model: response.model,
+          extractedGoal: response.metadata.extractedGoal,
         },
         category: 'idle',
         tags: ['monitoring', 'environmental', 'survival'],
@@ -468,6 +474,9 @@ export class EnhancedThoughtGenerator extends EventEmitter {
       situation += `I don't have any active tasks. `;
     }
 
+    const stressCtx = buildStressContext(getInteroState().stressAxes);
+    if (stressCtx) situation += stressCtx + ' ';
+
     situation +=
       'Should I acknowledge this entity? Consider social norms, safety, and my current priorities.';
 
@@ -539,6 +548,9 @@ export class EnhancedThoughtGenerator extends EventEmitter {
     if (position) {
       situation += `At (${Math.round(position.x)}, ${Math.round(position.y)}, ${Math.round(position.z)}). `;
     }
+
+    const stressCtx = buildStressContext(getInteroState().stressAxes);
+    if (stressCtx) situation += stressCtx + ' ';
 
     return situation || 'Idle with no clear context.';
   }
@@ -642,6 +654,7 @@ export class EnhancedThoughtGenerator extends EventEmitter {
                 : 'task-progress',
           llmConfidence: response.confidence,
           model: response.model,
+          extractedGoal: response.metadata.extractedGoal,
         },
         category: 'task-related' as CognitiveThought['category'],
         tags: [
@@ -789,6 +802,7 @@ export class EnhancedThoughtGenerator extends EventEmitter {
           intensity: 0.6,
           llmConfidence: response.confidence,
           model: response.model,
+          extractedGoal: response.metadata.extractedGoal,
         },
         category: 'social',
         tags: ['social', 'entity-nearby', 'consideration'],
@@ -902,6 +916,7 @@ export class EnhancedThoughtGenerator extends EventEmitter {
           trigger: 'event-occurred',
           llmConfidence: response.confidence,
           model: response.model,
+          extractedGoal: response.metadata.extractedGoal,
           ...eventData,
         },
         category: eventType === 'damage_taken' ? 'survival' : 'environmental',
