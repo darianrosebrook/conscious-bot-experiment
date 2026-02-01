@@ -14,7 +14,6 @@ import {
   Trash2,
 } from 'lucide-react';
 
-import { Section } from '@/components/section';
 import { Pill } from '@/components/pill';
 import { EmptyState } from '@/components/empty-state';
 import { Button } from '@/components/ui/button';
@@ -453,15 +452,9 @@ export function DatabasePanel() {
                           {mem.content}
                         </p>
                         <div className="flex flex-wrap gap-2 text-[10px] text-zinc-500">
-                          <span>
-                            Access Count: {mem.accessCount}
-                          </span>
-                          <span>
-                            Entities: {mem.entityCount}
-                          </span>
-                          <span>
-                            Relationships: {mem.relationshipCount}
-                          </span>
+                          <span>Access Count: {mem.accessCount}</span>
+                          <span>Entities: {mem.entityCount}</span>
+                          <span>Relationships: {mem.relationshipCount}</span>
                           {mem.createdAt > 0 && (
                             <span>
                               Created:{' '}
@@ -578,13 +571,13 @@ export function DatabasePanel() {
                     Entity Types
                   </div>
                   <div className="flex flex-wrap gap-2">
-                    {Object.entries(
-                      knowledgeGraph.entityTypeDistribution
-                    ).map(([type, count]) => (
-                      <Pill key={type}>
-                        {type}: {count}
-                      </Pill>
-                    ))}
+                    {Object.entries(knowledgeGraph.entityTypeDistribution).map(
+                      ([type, count]) => (
+                        <Pill key={type}>
+                          {type}: {count}
+                        </Pill>
+                      )
+                    )}
                   </div>
                 </div>
               )}
@@ -784,9 +777,7 @@ export function DatabasePanel() {
                       variant="destructive"
                       size="sm"
                       disabled={dangerLoading}
-                      onClick={() =>
-                        handleDangerAction('reset', resetConfirm)
-                      }
+                      onClick={() => handleDangerAction('reset', resetConfirm)}
                     >
                       {dangerLoading ? 'Resetting...' : 'Yes, Reset'}
                     </Button>
@@ -841,9 +832,7 @@ export function DatabasePanel() {
                       variant="destructive"
                       size="sm"
                       disabled={dangerLoading}
-                      onClick={() =>
-                        handleDangerAction('drop', dropConfirm)
-                      }
+                      onClick={() => handleDangerAction('drop', dropConfirm)}
                     >
                       {dangerLoading ? 'Dropping...' : 'Yes, Drop'}
                     </Button>

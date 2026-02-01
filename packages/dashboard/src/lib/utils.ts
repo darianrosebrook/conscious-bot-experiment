@@ -1,6 +1,13 @@
 import { type ClassValue, clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
 
+/** Only logs when NEXT_PUBLIC_DEBUG_DASHBOARD=1 to reduce browser console noise */
+export function debugLog(...args: unknown[]): void {
+  if (process.env.NEXT_PUBLIC_DEBUG_DASHBOARD === '1') {
+    console.log(...args);
+  }
+}
+
 /**
  * Utility function to merge Tailwind CSS classes
  * @param inputs - Class values to merge

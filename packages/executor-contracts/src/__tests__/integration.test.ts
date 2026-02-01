@@ -69,7 +69,10 @@ describe('PBI Integration with Planning System', () => {
       // Create a mock world state that simulates actual changes
       const mockWorldState = (() => {
         let currentPosition = { x: 0, y: 0, z: 0 };
-        let currentInventory: Record<string, number> = { oak_log: 2, stick: 4 };
+        const currentInventory: Record<string, number> = {
+          oak_log: 2,
+          stick: 4,
+        };
         let nearbyBlocks = [
           { type: 'stone', position: { x: 50, y: 64, z: 50 } },
         ];
@@ -121,7 +124,9 @@ describe('PBI Integration with Planning System', () => {
         // Simulate world state changes after successful actions
         if (result.success && step.type === 'navigate') {
           // Move to the target position
-          mockWorldState.updatePosition(step.args as any as { x: number; y: number; z: number });
+          mockWorldState.updatePosition(
+            step.args as any as { x: number; y: number; z: number }
+          );
         } else if (result.success && step.type === 'craft_item') {
           // Add crafted item to inventory
           mockWorldState.updateInventory(

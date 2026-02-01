@@ -9,6 +9,7 @@
  */
 
 import { useEffect, useCallback, useRef } from 'react';
+import { debugLog } from '@/lib/utils';
 import { useDashboardContext } from '@/contexts/dashboard-context';
 import { useApi } from '@/hooks/use-api';
 import { useDashboardStore } from '@/stores/dashboard-store';
@@ -117,14 +118,14 @@ export function useCognitiveStream() {
         typeof window !== 'undefined'
           ? `${window.location.origin}${path}`
           : config.routes.cognitiveStreamSSE();
-      console.log('Connecting to cognitive stream SSE:', url);
+      debugLog('Connecting to cognitive stream SSE:', url);
 
       try {
         const es = new EventSource(url);
         eventSourceRef.current = es;
-        console.log('EventSource created successfully');
+        debugLog('EventSource created successfully');
       } catch (error) {
-        console.error('Failed to create EventSource:', error);
+        debugLog('Failed to create EventSource:', error);
         return null;
       }
 
@@ -132,11 +133,11 @@ export function useCognitiveStream() {
       if (!es) return null;
 
       es.onopen = () => {
-        console.log(
+        debugLog(
           'Cognitive stream SSE connection opened, readyState:',
           es.readyState
         );
-        console.log('SSE URL:', es.url);
+        debugLog('SSE URL:', es.url);
       };
 
       es.onmessage = (event) => {
@@ -171,32 +172,28 @@ export function useCognitiveStream() {
             }
           }
         } catch (error) {
-          console.error('Failed to parse cognitive stream message:', error);
+          debugLog('Failed to parse cognitive stream message:', error);
         }
       };
 
       es.onerror = (error) => {
-        console.warn(
+        debugLog(
           'Cognitive stream SSE error event, readyState:',
           es.readyState
         );
 
-        // Log more details about the error
         if (es.readyState === EventSource.CONNECTING) {
-          console.log('SSE connection is connecting...');
+          debugLog('SSE connection is connecting...');
         } else if (es.readyState === EventSource.OPEN) {
-          console.log('SSE connection is open');
+          debugLog('SSE connection is open');
         } else if (es.readyState === EventSource.CLOSED) {
-          console.log('SSE connection is closed');
+          debugLog('SSE connection is closed');
         }
 
-        // Only log the error if it's not a connection close
         if (es.readyState !== EventSource.CLOSED) {
-          console.error('Cognitive stream SSE error:', error);
-          console.error('Error details:', {
+          debugLog('Cognitive stream SSE error:', error, {
             readyState: es.readyState,
             url: es.url,
-            withCredentials: es.withCredentials,
           });
         }
 
@@ -209,7 +206,7 @@ export function useCognitiveStream() {
 
         if (reconnectAttempts.current <= maxReconnectAttempts) {
           const delay = getReconnectDelay();
-          console.log(
+          debugLog(
             `Attempting to reconnect to cognitive stream in ${delay}ms (attempt ${reconnectAttempts.current}/${maxReconnectAttempts})...`
           );
 
@@ -219,7 +216,7 @@ export function useCognitiveStream() {
             }
           }, delay);
         } else {
-          console.error(
+          debugLog(
             'Max reconnection attempts reached. Giving up on cognitive stream connection.'
           );
         }
@@ -276,7 +273,7 @@ export function useCognitiveStream() {
           metadata: { messageType: 'intrusion', intent: 'external_suggestion' },
         });
 
-        // Also send to intrusive API (fire-and-forget)
+        // Also send to intrusive API (fire-and-forget; thought already in stream)
         api
           .post(config.routes.intrusive(), {
             text: trimmedText,
@@ -284,8 +281,11 @@ export function useCognitiveStream() {
             strength: 0.8,
             ...options,
           })
-          .catch(() => {
-            // Non-fatal error
+          .catch((err) => {
+            debugLog(
+              '[Dashboard] Intrusive API (cognition/planning) failed:',
+              err?.message ?? err
+            );
           });
 
         return true;

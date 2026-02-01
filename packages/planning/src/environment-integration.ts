@@ -110,7 +110,7 @@ const DEFAULT_CONFIG: EnvironmentIntegrationConfig = {
   maxBlockDistance: 20,
 };
 
-export class EnhancedEnvironmentIntegration extends EventEmitter {
+export class EnvironmentIntegration extends EventEmitter {
   private config: EnvironmentIntegrationConfig;
   private currentEnvironment: EnvironmentData | null = null;
   private currentInventory: InventoryItem[] = [];

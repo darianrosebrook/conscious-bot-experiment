@@ -69,7 +69,7 @@ DASHBOARD_ENDPOINT=http://localhost:3000
 # Minecraft server
 MINECRAFT_HOST=localhost
 MINECRAFT_PORT=25565
-MINECRAFT_VERSION=1.20.1
+MINECRAFT_VERSION=1.21.9
 MINECRAFT_USERNAME=ConsciousBot
 
 # Sterling reasoning server (clone ../sterling to enable)
@@ -155,7 +155,7 @@ pnpm --filter @conscious-bot/core run dev:server   # Core API (port 3007)
 | Sterling | `ws://localhost:8766` | Symbolic reasoning (crafting, building, tool progression); clone ../sterling to enable |
 | MLX-LM Sidecar | `http://localhost:5002` | Local LLM generation + embeddings (Apple Silicon) |
 | PostgreSQL | `localhost:5432` | pgvector-enabled database (Docker) |
-| Minecraft Server | `localhost:25565` | Vanilla 1.20.1 server (Docker) |
+| Minecraft Server | `localhost:25565` | Vanilla 1.21.9 server (Docker) |
 
 ### Observing the Bot (Spectator Mode)
 
@@ -163,7 +163,7 @@ The Minecraft server runs in offline mode, so you can connect with any username 
 
 #### Connecting with the Minecraft Client
 
-1. Open **Minecraft Java Edition 1.20.1**
+1. Open **Minecraft Java Edition 1.21.9**
 2. Go to **Multiplayer** > **Add Server**
 3. Enter server address: `localhost:25565`
 4. Join the server
@@ -305,7 +305,7 @@ The system is organized into 11 TypeScript packages, 2 Python sidecars, and Dock
 
 #### Docker Infrastructure
 - **PostgreSQL + pgvector** - Vector-enabled database for memory storage (768-dim embeddings, HNSW indexing)
-- **Minecraft Server** - Vanilla 1.20.1 server (offline mode, cheats enabled, operator pre-configured)
+- **Minecraft Server** - Vanilla 1.21.9 server (offline mode, cheats enabled, operator pre-configured)
 
 #### Dependency Architecture
 The package architecture follows strict dependency rules to prevent circular dependencies:
@@ -480,7 +480,7 @@ Finally, we draw on cognitive theories to inform specific components. For exampl
 **Operational Status:**
 - **All Services Running**: 9 application services + 2 Docker containers operational
 - **MLX-LM Sidecar**: Local LLM generation (gemma-3n-E2B) and embeddings (embeddinggemma) on Apple Silicon — replaces Ollama
-- **Docker Infrastructure**: PostgreSQL with pgvector and Minecraft 1.20.1 server managed via `docker compose`
+- **Docker Infrastructure**: PostgreSQL with pgvector and Minecraft 1.21.9 server managed via `docker compose`
 - **Dashboard**: Next.js 15 interface connects to all backend services for real-time monitoring
 - **Spectator Mode**: Minecraft server configured with operator permissions for human observation
 

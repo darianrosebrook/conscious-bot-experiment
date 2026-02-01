@@ -223,15 +223,17 @@ export class EventDrivenThoughtGenerator extends EventEmitter {
    * Generate thought content for task completion
    */
   private generateTaskCompletionThought(event: BotLifecycleEvent): string {
-    const { taskTitle, activeTasksCount } = event.data;
+    const { taskTitle, activeTasksCount: rawCount } = event.data;
+    const activeTasksCount =
+      typeof rawCount === 'number' && rawCount >= 0 ? rawCount : 0;
 
     if (activeTasksCount === 0) {
       return `I completed ${taskTitle}. Now I have some time to think about what to do next.`;
-    } else if (activeTasksCount === 1) {
-      return `Done with ${taskTitle}. I should focus on my remaining task.`;
-    } else {
-      return `${taskTitle} is complete. I have ${activeTasksCount} other tasks to consider.`;
     }
+    if (activeTasksCount === 1) {
+      return `Done with ${taskTitle}. I should focus on my remaining task.`;
+    }
+    return `${taskTitle} is complete. I have ${activeTasksCount} other tasks to consider.`;
   }
 
   /**

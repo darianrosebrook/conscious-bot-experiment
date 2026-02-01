@@ -16,6 +16,7 @@ import {
   SensingConfig,
   Orientation,
 } from '@conscious-bot/world';
+import { resilientFetch } from '@conscious-bot/core';
 
 // Simple inline goal classes for ES modules compatibility
 class SimpleGoalNear {
@@ -1264,7 +1265,9 @@ export class ActionTranslator {
           return {
             success: false,
             error:
-              e instanceof Error ? e.message : 'No visible matching block found nearby',
+              e instanceof Error
+                ? e.message
+                : 'No visible matching block found nearby',
           };
         }
       }
@@ -1277,31 +1280,47 @@ export class ActionTranslator {
           y: Math.floor(botPos.y),
           z: Math.floor(botPos.z),
         };
-        // If caller specified a blockType, prefer the nearest *visible* matching block
+        // If caller specified a blockType, we must find that block type; do not dig whatever is under the bot
         if (parameters.blockType) {
           try {
-            const targetPos = this.findNearestVisibleBlock(parameters.blockType);
+            const targetPos = this.findNearestVisibleBlock(
+              parameters.blockType
+            );
             parameters.pos = { x: targetPos.x, y: targetPos.y, z: targetPos.z };
             if (!parameters.expect) parameters.expect = parameters.blockType;
           } catch (e) {
-            // Keep "current" if no visible match was found; the leaf will validate
+            return {
+              success: false,
+              error:
+                e instanceof Error
+                  ? e.message
+                  : `No visible ${parameters.blockType} found nearby; move to the resource first`,
+            };
           }
         }
       }
 
       // Validate line-of-sight before digging: do not dig blocks the bot cannot see
       if (parameters.pos && typeof parameters.pos.x === 'number') {
-        const blockPos = new Vec3(parameters.pos.x, parameters.pos.y, parameters.pos.z);
+        const blockPos = new Vec3(
+          parameters.pos.x,
+          parameters.pos.y,
+          parameters.pos.z
+        );
         const observer = this.getEyePosition();
         const blockCenter = {
           x: blockPos.x + 0.5,
           y: blockPos.y + 0.5,
           z: blockPos.z + 0.5,
         };
-        const hasLos = this.raycastEngine.hasLineOfSight(observer, blockCenter, {
-          maxDistance: this.raycastConfig.maxDistance,
-          assumeBlockedOnError: true,
-        });
+        const hasLos = this.raycastEngine.hasLineOfSight(
+          observer,
+          blockCenter,
+          {
+            maxDistance: this.raycastConfig.maxDistance,
+            assumeBlockedOnError: true,
+          }
+        );
         if (!hasLos) {
           return {
             success: false,
@@ -1311,7 +1330,10 @@ export class ActionTranslator {
       }
 
       // Pass LOS validator so the leaf can enforce visibility when it resolves position itself
-      (context as any).hasLineOfSight = (obs: { x: number; y: number; z: number }, tgt: { x: number; y: number; z: number }) =>
+      (context as any).hasLineOfSight = (
+        obs: { x: number; y: number; z: number },
+        tgt: { x: number; y: number; z: number }
+      ) =>
         this.raycastEngine.hasLineOfSight(obs, tgt, {
           maxDistance: this.raycastConfig.maxDistance,
           assumeBlockedOnError: true,
@@ -2628,20 +2650,23 @@ export class ActionTranslator {
       // Use the world package's perception system for better item detection
       const worldUrl = process.env.WORLD_SERVICE_URL || 'http://localhost:3004';
 
-      const response = await fetch(`${worldUrl}/api/perception/visual-field`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          position: { x: center.x, y: center.y, z: center.z },
-          radius: radius,
-          fieldOfView: { horizontal: 120, vertical: 60 }, // Wide field of view for exploration
-          maxDistance: radius,
-          observerPosition: { x: center.x, y: center.y, z: center.z },
-          level: 'enhanced', // Use enhanced perception for better detection
-        }),
-      });
+      const response = await resilientFetch(
+        `${worldUrl}/api/perception/visual-field`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            position: { x: center.x, y: center.y, z: center.z },
+            radius: radius,
+            fieldOfView: { horizontal: 120, vertical: 60 }, // Wide field of view for exploration
+            maxDistance: radius,
+            observerPosition: { x: center.x, y: center.y, z: center.z },
+            level: 'enhanced', // Use enhanced perception for better detection
+          }),
+        }
+      );
 
-      if (!response.ok) {
+      if (!response?.ok) {
         console.log(
           `World perception API failed, falling back to spiral search`
         );
@@ -3557,10 +3582,12 @@ export class ActionTranslator {
       timeout
     );
     if (result.foundBlocks.length === 0) {
-      throw new Error(`No visible ${blockType} found within ${this.raycastConfig.maxDistance} blocks`);
+      throw new Error(
+        `No visible ${blockType} found within ${this.raycastConfig.maxDistance} blocks`
+      );
     }
-    const closest = result.foundBlocks.reduce(
-      (a, b) => (a.distance < b.distance ? a : b)
+    const closest = result.foundBlocks.reduce((a, b) =>
+      a.distance < b.distance ? a : b
     );
     return closest.position;
   }

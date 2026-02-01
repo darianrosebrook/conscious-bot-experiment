@@ -987,35 +987,32 @@ export class EnhancedThoughtGenerator extends EventEmitter {
     const inventory = context.currentState?.inventory || [];
     const currentTasks = context.currentTasks || [];
 
-    let thought = 'Processing current situation...';
+    // Task-based thoughts (prioritize over generic)
+    if (currentTasks.length > 0) {
+      const task = currentTasks[0];
+      return `Currently working on: ${task.title}. Focusing on task completion.`;
+    }
 
     // Health-based thoughts
     if (health < 10) {
-      thought =
-        'Health is critically low. Need to prioritize survival and healing.';
+      return 'Health is critically low. Need to prioritize survival and healing.';
     } else if (health < 15) {
-      thought =
-        'Health is moderate. Should consider finding food or healing items.';
-    }
-
-    // Task-based thoughts
-    if (currentTasks.length > 0) {
-      const task = currentTasks[0];
-      thought = `Currently working on: ${task.title}. Focusing on task completion.`;
-    }
-
-    // Position-based thoughts
-    if (position) {
-      thought += ` Located at (${position.x.toFixed(1)}, ${position.y.toFixed(1)}, ${position.z.toFixed(1)}).`;
+      return 'Health is moderate. Should consider finding food or healing items.';
     }
 
     // Inventory-based thoughts
     if (inventory.length > 0) {
       const itemCount = inventory.length;
-      thought += ` Carrying ${itemCount} different items.`;
+      return `Carrying ${itemCount} different items. Assessing next action.`;
     }
 
-    return thought;
+    // Position-based thoughts
+    if (position) {
+      return `Located at (${position.x.toFixed(1)}, ${position.y.toFixed(1)}, ${position.z.toFixed(1)}). Observing surroundings.`;
+    }
+
+    // Only use generic as last resort
+    return 'Maintaining awareness of surroundings.';
   }
 
   /**

@@ -713,7 +713,10 @@ export class DigBlockLeaf implements LeafImpl {
         const origin = bot.entity.position.clone();
         const eyePos = origin.offset(0, bot.entity.height ?? 1.62, 0);
         const hasLineOfSight = (ctx as any).hasLineOfSight as
-          | ((obs: { x: number; y: number; z: number }, tgt: { x: number; y: number; z: number }) => boolean)
+          | ((
+              obs: { x: number; y: number; z: number },
+              tgt: { x: number; y: number; z: number }
+            ) => boolean)
           | undefined;
         // Expanding cube search: prefer blocks the bot can actually see (no digging through dirt/stone)
         outer: for (let r = 1; r <= 10; r++) {
@@ -808,10 +811,17 @@ export class DigBlockLeaf implements LeafImpl {
 
       // Do not dig blocks the bot cannot see (occluded by dirt, stone, etc.)
       const hasLineOfSight = (ctx as any).hasLineOfSight as
-        | ((obs: { x: number; y: number; z: number }, tgt: { x: number; y: number; z: number }) => boolean)
+        | ((
+            obs: { x: number; y: number; z: number },
+            tgt: { x: number; y: number; z: number }
+          ) => boolean)
         | undefined;
       if (hasLineOfSight) {
-        const eyePos = bot.entity.position.offset(0, bot.entity.height ?? 1.62, 0);
+        const eyePos = bot.entity.position.offset(
+          0,
+          bot.entity.height ?? 1.62,
+          0
+        );
         const blockCenter = {
           x: targetPos.x + 0.5,
           y: targetPos.y + 0.5,
@@ -823,7 +833,8 @@ export class DigBlockLeaf implements LeafImpl {
             error: {
               code: 'world.invalidPosition',
               retryable: true,
-              detail: 'Block not visible (occluded); cannot dig through obstacles',
+              detail:
+                'Block not visible (occluded); cannot dig through obstacles',
             },
             metrics: {
               durationMs: ctx.now() - startTime,

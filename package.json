@@ -21,6 +21,8 @@
     "kill": "node scripts/kill-servers.js",
     "status": "node scripts/status.js",
     "health": "node scripts/health-check-diagnostic.js",
+    "clear-cognitive-state": "node scripts/clear-cognitive-state.js",
+    "clear-cognitive-state:db": "node scripts/clear-cognitive-state.js --db",
     "lint": "turbo lint",
     "test": "turbo test",
     "clean": "turbo clean",
@@ -48,7 +50,6 @@
   ],
   "devDependencies": {
     "@types/node": "^20.19.17",
-    "ws": "^8.18.0",
     "@typescript-eslint/eslint-plugin": "^6.21.0",
     "@typescript-eslint/parser": "^6.21.0",
     "concurrently": "^8.2.2",
@@ -56,7 +57,8 @@
     "prettier": "^3.6.2",
     "tsx": "^4.20.5",
     "turbo": "^2.5.6",
-    "typescript": "^5.9.2"
+    "typescript": "^5.9.2",
+    "ws": "^8.18.0"
   },
   "engines": {
     "node": ">=18.0.0",
@@ -83,6 +85,9 @@
       "axios": "^1.12.0",
       "esbuild": "^0.25.0",
       "vite": "^5.4.20"
+    },
+    "patchedDependencies": {
+      "prismarine-viewer@1.33.0": "patches/prismarine-viewer@1.33.0.patch"
     }
   }
 }

@@ -22,8 +22,8 @@ async function demoWorkingCapabilities() {
       port: process.env.MINECRAFT_PORT
         ? parseInt(process.env.MINECRAFT_PORT)
         : 25565,
-      username: process.env.MINECRAFT_USERNAME || 'ConsciousBot',
-      version: process.env.MINECRAFT_VERSION || '1.20.1',
+      username: process.env.MINECRAFT_USERNAME || 'Sterling',
+      version: process.env.MINECRAFT_VERSION || '1.21.9',
       auth: 'offline',
     });
 

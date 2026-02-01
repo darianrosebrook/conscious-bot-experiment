@@ -8,6 +8,7 @@
  */
 
 import { EventEmitter } from 'events';
+import { resilientFetch } from '@conscious-bot/core';
 
 interface MemoryEvent {
   id: string;
@@ -58,7 +59,7 @@ const DEFAULT_CONFIG: MemoryIntegrationConfig = {
   retryAttempts: 3,
 };
 
-export class EnhancedMemoryIntegration extends EventEmitter {
+export class MemoryIntegration extends EventEmitter {
   private config: MemoryIntegrationConfig;
   private events: MemoryEvent[] = [];
   private notes: ReflectiveNote[] = [];
@@ -97,8 +98,6 @@ export class EnhancedMemoryIntegration extends EventEmitter {
       return; // Don't discover too frequently
     }
 
-    console.log('🔍 Discovering memory system endpoints...');
-
     // Try multiple endpoints in order of preference
     const potentialEndpoints: string[] = [
       process.env.MEMORY_ENDPOINT || 'http://localhost:3001',
@@ -111,34 +110,37 @@ export class EnhancedMemoryIntegration extends EventEmitter {
     const discovered: string[] = [];
 
     for (const endpoint of potentialEndpoints) {
-      try {
-        const response = await fetch(`${endpoint.replace(/\/$/, '')}/health`, {
+      const response = await resilientFetch(
+        `${endpoint.replace(/\/$/, '')}/health`,
+        {
           method: 'GET',
-          signal: AbortSignal.timeout(2000),
-        });
-
-        if (response.ok) {
-          discovered.push(endpoint);
-          console.log(`✅ Memory system found at: ${endpoint}`);
+          timeoutMs: 2000,
+          label: `memory/${endpoint}`,
         }
-      } catch (error) {
-        console.log(`❌ Memory system not available at: ${endpoint}`);
+      );
+
+      if (response?.ok) {
+        discovered.push(endpoint);
       }
     }
 
     if (discovered.length > 0) {
       this.discoveredEndpoints = discovered;
-      // Update config with best available endpoint
+      const chosen = discovered[0];
       if (
         !this.config.memorySystemEndpoint ||
         !discovered.includes(this.config.memorySystemEndpoint)
       ) {
-        this.config.memorySystemEndpoint = discovered[0];
-        console.log(
-          `🔄 Updated memory system endpoint to: ${this.config.memorySystemEndpoint}`
-        );
+        this.config.memorySystemEndpoint = chosen;
+        if (process.env.NODE_ENV === 'development') {
+          console.log(`[Planning] Memory discovery: using ${chosen}`);
+        }
         this.emit('memorySystemDiscovered', this.config.memorySystemEndpoint);
       }
+    } else if (process.env.NODE_ENV === 'development') {
+      console.log(
+        `[Planning] Memory discovery: no endpoint available (tried ${potentialEndpoints.length} URLs)`
+      );
     }
 
     this.lastDiscovery = Date.now();
@@ -628,7 +630,7 @@ export class EnhancedMemoryIntegration extends EventEmitter {
   /**
    * Get memory context for planning decisions
    */
-  async getMemoryEnhancedContext(
+  async getMemoryContext(
     context: {
       query?: string;
       taskType?: string;
@@ -782,31 +784,17 @@ export class EnhancedMemoryIntegration extends EventEmitter {
    * Notify dashboard of updates
    */
   private async notifyDashboard(event: string, data: any): Promise<void> {
-    try {
-      const url = `${this.config.dashboardEndpoint.replace(/\/$/, '')}/api/memory-updates`;
-      const retries = 2;
-      let ok = false;
-      for (let attempt = 0; attempt <= retries; attempt++) {
-        try {
-          const controller = new AbortController();
-          const t = setTimeout(() => controller.abort(), 5_000);
-          const res = await fetch(url, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ event, data }),
-            signal: controller.signal,
-          });
-          clearTimeout(t);
-          if (res.ok) {
-            ok = true;
-            break;
-          }
-        } catch {}
-        await new Promise((r) => setTimeout(r, 200 + attempt * 200));
-      }
-      if (!ok) throw new Error('Failed to POST memory update');
-    } catch (error) {
-      console.error('Failed to notify dashboard:', error);
+    const url = `${this.config.dashboardEndpoint.replace(/\/$/, '')}/api/memory-updates`;
+    const res = await resilientFetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ event, data }),
+      timeoutMs: 5000,
+      maxRetries: 3,
+      label: 'dashboard/memory-updates',
+    });
+    if (!res?.ok) {
+      console.warn('Failed to notify dashboard of memory update');
     }
   }
 

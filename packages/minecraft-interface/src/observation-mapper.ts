@@ -10,6 +10,7 @@
 import { Bot } from 'mineflayer';
 import { Vec3 } from 'vec3';
 import { PlanningContext } from './types';
+import { resilientFetch } from '@conscious-bot/core';
 
 // Minimal type definition to avoid circular dependency
 export interface HomeostasisState {
@@ -94,6 +95,8 @@ export class ObservationMapper {
     thoughtType: string = 'observation'
   ): Promise<boolean> {
     try {
+      const cognitionUrl =
+        process.env.COGNITION_SERVICE_URL || 'http://localhost:3003';
       const thought = {
         type: thoughtType,
         content: content,
@@ -108,22 +111,23 @@ export class ObservationMapper {
         timestamp: Date.now(),
       };
 
-      const response = await fetch('http://localhost:3003/thoughts', {
+      const response = await resilientFetch(`${cognitionUrl}/thoughts`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(thought),
-        signal: AbortSignal.timeout(5000),
+        timeoutMs: 5000,
       });
 
-      if (response.ok) {
+      if (response?.ok) {
         console.log(`✅ Sent thought to cognition server: ${thoughtType}`);
         return true;
-      } else {
+      }
+      if (response) {
         console.error(
           `Failed to send thought to cognition server: ${response.status}`
         );
-        return false;
       }
+      return false;
     } catch (error) {
       console.error('Error sending thought to cognition server:', error);
       return false;
@@ -142,8 +146,8 @@ export class ObservationMapper {
     return {
       player: {
         position: bot.entity.position.clone(),
-        health: bot.health,
-        food: bot.food,
+        health: bot.health ?? 20,
+        food: bot.food ?? 20,
         experience: bot.experience.points,
         gameMode: bot.game.gameMode,
         dimension: bot.game.dimension,

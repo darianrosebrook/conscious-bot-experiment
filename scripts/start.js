@@ -370,9 +370,7 @@ async function waitForWebSocket(wsUrl, serviceName, maxAttempts = 60) {
     } catch (err) {
       if (attempt >= maxAttempts) {
         const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
-        throw new Error(
-          `WebSocket ${serviceName} not ready after ${elapsed}s`
-        );
+        throw new Error(`WebSocket ${serviceName} not ready after ${elapsed}s`);
       }
       await new Promise((r) => setTimeout(r, 2000));
     }
@@ -457,7 +455,10 @@ async function setupMLXEnvironment() {
 
   // Check if directory exists
   if (!fs.existsSync(mlxDir)) {
-    log(' ⚠️  mlx-lm-sidecar directory not found, skipping MLX setup', colors.yellow);
+    log(
+      ' ⚠️  mlx-lm-sidecar directory not found, skipping MLX setup',
+      colors.yellow
+    );
     return;
   }
 
@@ -465,11 +466,17 @@ async function setupMLXEnvironment() {
   try {
     const arch = execSync('uname -m', { encoding: 'utf-8' }).trim();
     if (arch !== 'arm64') {
-      log(' ⚠️  MLX requires Apple Silicon (arm64). Skipping MLX setup.', colors.yellow);
+      log(
+        ' ⚠️  MLX requires Apple Silicon (arm64). Skipping MLX setup.',
+        colors.yellow
+      );
       return;
     }
   } catch {
-    log(' ⚠️  Could not detect architecture, skipping MLX setup', colors.yellow);
+    log(
+      ' ⚠️  Could not detect architecture, skipping MLX setup',
+      colors.yellow
+    );
     return;
   }
 
@@ -492,14 +499,14 @@ async function setupMLXEnvironment() {
   // Install Python dependencies
   log(' 📦 Installing MLX dependencies...', colors.purple);
   try {
-    execSync(
-      `cd ${mlxDir} && ./venv-mlx/bin/pip install --upgrade pip`,
-      { stdio: 'inherit', shell: true }
-    );
-    execSync(
-      `cd ${mlxDir} && ./venv-mlx/bin/pip install -r requirements.txt`,
-      { stdio: 'inherit', shell: true }
-    );
+    execSync(`cd ${mlxDir} && ./venv-mlx/bin/pip install --upgrade pip`, {
+      stdio: 'inherit',
+      shell: true,
+    });
+    execSync(`cd ${mlxDir} && ./venv-mlx/bin/pip install -r requirements.txt`, {
+      stdio: 'inherit',
+      shell: true,
+    });
     log(' ✅ MLX dependencies installed', colors.green);
   } catch (error) {
     log(' ❌ Failed to install MLX dependencies', colors.red);
@@ -526,8 +533,14 @@ print('OK')
     );
     log(' ✅ MLX models are cached locally', colors.green);
   } catch (error) {
-    log(' ⚠️  Some MLX models are not cached — first startup will download them', colors.yellow);
-    log('     Run: cd mlx-lm-sidecar && bash setup.sh to pre-download', colors.cyan);
+    log(
+      ' ⚠️  Some MLX models are not cached — first startup will download them',
+      colors.yellow
+    );
+    log(
+      '     Run: cd mlx-lm-sidecar && bash setup.sh to pre-download',
+      colors.cyan
+    );
   }
 }
 
@@ -539,7 +552,10 @@ async function startDockerServices() {
   try {
     execSync('docker --version', { stdio: 'ignore' });
   } catch {
-    log(' ⚠️  Docker is not installed or not in PATH — skipping Docker services', colors.yellow);
+    log(
+      ' ⚠️  Docker is not installed or not in PATH — skipping Docker services',
+      colors.yellow
+    );
     return;
   }
 
@@ -547,7 +563,10 @@ async function startDockerServices() {
   try {
     execSync('docker info', { stdio: 'ignore' });
   } catch {
-    log(' ⚠️  Docker daemon is not running — skipping Docker services', colors.yellow);
+    log(
+      ' ⚠️  Docker daemon is not running — skipping Docker services',
+      colors.yellow
+    );
     return;
   }
 
@@ -564,7 +583,10 @@ async function startDockerServices() {
   let pgReady = false;
   for (let i = 0; i < 30; i++) {
     try {
-      execSync('docker exec conscious-bot-postgres pg_isready -U conscious_bot -q', { stdio: 'ignore' });
+      execSync(
+        'docker exec conscious-bot-postgres pg_isready -U conscious_bot -q',
+        { stdio: 'ignore' }
+      );
       pgReady = true;
       break;
     } catch {
@@ -579,10 +601,15 @@ async function startDockerServices() {
 
   // Log Minecraft status (non-blocking — it's optional)
   try {
-    execSync('docker exec conscious-bot-minecraft mc-health', { stdio: 'ignore' });
+    execSync('docker exec conscious-bot-minecraft mc-health', {
+      stdio: 'ignore',
+    });
     log(' ✅ Minecraft server is ready', colors.green);
   } catch {
-    log(' ℹ️  Minecraft server is still starting (non-blocking)', colors.yellow);
+    log(
+      ' ℹ️  Minecraft server is still starting (non-blocking)',
+      colors.yellow
+    );
   }
 }
 
@@ -729,6 +756,13 @@ async function main() {
     );
     logService(service.name, service.description, 'INFO');
 
+    const baseEnv = { ...process.env, FORCE_COLOR: '1' };
+    if (service.name === 'Memory' && !baseEnv.WORLD_SEED) {
+      baseEnv.MEMORY_DEV_DEFAULT_SEED = 'true';
+    }
+    if (service.name === 'Minecraft Interface') {
+      baseEnv.MINECRAFT_VERSION = '1.21.9';
+    }
     const child = spawn(service.command, service.args, {
       stdio: 'pipe',
       shell: service.cwd ? false : true,
@@ -737,7 +771,7 @@ async function main() {
         : service.name === 'MLX-LM Sidecar'
           ? `${process.cwd()}/mlx-lm-sidecar`
           : process.cwd(),
-      env: { ...process.env, FORCE_COLOR: '1' },
+      env: baseEnv,
     });
 
     // Handle output with service prefix
@@ -939,7 +973,11 @@ async function main() {
       colors.cyan
     );
   } else {
-    logWithTimestamp('\n🚦 Broadcasting system readiness...', 'INFO', colors.cyan);
+    logWithTimestamp(
+      '\n🚦 Broadcasting system readiness...',
+      'INFO',
+      colors.cyan
+    );
     const payload = {
       ready: true,
       services: readinessTargets.map((s) => s.name),
@@ -959,7 +997,11 @@ async function main() {
       }
       await wait(200);
     }
-    logWithTimestamp('✅ Readiness broadcast complete', 'SUCCESS', colors.green);
+    logWithTimestamp(
+      '✅ Readiness broadcast complete',
+      'SUCCESS',
+      colors.green
+    );
   }
 
   // Step 10: Check optional external services (Sterling is now started by this script when available)
@@ -993,13 +1035,25 @@ async function main() {
           reject(err);
         });
       });
-      log(`  ✅ Sterling reasoning server available at ${sterlingUrl}`, colors.green);
+      log(
+        `  ✅ Sterling reasoning server available at ${sterlingUrl}`,
+        colors.green
+      );
     } catch {
-      log(`  ℹ️  Sterling started but not responding at ${sterlingUrl} yet (optional)`, colors.yellow);
+      log(
+        `  ℹ️  Sterling started but not responding at ${sterlingUrl} yet (optional)`,
+        colors.yellow
+      );
     }
   } else {
-    log(`  ℹ️  Sterling not started (repo not found at ${sterlingDir})`, colors.yellow);
-    log('     To enable: clone Sterling to ../sterling or set STERLING_DIR', colors.cyan);
+    log(
+      `  ℹ️  Sterling not started (repo not found at ${sterlingDir})`,
+      colors.yellow
+    );
+    log(
+      '     To enable: clone Sterling to ../sterling or set STERLING_DIR',
+      colors.cyan
+    );
   }
 
   // Minecraft server (external or Docker-managed)
@@ -1026,8 +1080,14 @@ async function main() {
     });
     log(`  ✅ Minecraft server available at ${mcHost}:${mcPort}`, colors.green);
   } catch {
-    log(`  ℹ️  Minecraft server not available at ${mcHost}:${mcPort} (optional)`, colors.yellow);
-    log('     To enable: pnpm docker:up (or start a Minecraft 1.20.1 server manually)', colors.cyan);
+    log(
+      `  ℹ️  Minecraft server not available at ${mcHost}:${mcPort} (optional)`,
+      colors.yellow
+    );
+    log(
+      '     To enable: pnpm docker:up (or start a Minecraft 1.21.9 server manually)',
+      colors.cyan
+    );
   }
 
   // Step 11: Display status and URLs

@@ -5,7 +5,6 @@ import {
   Activity,
   BarChart3,
   Brain,
-  Database,
   FileText,
   History,
   ListChecks,
@@ -19,6 +18,8 @@ import {
 } from 'lucide-react';
 
 import { useDashboardStore } from '@/stores/dashboard-store';
+import type { InventoryItem, Task } from '@/types';
+import { debugLog } from '@/lib/utils';
 import { useWebSocket } from '@/hooks/useWebSocket';
 import { useCognitiveStream } from '@/hooks/use-cognitive-stream';
 import { useBotStateSSE } from '@/hooks/use-bot-state-sse';
@@ -49,11 +50,7 @@ interface BotState {
   achievement?: number;
   curiosity?: number;
   creativity?: number;
-  inventory?: Array<{
-    name: string;
-    count: number;
-    displayName: string;
-  }>;
+  inventory?: InventoryItem[];
   selectedSlot?: number;
   time?: number;
   weather?: string;
@@ -87,6 +84,9 @@ function ConsciousMinecraftDashboardContent() {
     setHud,
     addThought,
     setTasks,
+    updateTask,
+    addTask,
+    addEvent,
     setEvents,
     setMemories,
     setNotes,
@@ -124,7 +124,7 @@ function ConsciousMinecraftDashboardContent() {
       const result = await response.json();
       setViewerStatus(result);
     } catch (error) {
-      console.error('Error checking viewer status:', error);
+      debugLog('Error checking viewer status:', error);
       setViewerStatus({
         canStart: false,
         reason: 'Failed to check viewer status',
@@ -135,7 +135,7 @@ function ConsciousMinecraftDashboardContent() {
   // Memoized WebSocket callbacks to prevent infinite reconnections
   const handleWebSocketMessage = useCallback(
     (message: any) => {
-      console.log('WebSocket message received:', message);
+      debugLog('WebSocket message received:', message);
 
       // Handle different types of real-time updates
       switch (message.type) {
@@ -362,22 +362,22 @@ function ConsciousMinecraftDashboardContent() {
         }
 
         default:
-          console.log('Unhandled WebSocket message type:', message.type);
+          debugLog('Unhandled WebSocket message type:', message.type);
       }
     },
     [setHud, setInventory, setBotState, setBotConnections, addThought]
   );
 
   const handleWebSocketError = useCallback((error: Event) => {
-    console.warn('Bot state WebSocket connection error:', error);
+    debugLog('Bot state WebSocket connection error:', error);
   }, []);
 
   const handleWebSocketOpen = useCallback(() => {
-    console.log('Bot state WebSocket connection opened');
+    debugLog('Bot state WebSocket connection opened');
   }, []);
 
   const handleWebSocketClose = useCallback(() => {
-    console.log('Bot state WebSocket connection closed');
+    debugLog('Bot state WebSocket connection closed');
   }, []);
 
   // WebSocket connection for real-time bot state updates (Minecraft interface)
@@ -391,26 +391,84 @@ function ConsciousMinecraftDashboardContent() {
 
   // When WebSocket is disconnected, stream bot state over SSE from dashboard API
   const handleBotStateSSE = useCallback(
-    (msg: { data?: { connected?: boolean; inventory?: unknown[]; position?: [number, number, number] | null; vitals?: { health?: number; hunger?: number; food?: number; stamina?: number; sleep?: number } | null; intero?: { stress?: number; focus?: number; curiosity?: number }; mood?: string } }) => {
+    (msg: {
+      data?: {
+        connected?: boolean;
+        inventory?: unknown[];
+        position?: [number, number, number] | null;
+        vitals?: {
+          health?: number;
+          hunger?: number;
+          food?: number;
+          stamina?: number;
+          sleep?: number;
+        } | null;
+        intero?: { stress?: number; focus?: number; curiosity?: number };
+        mood?: string;
+      };
+    }) => {
       const d = msg?.data;
       if (!d) return;
       if (d.vitals || d.intero || d.mood) {
+        const defaultVitals = {
+          health: 20,
+          hunger: 20,
+          stamina: 100,
+          sleep: 100,
+        };
+        const v = d.vitals;
+        const vitals = {
+          health: v?.health ?? defaultVitals.health,
+          hunger: v?.hunger ?? v?.food ?? defaultVitals.hunger,
+          stamina: v?.stamina ?? defaultVitals.stamina,
+          sleep: v?.sleep ?? defaultVitals.sleep,
+        };
+        const defaultIntero = { stress: 20, focus: 80, curiosity: 75 };
+        const i = d.intero;
+        const intero = {
+          stress: i?.stress ?? defaultIntero.stress,
+          focus: i?.focus ?? defaultIntero.focus,
+          curiosity: i?.curiosity ?? defaultIntero.curiosity,
+        };
         setHud({
           ts: new Date().toISOString(),
-          vitals: d.vitals || { health: 20, hunger: 20, stamina: 100, sleep: 100 },
-          intero: d.intero || { stress: 20, focus: 80, curiosity: 75 },
-          mood: d.mood || 'neutral',
+          vitals,
+          intero,
+          mood: d.mood ?? 'neutral',
         });
       }
-      if (d.inventory) setInventory(d.inventory as Array<{ name: string; count: number; displayName: string }>);
+      const normalizedInventory: InventoryItem[] = d.inventory
+        ? (
+            d.inventory as Array<{
+              name?: string;
+              type?: string;
+              count?: number;
+              slot?: number;
+              displayName?: string;
+            }>
+          ).map((item, idx) => ({
+            type: item.type ?? item.name ?? null,
+            count: item.count ?? 0,
+            slot: item.slot ?? idx,
+            displayName: item.displayName,
+          }))
+        : [];
+      if (d.inventory) setInventory(normalizedInventory);
       setBotState({
-        position: d.position ? { x: d.position[0], y: d.position[1], z: d.position[2] } : undefined,
+        position: d.position
+          ? { x: d.position[0], y: d.position[1], z: d.position[2] }
+          : undefined,
         health: d.vitals?.health ?? d.vitals?.hunger ?? d.vitals?.food,
         food: d.vitals?.hunger ?? d.vitals?.food,
-        inventory: (d.inventory as Array<{ name: string; count: number; displayName: string }>) || [],
+        inventory: normalizedInventory,
       });
       setBotConnections([
-        { name: 'minecraft-bot', connected: d.connected ?? false, viewerActive: false, viewerUrl: 'http://localhost:3006' },
+        {
+          name: 'minecraft-bot',
+          connected: d.connected ?? false,
+          viewerActive: false,
+          viewerUrl: 'http://localhost:3006',
+        },
       ]);
     },
     [setHud, setInventory, setBotState, setBotConnections]
@@ -430,7 +488,7 @@ function ConsciousMinecraftDashboardContent() {
 
     // Only start polling if WebSocket is not connected and we have an error
     if (!botStateWebSocket.isConnected && botStateWebSocket.error) {
-      console.log('Starting polling fallback for bot state');
+      debugLog('Starting polling fallback for bot state');
 
       const pollBotState = async () => {
         try {
@@ -500,7 +558,7 @@ function ConsciousMinecraftDashboardContent() {
             }
           }
         } catch (error) {
-          console.error('Polling fallback error:', error);
+          debugLog('Polling fallback error:', error);
         }
       };
 
@@ -707,7 +765,7 @@ function ConsciousMinecraftDashboardContent() {
           }
         }
       } catch (error) {
-        console.warn('Initial data fetch error:', error);
+        debugLog('Initial data fetch error:', error);
         // Silently handle errors to prevent component crashes
         // Set default states to prevent UI issues
         setBotConnections([
@@ -735,12 +793,83 @@ function ConsciousMinecraftDashboardContent() {
     loadThoughtsFromServer,
   ]);
 
-  // Poll tasks so the list updates without refresh (SSE/push not used for tasks)
-  const TASK_POLL_MS = 15000;
+  // Map planning task to dashboard Task shape
+  const mapPlanningTaskToDashboard = useCallback(
+    (raw: {
+      id: string;
+      title?: string;
+      priority?: number;
+      progress?: number;
+      source?: string;
+      steps?: { id: string; label?: string; done?: boolean }[];
+      requirement?: unknown;
+    }) => {
+      const sourceMap: Record<
+        string,
+        'planner' | 'goal' | 'reflection' | 'intrusion' | 'system'
+      > = {
+        planner: 'planner',
+        goal: 'goal',
+        intrusive: 'intrusion',
+        autonomous: 'system',
+        manual: 'system',
+      };
+      const r = raw.requirement as
+        | {
+            kind?: string;
+            quantity?: number;
+            have?: number;
+            needed?: number;
+            patterns?: string[];
+            outputPattern?: string;
+            proxyPatterns?: string[];
+            proxyHave?: number;
+          }
+        | undefined;
+      const requirement: Task['requirement'] =
+        r &&
+        ['collect', 'mine', 'craft'].includes(r.kind ?? '') &&
+        typeof r.quantity === 'number' &&
+        typeof r.have === 'number' &&
+        typeof r.needed === 'number'
+          ? {
+              kind: r.kind as 'collect' | 'mine' | 'craft',
+              quantity: r.quantity,
+              have: r.have,
+              needed: r.needed,
+              patterns: r.patterns,
+              outputPattern: r.outputPattern,
+              proxyPatterns: r.proxyPatterns,
+              proxyHave: r.proxyHave,
+            }
+          : undefined;
+      return {
+        id: raw.id,
+        title: raw.title ?? 'Task',
+        priority: typeof raw.priority === 'number' ? raw.priority : 0,
+        progress: typeof raw.progress === 'number' ? raw.progress : 0,
+        source: sourceMap[raw.source ?? ''] ?? 'system',
+        steps: Array.isArray(raw.steps)
+          ? raw.steps.map((s) => ({
+              id: s.id,
+              label: s.label ?? s.id,
+              done: !!s.done,
+            }))
+          : undefined,
+        requirement,
+      };
+    },
+    []
+  );
+
+  // Poll tasks only as fallback (push via SSE is primary); slow interval to reduce load
+  const TASK_POLL_MS = 60_000;
   useEffect(() => {
     const pollTasks = async () => {
       try {
-        const res = await fetch('/api/tasks', { signal: AbortSignal.timeout(8000) });
+        const res = await fetch('/api/tasks', {
+          signal: AbortSignal.timeout(8000),
+        });
         if (res.ok) {
           const data = await res.json();
           if (data.tasks && Array.isArray(data.tasks)) setTasks(data.tasks);
@@ -753,12 +882,164 @@ function ConsciousMinecraftDashboardContent() {
     return () => clearInterval(interval);
   }, [setTasks]);
 
+  // Subscribe to task-updates SSE: progress/steps/taskAdded/taskMetadataUpdated (push)
+  useEffect(() => {
+    let es: EventSource | null = null;
+    try {
+      es = new EventSource('/api/task-updates');
+      es.onmessage = (e) => {
+        try {
+          const msg = JSON.parse(e.data) as {
+            type?: string;
+            event?: string;
+            data?: {
+              task?: {
+                id: string;
+                title?: string;
+                priority?: number;
+                progress?: number;
+                source?: string;
+                steps?: { id: string; label?: string; done?: boolean }[];
+                requirement?: unknown;
+              };
+            };
+          };
+          if (msg.type !== 'task_update' || !msg.data?.task?.id) return;
+          const { event, data } = msg;
+          const task = data.task;
+          if (!task) return;
+          if (event === 'taskAdded') {
+            addTask(mapPlanningTaskToDashboard(task));
+            return;
+          }
+          if (event === 'taskMetadataUpdated') {
+            updateTask(task.id, {
+              progress:
+                typeof task.progress === 'number' ? task.progress : undefined,
+              steps: Array.isArray(task.steps)
+                ? task.steps.map((s) => ({
+                    id: s.id,
+                    label: s.label ?? s.id,
+                    done: !!s.done,
+                  }))
+                : undefined,
+            });
+            return;
+          }
+          if (
+            event === 'taskProgressUpdated' ||
+            event === 'taskStepCompleted' ||
+            event === 'taskStepStarted' ||
+            event === 'taskStepsInserted'
+          ) {
+            const updates: {
+              progress?: number;
+              steps?: { id: string; label: string; done: boolean }[];
+            } = {
+              progress:
+                typeof task.progress === 'number' ? task.progress : undefined,
+            };
+            if (Array.isArray(task.steps)) {
+              updates.steps = task.steps.map((s) => ({
+                id: s.id,
+                label: s.label ?? s.id,
+                done: !!s.done,
+              }));
+            }
+            if (updates.progress !== undefined || updates.steps !== undefined) {
+              updateTask(task.id, updates);
+            }
+          }
+        } catch {
+          // Ignore parse errors for non-JSON or malformed messages
+        }
+      };
+      es.onerror = () => {
+        // Connection drop; slow polling will keep list in sync
+      };
+    } catch {
+      // EventSource not available; fall back to polling only
+    }
+    return () => {
+      if (es) {
+        es.close();
+      }
+    };
+  }, [updateTask, addTask, mapPlanningTaskToDashboard]);
+
+  // Subscribe to memory-updates SSE so events/notes update via push
+  useEffect(() => {
+    let es: EventSource | null = null;
+    try {
+      es = new EventSource('/api/memory-updates');
+      es.onmessage = (e) => {
+        try {
+          const msg = JSON.parse(e.data) as { event?: string; data?: unknown };
+          if (msg.event === 'eventAdded' && msg.data) {
+            const ev = msg.data as {
+              id?: string;
+              timestamp?: string;
+              type?: string;
+              content?: string;
+              payload?: Record<string, unknown>;
+            };
+            addEvent({
+              id: ev.id ?? '',
+              ts: ev.timestamp ?? new Date().toISOString(),
+              kind: ev.type ?? 'unknown',
+              payload: ev.payload ?? { content: ev.content },
+            });
+          }
+          if (msg.event === 'noteAdded' && msg.data) {
+            const n = msg.data as {
+              id?: string;
+              timestamp?: string;
+              type?: string;
+              title?: string;
+              content?: string;
+              source?: string;
+              confidence?: number;
+            };
+            const store = useDashboardStore.getState();
+            const existing = store.notes ?? [];
+            if (n.id && !existing.some((note) => note.id === n.id)) {
+              setNotes([
+                ...existing,
+                {
+                  id: n.id,
+                  ts: n.timestamp ?? new Date().toISOString(),
+                  type:
+                    (n.type as 'reflection' | 'episodic' | 'semantic') ??
+                    'reflection',
+                  title: n.title ?? '',
+                  content: n.content ?? '',
+                  source: n.source ?? 'unknown',
+                  confidence: n.confidence ?? 0,
+                },
+              ]);
+            }
+          }
+        } catch {
+          // Ignore parse errors
+        }
+      };
+      es.onerror = () => {};
+    } catch {
+      // EventSource not available
+    }
+    return () => {
+      if (es) es.close();
+    };
+  }, [addEvent, setNotes]);
+
   // Poll thought history so thoughts update when SSE has no connections or drops
   const THOUGHTS_POLL_MS = 20000;
   useEffect(() => {
     const mergeNewThoughts = async () => {
       try {
-        const currentIds = new Set(useDashboardStore.getState().thoughts.map((t) => t.id));
+        const currentIds = new Set(
+          useDashboardStore.getState().thoughts.map((t) => t.id)
+        );
         const res = await fetch('/api/ws/cognitive-stream/history?limit=100', {
           signal: AbortSignal.timeout(5000),
         });
@@ -768,8 +1049,20 @@ function ConsciousMinecraftDashboardContent() {
         for (const t of data.thoughts) {
           if (!t?.id || !t.content || currentIds.has(t.id)) continue;
           currentIds.add(t.id);
-          const type = (t.type === 'self' || t.type === 'reflection' || t.type === 'intrusion' || t.type === 'intrusive' ? t.type : 'reflection') as 'self' | 'reflection' | 'intrusion' | 'intrusive';
-          const attribution = t.attribution === 'external' ? 'external' : t.attribution === 'intrusive' ? 'intrusive' : 'self';
+          const type = (
+            t.type === 'self' ||
+            t.type === 'reflection' ||
+            t.type === 'intrusion' ||
+            t.type === 'intrusive'
+              ? t.type
+              : 'reflection'
+          ) as 'self' | 'reflection' | 'intrusion' | 'intrusive';
+          const attribution =
+            t.attribution === 'external'
+              ? 'external'
+              : t.attribution === 'intrusive'
+                ? 'intrusive'
+                : 'self';
           addThought({
             id: t.id,
             ts: new Date(t.timestamp).toISOString(),
@@ -984,7 +1277,7 @@ function ConsciousMinecraftDashboardContent() {
           ]);
         }
       } catch (error) {
-        console.warn('Periodic refresh error:', error);
+        debugLog('Periodic refresh error:', error);
         // If any error occurs, mark as disconnected
         setBotConnections([
           {
@@ -998,7 +1291,7 @@ function ConsciousMinecraftDashboardContent() {
     };
 
     // Refresh every 20 seconds so status/tasks/thoughts feel live without full reload
-    const interval = setInterval(refreshBotState, 20000);
+    const interval = setInterval(refreshBotState, 60000);
     return () => clearInterval(interval);
   }, [
     setInventory,
@@ -1029,7 +1322,7 @@ function ConsciousMinecraftDashboardContent() {
 
       if (success) {
         setIntrusion('');
-        console.log('Intrusive thought submitted successfully');
+        debugLog('Intrusive thought submitted successfully');
       } else {
         console.error('Failed to submit intrusive thought');
       }
@@ -1048,7 +1341,11 @@ function ConsciousMinecraftDashboardContent() {
           </div>
           <div className="font-semibold tracking-wide">Cognitive Stream</div>
           <nav className="ml-6 hidden md:flex items-center gap-4 text-sm text-zinc-300">
-            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-auto">
+            <Tabs
+              value={activeTab}
+              onValueChange={setActiveTab}
+              className="w-auto"
+            >
               <TabsList className="bg-zinc-900/50">
                 <TabsTrigger value="live" className="hover:text-zinc-100">
                   Live
@@ -1439,24 +1736,27 @@ function ConsciousMinecraftDashboardContent() {
                 <Section title="Events" icon={<History className="size-4" />}>
                   {events.length > 0 ? (
                     <div className="flex flex-col gap-2">
-                      {events.slice(-8).reverse().map((event) => (
-                        <div
-                          key={event.id}
-                          className="rounded-lg border border-zinc-800 bg-zinc-950 p-2.5"
-                        >
-                          <div className="flex items-center justify-between text-[11px] text-zinc-400 mb-1">
-                            <Pill>{event.kind}</Pill>
-                            <time className="tabular-nums">
-                              {formatTime(event.ts)}
-                            </time>
+                      {events
+                        .slice(-8)
+                        .reverse()
+                        .map((event) => (
+                          <div
+                            key={event.id}
+                            className="rounded-lg border border-zinc-800 bg-zinc-950 p-2.5"
+                          >
+                            <div className="flex items-center justify-between text-[11px] text-zinc-400 mb-1">
+                              <Pill>{event.kind}</Pill>
+                              <time className="tabular-nums">
+                                {formatTime(event.ts)}
+                              </time>
+                            </div>
+                            <p className="text-xs text-zinc-300 overflow-hidden text-ellipsis line-clamp-2">
+                              {(event.payload?.content as string) ||
+                                (event.payload?.title as string) ||
+                                event.kind}
+                            </p>
                           </div>
-                          <p className="text-xs text-zinc-300 overflow-hidden text-ellipsis line-clamp-2">
-                            {(event.payload?.content as string) ||
-                              (event.payload?.title as string) ||
-                              event.kind}
-                          </p>
-                        </div>
-                      ))}
+                        ))}
                     </div>
                   ) : (
                     <EmptyState
@@ -1470,27 +1770,30 @@ function ConsciousMinecraftDashboardContent() {
                 <Section title="Memories" icon={<Brain className="size-4" />}>
                   {memories.length > 0 ? (
                     <div className="flex flex-col gap-2">
-                      {memories.slice(-6).reverse().map((memory) => (
-                        <div
-                          key={memory.id}
-                          className="rounded-lg border border-zinc-800 bg-zinc-950 p-2.5"
-                        >
-                          <div className="flex items-center justify-between text-[11px] text-zinc-400 mb-1">
-                            <Pill>{memory.type}</Pill>
-                            <time className="tabular-nums">
-                              {formatTime(memory.ts)}
-                            </time>
-                          </div>
-                          <p className="text-xs text-zinc-300 overflow-hidden text-ellipsis line-clamp-2">
-                            {memory.text}
-                          </p>
-                          {memory.score != null && (
-                            <div className="mt-1 text-[10px] text-zinc-500">
-                              Salience: {Math.round(memory.score * 100)}%
+                      {memories
+                        .slice(-6)
+                        .reverse()
+                        .map((memory) => (
+                          <div
+                            key={memory.id}
+                            className="rounded-lg border border-zinc-800 bg-zinc-950 p-2.5"
+                          >
+                            <div className="flex items-center justify-between text-[11px] text-zinc-400 mb-1">
+                              <Pill>{memory.type}</Pill>
+                              <time className="tabular-nums">
+                                {formatTime(memory.ts)}
+                              </time>
                             </div>
-                          )}
-                        </div>
-                      ))}
+                            <p className="text-xs text-zinc-300 overflow-hidden text-ellipsis line-clamp-2">
+                              {memory.text}
+                            </p>
+                            {memory.score != null && (
+                              <div className="mt-1 text-[10px] text-zinc-500">
+                                Salience: {Math.round(memory.score * 100)}%
+                              </div>
+                            )}
+                          </div>
+                        ))}
                     </div>
                   ) : (
                     <EmptyState
@@ -1755,159 +2058,261 @@ function ConsciousMinecraftDashboardContent() {
                   className="flex-1 flex flex-col min-h-0"
                   fullHeight
                 >
-                  <div className="flex-1 min-h-0 flex flex-col">
-                    {thoughts.length > 0 ? (
-                      <ScrollArea className="h-full" ref={scrollAreaRef}>
-                        <div className="flex flex-col gap-2 pr-1 pb-2">
-                          {thoughts.map((thought) => {
-                            // Determine styling based on thought type and attribution
-                            const isIntrusive =
-                              thought.attribution === 'intrusive';
-                            const isExternalChat =
-                              thought.thoughtType === 'external_chat_in';
-                            const isBotResponse =
-                              thought.thoughtType === 'external_chat_out';
-                            const isSocial = thought.thoughtType === 'social';
-                            const isInternal =
-                              thought.thoughtType === 'internal' ||
-                              thought.thoughtType === 'reflection' ||
-                              thought.thoughtType === 'observation' ||
-                              thought.thoughtType === 'planning';
+                  <div
+                    className="flex-1 min-h-0 flex flex-col overflow-hidden"
+                    data-testid="cognitive-stream-container"
+                  >
+                    {(() => {
+                      const STATUS_TYPES = [
+                        'system_status',
+                        'system_metric',
+                        'system_log',
+                        'environmental',
+                        'status', // minecraft-interface sends type 'status' for health/hunger updates
+                      ];
+                      const isStatusOrEnvironmental = (
+                        t: (typeof thoughts)[0]
+                      ) => {
+                        const kind = (
+                          t.thoughtType ||
+                          t.type ||
+                          ''
+                        ).toLowerCase();
+                        if (STATUS_TYPES.includes(kind)) return true;
+                        // Content fallback: status-like messages that lost their type
+                        const text = (t.text || '').trim().toLowerCase();
+                        return (
+                          text.startsWith('health:') ||
+                          text.startsWith('system status:') ||
+                          /observing\s+environment\s+and\s+deciding/.test(text)
+                        );
+                      };
+                      const cognitiveThoughts = thoughts.filter(
+                        (t) => !isStatusOrEnvironmental(t)
+                      );
+                      const statusEnvironmentalThoughts = thoughts.filter(
+                        isStatusOrEnvironmental
+                      );
 
-                            // Cognitive system event types
-                            const isSystemEvent =
-                              thought.thoughtType === 'system_event';
-                            const isThoughtProcessing =
-                              thought.thoughtType === 'thought_processing';
-                            const isTaskCreation =
-                              thought.thoughtType === 'task_creation';
-                            const isSocialConsideration =
-                              thought.thoughtType === 'social_consideration';
-                            const isSystemStatus =
-                              thought.thoughtType === 'system_status';
-                            const isSystemMetric =
-                              thought.thoughtType === 'system_metric';
-                            const isSystemLog =
-                              thought.thoughtType === 'system_log';
+                      const renderThoughtCard = (
+                        thought: (typeof thoughts)[0]
+                      ) => {
+                        // Determine styling based on thought type and attribution
+                        const isIntrusive = thought.attribution === 'intrusive';
+                        const isExternalChat =
+                          thought.thoughtType === 'external_chat_in';
+                        const isBotResponse =
+                          thought.thoughtType === 'external_chat_out';
+                        const isSocial = thought.thoughtType === 'social';
+                        const isInternal =
+                          thought.thoughtType === 'internal' ||
+                          thought.thoughtType === 'reflection' ||
+                          thought.thoughtType === 'observation' ||
+                          thought.thoughtType === 'planning';
 
-                            let borderColor = 'border-zinc-800';
-                            let bgColor = 'bg-zinc-950';
-                            let prefix = '';
-                            let typeLabel = thought.thoughtType || thought.type;
-                            let textColor = 'text-zinc-200';
-                            // let iconColor = 'text-zinc-400';
+                        // Cognitive system event types
+                        const isSystemEvent =
+                          thought.thoughtType === 'system_event';
+                        const isThoughtProcessing =
+                          thought.thoughtType === 'thought_processing';
+                        const isTaskCreation =
+                          thought.thoughtType === 'task_creation';
+                        const isSocialConsideration =
+                          thought.thoughtType === 'social_consideration';
+                        const isSystemStatus =
+                          thought.thoughtType === 'system_status';
+                        const isSystemMetric =
+                          thought.thoughtType === 'system_metric';
+                        const isSystemLog =
+                          thought.thoughtType === 'system_log';
 
-                            if (isIntrusive) {
-                              borderColor = 'border-purple-600/50';
-                              bgColor = 'bg-purple-950/20';
-                              prefix = ' ';
-                              typeLabel = 'intrusive';
-                              textColor = 'text-purple-200';
-                              // iconColor = 'text-purple-400';
-                            } else if (isExternalChat) {
-                              borderColor = 'border-blue-600/50';
-                              bgColor = 'bg-blue-950/20';
-                              prefix = ` ${thought.sender}: `;
-                              typeLabel = 'chat_in';
-                              textColor = 'text-blue-200';
-                              // iconColor = 'text-blue-400';
-                            } else if (isBotResponse) {
-                              borderColor = 'border-green-600/50';
-                              bgColor = 'bg-green-950/20';
-                              prefix = ' ';
-                              typeLabel = 'chat_out';
-                              textColor = 'text-green-200';
-                              // iconColor = 'text-green-400';
-                            } else if (isSocial || isSocialConsideration) {
-                              borderColor = 'border-orange-600/50';
-                              bgColor = 'bg-orange-950/20';
-                              prefix = ' ';
-                              typeLabel = isSocialConsideration
-                                ? 'social_consideration'
-                                : 'social';
-                              textColor = 'text-orange-200';
-                              // iconColor = 'text-orange-400';
-                            } else if (isInternal) {
-                              borderColor = 'border-yellow-600/50';
-                              bgColor = 'bg-yellow-950/20';
-                              prefix = ' ';
-                              typeLabel = 'internal';
-                              textColor = 'text-yellow-200';
-                              // iconColor = 'text-yellow-400';
-                            } else if (isSystemEvent) {
-                              borderColor = 'border-indigo-600/50';
-                              bgColor = 'bg-indigo-950/20';
-                              prefix = '🔄 ';
-                              typeLabel = 'system_event';
-                              textColor = 'text-indigo-200';
-                              // iconColor = 'text-indigo-400';
-                            } else if (isThoughtProcessing) {
-                              borderColor = 'border-cyan-600/50';
-                              bgColor = 'bg-cyan-950/20';
-                              prefix = '⚡ ';
-                              typeLabel = 'thought_processing';
-                              textColor = 'text-cyan-200';
-                              // iconColor = 'text-cyan-400';
-                            } else if (isTaskCreation) {
-                              borderColor = 'border-emerald-600/50';
-                              bgColor = 'bg-emerald-950/20';
-                              prefix = '✅ ';
-                              typeLabel = 'task_creation';
-                              textColor = 'text-emerald-200';
-                              // iconColor = 'text-emerald-400';
-                            } else if (isSystemStatus) {
-                              borderColor = 'border-slate-600/50';
-                              bgColor = 'bg-slate-950/20';
-                              prefix = '📊 ';
-                              typeLabel = 'system_status';
-                              textColor = 'text-slate-200';
-                              // iconColor = 'text-slate-400';
-                            } else if (isSystemMetric) {
-                              borderColor = 'border-pink-600/50';
-                              bgColor = 'bg-pink-950/20';
-                              prefix = '📈 ';
-                              typeLabel = 'system_metric';
-                              textColor = 'text-pink-200';
-                              // iconColor = 'text-pink-400';
-                            } else if (isSystemLog) {
-                              borderColor = 'border-gray-600/50';
-                              bgColor = 'bg-gray-950/20';
-                              prefix = '📝 ';
-                              typeLabel = 'system_log';
-                              textColor = 'text-gray-200';
-                              // iconColor = 'text-gray-400';
-                            }
+                        let borderColor = 'border-zinc-800';
+                        let bgColor = 'bg-zinc-950';
+                        let prefix = '';
+                        let typeLabel = thought.thoughtType || thought.type;
+                        let textColor = 'text-zinc-200';
+                        // let iconColor = 'text-zinc-400';
 
-                            return (
-                              <div
-                                key={thought.id}
-                                className={`rounded-xl border ${borderColor} ${bgColor} p-2.5`}
+                        if (isIntrusive) {
+                          borderColor = 'border-purple-600/50';
+                          bgColor = 'bg-purple-950/20';
+                          prefix = ' ';
+                          typeLabel = 'intrusive';
+                          textColor = 'text-purple-200';
+                          // iconColor = 'text-purple-400';
+                        } else if (isExternalChat) {
+                          borderColor = 'border-blue-600/50';
+                          bgColor = 'bg-blue-950/20';
+                          prefix = ` ${thought.sender}: `;
+                          typeLabel = 'chat_in';
+                          textColor = 'text-blue-200';
+                          // iconColor = 'text-blue-400';
+                        } else if (isBotResponse) {
+                          borderColor = 'border-green-600/50';
+                          bgColor = 'bg-green-950/20';
+                          prefix = ' ';
+                          typeLabel = 'chat_out';
+                          textColor = 'text-green-200';
+                          // iconColor = 'text-green-400';
+                        } else if (isSocial || isSocialConsideration) {
+                          borderColor = 'border-orange-600/50';
+                          bgColor = 'bg-orange-950/20';
+                          prefix = ' ';
+                          typeLabel = isSocialConsideration
+                            ? 'social_consideration'
+                            : 'social';
+                          textColor = 'text-orange-200';
+                          // iconColor = 'text-orange-400';
+                        } else if (isInternal) {
+                          borderColor = 'border-yellow-600/50';
+                          bgColor = 'bg-yellow-950/20';
+                          prefix = ' ';
+                          typeLabel = 'internal';
+                          textColor = 'text-yellow-200';
+                          // iconColor = 'text-yellow-400';
+                        } else if (isSystemEvent) {
+                          borderColor = 'border-indigo-600/50';
+                          bgColor = 'bg-indigo-950/20';
+                          prefix = '🔄 ';
+                          typeLabel = 'system_event';
+                          textColor = 'text-indigo-200';
+                          // iconColor = 'text-indigo-400';
+                        } else if (isThoughtProcessing) {
+                          borderColor = 'border-cyan-600/50';
+                          bgColor = 'bg-cyan-950/20';
+                          prefix = '⚡ ';
+                          typeLabel = 'thought_processing';
+                          textColor = 'text-cyan-200';
+                          // iconColor = 'text-cyan-400';
+                        } else if (isTaskCreation) {
+                          borderColor = 'border-emerald-600/50';
+                          bgColor = 'bg-emerald-950/20';
+                          prefix = '✅ ';
+                          typeLabel = 'task_creation';
+                          textColor = 'text-emerald-200';
+                          // iconColor = 'text-emerald-400';
+                        } else if (isSystemStatus) {
+                          borderColor = 'border-slate-600/50';
+                          bgColor = 'bg-slate-950/20';
+                          prefix = '';
+                          typeLabel = 'status';
+                          textColor = 'text-slate-200';
+                          // iconColor = 'text-slate-400';
+                        } else if (thought.thoughtType === 'status') {
+                          // minecraft-interface health/hunger updates (type: 'status')
+                          borderColor = 'border-slate-600/50';
+                          bgColor = 'bg-slate-950/20';
+                          prefix = '';
+                          typeLabel = 'status';
+                          textColor = 'text-slate-200';
+                        } else if (isSystemMetric) {
+                          borderColor = 'border-pink-600/50';
+                          bgColor = 'bg-pink-950/20';
+                          prefix = '📈 ';
+                          typeLabel = 'system_metric';
+                          textColor = 'text-pink-200';
+                          // iconColor = 'text-pink-400';
+                        } else if (isSystemLog) {
+                          borderColor = 'border-gray-600/50';
+                          bgColor = 'bg-gray-950/20';
+                          prefix = '📝 ';
+                          typeLabel = 'system_log';
+                          textColor = 'text-gray-200';
+                          // iconColor = 'text-gray-400';
+                        } else if (thought.thoughtType === 'environmental') {
+                          borderColor = 'border-teal-600/50';
+                          bgColor = 'bg-teal-950/20';
+                          prefix = '';
+                          typeLabel = 'environmental';
+                          textColor = 'text-teal-200';
+                        }
+
+                        return (
+                          <div
+                            className={`rounded-xl border ${borderColor} ${bgColor} p-2.5`}
+                          >
+                            <div className="flex items-center justify-between text-[11px] text-zinc-400">
+                              <span className="uppercase tracking-wide">
+                                {typeLabel}
+                              </span>
+                              <time className="tabular-nums">
+                                {formatTime(thought.ts)}
+                              </time>
+                            </div>
+                            <p className={`mt-1 text-sm ${textColor}`}>
+                              {prefix}
+                              {thought.text}
+                            </p>
+                          </div>
+                        );
+                      };
+
+                      return (
+                        <Tabs
+                          defaultValue="cognitive"
+                          className="flex-1 flex flex-col min-h-0 overflow-hidden"
+                        >
+                          <TabsList className="w-full grid grid-cols-2 shrink-0 mb-2 bg-zinc-900/80">
+                            <TabsTrigger value="cognitive" className="text-xs">
+                              Cognitive Stream
+                            </TabsTrigger>
+                            <TabsTrigger value="status" className="text-xs">
+                              Status / Environmental
+                            </TabsTrigger>
+                          </TabsList>
+                          <TabsContent
+                            value="cognitive"
+                            className="flex-1 min-h-0 mt-0 overflow-hidden data-[state=inactive]:hidden flex flex-col"
+                          >
+                            {cognitiveThoughts.length > 0 ? (
+                              <ScrollArea
+                                className="h-full min-h-0 flex-1"
+                                ref={scrollAreaRef}
                               >
-                                <div className="flex items-center justify-between text-[11px] text-zinc-400">
-                                  <span className="uppercase tracking-wide">
-                                    {typeLabel}
-                                  </span>
-                                  <time className="tabular-nums">
-                                    {formatTime(thought.ts)}
-                                  </time>
+                                <div className="flex flex-col gap-2 pr-1 pb-2">
+                                  {cognitiveThoughts.map((thought) => (
+                                    <React.Fragment key={thought.id}>
+                                      {renderThoughtCard(thought)}
+                                    </React.Fragment>
+                                  ))}
+                                  <div ref={thoughtsEndRef} />
                                 </div>
-                                <p className={`mt-1 text-sm ${textColor}`}>
-                                  {prefix}
-                                  {thought.text}
-                                </p>
-                              </div>
-                            );
-                          })}
-                          <div ref={thoughtsEndRef} />
-                        </div>
-                      </ScrollArea>
-                    ) : (
-                      <EmptyState
-                        icon={MessageSquare}
-                        title="No thoughts yet"
-                        description="Cognitive thoughts will appear here as the bot processes and reflects."
-                      />
-                    )}
+                              </ScrollArea>
+                            ) : (
+                              <EmptyState
+                                icon={MessageSquare}
+                                title="No thoughts yet"
+                                description="Cognitive thoughts will appear here as the bot processes and reflects."
+                              />
+                            )}
+                          </TabsContent>
+                          <TabsContent
+                            value="status"
+                            className="flex-1 min-h-0 mt-0 overflow-hidden data-[state=inactive]:hidden flex flex-col"
+                          >
+                            {statusEnvironmentalThoughts.length > 0 ? (
+                              <ScrollArea className="h-full min-h-0 flex-1">
+                                <div className="flex flex-col gap-2 pr-1 pb-2">
+                                  {statusEnvironmentalThoughts.map(
+                                    (thought) => (
+                                      <React.Fragment key={thought.id}>
+                                        {renderThoughtCard(thought)}
+                                      </React.Fragment>
+                                    )
+                                  )}
+                                </div>
+                              </ScrollArea>
+                            ) : (
+                              <EmptyState
+                                icon={Activity}
+                                title="No status updates yet"
+                                description="Health, hunger, and environmental updates will appear here."
+                              />
+                            )}
+                          </TabsContent>
+                        </Tabs>
+                      );
+                    })()}
                   </div>
                 </Section>
 

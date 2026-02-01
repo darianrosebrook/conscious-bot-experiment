@@ -531,9 +531,9 @@ export const GET = async (req: NextRequest) => {
           // Process external chat and bot responses only
           // Thought generation is now handled by bot lifecycle events
           const thoughts = [
-            ...(await generateThoughts() || []),
-            ...(await processExternalChat() || []),
-            ...(await processBotResponses() || []),
+            ...((await generateThoughts()) || []),
+            ...((await processExternalChat()) || []),
+            ...((await processBotResponses()) || []),
           ];
 
           if (thoughts.length > 0) {
@@ -604,7 +604,7 @@ export const GET = async (req: NextRequest) => {
       Expires: '0',
       Connection: 'keep-alive',
       'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+      'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
       'Access-Control-Allow-Headers': 'Content-Type',
     },
   });
@@ -615,10 +615,60 @@ export const OPTIONS = async () => {
     status: 200,
     headers: {
       'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+      'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
       'Access-Control-Allow-Headers': 'Content-Type',
     },
   });
+};
+
+/**
+ * Clear all thoughts from persistent storage and in-memory store.
+ * Clears the active thoughts file and all seed-scoped files under data/thoughts/.
+ */
+export const DELETE = async () => {
+  try {
+    thoughtHistory = [];
+    currentThoughtsPath = null;
+
+    const dataDir = path.join(process.cwd(), 'data');
+    const defaultPath = path.join(dataDir, 'cognitive-thoughts.json');
+    const thoughtsDir = path.join(dataDir, 'thoughts');
+
+    const cleared: string[] = [];
+
+    await ensureDataDirectory(defaultPath);
+    await fs.writeFile(defaultPath, JSON.stringify([], null, 2));
+    cleared.push(defaultPath);
+
+    try {
+      const entries = await fs.readdir(thoughtsDir, { withFileTypes: true });
+      for (const ent of entries) {
+        if (ent.isDirectory()) {
+          const filePath = path.join(thoughtsDir, ent.name, 'cognitive-thoughts.json');
+          try {
+            await fs.writeFile(filePath, JSON.stringify([], null, 2));
+            cleared.push(filePath);
+          } catch {
+            // Skip if file cannot be written
+          }
+        }
+      }
+    } catch {
+      // thoughts subdir may not exist
+    }
+
+    return new Response(
+      JSON.stringify({
+        success: true,
+        message: `Cleared ${cleared.length} thought store(s)`,
+        cleared,
+      }),
+      { headers: { 'Content-Type': 'application/json' } }
+    );
+  } catch (error) {
+    console.error('DELETE /api/ws/cognitive-stream error:', error);
+    return new Response('Internal server error', { status: 500 });
+  }
 };
 
 // Mark a thought as processed
@@ -650,6 +700,48 @@ export const PUT = async (req: NextRequest) => {
   }
 };
 
+/**
+ * Clean markdown artifacts from LLM output
+ */
+function cleanMarkdownArtifacts(text: string): string {
+  if (!text) return text;
+
+  let cleaned = text;
+
+  // Remove all code fence markers (opening and closing, including nested)
+  // Match: ```text, ```python, ```, or just backticks at start/end
+  cleaned = cleaned.replace(/^```+[a-z]*\s*/gim, '');
+  cleaned = cleaned.replace(/\s*```+$/gm, '');
+
+  // Remove any remaining standalone triple backticks
+  cleaned = cleaned.replace(/```+/g, '');
+
+  // Collapse multiple spaces/newlines
+  cleaned = cleaned.replace(/\s+/g, ' ');
+
+  // Trim
+  cleaned = cleaned.trim();
+
+  return cleaned;
+}
+
+/**
+ * Check if content is a generic fallback message
+ */
+function isGenericFallback(text: string): boolean {
+  const lower = text.toLowerCase().trim();
+  const GENERIC_PATTERNS = [
+    'processing current situation',
+    'maintaining awareness',
+    'observing surroundings',
+    'monitoring environment',
+    'processing intrusive thought',
+  ];
+  return GENERIC_PATTERNS.some(
+    (pattern) => lower === pattern || lower.startsWith(pattern + ':')
+  );
+}
+
 export const POST = async (req: NextRequest) => {
   try {
     await maybeReloadThoughtStore();
@@ -669,8 +761,37 @@ export const POST = async (req: NextRequest) => {
       return new Response('Thought content is required', { status: 400 });
     }
 
+    // Clean markdown artifacts from content
+    const cleanedContent = cleanMarkdownArtifacts(content);
+
+    if (!cleanedContent || cleanedContent.length === 0) {
+      return new Response('Thought content is empty after cleaning', {
+        status: 400,
+      });
+    }
+
+    // Deduplicate generic fallbacks more aggressively (5 minutes instead of 30s)
+    if (isGenericFallback(cleanedContent)) {
+      const recentGenericCutoff = Date.now() - 300_000; // 5 minutes
+      const recentGeneric = thoughtHistory.find(
+        (old) =>
+          isGenericFallback(old.content) && old.timestamp > recentGenericCutoff
+      );
+      if (recentGeneric) {
+        return new Response(
+          JSON.stringify({
+            success: true,
+            deduplicated: true,
+            id: recentGeneric.id,
+            reason: 'generic_fallback',
+          }),
+          { headers: { 'Content-Type': 'application/json' } }
+        );
+      }
+    }
+
     // Deduplicate: skip if identical content+type was added within the last 30s
-    const trimmedContent = content.trim();
+    const trimmedContent = cleanedContent.trim();
     const recentCutoff = Date.now() - 30_000;
     const duplicate = thoughtHistory.find(
       (old) =>
@@ -685,10 +806,10 @@ export const POST = async (req: NextRequest) => {
       );
     }
 
-    // Add the thought to the history
+    // Add the thought to the history (use cleaned content)
     const newThought = addThought({
       type: type || 'intrusive',
-      content: content.trim(),
+      content: trimmedContent,
       attribution: attribution || 'external',
       context: context || {
         emotionalState: 'neutral',

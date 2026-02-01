@@ -123,7 +123,7 @@ export interface CurriculumGoal {
 // LLM Skill Composer Implementation
 // ============================================================================
 
-export class LLMEnhancedSkillComposer extends EventEmitter {
+export class LLMSkillComposer extends EventEmitter {
   private baseSkillComposer: SkillComposer;
   private config: LLMEnhancementConfig;
   private refinementHistory: Map<string, GoalRefinementResult[]> = new Map();

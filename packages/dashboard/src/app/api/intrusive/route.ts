@@ -1,8 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { resilientFetch } from '@/lib/resilient-fetch';
 import type {
   IntrusiveThoughtRequest,
   IntrusiveThoughtResponse,
 } from '@/types';
+
+const COGNITION_URL =
+  process.env.COGNITION_SERVICE_URL || 'http://localhost:3003';
+const PLANNING_URL =
+  process.env.PLANNING_SERVICE_URL || 'http://localhost:3002';
 
 /**
  * Intrusive Thought API
@@ -23,11 +29,12 @@ export async function POST(request: NextRequest) {
     }
 
     // Submit to cognition system
-    const cognitionResponse = await fetch('http://localhost:3003/process', {
+    const cognitionResponse = await resilientFetch(`${COGNITION_URL}/process`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
+      label: 'cognition/process',
       body: JSON.stringify({
         type: 'intrusion',
         content: text,
@@ -39,9 +46,20 @@ export async function POST(request: NextRequest) {
       }),
     });
 
-    if (!cognitionResponse.ok) {
+    if (!cognitionResponse?.ok) {
+      const errBody = cognitionResponse
+        ? await cognitionResponse.text()
+        : 'Service unavailable';
+      console.error(
+        '[Dashboard] Intrusive thought cognition failure:',
+        cognitionResponse?.status ?? 'unavailable',
+        errBody
+      );
       return NextResponse.json(
-        { error: 'Failed to process intrusive thought' },
+        {
+          error: 'Failed to process intrusive thought',
+          detail: process.env.NODE_ENV === 'development' ? errBody : undefined,
+        },
         { status: 500 }
       );
     }
@@ -58,12 +76,18 @@ export async function POST(request: NextRequest) {
       text.toLowerCase().includes('farm')
     ) {
       try {
-        console.log(` Creating goal from intrusive thought: "${text}"`);
-        const planningResponse = await fetch('http://localhost:3002/goal', {
+        if (process.env.NODE_ENV === 'development') {
+          console.log(
+            '[Dashboard] Creating goal from intrusive thought:',
+            text.slice(0, 60)
+          );
+        }
+        const planningResponse = await resilientFetch(`${PLANNING_URL}/goal`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
           },
+          label: 'planning/goal',
           body: JSON.stringify({
             name: `Goal from intrusion`,
             description: text,
@@ -81,17 +105,26 @@ export async function POST(request: NextRequest) {
           }),
         });
 
-        if (planningResponse.ok) {
-          const planningResult = await planningResponse.json();
-          console.log(` Goal created successfully:`, planningResult);
-        } else {
+        if (planningResponse?.ok) {
+          if (process.env.NODE_ENV === 'development') {
+            const planningResult = await planningResponse.json();
+            console.log(
+              '[Dashboard] Goal created from intrusive thought:',
+              planningResult
+            );
+          }
+        } else if (planningResponse) {
           console.error(
-            ` Failed to create goal:`,
+            '[Dashboard] Planning goal creation failed:',
+            planningResponse.status,
             await planningResponse.text()
           );
         }
       } catch (error) {
-        console.error('Failed to create goal from intrusive thought:', error);
+        console.error(
+          '[Dashboard] Failed to create goal from intrusive thought:',
+          error
+        );
       }
     }
 
@@ -104,6 +137,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(response);
   } catch (error) {
+    console.error('[Dashboard] Intrusive thought API error:', error);
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

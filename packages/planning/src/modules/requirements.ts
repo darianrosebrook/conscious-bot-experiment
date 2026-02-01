@@ -3,11 +3,25 @@ import { InventoryItem, countItems, itemMatches } from './inventory-helpers';
 export type TaskRequirement =
   | { kind: 'collect'; patterns: string[]; quantity: number }
   | { kind: 'mine'; patterns: string[]; quantity: number }
-  | { kind: 'craft'; outputPattern: string; quantity: number; proxyPatterns?: string[] }
-  | { kind: 'tool_progression'; targetTool: string; toolType: string; targetTier: string; quantity: number }
+  | {
+      kind: 'craft';
+      outputPattern: string;
+      quantity: number;
+      proxyPatterns?: string[];
+    }
+  | {
+      kind: 'tool_progression';
+      targetTool: string;
+      toolType: string;
+      targetTier: string;
+      quantity: number;
+    }
   | { kind: 'build'; structure: string; quantity: number };
 
-export function parseRequiredQuantityFromTitle(title: string | undefined, fallback: number): number {
+export function parseRequiredQuantityFromTitle(
+  title: string | undefined,
+  fallback: number
+): number {
   if (!title) return fallback;
   const m = String(title).match(/(\d{1,3})/);
   return m ? Math.max(1, parseInt(m[1], 10)) : fallback;
@@ -48,47 +62,93 @@ export function requirementsEquivalent(
   }
 }
 
-export function resolveRequirement(task: any): TaskRequirement | null {
+export interface ResolveRequirementOptions {
+  /**
+   * When true (production default), only structured candidates are used.
+   * When false, regex fallback fires with a deprecation warning.
+   *
+   * @pivot 8 — Strict mode is the production default
+   */
+  strict?: boolean;
+}
+
+/**
+ * Number of regex fallback patterns. Exported for freeze-test guard (Phase 4).
+ * If you add a regex pattern below, increment this and update the freeze test.
+ */
+export const REGEX_FALLBACK_PATTERN_COUNT = 8;
+
+export function resolveRequirement(
+  task: any,
+  options?: ResolveRequirementOptions
+): TaskRequirement | null {
+  const strict = options?.strict ?? process.env.STRICT_REQUIREMENTS !== 'false';
+
   // Prefer structured requirement candidate from thought extraction
   const candidate = task?.parameters?.requirementCandidate;
-  if (candidate && candidate.kind && candidate.outputPattern) {
-    if (candidate.kind === 'craft') {
-      return {
-        kind: 'craft',
-        outputPattern: candidate.outputPattern,
-        quantity: candidate.quantity || 1,
-        proxyPatterns: candidate.proxyPatterns || [],
-      };
+  if (candidate && candidate.kind) {
+    // Structured candidate with outputPattern
+    if (candidate.outputPattern) {
+      if (candidate.kind === 'craft') {
+        return {
+          kind: 'craft',
+          outputPattern: candidate.outputPattern,
+          quantity: candidate.quantity || 1,
+          proxyPatterns: candidate.proxyPatterns || [],
+        };
+      }
+      if (candidate.kind === 'collect') {
+        return {
+          kind: 'collect',
+          patterns: [candidate.outputPattern],
+          quantity: candidate.quantity || 1,
+        };
+      }
+      if (candidate.kind === 'mine') {
+        return {
+          kind: 'mine',
+          patterns: [candidate.outputPattern],
+          quantity: candidate.quantity || 1,
+        };
+      }
+      if (candidate.kind === 'build') {
+        return {
+          kind: 'build',
+          structure: candidate.outputPattern,
+          quantity: 1,
+        };
+      }
     }
-    if (candidate.kind === 'collect') {
+    // Structured candidate for tool_progression (uses targetTool, not outputPattern)
+    if (candidate.kind === 'tool_progression' && candidate.targetTool) {
       return {
-        kind: 'collect',
-        patterns: [candidate.outputPattern],
+        kind: 'tool_progression',
+        targetTool: candidate.targetTool,
+        toolType: candidate.toolType || 'pickaxe',
+        targetTier: candidate.targetTier || 'iron',
         quantity: candidate.quantity || 1,
-      };
-    }
-    if (candidate.kind === 'mine') {
-      return {
-        kind: 'mine',
-        patterns: [candidate.outputPattern],
-        quantity: candidate.quantity || 1,
-      };
-    }
-    if (candidate.kind === 'build') {
-      return {
-        kind: 'build',
-        structure: candidate.outputPattern,
-        quantity: 1,
       };
     }
   }
 
-  // Existing regex-based resolution follows
+  // --- Strict mode gate ---
+  // @pivot 8: In strict mode, only structured candidates produce requirements.
+  if (strict) {
+    return null;
+  }
+
+  // --- Regex fallback (permissive mode only) ---
+  console.warn(
+    `[ResolveRequirement:regex-fallback] ${task?.title ?? '<no title>'}`
+  );
+
   const ttl = (task.title || '').toLowerCase();
 
   // Tool progression — detect tier-specific tool tasks BEFORE generic crafting
   // Matches: "craft stone pickaxe", "get iron pickaxe", "upgrade to diamond pickaxe"
-  const tierMatch = ttl.match(/\b(wooden|stone|iron|diamond)\b.*\b(pickaxe|axe|shovel|hoe|sword)\b/);
+  const tierMatch = ttl.match(
+    /\b(wooden|stone|iron|diamond)\b.*\b(pickaxe|axe|shovel|hoe|sword)\b/
+  );
   if (tierMatch && tierMatch[1] !== 'wooden') {
     // Non-wooden tier tool → tool progression domain
     const tier = tierMatch[1] as string;
@@ -102,7 +162,9 @@ export function resolveRequirement(task: any): TaskRequirement | null {
     };
   }
   // Also detect explicit upgrade/progression intent
-  if (/\bupgrade\b.*\b(tool|pickaxe|axe|sword)\b|\btool\s*progression\b/.test(ttl)) {
+  if (
+    /\bupgrade\b.*\b(tool|pickaxe|axe|sword)\b|\btool\s*progression\b/.test(ttl)
+  ) {
     return {
       kind: 'tool_progression',
       targetTool: 'iron_pickaxe',
@@ -145,7 +207,14 @@ export function resolveRequirement(task: any): TaskRequirement | null {
     const qty = parseRequiredQuantityFromTitle(task.title, 8);
     return {
       kind: 'collect',
-      patterns: ['oak_log', 'birch_log', 'spruce_log', 'jungle_log', 'acacia_log', 'dark_oak_log'],
+      patterns: [
+        'oak_log',
+        'birch_log',
+        'spruce_log',
+        'jungle_log',
+        'acacia_log',
+        'dark_oak_log',
+      ],
       quantity: qty,
     };
   }
@@ -158,7 +227,14 @@ export function resolveRequirement(task: any): TaskRequirement | null {
     const qty = parseRequiredQuantityFromTitle(task.title, 8);
     return {
       kind: 'collect',
-      patterns: ['oak_log', 'birch_log', 'spruce_log', 'jungle_log', 'acacia_log', 'dark_oak_log'],
+      patterns: [
+        'oak_log',
+        'birch_log',
+        'spruce_log',
+        'jungle_log',
+        'acacia_log',
+        'dark_oak_log',
+      ],
       quantity: qty,
     };
   }
@@ -173,7 +249,10 @@ export function resolveRequirement(task: any): TaskRequirement | null {
   return null;
 }
 
-export function computeProgressFromInventory(inv: InventoryItem[], req: TaskRequirement): number {
+export function computeProgressFromInventory(
+  inv: InventoryItem[],
+  req: TaskRequirement
+): number {
   if (req.kind === 'collect' || req.kind === 'mine') {
     const have = countItems(inv, req.patterns);
     return Math.max(0, Math.min(1, have / req.quantity));
@@ -192,7 +271,10 @@ export function computeProgressFromInventory(inv: InventoryItem[], req: TaskRequ
   return 0;
 }
 
-export function computeRequirementSnapshot(inv: InventoryItem[], req: TaskRequirement) {
+export function computeRequirementSnapshot(
+  inv: InventoryItem[],
+  req: TaskRequirement
+) {
   if (req.kind === 'collect' || req.kind === 'mine') {
     const have = countItems(inv, req.patterns);
     return {
@@ -229,4 +311,3 @@ export function computeRequirementSnapshot(inv: InventoryItem[], req: TaskRequir
   }
   return { kind: (req as any).kind, quantity: (req as any).quantity } as any;
 }
-

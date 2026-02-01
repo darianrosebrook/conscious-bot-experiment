@@ -25,9 +25,7 @@ export interface StandaloneMinecraftInterface {
   executeAction(action: any): Promise<any>;
 }
 
-export class StandaloneMinecraftInterface
-  implements StandaloneMinecraftInterface
-{
+export class StandaloneMinecraftInterface implements StandaloneMinecraftInterface {
   public botAdapter: BotAdapter;
   public observationMapper: ObservationMapper;
   public actionTranslator: ActionTranslator;
@@ -213,7 +211,7 @@ export const DEFAULT_STANDALONE_CONFIG: BotConfig = {
   host: 'localhost',
   port: 25565,
   username: 'StandaloneBot',
-  version: '1.20.1',
+  version: '1.21.9',
   auth: 'offline',
   pathfindingTimeout: 30000,
   actionTimeout: 10000,

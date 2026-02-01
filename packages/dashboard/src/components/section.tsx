@@ -27,12 +27,12 @@ export function Section({
   return (
     <section
       className={cn(
-        "rounded-2xl border border-zinc-800 bg-zinc-950/60 shadow-sm",
-        fullHeight && "flex h-full flex-col overflow-hidden",
+        'rounded-2xl border border-zinc-800 bg-zinc-950/60 shadow-sm',
+        fullHeight && 'flex h-full min-h-0 flex-col overflow-hidden',
         className
       )}
     >
-      <header className="flex items-center justify-between px-3 py-2 border-b border-zinc-800/80">
+      <header className="flex shrink-0 items-center justify-between px-3 py-2 border-b border-zinc-800/80">
         <div className="flex items-center gap-2 text-zinc-200">
           {icon}
           <h3 className="text-sm font-semibold">{title}</h3>
@@ -41,9 +41,10 @@ export function Section({
       </header>
       <div
         className={cn(
-          "px-3",
-          tight ? "py-2" : "py-3",
-          fullHeight && "flex-1 min-h-0 overflow-y-auto flex flex-col"
+          'px-3',
+          tight ? 'py-2' : 'py-3',
+          fullHeight &&
+            'flex-1 min-h-0 overflow-y-auto overflow-x-hidden flex flex-col'
         )}
       >
         {children}

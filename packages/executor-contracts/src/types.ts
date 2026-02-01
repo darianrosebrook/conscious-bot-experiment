@@ -225,6 +225,8 @@ export class PBIError extends Error {
   }
 }
 
+/** Error codes for PBI execution; exported for API consumers. */
+/* eslint-disable no-unused-vars -- enum members are part of public API */
 export enum PBIErrorCode {
   SCHEMA_VIOLATION = 'schema_violation',
   CAPABILITY_UNAVAILABLE = 'capability_unavailable',
@@ -237,6 +239,7 @@ export enum PBIErrorCode {
   DOUBLE_DISPATCH = 'double_dispatch',
   PRECOND_UNMET = 'precond_unmet',
 }
+/* eslint-enable no-unused-vars */
 
 // ============================================================================
 // Zod Schemas for Validation

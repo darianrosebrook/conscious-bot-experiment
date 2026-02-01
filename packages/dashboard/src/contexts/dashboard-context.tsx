@@ -325,7 +325,7 @@ class ServiceDiscovery {
     memory: 3001,
     planning: 3002,
     world: 3004,
-    evaluation: 3006,
+    evaluation: 3008, // 3006 reserved for Prismarine viewer
   };
 
   private constructor() {}

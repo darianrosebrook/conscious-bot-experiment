@@ -49,11 +49,10 @@ export function useViewer() {
 
   useEffect(() => {
     isMounted.current = true;
+    const timeoutRef = statusCheckTimeoutRef;
     return () => {
       isMounted.current = false;
-
-      // Capture current timeout ID to avoid stale closure issues
-      const currentTimeout = statusCheckTimeoutRef.current;
+      const currentTimeout = timeoutRef.current;
       if (currentTimeout) {
         clearTimeout(currentTimeout);
       }

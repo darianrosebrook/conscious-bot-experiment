@@ -9,10 +9,9 @@ module.exports = {
     'dist/',
     'node_modules/',
     '*.js',
-    'src/__tests__/autonomous-task-execution.test.ts',
-    'src/__tests__/integrated-planning-system.test.ts',
-    'src/__tests__/planning-integration.test.ts',
-    'src/__tests__/server-autonomous-startup.test.ts',
+    'src/**/__tests__/**',
+    'src/**/*.test.ts',
+    'src/**/*.spec.ts',
     'src/skill-integration/**/*',
   ],
   rules: {

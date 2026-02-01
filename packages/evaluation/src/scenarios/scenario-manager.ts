@@ -14,11 +14,30 @@ import {
   EvaluationEvent,
   StressTestConfig,
 } from '../types';
-import {
-  IntegratedPlanningSystem,
-  createIntegratedPlanningSystem,
-} from '@conscious-bot/planning';
 import { EventEmitter } from 'events';
+
+/**
+ * Stub interface replacing the deleted IntegratedPlanningSystem.
+ * Evaluation scenarios that need real planning should use Sterling solvers.
+ */
+interface IntegratedPlanningSystem {
+  planTask(input: string, options: Record<string, any>): Promise<{
+    success: boolean;
+    plan?: { confidence?: number };
+    routingDecision: { reasoning: string };
+  }>;
+}
+
+function createIntegratedPlanningSystem(_config: Record<string, any>): IntegratedPlanningSystem {
+  return {
+    async planTask(_input, _options) {
+      return {
+        success: false,
+        routingDecision: { reasoning: 'IntegratedPlanningSystem retired — use Sterling solvers' },
+      };
+    },
+  };
+}
 import type {
   EnhancedMemorySystem,
   HybridSearchResult,

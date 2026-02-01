@@ -1,22 +1,20 @@
 /**
- * Skill Integration Module - Exports all skill-related planning components
+ * Skill Integration Module - Exports skill-related planning components
+ *
+ * Legacy exports removed:
+ * - HybridSkillPlanner, HybridPlanningContext, HybridPlan, PlanningDecision — deleted
+ * - integration-example, comprehensive-integration-example — deleted
  *
  * @author @darianrosebrook
  */
 
-export { HybridSkillPlanner } from './hybrid-skill-planner';
 export { SkillComposerAdapter } from './skill-composer-adapter';
-export { MCPCapabilitiesAdapter } from './mcp-capabilities-adapter';
-export { SkillPlannerAdapter } from './skill-planner-adapter';
-export { LLMEnhancedSkillComposer } from './llm-skill-composer';
-export { EnhancedMCPIntegration } from './mcp-integration';
-
-// Re-export types
-export type {
-  HybridPlanningContext,
-  HybridPlan,
-  PlanningDecision,
-} from './hybrid-skill-planner';
+export { LLMSkillComposer } from './llm-skill-composer';
+export { MCPSkillIntegration } from './mcp-integration';
+/** @deprecated Use LLMSkillComposer */
+export { LLMSkillComposer as LLMEnhancedSkillComposer } from './llm-skill-composer';
+/** @deprecated Use MCPSkillIntegration */
+export { MCPSkillIntegration as EnhancedMCPIntegration } from './mcp-integration';
 
 export type {
   ComposedSkillAdapter,
@@ -40,7 +38,8 @@ export type {
 } from './llm-skill-composer';
 
 export type {
-  EnhancedMCPConfig,
+  MCPSkillConfig,
+  MCPSkillConfig as EnhancedMCPConfig,
   MCPCapability,
   CapabilityDiscoveryRequest,
   CapabilityDiscoveryResult,

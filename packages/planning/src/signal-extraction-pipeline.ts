@@ -194,7 +194,7 @@ export class MemoryBackedExtractor implements SignalExtractor {
 
       // Query memory for entity cards
       for (const entity of entities) {
-        const memoryContext = await this.memoryClient.getMemoryEnhancedContext({
+        const memoryContext = await this.memoryClient.getMemoryContext({
           query: `entity:${entity} in context`,
           taskType: 'entity_analysis',
           entities: [entity],
@@ -301,7 +301,7 @@ export class MemoryBackedExtractor implements SignalExtractor {
     const biome = worldState.biome.toLowerCase();
 
     // Query for area-specific knowledge
-    const memoryContext = await this.memoryClient.getMemoryEnhancedContext({
+    const memoryContext = await this.memoryClient.getMemoryContext({
       query: `area:${biome} opportunities and hazards`,
       taskType: 'area_analysis',
       entities: [biome],
@@ -371,7 +371,7 @@ export class LLMExtractor implements SignalExtractor {
       // Get relevant memories for context
       let memoryContext = '';
       if (memoryClient) {
-        const memories = await memoryClient.getMemoryEnhancedContext({
+        const memories = await memoryClient.getMemoryContext({
           query: `context for: ${thought.content}`,
           taskType: 'signal_context',
           entities: this.extractEntitiesFromThought(thought.content),

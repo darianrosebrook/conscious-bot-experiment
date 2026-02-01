@@ -10,6 +10,14 @@
 // HTTP Client utilities
 export { HttpClient, createServiceClients } from './utils/http-client';
 export type { HttpClientConfig } from './utils/http-client';
+export {
+  resilientFetch,
+  waitForService,
+} from './utils/resilient-service-client';
+export type {
+  ResilientFetchOptions,
+  WaitForServiceOptions,
+} from './utils/resilient-service-client';
 
 // Main classes
 export { Arbiter, ReflexModule } from './arbiter';

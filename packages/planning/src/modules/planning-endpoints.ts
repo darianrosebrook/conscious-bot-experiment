@@ -19,7 +19,7 @@ export interface PlanningSystem {
     getGoalCount: () => number;
     getCurrentTasks: () => any[];
     addGoal?: (goal: any) => Promise<any> | any;
-    addTask: (task: any) => void;
+    addTask: (task: any) => Promise<any> | void;
     getCompletedTasks: () => any[];
     reprioritizeGoal?: (
       goalId: string,
@@ -233,6 +233,13 @@ export function createPlanningEndpoints(
         await planningSystem.goalFormulation.addGoal(goal);
       }
 
+      if (process.env.NODE_ENV === 'development') {
+        const desc = (goal.description || '').slice(0, 60);
+        console.log(
+          `[Planning] Goal created: id=${goal.id} description="${desc}" tasks=${tasks?.length ?? 0}`
+        );
+      }
+
       // Optionally add associated tasks into the queue
       if (Array.isArray(tasks)) {
         for (const t of tasks) {
@@ -397,12 +404,13 @@ export function createPlanningEndpoints(
   }
 
   // POST /task - Add a new task
-  router.post('/task', (req: Request, res: Response) => {
+  router.post('/task', async (req: Request, res: Response) => {
     try {
       const taskData = req.body;
-      planningSystem.goalFormulation.addTask(taskData);
+      const task = await planningSystem.goalFormulation.addTask(taskData);
       res.json({
         success: true,
+        taskId: task?.id,
         message: `Task added: ${taskData.type} - ${taskData.description}`,
         timestamp: Date.now(),
       });

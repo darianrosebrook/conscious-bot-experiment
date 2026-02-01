@@ -8,6 +8,127 @@ export const maxDuration = 60; // Allow longer execution time
 const activeConnections = new Set<ReadableStreamDefaultController>();
 const MAX_CONNECTIONS = 10; // Limit concurrent connections
 
+/** Parse response body as JSON; return null on empty body or invalid JSON. */
+async function safeJson<T = unknown>(response: Response): Promise<T | null> {
+  const text = await response.text();
+  if (!text.trim()) return null;
+  try {
+    return JSON.parse(text) as T;
+  } catch {
+    return null;
+  }
+}
+
+/** Shape of Minecraft interface /state response (success case). */
+interface MinecraftStateResponse {
+  success?: boolean;
+  data?: {
+    worldState?: {
+      player?: { position?: unknown; health?: number; food?: number };
+      inventory?: { items?: unknown[] };
+    };
+    data?: {
+      position?: unknown;
+      inventory?: { items?: unknown[] };
+      health?: number;
+      food?: number;
+    };
+  };
+}
+
+/** Normalize position to [x, y, z] for dashboard (expects array). */
+function positionToArray(pos: unknown): [number, number, number] | null {
+  if (pos == null) return null;
+  if (
+    Array.isArray(pos) &&
+    pos.length >= 3 &&
+    typeof pos[0] === 'number' &&
+    typeof pos[1] === 'number' &&
+    typeof pos[2] === 'number'
+  ) {
+    return [pos[0], pos[1], pos[2]];
+  }
+  const o = pos as { x?: number; y?: number; z?: number };
+  if (
+    typeof o.x === 'number' &&
+    typeof o.y === 'number' &&
+    typeof o.z === 'number'
+  ) {
+    return [o.x, o.y, o.z];
+  }
+  return null;
+}
+
+/** Build the bot_state_update payload from minecraft (and optional cognition/world) data. */
+function buildBotStatePayload(
+  minecraftData: MinecraftStateResponse | null,
+  cognitionData: unknown = null,
+  worldData: unknown = null
+) {
+  const rawPos =
+    minecraftData?.data?.worldState?.player?.position ??
+    minecraftData?.data?.data?.position ??
+    null;
+  return {
+    type: 'bot_state_update',
+    timestamp: Date.now(),
+    data: {
+      connected: minecraftData?.success ?? false,
+      inventory:
+        minecraftData?.data?.worldState?.inventory?.items ??
+        (
+          minecraftData?.data?.data as
+            | { inventory?: { items?: unknown[] } }
+            | undefined
+        )?.inventory?.items ??
+        [],
+      position: positionToArray(rawPos),
+      vitals:
+        minecraftData?.data?.worldState || minecraftData?.data?.data
+          ? {
+              health:
+                minecraftData?.data?.worldState?.player?.health ??
+                (minecraftData?.data?.data as { health?: number })?.health ??
+                0,
+              food:
+                minecraftData?.data?.worldState?.player?.food ??
+                (minecraftData?.data?.data as { food?: number })?.food ??
+                0,
+              hunger:
+                minecraftData?.data?.worldState?.player?.food ??
+                (minecraftData?.data?.data as { food?: number })?.food ??
+                0,
+              stamina: 100,
+              sleep: 100,
+            }
+          : null,
+      environment: worldData ?? null,
+      cognition:
+        cognitionData != null
+          ? { ...(cognitionData as object) }
+          : { error: 'Cognition service unavailable' },
+    },
+  };
+}
+
+const encoder = new TextEncoder();
+
+/** Broadcast a bot_state_update payload to all SSE clients (push). */
+function broadcastBotState(payload: {
+  type: string;
+  timestamp: number;
+  data: unknown;
+}) {
+  const data = `data: ${JSON.stringify(payload)}\n\n`;
+  activeConnections.forEach((controller) => {
+    try {
+      controller.enqueue(encoder.encode(data));
+    } catch (err) {
+      activeConnections.delete(controller);
+    }
+  });
+}
+
 /**
  * Centralized Bot State Stream
  *
@@ -43,41 +164,74 @@ export const GET = async (req: NextRequest) => {
       let worldData: unknown = null;
 
       try {
-        const minecraftResponse = await fetch('http://localhost:3005/state', opts);
-        minecraftData = minecraftResponse.ok ? await minecraftResponse.json() : null;
+        const minecraftResponse = await fetch(
+          'http://localhost:3005/state',
+          opts
+        );
+        minecraftData = minecraftResponse.ok
+          ? await safeJson(minecraftResponse)
+          : null;
       } catch (e) {
-        if (process.env.NODE_ENV === 'development' && !(globalThis as unknown as { botStateMinecraftLogged?: boolean }).botStateMinecraftLogged) {
-          console.warn('[Dashboard] Minecraft state unavailable (timeout or error), returning degraded state');
-          (globalThis as unknown as { botStateMinecraftLogged?: boolean }).botStateMinecraftLogged = true;
+        if (
+          process.env.NODE_ENV === 'development' &&
+          !(globalThis as unknown as { botStateMinecraftLogged?: boolean })
+            .botStateMinecraftLogged
+        ) {
+          console.warn(
+            '[Dashboard] Minecraft state unavailable (timeout or error), returning degraded state'
+          );
+          (
+            globalThis as unknown as { botStateMinecraftLogged?: boolean }
+          ).botStateMinecraftLogged = true;
         }
       }
 
       try {
-        const cognitionResponse = await fetch('http://localhost:3003/state', opts);
-        cognitionData = cognitionResponse.ok ? await cognitionResponse.json() : null;
+        const cognitionResponse = await fetch(
+          'http://localhost:3003/state',
+          opts
+        );
+        cognitionData = cognitionResponse.ok
+          ? await safeJson(cognitionResponse)
+          : null;
       } catch {
         cognitionData = null;
       }
 
       try {
         const worldResponse = await fetch('http://localhost:3004/state', opts);
-        worldData = worldResponse.ok ? await worldResponse.json() : null;
+        worldData = worldResponse.ok ? await safeJson(worldResponse) : null;
       } catch {
         worldData = null;
       }
 
-      const m = minecraftData as { success?: boolean; data?: { worldState?: { inventory?: { items?: unknown[] }; player?: { position?: unknown; health?: number; food?: number } }; data?: { inventory?: { items?: unknown[] }; position?: unknown; health?: number; food?: number } } } | null;
+      const m = minecraftData as MinecraftStateResponse | null;
+      const rawPosition =
+        m?.data?.worldState?.player?.position ??
+        m?.data?.data?.position ??
+        null;
+      const hasVitals = m?.data?.worldState != null || m?.data?.data != null;
       const botState = {
         type: 'bot_state_update',
         timestamp: Date.now(),
         data: {
           connected: m?.success ?? false,
-          inventory: m?.data?.worldState?.inventory?.items ?? m?.data?.data?.inventory?.items ?? [],
-          position: m?.data?.worldState?.player?.position ?? m?.data?.data?.position ?? null,
-          vitals: m?.data?.worldState
+          inventory:
+            m?.data?.worldState?.inventory?.items ??
+            (m?.data?.data as { inventory?: { items?: unknown[] } } | undefined)
+              ?.inventory?.items ??
+            [],
+          position: positionToArray(rawPosition),
+          vitals: hasVitals
             ? {
-                health: m.data.worldState.player?.health ?? m.data.data?.health ?? 0,
-                hunger: m.data.worldState.player?.food ?? m.data.data?.food ?? 0,
+                health:
+                  m?.data?.worldState?.player?.health ??
+                  (m?.data?.data as { health?: number } | undefined)?.health ??
+                  0,
+                hunger:
+                  m?.data?.worldState?.player?.food ??
+                  (m?.data?.data as { food?: number } | undefined)?.food ??
+                  0,
                 stamina: 100,
                 sleep: 100,
               }
@@ -85,7 +239,10 @@ export const GET = async (req: NextRequest) => {
           intero: { stress: 20, focus: 80, curiosity: 75 },
           mood: 'neutral',
           environment: worldData ?? null,
-          cognition: cognitionData != null ? { ...(cognitionData as object) } : { error: 'Cognition service unavailable' },
+          cognition:
+            cognitionData != null
+              ? { ...(cognitionData as object) }
+              : { error: 'Cognition service unavailable' },
         },
       };
 
@@ -110,180 +267,75 @@ export const GET = async (req: NextRequest) => {
       return new Response('Too many connections', { status: 429 });
     }
 
-    const encoder = new TextEncoder();
-
     const stream = new ReadableStream({
-      start(controller) {
-        let lastBotState: string | null = null;
-        let isConnected = true;
-        const intervalId: NodeJS.Timeout = setInterval(() => {
-          if (!isConnected) {
-            clearInterval(intervalId);
-            return;
-          }
-          sendBotState();
-        }, 5000); // Reduced from 2 seconds to 5 seconds to reduce load
-
-        // Track this connection
+      async start(controller) {
         activeConnections.add(controller);
-        // Only log connection changes in development
         if (process.env.NODE_ENV === 'development') {
           console.log(
             `SSE connection established. Total connections: ${activeConnections.size}`
           );
         }
 
-        const sendBotState = async () => {
-          if (!isConnected) return;
-
+        // Send one initial snapshot; further updates come via POST /api/ws/bot-state (push)
+        try {
+          let minecraftData: MinecraftStateResponse | null = null;
+          let cognitionData: unknown = null;
+          let worldData: unknown = null;
           try {
-            // Fetch bot state from Minecraft interface with fallback
-            let minecraftData = null;
-            try {
-              const minecraftResponse = await fetch(
-                'http://localhost:3005/state',
-                {
-                  method: 'GET',
-                  headers: { 'Content-Type': 'application/json' },
-                  signal: AbortSignal.timeout(3000), // 3 second timeout
-                }
-              );
-              minecraftData = minecraftResponse.ok
-                ? await minecraftResponse.json()
-                : null;
-            } catch (minecraftError) {
-              // Only log once per session to avoid spam
-              if (!(globalThis as any).minecraftUnavailableLogged) {
-                console.log(
-                  'Minecraft interface unavailable, using graceful fallback state'
-                );
-                (globalThis as any).minecraftUnavailableLogged = true;
-              }
-
-              // No fallback data - return null to indicate unavailability
-              minecraftData = null;
-            }
-
-            // Fetch cognition state with fallback
-            let cognitionData = null;
-            try {
-              const cognitionResponse = await fetch(
-                'http://localhost:3003/state',
-                {
-                  method: 'GET',
-                  headers: { 'Content-Type': 'application/json' },
-                  signal: AbortSignal.timeout(3000), // 3 second timeout
-                }
-              );
-              cognitionData = cognitionResponse.ok
-                ? await cognitionResponse.json()
-                : null;
-            } catch (cognitionError) {
-              // Only log once per session to avoid spam
-              if (!(globalThis as any).cognitionUnavailableLogged) {
-                console.log(
-                  'Cognition service unavailable, using graceful fallback state'
-                );
-                (globalThis as any).cognitionUnavailableLogged = true;
-              }
-
-              // No fallback data - return null to indicate unavailability
-              cognitionData = null;
-            }
-
-            // Fetch world state with fallback
-            let worldData = null;
-            try {
-              const worldResponse = await fetch('http://localhost:3004/state', {
-                method: 'GET',
-                headers: { 'Content-Type': 'application/json' },
-                signal: AbortSignal.timeout(3000), // 3 second timeout
-              });
-              worldData = worldResponse.ok ? await worldResponse.json() : null;
-            } catch (worldError) {
-              // Only log once per session to avoid spam
-              if (!(globalThis as any).worldUnavailableLogged) {
-                console.log(
-                  'World service unavailable, using graceful fallback state'
-                );
-                (globalThis as any).worldUnavailableLogged = true;
-              }
-
-              // No fallback data - return null to indicate unavailability
-              worldData = null;
-            }
-
-            const botState = {
-              type: 'bot_state_update',
-              timestamp: Date.now(),
-              data: {
-                connected: minecraftData?.success || false,
-                inventory:
-                  minecraftData?.data?.worldState?.inventory?.items ||
-                  minecraftData?.data?.data?.inventory?.items ||
-                  [],
-                position:
-                  minecraftData?.data?.worldState?.player?.position ??
-                  minecraftData?.data?.data?.position ??
-                  null,
-                vitals: minecraftData?.data?.worldState
-                  ? {
-                      health: minecraftData.data.worldState.player?.health ?? minecraftData.data.data?.health ?? 0,
-                      food: minecraftData.data.worldState.player?.food ?? minecraftData.data.data?.food ?? 0,
-                      hunger: minecraftData.data.worldState.player?.food ?? minecraftData.data.data?.food ?? 0,
-                      stamina: 100, // Default stamina value
-                      sleep: 100, // Default sleep value
-                    }
-                  : null,
-                environment: worldData || null,
-                cognition: cognitionData
-                  ? { ...cognitionData }
-                  : { error: 'Cognition service unavailable' },
-              },
-            };
-
-            // Only send if data has changed
-            const stateString = JSON.stringify(botState);
-            if (stateString !== lastBotState) {
-              lastBotState = stateString;
-              const data = `data: ${stateString}\n\n`;
-
-              try {
-                controller.enqueue(encoder.encode(data));
-              } catch (error) {
-                if (
-                  error instanceof Error &&
-                  error.message.includes('Controller is already closed')
-                ) {
-                  isConnected = false;
-                  return;
-                }
-                throw error;
-              }
-            }
-          } catch (error) {
-            console.error('Error in bot state stream:', error);
-            // Don't throw - just log and continue
+            const r = await fetch('http://localhost:3005/state', {
+              method: 'GET',
+              headers: { 'Content-Type': 'application/json' },
+              signal: AbortSignal.timeout(3000),
+            });
+            minecraftData = r.ok
+              ? await safeJson<MinecraftStateResponse>(r)
+              : null;
+          } catch {
+            minecraftData = null;
           }
-        };
-
-        // Send initial state
-        sendBotState();
-
-        // Clean up on disconnect - Enhanced for Next.js 15
-        const cleanup = () => {
-          isConnected = false;
-          if (intervalId) {
-            clearInterval(intervalId);
+          try {
+            const r = await fetch('http://localhost:3003/state', {
+              method: 'GET',
+              headers: { 'Content-Type': 'application/json' },
+              signal: AbortSignal.timeout(3000),
+            });
+            cognitionData = r.ok ? await safeJson(r) : null;
+          } catch {
+            cognitionData = null;
           }
-          activeConnections.delete(controller);
-          console.log(
-            `SSE connection closed. Total connections: ${activeConnections.size}`
+          try {
+            const r = await fetch('http://localhost:3004/state', {
+              method: 'GET',
+              headers: { 'Content-Type': 'application/json' },
+              signal: AbortSignal.timeout(3000),
+            });
+            worldData = r.ok ? await safeJson(r) : null;
+          } catch {
+            worldData = null;
+          }
+          const payload = buildBotStatePayload(
+            minecraftData,
+            cognitionData,
+            worldData
           );
+          controller.enqueue(
+            encoder.encode(`data: ${JSON.stringify(payload)}\n\n`)
+          );
+        } catch (err) {
+          console.error('Error sending initial bot state:', err);
+        }
+
+        const cleanup = () => {
+          activeConnections.delete(controller);
+          if (process.env.NODE_ENV === 'development') {
+            console.log(
+              `SSE connection closed. Total connections: ${activeConnections.size}`
+            );
+          }
           try {
             controller.close();
-          } catch (error) {
-            // Controller might already be closed
+          } catch {
+            // Controller may already be closed
           }
         };
 
@@ -316,3 +368,58 @@ export const GET = async (req: NextRequest) => {
     return new Response('Internal Server Error', { status: 500 });
   }
 };
+
+/**
+ * POST endpoint for push-based bot state updates.
+ * Minecraft-interface (or other services) POST here when state changes;
+ * dashboard broadcasts to all SSE clients so they receive updates without polling.
+ */
+export async function POST(req: NextRequest) {
+  try {
+    const body = await req.json();
+    let payload: { type: string; timestamp: number; data: unknown };
+
+    if (body?.type === 'bot_state_update' && body?.data != null) {
+      payload = {
+        type: 'bot_state_update',
+        timestamp: body.timestamp ?? Date.now(),
+        data: body.data,
+      };
+    } else if (body?.data != null) {
+      const m = body.data as MinecraftStateResponse;
+      payload = buildBotStatePayload(
+        m,
+        body.cognition ?? null,
+        body.environment ?? null
+      );
+    } else {
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: 'Missing data or bot_state_update payload',
+        }),
+        {
+          status: 400,
+          headers: { 'Content-Type': 'application/json' },
+        }
+      );
+    }
+
+    broadcastBotState(payload);
+    return new Response(
+      JSON.stringify({ success: true, connections: activeConnections.size }),
+      {
+        headers: { 'Content-Type': 'application/json' },
+      }
+    );
+  } catch (err) {
+    console.error('Bot state ingest failed:', err);
+    return new Response(
+      JSON.stringify({ success: false, error: 'Invalid JSON or body' }),
+      {
+        status: 500,
+        headers: { 'Content-Type': 'application/json' },
+      }
+    );
+  }
+}

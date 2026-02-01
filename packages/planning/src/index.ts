@@ -3,9 +3,13 @@
  *
  * This package provides:
  * - Goal formulation and homeostasis monitoring
- * - Hierarchical task planning (HTN)
- * - Goal-oriented action planning (GOAP)
- * - Reactive execution and plan repair
+ * - Cognitive task routing
+ * - Sterling solver integration (crafting, building, tool progression)
+ * - Reactive execution with safety reflexes
+ * - Capability-aware action plan routing
+ *
+ * Legacy planners (HRM, GOAP planTo, HTN decompose, IntegratedPlanningCoordinator)
+ * have been retired. Sterling solvers + deterministic compiler are canonical.
  *
  * @author @darianrosebrook
  */
@@ -14,14 +18,10 @@
 export * from './goal-formulation/homeostasis-monitor';
 export * from './goal-formulation/need-generator';
 export * from './goal-formulation/goal-manager';
+export { GoalManager as EnhancedGoalManager } from './goal-formulation/goal-manager';
 export * from './goal-formulation/utility-calculator';
 
-// Hierarchical Planning (Legacy)
-export * from './hierarchical-planner/hierarchical-planner';
-export * from './hierarchical-planner/task-network';
-export * from './hierarchical-planner/plan-decomposer';
-
-// HRM-Inspired Planning (M3) - Selective exports to avoid conflicts
+// Cognitive Task Routing (retained from hierarchical-planner)
 export {
   CognitiveTaskRouter,
   createCognitiveRouter,
@@ -34,21 +34,6 @@ export type {
   RoutingDecision,
   RouterType,
 } from './hierarchical-planner/cognitive-router';
-
-export {
-  HRMInspiredPlanner,
-  createHRMPlanner,
-} from './hierarchical-planner/hrm-inspired-planner';
-
-export type {
-  Plan as HRMPlan,
-  PlanNode as HRMPlanNode,
-} from './hierarchical-planner/hrm-inspired-planner';
-export {
-  IntegratedPlanningSystem,
-  createIntegratedPlanningSystem,
-  plan as quickPlan,
-} from './hierarchical-planner';
 
 // Behavior Trees
 export {
@@ -63,17 +48,30 @@ export {
 
 // Reactive Execution
 export * from './reactive-executor/reactive-executor';
-export * from './reactive-executor/goap-planner';
-export * from './reactive-executor/plan-repair';
+/** @deprecated Use ReactiveExecutor */
+export { ReactiveExecutor as EnhancedReactiveExecutor } from './reactive-executor/reactive-executor';
 
-// Integrated Planning Coordinator (M3 - Full Integration)
+// Safety Reflexes (extracted from GOAP planner)
 export {
-  IntegratedPlanningCoordinator,
-  createIntegratedPlanningCoordinator,
-  type PlanningConfiguration,
-  type PlanningContext,
-  type IntegratedPlanningResult,
-} from './integrated-planning-coordinator';
+  SafetyReflexes,
+  type ExecutionSnapshot,
+  type SafetyAction,
+  type ReflexMCPBus,
+} from './reactive-executor/safety-reflexes';
+
+// Capability-aware routing
+export { routeActionPlan, type CapabilityRoute, type PlanBackend } from './modules/action-plan-backend';
+export type { RouteOptions } from './modules/action-plan-backend';
+
+// Solve contract types
+export type {
+  SolveInput,
+  SolveOutput,
+  FailureContext,
+  RepairInput,
+  CompilerConstraints,
+  SterlingDomainDeclaration,
+} from './modules/solve-contract';
 
 // Types
 export * from './types.js';
@@ -106,4 +104,15 @@ export type {
 } from './sterling';
 
 // Additional exports for minecraft-interface compatibility
-export type { PlanStep, HomeostasisState } from './types';
+export type { PlanStep, HomeostasisState, PlanningContext } from './types';
+
+// Interfaces and bootstrap for dependency injection
+export type { ITaskIntegration, IGoalManager, IReactiveExecutor } from './interfaces';
+export { createPlanningBootstrap } from './modules/planning-bootstrap';
+
+// Task integration and integrations (used by modular-server; backward-compat aliases)
+export { TaskIntegration, type TaskIntegrationConfig } from './task-integration';
+/** @deprecated Use TaskIntegration */
+export { TaskIntegration as EnhancedTaskIntegration } from './task-integration';
+/** @deprecated Use TaskIntegrationConfig */
+export type { TaskIntegrationConfig as EnhancedTaskIntegrationConfig } from './task-integration';

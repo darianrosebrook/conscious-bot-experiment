@@ -8,7 +8,7 @@
 
 import * as express from 'express';
 import * as cors from 'cors';
-import { createServiceClients } from '@conscious-bot/core';
+import { createServiceClients, resilientFetch } from '@conscious-bot/core';
 import { ReActArbiter } from './react-arbiter/ReActArbiter';
 import {
   eventDrivenThoughtGenerator,
@@ -60,9 +60,10 @@ class CognitiveStreamLogger {
     } = {}
   ): Promise<void> {
     try {
-      const response = await fetch(this.cognitiveStreamUrl, {
+      const response = await resilientFetch(this.cognitiveStreamUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        label: 'dashboard/cognitive-stream',
         body: JSON.stringify({
           type: type || 'system_log',
           content: content,
@@ -83,19 +84,13 @@ class CognitiveStreamLogger {
         }),
       });
 
-      if (!response.ok) {
+      if (!response?.ok) {
         console.warn(
           '❌ Failed to send log to cognitive stream:',
-          response.status
+          response?.status ?? 'unavailable'
         );
       }
     } catch (error: unknown) {
-      const cause = error && typeof error === 'object' && 'cause' in error ? (error as { cause?: { code?: string } }).cause : undefined;
-      const isRefused = cause?.code === 'ECONNREFUSED' || (error instanceof Error && error.message?.includes('ECONNREFUSED'));
-      if (isRefused) {
-        // Dashboard not ready yet (startup race); avoid log spam
-        return;
-      }
       console.warn('❌ Error sending log to cognitive stream:', error);
     }
   }
@@ -407,8 +402,21 @@ function buildObservationPayload(
 
   const baseCategory =
     raw.category === 'environment' ? 'environment' : 'entity';
-  const entity = raw.entity || metadata?.entity || undefined;
-  const event = raw.event || undefined;
+  const rawEntity = raw.entity || metadata?.entity;
+  // Bot-adapter sends flat metadata (entityType, entityId, distance, position);
+  // construct entity from that when raw.entity/metadata.entity is absent
+  const entityFromMetadata =
+    !rawEntity &&
+    (metadata?.entityType ?? metadata?.entityId ?? metadata?.distance != null)
+      ? {
+          id: metadata?.entityId ?? observationId,
+          name: metadata?.entityType ?? 'unknown',
+          distance: coerceNumber(metadata?.distance),
+          position: metadata?.position,
+        }
+      : undefined;
+  const entity = rawEntity ?? entityFromMetadata;
+  const event = raw.event ?? metadata?.event ?? undefined;
 
   const payload: ObservationPayload = {
     observationId,
@@ -436,7 +444,9 @@ function buildObservationPayload(
           threatLevel:
             entity.threatLevel ??
             metadata?.threatLevel ??
-            inferThreatLevel(entity.name),
+            inferThreatLevel(
+              typeof entity.name === 'string' ? entity.name : metadata?.entityType
+            ),
           distance:
             coerceNumber(entity.distance ?? metadata?.distance) ?? undefined,
           position: entity.position
@@ -445,7 +455,13 @@ function buildObservationPayload(
                 y: Number(entity.position.y) || 0,
                 z: Number(entity.position.z) || 0,
               }
-            : undefined,
+            : metadata?.position
+              ? {
+                  x: Number(metadata.position.x) || 0,
+                  y: Number(metadata.position.y) || 0,
+                  z: Number(metadata.position.z) || 0,
+                }
+              : undefined,
           velocity: entity.velocity
             ? {
                 x: Number(entity.velocity.x) || 0,
@@ -800,8 +816,10 @@ let cognitiveThoughts: any[] = [];
 // Function to send thoughts to cognitive stream
 async function sendThoughtToCognitiveStream(thought: any) {
   try {
-    const response = await fetch(
-      'http://localhost:3000/api/ws/cognitive-stream',
+    const dashboardUrl =
+      process.env.DASHBOARD_ENDPOINT || 'http://localhost:3000';
+    const response = await resilientFetch(
+      `${dashboardUrl}/api/ws/cognitive-stream`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -822,7 +840,7 @@ async function sendThoughtToCognitiveStream(thought: any) {
       }
     );
 
-    if (response.ok) {
+    if (response?.ok) {
       console.log(
         '✅ Thought sent to cognitive stream:',
         thought.content.substring(0, 50) + '...'
@@ -872,14 +890,15 @@ function startThoughtGeneration() {
   thoughtGenerationInterval = setInterval(async () => {
     try {
       // Fetch real bot state and planning data
-      const [botState, planningState] = await Promise.all([
-        fetch('http://localhost:3005/state')
-          .then((res) => res.json())
-          .catch(() => null),
-        fetch('http://localhost:3002/state')
-          .then((res) => res.json())
-          .catch(() => null),
+      const mcUrl = process.env.MINECRAFT_ENDPOINT || 'http://localhost:3005';
+      const planningUrl =
+        process.env.PLANNING_SERVICE_URL || 'http://localhost:3002';
+      const [botRes, planningRes] = await Promise.all([
+        resilientFetch(`${mcUrl}/state`, { label: 'mc/state' }),
+        resilientFetch(`${planningUrl}/state`, { label: 'planning/state' }),
       ]);
+      const botState = botRes?.ok ? await botRes.json() : null;
+      const planningState = planningRes?.ok ? await planningRes.json() : null;
 
       const currentState = (botState as any)?.data || {};
       const currentTasks = (planningState as any)?.state?.tasks?.current || [];
@@ -1518,8 +1537,11 @@ app.post('/process', async (req, res) => {
       // Send the generated internal thought to the cognitive stream with self attribution
       if (result.thought) {
         try {
-          const cognitiveStreamResponse = await fetch(
-            'http://localhost:3000/api/ws/cognitive-stream',
+          const cognitiveStreamUrl = process.env.DASHBOARD_ENDPOINT
+            ? `${process.env.DASHBOARD_ENDPOINT}/api/ws/cognitive-stream`
+            : 'http://localhost:3000/api/ws/cognitive-stream';
+          const cognitiveStreamResponse = await resilientFetch(
+            cognitiveStreamUrl,
             {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
@@ -1536,18 +1558,21 @@ app.post('/process', async (req, res) => {
             }
           );
 
-          if (cognitiveStreamResponse.ok) {
+          if (cognitiveStreamResponse?.ok) {
             console.log(
-              '✅ Intrusive thought processed as internal thought and sent to cognitive stream'
+              '[Cognition] Intrusive thought processed and sent to cognitive stream'
             );
-          } else {
+          } else if (cognitiveStreamResponse) {
+            const errBody = await cognitiveStreamResponse.text();
             console.error(
-              '❌ Failed to send intrusive thought to cognitive stream as internal thought'
+              '[Cognition] Failed to send intrusive thought to cognitive stream:',
+              cognitiveStreamResponse.status,
+              errBody
             );
           }
         } catch (error) {
           console.error(
-            '❌ Error sending intrusive thought to cognitive stream as internal thought:',
+            '[Cognition] Error sending intrusive thought to cognitive stream:',
             error
           );
         }
@@ -1562,7 +1587,10 @@ app.post('/process', async (req, res) => {
       });
     } else if (type === 'environmental_awareness') {
       // Process environmental awareness (entity detection, events, etc.)
-      logObservation('Processing environmental awareness', { content, metadata });
+      logObservation('Processing environmental awareness', {
+        content,
+        metadata,
+      });
 
       try {
         // The minecraft interface sends data directly in req.body, not in req.body.observation
@@ -1641,17 +1669,21 @@ app.post('/process', async (req, res) => {
 
           const isGenericFallback =
             insight.fallback &&
-            insight.thought.text === ObservationReasoner.GENERIC_FALLBACK_THOUGHT;
+            insight.thought.text ===
+              ObservationReasoner.GENERIC_FALLBACK_THOUGHT;
           if (!isGenericFallback) {
-            const cognitiveStreamResponse = await fetch(
-              'http://localhost:3000/api/ws/cognitive-stream',
+            const dashboardUrl =
+              process.env.DASHBOARD_ENDPOINT || 'http://localhost:3000';
+            const cognitiveStreamResponse = await resilientFetch(
+              `${dashboardUrl}/api/ws/cognitive-stream`,
               {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(internalThought),
+                label: 'dashboard/cognitive-stream',
               }
             );
-            if (!cognitiveStreamResponse.ok) {
+            if (!cognitiveStreamResponse?.ok) {
               console.warn(
                 '❌ Failed to send observation thought to cognitive stream'
               );
@@ -1701,10 +1733,13 @@ app.post('/process', async (req, res) => {
           processed: true,
         };
 
-        await fetch('http://localhost:3000/api/ws/cognitive-stream', {
+        const dashboardUrl =
+          process.env.DASHBOARD_ENDPOINT || 'http://localhost:3000';
+        await resilientFetch(`${dashboardUrl}/api/ws/cognitive-stream`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(fallbackThought),
+          label: 'dashboard/cognitive-stream',
         });
 
         res.json({
@@ -1772,14 +1807,14 @@ app.post('/process', async (req, res) => {
         };
 
         // Send to cognitive stream
-        const cognitiveStreamResponse = await fetch(
-          'http://localhost:3000/api/ws/cognitive-stream',
-          {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(internalThought),
-          }
-        );
+        const dashboardUrl =
+          process.env.DASHBOARD_ENDPOINT || 'http://localhost:3000';
+        await resilientFetch(`${dashboardUrl}/api/ws/cognitive-stream`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(internalThought),
+          label: 'dashboard/cognitive-stream',
+        });
 
         let shouldRespond = false;
         let response = '';
@@ -1872,14 +1907,14 @@ app.post('/process', async (req, res) => {
         };
 
         // Send to cognitive stream
-        const cognitiveStreamResponse = await fetch(
-          'http://localhost:3000/api/ws/cognitive-stream',
-          {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(internalThought),
-          }
-        );
+        const dashboardUrl =
+          process.env.DASHBOARD_ENDPOINT || 'http://localhost:3000';
+        await resilientFetch(`${dashboardUrl}/api/ws/cognitive-stream`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(internalThought),
+          label: 'dashboard/cognitive-stream',
+        });
 
         let shouldRespond = false;
         let response = '';
@@ -1938,10 +1973,12 @@ app.post('/process', async (req, res) => {
         // Get actual inventory data
         let actualInventory = { items: [], armor: [], tools: [] };
         try {
-          const inventoryResponse = await fetch(
-            'http://localhost:3005/inventory'
-          );
-          if (inventoryResponse.ok) {
+          const mcUrl =
+            process.env.MINECRAFT_ENDPOINT || 'http://localhost:3005';
+          const inventoryResponse = await resilientFetch(`${mcUrl}/inventory`, {
+            label: 'mc/inventory',
+          });
+          if (inventoryResponse?.ok) {
             const inventoryData = await inventoryResponse.json();
             actualInventory = (await (inventoryData as any).data) || {
               items: [],
@@ -2938,8 +2975,10 @@ app.post('/thought-generated', async (req: Request, res: Response) => {
 
     // Forward the thought to the dashboard
     try {
-      const dashboardResponse = await fetch(
-        'http://localhost:3000/api/ws/cognitive-stream',
+      const dashboardUrl =
+        process.env.DASHBOARD_ENDPOINT || 'http://localhost:3000';
+      const dashboardResponse = await resilientFetch(
+        `${dashboardUrl}/api/ws/cognitive-stream`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -2956,13 +2995,13 @@ app.post('/thought-generated', async (req: Request, res: Response) => {
         }
       );
 
-      if (dashboardResponse.ok) {
+      if (dashboardResponse?.ok) {
         console.log('✅ Thought forwarded to dashboard successfully');
         res.json({ success: true, message: 'Thought forwarded to dashboard' });
       } else {
         console.warn(
           '⚠️ Failed to forward thought to dashboard:',
-          dashboardResponse.status
+          dashboardResponse?.status ?? 'unavailable'
         );
         res
           .status(500)
@@ -2986,7 +3025,8 @@ app.post('/api/cognitive-stream/events', async (req, res) => {
     if (!event.type || !event.timestamp) {
       return res.status(400).json({ error: 'Missing type or timestamp' });
     }
-    const thought = await eventDrivenThoughtGenerator.generateThoughtForEvent(event);
+    const thought =
+      await eventDrivenThoughtGenerator.generateThoughtForEvent(event);
     res.json({
       success: true,
       thoughtGenerated: !!thought,
@@ -3055,7 +3095,9 @@ eventDrivenThoughtGenerator.on(
       }
 
       // Forward to dashboard
-      await fetch('http://localhost:3000/api/ws/cognitive-stream', {
+      const dashboardUrl =
+        process.env.DASHBOARD_ENDPOINT || 'http://localhost:3000';
+      await resilientFetch(`${dashboardUrl}/api/ws/cognitive-stream`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -3068,6 +3110,7 @@ eventDrivenThoughtGenerator.on(
           timestamp: data.thought.timestamp,
           processed: data.thought.processed,
         }),
+        label: 'dashboard/cognitive-stream',
       });
     } catch (error) {
       console.warn(
@@ -3102,15 +3145,15 @@ app.listen(port, () => {
     const host = cfg.host ?? 'localhost';
     const port = cfg.port ?? 5002;
     const healthUrl = `http://${host}:${port}/health`;
-    fetch(healthUrl, { signal: AbortSignal.timeout(5000) })
+    resilientFetch(healthUrl, { timeoutMs: 5000, label: 'llm/health' })
       .then((r) => {
-        if (r.ok) {
+        if (r?.ok) {
           console.log(
             `[Cognition] LLM backend (MLX/Ollama) reachable at ${healthUrl}`
           );
         } else {
           console.warn(
-            `[Cognition] LLM backend at ${healthUrl} returned ${r.status} - observation reasoning may fall back`
+            `[Cognition] LLM backend at ${healthUrl} returned ${r?.status ?? 'unknown'} - observation reasoning may fall back`
           );
         }
       })

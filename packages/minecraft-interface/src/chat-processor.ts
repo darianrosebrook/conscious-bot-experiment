@@ -7,6 +7,7 @@
  * @author @darianrosebrook
  */
 
+import { resilientFetch } from '@conscious-bot/core';
 import { EventEmitter } from 'events';
 
 export interface ChatMessage {
@@ -145,9 +146,12 @@ export class ChatProcessor extends EventEmitter {
     // This respects the bot's cognitive autonomy
     if (message.requiresResponse) {
       try {
-        await fetch('http://localhost:3000/api/ws/cognitive-stream', {
+        const dashboardUrl =
+          process.env.DASHBOARD_ENDPOINT || 'http://localhost:3000';
+        await resilientFetch(`${dashboardUrl}/api/ws/cognitive-stream`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
+          label: 'dashboard/cognitive-stream',
           body: JSON.stringify({
             type: 'external_chat_in',
             content: message.content,

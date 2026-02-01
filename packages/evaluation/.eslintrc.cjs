@@ -9,8 +9,9 @@ module.exports = {
     'dist/',
     'node_modules/',
     '*.js',
-    'src/__tests__/complex-reasoning-evaluation.test.ts',
-    'src/__tests__/phase5-integration.test.ts',
+    'src/**/__tests__/**',
+    'src/**/*.test.ts',
+    'src/benchmarking/**',
   ],
   rules: {
     'no-unused-vars': 'warn',

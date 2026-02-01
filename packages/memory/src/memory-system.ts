@@ -2285,108 +2285,124 @@ export function createEnhancedMemorySystem(
 // Default Configuration
 // ============================================================================
 
+const DEV_DEFAULT_WORLD_SEED = '1';
+
 function getRequiredWorldSeed(override?: string): string {
   const raw = override || process.env.WORLD_SEED;
   if (!raw || raw === '0') {
+    if (
+      process.env.NODE_ENV === 'development' ||
+      process.env.MEMORY_DEV_DEFAULT_SEED === 'true'
+    ) {
+      return DEV_DEFAULT_WORLD_SEED;
+    }
     throw new Error(
       'WORLD_SEED environment variable is required and must be non-zero. ' +
-        'Set it to the Minecraft world seed to enable per-seed database isolation.'
+        'Set it to the Minecraft world seed to enable per-seed database isolation. ' +
+        'For local dev without a seed, set MEMORY_DEV_DEFAULT_SEED=true.'
     );
   }
   return raw;
 }
 
-export function createDefaultMemoryConfig(seedOverride?: string): EnhancedMemorySystemConfig {
+export function createDefaultMemoryConfig(
+  seedOverride?: string
+): EnhancedMemorySystemConfig {
   return {
-  host: process.env.PG_HOST || 'localhost',
-  port: parseInt(process.env.PG_PORT || '5432'),
-  user: process.env.PG_USER || 'conscious_bot',
-  password: process.env.PG_PASSWORD || 'secure_password',
-  database: process.env.PG_DATABASE || 'conscious_bot',
-  worldSeed: getRequiredWorldSeed(seedOverride),
-  vectorDbTableName: 'memory_chunks',
-  ollamaHost: process.env.OLLAMA_HOST || 'http://localhost:5002',
-  embeddingModel: process.env.MEMORY_EMBEDDING_MODEL || 'embeddinggemma',
-  embeddingDimension: parseInt(process.env.MEMORY_EMBEDDING_DIMENSION || '768'),
-  defaultGraphWeight: parseFloat(
-    process.env.MEMORY_HYBRID_GRAPH_WEIGHT || '0.5'
-  ),
-  defaultVectorWeight: parseFloat(
-    process.env.MEMORY_HYBRID_VECTOR_WEIGHT || '0.5'
-  ),
-  maxSearchResults: parseInt(process.env.MEMORY_MAX_SEARCH_RESULTS || '20'),
-  minSimilarity: parseFloat(process.env.MEMORY_MIN_SIMILARITY || '0.1'),
-  chunkingConfig: {
-    maxTokens: parseInt(process.env.MEMORY_CHUNK_SIZE || '900'),
-    overlapPercent: parseFloat(process.env.MEMORY_CHUNK_OVERLAP || '0.12'),
-    semanticSplitting: process.env.MEMORY_SEMANTIC_SPLITTING !== 'false',
-  },
-  enableQueryExpansion: process.env.MEMORY_QUERY_EXPANSION !== 'false',
-  enableDiversification: process.env.MEMORY_DIVERSIFICATION !== 'false',
-  enableSemanticBoost: process.env.MEMORY_SEMANTIC_BOOST !== 'false',
-  enablePersistence: process.env.MEMORY_PERSISTENCE !== 'false',
+    host: process.env.PG_HOST || 'localhost',
+    port: parseInt(process.env.PG_PORT || '5432'),
+    user: process.env.PG_USER || 'conscious_bot',
+    password: process.env.PG_PASSWORD || 'secure_password',
+    database: process.env.PG_DATABASE || 'conscious_bot',
+    worldSeed: getRequiredWorldSeed(seedOverride),
+    vectorDbTableName: 'memory_chunks',
+    ollamaHost: process.env.OLLAMA_HOST || 'http://localhost:5002',
+    embeddingModel: process.env.MEMORY_EMBEDDING_MODEL || 'embeddinggemma',
+    embeddingDimension: parseInt(
+      process.env.MEMORY_EMBEDDING_DIMENSION || '768'
+    ),
+    defaultGraphWeight: parseFloat(
+      process.env.MEMORY_HYBRID_GRAPH_WEIGHT || '0.5'
+    ),
+    defaultVectorWeight: parseFloat(
+      process.env.MEMORY_HYBRID_VECTOR_WEIGHT || '0.5'
+    ),
+    maxSearchResults: parseInt(process.env.MEMORY_MAX_SEARCH_RESULTS || '20'),
+    minSimilarity: parseFloat(process.env.MEMORY_MIN_SIMILARITY || '0.1'),
+    chunkingConfig: {
+      maxTokens: parseInt(process.env.MEMORY_CHUNK_SIZE || '900'),
+      overlapPercent: parseFloat(process.env.MEMORY_CHUNK_OVERLAP || '0.12'),
+      semanticSplitting: process.env.MEMORY_SEMANTIC_SPLITTING !== 'false',
+    },
+    enableQueryExpansion: process.env.MEMORY_QUERY_EXPANSION !== 'false',
+    enableDiversification: process.env.MEMORY_DIVERSIFICATION !== 'false',
+    enableSemanticBoost: process.env.MEMORY_SEMANTIC_BOOST !== 'false',
+    enablePersistence: process.env.MEMORY_PERSISTENCE !== 'false',
 
-  // Memory decay configuration
-  enableMemoryDecay: process.env.MEMORY_ENABLE_DECAY !== 'false',
-  decayEvaluationInterval: parseInt(
-    process.env.MEMORY_DECAY_INTERVAL || '3600000'
-  ), // 1 hour
-  maxMemoryRetentionDays: parseInt(
-    process.env.MEMORY_MAX_RETENTION_DAYS || '90'
-  ),
-  frequentAccessThreshold: parseInt(
-    process.env.MEMORY_FREQUENT_THRESHOLD || '5'
-  ),
-  forgottenThresholdDays: parseInt(
-    process.env.MEMORY_FORGOTTEN_THRESHOLD || '30'
-  ),
-  enableMemoryConsolidation:
-    process.env.MEMORY_ENABLE_CONSOLIDATION !== 'false',
-  enableMemoryArchiving: process.env.MEMORY_ENABLE_ARCHIVING !== 'false',
+    // Memory decay configuration
+    enableMemoryDecay: process.env.MEMORY_ENABLE_DECAY !== 'false',
+    decayEvaluationInterval: parseInt(
+      process.env.MEMORY_DECAY_INTERVAL || '3600000'
+    ), // 1 hour
+    maxMemoryRetentionDays: parseInt(
+      process.env.MEMORY_MAX_RETENTION_DAYS || '90'
+    ),
+    frequentAccessThreshold: parseInt(
+      process.env.MEMORY_FREQUENT_THRESHOLD || '5'
+    ),
+    forgottenThresholdDays: parseInt(
+      process.env.MEMORY_FORGOTTEN_THRESHOLD || '30'
+    ),
+    enableMemoryConsolidation:
+      process.env.MEMORY_ENABLE_CONSOLIDATION !== 'false',
+    enableMemoryArchiving: process.env.MEMORY_ENABLE_ARCHIVING !== 'false',
 
-  // Reflection and learning configuration
-  enableNarrativeTracking: process.env.MEMORY_ENABLE_NARRATIVE !== 'false',
-  enableMetacognition: process.env.MEMORY_ENABLE_METACOGNITION !== 'false',
-  enableSelfModelUpdates: process.env.MEMORY_ENABLE_SELF_MODEL !== 'false',
+    // Reflection and learning configuration
+    enableNarrativeTracking: process.env.MEMORY_ENABLE_NARRATIVE !== 'false',
+    enableMetacognition: process.env.MEMORY_ENABLE_METACOGNITION !== 'false',
+    enableSelfModelUpdates: process.env.MEMORY_ENABLE_SELF_MODEL !== 'false',
 
-  // Enhanced search features
-  enableMultiHopReasoning: process.env.MEMORY_ENABLE_MULTIHOP !== 'false',
-  enableProvenanceTracking: process.env.MEMORY_ENABLE_PROVENANCE !== 'false',
-  enableDecayAwareRanking: process.env.MEMORY_ENABLE_DECAY_RANKING !== 'false',
-  maxHops: parseInt(process.env.MEMORY_MAX_HOPS || '3'),
-  maxReflections: parseInt(process.env.MEMORY_MAX_REFLECTIONS || '1000'),
-  reflectionCheckpointInterval: parseInt(
-    process.env.MEMORY_CHECKPOINT_INTERVAL || '86400000'
-  ), // 24 hours
-  minLessonConfidence: parseFloat(
-    process.env.MEMORY_MIN_LESSON_CONFIDENCE || '0.6'
-  ),
+    // Enhanced search features
+    enableMultiHopReasoning: process.env.MEMORY_ENABLE_MULTIHOP !== 'false',
+    enableProvenanceTracking: process.env.MEMORY_ENABLE_PROVENANCE !== 'false',
+    enableDecayAwareRanking:
+      process.env.MEMORY_ENABLE_DECAY_RANKING !== 'false',
+    maxHops: parseInt(process.env.MEMORY_MAX_HOPS || '3'),
+    maxReflections: parseInt(process.env.MEMORY_MAX_REFLECTIONS || '1000'),
+    reflectionCheckpointInterval: parseInt(
+      process.env.MEMORY_CHECKPOINT_INTERVAL || '86400000'
+    ), // 24 hours
+    minLessonConfidence: parseFloat(
+      process.env.MEMORY_MIN_LESSON_CONFIDENCE || '0.6'
+    ),
 
-  // Tool efficiency and learning configuration
-  enableToolEfficiencyTracking: process.env.MEMORY_TOOL_EFFICIENCY !== 'false',
-  toolEfficiencyEvaluationInterval: parseInt(
-    process.env.MEMORY_TOOL_EFFICIENCY_INTERVAL || '300000'
-  ), // 5 minutes
-  minUsesForToolRecommendation: parseInt(
-    process.env.MEMORY_MIN_TOOL_USES || '3'
-  ),
-  toolEfficiencyRecencyWeight: parseFloat(
-    process.env.MEMORY_TOOL_RECENCY_WEIGHT || '0.7'
-  ),
-  enableBehaviorTreeLearning:
-    process.env.MEMORY_BEHAVIOR_TREE_LEARNING !== 'false',
-  enableCognitivePatternTracking:
-    process.env.MEMORY_COGNITIVE_PATTERNS !== 'false',
-  maxPatternsPerContext: parseInt(process.env.MEMORY_MAX_PATTERNS || '10'),
-  enableAutoRecommendations:
-    process.env.MEMORY_AUTO_RECOMMENDATIONS !== 'false',
-  toolEfficiencyThreshold: parseFloat(
-    process.env.MEMORY_EFFICIENCY_THRESHOLD || '0.6'
-  ),
-  toolEfficiencyCleanupInterval: parseInt(
-    process.env.MEMORY_TOOL_CLEANUP_INTERVAL || '3600000'
-  ), // 1 hour
+    // Tool efficiency and learning configuration
+    enableToolEfficiencyTracking:
+      process.env.MEMORY_TOOL_EFFICIENCY !== 'false',
+    toolEfficiencyEvaluationInterval: parseInt(
+      process.env.MEMORY_TOOL_EFFICIENCY_INTERVAL || '300000'
+    ), // 5 minutes
+    minUsesForToolRecommendation: parseInt(
+      process.env.MEMORY_MIN_TOOL_USES || '3'
+    ),
+    toolEfficiencyRecencyWeight: parseFloat(
+      process.env.MEMORY_TOOL_RECENCY_WEIGHT || '0.7'
+    ),
+    enableBehaviorTreeLearning:
+      process.env.MEMORY_BEHAVIOR_TREE_LEARNING !== 'false',
+    enableCognitivePatternTracking:
+      process.env.MEMORY_COGNITIVE_PATTERNS !== 'false',
+    maxPatternsPerContext: parseInt(process.env.MEMORY_MAX_PATTERNS || '10'),
+    enableAutoRecommendations:
+      process.env.MEMORY_AUTO_RECOMMENDATIONS !== 'false',
+    toolEfficiencyThreshold: parseFloat(
+      process.env.MEMORY_EFFICIENCY_THRESHOLD || '0.6'
+    ),
+    toolEfficiencyCleanupInterval: parseInt(
+      process.env.MEMORY_TOOL_CLEANUP_INTERVAL || '3600000'
+    ), // 1 hour
   };
 }
 
-export const DEFAULT_MEMORY_CONFIG: EnhancedMemorySystemConfig = createDefaultMemoryConfig();
+export const DEFAULT_MEMORY_CONFIG: EnhancedMemorySystemConfig =
+  createDefaultMemoryConfig();

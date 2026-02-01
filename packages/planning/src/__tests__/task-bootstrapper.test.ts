@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { TaskBootstrapper } from '../goal-formulation/task-bootstrapper';
 import { GoalType } from '../types';
-import type { PlanningContext } from '../integrated-planning-coordinator';
+import type { PlanningContext } from '../types';
 
 function createPlanningContext(): PlanningContext {
   const timestamp = Date.now();

@@ -9,7 +9,11 @@
  */
 
 import { EventEmitter } from 'events';
-// Temporary local type definitions until @conscious-bot/core is available
+import {
+  CapabilityRegistry,
+  type ExecutionRequest as BaseExecutionRequest,
+} from '../modules/capability-registry';
+
 export interface ShadowRunResult {
   success: boolean;
   data?: any;
@@ -67,28 +71,7 @@ export class ExecError extends Error {
   }
 }
 
-export class CapabilityRegistry {
-  constructor() {}
-  register(name: string, capability: any): void {
-    console.log(`Registered capability: ${name}`);
-  }
-  executeCapability(request: ExecutionRequest): Promise<any> {
-    return Promise.resolve({ success: true, data: request });
-  }
-}
-
-export interface ExecutionRequest {
-  id: string;
-  type: string;
-  params: any;
-  parameters?: any;
-  capabilityId?: string;
-  requestedBy?: string;
-  priority?: number;
-  timeout?: number;
-  metadata?: any;
-  timestamp?: number;
-}
+export type ExecutionRequest = BaseExecutionRequest;
 
 export interface ExecutionContext {
   id: string;
@@ -104,11 +87,40 @@ export interface ExecutionContext {
   biome?: any;
   dangerLevel?: any;
 }
-import {
-  Plan,
-  PlanNode,
-  PlanningContext,
-} from '../hierarchical-planner/hrm-inspired-planner';
+// HRM types — minimal stubs retained after legacy planner deletion.
+interface PlanNode {
+  id: string;
+  type: 'goal' | 'subgoal' | 'action' | 'condition';
+  description: string;
+  status: 'pending' | 'active' | 'completed' | 'failed' | 'blocked';
+  priority: number;
+  estimatedDuration: number;
+  dependencies: string[];
+  constraints: string[];
+  metadata?: Record<string, any>;
+}
+
+interface Plan {
+  id: string;
+  goalId: string;
+  nodes: PlanNode[];
+  executionOrder: string[];
+  confidence: number;
+  estimatedLatency: number;
+  refinementCount: number;
+  createdAt: number;
+  lastRefinedAt: number;
+}
+
+interface PlanningContext {
+  goal: string;
+  currentState: Record<string, any>;
+  constraints: string[];
+  resources: Record<string, number>;
+  timeLimit?: number;
+  urgency: 'low' | 'medium' | 'high' | 'emergency';
+  domain: 'minecraft' | 'general' | 'spatial' | 'logical';
+}
 // Already defined above as temporary local type
 // Temporary local type definition
 export interface OptionProposalResponse {
@@ -118,22 +130,6 @@ export interface OptionProposalResponse {
   name?: string;
 }
 
-export class EnhancedRegistry {
-  constructor() {}
-  register(name: string, handler: any): void {
-    console.log(`Registered: ${name}`);
-  }
-  listCapabilities(): any[] {
-    return [];
-  }
-  getCapability(id: string): any {
-    return null;
-  }
-  executeShadowRun(context: any): any {
-    return { success: true, data: null };
-  }
-}
-
 // ============================================================================
 // Types
 // ============================================================================
@@ -141,7 +137,7 @@ export class EnhancedRegistry {
 export interface MCPCapabilityPlanningContext extends PlanningContext {
   leafContext: LeafContext;
   availableCapabilities: string[]; // List of capability IDs
-  registry: EnhancedRegistry;
+  registry: CapabilityRegistry;
   dynamicFlow: DynamicCreationFlow;
   worldState: Record<string, any>;
   goalRequirements: Record<string, any>;
@@ -185,14 +181,14 @@ export interface CapabilityExecutionResult {
 type EffectSink = { applyEffects(effects: any[]): void };
 
 export class MCPCapabilitiesAdapter extends EventEmitter {
-  private registry: EnhancedRegistry;
+  private registry: CapabilityRegistry;
   private dynamicFlow: DynamicCreationFlow;
   private capabilityRegistry: CapabilityRegistry;
   private executionHistory: CapabilityExecutionResult[] = [];
   private effectSink?: EffectSink;
 
   constructor(
-    registry: EnhancedRegistry,
+    registry: CapabilityRegistry,
     dynamicFlow: DynamicCreationFlow,
     capabilityRegistry?: CapabilityRegistry,
     effectSink?: EffectSink
@@ -200,7 +196,7 @@ export class MCPCapabilitiesAdapter extends EventEmitter {
     super();
     this.registry = registry;
     this.dynamicFlow = dynamicFlow;
-    this.capabilityRegistry = capabilityRegistry || new CapabilityRegistry();
+    this.capabilityRegistry = capabilityRegistry ?? new CapabilityRegistry();
     this.effectSink = effectSink;
   }
 

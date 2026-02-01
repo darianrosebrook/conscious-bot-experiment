@@ -28,7 +28,7 @@ services:
     container_name: conscious-bot-minecraft
     environment:
       EULA: "TRUE"
-      VERSION: "1.20.1"
+      VERSION: "1.21.9"
       ONLINE_MODE: "FALSE"
       GAMEMODE: survival 
       DIFFICULTY: normal
@@ -36,13 +36,12 @@ services:
       VIEW_DISTANCE: "10"
       MEMORY: 2G
       ENABLE_COMMAND_BLOCK: "TRUE"
-      EXISTING_OPS_FILE: SYNCHRONIZE
-      LEVEL_TYPE: "flat"
+      EXISTING_OPS_FILE: SYNCHRONIZE 
     ports:
       - "25565:25565"
     volumes:
       - minecraft_data:/data
-      - ./minecraft-config/ops.json:/data/ops.json:ro
+      - ./minecraft-config/ops.json:/data/ops.json
     healthcheck:
       test: mc-health
       interval: 5s

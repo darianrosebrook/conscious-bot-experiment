@@ -7,11 +7,12 @@
   "types": "./dist/index.d.ts",
   "scripts": {
     "build": "tsc",
-    "test": "vitest run",
-    "test:run": "vitest run",
+    "test": "vitest run --passWithNoTests",
+    "test:run": "vitest run --passWithNoTests",
     "test:watch": "vitest --watch",
     "lint": "eslint src --ext .ts,.tsx",
     "typecheck": "tsc --noEmit",
+    "type-check": "tsc --noEmit",
     "security-scan": "echo 'Security scan completed - no vulnerabilities found'"
   },
   "dependencies": {

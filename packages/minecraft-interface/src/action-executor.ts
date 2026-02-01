@@ -183,7 +183,10 @@ export class ActionExecutor {
 
         return { success: !result.error };
       } else {
-        return { success: false, error: `Unknown move target: ${action.target}` };
+        return {
+          success: false,
+          error: `Unknown move target: ${action.target}`,
+        };
       }
     } catch (error) {
       return { success: false, error: `Move action error: ${error}` };

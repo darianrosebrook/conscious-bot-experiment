@@ -7,6 +7,7 @@
  * @author @darianrosebrook
  */
 
+import { resilientFetch } from '@conscious-bot/core';
 import { BotConfig } from './types';
 
 /**
@@ -69,7 +70,7 @@ export class MemoryIntegrationService {
         serverAddress: `${this.botConfig.host}:${this.botConfig.port}`,
       };
 
-      const response = await fetch(
+      const response = await resilientFetch(
         `${this.config.memoryServiceUrl}/versioning/activate`,
         {
           method: 'POST',
@@ -84,13 +85,13 @@ export class MemoryIntegrationService {
         }
       );
 
-      if (!response.ok) {
+      if (!response?.ok) {
         throw new Error(
-          `Memory service responded with status: ${response.status}`
+          `Memory service responded with status: ${response?.status ?? 'unavailable'}`
         );
       }
 
-      const result = (await response.json()) as any;
+      const result = (await response!.json()) as any; // response non-null after ok check
 
       if (result.success) {
         console.log(
@@ -116,17 +117,18 @@ export class MemoryIntegrationService {
    */
   async getActiveNamespace(): Promise<any> {
     try {
-      const response = await fetch(
-        `${this.config.memoryServiceUrl}/versioning/active`
+      const response = await resilientFetch(
+        `${this.config.memoryServiceUrl}/versioning/active`,
+        { label: 'memory/versioning/active' }
       );
 
-      if (!response.ok) {
+      if (!response?.ok) {
         throw new Error(
-          `Memory service responded with status: ${response.status}`
+          `Memory service responded with status: ${response?.status ?? 'unavailable'}`
         );
       }
 
-      const result = (await response.json()) as any;
+      const result = (await response!.json()) as any;
       return result.success ? result.data : null;
     } catch (error) {
       console.error('❌ Error getting active namespace:', error);
@@ -139,15 +141,18 @@ export class MemoryIntegrationService {
    */
   async getMemoryStats(): Promise<any> {
     try {
-      const response = await fetch(`${this.config.memoryServiceUrl}/stats`);
+      const response = await resilientFetch(
+        `${this.config.memoryServiceUrl}/stats`,
+        { label: 'memory/stats' }
+      );
 
-      if (!response.ok) {
+      if (!response?.ok) {
         throw new Error(
-          `Memory service responded with status: ${response.status}`
+          `Memory service responded with status: ${response?.status ?? 'unavailable'}`
         );
       }
 
-      const result = (await response.json()) as any;
+      const result = (await response!.json()) as any;
       return result.success ? result.data : null;
     } catch (error) {
       console.error('❌ Error getting memory stats:', error);
@@ -160,15 +165,19 @@ export class MemoryIntegrationService {
    */
   async storeMemory(memory: any): Promise<boolean> {
     try {
-      const response = await fetch(`${this.config.memoryServiceUrl}/episodic`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(memory),
-      });
+      const response = await resilientFetch(
+        `${this.config.memoryServiceUrl}/episodic`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(memory),
+          label: 'memory/episodic',
+        }
+      );
 
-      if (!response.ok) {
+      if (!response?.ok) {
         throw new Error(
           `Memory service responded with status: ${response.status}`
         );
@@ -187,7 +196,7 @@ export class MemoryIntegrationService {
    */
   async retrieveMemories(query: any): Promise<any[]> {
     try {
-      const response = await fetch(
+      const response = await resilientFetch(
         `${this.config.memoryServiceUrl}/episodic/retrieve`,
         {
           method: 'POST',
@@ -195,16 +204,17 @@ export class MemoryIntegrationService {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify(query),
+          label: 'memory/episodic/retrieve',
         }
       );
 
-      if (!response.ok) {
+      if (!response?.ok) {
         throw new Error(
-          `Memory service responded with status: ${response.status}`
+          `Memory service responded with status: ${response?.status ?? 'unavailable'}`
         );
       }
 
-      const result = (await response.json()) as any;
+      const result = (await response!.json()) as any;
       return result.success ? result.data : [];
     } catch (error) {
       console.error('❌ Error retrieving memories:', error);

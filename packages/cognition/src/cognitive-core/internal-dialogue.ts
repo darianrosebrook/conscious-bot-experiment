@@ -89,15 +89,32 @@ export class InternalDialogue {
         agentState: context.currentState,
       });
 
+      // Clean up markdown artifacts (backticks, etc.) from LLM output
+      let cleanContent = response.text.trim();
+
+      // Remove all code fence markers (opening and closing, including nested)
+      // Match: ```text, ```python, ```, or just backticks at start/end
+      cleanContent = cleanContent.replace(/^```+[a-z]*\s*/gim, '');
+      cleanContent = cleanContent.replace(/\s*```+$/gm, '');
+
+      // Remove any remaining standalone triple backticks
+      cleanContent = cleanContent.replace(/```+/g, '');
+
+      // Collapse multiple spaces/newlines
+      cleanContent = cleanContent.replace(/\s+/g, ' ');
+
+      // Trim
+      cleanContent = cleanContent.trim();
+
       const thought: InternalThought = {
         id: `thought-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         type,
-        content: response.text.trim(),
+        content: cleanContent,
         context,
         confidence: response.confidence,
         timestamp: Date.now(),
-        followUp: this.identifyFollowUpQuestions(response.text, type),
-        relatedThoughts: this.findRelatedThoughts(response.text, type),
+        followUp: this.identifyFollowUpQuestions(cleanContent, type),
+        relatedThoughts: this.findRelatedThoughts(cleanContent, type),
       };
 
       // Validate the thought

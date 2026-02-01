@@ -76,7 +76,7 @@ interface PlanningClient {
 }
 
 interface MemoryClient {
-  getMemoryEnhancedContext(context: {
+  getMemoryContext(context: {
     query?: string;
     taskType?: string;
     entities?: string[];
@@ -144,7 +144,7 @@ class HttpPlanningClient implements PlanningClient {
 class HttpMemoryClient implements MemoryClient {
   constructor(private base: string) {}
 
-  async getMemoryEnhancedContext(context: {
+  async getMemoryContext(context: {
     query?: string;
     taskType?: string;
     entities?: string[];
@@ -1162,7 +1162,7 @@ export class CognitiveThoughtProcessor extends EventEmitter {
     // 1. Get memory context if memory client is available
     if (this.memory) {
       try {
-        const memoryContext = await this.memory.getMemoryEnhancedContext({
+        const memoryContext = await this.memory.getMemoryContext({
           query: thought.content,
           taskType: thought.category,
           entities: this.extractEntitiesFromThought(thought),
@@ -1462,7 +1462,10 @@ export class CognitiveThoughtProcessor extends EventEmitter {
       }
 
       // Biome-based thoughts
-      const biomeThought = this.getBiomeOpportunities(worldState.biome, context);
+      const biomeThought = this.getBiomeOpportunities(
+        worldState.biome,
+        context
+      );
       if (biomeThought) {
         thoughts.push(biomeThought);
       }
@@ -1512,7 +1515,10 @@ export class CognitiveThoughtProcessor extends EventEmitter {
         });
       }
     } catch (error) {
-      console.warn('generateThoughtsFromContext: failed to fetch world state', error);
+      console.warn(
+        'generateThoughtsFromContext: failed to fetch world state',
+        error
+      );
     }
 
     return thoughts;
@@ -1554,7 +1560,10 @@ export class CognitiveThoughtProcessor extends EventEmitter {
       }
 
       // Generate thoughts from recommendations
-      if (memoryData.recommendations && Array.isArray(memoryData.recommendations)) {
+      if (
+        memoryData.recommendations &&
+        Array.isArray(memoryData.recommendations)
+      ) {
         for (const recommendation of memoryData.recommendations) {
           thoughts.push({
             type: 'planning',
@@ -1578,7 +1587,10 @@ export class CognitiveThoughtProcessor extends EventEmitter {
   /**
    * Get context-aware inventory advice based on biome and time of day.
    */
-  private getInventoryAdvice(context: { biome?: string; time?: string }): string {
+  private getInventoryAdvice(context: {
+    biome?: string;
+    time?: string;
+  }): string {
     if (context.time === 'night') {
       return 'At night, prioritize finding shelter and collecting basic survival items like wood and stone.';
     }

@@ -78,6 +78,9 @@ describe('Real Autonomous Executor Tests', () => {
   beforeEach(() => {
     vi.clearAllMocks();
 
+    // Restore mock implementations after clearAllMocks (implementation may be cleared)
+    mockCheckBotConnection.mockResolvedValue(true);
+
     // Reset global state
     mockGlobal.__planningExecutorState = {
       running: false,
@@ -116,7 +119,9 @@ describe('Real Autonomous Executor Tests', () => {
     expect(mcpOptions.length).toBeGreaterThan(0);
 
     // 3. Check if we can find suitable options for gathering tasks
-    const gatheringTask = activeTasks.find((task: any) => task.type === 'gathering');
+    const gatheringTask = activeTasks.find(
+      (task: any) => task.type === 'gathering'
+    );
     expect(gatheringTask).toBeDefined();
     console.log('🎯 Found gathering task:', gatheringTask?.title);
 

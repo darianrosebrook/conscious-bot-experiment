@@ -18,7 +18,6 @@ import {
   PBIError,
   PBIErrorCode,
   DEFAULT_PBI_ACCEPTANCE,
-  isPlanStep,
   isActionResult,
 } from './types';
 

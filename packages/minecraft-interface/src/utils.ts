@@ -14,7 +14,7 @@ export function createDefaultBotConfig(): BotConfig {
     host: 'localhost',
     port: 25565,
     username: 'ConsciousBot',
-    version: '1.20.1',
+    version: '1.21.9',
     auth: 'offline',
 
     pathfindingTimeout: 30000,

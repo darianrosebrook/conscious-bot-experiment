@@ -1,0 +1,30 @@
+diff --git a/viewer/lib/entity/Entity.js b/viewer/lib/entity/Entity.js
+index 89454526bd0c58e167fa4cc787cf1892ea26297f..510e545e62a86a8f8398df13fb8218a61abf2ee4 100644
+--- a/viewer/lib/entity/Entity.js
++++ b/viewer/lib/entity/Entity.js
+@@ -200,10 +200,23 @@ function getMesh (texture, jsonModel) {
+   return mesh
+ }
+ 
++/** Fallbacks for entities missing geometry (prismarine-viewer gaps) */
++const ENTITY_FALLBACKS = { glow_squid: 'squid' }
++const ENTITY_SKIP = new Set(['item']) // No geometry for dropped items
++
+ class Entity {
+   constructor (version, type, scene) {
+-    const e = entities[type]
+-    if (!e) throw new Error(`Unknown entity ${type}`)
++    let e = entities[type]
++    if (!e && ENTITY_FALLBACKS[type]) {
++      e = entities[ENTITY_FALLBACKS[type]]
++    }
++    if (!e) {
++      if (ENTITY_SKIP.has(type)) {
++        this.mesh = new THREE.Object3D()
++        return
++      }
++      throw new Error(`Unknown entity ${type}`)
++    }
+ 
+     this.mesh = new THREE.Object3D()
+     for (const [name, jsonModel] of Object.entries(e.geometry)) {

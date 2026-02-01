@@ -8,17 +8,17 @@
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { EnhancedReactiveExecutor } from '../reactive-executor';
+import { ReactiveExecutor } from '../reactive-executor';
 
 // Mock fetch globally
 global.fetch = vi.fn();
 
 describe('Action Task Execution Fix', () => {
-  let executor: EnhancedReactiveExecutor;
+  let executor: ReactiveExecutor;
 
   beforeEach(() => {
     vi.clearAllMocks();
-    executor = new EnhancedReactiveExecutor({
+    executor = new ReactiveExecutor({
       capabilities: [],
     } as any);
   });

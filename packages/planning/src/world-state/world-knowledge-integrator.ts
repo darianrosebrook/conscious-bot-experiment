@@ -67,6 +67,7 @@ export class WorldKnowledgeIntegrator {
 
   handleWorldUpdate(snapshot: WorldStateSnapshot): void {
     if (!snapshot.connected) return;
+    if (!this.kg) return; // No knowledge graph until @conscious-bot/memory provides one
     this.captureInventoryDeltas(snapshot);
     this.captureEnvironmentHints(snapshot);
   }
@@ -95,6 +96,7 @@ export class WorldKnowledgeIntegrator {
   }
 
   private recordResourceObserved(name: string, quantity: number): void {
+    if (!this.kg) return;
     const now = Date.now();
     // Create or update item/resource entity
     const entity = this.kg.upsertEntity({
@@ -166,6 +168,7 @@ export class WorldKnowledgeIntegrator {
   }
 
   private captureEnvironmentHints(snapshot: WorldStateSnapshot): void {
+    if (!this.kg) return;
     const now = Date.now();
     // Infer time-of-day category (day/night)
     if (typeof snapshot.timeOfDay === 'number') {

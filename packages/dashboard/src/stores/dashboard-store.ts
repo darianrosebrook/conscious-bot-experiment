@@ -29,6 +29,7 @@ interface DashboardStore extends DashboardState {
   loadThoughtsFromServer: () => Promise<void>;
   setTasks: (tasks: Task[]) => void;
   updateTask: (id: string, updates: Partial<Task>) => void;
+  addTask: (task: Task) => void;
   addEvent: (event: Event) => void;
   setEvents: (events: Event[]) => void;
   setMemories: (memories: Memory[]) => void;
@@ -214,7 +215,9 @@ export const useDashboardStore = create<DashboardStore>()(
               }
             }
           } catch (error) {
-            console.warn('Failed to load thoughts from server:', error);
+            if (process.env.NEXT_PUBLIC_DEBUG_DASHBOARD === '1') {
+              console.warn('Failed to load thoughts from server:', error);
+            }
           }
         },
 
@@ -238,6 +241,12 @@ export const useDashboardStore = create<DashboardStore>()(
             const newTasks = [...state.tasks];
             newTasks[taskIndex] = updatedTask;
             return { tasks: newTasks };
+          }),
+
+        addTask: (task) =>
+          set((state) => {
+            if (state.tasks.some((t) => t.id === task.id)) return state;
+            return { tasks: [...state.tasks, task].slice(-100) };
           }),
 
         addEvent: (event) =>

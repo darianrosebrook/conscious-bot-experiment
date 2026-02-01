@@ -27,6 +27,7 @@ import {
   PriorityScore,
 } from './priority-scorer';
 import { HomeostasisMonitor } from './homeostasis-monitor';
+import type { IGoalManager } from '../interfaces/goal-manager';
 
 export interface GoalFormulationResult {
   identifiedNeeds: Need[];
@@ -58,9 +59,9 @@ export interface GoalFormulationMetrics {
 }
 
 /**
- * Enhanced goal manager with complete goal formulation pipeline.
+ * Goal manager with complete goal formulation pipeline.
  */
-export class EnhancedGoalManager {
+export class GoalManager implements IGoalManager {
   private signalProcessor: AdvancedSignalProcessor;
   private goalGenerator: GoalGenerator;
   private priorityScorer: PriorityScorer;

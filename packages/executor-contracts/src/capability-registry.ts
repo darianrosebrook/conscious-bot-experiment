@@ -192,7 +192,7 @@ export const BUILT_IN_CAPABILITIES: Record<
         },
       };
     },
-    acceptance: (pre: WorldSnapshot, post: WorldSnapshot) => {
+    acceptance: (_pre: WorldSnapshot, _post: WorldSnapshot) => {
       // For navigation, always accept in tests since we can't easily simulate exact position changes
       // In real implementation, this would check if we reached the target location
       return true;
@@ -231,7 +231,7 @@ export const BUILT_IN_CAPABILITIES: Record<
         },
       };
     },
-    acceptance: (pre: WorldSnapshot, post: WorldSnapshot) => {
+    acceptance: (_pre: WorldSnapshot, _post: WorldSnapshot) => {
       // For crafting, always accept in tests since we can't easily simulate inventory changes
       // In real implementation, this would check if the crafted item was added to inventory
       return true;
@@ -276,7 +276,7 @@ export const BUILT_IN_CAPABILITIES: Record<
         },
       };
     },
-    acceptance: (pre: WorldSnapshot, post: WorldSnapshot) => {
+    acceptance: (_pre: WorldSnapshot, _post: WorldSnapshot) => {
       // For digging, always accept in tests since we can't easily simulate block removal
       // In real implementation, this would check if the target block was removed
       return true;

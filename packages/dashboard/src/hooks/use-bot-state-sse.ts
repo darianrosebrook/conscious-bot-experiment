@@ -8,7 +8,7 @@
  * @author @darianrosebrook
  */
 
-import { useEffect, useRef, useCallback } from 'react';
+import { useEffect, useRef } from 'react';
 
 export interface BotStateSSEMessage {
   type: string;
@@ -63,9 +63,7 @@ export function useBotStateSSE({
 
     const path = '/api/ws/bot-state';
     const url =
-      typeof window !== 'undefined'
-        ? `${window.location.origin}${path}`
-        : '';
+      typeof window !== 'undefined' ? `${window.location.origin}${path}` : '';
 
     if (!url) return;
 

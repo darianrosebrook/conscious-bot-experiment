@@ -100,9 +100,11 @@ declare global {
 import { CognitiveIntegration } from './cognitive-integration';
 import { BehaviorTreeRunner } from './behavior-trees/BehaviorTreeRunner';
 import { CognitiveThoughtProcessor } from './cognitive-thought-processor';
-import { IntegratedPlanningCoordinator } from './integrated-planning-coordinator';
 import { createServiceClients, SterlingClient } from '@conscious-bot/core';
-import { SterlingReasoningService, MinecraftCraftingSolver, MinecraftBuildingSolver, MinecraftToolProgressionSolver } from './sterling';
+import type { SterlingReasoningService, MinecraftCraftingSolver, MinecraftBuildingSolver, MinecraftToolProgressionSolver } from './sterling';
+import { createSterlingBootstrap } from './server/sterling-bootstrap';
+import { detectActionableSteps, convertCognitiveReflectionToTasks } from './server/cognitive-task-handler';
+import { startAutonomousExecutor as startAutonomousExecutorScheduler } from './server/autonomous-executor';
 
 // Create HTTP clients for inter-service communication
 const serviceClients = createServiceClients();
@@ -112,23 +114,14 @@ let sterlingService: SterlingReasoningService | undefined;
 let minecraftCraftingSolver: MinecraftCraftingSolver | undefined;
 let minecraftBuildingSolver: MinecraftBuildingSolver | undefined;
 let minecraftToolProgressionSolver: MinecraftToolProgressionSolver | undefined;
-import { EnhancedGoalManager } from './goal-formulation/goal-manager';
-import { EnhancedReactiveExecutor } from './reactive-executor/reactive-executor';
-import { EnhancedTaskIntegration } from './task-integration';
-import { EnhancedMemoryIntegration } from './memory-integration';
-import { EnhancedEnvironmentIntegration } from './environment-integration';
-import { EnhancedLiveStreamIntegration } from './live-stream-integration';
+import { MemoryIntegration } from './memory-integration';
+import { createPlanningBootstrap } from './modules/planning-bootstrap';
+import { EnvironmentIntegration } from './environment-integration';
+import { LiveStreamIntegration } from './live-stream-integration';
 import { GoalStatus } from './types';
-// Temporary local type definition until @conscious-bot/core is available
-export class EnhancedRegistry {
-  constructor() {}
-  register(name: string, handler: any): void {
-    console.log(`Registered: ${name}`);
-  }
-  registerLeaf(name: string, leaf: any): void {
-    console.log(`Registered leaf: ${name}`);
-  }
-}
+import { MCPLeafRegistry } from './modules/capability-registry';
+
+export { MCPLeafRegistry } from './modules/capability-registry';
 import { WorldStateManager } from './world-state/world-state-manager';
 import { WorldKnowledgeIntegrator } from './world-state/world-knowledge-integrator';
 import {
@@ -310,7 +303,7 @@ function emitExecutorBudgetEvent(
 ): void {
   if (!shouldEmitExecutorEvent(`budget:${taskId}:${reason}`, 3000)) return;
   try {
-    enhancedTaskIntegration.outbox.enqueue(DASHBOARD_STREAM_URL, {
+    taskIntegration.outbox.enqueue(DASHBOARD_STREAM_URL, {
       type: 'executor_budget',
       timestamp: Date.now(),
       data: {
@@ -684,7 +677,7 @@ async function injectNextAcquisitionStep(
   qty: number
 ): Promise<boolean> {
   // Deduplicate: skip if an active child task for this parent+item already exists
-  const activeTasks = enhancedTaskIntegration.getActiveTasks();
+  const activeTasks = taskIntegration.getActiveTasks();
   const existingChild = activeTasks.find(
     (t: any) =>
       t.metadata?.parentTaskId === parentTask.id &&
@@ -701,7 +694,7 @@ async function injectNextAcquisitionStep(
 
   const step = await planNextAcquisitionStep(goalItem, qty);
   if (!step) return false;
-  const t = await enhancedTaskIntegration.addTask({
+  const t = await taskIntegration.addTask({
     title: step.title,
     description: step.description,
     type: step.type,
@@ -748,7 +741,7 @@ async function injectDynamicPrereqForCraft(task: any): Promise<boolean> {
   );
   if (injected) {
     // Increment cap counter on successful injection
-    enhancedTaskIntegration.updateTaskMetadata(task.id, {
+    taskIntegration.updateTaskMetadata(task.id, {
       ...task.metadata,
       prereqInjectionCount: prereqAttempts + 1,
     });
@@ -793,11 +786,11 @@ async function recomputeProgressAndMaybeComplete(task: any) {
     const p = computeProgressFromInventory(inv, requirement);
     const clamped = Math.max(0, Math.min(1, p));
     const snapshot = computeRequirementSnapshot(inv, requirement);
-    enhancedTaskIntegration.updateTaskMetadata(task.id, {
+    taskIntegration.updateTaskMetadata(task.id, {
       requirement: snapshot,
     });
     const status = task.status === 'pending' ? 'active' : task.status;
-    enhancedTaskIntegration.updateTaskProgress(task.id, clamped, status);
+    taskIntegration.updateTaskProgress(task.id, clamped, status);
     // Crafting may finish all materials but not produce output; gate finalization.
     let canComplete = clamped >= 1;
     if (canComplete && (requirement as any)?.kind === 'craft') {
@@ -808,16 +801,16 @@ async function recomputeProgressAndMaybeComplete(task: any) {
     }
     if (!task.steps || !Array.isArray(task.steps)) {
       if (canComplete) {
-        enhancedTaskIntegration.updateTaskProgress(task.id, 1, 'completed');
+        taskIntegration.updateTaskProgress(task.id, 1, 'completed');
       }
       return;
     }
     const currentStep = task.steps.find((s: any) => !s.done);
     if (currentStep)
-      await enhancedTaskIntegration.completeTaskStep(task.id, currentStep.id);
+      await taskIntegration.completeTaskStep(task.id, currentStep.id);
     const allStepsComplete = task.steps.every((s: any) => s.done);
     if (canComplete && allStepsComplete) {
-      enhancedTaskIntegration.updateTaskProgress(task.id, 1, 'completed');
+      taskIntegration.updateTaskProgress(task.id, 1, 'completed');
 
       // Log action completion for audit trail
       import('@conscious-bot/cognition')
@@ -944,7 +937,7 @@ function getStepBudgetState(task: any, stepId: string) {
 function persistStepBudget(task: any, budgets: Record<string, any>) {
   const meta = task.metadata || {};
   const nextMeta = { ...meta, executionBudget: budgets };
-  enhancedTaskIntegration.updateTaskMetadata(task.id, nextMeta);
+  taskIntegration.updateTaskMetadata(task.id, nextMeta);
 }
 
 /**
@@ -1278,7 +1271,7 @@ async function addCraftingTableTask(
     },
   };
 
-  const result = await enhancedTaskIntegration.addTask(craftingTableTask);
+  const result = await taskIntegration.addTask(craftingTableTask);
   if (result && result.id) {
     console.log(`✅ Added intelligent crafting table task: ${result.id}`);
   } else {
@@ -1348,7 +1341,7 @@ async function addResourceGatheringTask(
     },
   };
 
-  const result = await enhancedTaskIntegration.addTask(woodTask);
+  const result = await taskIntegration.addTask(woodTask);
   if (result && result.id) {
     console.log(`✅ Added intelligent wood gathering task: ${result.id}`);
   } else {
@@ -1534,7 +1527,7 @@ async function generateComplexCraftingSubtasks(task: any): Promise<void> {
 
       // Add all subtasks
       for (const subtask of subtasks) {
-        const result = await enhancedTaskIntegration.addTask(subtask);
+        const result = await taskIntegration.addTask(subtask);
         if (result && result.id) {
           console.log(`✅ Added crafting subtask: ${subtask.title}`);
         } else {
@@ -1549,171 +1542,6 @@ async function generateComplexCraftingSubtasks(task: any): Promise<void> {
   } catch (error) {
     console.error('Error generating complex crafting subtasks:', error);
   }
-}
-
-/**
- * Helper function to detect if cognitive reflection contains actionable steps
- */
-function detectActionableSteps(thoughtContent: string): boolean {
-  const actionableKeywords = [
-    'approach',
-    'chop',
-    'craft',
-    'build',
-    'gather',
-    'collect',
-    'use',
-    'move',
-    'identify',
-    'return',
-    'place',
-    'set up',
-    'choose',
-    'begin',
-    'start',
-    'scan',
-    'mark',
-    'transport',
-    'break',
-    'cut down',
-    'observe',
-  ];
-
-  const content = thoughtContent.toLowerCase();
-  return actionableKeywords.some((keyword) => content.includes(keyword));
-}
-
-/**
- * Helper function to convert cognitive reflection tasks to actionable tasks
- */
-async function convertCognitiveReflectionToTasks(
-  cognitiveTask: any
-): Promise<void> {
-  try {
-    console.log(
-      `🧠 [AUTONOMOUS EXECUTOR] Converting cognitive reflection to actionable tasks: ${cognitiveTask.title}`
-    );
-
-    const thoughtContent = cognitiveTask.parameters?.thoughtContent || '';
-
-    // Extract actionable steps from the cognitive reflection
-    const steps = extractActionableSteps(thoughtContent);
-
-    if (steps.length > 0) {
-      console.log(
-        `🧠 [AUTONOMOUS EXECUTOR] Found ${steps.length} actionable steps`
-      );
-
-      // Create actionable tasks from the steps
-      for (const step of steps) {
-        const actionTask = {
-          id: `action-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
-          title: step.label,
-          type: 'action',
-          description: step.label,
-          priority: cognitiveTask.priority || 0.5,
-          urgency: cognitiveTask.urgency || 0.5,
-          parameters: {
-            action: determineActionType(step.label),
-            estimatedDuration: step.estimatedDuration || 5000,
-          },
-          goal: 'execute_action',
-          status: 'pending' as const,
-          createdAt: Date.now(),
-          completedAt: null,
-          parentTaskId: cognitiveTask.id,
-          progress: 0,
-        };
-
-        // Submit the actionable task
-        await enhancedTaskIntegration.addTask(actionTask);
-        console.log(
-          `🧠 [AUTONOMOUS EXECUTOR] Created actionable task: ${actionTask.title}`
-        );
-      }
-
-      // DO NOT mark cognitive reflection as completed here
-      // It should only be marked complete when actionable tasks are actually executed
-      console.log(
-        `✅ [AUTONOMOUS EXECUTOR] Cognitive reflection converted to actionable tasks - keeping reflection task active until execution`
-      );
-    } else {
-      console.log(
-        `🧠 [AUTONOMOUS EXECUTOR] No actionable steps found, marking as completed`
-      );
-      await enhancedTaskIntegration.updateTaskStatus(
-        cognitiveTask.id,
-        'completed'
-      );
-    }
-  } catch (error) {
-    console.error(
-      `❌ [AUTONOMOUS EXECUTOR] Failed to convert cognitive reflection to tasks:`,
-      error
-    );
-    await enhancedTaskIntegration.updateTaskStatus(cognitiveTask.id, 'failed');
-  }
-}
-
-/**
- * Extract actionable steps from cognitive reflection content
- */
-function extractActionableSteps(content: string): any[] {
-  // Simple parsing to extract actionable steps
-  // This is a basic implementation - could be enhanced with NLP
-  const steps = [];
-  const sentences = content.split(/[.!?]+/).filter((s) => s.trim().length > 0);
-
-  for (const sentence of sentences) {
-    if (
-      sentence.toLowerCase().includes('approach') ||
-      sentence.toLowerCase().includes('chop') ||
-      sentence.toLowerCase().includes('craft') ||
-      sentence.toLowerCase().includes('build') ||
-      sentence.toLowerCase().includes('gather') ||
-      sentence.toLowerCase().includes('collect') ||
-      sentence.toLowerCase().includes('use') ||
-      sentence.toLowerCase().includes('move') ||
-      sentence.toLowerCase().includes('identify') ||
-      sentence.toLowerCase().includes('scan')
-    ) {
-      steps.push({
-        label: sentence.trim(),
-        estimatedDuration: 5000, // Default 5 seconds
-      });
-    }
-  }
-
-  return steps;
-}
-
-/**
- * Determine action type from step description
- */
-function determineActionType(stepDescription: string): string {
-  const description = stepDescription.toLowerCase();
-
-  if (
-    description.includes('approach') ||
-    description.includes('move') ||
-    description.includes('walk')
-  ) {
-    return 'move_to';
-  }
-  if (description.includes('chop') || description.includes('cut')) {
-    return 'dig_block';
-  }
-  if (description.includes('craft')) {
-    return 'craft_recipe';
-  }
-  if (description.includes('build') || description.includes('construct')) {
-    return 'build_structure';
-  }
-  if (description.includes('gather') || description.includes('collect')) {
-    return 'gather_resources';
-  }
-
-  return 'generic_action';
 }
 
 /**
@@ -1751,7 +1579,7 @@ async function autonomousTaskExecutor() {
     );
 
     // Get active tasks directly from the enhanced task integration
-    const activeTasks = enhancedTaskIntegration.getActiveTasks();
+    const activeTasks = taskIntegration.getActiveTasks();
 
     // Only log task count when it changes or every 5 minutes
     const now = Date.now();
@@ -1797,7 +1625,7 @@ async function autonomousTaskExecutor() {
         );
         const prevIdleAt = global.lastIdleEvent || 0;
         global.lastIdleEvent = now;
-        enhancedTaskIntegration.outbox.enqueue(
+        taskIntegration.outbox.enqueue(
           'http://localhost:3003/api/cognitive-stream/events',
           {
             type: 'idle_period',
@@ -1816,8 +1644,12 @@ async function autonomousTaskExecutor() {
       );
     }
 
-    // Filter out tasks that are blocked or in backoff
+    // Filter out tasks that are blocked, in backoff, or in non-executable states
     const eligibleTasks = activeTasks.filter((t) => {
+      // @pivot 4: Skip tasks in planning or terminal-unplannable states
+      if (t.status === 'pending_planning' || t.status === 'unplannable') {
+        return false;
+      }
       // Skip tasks with a blocked reason
       if (t.metadata?.blockedReason) {
         return false;
@@ -1882,7 +1714,7 @@ async function autonomousTaskExecutor() {
         );
 
         // Convert cognitive reflection to actionable tasks
-        await convertCognitiveReflectionToTasks(currentTask);
+        await convertCognitiveReflectionToTasks(currentTask, taskIntegration);
       } else {
         console.log(
           `🧠 [AUTONOMOUS EXECUTOR] Processing cognitive reflection task: ${currentTask.title}`
@@ -2026,13 +1858,13 @@ async function autonomousTaskExecutor() {
         const clamped = Math.max(0, Math.min(1, p));
         const status =
           currentTask.status === 'pending' ? 'active' : currentTask.status;
-        enhancedTaskIntegration.updateTaskProgress(
+        taskIntegration.updateTaskProgress(
           currentTask.id,
           clamped,
           status
         );
         const snapshot = computeRequirementSnapshot(inv, requirement);
-        enhancedTaskIntegration.updateTaskMetadata(currentTask.id, {
+        taskIntegration.updateTaskMetadata(currentTask.id, {
           requirement: snapshot,
         });
         if (clamped >= 1 && (requirement as any).quantity >= 1) {
@@ -2054,7 +1886,7 @@ async function autonomousTaskExecutor() {
           console.log(
             '✅ Requirement already satisfied from inventory; completing task.'
           );
-          enhancedTaskIntegration.updateTaskProgress(
+          taskIntegration.updateTaskProgress(
             currentTask.id,
             1,
             'completed'
@@ -2083,7 +1915,7 @@ async function autonomousTaskExecutor() {
 
       // If no executable steps remain but non-done steps exist, the plan is blocked
       if (!nextStep && currentTask.steps?.some((s: any) => !s.done)) {
-        enhancedTaskIntegration.updateTaskMetadata(currentTask.id, {
+        taskIntegration.updateTaskMetadata(currentTask.id, {
           ...currentTask.metadata,
           blockedReason: 'no-executable-plan',
         });
@@ -2101,7 +1933,7 @@ async function autonomousTaskExecutor() {
             let budgetDirty = created;
             const elapsed = now - (state.firstAt || now);
             if (elapsed > BUILD_EXEC_MAX_ELAPSED_MS) {
-              enhancedTaskIntegration.updateTaskMetadata(currentTask.id, {
+              taskIntegration.updateTaskMetadata(currentTask.id, {
                 ...currentTask.metadata,
                 blockedReason: `budget-exhausted:time:${leafExec.leafName}`,
               });
@@ -2115,7 +1947,7 @@ async function autonomousTaskExecutor() {
               return;
             }
             if (state.attempts >= BUILD_EXEC_MAX_ATTEMPTS) {
-              enhancedTaskIntegration.updateTaskMetadata(currentTask.id, {
+              taskIntegration.updateTaskMetadata(currentTask.id, {
                 ...currentTask.metadata,
                 blockedReason: `budget-exhausted:attempts:${leafExec.leafName}`,
               });
@@ -2130,7 +1962,7 @@ async function autonomousTaskExecutor() {
             }
             if (state.lastAt && now - state.lastAt < BUILD_EXEC_MIN_INTERVAL_MS) {
               const delay = BUILD_EXEC_MIN_INTERVAL_MS - (now - state.lastAt);
-              enhancedTaskIntegration.updateTaskMetadata(currentTask.id, {
+              taskIntegration.updateTaskMetadata(currentTask.id, {
                 ...currentTask.metadata,
                 nextEligibleAt: now + delay,
               });
@@ -2155,7 +1987,7 @@ async function autonomousTaskExecutor() {
           const validationError = validateLeafArgs(leafExec.leafName, leafExec.args, true);
           if (validationError) {
             console.warn(`⚠️ [Executor] Invalid args for ${leafExec.leafName}: ${validationError}`);
-            enhancedTaskIntegration.updateTaskMetadata(currentTask.id, {
+            taskIntegration.updateTaskMetadata(currentTask.id, {
               ...currentTask.metadata,
               blockedReason: `invalid-args: ${validationError}`,
             });
@@ -2187,13 +2019,13 @@ async function autonomousTaskExecutor() {
             `🏗️ [Executor:${stepAuthority}] Executing step ${nextStep.order}: ${nextStep.label} → ${leafExec.leafName}`
           );
           // Capture before-snapshot so verification can detect inventory delta
-          await enhancedTaskIntegration.startTaskStep(currentTask.id, nextStep.id);
+          await taskIntegration.startTaskStep(currentTask.id, nextStep.id);
           const actionResult = await toolExecutor.execute(
             `minecraft.${leafExec.leafName}`,
             leafExec.args
           );
           if (actionResult?.ok) {
-            const stepCompleted = await enhancedTaskIntegration.completeTaskStep(
+            const stepCompleted = await taskIntegration.completeTaskStep(
               currentTask.id,
               nextStep.id
             );
@@ -2202,7 +2034,7 @@ async function autonomousTaskExecutor() {
             } else {
               // Verification failed (e.g. inventory not updated yet); back off to avoid spin loop
               const backoffMs = 5000;
-              enhancedTaskIntegration.updateTaskMetadata(currentTask.id, {
+              taskIntegration.updateTaskMetadata(currentTask.id, {
                 ...currentTask.metadata,
                 nextEligibleAt: Date.now() + backoffMs,
               });
@@ -2231,19 +2063,57 @@ async function autonomousTaskExecutor() {
             const backoffMs = Math.min(1000 * Math.pow(2, newRetryCount), 30_000);
 
             if (newRetryCount >= maxRetries) {
-              enhancedTaskIntegration.updateTaskMetadata(currentTask.id, {
+              // --- Sterling repair gate (Pivot 2) ---
+              // Before giving up, attempt Sterling re-solve with failure context.
+              const repairCount = (currentTask.metadata as any)?.repairCount ?? 0;
+              const lastDigest = (currentTask.metadata as any)?.lastStepsDigest;
+              if (repairCount < 2) {
+                try {
+                  const failureContext = {
+                    failedLeaf: (nextStep?.meta?.leaf as string) || 'unknown',
+                    reasonClass: actionResult?.error || 'execution-failure',
+                    attemptCount: newRetryCount,
+                  };
+                  console.log(`[Repair] Attempting Sterling re-solve for task: ${currentTask.title} (repair #${repairCount + 1})`);
+                  const repairResult = await taskIntegration.regenerateSteps(
+                    currentTask.id,
+                    failureContext,
+                  );
+                  if (repairResult.success && repairResult.stepsDigest) {
+                    // No-change detection (Pivot 2): identical digest = non-repair
+                    if (repairResult.stepsDigest !== lastDigest) {
+                      taskIntegration.updateTaskMetadata(currentTask.id, {
+                        ...currentTask.metadata,
+                        retryCount: 0,
+                        repairCount: repairCount + 1,
+                        lastRepairAt: Date.now(),
+                        lastStepsDigest: repairResult.stepsDigest,
+                        nextEligibleAt: undefined,
+                      } as any);
+                      console.log(`[Repair] Sterling re-solve produced new plan (digest: ${repairResult.stepsDigest})`);
+                      return; // Re-execute on next cycle with fresh plan
+                    }
+                    console.log(`[Repair] Sterling re-solve returned identical plan — treating as non-repair`);
+                  }
+                } catch (repairErr) {
+                  console.warn(`[Repair] Sterling re-solve failed:`, repairErr);
+                }
+              }
+              // --- End repair gate ---
+
+              taskIntegration.updateTaskMetadata(currentTask.id, {
                 ...currentTask.metadata,
                 retryCount: newRetryCount,
                 blockedReason: 'max-retries-exceeded',
               });
-              enhancedTaskIntegration.updateTaskProgress(
+              taskIntegration.updateTaskProgress(
                 currentTask.id,
                 currentTask.progress || 0,
                 'failed'
               );
               console.log(`❌ [Executor] Task failed after ${newRetryCount} retries: ${currentTask.title}`);
             } else {
-              enhancedTaskIntegration.updateTaskMetadata(currentTask.id, {
+              taskIntegration.updateTaskMetadata(currentTask.id, {
                 ...currentTask.metadata,
                 retryCount: newRetryCount,
                 nextEligibleAt: Date.now() + backoffMs,
@@ -2260,7 +2130,7 @@ async function autonomousTaskExecutor() {
             nextStep.meta?.executable === true;
           if (hasExecProvenance) {
             const blockedReason = 'executable-step-no-leaf-binding';
-            enhancedTaskIntegration.updateTaskMetadata(currentTask.id, {
+            taskIntegration.updateTaskMetadata(currentTask.id, {
               ...currentTask.metadata,
               blockedReason,
               lastBindingFailure: {
@@ -2291,7 +2161,7 @@ async function autonomousTaskExecutor() {
       console.log(
         `🎯 Found MCP option: ${suitableOption.name} (${suitableOption.id}) - delegating to MCP execution pipeline`
       );
-      enhancedTaskIntegration.updateTaskMetadata(currentTask.id, {
+      taskIntegration.updateTaskMetadata(currentTask.id, {
         ...currentTask.metadata,
         updatedAt: Date.now(),
       });
@@ -2311,13 +2181,15 @@ async function autonomousTaskExecutor() {
           );
 
           // Update task status
-          await enhancedTaskIntegration.updateTaskStatus(
+          await taskIntegration.updateTaskStatus(
             currentTask.id,
             'completed'
           );
 
           // Post task_completed event to cognition service (non-blocking)
-          enhancedTaskIntegration.outbox.enqueue(
+          const remainingActive =
+            taskIntegration.getActiveTasks().length;
+          taskIntegration.outbox.enqueue(
             'http://localhost:3003/api/cognitive-stream/events',
             {
               type: 'task_completed',
@@ -2328,6 +2200,7 @@ async function autonomousTaskExecutor() {
                 taskType: currentTask.type,
                 completedSteps: execResult.completedSteps || 0,
                 totalSteps: currentTask.steps?.length || 0,
+                activeTasksCount: remainingActive,
               },
             }
           );
@@ -2339,7 +2212,7 @@ async function autonomousTaskExecutor() {
           );
 
           // Update task with failure
-          await enhancedTaskIntegration.updateTaskStatus(
+          await taskIntegration.updateTaskStatus(
             currentTask.id,
             'failed'
           );
@@ -2350,7 +2223,7 @@ async function autonomousTaskExecutor() {
         console.error(`❌ Task execution error: ${currentTask.title}`, error);
 
         // Update task with error
-        await enhancedTaskIntegration.updateTaskStatus(
+        await taskIntegration.updateTaskStatus(
           currentTask.id,
           'failed'
         );
@@ -2559,7 +2432,7 @@ async function autonomousTaskExecutor() {
           console.log(
             `❌ Task failed after ${retryCount} retries, marking as failed: ${currentTask.title}`
           );
-          enhancedTaskIntegration.updateTaskProgress(
+          taskIntegration.updateTaskProgress(
             currentTask.id,
             currentTask.progress || 0,
             'failed'
@@ -2581,7 +2454,7 @@ async function autonomousTaskExecutor() {
             console.log(
               '🪵 Missing wood logs for crafting (leaf path). Injecting prerequisite gathering steps.'
             );
-            enhancedTaskIntegration.addStepsBeforeCurrent(currentTask.id, [
+            taskIntegration.addStepsBeforeCurrent(currentTask.id, [
               { label: 'Locate nearby wood' },
               { label: 'Move to resource location' },
               { label: 'Collect wood safely' },
@@ -2592,7 +2465,7 @@ async function autonomousTaskExecutor() {
 
         // Annotate current step with leaf and parameters for verification clarity
         try {
-          enhancedTaskIntegration.annotateCurrentStepWithLeaf(
+          taskIntegration.annotateCurrentStepWithLeaf(
             currentTask.id,
             selectedLeaf.leafName,
             selectedLeaf.args
@@ -2646,7 +2519,7 @@ async function autonomousTaskExecutor() {
 
         // Exponential backoff
         const backoffMs = Math.min(1000 * Math.pow(2, newRetryCount), 30_000);
-        enhancedTaskIntegration.updateTaskMetadata(currentTask.id, {
+        taskIntegration.updateTaskMetadata(currentTask.id, {
           ...currentTask.metadata,
           nextEligibleAt: Date.now() + backoffMs,
         });
@@ -2657,7 +2530,7 @@ async function autonomousTaskExecutor() {
           typeof actionResult?.error === 'string' &&
           /no .*found/i.test(actionResult.error)
         ) {
-          await enhancedTaskIntegration.addTask({
+          await taskIntegration.addTask({
             title: `Explore for ${leafConfig.args?.blockType || 'resource'}`,
             description: 'Search area to find resources',
             type: 'exploration',
@@ -2679,12 +2552,12 @@ async function autonomousTaskExecutor() {
         }
 
         if (newRetryCount >= maxRetries) {
-          enhancedTaskIntegration.updateTaskMetadata(currentTask.id, {
+          taskIntegration.updateTaskMetadata(currentTask.id, {
             ...currentTask.metadata,
             retryCount: newRetryCount,
             blockedReason: 'max-retries-exceeded',
           });
-          enhancedTaskIntegration.updateTaskProgress(
+          taskIntegration.updateTaskProgress(
             currentTask.id,
             currentTask.progress || 0,
             'failed'
@@ -2693,7 +2566,7 @@ async function autonomousTaskExecutor() {
             `❌ Task marked as failed after ${newRetryCount} retries: ${currentTask.title}`
           );
         } else {
-          enhancedTaskIntegration.updateTaskMetadata(currentTask.id, {
+          taskIntegration.updateTaskMetadata(currentTask.id, {
             ...currentTask.metadata,
             retryCount: newRetryCount,
             lastRetry: Date.now(),
@@ -2703,7 +2576,7 @@ async function autonomousTaskExecutor() {
             leafConfig.leafName === 'craft_recipe' &&
             /pickaxe/i.test(currentTask.title || '')
           ) {
-            enhancedTaskIntegration.addStepsBeforeCurrent(currentTask.id, [
+            taskIntegration.addStepsBeforeCurrent(currentTask.id, [
               { label: 'Search nearby chest for wood' },
             ]);
           }
@@ -2725,7 +2598,7 @@ async function autonomousTaskExecutor() {
         console.log(
           `❌ Task failed after ${retryCount} retries, marking as failed: ${currentTask.title}`
         );
-        enhancedTaskIntegration.updateTaskProgress(
+        taskIntegration.updateTaskProgress(
           currentTask.id,
           currentTask.progress || 0,
           'failed'
@@ -2750,7 +2623,7 @@ async function autonomousTaskExecutor() {
             console.warn(
               '⚠️ Quick gather attempt failed. Injecting prerequisite steps.'
             );
-            enhancedTaskIntegration.addStepsBeforeCurrent(currentTask.id, [
+            taskIntegration.addStepsBeforeCurrent(currentTask.id, [
               { label: 'Locate nearby wood' },
               { label: 'Move to resource location' },
               { label: 'Collect wood safely' },
@@ -2762,7 +2635,7 @@ async function autonomousTaskExecutor() {
             console.warn(
               '⚠️ Wood still insufficient after gather attempt. Injecting prerequisite steps.'
             );
-            enhancedTaskIntegration.addStepsBeforeCurrent(currentTask.id, [
+            taskIntegration.addStepsBeforeCurrent(currentTask.id, [
               { label: 'Locate nearby wood' },
               { label: 'Move to resource location' },
               { label: 'Collect wood safely' },
@@ -2791,7 +2664,7 @@ async function autonomousTaskExecutor() {
 
       // Annotate step with MCP option and resolved parameters
       try {
-        enhancedTaskIntegration.annotateCurrentStepWithOption(
+        taskIntegration.annotateCurrentStepWithOption(
           currentTask.id,
           suitableOption.name,
           {
@@ -2844,7 +2717,7 @@ async function autonomousTaskExecutor() {
           typeof mcpResult?.error === 'string' &&
           /no .*found/i.test(mcpResult.error)
         ) {
-          await enhancedTaskIntegration.addTask({
+          await taskIntegration.addTask({
             title: `Explore for ${desiredBlock || 'resource'}`,
             description: 'Search area to find resources',
             type: 'exploration',
@@ -2870,7 +2743,7 @@ async function autonomousTaskExecutor() {
 
         if (newRetryCount >= maxRetries) {
           // Update task status using the enhanced task integration
-          enhancedTaskIntegration.updateTaskProgress(
+          taskIntegration.updateTaskProgress(
             currentTask.id,
             currentTask.progress || 0,
             'failed'
@@ -2880,7 +2753,7 @@ async function autonomousTaskExecutor() {
           );
         } else {
           // Update retry count using the enhanced task integration
-          enhancedTaskIntegration.updateTaskMetadata(currentTask.id, {
+          taskIntegration.updateTaskMetadata(currentTask.id, {
             ...currentTask.metadata,
             retryCount: newRetryCount,
             lastRetry: Date.now(),
@@ -2890,7 +2763,7 @@ async function autonomousTaskExecutor() {
             currentTask.type === 'crafting' &&
             /pickaxe/i.test(currentTask.title || '')
           ) {
-            enhancedTaskIntegration.addStepsBeforeCurrent(currentTask.id, [
+            taskIntegration.addStepsBeforeCurrent(currentTask.id, [
               { label: 'Search nearby chest for wood' },
             ]);
           }
@@ -2932,7 +2805,7 @@ async function autonomousTaskExecutor() {
             const maxRetries = currentTask.metadata?.maxRetries || 3;
 
             if (retryCount >= maxRetries) {
-              enhancedTaskIntegration.updateTaskProgress(
+              taskIntegration.updateTaskProgress(
                 currentTask.id,
                 currentTask.progress || 0,
                 'failed'
@@ -2941,7 +2814,7 @@ async function autonomousTaskExecutor() {
                 `❌ Task marked as failed after ${retryCount} retries: ${currentTask.title}`
               );
             } else {
-              enhancedTaskIntegration.updateTaskMetadata(currentTask.id, {
+              taskIntegration.updateTaskMetadata(currentTask.id, {
                 ...currentTask.metadata,
                 retryCount,
                 lastRetry: Date.now(),
@@ -3015,30 +2888,13 @@ worldStateManager.on('updated', (snapshot) => {
   }
 });
 
-const integratedPlanningCoordinator = new IntegratedPlanningCoordinator({
-  hrmConfig: {
-    hrmLatencyTarget: 100,
-    qualityThreshold: 0.7,
-    maxRefinements: 3,
-    enableIterativeRefinement: true,
-  },
-});
+// IntegratedPlanningCoordinator removed — legacy planner retired (Phase 3).
+// Sterling solvers + deterministic compiler are the canonical planning backends.
 
-const enhancedGoalManager = new EnhancedGoalManager();
-const enhancedReactiveExecutor = new EnhancedReactiveExecutor();
-const enhancedTaskIntegration = new EnhancedTaskIntegration({
-  enableRealTimeUpdates: true,
-  enableProgressTracking: true,
-  enableTaskStatistics: true,
-  enableTaskHistory: true,
-  maxTaskHistory: 1000,
-  progressUpdateInterval: 5000,
-  dashboardEndpoint: 'http://localhost:3000',
-  // Enable action verification with real-world checks
-  enableActionVerification: true,
-});
+const { goalManager, reactiveExecutor, taskIntegration } =
+  createPlanningBootstrap();
 
-const enhancedMemoryIntegration = new EnhancedMemoryIntegration({
+const memoryIntegration = new MemoryIntegration({
   enableRealTimeUpdates: true,
   enableReflectiveNotes: true,
   enableEventLogging: true,
@@ -3051,7 +2907,7 @@ const enhancedMemoryIntegration = new EnhancedMemoryIntegration({
   retryAttempts: parseInt(process.env.MEMORY_RETRIES || '3'),
 });
 
-const enhancedEnvironmentIntegration = new EnhancedEnvironmentIntegration({
+const environmentIntegration = new EnvironmentIntegration({
   enableRealTimeUpdates: true,
   enableEntityDetection: true,
   enableInventoryTracking: true,
@@ -3064,7 +2920,7 @@ const enhancedEnvironmentIntegration = new EnhancedEnvironmentIntegration({
   maxBlockDistance: 20,
 });
 
-const enhancedLiveStreamIntegration = new EnhancedLiveStreamIntegration({
+const liveStreamIntegration = new LiveStreamIntegration({
   enableRealTimeUpdates: true,
   enableActionLogging: true,
   enableVisualFeedback: true,
@@ -3082,13 +2938,13 @@ const enhancedLiveStreamIntegration = new EnhancedLiveStreamIntegration({
 // Create planning system interface
 const planningSystem: PlanningSystem = {
   goalFormulation: {
-    getCurrentGoals: () => enhancedGoalManager.listGoals(),
+    getCurrentGoals: () => goalManager.listGoals(),
     getActiveGoals: () =>
-      enhancedGoalManager.getGoalsByStatus(GoalStatus.PENDING),
-    getGoalCount: () => enhancedGoalManager.listGoals().length,
+      goalManager.getGoalsByStatus(GoalStatus.PENDING),
+    getGoalCount: () => goalManager.listGoals().length,
     addGoal: async (goal: any) => {
       try {
-        enhancedGoalManager.upsert(goal);
+        goalManager.upsert(goal);
         return { success: true, goalId: goal.id };
       } catch (e) {
         return {
@@ -3098,16 +2954,16 @@ const planningSystem: PlanningSystem = {
       }
     },
     reprioritizeGoal: (goalId: string, p?: number, u?: number) =>
-      enhancedGoalManager.reprioritize(goalId, p, u),
+      goalManager.reprioritize(goalId, p, u),
     cancelGoal: (goalId: string, reason?: string) =>
-      enhancedGoalManager.cancel(goalId, reason),
-    pauseGoal: (goalId: string) => enhancedGoalManager.pause(goalId),
-    resumeGoal: (goalId: string) => enhancedGoalManager.resume(goalId),
-    completeGoal: (goalId: string) => enhancedGoalManager.complete(goalId),
-    getCurrentTasks: () => enhancedTaskIntegration.getActiveTasks(),
-    addTask: async (task: any) => await enhancedTaskIntegration.addTask(task),
+      goalManager.cancel(goalId, reason),
+    pauseGoal: (goalId: string) => goalManager.pause(goalId),
+    resumeGoal: (goalId: string) => goalManager.resume(goalId),
+    completeGoal: (goalId: string) => goalManager.complete(goalId),
+    getCurrentTasks: () => taskIntegration.getActiveTasks(),
+    addTask: async (task: any) => await taskIntegration.addTask(task),
     getCompletedTasks: () =>
-      enhancedTaskIntegration.getTasks({ status: 'completed' }),
+      taskIntegration.getTasks({ status: 'completed' }),
     updateBotInstance: async (botInstance: any) => {
       const mcpIntegration = serverConfig.getMCPIntegration();
       if (mcpIntegration) {
@@ -3124,7 +2980,7 @@ const planningSystem: PlanningSystem = {
         console.log(`🎯 Executing goal: ${goal.title || goal.id}`);
 
         // Execute the goal through the enhanced reactive executor
-        const result = await enhancedReactiveExecutor.executeTask(goal);
+        const result = await reactiveExecutor.executeTask(goal);
 
         if (result.success) {
           console.log(
@@ -3161,7 +3017,7 @@ const planningSystem: PlanningSystem = {
         console.log(`🔄 Executing task: ${task.title || task.id}`);
 
         // Execute the task through the enhanced reactive executor
-        const result = await enhancedReactiveExecutor.executeTask(task);
+        const result = await reactiveExecutor.executeTask(task);
 
         if (result.success) {
           console.log(
@@ -3209,11 +3065,11 @@ const serverConfig = new ServerConfiguration({
 });
 
 // Setup event listeners
-enhancedTaskIntegration.on('taskAdded', (task) => {
+taskIntegration.on('taskAdded', (task) => {
   console.log('Task added to enhanced integration:', task.title);
 });
 
-enhancedTaskIntegration.on(
+taskIntegration.on(
   'taskProgressUpdated',
   ({ task, oldProgress, oldStatus }) => {
     console.log(
@@ -3264,7 +3120,7 @@ serverConfig.addEndpoint('post', '/sterling/crafting/solve', async (req, res) =>
     // Load mcData server-side if not provided by client
     let mcData = clientMcData;
     if (!mcData || Object.keys(mcData).length === 0) {
-      mcData = enhancedTaskIntegration.getMcDataPublic();
+      mcData = taskIntegration.getMcDataPublic();
       if (!mcData) {
         res.status(500).json({ error: 'minecraft-data not available on server' });
         return;
@@ -3305,38 +3161,14 @@ async function startServer() {
     }
 
     // Initialize Sterling reasoning service (optional external dependency)
-    try {
-      sterlingService = new SterlingReasoningService();
-      await sterlingService.initialize();
-      if (sterlingService.isAvailable()) {
-        console.log('✅ Sterling reasoning service connected');
-      } else {
-        console.log('ℹ️ Sterling reasoning service not available (will retry on demand)');
-      }
+    const sterling = await createSterlingBootstrap(taskIntegration);
+    sterlingService = sterling.sterlingService;
+    minecraftCraftingSolver = sterling.minecraftCraftingSolver;
+    minecraftBuildingSolver = sterling.minecraftBuildingSolver;
+    minecraftToolProgressionSolver = sterling.minecraftToolProgressionSolver;
 
-      // Create crafting solver on top of Sterling service
-      minecraftCraftingSolver = new MinecraftCraftingSolver(sterlingService);
-      enhancedTaskIntegration.registerSolver(minecraftCraftingSolver);
-      console.log('✅ Minecraft crafting solver initialized');
-
-      // Create building solver on top of Sterling service
-      minecraftBuildingSolver = new MinecraftBuildingSolver(sterlingService);
-      enhancedTaskIntegration.registerSolver(minecraftBuildingSolver);
-      console.log('✅ Minecraft building solver initialized');
-
-      // Create tool progression solver on top of Sterling service
-      minecraftToolProgressionSolver = new MinecraftToolProgressionSolver(sterlingService);
-      enhancedTaskIntegration.registerSolver(minecraftToolProgressionSolver);
-      console.log('✅ Minecraft tool progression solver initialized');
-    } catch (error) {
-      console.warn(
-        '⚠️ Sterling reasoning service failed to initialize, continuing without it:',
-        error instanceof Error ? error.message : error
-      );
-    }
-
-    // Create an EnhancedRegistry for MCP integration
-    const registry = new EnhancedRegistry();
+    // Create MCP leaf registry for MCP integration
+    const registry = new MCPLeafRegistry();
 
     // Initialize MCP integration with the registry
     try {
@@ -3370,7 +3202,7 @@ async function startServer() {
       );
     }
 
-    // Register placeholder Minecraft leaves with both the EnhancedRegistry and MCP
+    // Register placeholder Minecraft leaves with both the registry and MCP
     try {
       const mcpIntegration = serverConfig.getMCPIntegration();
       if (mcpIntegration) {
@@ -3659,59 +3491,34 @@ async function startServer() {
     await serverConfig.start();
     console.log('✅ Server started successfully');
 
+    // DISABLED: Legacy autonomous executor
+    // This was a workaround to force the bot to do something when it got stuck
+    // Now replaced by the minecraft-interface planning cycle which is more robust
     const startAutonomousExecutor = () => {
-      // Start autonomous task executor (singleton; supports hot-reload)
-      console.log('🚀 Starting autonomous task executor...');
+      console.log('Starting autonomous task executor...');
       console.log(
-        '📊 Enhanced task integration has',
-        enhancedTaskIntegration.getActiveTasks().length,
+        'Task integration has',
+        taskIntegration.getActiveTasks().length,
         'active tasks'
       );
-      console.log('🔧 Initializing autonomous executor state...');
-      if (global.__planningInterval) clearInterval(global.__planningInterval);
-      global.__planningInterval = setInterval(async () => {
-        try {
-          console.log('⏰ Autonomous executor timer fired...');
-          console.log(
-            '📊 Current task count:',
-            enhancedTaskIntegration.getActiveTasks().length
-          );
-          const st = global.__planningExecutorState!;
-          // exponential backoff while breaker is open
-          if (st?.breaker === 'open') {
-            const elapsed = Date.now() - (st.lastAttempt || 0);
-            if (elapsed < BOT_BREAKER_OPEN_MS) return;
-            st.breaker = 'half-open';
-          }
-          try {
-            await autonomousTaskExecutor();
-          } catch (error) {
-            const s = global.__planningExecutorState!;
-            s.failures = Math.min(s.failures + 1, 100);
-            const backoff = Math.min(
-              2 ** s.failures * 250,
-              EXECUTOR_MAX_BACKOFF_MS
-            );
-            console.warn(
-              `Autonomous executor error (${s.failures}); backoff ${backoff}ms`
-            );
-            await new Promise((r) => setTimeout(r, backoff));
-          }
-        } catch (error) {
-          console.error('[MCP] Failed to start autonomous task executor:', error);
-        }
-      }, EXECUTOR_POLL_MS);
+      startAutonomousExecutorScheduler(autonomousTaskExecutor, {
+        pollMs: EXECUTOR_POLL_MS,
+        maxBackoffMs: EXECUTOR_MAX_BACKOFF_MS,
+        breakerOpenMs: BOT_BREAKER_OPEN_MS,
+      });
     };
 
-    if (isSystemReady()) {
-      startAutonomousExecutor();
-    } else {
-      console.log('⏸️ Waiting for system readiness before starting executor...');
-      waitForSystemReady().then(() => {
-        console.log('✅ System readiness received; starting executor');
-        startAutonomousExecutor();
-      });
-    }
+    // DISABLED: Legacy autonomous executor - now using minecraft-interface planning cycle instead
+    // if (isSystemReady()) {
+    //   startAutonomousExecutor();
+    // } else {
+    //   console.log('⏸️ Waiting for system readiness before starting executor...');
+    //   waitForSystemReady().then(() => {
+    //     console.log('✅ System readiness received; starting executor');
+    //     startAutonomousExecutor();
+    //   });
+    // }
+    console.log('ℹ️ Legacy autonomous executor disabled - using minecraft-interface planning cycle');
 
     // Start cognitive thought processor (DISABLED - using event-driven system instead)
     // try {
@@ -3741,10 +3548,10 @@ export {
   startServer,
   autonomousTaskExecutor,
   cognitiveThoughtProcessor,
-  enhancedTaskIntegration,
-  enhancedMemoryIntegration,
-  enhancedEnvironmentIntegration,
-  enhancedLiveStreamIntegration,
+  taskIntegration,
+  memoryIntegration,
+  environmentIntegration,
+  liveStreamIntegration,
   sterlingService,
   minecraftCraftingSolver,
 };

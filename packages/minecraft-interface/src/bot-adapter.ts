@@ -12,6 +12,7 @@ import { EventEmitter } from 'events';
 import { Vec3 } from 'vec3';
 import { BotConfig, BotEvent, BotEventType } from './types';
 import { AutomaticSafetyMonitor } from './automatic-safety-monitor';
+import { resilientFetch } from '@conscious-bot/core';
 import { ActionTranslator } from './action-translator';
 import mcData from 'minecraft-data';
 
@@ -773,7 +774,7 @@ export class BotAdapter extends EventEmitter {
       // Send to cognition system for processing
       const cognitionUrl =
         process.env.COGNITION_SERVICE_URL || 'http://localhost:3003';
-      const response = await fetch(`${cognitionUrl}/process`, {
+      const response = await resilientFetch(`${cognitionUrl}/process`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -793,7 +794,7 @@ export class BotAdapter extends EventEmitter {
         }),
       });
 
-      if (response.ok) {
+      if (response?.ok) {
         const result = (await response.json()) as {
           shouldRespond?: boolean;
           response?: string;
@@ -821,7 +822,7 @@ export class BotAdapter extends EventEmitter {
             );
           }
         }
-      } else {
+      } else if (response) {
         console.log(
           `⚠️ Cognition system chat processing failed: ${response.status}`
         );
@@ -912,7 +913,7 @@ export class BotAdapter extends EventEmitter {
       // Send entity detection to cognition system
       const cognitionUrl =
         process.env.COGNITION_SERVICE_URL || 'http://localhost:3003';
-      const response = await fetch(`${cognitionUrl}/process`, {
+      const response = await resilientFetch(`${cognitionUrl}/process`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -937,7 +938,7 @@ export class BotAdapter extends EventEmitter {
         }),
       });
 
-      if (response.ok) {
+      if (response?.ok) {
         const result = (await response.json()) as {
           shouldRespond?: boolean;
           response?: string;
@@ -1019,7 +1020,7 @@ export class BotAdapter extends EventEmitter {
       const planningUrl =
         process.env.PLANNING_SERVICE_URL || 'http://localhost:3002';
 
-      const response = await fetch(`${planningUrl}/goal`, {
+      const response = await resilientFetch(`${planningUrl}/goal`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1047,10 +1048,10 @@ export class BotAdapter extends EventEmitter {
         }),
       });
 
-      if (response.ok) {
+      if (response?.ok) {
         const result = await response.json();
         console.warn(`[DEBUG] ✅ Created task from entity encounter:`, result);
-      } else {
+      } else if (response) {
         console.warn(`[DEBUG] ⚠️ Failed to create task: ${response.status}`);
       }
     } catch (error) {
@@ -1168,7 +1169,7 @@ export class BotAdapter extends EventEmitter {
       // Send to cognition system
       const cognitionUrl =
         process.env.COGNITION_SERVICE_URL || 'http://localhost:3003';
-      const response = await fetch(`${cognitionUrl}/process`, {
+      const response = await resilientFetch(`${cognitionUrl}/process`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1188,7 +1189,7 @@ export class BotAdapter extends EventEmitter {
         }),
       });
 
-      if (response.ok) {
+      if (response?.ok) {
         const result = (await response.json()) as {
           shouldRespond?: boolean;
           response?: string;
@@ -1273,7 +1274,7 @@ export class BotAdapter extends EventEmitter {
       const planningUrl =
         process.env.PLANNING_SERVICE_URL || 'http://localhost:3002';
 
-      const response = await fetch(`${planningUrl}/goal`, {
+      const response = await resilientFetch(`${planningUrl}/goal`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1297,13 +1298,13 @@ export class BotAdapter extends EventEmitter {
         }),
       });
 
-      if (response.ok) {
+      if (response?.ok) {
         const result = await response.json();
         console.warn(
           `[DEBUG] ✅ Created task from environmental event:`,
           result
         );
-      } else {
+      } else if (response) {
         console.warn(`[DEBUG] ⚠️ Failed to create task: ${response.status}`);
       }
     } catch (error) {

@@ -1,8 +1,8 @@
-import { EnhancedEnvironmentIntegration } from '../environment-integration';
+import { EnvironmentIntegration } from '../environment-integration';
 import { Goal, GoalStatus, GoalType } from '../types';
 import { auditLogger } from '@conscious-bot/cognition';
 
-import type { PlanningContext } from '../integrated-planning-coordinator';
+import type { PlanningContext } from '../types';
 
 export interface TaskBootstrapperConfig {
   memoryEndpoint?: string;
@@ -96,7 +96,7 @@ export class TaskBootstrapper {
 
     this.environment =
       config.environmentProvider ||
-      new EnhancedEnvironmentIntegration({ enableRealTimeUpdates: false });
+      new EnvironmentIntegration({ enableRealTimeUpdates: false });
   }
 
   async bootstrap(args: {

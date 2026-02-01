@@ -5,6 +5,7 @@ import {
   HEALTH_CHECK_TIMEOUT_MS,
   FailureKind,
 } from './timeout-policy';
+import { resilientFetch } from '@conscious-bot/core';
 
 export const MC_ENDPOINT =
   process.env.MINECRAFT_ENDPOINT || 'http://localhost:3005';
@@ -160,9 +161,7 @@ export async function checkBotConnectionDetailed(): Promise<{
   } catch (error) {
     const failureKind = classifyFailure(error);
     if (failureKind === 'timeout') {
-      await new Promise((r) =>
-        setTimeout(r, HEALTH_CHECK_RETRY_DELAY_MS)
-      );
+      await new Promise((r) => setTimeout(r, HEALTH_CHECK_RETRY_DELAY_MS));
       try {
         return await attempt();
       } catch (retryError) {
@@ -222,31 +221,70 @@ export interface TaskVerification {
 }
 
 /**
- * Verify that a task was actually accomplished based on its requirements
+ * Verify that a task was actually accomplished based on its requirements.
+ *
+ * Uses structured requirement metadata (requirement.item, requirement.quantity)
+ * rather than parsing task titles. Falls back to requirement.outputPattern
+ * when structured fields are absent.
  */
 async function verifyTaskCompletion(
   task: any,
   result: any
 ): Promise<TaskVerification> {
   try {
-    // If task has no requirements, consider it verified
     if (!task.metadata?.requirement) {
       return { verified: true };
     }
 
     const requirement = task.metadata.requirement;
 
-    // Verify based on task type
-    switch (task.type) {
-      case 'crafting':
-        return await verifyCraftingTask(task, requirement);
-      case 'gathering':
-        return await verifyGatheringTask(task, requirement);
-      case 'exploration':
-        return await verifyExplorationTask(task, requirement);
-      default:
-        return { verified: true }; // Other task types don't need verification yet
+    // Prefer structured requirement fields over task-type routing
+    const expectedItem: string | undefined =
+      requirement.item ?? requirement.outputPattern;
+    const expectedQty: number = requirement.quantity ?? 1;
+
+    if (!expectedItem) {
+      // No structured expectation — trust step-level verification
+      return { verified: true };
     }
+
+    // Fetch inventory once for all verification
+    const response = await resilientFetch(`${MC_ENDPOINT}/inventory`, {
+      method: 'GET',
+      headers: { 'Content-Type': 'application/json' },
+      timeoutMs: 5000,
+      label: 'mc/inventory',
+    });
+
+    if (!response?.ok) {
+      return {
+        verified: false,
+        error: 'Failed to fetch inventory for task verification',
+      };
+    }
+
+    const data = (await response.json()) as any;
+    const inventory: any[] = data.data || [];
+
+    const target = expectedItem.toLowerCase();
+    const matchingItems = inventory.filter((it: any) => {
+      const name = (it.type ?? it.name ?? '').toString().toLowerCase();
+      return name.includes(target);
+    });
+    const totalQty = matchingItems.reduce(
+      (sum: number, it: any) => sum + (it.count || 1),
+      0
+    );
+
+    if (totalQty < expectedQty) {
+      return {
+        verified: false,
+        error: `Task requires ${expectedQty}x ${expectedItem} but found ${totalQty}`,
+        actualResult: { required: expectedQty, found: totalQty },
+      };
+    }
+
+    return { verified: true };
   } catch (error) {
     return {
       verified: false,
@@ -254,160 +292,6 @@ async function verifyTaskCompletion(
       actualResult: result,
     };
   }
-}
-
-/**
- * Verify crafting task completion by checking inventory
- */
-async function verifyCraftingTask(
-  task: any,
-  requirement: any
-): Promise<TaskVerification> {
-  try {
-    const response = await fetch('http://localhost:3005/inventory', {
-      method: 'GET',
-      headers: { 'Content-Type': 'application/json' },
-      signal: AbortSignal.timeout(5000),
-    });
-
-    if (!response.ok) {
-      return {
-        verified: false,
-        error: 'Failed to fetch inventory for verification',
-      };
-    }
-
-    const data = (await response.json()) as any;
-    const inventory = data.data || [];
-
-    // Extract expected item from task title/description
-    const taskText = `${task.title} ${task.description}`.toLowerCase();
-    let expectedItem = '';
-
-    if (taskText.includes('pickaxe')) {
-      if (taskText.includes('wooden')) expectedItem = 'wooden_pickaxe';
-      else if (taskText.includes('stone')) expectedItem = 'stone_pickaxe';
-      else if (taskText.includes('iron')) expectedItem = 'iron_pickaxe';
-      else if (taskText.includes('diamond')) expectedItem = 'diamond_pickaxe';
-      else if (taskText.includes('gold')) expectedItem = 'golden_pickaxe';
-      else expectedItem = 'pickaxe';
-    } else if (taskText.includes('crafting table')) {
-      expectedItem = 'crafting_table';
-    } else if (taskText.includes('axe')) {
-      if (taskText.includes('wooden')) expectedItem = 'wooden_axe';
-      else if (taskText.includes('stone')) expectedItem = 'stone_axe';
-      else expectedItem = 'axe';
-    } else if (taskText.includes('shovel')) {
-      if (taskText.includes('wooden')) expectedItem = 'wooden_shovel';
-      else if (taskText.includes('stone')) expectedItem = 'stone_shovel';
-      else expectedItem = 'shovel';
-    } else if (taskText.includes('sword')) {
-      if (taskText.includes('wooden')) expectedItem = 'wooden_sword';
-      else if (taskText.includes('stone')) expectedItem = 'stone_sword';
-      else expectedItem = 'sword';
-    }
-
-    // Check if the expected item is in inventory
-    const hasItem = inventory.some((item: any) =>
-      item.type?.toLowerCase().includes(expectedItem.replace('_', ''))
-    );
-
-    if (!hasItem) {
-      return {
-        verified: false,
-        error: `Crafting task completed but item not found in inventory: ${expectedItem}`,
-        actualResult: inventory,
-      };
-    }
-
-    return { verified: true };
-  } catch (error) {
-    return {
-      verified: false,
-      error: `Crafting verification failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
-    };
-  }
-}
-
-/**
- * Verify gathering task completion by checking inventory
- */
-async function verifyGatheringTask(
-  task: any,
-  requirement: any
-): Promise<TaskVerification> {
-  try {
-    const response = await fetch('http://localhost:3005/inventory', {
-      method: 'GET',
-      headers: { 'Content-Type': 'application/json' },
-      signal: AbortSignal.timeout(5000),
-    });
-
-    if (!response.ok) {
-      return {
-        verified: false,
-        error: 'Failed to fetch inventory for verification',
-      };
-    }
-
-    const data = (await response.json()) as any;
-    const inventory = data.data || [];
-
-    // Extract expected item from task title/description
-    const taskText = `${task.title} ${task.description}`.toLowerCase();
-    let expectedItem = 'wood'; // Default
-
-    if (taskText.includes('wood') || taskText.includes('log')) {
-      expectedItem = 'log';
-    } else if (taskText.includes('stone') || taskText.includes('cobblestone')) {
-      expectedItem = 'cobblestone';
-    } else if (taskText.includes('iron') || taskText.includes('ore')) {
-      expectedItem = 'iron_ore';
-    } else if (taskText.includes('coal')) {
-      expectedItem = 'coal';
-    }
-
-    // Check if the expected items are in inventory
-    const matchingItems = inventory.filter((item: any) =>
-      item.type?.toLowerCase().includes(expectedItem)
-    );
-    const totalQuantity = matchingItems.reduce(
-      (sum: number, item: any) => sum + (item.count || 1),
-      0
-    );
-
-    const requiredQuantity = requirement.quantity || 1;
-    if (totalQuantity < requiredQuantity) {
-      return {
-        verified: false,
-        error: `Gathering task completed but insufficient items: ${requiredQuantity} ${expectedItem} needed, ${totalQuantity} found`,
-        actualResult: {
-          required: requiredQuantity,
-          found: totalQuantity,
-          items: matchingItems,
-        },
-      };
-    }
-
-    return { verified: true };
-  } catch (error) {
-    return {
-      verified: false,
-      error: `Gathering verification failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
-    };
-  }
-}
-
-/**
- * Verify exploration task completion
- */
-async function verifyExplorationTask(
-  task: any,
-  requirement: any
-): Promise<TaskVerification> {
-  // Exploration tasks are harder to verify automatically
-  // For now, we'll consider them verified if they completed without errors
-  return { verified: true };
 }
 
 export async function executeTask(task: any): Promise<TaskExecutionResult> {

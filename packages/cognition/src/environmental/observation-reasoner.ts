@@ -136,10 +136,7 @@ export class ObservationReasoner {
 
     const startTime = Date.now();
     const abortController = new AbortController();
-    const timeoutId = setTimeout(
-      () => abortController.abort(),
-      this.timeoutMs
-    );
+    const timeoutId = setTimeout(() => abortController.abort(), this.timeoutMs);
 
     try {
       console.log(
@@ -336,6 +333,7 @@ export class ObservationReasoner {
 
     const details: Record<string, any> = {
       bot: {
+        position: sanitiseVec3(payload.bot.position),
         health: payload.bot.health,
         food: payload.bot.food,
         dimension: payload.bot.dimension,

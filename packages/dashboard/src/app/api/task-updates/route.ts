@@ -60,23 +60,24 @@ export async function POST(request: NextRequest) {
  * GET endpoint for Server-Sent Events (SSE) connection
  */
 export async function GET() {
+  let controllerRef: ReadableStreamDefaultController | null = null;
   const stream = new ReadableStream({
     start(controller) {
-      // Add connection to active set
+      controllerRef = controller;
       activeConnections.add(controller);
 
-      // Send initial connection message
       const message = JSON.stringify({
         type: 'connection_established',
         message: 'Task updates stream connected',
         timestamp: Date.now(),
       });
-
       controller.enqueue(new TextEncoder().encode(`data: ${message}\n\n`));
-
-      // Handle connection close
-      // Note: ReadableStreamDefaultController doesn't have a signal property
-      // We'll handle cleanup when the stream is closed
+    },
+    cancel() {
+      if (controllerRef) {
+        activeConnections.delete(controllerRef);
+        controllerRef = null;
+      }
     },
   });
 

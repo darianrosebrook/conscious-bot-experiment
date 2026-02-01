@@ -16,18 +16,19 @@ import {
   Action,
   ActionType,
 } from '../types';
-import { IntegratedPlanningCoordinator } from '../integrated-planning-coordinator';
-import { EnhancedGoalManager } from '../goal-formulation/goal-manager';
-import { EnhancedReactiveExecutor } from '../reactive-executor/reactive-executor';
+// IntegratedPlanningCoordinator removed — legacy planner retired (Phase 3).
+import { GoalManager } from '../goal-formulation/goal-manager';
+import { ReactiveExecutor } from '../reactive-executor/reactive-executor';
 
 // ============================================================================
 // Mock Planning System Components
 // ============================================================================
 
 /**
- * Creates a mock integrated planning coordinator for testing
+ * Creates a mock integrated planning coordinator for testing.
+ * Returns a generic mock since the coordinator class has been deleted.
  */
-export function createMockIntegratedPlanningCoordinator(): Mocked<IntegratedPlanningCoordinator> {
+export function createMockIntegratedPlanningCoordinator(): any {
   return {
     planAndExecute: vi.fn().mockResolvedValue({
       primaryPlan: createMockPlan(),
@@ -43,11 +44,11 @@ export function createMockIntegratedPlanningCoordinator(): Mocked<IntegratedPlan
 }
 
 /**
- * Creates a mock enhanced goal manager for testing
+ * Creates a mock goal manager for testing
  */
-export function createMockEnhancedGoalManager(): Mocked<EnhancedGoalManager> {
+export function createMockGoalManager(): Mocked<GoalManager> {
   return {
-    // Real methods from EnhancedGoalManager
+    // Real methods from GoalManager
     formulateGoals: vi.fn().mockResolvedValue({
       identifiedNeeds: [],
       generatedGoals: [],
@@ -117,9 +118,9 @@ export function createMockEnhancedGoalManager(): Mocked<EnhancedGoalManager> {
 }
 
 /**
- * Creates a mock enhanced reactive executor for testing
+ * Creates a mock reactive executor for testing
  */
-export function createMockEnhancedReactiveExecutor(): Mocked<EnhancedReactiveExecutor> {
+export function createMockReactiveExecutor(): Mocked<ReactiveExecutor> {
   return {
     isExecuting: vi.fn().mockReturnValue(false),
     executeNextTask: vi.fn().mockResolvedValue({ success: true }),
@@ -318,8 +319,8 @@ export function createMockPlanningContext(overrides: any = {}) {
  */
 export function createMockPlanningSystem() {
   const mockCoordinator = createMockIntegratedPlanningCoordinator();
-  const mockGoalManager = createMockEnhancedGoalManager();
-  const mockReactiveExecutor = createMockEnhancedReactiveExecutor();
+  const mockGoalManager = createMockGoalManager();
+  const mockReactiveExecutor = createMockReactiveExecutor();
 
   return {
     goalFormulation: {
@@ -503,10 +504,6 @@ export function cleanupTestEnvironment() {
 export type MockIntegratedPlanningCoordinator = ReturnType<
   typeof createMockIntegratedPlanningCoordinator
 >;
-export type MockEnhancedGoalManager = ReturnType<
-  typeof createMockEnhancedGoalManager
->;
-export type MockEnhancedReactiveExecutor = ReturnType<
-  typeof createMockEnhancedReactiveExecutor
->;
+export type MockGoalManager = ReturnType<typeof createMockGoalManager>;
+export type MockReactiveExecutor = ReturnType<typeof createMockReactiveExecutor>;
 export type MockPlanningSystem = ReturnType<typeof createMockPlanningSystem>;

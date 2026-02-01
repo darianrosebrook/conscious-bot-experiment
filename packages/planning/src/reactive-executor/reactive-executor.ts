@@ -1,7 +1,7 @@
 /**
- * Enhanced Reactive Executor
+ * Reactive Executor
  *
- * Integrates enhanced GOAP planning, plan repair, and safety reflexes
+ * Integrates GOAP planning stubs, plan repair, and safety reflexes
  * for real-time opportunistic action selection and execution
  *
  * @author @darianrosebrook
@@ -16,7 +16,7 @@ import {
 } from '../types';
 import { z } from 'zod';
 import {
-  EnhancedGOAPPlanner,
+  GOAPPlanner,
   GOAPPlan,
   WorldState,
   SafetyAction,
@@ -24,8 +24,8 @@ import {
   ReactiveExecutorMetrics,
   MCPBus,
   ExecutionContext as GOAPExecutionContext,
-} from './goap-planner';
-import { EnhancedPlanRepair } from './plan-repair';
+  PlanRepair,
+} from './goap-types';
 import {
   createPBIEnforcer,
   PlanStep as PBIPlanStep,
@@ -38,6 +38,7 @@ import {
   ToolExecutionResult,
   ToolDiscoveryResult,
 } from '../modules/mcp-integration';
+import type { IReactiveExecutor } from '../interfaces/reactive-executor';
 
 export interface ExecutionResult {
   success: boolean;
@@ -70,12 +71,17 @@ export interface MCPExecutionConfig {
   fallbackToMinecraft?: boolean;
 }
 
+export interface ReactiveExecutorOptions extends MCPExecutionConfig {
+  contextBuilder?: ExecutionContextBuilder;
+  realTimeAdapter?: RealTimeAdapter;
+}
+
 /**
- * Enhanced Reactive Executor with advanced features
+ * Reactive executor with safety reflexes and plan repair
  */
-export class EnhancedReactiveExecutor {
-  private goapPlanner: EnhancedGOAPPlanner;
-  private planRepair: EnhancedPlanRepair;
+export class ReactiveExecutor implements IReactiveExecutor {
+  private goapPlanner: GOAPPlanner;
+  private planRepair: PlanRepair;
   private contextBuilder: ExecutionContextBuilder;
   private realTimeAdapter: RealTimeAdapter;
   private metrics: ReactiveExecutorMetrics;
@@ -106,16 +112,19 @@ export class EnhancedReactiveExecutor {
   private mcpConfig?: MCPExecutionConfig;
   private mcpIntegration?: MCPIntegration;
 
-  constructor(mcpConfig?: MCPExecutionConfig) {
-    this.goapPlanner = new EnhancedGOAPPlanner();
-    this.planRepair = new EnhancedPlanRepair();
-    this.contextBuilder = new DefaultExecutionContextBuilder();
+  constructor(options?: ReactiveExecutorOptions | MCPExecutionConfig) {
+    this.goapPlanner = new GOAPPlanner();
+    this.planRepair = new PlanRepair();
+    this.pbiEnforcer = createPBIEnforcer();
+
+    const opts = (options ?? {}) as ReactiveExecutorOptions;
+    this.contextBuilder =
+      opts.contextBuilder ?? new DefaultExecutionContextBuilder();
+    this.realTimeAdapter =
+      opts.realTimeAdapter ?? new DefaultRealTimeAdapter(this.pbiEnforcer);
+
     this.metrics = this.initializeMetrics();
     this.pbiMetrics = this.initializePBIMetrics();
-
-    // Initialize PBI enforcer for plan-body interface enforcement
-    this.pbiEnforcer = createPBIEnforcer();
-    this.realTimeAdapter = new DefaultRealTimeAdapter(this.pbiEnforcer);
 
     // Initialize memory integration
     this.initializeMemoryIntegration();
@@ -127,7 +136,7 @@ export class EnhancedReactiveExecutor {
       enableToolDiscovery: true,
       preferMCPForTaskTypes: ['action', 'custom', 'tool'],
       fallbackToMinecraft: true,
-      ...mcpConfig,
+      ...opts,
     };
 
     this.initializeMemoryIntegration();
@@ -164,7 +173,7 @@ export class EnhancedReactiveExecutor {
 
     if (this.memoryEndpoint) {
       this.memoryClient = {
-        getMemoryEnhancedContext: async (context: any) => {
+        getMemoryContext: async (context: any) => {
           try {
             const response = await fetch(
               `${this.memoryEndpoint}/memory-context`,
@@ -303,7 +312,7 @@ export class EnhancedReactiveExecutor {
       };
 
       const memoryContext =
-        await this.memoryClient.getMemoryEnhancedContext(context);
+        await this.memoryClient.getMemoryContext(context);
 
       // Add plan-specific memory analysis
       const planMemory = {
@@ -790,14 +799,14 @@ export class EnhancedReactiveExecutor {
   /**
    * Get the GOAP planner for direct access
    */
-  getGOAPPlanner(): EnhancedGOAPPlanner {
+  getGOAPPlanner(): GOAPPlanner {
     return this.goapPlanner;
   }
 
   /**
    * Get the plan repair system for direct access
    */
-  getPlanRepair(): EnhancedPlanRepair {
+  getPlanRepair(): PlanRepair {
     return this.planRepair;
   }
 

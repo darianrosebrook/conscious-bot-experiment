@@ -1,4 +1,5 @@
 import { EventEmitter } from 'events';
+import { resilientFetch } from '@conscious-bot/core';
 import { POLL_TIMEOUT_MS } from '../modules/timeout-policy';
 import { isSystemReady } from '../startup-barrier';
 
@@ -82,19 +83,15 @@ export class WorldStateManager extends EventEmitter {
       return;
     }
     this.pollInFlight = true;
-    let timeoutId: ReturnType<typeof setTimeout> | undefined;
     try {
-      const controller = new AbortController();
-      timeoutId = setTimeout(() => controller.abort(), POLL_TIMEOUT_MS);
-      const res = await fetch(`${this.baseUrl}/state`, {
+      const res = await resilientFetch(`${this.baseUrl}/state`, {
         method: 'GET',
-        signal: controller.signal,
+        timeoutMs: POLL_TIMEOUT_MS,
+        label: 'world/state',
       });
-      clearTimeout(timeoutId);
-      timeoutId = undefined;
-      if (!res.ok) {
+      if (!res?.ok) {
         console.warn(
-          `WorldStateManager: poll got HTTP ${res.status} — stale snapshot preserved`
+          `WorldStateManager: poll got HTTP ${res?.status ?? 'unavailable'} — stale snapshot preserved`
         );
         return;
       }
@@ -103,7 +100,13 @@ export class WorldStateManager extends EventEmitter {
       const worldState = data.worldState || {};
       const player = worldState.player || {};
       // Minecraft interface /state returns inventory at data.data.inventory (object with .items) or data.data.inventory as array
-      const nested = data.data as { inventory?: CachedInventoryItem[] | { items?: CachedInventoryItem[] } } | undefined;
+      const nested = data.data as
+        | {
+            inventory?:
+              | CachedInventoryItem[]
+              | { items?: CachedInventoryItem[] };
+          }
+        | undefined;
 
       // Extract inventory items: data.inventory | data.data.inventory | data.data.inventory.items | worldState.inventory.items
       const inv = Array.isArray(data.inventory)
@@ -155,7 +158,6 @@ export class WorldStateManager extends EventEmitter {
         (e as any)?.message || e
       );
     } finally {
-      if (timeoutId !== undefined) clearTimeout(timeoutId);
       this.pollInFlight = false;
     }
   }

@@ -4,7 +4,13 @@ Planning and goal management system for Conscious Bot.
 
 ## Overview
 
-This package provides hierarchical and reactive planning, MCP integration, and an autonomous executor that coordinates with the Minecraft interface and other subsystems.
+This package provides Sterling solver integration (crafting, building, tool progression), deterministic fallback planning for collect/mine, MCP integration, and task/goal management. Legacy planners (HRM, GOAP planTo, HTN, IntegratedPlanningCoordinator) are retired. Sterling solvers plus the deterministic compiler are canonical.
+
+## Architecture
+
+- **Sterling solvers**: craft (Rig A), tool_progression (Rig B), build (Rig G) via `routeActionPlan()` in `modules/action-plan-backend.ts`
+- **Deterministic compiler**: collect and mine requirements lowered to `dig_block` steps via `requirementToFallbackPlan()` in `modules/leaf-arg-contracts.ts`
+- **Cognitive task routing**: retained from hierarchical-planner via `CognitiveTaskRouter`
 
 ## Server
 
@@ -15,21 +21,27 @@ This package provides hierarchical and reactive planning, MCP integration, and a
 ### Endpoints
 
 - `GET /health` — service health and memory usage
+- `GET/POST /system/ready` — startup readiness barrier
 - `GET /planner` — summary of current plan, action queue, and activity flags
 - `GET /state` — structured goals/tasks state for dashboards
+- `POST /goal` — add a goal with tasks
+- `POST /goal/:id/cancel` — cancel a goal
 - `POST /task` — add a new task `{ title, description, type, ... }`
 - `GET /tasks` — list current and completed tasks
 - `POST /execute` — execute a goal or task `{ type: 'goal'|'task', id }`
 - `POST /execute-plan` — execute a concrete plan or a task-derived plan
+- `POST /autonomous` — trigger autonomous task discovery and execution
+- `POST /update-bot-instance` — update bot instance in planning server
 - `GET/POST /mcp/*` — MCP operations (list/register/promote/run options)
 
-### Autonomous Executor
+### Autonomous Executor (Currently Disabled)
 
-- Runs every ~10s to discover and execute the highest-priority task.
-- Prefers MCP-registered Behavior Tree options and validates results against actual game state.
-- Uses inventory-based progress gating and completion checks to avoid "fake completion".
-- Injects prerequisite steps (e.g., gather wood) and retries with backoff when needed.
-- Dispatches any step with `meta.executable: true` and validates leaf args before dispatch.
+The planning package's autonomous executor (which would run every ~10s via `EXECUTOR_POLL_MS`) is **disabled**. Task discovery and execution are driven by:
+
+- **HTTP triggers**: `POST /execute`, `POST /execute-plan`, `POST /autonomous`
+- **Minecraft-interface planning cycle**: 15s loop in minecraft-interface (coordinator is a stub; actual planning via Sterling solvers happens when tasks are submitted)
+
+Executor behavior when enabled: prefers MCP-registered Behavior Tree options, validates results against actual game state, uses inventory-based progress gating, injects prerequisite steps (e.g., gather wood), retries with backoff. Dispatches any step with `meta.executable: true` and validates leaf args before dispatch.
 
 ### Fallback-Macro Planner
 
@@ -77,6 +89,8 @@ Environment variables:
 
 - `PORT` — planning server port (default `3002`)
 - `MCP_ONLY` — when `true`, disallow direct `/action` fallback and use MCP exclusively
+- `EXECUTOR_POLL_MS` — autonomous executor poll interval when enabled (default `10000`)
+- `STRICT_REQUIREMENTS` — when not `false`, only structured `requirementCandidate` produces requirements; regex fallback disabled
 - `NODE_ENV`, `DEBUG_ENVIRONMENT` — enable additional environment logging
 
 ## Development

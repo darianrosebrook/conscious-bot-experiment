@@ -47,11 +47,41 @@ import {
   BehaviorTreeRunner,
   ToolExecutor,
 } from '../behavior-trees/BehaviorTreeRunner';
-import {
-  Plan,
-  PlanNode,
-  PlanningContext,
-} from '../hierarchical-planner/hrm-inspired-planner';
+// HRM types — minimal stubs retained after legacy planner deletion.
+// These were originally from hrm-inspired-planner.ts (now deleted).
+interface PlanNode {
+  id: string;
+  type: 'goal' | 'subgoal' | 'action' | 'condition';
+  description: string;
+  status: 'pending' | 'active' | 'completed' | 'failed' | 'blocked';
+  priority: number;
+  estimatedDuration: number;
+  dependencies: string[];
+  constraints: string[];
+  metadata?: Record<string, any>;
+}
+
+interface Plan {
+  id: string;
+  goalId: string;
+  nodes: PlanNode[];
+  executionOrder: string[];
+  confidence: number;
+  estimatedLatency: number;
+  refinementCount: number;
+  createdAt: number;
+  lastRefinedAt: number;
+}
+
+interface PlanningContext {
+  goal: string;
+  currentState: Record<string, any>;
+  constraints: string[];
+  resources: Record<string, number>;
+  timeLimit?: number;
+  urgency: 'low' | 'medium' | 'high' | 'emergency';
+  domain: 'minecraft' | 'general' | 'spatial' | 'logical';
+}
 
 // ============================================================================
 // Types

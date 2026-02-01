@@ -674,3 +674,33 @@ export const HTNTaskNetworkSchema = z.object({
   createdAt: z.number(),
   updatedAt: z.number(),
 });
+
+// =========================================================================
+// Planning Context (relocated from integrated-planning-coordinator.ts)
+// =========================================================================
+
+/**
+ * Context provided to planning subsystems.
+ * Contains world state, goals, resources, and situational factors.
+ *
+ * Canonical location: types.ts (moved from integrated-planning-coordinator.ts
+ * during legacy planner retirement).
+ */
+export interface PlanningContext {
+  worldState: Record<string, any>;
+  currentState: HomeostasisState;
+  activeGoals: Goal[];
+  availableResources: Resource[];
+  timeConstraints: {
+    urgency: 'low' | 'medium' | 'high' | 'emergency';
+    deadline?: number;
+    maxPlanningTime: number;
+  };
+  situationalFactors: {
+    threatLevel: number;
+    opportunityLevel: number;
+    socialContext: string[];
+    environmentalFactors: string[];
+  };
+  bot?: any;
+}

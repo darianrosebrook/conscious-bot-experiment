@@ -20,10 +20,30 @@ import {
   ObservationMapper,
   MemoryIntegrationService,
 } from './index';
-// Import real planning coordinator
-import { createIntegratedPlanningCoordinator } from '@conscious-bot/planning';
+// Legacy IntegratedPlanningCoordinator retired — replaced by Sterling solvers.
+// Provide a no-op stub satisfying the local IntegratedPlanningCoordinator interface.
+import type { IntegratedPlanningCoordinator } from './plan-executor';
+function createIntegratedPlanningCoordinator(
+  _config?: any
+): IntegratedPlanningCoordinator {
+  return {
+    plan: async () => ({
+      success: false,
+      error: 'Legacy planning retired — use Sterling solvers',
+    }),
+    executePlan: async () => ({
+      success: false,
+      error: 'Legacy planning retired — use Sterling solvers',
+    }),
+    planAndExecute: async () => ({
+      success: false,
+      error: 'Legacy planning retired — use Sterling solvers',
+    }),
+  };
+}
 import type { Bot } from 'mineflayer';
 import { mineflayer as startMineflayerViewer } from 'prismarine-viewer';
+import { resilientFetch } from '@conscious-bot/core';
 
 // Import viewer enhancements
 import { applyViewerEnhancements } from './viewer-enhancements';
@@ -168,8 +188,8 @@ const botConfig: BotConfig = {
   port: process.env.MINECRAFT_PORT
     ? parseInt(process.env.MINECRAFT_PORT)
     : 25565,
-  username: process.env.MINECRAFT_USERNAME || 'ConsciousBot',
-  version: process.env.MINECRAFT_VERSION || '1.20.1',
+  username: process.env.MINECRAFT_USERNAME || 'Sterling',
+  version: process.env.MINECRAFT_VERSION || '1.21.9',
   auth: 'offline',
 
   // World configuration for memory versioning
@@ -194,6 +214,7 @@ let minecraftInterface: {
 // Thought generation interval
 let thoughtGenerationInterval: NodeJS.Timeout | null = null;
 let hudUpdateInterval: NodeJS.Timeout | null = null;
+let dashboardPushInterval: NodeJS.Timeout | null = null;
 let botInstanceSyncInterval: NodeJS.Timeout | null = null;
 let planningCoordinator: any = null;
 let memoryIntegration: MemoryIntegrationService | null = null;
@@ -238,31 +259,45 @@ function startThoughtGeneration() {
       }
 
       // Send a contextual thought to cognition (preserve existing behavior)
-      const worldState = minecraftInterface.observationMapper.mapBotStateToPlanningContext(bot);
-      const healthPct = Math.round((worldState.worldState?.health ?? 0) / 20 * 100);
-      const hungerPct = Math.round((worldState.worldState?.hunger ?? 0) / 20 * 100);
+      const worldState =
+        minecraftInterface.observationMapper.mapBotStateToPlanningContext(bot);
+      const healthPct = Math.round(
+        ((worldState.worldState?.health ?? 0) / 20) * 100
+      );
+      const hungerPct = Math.round(
+        ((worldState.worldState?.hunger ?? 0) / 20) * 100
+      );
       const thought = `Health: ${healthPct}%, Hunger: ${hungerPct}%. Observing environment and deciding next action.`;
 
-      minecraftInterface.observationMapper.sendThoughtToCognition(thought, 'status')
+      minecraftInterface.observationMapper
+        .sendThoughtToCognition(thought, 'status')
         .catch(() => {}); // Fire-and-forget, don't block execution
 
       // Execute an autonomous planning cycle with concurrency guard
       isRunningPlanningCycle = true;
       console.log('🔄 Starting autonomous planning cycle...');
       try {
-        const result = await minecraftInterface.planExecutor.executePlanningCycle();
+        const result =
+          await minecraftInterface.planExecutor.executePlanningCycle();
 
         if (result.success) {
-          console.log(`✅ Planning cycle complete: ${result.executedSteps}/${result.totalSteps} steps executed`);
+          console.log(
+            `✅ Planning cycle complete: ${result.executedSteps}/${result.totalSteps} steps executed`
+          );
         } else {
-          console.log(`⚠️ Planning cycle ended: ${result.error || 'no plan generated'} (${result.executedSteps}/${result.totalSteps} steps)`);
+          console.log(
+            `⚠️ Planning cycle ended: ${result.error || 'no plan generated'} (${result.executedSteps}/${result.totalSteps} steps)`
+          );
         }
       } finally {
         isRunningPlanningCycle = false;
       }
     } catch (error) {
       isRunningPlanningCycle = false;
-      console.error('❌ Error in autonomous planning cycle:', error instanceof Error ? error.message : error);
+      console.error(
+        '❌ Error in autonomous planning cycle:',
+        error instanceof Error ? error.message : error
+      );
     }
   }, 15000); // Every 15 seconds
 
@@ -433,6 +468,29 @@ function setupBotStateWebSocket() {
       console.log('No minecraft interface available for HUD update');
     }
   }, 5000);
+
+  // Push bot state to dashboard so SSE clients get updates without dashboard polling
+  const dashboardUrl = process.env.DASHBOARD_URL || 'http://localhost:3000';
+  if (dashboardPushInterval) clearInterval(dashboardPushInterval);
+  dashboardPushInterval = setInterval(async () => {
+    if (!minecraftInterface) return;
+    try {
+      const r = await fetch(`http://localhost:${port}/state`, {
+        signal: AbortSignal.timeout(2000),
+      });
+      if (!r.ok) return;
+      const data = (await r.json()) as { success?: boolean; data?: unknown };
+      if (!data?.success || !data?.data) return;
+      await fetch(`${dashboardUrl}/api/ws/bot-state`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ data }),
+        signal: AbortSignal.timeout(3000),
+      });
+    } catch {
+      // Silent; dashboard may be down or SSE clients may use WebSocket
+    }
+  }, 2000);
 }
 
 // WebSocket connection handling
@@ -567,15 +625,18 @@ app.post('/seed', async (req, res) => {
     botConfig.worldSeed = seedStr;
     process.env.WORLD_SEED = seedStr;
 
-    // Propagate to memory service
-    try {
-      await fetch(`${process.env.MEMORY_ENDPOINT || 'http://localhost:3001'}/enhanced/seed`, {
+    // Propagate to memory service (resilient: retries until memory is up)
+    const memoryResponse = await resilientFetch(
+      `${process.env.MEMORY_ENDPOINT || 'http://localhost:3001'}/enhanced/seed`,
+      {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ worldSeed: seedStr }),
-      });
-    } catch {
-      console.warn('⚠️ Failed to propagate seed to memory service');
+        label: 'memory/seed',
+      }
+    );
+    if (memoryResponse?.ok) {
+      console.log('✅ Seed propagated to memory service');
     }
 
     res.json({
@@ -611,15 +672,18 @@ app.post('/connect', async (req, res) => {
       botConfig.worldSeed = seedStr;
       process.env.WORLD_SEED = seedStr;
       console.log(`🌱 World seed set to ${seedStr} via POST /connect`);
-      // Propagate to memory service
-      try {
-        await fetch(`${process.env.MEMORY_ENDPOINT || 'http://localhost:3001'}/enhanced/seed`, {
+      // Propagate to memory service (resilient: retries until memory is up)
+      const memoryResponse = await resilientFetch(
+        `${process.env.MEMORY_ENDPOINT || 'http://localhost:3001'}/enhanced/seed`,
+        {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ worldSeed: seedStr }),
-        });
-      } catch {
-        console.warn('⚠️ Failed to propagate seed to memory service');
+          label: 'memory/seed',
+        }
+      );
+      if (memoryResponse?.ok) {
+        console.log('✅ Seed propagated to memory service');
       }
     }
 
@@ -676,13 +740,10 @@ app.post('/connect', async (req, res) => {
     // Setup WebSocket event handlers for real-time updates
     setupBotStateWebSocket();
 
-    // Register core leaves with the capability registry
-    await registerCoreLeaves();
-
+    // Leaves already registered on server startup; skip duplicate
     console.log('✅ Connected to Minecraft server');
     console.log('✅ Memory integration initialized');
     console.log('✅ Planning coordinator initialized');
-    console.log('✅ Core leaves registered');
 
     res.json({
       success: true,
@@ -867,9 +928,7 @@ async function attemptAutoConnect() {
     // Manually initialize the plan executor to connect to Minecraft
     await minecraftInterface.planExecutor.initialize();
 
-    // Register core leaves with the capability registry
-    await registerCoreLeaves();
-
+    // Leaves already registered on server startup; skip duplicate
     // Setup WebSocket event handlers and start autonomous planning
     // (must be after initialize() completes, not in 'initialized' event which already fired)
     setupBotStateWebSocket();
@@ -945,7 +1004,7 @@ async function attemptAutoConnect() {
         ' Protocol version incompatibility detected. Skipping auto-reconnect.'
       );
       console.log(
-        ' To resolve: Use Minecraft server version 1.21.1 or earlier, or wait for minecraft-protocol library update.'
+        ' To resolve: Ensure Minecraft server version matches mineflayer support (1.8–1.21.9), or wait for protocol library update.'
       );
       return;
     }
@@ -1267,7 +1326,7 @@ app.get('/state', async (req, res) => {
           server: {
             playerCount: 1,
             difficulty: executionStatus?.bot?.server?.difficulty || 'normal',
-            version: executionStatus?.bot?.server?.version || '1.20.1',
+            version: executionStatus?.bot?.server?.version || '1.21.9',
           },
         },
         planningContext: {
@@ -1743,9 +1802,8 @@ app.post('/execute-scenario', async (req, res) => {
 // Test with simulation (no Minecraft server required)
 app.post('/test-simulation', async (req, res) => {
   try {
-    const { createSimulatedMinecraftInterface } = await import(
-      './simulation-stub'
-    );
+    const { createSimulatedMinecraftInterface } =
+      await import('./simulation-stub');
 
     // Create a simulated interface for testing
     const simulation = createSimulatedMinecraftInterface({
@@ -2523,18 +2581,21 @@ async function updateBotInstanceInPlanningServer() {
         version: (bot as any).version || 'unknown',
       };
 
-      const response = await fetch(
-        'http://localhost:3002/update-bot-instance',
+      const planningUrl =
+        process.env.PLANNING_SERVICE_URL || 'http://localhost:3002';
+      const response = await resilientFetch(
+        `${planningUrl}/update-bot-instance`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ botInstance: botData }),
+          label: 'planning/update-bot-instance',
         }
       );
 
-      if (response.ok) {
+      if (response?.ok) {
         console.log('✅ Bot instance updated in planning server');
-      } else {
+      } else if (response) {
         console.warn(
           '⚠️ Failed to update bot instance in planning server:',
           response.status

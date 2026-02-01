@@ -112,7 +112,7 @@ const DEFAULT_CONFIG: LiveStreamIntegrationConfig = {
   screenshotInterval: 30000, // Reduced from 10 seconds to 30 seconds
 };
 
-export class EnhancedLiveStreamIntegration extends EventEmitter {
+export class LiveStreamIntegration extends EventEmitter {
   private config: LiveStreamIntegrationConfig;
   private liveStreamData: LiveStreamData | null = null;
   private actionLogs: ActionLog[] = [];

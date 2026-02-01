@@ -5,7 +5,15 @@ module.exports = {
     project: './tsconfig.json',
     tsconfigRootDir: __dirname,
   },
-  ignorePatterns: ['dist/', 'node_modules/', '*.js', '*.cjs', '*.d.ts'],
+  ignorePatterns: [
+    'dist/',
+    'node_modules/',
+    '*.js',
+    '*.cjs',
+    '*.d.ts',
+    'src/**/__tests__/**',
+    'src/**/*.test.ts',
+  ],
   rules: {
     'no-unused-vars': 'warn',
     '@typescript-eslint/no-non-null-assertion': 'warn',

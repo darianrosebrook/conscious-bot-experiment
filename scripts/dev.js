@@ -198,10 +198,17 @@ async function main() {
   for (const service of services) {
     log(` Starting ${service.name} (port ${service.port})...`, colors.purple);
 
+    const baseEnv = { ...process.env, FORCE_COLOR: '1' };
+    if (service.name === 'Memory' && !baseEnv.WORLD_SEED) {
+      baseEnv.MEMORY_DEV_DEFAULT_SEED = 'true';
+    }
+    if (service.name === 'Minecraft Bot') {
+      baseEnv.MINECRAFT_VERSION = '1.21.9';
+    }
     const child = spawn(service.command, service.args, {
       stdio: 'pipe',
       shell: true,
-      env: { ...process.env, FORCE_COLOR: '1' },
+      env: baseEnv,
     });
 
     // Handle output

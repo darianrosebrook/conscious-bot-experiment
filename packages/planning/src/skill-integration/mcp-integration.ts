@@ -11,16 +11,9 @@
  */
 
 import { EventEmitter } from 'events';
-// Temporary local type definitions until @conscious-bot/core is available
-export class EnhancedRegistry {
-  constructor() {}
-  register(name: string, handler: any): void {
-    console.log(`Registered: ${name}`);
-  }
-  listCapabilities(): any[] {
-    return [];
-  }
-}
+import { CapabilityRegistry } from '../modules/capability-registry';
+
+export { CapabilityRegistry } from '../modules/capability-registry';
 
 export interface ShadowRunResult {
   success: boolean;
@@ -33,14 +26,14 @@ export class DynamicCreationFlow {
     return { created: true, config };
   }
 }
-import { LLMEnhancedSkillComposer } from './llm-skill-composer';
+import { LLMSkillComposer } from './llm-skill-composer';
 import { Goal, GoalType, GoalStatus } from '../types';
 
 // ============================================================================
 // Types
 // ============================================================================
 
-export interface EnhancedMCPConfig {
+export interface MCPSkillConfig {
   enableDynamicDiscovery: boolean;
   enableLLMEnhancement: boolean;
   enableCapabilityComposition: boolean;
@@ -158,14 +151,14 @@ export interface AdaptiveCapabilitySelector {
 }
 
 // ============================================================================
-// Enhanced MCP Integration Implementation
+// MCP Skill Integration Implementation
 // ============================================================================
 
-export class EnhancedMCPIntegration extends EventEmitter {
-  private registry: EnhancedRegistry;
+export class MCPSkillIntegration extends EventEmitter {
+  private registry: CapabilityRegistry;
   private dynamicFlow: DynamicCreationFlow;
-  private llmSkillComposer: LLMEnhancedSkillComposer;
-  private config: EnhancedMCPConfig;
+  private llmSkillComposer: LLMSkillComposer;
+  private config: MCPSkillConfig;
   private capabilityCache: Map<string, MCPCapability> = new Map();
   private discoveryHistory: Map<string, CapabilityDiscoveryResult[]> =
     new Map();
@@ -174,10 +167,10 @@ export class EnhancedMCPIntegration extends EventEmitter {
   private adaptiveSelector: AdaptiveCapabilitySelector;
 
   constructor(
-    registry: EnhancedRegistry,
+    registry: CapabilityRegistry,
     dynamicFlow: DynamicCreationFlow,
-    llmSkillComposer: LLMEnhancedSkillComposer,
-    config: Partial<EnhancedMCPConfig> = {}
+    llmSkillComposer: LLMSkillComposer,
+    config: Partial<MCPSkillConfig> = {}
   ) {
     super();
     this.registry = registry;
