@@ -1312,21 +1312,51 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
 
     this.taskStore.updateStatistics();
 
-    // Goal-binding protocol: fire progress hook (runtime origin only)
+    // Goal-binding protocol: fire progress hook AND status hook (runtime origin only).
+    // Both hooks produce effects that are collected and scheduled once.
     const origin = options?.origin ?? 'runtime';
     if (origin === 'runtime') {
       const binding = (task.metadata as any).goalBinding as GoalBinding | undefined;
       if (binding) {
-        const hookResult = onTaskProgressUpdated(
+        const allEffects: SyncEffect[] = [];
+
+        // Status hook: if status actually changed, fire onTaskStatusChanged so
+        // the goal protocol learns about the transition. Without this, status
+        // changes via updateTaskProgress (e.g. 'completed', 'failed') would
+        // bypass goal-status propagation entirely.
+        const statusChanged = status && status !== oldStatus;
+        if (statusChanged) {
+          const statusHookResult = onTaskStatusChanged(
+            task,
+            oldStatus,
+            task.status,
+            { verifierRegistry: this.verifierRegistry },
+          );
+          if (statusHookResult.syncEffects.length > 0) {
+            // Apply self-targeted hold effects synchronously before persist
+            // would be ideal, but task is already persisted above. For status
+            // changes through this path (completed/failed), self-hold effects
+            // are not expected (completed/failed don't produce apply_hold).
+            // Route all effects through the drain.
+            allEffects.push(...statusHookResult.syncEffects);
+          }
+        }
+
+        // Progress hook (existing behavior)
+        const progressHookResult = onTaskProgressUpdated(
           task,
           task.progress,
           { verifierRegistry: this.verifierRegistry },
         );
-        if (hookResult.syncEffects.length > 0) {
+        if (progressHookResult.syncEffects.length > 0) {
+          allEffects.push(...progressHookResult.syncEffects);
+        }
+
+        if (allEffects.length > 0) {
           // updateTaskProgress is sync — schedule onto the global drain so
           // protocol effects serialize with effects from all callers.
           // void: intentionally not awaited; drain handles settlement.
-          void this.scheduleGoalProtocolEffects(hookResult.syncEffects);
+          void this.scheduleGoalProtocolEffects(allEffects);
         }
       }
     }
@@ -1393,14 +1423,15 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
     const newProgress =
       task.steps.length > 0 ? completedSteps / task.steps.length : 1;
 
-    // Update task progress (only if task is not failed)
-    if (task.status !== 'failed') {
-      this.updateTaskProgress(taskId, newProgress);
-    } else {
+    // Determine final status: if all steps done, run inventory gate then complete.
+    // Single updateTaskProgress call ensures hooks fire exactly once.
+    let finalStatus: Task['status'] | undefined;
+
+    if (task.status === 'failed') {
       console.log(`🔇 Skipping progress update for failed task: ${taskId}`);
+      return true;
     }
 
-    // Check if task is complete
     if (newProgress >= 1) {
       // Final inventory gate: if the task has a structured requirement with an
       // expected output item/quantity, verify the bot actually has it before
@@ -1448,8 +1479,10 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
         }
       }
 
-      this.updateTaskProgress(taskId, 1, 'completed');
+      finalStatus = 'completed';
     }
+
+    this.updateTaskProgress(taskId, finalStatus ? 1 : newProgress, finalStatus);
 
     this.emit('taskStepCompleted', { task, step });
 
@@ -2085,10 +2118,11 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
       task.metadata.solver!.suggestedParallelism = advice.suggestedParallelism;
 
       if (!advice.shouldProceed) {
-        task.status = 'unplannable';
+        // Route through updateTaskStatus so goal-binding protocol hooks fire
         task.metadata.blockedReason = advice.blockReason || 'Rig G feasibility gate failed';
         task.metadata.updatedAt = Date.now();
-        this.taskStore.setTask(task);
+        this.taskStore.setTask(task); // persist metadata before status transition
+        await this.updateTaskStatus(taskId, 'unplannable');
         console.log(
           `[RigG-Gate] Task ${taskId} blocked: ${advice.blockReason}`
         );
@@ -2464,14 +2498,16 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
             afterTask.metadata.solver.stepsDigest = result.stepsDigest;
           }
 
-          // If new steps are viable, transition back to pending
+          // If new steps are viable, transition back to pending via updateTaskStatus
+          // so goal-binding protocol hooks fire for the status change.
           if (result.steps && result.steps.length > 0 && !result.steps[0].meta?.blocked) {
-            afterTask.status = 'pending';
             afterTask.metadata.blockedReason = undefined;
             afterTask.metadata.solver.rigGChecked = false; // allow re-evaluation
+            this.taskStore.setTask(afterTask); // persist metadata before status transition
+            await this.updateTaskStatus(taskId, 'pending');
+          } else {
+            this.taskStore.setTask(afterTask);
           }
-
-          this.taskStore.setTask(afterTask);
         }
       } catch (err) {
         console.error(`[RigG] Replan ${attempts} failed:`, err);
