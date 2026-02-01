@@ -26,6 +26,10 @@ export interface CognitiveStreamThought {
     model?: string;
     /** Observation fallback; do not convert to tasks */
     fallback?: boolean;
+    /** Structured goal extracted by the sanitizer boundary */
+    extractedGoal?: { version?: number; action: string; target: string; amount: number | null; raw?: string };
+    /** Sanitization flags from the LLM output sanitizer */
+    sanitizationFlags?: Record<string, any>;
   };
   id: string;
   timestamp: number;

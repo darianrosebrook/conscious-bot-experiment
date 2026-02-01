@@ -8,7 +8,7 @@
  */
 
 import { LLMConfig, LLMConfigSchema, LLMContext, LLMResponse } from '../types';
-import { sanitizeLLMOutput } from '../llm-output-sanitizer';
+import { sanitizeLLMOutput, isUsableContent } from '../llm-output-sanitizer';
 
 // Export LLMContext for use by other modules
 export type { LLMContext, LLMResponse } from '../types';
@@ -106,6 +106,44 @@ export class LLMInterface {
 
       const sanitized = sanitizeLLMOutput(response.response);
 
+      const metadata = {
+        finishReason: response.done ? 'stop' : 'length',
+        usage: {
+          promptTokens,
+          completionTokens,
+          totalTokens: promptTokens + completionTokens,
+        },
+        extractedGoal: sanitized.goalTagV1 ?? sanitized.goalTag ?? undefined,
+        sanitizationFlags: sanitized.flags,
+      } as LLMResponse['metadata'];
+
+      if (!isUsableContent(sanitized.text)) {
+        // Single quality retry — slightly bumped temperature, no recursive check
+        const retryResponse = await this.callOllama(model, fullPrompt, {
+          temperature: Math.min(temperature + 0.1, 1.0),
+          maxTokens,
+          signal: options?.signal,
+        });
+        const retrySanitized = sanitizeLLMOutput(retryResponse.response);
+        const retryEndTime = performance.now();
+        return {
+          id: `llm-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          text: retrySanitized.text,
+          model,
+          tokensUsed: retryResponse.eval_count || 0,
+          latency: retryEndTime - startTime,
+          confidence: this.calculateConfidence(retryResponse),
+          metadata: {
+            ...metadata,
+            retryAttempt: 1,
+            retryReason: 'quality_gate',
+            extractedGoal: retrySanitized.goalTagV1 ?? retrySanitized.goalTag ?? undefined,
+            sanitizationFlags: retrySanitized.flags,
+          },
+          timestamp: Date.now(),
+        };
+      }
+
       return {
         id: `llm-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         text: sanitized.text,
@@ -113,16 +151,7 @@ export class LLMInterface {
         tokensUsed: completionTokens,
         latency: latencyMs,
         confidence: this.calculateConfidence(response),
-        metadata: {
-          finishReason: response.done ? 'stop' : 'length',
-          usage: {
-            promptTokens,
-            completionTokens,
-            totalTokens: promptTokens + completionTokens,
-          },
-          extractedGoal: sanitized.goalTag ?? undefined,
-          sanitizationFlags: sanitized.flags,
-        },
+        metadata,
         timestamp: Date.now(),
       };
     } catch (error) {
@@ -171,7 +200,7 @@ export class LLMInterface {
                   (response.eval_count || 0),
               },
               retryAttempt: attempt,
-              extractedGoal: retrySanitized.goalTag ?? undefined,
+              extractedGoal: retrySanitized.goalTagV1 ?? retrySanitized.goalTag ?? undefined,
               sanitizationFlags: retrySanitized.flags,
             },
             timestamp: Date.now(),
@@ -212,7 +241,7 @@ You are my private inner thought while I'm in the world. Write exactly one or tw
 Say what I notice and what I'm about to do next, based on what's most urgent right now (safety, health, shelter, tools, resources, navigation, social cues). Don't explain or justify.
 
 Only if I'm committing to a concrete action now, end with:
-[GOAL: <collect|mine|craft|build> <target> <amount>]
+[GOAL: <collect|mine|craft|build|find|explore|navigate|gather|smelt|repair> <target> <amount>]
 Use names that appear in the situation. If I'm not committing yet, don't output a goal tag.
 `.trim();
 
@@ -286,27 +315,18 @@ Please analyze this situation and provide ethical guidance, including:
     conversationContext?: any,
     context?: LLMContext
   ): Promise<LLMResponse> {
-    const systemPrompt = `Respond to the following message naturally and conversationally.
+    const systemPrompt = `You are a Minecraft bot talking to another player in-game chat.
+Reply in one short sentence (under 200 characters). Be natural and casual -- you're a fellow player, not a customer service bot.
+If asked a question, answer directly. If greeted, be friendly but brief. If asked for help, say what you can do.
+Never say "I'm an AI" or "As a bot". Never use emojis. Keep it short.`.trim();
 
-Be:
-- Friendly and helpful
-- Respectful of others
-- Contextually appropriate
-
-Keep responses natural and conversational.`;
-
-    const contextText = conversationContext
-      ? `\nConversation context: ${JSON.stringify(conversationContext, null, 2)}`
-      : '';
-
-    const prompt = `Incoming message: "${message}"${contextText}
-
-How should I respond?`;
+    const senderName = conversationContext?.sender || 'someone';
+    const prompt = `${senderName} says: "${message}"\n\nReply briefly:`;
 
     return this.generateResponse(prompt, context, {
       systemPrompt,
-      temperature: 0.8,
-      maxTokens: 256,
+      temperature: 0.85,
+      maxTokens: 128,
     });
   }
 

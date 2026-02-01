@@ -482,7 +482,7 @@ private analyzePosition(worldState: any): CognitiveThought | null {
 
 ### **LLM Output Sanitization Pipeline**
 
-All LLM-generated text passes through a deterministic sanitization pipeline at the `generateResponse()` boundary in `LLMInterface`, ensuring every downstream consumer (planning signal extraction, intrusive thought parsing, social awareness, internal dialogue, dashboard) receives clean text.
+All LLM-generated text passes through a deterministic sanitization pipeline at the `generateResponse()` boundary in `LLMInterface`. This is the **single sanitization boundary** — downstream code never re-parses goal tags from raw text; it reads structured metadata (`extractedGoal`, `sanitizationFlags`).
 
 **Module:** `packages/cognition/src/llm-output-sanitizer.ts`
 
@@ -490,41 +490,114 @@ All LLM-generated text passes through a deterministic sanitization pipeline at t
 
 | Step | Function | What it does |
 |------|----------|--------------|
+| 0.5 | `stripWrappingQuotes()` | Removes balanced/unbalanced `"` / `'` / curly quotes the model wraps output in |
 | 1 | `stripCodeFences()` | Removes `` ``` `` / `` ```lang `` wrappers; preserves single backticks for item names like `` `oak_log` `` |
 | 2 | `stripSystemPromptLeaks()` | Detects and removes leaked system prompt fragments ("You are my private inner thought...", etc.) |
-| 3 | `extractGoalTag()` | Extracts structured `[GOAL: action target amount]` tags into `GoalTag` objects; handles malformed/split variants |
+| 3 | `extractGoalTag()` | **Bounded-scan parser** (no regex backtracking): `indexOf('[GOAL:')` → bounded scan (max 100 chars) for `]` → tokenize inner text → normalize action via `ACTION_NORMALIZE_MAP` → check `CANONICAL_ACTIONS` allowlist. Fail-closed: unknown actions → `goal: null`, raw tag preserved in `flags.rawGoalTag` |
 | 4 | `truncateDegeneration()` | N-gram repetition detection (trigrams 3+, consecutive identical words 4+); truncates at repetition boundary |
 | 5 | `stripTrailingGarbage()` | Removes trailing standalone numbers and incomplete sentence fragments |
 | 6 | `normalizeWhitespace()` | Collapses whitespace runs, trims |
 
+**Quality gate** (`isUsableContent`):
+- Rejects generic filler phrases ("maintaining awareness of surroundings")
+- **Code-likeness detection** via `hasCodeLikeDensity()`: scores each line for code patterns (import/def/class statements, brackets/semicolons, indentation); >40% code-like lines → rejected, `sanitizationFlags.hadCodeContent = true`
+
 **Integration points:**
 - Applied in `llm-interface.ts` `generateResponse()` at both primary and retry return paths
-- `SanitizationFlags` and `extractedGoal` are attached to `LLMResponse.metadata` for observability
+- `SanitizationFlags` and `extractedGoal` (as `GoalTagV1`) are attached to `LLMResponse.metadata` for observability
 - `thought-generator.ts` plumbs `extractedGoal` into `CognitiveThought.metadata` for all 4 generation methods (idle, task, social, event)
+- `server.ts` sends `displayContent` (tag-stripped, for UI), `extractedGoal` (structured, for routing), and `sanitizationFlags` to the cognitive stream
 - Dashboard `cleanMarkdownArtifacts()` remains as defense-in-depth (no-op on pre-cleaned text)
-- `isUsableContent()` exported separately for callers that want quality gating
+- `isUsableContent()` and `hasCodeLikeDensity()` exported for callers that want quality gating
 
-**Goal tag extraction output:**
+**Goal tag extraction output (`GoalTagV1`):**
 ```typescript
-interface GoalTag {
-  action: string;   // collect, mine, craft, build, find, explore, etc.
-  target: string;   // oak_log, stone, wooden_pickaxe, shelter, etc.
+interface GoalTagV1 {
+  version: 1;
+  action: string;         // canonical, from CANONICAL_ACTIONS allowlist
+  target: string;         // normalized lowercase
   amount: number | null;
+  raw: string;            // original tag text for debugging
 }
 ```
 
-**Future consideration:** The regex pipeline could be augmented by a distilled CoreML classifier (~0.62M params, ~0.4ms inference) for semantic quality scoring. See `isUsableContent()` in the module for details.
+**Canonical actions allowlist** (strict, versioned — 12 actions):
+`collect`, `mine`, `craft`, `build`, `find`, `explore`, `navigate`, `gather`, `check`, `smelt`, `repair`, `continue`
+
+**Action normalization** (`ACTION_NORMALIZE_MAP`, 30+ synonyms) runs before the allowlist check:
+- `dig`, `break`, `harvest` → `mine`
+- `get`, `obtain`, `pickup` → `collect`
+- `make`, `create` → `craft`
+- `construct`, `assemble`, `fortify` → `build`
+- `locate`, `search`, `look` → `find`
+- `move`, `go`, `walk`, `travel` → `navigate`
+- `observe`, `assess`, `inspect`, `hear` → `check`
+- `cook` → `smelt`
+- `fix`, `mend`, `restore` → `repair`
+- `acquire`, `increase` → `gather`
+
+**Backward compatibility:** The legacy `GoalTag` (without `version` or `raw`) is still populated alongside `GoalTagV1`. `llm-interface.ts` prefers `goalTagV1` when available: `sanitized.goalTagV1 ?? sanitized.goalTag ?? undefined`.
 
 ---
 
+### **Thought-to-Task Conversion (Single-Boundary Contract)**
+
+**Module:** `packages/planning/src/task-integration/thought-to-task-converter.ts`
+
+The converter reads structured `metadata.extractedGoal` — it **never re-parses** goal tags from raw text. The `extractStructuredIntent` LLM fallback has been removed.
+
+**Goal acceptance gate:** Only `ROUTABLE_ACTIONS` (strict subset of `CANONICAL_ACTIONS`) can produce tasks:
+
+| Canonical Action | Task Type | Routable | Rig |
+|---|---|---|---|
+| `collect`, `gather` | `gathering` | Yes | Compiler |
+| `mine` | `mining` | Yes | Compiler |
+| `craft`, `smelt` | `crafting` | Yes | A (Inventory Transform) |
+| `build`, `repair` | `building` | Yes | G (Feasibility) |
+| `find`, `explore`, `navigate` | — | No | Future: E (Hierarchical) |
+| `check`, `continue` | — | No | N/A (sensing/meta) |
+
+Unroutable actions are **fail-closed**: no task is created, but the thought remains visible in the cognitive stream.
+
+**Goal dedup:** Content-addressed hash (`action:target:amount`) with a 5-minute window prevents duplicate tasks.
+
+**Tag stripping:** All task titles and descriptions are cleaned of `[GOAL:]` tags before task creation.
+
+**Future consideration:** The sanitizer pipeline could be augmented by a distilled CoreML classifier (~0.62M params, ~0.4ms inference) for semantic quality scoring. See `isUsableContent()` in the module for details.
+
+---
+
+### **Idle Reflection Grounding and Dedup**
+
+**Module:** `packages/cognition/src/thought-generator.ts`
+
+Idle reflections use a **structured fact block** (`buildIdleSituation`) that always emits all environment facts, even when values are normal/default:
+
+```
+I am a Minecraft bot in survival mode.
+Health: 20/20. Food: 20/20.
+Biome: plains. Time: early morning (tick 1154). Weather: clear.
+Position: (68, 63, -102) on the surface.
+Empty inventory.
+No hostile mobs nearby. No passive mobs nearby.
+Water source nearby. Ore deposits nearby (1).
+```
+
+The system prompt includes: *"You must mention at least two facts from the situation. Do not invent locations, objects, or conditions not described above."*
+
+**Post-generation grounding check** (`checkGrounding`): Verifies the LLM output references at least 2 fact tokens from the situation (biome name, health value, time-of-day keyword, etc.). If the check fails, a deterministic template fallback is used — no LLM retry (avoids cost spiral).
+
+**Edge-triggered dedup** (`computeSituationSignature`): Banded situation signatures hash `biome:timeOfDayBand:healthBand:foodBand:threatBand:inventoryBand`. If the same signature appeared in the last 2 reflections, generation is skipped entirely. This prevents repetitive idle themes from identical-enough states.
+
 ### **Integration with Cognitive Architecture**
 
-The dynamic thought generation system integrates seamlessly with the existing cognitive architecture:
+The dynamic thought generation system integrates with the existing cognitive architecture:
 
 1. **Real-Time Context Integration**: World state from Sensorimotor Interface feeds directly into thought generation
 2. **Memory System Connection**: Enhanced Memory System provides historical context and recommendations
-3. **Planning System Integration**: Generated thoughts are processed by the Cognitive Thought Processor and converted to tasks
+3. **Planning System Integration**: Generated thoughts are processed by the thought-to-task converter (reading `metadata.extractedGoal`) and routed to Sterling solvers for plan generation
 4. **Learning Loop**: Generated thoughts are stored back to memory for future reference
+5. **Single Sanitization Boundary**: All LLM output crosses the sanitizer before reaching any consumer; downstream code reads structured metadata, never raw text
 
 ### **Performance Characteristics**
 

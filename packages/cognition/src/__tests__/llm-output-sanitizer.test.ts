@@ -8,6 +8,8 @@ import {
   stripTrailingGarbage,
   normalizeWhitespace,
   isUsableContent,
+  hasCodeLikeDensity,
+  CANONICAL_ACTIONS,
 } from '../llm-output-sanitizer';
 
 /**
@@ -160,12 +162,22 @@ describe('extractGoalTag', () => {
     expect(result.goal!.amount).toBe(1);
   });
 
-  it('handles split goal: [GOAL: action] target', () => {
+  it('fail-closed on split goal with no target inside brackets: [GOAL: find] text', () => {
+    // The bounded-scan parser requires target tokens inside the brackets.
+    // `[GOAL: find]` has action only — fail-closed (no goal).
+    // rawGoalTag preserved for debugging.
     const input = '[GOAL: find] shelter';
+    const result = extractGoalTag(input);
+    expect(result.goal).toBeNull();
+    expect(result.rawGoalTag).toBe('[GOAL: find]');
+  });
+
+  it('parses goal with target inside brackets', () => {
+    const input = '[GOAL: find shelter]';
     const result = extractGoalTag(input);
     expect(result.goal).not.toBeNull();
     expect(result.goal!.action).toBe('find');
-    expect(result.goal!.target).toContain('shelter');
+    expect(result.goal!.target).toBe('shelter');
   });
 
   it('returns null goal when no goal tag present', () => {
@@ -428,5 +440,138 @@ describe('sanitizeLLMOutput', () => {
   it('handles whitespace-only input', () => {
     const result = sanitizeLLMOutput('   \n\t  ');
     expect(result.text).toBe('');
+  });
+
+  it('populates goalTagV1 with version and raw fields', () => {
+    const result = sanitizeLLMOutput('I should mine stone. [GOAL: mine stone 16]');
+    expect(result.goalTagV1).not.toBeNull();
+    expect(result.goalTagV1!.version).toBe(1);
+    expect(result.goalTagV1!.action).toBe('mine');
+    expect(result.goalTagV1!.target).toBe('stone');
+    expect(result.goalTagV1!.amount).toBe(16);
+    expect(result.goalTagV1!.raw).toBe('[GOAL: mine stone 16]');
+  });
+
+  it('sets hadCodeContent flag for code-like output', () => {
+    const codeOutput = `import os\nfrom collections import defaultdict\ndef main():\n    data = {}\n    for item in items:\n        process(item)`;
+    const result = sanitizeLLMOutput(codeOutput);
+    expect(result.flags.hadCodeContent).toBe(true);
+  });
+
+  it('sets rawGoalTag when action is unknown (fail-closed)', () => {
+    const result = sanitizeLLMOutput('Something [GOAL: teleport spawn]');
+    expect(result.goalTag).toBeNull();
+    expect(result.flags.rawGoalTag).toBe('[GOAL: teleport spawn]');
+  });
+
+  it('handles trailing amount after closing bracket', () => {
+    const result = sanitizeLLMOutput('Time to mine. [GOAL: craft oak_planks] 20');
+    expect(result.goalTag).not.toBeNull();
+    expect(result.goalTag!.action).toBe('craft');
+    expect(result.goalTag!.target).toBe('oak_planks');
+    expect(result.goalTag!.amount).toBe(20);
+  });
+});
+
+// ============================================================================
+// hasCodeLikeDensity
+// ============================================================================
+
+describe('hasCodeLikeDensity', () => {
+  it('returns true for Python code blocks', () => {
+    const code = `import os\nfrom sys import argv\ndef main():\n    data = {}\n    for x in items:\n        print(x)`;
+    expect(hasCodeLikeDensity(code)).toBe(true);
+  });
+
+  it('returns false for short text (fewer than 3 lines)', () => {
+    expect(hasCodeLikeDensity('import os\nprint("hi")')).toBe(false);
+  });
+
+  it('returns false for English prose mentioning "import"', () => {
+    const prose = 'I should import wood from the nearby forest.\nThe logs are plentiful.\nI need shelter before nightfall.';
+    expect(hasCodeLikeDensity(prose)).toBe(false);
+  });
+
+  it('returns true for JavaScript code', () => {
+    const code = `const x = 5;\nlet y = [];\nfunction test() {\n  return x + y;\n}\nif (x > 0) {\n  console.log("done");\n}`;
+    expect(hasCodeLikeDensity(code)).toBe(true);
+  });
+});
+
+// ============================================================================
+// CANONICAL_ACTIONS
+// ============================================================================
+
+describe('CANONICAL_ACTIONS', () => {
+  it('contains expected routable actions', () => {
+    expect(CANONICAL_ACTIONS.has('collect')).toBe(true);
+    expect(CANONICAL_ACTIONS.has('mine')).toBe(true);
+    expect(CANONICAL_ACTIONS.has('craft')).toBe(true);
+    expect(CANONICAL_ACTIONS.has('build')).toBe(true);
+  });
+
+  it('contains expected unroutable actions', () => {
+    expect(CANONICAL_ACTIONS.has('find')).toBe(true);
+    expect(CANONICAL_ACTIONS.has('explore')).toBe(true);
+    expect(CANONICAL_ACTIONS.has('navigate')).toBe(true);
+    expect(CANONICAL_ACTIONS.has('check')).toBe(true);
+    expect(CANONICAL_ACTIONS.has('continue')).toBe(true);
+  });
+
+  it('does not contain unknown actions', () => {
+    expect(CANONICAL_ACTIONS.has('teleport')).toBe(false);
+    expect(CANONICAL_ACTIONS.has('fly')).toBe(false);
+    expect(CANONICAL_ACTIONS.has('destroy')).toBe(false);
+  });
+});
+
+// ============================================================================
+// extractGoalTag — bounded-scan parser edge cases
+// ============================================================================
+
+describe('extractGoalTag (bounded-scan edge cases)', () => {
+  it('normalizes synonym actions via ACTION_NORMALIZE_MAP', () => {
+    const result = extractGoalTag('I need to. [GOAL: dig stone 5]');
+    expect(result.goal).not.toBeNull();
+    expect(result.goal!.action).toBe('mine'); // dig → mine
+    expect(result.goal!.target).toBe('stone');
+    expect(result.goal!.amount).toBe(5);
+  });
+
+  it('rejects unknown actions (fail-closed)', () => {
+    const result = extractGoalTag('Something [GOAL: teleport home]');
+    expect(result.goal).toBeNull();
+    expect(result.rawGoalTag).toBe('[GOAL: teleport home]');
+  });
+
+  it('handles case-insensitive [GOAL: tag', () => {
+    const result = extractGoalTag('Thought [goal: mine iron_ore 3]');
+    expect(result.goal).not.toBeNull();
+    expect(result.goal!.action).toBe('mine');
+    expect(result.goal!.target).toBe('iron_ore');
+    expect(result.goal!.amount).toBe(3);
+  });
+
+  it('handles malformed tag without closing bracket', () => {
+    const result = extractGoalTag('I should [GOAL: build shelter');
+    expect(result.goal).not.toBeNull();
+    expect(result.goal!.action).toBe('build');
+    expect(result.goal!.target).toBe('shelter');
+  });
+
+  it('inner amount takes priority over trailing amount', () => {
+    const result = extractGoalTag('Text [GOAL: build shelter 1] 37');
+    expect(result.goal!.amount).toBe(1);
+  });
+
+  it('trailing amount used when no inner amount', () => {
+    const result = extractGoalTag('Text [GOAL: craft oak_planks] 20');
+    expect(result.goal!.amount).toBe(20);
+  });
+
+  it('handles multi-word targets', () => {
+    const result = extractGoalTag('[GOAL: collect oak log 5]');
+    expect(result.goal!.target).toBe('oak log');
+    expect(result.goal!.amount).toBe(5);
   });
 });

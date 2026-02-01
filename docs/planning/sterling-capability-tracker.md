@@ -63,6 +63,85 @@ These are certifiability gates. Every rig must satisfy all of them before it can
 
 ---
 
+## Goal Action → Rig Routing Reference
+
+This table maps canonical goal actions (from the sanitizer's `CANONICAL_ACTIONS` allowlist) to their requirement kind, target rig, and routability status.
+
+**Contract**: `ROUTABLE_ACTIONS` in `thought-to-task-converter.ts` must be a strict subset of actions that `resolveRequirement` + `routeActionPlan` can handle. Unroutable actions produce no task — they exist for cognitive observability only.
+
+| Canonical Action | Requirement Kind | Rig | Routable | Status |
+|---|---|---|---|---|
+| `collect` | `collect` | Compiler | Yes | Working |
+| `mine` | `mine` | Compiler | Yes | Working |
+| `craft` | `craft` | A (Inventory Transform) | Yes | Working |
+| `build` | `build` | G (Feasibility) | Yes | P0 stub |
+| `gather` | `collect` | Compiler | Yes | Working |
+| `smelt` | `craft` (furnace) | Future: C (Temporal) | Yes (fallback) | Compiler fallback |
+| `repair` | `build` (maintenance) | Future: J (Invariant Maint.) | Yes (fallback) | Rig G fallback |
+| `find` | — | Future: E (Hierarchical) | **No** | Unroutable |
+| `explore` | — | Future: E (Hierarchical) | **No** | Unroutable |
+| `navigate` | — | Future: E (Hierarchical) | **No** | Unroutable |
+| `check` | — | N/A (sensing) | **No** | No task |
+| `continue` | — | N/A (meta-action) | **No** | No task |
+
+---
+
+## P21: Entity belief maintenance and saliency
+
+**Status**: PARTIAL → `p21.a` portable (2 surfaces), `p21.b` certified (1 surface)
+**Closeout**: [p21-closeout-packet.md](./p21-closeout-packet.md)
+
+### Architecture (post capsule-pivots refactor)
+
+P21 is split into two conformance layers:
+
+- **P21-A (Track Maintenance)**: 9 invariants (+ 1 opt-in `id_robustness`) governing adapter-internal state management. Tested via `runP21AConformanceSuite` in `@conscious-bot/testkits`.
+- **P21-B (Emission Protocol)**: 4 invariants governing how deltas are packaged into envelopes. Tested via `runP21BConformanceSuite` in `@conscious-bot/testkits`.
+
+Key extensions:
+- **Belief mode** (`conservative` | `predictive`): conservative mode suppresses risk under uncertainty (current Minecraft behavior); predictive mode allows risk to persist.
+- **`classifyRiskDetailed`**: optional method on `P21RiskClassifier` that decomposes risk into `classificationRisk` and `presenceRisk`, enabling finer-grained conformance assertions.
+- **`hysteresisBudget`**: configurable (was hard-coded to 4); each domain declares its tolerance.
+- **`id_robustness`**: opt-in invariant (INV-10) asserting same class+position with new entityId associates to same trackId. Not yet certified on any surface.
+
+### What's done
+
+| Item | File | Evidence |
+|------|------|----------|
+| Capsule types (domain-agnostic) | `sterling/primitives/p21/p21-capsule-types.ts` | Zero Minecraft imports; P21-A/P21-B split; `P21BeliefMode`, `P21RiskDetail`, `P21EmissionAdapter` |
+| Reference fixtures (2 domains) | `sterling/primitives/p21/p21-reference-fixtures.ts` | Mob-domain + security-monitoring |
+| P21-A conformance suite (9+1 invariants) | `@conscious-bot/testkits/src/p21/p21a-conformance-suite.ts` | Parameterized test factory; mode-aware monotonicity; configurable hysteresis |
+| P21-B conformance suite (4 invariants) | `@conscious-bot/testkits/src/p21/p21b-conformance-suite.ts` | delta_budget, envelope_determinism, producer_validation, snapshot_cadence |
+| Contract drift detector | `sterling/primitives/p21/p21-contract-equivalence.test.ts` | YAML↔capsule shape match |
+| Minecraft adapter (P21-A) | `entity-belief/__tests__/p21-conformance-minecraft.test.ts` | Passes all 9 P21-A invariants (conservative mode, hysteresisBudget=4) |
+| Minecraft adapter (P21-B) | `entity-belief/__tests__/p21b-conformance-minecraft.test.ts` | Passes all 4 P21-B invariants (deltaCap=32, snapshotIntervalTicks=25) |
+| Reference Security adapter (P21-A) | `testkits/src/p21/__tests__/p21a-reference-security.test.ts` | Second surface: 9 P21-A invariants (security domain, conservative mode) |
+| Type equivalence | `entity-belief/__tests__/p21-type-equivalence.test.ts` | ThreatLevel ↔ P21RiskLevel, RiskClassifier ↔ P21RiskClassifier |
+| Import guard | `testkits/src/__tests__/no-production-import.test.ts` | Prevents testkits imports in production code |
+| Boundary milestone | `entity-belief/__tests__/p21-boundary-milestone.test.ts` | 12 DOD tests |
+
+### Field name mapping (capsule <-> rig)
+
+| Capsule (domain-agnostic) | Rig (Minecraft) |
+|---------------------------|-----------------|
+| `proximityBucket` | `distBucket` |
+| `riskLevel` | `threatLevel` |
+| `riskClasses` | `HOSTILE_KINDS` |
+| `classifyRisk` | `classifyThreat` |
+| `entityId` | `engineId` |
+| `classEnum` | `kindEnum` |
+| `classLabel` | `kind` |
+
+### What's needed for "portable" claim
+
+- [x] At least one non-Minecraft adapter passes the P21-A conformance suite — Reference Security Domain (Tranche 2)
+- [x] P21-B Minecraft emission adapter (wrapping BeliefBus) wired to `runP21BConformanceSuite` — (Tranche 2)
+- [ ] `SterlingDomainDeclaration.implementsPrimitives` wired for runtime P21 claim
+- [ ] `id_robustness` (INV-10) certified on at least one surface
+- [ ] Extensions (`risk_components_v1`, `predictive_model`) certified on at least one surface
+
+---
+
 ## Next milestones (post Rig A certification)
 
 These are the highest-leverage follow-ons implied by the A.5 baseline + interpretation pass. They are intentionally separated from "Rig done" criteria so we don't accidentally certify "stability" as "learning efficacy."

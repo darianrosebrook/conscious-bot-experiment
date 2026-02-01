@@ -20,6 +20,11 @@ import {
   ObservationPayload,
   ObservationInsight,
 } from './environmental/observation-reasoner';
+import {
+  applySaliencyEnvelope,
+  createSaliencyReasonerState,
+  type BeliefStreamEnvelope,
+} from './environmental/saliency-reasoner';
 
 /**
  * Cognitive Stream Logger
@@ -231,6 +236,9 @@ const observationReasoner = new ObservationReasoner(llmInterface, {
   disabled: process.env.COGNITION_LLM_OBSERVATION_DISABLED === 'true',
   timeoutMs: observationTimeoutMs,
 });
+
+// Saliency reasoner state (replaces per-entity LLM observation calls)
+const saliencyState = createSaliencyReasonerState();
 
 /**
  * Observation queue: serialize LLM calls and cull stale.
@@ -802,9 +810,35 @@ const reactArbiter = new ReActArbiter({
 
 // Import enhanced components
 import { EnhancedThoughtGenerator } from './thought-generator';
+import {
+  getInteroState,
+  halveStressAxes,
+  setStressAxes,
+  decayStressAxes,
+  updateStressFromIntrusion,
+} from './interoception-store';
+import { logStressAtBoundary } from './stress-boundary-logger';
+import {
+  recordInteroSnapshot,
+  getInteroHistory,
+  loadInteroHistory,
+  getInteroHistorySummary,
+} from './intero-history';
+import {
+  buildWorldStateSnapshot,
+  computeStressAxes,
+  blendAxes,
+  buildStressContext,
+} from './stress-axis-computer';
 import { IntrusiveThoughtProcessor } from './intrusive-thought-processor';
 import { SocialAwarenessManager } from './social-awareness-manager';
 import { SocialMemoryManager } from '../../memory/src/social/social-memory-manager';
+
+// Spawn position and timing counters for stress axis computation
+let spawnPosition: { x: number; y: number; z: number } | null = null;
+let msSinceLastRest = 0;
+let msSinceLastProgress = 0;
+const THOUGHT_CYCLE_MS = 60000;
 
 // Initialize enhanced thought generator
 const enhancedThoughtGenerator = new EnhancedThoughtGenerator({
@@ -872,6 +906,9 @@ const cognitionSystem = {
 // Store cognitive thoughts for external access
 let cognitiveThoughts: any[] = [];
 
+// Regex to strip residual [GOAL:...] tags (and optional trailing amount) from display text
+const GOAL_TAG_STRIP = /\s*\[GOAL:[^\]]*\](?:\s*\d+\w*)?/gi;
+
 // Function to send thoughts to cognitive stream
 async function sendThoughtToCognitiveStream(thought: any) {
   try {
@@ -884,7 +921,11 @@ async function sendThoughtToCognitiveStream(thought: any) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           type: thought.type || 'reflection',
-          content: thought.content,
+          content: thought.content,                          // raw sanitized text (may contain failed tags)
+          displayContent: (thought.content || '')            // UI-safe version: strip any residual tags
+            .replace(GOAL_TAG_STRIP, '').trim(),
+          extractedGoal: thought.metadata?.extractedGoal || null,  // structured goal for routing
+          sanitizationFlags: thought.metadata?.sanitizationFlags || null,
           attribution: 'self',
           context: {
             emotionalState: thought.context?.emotionalState || 'neutral',
@@ -959,16 +1000,61 @@ function startThoughtGeneration() {
       const botState = botRes?.ok ? await botRes.json() : null;
       const planningState = planningRes?.ok ? await planningRes.json() : null;
 
-      const currentState = (botState as any)?.data || {};
+      // botState.data is convertedState: { worldState, status, data: {pos,health,food,inventory,...env}, isAlive }
+      // Flatten inner data (which has environment fields after wiring fix) into currentState
+      const rawState = (botState as any)?.data || {};
+      const innerData = rawState.data || {};
+      // Normalize inventory: server sends { items, totalSlots, usedSlots }, thought generator expects Array
+      const rawInventory = innerData.inventory;
+      const inventory = Array.isArray(rawInventory) ? rawInventory
+        : Array.isArray(rawInventory?.items) ? rawInventory.items
+        : [];
+      const currentState = {
+        ...innerData,
+        inventory,
+        timeOfDay: innerData.timeOfDay,
+        weather: innerData.weather,
+        biome: innerData.biome,
+        dimension: innerData.dimension,
+        nearbyHostiles: innerData.nearbyHostiles,
+        nearbyPassives: innerData.nearbyPassives,
+        nearbyLogs: innerData.nearbyLogs,
+        nearbyOres: innerData.nearbyOres,
+        nearbyWater: innerData.nearbyWater,
+      };
       const currentTasks = (planningState as any)?.state?.tasks?.current || [];
       const recentEvents = (botState as any)?.data?.recentEvents || [];
+
+      // Compute and blend stress axes from world state
+      if (botState) {
+        const snapshot = buildWorldStateSnapshot(
+          botState,
+          spawnPosition,
+          { msSinceLastRest, msSinceLastProgress }
+        );
+        const computed = computeStressAxes(snapshot);
+        const blended = blendAxes(getInteroState().stressAxes, computed);
+        setStressAxes(blended);
+        decayStressAxes();
+      }
+      msSinceLastRest += THOUGHT_CYCLE_MS;
+      msSinceLastProgress += THOUGHT_CYCLE_MS;
+
+      const compositeStress = getInteroState().stress;
+      const emotionalState = compositeStress > 60 ? 'uneasy' : compositeStress > 35 ? 'attentive' : 'neutral';
+
+      // Record intero snapshot for history/evaluation dashboard
+      recordInteroSnapshot(getInteroState(), emotionalState);
+
+      const stressCtx = buildStressContext(getInteroState().stressAxes);
 
       await enhancedThoughtGenerator.generateThought({
         currentState,
         currentTasks,
         recentEvents,
-        emotionalState: 'neutral',
+        emotionalState,
         memoryContext: {},
+        stressContext: stressCtx || undefined,
       });
     } catch (error) {
       console.error('Error generating periodic thought:', error);
@@ -1484,12 +1570,95 @@ app.get('/state', (req, res) => {
         agentModels: cognitionSystem.socialCognition.getAgentCount(),
         relationships: cognitionSystem.socialCognition.getRelationshipCount(),
       },
+      intero: getInteroState(),
     };
 
     res.json(state);
   } catch (error) {
     console.error('Error getting cognition state:', error);
     res.status(500).json({ error: 'Failed to get cognition state' });
+  }
+});
+
+// Halve stress axes (e.g. after sleep or respawn at bed)
+app.post('/stress/reset', (req, res) => {
+  try {
+    const body = req.body || {};
+    if (body.spawnPosition && typeof body.spawnPosition === 'object') {
+      spawnPosition = {
+        x: body.spawnPosition.x ?? 0,
+        y: body.spawnPosition.y ?? 64,
+        z: body.spawnPosition.z ?? 0,
+      };
+    }
+    msSinceLastRest = 0;
+    halveStressAxes();
+    res.json({ intero: getInteroState() });
+  } catch (error) {
+    console.error('Error resetting stress:', error);
+    res.status(500).json({ error: 'Failed to reset stress' });
+  }
+});
+
+// Interoception history for evaluation dashboard
+app.get('/intero/history', (req, res) => {
+  const since = parseInt(req.query.since as string) || 0;
+  const limit = Math.min(parseInt(req.query.limit as string) || 300, 1800);
+  res.json({
+    success: true,
+    snapshots: getInteroHistory(since, limit),
+    summary: getInteroHistorySummary(),
+    currentIntero: getInteroState(),
+  });
+});
+
+// Stress boundary decision stats for evaluation dashboard
+app.get('/intero/boundary-stats', (req, res) => {
+  try {
+    const fs = require('fs');
+    const logPath = process.env.STRESS_BOUNDARY_LOG_PATH || 'stress-boundary.log';
+    const eventCounts: Record<string, number> = {
+      observation_thought: 0,
+      intrusion_accept: 0,
+      intrusion_resist: 0,
+      task_selected: 0,
+    };
+    let totalEvents = 0;
+
+    try {
+      if (fs.existsSync(logPath)) {
+        const raw = fs.readFileSync(logPath, 'utf-8');
+        const lines = raw.split('\n').filter((l: string) => l.trim());
+        for (const line of lines) {
+          try {
+            const entry = JSON.parse(line);
+            if (entry.event && eventCounts[entry.event] !== undefined) {
+              eventCounts[entry.event]++;
+              totalEvents++;
+            }
+          } catch {
+            // Skip malformed lines
+          }
+        }
+      }
+    } catch {
+      // Log file unreadable
+    }
+
+    const accepts = eventCounts.intrusion_accept;
+    const resists = eventCounts.intrusion_resist;
+    const acceptResistRatio =
+      accepts + resists > 0 ? accepts / (accepts + resists) : 0;
+
+    res.json({
+      success: true,
+      totalEvents,
+      eventCounts,
+      acceptResistRatio: Math.round(acceptResistRatio * 100) / 100,
+    });
+  } catch (error) {
+    console.error('Error reading boundary stats:', error);
+    res.status(500).json({ error: 'Failed to read boundary stats' });
   }
 });
 
@@ -1581,6 +1750,38 @@ app.post('/thoughts', (req, res) => {
   }
 });
 
+/** Consideration step: ask bot to accept or resist thought; bias default accept. */
+async function runConsiderationStep(
+  content: string,
+  llm: LLMInterface
+): Promise<'accept' | 'resist'> {
+  const stressCtx = buildStressContext(getInteroState().stressAxes);
+  const contextLine = stressCtx ? `\nCurrent situation: ${stressCtx}` : '';
+  const prompt = `You had the thought: ${content.slice(0, 500)}.${contextLine} Do you want to act on it (accept) or dismiss it (resist)? Reply with only one word: accept or resist. If unsure, reply accept.`;
+  try {
+    const response = await llm.generateResponse(prompt, undefined, {
+      maxTokens: 32,
+      temperature: 0.3,
+    });
+    const text = (
+      response?.text ??
+      (response as { content?: string })?.content ??
+      ''
+    )
+      .trim()
+      .toLowerCase();
+    if (/resist/.test(text) && !/accept/.test(text)) return 'resist';
+    if (/resist/.test(text) && /accept/.test(text)) {
+      const resistPos = text.indexOf('resist');
+      const acceptPos = text.indexOf('accept');
+      return resistPos < acceptPos ? 'resist' : 'accept';
+    }
+    return 'accept';
+  } catch {
+    return 'accept';
+  }
+}
+
 // Process cognitive task
 app.post('/process', async (req, res) => {
   try {
@@ -1589,9 +1790,46 @@ app.post('/process', async (req, res) => {
     logObservation(`Processing ${type} request`, { content, metadata });
 
     if (type === 'intrusion') {
+      const considerationEnabled =
+        process.env.ENABLE_CONSIDERATION_STEP === 'true';
+      if (considerationEnabled) {
+        const decision = await runConsiderationStep(content, llmInterface);
+        if (decision === 'resist') {
+          logStressAtBoundary('intrusion_resist', {
+            thoughtSummary: 'Dismissed',
+          });
+          res.json({
+            processed: false,
+            type: 'intrusion',
+            response: 'Dismissed',
+            thought: null,
+            timestamp: Date.now(),
+            recorded: true,
+          });
+          return;
+        }
+      }
+
       // Use enhanced intrusive thought processor to generate internal thought
       const result =
         await intrusiveThoughtProcessor.processIntrusiveThought(content);
+
+      updateStressFromIntrusion({
+        accepted: result.accepted,
+        task: result.task,
+      });
+
+      logStressAtBoundary(
+        result.accepted ? 'intrusion_accept' : 'intrusion_resist',
+        {
+          thoughtSummary: result.response?.slice(0, 200),
+        }
+      );
+      if (result.accepted && result.task) {
+        logStressAtBoundary('task_selected', {
+          actionSummary: result.task.title?.slice(0, 200),
+        });
+      }
 
       // Send the generated internal thought to the cognitive stream with self attribution
       if (result.thought) {
@@ -1649,6 +1887,85 @@ app.post('/process', async (req, res) => {
         timestamp: Date.now(),
       });
     } else if (type === 'environmental_awareness') {
+      // Route belief-stream envelopes to saliency reasoner (no per-entity LLM call)
+      if (req.body?.request_version === 'saliency_delta') {
+        try {
+          const envelope = req.body as BeliefStreamEnvelope;
+          const insight = applySaliencyEnvelope(envelope, saliencyState);
+
+          if (!insight.processed) {
+            res.json({
+              processed: false,
+              type: 'environmental_awareness',
+              reason: 'out_of_order',
+              timestamp: Date.now(),
+            });
+            return;
+          }
+
+          // Stream non-empty awareness to dashboard
+          if (insight.thought.text !== 'No significant entities nearby.') {
+            const dashboardUrl =
+              process.env.DASHBOARD_ENDPOINT || 'http://localhost:3000';
+            const internalThought = {
+              type: 'environmental',
+              content: insight.thought.text,
+              attribution: 'self',
+              context: {
+                emotionalState: insight.actions.shouldRespond ? 'alert' : 'aware',
+                confidence: insight.thought.confidence,
+                cognitiveSystem: 'saliency-reasoner',
+              },
+              metadata: {
+                thoughtType: 'environmental',
+                source: 'saliency',
+                trackCount: insight.trackCount,
+                deltaCount: insight.deltaCount,
+              },
+              id: `thought-${Date.now()}-sal-${envelope.seq}`,
+              timestamp: Date.now(),
+              processed: true,
+            };
+
+            await resilientFetch(
+              `${dashboardUrl}/api/ws/cognitive-stream`,
+              {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(internalThought),
+                label: 'dashboard/cognitive-stream-saliency',
+              }
+            );
+          }
+
+          res.json({
+            processed: true,
+            type: 'environmental_awareness',
+            thought: insight.thought,
+            actions: insight.actions,
+            fallback: false,
+            shouldRespond: insight.actions.shouldRespond,
+            response: insight.actions.response ?? '',
+            shouldCreateTask: false,
+            taskSuggestion: undefined,
+            trackCount: insight.trackCount,
+            deltaCount: insight.deltaCount,
+            timestamp: Date.now(),
+          });
+          return;
+        } catch (error) {
+          console.error('[SaliencyReasoner] Error processing envelope:', error);
+          res.json({
+            processed: false,
+            type: 'environmental_awareness',
+            error: error instanceof Error ? error.message : 'Unknown error',
+            timestamp: Date.now(),
+          });
+          return;
+        }
+      }
+
+      // Legacy path: per-entity observation processing
       // Process environmental awareness (entity detection, events, etc.)
       logObservation('Processing environmental awareness', {
         content,
@@ -1888,37 +2205,72 @@ app.post('/process', async (req, res) => {
         const message = metadata?.message?.toLowerCase() || '';
         const sender = metadata?.sender || 'unknown';
 
-        // Only respond to direct questions or important messages
-        if (message.includes('?')) {
-          // This is a question - respond
+        if (message.includes('danger') || message.includes('threat')) {
+          // Immediate safety concern — latency-critical, no LLM round-trip
           shouldRespond = true;
-          response = `I'm processing your question about "${message}". Let me think about that.`;
-          shouldCreateTask = true;
-          taskSuggestion = `Answer question from ${sender}: "${message}"`;
-        } else if (message.includes('help') || message.includes('assist')) {
-          // Direct request for help
-          shouldRespond = true;
-          response = `I can help with exploration, resource gathering, and various tasks. What specifically do you need?`;
-          shouldCreateTask = true;
-          taskSuggestion = `Provide assistance requested by ${sender}`;
-        } else if (message.includes('danger') || message.includes('threat')) {
-          // Immediate safety concern
-          shouldRespond = true;
-          response = `I understand there's a safety concern. I'm monitoring the situation.`;
+          response = 'On it -- checking the area now.';
           shouldCreateTask = true;
           taskSuggestion = `Address safety concern from ${sender}`;
-        } else if (
-          message.length < 10 &&
-          (message.includes('hello') || message.includes('hi'))
-        ) {
-          // Short greeting - respond occasionally
-          shouldRespond = Math.random() < 0.4; // 40% chance
-          if (shouldRespond) {
-            response = `Hello! I'm currently focused on my tasks, but I noticed your greeting.`;
+        } else if (message.includes('?')) {
+          // Question — use LLM for a natural answer
+          shouldRespond = true;
+          shouldCreateTask = true;
+          taskSuggestion = `Answer question from ${sender}: "${message}"`;
+          try {
+            const llmResult = await llmInterface.generateSocialResponse(
+              metadata?.message || message,
+              { sender },
+            );
+            response = llmResult.text || 'Hmm, let me think about that...';
+          } catch {
+            response = 'Hmm, let me think about that...';
           }
-          shouldCreateTask = false; // Don't create tasks for casual greetings
+        } else if (message.includes('help') || message.includes('assist')) {
+          // Help request — use LLM
+          shouldRespond = true;
+          shouldCreateTask = true;
+          taskSuggestion = `Provide assistance requested by ${sender}`;
+          try {
+            const llmResult = await llmInterface.generateSocialResponse(
+              metadata?.message || message,
+              { sender },
+            );
+            response = llmResult.text || 'Sure, what do you need?';
+          } catch {
+            response = 'Sure, what do you need?';
+          }
+        } else if (
+          message.length < 15 &&
+          (message.includes('hello') || message.includes('hi') || message.includes('hey'))
+        ) {
+          // Short greeting — 60% respond, of those 50/50 template vs LLM
+          shouldRespond = Math.random() < 0.6;
+          if (shouldRespond) {
+            const greetingTemplates = [
+              `Hey ${sender}!`,
+              'Oh, hi there!',
+              'Hey! What\'s going on?',
+              `Yo ${sender}.`,
+              'Oh hey, didn\'t see you there.',
+            ];
+            const useLLM = Math.random() < 0.5;
+            if (useLLM) {
+              try {
+                const llmResult = await llmInterface.generateSocialResponse(
+                  metadata?.message || message,
+                  { sender },
+                );
+                response = llmResult.text || greetingTemplates[Math.floor(Math.random() * greetingTemplates.length)];
+              } catch {
+                response = greetingTemplates[Math.floor(Math.random() * greetingTemplates.length)];
+              }
+            } else {
+              response = greetingTemplates[Math.floor(Math.random() * greetingTemplates.length)];
+            }
+          }
+          shouldCreateTask = false;
         }
-        // For other messages, stay silent - don't spam responses
+        // For other messages, stay silent — don't spam responses
 
         res.json({
           processed: true,
@@ -2085,9 +2437,7 @@ app.post('/process', async (req, res) => {
           memorySummaries: [],
         });
 
-        const responseText =
-          response.thoughts ||
-          `What now?`;
+        const responseText = response.thoughts || `What now?`;
 
         // Generate cognitive thoughts about the interaction
         const cognitiveThought = await enhancedThoughtGenerator.generateThought(
@@ -3201,6 +3551,9 @@ app.listen(port, () => {
     });
 
   console.log(startupMessage);
+
+  // Load persisted interoception history from previous sessions
+  loadInteroHistory();
 
   // One-off LLM backend health check so operators see MLX/Ollama connectivity
   setTimeout(() => {

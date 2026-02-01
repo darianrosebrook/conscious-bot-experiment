@@ -1,6 +1,10 @@
 /**
  * Thought-to-task conversion: extract action type, title, and parameters
- * from cognitive stream thoughts. Actionable-word filtering and LLM fallback.
+ * from cognitive stream thoughts.
+ *
+ * Architecture principle: The sanitizer (llm-output-sanitizer.ts) is the single
+ * deterministic boundary for goal extraction. This module reads structured
+ * metadata (extractedGoal) — it never re-parses goal tags from raw text.
  *
  * @author @darianrosebrook
  */
@@ -8,6 +12,31 @@
 import type { Task } from '../types/task';
 import type { CognitiveStreamThought } from '../modules/cognitive-stream-client';
 import { parseRequiredQuantityFromTitle } from '../modules/requirements';
+
+// Import shared parser from cognition boundary — no local regex fork
+import type { GoalTagV1 } from '@conscious-bot/cognition';
+
+/**
+ * Routable actions — strict subset of CANONICAL_ACTIONS that resolveRequirement + routeActionPlan can handle.
+ * Unroutable actions (find, explore, navigate, check, continue) exist for cognitive observability only.
+ */
+const ROUTABLE_ACTIONS = new Set([
+  'collect', 'mine', 'craft', 'build', 'gather', 'smelt', 'repair',
+]);
+
+/** Maps routable canonical actions to task types */
+const ACTION_TO_TASK_TYPE: Record<string, string> = {
+  collect: 'gathering',
+  mine: 'mining',
+  craft: 'crafting',
+  build: 'building',
+  gather: 'gathering',
+  smelt: 'crafting',
+  repair: 'building',
+};
+
+/** Regex to strip residual [GOAL:...] tags (and optional trailing amount) from display text */
+const GOAL_TAG_STRIP = /\s*\[GOAL:[^\]]*\](?:\s*\d+\w*)?/gi;
 
 export function extractActionTitle(
   content: string,
@@ -78,97 +107,6 @@ export function calculateTaskUrgency(thought: CognitiveStreamThought): number {
   return Math.min(1.0, urgency);
 }
 
-const VALID_TARGETS = new Set([
-  'oak_log',
-  'birch_log',
-  'spruce_log',
-  'iron_ore',
-  'cobblestone',
-  'diamond_ore',
-  'coal_ore',
-  'stone',
-  'wooden_pickaxe',
-  'stone_pickaxe',
-  'iron_pickaxe',
-  'crafting_table',
-  'wooden_axe',
-  'wooden_sword',
-  'furnace',
-  'chest',
-  'oak_planks',
-  'stick',
-]);
-
-/**
- * Extract structured intent from ambiguous thought text via local LLM.
- * Returns null on failure or when MLX sidecar is unavailable.
- */
-export async function extractStructuredIntent(content: string): Promise<{
-  kind: 'collect' | 'mine' | 'craft' | 'build';
-  target: string;
-  quantity: number;
-} | null> {
-  const VALID_KINDS = new Set(['collect', 'mine', 'craft', 'build']);
-
-  type StructuredIntent = {
-    kind: 'collect' | 'mine' | 'craft' | 'build';
-    target: string;
-    quantity: number;
-  };
-  const validateParsed = (parsed: any): StructuredIntent | null => {
-    if (!parsed.kind || !parsed.target) return null;
-    const normalizedTarget = String(parsed.target)
-      .toLowerCase()
-      .trim()
-      .replace(/['"]/g, '')
-      .replace(/\s+/g, '_');
-    if (!VALID_KINDS.has(parsed.kind)) return null;
-    if (!VALID_TARGETS.has(normalizedTarget)) return null;
-    const qty =
-      typeof parsed.quantity === 'number' && parsed.quantity > 0
-        ? parsed.quantity
-        : 1;
-    return { kind: parsed.kind, target: normalizedTarget, quantity: qty };
-  };
-
-  try {
-    const { LLMInterface } = await import('@conscious-bot/cognition');
-    const llm = new LLMInterface({
-      temperature: 0.1,
-      maxTokens: 80,
-      timeout: 3000,
-      retries: 0,
-    });
-    const response = await llm.generateResponse(
-      `Extract the Minecraft goal from this thought. Reply with ONLY valid JSON, nothing else.
-Valid kinds: collect, mine, craft, build
-Valid targets: ${[...VALID_TARGETS].join(', ')}
-
-Thought: "${content}"
-
-Reply with exactly: {"kind":"...","target":"...","quantity":N}`
-    );
-    const text = (response.text || '').trim();
-    try {
-      const result = validateParsed(JSON.parse(text));
-      if (result) return result;
-    } catch {
-      const match = text.match(/\{[^}]+\}/);
-      if (match) {
-        try {
-          const result = validateParsed(JSON.parse(match[0]));
-          if (result) return result;
-        } catch {
-          /* malformed */
-        }
-      }
-    }
-  } catch {
-    /* MLX sidecar unavailable */
-  }
-  return null;
-}
-
 export interface ConvertThoughtToTaskDeps {
   addTask: (taskData: Partial<Task>) => Promise<Task>;
   markThoughtAsProcessed: (thoughtId: string) => Promise<void>;
@@ -176,9 +114,35 @@ export interface ConvertThoughtToTaskDeps {
   trimSeenThoughtIds: () => void;
 }
 
+/** Recent goal hashes for 5-minute dedup window */
+const recentGoalHashes = new Map<string, number>();
+const GOAL_DEDUP_WINDOW_MS = 5 * 60 * 1000;
+
+function isGoalDuplicate(goal: GoalTagV1): boolean {
+  const hash = `${goal.action}:${goal.target}:${goal.amount ?? ''}`;
+  const now = Date.now();
+  const lastSeen = recentGoalHashes.get(hash);
+  if (lastSeen && now - lastSeen < GOAL_DEDUP_WINDOW_MS) {
+    return true;
+  }
+  recentGoalHashes.set(hash, now);
+  // Clean old entries
+  if (recentGoalHashes.size > 50) {
+    for (const [key, ts] of recentGoalHashes) {
+      if (now - ts > GOAL_DEDUP_WINDOW_MS) recentGoalHashes.delete(key);
+    }
+  }
+  return false;
+}
+
 /**
  * Convert a cognitive thought to a planning task.
- * Applies actionable-word filtering and dedup; returns null if skipped.
+ *
+ * Primary path: reads `thought.metadata.extractedGoal` (populated by sanitizer).
+ * Fallback: keyword-based classification from content.
+ * No LLM fallback — the sanitizer is the single boundary.
+ *
+ * Fail-closed: unroutable actions (find, explore, navigate, check, continue) → null.
  */
 export async function convertThoughtToTask(
   thought: CognitiveStreamThought,
@@ -204,34 +168,29 @@ export async function convertThoughtToTask(
       deps.trimSeenThoughtIds();
     }
 
-    const content = thought.content.toLowerCase();
-    const tail = thought.content.slice(-100);
-    const goalMatch = tail.match(
-      /\[GOAL:\s*(collect|mine|craft|build)\s+([\w]+)(?:\s+(\d+))?\]/i
-    );
+    // Primary path: use structured extractedGoal from sanitizer
+    const extractedGoal = thought.metadata?.extractedGoal as GoalTagV1 | undefined;
 
     let actionType = 'general';
     let taskTitle = thought.content;
     let taskDescription = thought.content;
 
-    if (goalMatch) {
-      const [, kind] = goalMatch;
-      const kindLower = (kind || '').toLowerCase() as
-        | 'collect'
-        | 'mine'
-        | 'craft'
-        | 'build';
-      const kindToType: Record<string, string> = {
-        collect: 'gathering',
-        mine: 'mining',
-        craft: 'crafting',
-        build: 'building',
-      };
-      actionType = kindToType[kindLower] || 'general';
-      taskTitle = extractActionTitle(content, kindLower);
-    }
+    if (extractedGoal && extractedGoal.action) {
+      // Goal acceptance gate: must be routable
+      if (!ROUTABLE_ACTIONS.has(extractedGoal.action)) {
+        return null; // fail-closed: don't create task for unroutable actions
+      }
 
-    if (!goalMatch) {
+      // Goal dedup: skip if same goal was created recently
+      if ('version' in extractedGoal && isGoalDuplicate(extractedGoal as GoalTagV1)) {
+        return null;
+      }
+
+      actionType = ACTION_TO_TASK_TYPE[extractedGoal.action] || 'general';
+      taskTitle = extractActionTitle(lower, extractedGoal.action);
+    } else {
+      // Fallback: keyword-based classification (no LLM re-parse)
+      const content = lower;
       if (
         content.includes('gather') ||
         content.includes('collect') ||
@@ -256,13 +215,6 @@ export async function convertThoughtToTask(
         actionType = 'mining';
         taskTitle = extractActionTitle(content, 'mine');
       } else if (
-        content.includes('explore') ||
-        content.includes('search') ||
-        content.includes('scout')
-      ) {
-        actionType = 'exploration';
-        taskTitle = extractActionTitle(content, 'explore');
-      } else if (
         content.includes('farm') ||
         content.includes('plant') ||
         content.includes('harvest')
@@ -270,9 +222,18 @@ export async function convertThoughtToTask(
         actionType = 'farming';
         taskTitle = extractActionTitle(content, 'farm');
       } else {
+        // Truly general — not enough signal for a task
         taskTitle = thought.content;
       }
     }
+
+    // Strip [GOAL:] tags from title and description
+    taskTitle = taskTitle.replace(GOAL_TAG_STRIP, '').trim();
+    taskDescription = taskDescription.replace(GOAL_TAG_STRIP, '').trim();
+
+    // Ensure we have a non-empty title
+    if (!taskTitle) taskTitle = thought.content.replace(GOAL_TAG_STRIP, '').trim();
+    if (!taskTitle) taskTitle = 'Autonomous task';
 
     const parameters: Record<string, any> = {
       thoughtContent: thought.content,
@@ -284,16 +245,18 @@ export async function convertThoughtToTask(
       model: thought.metadata.model,
     };
 
-    if (actionType === 'gathering') {
-      parameters.resourceType = extractResourceType(content);
+    // Build requirement candidate from structured goal or keyword fallback
+    if (extractedGoal && extractedGoal.action && ROUTABLE_ACTIONS.has(extractedGoal.action)) {
+      parameters.requirementCandidate = {
+        kind: extractedGoal.action,
+        outputPattern: extractedGoal.target.replace(/\s+/g, '_'),
+        quantity: extractedGoal.amount ||
+          (extractedGoal.action === 'mine' ? 3 :
+           extractedGoal.action === 'collect' || extractedGoal.action === 'gather' ? 8 : 1),
+        extractionMethod: 'goal-tag',
+      };
     } else if (actionType === 'crafting') {
-      parameters.itemType = extractItemType(content);
-    } else if (actionType === 'mining') {
-      parameters.blockType = extractBlockType(content);
-    }
-
-    if (actionType === 'crafting') {
-      const itemName = extractItemType(content);
+      const itemName = extractItemType(lower);
       if (itemName) {
         parameters.requirementCandidate = {
           kind: 'craft',
@@ -303,7 +266,7 @@ export async function convertThoughtToTask(
         };
       }
     } else if (actionType === 'gathering') {
-      const resource = extractResourceType(content);
+      const resource = extractResourceType(lower);
       if (resource) {
         parameters.requirementCandidate = {
           kind: 'collect',
@@ -313,7 +276,7 @@ export async function convertThoughtToTask(
         };
       }
     } else if (actionType === 'mining') {
-      const blockType = extractBlockType(content);
+      const blockType = extractBlockType(lower);
       if (blockType) {
         parameters.requirementCandidate = {
           kind: 'mine',
@@ -331,37 +294,12 @@ export async function convertThoughtToTask(
       };
     }
 
-    if (goalMatch) {
-      const [, kind, target, qtyStr] = goalMatch;
-      const kindLower = (kind || '').toLowerCase();
-      const qty = qtyStr ? parseInt(qtyStr, 10) : undefined;
-      parameters.requirementCandidate = {
-        kind: kindLower,
-        outputPattern: (target || '').toLowerCase(),
-        quantity:
-          qty || (kindLower === 'mine' ? 3 : kindLower === 'collect' ? 8 : 1),
-        extractionMethod: 'goal-tag',
-      };
-    }
-
-    if (actionType === 'general' && !goalMatch) {
-      const structured = await extractStructuredIntent(thought.content);
-      if (structured) {
-        const kindToType: Record<string, string> = {
-          collect: 'gathering',
-          mine: 'mining',
-          craft: 'crafting',
-          build: 'building',
-        };
-        actionType = kindToType[structured.kind] || actionType;
-        taskTitle = extractActionTitle(content, structured.kind);
-        parameters.requirementCandidate = {
-          kind: structured.kind,
-          outputPattern: structured.target,
-          quantity: structured.quantity,
-          extractionMethod: 'llm-structured',
-        };
-      }
+    if (actionType === 'gathering') {
+      parameters.resourceType = extractResourceType(lower);
+    } else if (actionType === 'crafting') {
+      parameters.itemType = extractItemType(lower);
+    } else if (actionType === 'mining') {
+      parameters.blockType = extractBlockType(lower);
     }
 
     const extractionMethod =

@@ -11,7 +11,6 @@ export {
   extractBlockType,
   calculateTaskPriority,
   calculateTaskUrgency,
-  extractStructuredIntent,
   convertThoughtToTask,
   type ConvertThoughtToTaskDeps,
 } from './thought-to-task-converter';

@@ -163,24 +163,88 @@ flowchart TB
 
 ## LLM Output Sanitization
 
-All LLM responses are sanitized at the `generateResponse()` return boundary in `LLMInterface` before any consumer sees them. This ensures clean text reaches the cognitive stream, planning signal extraction, intrusive thought parsing, and the dashboard.
+All LLM responses are sanitized at the `generateResponse()` return boundary in `LLMInterface` before any consumer sees them. This is the **single deterministic sanitization boundary** — downstream code never re-parses goal tags from raw text; it reads structured metadata (`extractedGoal`, `sanitizationFlags`).
 
 **Module:** `packages/cognition/src/llm-output-sanitizer.ts`
 
 **Pipeline (applied in order):**
-1. **Strip code fences** — Removes `` ``` `` / `` ```lang `` wrappers the LLM sometimes emits
-2. **Strip system prompt leaks** — Removes regurgitated prompt fragments ("You are my private inner thought...")
-3. **Extract goal tag** — Parses `[GOAL: action target amount]` into structured `GoalTag`; removes tag from text
-4. **Truncate degeneration** — Detects trigram repetition (3+) and consecutive identical words (4+); truncates
-5. **Strip trailing garbage** — Removes trailing standalone numbers and incomplete sentence fragments
-6. **Normalize whitespace** — Collapses runs, trims
+1. **Strip wrapping quotes** — Removes balanced/unbalanced `"` / `'` / curly quotes the model sometimes wraps output in
+2. **Strip code fences** — Removes `` ``` `` / `` ```lang `` wrappers the LLM sometimes emits
+3. **Strip system prompt leaks** — Removes regurgitated prompt fragments ("You are my private inner thought...")
+4. **Extract goal tag** — Bounded-scan parser (no regex backtracking): `indexOf('[GOAL:')` → bounded scan for `]` → tokenize inner text → normalize action → allowlist check. Returns structured `GoalTagV1`. Unknown actions → fail-closed (`goal: null`, raw tag preserved in `flags.rawGoalTag`)
+5. **Truncate degeneration** — Detects trigram repetition (3+) and consecutive identical words (4+); truncates
+6. **Strip trailing garbage** — Removes trailing standalone numbers and incomplete sentence fragments
+7. **Normalize whitespace** — Collapses runs, trims
+
+**Quality gate** (`isUsableContent`):
+- Rejects generic filler phrases ("maintaining awareness of surroundings")
+- Rejects **code-like content** via `hasCodeLikeDensity()` — line-by-line scoring for import/def/class statements, brackets, indentation patterns; >40% code-like lines → rejected, `sanitizationFlags.hadCodeContent = true`
+
+**Goal tag extraction:**
+
+The parser uses `CANONICAL_ACTIONS` (12 actions: `collect`, `mine`, `craft`, `build`, `find`, `explore`, `navigate`, `gather`, `check`, `smelt`, `repair`, `continue`) as a strict allowlist. Action normalization runs first (30+ synonyms, e.g. `dig` → `mine`, `make` → `craft`), then the allowlist check. The output is versioned:
+
+```typescript
+interface GoalTagV1 {
+  version: 1;
+  action: string;         // canonical, from CANONICAL_ACTIONS allowlist
+  target: string;         // normalized lowercase
+  amount: number | null;
+  raw: string;            // original tag text for debugging
+}
+```
 
 **Metadata propagation:**
-- `LLMResponse.metadata.extractedGoal` — Structured goal if a `[GOAL:]` tag was found
-- `LLMResponse.metadata.sanitizationFlags` — What was cleaned (code fences, leaks, degeneration, garbage, lengths)
+- `LLMResponse.metadata.extractedGoal` — Structured `GoalTagV1` if a `[GOAL:]` tag was found and parsed successfully
+- `LLMResponse.metadata.sanitizationFlags` — What was cleaned (code fences, leaks, degeneration, garbage, code content, lengths) + `rawGoalTag` for debugging parse failures
 - `CognitiveThought.metadata.extractedGoal` — Plumbed through all 4 thought generation methods
 
+**Cognitive stream payload** (sent to dashboard via `sendThoughtToCognitiveStream` in `server.ts`):
+- `content` — raw sanitized text (may contain residual tags if parsing failed, for debugging)
+- `displayContent` — tag-stripped version for the UI (clean natural language)
+- `extractedGoal` — structured `GoalTagV1` for routing
+- `sanitizationFlags` — full flags for observability
+
 The dashboard's `cleanMarkdownArtifacts()` remains as defense-in-depth but is effectively a no-op on pre-cleaned text.
+
+---
+
+## Thought-to-Task Conversion
+
+**Module:** `packages/planning/src/task-integration/thought-to-task-converter.ts`
+
+The converter reads structured `metadata.extractedGoal` — it never re-parses goal tags from text. There is no LLM fallback for intent extraction.
+
+**Goal acceptance gate:** Only `ROUTABLE_ACTIONS` can produce tasks:
+
+| Canonical Action | Task Type | Routable |
+|---|---|---|
+| `collect`, `gather` | `gathering` | Yes |
+| `mine` | `mining` | Yes |
+| `craft`, `smelt` | `crafting` | Yes |
+| `build`, `repair` | `building` | Yes |
+| `find`, `explore`, `navigate` | — | **No** (unroutable until Rig E lands) |
+| `check`, `continue` | — | **No** (sensing/meta-action) |
+
+Unroutable actions are fail-closed: no task is created, but the thought remains visible in the cognitive stream for observability.
+
+**Dedup:** Goal dedup via content-addressed hash (`action:target:amount`) with a 5-minute window prevents duplicate tasks from repeated LLM output.
+
+**Fallback:** If `extractedGoal` is null, keyword-based classification from content determines the task type. No LLM re-parse.
+
+**`[GOAL:]` tag stripping:** All task titles and descriptions are stripped of residual `[GOAL:]` tags before task creation.
+
+---
+
+## Idle Reflection Grounding
+
+**Module:** `packages/cognition/src/thought-generator.ts`
+
+Idle reflections use a **structured fact block** that always emits all environment facts (even when values are normal/default): health, food, biome, time, weather, position, inventory, nearby entities, resources. The system prompt includes: "You must mention at least two facts from the situation."
+
+**Post-generation grounding check:** Verifies the LLM output references at least 2 fact tokens from the situation. If the check fails, a deterministic template is used as fallback (no LLM retry, avoids cost spiral).
+
+**Edge-triggered dedup:** Banded situation signatures (`biome:timeOfDayBand:healthBand:foodBand:threatBand:inventoryBand`) prevent repeated LLM calls for identical-enough states. If the same signature appeared in the last 2 reflections, generation is skipped.
 
 ---
 
@@ -269,7 +333,7 @@ The dashboard's `cleanMarkdownArtifacts()` remains as defense-in-depth but is ef
 | Entity detection -> POST Cognition /process | Works | Requests are sent; often timeout on client side |
 | Cognition /process -> ObservationReasoner | Works | Observations parsed and reasoned |
 | ObservationReasoner -> MLX | Partial | Some 200s; many aborted, fallback used |
-| LLM output sanitization | Works | Deterministic regex pipeline at generateResponse() boundary; strips fences, leaks, degeneration, garbage; extracts goal tags |
+| LLM output sanitization | Works | Bounded-scan parser at generateResponse() boundary; strips fences/leaks/degeneration/garbage/code; extracts `GoalTagV1` with canonical action allowlist |
 | Cognition -> Dashboard cognitive stream | Works | Thoughts (including fallback) reach Dashboard |
 | Cognition response -> Minecraft Interface | Broken | Client aborts before response; no task suggestion received |
 | Planning cycle -> planAndExecute | Broken | Stub coordinator; no plan ever returned |

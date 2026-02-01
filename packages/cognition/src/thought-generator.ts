@@ -68,6 +68,12 @@ export interface ThoughtContext {
     timeOfDay?: number;
     weather?: string;
     biome?: string;
+    dimension?: string;
+    nearbyHostiles?: number;
+    nearbyPassives?: number;
+    nearbyLogs?: number;
+    nearbyOres?: number;
+    nearbyWater?: number;
   };
   currentTasks?: Array<{
     id: string;
@@ -194,6 +200,8 @@ export class EnhancedThoughtGenerator extends EventEmitter {
   private isGenerating: boolean = false;
   private llm: LLMInterface;
   private thoughtDeduplicator: ThoughtDeduplicator;
+  /** Recent situation signatures for edge-triggered dedup (max 2) */
+  private _recentSituationSigs: string[] = [];
 
   constructor(config: Partial<EnhancedThoughtGeneratorConfig> = {}) {
     super();
@@ -351,6 +359,41 @@ export class EnhancedThoughtGenerator extends EventEmitter {
   ): Promise<CognitiveThought> {
     try {
       const situation = this.buildIdleSituation(context);
+
+      // Edge-trigger dedup: skip if same situation signature was used recently
+      const sig = this.computeSituationSignature(context);
+      if (this._recentSituationSigs.includes(sig)) {
+        // Same banded state — use deterministic fallback instead of LLM
+        const fallbackContent = this.generateFallbackThought(context);
+        return {
+          id: `thought-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+          type: 'reflection',
+          content: fallbackContent,
+          timestamp: Date.now(),
+          context: {
+            emotionalState: context.emotionalState || 'neutral',
+            confidence: 0.3,
+            cognitiveSystem: 'dedup-fallback',
+            health: context.currentState?.health,
+            position: context.currentState?.position,
+            inventory: context.currentState?.inventory,
+          },
+          metadata: {
+            thoughtType: 'idle-reflection',
+            trigger: 'time-based',
+            context: 'environmental-monitoring',
+            intensity: 0.2,
+          },
+          category: 'idle',
+          tags: ['monitoring', 'dedup-skipped'],
+          priority: 'low',
+        };
+      }
+      this._recentSituationSigs.push(sig);
+      if (this._recentSituationSigs.length > 2) {
+        this._recentSituationSigs.shift();
+      }
+
       const stressCtxForLLM = context.stressContext || buildStressContext(getInteroState().stressAxes) || undefined;
 
       // Add timeout wrapper to prevent hanging
@@ -368,10 +411,17 @@ export class EnhancedThoughtGenerator extends EventEmitter {
         ),
       ]);
 
+      // Post-generation grounding check: verify output references actual facts
+      let content = response.text.trim();
+      if (!this.checkGrounding(content)) {
+        // Grounding failed — use deterministic fallback (don't retry LLM)
+        content = this.generateFallbackThought(context);
+      }
+
       return {
         id: `thought-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
         type: 'reflection',
-        content: response.text.trim(),
+        content,
         timestamp: Date.now(),
         context: {
           emotionalState: context.emotionalState || 'neutral',
@@ -438,6 +488,9 @@ export class EnhancedThoughtGenerator extends EventEmitter {
     const position = context.currentState?.position;
     const biome = context.currentState?.biome || 'unknown';
     const timeOfDay = context.currentState?.timeOfDay || 0;
+    const weather = context.currentState?.weather;
+    const dimension = context.currentState?.dimension;
+    const nearbyHostiles = context.currentState?.nearbyHostiles ?? 0;
     const currentTasks = context.currentTasks || [];
 
     let situation = `A ${entity.type} (ID: ${entity.id}) is ${entity.distance} blocks away. `;
@@ -462,8 +515,24 @@ export class EnhancedThoughtGenerator extends EventEmitter {
       situation += `We're in a ${biome} biome. `;
     }
 
-    if (timeOfDay < 12000 || timeOfDay > 24000) {
+    if (weather && weather !== 'clear') {
+      situation += `Weather: ${weather}. `;
+    }
+
+    if (dimension && dimension !== 'overworld') {
+      situation += `In the ${dimension}. `;
+    }
+
+    // Time of day
+    if (timeOfDay >= 13000) {
       situation += `It's currently nighttime. `;
+    } else if (timeOfDay >= 12000) {
+      situation += `Sunset approaching. `;
+    }
+
+    // Threat awareness beyond the entity in question
+    if (nearbyHostiles > 1) {
+      situation += `${nearbyHostiles} hostile mobs in the area. `;
     }
 
     // Add task context
@@ -503,56 +572,142 @@ export class EnhancedThoughtGenerator extends EventEmitter {
   }
 
   /**
-   * Build situation description for idle thought generation
+   * Build structured fact block for idle thought generation.
+   * Always emits all facts (even default values) so the model has
+   * a complete grounding context — prevents hallucinated environments.
    */
   private buildIdleSituation(context: ThoughtContext): string {
-    const health = context.currentState?.health || 20;
+    const health = context.currentState?.health ?? 20;
+    const food = context.currentState?.food ?? 20;
     const inventory = context.currentState?.inventory || [];
     const position = context.currentState?.position;
-    const biome = context.currentState?.biome || 'unknown';
-    const timeOfDay = context.currentState?.timeOfDay || 0;
+    const biome = context.currentState?.biome || 'plains';
+    const timeOfDay = context.currentState?.timeOfDay ?? 0;
+    const weather = context.currentState?.weather || 'clear';
+    const dimension = context.currentState?.dimension || 'overworld';
+    const nearbyHostiles = context.currentState?.nearbyHostiles ?? 0;
+    const nearbyPassives = context.currentState?.nearbyPassives ?? 0;
+    const nearbyLogs = context.currentState?.nearbyLogs ?? 0;
+    const nearbyOres = context.currentState?.nearbyOres ?? 0;
+    const nearbyWater = context.currentState?.nearbyWater ?? 0;
 
-    let situation = '';
+    // Time of day description from ticks
+    let timeDesc: string;
+    if (timeOfDay < 6000) timeDesc = `early morning (tick ${timeOfDay})`;
+    else if (timeOfDay < 12000) timeDesc = `daytime (tick ${timeOfDay})`;
+    else if (timeOfDay < 13000) timeDesc = `sunset (tick ${timeOfDay})`;
+    else timeDesc = `nighttime (tick ${timeOfDay})`;
 
-    // Health status
-    if (health < 10) {
-      situation += `Low health (${health}/20). `;
-    } else if (health < 15) {
-      situation += `Moderate health (${health}/20). `;
+    // Position description
+    let posDesc = 'unknown position';
+    if (position) {
+      const y = Math.round(position.y);
+      let elevation = 'on the surface';
+      if (y < 0) elevation = 'deep underground';
+      else if (y < 40) elevation = 'underground';
+      else if (y > 100) elevation = 'high altitude';
+      posDesc = `(${Math.round(position.x)}, ${y}, ${Math.round(position.z)}) ${elevation}`;
     }
 
-    // Inventory status
+    // Inventory description
+    let invDesc: string;
     if (inventory.length === 0) {
-      situation += `Empty inventory. `;
+      invDesc = 'Empty inventory.';
     } else {
-      const itemCount = inventory.length;
-      situation += `Carrying ${itemCount} items. `;
+      const topItems = inventory.slice(0, 5).map(
+        (i: any) => `${i.count} ${i.displayName || i.name || i.type}`
+      ).join(', ');
+      invDesc = `Carrying: ${topItems}.`;
     }
 
-    // Environmental context
-    if (biome !== 'unknown') {
-      situation += `In ${biome} biome. `;
-    }
+    // Mobs
+    const hostileDesc = nearbyHostiles > 0
+      ? `${nearbyHostiles} hostile mob${nearbyHostiles > 1 ? 's' : ''} nearby.`
+      : 'No hostile mobs nearby.';
+    const passiveDesc = nearbyPassives > 0
+      ? `${nearbyPassives} passive mob${nearbyPassives > 1 ? 's' : ''} nearby.`
+      : 'No passive mobs nearby.';
 
-    if (timeOfDay < 12000 || timeOfDay > 24000) {
-      situation += `Night time. `;
-    }
+    // Resources
+    const resources: string[] = [];
+    if (nearbyLogs > 0) resources.push(`Wood available (${nearbyLogs} logs)`);
+    if (nearbyOres > 0) resources.push(`Ore deposits nearby (${nearbyOres})`);
+    if (nearbyWater > 0) resources.push(`Water source nearby`);
+    const resourceDesc = resources.length > 0
+      ? resources.join('. ') + '.'
+      : 'No notable resources nearby.';
+
+    // Assemble structured fact block
+    const facts = [
+      `I am a Minecraft bot in survival mode${dimension !== 'overworld' ? ` in the ${dimension}` : ''}.`,
+      `Health: ${health}/20. Food: ${food}/20.`,
+      `Biome: ${biome}. Time: ${timeDesc}. Weather: ${weather}.`,
+      `Position: ${posDesc}.`,
+      invDesc,
+      hostileDesc + ' ' + passiveDesc,
+      resourceDesc,
+    ];
 
     // Recent events
     if (context.recentEvents && context.recentEvents.length > 0) {
       const recentEvent = context.recentEvents[context.recentEvents.length - 1];
-      situation += `Recently: ${recentEvent}. `;
-    }
-
-    // Position if available
-    if (position) {
-      situation += `At (${Math.round(position.x)}, ${Math.round(position.y)}, ${Math.round(position.z)}). `;
+      facts.push(`Recently: ${recentEvent}.`);
     }
 
     const stressCtx = buildStressContext(getInteroState().stressAxes);
-    if (stressCtx) situation += stressCtx + ' ';
+    if (stressCtx) facts.push(stressCtx);
 
-    return situation || 'Idle with no clear context.';
+    // Store fact tokens for grounding check
+    this._lastFactTokens = [
+      biome, weather, timeDesc.split(' ')[0], // time keyword (early, daytime, sunset, nighttime)
+      `${health}`, `${food}`,
+      ...(position ? [`${Math.round(position.x)}`, `${Math.round(position.y)}`] : []),
+      ...(nearbyHostiles > 0 ? ['hostile'] : []),
+      ...(nearbyLogs > 0 ? ['wood', 'log'] : []),
+      ...(nearbyOres > 0 ? ['ore'] : []),
+      ...(nearbyWater > 0 ? ['water'] : []),
+      ...(inventory.length === 0 ? ['empty'] : inventory.slice(0, 3).map((i: any) => (i.name || i.type || '').toLowerCase())),
+    ].filter(t => t && t.length > 1);
+
+    return facts.join('\n');
+  }
+
+  /** Fact tokens from the last buildIdleSituation call, for grounding verification */
+  private _lastFactTokens: string[] = [];
+
+  /**
+   * Check if LLM output references at least N facts from the situation.
+   * Simple substring match against fact tokens.
+   */
+  private checkGrounding(output: string, minFacts: number = 2): boolean {
+    const lower = output.toLowerCase();
+    let matched = 0;
+    const seen = new Set<string>();
+    for (const token of this._lastFactTokens) {
+      if (seen.has(token)) continue;
+      if (lower.includes(token.toLowerCase())) {
+        matched++;
+        seen.add(token);
+        if (matched >= minFacts) return true;
+      }
+    }
+    return matched >= minFacts;
+  }
+
+  /**
+   * Compute a banded situation signature for dedup.
+   * Hashes (biome, timeOfDayBand, healthBand, hungerBand, threatBand, inventoryBand)
+   * so identical-enough situations don't trigger duplicate LLM calls.
+   */
+  private computeSituationSignature(context: ThoughtContext): string {
+    const band = (v: number, step: number) => Math.floor(v / step) * step;
+    const biome = context.currentState?.biome || 'plains';
+    const timeOfDay = context.currentState?.timeOfDay ?? 0;
+    const health = context.currentState?.health ?? 20;
+    const food = context.currentState?.food ?? 20;
+    const nearbyHostiles = context.currentState?.nearbyHostiles ?? 0;
+    const inventory = context.currentState?.inventory || [];
+    return `${biome}:${band(timeOfDay, 3000)}:${band(health, 5)}:${band(food, 5)}:${nearbyHostiles > 0 ? 'threat' : 'safe'}:${inventory.length > 0 ? 'has-items' : 'empty'}`;
   }
 
   /**

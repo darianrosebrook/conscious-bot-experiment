@@ -6,7 +6,7 @@
 
 import { z } from 'zod';
 
-import type { SanitizationFlags } from './llm-output-sanitizer';
+import type { SanitizationFlags, GoalTagV1 } from './llm-output-sanitizer';
 
 // ============================================================================
 // LLM Interface Types
@@ -63,7 +63,8 @@ export interface LLMResponse {
     reasoning?: string[];
     citations?: string[];
     retryAttempt?: number;
-    extractedGoal?: { action: string; target: string; amount: number | null };
+    retryReason?: string;
+    extractedGoal?: GoalTagV1 | { action: string; target: string; amount: number | null };
     sanitizationFlags?: SanitizationFlags;
   };
   timestamp: number;

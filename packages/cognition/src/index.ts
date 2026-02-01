@@ -54,6 +54,22 @@ export type {
   AuditSummary,
 } from './audit/thought-action-audit-logger';
 
+// LLM Output Sanitizer (shared boundary — downstream code imports from here)
+export {
+  extractGoalTag,
+  normalizeGoalAction,
+  sanitizeLLMOutput,
+  isUsableContent,
+  hasCodeLikeDensity,
+  CANONICAL_ACTIONS,
+} from './llm-output-sanitizer';
+export type {
+  GoalTag,
+  GoalTagV1,
+  SanitizedOutput,
+  SanitizationFlags,
+} from './llm-output-sanitizer';
+
 // Core Types (specific exports to avoid conflicts)
 export type {
   LLMConfig,

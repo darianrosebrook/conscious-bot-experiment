@@ -17,6 +17,7 @@
 export interface SanitizedOutput {
   text: string;
   goalTag: GoalTag | null;
+  goalTagV1: GoalTagV1 | null;
   flags: SanitizationFlags;
 }
 
@@ -26,11 +27,26 @@ export interface GoalTag {
   amount: number | null;
 }
 
+/**
+ * Structured goal tag with version, canonical action, and raw text for debugging.
+ * This is the single source of truth for goal extraction — downstream code reads
+ * this instead of re-parsing text.
+ */
+export interface GoalTagV1 {
+  version: 1;
+  action: string;         // canonical, from CANONICAL_ACTIONS allowlist
+  target: string;         // normalized lowercase
+  amount: number | null;
+  raw: string;            // original tag text for debugging
+}
+
 export interface SanitizationFlags {
   hadCodeFences: boolean;
   hadSystemPromptLeak: boolean;
   hadDegeneration: boolean;
   hadTrailingGarbage: boolean;
+  hadCodeContent: boolean;
+  rawGoalTag: string | null; // original tag text when parsing fails, for debugging
   originalLength: number;
   cleanedLength: number;
 }
@@ -63,8 +79,90 @@ const GENERIC_FILLER_PATTERNS = [
 ];
 
 // ============================================================================
+// Action normalization — maps synonyms to canonical goal actions
+// ============================================================================
+
+const ACTION_NORMALIZE_MAP: Record<string, string> = {
+  dig: 'mine',
+  break: 'mine',
+  harvest: 'mine',
+  get: 'collect',
+  obtain: 'collect',
+  pickup: 'collect',
+  make: 'craft',
+  create: 'craft',
+  construct: 'build',
+  assemble: 'build',
+  reinforce: 'build',
+  fortify: 'build',
+  locate: 'find',
+  search: 'find',
+  look: 'find',
+  identify: 'find',
+  move: 'navigate',
+  go: 'navigate',
+  reach: 'navigate',
+  walk: 'navigate',
+  travel: 'navigate',
+  run: 'navigate',
+  observe: 'check',
+  assess: 'check',
+  inspect: 'check',
+  acknowledge: 'check',
+  acquire: 'gather',
+  increase: 'gather',
+  fix: 'repair',
+  mend: 'repair',
+  restore: 'repair',
+  cook: 'smelt',
+  hear: 'check',
+  listen: 'check',
+};
+
+/**
+ * Normalize a raw goal action to its canonical form.
+ * Unknown actions pass through unchanged.
+ */
+export function normalizeGoalAction(raw: string): string {
+  const lower = raw.toLowerCase().replace(/^_+|_+$/g, '');
+  return ACTION_NORMALIZE_MAP[lower] ?? lower;
+}
+
+// ============================================================================
+// Canonical actions allowlist (strict, versioned)
+// ============================================================================
+
+export const CANONICAL_ACTIONS = new Set([
+  'collect', 'mine', 'craft', 'build', 'find', 'explore',
+  'navigate', 'gather', 'check', 'smelt', 'repair', 'continue',
+]);
+
+// ============================================================================
 // Pipeline Steps
 // ============================================================================
+
+/**
+ * Step 0.5: Strip wrapping quotation marks the model sometimes adds.
+ * Handles unbalanced pairs (e.g. `"Hey! How's it going?` with only an opener).
+ */
+export function stripWrappingQuotes(text: string): string {
+  let result = text.trim();
+  // Balanced pair: starts and ends with the same quote character
+  if (
+    (result.startsWith('"') && result.endsWith('"')) ||
+    (result.startsWith("'") && result.endsWith("'")) ||
+    (result.startsWith('\u201c') && result.endsWith('\u201d'))
+  ) {
+    result = result.slice(1, -1).trim();
+  } else if (result.startsWith('"') || result.startsWith("'") || result.startsWith('\u201c')) {
+    // Unbalanced: leading quote with no closer
+    result = result.slice(1).trim();
+  } else if (result.endsWith('"') || result.endsWith("'") || result.endsWith('\u201d')) {
+    // Unbalanced: trailing quote with no opener
+    result = result.slice(0, -1).trim();
+  }
+  return result;
+}
 
 /**
  * Step 1: Remove code fences while preserving single/double backticks
@@ -123,58 +221,121 @@ export function stripSystemPromptLeaks(text: string): string {
 
 /**
  * Step 3: Extract [GOAL: action target amount?] tag from text.
- * Returns the cleaned text (tag removed) and the parsed goal.
+ *
+ * Bounded-scan parser (no regex backtracking):
+ * 1. Locate `[GOAL:` via indexOf
+ * 2. Find matching `]` via bounded scan (max 100 chars)
+ * 3. Tokenize inner text, validate against CANONICAL_ACTIONS allowlist
+ * 4. Also handle trailing amount after `]` (e.g. `[GOAL: craft wood] 20`)
+ *
+ * Fail-closed: unknown actions → goal: null (raw tag preserved in flags for debugging).
  */
-export function extractGoalTag(text: string): { text: string; goal: GoalTag | null } {
-  // Match well-formed: [GOAL: action target amount?]
-  const wellFormed = /\[GOAL:\s*([a-z_]+)\s+([a-z_\s]+?)(?:\s+(\d+))?\s*\]/i;
-  const match = text.match(wellFormed);
-
-  if (match) {
-    const cleanedText = text.replace(wellFormed, '').trim();
-    return {
-      text: cleanedText,
-      goal: {
-        action: match[1].toLowerCase(),
-        target: match[2].trim().toLowerCase(),
-        amount: match[3] ? parseInt(match[3], 10) : null,
-      },
-    };
+export function extractGoalTag(text: string): {
+  text: string;
+  goal: GoalTag | null;
+  goalV1: GoalTagV1 | null;
+  rawGoalTag: string | null;
+} {
+  const openerIdx = text.toUpperCase().indexOf('[GOAL:');
+  if (openerIdx === -1) {
+    return { text, goal: null, goalV1: null, rawGoalTag: null };
   }
 
-  // Try malformed: missing closing bracket
-  const malformed = /\[GOAL:\s*([a-z_]+)\s+([a-z_\s]+?)(?:\s+(\d+))?\s*$/i;
-  const malformedMatch = text.match(malformed);
-
-  if (malformedMatch) {
-    const cleanedText = text.replace(malformed, '').trim();
-    return {
-      text: cleanedText,
-      goal: {
-        action: malformedMatch[1].toLowerCase(),
-        target: malformedMatch[2].trim().toLowerCase(),
-        amount: malformedMatch[3] ? parseInt(malformedMatch[3], 10) : null,
-      },
-    };
+  // Find closing bracket within 100 chars of opener
+  const searchEnd = Math.min(openerIdx + 106, text.length); // [GOAL: = 6 chars + 100
+  let closerIdx = -1;
+  for (let i = openerIdx + 6; i < searchEnd; i++) {
+    if (text[i] === ']') {
+      closerIdx = i;
+      break;
+    }
   }
 
-  // Try split goal: [GOAL: action] target — best effort
-  const splitGoal = /\[GOAL:\s*([a-z_]+)\s*\]\s*(.+)/i;
-  const splitMatch = text.match(splitGoal);
+  // Handle malformed (no closing bracket): scan to end of line or end of text
+  const tagStart = openerIdx;
+  let tagEnd: number;
+  let inner: string;
 
-  if (splitMatch) {
-    const cleanedText = text.replace(splitGoal, '').trim();
-    return {
-      text: cleanedText,
-      goal: {
-        action: splitMatch[1].toLowerCase(),
-        target: splitMatch[2].trim().toLowerCase().replace(/[^a-z_\s]/g, '').trim(),
-        amount: null,
-      },
-    };
+  if (closerIdx !== -1) {
+    tagEnd = closerIdx + 1;
+    inner = text.slice(openerIdx + 6, closerIdx).trim();
+  } else {
+    // No closing bracket — scan to end of line
+    const eolIdx = text.indexOf('\n', openerIdx);
+    tagEnd = eolIdx !== -1 ? eolIdx : text.length;
+    inner = text.slice(openerIdx + 6, tagEnd).trim();
   }
 
-  return { text, goal: null };
+  const rawTag = text.slice(tagStart, tagEnd);
+
+  // Check for trailing amount after `]` (e.g., `[GOAL: craft wood] 20`)
+  let trailingAmount: number | null = null;
+  let trailingEnd = tagEnd;
+  if (closerIdx !== -1) {
+    const afterCloser = text.slice(tagEnd);
+    const trailingMatch = afterCloser.match(/^\s*(\d+)/);
+    if (trailingMatch) {
+      trailingAmount = parseInt(trailingMatch[1], 10);
+      trailingEnd = tagEnd + trailingMatch[0].length;
+      // Skip optional unit suffix (e.g., "20x", "20 units")
+      const unitMatch = text.slice(trailingEnd).match(/^\w*/);
+      if (unitMatch) trailingEnd += unitMatch[0].length;
+    }
+  }
+
+  // Tokenize inner text
+  const tokens = inner.split(/\s+/).filter(t => t.length > 0);
+  if (tokens.length === 0) {
+    return { text, goal: null, goalV1: null, rawGoalTag: rawTag };
+  }
+
+  // Token 1: action — normalize then check allowlist
+  const rawAction = tokens[0].toLowerCase().replace(/[^a-z_]/g, '');
+  const action = normalizeGoalAction(rawAction);
+  if (!CANONICAL_ACTIONS.has(action)) {
+    // Fail-closed: unknown action → no goal, but preserve raw tag for debugging
+    return { text, goal: null, goalV1: null, rawGoalTag: rawTag };
+  }
+
+  // Remaining tokens: target words and optional trailing amount
+  let innerAmount: number | null = null;
+  const targetTokens: string[] = [];
+
+  for (let i = 1; i < tokens.length; i++) {
+    const token = tokens[i].toLowerCase();
+    // If last token is numeric, treat as amount
+    if (i === tokens.length - 1 && /^\d+$/.test(token)) {
+      innerAmount = parseInt(token, 10);
+    } else {
+      // Validate target token: a-z and underscore only
+      const cleaned = token.replace(/[^a-z_]/g, '');
+      if (cleaned.length > 0) {
+        targetTokens.push(cleaned);
+      }
+    }
+  }
+
+  // Inner amount takes priority over trailing amount
+  const amount = innerAmount ?? trailingAmount;
+
+  const target = targetTokens.join(' ');
+  if (target.length === 0) {
+    return { text, goal: null, goalV1: null, rawGoalTag: rawTag };
+  }
+
+  // Strip the tag (and trailing amount) from text
+  const cleanedText = (text.slice(0, tagStart) + text.slice(trailingEnd)).trim();
+
+  const goal: GoalTag = { action, target, amount };
+  const goalV1: GoalTagV1 = {
+    version: 1,
+    action,
+    target,
+    amount,
+    raw: rawTag,
+  };
+
+  return { text: cleanedText, goal, goalV1, rawGoalTag: null };
 }
 
 /**
@@ -265,7 +426,27 @@ export function normalizeWhitespace(text: string): string {
 }
 
 /**
- * Check if content is usable (not empty, not too short, not generic filler).
+ * Detect code-like content using line density (not keyword-only).
+ * Avoids false positives on English prose containing "import" etc.
+ * Returns true if >40% of lines have code-like patterns.
+ */
+export function hasCodeLikeDensity(text: string): boolean {
+  const lines = text.split('\n');
+  if (lines.length < 3) return false;
+
+  let codeIndicators = 0;
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (/^(def |class |import |from |if |for |while |return |print\(|const |let |var |function )/.test(trimmed)) codeIndicators++;
+    if (/[(){}\[\];=]/.test(trimmed) && trimmed.length > 5) codeIndicators++;
+    if (/^\s{2,}/.test(line) && /\w/.test(trimmed)) codeIndicators++; // indented code
+  }
+
+  return codeIndicators / lines.length > 0.4;
+}
+
+/**
+ * Check if content is usable (not empty, not too short, not generic filler, not code).
  *
  * Future consideration: This function and the sanitization pipeline could be
  * replaced or augmented by a distilled classifier model (similar to the 8-Ball
@@ -283,6 +464,8 @@ export function isUsableContent(text: string): boolean {
 
   if (trimmed.length === 0) return false;
   if (trimmed.length < 5) return false;
+
+  if (hasCodeLikeDensity(trimmed)) return false;
 
   for (const pattern of GENERIC_FILLER_PATTERNS) {
     if (pattern.test(trimmed)) return false;
@@ -314,15 +497,26 @@ export function sanitizeLLMOutput(raw: string): SanitizedOutput {
     hadSystemPromptLeak: false,
     hadDegeneration: false,
     hadTrailingGarbage: false,
+    hadCodeContent: false,
+    rawGoalTag: null,
     originalLength,
     cleanedLength: 0,
   };
+
+  // Step 0: Check for code-like content before stripping fences
+  if (hasCodeLikeDensity(raw)) {
+    flags.hadCodeContent = true;
+  }
 
   // Step 1: Strip code fences
   let text = stripCodeFences(raw);
   if (text !== raw) {
     flags.hadCodeFences = true;
   }
+
+  // Step 1.5: Strip wrapping quotes (apply twice for double-wrapped outputs)
+  text = stripWrappingQuotes(text);
+  text = stripWrappingQuotes(text);
 
   // Step 2: Strip system prompt leaks
   const beforeLeak = text;
@@ -331,9 +525,10 @@ export function sanitizeLLMOutput(raw: string): SanitizedOutput {
     flags.hadSystemPromptLeak = true;
   }
 
-  // Step 3: Extract goal tag
+  // Step 3: Extract goal tag (bounded-scan parser)
   const goalResult = extractGoalTag(text);
   text = goalResult.text;
+  flags.rawGoalTag = goalResult.rawGoalTag;
 
   // Step 4: Truncate degeneration
   const degenResult = truncateDegeneration(text);
@@ -353,6 +548,23 @@ export function sanitizeLLMOutput(raw: string): SanitizedOutput {
   return {
     text,
     goalTag: goalResult.goal,
+    goalTagV1: goalResult.goalV1,
     flags,
   };
+}
+
+/**
+ * Sanitize text for outbound Minecraft chat.
+ * Runs through the full sanitization pipeline, then collapses newlines,
+ * normalizes whitespace, and caps length at 256 characters.
+ */
+export function sanitizeForChat(raw: string): string {
+  const sanitized = sanitizeLLMOutput(raw);
+  let text = sanitized.text.replace(/\n/g, ' ');
+  text = normalizeWhitespace(text);
+  if (text.length > 256) {
+    const lastSpace = text.slice(0, 256).lastIndexOf(' ');
+    text = lastSpace > 180 ? text.slice(0, lastSpace) + '...' : text.slice(0, 253) + '...';
+  }
+  return text;
 }
