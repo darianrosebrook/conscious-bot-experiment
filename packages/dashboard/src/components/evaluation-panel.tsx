@@ -14,12 +14,13 @@ import {
   TrendingUp,
   AlertTriangle,
   CheckCircle,
-  // Clock,
   Target,
 } from 'lucide-react';
 import { Section } from './section';
 import { Pill } from './pill';
 import { EmptyState } from './empty-state';
+import { cn } from '@/lib/utils';
+import s from './evaluation-panel.module.scss';
 
 interface EvaluationMetrics {
   name: string;
@@ -95,48 +96,63 @@ export function EvaluationPanel() {
   const getHealthColor = (health: string) => {
     switch (health) {
       case 'healthy':
-        return 'text-green-500';
+        return s.healthGreen;
       case 'degraded':
-        return 'text-yellow-500';
+        return s.healthYellow;
       case 'critical':
-        return 'text-orange-500';
+        return s.healthOrange;
       case 'emergency':
-        return 'text-red-500';
+        return s.healthRed;
       default:
-        return 'text-zinc-500';
+        return s.healthDefault;
+    }
+  };
+
+  const getHealthBgColor = (health: string) => {
+    switch (health) {
+      case 'healthy':
+        return s.bgGreen;
+      case 'degraded':
+        return s.bgYellow;
+      case 'critical':
+        return s.bgOrange;
+      case 'emergency':
+        return s.bgRed;
+      default:
+        return s.bgDefault;
     }
   };
 
   const getSeverityColor = (severity: string) => {
     switch (severity) {
       case 'warning':
-        return 'text-yellow-500';
+        return s.healthYellow;
       case 'critical':
-        return 'text-orange-500';
+        return s.healthOrange;
       case 'emergency':
-        return 'text-red-500';
+        return s.healthRed;
       default:
-        return 'text-zinc-500';
+        return s.healthDefault;
     }
   };
 
   const getTrendIcon = (trend: string) => {
     switch (trend) {
       case 'up':
-        return <TrendingUp className="size-3 text-green-500" />;
+        return <TrendingUp className={cn(s.metricTrendIcon, s.trendUp)} />;
       case 'down':
-        return <TrendingUp className="size-3 text-red-500 rotate-180" />;
+        return <TrendingUp className={cn(s.metricTrendIcon, s.trendDown)} />;
       default:
-        return <div className="size-3" />;
+        return <div className={s.trendStable} />;
     }
   };
 
   if (isLoading) {
     return (
       <Section title="Evaluation" icon={<BarChart3 className="size-4" />}>
-        <div className="flex items-center justify-center py-8">
-          <div className="flex items-center gap-2 text-sm text-zinc-400">
-            <div className="size-4 rounded-full border-2 border-zinc-600 border-t-zinc-300 animate-spin" />
+        <div className={s.centerPy8}>
+          <div className={s.loadingRow}>
+            <div className={s.spinner} />
             <span>Loading evaluation data...</span>
           </div>
         </div>
@@ -147,13 +163,13 @@ export function EvaluationPanel() {
   if (error) {
     return (
       <Section title="Evaluation" icon={<BarChart3 className="size-4" />}>
-        <div className="flex items-center justify-center py-8">
-          <div className="text-center">
-            <AlertTriangle className="size-8 text-red-500 mx-auto mb-2" />
-            <p className="text-sm text-zinc-400 mb-2">{error}</p>
+        <div className={s.centerPy8}>
+          <div className={s.errorCenter}>
+            <AlertTriangle className={s.errorIcon} />
+            <p className={s.errorText}>{error}</p>
             <button
               onClick={fetchEvaluationData}
-              className="text-xs text-zinc-500 hover:text-zinc-300 underline"
+              className={s.retryLink}
             >
               Retry
             </button>
@@ -176,26 +192,26 @@ export function EvaluationPanel() {
   }
 
   return (
-    <div className="space-y-3">
+    <div className={s.spacer}>
       {/* System Health */}
       <Section
         title="System Health"
         icon={<CheckCircle className="size-4" />}
         tight
       >
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
+        <div className={s.healthRow}>
+          <div className={s.alertBadgeRow}>
             <div
-              className={`size-2 rounded-full ${getHealthColor(evaluationData.systemHealth).replace('text-', 'bg-')}`}
+              className={cn(s.healthDot, getHealthBgColor(evaluationData.systemHealth))}
             />
             <span
-              className={`text-sm font-medium ${getHealthColor(evaluationData.systemHealth)}`}
+              className={cn(s.healthLabel, getHealthColor(evaluationData.systemHealth))}
             >
               {evaluationData.systemHealth.charAt(0).toUpperCase() +
                 evaluationData.systemHealth.slice(1)}
             </span>
           </div>
-          <span className="text-xs text-zinc-500">
+          <span className={s.healthTime}>
             {new Date(evaluationData.lastUpdated).toLocaleTimeString()}
           </span>
         </div>
@@ -203,17 +219,17 @@ export function EvaluationPanel() {
 
       {/* Key Metrics */}
       <Section title="Performance Metrics" icon={<Target className="size-4" />}>
-        <div className="grid grid-cols-2 gap-3">
+        <div className={s.metricsGrid}>
           {evaluationData.metrics.map((metric) => (
             <div
               key={metric.name}
-              className="rounded-lg border border-zinc-800 bg-zinc-950 p-3"
+              className={s.metricCard}
             >
-              <div className="flex items-center justify-between mb-1">
-                <span className="text-xs text-zinc-500">{metric.name}</span>
+              <div className={s.metricHeader}>
+                <span className={s.metricName}>{metric.name}</span>
                 {getTrendIcon(metric.trend)}
               </div>
-              <div className="text-lg font-semibold text-zinc-200">
+              <div className={s.metricValue}>
                 {metric.value}
                 {metric.unit}
               </div>
@@ -224,16 +240,16 @@ export function EvaluationPanel() {
 
       {/* Statistics */}
       <Section title="Statistics" icon={<BarChart3 className="size-4" />} tight>
-        <div className="grid grid-cols-2 gap-2 text-sm">
-          <div className="flex justify-between">
-            <span className="text-zinc-500">Total Evaluations</span>
-            <span className="text-zinc-200">
+        <div className={s.statsGrid}>
+          <div className={s.statRow}>
+            <span className={s.statLabel}>Total Evaluations</span>
+            <span className={s.statValue}>
               {evaluationData.statistics.totalEvaluations}
             </span>
           </div>
-          <div className="flex justify-between">
-            <span className="text-zinc-500">Success Rate</span>
-            <span className="text-zinc-200">
+          <div className={s.statRow}>
+            <span className={s.statLabel}>Success Rate</span>
+            <span className={s.statValue}>
               {(
                 (evaluationData.statistics.successfulEvaluations /
                   evaluationData.statistics.totalEvaluations) *
@@ -242,27 +258,27 @@ export function EvaluationPanel() {
               %
             </span>
           </div>
-          <div className="flex justify-between">
-            <span className="text-zinc-500">Avg Score</span>
-            <span className="text-zinc-200">
+          <div className={s.statRow}>
+            <span className={s.statLabel}>Avg Score</span>
+            <span className={s.statValue}>
               {evaluationData.statistics.averageScore.toFixed(1)}%
             </span>
           </div>
-          <div className="flex justify-between">
-            <span className="text-zinc-500">Avg Duration</span>
-            <span className="text-zinc-200">
+          <div className={s.statRow}>
+            <span className={s.statLabel}>Avg Duration</span>
+            <span className={s.statValue}>
               {evaluationData.statistics.averageDuration.toFixed(1)}s
             </span>
           </div>
-          <div className="flex justify-between">
-            <span className="text-zinc-500">Active Scenarios</span>
-            <span className="text-zinc-200">
+          <div className={s.statRow}>
+            <span className={s.statLabel}>Active Scenarios</span>
+            <span className={s.statValue}>
               {evaluationData.statistics.activeScenarios}
             </span>
           </div>
-          <div className="flex justify-between">
-            <span className="text-zinc-500">Active Agents</span>
-            <span className="text-zinc-200">
+          <div className={s.statRow}>
+            <span className={s.statLabel}>Active Agents</span>
+            <span className={s.statValue}>
               {evaluationData.statistics.activeAgents}
             </span>
           </div>
@@ -275,31 +291,31 @@ export function EvaluationPanel() {
         icon={<AlertTriangle className="size-4" />}
       >
         {evaluationData.alerts.length > 0 ? (
-          <div className="space-y-2">
+          <div className={s.alertSpacer}>
             {evaluationData.alerts.map((alert) => (
               <div
                 key={alert.id}
-                className="rounded-lg border border-zinc-800 bg-zinc-950 p-3"
+                className={s.alertCard}
               >
-                <div className="flex items-start justify-between mb-1">
-                  <div className="flex items-center gap-2">
+                <div className={s.alertHeader}>
+                  <div className={s.alertBadgeRow}>
                     <AlertTriangle
-                      className={`size-3 ${getSeverityColor(alert.severity)}`}
+                      className={cn(s.alertSeverityIcon, getSeverityColor(alert.severity))}
                     />
-                    <Pill className="text-xs">{alert.severity}</Pill>
+                    <Pill>{alert.severity}</Pill>
                   </div>
-                  <span className="text-xs text-zinc-500">
+                  <span className={s.alertTime}>
                     {new Date(alert.timestamp).toLocaleTimeString()}
                   </span>
                 </div>
-                <p className="text-sm text-zinc-300">{alert.message}</p>
+                <p className={s.alertMessage}>{alert.message}</p>
               </div>
             ))}
           </div>
         ) : (
-          <div className="text-center py-4">
-            <CheckCircle className="size-6 text-green-500 mx-auto mb-2" />
-            <p className="text-sm text-zinc-400">No active alerts</p>
+          <div className={s.noAlerts}>
+            <CheckCircle className={s.noAlertsIcon} />
+            <p className={s.noAlertsText}>No active alerts</p>
           </div>
         )}
       </Section>

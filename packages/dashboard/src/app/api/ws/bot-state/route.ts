@@ -103,6 +103,11 @@ function buildBotStatePayload(
             }
           : null,
       environment: worldData ?? null,
+      intero: (
+        cognitionData as {
+          intero?: { stress?: number; focus?: number; curiosity?: number; stressAxes?: { time: number; situational: number; healthHunger: number; resource: number; protection: number; locationDistance: number } };
+        }
+      )?.intero ?? { stress: 20, focus: 80, curiosity: 75, stressAxes: { time: 15, situational: 10, healthHunger: 10, resource: 20, protection: 15, locationDistance: 10 } },
       cognition:
         cognitionData != null
           ? { ...(cognitionData as object) }
@@ -236,7 +241,11 @@ export const GET = async (req: NextRequest) => {
                 sleep: 100,
               }
             : null,
-          intero: { stress: 20, focus: 80, curiosity: 75 },
+          intero: (
+            cognitionData as {
+              intero?: { stress?: number; focus?: number; curiosity?: number; stressAxes?: { time: number; situational: number; healthHunger: number; resource: number; protection: number; locationDistance: number } };
+            }
+          )?.intero ?? { stress: 20, focus: 80, curiosity: 75, stressAxes: { time: 15, situational: 10, healthHunger: 10, resource: 20, protection: 15, locationDistance: 10 } },
           mood: 'neutral',
           environment: worldData ?? null,
           cognition:

@@ -1,5 +1,7 @@
 import React from 'react';
 import { LucideIcon } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import styles from './empty-state.module.scss';
 
 interface EmptyStateProps {
   icon: LucideIcon;
@@ -21,16 +23,13 @@ export function EmptyState({
   className = '',
 }: EmptyStateProps) {
   return (
-    <div
-      className={`flex flex-col items-center justify-center p-6 text-center ${className}`}
-    >
-      <div className="mb-4 rounded-full bg-zinc-800/50 p-3">
-        <Icon className="size-6 text-zinc-400" />
+    <div className={cn(styles.root, className)}>
+      <div className={styles.iconWrapper}>
+        <Icon className={styles.icon} />
       </div>
-      <h3 className="mb-2 text-sm font-medium text-zinc-200">{title}</h3>
-      <p className="mb-4 text-xs text-zinc-400 max-w-sm">{description}</p>
-      {action && <div className="flex justify-center">{action}</div>}
+      <h3 className={styles.title}>{title}</h3>
+      <p className={styles.description}>{description}</p>
+      {action && <div className={styles.actionWrapper}>{action}</div>}
     </div>
   );
 }
-

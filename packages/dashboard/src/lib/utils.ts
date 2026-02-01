@@ -1,5 +1,5 @@
 import { type ClassValue, clsx } from 'clsx';
-import { twMerge } from 'tailwind-merge';
+import hudColors from '@/styles/hud-colors.module.scss';
 
 /** Only logs when NEXT_PUBLIC_DEBUG_DASHBOARD=1 to reduce browser console noise */
 export function debugLog(...args: unknown[]): void {
@@ -9,12 +9,12 @@ export function debugLog(...args: unknown[]): void {
 }
 
 /**
- * Utility function to merge Tailwind CSS classes
+ * Utility function to merge CSS classes (clsx only, no Tailwind merge)
  * @param inputs - Class values to merge
  * @returns Merged class string
  */
 export function cn(...inputs: ClassValue[]) {
-  return twMerge(clsx(inputs));
+  return clsx(inputs);
 }
 
 /**
@@ -52,10 +52,10 @@ export function formatRelativeTime(ts: string): string {
 }
 
 /**
- * Get color for HUD meter based on value and type
+ * Get color class for HUD meter based on value and type
  * @param value - Current value (0-100)
  * @param type - Type of meter (health, hunger, stress, etc.)
- * @returns Tailwind color class
+ * @returns SCSS module color class
  */
 export function getHudColor(value: number, type: string): string {
   // For stress-like metrics (lower is better)
@@ -64,9 +64,9 @@ export function getHudColor(value: number, type: string): string {
     type.includes('fatigue') ||
     type.includes('anxiety')
   ) {
-    if (value <= 10) return 'bg-green-500'; // Green for low stress
-    if (value <= 50) return 'bg-yellow-500'; // Yellow for moderate stress
-    return 'bg-red-500'; // Red for high stress
+    if (value <= 10) return hudColors.colorGreen;
+    if (value <= 50) return hudColors.colorYellow;
+    return hudColors.colorRed;
   }
 
   // For health-like metrics (higher is better)
@@ -76,15 +76,39 @@ export function getHudColor(value: number, type: string): string {
     type.includes('happiness') ||
     type.includes('hunger')
   ) {
-    if (value >= 80) return 'bg-green-500'; // Green for high health
-    if (value >= 50) return 'bg-yellow-500'; // Yellow for moderate health
-    return 'bg-red-500'; // Red for low health
+    if (value >= 80) return hudColors.colorGreen;
+    if (value >= 50) return hudColors.colorYellow;
+    return hudColors.colorRed;
   }
 
   // Default behavior (higher is better)
-  if (value >= 80) return 'bg-green-500';
-  if (value >= 50) return 'bg-yellow-500';
-  return 'bg-red-500';
+  if (value >= 80) return hudColors.colorGreen;
+  if (value >= 50) return hudColors.colorYellow;
+  return hudColors.colorRed;
+}
+
+/**
+ * Get durability color class based on percentage
+ */
+export function getDurabilityColor(percentage: number): string {
+  if (percentage >= 80) return hudColors.durabilityGreen;
+  if (percentage >= 50) return hudColors.durabilityYellow;
+  if (percentage >= 20) return hudColors.durabilityOrange;
+  return hudColors.durabilityRed;
+}
+
+/**
+ * Get indicator text color based on item state
+ */
+export function getIndicatorColor(item: { durability?: number; maxDurability?: number }): string {
+  if (item.durability !== undefined && item.maxDurability) {
+    const percentage = Math.max(0, Math.min(100, ((item.maxDurability - item.durability) / item.maxDurability) * 100));
+    if (percentage >= 80) return hudColors.textGreen;
+    if (percentage >= 50) return hudColors.textYellow;
+    if (percentage >= 20) return hudColors.textOrange;
+    return hudColors.textRed;
+  }
+  return hudColors.textWhite;
 }
 
 /**

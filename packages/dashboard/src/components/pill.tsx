@@ -1,5 +1,6 @@
 import React from 'react';
 import { cn } from '@/lib/utils';
+import styles from './pill.module.scss';
 
 interface PillProps {
   children: React.ReactNode;
@@ -11,21 +12,21 @@ interface PillProps {
  * Pill component for displaying tags and labels
  * Used for task sources, thought types, and other metadata
  */
-export function Pill({ 
-  children, 
+export function Pill({
+  children,
   variant = 'default',
-  className 
+  className
 }: PillProps) {
   const variantClasses = {
-    default: "bg-zinc-800/80 text-zinc-300",
-    success: "bg-emerald-600/20 text-emerald-300 border border-emerald-600/30",
-    warning: "bg-amber-600/20 text-amber-300 border border-amber-600/30",
-    danger: "bg-red-600/20 text-red-300 border border-red-600/30",
+    default: styles.variantDefault,
+    success: styles.variantSuccess,
+    warning: styles.variantWarning,
+    danger: styles.variantDanger,
   };
 
   return (
     <span className={cn(
-      "rounded-full px-2 py-0.5 text-[11px] font-medium",
+      styles.root,
       variantClasses[variant],
       className
     )}>

@@ -1,0 +1,56 @@
+@use '../styles/mixins' as *;
+
+.spacer { display: flex; flex-direction: column; gap: 0.75rem; }
+.centerPy8 { display: flex; align-items: center; justify-content: center; padding: 2rem 0; }
+.loadingRow { display: flex; align-items: center; gap: 0.5rem; font-size: 0.875rem; color: rgb(161 161 170); }
+.spinner { width: 1rem; height: 1rem; border-radius: 9999px; border: 2px solid rgb(82 82 91); border-top-color: rgb(212 212 216); animation: spin 1s linear infinite; }
+@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
+.errorCenter { text-align: center; }
+.errorIcon { width: 2rem; height: 2rem; color: rgb(239 68 68); margin: 0 auto 0.5rem; }
+.errorText { font-size: 0.875rem; color: rgb(161 161 170); margin-bottom: 0.5rem; }
+.retryLink { font-size: 0.75rem; color: rgb(113 113 122); cursor: pointer; text-decoration: underline; &:hover { color: rgb(212 212 216); } }
+
+.healthRow { @include flex-between; }
+.healthDot { width: 0.5rem; height: 0.5rem; border-radius: 9999px; }
+.healthLabel { font-size: 0.875rem; font-weight: 500; }
+.healthTime { font-size: 0.75rem; color: rgb(113 113 122); }
+
+.metricsGrid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.75rem; }
+.metricCard { border-radius: 0.5rem; border: 1px solid rgb(39 39 42); background-color: rgb(9 9 11); padding: 0.75rem; }
+.metricHeader { @include flex-between; margin-bottom: 0.25rem; }
+.metricName { font-size: 0.75rem; color: rgb(113 113 122); }
+.metricTrendIcon { width: 0.75rem; height: 0.75rem; }
+.metricValue { font-size: 1.125rem; font-weight: 600; color: rgb(228 228 231); }
+
+.statsGrid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.5rem; font-size: 0.875rem; }
+.statRow { display: flex; justify-content: space-between; }
+.statLabel { color: rgb(113 113 122); }
+.statValue { color: rgb(228 228 231); }
+
+.alertSpacer { display: flex; flex-direction: column; gap: 0.5rem; }
+.alertCard { border-radius: 0.5rem; border: 1px solid rgb(39 39 42); background-color: rgb(9 9 11); padding: 0.75rem; }
+.alertHeader { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 0.25rem; }
+.alertBadgeRow { display: flex; align-items: center; gap: 0.5rem; }
+.alertSeverityIcon { width: 0.75rem; height: 0.75rem; }
+.alertTime { font-size: 0.75rem; color: rgb(113 113 122); }
+.alertMessage { font-size: 0.875rem; color: rgb(212 212 216); }
+.noAlerts { text-align: center; padding: 1rem 0; }
+.noAlertsIcon { width: 1.5rem; height: 1.5rem; color: rgb(34 197 94); margin: 0 auto 0.5rem; }
+.noAlertsText { font-size: 0.875rem; color: rgb(161 161 170); }
+
+// Health colors
+.healthGreen { color: rgb(34 197 94); }
+.bgGreen { background-color: rgb(34 197 94); }
+.healthYellow { color: rgb(234 179 8); }
+.bgYellow { background-color: rgb(234 179 8); }
+.healthOrange { color: rgb(249 115 22); }
+.bgOrange { background-color: rgb(249 115 22); }
+.healthRed { color: rgb(239 68 68); }
+.bgRed { background-color: rgb(239 68 68); }
+.healthDefault { color: rgb(113 113 122); }
+.bgDefault { background-color: rgb(113 113 122); }
+
+.trendUp { color: rgb(34 197 94); }
+.trendDown { color: rgb(239 68 68); transform: rotate(180deg); }
+.trendStable { width: 0.75rem; height: 0.75rem; }

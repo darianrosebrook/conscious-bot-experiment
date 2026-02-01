@@ -1,5 +1,6 @@
 import React from 'react';
 import { cn, getHudColor } from '@/lib/utils';
+import styles from './hud-meter.module.scss';
 
 interface HudMeterProps {
   label: string;
@@ -23,25 +24,23 @@ export function HudMeter({
   color,
 }: HudMeterProps) {
   const percentage = Math.max(0, Math.min(100, (100 * value) / max));
-  const colorClass = color
-    ? `bg-${color}-500`
-    : getHudColor(percentage, label.toLowerCase());
+  const colorClass = getHudColor(percentage, color || label.toLowerCase());
 
   return (
-    <div className={cn('flex flex-col gap-1', className)}>
-      <div className="flex items-center justify-between text-xs text-zinc-300">
-        <span className="uppercase tracking-wide">{label}</span>
-        <span className="tabular-nums text-zinc-400">
+    <div className={cn(styles.root, className)}>
+      <div className={styles.labelRow}>
+        <span className={styles.labelText}>{label}</span>
+        <span className={styles.valueText}>
           {Math.round(percentage)}%
         </span>
       </div>
-      <div className="h-2 w-full rounded bg-zinc-800">
+      <div className={styles.track}>
         <div
-          className={cn('h-2 rounded transition-all duration-300', colorClass)}
+          className={cn(styles.fill, colorClass)}
           style={{ width: `${percentage}%` }}
         />
       </div>
-      {hint && <div className="text-[10px] text-zinc-500">{hint}</div>}
+      {hint && <div className={styles.hint}>{hint}</div>}
     </div>
   );
 }

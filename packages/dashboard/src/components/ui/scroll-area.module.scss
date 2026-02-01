@@ -1,0 +1,39 @@
+.root {
+  position: relative;
+  overflow: hidden;
+}
+
+.viewport {
+  height: 100%;
+  width: 100%;
+  border-radius: inherit;
+}
+
+.scrollbar {
+  display: flex;
+  touch-action: none;
+  user-select: none;
+  transition-property: color, background-color;
+  transition-duration: 150ms;
+}
+
+.scrollbarVertical {
+  height: 100%;
+  width: 0.625rem;
+  border-left: 1px solid transparent;
+  padding: 1px;
+}
+
+.scrollbarHorizontal {
+  height: 0.625rem;
+  flex-direction: column;
+  border-top: 1px solid transparent;
+  padding: 1px;
+}
+
+.thumb {
+  position: relative;
+  flex: 1;
+  border-radius: 9999px;
+  background-color: hsl(var(--border));
+}

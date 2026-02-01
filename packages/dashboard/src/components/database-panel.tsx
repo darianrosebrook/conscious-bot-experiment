@@ -14,10 +14,12 @@ import {
   Trash2,
 } from 'lucide-react';
 
+import { cn } from '@/lib/utils';
 import { Pill } from '@/components/pill';
 import { EmptyState } from '@/components/empty-state';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import s from './database-panel.module.scss';
 
 import type {
   DatabaseOverview,
@@ -44,22 +46,22 @@ function CollapsibleSection({
   const [open, setOpen] = useState(defaultOpen);
 
   return (
-    <div className="rounded-2xl border border-zinc-800 bg-zinc-950/60">
+    <div className={s.collapsible}>
       <button
         onClick={() => setOpen(!open)}
-        className="flex w-full items-center justify-between px-3 py-2 border-b border-zinc-800/80 hover:bg-zinc-900/40 transition-colors"
+        className={s.collapsibleBtn}
       >
-        <div className="flex items-center gap-2 text-zinc-200">
+        <div className={s.collapsibleTitle}>
           {icon}
-          <h3 className="text-sm font-semibold">{title}</h3>
+          <h3 className={s.collapsibleTitleText}>{title}</h3>
         </div>
         {open ? (
-          <ChevronDown className="size-4 text-zinc-400" />
+          <ChevronDown className={s.chevronIcon} />
         ) : (
-          <ChevronRight className="size-4 text-zinc-400" />
+          <ChevronRight className={s.chevronIcon} />
         )}
       </button>
-      {open && <div className="px-3 py-3">{children}</div>}
+      {open && <div className={s.collapsibleBody}>{children}</div>}
     </div>
   );
 }
@@ -204,9 +206,9 @@ export function DatabasePanel() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center p-12">
-        <div className="flex items-center gap-2 text-sm text-zinc-400">
-          <RefreshCw className="size-4 animate-spin" />
+      <div className={s.loadingCenter}>
+        <div className={s.loadingRow}>
+          <RefreshCw className={s.spinIcon} />
           <span>Loading database information...</span>
         </div>
       </div>
@@ -233,7 +235,7 @@ export function DatabasePanel() {
               ]).finally(() => setLoading(false));
             }}
           >
-            <RefreshCw className="size-4 mr-2" />
+            <RefreshCw className={s.spinIcon} />
             Retry
           </Button>
         }
@@ -244,46 +246,54 @@ export function DatabasePanel() {
   const seedStr = overview?.worldSeed?.toString() ?? '';
   const dbName = overview?.databaseName ?? '';
 
+  const distColors = [
+    s.distSky,
+    s.distEmerald,
+    s.distAmber,
+    s.distPurple,
+    s.distRose,
+  ];
+
   return (
     <ScrollArea className="h-full">
-      <div className="flex flex-col gap-3 p-3">
+      <div className={s.scrollContent}>
         {/* 4A: Overview Panel */}
         <CollapsibleSection
           title="Overview"
           icon={<Database className="size-4" />}
         >
           {overview ? (
-            <div className="space-y-3">
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-                <div className="rounded-lg border border-zinc-800 bg-zinc-950 p-2.5">
-                  <div className="text-[11px] text-zinc-500 uppercase tracking-wide">
+            <div className={s.overviewSpacer}>
+              <div className={s.overviewGrid}>
+                <div className={s.statCard}>
+                  <div className={s.statLabel}>
                     Database
                   </div>
-                  <div className="text-sm font-medium text-zinc-200 truncate">
+                  <div className={s.statValue}>
                     {overview.databaseName}
                   </div>
                 </div>
-                <div className="rounded-lg border border-zinc-800 bg-zinc-950 p-2.5">
-                  <div className="text-[11px] text-zinc-500 uppercase tracking-wide">
+                <div className={s.statCard}>
+                  <div className={s.statLabel}>
                     World Seed
                   </div>
-                  <div className="text-sm font-medium text-zinc-200">
+                  <div className={s.statValue}>
                     {overview.worldSeed}
                   </div>
                 </div>
-                <div className="rounded-lg border border-zinc-800 bg-zinc-950 p-2.5">
-                  <div className="text-[11px] text-zinc-500 uppercase tracking-wide">
+                <div className={s.statCard}>
+                  <div className={s.statLabel}>
                     Total Chunks
                   </div>
-                  <div className="text-sm font-medium text-zinc-200">
+                  <div className={s.statValue}>
                     {overview.totalChunks.toLocaleString()}
                   </div>
                 </div>
-                <div className="rounded-lg border border-zinc-800 bg-zinc-950 p-2.5">
-                  <div className="text-[11px] text-zinc-500 uppercase tracking-wide">
+                <div className={s.statCard}>
+                  <div className={s.statLabel}>
                     Entities / Relationships
                   </div>
-                  <div className="text-sm font-medium text-zinc-200">
+                  <div className={s.statValue}>
                     {overview.entityCount} / {overview.relationshipCount}
                   </div>
                 </div>
@@ -292,10 +302,10 @@ export function DatabasePanel() {
               {/* Memory type distribution */}
               {Object.keys(overview.memoryTypeDistribution).length > 0 && (
                 <div>
-                  <div className="text-[11px] text-zinc-500 uppercase tracking-wide mb-1.5">
+                  <div className={s.sectionLabel}>
                     Memory Type Distribution
                   </div>
-                  <div className="flex gap-1 h-3 rounded-full overflow-hidden bg-zinc-800">
+                  <div className={s.distBar}>
                     {(() => {
                       const entries = Object.entries(
                         overview.memoryTypeDistribution
@@ -304,17 +314,10 @@ export function DatabasePanel() {
                         (sum, [, count]) => sum + count,
                         0
                       );
-                      const colors = [
-                        'bg-sky-500',
-                        'bg-emerald-500',
-                        'bg-amber-500',
-                        'bg-purple-500',
-                        'bg-rose-500',
-                      ];
                       return entries.map(([type, count], i) => (
                         <div
                           key={type}
-                          className={`${colors[i % colors.length]} transition-all`}
+                          className={distColors[i % distColors.length]}
                           style={{
                             width: `${total > 0 ? (count / total) * 100 : 0}%`,
                           }}
@@ -323,7 +326,7 @@ export function DatabasePanel() {
                       ));
                     })()}
                   </div>
-                  <div className="flex flex-wrap gap-2 mt-1.5">
+                  <div className={s.pillWrap}>
                     {Object.entries(overview.memoryTypeDistribution).map(
                       ([type, count]) => (
                         <Pill key={type}>
@@ -338,17 +341,17 @@ export function DatabasePanel() {
               {/* Index info */}
               {overview.indexInfo.length > 0 && (
                 <div>
-                  <div className="text-[11px] text-zinc-500 uppercase tracking-wide mb-1.5">
+                  <div className={s.sectionLabel}>
                     Indexes
                   </div>
-                  <div className="space-y-1">
+                  <div className={s.indexSpacer}>
                     {overview.indexInfo.map((idx, i) => (
                       <div
                         key={i}
-                        className="flex items-center justify-between text-xs text-zinc-300"
+                        className={s.indexRow}
                       >
-                        <span>{idx.name}</span>
-                        <span className="text-zinc-500">
+                        <span className={s.indexName}>{idx.name}</span>
+                        <span className={s.indexMeta}>
                           {idx.type} &middot; {idx.size}
                         </span>
                       </div>
@@ -362,7 +365,6 @@ export function DatabasePanel() {
               icon={Database}
               title="No overview data"
               description="Database overview will appear when the memory service is connected."
-              className="p-3"
             />
           )}
         </CollapsibleSection>
@@ -373,16 +375,16 @@ export function DatabasePanel() {
           icon={<Search className="size-4" />}
           defaultOpen={false}
         >
-          <div className="space-y-3">
+          <div className={s.overviewSpacer}>
             {/* Filters */}
-            <div className="flex flex-wrap items-center gap-2">
+            <div className={s.filterRow}>
               <select
                 value={memoriesType}
                 onChange={(e) => {
                   setMemoriesType(e.target.value);
                   setMemoriesPage(1);
                 }}
-                className="rounded-lg border border-zinc-800 bg-zinc-900 px-2 py-1 text-xs text-zinc-300 outline-none"
+                className={s.filterSelect}
               >
                 <option value="">All Types</option>
                 <option value="episodic">Episodic</option>
@@ -397,7 +399,7 @@ export function DatabasePanel() {
                   setMemoriesSortBy(e.target.value);
                   setMemoriesPage(1);
                 }}
-                className="rounded-lg border border-zinc-800 bg-zinc-900 px-2 py-1 text-xs text-zinc-300 outline-none"
+                className={s.filterSelect}
               >
                 <option value="created">Sort: Created</option>
                 <option value="accessed">Sort: Last Accessed</option>
@@ -406,21 +408,21 @@ export function DatabasePanel() {
               <Button
                 variant="outline"
                 size="sm"
-                className="h-7 text-xs bg-zinc-900 border-zinc-800"
+                className={s.refreshBtn}
                 onClick={() => fetchMemories()}
               >
-                <RefreshCw className="size-3 mr-1" />
+                <RefreshCw className={s.refreshIcon} />
                 Refresh
               </Button>
             </div>
 
             {/* Memory table */}
             {memories.length > 0 ? (
-              <div className="space-y-1.5">
+              <div className={s.memorySpacer}>
                 {memories.map((mem) => (
                   <div
                     key={mem.id}
-                    className="rounded-lg border border-zinc-800 bg-zinc-950 overflow-hidden"
+                    className={s.memoryCard}
                   >
                     <button
                       onClick={() =>
@@ -428,30 +430,30 @@ export function DatabasePanel() {
                           expandedMemory === mem.id ? null : mem.id
                         )
                       }
-                      className="w-full flex items-center gap-2 px-2.5 py-2 text-left hover:bg-zinc-900/40 transition-colors"
+                      className={s.memoryBtn}
                     >
                       {expandedMemory === mem.id ? (
-                        <ChevronDown className="size-3 text-zinc-500 shrink-0" />
+                        <ChevronDown className={s.memChevron} />
                       ) : (
-                        <ChevronRight className="size-3 text-zinc-500 shrink-0" />
+                        <ChevronRight className={s.memChevron} />
                       )}
-                      <span className="text-[10px] text-zinc-500 font-mono w-16 shrink-0 truncate">
+                      <span className={s.memId}>
                         {mem.id.slice(0, 8)}
                       </span>
-                      <span className="text-xs text-zinc-300 flex-1 truncate">
+                      <span className={s.memContent}>
                         {mem.content}
                       </span>
                       <Pill>{mem.memoryType}</Pill>
-                      <span className="text-[10px] text-zinc-500 tabular-nums">
+                      <span className={s.memImportance}>
                         imp: {mem.importance.toFixed(2)}
                       </span>
                     </button>
                     {expandedMemory === mem.id && (
-                      <div className="px-3 pb-2.5 pt-1 border-t border-zinc-800/50 space-y-1.5">
-                        <p className="text-xs text-zinc-300 whitespace-pre-wrap">
+                      <div className={s.memExpanded}>
+                        <p className={s.memExpandedText}>
                           {mem.content}
                         </p>
-                        <div className="flex flex-wrap gap-2 text-[10px] text-zinc-500">
+                        <div className={s.memExpandedMeta}>
                           <span>Access Count: {mem.accessCount}</span>
                           <span>Entities: {mem.entityCount}</span>
                           <span>Relationships: {mem.relationshipCount}</span>
@@ -474,15 +476,15 @@ export function DatabasePanel() {
                 ))}
 
                 {/* Pagination */}
-                <div className="flex items-center justify-between pt-1">
-                  <span className="text-[11px] text-zinc-500">
+                <div className={s.paginationRow}>
+                  <span className={s.paginationLabel}>
                     Showing {memories.length} of {memoriesTotal} memories
                   </span>
-                  <div className="flex gap-1">
+                  <div className={s.paginationBtns}>
                     <Button
                       variant="outline"
                       size="sm"
-                      className="h-6 text-[10px] bg-zinc-900 border-zinc-800"
+                      className={s.paginationBtn}
                       disabled={memoriesPage <= 1}
                       onClick={() => setMemoriesPage((p) => Math.max(1, p - 1))}
                     >
@@ -491,7 +493,7 @@ export function DatabasePanel() {
                     <Button
                       variant="outline"
                       size="sm"
-                      className="h-6 text-[10px] bg-zinc-900 border-zinc-800"
+                      className={s.paginationBtn}
                       disabled={memories.length < 20}
                       onClick={() => setMemoriesPage((p) => p + 1)}
                     >
@@ -505,7 +507,6 @@ export function DatabasePanel() {
                 icon={Search}
                 title="No memories found"
                 description="Memory chunks will appear here when the memory system has stored data."
-                className="p-3"
               />
             )}
           </div>
@@ -518,21 +519,21 @@ export function DatabasePanel() {
           defaultOpen={false}
         >
           {knowledgeGraph ? (
-            <div className="space-y-3">
-              <div className="grid grid-cols-2 gap-2">
-                <div className="rounded-lg border border-zinc-800 bg-zinc-950 p-2.5">
-                  <div className="text-[11px] text-zinc-500 uppercase tracking-wide">
+            <div className={s.overviewSpacer}>
+              <div className={s.kgGrid}>
+                <div className={s.statCard}>
+                  <div className={s.statLabel}>
                     Total Entities
                   </div>
-                  <div className="text-sm font-medium text-zinc-200">
+                  <div className={s.statValue}>
                     {knowledgeGraph.totalEntities}
                   </div>
                 </div>
-                <div className="rounded-lg border border-zinc-800 bg-zinc-950 p-2.5">
-                  <div className="text-[11px] text-zinc-500 uppercase tracking-wide">
+                <div className={s.statCard}>
+                  <div className={s.statLabel}>
                     Total Relationships
                   </div>
-                  <div className="text-sm font-medium text-zinc-200">
+                  <div className={s.statValue}>
                     {knowledgeGraph.totalRelationships}
                   </div>
                 </div>
@@ -541,20 +542,20 @@ export function DatabasePanel() {
               {/* Top entities */}
               {knowledgeGraph.topEntities.length > 0 && (
                 <div>
-                  <div className="text-[11px] text-zinc-500 uppercase tracking-wide mb-1.5">
+                  <div className={s.sectionLabel}>
                     Top Entities
                   </div>
-                  <div className="space-y-1">
+                  <div className={s.indexSpacer}>
                     {knowledgeGraph.topEntities.map((entity, i) => (
                       <div
                         key={i}
-                        className="flex items-center justify-between text-xs rounded-lg border border-zinc-800 bg-zinc-950 px-2.5 py-1.5"
+                        className={s.kgEntityRow}
                       >
-                        <div className="flex items-center gap-2">
-                          <span className="text-zinc-200">{entity.name}</span>
+                        <div className={s.kgEntityName}>
+                          <span>{entity.name}</span>
                           <Pill>{entity.type}</Pill>
                         </div>
-                        <span className="text-zinc-500">
+                        <span className={s.kgEntityConn}>
                           {entity.connectionCount} connections
                         </span>
                       </div>
@@ -567,10 +568,10 @@ export function DatabasePanel() {
               {Object.keys(knowledgeGraph.entityTypeDistribution).length >
                 0 && (
                 <div>
-                  <div className="text-[11px] text-zinc-500 uppercase tracking-wide mb-1.5">
+                  <div className={s.sectionLabel}>
                     Entity Types
                   </div>
-                  <div className="flex flex-wrap gap-2">
+                  <div className={s.pillWrap}>
                     {Object.entries(knowledgeGraph.entityTypeDistribution).map(
                       ([type, count]) => (
                         <Pill key={type}>
@@ -586,10 +587,10 @@ export function DatabasePanel() {
               {Object.keys(knowledgeGraph.relationshipTypeDistribution).length >
                 0 && (
                 <div>
-                  <div className="text-[11px] text-zinc-500 uppercase tracking-wide mb-1.5">
+                  <div className={s.sectionLabel}>
                     Relationship Types
                   </div>
-                  <div className="flex flex-wrap gap-2">
+                  <div className={s.pillWrap}>
                     {Object.entries(
                       knowledgeGraph.relationshipTypeDistribution
                     ).map(([type, count]) => (
@@ -606,7 +607,6 @@ export function DatabasePanel() {
               icon={Network}
               title="No knowledge graph data"
               description="Knowledge graph statistics will appear when the memory system has entity data."
-              className="p-3"
             />
           )}
         </CollapsibleSection>
@@ -618,37 +618,37 @@ export function DatabasePanel() {
           defaultOpen={false}
         >
           {embeddingHealth ? (
-            <div className="space-y-3">
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-                <div className="rounded-lg border border-zinc-800 bg-zinc-950 p-2.5">
-                  <div className="text-[11px] text-zinc-500 uppercase tracking-wide">
+            <div className={s.overviewSpacer}>
+              <div className={s.overviewGrid}>
+                <div className={s.statCard}>
+                  <div className={s.statLabel}>
                     Dimension
                   </div>
-                  <div className="text-sm font-medium text-zinc-200">
+                  <div className={s.statValue}>
                     {embeddingHealth.dimension}
                   </div>
                 </div>
-                <div className="rounded-lg border border-zinc-800 bg-zinc-950 p-2.5">
-                  <div className="text-[11px] text-zinc-500 uppercase tracking-wide">
+                <div className={s.statCard}>
+                  <div className={s.statLabel}>
                     Total Embeddings
                   </div>
-                  <div className="text-sm font-medium text-zinc-200">
+                  <div className={s.statValue}>
                     {embeddingHealth.totalEmbeddings.toLocaleString()}
                   </div>
                 </div>
-                <div className="rounded-lg border border-zinc-800 bg-zinc-950 p-2.5">
-                  <div className="text-[11px] text-zinc-500 uppercase tracking-wide">
+                <div className={s.statCard}>
+                  <div className={s.statLabel}>
                     Index Type
                   </div>
-                  <div className="text-sm font-medium text-zinc-200">
+                  <div className={s.statValue}>
                     {embeddingHealth.indexType}
                   </div>
                 </div>
-                <div className="rounded-lg border border-zinc-800 bg-zinc-950 p-2.5">
-                  <div className="text-[11px] text-zinc-500 uppercase tracking-wide">
+                <div className={s.statCard}>
+                  <div className={s.statLabel}>
                     Index Size
                   </div>
-                  <div className="text-sm font-medium text-zinc-200">
+                  <div className={s.statValue}>
                     {embeddingHealth.indexSize}
                   </div>
                 </div>
@@ -656,19 +656,19 @@ export function DatabasePanel() {
 
               {/* Norm statistics */}
               <div>
-                <div className="text-[11px] text-zinc-500 uppercase tracking-wide mb-1.5">
+                <div className={s.sectionLabel}>
                   Norm Statistics
                 </div>
-                <div className="grid grid-cols-4 gap-2">
+                <div className={s.normGrid}>
                   {(['min', 'max', 'avg', 'stddev'] as const).map((stat) => (
                     <div
                       key={stat}
-                      className="rounded-lg border border-zinc-800 bg-zinc-950 p-2 text-center"
+                      className={s.normCard}
                     >
-                      <div className="text-[10px] text-zinc-500 uppercase">
+                      <div className={s.normLabel}>
                         {stat}
                       </div>
-                      <div className="text-xs font-medium text-zinc-200">
+                      <div className={s.normValue}>
                         {embeddingHealth.normStats[stat].toFixed(4)}
                       </div>
                     </div>
@@ -679,28 +679,28 @@ export function DatabasePanel() {
               {/* Similarity distribution */}
               {embeddingHealth.sampleSimilarityDistribution.length > 0 && (
                 <div>
-                  <div className="text-[11px] text-zinc-500 uppercase tracking-wide mb-1.5">
+                  <div className={s.sectionLabel}>
                     Similarity Distribution
                   </div>
-                  <div className="space-y-1">
+                  <div className={s.indexSpacer}>
                     {embeddingHealth.sampleSimilarityDistribution.map(
                       (bucket) => (
                         <div
                           key={bucket.bucket}
-                          className="flex items-center gap-2 text-xs"
+                          className={s.simRow}
                         >
-                          <span className="w-20 text-zinc-400 text-right">
+                          <span className={s.simBucket}>
                             {bucket.bucket}
                           </span>
-                          <div className="flex-1 h-2 bg-zinc-800 rounded-full overflow-hidden">
+                          <div className={s.simBar}>
                             <div
-                              className="h-full bg-sky-500 rounded-full"
+                              className={s.simBarFill}
                               style={{
                                 width: `${Math.min(100, bucket.count * 5)}%`,
                               }}
                             />
                           </div>
-                          <span className="w-8 text-zinc-500 text-right">
+                          <span className={s.simCount}>
                             {bucket.count}
                           </span>
                         </div>
@@ -715,7 +715,6 @@ export function DatabasePanel() {
               icon={Activity}
               title="No embedding data"
               description="Embedding health metrics will appear when the vector database is active."
-              className="p-3"
             />
           )}
         </CollapsibleSection>
@@ -723,17 +722,18 @@ export function DatabasePanel() {
         {/* 4E: Danger Zone */}
         <CollapsibleSection
           title="Danger Zone"
-          icon={<AlertTriangle className="size-4 text-red-400" />}
+          icon={<AlertTriangle className="size-4" />}
           defaultOpen={false}
         >
-          <div className="space-y-4 rounded-lg border-2 border-red-900/50 bg-red-950/10 p-3">
+          <div className={s.dangerOuter}>
             {dangerResult && (
               <div
-                className={`rounded-lg border px-3 py-2 text-xs ${
+                className={cn(
+                  s.dangerResult,
                   dangerResult.startsWith('Error')
-                    ? 'border-red-800 bg-red-950/30 text-red-300'
-                    : 'border-emerald-800 bg-emerald-950/30 text-emerald-300'
-                }`}
+                    ? s.dangerResultError
+                    : s.dangerResultOk
+                )}
               >
                 {dangerResult}
               </div>
@@ -741,20 +741,20 @@ export function DatabasePanel() {
 
             {/* Reset Database */}
             <div>
-              <h4 className="text-sm font-medium text-red-300 mb-1">
+              <h4 className={s.dangerTitle}>
                 Reset Database
               </h4>
-              <p className="text-xs text-zinc-400 mb-2">
+              <p className={s.dangerDesc}>
                 Truncates all memory tables for the current seed database. This
                 removes all stored memories, entities, and relationships but
                 keeps the database structure intact.
               </p>
-              <div className="flex items-center gap-2">
+              <div className={s.dangerInputRow}>
                 <input
                   value={resetConfirm}
                   onChange={(e) => setResetConfirm(e.target.value)}
                   placeholder={`Type "${seedStr}" to confirm`}
-                  className="flex-1 rounded-lg border border-zinc-800 bg-zinc-900 px-2 py-1.5 text-xs text-zinc-300 outline-none placeholder:text-zinc-600"
+                  className={s.dangerInput}
                 />
                 <Button
                   variant="destructive"
@@ -762,17 +762,17 @@ export function DatabasePanel() {
                   disabled={resetConfirm !== seedStr || dangerLoading}
                   onClick={() => setShowResetDialog(true)}
                 >
-                  <Trash2 className="size-3 mr-1" />
+                  <Trash2 className={s.dangerBtnIcon} />
                   Reset
                 </Button>
               </div>
               {showResetDialog && resetConfirm === seedStr && (
-                <div className="mt-2 rounded-lg border border-red-800 bg-red-950/30 p-2.5">
-                  <p className="text-xs text-red-300 mb-2">
+                <div className={s.dangerConfirmBox}>
+                  <p className={s.dangerConfirmText}>
                     Are you sure? This will remove all memory data for seed{' '}
                     {seedStr}. This action cannot be undone.
                   </p>
-                  <div className="flex gap-2">
+                  <div className={s.dangerConfirmBtns}>
                     <Button
                       variant="destructive"
                       size="sm"
@@ -793,23 +793,23 @@ export function DatabasePanel() {
               )}
             </div>
 
-            <hr className="border-red-900/30" />
+            <hr className={s.dangerSep} />
 
             {/* Drop Database */}
             <div>
-              <h4 className="text-sm font-medium text-red-300 mb-1">
+              <h4 className={s.dangerTitle}>
                 Drop Database
               </h4>
-              <p className="text-xs text-zinc-400 mb-2">
+              <p className={s.dangerDesc}>
                 Drops the entire per-seed database. This is the most destructive
                 operation and removes all data including the database itself.
               </p>
-              <div className="flex items-center gap-2">
+              <div className={s.dangerInputRow}>
                 <input
                   value={dropConfirm}
                   onChange={(e) => setDropConfirm(e.target.value)}
                   placeholder={`Type "${dbName}" to confirm`}
-                  className="flex-1 rounded-lg border border-zinc-800 bg-zinc-900 px-2 py-1.5 text-xs text-zinc-300 outline-none placeholder:text-zinc-600"
+                  className={s.dangerInput}
                 />
                 <Button
                   variant="destructive"
@@ -817,17 +817,17 @@ export function DatabasePanel() {
                   disabled={dropConfirm !== dbName || dangerLoading}
                   onClick={() => setShowDropDialog(true)}
                 >
-                  <HardDrive className="size-3 mr-1" />
+                  <HardDrive className={s.dangerBtnIcon} />
                   Drop
                 </Button>
               </div>
               {showDropDialog && dropConfirm === dbName && (
-                <div className="mt-2 rounded-lg border border-red-800 bg-red-950/30 p-2.5">
-                  <p className="text-xs text-red-300 mb-2">
+                <div className={s.dangerConfirmBox}>
+                  <p className={s.dangerConfirmText}>
                     Are you sure? This will permanently drop the database &quot;
                     {dbName}&quot;. This action cannot be undone.
                   </p>
-                  <div className="flex gap-2">
+                  <div className={s.dangerConfirmBtns}>
                     <Button
                       variant="destructive"
                       size="sm"

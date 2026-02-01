@@ -11,10 +11,20 @@ export interface Vitals {
   sleep: number;
 }
 
+export interface StressAxes {
+  time: number;
+  situational: number;
+  healthHunger: number;
+  resource: number;
+  protection: number;
+  locationDistance: number;
+}
+
 export interface Interoception {
   stress: number;
   focus: number;
   curiosity: number;
+  stressAxes?: StressAxes;
 }
 
 export interface HudData {
@@ -267,4 +277,19 @@ export interface DashboardState {
   currentScreenshot: Screenshot | null;
   inventory: InventoryItem[];
   plannerData: PlannerData | null;
+}
+
+// Interoception History types (evaluation dashboard)
+export interface InteroSnapshot {
+  ts: number;
+  stress: number;
+  focus: number;
+  curiosity: number;
+  stressAxes: StressAxes;
+  emotionalState: string;
+}
+
+export interface ServiceHealthStatus {
+  name: string;
+  status: 'up' | 'down';
 }

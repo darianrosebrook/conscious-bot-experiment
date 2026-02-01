@@ -1,5 +1,6 @@
 import React from 'react';
 import { cn } from '@/lib/utils';
+import styles from './section.module.scss';
 
 interface SectionProps {
   title: string;
@@ -27,24 +28,23 @@ export function Section({
   return (
     <section
       className={cn(
-        'rounded-2xl border border-zinc-800 bg-zinc-950/60 shadow-sm',
-        fullHeight && 'flex h-full min-h-0 flex-col overflow-hidden',
+        styles.section,
+        fullHeight && styles.sectionFullHeight,
         className
       )}
     >
-      <header className="flex shrink-0 items-center justify-between px-3 py-2 border-b border-zinc-800/80">
-        <div className="flex items-center gap-2 text-zinc-200">
+      <header className={styles.header}>
+        <div className={styles.headerTitle}>
           {icon}
-          <h3 className="text-sm font-semibold">{title}</h3>
+          <h3 className={styles.titleText}>{title}</h3>
         </div>
         {actions}
       </header>
       <div
         className={cn(
-          'px-3',
-          tight ? 'py-2' : 'py-3',
-          fullHeight &&
-            'flex-1 min-h-0 overflow-y-auto overflow-x-hidden flex flex-col'
+          styles.content,
+          tight && styles.contentTight,
+          fullHeight && styles.contentFullHeight
         )}
       >
         {children}

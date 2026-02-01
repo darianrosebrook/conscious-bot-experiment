@@ -3,7 +3,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   Activity,
-  BarChart3,
   Brain,
   FileText,
   History,
@@ -19,22 +18,24 @@ import {
 
 import { useDashboardStore } from '@/stores/dashboard-store';
 import type { InventoryItem, Task } from '@/types';
-import { debugLog } from '@/lib/utils';
+import { cn, debugLog, formatTime } from '@/lib/utils';
 import { useWebSocket } from '@/hooks/useWebSocket';
 import { useCognitiveStream } from '@/hooks/use-cognitive-stream';
 import { useBotStateSSE } from '@/hooks/use-bot-state-sse';
-import { formatTime } from '@/lib/utils';
-import { HudMeter } from '@/components/hud-meter';
+import { ViewerHudOverlay } from '@/components/viewer-hud-overlay';
+import { StressHexHeatmap, getHexKey } from '@/components/stress-hex-heatmap';
 import { Section } from '@/components/section';
 import { Pill } from '@/components/pill';
 import { EmptyState } from '@/components/empty-state';
 import { InventoryDisplay } from '@/components/inventory-display';
-import { EvaluationPanel } from '@/components/evaluation-panel';
+import { EvaluationTab } from '@/components/evaluation-tab';
 import { DatabasePanel } from '@/components/database-panel';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { DashboardProvider } from '@/contexts/dashboard-context';
+import styles from './page.module.scss';
+import tc from '@/styles/thought-colors.module.scss';
 
 interface BotState {
   position?: {
@@ -62,6 +63,24 @@ interface BotConnection {
   viewerActive?: boolean;
   viewerUrl?: string;
 }
+
+type ThoughtColorKey = 'intrusive' | 'chatIn' | 'chatOut' | 'social' | 'internal' | 'systemEvent' | 'thoughtProcessing' | 'taskCreation' | 'status' | 'systemMetric' | 'systemLog' | 'environmental' | 'default';
+
+const THOUGHT_COLORS: Record<ThoughtColorKey, { border: string; bg: string; text: string }> = {
+  intrusive: { border: tc.intrusiveBorder, bg: tc.intrusiveBg, text: tc.intrusiveText },
+  chatIn: { border: tc.chatInBorder, bg: tc.chatInBg, text: tc.chatInText },
+  chatOut: { border: tc.chatOutBorder, bg: tc.chatOutBg, text: tc.chatOutText },
+  social: { border: tc.socialBorder, bg: tc.socialBg, text: tc.socialText },
+  internal: { border: tc.internalBorder, bg: tc.internalBg, text: tc.internalText },
+  systemEvent: { border: tc.systemEventBorder, bg: tc.systemEventBg, text: tc.systemEventText },
+  thoughtProcessing: { border: tc.thoughtProcessingBorder, bg: tc.thoughtProcessingBg, text: tc.thoughtProcessingText },
+  taskCreation: { border: tc.taskCreationBorder, bg: tc.taskCreationBg, text: tc.taskCreationText },
+  status: { border: tc.statusBorder, bg: tc.statusBg, text: tc.statusText },
+  systemMetric: { border: tc.systemMetricBorder, bg: tc.systemMetricBg, text: tc.systemMetricText },
+  systemLog: { border: tc.systemLogBorder, bg: tc.systemLogBg, text: tc.systemLogText },
+  environmental: { border: tc.environmentalBorder, bg: tc.environmentalBg, text: tc.environmentalText },
+  default: { border: tc.defaultBorder, bg: tc.defaultBg, text: tc.defaultText },
+};
 
 /**
  * Conscious Minecraft Bot Dashboard
@@ -110,6 +129,7 @@ function ConsciousMinecraftDashboardContent() {
     },
   ]);
   const [viewerKey, setViewerKey] = useState(0);
+  const [dwellCounts, setDwellCounts] = useState<Record<string, number>>({});
   const [viewerStatus, setViewerStatus] = useState<{
     canStart: boolean;
     viewerActive?: boolean;
@@ -158,6 +178,12 @@ function ConsciousMinecraftDashboardContent() {
         case 'health_changed': {
           // Update HUD with new health data
           const healthData = message.data;
+          const healthIntero = {
+            stress: 20,
+            focus: 80,
+            curiosity: 75,
+            ...(hud?.intero?.stressAxes ? { stressAxes: hud.intero.stressAxes } : {}),
+          };
           setHud({
             ts: new Date().toISOString(),
             vitals: {
@@ -166,12 +192,12 @@ function ConsciousMinecraftDashboardContent() {
               stamina: 100, // Default value
               sleep: 100, // Default value
             },
-            intero: {
-              stress: 20, // Default value
-              focus: 80, // Default value
-              curiosity: 75, // Default value
-            },
+            intero: healthIntero,
             mood: 'neutral', // Default value
+          });
+          setDwellCounts((prev) => {
+            const key = getHexKey(healthIntero);
+            return { ...prev, [key]: (prev[key] ?? 0) + 1 };
           });
 
           // Update bot state
@@ -184,8 +210,22 @@ function ConsciousMinecraftDashboardContent() {
         }
 
         case 'hud_update': {
-          // Update HUD with comprehensive data from periodic updates
+          // Update HUD with comprehensive data from periodic updates.
+          // Prefer cognition intero when present; otherwise derive from safety/curiosity.
           const hudData = message.data;
+          const derivedIntero = {
+            stress: (1 - (hudData.safety || 0.9)) * 100,
+            focus: (hudData.curiosity || 0.6) * 100,
+            curiosity: (hudData.curiosity || 0.6) * 100,
+          };
+          const hudIntero = hudData.intero
+            ? {
+                stress: hudData.intero.stress ?? derivedIntero.stress,
+                focus: hudData.intero.focus ?? derivedIntero.focus,
+                curiosity: hudData.intero.curiosity ?? derivedIntero.curiosity,
+                ...(hudData.intero.stressAxes ? { stressAxes: hudData.intero.stressAxes } : {}),
+              }
+            : derivedIntero;
           setHud({
             ts: new Date().toISOString(),
             vitals: {
@@ -194,17 +234,17 @@ function ConsciousMinecraftDashboardContent() {
               stamina: (hudData.energy || 1) * 100, // Convert from 0-1 to 0-100
               sleep: 100, // Default value
             },
-            intero: {
-              stress: (1 - (hudData.safety || 0.9)) * 100, // Convert safety to stress (inverted)
-              focus: (hudData.curiosity || 0.6) * 100, // Use curiosity as focus proxy
-              curiosity: (hudData.curiosity || 0.6) * 100, // Direct curiosity mapping
-            },
+            intero: hudIntero,
             mood:
               (hudData.safety || 0.9) > 0.8
                 ? 'content'
                 : (hudData.safety || 0.9) > 0.5
                   ? 'neutral'
                   : 'concerned',
+          });
+          setDwellCounts((prev) => {
+            const key = getHexKey(hudIntero);
+            return { ...prev, [key]: (prev[key] ?? 0) + 1 };
           });
 
           // Update bot state
@@ -277,7 +317,12 @@ function ConsciousMinecraftDashboardContent() {
           // Handle bot errors, especially death
           const errorData = message.data;
           if (errorData.error === 'Bot died') {
-            // Update HUD to show 0 health when bot dies
+            const deadIntero = {
+              stress: 100,
+              focus: 0,
+              curiosity: 0,
+              stressAxes: { time: 100, situational: 100, healthHunger: 100, resource: 50, protection: 100, locationDistance: 50 },
+            };
             setHud({
               ts: new Date().toISOString(),
               vitals: {
@@ -286,12 +331,12 @@ function ConsciousMinecraftDashboardContent() {
                 stamina: 0,
                 sleep: 100,
               },
-              intero: {
-                stress: 100, // High stress when dead
-                focus: 0, // No focus when dead
-                curiosity: 0, // No curiosity when dead
-              },
+              intero: deadIntero,
               mood: 'dead',
+            });
+            setDwellCounts((prev) => {
+              const key = getHexKey(deadIntero);
+              return { ...prev, [key]: (prev[key] ?? 0) + 1 };
             });
 
             // Update bot state
@@ -315,6 +360,12 @@ function ConsciousMinecraftDashboardContent() {
         case 'respawned': {
           // Handle bot respawn
           const respawnData = message.data;
+          const respawnIntero = {
+            stress: 20,
+            focus: 80,
+            curiosity: 75,
+            stressAxes: { time: 5, situational: 5, healthHunger: 5, resource: 20, protection: 15, locationDistance: 5 },
+          };
 
           // Update HUD with respawned health
           setHud({
@@ -325,12 +376,12 @@ function ConsciousMinecraftDashboardContent() {
               stamina: 100,
               sleep: 100,
             },
-            intero: {
-              stress: 20,
-              focus: 80,
-              curiosity: 75,
-            },
+            intero: respawnIntero,
             mood: 'neutral',
+          });
+          setDwellCounts((prev) => {
+            const key = getHexKey(respawnIntero);
+            return { ...prev, [key]: (prev[key] ?? 0) + 1 };
           });
 
           // Update bot state
@@ -367,7 +418,14 @@ function ConsciousMinecraftDashboardContent() {
           debugLog('Unhandled WebSocket message type:', message.type);
       }
     },
-    [setHud, setInventory, setBotState, setBotConnections, addThought]
+    [
+      setHud,
+      setInventory,
+      setBotState,
+      setBotConnections,
+      addThought,
+      setDwellCounts,
+    ]
   );
 
   const handleWebSocketError = useCallback((error: Event) => {
@@ -405,7 +463,7 @@ function ConsciousMinecraftDashboardContent() {
           stamina?: number;
           sleep?: number;
         } | null;
-        intero?: { stress?: number; focus?: number; curiosity?: number };
+        intero?: { stress?: number; focus?: number; curiosity?: number; stressAxes?: { time: number; situational: number; healthHunger: number; resource: number; protection: number; locationDistance: number } };
         mood?: string;
       };
     }) => {
@@ -431,12 +489,17 @@ function ConsciousMinecraftDashboardContent() {
           stress: i?.stress ?? defaultIntero.stress,
           focus: i?.focus ?? defaultIntero.focus,
           curiosity: i?.curiosity ?? defaultIntero.curiosity,
+          ...(i?.stressAxes ? { stressAxes: i.stressAxes } : {}),
         };
         setHud({
           ts: new Date().toISOString(),
           vitals,
           intero,
           mood: d.mood ?? 'neutral',
+        });
+        setDwellCounts((prev) => {
+          const key = getHexKey(intero);
+          return { ...prev, [key]: (prev[key] ?? 0) + 1 };
         });
       }
       const normalizedInventory: InventoryItem[] = d.inventory
@@ -1337,80 +1400,80 @@ function ConsciousMinecraftDashboardContent() {
   };
 
   return (
-    <div className="h-screen w-screen bg-gradient-to-b from-zinc-950 via-zinc-950 to-black text-zinc-100 overflow-hidden h-full">
+    <div className={styles.root}>
       {/* Top Navigation */}
-      <header className="flex items-center justify-between border-b border-zinc-900/80 bg-zinc-950/80 px-4 py-3 backdrop-blur supports-[backdrop-filter]:bg-zinc-950/60">
-        <div className="flex items-center gap-3">
-          <div className="size-8 rounded bg-emerald-500/10 grid place-items-center">
-            <Brain className="size-4" />
+      <header className={styles.header}>
+        <div className={styles.headerLeft}>
+          <div className={styles.headerLogo}>
+            <Brain className={styles.icon4} />
           </div>
-          <div className="font-semibold tracking-wide">Cognitive Stream</div>
-          <nav className="ml-6 hidden md:flex items-center gap-4 text-sm text-zinc-300">
+          <div className={styles.headerTitle}>Cognitive Stream</div>
+          <nav className={styles.headerNav}>
             <Tabs
               value={activeTab}
               onValueChange={setActiveTab}
-              className="w-auto"
+              className={styles.tabsAuto}
             >
-              <TabsList className="bg-zinc-900/50">
-                <TabsTrigger value="live" className="hover:text-zinc-100">
+              <TabsList className={styles.tabsBg}>
+                <TabsTrigger value="live">
                   Live
                 </TabsTrigger>
-                <TabsTrigger value="evaluation" className="hover:text-zinc-100">
+                <TabsTrigger value="evaluation">
                   Evaluation
                 </TabsTrigger>
-                <TabsTrigger value="database" className="hover:text-zinc-100">
+                <TabsTrigger value="database">
                   Database
                 </TabsTrigger>
               </TabsList>
             </Tabs>
           </nav>
         </div>
-        <div className="flex items-center gap-2">
+        <div className={styles.headerRight}>
           <Button
             variant="outline"
             size="sm"
-            className="bg-zinc-900 border-zinc-800 hover:bg-zinc-800/80"
+            className={styles.headerBtn}
           >
-            <Search className="size-4 mr-2" />
+            <Search className={styles.iconMr} />
             Search
           </Button>
           <Button
             variant="outline"
             size="sm"
-            className="bg-zinc-900 border-zinc-800 hover:bg-zinc-800/80"
+            className={styles.headerBtn}
             onClick={() => setIsLive(!isLive)}
           >
             {isLive ? (
-              <PauseCircle className="size-4 mr-2" />
+              <PauseCircle className={styles.iconMr} />
             ) : (
-              <PlayCircle className="size-4 mr-2" />
+              <PlayCircle className={styles.iconMr} />
             )}
             {isLive ? 'Pause' : 'Go Live'}
           </Button>
           <Button
             variant="outline"
             size="sm"
-            className="bg-zinc-900 border-zinc-800 hover:bg-zinc-800/80"
+            className={styles.headerBtn}
             onClick={() => {
               // Refresh bot state data
               botStateWebSocket.reconnect();
               setViewerKey((prev) => prev + 1);
             }}
           >
-            <RefreshCw className="size-4 mr-2" />
+            <RefreshCw className={styles.iconMr} />
             Refresh
           </Button>
-          <div className="flex items-center gap-1 text-xs">
+          <div className={styles.statusGroup}>
             <div
-              className={`size-2 rounded-full ${botStateWebSocket.isConnected ? 'bg-green-500' : botStateWebSocket.error ? 'bg-red-500' : 'bg-yellow-500'}`}
+              className={cn(styles.statusDot, botStateWebSocket.isConnected ? styles.statusDotGreen : botStateWebSocket.error ? styles.statusDotRed : styles.statusDotYellow)}
             />
-            <span className="text-zinc-400">Bot State</span>
+            <span className={styles.statusLabel}>Bot State</span>
             {botStateWebSocket.error && (
               <button
                 onClick={() => {
                   botStateWebSocket.reconnect();
                 }}
-                className="ml-2 text-xs text-zinc-400 hover:text-zinc-200 underline"
+                className={styles.reconnectBtn}
               >
                 Reconnect
               </button>
@@ -1419,76 +1482,56 @@ function ConsciousMinecraftDashboardContent() {
         </div>
       </header>
 
-      {/* HUD Bar */}
-      <div className="border-b border-zinc-900/80 bg-zinc-950/70 px-4 py-2 backdrop-blur supports-[backdrop-filter]:bg-zinc-950/50">
-        {hud ? (
-          <>
-            <div className="grid grid-cols-2 md:grid-cols-7 gap-3">
-              <HudMeter
-                label="Health"
-                value={((hud.vitals.health || 0) / 20) * 100}
-              />
-              <HudMeter
-                label="Hunger"
-                value={((hud.vitals.hunger || 0) / 20) * 100}
-              />
-              <HudMeter label="Stamina" value={hud.vitals.stamina || 0} />
-              <HudMeter label="Sleep" value={hud.vitals.sleep || 0} />
-              <HudMeter
-                label="Stress"
-                value={hud.intero.stress || 0}
-                hint="lower is better"
-              />
-              <HudMeter label="Focus" value={hud.intero.focus || 0} />
-              <HudMeter label="Curiosity" value={hud.intero.curiosity || 0} />
-            </div>
-            <div className="mt-1 text-xs text-zinc-400">
-              Mood: <span className="text-zinc-200">{hud.mood}</span>
-            </div>
-          </>
-        ) : (
-          <div className="flex items-center justify-center py-4">
-            <div className="flex items-center gap-2 text-sm text-zinc-400">
-              <div className="size-2 rounded-full bg-zinc-600 animate-pulse" />
-              <span>Waiting for HUD data...</span>
-            </div>
-          </div>
-        )}
-      </div>
-
       {/* Main Content with Tabs */}
-      <div className="h-[calc(100vh-136px)]">
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="h-full">
-          <TabsContent value="live" className="h-full mt-0">
-            <div className="grid h-full grid-cols-12 gap-3 p-3">
-              {/* Left: Tasks, Planner, Reflective Notes, Environment, Events, Memories */}
-              <aside className="col-span-12 md:col-span-3 flex flex-col gap-3 overflow-auto">
-                <Section title="Tasks" icon={<ListChecks className="size-4" />}>
+      <div className={styles.mainContent}>
+        <Tabs value={activeTab} onValueChange={setActiveTab} className={styles.tabsFull}>
+          <TabsContent value="live" className={styles.tabContentFull}>
+            <div className={styles.liveGrid}>
+              {/* Left: Stress heatmap, Tasks, Planner, Reflective Notes, Environment, Events, Memories */}
+              <aside className={styles.leftSidebar}>
+                {hud?.intero && (
+                  <Section
+                    title="Stress / Interoception"
+                    icon={<Brain className={styles.icon4} />}
+                  >
+                    <div className={styles.stressContent}>
+                      <StressHexHeatmap
+                        intero={hud.intero}
+                        dwellCounts={dwellCounts}
+                        className={styles.shrink0}
+                      />
+                      <div className={styles.moodText}>
+                        Mood: <span className={styles.moodValue}>{hud.mood}</span>
+                      </div>
+                    </div>
+                  </Section>
+                )}
+                <Section title="Tasks" icon={<ListChecks className={styles.icon4} />}>
                   {tasks.length > 0 ? (
-                    <div className="flex flex-col gap-3">
+                    <div className={styles.taskList}>
                       {tasks.map((task) => (
                         <div
                           key={task.id}
-                          className="rounded-xl border border-zinc-800 bg-zinc-950 p-3"
+                          className={styles.taskCard}
                         >
-                          <div className="flex items-center justify-between">
-                            <div className="font-medium text-zinc-200">
+                          <div className={styles.taskHeader}>
+                            <div className={styles.taskTitle}>
                               {task.title}
                             </div>
                             <Pill>{task.source}</Pill>
                           </div>
-                          <div className="mt-2 h-1.5 w-full rounded bg-zinc-800">
+                          <div className={styles.taskProgressTrack}>
                             <div
-                              className="h-1.5 rounded bg-sky-500 transition-all duration-300"
+                              className={styles.taskProgressFill}
                               style={{
                                 width: `${Math.round(task.progress * 100)}%`,
                               }}
                             />
                           </div>
                           {task.requirement && (
-                            <div className="mt-2 text-xs text-zinc-400">
-                              <div className="flex items-center justify-between">
-                                <span className="font-medium text-zinc-300">
+                            <div className={styles.taskRequirement}>
+                              <div className={styles.requirementHeader}>
+                                <span className={styles.requirementLabel}>
                                   Requirement
                                 </span>
                                 {task.requirement?.kind === 'craft' &&
@@ -1515,7 +1558,7 @@ function ConsciousMinecraftDashboardContent() {
                               </div>
                               {Array.isArray(task.requirement?.patterns) &&
                               task.requirement?.patterns?.length ? (
-                                <div className="mt-1 truncate text-zinc-500">
+                                <div className={styles.requirementPatterns}>
                                   Items: {task.requirement.patterns.join(', ')}
                                 </div>
                               ) : null}
@@ -1546,18 +1589,18 @@ function ConsciousMinecraftDashboardContent() {
                                 }
                                 const pct = Math.round(reqProgress * 100);
                                 return (
-                                  <div className="mt-2">
-                                    <div className="flex items-center justify-between mb-1">
-                                      <span className="text-[10px] uppercase tracking-wide text-zinc-500">
+                                  <div className={styles.requirementProgressWrapper}>
+                                    <div className={styles.requirementProgressHeader}>
+                                      <span className={styles.requirementProgressLabel}>
                                         Requirement Progress
                                       </span>
-                                      <span className="text-[10px] text-zinc-400">
+                                      <span className={styles.requirementProgressValue}>
                                         {pct}%
                                       </span>
                                     </div>
-                                    <div className="h-1 w-full rounded bg-zinc-800">
+                                    <div className={styles.requirementProgressTrack}>
                                       <div
-                                        className="h-1 rounded bg-emerald-500 transition-all duration-300"
+                                        className={styles.requirementProgressFill}
                                         style={{ width: `${pct}%` }}
                                       />
                                     </div>
@@ -1567,24 +1610,20 @@ function ConsciousMinecraftDashboardContent() {
                             </div>
                           )}
                           {task.steps && (
-                            <ul className="mt-2 space-y-1 text-sm text-zinc-300">
+                            <ul className={styles.taskSteps}>
                               {task.steps.map((step) => (
                                 <li
                                   key={step.id}
-                                  className="flex items-center gap-2"
+                                  className={styles.stepItem}
                                 >
                                   <input
                                     type="checkbox"
                                     checked={step.done}
                                     onChange={() => {}}
-                                    className="size-3"
+                                    className={styles.stepCheckbox}
                                   />
                                   <span
-                                    className={
-                                      step.done
-                                        ? 'line-through text-zinc-500'
-                                        : ''
-                                    }
+                                    className={step.done ? styles.stepDone : undefined}
                                   >
                                     {step.label}
                                   </span>
@@ -1610,28 +1649,28 @@ function ConsciousMinecraftDashboardContent() {
 
                 <Section
                   title="Current Status"
-                  icon={<Activity className="size-4" />}
+                  icon={<Activity className={styles.icon4} />}
                   tight
                 >
                   {plannerData ? (
-                    <div className="space-y-3">
+                    <div className={styles.plannerContent}>
                       {plannerData.currentAction && (
-                        <div className="rounded-lg border border-zinc-800 bg-zinc-950 p-3">
-                          <div className="flex items-center justify-between mb-2">
-                            <h4 className="text-sm font-medium text-zinc-200">
+                        <div className={styles.plannerCard}>
+                          <div className={styles.plannerCardHeader}>
+                            <h4 className={styles.plannerCardTitle}>
                               Current Action
                             </h4>
-                            <span className="text-xs text-zinc-500">
+                            <span className={styles.plannerCardPercent}>
                               {Math.round(
                                 (plannerData.currentAction.progress || 0) * 100
                               )}
                               %
                             </span>
                           </div>
-                          <p className="text-xs text-zinc-400">
+                          <p className={styles.plannerCardDesc}>
                             {plannerData.currentAction.name}
                             {plannerData.currentAction.target && (
-                              <span className="text-zinc-500">
+                              <span className={styles.plannerCardTarget}>
                                 {' '}
                                 → {plannerData.currentAction.target}
                               </span>
@@ -1641,15 +1680,15 @@ function ConsciousMinecraftDashboardContent() {
                       )}
 
                       {plannerData.planQueue.length > 0 && (
-                        <div className="rounded-lg border border-zinc-800 bg-zinc-950 p-3">
-                          <h4 className="text-sm font-medium text-zinc-200 mb-2">
+                        <div className={styles.plannerCard}>
+                          <h4 className={styles.plannerCardTitle}>
                             Upcoming Plans
                           </h4>
-                          <div className="space-y-1">
+                          <div className={styles.plannerUpcomingContent}>
                             {plannerData.planQueue.slice(0, 2).map((plan) => (
                               <div
                                 key={plan.id}
-                                className="text-xs text-zinc-400"
+                                className={styles.plannerUpcomingItem}
                               >
                                 • {plan.name}
                               </div>
@@ -1663,40 +1702,39 @@ function ConsciousMinecraftDashboardContent() {
                       icon={Activity}
                       title="No status data"
                       description="Status information will appear here when the bot is active."
-                      className="p-3"
                     />
                   )}
                 </Section>
 
                 <Section
                   title="Reflective Notes"
-                  icon={<FileText className="size-4" />}
+                  icon={<FileText className={styles.icon4} />}
                   tight
                 >
                   {notes.length > 0 ? (
-                    <div className="flex flex-col gap-2 p-2">
+                    <div className={styles.notesList}>
                       {notes.slice(0, 5).map((note) => (
                         <div
                           key={note.id}
-                          className="rounded-lg border border-zinc-800 bg-zinc-950 p-2.5"
+                          className={styles.noteCard}
                         >
-                          <div className="flex items-center justify-between text-[11px] text-zinc-400 mb-1">
+                          <div className={styles.noteHeader}>
                             <Pill>{note.type}</Pill>
-                            <time className="tabular-nums">
+                            <time className={styles.tabularNums}>
                               {formatTime(note.ts)}
                             </time>
                           </div>
                           {note.title && (
-                            <div className="text-xs font-medium text-zinc-200 mb-0.5">
+                            <div className={styles.noteTitle}>
                               {note.title}
                             </div>
                           )}
-                          <p className="text-xs text-zinc-300 overflow-hidden text-ellipsis line-clamp-2">
+                          <p className={styles.noteContent}>
                             {note.content}
                           </p>
-                          <div className="flex items-center justify-between mt-1.5">
+                          <div className={styles.noteFooter}>
                             <Pill>{note.source}</Pill>
-                            <span className="text-[10px] text-zinc-500">
+                            <span className={styles.noteConfidence}>
                               {Math.round(note.confidence * 100)}%
                             </span>
                           </div>
@@ -1708,28 +1746,27 @@ function ConsciousMinecraftDashboardContent() {
                       icon={FileText}
                       title="No reflective notes"
                       description="Reflective insights will appear here as the bot processes experiences."
-                      className="p-3"
                     />
                   )}
                 </Section>
 
-                <Section title="Environment" icon={<Map className="size-4" />}>
+                <Section title="Environment" icon={<Map className={styles.icon4} />}>
                   {environment ? (
-                    <div className="grid grid-cols-2 gap-2 text-sm text-zinc-300">
-                      <div className="rounded-lg border border-zinc-800 bg-zinc-950 p-2">
-                        <span className="text-zinc-500">Biome</span>
+                    <div className={styles.envGrid}>
+                      <div className={styles.envCell}>
+                        <span className={styles.envLabel}>Biome</span>
                         <div>{environment.biome}</div>
                       </div>
-                      <div className="rounded-lg border border-zinc-800 bg-zinc-950 p-2">
-                        <span className="text-zinc-500">Weather</span>
+                      <div className={styles.envCell}>
+                        <span className={styles.envLabel}>Weather</span>
                         <div>{environment.weather}</div>
                       </div>
-                      <div className="rounded-lg border border-zinc-800 bg-zinc-950 p-2">
-                        <span className="text-zinc-500">Time</span>
+                      <div className={styles.envCell}>
+                        <span className={styles.envLabel}>Time</span>
                         <div>{environment.timeOfDay}</div>
                       </div>
-                      <div className="rounded-lg border border-zinc-800 bg-zinc-950 p-2">
-                        <span className="text-zinc-500">Nearby</span>
+                      <div className={styles.envCell}>
+                        <span className={styles.envLabel}>Nearby</span>
                         <div>{environment.nearbyEntities.join(', ')}</div>
                       </div>
                     </div>
@@ -1742,24 +1779,24 @@ function ConsciousMinecraftDashboardContent() {
                   )}
                 </Section>
 
-                <Section title="Events" icon={<History className="size-4" />}>
+                <Section title="Events" icon={<History className={styles.icon4} />}>
                   {events.length > 0 ? (
-                    <div className="flex flex-col gap-2">
+                    <div className={styles.eventMemoryList}>
                       {events
                         .slice(-8)
                         .reverse()
                         .map((event) => (
                           <div
                             key={event.id}
-                            className="rounded-lg border border-zinc-800 bg-zinc-950 p-2.5"
+                            className={styles.eventCard}
                           >
-                            <div className="flex items-center justify-between text-[11px] text-zinc-400 mb-1">
+                            <div className={styles.eventHeader}>
                               <Pill>{event.kind}</Pill>
-                              <time className="tabular-nums">
+                              <time className={styles.tabularNums}>
                                 {formatTime(event.ts)}
                               </time>
                             </div>
-                            <p className="text-xs text-zinc-300 overflow-hidden text-ellipsis line-clamp-2">
+                            <p className={styles.eventContent}>
                               {(event.payload?.content as string) ||
                                 (event.payload?.title as string) ||
                                 event.kind}
@@ -1776,28 +1813,28 @@ function ConsciousMinecraftDashboardContent() {
                   )}
                 </Section>
 
-                <Section title="Memories" icon={<Brain className="size-4" />}>
+                <Section title="Memories" icon={<Brain className={styles.icon4} />}>
                   {memories.length > 0 ? (
-                    <div className="flex flex-col gap-2">
+                    <div className={styles.eventMemoryList}>
                       {memories
                         .slice(-6)
                         .reverse()
                         .map((memory) => (
                           <div
                             key={memory.id}
-                            className="rounded-lg border border-zinc-800 bg-zinc-950 p-2.5"
+                            className={styles.eventCard}
                           >
-                            <div className="flex items-center justify-between text-[11px] text-zinc-400 mb-1">
+                            <div className={styles.eventHeader}>
                               <Pill>{memory.type}</Pill>
-                              <time className="tabular-nums">
+                              <time className={styles.tabularNums}>
                                 {formatTime(memory.ts)}
                               </time>
                             </div>
-                            <p className="text-xs text-zinc-300 overflow-hidden text-ellipsis line-clamp-2">
+                            <p className={styles.eventContent}>
                               {memory.text}
                             </p>
                             {memory.score != null && (
-                              <div className="mt-1 text-[10px] text-zinc-500">
+                              <div className={styles.memorySalience}>
                                 Salience: {Math.round(memory.score * 100)}%
                               </div>
                             )}
@@ -1815,12 +1852,12 @@ function ConsciousMinecraftDashboardContent() {
               </aside>
 
               {/* Center: Live Stream + Inventory */}
-              <main className="col-span-12 md:col-span-6 flex flex-col gap-3 overflow-hidden">
+              <main className={styles.centerColumn}>
                 <Section
                   title="Live Stream"
-                  icon={<Activity className="size-4" />}
+                  icon={<Activity className={styles.icon4} />}
                 >
-                  <div className="relative aspect-video w-full overflow-hidden rounded-xl border border-zinc-800 bg-zinc-900">
+                  <div className={styles.streamWrapper}>
                     {botConnections.find((c) => c.name === 'minecraft-bot')
                       ?.viewerActive ? (
                       <>
@@ -1831,19 +1868,26 @@ function ConsciousMinecraftDashboardContent() {
                               (c) => c.name === 'minecraft-bot'
                             )?.viewerUrl || 'http://localhost:3006'
                           }
-                          className="absolute inset-0 w-full h-full border-0"
+                          className={styles.streamIframe}
                           title="Minecraft Bot View"
                           sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals"
                           allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                         />
-                        <div className="absolute right-3 top-3 flex items-center gap-2">
+                        <ViewerHudOverlay
+                          health={hud?.vitals?.health ?? botState?.health ?? 20}
+                          hunger={hud?.vitals?.hunger ?? botState?.food ?? 20}
+                          armor={0}
+                          breath={20}
+                          experience={0}
+                        />
+                        <div className={styles.streamOverlayButtons}>
                           <button
                             onClick={async () => {
                               setViewerKey((prev) => prev + 1);
                               // Also refresh viewer status
                               await checkViewerStatus();
                             }}
-                            className="rounded-md bg-black/60 px-2 py-1 text-xs text-zinc-300 hover:bg-black/80"
+                            className={styles.viewerBtn}
                           >
                             Refresh Viewer
                           </button>
@@ -1856,7 +1900,7 @@ function ConsciousMinecraftDashboardContent() {
                                 '_blank'
                               );
                             }}
-                            className="rounded-md bg-black/60 px-2 py-1 text-xs text-zinc-300 hover:bg-black/80"
+                            className={styles.viewerBtn}
                           >
                             Full Screen
                           </button>
@@ -1886,22 +1930,22 @@ function ConsciousMinecraftDashboardContent() {
                                 console.error('Error stopping viewer:', error);
                               }
                             }}
-                            className="rounded-md bg-red-600/60 px-2 py-1 text-xs text-zinc-300 hover:bg-red-600/80"
+                            className={styles.viewerBtnStop}
                           >
                             Stop Viewer
                           </button>
                         </div>
                       </>
                     ) : (
-                      <div className="absolute inset-0 flex items-center justify-center">
-                        <div className="text-center p-6">
-                          <div className="mb-4 rounded-full bg-zinc-800/50 p-3 inline-block">
-                            <Activity className="size-6 text-zinc-400" />
+                      <div className={styles.streamPlaceholder}>
+                        <div className={styles.streamPlaceholderContent}>
+                          <div className={styles.streamPlaceholderIcon}>
+                            <Activity className={cn(styles.icon6, styles.statusLabel)} />
                           </div>
-                          <h3 className="text-sm font-medium text-zinc-200 mb-2">
+                          <h3 className={styles.streamPlaceholderTitle}>
                             Bot Status
                           </h3>
-                          <p className="text-xs text-zinc-400 mb-4">
+                          <p className={styles.streamPlaceholderDesc}>
                             {botConnections.find(
                               (c) => c.name === 'minecraft-bot'
                             )?.connected
@@ -1961,11 +2005,7 @@ function ConsciousMinecraftDashboardContent() {
                                   );
                                 }
                               }}
-                              className={`rounded-md px-3 py-1 text-xs ${
-                                viewerStatus?.canStart
-                                  ? 'bg-sky-600 text-white hover:bg-sky-700'
-                                  : 'bg-gray-400 text-gray-200 cursor-not-allowed'
-                              }`}
+                              className={cn(styles.startViewerBtn, viewerStatus?.canStart ? styles.startViewerReady : styles.startViewerDisabled)}
                               disabled={!viewerStatus?.canStart}
                               title={
                                 viewerStatus?.reason || 'Start Minecraft viewer'
@@ -1976,7 +2016,7 @@ function ConsciousMinecraftDashboardContent() {
                                 : 'Viewer Not Ready'}
                             </button>
                           )}
-                          <div className="text-xs text-zinc-500 space-y-1">
+                          <div className={styles.botStatusInfo}>
                             {botState ? (
                               <>
                                 <div>
@@ -2026,18 +2066,19 @@ function ConsciousMinecraftDashboardContent() {
                         </div>
                       </div>
                     )}
-                    <div className="absolute left-3 top-3 flex items-center gap-2 rounded-md bg-black/60 px-2 py-1 text-xs">
+                    <div className={styles.streamStatusBadge}>
                       <div
-                        className={`size-2 rounded-full ${
+                        className={cn(
+                          styles.statusDot,
                           botConnections.find((c) => c.name === 'minecraft-bot')
                             ?.viewerActive
-                            ? 'bg-green-500 animate-pulse'
+                            ? styles.statusDotPulse
                             : botConnections.find(
                                   (c) => c.name === 'minecraft-bot'
                                 )?.connected
-                              ? 'bg-yellow-500'
-                              : 'bg-red-500'
-                        }`}
+                              ? styles.statusDotYellow
+                              : styles.statusDotRed
+                        )}
                       />
                       {botConnections.find((c) => c.name === 'minecraft-bot')
                         ?.viewerActive
@@ -2046,8 +2087,8 @@ function ConsciousMinecraftDashboardContent() {
                               ?.connected
                           ? 'BOT CONNECTED'
                           : 'DISCONNECTED'}
-                      <div className="size-2 rounded-full bg-zinc-600" />
-                      <span className="text-zinc-400">COG</span>
+                      <div className={styles.cogDot} />
+                      <span className={styles.cogLabel}>COG</span>
                     </div>
                   </div>
                 </Section>
@@ -2059,16 +2100,16 @@ function ConsciousMinecraftDashboardContent() {
               </main>
 
               {/* Right: Cognitive Stream + Thought Input */}
-              <aside className="col-span-12 md:col-span-3 flex flex-col gap-3 h-full overflow-hidden">
+              <aside className={styles.rightSidebar}>
                 <Section
                   title="Cognitive Stream"
-                  icon={<MessageSquare className="size-4" />}
+                  icon={<MessageSquare className={styles.icon4} />}
                   actions={<Pill>consciousness flow</Pill>}
-                  className="flex-1 flex flex-col min-h-0"
+                  className={styles.cognitiveSection}
                   fullHeight
                 >
                   <div
-                    className="flex-1 min-h-0 flex flex-col overflow-hidden"
+                    className={styles.cognitiveContainer}
                     data-testid="cognitive-stream-container"
                   >
                     {(() => {
@@ -2138,120 +2179,73 @@ function ConsciousMinecraftDashboardContent() {
                         const isSystemLog =
                           thought.thoughtType === 'system_log';
 
-                        let borderColor = 'border-zinc-800';
-                        let bgColor = 'bg-zinc-950';
                         let prefix = '';
                         let typeLabel = thought.thoughtType || thought.type;
-                        let textColor = 'text-zinc-200';
-                        // let iconColor = 'text-zinc-400';
+                        let colorKey: ThoughtColorKey = 'default';
 
                         if (isIntrusive) {
-                          borderColor = 'border-purple-600/50';
-                          bgColor = 'bg-purple-950/20';
+                          colorKey = 'intrusive';
                           prefix = ' ';
                           typeLabel = 'intrusive';
-                          textColor = 'text-purple-200';
-                          // iconColor = 'text-purple-400';
                         } else if (isExternalChat) {
-                          borderColor = 'border-blue-600/50';
-                          bgColor = 'bg-blue-950/20';
+                          colorKey = 'chatIn';
                           prefix = ` ${thought.sender}: `;
                           typeLabel = 'chat_in';
-                          textColor = 'text-blue-200';
-                          // iconColor = 'text-blue-400';
                         } else if (isBotResponse) {
-                          borderColor = 'border-green-600/50';
-                          bgColor = 'bg-green-950/20';
+                          colorKey = 'chatOut';
                           prefix = ' ';
                           typeLabel = 'chat_out';
-                          textColor = 'text-green-200';
-                          // iconColor = 'text-green-400';
                         } else if (isSocial || isSocialConsideration) {
-                          borderColor = 'border-orange-600/50';
-                          bgColor = 'bg-orange-950/20';
+                          colorKey = 'social';
                           prefix = ' ';
                           typeLabel = isSocialConsideration
                             ? 'social_consideration'
                             : 'social';
-                          textColor = 'text-orange-200';
-                          // iconColor = 'text-orange-400';
                         } else if (isInternal) {
-                          borderColor = 'border-yellow-600/50';
-                          bgColor = 'bg-yellow-950/20';
+                          colorKey = 'internal';
                           prefix = ' ';
                           typeLabel = 'internal';
-                          textColor = 'text-yellow-200';
-                          // iconColor = 'text-yellow-400';
                         } else if (isSystemEvent) {
-                          borderColor = 'border-indigo-600/50';
-                          bgColor = 'bg-indigo-950/20';
-                          prefix = '';
+                          colorKey = 'systemEvent';
                           typeLabel = 'system_event';
-                          textColor = 'text-indigo-200';
-                          // iconColor = 'text-indigo-400';
                         } else if (isThoughtProcessing) {
-                          borderColor = 'border-cyan-600/50';
-                          bgColor = 'bg-cyan-950/20';
+                          colorKey = 'thoughtProcessing';
                           prefix = '⚡ ';
                           typeLabel = 'thought_processing';
-                          textColor = 'text-cyan-200';
-                          // iconColor = 'text-cyan-400';
                         } else if (isTaskCreation) {
-                          borderColor = 'border-emerald-600/50';
-                          bgColor = 'bg-emerald-950/20';
-                          prefix = '';
+                          colorKey = 'taskCreation';
                           typeLabel = 'task_creation';
-                          textColor = 'text-emerald-200';
-                          // iconColor = 'text-emerald-400';
-                        } else if (isSystemStatus) {
-                          borderColor = 'border-slate-600/50';
-                          bgColor = 'bg-slate-950/20';
-                          prefix = '';
+                        } else if (isSystemStatus || thought.thoughtType === 'status') {
+                          colorKey = 'status';
                           typeLabel = 'status';
-                          textColor = 'text-slate-200';
-                          // iconColor = 'text-slate-400';
-                        } else if (thought.thoughtType === 'status') {
-                          // minecraft-interface health/hunger updates (type: 'status')
-                          borderColor = 'border-slate-600/50';
-                          bgColor = 'bg-slate-950/20';
-                          prefix = '';
-                          typeLabel = 'status';
-                          textColor = 'text-slate-200';
                         } else if (isSystemMetric) {
-                          borderColor = 'border-pink-600/50';
-                          bgColor = 'bg-pink-950/20';
+                          colorKey = 'systemMetric';
                           prefix = '📈 ';
                           typeLabel = 'system_metric';
-                          textColor = 'text-pink-200';
-                          // iconColor = 'text-pink-400';
                         } else if (isSystemLog) {
-                          borderColor = 'border-gray-600/50';
-                          bgColor = 'bg-gray-950/20';
+                          colorKey = 'systemLog';
                           prefix = '📝 ';
                           typeLabel = 'system_log';
-                          textColor = 'text-gray-200';
-                          // iconColor = 'text-gray-400';
                         } else if (thought.thoughtType === 'environmental') {
-                          borderColor = 'border-teal-600/50';
-                          bgColor = 'bg-teal-950/20';
-                          prefix = '';
+                          colorKey = 'environmental';
                           typeLabel = 'environmental';
-                          textColor = 'text-teal-200';
                         }
+
+                        const colors = THOUGHT_COLORS[colorKey];
 
                         return (
                           <div
-                            className={`rounded-xl border ${borderColor} ${bgColor} p-2.5`}
+                            className={cn(styles.thoughtCard, colors.border, colors.bg)}
                           >
-                            <div className="flex items-center justify-between text-[11px] text-zinc-400">
-                              <span className="uppercase tracking-wide">
+                            <div className={styles.thoughtHeader}>
+                              <span className={styles.thoughtTypeLabel}>
                                 {typeLabel}
                               </span>
-                              <time className="tabular-nums">
+                              <time className={styles.tabularNums}>
                                 {formatTime(thought.ts)}
                               </time>
                             </div>
-                            <p className={`mt-1 text-sm ${textColor}`}>
+                            <p className={cn(styles.thoughtText, colors.text)}>
                               {prefix}
                               {thought.text}
                             </p>
@@ -2262,26 +2256,26 @@ function ConsciousMinecraftDashboardContent() {
                       return (
                         <Tabs
                           defaultValue="cognitive"
-                          className="flex-1 flex flex-col min-h-0 overflow-hidden"
+                          className={styles.cognitiveContainer}
                         >
-                          <TabsList className="w-full grid grid-cols-2 shrink-0 mb-2 bg-zinc-900/80">
-                            <TabsTrigger value="cognitive" className="text-xs">
+                          <TabsList className={styles.innerTabsList}>
+                            <TabsTrigger value="cognitive" className={styles.innerTabTrigger}>
                               Cognitive Stream
                             </TabsTrigger>
-                            <TabsTrigger value="status" className="text-xs">
+                            <TabsTrigger value="status" className={styles.innerTabTrigger}>
                               Status / Environmental
                             </TabsTrigger>
                           </TabsList>
                           <TabsContent
                             value="cognitive"
-                            className="flex-1 min-h-0 mt-0 overflow-hidden data-[state=inactive]:hidden flex flex-col"
+                            className={styles.innerTabContent}
                           >
                             {cognitiveThoughts.length > 0 ? (
                               <ScrollArea
-                                className="h-full min-h-0 flex-1"
+                                className={styles.scrollFull}
                                 ref={scrollAreaRef}
                               >
-                                <div className="flex flex-col gap-2 pr-1 pb-2">
+                                <div className={styles.thoughtsList}>
                                   {cognitiveThoughts.map((thought) => (
                                     <React.Fragment key={thought.id}>
                                       {renderThoughtCard(thought)}
@@ -2300,11 +2294,11 @@ function ConsciousMinecraftDashboardContent() {
                           </TabsContent>
                           <TabsContent
                             value="status"
-                            className="flex-1 min-h-0 mt-0 overflow-hidden data-[state=inactive]:hidden flex flex-col"
+                            className={styles.innerTabContent}
                           >
                             {statusEnvironmentalThoughts.length > 0 ? (
-                              <ScrollArea className="h-full min-h-0 flex-1">
-                                <div className="flex flex-col gap-2 pr-1 pb-2">
+                              <ScrollArea className={styles.scrollFull}>
+                                <div className={styles.thoughtsList}>
                                   {statusEnvironmentalThoughts.map(
                                     (thought) => (
                                       <React.Fragment key={thought.id}>
@@ -2329,8 +2323,8 @@ function ConsciousMinecraftDashboardContent() {
                 </Section>
 
                 {/* Intrusive Thought Input */}
-                <div className="rounded-2xl border border-zinc-800 bg-zinc-950 p-2">
-                  <div className="flex items-center gap-2">
+                <div className={styles.intrusiveInputWrapper}>
+                  <div className={styles.intrusiveInputRow}>
                     <input
                       value={intrusion}
                       onChange={(e) => setIntrusion(e.target.value)}
@@ -2338,17 +2332,17 @@ function ConsciousMinecraftDashboardContent() {
                         if (e.key === 'Enter') handleSubmitIntrusion();
                       }}
                       placeholder="Enter an intrusive thought… (appears as bot's own idea)"
-                      className="flex-1 rounded-xl bg-zinc-900 px-3 py-2 text-sm outline-none placeholder:text-zinc-600"
+                      className={styles.intrusiveInput}
                     />
                     <Button
                       onClick={handleSubmitIntrusion}
-                      className="bg-emerald-600/90 hover:bg-emerald-600 border-zinc-800"
+                      className={styles.injectBtn}
                     >
-                      <UploadCloud className="size-4 mr-2" />
+                      <UploadCloud className={styles.iconMr} />
                       Inject
                     </Button>
                   </div>
-                  <div className="mt-1 text-[11px] text-zinc-500">
+                  <div className={styles.intrusiveHint}>
                     Try: &quot;craft a wooden pickaxe&quot;, &quot;mine some
                     stone&quot;, &quot;explore the area&quot;, &quot;build a
                     house&quot;
@@ -2359,39 +2353,12 @@ function ConsciousMinecraftDashboardContent() {
           </TabsContent>
 
           {/* Evaluation Tab Content */}
-          <TabsContent value="evaluation" className="h-full mt-0">
-            <div className="grid h-full grid-cols-12 gap-3 p-3">
-              {/* Left: Evaluation Panel */}
-              <aside className="col-span-12 md:col-span-4 flex flex-col gap-3 overflow-auto">
-                <EvaluationPanel />
-              </aside>
-
-              {/* Center: Evaluation Details */}
-              <main className="col-span-12 md:col-span-8 flex flex-col gap-3 overflow-hidden">
-                <Section
-                  title="Evaluation Overview"
-                  icon={<BarChart3 className="size-4" />}
-                >
-                  <div className="rounded-xl border border-zinc-800 bg-zinc-950 p-6">
-                    <div className="text-center">
-                      <BarChart3 className="size-12 text-zinc-600 mx-auto mb-4" />
-                      <h3 className="text-lg font-semibold text-zinc-200 mb-2">
-                        Evaluation Dashboard
-                      </h3>
-                      <p className="text-sm text-zinc-400">
-                        Real-time evaluation metrics and run history are
-                        available in the Evaluation Panel on the left. Select a
-                        run to see detailed results here.
-                      </p>
-                    </div>
-                  </div>
-                </Section>
-              </main>
-            </div>
+          <TabsContent value="evaluation" className={styles.tabContentFull}>
+            <EvaluationTab />
           </TabsContent>
 
           {/* Database Tab Content */}
-          <TabsContent value="database" className="h-full mt-0">
+          <TabsContent value="database" className={styles.tabContentFull}>
             <DatabasePanel />
           </TabsContent>
         </Tabs>

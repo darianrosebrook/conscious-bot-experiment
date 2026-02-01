@@ -307,7 +307,10 @@ async function generateThoughts(): Promise<CognitiveThought[]> {
       ];
     });
   } catch (error) {
-    console.warn('Cognition service unavailable; returning no thoughts.', error);
+    console.warn(
+      'Cognition service unavailable; returning no thoughts.',
+      error
+    );
     return [];
   }
 }
@@ -388,9 +391,7 @@ async function processExternalChat(): Promise<CognitiveThought[]> {
             if (minecraftResponse.ok) {
               console.log('Bot response sent to minecraft server');
             } else {
-              console.error(
-                'Failed to send bot response to minecraft server'
-              );
+              console.error('Failed to send bot response to minecraft server');
             }
           } catch (error) {
             console.error(
@@ -794,22 +795,26 @@ export const POST = async (req: NextRequest) => {
     }
 
     const trimmedContent = cleanedContent.trim();
-    const provenance =
-      (body.metadata && (body.metadata as { provenance?: string }).provenance) as
-        | 'chain-of-thought'
-        | 'intrusion'
-        | undefined;
+    const provenance = (body.metadata &&
+      (body.metadata as { provenance?: string }).provenance) as
+      | 'chain-of-thought'
+      | 'intrusion'
+      | undefined;
 
     // Deduplicate intrusive thoughts by canonical content within 8 minutes
     // so the same intrusive thought does not appear multiple times in the dashboard
     if (provenance === 'intrusion') {
-      const canonicalIntrusive = trimmedContent.toLowerCase().replace(/\s+/g, ' ').trim();
+      const canonicalIntrusive = trimmedContent
+        .toLowerCase()
+        .replace(/\s+/g, ' ')
+        .trim();
       const intrusiveCutoff = Date.now() - 8 * 60_000; // 8 minutes
       const duplicateIntrusive = thoughtHistory.find(
         (old) =>
           old.metadata?.provenance === 'intrusion' &&
           old.timestamp > intrusiveCutoff &&
-          old.content.toLowerCase().replace(/\s+/g, ' ').trim() === canonicalIntrusive
+          old.content.toLowerCase().replace(/\s+/g, ' ').trim() ===
+            canonicalIntrusive
       );
       if (duplicateIntrusive) {
         return new Response(
