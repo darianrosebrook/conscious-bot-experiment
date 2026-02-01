@@ -3680,6 +3680,13 @@ async function startServer() {
     await serverConfig.start();
     console.log('✅ Server started successfully');
 
+    // Phase 0 prerequisite for EXECUTOR_MODE=live:
+    //   The action-translator dispatch boundary (minecraft-interface executeAction)
+    //   must handle every step type that solvers emit. Currently, craft/smelt/building
+    //   types fail with "Unknown action type" in executeAction(). Until Phase 0 commits
+    //   (0a: add craft/smelt/building cases, 0b: LeafFactory-first dispatch,
+    //   0c: boundary conformance test) are merged, live mode will execute actions that
+    //   the minecraft-interface silently rejects. Shadow mode is safe regardless.
     if (executorConfig.enabled) {
       console.log(
         `[Planning] Executor enabled (mode=${executorConfig.mode}, ` +

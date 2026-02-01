@@ -168,7 +168,31 @@ export function hashNearbyBlocks(blocks: string[]): ContentHash {
   return contentHash(canonicalize(blocks));
 }
 
-/** Hash ordered action IDs from solve steps */
+/**
+ * Hash ordered action IDs from solve steps.
+ *
+ * Digest input schema (what affects the hash):
+ *   - The `action` string from each step, in array order.
+ *   - Callers typically pass `s.label || s.id` as the action value
+ *     (see task-integration.ts addTask/regenerateSteps).
+ *
+ * Excluded from digest (does NOT affect the hash):
+ *   - Step id, done, order, startedAt, completedAt, estimatedDuration
+ *   - Step meta (authority, leaf, blocked, executable, source, etc.)
+ *   - Any timestamps or transient fields
+ *
+ * Ordering sensitivity:
+ *   - Array order IS preserved (not sorted). Reordering steps changes the digest.
+ *   - This is intentional: different step sequences represent different plans.
+ *
+ * Used for replan detection:
+ *   - stepsDigest is seeded in addTask() and recomputed in regenerateSteps().
+ *   - If a replan produces the same digest, the world hasn't changed enough
+ *     to warrant a new plan, and the replan consumer stops early.
+ *   - If the digest is too sensitive (e.g., label formatting changes), replans
+ *     will never match. If too coarse, identical plans won't be detected.
+ *     Current granularity (label string) is the right level for plan identity.
+ */
 export function hashSteps(steps: Array<{ action: string }>): ContentHash {
   const actions = steps.map((s) => s.action);
   return contentHash(canonicalize(actions));
