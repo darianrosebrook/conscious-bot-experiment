@@ -29,6 +29,16 @@ import {
 import { parseSearchHealth } from './search-health';
 
 import type { TaskStep } from '../types/task-step';
+import { buildDagFromModules, findCommutingPairs } from '../constraints/dag-builder';
+import { linearize } from '../constraints/linearization';
+import { checkFeasibility } from '../constraints/feasibility-checker';
+import { extractDependencyConstraints } from '../constraints/constraint-model';
+import { computeRigGSignals } from '../constraints/signals';
+import type { PlanningDecision } from '../constraints/planning-decisions';
+import type { PartialOrderPlan, RigGSignals } from '../constraints/partial-order-plan';
+import type { LinearizationResult } from '../constraints/linearization';
+import type { FeasibilityResult } from '../constraints/feasibility-checker';
+import type { RigGMode, RigGStageDecisions } from './minecraft-building-types';
 
 // ============================================================================
 // Solver
@@ -184,7 +194,87 @@ export class MinecraftBuildingSolver extends BaseDomainSolver<BuildingSolveResul
     }
 
     // Map Sterling's solution to building steps
-    const steps = this.mapSolutionToSteps(result);
+    const rawSteps = this.mapSolutionToSteps(result);
+
+    // Rig G DAG pipeline: build → linearize → feasibility → commuting → signals
+    // Supports strict (fail-closed) and permissive (fallback to raw steps) modes.
+    const rigGMode: RigGMode = (executionMode === 'strict' ? 'strict' : 'permissive');
+    const dagDecision = buildDagFromModules(modules, rawSteps);
+    let steps = rawSteps;
+    let partialOrderPlan: PartialOrderPlan<BuildingSolveStep> | undefined;
+    let rigGSignals: RigGSignals | undefined;
+    let degradedToRawSteps = false;
+
+    // Per-stage decisions for operational debugging
+    let linDecision: PlanningDecision<LinearizationResult<BuildingSolveStep>> | undefined;
+    let feasDecision: PlanningDecision<FeasibilityResult> | undefined;
+    let overallDecision: PlanningDecision<PartialOrderPlan<BuildingSolveStep>> = dagDecision;
+
+    if (dagDecision.kind === 'ok') {
+      const dag = dagDecision.value;
+
+      // Linearize for deterministic step ordering
+      linDecision = linearize(dag);
+      if (linDecision.kind === 'ok') {
+        // steps[] is always a projection of linearize(dag)
+        steps = linDecision.value.order.map((n) => n.data);
+        partialOrderPlan = dag;
+        overallDecision = { kind: 'ok', value: dag };
+
+        // Feasibility check (dependency constraints from modules)
+        const constraints = extractDependencyConstraints(modules);
+        feasDecision = checkFeasibility(dag, constraints);
+        const feasibility =
+          feasDecision.kind === 'ok' ? feasDecision.value : undefined;
+
+        // Commuting pairs
+        const commutingPairs = findCommutingPairs(dag);
+
+        // Compute signals
+        rigGSignals = computeRigGSignals({
+          plan: dag,
+          linearization: linDecision.value,
+          feasibility,
+          commutingPairs,
+          degradedToRawSteps: false,
+        });
+      } else {
+        // Linearization failed (cycle)
+        overallDecision = linDecision;
+        if (rigGMode === 'strict') {
+          // Fail-closed: propagate the error
+          console.warn(
+            `[Building] DAG linearization failed (strict mode): ${linDecision.detail}`
+          );
+        } else {
+          // Permissive: fall back to raw step order
+          degradedToRawSteps = true;
+          console.warn(
+            `[Building] DAG linearization failed, degrading to raw steps: ${linDecision.detail}`
+          );
+        }
+      }
+    } else {
+      // DAG construction blocked
+      overallDecision = dagDecision;
+      if (rigGMode === 'strict') {
+        console.warn(
+          `[Building] DAG construction ${dagDecision.kind} (strict mode): ${dagDecision.detail}`
+        );
+      } else {
+        degradedToRawSteps = true;
+        console.warn(
+          `[Building] DAG construction ${dagDecision.kind}, degrading to raw steps: ${dagDecision.detail}`
+        );
+      }
+    }
+
+    const rigGStageDecisions: RigGStageDecisions = {
+      dagDecision,
+      linearizeDecision: linDecision,
+      feasibilityDecision: feasDecision,
+      overallDecision,
+    };
 
     const bundleOutput = computeBundleOutput({
       planId,
@@ -205,6 +295,11 @@ export class MinecraftBuildingSolver extends BaseDomainSolver<BuildingSolveResul
       durationMs: result.durationMs,
       planId,
       solveMeta: { bundles: [solveBundle] },
+      partialOrderPlan,
+      rigGSignals,
+      rigGStageDecisions,
+      degradedToRawSteps,
+      planDecision: dagDecision,
     };
   }
 

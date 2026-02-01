@@ -89,6 +89,29 @@ export interface BuildingMaterialDeficit {
   currentProgress: number;
 }
 
+/** Rig G degradation mode: strict blocks on any DAG failure, permissive falls back to raw step order */
+export type RigGMode = 'strict' | 'permissive';
+
+/** Per-stage decisions from the Rig G pipeline (DAG → linearize → feasibility) */
+export interface RigGStageDecisions {
+  /** DAG construction decision */
+  dagDecision: import('../constraints/planning-decisions').PlanningDecision<
+    import('../constraints/partial-order-plan').PartialOrderPlan<BuildingSolveStep>
+  >;
+  /** Linearization decision (undefined if DAG construction failed) */
+  linearizeDecision?: import('../constraints/planning-decisions').PlanningDecision<
+    import('../constraints/linearization').LinearizationResult<BuildingSolveStep>
+  >;
+  /** Feasibility decision (undefined if linearization failed) */
+  feasibilityDecision?: import('../constraints/planning-decisions').PlanningDecision<
+    import('../constraints/feasibility-checker').FeasibilityResult
+  >;
+  /** Synthesized overall outcome */
+  overallDecision: import('../constraints/planning-decisions').PlanningDecision<
+    import('../constraints/partial-order-plan').PartialOrderPlan<BuildingSolveStep>
+  >;
+}
+
 /** Full result from the building solver */
 export interface BuildingSolveResult {
   solved: boolean;
@@ -102,6 +125,21 @@ export interface BuildingSolveResult {
   planId?: string | null;
   /** Observability metadata — does not affect solve behavior */
   solveMeta?: { bundles: import('./solve-bundle-types').SolveBundle[] };
+  /** Partial-order DAG (present when solve succeeds and DAG construction succeeds) */
+  partialOrderPlan?: import('../constraints/partial-order-plan').PartialOrderPlan<BuildingSolveStep>;
+  /** Rig G instrumentation signals (present when DAG is computed) */
+  rigGSignals?: import('../constraints/partial-order-plan').RigGSignals;
+  /** Per-stage Rig G decisions for operational debugging */
+  rigGStageDecisions?: RigGStageDecisions;
+  /** Whether Rig G degraded to raw step order (true if DAG/linearization failed in permissive mode) */
+  degradedToRawSteps?: boolean;
+  /**
+   * @deprecated Use rigGStageDecisions.overallDecision instead.
+   * Kept for backward compatibility with existing tests.
+   */
+  planDecision?: import('../constraints/planning-decisions').PlanningDecision<
+    import('../constraints/partial-order-plan').PartialOrderPlan<BuildingSolveStep>
+  >;
 }
 
 // ============================================================================
