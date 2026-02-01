@@ -1018,10 +1018,34 @@ app.post('/enhanced/reset', async (req, res) => {
       });
     }
 
-    enhancedMemorySystem = await getEnhancedMemorySystem();
-
-    // Use cleanup with 0 days retention to remove all memories
-    const cleaned = await enhancedMemorySystem.cleanup(0);
+    let cleaned = 0;
+    try {
+      enhancedMemorySystem = await getEnhancedMemorySystem();
+      try {
+        cleaned = await enhancedMemorySystem.cleanup(0);
+      } catch (cleanupError) {
+        const msg =
+          cleanupError instanceof Error ? cleanupError.message : String(cleanupError);
+        if (msg.includes('does not exist')) {
+          cleaned = 0;
+        } else {
+          throw cleanupError;
+        }
+      }
+    } catch (initOrCleanupError) {
+      const msg =
+        initOrCleanupError instanceof Error
+          ? initOrCleanupError.message
+          : String(initOrCleanupError);
+      if (
+        msg.includes('does not exist') ||
+        msg.includes('permission denied to create extension')
+      ) {
+        cleaned = 0;
+      } else {
+        throw initOrCleanupError;
+      }
+    }
 
     res.json({
       success: true,

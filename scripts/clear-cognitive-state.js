@@ -7,8 +7,15 @@
  *   node scripts/clear-cognitive-state.js              # Clear thoughts only
  *   node scripts/clear-cognitive-state.js --db         # Clear thoughts + reset DB
  *
- * DB reset requires WORLD_SEED in env (or defaults to '0'). Confirmation is sent
- * automatically when --db is used.
+ * DB reset requires WORLD_SEED in env (or defaults to '0'). Loads ROOT/.env if
+ * present so WORLD_SEED from .env is used when running --db.
+ *
+ * Full clean slate (stream + DB + new Minecraft world):
+ *   1. Ensure memory service is running (port 3001) and .env has WORLD_SEED set.
+ *   2. pnpm run clear-cognitive-state:db
+ *   3. docker compose down -v && docker compose up -d
+ *   Step 3 removes the Minecraft volume so the world is recreated with
+ *   LEVEL_SEED from docker-compose.yml.
  *
  * @author @darianrosebrook
  */
@@ -19,6 +26,27 @@ import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
+
+/** Load ROOT/.env into process.env (no external deps). */
+async function loadEnv() {
+  const envPath = path.join(ROOT, '.env');
+  try {
+    const raw = await fs.readFile(envPath, 'utf-8');
+    for (const line of raw.split('\n')) {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith('#')) continue;
+      const eq = trimmed.indexOf('=');
+      if (eq <= 0) continue;
+      const key = trimmed.slice(0, eq).trim();
+      let val = trimmed.slice(eq + 1).trim();
+      if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'")))
+        val = val.slice(1, -1);
+      if (key && !process.env[key]) process.env[key] = val;
+    }
+  } catch (err) {
+    if (err.code !== 'ENOENT') console.warn('Could not load .env:', err.message);
+  }
+}
 
 async function clearThoughtFiles() {
   const dataDir = path.join(ROOT, 'packages', 'dashboard', 'data');
@@ -64,21 +92,37 @@ async function resetDatabase() {
   const memoryUrl = process.env.MEMORY_SERVICE_URL || 'http://localhost:3001';
   const worldSeed = process.env.WORLD_SEED || '0';
 
-  const res = await fetch(`${memoryUrl}/enhanced/reset`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ confirm: worldSeed }),
-    signal: AbortSignal.timeout(15000),
-  });
+  let res;
+  try {
+    res = await fetch(`${memoryUrl}/enhanced/reset`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ confirm: worldSeed }),
+      signal: AbortSignal.timeout(15000),
+    });
+  } catch (err) {
+    throw new Error(
+      `Memory service unreachable (${memoryUrl}): ${err.message}. Is it running on port 3001?`
+    );
+  }
 
-  const data = await res.json();
+  let data;
+  try {
+    data = await res.json();
+  } catch {
+    throw new Error(`Memory service returned non-JSON (HTTP ${res.status})`);
+  }
+
   if (!res.ok) {
-    throw new Error(data.message || `HTTP ${res.status}`);
+    const detail = data.error ? `${data.message}: ${data.error}` : data.message;
+    throw new Error(detail || `HTTP ${res.status}`);
   }
   return data;
 }
 
 async function main() {
+  await loadEnv();
+
   const doDb = process.argv.includes('--db');
 
   console.log('Clearing cognitive thought stores...');
