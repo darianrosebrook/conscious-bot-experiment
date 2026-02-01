@@ -1,6 +1,6 @@
 # Sterling Capability Rig Tracker
 
-**Last updated**: 2026-01-30
+**Last updated**: 2026-02-01
 **Repos**: conscious-bot (TS), sterling (Python)
 **Reference**: [sterling-minecraft-domains.md](./sterling-minecraft-domains.md), [capability-primitives.md](./capability-primitives.md)
 
@@ -39,6 +39,25 @@ These are certifiability gates. Every rig must satisfy all of them before it can
 - [x] **Explanation infrastructure** (invariant 6): `SolveRationale` type with structured fields: `boundingConstraints` (maxNodes, objectiveWeights), `searchEffort` (nodesExpanded, frontierPeak, branchingEstimate — direct from searchHealth, no derived arithmetic), `searchTermination` (terminationReason, degeneracy), `shapingEvidence` (compat validity/issues).
 - [x] **Cost caps** (invariant 7): `INVALID_BASE_COST` check in `compat-linter.ts`. `MAX_BASE_COST = 1000`. Rejects NaN, Infinity, -Infinity, 0, negatives, above-max. 9 tests.
 - [x] **Multi-objective declaration** (invariant 8): `ObjectiveWeights` with `costWeight?`, `timeWeight?`, `riskWeight?`. `DEFAULT_OBJECTIVE_WEIGHTS = {1.0, 0.0, 0.0}`. `SolveBundleInput` captures `objectiveWeightsProvided`, `objectiveWeightsEffective`, `objectiveWeightsSource`. 3 tests.
+
+---
+
+## Sterling capability infrastructure (2026-02-01)
+
+Sterling's capability absorption pipeline infrastructure (Layers 1–5) is now implemented. This provides the type system and runtime machinery for Steps 1–6 of the absorption pipeline described in [sterling-boundary-contract.md](./sterling-boundary-contract.md).
+
+| Component | Sterling type | Key feature |
+|-----------|-------------|-------------|
+| Primitive specs | `PrimitiveSpecV1` + `PrimitiveRegistry` | Data-driven obligation documents; P01–P05 factories; loads from `data/primitive_specs/index.json` |
+| Capability descriptors | `CapabilityDescriptorV1` | Per-primitive, content-addressed; `(primitive_id, contract_version)` versioned keys |
+| Capability claims | `CapabilityClaimRegistry` | `(domain_id, primitive_id, contract_version)` triple; registry hash from VERIFIED entries only |
+| Conformance suite descriptors | `ConformanceSuiteV1` | Content-addressed with `suite_impl_ref` code identity binding |
+| Domain declarations | `DomainDeclarationV1` | Long-lived capability commitment; binds primitive claims to a domain |
+| Domain sessions | `DomainSessionV1` | Ephemeral session attachment; KG ref, operator pack; NOT content-addressed |
+| Runtime routing | `_check_primitive_eligibility()` | Proof-backed by default (structural + VERIFIED claims); `structural_only=True` opt-in |
+| Anti-leak CI | `test_domain_coupling_prevention.py` | AST-based: import boundary, no hardcoded dicts, structural flag alignment, no-isinstance routing |
+
+**What this means for conscious-bot**: When wiring `SterlingDomainDeclaration.implementsPrimitives` for runtime claims, the target Sterling types are `DomainDeclarationV1` (for the declaration) and `CapabilityClaimRegistry` (for claim registration). The `required_primitives` field on `SterlingOptions` drives proof-backed routing at the engine level.
 
 ---
 
@@ -136,7 +155,7 @@ Key extensions:
 
 - [x] At least one non-Minecraft adapter passes the P21-A conformance suite — Reference Security Domain (Tranche 2)
 - [x] P21-B Minecraft emission adapter (wrapping BeliefBus) wired to `runP21BConformanceSuite` — (Tranche 2)
-- [ ] `SterlingDomainDeclaration.implementsPrimitives` wired for runtime P21 claim
+- [ ] `SterlingDomainDeclaration.implementsPrimitives` wired for runtime P21 claim — **Sterling-side infrastructure ready**: `DomainDeclarationV1` + `CapabilityClaimRegistry` with versioned keys are implemented. Remaining work is on the conscious-bot side to create declaration instances and register claims.
 - [ ] `id_robustness` (INV-10) certified on at least one surface
 - [ ] Extensions (`risk_components_v1`, `predictive_model`) certified on at least one surface
 

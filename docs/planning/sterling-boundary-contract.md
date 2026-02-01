@@ -279,7 +279,24 @@ New primitives should start from this template rather than inventing ad-hoc shap
 
 ## 7. Where conscious-bot stands today
 
-### Certified
+### Sterling infrastructure status (as of 2026-02-01)
+
+Sterling's capability absorption pipeline infrastructure is now built:
+
+| Sterling component | Status | Notes |
+|-------------------|--------|-------|
+| `PrimitiveSpecV1` + `PrimitiveRegistry` | Implemented | P01–P05 factories; data-file-backed (`data/primitive_specs/index.json`) |
+| `CapabilityDescriptorV1` | Implemented | Per-primitive, content-addressed |
+| `CapabilityClaimRegistry` (versioned keys) | Implemented | `(domain_id, primitive_id, contract_version)` triple; hash from VERIFIED only |
+| `ConformanceSuiteV1` | Implemented | Content-addressed with `suite_impl_ref` code identity binding |
+| `DomainDeclarationV1` + `DomainSessionV1` | Implemented | Split handshake: long-lived declaration + ephemeral session |
+| Runtime proof-backed routing | Implemented | `_check_primitive_eligibility()` in engine; structural + claim checks |
+| Anti-leak CI enforcement | Implemented | AST-based import boundary, structural flag alignment, no-isinstance routing |
+| Schema registry entries | Implemented | 4 new schemas registered |
+
+This means Steps 1–6 of the absorption pipeline now have Sterling-side type support. The remaining integration work is on the conscious-bot side: creating `DomainDeclarationV1` instances from `SterlingDomainDeclaration.implementsPrimitives` and registering claims in `CapabilityClaimRegistry`.
+
+### Certified (conscious-bot rigs)
 
 | Capability | Sub-primitive | Domain | Evidence |
 |-----------|---------------|--------|----------|
@@ -297,7 +314,7 @@ New primitives should start from this template rather than inventing ad-hoc shap
 
 ### Not yet capsule-defined (conscious-bot side)
 
-All remaining primitives (P3–P15). Sterling-side primitive specs exist (`sterling/docs/planning/capability_primitives_bundle/primitives/P01–P21`), and conscious-bot has rig approach docs, but TypeScript capsule types and conformance suites in `@conscious-bot/testkits` do not yet exist for these primitives.
+All remaining primitives (P3–P15). Sterling-side primitive specs exist (`sterling/docs/planning/capability_primitives_bundle/primitives/P01–P21`) and `PrimitiveSpecV1` code objects exist for P01–P05. Conscious-bot has rig approach docs, but TypeScript capsule types and conformance suites in `@conscious-bot/testkits` do not yet exist for P3–P15. Next priority: Rig C (P03 temporal planning) requires defining the P3 capsule before implementing `FurnaceSchedulingSolver`.
 
 ---
 
