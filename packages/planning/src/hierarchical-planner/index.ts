@@ -3,6 +3,7 @@
  *
  * Retains CognitiveTaskRouter for task routing decisions.
  * Legacy planners (HRM, HTN, IntegratedPlanningSystem) have been retired.
+ * New hierarchical macro/micro planning lives in ../hierarchical/.
  *
  * @author @darianrosebrook
  */
@@ -26,6 +27,8 @@ export type {
 // - HRMInspiredPlanner, createHRMPlanner — deleted
 // - IntegratedPlanningSystem, createIntegratedPlanningSystem, quickPlan — deleted
 // - HTNPlanner — deleted
-// - task-network, plan-decomposer — retained as standalone files
 export * from './task-network';
-export * from './plan-decomposer';
+export { decomposeToPlan } from './plan-decomposer';
+
+// Re-export Rig E hierarchical planning primitives
+export * from '../hierarchical';

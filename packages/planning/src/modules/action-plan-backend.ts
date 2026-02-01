@@ -108,6 +108,33 @@ export function routeActionPlan(
         reason: 'mine-requirement',
       };
 
+    case 'navigate':
+      return {
+        backend: 'sterling',
+        requiredRig: 'E',
+        requiredCapabilities: ['navigate'],
+        availableCapabilities: ['navigate'],
+        reason: 'navigate-requirement',
+      };
+
+    case 'explore':
+      return {
+        backend: 'sterling',
+        requiredRig: 'E',
+        requiredCapabilities: ['explore'],
+        availableCapabilities: ['explore'],
+        reason: 'explore-requirement',
+      };
+
+    case 'find':
+      return {
+        backend: 'sterling',
+        requiredRig: 'E',
+        requiredCapabilities: ['find'],
+        availableCapabilities: ['find'],
+        reason: 'find-requirement',
+      };
+
     default: {
       // Exhaustive check: if a new requirement kind is added, TypeScript
       // will flag this as an error (assuming TaskRequirement is a closed union).

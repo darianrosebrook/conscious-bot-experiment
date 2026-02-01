@@ -16,7 +16,11 @@ export type TaskRequirement =
       targetTier: string;
       quantity: number;
     }
-  | { kind: 'build'; structure: string; quantity: number };
+  | { kind: 'build'; structure: string; quantity: number }
+  // Rig E exploration/navigation requirements
+  | { kind: 'navigate'; destination: string; tolerance: number; quantity: number }
+  | { kind: 'explore'; target: string; maxSteps: number; quantity: number }
+  | { kind: 'find'; target: string; quantity: number };
 
 export function parseRequiredQuantityFromTitle(
   title: string | undefined,
@@ -56,6 +60,15 @@ export function requirementsEquivalent(
     case 'tool_progression': {
       if (b.kind !== 'tool_progression') return false;
       return a.targetTool === b.targetTool;
+    }
+    case 'navigate': {
+      if (b.kind !== 'navigate') return false;
+      return a.destination === b.destination;
+    }
+    case 'explore':
+    case 'find': {
+      if (b.kind !== a.kind) return false;
+      return (a as any).target === (b as any).target;
     }
     default:
       return false;
@@ -116,6 +129,29 @@ export function resolveRequirement(
           kind: 'build',
           structure: candidate.outputPattern,
           quantity: 1,
+        };
+      }
+      if (candidate.kind === 'navigate') {
+        return {
+          kind: 'navigate',
+          destination: candidate.outputPattern,
+          tolerance: candidate.tolerance ?? 3,
+          quantity: candidate.quantity || 1,
+        };
+      }
+      if (candidate.kind === 'explore') {
+        return {
+          kind: 'explore',
+          target: candidate.outputPattern,
+          maxSteps: candidate.maxSteps ?? 50,
+          quantity: candidate.quantity || 1,
+        };
+      }
+      if (candidate.kind === 'find') {
+        return {
+          kind: 'find',
+          target: candidate.outputPattern,
+          quantity: candidate.quantity || 1,
         };
       }
     }
