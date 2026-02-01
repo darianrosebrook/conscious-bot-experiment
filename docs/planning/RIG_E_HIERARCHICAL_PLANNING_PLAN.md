@@ -58,7 +58,18 @@ With proper hierarchy:
 | Feedback path | task-integration, modular-server | Where step success/failure is reported |
 | Hierarchical planner | `packages/planning/src/hierarchical-planner/` | Existing HTN/plan decomposer; reuse vs extend |
 
-**Outcome:** Confirm where macro plan is produced; where micro execution is invoked; where feedback is reported.
+**Investigation outcome (verified 2025-01-31):** No macro/micro separation today. `plan-decomposer.ts:10-24` (`decomposeToPlan(goal)`) returns empty steps; stub only. `sterling-planner.ts:147-292` (`generateDynamicSteps`) delegates directly to crafting/toolProgression/building solvers; flat invocation, no macro layer. `task-integration.ts` orchestrates tasks; no macro state. `reactive-executor` executes steps in order; no micro delegation. Feedback: step success/failure flows to task-integration; no macro cost update. Macro plan would sit above sterling-planner (new macroPlanner); micro execution would be invoked by macro edge handler in reactive-executor.
+
+### 4a. Current code anchors (verified 2025-01-31)
+
+| File | Line(s) | What |
+|------|---------|------|
+| `packages/planning/src/hierarchical-planner/plan-decomposer.ts` | 10-24 | `decomposeToPlan(goal)`: returns empty steps; stub. No macro structure. |
+| `packages/planning/src/task-integration/sterling-planner.ts` | 147-292 | `generateDynamicSteps()`: routes to crafting/toolProgression/building solvers; flat, no macro layer. |
+| `packages/planning/src/reactive-executor/reactive-executor.ts` | step execution | Executes steps in order; no macro edge → micro delegation. |
+| `packages/planning/src/hierarchical-planner/index.ts` | exports | plan-decomposer, cognitive-router, task-network; decomposer is stub. |
+
+**Gap:** No macro state, macro planner, or macro-edge semantics. No feedback from micro to macro costs. Hierarchical separation would require new macro layer above sterling-planner.
 
 ---
 

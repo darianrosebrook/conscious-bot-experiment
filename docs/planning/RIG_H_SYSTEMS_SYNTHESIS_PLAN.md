@@ -57,7 +57,17 @@ With proper synthesis:
 | Farm mechanics | Minecraft/mineflayer | Crop growth, water flow; simulator requirements |
 | Sterling search | Sterling (Python) | State space for design; operator application |
 
-**Outcome:** Confirm building domain structure; simulator feasibility; where design state would integrate.
+**Investigation outcome (verified 2025-01-31):** No design synthesis. Building domain: `MinecraftBuildingSolver.solveBuildingPlan` (minecraft-building-solver.ts:61-80) sends modules to Sterling; `BuildingModule` has `requiresModules`, `placementFeasible`; template-based, not design exploration. World state: `world-state-manager.ts` (WorldStateSnapshot) has nearbyBlocks; no block placement map or design-as-state. Farm mechanics: Minecraft/mineflayer has block/crop APIs; no deterministic simulator for "water reaches all farmland." Sterling: building domain returns ordered steps; no design-space search. Design state would be new; simulator would require farm/circuit evaluation; motif reuse would be learning-layer extension.
+
+### 4a. Current code anchors (verified 2025-01-31)
+
+| File | Line(s) | What |
+|------|---------|------|
+| `packages/planning/src/sterling/minecraft-building-solver.ts` | 61-80 | `solveBuildingPlan()`: template + modules; Sterling returns ordered steps. No design exploration. |
+| `packages/planning/src/sterling/minecraft-building-types.ts` | BuildingModule, BuildingSiteState | `requiresModules`, `placementFeasible`; template-driven. No partial design graph. |
+| `packages/planning/src/world-state/world-state-manager.ts` | 16-27 | `WorldStateSnapshot`: nearbyBlocks; no design state or block placement map. |
+
+**Gap:** No design state, design operators, specification evaluator, or motif library. Building is template application, not synthesis.
 
 ---
 

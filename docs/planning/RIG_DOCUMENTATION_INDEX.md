@@ -74,17 +74,17 @@ Per-rig checklist: what each document set provides. Use this to identify gaps be
 | A | Plan 2 | Plan 3 | Plan 4 | Approach 4 | Approach 3 | Plan 1 |
 | B | Plan 3.1 | Plan 4 (verified) | Plan 5 | Approach 8 | Approach 3 | Plan 1 |
 | C | Plan 3 | Plan 3 (verified) | Plan 5 | Approach 6, 9 | Plan 3, Approach 3 | Plan 1 |
-| D | Plan 3.1 | Plan 4 | Plan 5 | Approach 2 | — | Plan 1 |
-| E | Plan 3.1 | Plan 4 | Plan 5 | Approach 2 | — | Plan 1 |
-| F | Plan 3.1 | Plan 4 | Plan 5 | Approach 2 | — | Plan 1 |
-| G | Plan 3.1 | Plan 4 | Plan 5 | Approach 2 | — | Plan 1 |
-| H | Plan 3.1 | Plan 4 | Plan 5 | Approach 2 | — | Plan 1 |
+| D | Plan 3.1 | Plan 4 (verified 4a) | Plan 5 | Approach 2 | Plan 4a | Plan 1 |
+| E | Plan 3.1 | Plan 4 (verified 4a) | Plan 5 | Approach 2 | Plan 4a | Plan 1 |
+| F | Plan 3.1 | Plan 4 (verified 4a) | Plan 5 | Approach 2 | Plan 4a | Plan 1 |
+| G | Plan 3.1 | Plan 4 (verified 4a) | Plan 5 | Approach 2 | Plan 4a | Plan 1 |
+| H | Plan 3.1 | Plan 4 (verified 4a) | Plan 5 | Approach 2 | Plan 4a | Plan 1 |
 | I | Plan 2 | Plan 3 (verified 3a) | Plan 5 | Plan 7, Approach 2, 3b | Plan 3a, Approach 3b | Plan 1 |
 | I-ext | Plan 1, 1b | Plan 2, 2.1a (verified) | Plan 3 | Approach 6.2 | Approach 3 | Plan 1 |
 | J | Plan 2 | Plan 3 (verified 3a) | Plan 5 | Plan 7, Approach 2 | Approach 4 | Plan 1 |
-| K | Plan 3.1 | Plan 4 | Plan 5 | Approach 2 | — | Plan 1 |
+| K | Plan 3.1 | Plan 4 (verified 4a) | Plan 5 | Approach 2 | Plan 4a | Plan 1 |
 
-**Investigation verification added (2025-01-31):** Rig A–C, I, J, I-ext, B have verified investigation outcomes and current code anchors. Rig I, J now ENRICHED with implementation pivots, transfer surfaces, and certification tests. Rig D, G have verified investigation outcomes and code anchors (partial). Rigs E, F, H, K still lack "Current code anchors"; add when implementation begins per `RIG_DOCUMENTATION_UPGRADE_GUIDE.md`.
+**Investigation verification added (2025-01-31):** All 12 rigs have verified investigation outcomes and current code anchors (section 4a). Rig A–C, I, J, I-ext, B are ENRICHED. Rig D, E, F, G, H, K are PARTIAL (investigation complete; implementation pivots, transfer surfaces, tests pending when Track 1-2 complete). See `RIG_ENRICHMENT_STATUS.md` for status.
 
 ---
 

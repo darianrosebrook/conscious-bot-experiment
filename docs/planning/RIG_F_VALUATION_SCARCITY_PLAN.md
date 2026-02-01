@@ -56,7 +56,18 @@ With proper valuation:
 | Drop/gather flow | minecraft-interface, planning | Where inventory-full decisions happen; where drop would be triggered |
 | Solve output | Sterling solve response | Where to attach drop rationale; explanation extension point |
 
-**Outcome:** Confirm inventory/capacity data flow; where goal is available; where drop decisions and explanations are emitted.
+**Investigation outcome (verified 2025-01-31):** No goal-conditioned valuation. Inventory: `sterling-planner.fetchBotContext()` (sterling-planner.ts:129-145) returns `inventory` (items array); `task-integration.buildInventoryIndex()` (task-integration.ts:298-302) builds `Record<string, number>`. No slot count or capacity model. Goal context: `taskData.metadata` and `resolveRequirement(taskData)` (task-integration) carry goal; no value function. Drop/gather: `modular-server.ts` and `inventory-helpers` have `analyzeCraftingResources`; no drop operator or rationale. Solve output: Sterling returns steps; no drop rationale extension. Capacity would extend world state; value function would sit in planning layer; drop operators would be new domain rules.
+
+### 4a. Current code anchors (verified 2025-01-31)
+
+| File | Line(s) | What |
+|------|---------|------|
+| `packages/planning/src/task-integration/sterling-planner.ts` | 129-145, 249-256 | `fetchBotContext()`: inventory array; `generateStepsFromSterling()`: inventory from botCtx or metadata. No slot count. |
+| `packages/planning/src/task-integration.ts` | 298-302 | `buildInventoryIndex(inventory)`: maps items to `Record<string, number>`. No capacity. |
+| `packages/planning/src/modular-server.ts` | 985-999, 1038-1060 | `analyzeCraftingResources(inventory)`: wood/log analysis; no drop logic or value function. |
+| `packages/planning/src/modules/mc-client.ts` | 251-270 | `fetchInventory()`: inventory from `/inventory`; no capacity or goal context. |
+
+**Gap:** No capacity model (slots free), no goal-conditioned value function, no drop/keep operators, no explanation output. Valuation would require new `valuation/` module and domain extension.
 
 ---
 

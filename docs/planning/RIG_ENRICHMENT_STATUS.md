@@ -27,10 +27,10 @@ A rig is considered **ENRICHED** when it has:
 |-------|------|----------|---------|-------------|
 | **Track 1** (Certification) | 3 | 3 | 0 | 0 |
 | **Track 2** (Belief + Perception) | 3 | 3 | 0 | 0 |
-| **Track 3** (Widening) | 6 | 0 | 2 | 4 |
-| **Total** | 12 | 6 | 2 | 4 |
+| **Track 3** (Widening) | 6 | 0 | 6 | 0 |
+| **Total** | 12 | 6 | 6 | 0 |
 
-**Progress**: 6/12 enriched (50%); 2 partial (D, G). Track 1-2: 100% enriched.
+**Progress**: 6/12 enriched (50%); 6 partial (D, E, F, G, H, K). Track 1-2: 100% enriched. Track 3: 100% partial (investigation complete).
 
 ---
 
@@ -187,13 +187,18 @@ A rig is considered **ENRICHED** when it has:
 
 ### Rig E: Hierarchical Planning (P5)
 
-**Status**: 🔴 **NOT STARTED**
+**Status**: ⚠️ **PARTIAL** (investigation complete; implementation pending)
+
+**What exists**:
+- ✅ Section 4a: Current code anchors (verified 2025-01-31)
+- ✅ Investigation outcome: plan-decomposer is stub; sterling-planner flat; no macro/micro separation
+
+**What's missing for ENRICHED**:
+- ❌ conscious-bot vs Sterling split; implementation pivots; transfer surfaces; concrete tests
+
+**Next action**: Add conscious-bot split; pivots; transfer surfaces; certification tests when Track 1-2 complete.
 
 **Priority**: 🟢 **MEDIUM** (defer until Track 1-2 complete)
-
-**What's missing**: All enrichment sections 3-9
-
-**Next action**: Defer; enrich after Track 1-2 proven.
 
 **Estimated effort**: 5-6 hours (hierarchical semantics complex)
 
@@ -201,13 +206,18 @@ A rig is considered **ENRICHED** when it has:
 
 ### Rig F: Valuation under Scarcity (P6)
 
-**Status**: 🔴 **NOT STARTED**
+**Status**: ⚠️ **PARTIAL** (investigation complete; implementation pending)
+
+**What exists**:
+- ✅ Section 4a: Current code anchors (verified 2025-01-31)
+- ✅ Investigation outcome: inventory from fetchBotContext; no capacity model, value function, or drop rationale
+
+**What's missing for ENRICHED**:
+- ❌ conscious-bot vs Sterling split; implementation pivots; transfer surfaces; concrete tests
+
+**Next action**: Add conscious-bot split; pivots; transfer surfaces; certification tests when Track 1-2 complete.
 
 **Priority**: 🟢 **MEDIUM** (defer until Track 1-2 complete)
-
-**What's missing**: All enrichment sections 3-9
-
-**Next action**: Defer; enrich after Track 1-2 proven.
 
 **Estimated effort**: 4-5 hours
 
@@ -234,13 +244,18 @@ A rig is considered **ENRICHED** when it has:
 
 ### Rig H: Systems Synthesis (P8)
 
-**Status**: 🔴 **NOT STARTED**
+**Status**: ⚠️ **PARTIAL** (investigation complete; implementation pending)
+
+**What exists**:
+- ✅ Section 4a: Current code anchors (verified 2025-01-31)
+- ✅ Investigation outcome: building domain is template-based; no design exploration, simulator, or motif reuse
+
+**What's missing for ENRICHED**:
+- ❌ conscious-bot vs Sterling split; implementation pivots; transfer surfaces; concrete tests
+
+**Next action**: Add conscious-bot split; pivots; transfer surfaces; certification tests when Track 1-2 complete.
 
 **Priority**: 🟢 **MEDIUM** (defer until Track 1-2 complete)
-
-**What's missing**: All enrichment sections 3-9
-
-**Next action**: Defer; enrich after Track 1-2 proven.
 
 **Estimated effort**: 6-7 hours (synthesis + evaluation complex)
 
@@ -248,13 +263,18 @@ A rig is considered **ENRICHED** when it has:
 
 ### Rig K: Irreversibility (P13)
 
-**Status**: 🔴 **NOT STARTED**
+**Status**: ⚠️ **PARTIAL** (investigation complete; implementation pending)
+
+**What exists**:
+- ✅ Section 4a: Current code anchors (verified 2025-01-31)
+- ✅ Investigation outcome: no irreversibility tags on operators; no verification-before-commit; villager/trade in action-translator
+
+**What's missing for ENRICHED**:
+- ❌ conscious-bot vs Sterling split; implementation pivots; transfer surfaces; concrete tests
+
+**Next action**: Add conscious-bot split; pivots; transfer surfaces; certification tests when Track 1-2 complete.
 
 **Priority**: 🟢 **MEDIUM** (defer until Track 1-2 complete)
-
-**What's missing**: All enrichment sections 3-9
-
-**Next action**: Defer; enrich after Track 1-2 proven.
 
 **Estimated effort**: 4-5 hours
 

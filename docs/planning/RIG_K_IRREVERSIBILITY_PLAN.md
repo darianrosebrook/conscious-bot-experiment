@@ -56,7 +56,17 @@ With proper commitment modeling:
 | Plan step order | Sterling solver | Step ordering; where verification-before-commit would be enforced |
 | Execution reporting | task-integration, reactive-executor | Step success/failure; where commitment is confirmed |
 
-**Outcome:** Confirm villager/trade integration; operator extensibility; where verification and commit ordering are enforced.
+**Investigation outcome (verified 2025-01-31):** No irreversibility modeling. Villager/trade: `action-translator.ts` (minecraft-interface) has villager/trade logic; no commitment semantics or verification-before-commit. Operators: `MinecraftCraftingRule`, `MinecraftSolveStep` (minecraft-crafting-types.ts) have no `irreversible` tag. Plan step order: Sterling returns ordered steps; no verification-before-commit enforcement. Execution: reactive-executor executes in order; no "check then commit" pattern. Commitment modeling would require operator metadata (`irreversible: boolean`), verification operators, option value in objective, and one-way constraints in domain state.
+
+### 4a. Current code anchors (verified 2025-01-31)
+
+| File | Line(s) | What |
+|------|---------|------|
+| `packages/planning/src/sterling/minecraft-crafting-types.ts` | 31-48, 64-70 | `MinecraftCraftingRule`, `MinecraftSolveStep`: no `irreversible` or `commitmentCost`. |
+| `packages/minecraft-interface/src/action-translator.ts` | villager/trade | Villager interaction; no verification-before-commit or option value. |
+| `packages/planning/src/reactive-executor/reactive-executor.ts` | step execution | Executes steps in order; no verification/commit sequencing. |
+
+**Gap:** No irreversibility tags, option value, verification operators, or commitment constraints. Rig K would extend operator metadata and domain state.
 
 ---
 
