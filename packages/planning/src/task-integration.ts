@@ -42,6 +42,15 @@ import { FeedbackStore } from './hierarchical/feedback';
 import { GoalResolver, type AtomicResolveOutcome } from './goals/goal-resolver';
 import { computeProvisionalKey } from './goals/goal-identity';
 import type { GoalBinding } from './goals/goal-binding-types';
+import {
+  onTaskStatusChanged,
+  onTaskProgressUpdated,
+  applySyncEffects,
+  type EffectApplierDeps,
+} from './goals/goal-lifecycle-hooks';
+import type { SyncEffect } from './goals/goal-task-sync';
+import type { VerifierRegistry } from './goals/verifier-registry';
+import { GoalStatus } from './types';
 
 export type { TaskStep } from './types/task-step';
 export type { MutationOrigin, MutationOptions } from './interfaces/task-integration';
@@ -79,6 +88,12 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
 
   private cognitionOutbox = new CognitionOutbox();
   private goalResolver?: GoalResolver;
+  private verifierRegistry?: VerifierRegistry;
+  private goalManager?: {
+    pause: (id: string) => boolean;
+    resume: (id: string) => boolean;
+    cancel: (id: string, reason?: string) => boolean;
+  };
 
   get outbox(): CognitionOutbox {
     return this.cognitionOutbox;
@@ -230,6 +245,26 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
     const task = this.taskStore.getTask(taskId);
     if (task) {
       const previousStatus = task.status;
+      const origin = options?.origin ?? 'runtime';
+
+      // Goal-binding protocol: compute hook result before persist so that
+      // hold/clear_hold effects targeting THIS task can be applied atomically.
+      let hookResult: ReturnType<typeof onTaskStatusChanged> | undefined;
+      if (origin === 'runtime') {
+        const binding = (task.metadata as any).goalBinding as GoalBinding | undefined;
+        if (binding) {
+          // Pre-compute effects before mutating status (hooks need old+new)
+          // We temporarily set the new status to compute effects, then apply
+          // self-targeted hold effects to the task object before persist.
+          hookResult = onTaskStatusChanged(
+            { ...task, status: status as Task['status'] },
+            previousStatus,
+            status as Task['status'],
+            { verifierRegistry: this.verifierRegistry },
+          );
+        }
+      }
+
       task.status = status as any;
       console.log(`Updated task ${taskId} status to ${status}`);
 
@@ -239,6 +274,11 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
       // Unblock parent when prerequisite children reach terminal state
       if (status === 'completed' || status === 'failed') {
         this.tryUnblockParent(task);
+      }
+
+      // Apply goal protocol effects (after persist, targeting other tasks/goals)
+      if (hookResult && hookResult.syncEffects.length > 0) {
+        this.applyGoalProtocolEffects(hookResult.syncEffects);
       }
 
       // Emit lifecycle events for thought generation
@@ -740,6 +780,74 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
     return this.goalResolver !== undefined;
   }
 
+  /**
+   * Wire the verifier registry for goal completion checks.
+   */
+  enableVerifierRegistry(registry: VerifierRegistry): void {
+    this.verifierRegistry = registry;
+  }
+
+  /**
+   * Wire a GoalManager for goal-side status updates.
+   *
+   * WARNING: GoalManager methods must NOT mutate tasks. If GoalManager
+   * later gains task-side effects, those must route through
+   * TaskIntegration with origin: 'protocol' to prevent re-entrancy.
+   */
+  enableGoalManager(gm: typeof this.goalManager): void {
+    this.goalManager = gm;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Goal-binding protocol: effect application
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Apply sync effects produced by goal lifecycle hooks.
+   *
+   * Status effects route through updateTaskStatus with origin='protocol'
+   * (preserves lifecycle events, indexing, parent unblocking — only
+   * suppresses re-entering goal hooks). Metadata effects (hold, clear_hold,
+   * goal_status) apply directly to the store.
+   */
+  private applyGoalProtocolEffects(effects: SyncEffect[]): number {
+    // Separate status effects (route through mutators) from metadata effects (direct store)
+    const statusEffects: SyncEffect[] = [];
+    const otherEffects: SyncEffect[] = [];
+    for (const e of effects) {
+      if (e.type === 'update_task_status') statusEffects.push(e);
+      else otherEffects.push(e);
+    }
+
+    // Apply metadata effects (hold, clear_hold, goal_status) via store
+    const deps: EffectApplierDeps = {
+      getTask: (id) => this.taskStore.getTask(id),
+      setTask: (t) => this.taskStore.setTask(t),
+      updateGoalStatus: this.goalManager
+        ? (goalId, status, reason) => {
+            this.emit('goalStatusUpdate', { goalId, status, reason });
+            if (status === GoalStatus.SUSPENDED) this.goalManager!.pause(goalId);
+            else if (status === GoalStatus.FAILED) this.goalManager!.cancel(goalId, reason);
+            else if (status === GoalStatus.PENDING) this.goalManager!.resume(goalId);
+          }
+        : (goalId, status, reason) => {
+            // No GoalManager wired — emit event only
+            this.emit('goalStatusUpdate', { goalId, status, reason });
+          },
+    };
+    let count = applySyncEffects(otherEffects, deps);
+
+    // Apply status effects through TaskIntegration mutators (with hook suppression)
+    for (const e of statusEffects) {
+      if (e.type === 'update_task_status') {
+        this.updateTaskStatus(e.taskId, e.status, { origin: 'protocol' });
+        count++;
+      }
+    }
+
+    return count;
+  }
+
   async addTask(taskData: Partial<Task>): Promise<Task> {
     // Goal-sourced task interception: route through GoalResolver when enabled
     if (this.goalResolver && taskData.source === 'goal' && taskData.type === 'building') {
@@ -985,6 +1093,23 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
     });
 
     this.taskStore.updateStatistics();
+
+    // Goal-binding protocol: fire progress hook (runtime origin only)
+    const origin = options?.origin ?? 'runtime';
+    if (origin === 'runtime') {
+      const binding = (task.metadata as any).goalBinding as GoalBinding | undefined;
+      if (binding) {
+        const hookResult = onTaskProgressUpdated(
+          task,
+          task.progress,
+          { verifierRegistry: this.verifierRegistry },
+        );
+        if (hookResult.syncEffects.length > 0) {
+          this.applyGoalProtocolEffects(hookResult.syncEffects);
+        }
+      }
+    }
+
     this.emit('taskProgressUpdated', { task, oldProgress, oldStatus });
 
     if (this.config.enableRealTimeUpdates) {
