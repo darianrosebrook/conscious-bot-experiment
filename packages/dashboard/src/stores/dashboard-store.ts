@@ -47,6 +47,11 @@ interface DashboardStore extends DashboardState {
 // Persistence Configuration
 // =============================================================================
 
+/** Strip [GOAL:] routing tags — these are for the planner, not for display. */
+const GOAL_TAG_STRIP_RE = /\s*\[GOAL:[^\]]*\](?:\s*\d+\w*)?/gi;
+const stripGoalTags = (text: string) =>
+  text.replace(GOAL_TAG_STRIP_RE, '').trim() || text;
+
 const PERSIST_CONFIG = {
   name: 'conscious-bot-dashboard-state',
   partialize: (state: DashboardStore) => ({
@@ -60,6 +65,19 @@ const PERSIST_CONFIG = {
     // inventory: state.inventory,
     // plannerData: state.plannerData,
   }),
+  // Strip residual [GOAL:] tags from persisted thoughts on rehydration
+  // (handles thoughts stored before the displayContent pipeline was added)
+  merge: (persistedState: any, currentState: DashboardStore): DashboardStore => {
+    if (!persistedState) return currentState;
+    const merged = { ...currentState, ...persistedState };
+    if (Array.isArray(merged.thoughts)) {
+      merged.thoughts = merged.thoughts.map((t: any) => ({
+        ...t,
+        text: typeof t.text === 'string' ? stripGoalTags(t.text) : t.text,
+      }));
+    }
+    return merged;
+  },
 };
 
 // =============================================================================
@@ -200,6 +218,11 @@ export const useDashboardStore = create<DashboardStore>()(
 
         // Load thoughts from server (for initial load)
         loadThoughtsFromServer: async () => {
+          // Strip residual [GOAL:] routing tags from display text
+          const GOAL_TAG_STRIP = /\s*\[GOAL:[^\]]*\](?:\s*\d+\w*)?/gi;
+          const stripGoalTags = (text: string) =>
+            text.replace(GOAL_TAG_STRIP, '').trim() || text;
+
           try {
             const response = await fetch('/api/ws/cognitive-stream/history');
             if (response.ok) {
@@ -208,7 +231,7 @@ export const useDashboardStore = create<DashboardStore>()(
                 const serverThoughts = data.thoughts.map((thought: any) => ({
                   id: thought.id,
                   ts: new Date(thought.timestamp).toISOString(),
-                  text: thought.content,
+                  text: stripGoalTags(thought.displayContent || thought.content),
                   type: thought.type || 'reflection',
                   attribution: thought.attribution || 'self',
                   thoughtType: thought.metadata?.thoughtType || thought.type,

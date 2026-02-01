@@ -44,7 +44,7 @@ export interface Thought {
   type: ThoughtType;
   attrHidden?: boolean; // true in prod; debugging only
   sender?: string; // For chat messages
-  thoughtType?: string; // Internal thought type (internal, external_chat_in, external_chat_out, intrusive, reflection, observation)
+  thoughtType?: string; // Thought type: internal, idle-reflection, reflection, observation, planning, external_chat_in, external_chat_out, intrusive, etc.
   /** Dashboard-only: chain-of-thought vs intrusion for display; bot always sees attribution 'self' */
   provenance?: 'chain-of-thought' | 'intrusion';
   attribution?: 'self' | 'external' | 'intrusive'; // Source of the thought (bot-facing)

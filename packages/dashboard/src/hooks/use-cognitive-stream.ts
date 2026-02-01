@@ -22,6 +22,8 @@ interface CognitiveThought {
   id: string;
   timestamp: number | string;
   content: string;
+  /** Tag-stripped display text (payloadVersion >= 2). Falls back to content. */
+  displayContent?: string;
   type: string;
   attribution?: string;
   metadata?: {
@@ -46,6 +48,13 @@ interface IntrusiveThoughtRequest {
 // =============================================================================
 // Utility Functions
 // =============================================================================
+
+/** Strip [GOAL:] routing tags — these are for the planner, not for display. */
+const GOAL_TAG_STRIP = /\s*\[GOAL:[^\]]*\](?:\s*\d+\w*)?/gi;
+function stripGoalTags(text: string): string {
+  return text.replace(GOAL_TAG_STRIP, '').trim() || text;
+}
+
 function mapThoughtType(type: string): ThoughtType {
   switch (type) {
     case 'self':
@@ -165,7 +174,7 @@ export function useCognitiveStream() {
               addThought({
                 id: thought.id,
                 ts,
-                text: thought.content,
+                text: stripGoalTags(thought.displayContent || thought.content),
                 type: mapThoughtType(thought.type),
                 attribution: mapAttribution(thought.attribution),
                 thoughtType: thought.metadata?.thoughtType || thought.type,
@@ -251,11 +260,14 @@ export function useCognitiveStream() {
       const trimmedText = text.trim();
       if (!trimmedText) return false;
 
+      // Strip [GOAL:] tags from display text (tags are for routing, not display)
+      const displayText = stripGoalTags(trimmedText);
+
       // Optimistic UI update - immediately add the thought to the UI
       const optimisticThought = {
         id: `optimistic-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         ts: new Date().toISOString(),
-        text: trimmedText,
+        text: displayText,
         type: 'intrusive' as const,
         attribution: 'intrusive' as const,
         thoughtType: 'intrusive',

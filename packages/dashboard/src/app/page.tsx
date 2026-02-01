@@ -64,21 +64,69 @@ interface BotConnection {
   viewerUrl?: string;
 }
 
-type ThoughtColorKey = 'intrusive' | 'chatIn' | 'chatOut' | 'social' | 'internal' | 'systemEvent' | 'thoughtProcessing' | 'taskCreation' | 'status' | 'systemMetric' | 'systemLog' | 'environmental' | 'default';
+type ThoughtColorKey =
+  | 'intrusive'
+  | 'chatIn'
+  | 'chatOut'
+  | 'social'
+  | 'internal'
+  | 'systemEvent'
+  | 'thoughtProcessing'
+  | 'taskCreation'
+  | 'status'
+  | 'systemMetric'
+  | 'systemLog'
+  | 'environmental'
+  | 'default';
 
-const THOUGHT_COLORS: Record<ThoughtColorKey, { border: string; bg: string; text: string }> = {
-  intrusive: { border: tc.intrusiveBorder, bg: tc.intrusiveBg, text: tc.intrusiveText },
+const THOUGHT_COLORS: Record<
+  ThoughtColorKey,
+  { border: string; bg: string; text: string }
+> = {
+  intrusive: {
+    border: tc.intrusiveBorder,
+    bg: tc.intrusiveBg,
+    text: tc.intrusiveText,
+  },
   chatIn: { border: tc.chatInBorder, bg: tc.chatInBg, text: tc.chatInText },
   chatOut: { border: tc.chatOutBorder, bg: tc.chatOutBg, text: tc.chatOutText },
   social: { border: tc.socialBorder, bg: tc.socialBg, text: tc.socialText },
-  internal: { border: tc.internalBorder, bg: tc.internalBg, text: tc.internalText },
-  systemEvent: { border: tc.systemEventBorder, bg: tc.systemEventBg, text: tc.systemEventText },
-  thoughtProcessing: { border: tc.thoughtProcessingBorder, bg: tc.thoughtProcessingBg, text: tc.thoughtProcessingText },
-  taskCreation: { border: tc.taskCreationBorder, bg: tc.taskCreationBg, text: tc.taskCreationText },
+  internal: {
+    border: tc.internalBorder,
+    bg: tc.internalBg,
+    text: tc.internalText,
+  },
+  systemEvent: {
+    border: tc.systemEventBorder,
+    bg: tc.systemEventBg,
+    text: tc.systemEventText,
+  },
+  thoughtProcessing: {
+    border: tc.thoughtProcessingBorder,
+    bg: tc.thoughtProcessingBg,
+    text: tc.thoughtProcessingText,
+  },
+  taskCreation: {
+    border: tc.taskCreationBorder,
+    bg: tc.taskCreationBg,
+    text: tc.taskCreationText,
+  },
   status: { border: tc.statusBorder, bg: tc.statusBg, text: tc.statusText },
-  systemMetric: { border: tc.systemMetricBorder, bg: tc.systemMetricBg, text: tc.systemMetricText },
-  systemLog: { border: tc.systemLogBorder, bg: tc.systemLogBg, text: tc.systemLogText },
-  environmental: { border: tc.environmentalBorder, bg: tc.environmentalBg, text: tc.environmentalText },
+  systemMetric: {
+    border: tc.systemMetricBorder,
+    bg: tc.systemMetricBg,
+    text: tc.systemMetricText,
+  },
+  systemLog: {
+    border: tc.systemLogBorder,
+    bg: tc.systemLogBg,
+    text: tc.systemLogText,
+  },
+  environmental: {
+    border: tc.environmentalBorder,
+    bg: tc.environmentalBg,
+    text: tc.environmentalText,
+  },
   default: { border: tc.defaultBorder, bg: tc.defaultBg, text: tc.defaultText },
 };
 
@@ -182,7 +230,9 @@ function ConsciousMinecraftDashboardContent() {
             stress: 20,
             focus: 80,
             curiosity: 75,
-            ...(hud?.intero?.stressAxes ? { stressAxes: hud.intero.stressAxes } : {}),
+            ...(hud?.intero?.stressAxes
+              ? { stressAxes: hud.intero.stressAxes }
+              : {}),
           };
           setHud({
             ts: new Date().toISOString(),
@@ -223,7 +273,9 @@ function ConsciousMinecraftDashboardContent() {
                 stress: hudData.intero.stress ?? derivedIntero.stress,
                 focus: hudData.intero.focus ?? derivedIntero.focus,
                 curiosity: hudData.intero.curiosity ?? derivedIntero.curiosity,
-                ...(hudData.intero.stressAxes ? { stressAxes: hudData.intero.stressAxes } : {}),
+                ...(hudData.intero.stressAxes
+                  ? { stressAxes: hudData.intero.stressAxes }
+                  : {}),
               }
             : derivedIntero;
           setHud({
@@ -321,7 +373,14 @@ function ConsciousMinecraftDashboardContent() {
               stress: 100,
               focus: 0,
               curiosity: 0,
-              stressAxes: { time: 100, situational: 100, healthHunger: 100, resource: 50, protection: 100, locationDistance: 50 },
+              stressAxes: {
+                time: 100,
+                situational: 100,
+                healthHunger: 100,
+                resource: 50,
+                protection: 100,
+                locationDistance: 50,
+              },
             };
             setHud({
               ts: new Date().toISOString(),
@@ -364,7 +423,14 @@ function ConsciousMinecraftDashboardContent() {
             stress: 20,
             focus: 80,
             curiosity: 75,
-            stressAxes: { time: 5, situational: 5, healthHunger: 5, resource: 20, protection: 15, locationDistance: 5 },
+            stressAxes: {
+              time: 5,
+              situational: 5,
+              healthHunger: 5,
+              resource: 20,
+              protection: 15,
+              locationDistance: 5,
+            },
           };
 
           // Update HUD with respawned health
@@ -463,7 +529,19 @@ function ConsciousMinecraftDashboardContent() {
           stamina?: number;
           sleep?: number;
         } | null;
-        intero?: { stress?: number; focus?: number; curiosity?: number; stressAxes?: { time: number; situational: number; healthHunger: number; resource: number; protection: number; locationDistance: number } };
+        intero?: {
+          stress?: number;
+          focus?: number;
+          curiosity?: number;
+          stressAxes?: {
+            time: number;
+            situational: number;
+            healthHunger: number;
+            resource: number;
+            protection: number;
+            locationDistance: number;
+          };
+        };
         mood?: string;
       };
     }) => {
@@ -869,6 +947,7 @@ function ConsciousMinecraftDashboardContent() {
       source?: string;
       steps?: { id: string; label?: string; done?: boolean }[];
       requirement?: unknown;
+      metadata?: { titleDisplay?: string; [key: string]: unknown };
     }) => {
       const sourceMap: Record<
         string,
@@ -911,7 +990,7 @@ function ConsciousMinecraftDashboardContent() {
           : undefined;
       return {
         id: raw.id,
-        title: raw.title ?? 'Task',
+        title: raw.metadata?.titleDisplay ?? raw.title ?? 'Task',
         priority: typeof raw.priority === 'number' ? raw.priority : 0,
         progress: typeof raw.progress === 'number' ? raw.progress : 0,
         source: sourceMap[raw.source ?? ''] ?? 'system',
@@ -1133,7 +1212,7 @@ function ConsciousMinecraftDashboardContent() {
           addThought({
             id: t.id,
             ts: new Date(t.timestamp).toISOString(),
-            text: t.content,
+            text: t.displayContent || t.content,
             type,
             attribution,
             thoughtType: t.metadata?.thoughtType || t.type,
@@ -1415,25 +1494,15 @@ function ConsciousMinecraftDashboardContent() {
               className={styles.tabsAuto}
             >
               <TabsList className={styles.tabsBg}>
-                <TabsTrigger value="live">
-                  Live
-                </TabsTrigger>
-                <TabsTrigger value="evaluation">
-                  Evaluation
-                </TabsTrigger>
-                <TabsTrigger value="database">
-                  Database
-                </TabsTrigger>
+                <TabsTrigger value="live">Live</TabsTrigger>
+                <TabsTrigger value="evaluation">Evaluation</TabsTrigger>
+                <TabsTrigger value="database">Database</TabsTrigger>
               </TabsList>
             </Tabs>
           </nav>
         </div>
         <div className={styles.headerRight}>
-          <Button
-            variant="outline"
-            size="sm"
-            className={styles.headerBtn}
-          >
+          <Button variant="outline" size="sm" className={styles.headerBtn}>
             <Search className={styles.iconMr} />
             Search
           </Button>
@@ -1465,7 +1534,14 @@ function ConsciousMinecraftDashboardContent() {
           </Button>
           <div className={styles.statusGroup}>
             <div
-              className={cn(styles.statusDot, botStateWebSocket.isConnected ? styles.statusDotGreen : botStateWebSocket.error ? styles.statusDotRed : styles.statusDotYellow)}
+              className={cn(
+                styles.statusDot,
+                botStateWebSocket.isConnected
+                  ? styles.statusDotGreen
+                  : botStateWebSocket.error
+                    ? styles.statusDotRed
+                    : styles.statusDotYellow
+              )}
             />
             <span className={styles.statusLabel}>Bot State</span>
             {botStateWebSocket.error && (
@@ -1484,7 +1560,11 @@ function ConsciousMinecraftDashboardContent() {
 
       {/* Main Content with Tabs */}
       <div className={styles.mainContent}>
-        <Tabs value={activeTab} onValueChange={setActiveTab} className={styles.tabsFull}>
+        <Tabs
+          value={activeTab}
+          onValueChange={setActiveTab}
+          className={styles.tabsFull}
+        >
           <TabsContent value="live" className={styles.tabContentFull}>
             <div className={styles.liveGrid}>
               {/* Left: Stress heatmap, Tasks, Planner, Reflective Notes, Environment, Events, Memories */}
@@ -1501,23 +1581,22 @@ function ConsciousMinecraftDashboardContent() {
                         className={styles.shrink0}
                       />
                       <div className={styles.moodText}>
-                        Mood: <span className={styles.moodValue}>{hud.mood}</span>
+                        Mood:{' '}
+                        <span className={styles.moodValue}>{hud.mood}</span>
                       </div>
                     </div>
                   </Section>
                 )}
-                <Section title="Tasks" icon={<ListChecks className={styles.icon4} />}>
+                <Section
+                  title="Tasks"
+                  icon={<ListChecks className={styles.icon4} />}
+                >
                   {tasks.length > 0 ? (
                     <div className={styles.taskList}>
                       {tasks.map((task) => (
-                        <div
-                          key={task.id}
-                          className={styles.taskCard}
-                        >
+                        <div key={task.id} className={styles.taskCard}>
                           <div className={styles.taskHeader}>
-                            <div className={styles.taskTitle}>
-                              {task.title}
-                            </div>
+                            <div className={styles.taskTitle}>{task.title}</div>
                             <Pill>{task.source}</Pill>
                           </div>
                           <div className={styles.taskProgressTrack}>
@@ -1589,18 +1668,40 @@ function ConsciousMinecraftDashboardContent() {
                                 }
                                 const pct = Math.round(reqProgress * 100);
                                 return (
-                                  <div className={styles.requirementProgressWrapper}>
-                                    <div className={styles.requirementProgressHeader}>
-                                      <span className={styles.requirementProgressLabel}>
+                                  <div
+                                    className={
+                                      styles.requirementProgressWrapper
+                                    }
+                                  >
+                                    <div
+                                      className={
+                                        styles.requirementProgressHeader
+                                      }
+                                    >
+                                      <span
+                                        className={
+                                          styles.requirementProgressLabel
+                                        }
+                                      >
                                         Requirement Progress
                                       </span>
-                                      <span className={styles.requirementProgressValue}>
+                                      <span
+                                        className={
+                                          styles.requirementProgressValue
+                                        }
+                                      >
                                         {pct}%
                                       </span>
                                     </div>
-                                    <div className={styles.requirementProgressTrack}>
+                                    <div
+                                      className={
+                                        styles.requirementProgressTrack
+                                      }
+                                    >
                                       <div
-                                        className={styles.requirementProgressFill}
+                                        className={
+                                          styles.requirementProgressFill
+                                        }
                                         style={{ width: `${pct}%` }}
                                       />
                                     </div>
@@ -1612,10 +1713,7 @@ function ConsciousMinecraftDashboardContent() {
                           {task.steps && (
                             <ul className={styles.taskSteps}>
                               {task.steps.map((step) => (
-                                <li
-                                  key={step.id}
-                                  className={styles.stepItem}
-                                >
+                                <li key={step.id} className={styles.stepItem}>
                                   <input
                                     type="checkbox"
                                     checked={step.done}
@@ -1623,7 +1721,9 @@ function ConsciousMinecraftDashboardContent() {
                                     className={styles.stepCheckbox}
                                   />
                                   <span
-                                    className={step.done ? styles.stepDone : undefined}
+                                    className={
+                                      step.done ? styles.stepDone : undefined
+                                    }
                                   >
                                     {step.label}
                                   </span>
@@ -1714,10 +1814,7 @@ function ConsciousMinecraftDashboardContent() {
                   {notes.length > 0 ? (
                     <div className={styles.notesList}>
                       {notes.slice(0, 5).map((note) => (
-                        <div
-                          key={note.id}
-                          className={styles.noteCard}
-                        >
+                        <div key={note.id} className={styles.noteCard}>
                           <div className={styles.noteHeader}>
                             <Pill>{note.type}</Pill>
                             <time className={styles.tabularNums}>
@@ -1725,13 +1822,9 @@ function ConsciousMinecraftDashboardContent() {
                             </time>
                           </div>
                           {note.title && (
-                            <div className={styles.noteTitle}>
-                              {note.title}
-                            </div>
+                            <div className={styles.noteTitle}>{note.title}</div>
                           )}
-                          <p className={styles.noteContent}>
-                            {note.content}
-                          </p>
+                          <p className={styles.noteContent}>{note.content}</p>
                           <div className={styles.noteFooter}>
                             <Pill>{note.source}</Pill>
                             <span className={styles.noteConfidence}>
@@ -1750,7 +1843,10 @@ function ConsciousMinecraftDashboardContent() {
                   )}
                 </Section>
 
-                <Section title="Environment" icon={<Map className={styles.icon4} />}>
+                <Section
+                  title="Environment"
+                  icon={<Map className={styles.icon4} />}
+                >
                   {environment ? (
                     <div className={styles.envGrid}>
                       <div className={styles.envCell}>
@@ -1779,17 +1875,17 @@ function ConsciousMinecraftDashboardContent() {
                   )}
                 </Section>
 
-                <Section title="Events" icon={<History className={styles.icon4} />}>
+                <Section
+                  title="Events"
+                  icon={<History className={styles.icon4} />}
+                >
                   {events.length > 0 ? (
                     <div className={styles.eventMemoryList}>
                       {events
                         .slice(-8)
                         .reverse()
                         .map((event) => (
-                          <div
-                            key={event.id}
-                            className={styles.eventCard}
-                          >
+                          <div key={event.id} className={styles.eventCard}>
                             <div className={styles.eventHeader}>
                               <Pill>{event.kind}</Pill>
                               <time className={styles.tabularNums}>
@@ -1813,26 +1909,24 @@ function ConsciousMinecraftDashboardContent() {
                   )}
                 </Section>
 
-                <Section title="Memories" icon={<Brain className={styles.icon4} />}>
+                <Section
+                  title="Memories"
+                  icon={<Brain className={styles.icon4} />}
+                >
                   {memories.length > 0 ? (
                     <div className={styles.eventMemoryList}>
                       {memories
                         .slice(-6)
                         .reverse()
                         .map((memory) => (
-                          <div
-                            key={memory.id}
-                            className={styles.eventCard}
-                          >
+                          <div key={memory.id} className={styles.eventCard}>
                             <div className={styles.eventHeader}>
                               <Pill>{memory.type}</Pill>
                               <time className={styles.tabularNums}>
                                 {formatTime(memory.ts)}
                               </time>
                             </div>
-                            <p className={styles.eventContent}>
-                              {memory.text}
-                            </p>
+                            <p className={styles.eventContent}>{memory.text}</p>
                             {memory.score != null && (
                               <div className={styles.memorySalience}>
                                 Salience: {Math.round(memory.score * 100)}%
@@ -1856,6 +1950,61 @@ function ConsciousMinecraftDashboardContent() {
                 <Section
                   title="Live Stream"
                   icon={<Activity className={styles.icon4} />}
+                  actions={
+                    botConnections.find((c) => c.name === 'minecraft-bot')
+                      ?.viewerActive ? (
+                      <div className={styles.streamHeaderButtons}>
+                        <button
+                          onClick={async () => {
+                            setViewerKey((prev) => prev + 1);
+                            await checkViewerStatus();
+                          }}
+                          className={styles.viewerBtn}
+                        >
+                          Refresh Viewer
+                        </button>
+                        <button
+                          onClick={() => {
+                            window.open(
+                              botConnections.find(
+                                (c) => c.name === 'minecraft-bot'
+                              )?.viewerUrl || 'http://localhost:3006',
+                              '_blank'
+                            );
+                          }}
+                          className={styles.viewerBtn}
+                        >
+                          Full Screen
+                        </button>
+                        <button
+                          onClick={async () => {
+                            try {
+                              const response = await fetch(
+                                'http://localhost:3005/stop-viewer',
+                                { method: 'POST' }
+                              );
+                              const result = await response.json();
+                              if (result.success) {
+                                setBotConnections((prev) =>
+                                  prev.map((conn) =>
+                                    conn.name === 'minecraft-bot'
+                                      ? { ...conn, viewerActive: false }
+                                      : conn
+                                  )
+                                );
+                                await checkViewerStatus();
+                              }
+                            } catch (error) {
+                              console.error('Error stopping viewer:', error);
+                            }
+                          }}
+                          className={styles.viewerBtnStop}
+                        >
+                          Stop Viewer
+                        </button>
+                      </div>
+                    ) : null
+                  }
                 >
                   <div className={styles.streamWrapper}>
                     {botConnections.find((c) => c.name === 'minecraft-bot')
@@ -1880,67 +2029,14 @@ function ConsciousMinecraftDashboardContent() {
                           breath={20}
                           experience={0}
                         />
-                        <div className={styles.streamOverlayButtons}>
-                          <button
-                            onClick={async () => {
-                              setViewerKey((prev) => prev + 1);
-                              // Also refresh viewer status
-                              await checkViewerStatus();
-                            }}
-                            className={styles.viewerBtn}
-                          >
-                            Refresh Viewer
-                          </button>
-                          <button
-                            onClick={() => {
-                              window.open(
-                                botConnections.find(
-                                  (c) => c.name === 'minecraft-bot'
-                                )?.viewerUrl || 'http://localhost:3006',
-                                '_blank'
-                              );
-                            }}
-                            className={styles.viewerBtn}
-                          >
-                            Full Screen
-                          </button>
-                          <button
-                            onClick={async () => {
-                              try {
-                                const response = await fetch(
-                                  'http://localhost:3005/stop-viewer',
-                                  {
-                                    method: 'POST',
-                                  }
-                                );
-                                const result = await response.json();
-                                if (result.success) {
-                                  // Update viewer status
-                                  setBotConnections((prev) =>
-                                    prev.map((conn) =>
-                                      conn.name === 'minecraft-bot'
-                                        ? { ...conn, viewerActive: false }
-                                        : conn
-                                    )
-                                  );
-                                  // Refresh viewer status
-                                  await checkViewerStatus();
-                                }
-                              } catch (error) {
-                                console.error('Error stopping viewer:', error);
-                              }
-                            }}
-                            className={styles.viewerBtnStop}
-                          >
-                            Stop Viewer
-                          </button>
-                        </div>
                       </>
                     ) : (
                       <div className={styles.streamPlaceholder}>
                         <div className={styles.streamPlaceholderContent}>
                           <div className={styles.streamPlaceholderIcon}>
-                            <Activity className={cn(styles.icon6, styles.statusLabel)} />
+                            <Activity
+                              className={cn(styles.icon6, styles.statusLabel)}
+                            />
                           </div>
                           <h3 className={styles.streamPlaceholderTitle}>
                             Bot Status
@@ -2005,7 +2101,12 @@ function ConsciousMinecraftDashboardContent() {
                                   );
                                 }
                               }}
-                              className={cn(styles.startViewerBtn, viewerStatus?.canStart ? styles.startViewerReady : styles.startViewerDisabled)}
+                              className={cn(
+                                styles.startViewerBtn,
+                                viewerStatus?.canStart
+                                  ? styles.startViewerReady
+                                  : styles.startViewerDisabled
+                              )}
                               disabled={!viewerStatus?.canStart}
                               title={
                                 viewerStatus?.reason || 'Start Minecraft viewer'
@@ -2160,6 +2261,7 @@ function ConsciousMinecraftDashboardContent() {
                         const isInternal =
                           thought.thoughtType === 'internal' ||
                           thought.thoughtType === 'reflection' ||
+                          thought.thoughtType === 'idle-reflection' ||
                           thought.thoughtType === 'observation' ||
                           thought.thoughtType === 'planning';
 
@@ -2215,7 +2317,10 @@ function ConsciousMinecraftDashboardContent() {
                         } else if (isTaskCreation) {
                           colorKey = 'taskCreation';
                           typeLabel = 'task_creation';
-                        } else if (isSystemStatus || thought.thoughtType === 'status') {
+                        } else if (
+                          isSystemStatus ||
+                          thought.thoughtType === 'status'
+                        ) {
                           colorKey = 'status';
                           typeLabel = 'status';
                         } else if (isSystemMetric) {
@@ -2235,7 +2340,11 @@ function ConsciousMinecraftDashboardContent() {
 
                         return (
                           <div
-                            className={cn(styles.thoughtCard, colors.border, colors.bg)}
+                            className={cn(
+                              styles.thoughtCard,
+                              colors.border,
+                              colors.bg
+                            )}
                           >
                             <div className={styles.thoughtHeader}>
                               <span className={styles.thoughtTypeLabel}>
@@ -2259,10 +2368,16 @@ function ConsciousMinecraftDashboardContent() {
                           className={styles.cognitiveContainer}
                         >
                           <TabsList className={styles.innerTabsList}>
-                            <TabsTrigger value="cognitive" className={styles.innerTabTrigger}>
+                            <TabsTrigger
+                              value="cognitive"
+                              className={styles.innerTabTrigger}
+                            >
                               Cognitive Stream
                             </TabsTrigger>
-                            <TabsTrigger value="status" className={styles.innerTabTrigger}>
+                            <TabsTrigger
+                              value="status"
+                              className={styles.innerTabTrigger}
+                            >
                               Status / Environmental
                             </TabsTrigger>
                           </TabsList>

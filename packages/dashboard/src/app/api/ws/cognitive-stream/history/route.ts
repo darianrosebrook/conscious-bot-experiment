@@ -18,6 +18,8 @@ interface CognitiveThought {
   id: string;
   type: string;
   content: string;
+  /** Tag-stripped display text (payloadVersion >= 2). Falls back to content. */
+  displayContent?: string;
   attribution: string;
   context: {
     currentTask?: string;

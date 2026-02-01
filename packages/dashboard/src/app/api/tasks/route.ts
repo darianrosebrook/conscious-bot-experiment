@@ -58,7 +58,7 @@ export async function GET(_request: NextRequest) {
         for (const task of currentTasks) {
           tasks.push({
             id: task.id,
-            title: task.title,
+            title: task.metadata?.titleDisplay ?? task.title,
             priority: task.priority || 0.5,
             progress: task.progress || 0,
             source: task.source || ('planner' as any),
@@ -78,7 +78,7 @@ export async function GET(_request: NextRequest) {
         for (const task of completedTasks) {
           tasks.push({
             id: task.id,
-            title: task.title,
+            title: task.metadata?.titleDisplay ?? task.title,
             priority: task.priority || 0.5,
             progress: 1.0, // Completed tasks have 100% progress
             source: task.source || ('planner' as any),
@@ -102,7 +102,7 @@ export async function GET(_request: NextRequest) {
           if (!tasks.find((t) => t.id === task.id)) {
             tasks.push({
               id: task.id,
-              title: task.title,
+              title: task.metadata?.titleDisplay ?? task.title,
               priority: task.priority || 0.5,
               progress: task.progress || 0,
               source: task.source || ('planner' as any),

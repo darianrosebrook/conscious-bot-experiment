@@ -22,6 +22,8 @@ interface CognitiveThought {
   timestamp: number;
   type: string;
   content: string;
+  /** Tag-stripped display text (payloadVersion >= 2). Falls back to content. */
+  displayContent?: string;
   attribution: string;
   context: {
     currentTask?: string;
@@ -750,7 +752,7 @@ export const POST = async (req: NextRequest) => {
   try {
     await maybeReloadThoughtStore();
     const body = await req.json();
-    const { type, content, attribution, context, metadata } = body;
+    const { type, content, displayContent, attribution, context, metadata } = body;
 
     // Only log in development mode
     if (process.env.NODE_ENV === 'development') {
@@ -844,10 +846,21 @@ export const POST = async (req: NextRequest) => {
       );
     }
 
+    // Compute display content: prefer explicit displayContent from payload,
+    // otherwise strip any residual [GOAL:] tags from the cleaned content.
+    const GOAL_TAG_STRIP = /\s*\[GOAL:[^\]]*\](?:\s*\d+\w*)?/gi;
+    const resolvedDisplayContent =
+      (displayContent && typeof displayContent === 'string'
+        ? displayContent.trim()
+        : null) || trimmedContent.replace(GOAL_TAG_STRIP, '').trim();
+
     // Add the thought to the history (use cleaned content)
     const newThought = addThought({
       type: type || 'reflection',
       content: trimmedContent,
+      displayContent: resolvedDisplayContent !== trimmedContent
+        ? resolvedDisplayContent
+        : undefined,
       attribution: attribution || 'external',
       context: context || {
         emotionalState: 'neutral',
