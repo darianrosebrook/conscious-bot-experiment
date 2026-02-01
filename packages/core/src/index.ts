@@ -13,7 +13,6 @@ export type { HttpClientConfig } from './utils/http-client';
 export {
   resilientFetch,
   waitForService,
-  _resetLogDedup,
 } from './utils/resilient-service-client';
 export type {
   ResilientFetchOptions,

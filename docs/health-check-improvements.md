@@ -141,6 +141,41 @@ If you still experience health check issues:
    lsof -i :3000-3010
    ```
 
+## Execution Readiness Gate (February 2025)
+
+A runtime readiness layer was added to gate executor enablement without blocking server startup.
+
+### ReadinessMonitor
+
+`packages/planning/src/server/execution-readiness.ts` provides `ReadinessMonitor`, which probes service health endpoints at startup and re-probes every 2 minutes.
+
+**Probed services**: minecraft, memory, cognition, dashboard
+
+**Tri-state per service**: `up` (2xx), `unhealthy` (non-2xx), `down` (network error)
+
+**Executor gating**: The executor only starts when all `executionRequired` services (default: `['minecraft']`) are `up` AND results are fresh (within 120s). If minecraft is down at startup, the executor defers and starts automatically when re-probe detects it coming online.
+
+**State-change logging**: Only transitions are logged (e.g., `[readiness] minecraft: down → up`). Steady-state silence eliminates the 95+ ECONNREFUSED lines/minute that previously masked real errors.
+
+### Resilient Fetch Log Dedup
+
+`packages/core/src/utils/resilient-service-client.ts` now deduplicates failure logs using a bounded LRU map:
+
+- **Key**: `label:errorKind` (e.g., `mc/health:ECONNREFUSED`)
+- **Error classes**: ECONNREFUSED, ETIMEDOUT, timeout, fetch_failed, unknown — different classes for the same label are logged independently
+- **Cooldown**: 60s between duplicate warns for the same key (override: `RESILIENT_FETCH_DEDUP_COOLDOWN_MS`)
+- **Capacity**: 64 entries with LRU eviction (override: `RESILIENT_FETCH_DEDUP_MAX`)
+- **Silent mode**: `silent: true` option suppresses all logging (used by readiness probes and memory discovery)
+- **Hot-but-suppressed keys** refresh their LRU position to prevent eviction by cold keys
+
+### State-Change Logging Pattern
+
+Applied across the planning package:
+
+- **Memory discovery** (`memory-integration.ts`): logs endpoint UP/DOWN transitions only
+- **LiveStream integration** (`live-stream-integration.ts`): logs MC interface and Dashboard UP/DOWN transitions only
+- **WorldState manager** (`world-state-manager.ts`): suppresses catch-block warns (resilientFetch owns the deduped warn)
+
 ## Future Improvements
 
 - **Service dependency management**: Start services in dependency order
@@ -150,5 +185,5 @@ If you still experience health check issues:
 
 ---
 
-*Last updated: January 2025*
+*Last updated: February 2025*
 *Author: @darianrosebrook*

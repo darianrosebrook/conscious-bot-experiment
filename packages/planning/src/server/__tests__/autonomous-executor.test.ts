@@ -369,6 +369,11 @@ describe('isInsideGeofence', () => {
     const fenceY: GeofenceConfig = { ...fence, yRange: { min: 0, max: 128 } };
     expect(isInsideGeofence({ x: 0, y: 200, z: 0 }, fenceY)).toBe(false);
   });
+
+  it('with yRange configured but position.y undefined → false (fail-closed)', () => {
+    const fenceY: GeofenceConfig = { ...fence, yRange: { min: 0, max: 128 } };
+    expect(isInsideGeofence({ x: 0, z: 0 }, fenceY)).toBe(false);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -455,6 +460,25 @@ describe('emergencyStopExecutor', () => {
     emergencyStopExecutor();
 
     expect(global.__planningInterval).toBeUndefined();
+    warnSpy.mockRestore();
+  });
+
+  it('abort signal cancels an in-flight fetch', async () => {
+    const controller = initExecutorAbortController();
+    const signal = controller.signal;
+
+    // Create a fetch that will hang until aborted
+    const fetchPromise = new Promise<void>((_, reject) => {
+      signal.addEventListener('abort', () => {
+        reject(new DOMException('The operation was aborted', 'AbortError'));
+      });
+    });
+
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    emergencyStopExecutor();
+
+    await expect(fetchPromise).rejects.toThrow('The operation was aborted');
+    expect(signal.aborted).toBe(true);
     warnSpy.mockRestore();
   });
 });

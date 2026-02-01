@@ -84,7 +84,9 @@ export function isInsideGeofence(
   const insideXZ = Math.abs(position.x - config.center.x) <= config.radius
     && Math.abs(position.z - config.center.z) <= config.radius;
   if (!insideXZ) return false;
-  if (config.yRange && position.y !== undefined) {
+  if (config.yRange) {
+    // Fail-closed: if Y constraint is configured but Y is unknown, block.
+    if (position.y === undefined) return false;
     return position.y >= config.yRange.min && position.y <= config.yRange.max;
   }
   return true;

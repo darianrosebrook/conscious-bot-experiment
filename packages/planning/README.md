@@ -33,15 +33,59 @@ This package provides Sterling solver integration (crafting, building, tool prog
 - `POST /autonomous` — trigger autonomous task discovery and execution
 - `POST /update-bot-instance` — update bot instance in planning server
 - `GET/POST /mcp/*` — MCP operations (list/register/promote/run options)
+- `POST /executor/stop` — emergency stop (halts executor loop + aborts in-flight HTTP; optional `EXECUTOR_EMERGENCY_TOKEN` auth)
 
-### Autonomous Executor (Currently Disabled)
+### Autonomous Executor
 
-The planning package's autonomous executor (which would run every ~10s via `EXECUTOR_POLL_MS`) is **disabled**. Task discovery and execution are driven by:
+The autonomous executor polls every ~10s (`EXECUTOR_POLL_MS`) and drives task execution through the guard pipeline. It is **disabled by default** and gated behind multiple safety layers.
 
-- **HTTP triggers**: `POST /execute`, `POST /execute-plan`, `POST /autonomous`
-- **Minecraft-interface planning cycle**: 15s loop in minecraft-interface (coordinator is a stub; actual planning via Sterling solvers happens when tasks are submitted)
+#### Startup gating
 
-Executor behavior when enabled: prefers MCP-registered Behavior Tree options, validates results against actual game state, uses inventory-based progress gating, injects prerequisite steps (e.g., gather wood), retries with backoff. Dispatches any step with `meta.executable: true` and validates leaf args before dispatch.
+The executor does not start unless all three conditions are met simultaneously:
+
+1. `ENABLE_PLANNING_EXECUTOR=1` environment variable is set
+2. The planning system reports ready (`isSystemReady()`)
+3. The `ReadinessMonitor` confirms required services are reachable (`executorReady`)
+
+If conditions aren't met at startup, the executor defers and starts automatically when readiness changes (via `ReadinessMonitor.onChange` callback). The startup check is atomic — a centralized `tryStartExecutor()` prevents double-start.
+
+#### Execution readiness gate
+
+The `ReadinessMonitor` (in `src/server/execution-readiness.ts`) probes service health at startup and re-probes every 2 minutes:
+
+- **minecraft** — required for executor enablement
+- **memory**, **cognition**, **dashboard** — probed for observability; not required
+
+Each service has a tri-state: `up` (2xx), `unhealthy` (non-2xx), `down` (network error). Only state transitions are logged (e.g., `[readiness] minecraft: down → up`), keeping steady-state silent.
+
+#### Guard pipeline
+
+Every step passes through the guard pipeline in this exact order:
+
+| # | Guard | Behavior |
+|---|-------|----------|
+| 0 | **Geofence** | Fail-closed: blocks if position unknown OR outside fence |
+| 1 | **Allowlist** | Terminally blocks unknown leaves (free, no budget consumed) |
+| 2 | **Shadow** | Observe without mutating (never throttled) |
+| 3 | **Rate limit** | Live-only sliding-window throttle |
+| 4 | **Rig G** | Feasibility gate via `startTaskStep` |
+| 5 | **Commit** | `record()` + execute (budget consumed only here) |
+
+Shadow mode (`EXECUTOR_MODE=shadow`) never consumes rate-limit budget and never mutates game state.
+
+#### Geofence
+
+When configured, the executor blocks any step where the bot is outside the horizontal bounding box (Chebyshev/square distance). Fail-closed: if bot position is unknown, execution is blocked.
+
+#### Emergency stop
+
+`POST /executor/stop` immediately halts the executor loop and aborts in-flight HTTP requests via `AbortController`. The abort signal is threaded through `mcFetch` → `mcPostJson` → `executeActionWithBotCheck` to reach the actual HTTP boundary. Optionally gated behind `EXECUTOR_EMERGENCY_TOKEN`.
+
+Note: abort cancels outbound HTTP only. If a leaf action has already been dispatched to the MC bot, the bot-side effect may continue.
+
+#### Behavior when enabled
+
+Prefers MCP-registered Behavior Tree options, validates results against actual game state, uses inventory-based progress gating, injects prerequisite steps (e.g., gather wood), retries with backoff. Dispatches any step with `meta.executable: true` and validates leaf args before dispatch.
 
 ### Fallback-Macro Planner
 
@@ -89,9 +133,29 @@ Environment variables:
 
 - `PORT` — planning server port (default `3002`)
 - `MCP_ONLY` — when `true`, disallow direct `/action` fallback and use MCP exclusively
-- `EXECUTOR_POLL_MS` — autonomous executor poll interval when enabled (default `10000`)
 - `STRICT_REQUIREMENTS` — when not `false`, only structured `requirementCandidate` produces requirements; regex fallback disabled
 - `NODE_ENV`, `DEBUG_ENVIRONMENT` — enable additional environment logging
+
+Executor variables:
+
+- `ENABLE_PLANNING_EXECUTOR` — `1` to enable the autonomous executor (default: disabled)
+- `EXECUTOR_MODE` — `shadow` (observe only, default) or `live` (mutates game state)
+- `EXECUTOR_LIVE_CONFIRM` — must be `YES` to actually enable live mode (safety interlock)
+- `EXECUTOR_POLL_MS` — executor poll interval in ms (default `10000`)
+- `EXECUTOR_MAX_STEPS_PER_MINUTE` — sliding-window rate limit (default `6`)
+- `EXECUTOR_FAILURE_COOLDOWN_MS` — cooldown after step failure (default `10000`)
+- `EXECUTOR_MAX_BACKOFF_MS` — max exponential backoff on executor errors (default `60000`)
+- `EXECUTOR_GEOFENCE_CENTER` — geofence center as `x,z` or `x,y,z` (unset = disabled)
+- `EXECUTOR_GEOFENCE_RADIUS` — Chebyshev (square) radius in blocks (default `100`)
+- `EXECUTOR_GEOFENCE_Y_RANGE` — optional vertical constraint as `min,max` (fail-closed if set but Y unknown)
+- `EXECUTOR_EMERGENCY_TOKEN` — bearer token for `/executor/stop` endpoint (unset = no auth required)
+
+Service endpoint overrides (used by readiness probes):
+
+- `MINECRAFT_ENDPOINT` — minecraft interface URL (default `http://localhost:3005`)
+- `MEMORY_ENDPOINT` — memory service URL (default `http://localhost:3001`)
+- `COGNITION_ENDPOINT` — cognition service URL (default `http://localhost:3003`)
+- `DASHBOARD_ENDPOINT` — dashboard URL (default `http://localhost:3000`)
 
 ## Development
 

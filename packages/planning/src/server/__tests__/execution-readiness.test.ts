@@ -202,4 +202,59 @@ describe('ReadinessMonitor', () => {
     expect(monitor.isUp('minecraft')).toBe(false);
     expect(monitor.executorReady).toBe(false);
   });
+
+  it('onChange callback fires on state transition', async () => {
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+    mockResilientFetch.mockResolvedValue(null); // all down
+
+    const monitor = new ReadinessMonitor({
+      executionRequired: ['minecraft'],
+      endpoints: TEST_ENDPOINTS,
+    });
+    await monitor.probe();
+
+    const onChange = vi.fn();
+    monitor.onChange(onChange);
+
+    // Bring minecraft up
+    mockResilientFetch.mockResolvedValue(makeOkResponse());
+    monitor.startMonitoring(1000);
+    await vi.advanceTimersByTimeAsync(1100);
+
+    expect(onChange).toHaveBeenCalledTimes(1);
+    expect(onChange).toHaveBeenCalledWith(
+      expect.objectContaining({
+        executorReady: true,
+        services: expect.objectContaining({
+          minecraft: expect.objectContaining({ state: 'up' }),
+        }),
+      }),
+    );
+
+    monitor.stopMonitoring();
+    vi.restoreAllMocks();
+  });
+
+  it('onChange callback does not fire when no state changes', async () => {
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+    mockResilientFetch.mockResolvedValue(makeOkResponse()); // all up
+
+    const monitor = new ReadinessMonitor({
+      executionRequired: ['minecraft'],
+      endpoints: TEST_ENDPOINTS,
+    });
+    await monitor.probe();
+
+    const onChange = vi.fn();
+    monitor.onChange(onChange);
+
+    // Re-probe with same state (still all up)
+    monitor.startMonitoring(1000);
+    await vi.advanceTimersByTimeAsync(1100);
+
+    expect(onChange).not.toHaveBeenCalled();
+
+    monitor.stopMonitoring();
+    vi.restoreAllMocks();
+  });
 });

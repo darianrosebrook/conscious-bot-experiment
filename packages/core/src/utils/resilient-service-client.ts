@@ -57,10 +57,26 @@ export interface ResilientFetchOptions extends RequestInit {
 // Bounded dedup map with error-class keying
 // ---------------------------------------------------------------------------
 
-/** Max entries in the dedup map. Entries evicted FIFO when full. */
-const DEDUP_MAX_ENTRIES = 64;
-/** Minimum ms between duplicate warns for the same label+errorKind. */
-const DEDUP_COOLDOWN_MS = 60_000;
+/**
+ * Max entries in the dedup map. Entries evicted LRU when full.
+ * Override with RESILIENT_FETCH_DEDUP_MAX env var.
+ */
+const _rawDedupMax = Number(
+  (typeof process !== 'undefined' && process.env?.RESILIENT_FETCH_DEDUP_MAX) || 64
+);
+const DEDUP_MAX_ENTRIES = Number.isFinite(_rawDedupMax) && _rawDedupMax > 0
+  ? Math.floor(_rawDedupMax)
+  : 64;
+/**
+ * Minimum ms between duplicate warns for the same label+errorKind.
+ * Override with RESILIENT_FETCH_DEDUP_COOLDOWN_MS env var.
+ */
+const _rawDedupCooldown = Number(
+  (typeof process !== 'undefined' && process.env?.RESILIENT_FETCH_DEDUP_COOLDOWN_MS) || 60_000
+);
+const DEDUP_COOLDOWN_MS = Number.isFinite(_rawDedupCooldown) && _rawDedupCooldown > 0
+  ? Math.floor(_rawDedupCooldown)
+  : 60_000;
 
 const _dedupMap = new Map<string, number>(); // key → last-log-timestamp
 
@@ -78,11 +94,20 @@ function _classifyError(error: unknown): string {
 function _shouldLog(label: string, errorKind: string): boolean {
   const key = `${label}:${errorKind}`;
   const now = Date.now();
-  const last = _dedupMap.get(key) ?? 0;
-  if (now - last < DEDUP_COOLDOWN_MS) return false;
+  const last = _dedupMap.get(key);
+  if (last !== undefined && now - last < DEDUP_COOLDOWN_MS) {
+    // Within cooldown — suppress logging but refresh LRU position so
+    // hot-but-suppressed keys are not evicted by cold keys.
+    _dedupMap.delete(key);
+    _dedupMap.set(key, last); // preserve original timestamp, refresh insertion order
+    return false;
+  }
 
-  // Evict oldest entries if map is full
-  if (_dedupMap.size >= DEDUP_MAX_ENTRIES && !_dedupMap.has(key)) {
+  // LRU: delete existing key so re-insertion moves it to the end
+  if (_dedupMap.has(key)) {
+    _dedupMap.delete(key);
+  } else if (_dedupMap.size >= DEDUP_MAX_ENTRIES) {
+    // Evict least-recently-used (oldest insertion order)
     const oldest = _dedupMap.keys().next().value;
     if (oldest) _dedupMap.delete(oldest);
   }

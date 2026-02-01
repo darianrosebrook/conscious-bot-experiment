@@ -31,7 +31,7 @@ function mcRecordSuccess(): void {
 
 export async function mcFetch(
   path: string,
-  init: RequestInit & { timeoutMs?: number } = {}
+  init: RequestInit & { timeoutMs?: number; externalSignal?: AbortSignal } = {}
 ): Promise<Response> {
   if (mcCircuitOpen()) {
     throw new Error('Minecraft endpoint circuit open');
@@ -42,12 +42,25 @@ export async function mcFetch(
   let lastErr: any;
   for (let attempt = 0; attempt <= retries; attempt++) {
     let timeoutId: ReturnType<typeof setTimeout> | undefined;
+    // Named handler for external abort signal — removed in finally to prevent leak
+    const onExternalAbort = init.externalSignal
+      ? () => { clearTimeout(timeoutId!); controller.abort(); }
+      : undefined;
+    const controller = new AbortController();
     try {
-      const controller = new AbortController();
       timeoutId = setTimeout(
         () => controller.abort(),
         init.timeoutMs ?? 10_000
       );
+      // Honor external abort signal (e.g. emergency stop)
+      if (init.externalSignal && onExternalAbort) {
+        if (init.externalSignal.aborted) {
+          clearTimeout(timeoutId);
+          controller.abort();
+        } else {
+          init.externalSignal.addEventListener('abort', onExternalAbort, { once: true });
+        }
+      }
       const res = await fetch(url, { ...init, signal: controller.signal });
       clearTimeout(timeoutId);
       if (res.ok) {
@@ -78,6 +91,11 @@ export async function mcFetch(
       // AbortError = system busy / timeout — already thrown above; record failure for other kinds
       mcRecordFailure();
       throw err;
+    } finally {
+      // Remove external abort listener to prevent accumulation over executor lifetime
+      if (init.externalSignal && onExternalAbort) {
+        init.externalSignal.removeEventListener('abort', onExternalAbort);
+      }
     }
   }
   mcRecordFailure();
@@ -87,7 +105,8 @@ export async function mcFetch(
 export async function mcPostJson<T = any>(
   path: string,
   body: any,
-  timeoutMs?: number
+  timeoutMs?: number,
+  externalSignal?: AbortSignal,
 ): Promise<{ ok: boolean; data?: T; error?: string; raw?: Response }> {
   try {
     const res = await mcFetch(path, {
@@ -95,6 +114,7 @@ export async function mcPostJson<T = any>(
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
       timeoutMs,
+      externalSignal,
     });
     if (!res.ok) {
       const text = await res.text().catch(() => '');

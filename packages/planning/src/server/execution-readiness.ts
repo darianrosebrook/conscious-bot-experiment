@@ -130,10 +130,17 @@ export async function probeServices(
 /**
  * Monitors service readiness with periodic re-probing and state-change logging.
  */
+export type ReadinessChangeCallback = (result: ReadinessResult) => void;
+
+/**
+ * Monitors service readiness with periodic re-probing and state-change logging.
+ */
 export class ReadinessMonitor {
   private _result: ReadinessResult | null = null;
   private _timer: ReturnType<typeof setInterval> | null = null;
   private _config: ReadinessConfig;
+  private _listeners: ReadinessChangeCallback[] = [];
+  private _probeInFlight = false;
 
   constructor(config?: Partial<ReadinessConfig>) {
     this._config = {
@@ -149,22 +156,47 @@ export class ReadinessMonitor {
     return this._result;
   }
 
+  /** Register a callback fired on every re-probe that detects a state change. */
+  onChange(cb: ReadinessChangeCallback): void {
+    this._listeners.push(cb);
+  }
+
   /** Start periodic re-probing every intervalMs. Logs only on state transitions. */
   startMonitoring(intervalMs: number = 120_000): void {
     this.stopMonitoring();
     this._timer = setInterval(async () => {
-      const oldResult = this._result;
-      const newResult = await probeServices(this._config);
+      // Skip if a previous probe is still running (network stall, slow DNS, etc.)
+      if (this._probeInFlight) return;
+      this._probeInFlight = true;
+      try {
+        const oldResult = this._result;
+        const newResult = await probeServices(this._config);
 
-      // State-change logging
-      for (const [name, newHealth] of Object.entries(newResult.services)) {
-        const oldState = oldResult?.services[name]?.state ?? 'down';
-        if (newHealth.state !== oldState) {
-          console.log(`[readiness] ${name}: ${oldState} → ${newHealth.state}`);
+        // Detect state changes
+        let changed = false;
+        for (const [name, newHealth] of Object.entries(newResult.services)) {
+          const oldState = oldResult?.services[name]?.state ?? 'down';
+          if (newHealth.state !== oldState) {
+            console.log(`[readiness] ${name}: ${oldState} → ${newHealth.state}`);
+            changed = true;
+          }
         }
-      }
 
-      this._result = newResult;
+        this._result = newResult;
+
+        // Notify listeners on any state change
+        if (changed) {
+          for (const cb of this._listeners) {
+            try {
+              cb(newResult);
+            } catch (e) {
+              console.warn('[readiness] onChange callback error:', (e as Error)?.message);
+            }
+          }
+        }
+      } finally {
+        this._probeInFlight = false;
+      }
     }, intervalMs);
   }
 
