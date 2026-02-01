@@ -193,8 +193,30 @@ export class PlanExecutor extends EventEmitter {
       });
 
       // Step 4: Execute plan with enhanced monitoring
+      // INTERMEDIATE FIX: Handle case where planning is retired or no plan available
+      // TODO(rig-planning): Replace with proper Sterling solver integration when planning rigs are implemented.
       if (!this.currentPlan) {
-        throw new Error('No plan available for execution');
+        // Check if this is the legacy retired case (expected) vs actual planning failure
+        const isLegacyRetired = (planningResult as any).isLegacyRetired === true;
+        const errorMsg = isLegacyRetired
+          ? 'Legacy planning retired — awaiting rig implementation'
+          : planningResult.error || 'No plan available for execution';
+
+        // Return gracefully instead of throwing - this is expected when idle or legacy retired
+        return {
+          success: false,
+          plan: null as any,
+          executedSteps: 0,
+          totalSteps: 0,
+          startTime: this.executionStartTime,
+          endTime: Date.now(),
+          actionResults: [],
+          repairAttempts: 0,
+          finalWorldState: this.observationMapper.mapBotStateToPlanningContext(
+            bot
+          ).worldState as any,
+          error: errorMsg,
+        };
       }
 
       const executionResult = await this.executePlan(this.currentPlan);

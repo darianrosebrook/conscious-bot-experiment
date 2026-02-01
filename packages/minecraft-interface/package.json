@@ -11,6 +11,7 @@
     "mc-simple": "dist/bin/mc-simple.js"
   },
   "scripts": {
+    "postinstall": "node scripts/rebuild-prismarine-viewer.cjs 2>/dev/null || true",
     "build": "tsc",
     "dev": "tsc --watch",
     "test": "vitest run --passWithNoTests",
@@ -84,6 +85,8 @@
     "ws": "^8.18.3"
   },
   "devDependencies": {
+    "webpack": "^5.95.0",
+    "webpack-cli": "^6.0.0",
     "@types/cors": "^2.8.19",
     "@types/express": "^4.17.23",
     "@types/js-yaml": "^4.0.9",

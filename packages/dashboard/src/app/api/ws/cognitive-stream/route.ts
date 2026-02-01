@@ -32,6 +32,8 @@ interface CognitiveThought {
   metadata: {
     llmConfidence?: number;
     thoughtType?: string;
+    /** Dashboard-only: 'chain-of-thought' | 'intrusion' for display and dedup */
+    provenance?: 'chain-of-thought' | 'intrusion';
     sender?: string;
     messageType?: string;
     intent?: string;
@@ -791,13 +793,43 @@ export const POST = async (req: NextRequest) => {
       }
     }
 
-    // Deduplicate: skip if identical content+type was added within the last 30s
     const trimmedContent = cleanedContent.trim();
+    const provenance =
+      (body.metadata && (body.metadata as { provenance?: string }).provenance) as
+        | 'chain-of-thought'
+        | 'intrusion'
+        | undefined;
+
+    // Deduplicate intrusive thoughts by canonical content within 8 minutes
+    // so the same intrusive thought does not appear multiple times in the dashboard
+    if (provenance === 'intrusion') {
+      const canonicalIntrusive = trimmedContent.toLowerCase().replace(/\s+/g, ' ').trim();
+      const intrusiveCutoff = Date.now() - 8 * 60_000; // 8 minutes
+      const duplicateIntrusive = thoughtHistory.find(
+        (old) =>
+          old.metadata?.provenance === 'intrusion' &&
+          old.timestamp > intrusiveCutoff &&
+          old.content.toLowerCase().replace(/\s+/g, ' ').trim() === canonicalIntrusive
+      );
+      if (duplicateIntrusive) {
+        return new Response(
+          JSON.stringify({
+            success: true,
+            deduplicated: true,
+            id: duplicateIntrusive.id,
+            reason: 'intrusive_dedup',
+          }),
+          { headers: { 'Content-Type': 'application/json' } }
+        );
+      }
+    }
+
+    // Deduplicate: skip if identical content+type was added within the last 30s
     const recentCutoff = Date.now() - 30_000;
     const duplicate = thoughtHistory.find(
       (old) =>
         old.content === trimmedContent &&
-        old.type === (type || 'intrusive') &&
+        old.type === (type || 'reflection') &&
         old.timestamp > recentCutoff
     );
     if (duplicate) {
@@ -809,7 +841,7 @@ export const POST = async (req: NextRequest) => {
 
     // Add the thought to the history (use cleaned content)
     const newThought = addThought({
-      type: type || 'intrusive',
+      type: type || 'reflection',
       content: trimmedContent,
       attribution: attribution || 'external',
       context: context || {
@@ -818,7 +850,8 @@ export const POST = async (req: NextRequest) => {
       },
       metadata: {
         ...metadata,
-        thoughtType: type || 'intrusive', // Ensure thoughtType is set
+        thoughtType: metadata?.thoughtType ?? type ?? 'reflection',
+        provenance: provenance ?? 'chain-of-thought',
       },
     });
 

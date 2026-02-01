@@ -1,3 +1,25 @@
+diff --git a/lib/mineflayer.js b/lib/mineflayer.js
+index 06634bf6415ec41410e95ec816bebcc239726497..f634efe72acaa1431cdd8890b9bb98f50cb39b63 100644
+--- a/lib/mineflayer.js
++++ b/lib/mineflayer.js
+@@ -71,8 +71,17 @@ module.exports = (bot, { viewDistance = 6, firstPerson = false, port = 3000, pre
+ 
+     bot.on('move', botPosition)
+     worldView.listenToBot(bot)
++
++    function emitTime () {
++      const time = (bot.time && bot.time.timeOfDay != null) ? bot.time.timeOfDay : (bot.world && bot.world.time != null ? bot.world.time : 6000)
++      socket.emit('time', time)
++    }
++    emitTime()
++    bot.on('time', emitTime)
++
+     socket.on('disconnect', () => {
+       bot.removeListener('move', botPosition)
++      bot.removeListener('time', emitTime)
+       worldView.removeListenersFromBot(bot)
+       sockets.splice(sockets.indexOf(socket), 1)
+     })
 diff --git a/viewer/lib/entity/Entity.js b/viewer/lib/entity/Entity.js
 index 89454526bd0c58e167fa4cc787cf1892ea26297f..510e545e62a86a8f8398df13fb8218a61abf2ee4 100644
 --- a/viewer/lib/entity/Entity.js
@@ -28,3 +50,79 @@ index 89454526bd0c58e167fa4cc787cf1892ea26297f..510e545e62a86a8f8398df13fb8218a6
  
      this.mesh = new THREE.Object3D()
      for (const [name, jsonModel] of Object.entries(e.geometry)) {
+diff --git a/viewer/lib/viewer.js b/viewer/lib/viewer.js
+index db02d904690f4066555dbea72b00dd11fbd99640..b63729acd40c6b4e059c74ab22e224cab2295128 100644
+--- a/viewer/lib/viewer.js
++++ b/viewer/lib/viewer.js
+@@ -82,6 +82,60 @@ class Viewer {
+     this.camera.rotation.set(pitch, yaw, 0, 'ZYX')
+   }
+ 
++  /**
++   * Update sky and lighting from Minecraft time (0-24000).
++   * 0=sunrise, 6000=noon, 12000=sunset, 18000=midnight
++   */
++  updateTime (time) {
++    if (time == null || typeof time !== 'number') return
++    const t = ((time % 24000) + 24000) % 24000
++    const cycle = t / 24000
++
++    let r, g, b
++    if (t >= 0 && t < 2000) {
++      const u = t / 2000
++      r = 0.4 + 0.35 * u
++      g = 0.5 + 0.25 * u
++      b = 0.9
++    } else if (t >= 2000 && t < 10000) {
++      r = 0.75
++      g = 0.85
++      b = 1
++    } else if (t >= 10000 && t < 12000) {
++      const u = (t - 10000) / 2000
++      r = 0.75 + 0.25 * u
++      g = 0.85 - 0.35 * u
++      b = 1 - 0.5 * u
++    } else if (t >= 12000 && t < 14000) {
++      const u = (t - 12000) / 2000
++      r = 0.15 + 0.1 * u
++      g = 0.1 + 0.05 * u
++      b = 0.3 + 0.1 * u
++    } else if (t >= 14000 && t < 22000) {
++      r = 0.08
++      g = 0.06
++      b = 0.18
++    } else {
++      const u = (t - 22000) / 2000
++      r = 0.08 + 0.32 * u
++      g = 0.06 + 0.44 * u
++      b = 0.18 + 0.72 * u
++    }
++    this.scene.background = new THREE.Color(r, g, b)
++
++    const isDay = t >= 23500 || t < 12500
++    const ambient = isDay ? 0.8 : 0.25
++    const directional = isDay ? 0.5 : 0.1
++    this.ambientLight.intensity = ambient
++    this.ambientLight.color.setRGB(1, 1, 1)
++    this.directionalLight.intensity = directional
++    this.directionalLight.position.set(
++      Math.cos(cycle * Math.PI * 2 - Math.PI / 2) * 0.5 + 0.5,
++      0.8,
++      Math.sin(cycle * Math.PI * 2 - Math.PI / 2) * 0.5 + 0.5
++    ).normalize()
++  }
++
+   listen (emitter) {
+     emitter.on('entity', (e) => {
+       this.updateEntity(e)
+@@ -103,6 +157,10 @@ class Viewer {
+       this.setBlockStateId(new Vec3(pos.x, pos.y, pos.z), stateId)
+     })
+ 
++    emitter.on('time', (time) => {
++      this.updateTime(time)
++    })
++
+     this.domElement.addEventListener('pointerdown', (evt) => {
+       const raycaster = new THREE.Raycaster()
+       const mouse = new THREE.Vector2()

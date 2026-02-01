@@ -81,6 +81,9 @@ export class LLMInterface {
       options?.systemPrompt
     );
     const startTime = performance.now();
+    const benchmarkLog =
+      process.env.COGNITION_LLM_BENCHMARK === '1' ||
+      process.env.COGNITION_LLM_BENCHMARK === 'true';
 
     try {
       const response = await this.callOllama(model, fullPrompt, {
@@ -90,21 +93,29 @@ export class LLMInterface {
       });
 
       const endTime = performance.now();
+      const latencyMs = endTime - startTime;
+      const promptTokens = response.prompt_eval_count || 0;
+      const completionTokens = response.eval_count || 0;
+
+      if (benchmarkLog) {
+        console.log(
+          `[LLM benchmark] latency_ms=${Math.round(latencyMs)} prompt_len=${fullPrompt.length} max_tokens=${maxTokens} prompt_tokens=${promptTokens} completion_tokens=${completionTokens}`
+        );
+      }
 
       return {
         id: `llm-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         text: response.response,
         model,
-        tokensUsed: response.eval_count || 0,
-        latency: endTime - startTime,
+        tokensUsed: completionTokens,
+        latency: latencyMs,
         confidence: this.calculateConfidence(response),
         metadata: {
           finishReason: response.done ? 'stop' : 'length',
           usage: {
-            promptTokens: response.prompt_eval_count || 0,
-            completionTokens: response.eval_count || 0,
-            totalTokens:
-              (response.prompt_eval_count || 0) + (response.eval_count || 0),
+            promptTokens,
+            completionTokens,
+            totalTokens: promptTokens + completionTokens,
           },
         },
         timestamp: Date.now(),

@@ -1,4 +1,5 @@
 import { LLMInterface, LLMResponse } from '../cognitive-core/llm-interface';
+import { getLLMConfig } from '../config/llm-token-config';
 import { z } from 'zod';
 import { auditLogger } from '../audit/thought-action-audit-logger';
 
@@ -136,27 +137,30 @@ export class ObservationReasoner {
 
     const startTime = Date.now();
     const abortController = new AbortController();
-    const timeoutId = setTimeout(() => abortController.abort(), this.timeoutMs);
+    const abortTimeoutId = setTimeout(() => abortController.abort(), this.timeoutMs);
 
     try {
       console.log(
         `[ObservationReasoner] Calling LLM with prompt: ${prompt.prompt.substring(0, 100)}...`
       );
 
+      const observationConfig = getLLMConfig('observation');
       const llmPromise = this.llm.generateResponse(prompt.prompt, undefined, {
         systemPrompt: prompt.system,
-        temperature: 0.35,
-        maxTokens: 512,
+        temperature: observationConfig.temperature,
+        maxTokens: observationConfig.maxTokens,
         signal: abortController.signal,
       });
       llmPromise.catch(() => {}); // Swallow AbortError when we timeout so no unhandled rejection
 
-      const timeoutPromise = new Promise<LLMResponse>((_, reject) =>
-        setTimeout(
+      // INTERMEDIATE FIX: Track both timeout IDs to prevent leak
+      let raceTimeoutId: NodeJS.Timeout | null = null;
+      const timeoutPromise = new Promise<LLMResponse>((_, reject) => {
+        raceTimeoutId = setTimeout(
           () => reject(new Error('LLM observation reasoning timed out')),
           this.timeoutMs
-        )
-      );
+        );
+      });
 
       const llmResponse = await Promise.race<LLMResponse>([
         llmPromise,
@@ -167,7 +171,9 @@ export class ObservationReasoner {
         `[ObservationReasoner] LLM response received: ${llmResponse.text.substring(0, 100)}...`
       );
 
-      clearTimeout(timeoutId);
+      // INTERMEDIATE FIX: Clear both timeouts to prevent leak
+      clearTimeout(abortTimeoutId);
+      if (raceTimeoutId) clearTimeout(raceTimeoutId);
 
       const insight = this.parseLLMResponse(llmResponse.text);
 
@@ -215,7 +221,8 @@ export class ObservationReasoner {
         llmResponse,
       };
     } catch (error) {
-      clearTimeout(timeoutId);
+      // INTERMEDIATE FIX: Clear both timeouts in error path too
+      clearTimeout(abortTimeoutId);
       const reason =
         error instanceof Error ? error.message : 'Unknown observation error';
       console.log(
@@ -262,6 +269,14 @@ export class ObservationReasoner {
     }
 
     return ObservationInsightSchema.parse(parsedJson);
+  }
+
+  /** Public fallback for stale/superseded observations (no LLM call). Used when queue drains with latest-wins. */
+  getStaleFallback(
+    payload: ObservationPayload,
+    observationId: string | undefined
+  ): ObservationInsight {
+    return this.createFallback(payload, observationId, 'stale');
   }
 
   /** Fallback insight; downstream should filter or display fallbacks differently (e.g. by thought.source === 'fallback'). */

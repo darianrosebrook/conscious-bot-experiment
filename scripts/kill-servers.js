@@ -13,23 +13,29 @@ import { promisify } from 'util';
 
 const execAsync = promisify(exec);
 
-// Server ports used by our services
+// Server ports used by our services (must match start.js)
 const SERVER_PORTS = {
-  dashboard: 3000,
-  minecraft: 3005,
-  cognition: 3003,
+  core: 3007,
   memory: 3001,
   world: 3004,
+  cognition: 3003,
   planning: 3002,
+  minecraft: 3005,
+  dashboard: 3000,
+  mlx: 5002,
+  sterling: 8766,
 };
 
-// Process patterns to kill
+// Process patterns to kill (catches orphaned children from scripts)
 const PROCESS_PATTERNS = [
   'tsx src/server.ts',
   'next dev',
   'node.*dev.js',
   'pnpm.*dev',
   'minecraft-interface',
+  'python3.*mlx_server.py',
+  'mlx_server.py',
+  'sterling_unified_server.py',
 ];
 
 /**
@@ -37,11 +43,11 @@ const PROCESS_PATTERNS = [
  */
 async function killProcessesByPattern(pattern) {
   try {
-    const { stdout } = await execAsync(`pkill -f "${pattern}"`);
-    console.log(`✅ Killed processes matching: ${pattern}`);
+    await execAsync(`pkill -f "${pattern}"`);
+    console.log(`Killed processes matching: ${pattern}`);
     return true;
-  } catch (error) {
-    console.log(`ℹ️  No processes found for pattern: ${pattern}`);
+  } catch {
+    console.log(`No processes for pattern: ${pattern}`);
     return false;
   }
 }
@@ -51,11 +57,11 @@ async function killProcessesByPattern(pattern) {
  */
 async function killProcessesByPort(port) {
   try {
-    const { stdout } = await execAsync(`lsof -ti:${port} | xargs kill -9`);
-    console.log(`✅ Killed processes on port ${port}`);
+    await execAsync(`lsof -ti:${port} | xargs kill -9`);
+    console.log(`Killed processes on port ${port}`);
     return true;
-  } catch (error) {
-    console.log(`ℹ️  No processes found on port ${port}`);
+  } catch {
+    console.log(`No processes on port ${port}`);
     return false;
   }
 }
@@ -64,26 +70,22 @@ async function killProcessesByPort(port) {
  * Main function
  */
 async function main() {
-  console.log('🛑 Killing all Conscious Bot servers...\n');
+  console.log('Killing all Conscious Bot servers...\n');
 
-  // Kill processes by pattern
-  console.log('🔄 Killing processes by pattern...');
+  console.log('By process pattern...');
   for (const pattern of PROCESS_PATTERNS) {
     await killProcessesByPattern(pattern);
   }
 
-  // Kill processes by port
-  console.log('\n🔄 Killing processes by port...');
+  console.log('\nBy port...');
   for (const [service, port] of Object.entries(SERVER_PORTS)) {
     await killProcessesByPort(port);
   }
 
-  console.log('\n✅ All servers killed!');
-  console.log('\n💡 Run "pnpm dev" to start servers again');
+  console.log('\nDone. Run "pnpm start" or "pnpm dev" to start again.');
 }
 
-// Run the main function
 main().catch((error) => {
-  console.error('❌ Error killing servers:', error);
+  console.error('Error killing servers:', error.message);
   process.exit(1);
 });

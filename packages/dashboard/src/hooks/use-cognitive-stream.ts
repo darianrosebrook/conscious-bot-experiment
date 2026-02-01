@@ -26,6 +26,7 @@ interface CognitiveThought {
   attribution?: string;
   metadata?: {
     thoughtType?: string;
+    provenance?: 'chain-of-thought' | 'intrusion';
   };
 }
 
@@ -168,6 +169,7 @@ export function useCognitiveStream() {
                 type: mapThoughtType(thought.type),
                 attribution: mapAttribution(thought.attribution),
                 thoughtType: thought.metadata?.thoughtType || thought.type,
+                provenance: thought.metadata?.provenance,
               });
             }
           }

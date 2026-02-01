@@ -20,8 +20,10 @@ import {
   ObservationMapper,
   MemoryIntegrationService,
 } from './index';
-// Legacy IntegratedPlanningCoordinator retired — replaced by Sterling solvers.
-// Provide a no-op stub satisfying the local IntegratedPlanningCoordinator interface.
+// INTERMEDIATE FIX: Legacy IntegratedPlanningCoordinator retired — replaced by Sterling solvers.
+// This stub provides a no-op implementation satisfying the local IntegratedPlanningCoordinator interface.
+// TODO(rig-planning): Replace with proper Sterling solver integration when planning rigs are implemented.
+// The stub returns a valid structure with primaryPlan: null to avoid "no plan available" errors.
 import type { IntegratedPlanningCoordinator } from './plan-executor';
 function createIntegratedPlanningCoordinator(
   _config?: any
@@ -29,15 +31,23 @@ function createIntegratedPlanningCoordinator(
   return {
     plan: async () => ({
       success: false,
+      primaryPlan: null,
       error: 'Legacy planning retired — use Sterling solvers',
+      planningLatency: 0,
     }),
     executePlan: async () => ({
       success: false,
+      primaryPlan: null,
       error: 'Legacy planning retired — use Sterling solvers',
+      planningLatency: 0,
     }),
     planAndExecute: async () => ({
       success: false,
+      primaryPlan: null,
       error: 'Legacy planning retired — use Sterling solvers',
+      planningLatency: 0,
+      // INTERMEDIATE FIX: Return valid structure so executePlanningCycle doesn't throw
+      isLegacyRetired: true,
     }),
   };
 }
@@ -227,6 +237,11 @@ let readyAt: string | null = systemReady ? new Date().toISOString() : null;
 let readySource: string | null = systemReady ? 'env' : null;
 let pendingThoughtGeneration = false;
 
+// INTERMEDIATE FIX: Throttle "no plan" log messages to avoid spam
+// TODO(rig-planning): Remove this throttling when proper planning rigs are implemented
+let lastNoPlanLogTime = 0;
+const NO_PLAN_LOG_THROTTLE_MS = 60000; // Only log "no plan" once per minute
+
 /**
  * Start automatic thought generation from bot experiences
  */
@@ -260,7 +275,10 @@ function startThoughtGeneration() {
 
       // Execute an autonomous planning cycle with concurrency guard
       isRunningPlanningCycle = true;
-      console.log('Starting autonomous planning cycle...');
+      // INTERMEDIATE FIX: Only log cycle start in debug mode to reduce spam
+      if (process.env.DEBUG_PLANNING === 'true') {
+        console.log('Starting autonomous planning cycle...');
+      }
       try {
         const result =
           await minecraftInterface.planExecutor.executePlanningCycle();
@@ -285,9 +303,24 @@ function startThoughtGeneration() {
               .catch(() => {}); // Fire-and-forget, don't block execution
           }
         } else {
-          console.log(
-            `Planning cycle ended: ${result.error || 'no plan generated'} (${result.executedSteps}/${result.totalSteps} steps)`
-          );
+          // INTERMEDIATE FIX: Throttle "no plan" log messages to once per minute
+          // TODO(rig-planning): Remove this throttling when proper planning rigs are implemented
+          const now = Date.now();
+          const isLegacyRetired = result.error?.includes('Legacy planning retired');
+          if (isLegacyRetired) {
+            // Only log legacy retired message once per minute
+            if (now - lastNoPlanLogTime >= NO_PLAN_LOG_THROTTLE_MS) {
+              lastNoPlanLogTime = now;
+              console.log(
+                '[Planning] Legacy planning retired — awaiting rig implementation (throttled, next log in 60s)'
+              );
+            }
+          } else if (process.env.DEBUG_PLANNING === 'true') {
+            // Log other planning errors only in debug mode
+            console.log(
+              `Planning cycle ended: ${result.error || 'no plan generated'} (${result.executedSteps}/${result.totalSteps} steps)`
+            );
+          }
         }
       } finally {
         isRunningPlanningCycle = false;

@@ -212,6 +212,7 @@ export const useDashboardStore = create<DashboardStore>()(
                   type: thought.type || 'reflection',
                   attribution: thought.attribution || 'self',
                   thoughtType: thought.metadata?.thoughtType || thought.type,
+                  provenance: thought.metadata?.provenance,
                 }));
                 set({ thoughts: serverThoughts });
               }

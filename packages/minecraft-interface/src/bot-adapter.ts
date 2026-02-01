@@ -832,11 +832,37 @@ export class BotAdapter extends EventEmitter {
   }
 
   private lastEntityScan = 0;
+  private isScanning = false; // INTERMEDIATE FIX: Prevent overlapping scans
+  private lastEntityProcessCall = 0; // INTERMEDIATE FIX: Throttle entity /process calls
+  private lastEnvironmentalProcessCall = 0; // INTERMEDIATE FIX: Throttle environmental /process calls
+  private readonly ENTITY_PROCESS_THROTTLE_MS = 30000; // 30 seconds between entity /process calls
+  private readonly ENVIRONMENTAL_PROCESS_THROTTLE_MS = 15000; // 15 seconds between environmental /process calls
+  // TODO(rig-I-primitive-21): Remove /process throttling when observation batching is implemented
 
   /**
    * Detect nearby entities and trigger appropriate responses
    */
   private async detectAndRespondToEntities(): Promise<void> {
+    if (!this.bot || !this.bot.entity) return;
+
+    // INTERMEDIATE FIX: Prevent race condition where multiple scans overlap
+    // TODO(rig-I-primitive-21): Replace with proper entity observation batching
+    if (this.isScanning) {
+      return; // Skip if already scanning
+    }
+
+    this.isScanning = true;
+    try {
+      await this._detectAndRespondToEntitiesImpl();
+    } finally {
+      this.isScanning = false;
+    }
+  }
+
+  /**
+   * Internal implementation of entity detection
+   */
+  private async _detectAndRespondToEntitiesImpl(): Promise<void> {
     if (!this.bot || !this.bot.entity) return;
     const bot = this.bot;
 
@@ -869,6 +895,15 @@ export class BotAdapter extends EventEmitter {
     if (!this.bot?.entity) return;
 
     try {
+      // INTERMEDIATE FIX: Throttle /process calls to prevent LLM overload
+      // TODO(rig-I-primitive-21): Replace with proper entity observation batching
+      const now = Date.now();
+      if (now - this.lastEntityProcessCall < this.ENTITY_PROCESS_THROTTLE_MS) {
+        // Skip this entity - we're throttling /process calls
+        return;
+      }
+      this.lastEntityProcessCall = now;
+
       const botPos = this.bot.entity.position;
       const distance = entity.position.distanceTo(botPos);
 
@@ -904,6 +939,8 @@ export class BotAdapter extends EventEmitter {
             timestamp: Date.now(),
           },
         }),
+        timeoutMs: 25000,
+        label: 'cognition/process-environmental',
       });
 
       if (response?.ok) {
@@ -1125,6 +1162,15 @@ export class BotAdapter extends EventEmitter {
     if (!this.bot) return;
 
     try {
+      // INTERMEDIATE FIX: Throttle environmental /process calls to prevent LLM overload
+      // TODO(rig-I-primitive-21): Replace with proper observation batching
+      const now = Date.now();
+      if (now - this.lastEnvironmentalProcessCall < this.ENVIRONMENTAL_PROCESS_THROTTLE_MS) {
+        // Skip this event - we're throttling /process calls
+        return;
+      }
+      this.lastEnvironmentalProcessCall = now;
+
       // Create a linguistic description of the event
       const eventDescription = this.describeEnvironmentalEvent(
         eventType,
@@ -1155,6 +1201,8 @@ export class BotAdapter extends EventEmitter {
             ...eventData,
           },
         }),
+        timeoutMs: 25000,
+        label: 'cognition/process-environmental-event',
       });
 
       if (response?.ok) {

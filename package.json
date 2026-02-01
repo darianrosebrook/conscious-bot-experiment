@@ -46,7 +46,8 @@
     "docker:up": "docker compose up -d",
     "docker:down": "docker compose down",
     "docker:ps": "docker compose ps",
-    "docker:logs": "docker compose logs -f"
+    "docker:logs": "docker compose logs -f",
+    "benchmark:mlx": "node scripts/benchmark-mlx.js"
   },
   "workspaces": [
     "packages/*",

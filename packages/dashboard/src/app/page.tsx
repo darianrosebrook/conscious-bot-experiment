@@ -1074,6 +1074,7 @@ function ConsciousMinecraftDashboardContent() {
             type,
             attribution,
             thoughtType: t.metadata?.thoughtType || t.type,
+            provenance: t.metadata?.provenance,
           });
         }
       } catch {
@@ -2105,8 +2106,11 @@ function ConsciousMinecraftDashboardContent() {
                       const renderThoughtCard = (
                         thought: (typeof thoughts)[0]
                       ) => {
-                        // Determine styling based on thought type and attribution
-                        const isIntrusive = thought.attribution === 'intrusive';
+                        // Determine styling based on thought type and provenance (dashboard-only)
+                        // Intrusive thoughts use attribution 'self' for the bot; we show "intrusive" via thoughtType/provenance
+                        const isIntrusive =
+                          thought.provenance === 'intrusion' ||
+                          thought.thoughtType === 'intrusive';
                         const isExternalChat =
                           thought.thoughtType === 'external_chat_in';
                         const isBotResponse =

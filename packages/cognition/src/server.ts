@@ -18,6 +18,7 @@ import { LLMInterface } from './cognitive-core/llm-interface';
 import {
   ObservationReasoner,
   ObservationPayload,
+  ObservationInsight,
 } from './environmental/observation-reasoner';
 
 /**
@@ -230,6 +231,62 @@ const observationReasoner = new ObservationReasoner(llmInterface, {
   disabled: process.env.COGNITION_LLM_OBSERVATION_DISABLED === 'true',
   timeoutMs: observationTimeoutMs,
 });
+
+/**
+ * Observation queue: serialize LLM calls and cull stale.
+ * When draining, run the newest observation only; resolve all others with stale fallback.
+ */
+interface ObservationQueueItem {
+  observation: ObservationPayload;
+  resolve: (insight: ObservationInsight) => void;
+  reject: (err: unknown) => void;
+  createdAt: number;
+}
+let observationQueue: ObservationQueueItem[] = [];
+let observationQueueRunning = false;
+
+function drainObservationQueue(): void {
+  if (observationQueueRunning || observationQueue.length === 0) return;
+  observationQueueRunning = true;
+  const pending = observationQueue;
+  observationQueue = [];
+  const byNewest = [...pending].sort((a, b) => b.createdAt - a.createdAt);
+  const newest = byNewest[0];
+  const stale = byNewest.slice(1);
+  for (const item of stale) {
+    const insight = observationReasoner.getStaleFallback(
+      item.observation,
+      item.observation.observationId
+    );
+    item.resolve(insight);
+  }
+  observationReasoner
+    .reason(newest.observation)
+    .then((insight) => {
+      newest.resolve(insight);
+    })
+    .catch((err) => {
+      newest.reject(err);
+    })
+    .finally(() => {
+      observationQueueRunning = false;
+      if (observationQueue.length > 0) drainObservationQueue();
+    });
+}
+
+function enqueueObservation(
+  observation: ObservationPayload
+): Promise<ObservationInsight> {
+  return new Promise<ObservationInsight>((resolve, reject) => {
+    observationQueue.push({
+      observation,
+      resolve,
+      reject,
+      createdAt: Date.now(),
+    });
+    drainObservationQueue();
+  });
+}
 
 const app = express.default();
 const port = process.env.PORT ? parseInt(process.env.PORT) : 3003;
@@ -1548,11 +1605,15 @@ app.post('/process', async (req, res) => {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
-                type: result.thought.type || 'intrusive',
+                type: result.thought.type || 'reflection',
                 content: result.thought.content,
                 attribution: 'self',
                 context: result.thought.context,
-                metadata: result.thought.metadata,
+                metadata: {
+                  ...result.thought.metadata,
+                  thoughtType: 'intrusive',
+                  provenance: 'intrusion',
+                },
                 id: result.thought.id,
                 timestamp: result.thought.timestamp,
                 processed: true,
@@ -1608,7 +1669,7 @@ app.post('/process', async (req, res) => {
             category: observation.category,
           });
 
-          const insight = await observationReasoner.reason(observation);
+          const insight = await enqueueObservation(observation);
 
           if (insight.fallback) {
             console.warn('cognition.observation.fallback', {
