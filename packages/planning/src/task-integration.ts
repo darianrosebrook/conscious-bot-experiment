@@ -34,7 +34,8 @@ import {
 import { TaskStore } from './task-integration/task-store';
 import { SterlingPlanner } from './task-integration/sterling-planner';
 import { convertThoughtToTask } from './task-integration/thought-to-task-converter';
-import { TaskManagementHandler } from './task-integration/task-management-handler';
+import { TaskManagementHandler, type ManagementResult } from './task-integration/task-management-handler';
+import type { GoalTagV1 } from '@conscious-bot/cognition';
 import { adviseExecution } from './constraints/execution-advisor';
 import type { RigGMetadata } from './constraints/execution-advisor';
 import { buildDefaultMinecraftGraph } from './hierarchical/macro-planner';
@@ -50,6 +51,7 @@ import {
 } from './goals/goal-lifecycle-hooks';
 import type { SyncEffect } from './goals/goal-task-sync';
 import type { VerifierRegistry } from './goals/verifier-registry';
+import { applyHold, clearHold, syncHoldToTaskFields } from './goals/goal-binding-normalize';
 import { GoalStatus } from './types';
 
 export type { TaskStep } from './types/task-step';
@@ -174,7 +176,12 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
             markThoughtAsProcessed: this.markThoughtAsProcessed.bind(this),
             seenThoughtIds: this.seenThoughtIds,
             trimSeenThoughtIds: () => this.trimSeenThoughtIds(),
-            managementHandler: this.managementHandler,
+            // Wrap management handler to route through handleManagementAction
+            // which applies hold protocol for goal-bound tasks
+            managementHandler: {
+              handle: (goal: GoalTagV1, sourceThoughtId?: string) =>
+                this.handleManagementAction(goal, sourceThoughtId),
+            } as TaskManagementHandler,
             getInventoryBand: (itemName: string) => {
               // Use inventory from last bot context fetch for satisfaction-aware dedup
               const activeTasks = this.getActiveTasks();
@@ -846,6 +853,64 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
     }
 
     return count;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Goal-binding protocol: management action wrapper
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Wrap management actions with hold protocol for goal-bound tasks.
+   *
+   * Management "pause" uses hold reason 'manual_pause' (not 'preempted').
+   * Effects are task-scoped (only the targeted task), not goal-scoped.
+   * Does NOT use onGoalAction (which is goal-scoped by design).
+   */
+  handleManagementAction(
+    goal: GoalTagV1,
+    sourceThoughtId?: string,
+  ): ManagementResult {
+    const result = this.managementHandler.handle(goal, sourceThoughtId);
+
+    if (result.decision !== 'applied' || !result.affectedTaskId) {
+      return result;
+    }
+
+    const task = this.taskStore.getTask(result.affectedTaskId);
+    if (!task) return result;
+
+    const binding = (task.metadata as any).goalBinding as GoalBinding | undefined;
+    if (!binding) return result;
+
+    // Apply hold protocol for goal-bound tasks
+    if (result.action === 'pause' && result.newStatus === 'paused') {
+      // Management pause = manual_pause (hard wall: cannot be auto-cleared)
+      applyHold(task, {
+        reason: 'manual_pause',
+        heldAt: Date.now(),
+        resumeHints: [],
+        nextReviewAt: Date.now() + 5 * 60 * 1000,
+      });
+      syncHoldToTaskFields(task);
+      this.taskStore.setTask(task);
+    }
+
+    if (result.action === 'resume' && result.previousStatus === 'paused') {
+      clearHold(task);
+      syncHoldToTaskFields(task);
+      this.taskStore.setTask(task);
+    }
+
+    if (result.action === 'cancel') {
+      // Clear any existing hold before task goes to failed
+      if (binding.hold) {
+        clearHold(task);
+        syncHoldToTaskFields(task);
+        this.taskStore.setTask(task);
+      }
+    }
+
+    return result;
   }
 
   async addTask(taskData: Partial<Task>): Promise<Task> {
