@@ -10,6 +10,8 @@ import {
   isUsableContent,
   hasCodeLikeDensity,
   CANONICAL_ACTIONS,
+  normalizeGoalAction,
+  NORMALIZE_MAP_VERSION,
 } from '../llm-output-sanitizer';
 
 /**
@@ -185,6 +187,75 @@ describe('extractGoalTag', () => {
     const result = extractGoalTag(input);
     expect(result.text).toBe(input);
     expect(result.goal).toBeNull();
+  });
+
+  // --- id= token parsing (Phase 1A) ---
+
+  it('extracts targetId from id= token', () => {
+    const input = 'Cancel that. [GOAL: cancel id=task_8f2a]';
+    const result = extractGoalTag(input);
+    expect(result.goalV1).not.toBeNull();
+    expect(result.goalV1!.action).toBe('cancel');
+    expect(result.goalV1!.targetId).toBe('task_8f2a');
+    expect(result.goalV1!.target).toBe('');
+  });
+
+  it('extracts targetId with target text', () => {
+    const input = '[GOAL: cancel mining_stone id=task_123]';
+    const result = extractGoalTag(input);
+    expect(result.goalV1).not.toBeNull();
+    expect(result.goalV1!.action).toBe('cancel');
+    expect(result.goalV1!.targetId).toBe('task_123');
+    expect(result.goalV1!.target).toBe('mining_stone');
+  });
+
+  it('returns null targetId when no id= token present', () => {
+    const input = '[GOAL: mine stone 5]';
+    const result = extractGoalTag(input);
+    expect(result.goalV1).not.toBeNull();
+    expect(result.goalV1!.targetId).toBeNull();
+    expect(result.goalV1!.target).toBe('stone');
+    expect(result.goalV1!.amount).toBe(5);
+  });
+
+  it('extracts amount= key-value token', () => {
+    const input = '[GOAL: collect oak_log amount=20]';
+    const result = extractGoalTag(input);
+    expect(result.goalV1).not.toBeNull();
+    expect(result.goalV1!.target).toBe('oak_log');
+    expect(result.goalV1!.amount).toBe(20);
+  });
+
+  it('management action with only id= (no target) succeeds', () => {
+    const input = 'I should pause this. [GOAL: pause id=task_abc]';
+    const result = extractGoalTag(input);
+    expect(result.goalV1).not.toBeNull();
+    expect(result.goalV1!.action).toBe('pause');
+    expect(result.goalV1!.targetId).toBe('task_abc');
+  });
+
+  it('management action prioritize with id=', () => {
+    const input = '[GOAL: prioritize id=task_xyz]';
+    const result = extractGoalTag(input);
+    expect(result.goalV1).not.toBeNull();
+    expect(result.goalV1!.action).toBe('prioritize');
+    expect(result.goalV1!.targetId).toBe('task_xyz');
+  });
+
+  it('management action resume with id=', () => {
+    const input = '[GOAL: resume id=task_999]';
+    const result = extractGoalTag(input);
+    expect(result.goalV1).not.toBeNull();
+    expect(result.goalV1!.action).toBe('resume');
+    expect(result.goalV1!.targetId).toBe('task_999');
+  });
+
+  it('normalizes management action synonyms through extractGoalTag', () => {
+    const input = '[GOAL: abort id=task_1]';
+    const result = extractGoalTag(input);
+    expect(result.goalV1).not.toBeNull();
+    expect(result.goalV1!.action).toBe('cancel');
+    expect(result.goalV1!.targetId).toBe('task_1');
   });
 });
 
@@ -573,5 +644,171 @@ describe('extractGoalTag (bounded-scan edge cases)', () => {
     const result = extractGoalTag('[GOAL: collect oak log 5]');
     expect(result.goal!.target).toBe('oak log');
     expect(result.goal!.amount).toBe(5);
+  });
+});
+
+// ============================================================================
+// GoalTagFailReason — discriminated failure states
+// ============================================================================
+
+describe('GoalTagFailReason', () => {
+  it('returns no_tag when no [GOAL: opener exists', () => {
+    const result = extractGoalTag('I should find shelter.');
+    expect(result.failReason).toBe('no_tag');
+    expect(result.tagCount).toBe(0);
+  });
+
+  it('returns unknown_action for unrecognized actions', () => {
+    const result = extractGoalTag('[GOAL: teleport spawn]');
+    expect(result.failReason).toBe('unknown_action');
+    expect(result.goal).toBeNull();
+    expect(result.rawGoalTag).toBe('[GOAL: teleport spawn]');
+  });
+
+  it('returns no_target when action-only tag has no target', () => {
+    const result = extractGoalTag('[GOAL: mine]');
+    expect(result.failReason).toBe('no_target');
+    expect(result.goal).toBeNull();
+  });
+
+  it('returns empty_inner for [GOAL:]', () => {
+    const result = extractGoalTag('Text [GOAL:] more text');
+    expect(result.failReason).toBe('empty_inner');
+    expect(result.goal).toBeNull();
+  });
+
+  it('returns tag_too_long when inner content exceeds 100-char scan limit', () => {
+    const longTarget = 'a'.repeat(110);
+    const input = `[GOAL: collect ${longTarget}]`;
+    const result = extractGoalTag(input);
+    expect(result.failReason).toBe('tag_too_long');
+    expect(result.goal).toBeNull();
+  });
+
+  it('returns none on successful extraction', () => {
+    const result = extractGoalTag('[GOAL: mine stone 5]');
+    expect(result.failReason).toBe('none');
+    expect(result.goal).not.toBeNull();
+  });
+});
+
+// ============================================================================
+// Multi-tag handling — first tag wins, count is observable
+// ============================================================================
+
+describe('extractGoalTag (multi-tag)', () => {
+  it('extracts first tag when multiple present (first-wins)', () => {
+    const input = 'I should [GOAL: mine stone 3] and then [GOAL: craft pickaxe 1]';
+    const result = extractGoalTag(input);
+    expect(result.goal!.action).toBe('mine');
+    expect(result.goal!.target).toBe('stone');
+    expect(result.goal!.amount).toBe(3);
+    expect(result.tagCount).toBe(2);
+  });
+
+  it('counts all [GOAL: openers even if only first is extracted', () => {
+    const input = '[GOAL: collect wood 5] [GOAL: craft planks] [GOAL: build shelter]';
+    const result = extractGoalTag(input);
+    expect(result.tagCount).toBe(3);
+    expect(result.goal!.action).toBe('collect');
+  });
+
+  it('reports tagCount=1 for single tag', () => {
+    const result = extractGoalTag('[GOAL: mine iron_ore 8]');
+    expect(result.tagCount).toBe(1);
+  });
+});
+
+// ============================================================================
+// goalTagFailReason propagation through sanitizeLLMOutput
+// ============================================================================
+
+describe('sanitizeLLMOutput (goalTagFailReason + goalTagCount)', () => {
+  it('propagates goalTagFailReason for no tag', () => {
+    const result = sanitizeLLMOutput('Just exploring.');
+    expect(result.flags.goalTagFailReason).toBe('no_tag');
+    expect(result.flags.goalTagCount).toBe(0);
+  });
+
+  it('propagates goalTagFailReason for unknown action', () => {
+    const result = sanitizeLLMOutput('Hmm [GOAL: yeet blocks]');
+    expect(result.flags.goalTagFailReason).toBe('unknown_action');
+    expect(result.flags.goalTagCount).toBe(1);
+  });
+
+  it('propagates goalTagCount for successful extraction', () => {
+    const result = sanitizeLLMOutput('Go. [GOAL: mine stone 3]');
+    expect(result.flags.goalTagFailReason).toBe('none');
+    expect(result.flags.goalTagCount).toBe(1);
+  });
+});
+
+// ============================================================================
+// hasCodeLikeDensity — single-line symbol density
+// ============================================================================
+
+describe('hasCodeLikeDensity (single-line code)', () => {
+  it('detects single-line code with high symbol density', () => {
+    expect(hasCodeLikeDensity('const x = foo({ bar: [1,2,3] });')).toBe(true);
+  });
+
+  it('does not flag short natural language', () => {
+    expect(hasCodeLikeDensity('I should find shelter.')).toBe(false);
+  });
+
+  it('does not flag very short strings', () => {
+    expect(hasCodeLikeDensity('hi()')).toBe(false);
+  });
+
+  it('detects two-line code snippet', () => {
+    expect(hasCodeLikeDensity('x = {a: 1, b: [2]};\ny = fn(x);')).toBe(true);
+  });
+});
+
+// ============================================================================
+// Normalization map stability lockdown
+// ============================================================================
+
+describe('ACTION_NORMALIZE_MAP stability', () => {
+  it('has a version number', () => {
+    expect(NORMALIZE_MAP_VERSION).toBe(2);
+  });
+
+  it('normalizes known synonyms consistently', () => {
+    // These mappings are part of the contract — changing them changes meaning
+    expect(normalizeGoalAction('dig')).toBe('mine');
+    expect(normalizeGoalAction('break')).toBe('mine');
+    expect(normalizeGoalAction('get')).toBe('collect');
+    expect(normalizeGoalAction('make')).toBe('craft');
+    expect(normalizeGoalAction('construct')).toBe('build');
+    expect(normalizeGoalAction('locate')).toBe('find');
+    expect(normalizeGoalAction('move')).toBe('navigate');
+    expect(normalizeGoalAction('observe')).toBe('check');
+    expect(normalizeGoalAction('acquire')).toBe('gather');
+    expect(normalizeGoalAction('fix')).toBe('repair');
+    expect(normalizeGoalAction('cook')).toBe('smelt');
+  });
+
+  it('passes through unknown actions unchanged', () => {
+    expect(normalizeGoalAction('yeet')).toBe('yeet');
+    expect(normalizeGoalAction('teleport')).toBe('teleport');
+  });
+
+  it('CANONICAL_ACTIONS has exactly 16 entries', () => {
+    expect(CANONICAL_ACTIONS.size).toBe(16);
+  });
+
+  it('normalizes management action synonyms (v2)', () => {
+    expect(normalizeGoalAction('remove')).toBe('cancel');
+    expect(normalizeGoalAction('drop')).toBe('cancel');
+    expect(normalizeGoalAction('abort')).toBe('cancel');
+    expect(normalizeGoalAction('stop')).toBe('cancel');
+    expect(normalizeGoalAction('boost')).toBe('prioritize');
+    expect(normalizeGoalAction('promote')).toBe('prioritize');
+    expect(normalizeGoalAction('hold')).toBe('pause');
+    expect(normalizeGoalAction('defer')).toBe('pause');
+    expect(normalizeGoalAction('suspend')).toBe('pause');
+    expect(normalizeGoalAction('unpause')).toBe('resume');
+    expect(normalizeGoalAction('restart')).toBe('resume');
   });
 });

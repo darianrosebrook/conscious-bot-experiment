@@ -12,16 +12,16 @@ const MIN = 0;
 const MAX = 100;
 
 export interface StressAxes {
-  time: number;           // urgency, time since rest/progress
-  situational: number;    // immediate threats, unexpected events
-  healthHunger: number;   // low health or food
-  resource: number;       // scarcity of key items, inventory pressure
-  protection: number;     // armor, shelter, exposure
+  time: number; // urgency, time since rest/progress
+  situational: number; // immediate threats, unexpected events
+  healthHunger: number; // low health or food
+  resource: number; // scarcity of key items, inventory pressure
+  protection: number; // armor, shelter, exposure
   locationDistance: number; // distance from bed/spawn
 }
 
 export interface InteroState {
-  stress: number;          // composite: weighted mean of axes (backward compat)
+  stress: number; // composite: weighted mean of axes (backward compat)
   focus: number;
   curiosity: number;
   stressAxes: StressAxes;
@@ -29,11 +29,11 @@ export interface InteroState {
 
 const AXIS_WEIGHTS: Record<keyof StressAxes, number> = {
   situational: 0.25,
-  healthHunger: 0.20,
+  healthHunger: 0.2,
   time: 0.15,
   resource: 0.15,
   protection: 0.15,
-  locationDistance: 0.10,
+  locationDistance: 0.1,
 };
 
 const AXIS_DEFAULTS: StressAxes = {
@@ -162,7 +162,9 @@ export function halveStressAxes(): void {
   state.stressAxes.situational = clamp(state.stressAxes.situational * 0.5);
   state.stressAxes.resource = clamp(state.stressAxes.resource * 0.5);
   state.stressAxes.protection = clamp(state.stressAxes.protection * 0.5);
-  state.stressAxes.locationDistance = clamp(state.stressAxes.locationDistance * 0.5);
+  state.stressAxes.locationDistance = clamp(
+    state.stressAxes.locationDistance * 0.5
+  );
   state.stress = computeComposite(state.stressAxes);
   state.focus = clamp(state.focus * 0.5 + 50);
   state.curiosity = clamp(state.curiosity * 0.5 + 50);
@@ -189,7 +191,9 @@ export function updateStressFromIntrusion(
   result: IntrusionResultForStress
 ): void {
   if (result.accepted === false) {
-    state.stressAxes.situational = clamp(state.stressAxes.situational - STRESS_RESIST_DECREASE);
+    state.stressAxes.situational = clamp(
+      state.stressAxes.situational - STRESS_RESIST_DECREASE
+    );
     state.stress = computeComposite(state.stressAxes);
     return;
   }
@@ -204,9 +208,13 @@ export function updateStressFromIntrusion(
     (category.toLowerCase().includes('goal') ||
       category.toLowerCase().includes('task'));
   if (detrimental) {
-    state.stressAxes.situational = clamp(state.stressAxes.situational + STRESS_ACCEPT_DETRIMENTAL_INCREASE);
+    state.stressAxes.situational = clamp(
+      state.stressAxes.situational + STRESS_ACCEPT_DETRIMENTAL_INCREASE
+    );
   } else if (beneficial) {
-    state.stressAxes.situational = clamp(state.stressAxes.situational - STRESS_ACCEPT_BENEFICIAL_DECREASE);
+    state.stressAxes.situational = clamp(
+      state.stressAxes.situational - STRESS_ACCEPT_BENEFICIAL_DECREASE
+    );
   }
   state.stress = computeComposite(state.stressAxes);
 }

@@ -616,7 +616,7 @@ export class IntrusiveThoughtProcessor extends EventEmitter {
     return {
       id: `task-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
       title,
-      description: `From thought "${thought}" — bucket ${bucket.name}, cap ${bucket.maxMs}ms.`,
+      description: `From thought "${thought.replace(/\s*\[GOAL:[^\]]*\](?:\s*\d+\w*)?/gi, '').trim()}" — bucket ${bucket.name}, cap ${bucket.maxMs}ms.`,
       type: action.category,
       priority: action.priority,
       source: 'intrusive-thought',
@@ -978,7 +978,8 @@ export class IntrusiveThoughtProcessor extends EventEmitter {
     action: Action,
     originalThought: string
   ): string {
-    return `Task created from intrusive thought: "${originalThought}". ${action.type} ${action.target}.`;
+    const cleanThought = originalThought.replace(/\s*\[GOAL:[^\]]*\](?:\s*\d+\w*)?/gi, '').trim();
+    return `Task created from intrusive thought: "${cleanThought}". ${action.type} ${action.target}.`;
   }
 
   /**

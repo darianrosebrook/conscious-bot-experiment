@@ -62,10 +62,12 @@ export {
   isUsableContent,
   hasCodeLikeDensity,
   CANONICAL_ACTIONS,
+  NORMALIZE_MAP_VERSION,
 } from './llm-output-sanitizer';
 export type {
   GoalTag,
   GoalTagV1,
+  GoalTagFailReason,
   SanitizedOutput,
   SanitizationFlags,
 } from './llm-output-sanitizer';

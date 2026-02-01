@@ -442,7 +442,9 @@ Rules:
 - No extra keys. No text outside JSON.
 `.trim();
 
-    const situationLine = stressContext ? `\nCurrent situation: ${stressContext}` : '';
+    const situationLine = stressContext
+      ? `\nCurrent situation: ${stressContext}`
+      : '';
     const prompt = `Observation: ${sanitised.summary}
 Details: ${JSON.stringify(sanitised.details, null, 2)}${situationLine}
 

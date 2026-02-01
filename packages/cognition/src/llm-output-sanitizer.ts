@@ -36,9 +36,23 @@ export interface GoalTagV1 {
   version: 1;
   action: string;         // canonical, from CANONICAL_ACTIONS allowlist
   target: string;         // normalized lowercase
+  targetId: string | null; // explicit task ID from id= token
   amount: number | null;
   raw: string;            // original tag text for debugging
 }
+
+/**
+ * Reason why goal tag extraction failed.
+ * 'none' means extraction succeeded or no tag was present at all.
+ */
+export type GoalTagFailReason =
+  | 'none'               // extraction succeeded or no tag in input
+  | 'no_tag'             // no [GOAL: opener found
+  | 'tag_too_long'       // inner content exceeded 100-char scan limit
+  | 'malformed'          // closing bracket missing or unparseable structure
+  | 'unknown_action'     // action not in CANONICAL_ACTIONS after normalization
+  | 'no_target'          // action present but no target tokens inside brackets
+  | 'empty_inner';       // [GOAL:] with nothing inside
 
 export interface SanitizationFlags {
   hadCodeFences: boolean;
@@ -47,6 +61,9 @@ export interface SanitizationFlags {
   hadTrailingGarbage: boolean;
   hadCodeContent: boolean;
   rawGoalTag: string | null; // original tag text when parsing fails, for debugging
+  goalTagFailReason: GoalTagFailReason;
+  /** Number of [GOAL: openers found (for multi-tag observability) */
+  goalTagCount: number;
   originalLength: number;
   cleanedLength: number;
 }
@@ -80,7 +97,11 @@ const GENERIC_FILLER_PATTERNS = [
 
 // ============================================================================
 // Action normalization — maps synonyms to canonical goal actions
+// Versioned: changes to this map change meaning, not just parsing.
+// Bump NORMALIZE_MAP_VERSION when adding/removing/changing entries.
 // ============================================================================
+
+export const NORMALIZE_MAP_VERSION = 2;
 
 const ACTION_NORMALIZE_MAP: Record<string, string> = {
   dig: 'mine',
@@ -117,6 +138,18 @@ const ACTION_NORMALIZE_MAP: Record<string, string> = {
   cook: 'smelt',
   hear: 'check',
   listen: 'check',
+  // Management action synonyms (v2)
+  remove: 'cancel',
+  drop: 'cancel',
+  abort: 'cancel',
+  stop: 'cancel',
+  boost: 'prioritize',
+  promote: 'prioritize',
+  hold: 'pause',
+  defer: 'pause',
+  suspend: 'pause',
+  unpause: 'resume',
+  restart: 'resume',
 };
 
 /**
@@ -135,6 +168,8 @@ export function normalizeGoalAction(raw: string): string {
 export const CANONICAL_ACTIONS = new Set([
   'collect', 'mine', 'craft', 'build', 'find', 'explore',
   'navigate', 'gather', 'check', 'smelt', 'repair', 'continue',
+  // Management actions (v2)
+  'cancel', 'prioritize', 'pause', 'resume',
 ]);
 
 // ============================================================================
@@ -235,19 +270,43 @@ export function extractGoalTag(text: string): {
   goal: GoalTag | null;
   goalV1: GoalTagV1 | null;
   rawGoalTag: string | null;
+  failReason: GoalTagFailReason;
+  tagCount: number;
 } {
-  const openerIdx = text.toUpperCase().indexOf('[GOAL:');
+  // Count total [GOAL: openers for multi-tag observability
+  const upperText = text.toUpperCase();
+  let tagCount = 0;
+  let searchFrom = 0;
+  while (true) {
+    const idx = upperText.indexOf('[GOAL:', searchFrom);
+    if (idx === -1) break;
+    tagCount++;
+    searchFrom = idx + 6;
+  }
+
+  const openerIdx = upperText.indexOf('[GOAL:');
   if (openerIdx === -1) {
-    return { text, goal: null, goalV1: null, rawGoalTag: null };
+    return { text, goal: null, goalV1: null, rawGoalTag: null, failReason: 'no_tag', tagCount: 0 };
   }
 
   // Find closing bracket within 100 chars of opener
-  const searchEnd = Math.min(openerIdx + 106, text.length); // [GOAL: = 6 chars + 100
+  const scanLimit = openerIdx + 106; // [GOAL: = 6 chars + 100
+  const searchEnd = Math.min(scanLimit, text.length);
   let closerIdx = -1;
   for (let i = openerIdx + 6; i < searchEnd; i++) {
     if (text[i] === ']') {
       closerIdx = i;
       break;
+    }
+  }
+
+  // Check if tag exceeded scan limit (closing bracket exists beyond 100 chars)
+  let tagTooLong = false;
+  if (closerIdx === -1 && scanLimit < text.length) {
+    // Check if there's a ] beyond the scan window
+    const laterCloser = text.indexOf(']', scanLimit);
+    if (laterCloser !== -1) {
+      tagTooLong = true;
     }
   }
 
@@ -268,6 +327,10 @@ export function extractGoalTag(text: string): {
 
   const rawTag = text.slice(tagStart, tagEnd);
 
+  if (tagTooLong) {
+    return { text, goal: null, goalV1: null, rawGoalTag: rawTag, failReason: 'tag_too_long', tagCount };
+  }
+
   // Check for trailing amount after `]` (e.g., `[GOAL: craft wood] 20`)
   let trailingAmount: number | null = null;
   let trailingEnd = tagEnd;
@@ -286,7 +349,7 @@ export function extractGoalTag(text: string): {
   // Tokenize inner text
   const tokens = inner.split(/\s+/).filter(t => t.length > 0);
   if (tokens.length === 0) {
-    return { text, goal: null, goalV1: null, rawGoalTag: rawTag };
+    return { text, goal: null, goalV1: null, rawGoalTag: rawTag, failReason: 'empty_inner', tagCount };
   }
 
   // Token 1: action — normalize then check allowlist
@@ -294,21 +357,39 @@ export function extractGoalTag(text: string): {
   const action = normalizeGoalAction(rawAction);
   if (!CANONICAL_ACTIONS.has(action)) {
     // Fail-closed: unknown action → no goal, but preserve raw tag for debugging
-    return { text, goal: null, goalV1: null, rawGoalTag: rawTag };
+    return { text, goal: null, goalV1: null, rawGoalTag: rawTag, failReason: 'unknown_action', tagCount };
   }
 
-  // Remaining tokens: target words and optional trailing amount
+  // Remaining tokens: target words, optional id=, amount=, and trailing bare amount
   let innerAmount: number | null = null;
+  let targetId: string | null = null;
   const targetTokens: string[] = [];
 
   for (let i = 1; i < tokens.length; i++) {
-    const token = tokens[i].toLowerCase();
-    // If last token is numeric, treat as amount
-    if (i === tokens.length - 1 && /^\d+$/.test(token)) {
-      innerAmount = parseInt(token, 10);
+    const token = tokens[i];
+    const tokenLower = token.toLowerCase();
+
+    // Parse id=<value> key-value token
+    if (tokenLower.startsWith('id=') && token.length > 3) {
+      targetId = token.slice(3);
+      continue;
+    }
+
+    // Parse amount=<N> key-value token
+    if (tokenLower.startsWith('amount=') && token.length > 7) {
+      const amtVal = parseInt(token.slice(7), 10);
+      if (!isNaN(amtVal)) {
+        innerAmount = amtVal;
+        continue;
+      }
+    }
+
+    // If last token is numeric, treat as amount (bare trailing number)
+    if (i === tokens.length - 1 && /^\d+$/.test(tokenLower)) {
+      innerAmount = parseInt(tokenLower, 10);
     } else {
       // Validate target token: a-z and underscore only
-      const cleaned = token.replace(/[^a-z_]/g, '');
+      const cleaned = tokenLower.replace(/[^a-z_]/g, '');
       if (cleaned.length > 0) {
         targetTokens.push(cleaned);
       }
@@ -319,8 +400,10 @@ export function extractGoalTag(text: string): {
   const amount = innerAmount ?? trailingAmount;
 
   const target = targetTokens.join(' ');
-  if (target.length === 0) {
-    return { text, goal: null, goalV1: null, rawGoalTag: rawTag };
+  // Management actions (cancel, pause, resume, prioritize) may have only id= and no target tokens
+  const isManagementAction = action === 'cancel' || action === 'pause' || action === 'resume' || action === 'prioritize';
+  if (target.length === 0 && !targetId && !isManagementAction) {
+    return { text, goal: null, goalV1: null, rawGoalTag: rawTag, failReason: 'no_target', tagCount };
   }
 
   // Strip the tag (and trailing amount) from text
@@ -331,11 +414,12 @@ export function extractGoalTag(text: string): {
     version: 1,
     action,
     target,
+    targetId,
     amount,
     raw: rawTag,
   };
 
-  return { text: cleanedText, goal, goalV1, rawGoalTag: null };
+  return { text: cleanedText, goal, goalV1, rawGoalTag: null, failReason: 'none', tagCount };
 }
 
 /**
@@ -428,12 +512,25 @@ export function normalizeWhitespace(text: string): string {
 /**
  * Detect code-like content using line density (not keyword-only).
  * Avoids false positives on English prose containing "import" etc.
- * Returns true if >40% of lines have code-like patterns.
+ *
+ * Two checks:
+ * 1. Multi-line: >40% of lines have code-like patterns (3+ lines required)
+ * 2. Single-line/short: high symbol density (brackets, semicolons, operators)
+ *    even in 1-2 lines — catches embedded code snippets in short thoughts.
  */
 export function hasCodeLikeDensity(text: string): boolean {
   const lines = text.split('\n');
-  if (lines.length < 3) return false;
 
+  // Single-line / short text: check symbol density
+  // This catches things like `const x = foo({ bar: [1,2,3] });` in a 1-line thought
+  if (lines.length < 3) {
+    const stripped = text.replace(/\s/g, '');
+    if (stripped.length < 10) return false;
+    const symbolChars = (stripped.match(/[(){}\[\];=<>|&!^~+\-*/\\@#$%]/g) || []).length;
+    return symbolChars / stripped.length > 0.25;
+  }
+
+  // Multi-line: line-by-line density scoring
   let codeIndicators = 0;
   for (const line of lines) {
     const trimmed = line.trim();
@@ -499,6 +596,8 @@ export function sanitizeLLMOutput(raw: string): SanitizedOutput {
     hadTrailingGarbage: false,
     hadCodeContent: false,
     rawGoalTag: null,
+    goalTagFailReason: 'no_tag',
+    goalTagCount: 0,
     originalLength,
     cleanedLength: 0,
   };
@@ -529,6 +628,8 @@ export function sanitizeLLMOutput(raw: string): SanitizedOutput {
   const goalResult = extractGoalTag(text);
   text = goalResult.text;
   flags.rawGoalTag = goalResult.rawGoalTag;
+  flags.goalTagFailReason = goalResult.failReason;
+  flags.goalTagCount = goalResult.tagCount;
 
   // Step 4: Truncate degeneration
   const degenResult = truncateDegeneration(text);

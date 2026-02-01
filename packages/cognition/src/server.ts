@@ -920,11 +920,13 @@ async function sendThoughtToCognitiveStream(thought: any) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          payloadVersion: 2,
           type: thought.type || 'reflection',
-          content: thought.content,                          // raw sanitized text (may contain failed tags)
-          displayContent: (thought.content || '')            // UI-safe version: strip any residual tags
-            .replace(GOAL_TAG_STRIP, '').trim(),
-          extractedGoal: thought.metadata?.extractedGoal || null,  // structured goal for routing
+          content: thought.content, // raw sanitized text (may contain failed tags)
+          displayContent: (thought.content || '') // UI-safe version: strip any residual tags
+            .replace(GOAL_TAG_STRIP, '')
+            .trim(),
+          extractedGoal: thought.metadata?.extractedGoal || null, // structured goal for routing
           sanitizationFlags: thought.metadata?.sanitizationFlags || null,
           attribution: 'self',
           context: {
@@ -1006,9 +1008,11 @@ function startThoughtGeneration() {
       const innerData = rawState.data || {};
       // Normalize inventory: server sends { items, totalSlots, usedSlots }, thought generator expects Array
       const rawInventory = innerData.inventory;
-      const inventory = Array.isArray(rawInventory) ? rawInventory
-        : Array.isArray(rawInventory?.items) ? rawInventory.items
-        : [];
+      const inventory = Array.isArray(rawInventory)
+        ? rawInventory
+        : Array.isArray(rawInventory?.items)
+          ? rawInventory.items
+          : [];
       const currentState = {
         ...innerData,
         inventory,
@@ -1027,11 +1031,10 @@ function startThoughtGeneration() {
 
       // Compute and blend stress axes from world state
       if (botState) {
-        const snapshot = buildWorldStateSnapshot(
-          botState,
-          spawnPosition,
-          { msSinceLastRest, msSinceLastProgress }
-        );
+        const snapshot = buildWorldStateSnapshot(botState, spawnPosition, {
+          msSinceLastRest,
+          msSinceLastProgress,
+        });
         const computed = computeStressAxes(snapshot);
         const blended = blendAxes(getInteroState().stressAxes, computed);
         setStressAxes(blended);
@@ -1041,7 +1044,12 @@ function startThoughtGeneration() {
       msSinceLastProgress += THOUGHT_CYCLE_MS;
 
       const compositeStress = getInteroState().stress;
-      const emotionalState = compositeStress > 60 ? 'uneasy' : compositeStress > 35 ? 'attentive' : 'neutral';
+      const emotionalState =
+        compositeStress > 60
+          ? 'uneasy'
+          : compositeStress > 35
+            ? 'attentive'
+            : 'neutral';
 
       // Record intero snapshot for history/evaluation dashboard
       recordInteroSnapshot(getInteroState(), emotionalState);
@@ -1616,7 +1624,8 @@ app.get('/intero/history', (req, res) => {
 app.get('/intero/boundary-stats', (req, res) => {
   try {
     const fs = require('fs');
-    const logPath = process.env.STRESS_BOUNDARY_LOG_PATH || 'stress-boundary.log';
+    const logPath =
+      process.env.STRESS_BOUNDARY_LOG_PATH || 'stress-boundary.log';
     const eventCounts: Record<string, number> = {
       observation_thought: 0,
       intrusion_accept: 0,
@@ -1843,8 +1852,16 @@ app.post('/process', async (req, res) => {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
+                payloadVersion: 2,
                 type: result.thought.type || 'reflection',
                 content: result.thought.content,
+                displayContent: (result.thought.content || '')
+                  .replace(GOAL_TAG_STRIP, '')
+                  .trim(),
+                extractedGoal:
+                  result.thought.metadata?.extractedGoal || null,
+                sanitizationFlags:
+                  result.thought.metadata?.sanitizationFlags || null,
                 attribution: 'self',
                 context: result.thought.context,
                 metadata: {
@@ -1912,7 +1929,9 @@ app.post('/process', async (req, res) => {
               content: insight.thought.text,
               attribution: 'self',
               context: {
-                emotionalState: insight.actions.shouldRespond ? 'alert' : 'aware',
+                emotionalState: insight.actions.shouldRespond
+                  ? 'alert'
+                  : 'aware',
                 confidence: insight.thought.confidence,
                 cognitiveSystem: 'saliency-reasoner',
               },
@@ -1927,15 +1946,12 @@ app.post('/process', async (req, res) => {
               processed: true,
             };
 
-            await resilientFetch(
-              `${dashboardUrl}/api/ws/cognitive-stream`,
-              {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(internalThought),
-                label: 'dashboard/cognitive-stream-saliency',
-              }
-            );
+            await resilientFetch(`${dashboardUrl}/api/ws/cognitive-stream`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(internalThought),
+              label: 'dashboard/cognitive-stream-saliency',
+            });
           }
 
           res.json({
@@ -2219,7 +2235,7 @@ app.post('/process', async (req, res) => {
           try {
             const llmResult = await llmInterface.generateSocialResponse(
               metadata?.message || message,
-              { sender },
+              { sender }
             );
             response = llmResult.text || 'Hmm, let me think about that...';
           } catch {
@@ -2233,7 +2249,7 @@ app.post('/process', async (req, res) => {
           try {
             const llmResult = await llmInterface.generateSocialResponse(
               metadata?.message || message,
-              { sender },
+              { sender }
             );
             response = llmResult.text || 'Sure, what do you need?';
           } catch {
@@ -2241,7 +2257,9 @@ app.post('/process', async (req, res) => {
           }
         } else if (
           message.length < 15 &&
-          (message.includes('hello') || message.includes('hi') || message.includes('hey'))
+          (message.includes('hello') ||
+            message.includes('hi') ||
+            message.includes('hey'))
         ) {
           // Short greeting — 60% respond, of those 50/50 template vs LLM
           shouldRespond = Math.random() < 0.6;
@@ -2249,23 +2267,33 @@ app.post('/process', async (req, res) => {
             const greetingTemplates = [
               `Hey ${sender}!`,
               'Oh, hi there!',
-              'Hey! What\'s going on?',
+              "Hey! What's going on?",
               `Yo ${sender}.`,
-              'Oh hey, didn\'t see you there.',
+              "Oh hey, didn't see you there.",
             ];
             const useLLM = Math.random() < 0.5;
             if (useLLM) {
               try {
                 const llmResult = await llmInterface.generateSocialResponse(
                   metadata?.message || message,
-                  { sender },
+                  { sender }
                 );
-                response = llmResult.text || greetingTemplates[Math.floor(Math.random() * greetingTemplates.length)];
+                response =
+                  llmResult.text ||
+                  greetingTemplates[
+                    Math.floor(Math.random() * greetingTemplates.length)
+                  ];
               } catch {
-                response = greetingTemplates[Math.floor(Math.random() * greetingTemplates.length)];
+                response =
+                  greetingTemplates[
+                    Math.floor(Math.random() * greetingTemplates.length)
+                  ];
               }
             } else {
-              response = greetingTemplates[Math.floor(Math.random() * greetingTemplates.length)];
+              response =
+                greetingTemplates[
+                  Math.floor(Math.random() * greetingTemplates.length)
+                ];
             }
           }
           shouldCreateTask = false;
@@ -3470,6 +3498,24 @@ app.post('/api/cognitive-stream/ack', async (req, res) => {
     res.json({ success: true, ackedCount: acked });
   } catch (error) {
     res.status(500).json({ error: 'Failed to ack thoughts' });
+  }
+});
+
+// ── POST /api/task-review ──
+// Called by the planning service when a lifecycle event (completed, failed,
+// solver_unavailable, rig_g_replan_needed, high_priority_added) warrants LLM review.
+// Coalesces: if a review is already pending, the reason is appended rather than duplicated.
+app.post('/api/task-review', (req, res) => {
+  try {
+    const { reason } = req.body ?? {};
+    const reviewReason = typeof reason === 'string' && reason.length > 0
+      ? reason.slice(0, 200) // bound input length
+      : 'lifecycle event';
+    enhancedThoughtGenerator.requestTaskReview(reviewReason);
+    res.json({ success: true, reason: reviewReason });
+  } catch (error) {
+    console.error('[Cognition] Failed to request task review:', error);
+    res.status(500).json({ error: 'Failed to request task review' });
   }
 });
 
