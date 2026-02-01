@@ -17,6 +17,28 @@ import {
 } from '@conscious-bot/core';
 
 // ============================================================================
+// Workstation Constants
+// ============================================================================
+
+/** Workstation types the place_workstation leaf accepts. */
+export const WORKSTATION_TYPES = new Set(['crafting_table', 'furnace', 'blast_furnace']);
+
+/**
+ * Shared search radius for workstation placement and consumer leaves.
+ * PlaceWorkstationLeaf ensures workstations are placed within this radius,
+ * and CraftRecipeLeaf / SmeltLeaf search within this radius to find them.
+ * Changing this in one place without the other creates intermittent failures.
+ */
+export const WORKSTATION_SEARCH_RADIUS = 6;
+
+/**
+ * Soft cap on same-type workstations within search radius.
+ * If this many already exist, the leaf refuses to place another and returns
+ * a retryable failure so the planning layer can move or dig first.
+ */
+export const MAX_NEARBY_WORKSTATIONS = 3;
+
+// ============================================================================
 // Shared Helpers
 // ============================================================================
 
@@ -96,6 +118,147 @@ async function findNearestBlock(
   }
 
   return null;
+}
+
+/**
+ * Count blocks matching `names` within `radius` of bot position.
+ * Used for sprawl detection — stops counting at `limit` for efficiency.
+ * Scans a single cube (not expanding shells) to avoid double-counting.
+ */
+function countNearbyBlocks(
+  bot: any,
+  names: string[],
+  radius: number,
+  limit: number = 64,
+): number {
+  if (!bot.entity?.position) return 0;
+  const pos = bot.entity.position;
+  let count = 0;
+  for (let x = -radius; x <= radius; x++) {
+    for (let y = -radius; y <= radius; y++) {
+      for (let z = -radius; z <= radius; z++) {
+        if (x === 0 && y === 0 && z === 0) continue; // skip bot position
+        const block = bot.blockAt(pos.offset(x, y, z));
+        if (block && names.includes(block.name)) {
+          count++;
+          if (count >= limit) return count;
+        }
+      }
+    }
+  }
+  return count;
+}
+
+/**
+ * Parse a place action string. Returns the item if valid, null otherwise.
+ * Strict: only accepts exactly "place:<item>" (one colon, non-empty item).
+ */
+export function parsePlaceAction(action: string | undefined): string | null {
+  if (!action) return null;
+  const idx = action.indexOf(':');
+  if (idx < 0 || action.indexOf(':', idx + 1) >= 0) return null; // 0 or 2+ colons
+  const prefix = action.slice(0, idx);
+  const item = action.slice(idx + 1);
+  if (prefix !== 'place' || !item) return null;
+  return item;
+}
+
+/**
+ * Check if a workstation at `pos` has at least one standable adjacent position.
+ * "Standable" = air block with solid block below it, adjacent to the workstation.
+ */
+function isStandableAdjacent(bot: any, pos: Vec3): boolean {
+  const offsets: [number, number, number][] = [
+    [1, 0, 0], [-1, 0, 0], [0, 0, 1], [0, 0, -1],
+  ];
+  for (const [dx, dy, dz] of offsets) {
+    const adj = pos.offset(dx, dy, dz);
+    const block = bot.blockAt(adj);
+    const below = bot.blockAt(adj.offset(0, -1, 0));
+    if (block?.name === 'air' && below?.boundingBox === 'block') return true;
+  }
+  return false;
+}
+
+/**
+ * Check if a workstation is usable: standable adjacency + optional line-of-sight.
+ * When hasLineOfSight is available (injected via LeafContext), also verifies the
+ * bot can see the workstation block (not occluded by terrain). Without it, falls
+ * back to standable-adjacency-only (matches pre-raycast behavior).
+ */
+function isWorkstationUsable(
+  bot: any,
+  pos: Vec3,
+  hasLineOfSight?: ((from: any, to: any) => boolean) | null,
+): boolean {
+  if (!isStandableAdjacent(bot, pos)) return false;
+  if (!hasLineOfSight) return true;
+  const eyePos = bot.entity.position.offset(0, bot.entity.height ?? 1.62, 0);
+  const blockCenter = { x: pos.x + 0.5, y: pos.y + 0.5, z: pos.z + 0.5 };
+  return hasLineOfSight(eyePos, blockCenter);
+}
+
+/**
+ * Shared placement helper: equip item, find reference block, place against it, verify.
+ *
+ * Mineflayer's real API is `placeBlock(referenceBlock: Block, faceVector: Vec3)`
+ * where referenceBlock is the solid block you place *against* and faceVector points
+ * from that block toward the target air position. This helper encodes that contract
+ * so callers only need to specify the desired air position.
+ *
+ * Throws on failure with prefixed error codes: 'missing:', 'noref:', 'verify:'.
+ */
+async function placeBlockAt(
+  bot: any,
+  itemName: string,
+  targetPos: Vec3
+): Promise<string> {
+  // 1. Find the item in inventory
+  const itemToPlace = bot.inventory
+    .items()
+    .find((invItem: any) => invItem.name === itemName);
+  if (!itemToPlace) {
+    throw new Error(`missing:${itemName}`);
+  }
+
+  // 2. Equip the item in hand (required by mineflayer before placement)
+  await bot.equip(itemToPlace, 'hand');
+
+  // 3. Find a solid reference block adjacent to targetPos and compute face vector.
+  //    We check below first (most common: placing on top of ground), then cardinal.
+  const refOffsets: [number, number, number][] = [
+    [0, -1, 0],   // below (place on top of ground)
+    [1, 0, 0], [-1, 0, 0], [0, 0, 1], [0, 0, -1],  // cardinal
+    [0, 1, 0],    // above (rare but valid)
+  ];
+
+  let referenceBlock: any = null;
+  let faceVector: Vec3 | null = null;
+
+  for (const [dx, dy, dz] of refOffsets) {
+    const refPos = targetPos.offset(dx, dy, dz);
+    const block = bot.blockAt(refPos);
+    if (block && block.boundingBox === 'block') {
+      referenceBlock = block;
+      // Face vector points FROM reference block TOWARD target position
+      faceVector = new Vec3(-dx, -dy, -dz);
+      break;
+    }
+  }
+
+  if (!referenceBlock || !faceVector) {
+    throw new Error(`noref:${itemName}`);
+  }
+
+  // 4. Place against the reference block
+  await bot.placeBlock(referenceBlock, faceVector);
+
+  // 5. Verify placement
+  const placedBlock = bot.blockAt(targetPos);
+  if (!placedBlock || placedBlock.name !== itemName) {
+    throw new Error(`verify:${itemName}`);
+  }
+  return placedBlock.name;
 }
 
 // ============================================================================
@@ -186,15 +349,21 @@ export class CraftRecipeLeaf implements LeafImpl {
       };
     }
 
-    // Check if recipe requires crafting table
+    // Check if recipe requires crafting table — need the Block object, not just position
     const tableName = 'crafting_table';
     const craftingTableItem = mcData.blocksByName[tableName];
-    const tableBlock = craftingTableItem
-      ? await findNearestBlock(bot, [tableName], 6)
+    const tablePos = craftingTableItem
+      ? await findNearestBlock(bot, [tableName], WORKSTATION_SEARCH_RADIUS)
       : null;
+    const tableBlock = tablePos ? bot.blockAt(tablePos) : null;
 
-    // Get recipes for the item (Mineflayer expects output item id)
-    const recipes = bot.recipesFor(item.id, null, null, null);
+    // Get recipes: try without table first (2x2 inventory grid), then with table (3x3)
+    let recipes = bot.recipesFor(item.id, null, null, null);
+    let useTable = false;
+    if ((!recipes || recipes.length === 0) && tableBlock) {
+      recipes = bot.recipesFor(item.id, null, null, tableBlock);
+      useTable = true;
+    }
     if (!recipes || recipes.length === 0) {
       return {
         status: 'failure',
@@ -222,8 +391,9 @@ export class CraftRecipeLeaf implements LeafImpl {
             reject(new Error('aborted'));
           });
 
-          // Call bot.craft and wait for it to complete
-          const result = bot.craft(r, qty, undefined);
+          // Call bot.craft — only pass table if the recipe requires it
+          const craftTable = useTable ? tableBlock : undefined;
+          const result = bot.craft(r, qty, craftTable ?? undefined);
           if (result instanceof Promise) {
             // If bot.craft returns a Promise, wait for it
             result.then(() => resolve()).catch(reject);
@@ -405,9 +575,10 @@ export class SmeltLeaf implements LeafImpl {
     const beforeInv = await ctx.inventory();
     const beforeCounts = countByName(beforeInv);
 
-    // Find nearby furnace
-    const furnaceNames = ['furnace', 'blast_furnace']; // adjust to your version/needs
-    const furnaceBlock = await findNearestBlock(bot, furnaceNames, 6);
+    // Find nearby furnace — need the Block object for bot.openFurnace()
+    const furnaceNames = ['furnace', 'blast_furnace'];
+    const furnacePos = await findNearestBlock(bot, furnaceNames, WORKSTATION_SEARCH_RADIUS);
+    const furnaceBlock = furnacePos ? bot.blockAt(furnacePos) : null;
     if (!furnaceBlock) {
       return {
         status: 'failure',
@@ -542,6 +713,226 @@ export class SmeltLeaf implements LeafImpl {
       // add more…
     };
     return map[input] ?? input; // fallback: no rename
+  }
+}
+
+// ============================================================================
+// Place Workstation Leaf
+// ============================================================================
+
+/**
+ * Place a workstation (crafting_table, furnace, blast_furnace) with
+ * usability-validated reuse, accessibility-aware positioning, and
+ * shared placement mechanics.
+ *
+ * Invariants:
+ * 1. After success, at least one standable adjacent position exists.
+ * 2. The workstation is within 6 blocks of the bot.
+ * 3. Placement prefers distance 2-3 from bot; distance 1 is fallback.
+ * 4. Reuse requires both presence within radius AND standable adjacency.
+ */
+export class PlaceWorkstationLeaf implements LeafImpl {
+  spec: LeafSpec = {
+    name: 'place_workstation',
+    version: '1.0.0',
+    description: 'Place a workstation with usability-validated reuse and accessibility-aware positioning',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        workstation: {
+          type: 'string',
+          description: 'Workstation type to place',
+          enum: ['crafting_table', 'furnace', 'blast_furnace'],
+        },
+      },
+      required: ['workstation'],
+    },
+    outputSchema: {
+      type: 'object',
+      properties: {
+        workstation: { type: 'string' },
+        position: {
+          type: 'object',
+          properties: {
+            x: { type: 'number' },
+            y: { type: 'number' },
+            z: { type: 'number' },
+          },
+        },
+        reused: { type: 'boolean' },
+      },
+      required: ['workstation', 'position', 'reused'],
+    },
+    timeoutMs: 8000,
+    retries: 1,
+    permissions: ['place'],
+  };
+
+  async run(ctx: LeafContext, args: any): Promise<LeafResult> {
+    const t0 = ctx.now();
+    const { workstation } = args;
+    const bot = ctx.bot;
+
+    // 1. Validate workstation type
+    if (!workstation || !WORKSTATION_TYPES.has(workstation)) {
+      return {
+        status: 'failure',
+        error: {
+          code: 'world.invalidPosition',
+          retryable: false,
+          detail: `Invalid workstation type: ${workstation}`,
+        },
+        metrics: { durationMs: ctx.now() - t0, retries: 0, timeouts: 0 },
+      };
+    }
+
+    // Extract optional line-of-sight check from context (injected by raycast engine)
+    const hasLineOfSight = (ctx as any).hasLineOfSight as
+      | ((from: any, to: any) => boolean)
+      | undefined;
+
+    // 2. Check for existing reusable workstation within 6 blocks
+    const existing = await findNearestBlock(bot, [workstation], WORKSTATION_SEARCH_RADIUS);
+    if (existing && isWorkstationUsable(bot, existing, hasLineOfSight)) {
+      ctx.emitMetric('place_workstation_duration', ctx.now() - t0, {
+        workstation,
+        reused: 'true',
+      });
+      ctx.emitMetric('place_workstation_reused', 1, { workstation });
+      return {
+        status: 'success',
+        result: {
+          workstation,
+          position: { x: existing.x, y: existing.y, z: existing.z },
+          reused: true,
+        },
+        metrics: { durationMs: ctx.now() - t0, retries: 0, timeouts: 0 },
+      };
+    }
+
+    // 3. Check inventory for the workstation item
+    const hasItem = bot.inventory
+      .items()
+      .find((it: any) => it.name === workstation);
+    if (!hasItem) {
+      return {
+        status: 'failure',
+        error: {
+          code: 'inventory.missingItem',
+          retryable: false,
+          detail: `${workstation} not found in inventory`,
+        },
+        metrics: { durationMs: ctx.now() - t0, retries: 0, timeouts: 0 },
+      };
+    }
+
+    // 3b. Sprawl check — refuse to place if too many same-type workstations nearby
+    const nearbyCount = countNearbyBlocks(
+      bot, [workstation], WORKSTATION_SEARCH_RADIUS, MAX_NEARBY_WORKSTATIONS,
+    );
+    if (nearbyCount >= MAX_NEARBY_WORKSTATIONS) {
+      ctx.emitMetric('place_workstation_sprawl', nearbyCount, { workstation });
+      return {
+        status: 'failure',
+        error: {
+          code: 'place.sprawlLimit' as any,
+          retryable: true,
+          detail: `${nearbyCount} ${workstation}(s) already nearby — move or dig first`,
+        },
+        metrics: { durationMs: ctx.now() - t0, retries: 0, timeouts: 0 },
+      };
+    }
+    if (nearbyCount > 0) {
+      // Existing but unusable workstations — emit warning metric
+      ctx.emitMetric('place_workstation_unusable_nearby', nearbyCount, { workstation });
+    }
+
+    // 4. Find placement position — prefer distance 2-3, fallback to 1
+    const origin = bot.entity.position.clone();
+    const dist2Offsets: [number, number, number][] = [
+      [2, 0, 0], [-2, 0, 0], [0, 0, 2], [0, 0, -2],
+      [2, 0, 1], [2, 0, -1], [-2, 0, 1], [-2, 0, -1],
+      [1, 0, 2], [-1, 0, 2], [1, 0, -2], [-1, 0, -2],
+    ];
+    const dist1Offsets: [number, number, number][] = [
+      [1, 0, 0], [-1, 0, 0], [0, 0, 1], [0, 0, -1],
+    ];
+
+    let placementPos: Vec3 | null = null;
+
+    // Try preferred distance first, then fallback
+    for (const offsets of [dist2Offsets, dist1Offsets]) {
+      for (const [dx, dy, dz] of offsets) {
+        const candidate = origin.offset(dx, dy, dz);
+        const block = bot.blockAt(candidate);
+        const below = bot.blockAt(candidate.offset(0, -1, 0));
+        if (
+          block?.name === 'air' &&
+          below?.boundingBox === 'block' &&
+          isStandableAdjacent(bot, candidate)
+        ) {
+          placementPos = candidate;
+          break;
+        }
+      }
+      if (placementPos) break;
+    }
+
+    if (!placementPos) {
+      return {
+        status: 'failure',
+        error: {
+          code: 'place.invalidFace',
+          retryable: true,
+          detail: 'No suitable placement position with standable adjacency nearby',
+        },
+        metrics: { durationMs: ctx.now() - t0, retries: 0, timeouts: 0 },
+      };
+    }
+
+    // 5. Place the block using shared helper
+    try {
+      await placeBlockAt(bot, workstation, placementPos);
+    } catch (e: any) {
+      const msg = String(e?.message ?? e);
+      const code = msg.startsWith('missing:')
+        ? 'inventory.missingItem'
+        : msg.startsWith('noref:')
+          ? 'place.invalidFace'
+          : msg.startsWith('verify:')
+            ? 'place.invalidFace'
+            : 'place.invalidFace';
+      return {
+        status: 'failure',
+        error: {
+          code: code as any,
+          retryable: code === 'place.invalidFace',
+          detail: msg,
+        },
+        metrics: { durationMs: ctx.now() - t0, retries: 0, timeouts: 0 },
+      };
+    }
+
+    // 6. Emit metrics and return
+    ctx.emitMetric('place_workstation_duration', ctx.now() - t0, {
+      workstation,
+      reused: 'false',
+    });
+    ctx.emitMetric('place_workstation_reused', 0, { workstation });
+
+    return {
+      status: 'success',
+      result: {
+        workstation,
+        position: {
+          x: placementPos.x,
+          y: placementPos.y,
+          z: placementPos.z,
+        },
+        reused: false,
+      },
+      metrics: { durationMs: ctx.now() - t0, retries: 0, timeouts: 0 },
+    };
   }
 }
 

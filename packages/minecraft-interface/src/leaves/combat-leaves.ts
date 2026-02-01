@@ -955,3 +955,185 @@ export class UseItemLeaf implements LeafImpl {
     }
   }
 }
+
+// ============================================================================
+// Equip Tool Leaf
+// ============================================================================
+
+/** Maps block material categories to the best tool type for mining them. */
+const TOOL_FOR_MATERIAL: Record<string, string> = {
+  stone: 'pickaxe',
+  ore: 'pickaxe',
+  cobblestone: 'pickaxe',
+  deepslate: 'pickaxe',
+  netherrack: 'pickaxe',
+  obsidian: 'pickaxe',
+  wood: 'axe',
+  log: 'axe',
+  planks: 'axe',
+  dirt: 'shovel',
+  grass: 'shovel',
+  sand: 'shovel',
+  gravel: 'shovel',
+  clay: 'shovel',
+  snow: 'shovel',
+  soul_sand: 'shovel',
+};
+
+/** Tool material tiers, best first. */
+const TOOL_TIERS = ['netherite', 'diamond', 'iron', 'stone', 'golden', 'wooden'];
+
+/**
+ * Equip the best tool for a given task (mining stone, chopping wood, digging dirt).
+ * Separate from EquipWeaponLeaf which handles combat weapons.
+ */
+export class EquipToolLeaf implements LeafImpl {
+  spec: LeafSpec = {
+    name: 'equip_tool',
+    version: '1.0.0',
+    description: 'Equip the best tool for a given material or task',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        material: {
+          type: 'string',
+          description: 'Block material to mine (e.g. "stone", "wood", "dirt")',
+        },
+        toolType: {
+          type: 'string',
+          description: 'Explicit tool type (e.g. "pickaxe", "axe", "shovel", "hoe")',
+          enum: ['pickaxe', 'axe', 'shovel', 'hoe'],
+        },
+        fallbackToHand: {
+          type: 'boolean',
+          default: true,
+        },
+      },
+    },
+    outputSchema: {
+      type: 'object',
+      properties: {
+        success: { type: 'boolean' },
+        toolEquipped: { type: 'string' },
+        toolType: { type: 'string' },
+        tier: { type: 'string' },
+        slot: { type: 'number' },
+      },
+    },
+    timeoutMs: 5000,
+    retries: 1,
+    permissions: ['container.read'],
+  };
+
+  async run(ctx: LeafContext, args: any): Promise<LeafResult> {
+    const t0 = ctx.now();
+    const bot = ctx.bot;
+    const fallback = args?.fallbackToHand ?? true;
+
+    try {
+      // Determine which tool type we need
+      let toolType = args?.toolType;
+      if (!toolType && args?.material) {
+        const mat = String(args.material).toLowerCase();
+        for (const [key, type] of Object.entries(TOOL_FOR_MATERIAL)) {
+          if (mat.includes(key)) {
+            toolType = type;
+            break;
+          }
+        }
+      }
+
+      if (!toolType) {
+        if (fallback) {
+          return {
+            status: 'success',
+            result: {
+              success: true,
+              toolEquipped: 'hand',
+              toolType: 'none',
+              tier: 'none',
+              slot: -1,
+            },
+            metrics: { durationMs: ctx.now() - t0, retries: 0, timeouts: 0 },
+          };
+        }
+        return {
+          status: 'failure',
+          error: {
+            code: 'inventory.missingItem',
+            retryable: false,
+            detail: 'Cannot determine tool type: provide material or toolType',
+          },
+          metrics: { durationMs: ctx.now() - t0, retries: 0, timeouts: 0 },
+        };
+      }
+
+      // Search inventory for the best tier of this tool type
+      const items = bot.inventory.items();
+      let bestItem: any = null;
+      let bestTierIdx = TOOL_TIERS.length;
+
+      for (const item of items) {
+        if (!item.name.endsWith(`_${toolType}`)) continue;
+        const tierIdx = TOOL_TIERS.findIndex((t) => item.name.startsWith(t));
+        if (tierIdx >= 0 && tierIdx < bestTierIdx) {
+          bestTierIdx = tierIdx;
+          bestItem = item;
+        }
+      }
+
+      if (!bestItem) {
+        if (fallback) {
+          return {
+            status: 'success',
+            result: {
+              success: true,
+              toolEquipped: 'hand',
+              toolType: 'none',
+              tier: 'none',
+              slot: -1,
+            },
+            metrics: { durationMs: ctx.now() - t0, retries: 0, timeouts: 0 },
+          };
+        }
+        return {
+          status: 'failure',
+          error: {
+            code: 'inventory.missingItem',
+            retryable: true,
+            detail: `No ${toolType} found in inventory`,
+          },
+          metrics: { durationMs: ctx.now() - t0, retries: 0, timeouts: 0 },
+        };
+      }
+
+      // Equip the tool
+      await bot.equip(bestItem, 'hand');
+
+      const tier = TOOL_TIERS[bestTierIdx] || 'unknown';
+      ctx.emitMetric('equip_tool_tier', bestTierIdx);
+
+      return {
+        status: 'success',
+        result: {
+          success: true,
+          toolEquipped: bestItem.name,
+          toolType,
+          tier,
+          slot: bestItem.slot,
+        },
+        metrics: { durationMs: ctx.now() - t0, retries: 0, timeouts: 0 },
+      };
+    } catch (e: any) {
+      return {
+        status: 'failure',
+        error: {
+          code: 'inventory.missingItem',
+          retryable: true,
+          detail: e?.message ?? String(e),
+        },
+        metrics: { durationMs: ctx.now() - t0, retries: 0, timeouts: 0 },
+      };
+    }
+  }
+}

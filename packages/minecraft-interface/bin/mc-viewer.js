@@ -128,7 +128,7 @@ async function main() {
   const config = {
     serverAddress: process.env.MINECRAFT_SERVER || 'localhost',
     serverPort: parseInt(process.env.MINECRAFT_PORT || '25565'),
-    version: process.env.MINECRAFT_VERSION || '1.21.9',
+    version: process.env.MINECRAFT_VERSION || '1.21.4',
     username: process.env.MINECRAFT_USERNAME || 'conscious-bot',
     viewerPort: parseInt(process.env.VIEWER_PORT || '3005'),
   };

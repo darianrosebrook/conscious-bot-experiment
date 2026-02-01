@@ -70,14 +70,17 @@ import {
   PlaceTorchIfNeededLeaf,
   RetreatAndBlockLeaf,
   ConsumeFoodLeaf,
+  SleepLeaf,
+  CollectItemsLeaf,
 } from './leaves/interaction-leaves';
 import {
   SenseHostilesLeaf,
   ChatLeaf,
   WaitLeaf,
   GetLightLevelLeaf,
+  FindResourceLeaf,
 } from './leaves/sensing-leaves';
-import { CraftRecipeLeaf, SmeltLeaf } from './leaves/crafting-leaves';
+import { CraftRecipeLeaf, SmeltLeaf, PlaceWorkstationLeaf, IntrospectRecipeLeaf } from './leaves/crafting-leaves';
 import {
   OpenContainerLeaf,
   TransferItemsLeaf,
@@ -89,6 +92,7 @@ import {
   EquipWeaponLeaf,
   RetreatFromThreatLeaf,
   UseItemLeaf,
+  EquipToolLeaf,
 } from './leaves/combat-leaves';
 import {
   TillSoilLeaf,
@@ -424,6 +428,10 @@ function setupBotStateWebSocket() {
   minecraftInterface.botAdapter.on('disconnected', (data) => {
     broadcastBotStateUpdate('disconnected', data);
 
+    // Invalidate cached ActionTranslator — stale bot reference
+    (global as any)._cachedActionTranslator = undefined;
+    (global as any)._cachedActionTranslatorBot = undefined;
+
     // Stop thought generation when bot disconnects
     console.log('Bot disconnected, stopping thought generation...');
     stopThoughtGeneration();
@@ -431,6 +439,10 @@ function setupBotStateWebSocket() {
 
   minecraftInterface.botAdapter.on('spawned', (data) => {
     broadcastBotStateUpdate('spawned', data);
+
+    // Invalidate cached ActionTranslator — new bot instance needs fresh state
+    (global as any)._cachedActionTranslator = undefined;
+    (global as any)._cachedActionTranslatorBot = undefined;
 
     // Start thought generation when bot spawns
     console.log('🤖 Bot spawned, starting thought generation...');
@@ -899,6 +911,8 @@ async function registerCoreLeaves() {
       new PlaceTorchIfNeededLeaf(),
       new RetreatAndBlockLeaf(),
       new ConsumeFoodLeaf(),
+      new SleepLeaf(),
+      new CollectItemsLeaf(),
     ];
 
     // Register sensing leaves
@@ -907,10 +921,11 @@ async function registerCoreLeaves() {
       new ChatLeaf(),
       new WaitLeaf(),
       new GetLightLevelLeaf(),
+      new FindResourceLeaf(),
     ];
 
     // Register crafting leaves
-    const craftingLeaves = [new CraftRecipeLeaf(), new SmeltLeaf()];
+    const craftingLeaves = [new CraftRecipeLeaf(), new SmeltLeaf(), new PlaceWorkstationLeaf(), new IntrospectRecipeLeaf()];
 
     // Register container leaves
     const containerLeaves = [
@@ -926,6 +941,7 @@ async function registerCoreLeaves() {
       new EquipWeaponLeaf(),
       new RetreatFromThreatLeaf(),
       new UseItemLeaf(),
+      new EquipToolLeaf(),
     ];
 
     // Register farming leaves
@@ -1760,21 +1776,28 @@ app.post('/action', async (req, res) => {
       throw new Error('Bot not available');
     }
 
-    // Create ActionTranslator directly
+    // Reuse a single ActionTranslator per bot to avoid re-initializing pathfinder/Movements
     const { ActionTranslator } = await import('./action-translator');
-    console.log('Creating ActionTranslator for request...');
-    console.log('Bot state for ActionTranslator:', {
-      hasBot: !!bot,
-      hasEntity: !!bot.entity,
-      hasPosition: !!bot.entity?.position,
-      hasPathfinder: !!(bot as any).pathfinder,
-    });
+    if (!(global as any)._cachedActionTranslator || (global as any)._cachedActionTranslatorBot !== bot) {
+      (global as any)._cachedActionTranslator = new ActionTranslator(bot, {
+        actionTimeout: 15000,
+        pathfindingTimeout: 30000,
+      });
+      (global as any)._cachedActionTranslatorBot = bot;
+    }
+    const actionTranslator = (global as any)._cachedActionTranslator;
 
-    const actionTranslator = new ActionTranslator(bot, {
-      actionTimeout: 15000,
-      pathfindingTimeout: 30000,
-    });
-    console.log('ActionTranslator created for request');
+    // For movement actions, ensure pathfinder is ready before dispatching
+    const MOVEMENT_ACTIONS = new Set(['move_to', 'navigate', 'follow', 'step_forward_safely']);
+    if (MOVEMENT_ACTIONS.has(type)) {
+      const ready = await actionTranslator.ensureReady(5000);
+      if (!ready) {
+        return res.status(503).json({
+          success: false,
+          message: 'Navigation subsystem not ready',
+        });
+      }
+    }
 
     // Execute the action directly instead of as a plan step
     const action = {

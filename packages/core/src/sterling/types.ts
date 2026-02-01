@@ -80,7 +80,8 @@ export interface SterlingSearchEdgeMessage {
   type: 'search_edge';
   source: string;
   target: string;
-  label: Record<string, unknown>;
+  /** Action label — may be a string (Python emits rule.action directly) or structured object */
+  label: string | Record<string, unknown>;
 }
 
 export interface SterlingSearchStartMessage {
@@ -97,6 +98,8 @@ export interface SterlingSolutionPathMessage {
   type: 'solution_path';
   source: string;
   target: string;
+  /** Action label — may be a string (Python emits rule.action directly) or structured object */
+  label?: string | Record<string, unknown>;
 }
 
 export interface SterlingCompleteMessage {
@@ -177,6 +180,8 @@ export type SterlingMessage =
 export interface SterlingSolutionEdge {
   source: string;
   target: string;
+  /** Action label — may be a string (e.g. "craft:oak_planks") or structured object */
+  label?: string | Record<string, unknown>;
 }
 
 /** A discovered node during search */
@@ -194,7 +199,8 @@ export interface SterlingDiscoveredNode {
 export interface SterlingSearchEdge {
   source: string;
   target: string;
-  label: Record<string, unknown>;
+  /** Action label — may be a string (Python emits rule.action directly) or structured object */
+  label: string | Record<string, unknown>;
 }
 
 /** Aggregated result collected from streamed solve messages */

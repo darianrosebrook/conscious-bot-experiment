@@ -648,3 +648,170 @@ export class GetLightLevelLeaf implements LeafImpl {
     }
   }
 }
+
+// ============================================================================
+// Find Resource Leaf
+// ============================================================================
+
+/**
+ * Scan for blocks of a given type within a radius and return their positions
+ * without mining them. Useful for locating ores, trees, water, etc.
+ */
+export class FindResourceLeaf implements LeafImpl {
+  spec: LeafSpec = {
+    name: 'find_resource',
+    version: '1.0.0',
+    description: 'Scan for blocks of a given type nearby and return their positions',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        blockType: {
+          type: 'string',
+          description: 'Block name to search for (e.g. "iron_ore", "oak_log", "water")',
+        },
+        radius: {
+          type: 'number',
+          minimum: 1,
+          maximum: 64,
+          default: 32,
+        },
+        maxResults: {
+          type: 'number',
+          minimum: 1,
+          maximum: 50,
+          default: 10,
+        },
+        partialMatch: {
+          type: 'boolean',
+          description: 'Match block names containing the search string',
+          default: true,
+        },
+      },
+      required: ['blockType'],
+    },
+    outputSchema: {
+      type: 'object',
+      properties: {
+        success: { type: 'boolean' },
+        blockType: { type: 'string' },
+        found: { type: 'number' },
+        nearest: {
+          type: 'object',
+          properties: {
+            x: { type: 'number' },
+            y: { type: 'number' },
+            z: { type: 'number' },
+            distance: { type: 'number' },
+          },
+        },
+        positions: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              x: { type: 'number' },
+              y: { type: 'number' },
+              z: { type: 'number' },
+              distance: { type: 'number' },
+              blockName: { type: 'string' },
+            },
+          },
+        },
+      },
+    },
+    timeoutMs: 5000,
+    retries: 0,
+    permissions: ['sense'],
+  };
+
+  async run(ctx: LeafContext, args: any): Promise<LeafResult> {
+    const t0 = ctx.now();
+    const bot = ctx.bot;
+    const blockType = args?.blockType;
+    const radius = Math.min(Math.max(args?.radius ?? 32, 1), 64);
+    const maxResults = Math.min(Math.max(args?.maxResults ?? 10, 1), 50);
+    const partialMatch = args?.partialMatch ?? true;
+
+    if (!blockType || typeof blockType !== 'string') {
+      return {
+        status: 'failure',
+        error: {
+          code: 'sense.invalidInput',
+          retryable: false,
+          detail: 'blockType is required',
+        },
+        metrics: { durationMs: ctx.now() - t0, retries: 0, timeouts: 0 },
+      };
+    }
+
+    try {
+      const origin = bot.entity.position;
+      const results: Array<{
+        x: number; y: number; z: number;
+        distance: number; blockName: string;
+      }> = [];
+
+      // Expanding-shell search — check closer blocks first
+      for (let r = 1; r <= radius && results.length < maxResults; r++) {
+        for (let dx = -r; dx <= r; dx++) {
+          for (let dy = -r; dy <= r; dy++) {
+            for (let dz = -r; dz <= r; dz++) {
+              // Only check shell (skip interior already searched)
+              if (Math.abs(dx) !== r && Math.abs(dy) !== r && Math.abs(dz) !== r) continue;
+
+              const p = origin.offset(dx, dy, dz);
+              const b = bot.blockAt(p);
+              if (!b) continue;
+
+              const matches = partialMatch
+                ? b.name.includes(blockType)
+                : b.name === blockType;
+
+              if (matches) {
+                results.push({
+                  x: p.x, y: p.y, z: p.z,
+                  distance: Math.sqrt(dx * dx + dy * dy + dz * dz),
+                  blockName: b.name,
+                });
+                if (results.length >= maxResults) break;
+              }
+            }
+            if (results.length >= maxResults) break;
+          }
+          if (results.length >= maxResults) break;
+        }
+      }
+
+      // Sort by distance
+      results.sort((a, b) => a.distance - b.distance);
+
+      const nearest = results[0] || null;
+
+      ctx.emitMetric('find_resource_count', results.length);
+
+      return {
+        status: 'success',
+        result: {
+          success: true,
+          blockType,
+          found: results.length,
+          nearest: nearest
+            ? { x: nearest.x, y: nearest.y, z: nearest.z, distance: nearest.distance }
+            : null,
+          positions: results,
+        },
+        metrics: { durationMs: ctx.now() - t0, retries: 0, timeouts: 0 },
+      };
+    } catch (e: any) {
+      return {
+        status: 'failure',
+        error: {
+          code: 'sense.apiError',
+          retryable: false,
+          detail: e?.message ?? String(e),
+        },
+        metrics: { durationMs: ctx.now() - t0, retries: 0, timeouts: 0 },
+      };
+    }
+  }
+}

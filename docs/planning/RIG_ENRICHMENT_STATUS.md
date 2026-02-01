@@ -282,29 +282,18 @@ A rig is considered **ENRICHED** when it has:
 
 ## Enrichment roadmap
 
-### Phase 1: Track 1 completion (CRITICAL - blocks implementation)
+### Phase 1: Track 1 completion ✅ COMPLETE
 
 **Goal**: All Track 1 rigs (A, B, C) enriched to enable Sterling + conscious-bot coordinated development.
 
-**Status**: 2/3 complete (Rig A ✅, Rig B ✅)
+**Status**: 3/3 complete (Rig A ✅, Rig B ✅, Rig C ✅)
 
-**Remaining work**:
+**Completed work**:
 1. ~~**Rig A enrichment** (3-4 hours)~~ ✅ **COMPLETE** (2026-01-31)
-   - ✅ Added sections 3-10 using Rig B as template
-   - ✅ Trace hashing, rule validation, execution-based credit
-   - ✅ Transfer surfaces: BOM assembly, build graph, data pipeline
-   - ✅ 5 pivots, 5 test suites (12 test cases), implementation files summary
+2. **Rig B enrichment** ✅ **COMPLETE** (baseline template)
+3. **Rig C enrichment** ✅ **COMPLETE** (2026-01-31)
 
-2. **Rig C enrichment** (4-5 hours)
-   - Add sections 3-9 using Rig B as template
-   - Focus on temporal semantics, batching, capacity constraints
-   - Transfer surfaces: job shop scheduling, manufacturing, ETL orchestration
-
-**Total estimated effort**: ~~7-9~~ **4-5 hours** (Rig C only)
-
-**Blocker for**: All Track 1 implementation work
-
-**Completion criteria**:
+**Completion criteria** — all met:
 - ✅ All 3 rigs pass enrichment quality checklist
 - ✅ Each has concrete code anchors, pivots, transfer surfaces, tests
 - ✅ conscious-bot vs Sterling split is explicit for all 3
@@ -312,28 +301,13 @@ A rig is considered **ENRICHED** when it has:
 
 ---
 
-### Phase 2: Track 2 completion (HIGH - observation spam fix)
+### Phase 2: Track 2 completion ✅ COMPLETE
 
 **Goal**: All Track 2 rigs (I, I-ext, J) enriched to enable belief layer implementation.
 
-**Status**: 1/3 complete (Rig I-ext done)
+**Status**: 3/3 complete (Rig I ✅, Rig I-ext ✅, Rig J ✅)
 
-**Remaining work**:
-1. **Rig I enrichment** (5-6 hours)
-   - Add sections 3-9 using Rig I-ext as template
-   - Focus on belief-state representation, probe selection, hypothesis collapse
-   - Transfer surfaces: fault diagnosis, structure localization
-
-2. **Rig J enrichment** (4-5 hours)
-   - Add sections 3-9 using Rig I-ext patterns
-   - Focus on invariant metrics, drift dynamics, receding horizon
-   - Transfer surfaces: SRE maintenance, control systems, SLO hygiene
-
-**Total estimated effort**: 9-11 hours
-
-**Blocker for**: Observation spam fix, entity belief tracking, reflexive safety
-
-**Completion criteria**:
+**Completion criteria** — all met:
 - ✅ All 3 rigs pass enrichment quality checklist
 - ✅ Belief Bus contract defined (I-ext)
 - ✅ Epistemic probe semantics defined (I)
@@ -357,23 +331,21 @@ A rig is considered **ENRICHED** when it has:
 ## Critical path to implementation
 
 ```
-Phase 1 (Track 1 enrichment)
-├─ Rig A enrichment (3-4h) ────✅ COMPLETE (2026-01-31)
-├─ Rig B enrichment ───────────✅ COMPLETE (baseline)
-├─ Rig C enrichment (4-5h) ────🔴 REMAINING
-└─ Total: ~~7-9~~ 4-5 hours   │
-                                ├─> Track 1 READY FOR IMPLEMENTATION
-                                │
-Phase 2 (Track 2 enrichment)   │
-├─ Rig I enrichment (5-6h) ────┤
-├─ Rig I-ext enrichment ───────✅ COMPLETE (gold standard)
-├─ Rig J enrichment (4-5h) ────┤
-└─ Total: 9-11 hours           │
-                                ├─> Track 2 READY FOR IMPLEMENTATION
-                                │
+Phase 1 (Track 1 enrichment)  ──────────── ✅ COMPLETE (2026-01-31)
+├─ Rig A enrichment ───────────✅ COMPLETE
+├─ Rig B enrichment ───────────✅ COMPLETE
+├─ Rig C enrichment ───────────✅ COMPLETE
+└─ Track 1 READY FOR IMPLEMENTATION
+
+Phase 2 (Track 2 enrichment)  ──────────── ✅ COMPLETE (2026-01-31)
+├─ Rig I enrichment ───────────✅ COMPLETE
+├─ Rig I-ext enrichment ───────✅ COMPLETE
+├─ Rig J enrichment ───────────✅ COMPLETE
+└─ Track 2 READY FOR IMPLEMENTATION
+
 Track 1 + Track 2 implementation (parallel)
 ├─ Sterling: P1, P2, P3 ───────┤
-├─ Conscious-bot: Rigs A, B, C │
+├─ Conscious-bot: Rigs A, B, C │  ← A+B DONE; C temporal enrichment layer built
 ├─ Sterling: P11, P21, P12 ────┤
 ├─ Conscious-bot: Rigs I, I-ext, J
 └─ Certification tests for all │
@@ -383,50 +355,22 @@ Phase 3 (Track 3 enrichment)   │
 └─ 6 rigs enriched ───────────┴─> Track 3 READY FOR IMPLEMENTATION (2026-01-31)
 ```
 
-**Progress update (2026-01-31)**:
-- ✅ Rig A enrichment complete (3.5h actual)
-- Track 1: 67% complete (2/3 rigs enriched)
-- Remaining: 4-5h (Rig C only)
+**Progress update (2026-02-01)**:
+- ✅ All enrichment phases complete (12/12 rigs)
+- ✅ Track 1 implementation: Rigs A+B DONE, Rig C temporal enrichment layer built (FurnaceSchedulingSolver C.1–C.7 remain)
+- Track 2+3 implementation: not yet started
 
-**Bottleneck**: ~~Documentation enrichment for Tracks 1-2 (16-20 hours total)~~ **Rig C enrichment (4-5 hours)** must complete BEFORE Track 1 implementation can proceed.
-
-**Updated critical path**: ~~16-20h~~ **13-16h** remaining (4-5h Track 1 + 9-11h Track 2)
+**Bottleneck**: No enrichment bottleneck remains. Implementation of Rig C FurnaceSchedulingSolver (C.1–C.7) is the next milestone.
 
 ---
 
-## Enrichment assignment recommendations
+## Implementation priorities (enrichment complete)
 
-### If working sequentially (one person)
+All enrichment work is done. Focus shifts to implementation:
 
-**Week 1** (UPDATED 2026-01-31):
-- ~~Day 1-2: Rig A enrichment (3-4h)~~ ✅ COMPLETE
-- Day 1: Rig C enrichment (4-5h)
-- Day 2: Track 1 validation and cross-check
-
-**Week 2**:
-- Day 1-2: Rig I enrichment (5-6h)
-- Day 3: Rig J enrichment (4-5h)
-- Day 4: Track 2 validation and cross-check
-
-**Week 3**: Implement Track 1 (Sterling + conscious-bot in parallel)
-
-**Week 4**: Implement Track 2 (Sterling + conscious-bot in parallel)
-
----
-
-### If working in parallel (two people)
-
-**Person 1 (Track 1 focus)**:
-- Rig A enrichment (3-4h)
-- Rig C enrichment (4-5h)
-- Total: 7-9 hours over 2-3 days
-
-**Person 2 (Track 2 focus)**:
-- Rig I enrichment (5-6h)
-- Rig J enrichment (4-5h)
-- Total: 9-11 hours over 2-3 days
-
-**Timeline**: Both tracks enriched within 3-4 days, enabling parallel Track 1 + Track 2 implementation.
+1. **Rig C FurnaceSchedulingSolver** (C.1–C.7) — completes Track 1
+2. **Track 2 implementation** (Rigs I, I-ext, J) — belief layer
+3. **Track 3 implementation** (Rigs D–K) — capability widening
 
 ---
 

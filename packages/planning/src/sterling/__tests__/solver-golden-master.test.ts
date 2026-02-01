@@ -472,6 +472,276 @@ describe('MinecraftCraftingSolver — golden-master', () => {
   });
 
   // ===========================================================================
+  // Temporal mode payload isolation (Rig C, Phase 3A)
+  // ===========================================================================
+
+  describe('temporal mode payload isolation', () => {
+    const mcData = {
+      itemsByName: {
+        stick: { id: 1, name: 'stick' },
+        oak_planks: { id: 2, name: 'oak_planks' },
+      },
+      items: {
+        1: { id: 1, name: 'stick' },
+        2: { id: 2, name: 'oak_planks' },
+      },
+      recipes: {
+        1: [
+          {
+            result: { id: 1, count: 4 },
+            ingredients: [2, 2],
+          },
+        ],
+      },
+    };
+
+    it('mode=off produces identical payload to default (no temporal fields)', async () => {
+      // Call with explicit mode=off
+      await solver.solveCraftingGoal('stick', [], mcData, ['oak_log'], { mode: 'off' });
+
+      expect(service.solve).toHaveBeenCalledTimes(1);
+      const call = (service.solve as ReturnType<typeof vi.fn>).mock.calls[0];
+      const payload = call[1];
+
+      // Must NOT have temporal fields
+      expect(payload).not.toHaveProperty('currentTickBucket');
+      expect(payload).not.toHaveProperty('horizonBucket');
+      expect(payload).not.toHaveProperty('bucketSizeTicks');
+      expect(payload).not.toHaveProperty('slots');
+
+      // Payload must match the existing golden-master snapshot
+      const stablePayload = {
+        contractVersion: payload.contractVersion,
+        solverId: payload.solverId,
+        inventory: payload.inventory,
+        goal: payload.goal,
+        nearbyBlocks: payload.nearbyBlocks,
+        rules: payload.rules,
+        maxNodes: payload.maxNodes,
+        useLearning: payload.useLearning,
+      };
+      const snapshot = canonicalize(stablePayload);
+      expect(snapshot).toMatchSnapshot();
+    });
+
+    it('mode=local_only produces identical Sterling payload (temporal stays local)', async () => {
+      await solver.solveCraftingGoal('stick', [], mcData, ['oak_log'], {
+        mode: 'local_only',
+        nowTicks: 1000,
+      });
+
+      expect(service.solve).toHaveBeenCalledTimes(1);
+      const call = (service.solve as ReturnType<typeof vi.fn>).mock.calls[0];
+      const payload = call[1];
+
+      // Must NOT have temporal fields — local_only keeps them local
+      expect(payload).not.toHaveProperty('currentTickBucket');
+      expect(payload).not.toHaveProperty('horizonBucket');
+      expect(payload).not.toHaveProperty('bucketSizeTicks');
+      expect(payload).not.toHaveProperty('slots');
+
+      // Canonical payload matches off mode
+      const stablePayload = {
+        contractVersion: payload.contractVersion,
+        solverId: payload.solverId,
+        inventory: payload.inventory,
+        goal: payload.goal,
+        nearbyBlocks: payload.nearbyBlocks,
+        rules: payload.rules,
+        maxNodes: payload.maxNodes,
+        useLearning: payload.useLearning,
+      };
+      const snapshot = canonicalize(stablePayload);
+      expect(snapshot).toMatchSnapshot();
+    });
+
+    it('mode=undefined (omitted) produces identical payload to default', async () => {
+      // Call without temporal options (existing behavior)
+      await solver.solveCraftingGoal('stick', [], mcData, ['oak_log']);
+
+      expect(service.solve).toHaveBeenCalledTimes(1);
+      const call = (service.solve as ReturnType<typeof vi.fn>).mock.calls[0];
+      const payload = call[1];
+
+      expect(payload).not.toHaveProperty('currentTickBucket');
+      expect(payload).not.toHaveProperty('slots');
+    });
+
+    it('rules have no durationTicks or requiresSlotType in off mode', async () => {
+      await solver.solveCraftingGoal('stick', [], mcData, ['oak_log']);
+
+      const call = (service.solve as ReturnType<typeof vi.fn>).mock.calls[0];
+      const payload = call[1];
+      const rules = payload.rules as Array<Record<string, unknown>>;
+
+      for (const rule of rules) {
+        expect(rule).not.toHaveProperty('durationTicks');
+        expect(rule).not.toHaveProperty('requiresSlotType');
+      }
+    });
+
+    it('mine-only rules in local_only mode do not false-deadlock', async () => {
+      await solver.solveCraftingGoal(
+        'stick',
+        [],
+        // mcData with only mine rules — no furnace requirement
+        {
+          itemsByName: {
+            iron_ingot: { id: 10, name: 'iron_ingot' },
+          },
+          items: {
+            10: { id: 10, name: 'iron_ingot' },
+          },
+          recipes: {},
+        },
+        [],
+        {
+          mode: 'local_only',
+          nowTicks: 0,
+          // No slots observed and no nearby furnace blocks = no furnace slots
+          // But mine rules don't require furnace, so no deadlock expected
+        },
+      );
+
+      // mine:iron_ingot doesn't need a furnace — Sterling should be called
+      expect(service.solve).toHaveBeenCalledTimes(1);
+    });
+
+    it('deadlock gating fires when enrichment detects capacity deadlock', async () => {
+      // buildCraftingRules only generates mine/craft/place rules (never smelt),
+      // so deadlock via solveCraftingGoal's mcData input alone is not possible
+      // today. This test verifies the gating works by testing at the enrichment
+      // boundary directly — the same code path the solver uses.
+      //
+      // Import the enrichment entrypoint and reference adapter to prove the
+      // deadlock check → early return path works.
+      const { computeTemporalEnrichment: compute } = await import('../../temporal/temporal-enrichment');
+      const { P03ReferenceAdapter: Adapter } = await import('../primitives/p03/p03-reference-adapter');
+      const { MAX_WAIT_BUCKETS, HORIZON_BUCKETS, MINECRAFT_BUCKET_SIZE_TICKS } = await import('../../temporal/time-state');
+
+      const adapter = new Adapter(MAX_WAIT_BUCKETS, 8);
+
+      // Rules with needsFurnace=true — like a future smelt rule
+      const rules = [
+        {
+          action: 'smelt:iron_ore',
+          actionType: 'smelt' as const,
+          produces: [{ name: 'iron_ingot', count: 1 }],
+          consumes: [{ name: 'iron_ore', count: 1 }],
+          requires: [],
+          needsTable: false,
+          needsFurnace: true,
+          baseCost: 1,
+        },
+      ];
+
+      const enrichment = compute({
+        mode: 'local_only',
+        adapter,
+        stateInput: {
+          nowTicks: 0,
+          nearbyBlocks: [],           // no furnace blocks nearby
+          slotsObserved: undefined,   // no slots observed
+          bucketSizeTicks: MINECRAFT_BUCKET_SIZE_TICKS,
+          horizonBuckets: HORIZON_BUCKETS,
+        },
+        rules,
+      });
+
+      // Deadlock should fire: needsFurnace=true rule but no furnace slots
+      expect(enrichment.deadlock).toBeDefined();
+      expect(enrichment.deadlock!.isDeadlock).toBe(true);
+      // Exactly ['furnace'] — no extraneous slot types, no missing ones
+      expect(enrichment.deadlock!.blockedSlotTypes).toEqual(['furnace']);
+
+      // This is exactly what the solver checks before calling Sterling:
+      // if (enrichment.deadlock?.isDeadlock) return early without calling solve
+    });
+
+    it('sterling_temporal mode attaches temporal fields to payload', async () => {
+      // Include multiple furnace blocks to verify canonical slot ordering
+      await solver.solveCraftingGoal('stick', [], mcData, ['furnace', 'smoker', 'furnace'], {
+        mode: 'sterling_temporal',
+        nowTicks: 500,
+      });
+
+      expect(service.solve).toHaveBeenCalledTimes(1);
+      const call = (service.solve as ReturnType<typeof vi.fn>).mock.calls[0];
+      const payload = call[1];
+
+      expect(payload).toHaveProperty('currentTickBucket');
+      expect(payload).toHaveProperty('horizonBucket');
+      expect(payload).toHaveProperty('bucketSizeTicks');
+      expect(payload).toHaveProperty('slots');
+      expect(payload.currentTickBucket).toBe(5); // 500 / 100
+      expect(Number.isInteger(payload.currentTickBucket)).toBe(true);
+
+      // Slots must be canonically ordered by (type ASC, readyAtBucket ASC, id ASC)
+      const slots = payload.slots as Array<{ id: string; type: string; readyAtBucket: number }>;
+      expect(slots.length).toBeGreaterThanOrEqual(3);
+      for (let i = 1; i < slots.length; i++) {
+        const prev = slots[i - 1];
+        const curr = slots[i];
+        const typeCmp = prev.type.localeCompare(curr.type);
+        if (typeCmp === 0) {
+          const readyCmp = prev.readyAtBucket - curr.readyAtBucket;
+          if (readyCmp === 0) {
+            expect(prev.id.localeCompare(curr.id)).toBeLessThanOrEqual(0);
+          } else {
+            expect(readyCmp).toBeLessThanOrEqual(0);
+          }
+        } else {
+          expect(typeCmp).toBeLessThanOrEqual(0);
+        }
+      }
+    });
+
+    it('rule durationTicks and requiresSlotType never leak into Sterling payload', async () => {
+      // Even in local_only mode where enrichment runs, the payload rules
+      // sent to Sterling must not contain temporal annotation fields
+      await solver.solveCraftingGoal('stick', [], mcData, ['furnace'], {
+        mode: 'local_only',
+        nowTicks: 1000,
+      });
+
+      expect(service.solve).toHaveBeenCalledTimes(1);
+      const call = (service.solve as ReturnType<typeof vi.fn>).mock.calls[0];
+      const payload = call[1];
+      const rules = payload.rules as Array<Record<string, unknown>>;
+
+      for (const rule of rules) {
+        expect(rule).not.toHaveProperty('durationTicks');
+        expect(rule).not.toHaveProperty('requiresSlotType');
+      }
+
+      // Top-level temporal state fields must also stay local in local_only
+      expect(payload).not.toHaveProperty('currentTickBucket');
+      expect(payload).not.toHaveProperty('horizonBucket');
+      expect(payload).not.toHaveProperty('bucketSizeTicks');
+      expect(payload).not.toHaveProperty('slots');
+    });
+
+    it('rule durationTicks and requiresSlotType never leak in sterling_temporal mode', async () => {
+      // Even in sterling_temporal mode, temporal fields on rules stay local.
+      // Only the top-level temporal state fields are sent to Sterling.
+      await solver.solveCraftingGoal('stick', [], mcData, ['furnace'], {
+        mode: 'sterling_temporal',
+        nowTicks: 1000,
+      });
+
+      expect(service.solve).toHaveBeenCalledTimes(1);
+      const call = (service.solve as ReturnType<typeof vi.fn>).mock.calls[0];
+      const payload = call[1];
+      const rules = payload.rules as Array<Record<string, unknown>>;
+
+      for (const rule of rules) {
+        expect(rule).not.toHaveProperty('durationTicks');
+        expect(rule).not.toHaveProperty('requiresSlotType');
+      }
+    });
+  });
+
+  // ===========================================================================
   // A.1: Composite goal test — wire format supports multi-item goals
   // ===========================================================================
 

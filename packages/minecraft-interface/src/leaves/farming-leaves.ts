@@ -280,8 +280,8 @@ export class TillSoilLeaf implements LeafImpl {
       // Equip the hoe
       await bot.equip(hoe, 'hand');
 
-      // Till the soil
-      await bot.dig(block);
+      // Till the soil by right-clicking (activating) the block with hoe equipped
+      await bot.activateBlock(block);
 
       return {
         status: 'success',

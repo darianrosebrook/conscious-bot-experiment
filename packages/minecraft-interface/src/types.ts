@@ -231,7 +231,13 @@ export type MinecraftActionType =
   | 'explore_item_properties'
   | 'gather'
   | 'move_to'
-  | 'scan_environment';
+  | 'scan_environment'
+  | 'smelt'
+  | 'smelt_item'
+  | 'prepare_site'
+  | 'build_module'
+  | 'place_feature'
+  | 'place_workstation';
 
 export interface MinecraftAction {
   type: MinecraftActionType;

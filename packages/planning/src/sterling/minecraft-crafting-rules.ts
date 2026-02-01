@@ -162,12 +162,15 @@ export function buildCraftingRules(
  * Convert a Mineflayer-style inventory array to a Record<string, number> map.
  */
 export function inventoryToRecord(
-  items: Array<{ name: string; count: number } | null | undefined>
+  items: Array<{ name?: string; type?: string; count: number } | null | undefined>
 ): Record<string, number> {
   const record: Record<string, number> = {};
   for (const item of items) {
-    if (!item || !item.name) continue;
-    record[item.name] = (record[item.name] || 0) + item.count;
+    if (!item) continue;
+    // MC interface returns `type`, solver tests use `name`
+    const itemName = item.name || item.type;
+    if (!itemName) continue;
+    record[itemName] = (record[itemName] || 0) + item.count;
   }
   return record;
 }

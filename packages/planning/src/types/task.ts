@@ -6,6 +6,7 @@
  */
 
 import type { TaskStep } from './task-step';
+import type { GoalBinding } from '../goals/goal-binding-types';
 
 export type { TaskStep } from './task-step';
 
@@ -61,6 +62,12 @@ export interface Task {
     titleDisplay?: string;
     /** Tag-stripped display description (computed on read if missing) */
     descriptionDisplay?: string;
+    /**
+     * Goal binding — join key between Goal (strategic intent) and Task (execution).
+     * Present only on goal-bound tasks. Non-goal tasks leave this undefined.
+     * @see docs/internal/goal-binding-protocol.md
+     */
+    goalBinding?: GoalBinding;
     /**
      * Solver-produced metadata namespace.
      * All solver outputs (Rig G signals, building plan IDs, Rig E macro data, etc.)

@@ -24,6 +24,14 @@ import { createMacroEdgeSession, finalizeSession } from '../hierarchical/macro-s
 import type { FeedbackStore } from '../hierarchical/feedback';
 import type { MicroOutcome } from '../hierarchical/macro-state';
 
+export interface StepGenerationResult {
+  steps: TaskStep[];
+  noStepsReason?: 'no-requirement' | 'unplannable' | 'solver-error' | 'solver-unsolved'
+    | 'context-unavailable' | 'compiler-empty' | 'blocked-sentinel';
+  route?: { backend: string; requiredRig: string | null; reason: string };
+  planId?: string;
+}
+
 export interface SterlingPlannerOptions {
   /** HTTP get for Minecraft interface (path, opts) => Response */
   minecraftGet: (
@@ -35,6 +43,8 @@ export interface SterlingPlannerOptions {
 function deriveLeafArgs(
   meta: Record<string, unknown>
 ): Record<string, unknown> | undefined {
+  // Skip degraded steps — don't manufacture nonsense args from empty produces/consumes
+  if (meta.degraded) return undefined;
   const leaf = meta.leaf as string | undefined;
   if (!leaf) return undefined;
   const produces =
@@ -54,6 +64,10 @@ function deriveLeafArgs(
     case 'smelt': {
       const consumed = consumes[0];
       return { input: consumed?.name || 'unknown' };
+    }
+    case 'place_workstation': {
+      const workstation = (meta.workstation as string) || 'crafting_table';
+      return { workstation };
     }
     case 'place_block': {
       const consumed = consumes[0];
@@ -186,13 +200,14 @@ export class SterlingPlanner {
 
     if (macroPlan.edges.length === 0) {
       // Already at goal — generate micro steps directly
-      const steps = await this.generateDynamicSteps(taskData);
-      return { kind: 'ok', value: { steps, macroPlan } };
+      const result = await this.generateDynamicSteps(taskData);
+      return { kind: 'ok', value: { steps: result.steps, macroPlan } };
     }
 
     // For now, generate steps for the first macro edge
     const currentEdge = macroPlan.edges[0];
-    const steps = await this.generateDynamicSteps(taskData);
+    const result = await this.generateDynamicSteps(taskData);
+    const steps = result.steps;
 
     return {
       kind: 'ok',
@@ -311,58 +326,67 @@ export class SterlingPlanner {
     }
   }
 
-  async generateDynamicSteps(taskData: Partial<Task>): Promise<TaskStep[]> {
+  async generateDynamicSteps(taskData: Partial<Task>): Promise<StepGenerationResult> {
     const requirement = resolveRequirement(taskData);
     const route = routeActionPlan(requirement);
+    const routeInfo = { backend: route.backend, requiredRig: route.requiredRig, reason: route.reason };
     console.log('[PlanRoute]', {
-      backend: route.backend,
-      rig: route.requiredRig,
-      reason: route.reason,
+      ...routeInfo,
       taskTitle: taskData.title,
     });
 
     if (route.backend === 'unplannable') {
-      return [];
+      const reason = route.reason === 'no-requirement' ? 'no-requirement' as const : 'unplannable' as const;
+      return { steps: [], noStepsReason: reason, route: routeInfo };
     }
 
     if (route.backend === 'compiler') {
-      return this.generateLeafMappedSteps(taskData);
+      const steps = this.generateLeafMappedSteps(taskData);
+      if (steps.length === 0) {
+        return { steps: [], noStepsReason: 'compiler-empty', route: routeInfo };
+      }
+      return { steps, route: routeInfo };
     }
 
     if (this.toolProgressionSolver && route.requiredRig === 'B') {
       try {
         const steps =
           await this.generateToolProgressionStepsFromSterling(taskData);
-        if (steps && steps.length > 0) return steps;
+        if (steps && steps.length > 0) return { steps, route: routeInfo };
       } catch (error) {
         console.warn(
           'Sterling tool progression solver failed, falling through:',
           error
         );
+        return { steps: [], noStepsReason: 'solver-error', route: routeInfo };
       }
     }
 
     if (this.craftingSolver && route.requiredRig === 'A') {
       try {
         const steps = await this.generateStepsFromSterling(taskData);
-        if (steps && steps.length > 0) return steps;
+        if (steps && steps.length > 0) return { steps, route: routeInfo };
+        return { steps: [], noStepsReason: 'solver-unsolved', route: routeInfo };
       } catch (error) {
         console.warn(
           'Sterling crafting solver failed, falling through:',
           error
         );
+        return { steps: [], noStepsReason: 'solver-error', route: routeInfo };
       }
     }
 
     if (this.buildingSolver && route.requiredRig === 'G') {
       try {
         const steps = await this.generateBuildingStepsFromSterling(taskData);
-        if (steps && steps.length > 0) return steps;
+        if (steps && steps.length > 0) return { steps, route: routeInfo };
+        return { steps: [], noStepsReason: 'solver-unsolved', route: routeInfo };
       } catch (error) {
         console.warn(
           'Sterling building solver failed, falling through:',
           error
         );
+        return { steps: [], noStepsReason: 'solver-error', route: routeInfo };
       }
     }
 
@@ -387,7 +411,7 @@ export class SterlingPlanner {
                 macroPlanDigest: macroPlan?.planDigest,
               },
             }));
-            if (taggedSteps.length > 0) return taggedSteps;
+            if (taggedSteps.length > 0) return { steps: taggedSteps, route: routeInfo };
           }
           // Hierarchical planner returned blocked — capture reason for sentinel
           if (decision.kind === 'blocked') {
@@ -409,20 +433,24 @@ export class SterlingPlanner {
       const blockedReason = !this.isHierarchicalConfigured
         ? 'rig_e_solver_unimplemented'
         : (rigEBlockedReason ?? 'rig_e_no_plan_found');
-      return [{
-        id: `step-blocked-rig-e-${taskData.id || 'unknown'}`,
-        label: `[BLOCKED] Rig E: ${blockedReason}`,
-        done: false,
-        order: 1,
-        meta: {
-          blocked: true,
-          blockedReason,
-          requiredRig: 'E',
-        },
-      }];
+      return {
+        steps: [{
+          id: `step-blocked-rig-e-${taskData.id || 'unknown'}`,
+          label: `[BLOCKED] Rig E: ${blockedReason}`,
+          done: false,
+          order: 1,
+          meta: {
+            blocked: true,
+            blockedReason,
+            requiredRig: 'E',
+          },
+        }],
+        noStepsReason: 'blocked-sentinel',
+        route: routeInfo,
+      };
     }
 
-    return [];
+    return { steps: [], route: routeInfo };
   }
 
   private generateLeafMappedSteps(taskData: Partial<Task>): TaskStep[] {
@@ -496,6 +524,13 @@ export class SterlingPlanner {
     if (result.planId) {
       ensureSolverMeta(taskData).craftingPlanId = result.planId;
     }
+    if (result.mappingDegraded) {
+      const solverMeta = ensureSolverMeta(taskData);
+      solverMeta.mappingDegraded = true;
+      solverMeta.noActionLabelEdges = result.noActionLabelEdges;
+      solverMeta.unmatchedRuleEdges = result.unmatchedRuleEdges;
+      solverMeta.searchEdgeCollisions = result.searchEdgeCollisions;
+    }
 
     if (!result.solved) return [];
 
@@ -551,6 +586,13 @@ export class SterlingPlanner {
 
     if (result.planId) {
       ensureSolverMeta(taskData).toolProgressionPlanId = result.planId;
+    }
+    if (result.mappingDegraded) {
+      const solverMeta = ensureSolverMeta(taskData);
+      solverMeta.mappingDegraded = true;
+      solverMeta.noActionLabelEdges = result.noActionLabelEdges;
+      solverMeta.unmatchedRuleEdges = result.unmatchedRuleEdges;
+      solverMeta.searchEdgeCollisions = result.searchEdgeCollisions;
     }
 
     if (!result.solved) return [];

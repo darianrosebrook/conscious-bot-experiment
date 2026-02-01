@@ -31,3 +31,6 @@ export type {
   InvariantEvidence,
   ExtensionEvidence,
 } from './capability-proof-manifest';
+
+export { runP03ConformanceSuite } from './p03/index';
+export type { P03ConformanceConfig } from './p03/index';

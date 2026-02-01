@@ -426,28 +426,23 @@ All templates provided in `RIG_DOCUMENTATION_ENRICHMENT_GUIDE.md`:
 
 ---
 
-### Current state
+### Current state (updated 2026-02-01)
 
-- **Enriched rigs**: 3 of 12 (Rig A ✅, Rig B ✅, Rig I-ext ✅)
-- **Track 1 progress**: 67% (2/3 complete)
-- **Track 2 progress**: 33% (1/3 complete)
-- **Needs enrichment**: 9 of 12
+- **Enriched rigs**: 12 of 12 (all tracks complete)
+- **Track 1 progress**: 100% enriched; Rigs A+B DONE, Rig C temporal enrichment layer built (FurnaceSchedulingSolver C.1–C.7 remain)
+- **Track 2 progress**: 100% enriched; implementation not started
+- **Track 3 progress**: 100% enriched; implementation not started
 
 ---
 
-### To unblock implementation
+### Implementation status
 
-**Critical path**: ~~16-20~~ **13-16 hours** of documentation work (updated 2026-01-31)
+All enrichment work is complete. No documentation blockers remain.
 
-- ~~Track 1 (A, C): 7-9 hours~~ **Track 1 (C only): 4-5 hours** → Sterling P1-P3 ready
-- Track 2 (I, J): 9-11 hours → Observation spam fix ready
-
-**Progress**:
-- ✅ Rig A enrichment complete (2026-01-31)
-- 🔴 Rig C enrichment remaining (4-5 hours) — **NEXT PRIORITY**
-- Track 1 is 67% complete; only Rig C blocks Track 1 implementation
-
-**Benefit**: Parallel, unambiguous implementation across Sterling + conscious-bot teams
+**Implementation progress** (as of 2026-02-01):
+- ✅ Rigs A+B: DONE (certified with transfer tests)
+- ✅ Rig C: Temporal enrichment layer built + 49-test e2e suite committed; FurnaceSchedulingSolver (C.1–C.7) is next
+- Tracks 2+3: Enriched, ready for implementation
 
 ---
 
@@ -486,10 +481,9 @@ Documentation enrichment is **DONE** when:
 
 ---
 
-**Next action**: ~~Assign Track 1 enrichment (Rigs A, C)~~ **Enrich Rig C (4-5 hours)** to complete Track 1 and unblock Sterling P1-P3 implementation.
+**Next action**: Implement Rig C FurnaceSchedulingSolver (C.1–C.7) to complete Track 1 certification.
 
-**Latest update (2026-01-31)**:
-- ✅ Rig A enrichment complete
-- Rig A now has: 3 code anchor sections, 5 pivots, 3 transfer surfaces, 12 test cases, implementation files summary
-- Critical path reduced from 16-20h to 13-16h
-- Track 1 is one rig away from implementation-ready
+**Latest update (2026-02-01)**:
+- ✅ All 12 rigs enriched (documentation phase complete)
+- ✅ Rig C temporal enrichment layer built and tested (49 e2e tests)
+- FurnaceSchedulingSolver (C.1–C.7) is the remaining work before Track 1 is fully certified

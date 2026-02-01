@@ -46,6 +46,28 @@ describe('validateLeafArgs', () => {
     expect(validateLeafArgs('place_block', {})).toBe('place_block requires item (string)');
   });
 
+  it('accepts valid place_workstation args', () => {
+    expect(validateLeafArgs('place_workstation', { workstation: 'crafting_table' })).toBeNull();
+  });
+
+  it('accepts place_workstation with furnace', () => {
+    expect(validateLeafArgs('place_workstation', { workstation: 'furnace' })).toBeNull();
+  });
+
+  it('accepts place_workstation with blast_furnace', () => {
+    expect(validateLeafArgs('place_workstation', { workstation: 'blast_furnace' })).toBeNull();
+  });
+
+  it('rejects place_workstation without workstation', () => {
+    expect(validateLeafArgs('place_workstation', {})).toBe('place_workstation requires workstation (string)');
+  });
+
+  it('rejects place_workstation with unknown workstation', () => {
+    expect(validateLeafArgs('place_workstation', { workstation: 'diamond_block' })).toBe(
+      "place_workstation: unknown workstation 'diamond_block'"
+    );
+  });
+
   it('accepts valid build_module args', () => {
     expect(validateLeafArgs('build_module', { moduleId: 'basic_shelter_5x5' })).toBeNull();
   });
@@ -190,13 +212,13 @@ describe('requirementToLeafMeta', () => {
 });
 
 describe('KNOWN_LEAVES', () => {
-  it('contains all 11 expected leaf names', () => {
+  it('contains all 12 expected leaf names', () => {
     const expected = [
-      'dig_block', 'craft_recipe', 'smelt', 'place_block', 'build_module',
-      'acquire_material', 'replan_building', 'replan_exhausted',
+      'dig_block', 'craft_recipe', 'smelt', 'place_block', 'place_workstation',
+      'build_module', 'acquire_material', 'replan_building', 'replan_exhausted',
       'prepare_site', 'place_feature', 'building_step',
     ];
-    expect(KNOWN_LEAVES.size).toBe(11);
+    expect(KNOWN_LEAVES.size).toBe(12);
     for (const leaf of expected) {
       expect(KNOWN_LEAVES.has(leaf)).toBe(true);
     }

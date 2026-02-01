@@ -25,6 +25,53 @@ import { parseSearchHealth } from './search-health';
 
 import type { TaskStep } from '../types/task-step';
 
+// ── Leaf routing (single source of truth) ────────────────────────
+import {
+  actionTypeToLeaf,
+  parsePlaceAction,
+  derivePlaceMeta,
+  estimateDuration as sharedEstimateDuration,
+} from './leaf-routing';
+import { extractActionName, type MappingDegradation } from './label-utils';
+
+// ── Temporal integration (Rig C) ─────────────────────────────────
+import type { TemporalMode, TemporalEnrichment } from '../temporal/temporal-enrichment';
+import { computeTemporalEnrichment } from '../temporal/temporal-enrichment';
+import { P03ReferenceAdapter } from './primitives/p03/p03-reference-adapter';
+import { MINECRAFT_BUCKET_SIZE_TICKS, HORIZON_BUCKETS, MAX_WAIT_BUCKETS } from '../temporal/time-state';
+
+/** Frozen singleton — returned by batchHint when mode='off'. */
+const NO_BATCH: Readonly<{ useBatch: false }> = Object.freeze({ useBatch: false });
+
+/**
+ * Static inert enrichment for mode='off' — avoids any temporal code paths.
+ * enrichRule returns the input rule reference (no copy); safe because the
+ * solver treats rules as readonly after buildCraftingRules returns.
+ * batchHint returns a frozen singleton to avoid per-call allocation.
+ */
+const INERT_ENRICHMENT: TemporalEnrichment = Object.freeze({
+  mode: 'off' as const,
+  enrichRule: (rule: Readonly<MinecraftCraftingRule>) => rule,
+  batchHint: () => NO_BATCH,
+});
+
+/** Options for temporal enrichment in solveCraftingGoal. */
+export interface CraftingTemporalOptions {
+  /** Temporal mode. Default: 'off'. */
+  mode: TemporalMode;
+  /** Current time in game ticks (required when mode !== 'off'). */
+  nowTicks?: number;
+  /** Observed resource slots (optional; inferred from nearbyBlocks if absent). */
+  slotsObserved?: import('./primitives/p03/p03-capsule-types').P03ResourceSlotV1[];
+}
+
+/** Internal result from mapSolutionToSteps with optional degradation metadata. */
+interface StepMappingResult {
+  steps: MinecraftSolveStep[];
+  /** Present only when mapping encountered any anomaly. */
+  mapping?: MappingDegradation;
+}
+
 // ============================================================================
 // Solver
 // ============================================================================
@@ -32,6 +79,21 @@ import type { TaskStep } from '../types/task-step';
 export class MinecraftCraftingSolver extends BaseDomainSolver<MinecraftCraftingSolveResult> {
   readonly sterlingDomain = 'minecraft' as const;
   readonly solverId = 'minecraft.crafting';
+
+  /**
+   * When true, a successful solve with degraded step mapping (unknown-* steps)
+   * is treated as a failure: `solved` flips to false and `steps` is emptied.
+   * Default: false (best-effort + observability).
+   *
+   * Enablement: Not wired to configuration yet. Intended to be toggled via
+   * env var (e.g. STERLING_STRICT_MAPPING=1) or solver registry config once
+   * the label contract is stable in production. Enable in tests with
+   * `solver.strictMapping = true`.
+   */
+  strictMapping = false;
+
+  /** Shared temporal adapter — initialized once, reused across solves. */
+  private readonly temporalAdapter = new P03ReferenceAdapter(MAX_WAIT_BUCKETS, 8);
 
   protected makeUnavailableResult(): MinecraftCraftingSolveResult {
     return {
@@ -50,12 +112,14 @@ export class MinecraftCraftingSolver extends BaseDomainSolver<MinecraftCraftingS
    * @param currentInventory - Bot's current inventory items
    * @param mcData         - minecraft-data instance
    * @param nearbyBlocks   - Block names the bot can see/reach
+   * @param temporalOptions - Temporal enrichment options (default: mode='off')
    */
   async solveCraftingGoal(
     goalItem: string,
     currentInventory: Array<{ name: string; count: number } | null | undefined>,
     mcData: any,
-    nearbyBlocks: string[] = []
+    nearbyBlocks: string[] = [],
+    temporalOptions?: CraftingTemporalOptions,
   ): Promise<MinecraftCraftingSolveResult> {
     if (!this.isAvailable()) return this.makeUnavailableResult();
 
@@ -77,7 +141,22 @@ export class MinecraftCraftingSolver extends BaseDomainSolver<MinecraftCraftingS
     // 3. Build goal
     const goal: Record<string, number> = { [goalItem]: 1 };
 
-    // 3a. Preflight lint + bundle input capture
+    // 3a. Temporal enrichment (Rig C) — sole entrypoint
+    const temporalMode = temporalOptions?.mode ?? 'off';
+    const enrichment = this.computeEnrichment(temporalMode, temporalOptions, rules, nearbyBlocks);
+
+    // 3b. Pre-solve deadlock check (when temporal mode is active)
+    if (enrichment.deadlock?.isDeadlock) {
+      return {
+        solved: false,
+        steps: [],
+        totalNodes: 0,
+        durationMs: 0,
+        error: `Temporal deadlock: ${enrichment.deadlock.reason ?? 'capacity deadlock detected'}`,
+      };
+    }
+
+    // 3c. Preflight lint + bundle input capture
     const maxNodes = 5000;
     const compatReport = lintRules(rules);
     const rationaleCtx = buildDefaultRationaleContext({ compatReport, maxNodes });
@@ -95,8 +174,8 @@ export class MinecraftCraftingSolver extends BaseDomainSolver<MinecraftCraftingS
       );
     }
 
-    // 4. Call Sterling
-    const result = await this.sterlingService.solve(this.sterlingDomain, {
+    // 4. Build Sterling payload — temporal fields only in sterling_temporal mode
+    const solvePayload: Record<string, unknown> = {
       contractVersion: this.contractVersion,
       solverId: this.solverId,
       inventory,
@@ -105,7 +184,16 @@ export class MinecraftCraftingSolver extends BaseDomainSolver<MinecraftCraftingS
       rules,
       maxNodes,
       useLearning: true,
-    });
+    };
+
+    if (temporalMode === 'sterling_temporal' && enrichment.temporalState) {
+      solvePayload.currentTickBucket = enrichment.temporalState.time.currentBucket;
+      solvePayload.horizonBucket = enrichment.temporalState.time.horizonBucket;
+      solvePayload.bucketSizeTicks = enrichment.temporalState.time.bucketSizeTicks;
+      solvePayload.slots = enrichment.temporalState.slots;
+    }
+
+    const result = await this.sterlingService.solve(this.sterlingDomain, solvePayload);
 
     // 5. Extract planId — returned in the result for caller to store in task metadata
     const planId = this.extractPlanId(result);
@@ -135,7 +223,7 @@ export class MinecraftCraftingSolver extends BaseDomainSolver<MinecraftCraftingS
       };
     }
 
-    const steps = this.mapSolutionToSteps(result, rules);
+    const { steps, mapping } = this.mapSolutionToSteps(result, rules);
 
     const bundleOutput = computeBundleOutput({
       planId,
@@ -149,6 +237,25 @@ export class MinecraftCraftingSolver extends BaseDomainSolver<MinecraftCraftingS
     });
     const solveBundle = createSolveBundle(bundleInput, bundleOutput, compatReport);
 
+    // Strict mode: treat degraded mapping as a solve failure
+    if (this.strictMapping && mapping?.degraded) {
+      return {
+        solved: false,
+        steps: [],
+        totalNodes: result.discoveredNodes.length,
+        durationMs: result.durationMs,
+        planId,
+        solveMeta: { bundles: [solveBundle] },
+        mappingDegraded: true,
+        noActionLabelEdges: mapping.noLabelEdges,
+        unmatchedRuleEdges: mapping.unmatchedRuleEdges,
+        searchEdgeCollisions: mapping.searchEdgeCollisions,
+        error: `Step mapping degraded: ${mapping.noLabelEdges} edges without label, `
+          + `${mapping.unmatchedRuleEdges} unmatched rules, `
+          + `${mapping.searchEdgeCollisions} search-edge collisions`,
+      };
+    }
+
     return {
       solved: true,
       steps,
@@ -156,6 +263,10 @@ export class MinecraftCraftingSolver extends BaseDomainSolver<MinecraftCraftingS
       durationMs: result.durationMs,
       planId,
       solveMeta: { bundles: [solveBundle] },
+      mappingDegraded: mapping?.degraded,
+      noActionLabelEdges: mapping?.noLabelEdges,
+      unmatchedRuleEdges: mapping?.unmatchedRuleEdges,
+      searchEdgeCollisions: mapping?.searchEdgeCollisions,
     };
   }
 
@@ -176,11 +287,13 @@ export class MinecraftCraftingSolver extends BaseDomainSolver<MinecraftCraftingS
       estimatedDuration: this.estimateDuration(step.actionType),
       meta: {
         domain: 'crafting',
-        leaf: this.actionTypeToLeaf(step.actionType),
+        leaf: this.actionTypeToLeaf(step.actionType, step.action),
         action: step.action,
         actionType: step.actionType,
         produces: step.produces,
         consumes: step.consumes,
+        ...(step.actionType === 'place' ? derivePlaceMeta(step.action) : {}),
+        ...(step.degraded ? { degraded: true, degradedReason: step.degradedReason } : {}),
       },
     }));
   }
@@ -212,44 +325,91 @@ export class MinecraftCraftingSolver extends BaseDomainSolver<MinecraftCraftingS
   // --------------------------------------------------------------------------
 
   /**
+   * Compute temporal enrichment via the single entrypoint.
+   * Short-circuits to static INERT_ENRICHMENT when mode is 'off' —
+   * no adapter allocation, no temporal code paths executed.
+   */
+  private computeEnrichment(
+    mode: TemporalMode,
+    options: CraftingTemporalOptions | undefined,
+    rules: readonly MinecraftCraftingRule[],
+    nearbyBlocks: readonly string[],
+  ): TemporalEnrichment {
+    if (mode === 'off') return INERT_ENRICHMENT;
+
+    return computeTemporalEnrichment({
+      mode,
+      adapter: this.temporalAdapter,
+      stateInput: {
+        nowTicks: options?.nowTicks ?? 0,
+        slotsObserved: options?.slotsObserved,
+        nearbyBlocks,
+        bucketSizeTicks: MINECRAFT_BUCKET_SIZE_TICKS,
+        horizonBuckets: HORIZON_BUCKETS,
+      },
+      rules,
+    });
+  }
+
+  /**
    * Map Sterling's solution path edges back to MinecraftSolveStep[].
    *
    * Each edge in the solution path has source/target as inventory state hashes
-   * and an implicit action label. We match edges to rules via the search_edge
-   * labels collected during solve.
+   * and an action label. Sterling's Python server emits labels as strings
+   * (the rule action name directly, e.g. "craft:oak_planks"). We also
+   * cross-reference search_edge labels as a fallback for older servers that
+   * may not emit labels on solution_path edges.
    */
   private mapSolutionToSteps(
     result: import('@conscious-bot/core').SterlingSolveResult,
     rules: MinecraftCraftingRule[]
-  ): MinecraftSolveStep[] {
+  ): StepMappingResult {
     const rulesByAction = new Map<string, MinecraftCraftingRule>();
     for (const rule of rules) {
       rulesByAction.set(rule.action, rule);
     }
 
-    // Build a lookup from (source, target) → edge label from search edges
-    const edgeLabelMap = new Map<string, Record<string, unknown>>();
+    // Build a lookup from (source, target) → action name from search edges.
+    // Keep the first entry for each key; count collisions (same key, different action).
+    const edgeActionMap = new Map<string, string>();
+    let searchEdgeCollisions = 0;
     for (const edge of result.searchEdges) {
-      edgeLabelMap.set(`${edge.source}->${edge.target}`, edge.label);
+      const actionName = extractActionName(edge.label);
+      if (actionName) {
+        const key = `${edge.source}->${edge.target}`;
+        const existing = edgeActionMap.get(key);
+        if (existing !== undefined) {
+          if (existing !== actionName) searchEdgeCollisions++;
+        } else {
+          edgeActionMap.set(key, actionName);
+        }
+      }
     }
 
     const steps: MinecraftSolveStep[] = [];
     let currentInventory: Record<string, number> = {};
+    let noLabelEdges = 0;
+    let unmatchedRuleEdges = 0;
 
     for (const pathEdge of result.solutionPath) {
-      const edgeKey = `${pathEdge.source}->${pathEdge.target}`;
-      const label = edgeLabelMap.get(edgeKey);
-      const actionName = (label?.action as string) || (label?.label as string) || '';
+      // Priority: solution_path label > search_edge lookup
+      const fromPathLabel = extractActionName(pathEdge.label);
+      const fromSearchEdge = edgeActionMap.get(`${pathEdge.source}->${pathEdge.target}`);
+      const actionName = fromPathLabel || fromSearchEdge || '';
 
       const rule = rulesByAction.get(actionName);
       if (!rule) {
-        // If we can't map the edge to a rule, create a generic step
+        const reason = !actionName ? 'no_label' as const : 'unmatched_rule' as const;
+        if (reason === 'no_label') noLabelEdges++;
+        else unmatchedRuleEdges++;
         steps.push({
           action: actionName || `unknown-${steps.length}`,
           actionType: 'craft',
           produces: [],
           consumes: [],
           resultingInventory: { ...currentInventory },
+          degraded: true,
+          degradedReason: reason,
         });
         continue;
       }
@@ -275,20 +435,21 @@ export class MinecraftCraftingSolver extends BaseDomainSolver<MinecraftCraftingS
       });
     }
 
-    return steps;
+    const degraded = noLabelEdges > 0 || unmatchedRuleEdges > 0 || searchEdgeCollisions > 0;
+    return {
+      steps,
+      mapping: degraded
+        ? { degraded: true, noLabelEdges, unmatchedRuleEdges, searchEdgeCollisions }
+        : undefined,
+    };
   }
 
   /**
    * Map action type to the corresponding BT leaf name.
+   * Delegates to shared leaf-routing module (single source of truth).
    */
-  private actionTypeToLeaf(actionType: string): string {
-    switch (actionType) {
-      case 'mine': return 'dig_block';
-      case 'craft': return 'craft_recipe';
-      case 'smelt': return 'smelt';
-      case 'place': return 'place_block';
-      default: return actionType;
-    }
+  private actionTypeToLeaf(actionType: string, action?: string): string {
+    return actionTypeToLeaf(actionType, action);
   }
 
   /**
@@ -311,8 +472,12 @@ export class MinecraftCraftingSolver extends BaseDomainSolver<MinecraftCraftingS
         return `Leaf: minecraft.smelt (item=${output?.name ?? 'unknown'})`;
       }
       case 'place': {
-        const consumed = step.consumes[0];
-        return `Leaf: minecraft.place_block (blockType=${consumed?.name ?? 'unknown'})`;
+        const item = parsePlaceAction(step.action) ?? step.consumes[0]?.name ?? 'unknown';
+        const leaf = this.actionTypeToLeaf(step.actionType, step.action);
+        if (leaf === 'place_workstation') {
+          return `Leaf: minecraft.place_workstation (workstation=${item})`;
+        }
+        return `Leaf: minecraft.place_block (blockType=${item})`;
       }
       default:
         return `Leaf: minecraft.${step.action}`;
@@ -321,19 +486,9 @@ export class MinecraftCraftingSolver extends BaseDomainSolver<MinecraftCraftingS
 
   /**
    * Estimate duration in ms based on action type.
+   * Delegates to shared leaf-routing module.
    */
   private estimateDuration(actionType: string): number {
-    switch (actionType) {
-      case 'mine':
-        return 5000;
-      case 'craft':
-        return 2000;
-      case 'smelt':
-        return 15000;
-      case 'place':
-        return 1000;
-      default:
-        return 3000;
-    }
+    return sharedEstimateDuration(actionType);
   }
 }

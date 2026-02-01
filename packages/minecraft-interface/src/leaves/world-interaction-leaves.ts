@@ -1106,6 +1106,42 @@ export class BuildStructureLeaf implements LeafImpl {
     }
   }
 
+  /**
+   * Place a block at the given air position by finding an adjacent solid
+   * reference block and calling bot.placeBlock(refBlock, faceVec).
+   * Returns true if placed, false if no valid reference found.
+   */
+  private async placeBlockAtPos(
+    bot: Bot,
+    blockPos: Vec3,
+    material: string
+  ): Promise<boolean> {
+    const materialItem = bot.inventory
+      .items()
+      .find((item: any) => item.name === material);
+    if (!materialItem) return false;
+
+    const faceOffsets: Array<{ offset: Vec3; face: Vec3 }> = [
+      { offset: new Vec3(0, -1, 0), face: new Vec3(0, 1, 0) },
+      { offset: new Vec3(0, 1, 0), face: new Vec3(0, -1, 0) },
+      { offset: new Vec3(1, 0, 0), face: new Vec3(-1, 0, 0) },
+      { offset: new Vec3(-1, 0, 0), face: new Vec3(1, 0, 0) },
+      { offset: new Vec3(0, 0, 1), face: new Vec3(0, 0, -1) },
+      { offset: new Vec3(0, 0, -1), face: new Vec3(0, 0, 1) },
+    ];
+
+    for (const { offset, face } of faceOffsets) {
+      const refPos = blockPos.plus(offset);
+      const refBlock = bot.blockAt(refPos);
+      if (refBlock && refBlock.boundingBox === 'block') {
+        await bot.equip(materialItem, 'hand');
+        await bot.placeBlock(refBlock, face);
+        return true;
+      }
+    }
+    return false;
+  }
+
   private calculateBlocksNeeded(
     structureType: string,
     dimensions: any
@@ -1158,11 +1194,7 @@ export class BuildStructureLeaf implements LeafImpl {
             block.name === 'air' ||
             block.name.includes('tall_grass')
           ) {
-            const materialItem = bot.inventory
-              .items()
-              .find((item) => item.name === material);
-            if (materialItem) {
-              await bot.placeBlock(block as any, new Vec3(0, -1, 0));
+            if (await this.placeBlockAtPos(bot, blockPos, material)) {
               blocksPlaced++;
             }
           }
@@ -1192,11 +1224,7 @@ export class BuildStructureLeaf implements LeafImpl {
             const block = bot.blockAt(blockPos);
 
             if (!block || block.name === 'air') {
-              const materialItem = bot.inventory
-                .items()
-                .find((item) => item.name === material);
-              if (materialItem) {
-                await bot.placeBlock(block as any, new Vec3(0, -1, 0));
+              if (await this.placeBlockAtPos(bot, blockPos, material)) {
                 blocksPlaced++;
               }
             }
@@ -1224,11 +1252,7 @@ export class BuildStructureLeaf implements LeafImpl {
         const block = bot.blockAt(blockPos);
 
         if (!block || block.name === 'air') {
-          const materialItem = bot.inventory
-            .items()
-            .find((item) => item.name === material);
-          if (materialItem) {
-            await bot.placeBlock(block as any, new Vec3(0, -1, 0));
+          if (await this.placeBlockAtPos(bot, blockPos, material)) {
             blocksPlaced++;
           }
         }
@@ -1254,11 +1278,7 @@ export class BuildStructureLeaf implements LeafImpl {
         const block = bot.blockAt(blockPos);
 
         if (!block || block.name === 'air') {
-          const materialItem = bot.inventory
-            .items()
-            .find((item) => item.name === material);
-          if (materialItem) {
-            await bot.placeBlock(block as any, new Vec3(0, -1, 0));
+          if (await this.placeBlockAtPos(bot, blockPos, material)) {
             blocksPlaced++;
           }
         }

@@ -93,6 +93,67 @@ Planning `POST /task` returns `{ success, taskId, message, timestamp }`. The Cog
 
 ---
 
+## Action dispatch boundary (minecraft-interface)
+
+When a task reaches the Minecraft interface for execution, the action type must pass through the `/action` endpoint's dispatch logic. This section documents the dispatch architecture.
+
+### Dispatch flow
+
+```
+mapBTActionToMinecraft(leafName, args)     mapTaskTypeToMinecraftAction(task)
+         │                                            │
+         └─────────── { type, parameters } ───────────┘
+                              │
+                    POST /action endpoint
+                              │
+                   actionTranslator.executeAction()
+                              │
+                  ┌───────────┴───────────┐
+                  │  LeafFactory-first     │
+                  │  (ACTION_TYPE_TO_LEAF  │
+                  │   normalization)       │
+                  └───────────┬───────────┘
+                              │
+                   ┌──── leaf found? ────┐
+                   │ yes (non-placeholder)│ no / placeholder
+                   │                      │
+              leaf.run()           hardcoded switch
+                                  (navigate, wait,
+                                   scan_environment, ...)
+```
+
+### ACTION_TYPE_TO_LEAF normalization
+
+The `ACTION_TYPE_TO_LEAF` map resolves aliases before LeafFactory lookup:
+
+| Action type (from planner) | Leaf name (in LeafFactory) |
+|---|---|
+| `craft` | `craft_recipe` |
+| `craft_item` | `craft_recipe` |
+| `smelt` | `smelt` |
+| `smelt_item` | `smelt` |
+| `prepare_site` | `prepare_site` |
+| `build_module` | `build_module` |
+| `place_feature` | `place_feature` |
+
+Types not in this map use their action type as the leaf name directly.
+
+### Known boundary gaps
+
+These BT leaf mappings emit action types that `executeAction` does not handle. They are cognitive-reflection mappings (not solver outputs) and do not block runtime execution of planned tasks.
+
+| BT leaf | Maps to action type | Status |
+|---|---|---|
+| `move_and_gather` | `gather_resources` | Not in executeAction; tracked for future cleanup |
+| `explore_area` | `move_random` | Not in executeAction; tracked for future cleanup |
+
+### Conformance tests
+
+- `packages/planning/src/__tests__/planner-action-boundary.test.ts` — Asserts every planner-emitted action type is accepted by `executeAction` (51 tests)
+- `packages/minecraft-interface/src/__tests__/action-dispatch-contract.test.ts` — Verifies dispatch mechanics: craft alias, smelt handler, building leaves, LeafFactory-first priority, placeholder fallthrough (24 tests)
+
+---
+
 ## Terminal log failures and mitigations
 
 | Log message | Cause | Mitigation |

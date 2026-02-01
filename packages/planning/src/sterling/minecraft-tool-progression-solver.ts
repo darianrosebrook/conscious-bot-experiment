@@ -47,6 +47,21 @@ import { parseSearchHealth } from './search-health';
 
 import type { TaskStep } from '../types/task-step';
 
+// ── Leaf routing (single source of truth) ────────────────────────
+import {
+  actionTypeToLeafExtended,
+  parsePlaceAction,
+  derivePlaceMeta,
+  estimateDuration as sharedEstimateDuration,
+} from './leaf-routing';
+import { extractActionName, type MappingDegradation } from './label-utils';
+
+/** Internal result from mapSolutionToSteps with optional degradation metadata. */
+interface TPStepMappingResult {
+  steps: ToolProgressionStep[];
+  mapping?: MappingDegradation;
+}
+
 // ============================================================================
 // Solver
 // ============================================================================
@@ -55,6 +70,17 @@ export class MinecraftToolProgressionSolver extends BaseDomainSolver<ToolProgres
   /** Shares the existing 'minecraft' backend handler — no backend changes */
   readonly sterlingDomain = 'minecraft' as const;
   readonly solverId = 'minecraft.tool_progression';
+
+  /**
+   * When true, a successful solve with degraded step mapping is treated as a failure.
+   * Default: false (best-effort + observability).
+   *
+   * Enablement: Not wired to configuration yet. Intended to be toggled via
+   * env var (e.g. STERLING_STRICT_MAPPING=1) or solver registry config once
+   * the label contract is stable in production. Enable in tests with
+   * `solver.strictMapping = true`.
+   */
+  strictMapping = false;
 
   protected makeUnavailableResult(): ToolProgressionSolveResult {
     return {
@@ -128,6 +154,9 @@ export class MinecraftToolProgressionSolver extends BaseDomainSolver<ToolProgres
     let totalDurationMs = 0;
     let lastPlanId: string | null = null;
     let runningTier: ToolTier | null = currentTier;
+    let totalNoLabelEdges = 0;
+    let totalUnmatchedRuleEdges = 0;
+    let totalSearchEdgeCollisions = 0;
 
     for (let i = startIdx; i <= endIdx; i++) {
       const tierGoal = TOOL_TIERS[i];
@@ -258,8 +287,13 @@ export class MinecraftToolProgressionSolver extends BaseDomainSolver<ToolProgres
       }
 
       // Map and accumulate steps
-      const tierSteps = this.mapSolutionToSteps(result, rules);
+      const { steps: tierSteps, mapping: tierMapping } = this.mapSolutionToSteps(result, rules);
       allSteps.push(...tierSteps);
+      if (tierMapping) {
+        totalNoLabelEdges += tierMapping.noLabelEdges;
+        totalUnmatchedRuleEdges += tierMapping.unmatchedRuleEdges;
+        totalSearchEdgeCollisions += tierMapping.searchEdgeCollisions;
+      }
 
       // Capture tier bundle
       const bundleOutput = computeBundleOutput({
@@ -287,6 +321,30 @@ export class MinecraftToolProgressionSolver extends BaseDomainSolver<ToolProgres
       inventory[tierToolName] = (inventory[tierToolName] || 0) + 1;
     }
 
+    const anyDegraded = totalNoLabelEdges > 0 || totalUnmatchedRuleEdges > 0 || totalSearchEdgeCollisions > 0;
+
+    // Strict mode: treat degraded mapping as a solve failure
+    if (this.strictMapping && anyDegraded) {
+      return {
+        solved: false,
+        steps: [],
+        totalNodes,
+        durationMs: totalDurationMs,
+        targetTier,
+        currentTier,
+        targetTool,
+        planId: lastPlanId,
+        solveMeta: { bundles: tierBundles },
+        mappingDegraded: true,
+        noActionLabelEdges: totalNoLabelEdges,
+        unmatchedRuleEdges: totalUnmatchedRuleEdges,
+        searchEdgeCollisions: totalSearchEdgeCollisions,
+        error: `Step mapping degraded: ${totalNoLabelEdges} edges without label, `
+          + `${totalUnmatchedRuleEdges} unmatched rules, `
+          + `${totalSearchEdgeCollisions} search-edge collisions`,
+      };
+    }
+
     return {
       solved: true,
       steps: allSteps,
@@ -297,6 +355,12 @@ export class MinecraftToolProgressionSolver extends BaseDomainSolver<ToolProgres
       targetTool,
       planId: lastPlanId,
       solveMeta: { bundles: tierBundles },
+      ...(anyDegraded ? {
+        mappingDegraded: true,
+        noActionLabelEdges: totalNoLabelEdges,
+        unmatchedRuleEdges: totalUnmatchedRuleEdges,
+        searchEdgeCollisions: totalSearchEdgeCollisions,
+      } : {}),
     };
   }
 
@@ -317,10 +381,12 @@ export class MinecraftToolProgressionSolver extends BaseDomainSolver<ToolProgres
       estimatedDuration: this.estimateDuration(step.actionType),
       meta: {
         domain: 'tool_progression',
-        leaf: this.actionTypeToLeaf(step.actionType),
+        leaf: this.actionTypeToLeaf(step.actionType, step.action),
         action: step.action,
         targetTool: result.targetTool,
         targetTier: result.targetTier,
+        ...(step.actionType === 'place' ? derivePlaceMeta(step.action) : {}),
+        ...(step.degraded ? { degraded: true, degradedReason: step.degradedReason } : {}),
       },
     }));
   }
@@ -361,34 +427,54 @@ export class MinecraftToolProgressionSolver extends BaseDomainSolver<ToolProgres
   private mapSolutionToSteps(
     result: import('@conscious-bot/core').SterlingSolveResult,
     rules: ToolProgressionRule[]
-  ): ToolProgressionStep[] {
+  ): TPStepMappingResult {
     const rulesByAction = new Map<string, ToolProgressionRule>();
     for (const rule of rules) {
       rulesByAction.set(rule.action, rule);
     }
 
-    // Build edge label lookup
-    const edgeLabelMap = new Map<string, Record<string, unknown>>();
+    // Build edge action name lookup from search edges.
+    // Keep the first entry for each key; count collisions.
+    const edgeActionMap = new Map<string, string>();
+    let searchEdgeCollisions = 0;
     for (const edge of result.searchEdges) {
-      edgeLabelMap.set(`${edge.source}->${edge.target}`, edge.label);
+      const actionName = extractActionName(edge.label);
+      if (actionName) {
+        const key = `${edge.source}->${edge.target}`;
+        const existing = edgeActionMap.get(key);
+        if (existing !== undefined) {
+          if (existing !== actionName) searchEdgeCollisions++;
+        } else {
+          edgeActionMap.set(key, actionName);
+        }
+      }
     }
 
     const steps: ToolProgressionStep[] = [];
     let currentInventory: Record<string, number> = {};
+    let noLabelEdges = 0;
+    let unmatchedRuleEdges = 0;
 
     for (const pathEdge of result.solutionPath) {
-      const edgeKey = `${pathEdge.source}->${pathEdge.target}`;
-      const label = edgeLabelMap.get(edgeKey);
-      const actionName = (label?.action as string) || (label?.label as string) || '';
+      // Priority: solution_path label > search_edge lookup
+      const actionName =
+        extractActionName(pathEdge.label) ||
+        edgeActionMap.get(`${pathEdge.source}->${pathEdge.target}`) ||
+        '';
 
       const rule = rulesByAction.get(actionName);
       if (!rule) {
+        const reason = !actionName ? 'no_label' as const : 'unmatched_rule' as const;
+        if (reason === 'no_label') noLabelEdges++;
+        else unmatchedRuleEdges++;
         steps.push({
           action: actionName || `tp:unknown-${steps.length}`,
           actionType: 'craft',
           produces: [],
           consumes: [],
           resultingInventory: filterCapTokens({ ...currentInventory }),
+          degraded: true,
+          degradedReason: reason,
         });
         continue;
       }
@@ -421,7 +507,13 @@ export class MinecraftToolProgressionSolver extends BaseDomainSolver<ToolProgres
       });
     }
 
-    return steps;
+    const degraded = noLabelEdges > 0 || unmatchedRuleEdges > 0 || searchEdgeCollisions > 0;
+    return {
+      steps,
+      mapping: degraded
+        ? { degraded: true, noLabelEdges, unmatchedRuleEdges, searchEdgeCollisions }
+        : undefined,
+    };
   }
 
   /**
@@ -446,8 +538,12 @@ export class MinecraftToolProgressionSolver extends BaseDomainSolver<ToolProgres
         return `Leaf: minecraft.smelt (item=${output?.name ?? 'unknown'})`;
       }
       case 'place': {
-        const consumed = step.consumes[0];
-        return `Leaf: minecraft.place_block (blockType=${consumed?.name ?? 'unknown'})`;
+        const item = parsePlaceAction(step.action) ?? step.consumes[0]?.name ?? 'unknown';
+        const leaf = this.actionTypeToLeaf(step.actionType, step.action);
+        if (leaf === 'place_workstation') {
+          return `Leaf: minecraft.place_workstation (workstation=${item})`;
+        }
+        return `Leaf: minecraft.place_block (blockType=${item})`;
       }
       case 'upgrade': {
         // Upgrade actions produce the tool item (first non-cap: produce)
@@ -461,36 +557,28 @@ export class MinecraftToolProgressionSolver extends BaseDomainSolver<ToolProgres
 
   /**
    * Map action type to leaf name for structured metadata.
+   * Delegates to shared leaf-routing module (single source of truth).
+   * Uses extended mapping which also handles 'upgrade' → 'craft_recipe'.
    */
-  private actionTypeToLeaf(actionType: string): string {
-    switch (actionType) {
-      case 'mine': return 'dig_block';
-      case 'craft': return 'craft_recipe';
-      case 'smelt': return 'smelt';
-      case 'place': return 'place_block';
-      case 'upgrade': return 'craft_recipe';
-      default: return actionType;
-    }
+  private actionTypeToLeaf(actionType: string, action?: string): string {
+    return actionTypeToLeafExtended(actionType, action);
   }
 
   /**
    * Estimate duration in ms based on action type.
+   * Delegates to shared leaf-routing module.
    */
   private estimateDuration(actionType: string): number {
-    switch (actionType) {
-      case 'mine': return 5000;
-      case 'craft': return 2000;
-      case 'smelt': return 15000;
-      case 'place': return 1000;
-      case 'upgrade': return 2000;
-      default: return 3000;
-    }
+    return sharedEstimateDuration(actionType);
   }
 
   /**
    * Determine which tier is blocked by missing blocks.
    */
-  private findBlockedTier(missingBlocks: string[], currentTier: ToolTier | null): ToolTier {
+  private findBlockedTier(
+    missingBlocks: string[],
+    currentTier: ToolTier | null,
+  ): ToolTier {
     // Missing stone/cobblestone -> blocked at stone tier
     if (missingBlocks.includes('stone') || missingBlocks.includes('cobblestone')) {
       return 'stone';

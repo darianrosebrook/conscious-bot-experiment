@@ -44,6 +44,15 @@ export interface MinecraftCraftingRule {
   needsFurnace: boolean;
   /** Base cost for A* heuristic (lower = preferred) */
   baseCost: number;
+
+  // ── Temporal annotations (Rig C, Phase 3A) ──────────────────────
+  // Populated by temporal enrichment when temporalMode !== 'off'.
+  // Never sent to Sterling in local_only mode.
+
+  /** Duration in ticks for this operation (from duration model). */
+  durationTicks?: number;
+  /** Slot type required, if any (from duration model). */
+  requiresSlotType?: string;
 }
 
 // ============================================================================
@@ -58,6 +67,19 @@ export interface MinecraftSolveRequest {
   rules: MinecraftCraftingRule[];      // full rule set
   maxNodes?: number;
   useLearning?: boolean;
+
+  // ── Temporal state (Rig C, Phase 3A) ────────────────────────────
+  // Only populated when temporalMode === 'sterling_temporal'.
+  // When present, Sterling can use temporal fields for scheduling.
+
+  /** Current time in integer buckets. */
+  currentTickBucket?: number;
+  /** Planning horizon in integer buckets. */
+  horizonBucket?: number;
+  /** Bucket granularity in domain ticks. */
+  bucketSizeTicks?: number;
+  /** Resource slot states with availability times. */
+  slots?: import('./primitives/p03/p03-capsule-types').P03ResourceSlotV1[];
 }
 
 /** A single step in the Sterling solution path */
@@ -67,6 +89,10 @@ export interface MinecraftSolveStep {
   produces: CraftingInventoryItem[];
   consumes: CraftingInventoryItem[];
   resultingInventory: Record<string, number>;
+  /** True when this step could not be mapped to a known rule. */
+  degraded?: boolean;
+  /** Why this step is degraded: no label found, or label didn't match any rule. */
+  degradedReason?: 'no_label' | 'unmatched_rule';
 }
 
 /** Full result from the crafting solver */
@@ -80,4 +106,12 @@ export interface MinecraftCraftingSolveResult {
   planId?: string | null;
   /** Observability metadata — does not affect solve behavior */
   solveMeta?: { bundles: import('./solve-bundle-types').SolveBundle[] };
+  /** True when step mapping encountered edges that could not be mapped to rules. */
+  mappingDegraded?: boolean;
+  /** Number of solution path edges with no action label from either source. */
+  noActionLabelEdges?: number;
+  /** Number of edges with a label that didn't match any known rule action. */
+  unmatchedRuleEdges?: number;
+  /** Number of search_edge (source,target) pairs with conflicting action names. */
+  searchEdgeCollisions?: number;
 }

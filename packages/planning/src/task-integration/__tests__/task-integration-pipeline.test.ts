@@ -364,13 +364,20 @@ describe('Rig G metadata propagation through addTask', () => {
     expect(task.metadata.solver!.buildingTemplateId).toBe('basic_shelter');
   });
 
-  it('addTask without solver namespace does not add spurious solver field', async () => {
+  it('addTask without solver namespace stores only solve observability (noStepsReason)', async () => {
     const task = await ti.addTask(makeTaskData({
       title: 'Mine some stone',
       type: 'gathering',
+      // No requirementCandidate → strict mode produces no-requirement
     }));
 
-    expect(task.metadata.solver).toBeUndefined();
+    // Solve observability is now stored even when no solver ran
+    expect(task.metadata.solver).toBeDefined();
+    expect(task.metadata.solver!.noStepsReason).toBe('no-requirement');
+    // No solver-specific fields like planId, rigG, etc.
+    expect(task.metadata.solver!.rigG).toBeUndefined();
+    expect(task.metadata.solver!.craftingPlanId).toBeUndefined();
+    expect(task.metadata.solver!.buildingPlanId).toBeUndefined();
   });
 });
 

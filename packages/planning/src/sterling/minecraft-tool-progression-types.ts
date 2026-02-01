@@ -199,6 +199,10 @@ export interface ToolProgressionStep {
   consumes: ToolProgressionItem[];
   /** Resulting inventory state (cap: tokens FILTERED OUT) */
   resultingInventory: Record<string, number>;
+  /** True when this step could not be mapped to a known rule. */
+  degraded?: boolean;
+  /** Why this step is degraded: no label found, or label didn't match any rule. */
+  degradedReason?: 'no_label' | 'unmatched_rule';
 }
 
 /** Blocks the progression plan needs but weren't observed nearby */
@@ -228,6 +232,14 @@ export interface ToolProgressionSolveResult extends BaseSolveResult {
   needsBlocks?: NeedsBlocks;
   /** Sterling planId for episode reporting */
   planId?: string | null;
+  /** True when step mapping encountered edges that could not be mapped to rules. */
+  mappingDegraded?: boolean;
+  /** Number of solution path edges with no action label from either source. */
+  noActionLabelEdges?: number;
+  /** Number of edges with a label that didn't match any known rule action. */
+  unmatchedRuleEdges?: number;
+  /** Number of search_edge (source,target) pairs with conflicting action names. */
+  searchEdgeCollisions?: number;
 }
 
 // ============================================================================

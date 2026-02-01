@@ -198,12 +198,12 @@ export class PlaceTorchIfNeededLeaf implements LeafImpl {
         };
       }
 
-      // Find a suitable placement position
-      const placementPos = await this.findTorchPlacementPosition(
+      // Find a suitable placement position with its reference block
+      const placement = await this.findTorchPlacementPosition(
         bot as BotWithPathfinder,
         targetPos
       );
-      if (!placementPos) {
+      if (!placement) {
         return {
           status: 'failure',
           error: {
@@ -219,8 +219,11 @@ export class PlaceTorchIfNeededLeaf implements LeafImpl {
         };
       }
 
-      // Place the torch
-      await bot.placeBlock(placementPos as any, torchItem as any);
+      const { torchPos: placementPos, refBlock, faceVec } = placement;
+
+      // Equip torch in hand and place against the reference block
+      await bot.equip(torchItem, 'hand');
+      await bot.placeBlock(refBlock, faceVec);
 
       // Record torch placement for optimal spacing
       this.recordTorchPlacement(placementPos);
@@ -330,33 +333,40 @@ export class PlaceTorchIfNeededLeaf implements LeafImpl {
   }
 
   /**
-   * Find a suitable position to place a torch
+   * Find a suitable position to place a torch, returning the air position,
+   * the solid reference block, and the face vector for bot.placeBlock().
    */
   private async findTorchPlacementPosition(
     bot: BotWithPathfinder,
     targetPos: Vec3
-  ): Promise<Vec3 | null> {
-    // Try to place on a wall or block near the target position
-    const directions = [
-      new Vec3(1, 0, 0),
-      new Vec3(-1, 0, 0),
-      new Vec3(0, 0, 1),
-      new Vec3(0, 0, -1),
-      new Vec3(0, 1, 0),
-      new Vec3(0, -1, 0),
+  ): Promise<{ torchPos: Vec3; refBlock: any; faceVec: Vec3 } | null> {
+    // Prefer placing on top of a block below (floor torch), then walls
+    const placements: Array<{ refOffset: Vec3; faceVec: Vec3 }> = [
+      { refOffset: new Vec3(0, -1, 0), faceVec: new Vec3(0, 1, 0) },  // floor
+      { refOffset: new Vec3(1, 0, 0), faceVec: new Vec3(-1, 0, 0) },  // wall
+      { refOffset: new Vec3(-1, 0, 0), faceVec: new Vec3(1, 0, 0) },
+      { refOffset: new Vec3(0, 0, 1), faceVec: new Vec3(0, 0, -1) },
+      { refOffset: new Vec3(0, 0, -1), faceVec: new Vec3(0, 0, 1) },
     ];
 
-    for (const direction of directions) {
-      const testPos = targetPos.plus(direction);
-      const block = bot.blockAt(testPos);
+    // Try at targetPos first, then immediate neighbors
+    const searchPositions = [
+      targetPos,
+      targetPos.offset(1, 0, 0),
+      targetPos.offset(-1, 0, 0),
+      targetPos.offset(0, 0, 1),
+      targetPos.offset(0, 0, -1),
+    ];
 
-      if (block && block.boundingBox === 'block') {
-        // Check if we can place a torch on this block
-        const torchPos = testPos.plus(direction);
-        const torchBlock = bot.blockAt(torchPos);
+    for (const torchPos of searchPositions) {
+      const airBlock = bot.blockAt(torchPos);
+      if (!airBlock || airBlock.boundingBox !== 'empty') continue;
 
-        if (torchBlock && torchBlock.boundingBox === 'empty') {
-          return torchPos;
+      for (const { refOffset, faceVec } of placements) {
+        const refPos = torchPos.plus(refOffset);
+        const refBlock = bot.blockAt(refPos);
+        if (refBlock && refBlock.boundingBox === 'block') {
+          return { torchPos, refBlock, faceVec };
         }
       }
     }
@@ -1072,8 +1082,49 @@ export class PlaceBlockLeaf implements LeafImpl {
         }
       }
 
-      // Place the block
-      await bot.placeBlock(placementPos as any, itemToPlace as any);
+      // Find a solid reference block adjacent to the target air position
+      const faceOffsets: Array<{ offset: Vec3; face: Vec3 }> = [
+        { offset: new Vec3(0, -1, 0), face: new Vec3(0, 1, 0) },  // below → place on top
+        { offset: new Vec3(0, 1, 0), face: new Vec3(0, -1, 0) },  // above → place below
+        { offset: new Vec3(1, 0, 0), face: new Vec3(-1, 0, 0) },
+        { offset: new Vec3(-1, 0, 0), face: new Vec3(1, 0, 0) },
+        { offset: new Vec3(0, 0, 1), face: new Vec3(0, 0, -1) },
+        { offset: new Vec3(0, 0, -1), face: new Vec3(0, 0, 1) },
+      ];
+
+      let refBlock: any = null;
+      let faceVec: Vec3 | null = null;
+      for (const { offset, face } of faceOffsets) {
+        const refPos = placementPos.plus(offset);
+        const candidate = bot.blockAt(refPos);
+        if (candidate && candidate.boundingBox === 'block') {
+          refBlock = candidate;
+          faceVec = face;
+          break;
+        }
+      }
+
+      if (!refBlock || !faceVec) {
+        return {
+          status: 'failure',
+          error: {
+            code: 'place.invalidFace',
+            retryable: true,
+            detail: 'No solid reference block adjacent to placement position',
+          },
+          metrics: {
+            durationMs: ctx.now() - startTime,
+            retries: 0,
+            timeouts: 0,
+          },
+        };
+      }
+
+      // Equip the item in hand before placing
+      await bot.equip(itemToPlace, 'hand');
+
+      // Place the block against the reference block
+      await bot.placeBlock(refBlock, faceVec);
 
       // Verify placement
       const placedBlock = bot.blockAt(placementPos);
@@ -1337,5 +1388,389 @@ export class ConsumeFoodLeaf implements LeafImpl {
     ];
 
     return foodItems.some((food) => itemName.includes(food));
+  }
+}
+
+// ============================================================================
+// Sleep Leaf
+// ============================================================================
+
+const BED_TYPES = new Set([
+  'white_bed', 'orange_bed', 'magenta_bed', 'light_blue_bed',
+  'yellow_bed', 'lime_bed', 'pink_bed', 'gray_bed',
+  'light_gray_bed', 'cyan_bed', 'purple_bed', 'blue_bed',
+  'brown_bed', 'green_bed', 'red_bed', 'black_bed',
+]);
+
+/**
+ * Sleep in a nearby bed. Places a bed from inventory if none found.
+ * Checks if it's nighttime before attempting to sleep.
+ */
+export class SleepLeaf implements LeafImpl {
+  spec: LeafSpec = {
+    name: 'sleep',
+    version: '1.0.0',
+    description: 'Sleep in a bed to skip the night and set spawn point',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        force: {
+          type: 'boolean',
+          description: 'Attempt to sleep even during daytime (will likely fail)',
+          default: false,
+        },
+        searchRadius: {
+          type: 'number',
+          minimum: 1,
+          maximum: 32,
+          default: 16,
+        },
+        placeBed: {
+          type: 'boolean',
+          description: 'Place a bed from inventory if none found nearby',
+          default: true,
+        },
+      },
+    },
+    outputSchema: {
+      type: 'object',
+      properties: {
+        success: { type: 'boolean' },
+        slept: { type: 'boolean' },
+        bedPosition: {
+          type: 'object',
+          properties: {
+            x: { type: 'number' },
+            y: { type: 'number' },
+            z: { type: 'number' },
+          },
+        },
+        placed: { type: 'boolean' },
+        wakeTime: { type: 'number' },
+      },
+    },
+    timeoutMs: 30000,
+    retries: 1,
+    permissions: ['movement', 'place'],
+  };
+
+  async run(ctx: LeafContext, args: any): Promise<LeafResult> {
+    const t0 = ctx.now();
+    const bot = ctx.bot;
+    const force = args?.force ?? false;
+    const searchRadius = Math.min(Math.max(args?.searchRadius ?? 16, 1), 32);
+    const placeBed = args?.placeBed ?? true;
+
+    try {
+      // Check if it's nighttime (MC time 12542-23459 is night)
+      const time = (bot as any).time?.timeOfDay ?? 0;
+      const isNight = time >= 12542 && time <= 23459;
+
+      if (!isNight && !force) {
+        return {
+          status: 'failure',
+          error: {
+            code: 'sleep.notNight',
+            retryable: true,
+            detail: `Cannot sleep during the day (time: ${time})`,
+          },
+          metrics: { durationMs: ctx.now() - t0, retries: 0, timeouts: 0 },
+        };
+      }
+
+      // Search for a nearby bed
+      let bedBlock: any = null;
+      const origin = bot.entity.position;
+      for (let r = 1; r <= searchRadius && !bedBlock; r++) {
+        for (let dx = -r; dx <= r; dx++) {
+          for (let dy = -3; dy <= 3; dy++) {
+            for (let dz = -r; dz <= r; dz++) {
+              const p = origin.offset(dx, dy, dz);
+              const b = bot.blockAt(p);
+              if (b && BED_TYPES.has(b.name)) {
+                bedBlock = b;
+                break;
+              }
+            }
+            if (bedBlock) break;
+          }
+          if (bedBlock) break;
+        }
+      }
+
+      let placed = false;
+
+      // If no bed found, try to place one from inventory
+      if (!bedBlock && placeBed) {
+        const bedItem = bot.inventory.items().find(
+          (item: any) => BED_TYPES.has(item.name) || item.name.endsWith('_bed')
+        );
+
+        if (bedItem) {
+          // Find a placement spot: 2 air blocks in a row with solid below
+          const yaw = bot.entity.yaw;
+          const forward = new Vec3(-Math.sin(yaw), 0, Math.cos(yaw));
+          const targetPos = origin.offset(
+            Math.round(forward.x * 2),
+            0,
+            Math.round(forward.z * 2)
+          );
+          const targetBlock = bot.blockAt(targetPos);
+          const belowBlock = bot.blockAt(targetPos.offset(0, -1, 0));
+
+          if (targetBlock && targetBlock.name === 'air' && belowBlock && belowBlock.boundingBox === 'block') {
+            // Find reference block for placement
+            const faceOffsets: Array<{ offset: Vec3; face: Vec3 }> = [
+              { offset: new Vec3(0, -1, 0), face: new Vec3(0, 1, 0) },
+              { offset: new Vec3(1, 0, 0), face: new Vec3(-1, 0, 0) },
+              { offset: new Vec3(-1, 0, 0), face: new Vec3(1, 0, 0) },
+              { offset: new Vec3(0, 0, 1), face: new Vec3(0, 0, -1) },
+              { offset: new Vec3(0, 0, -1), face: new Vec3(0, 0, 1) },
+            ];
+
+            for (const { offset, face } of faceOffsets) {
+              const refPos = targetPos.plus(offset);
+              const refBlock = bot.blockAt(refPos);
+              if (refBlock && refBlock.boundingBox === 'block') {
+                await bot.equip(bedItem, 'hand');
+                await bot.placeBlock(refBlock, face);
+                placed = true;
+                break;
+              }
+            }
+
+            if (placed) {
+              // Re-check for the placed bed
+              bedBlock = bot.blockAt(targetPos);
+              if (!bedBlock || !BED_TYPES.has(bedBlock.name)) {
+                bedBlock = null;
+                placed = false;
+              }
+            }
+          }
+        }
+      }
+
+      if (!bedBlock) {
+        return {
+          status: 'failure',
+          error: {
+            code: 'world.invalidPosition',
+            retryable: true,
+            detail: 'No bed found nearby and unable to place one',
+          },
+          metrics: { durationMs: ctx.now() - t0, retries: 0, timeouts: 0 },
+        };
+      }
+
+      // Sleep in the bed
+      await (bot as any).sleep(bedBlock);
+
+      // Wait until we wake up or timeout
+      await new Promise<void>((resolve) => {
+        const wakeHandler = () => resolve();
+        (bot as any).once('wake', wakeHandler);
+        // Safety timeout — MC night is ~7 minutes max
+        setTimeout(() => {
+          (bot as any).removeListener('wake', wakeHandler);
+          resolve();
+        }, 15000);
+      });
+
+      const bedPos = bedBlock.position;
+      ctx.emitMetric('sleep_duration_ms', ctx.now() - t0);
+
+      return {
+        status: 'success',
+        result: {
+          success: true,
+          slept: true,
+          bedPosition: { x: bedPos.x, y: bedPos.y, z: bedPos.z },
+          placed,
+          wakeTime: (bot as any).time?.timeOfDay ?? 0,
+        },
+        metrics: { durationMs: ctx.now() - t0, retries: 0, timeouts: 0 },
+      };
+    } catch (e: any) {
+      return {
+        status: 'failure',
+        error: {
+          code: 'sleep.failed',
+          retryable: true,
+          detail: e?.message ?? String(e),
+        },
+        metrics: { durationMs: ctx.now() - t0, retries: 0, timeouts: 0 },
+      };
+    }
+  }
+}
+
+// ============================================================================
+// Collect Items Leaf
+// ============================================================================
+
+/**
+ * Collect nearby dropped items by moving to them.
+ */
+export class CollectItemsLeaf implements LeafImpl {
+  spec: LeafSpec = {
+    name: 'collect_items',
+    version: '1.0.0',
+    description: 'Collect nearby dropped items by moving to them',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        itemName: {
+          type: 'string',
+          description: 'Filter to only collect items with this name (optional)',
+        },
+        radius: {
+          type: 'number',
+          minimum: 1,
+          maximum: 32,
+          default: 16,
+        },
+        maxItems: {
+          type: 'number',
+          minimum: 1,
+          maximum: 64,
+          default: 10,
+        },
+        timeout: {
+          type: 'number',
+          minimum: 1000,
+          maximum: 60000,
+          default: 15000,
+        },
+      },
+    },
+    outputSchema: {
+      type: 'object',
+      properties: {
+        success: { type: 'boolean' },
+        collected: { type: 'number' },
+        items: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              name: { type: 'string' },
+              count: { type: 'number' },
+            },
+          },
+        },
+      },
+    },
+    timeoutMs: 30000,
+    retries: 1,
+    permissions: ['movement'],
+  };
+
+  async run(ctx: LeafContext, args: any): Promise<LeafResult> {
+    const t0 = ctx.now();
+    const bot = ctx.bot;
+    const itemName = args?.itemName;
+    const radius = Math.min(Math.max(args?.radius ?? 16, 1), 32);
+    const maxItems = Math.min(Math.max(args?.maxItems ?? 10, 1), 64);
+    const timeout = Math.min(Math.max(args?.timeout ?? 15000, 1000), 60000);
+
+    try {
+      const origin = bot.entity.position;
+      const collected: Array<{ name: string; count: number }> = [];
+      const deadline = t0 + timeout;
+
+      // Find dropped item entities
+      const itemEntities = Object.values(bot.entities)
+        .filter((e: any) => {
+          if (e.name !== 'item' && e.objectType !== 'Item') return false;
+          if (!e.position) return false;
+          const dist = e.position.distanceTo(origin);
+          if (dist > radius) return false;
+          if (itemName && e.metadata) {
+            // Item entity metadata[8] contains the item stack info in newer versions
+            const itemInfo = (e as any).getDroppedItem?.();
+            if (itemInfo && !itemInfo.name.includes(itemName)) return false;
+          }
+          return true;
+        })
+        .sort((a: any, b: any) =>
+          a.position.distanceTo(origin) - b.position.distanceTo(origin)
+        );
+
+      if (itemEntities.length === 0) {
+        return {
+          status: 'success',
+          result: { success: true, collected: 0, items: [] },
+          metrics: { durationMs: ctx.now() - t0, retries: 0, timeouts: 0 },
+        };
+      }
+
+      // Move to each item to pick it up (auto-pickup on proximity)
+      let count = 0;
+      for (const entity of itemEntities) {
+        if (count >= maxItems) break;
+        if (ctx.now() > deadline) break;
+
+        const itemInfo = (entity as any).getDroppedItem?.();
+        const targetPos = (entity as any).position;
+
+        // Walk toward the item — simple approach using bot.lookAt + forward
+        const dist = targetPos.distanceTo(bot.entity.position);
+        if (dist > 1.5) {
+          await bot.lookAt(targetPos);
+          (bot as any).setControlState('forward', true);
+
+          // Wait until close enough or entity gone
+          await new Promise<void>((resolve) => {
+            const check = setInterval(() => {
+              const ent = bot.entities[(entity as any).id];
+              if (!ent || !ent.position) {
+                clearInterval(check);
+                resolve();
+                return;
+              }
+              const d = ent.position.distanceTo(bot.entity.position);
+              if (d < 1.0 || ctx.now() > deadline) {
+                clearInterval(check);
+                resolve();
+              }
+            }, 100);
+          });
+
+          (bot as any).setControlState('forward', false);
+        }
+
+        // Brief wait for pickup
+        await new Promise((r) => setTimeout(r, 200));
+
+        // Check if entity is gone (was picked up)
+        const stillExists = bot.entities[(entity as any).id];
+        if (!stillExists) {
+          count++;
+          collected.push({
+            name: itemInfo?.name ?? 'unknown',
+            count: itemInfo?.count ?? 1,
+          });
+        }
+      }
+
+      ctx.emitMetric('collect_items_count', count);
+
+      return {
+        status: 'success',
+        result: { success: true, collected: count, items: collected },
+        metrics: { durationMs: ctx.now() - t0, retries: 0, timeouts: 0 },
+      };
+    } catch (e: any) {
+      return {
+        status: 'failure',
+        error: {
+          code: 'collect.failed',
+          retryable: true,
+          detail: e?.message ?? String(e),
+        },
+        metrics: { durationMs: ctx.now() - t0, retries: 0, timeouts: 0 },
+      };
+    }
   }
 }

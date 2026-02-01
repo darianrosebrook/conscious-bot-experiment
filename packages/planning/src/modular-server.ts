@@ -89,6 +89,11 @@ import {
   normalizeStepExecutability,
   isExecutableStep,
 } from './modules/executable-step';
+import {
+  buildTaskFromRequirement,
+  computeSubtaskKey,
+  type BuildTaskInput,
+} from './task-integration/build-task-from-requirement';
 
 // Extend global interface for rate limiting variables
 declare global {
@@ -209,20 +214,55 @@ function resolvedBlock(task: any) {
 
 // Known leaf names (shared across services)
 const KNOWN_LEAF_NAMES = new Set([
+  // Movement
   'move_to',
   'step_forward_safely',
   'follow_entity',
+  // Interaction
   'dig_block',
   'place_block',
   'place_torch_if_needed',
   'retreat_and_block',
   'consume_food',
+  'sleep',
+  'collect_items',
+  // Sensing
   'sense_hostiles',
   'chat',
   'wait',
   'get_light_level',
+  'find_resource',
+  // Crafting
   'craft_recipe',
   'smelt',
+  'place_workstation',
+  'introspect_recipe',
+  // Container
+  'open_container',
+  'transfer_items',
+  'close_container',
+  'manage_inventory',
+  // Combat
+  'attack_entity',
+  'equip_weapon',
+  'retreat_from_threat',
+  'use_item',
+  'equip_tool',
+  // Farming
+  'till_soil',
+  'plant_crop',
+  'harvest_crop',
+  'manage_farm',
+  // World interaction
+  'interact_with_block',
+  'operate_piston',
+  'control_redstone',
+  'build_structure',
+  'control_environment',
+  // Construction (P0 stubs)
+  'prepare_site',
+  'build_module',
+  'place_feature',
 ]);
 // mc-fetch helpers are imported from modules/mc-client
 
@@ -605,11 +645,11 @@ async function planNextAcquisitionStep(
   goalItem: string,
   qty: number
 ): Promise<{
-  title: string;
-  description: string;
-  type: string;
-  parameters: any;
-  tags: string[];
+  requirement: BuildTaskInput;
+  tags?: string[];
+  typeOverride?: string;
+  extraParams?: Record<string, any>;
+  title?: string;
 } | null> {
   const inv = await fetchInventorySnapshot();
   const have = getCount(inv, goalItem);
@@ -629,30 +669,21 @@ async function planNextAcquisitionStep(
       const subInfo = await introspectRecipe(best.item);
       if (subInfo && subInfo.inputs.length > 0) {
         return {
-          title: `Craft ${best.item}`,
-          description: `Craft ${best.need}x ${best.item} for ${goalItem}`,
-          type: 'crafting',
-          parameters: { recipe: best.item, qty: Math.max(1, best.need) },
+          requirement: { kind: 'craft', outputPattern: best.item, quantity: Math.max(1, best.need) },
           tags: ['dynamic', 'crafting'],
         };
       }
       const mapping = baseGatherMapping(best.item);
       if (mapping) {
+        const kind = mapping.type === 'gathering' ? 'collect' : 'mine';
         return {
-          title:
-            mapping.type === 'gathering' ? 'Gather Resource' : 'Mine Resource',
-          description: `Obtain ${best.need}x ${best.item}`,
-          type: mapping.type,
-          parameters: { blockType: mapping.blockType },
+          requirement: { kind, outputPattern: mapping.blockType, quantity: best.need },
           tags: ['dynamic', 'gather'],
         };
       }
       // Fallback to crafting even if introspection failed
       return {
-        title: `Craft ${best.item}`,
-        description: `Craft ${best.need}x ${best.item}`,
-        type: 'crafting',
-        parameters: { recipe: best.item, qty: Math.max(1, best.need) },
+        requirement: { kind: 'craft', outputPattern: best.item, quantity: Math.max(1, best.need) },
         tags: ['dynamic', 'crafting'],
       };
     }
@@ -660,19 +691,15 @@ async function planNextAcquisitionStep(
     if (info.requiresTable) {
       if (!hasCraftingTableItem(inv)) {
         return {
-          title: 'Craft Crafting Table',
-          description: 'Create a crafting table for 3x3 recipes',
-          type: 'crafting',
-          parameters: { recipe: 'crafting_table', qty: 1 },
+          requirement: { kind: 'craft', outputPattern: 'crafting_table', quantity: 1 },
           tags: ['dynamic', 'crafting-table'],
         };
       } else {
         return {
-          title: 'Place Crafting Table',
-          description: 'Place a crafting table nearby to use 3x3 grid',
-          type: 'placement',
-          parameters: { item: 'crafting_table' },
+          requirement: { kind: 'build', outputPattern: 'crafting_table', quantity: 1 },
           tags: ['dynamic', 'placement'],
+          typeOverride: 'placement',
+          title: 'Place Crafting Table',
         };
       }
     }
@@ -682,11 +709,9 @@ async function planNextAcquisitionStep(
   // Not craftable: try base gathering
   const mapping = baseGatherMapping(goalItem);
   if (mapping) {
+    const kind = mapping.type === 'gathering' ? 'collect' : 'mine';
     return {
-      title: mapping.type === 'gathering' ? 'Gather Resource' : 'Mine Resource',
-      description: `Obtain ${qty - have}x ${goalItem}`,
-      type: mapping.type,
-      parameters: { blockType: mapping.blockType },
+      requirement: { kind, outputPattern: mapping.blockType, quantity: qty - have },
       tags: ['dynamic', 'gather'],
     };
   }
@@ -699,43 +724,40 @@ async function injectNextAcquisitionStep(
   goalItem: string,
   qty: number
 ): Promise<boolean> {
-  // Deduplicate: skip if an active child task for this parent+item already exists
+  const planned = await planNextAcquisitionStep(goalItem, qty);
+  if (!planned) return false;
+
+  // Subtask dedupe via subtaskKey
+  const key = computeSubtaskKey(planned.requirement, parentTask.id);
   const activeTasks = taskIntegration.getActiveTasks();
-  const existingChild = activeTasks.find(
+  const existing = activeTasks.find(
     (t: any) =>
-      t.metadata?.parentTaskId === parentTask.id &&
-      (t.parameters?.recipe === goalItem ||
-        t.parameters?.blockType === goalItem ||
-        t.title?.toLowerCase().includes(goalItem.replace(/_/g, ' ')))
+      (t.metadata as any)?.subtaskKey === key &&
+      t.status !== 'completed' &&
+      t.status !== 'failed'
   );
-  if (existingChild) {
+  if (existing) {
     console.log(
-      `⏭️ [Prereq] Skipping duplicate: active child "${existingChild.title}" already exists for parent ${parentTask.id}`
+      `⏭️ [Prereq] Skipping duplicate: subtaskKey "${key}" already active for parent ${parentTask.id}`
     );
     return false;
   }
 
-  const step = await planNextAcquisitionStep(goalItem, qty);
-  if (!step) return false;
-  const t = await taskIntegration.addTask({
-    title: step.title,
-    description: step.description,
-    type: step.type,
-    priority: Math.max(0.9, (parentTask.priority || 0.5) + 0.05),
-    urgency: parentTask.urgency || 0.7,
-    source: 'autonomous' as const,
-    parameters: step.parameters,
-    metadata: {
-      category: parentTask.metadata?.category || 'general',
-      tags: step.tags,
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
-      retryCount: 0,
-      maxRetries: 3,
-      parentTaskId: parentTask.id,
-      childTaskIds: [],
-    },
+  const taskData = buildTaskFromRequirement(planned.requirement, {
+    parentTask,
+    tags: planned.tags,
+    type: planned.typeOverride,
+    title: planned.title,
   });
+  const t = await taskIntegration.addTask(taskData);
+
+  // Block parent while prereq is active
+  if (t && parentTask.id) {
+    taskIntegration.updateTaskMetadata(parentTask.id, {
+      ...parentTask.metadata,
+      blockedReason: 'waiting_on_prereq',
+    });
+  }
   return Boolean(t);
 }
 
@@ -924,6 +946,13 @@ function stepToLeafExecution(
       return {
         leafName: 'smelt',
         args: { input: consumed?.name || 'unknown' },
+      };
+    }
+    case 'place_workstation': {
+      const workstation = (meta.workstation as string) || 'crafting_table';
+      return {
+        leafName: 'place_workstation',
+        args: { workstation },
       };
     }
     case 'place_block': {
@@ -1247,65 +1276,32 @@ async function addCraftingTableTask(
   originalTask: any,
   details: any
 ): Promise<void> {
-  const craftingTableTask = {
-    id: `task-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-    title: 'Craft Crafting Table',
-    description: 'Create a crafting table to enable advanced crafting recipes',
-    type: 'crafting',
-    priority: originalTask.priority + 1,
-    urgency: 0.8,
-    progress: 0,
-    status: 'pending' as const,
-    source: 'autonomous' as const,
-    parameters: {
-      itemType: 'crafting_table',
-      quantity: 1,
-      requiresWood: true,
-      analysis: details,
-    },
-    steps: [
-      {
-        id: 'craft-table-step-1',
-        label: 'Check required materials',
-        done: false,
-        order: 1,
-        estimatedDuration: 2000,
-      },
-      {
-        id: 'craft-table-step-2',
-        label: 'Access crafting interface',
-        done: false,
-        order: 2,
-        estimatedDuration: 3000,
-      },
-      {
-        id: 'craft-table-step-3',
-        label: 'Create the item',
-        done: false,
-        order: 3,
-        estimatedDuration: 5000,
-      },
-    ],
-    metadata: {
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
-      retryCount: 0,
-      maxRetries: 3,
-      childTaskIds: [],
-      tags: ['prerequisite', 'crafting'],
-      category: 'crafting',
-      requirement: {
-        type: 'crafting_table',
-        quantity: 1,
-      },
-    },
-  };
+  const input: BuildTaskInput = { kind: 'craft', outputPattern: 'crafting_table', quantity: 1 };
 
-  const result = await taskIntegration.addTask(craftingTableTask);
+  // Dedupe
+  const key = computeSubtaskKey(input, originalTask.id);
+  const activeTasks = taskIntegration.getActiveTasks();
+  const existing = activeTasks.find(
+    (t: any) => (t.metadata as any)?.subtaskKey === key && t.status !== 'completed' && t.status !== 'failed'
+  );
+  if (existing) {
+    console.log('Task already exists: Craft Crafting Table');
+    return;
+  }
+
+  const taskData = buildTaskFromRequirement(input, {
+    parentTask: originalTask,
+    tags: ['crafting'],
+    extraParameters: { analysis: details },
+  });
+  const result = await taskIntegration.addTask(taskData);
   if (result && result.id) {
     console.log(`✅ Added intelligent crafting table task: ${result.id}`);
-  } else {
-    console.log('Task already exists: Craft Crafting Table');
+    // Block parent
+    taskIntegration.updateTaskMetadata(originalTask.id, {
+      ...originalTask.metadata,
+      blockedReason: 'waiting_on_prereq',
+    });
   }
 }
 
@@ -1316,66 +1312,34 @@ async function addResourceGatheringTask(
   originalTask: any,
   details: any
 ): Promise<void> {
-  const woodTask = {
-    id: `task-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-    title: 'Gather Wood for Crafting Table',
-    description: `Collect ${details.neededWood || 4} wood units to craft a crafting table`,
-    type: 'gathering',
-    priority: originalTask.priority + 2,
-    urgency: 0.9,
-    progress: 0,
-    status: 'pending' as const,
-    source: 'autonomous' as const,
-    parameters: {
-      resourceType: 'wood',
-      targetQuantity: details.neededWood || 4,
-      currentQuantity: details.currentWood || 0,
-      locations: ['forest', 'trees', 'logs'],
-      tools: ['axe'],
-    },
-    steps: [
-      {
-        id: 'gather-wood-step-1',
-        label: 'Locate wood sources',
-        done: false,
-        order: 1,
-        estimatedDuration: 5000,
-      },
-      {
-        id: 'gather-wood-step-2',
-        label: 'Gather wood materials',
-        done: false,
-        order: 2,
-        estimatedDuration: details.neededWood * 3000, // 3s per wood unit
-      },
-      {
-        id: 'gather-wood-step-3',
-        label: 'Convert logs to planks if needed',
-        done: false,
-        order: 3,
-        estimatedDuration: 2000,
-      },
-    ],
-    metadata: {
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
-      retryCount: 0,
-      maxRetries: 5,
-      childTaskIds: [],
-      tags: ['prerequisite', 'gathering', 'wood'],
-      category: 'resource_gathering',
-      requirement: {
-        type: 'wood',
-        quantity: details.neededWood || 4,
-      },
-    },
-  };
+  const qty = details.neededWood || 4;
+  const input: BuildTaskInput = { kind: 'collect', outputPattern: 'oak_log', quantity: qty };
 
-  const result = await taskIntegration.addTask(woodTask);
+  // Dedupe
+  const key = computeSubtaskKey(input, originalTask.id);
+  const activeTasks = taskIntegration.getActiveTasks();
+  const existing = activeTasks.find(
+    (t: any) => (t.metadata as any)?.subtaskKey === key && t.status !== 'completed' && t.status !== 'failed'
+  );
+  if (existing) {
+    console.log('Task already exists: Gather Wood for Crafting Table');
+    return;
+  }
+
+  const taskData = buildTaskFromRequirement(input, {
+    title: 'Gather Wood for Crafting Table',
+    parentTask: originalTask,
+    tags: ['gathering', 'wood'],
+    extraParameters: { targetQuantity: qty, currentQuantity: details.currentWood || 0 },
+  });
+  const result = await taskIntegration.addTask(taskData);
   if (result && result.id) {
     console.log(`✅ Added intelligent wood gathering task: ${result.id}`);
-  } else {
-    console.log('Task already exists: Gather Wood for Crafting Table');
+    // Block parent
+    taskIntegration.updateTaskMetadata(originalTask.id, {
+      ...originalTask.metadata,
+      blockedReason: 'waiting_on_prereq',
+    });
   }
 }
 
@@ -1396,9 +1360,7 @@ async function generateComplexCraftingSubtasks(task: any): Promise<void> {
 
       // Check current inventory for required materials
       const inventory = await fetchInventorySnapshot();
-
-      // Create subtasks based on what's needed
-      const subtasks = [];
+      const subtaskDatas: Partial<any>[] = [];
 
       // Check if we need to place a crafting table
       const hasCraftingTable = inventory.some((item: any) =>
@@ -1406,50 +1368,10 @@ async function generateComplexCraftingSubtasks(task: any): Promise<void> {
       );
 
       if (hasCraftingTable) {
-        // Add task to place crafting table
-        subtasks.push({
-          id: `task-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-          title: 'Place Crafting Table',
-          description:
-            'Place crafting table in the world for advanced crafting',
-          type: 'placement',
-          priority: task.priority + 1,
-          urgency: 0.8,
-          progress: 0,
-          status: 'pending' as const,
-          source: 'autonomous' as const,
-          parameters: {
-            itemType: 'crafting_table',
-            quantity: 1,
-            placementLocation: 'nearby_safe_area',
-          },
-          steps: [
-            {
-              id: 'place-table-step-1',
-              label: 'Find suitable location',
-              done: false,
-              order: 1,
-              estimatedDuration: 3000,
-            },
-            {
-              id: 'place-table-step-2',
-              label: 'Place crafting table',
-              done: false,
-              order: 2,
-              estimatedDuration: 2000,
-            },
-          ],
-          metadata: {
-            createdAt: Date.now(),
-            updatedAt: Date.now(),
-            retryCount: 0,
-            maxRetries: 3,
-            childTaskIds: [],
-            tags: ['prerequisite', 'placement'],
-            category: 'placement',
-            requirement: { type: 'crafting_table', quantity: 1 },
-          },
-        });
+        subtaskDatas.push(buildTaskFromRequirement(
+          { kind: 'build', outputPattern: 'crafting_table', quantity: 1 },
+          { title: 'Place Crafting Table', type: 'placement', parentTask: task }
+        ));
       }
 
       // Check if we need to craft intermediate materials
@@ -1457,116 +1379,59 @@ async function generateComplexCraftingSubtasks(task: any): Promise<void> {
         taskTitle.includes('wooden_pickaxe') ||
         taskTitle.includes('wooden_axe')
       ) {
-        const hasPlanks = inventory.some((item: any) =>
+        const hasPlanksInv = inventory.some((item: any) =>
           item.type?.toLowerCase().includes('planks')
         );
-        const hasSticks = inventory.some((item: any) =>
+        const hasSticksInv = inventory.some((item: any) =>
           item.type?.toLowerCase().includes('stick')
         );
 
-        if (!hasPlanks) {
-          subtasks.push({
-            id: `task-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-            title: 'Craft Wood Planks',
-            description: 'Craft wood planks from logs for tool crafting',
-            type: 'crafting',
-            priority: task.priority + 2,
-            urgency: 0.8,
-            progress: 0,
-            status: 'pending' as const,
-            source: 'autonomous' as const,
-            parameters: {
-              itemType: 'oak_planks',
-              quantity: 4,
-              requiresLogs: true,
-            },
-            steps: [
-              {
-                id: 'craft-planks-step-1',
-                label: 'Check wood availability',
-                done: false,
-                order: 1,
-                estimatedDuration: 2000,
-              },
-              {
-                id: 'craft-planks-step-2',
-                label: 'Craft planks from logs',
-                done: false,
-                order: 2,
-                estimatedDuration: 3000,
-              },
-            ],
-            metadata: {
-              createdAt: Date.now(),
-              updatedAt: Date.now(),
-              retryCount: 0,
-              maxRetries: 3,
-              childTaskIds: [],
-              tags: ['prerequisite', 'crafting'],
-              category: 'crafting',
-              requirement: { type: 'oak_planks', quantity: 4 },
-            },
-          });
+        if (!hasPlanksInv) {
+          subtaskDatas.push(buildTaskFromRequirement(
+            { kind: 'craft', outputPattern: 'oak_planks', quantity: 4 },
+            { title: 'Craft Wood Planks', parentTask: task }
+          ));
         }
 
-        if (!hasSticks) {
-          subtasks.push({
-            id: `task-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-            title: 'Craft Sticks',
-            description: 'Craft sticks from planks for tool crafting',
-            type: 'crafting',
-            priority: task.priority + 3,
-            urgency: 0.8,
-            progress: 0,
-            status: 'pending' as const,
-            source: 'autonomous' as const,
-            parameters: {
-              itemType: 'stick',
-              quantity: 4,
-              requiresPlanks: true,
-            },
-            steps: [
-              {
-                id: 'craft-sticks-step-1',
-                label: 'Check plank availability',
-                done: false,
-                order: 1,
-                estimatedDuration: 2000,
-              },
-              {
-                id: 'craft-sticks-step-2',
-                label: 'Craft sticks from planks',
-                done: false,
-                order: 2,
-                estimatedDuration: 3000,
-              },
-            ],
-            metadata: {
-              createdAt: Date.now(),
-              updatedAt: Date.now(),
-              retryCount: 0,
-              maxRetries: 3,
-              childTaskIds: [],
-              tags: ['prerequisite', 'crafting'],
-              category: 'crafting',
-              requirement: { type: 'stick', quantity: 4 },
-            },
-          });
+        if (!hasSticksInv) {
+          subtaskDatas.push(buildTaskFromRequirement(
+            { kind: 'craft', outputPattern: 'stick', quantity: 4 },
+            { title: 'Craft Sticks', parentTask: task }
+          ));
         }
       }
 
-      // Add all subtasks
-      for (const subtask of subtasks) {
-        const result = await taskIntegration.addTask(subtask);
-        if (result && result.id) {
-          console.log(`✅ Added crafting subtask: ${subtask.title}`);
-        } else {
-          console.log(`Task already exists: ${subtask.title}`);
+      // Add all subtasks (with dedupe)
+      let addedCount = 0;
+      const activeTasks = taskIntegration.getActiveTasks();
+      for (const subtaskData of subtaskDatas) {
+        const subtaskKey = (subtaskData.metadata as any)?.subtaskKey;
+        if (subtaskKey) {
+          const existing = activeTasks.find(
+            (t: any) => (t.metadata as any)?.subtaskKey === subtaskKey && t.status !== 'completed' && t.status !== 'failed'
+          );
+          if (existing) {
+            console.log(`Task already exists: ${subtaskData.title}`);
+            continue;
+          }
         }
+        const result = await taskIntegration.addTask(subtaskData);
+        if (result && result.id) {
+          console.log(`✅ Added crafting subtask: ${subtaskData.title}`);
+          addedCount++;
+        }
+      }
+
+      // Block parent if any subtasks were added
+      if (addedCount > 0 && task.id) {
+        taskIntegration.updateTaskMetadata(task.id, {
+          ...task.metadata,
+          blockedReason: 'waiting_on_prereq',
+        });
       }
 
       console.log(
-        `🔧 Generated ${subtasks.length} subtasks for complex crafting`
+        `🔧 Generated ${addedCount} subtasks for complex crafting`
       );
     }
   } catch (error) {
@@ -2416,13 +2281,14 @@ async function autonomousTaskExecutor() {
             qty: currentTask.parameters?.qty || 1,
           },
         },
-        placement: {
-          leafName: 'place_block',
-          args: {
-            item: currentTask.parameters?.item || 'crafting_table',
-            pos: currentTask.parameters?.pos,
-          },
-        },
+        placement: (() => {
+          const item = currentTask.parameters?.item || 'crafting_table';
+          const WORKSTATION_SET = new Set(['crafting_table', 'furnace', 'blast_furnace']);
+          if (WORKSTATION_SET.has(item)) {
+            return { leafName: 'place_workstation', args: { workstation: item } };
+          }
+          return { leafName: 'place_block', args: { item, pos: currentTask.parameters?.pos } };
+        })(),
         exploration: {
           leafName: 'move_to',
           args: {
@@ -2681,25 +2547,22 @@ async function autonomousTaskExecutor() {
           typeof actionResult?.error === 'string' &&
           /no .*found/i.test(actionResult.error)
         ) {
-          await taskIntegration.addTask({
-            title: `Explore for ${leafConfig.args?.blockType || 'resource'}`,
-            description: 'Search area to find resources',
-            type: 'exploration',
-            priority: Math.max(0.9, (currentTask.priority || 0.5) + 0.05),
-            urgency: 0.6,
-            source: 'autonomous' as const,
-            parameters: { target: 'exploration_target' },
-            metadata: {
-              category: 'exploration',
-              tags: ['dynamic', 'explore'],
-              createdAt: Date.now(),
-              updatedAt: Date.now(),
-              retryCount: 0,
-              maxRetries: 3,
-              parentTaskId: currentTask.id,
-              childTaskIds: [],
-            },
-          });
+          const blockType = String(leafConfig.args?.blockType || 'resource');
+          const exploreInput: BuildTaskInput = { kind: 'explore', outputPattern: blockType, quantity: 1 };
+          const exploreKey = computeSubtaskKey(exploreInput, currentTask.id);
+          const activeExplore = taskIntegration.getActiveTasks().find(
+            (t: any) => (t.metadata as any)?.subtaskKey === exploreKey && t.status !== 'completed' && t.status !== 'failed'
+          );
+          if (!activeExplore) {
+            await taskIntegration.addTask(buildTaskFromRequirement(exploreInput, {
+              parentTask: currentTask,
+              tags: ['dynamic'],
+            }));
+            taskIntegration.updateTaskMetadata(currentTask.id, {
+              ...currentTask.metadata,
+              blockedReason: 'waiting_on_prereq',
+            });
+          }
         }
 
         if (newRetryCount >= maxRetries) {
@@ -2868,25 +2731,22 @@ async function autonomousTaskExecutor() {
           typeof mcpResult?.error === 'string' &&
           /no .*found/i.test(mcpResult.error)
         ) {
-          await taskIntegration.addTask({
-            title: `Explore for ${desiredBlock || 'resource'}`,
-            description: 'Search area to find resources',
-            type: 'exploration',
-            priority: Math.max(0.9, (currentTask.priority || 0.5) + 0.05),
-            urgency: 0.6,
-            source: 'autonomous' as const,
-            parameters: { target: 'exploration_target' },
-            metadata: {
-              category: 'exploration',
-              tags: ['dynamic', 'explore'],
-              createdAt: Date.now(),
-              updatedAt: Date.now(),
-              retryCount: 0,
-              maxRetries: 3,
-              parentTaskId: currentTask.id,
-              childTaskIds: [],
-            },
-          });
+          const target = String(desiredBlock || 'resource');
+          const exploreInput: BuildTaskInput = { kind: 'explore', outputPattern: target, quantity: 1 };
+          const exploreKey = computeSubtaskKey(exploreInput, currentTask.id);
+          const activeExplore = taskIntegration.getActiveTasks().find(
+            (t: any) => (t.metadata as any)?.subtaskKey === exploreKey && t.status !== 'completed' && t.status !== 'failed'
+          );
+          if (!activeExplore) {
+            await taskIntegration.addTask(buildTaskFromRequirement(exploreInput, {
+              parentTask: currentTask,
+              tags: ['dynamic'],
+            }));
+            taskIntegration.updateTaskMetadata(currentTask.id, {
+              ...currentTask.metadata,
+              blockedReason: 'waiting_on_prereq',
+            });
+          }
         }
 
         // Increment retry count
@@ -3051,6 +2911,15 @@ const { goalManager, reactiveExecutor, taskIntegration } =
 // blocked sentinel (rig_e_solver_unimplemented) as before.
 if (process.env.ENABLE_RIG_E === '1') {
   taskIntegration.configureHierarchicalPlanner();
+}
+
+// Goal Binding: Wire goal resolver for goal-sourced task deduplication.
+// With ENABLE_GOAL_BINDING=1, addTask() intercepts building tasks with
+// source='goal' and routes them through GoalResolver.resolveOrCreate()
+// to enforce the uniqueness invariant (at most one non-terminal task
+// per goalType + goalKey). Without it, goal tasks use standard dedup.
+if (process.env.ENABLE_GOAL_BINDING === '1') {
+  taskIntegration.enableGoalResolver();
 }
 
 const memoryIntegration = new MemoryIntegration({
@@ -3452,6 +3321,7 @@ async function startServer() {
           makePlaceholder('follow_entity', '1.0.0', ['movement']),
           makePlaceholder('dig_block', '1.0.0', ['dig']),
           makePlaceholder('place_block', '1.0.0', ['place']),
+          makePlaceholder('place_workstation', '1.0.0', ['place']),
           makePlaceholder('place_torch_if_needed', '1.0.0', ['place']),
           makePlaceholder('retreat_and_block', '1.0.0', ['place']),
           makePlaceholder('consume_food', '1.0.0', ['sense']),

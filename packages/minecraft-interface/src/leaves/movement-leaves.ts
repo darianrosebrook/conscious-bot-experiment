@@ -9,96 +9,12 @@
 
 import { Bot } from 'mineflayer';
 import { pathfinder } from 'mineflayer-pathfinder';
-// Use simple goals implementation
-class SimpleGoalNear {
-  constructor(x: number, y: number, z: number, range: number = 1) {
-    this.x = x;
-    this.y = y;
-    this.z = z;
-    this.range = range;
-  }
-  x: number;
-  y: number;
-  z: number;
-  range: number;
-
-  // Required Goal interface properties
-  heuristic(node: any): number {
-    return 0;
-  }
-
-  isEnd(endNode: any): boolean {
-    return false;
-  }
-
-  hasChanged(): boolean {
-    return false;
-  }
-
-  isValid(): boolean {
-    return true;
-  }
-}
-
-class SimpleGoalBlock {
-  constructor(x: number, y: number, z: number) {
-    this.x = x;
-    this.y = y;
-    this.z = z;
-  }
-  x: number;
-  y: number;
-  z: number;
-
-  // Required Goal interface properties
-  heuristic(node: any): number {
-    return 0;
-  }
-
-  isEnd(endNode: any): boolean {
-    return false;
-  }
-
-  hasChanged(): boolean {
-    return false;
-  }
-
-  isValid(): boolean {
-    return true;
-  }
-}
-
-class SimpleGoalFollow {
-  constructor(entity: any, range: number = 3) {
-    this.entity = entity;
-    this.range = range;
-  }
-  entity: any;
-  range: number;
-
-  // Required Goal interface properties
-  heuristic(node: any): number {
-    return 0;
-  }
-
-  isEnd(endNode: any): boolean {
-    return false;
-  }
-
-  hasChanged(): boolean {
-    return false;
-  }
-
-  isValid(): boolean {
-    return true;
-  }
-}
-
-const simpleGoals = {
-  GoalNear: SimpleGoalNear,
-  GoalBlock: SimpleGoalBlock,
-  GoalFollow: SimpleGoalFollow,
-};
+// mineflayer-pathfinder doesn't expose goals/Movements as ESM named exports — use require
+import { createRequire } from 'module';
+const require_ = createRequire(import.meta.url);
+const pfModule = require_('mineflayer-pathfinder');
+const pathfinderGoals = pfModule.goals;
+const Movements = pfModule.Movements;
 import { Vec3 } from 'vec3';
 import {
   LeafImpl,
@@ -205,98 +121,94 @@ export class MoveToLeaf implements LeafImpl {
     const target = new Vec3(posArg.x, posArg.y, posArg.z);
     const goalType: 'GoalBlock' | 'GoalNear' | 'GoalFollow' =
       args?.goal ?? 'GoalNear';
-    const dynamic = true; // allow continuous replans
+    const range = goalType === 'GoalBlock' ? 0 : (args?.range ?? 1);
     const timeoutMs = Math.min(Math.max(args?.timeout ?? 30000, 1000), 300000);
 
-    // Ensure pathfinder plugin
+    // Ensure pathfinder plugin and movements are configured
     if (!bot.pathfinder) bot.loadPlugin(pathfinder);
+    // Always set fresh Movements — the pathfinder may have stale or missing config
+    const moves = new Movements(bot);
+    moves.scafoldingBlocks = [];
+    moves.canDig = false;
+    bot.pathfinder.setMovements(moves);
 
-    // Optional: apply Movements profile for "safe" nav if you carry mcData
-    // if (args?.safe) {
-    //   const moves = new Movements(bot, mcData);
-    //   moves.allow1by1 = false;
-    //   bot.pathfinder.setMovements(moves);
-    // }
-
-    // Build goal
+    // Build goal using mineflayer-pathfinder's real goal classes
     let g: any;
     if (goalType === 'GoalBlock')
-      g = new simpleGoals.GoalBlock(target.x, target.y, target.z);
-    else g = new simpleGoals.GoalNear(target.x, target.y, target.z, 1);
-
-    // Local abort controller that aggregates ctx.abortSignal + timeout
-    const ac = new AbortController();
-    const timeoutId = setTimeout(() => ac.abort(), timeoutMs);
-    const onCtxAbort = () =>
-      ac.abort(new DOMException('aborted', 'AbortError'));
-    ctx.abortSignal?.addEventListener('abort', onCtxAbort, { once: true });
-
-    // Lifecycle flags & counters
-    let resolved = false;
-    let replanCount = 0;
-
-    const cleanup = () => {
-      try {
-        bot.removeListener('goal_reached' as any, onGoalReached);
-      } catch {}
-      try {
-        bot.removeListener('path_update' as any, onPathUpdate);
-      } catch {}
-      try {
-        bot.removeListener('path_reset' as any, onPathReset);
-      } catch {}
-      clearTimeout(timeoutId);
-      ctx.abortSignal?.removeEventListener('abort', onCtxAbort as any);
-    };
-
-    const onGoalReached = () => {
-      if (resolved) return;
-      resolved = true;
-      cleanup();
-    };
-
-    const onPathUpdate = (results: any) => {
-      // results.status: 'noPath'|'partial'|'complete' etc. — depends on lib version
-      if (results?.status === 'noPath' && !resolved) {
-        resolved = true;
-        cleanup();
-        // reject by throwing; caught in outer try/catch
-        throw Object.assign(new Error('noPath'), {
-          _execCode: 'path.unreachable',
-        });
-      }
-      replanCount++;
-    };
-
-    const onPathReset = () => {
-      if (!resolved) {
-        resolved = true;
-        cleanup();
-        throw Object.assign(new Error('path_reset'), {
-          _execCode: 'path.stuck',
-        });
-      }
-    };
+      g = new pathfinderGoals.GoalBlock(target.x, target.y, target.z);
+    else g = new pathfinderGoals.GoalNear(target.x, target.y, target.z, range);
 
     try {
-      bot.on('goal_reached' as any, onGoalReached);
-      bot.on('path_update' as any, onPathUpdate);
-      bot.on('path_reset' as any, onPathReset);
+      // Start pathfinding (non-dynamic so goal_reached can fire)
+      bot.pathfinder.setGoal(g, false);
 
-      // Kick movement
-      bot.pathfinder.setGoal(g, dynamic);
-
-      // Wait until either we hit goal or we abort/timeout
+      // Wait for goal_reached event OR position-based completion OR failure
       await new Promise<void>((resolve, reject) => {
-        const check = () => {
-          if (resolved) return resolve();
-          if (ac.signal.aborted)
-            return reject(
-              Object.assign(new Error('aborted'), { _execCode: 'aborted' })
-            );
-          setTimeout(check, 50);
+        let done = false;
+        const finish = (err?: Error) => {
+          if (done) return;
+          done = true;
+          clearTimeout(timer);
+          clearInterval(poller);
+          clearInterval(stuckPoll);
+          ctx.abortSignal?.removeEventListener('abort', ctxAbort as any);
+          bot.removeListener('goal_reached' as any, onReached);
+          bot.removeListener('path_update' as any, onUpdate);
+          if (err) {
+            try { bot.pathfinder?.stop(); } catch {}
+          }
+          if (err) reject(err); else resolve();
         };
-        check();
+
+        const timer = setTimeout(() => {
+          finish(Object.assign(new Error('aborted'), { _execCode: 'aborted' }));
+        }, timeoutMs);
+
+        const ctxAbort = () => {
+          finish(Object.assign(new Error('aborted'), { _execCode: 'aborted' }));
+        };
+        ctx.abortSignal?.addEventListener('abort', ctxAbort, { once: true });
+
+        const onReached = () => finish();
+
+        const onUpdate = (results: any) => {
+          if (results?.status === 'noPath') {
+            finish(Object.assign(new Error('noPath'), { _execCode: 'path.unreachable' }));
+          }
+        };
+
+        // Position polling: check every 250ms if bot reached target
+        const poller = setInterval(() => {
+          const pos = bot.entity?.position;
+          if (!pos) return;
+          if (g.isEnd && g.isEnd(pos)) {
+            finish();
+          } else if (pos.distanceTo(target) <= Math.max(range, 1.5)) {
+            finish();
+          }
+        }, 250);
+
+        // Sliding-window stuck detection (backported from NavigationBridge.moveToStep)
+        const STUCK_POLL_INTERVAL = 2000;
+        const STUCK_WINDOW = 3;      // 3 samples = 6s window
+        const STUCK_THRESHOLD = 0.5; // blocks
+        const positionHistory: Vec3[] = [];
+
+        const stuckPoll = setInterval(() => {
+          const pos = bot.entity?.position;
+          if (!pos) return;
+          positionHistory.push(pos.clone());
+          if (positionHistory.length > STUCK_WINDOW) positionHistory.shift();
+          if (positionHistory.length === STUCK_WINDOW) {
+            const moved = positionHistory[0].distanceTo(positionHistory[positionHistory.length - 1]);
+            if (moved < STUCK_THRESHOLD) {
+              finish(Object.assign(new Error('stuck'), { _execCode: 'path.stuck' }));
+            }
+          }
+        }, STUCK_POLL_INTERVAL);
+
+        bot.on('goal_reached' as any, onReached);
+        bot.on('path_update' as any, onUpdate);
       });
 
       // Success
@@ -304,25 +216,15 @@ export class MoveToLeaf implements LeafImpl {
       const me = bot.entity?.position ?? new Vec3(0, 0, 0);
       const distance = me.distanceTo(target);
       ctx.emitMetric('move_to_duration_ms', duration);
-      ctx.emitMetric('move_to_replans', replanCount);
       return {
         status: 'success',
         result: { success: true, distance, duration, pathLength: undefined },
-        metrics: {
-          durationMs: duration,
-          retries: 0,
-          timeouts: ac.signal.aborted ? 1 : 0,
-        },
+        metrics: { durationMs: duration, retries: 0, timeouts: 0 },
       };
     } catch (e: any) {
-      // Map errors
-      let code: any =
-        e?._execCode ?? (ac.signal.aborted ? 'aborted' : 'path.unreachable');
+      const code: any = e?._execCode ?? 'path.unreachable';
       const duration = ctx.now() - t0;
-      try {
-        bot.pathfinder?.stop();
-      } catch {}
-      cleanup();
+      try { bot.pathfinder?.stop(); } catch {}
       return {
         status: 'failure',
         error: {
@@ -336,8 +238,6 @@ export class MoveToLeaf implements LeafImpl {
           timeouts: code === 'aborted' ? 1 : 0,
         },
       };
-    } finally {
-      cleanup();
     }
   }
 }
@@ -430,7 +330,7 @@ export class StepForwardSafelyLeaf implements LeafImpl {
     const ac = new AbortController();
     const to = setTimeout(() => ac.abort(), this.spec.timeoutMs);
     const done = bot.pathfinder?.setGoal(
-      new simpleGoals.GoalNear(bTarget.x, bTarget.y, bTarget.z, 0.5),
+      new pathfinderGoals.GoalNear(bTarget.x, bTarget.y, bTarget.z, 0.5),
       true
     );
 
@@ -557,7 +457,7 @@ export class FollowEntityLeaf implements LeafImpl {
     ctx.abortSignal?.addEventListener('abort', onCtxAbort, { once: true });
 
     try {
-      bot.pathfinder.setGoal(new simpleGoals.GoalFollow(entity, range), true);
+      bot.pathfinder.setGoal(new pathfinderGoals.GoalFollow(entity, range), true);
 
       await new Promise<void>((resolve, reject) => {
         const tick = () => {

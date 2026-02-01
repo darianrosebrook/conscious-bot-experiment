@@ -471,6 +471,7 @@ export class SterlingClient extends EventEmitter {
             solutionPath.push({
               source: msg.source,
               target: msg.target,
+              label: msg.label,
             });
             break;
 

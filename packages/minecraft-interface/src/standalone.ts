@@ -211,7 +211,7 @@ export const DEFAULT_STANDALONE_CONFIG: BotConfig = {
   host: 'localhost',
   port: 25565,
   username: 'StandaloneBot',
-  version: '1.21.9',
+  version: process.env.MINECRAFT_VERSION || '1.21.4',
   auth: 'offline',
   pathfindingTimeout: 30000,
   actionTimeout: 10000,

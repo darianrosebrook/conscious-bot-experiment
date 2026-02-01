@@ -14,6 +14,7 @@
     "test:memory-integration": "vitest run src/__tests__/memory-llm-integration.test.ts",
     "test:ollama-memory": "vitest run src/__tests__/ollama-memory-integration.test.ts",
     "test:complete-flow": "vitest run src/__tests__/complete-cognitive-flow.test.ts",
+    "test:asset-memory": "vitest run src/asset/__tests__/asset-memory-acceptance.test.ts",
     "lint": "eslint src/**/*.ts",
     "type-check": "tsc --noEmit"
   },

@@ -67,11 +67,11 @@ Sterling's capability absorption pipeline infrastructure (Layers 1–5) is now i
 |-----|-----------|--------|-------|
 | **A**: Inventory transformation | 1, 16, 17, 19, 20 | DONE (all certification items complete including A.5 performance baselines) | Track 1 |
 | **B**: Capability gating | 2, 16, 19, 20 | DONE (full tier progression + certification tests) | Track 1 |
-| **C**: Temporal planning | 3, 16, 17, 18, 19 | NOT STARTED | Track 1 |
+| **C**: Temporal planning | 3, 16, 17, 18, 19 | PARTIAL (P03 capsule + temporal enrichment layer + crafting solver integration; FurnaceSchedulingSolver C.1–C.7 remain) | Track 1 |
 | **D**: Multi-strategy acquisition (learning-benchmark candidate) | 4, 17, 18, 19, 20 | NOT STARTED | Track 2 |
-| **E**: Hierarchical planning | 5, 16, 17, 19 | NOT STARTED | Track 2 |
+| **E**: Hierarchical planning | 5, 16, 17, 19 | PARTIAL (macro-planner wired, not domain-integrated) | Track 2 |
 | **F**: Valuation under scarcity | 6, 16, 17, 18, 19 | NOT STARTED | Track 2 |
-| **G**: Feasibility + partial order | 7, 16, 17, 19 | PARTIAL (P0 building solver stub) | Track 2 |
+| **G**: Feasibility + partial order | 7, 16, 17, 19 | PARTIAL (DAG pipeline + building solver; certification gaps G.1–G.5) | Track 2 |
 | **H**: Systems synthesis | 8, 14, 16, 19 | NOT STARTED | Track 2 |
 | **I**: Epistemic planning | 11, 13, 17, 19 | NOT STARTED | Track 2 |
 | **J**: Invariant maintenance | 12, 17, 18, 19 | NOT STARTED | Track 2 |
@@ -93,13 +93,13 @@ This table maps canonical goal actions (from the sanitizer's `CANONICAL_ACTIONS`
 | `collect` | `collect` | Compiler | Yes | Working |
 | `mine` | `mine` | Compiler | Yes | Working |
 | `craft` | `craft` | A (Inventory Transform) | Yes | Working |
-| `build` | `build` | G (Feasibility) | Yes | P0 stub |
+| `build` | `build` | G (Feasibility) | Yes | Working (DAG pipeline; G.1–G.5 certification gaps). Building leaves (`prepare_site`, `build_module`, `place_feature`) reachable via `executeLeafAction()`. |
 | `gather` | `collect` | Compiler | Yes | Working |
-| `smelt` | `craft` (furnace) | Future: C (Temporal) | Yes (fallback) | Compiler fallback |
+| `smelt` | `craft` (furnace) | Future: C (Temporal) | Yes | Direct handler via `executeSmeltItem()` + LeafFactory `smelt` leaf. Future: Rig C temporal scheduling. |
 | `repair` | `build` (maintenance) | Future: J (Invariant Maint.) | Yes (fallback) | Rig G fallback |
-| `find` | — | Future: E (Hierarchical) | **No** | Unroutable |
-| `explore` | — | Future: E (Hierarchical) | **No** | Unroutable |
-| `navigate` | — | Future: E (Hierarchical) | **No** | Unroutable |
+| `find` | `find` | E (Hierarchical) | Yes | Rig E routed (blocked sentinel if unconfigured) |
+| `explore` | `explore` | E (Hierarchical) | Yes | Rig E routed (blocked sentinel if unconfigured) |
+| `navigate` | `navigate` | E (Hierarchical) | Yes | Rig E routed (blocked sentinel if unconfigured) |
 | `check` | — | N/A (sensing) | **No** | No task |
 | `continue` | — | N/A (meta-action) | **No** | No task |
 
@@ -285,9 +285,31 @@ Completed in the P0–P2 hardening sprint (2026-01-29). This underpins every rig
 
 ## Rig C: Temporal planning with durations, batching, and capacity
 
-**Status**: NOT STARTED
+**Status**: PARTIAL — P03 capsule defined + temporal enrichment layer integrated into crafting solver; FurnaceSchedulingSolver (C.1–C.7) not yet started
+
+### What's done
+
+| Item | File | Evidence |
+|------|------|----------|
+| P03 capsule contract types (domain-agnostic) | `sterling/primitives/p03/p03-capsule-types.ts` | `P03TemporalStateV1`, `P03TemporalAdapter`, `P03PlannedStepV1`; 5 invariants (INV-1 through INV-5); canonical ordering for deterministic hashing |
+| Reference adapter (domain-agnostic) | `sterling/primitives/p03/p03-reference-adapter.ts` | `P03ReferenceAdapter` satisfying all 5 invariants |
+| Reference fixtures (2 domains) | `sterling/primitives/p03/p03-reference-fixtures.ts` | Furnace smelting domain + CI runner domain for portability |
+| Conformance suite — furnace | `sterling/primitives/p03/__tests__/p03-conformance-furnace.test.ts` | Passes all 5 P03 invariants on furnace domain |
+| Conformance suite — CI | `sterling/primitives/p03/__tests__/p03-conformance-ci.test.ts` | Passes all 5 P03 invariants on CI runner domain |
+| Temporal enrichment orchestrator | `temporal/temporal-enrichment.ts` | `computeTemporalEnrichment()` — 3 modes (`off`, `local_only`, `sterling_temporal`); returns enrichRule/batchHint closures + deadlock state |
+| Time-state construction | `temporal/time-state.ts` | `makeTemporalState()`, `inferSlotsFromBlocks()`, `toTickBucket()`; MINECRAFT_BUCKET_SIZE_TICKS=100, HORIZON_BUCKETS=100 |
+| Duration model | `temporal/duration-model.ts` | `annotateRuleWithDuration()`, `computeDurationTicks()`; per-action-type table (craft=0, mine=40, smelt=200, place=5); batch scaling formula |
+| Deadlock prevention | `temporal/deadlock-prevention.ts` | `deriveSlotNeeds()`, `checkDeadlockForRules()`; fail-closed: `needsFurnace=true` implies furnace slot need |
+| Batch operators | `temporal/batch-operators.ts` | `getBatchHint()`, `MINECRAFT_BATCH_OPERATORS` (5 operators, threshold=8, maxBatchSize=64) |
+| Crafting solver temporal integration | `minecraft-crafting-solver.ts:116-166` | 3-mode gating, enrichment closures, deadlock early-return, temporal payload attachment to Sterling wire |
+| Temporal e2e test suite (49 tests) | `sterling/__tests__/temporal-crafting-e2e.test.ts` | Suites A–M: mode gating, enrichment, temporal fields, duration annotations, deadlock detection, batch hints, round-trip, adapter reuse, slot ordering, strict mock validation, smelt injection, edge cases, enrichment call counts |
+| Temporal unit tests | `temporal/__tests__/` | duration-model (6 tests), deadlock-prevention (4 tests), time-state (5 tests), enrichment-bridge (3 tests) |
+
+> **Note**: The P03 capsule (`packages/planning/src/sterling/primitives/p03/`) and temporal modules (`packages/planning/src/temporal/`) are currently untracked in git. The e2e test file was committed (`dfaec57`). The remaining untracked directories should be committed as part of the next Rig C PR.
 
 ### What's needed
+
+C.1–C.7 are the **FurnaceSchedulingSolver** certification items. The temporal enrichment layer (above) is prerequisite infrastructure; these items build the dedicated furnace solver on top of it.
 
 - [ ] **C.1 — FurnaceSchedulingSolver class**: Extends `BaseDomainSolver`. Accepts furnace count, fuel inventory, smelt queue. Calls Sterling with time-aware rules.
   - **Acceptance**: `minecraft-furnace-solver.ts` exists. Extends `BaseDomainSolver<FurnaceSolveResult>`. `solverId = 'minecraft.furnace'`. SolveBundle wired.
@@ -314,14 +336,21 @@ Completed in the P0–P2 hardening sprint (2026-01-29). This underpins every rig
 
 ## Rig G: Feasibility + partial-order structure (building)
 
-**Status**: PARTIAL — P0 building solver stub, not full certification
+**Status**: PARTIAL — building solver with DAG pipeline; certification gaps G.1–G.5 remain
 
 ### What's done
 
 | Item | File | Evidence |
 |------|------|----------|
 | Building solver (templateId, modules, siteState) | `minecraft-building-solver.ts` | `solver-golden-master.test.ts`: building tests |
-| Module types (prep_site, apply_module, place_feature) | `minecraft-building-types.ts` | Type definitions + requiresModules field |
+| Module types (prep_site, apply_module, place_feature) | `minecraft-building-types.ts` | Type definitions + `requiresModules` field + `RigGMode`, `RigGStageDecisions` |
+| DAG builder (module dependency graph) | `constraints/dag-builder.ts` | Builds DAG from module `requiresModules` |
+| Topological linearization | `constraints/linearization.ts` | Linearizes DAG; tested in `linearization.test.ts` |
+| Feasibility checker | `constraints/feasibility-checker.ts` | Validates constraint satisfaction; tested in `feasibility-checker.test.ts` |
+| Partial-order plan representation | `constraints/partial-order-plan.ts` | `findCommutingPairs()` for independent modules; tested in `partial-order-plan.test.ts` |
+| Rig G signal computation | `constraints/signals.ts` | `computeRigGSignals()` for feasibility gating |
+| Execution advisor (Rig G metadata) | `constraints/execution-advisor.ts` | `RigGMetadata` type with signals, commuting pairs, partial-order plan; tested in `execution-advisor.test.ts` |
+| Rig G metadata wiring in planner | `sterling-planner.ts:618-625` | Stores `RigGMetadata` (signals, commuting pairs, partial-order plan) in `taskData.metadata.solver.rigG` |
 | Material deficit + replan loop | `minecraft-building-solver.ts:253-306` | Golden-master: deficit → acquisition steps + replan sentinel |
 | SolveBundle wiring | Building solver | E2E: `solverId: 'minecraft.building'`, bundle shape verified |
 | Episode reporting (per-module failure attribution) | `minecraft-building-solver.ts:322-340` | Captures failureAtModuleId |
@@ -345,15 +374,59 @@ Completed in the P0–P2 hardening sprint (2026-01-29). This underpins every rig
 
 ---
 
-## Rigs D–F, H–N: Not started
+## Rig E: Hierarchical planning (navigate/explore/find)
+
+**Status**: PARTIAL — macro-planner infrastructure wired; not fully domain-integrated
+
+### What's done
+
+| Item | File | Evidence |
+|------|------|----------|
+| MacroPlanner class (Dijkstra path planning) | `hierarchical/macro-planner.ts` | Context registry, edge cost model, path computation; tested in `macro-planner.test.ts` |
+| Macro state management | `hierarchical/macro-state.ts` | Macro path state, edge sessions, outcome tracking; tested in `macro-state.test.ts` and `macro-edge-session.test.ts` |
+| Feedback store (cost updates from micro execution) | `hierarchical/feedback.ts` | Cost updates propagated from micro step outcomes; tested in `feedback.test.ts` |
+| Rig E signal instrumentation | `hierarchical/signals.ts` | Observability signals for hierarchical planner |
+| E2E macro-micro integration test | `hierarchical/__tests__/e2e-macro-micro.test.ts` | End-to-end test of macro→micro decomposition |
+| Routing wired (navigate, explore, find) | `action-plan-backend.ts:111-136` | All three requirement kinds → `requiredRig: 'E'`, `backend: 'sterling'` |
+| Planner integration with configuration gate | `sterling-planner.ts:369-417` | Calls `generateDynamicStepsHierarchical()` when configured; returns blocked sentinel otherwise |
+| Actions in ROUTABLE_ACTIONS | `thought-to-task-converter.ts:57-60` | `navigate`, `explore`, `find` all routable; tasks created for these goals |
+| Rig E step provenance tagging | `sterling-planner.ts:379-388` | Steps tagged with `source: 'rig-e-macro'`, `macroEdgeId`, `contextTarget`, `macroPlanDigest` |
+
+### What's needed for certification
+
+- [ ] **E.1 — Full domain ontology integration**: Wire Minecraft world graph (biome regions, structure locations, resource zones) into MacroPlanner context registry.
+  - **Acceptance**: MacroPlanner produces real navigation plans using actual Minecraft world topology, not synthetic test graphs.
+
+- [ ] **E.2 — Micro-step decomposition**: Macro edges decompose into concrete Mineflayer movement/interaction steps.
+  - **Acceptance**: Each macro edge produces executable micro-steps that the PlanExecutor can run.
+
+- [ ] **E.3 — Feedback loop**: Micro execution outcomes update macro edge costs for future planning.
+  - **Acceptance**: Failed or slow macro edges have increased costs in subsequent plans. Test: block a path, re-plan routes around it.
+
+- [ ] **E.4 — Golden-master snapshot**: Outbound macro plan payload captured and snapshotted.
+  - **Acceptance**: Deterministic plan for a fixed world graph + goal.
+
+- [ ] **E.5 — Transfer test**: Non-Minecraft navigation surface (e.g., floor-plan routing, network topology).
+  - **Acceptance**: Same MacroPlanner, different domain graph. Conformance suite passes on both surfaces.
+
+---
+
+## Rigs D, F, H–N: Not started
 
 These rigs are documented in [sterling-minecraft-domains.md](./sterling-minecraft-domains.md) with full rig templates. Implementation follows Track 2 (D–K) and Later (L–N) priority ordering.
 
-### Track 2 order (after A–C certified):
+### Post-certification order (after A–C certified):
+
+> **Note**: This is the sequential implementation order for all remaining rigs,
+> spanning Tracks 2 and 3 from [RIG_DOCUMENTATION_INDEX.md](./RIG_DOCUMENTATION_INDEX.md).
+> The index organizes rigs by thematic track (Track 2 = belief/perception,
+> Track 3 = representational widening); this list orders them by dependency
+> and implementation priority within those tracks.
+
 1. **Rig D** — Multi-strategy acquisition (mine vs trade vs loot) — primary candidate for a learning-sensitive benchmark (multiple legal strategies, stable outcome signal)
-2. **Rig E** — Hierarchical macro/micro (waypoint routing + Mineflayer local)
+2. **Rig E** — Hierarchical planning certification (see above for existing work)
 3. **Rig F** — Valuation under scarcity (keep/drop/store)
-4. **Rig G** — Feasibility hardening (see above)
+4. **Rig G** — Feasibility certification (see above for existing work)
 5. **Rig H** — Systems synthesis (farm layout first)
 6. **Rig I** — Epistemic planning (structure localization)
 7. **Rig J** — Invariant maintenance (base upkeep loops)
@@ -377,6 +450,70 @@ A rig is certified when it passes all three test categories:
 ---
 
 ## Recently completed work
+
+### Rig C Temporal Enrichment Layer + E2E Test Suite (2026-02-01)
+
+Built and tested the temporal enrichment pipeline that integrates P03 temporal planning into the crafting solver. This is prerequisite infrastructure for the FurnaceSchedulingSolver (C.1–C.7).
+
+**Temporal modules** (untracked — `packages/planning/src/temporal/`):
+- `temporal-enrichment.ts` — `computeTemporalEnrichment()` orchestrator: 3 modes (`off` → inert, `local_only` → enrichment without wire changes, `sterling_temporal` → full temporal payload). Returns `enrichRule`/`batchHint` closures + deadlock state.
+- `time-state.ts` — `makeTemporalState()` converts domain ticks to P03 integer buckets. `inferSlotsFromBlocks()` for pessimistic-idle slot inference from nearby blocks. Constants: `MINECRAFT_BUCKET_SIZE_TICKS=100`, `HORIZON_BUCKETS=100`.
+- `duration-model.ts` — Per-action-type duration table (craft=0, mine=40, smelt=200, place=5 ticks). Batch scaling: `base + perItem * (count-1)`.
+- `deadlock-prevention.ts` — `deriveSlotNeeds()` + `checkDeadlockForRules()`. Fail-closed: `needsFurnace=true` implies furnace slot need even without duration model mapping.
+- `batch-operators.ts` — `getBatchHint()` delegates to `adapter.preferBatch()`. `MINECRAFT_BATCH_OPERATORS`: 5 operators (iron_ore, gold_ore, raw_beef, raw_iron, sand), maxBatchSize=64, threshold=8.
+- Unit tests: duration-model (6), deadlock-prevention (4), time-state (5), enrichment-bridge (3) — 18 tests total.
+
+**Crafting solver integration** (`minecraft-crafting-solver.ts:116-166`):
+- 3-mode temporal gating in `solveCraftingGoal()`
+- Deadlock detection short-circuits solver (service.solve NOT called when deadlocked)
+- Temporal payload fields attached for `sterling_temporal` mode only
+- `enrichRule` closure annotates rules with `durationTicks`/`requiresSlotType` (local only, not sent to Sterling)
+
+**E2E test suite** (`temporal-crafting-e2e.test.ts` — committed as `dfaec57`):
+- 49 tests across 13 suites (A–M):
+  - A: Baseline mode=off (3 tests)
+  - B: local_only enrichment (3 tests)
+  - C: sterling_temporal wire fields (3 tests)
+  - D: Temporal state construction (3 tests)
+  - E: Duration annotations per action type (6 tests)
+  - F: Deadlock detection incl. smelt injection via `vi.spyOn(ruleBuilderModule)` (5 tests)
+  - G: Batch hints (5 tests)
+  - H: Full pipeline round-trip (3 tests)
+  - I: Adapter reuse across solves (2 tests)
+  - J: Canonical slot ordering (3 tests)
+  - K: Strict mock validates payload (4 tests) — `createStrictMockService()` + `makeDerivedResponse()`
+  - L: mapSolutionToSteps edge cases (3 tests)
+  - M: Enrichment entrypoint call counts per mode (3 tests)
+- Strict mock validates: goal matches, rule actions present, consumes/produces correct, temporal fields present/absent per mode, no annotation leakage to wire
+- Smelt injection at solver boundary via `vi.spyOn(ruleBuilderModule, 'buildCraftingRules')` (not monkeypatch)
+
+**Files**: 7 new source files (temporal/), 1 new test file (committed), 1 modified solver file
+**Verification**: 49/49 e2e tests passed, 320/320 sterling+temporal tests passed, 0 TS errors
+
+### Phase 0: Action Dispatch Boundary Alignment (2026-02-01)
+
+Fixed the split-brain dispatcher architecture where `mapBTActionToMinecraft` emitted action types that `executeAction()` could not handle, causing "Unknown action type" errors at runtime.
+
+**Problem**: The `/action` endpoint calls `executeAction()` directly, but `executeAction` only had `case 'craft_item'` while `mapBTActionToMinecraft('craft_recipe')` emits `type: 'craft'`. Similarly, `smelt` had no handler, and building leaves (`prepare_site`, `build_module`, `place_feature`) were registered in LeafFactory but unreachable from `executeAction`.
+
+**Commit 0a — Contract mismatch fixes**:
+- Added `case 'craft':` fall-through to `case 'craft_item':` in `executeAction`
+- Added `executeSmeltItem()` handler for `smelt` / `smelt_item` types via LeafFactory `smelt` leaf
+- Added `executeLeafAction()` generic handler for building leaves (`prepare_site`, `build_module`, `place_feature`)
+- Extracted `createLeafContext()` shared helper (was ~30 lines duplicated in `executeCraftItem` and `executeDigBlock`)
+
+**Commit 0b — LeafFactory-first dispatch**:
+- Added `ACTION_TYPE_TO_LEAF` normalization map (`craft` → `craft_recipe`, `smelt` → `smelt`, etc.)
+- Restructured `executeAction` to try LeafFactory lookup before falling through to hardcoded switch cases
+- Placeholder leaves fall through to hardcoded handlers (no behavioral change for existing code paths)
+
+**Commit 0c — Boundary conformance tests**:
+- `planner-action-boundary.test.ts` — 51 tests verifying every planner-emitted action type is accepted by `executeAction`
+- `action-dispatch-contract.test.ts` — 24 tests verifying dispatch mechanics (craft alias, smelt handler, building leaves, LeafFactory-first priority, placeholder fallthrough)
+- Documented known boundary gaps: `move_and_gather` → `gather_resources` and `explore_area` → `move_random` (cognitive-reflection mappings, not solver outputs)
+
+**Files changed**: `action-translator.ts`, `action-mapping.ts`, `types.ts` (modified); 2 new test files
+**Verification**: 75/75 tests passed across both packages, 0 TS errors
 
 ### A.5 Performance Baselines + Tightening (2026-01-30)
 

@@ -14,7 +14,7 @@ export function createDefaultBotConfig(): BotConfig {
     host: 'localhost',
     port: 25565,
     username: 'ConsciousBot',
-    version: '1.21.9',
+    version: process.env.MINECRAFT_VERSION || '1.21.4',
     auth: 'offline',
 
     pathfindingTimeout: 30000,

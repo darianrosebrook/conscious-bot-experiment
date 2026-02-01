@@ -40,6 +40,17 @@ const CONTRACTS: Record<string, LeafArgContract> = {
       return null;
     },
   },
+  place_workstation: {
+    leafName: 'place_workstation',
+    validate: (args) => {
+      if (!args.workstation || typeof args.workstation !== 'string')
+        return 'place_workstation requires workstation (string)';
+      const valid = ['crafting_table', 'furnace', 'blast_furnace'];
+      if (!valid.includes(args.workstation as string))
+        return `place_workstation: unknown workstation '${args.workstation}'`;
+      return null;
+    },
+  },
   build_module: {
     leafName: 'build_module',
     validate: (args) => {

@@ -167,7 +167,11 @@ export class NavigationBridge extends EventEmitter {
 
   // mineflayer-pathfinder wiring
   private pf?: any;
-  private movements?: any;
+  public movements?: any;
+
+  // Stored-promise readiness (replaces event-only pattern to avoid race)
+  private _pathfinderReadyPromise: Promise<boolean>;
+  private _resolvePathfinderReady!: (v: boolean) => void;
 
   // Dynamic reconfiguration system
   private terrainAnalyzer?: TerrainAnalyzer;
@@ -277,6 +281,11 @@ export class NavigationBridge extends EventEmitter {
     // Initialize environmental monitoring
     this.initializeEnvironmentalMonitoring();
 
+    // Create stored readiness promise before kicking off async init
+    this._pathfinderReadyPromise = new Promise<boolean>((resolve) => {
+      this._resolvePathfinderReady = resolve;
+    });
+
     // Initialize pathfinder asynchronously - it will be ready when needed
     this.initializePathfinder();
     this.setupEventHandlers();
@@ -331,7 +340,8 @@ export class NavigationBridge extends EventEmitter {
 
       console.log('✅ Mineflayer pathfinder fully initialized');
 
-      // Emit event that pathfinder is ready
+      // Resolve stored promise and emit event
+      this._resolvePathfinderReady(true);
       this.emit('pathfinder-ready', { success: true });
     } catch (e) {
       // If pathfinder isn't available, we can still compile; navigateTo will fail fast.
@@ -339,7 +349,8 @@ export class NavigationBridge extends EventEmitter {
       console.error('Error stack:', e instanceof Error ? e.stack : 'No stack');
       this.pf = undefined;
 
-      // Emit event that pathfinder failed
+      // Resolve stored promise and emit event
+      this._resolvePathfinderReady(false);
       this.emit('pathfinder-ready', { success: false, error: e });
     }
   }
@@ -419,25 +430,19 @@ export class NavigationBridge extends EventEmitter {
   }
 
   /**
-   * Wait for pathfinder to be ready
+   * Wait for pathfinder to be ready.
+   *
+   * Uses a stored promise so callers never miss the ready event,
+   * even if it fired before this method was called.
    */
   public async waitForPathfinderReady(
     timeoutMs: number = 5000
   ): Promise<boolean> {
-    if (this.isPathfinderReady()) {
-      return true;
-    }
-
-    return new Promise((resolve) => {
-      const timeout = setTimeout(() => {
-        resolve(false);
-      }, timeoutMs);
-
-      this.once('pathfinder-ready', (result: any) => {
-        clearTimeout(timeout);
-        resolve(result.success);
-      });
-    });
+    if (this.isPathfinderReady()) return true;
+    const timeout = new Promise<boolean>((resolve) =>
+      setTimeout(() => resolve(false), timeoutMs)
+    );
+    return Promise.race([this._pathfinderReadyPromise, timeout]);
   }
 
   /**

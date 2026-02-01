@@ -39,6 +39,56 @@ export interface PlanningSystem {
   };
 }
 
+/**
+ * Deterministic inference of `requirementCandidate` from legacy endpoint parameters.
+ * Returns the candidate or null if inference fails.
+ */
+export function inferRequirementFromEndpointParams(
+  taskData: any
+): { kind: string; outputPattern: string; quantity: number } | null {
+  const params = taskData.parameters || {};
+  const type = (taskData.type || '').toLowerCase();
+
+  // { recipe: string } → kind: 'craft'
+  if (typeof params.recipe === 'string' && params.recipe) {
+    return { kind: 'craft', outputPattern: params.recipe, quantity: params.qty || params.quantity || 1 };
+  }
+
+  // { item: string } + type → infer kind from type
+  if (typeof params.item === 'string' && params.item) {
+    const kindFromType: Record<string, string> = {
+      crafting: 'craft',
+      mining: 'mine',
+      gathering: 'collect',
+    };
+    const kind = kindFromType[type];
+    if (kind) {
+      return { kind, outputPattern: params.item, quantity: params.quantity || 1 };
+    }
+  }
+
+  // { blockType: string } → mine or collect based on type
+  if (typeof params.blockType === 'string' && params.blockType) {
+    const kind = type === 'mining' ? 'mine' : 'collect';
+    return { kind, outputPattern: params.blockType, quantity: params.quantity || 1 };
+  }
+
+  // { resourceType: 'wood' } → collect oak_log
+  if (typeof params.resourceType === 'string') {
+    const resourceMap: Record<string, string> = {
+      wood: 'oak_log',
+      stone: 'stone',
+      iron: 'iron_ore',
+    };
+    const outputPattern = resourceMap[params.resourceType.toLowerCase()];
+    if (outputPattern) {
+      return { kind: 'collect', outputPattern, quantity: params.quantity || params.targetQuantity || 1 };
+    }
+  }
+
+  return null;
+}
+
 export function createPlanningEndpoints(
   planningSystem: PlanningSystem
 ): Router {
@@ -407,6 +457,22 @@ export function createPlanningEndpoints(
   router.post('/task', async (req: Request, res: Response) => {
     try {
       const taskData = req.body;
+
+      // Infer requirementCandidate from legacy parameters if missing
+      if (!taskData.parameters?.requirementCandidate) {
+        const inferred = inferRequirementFromEndpointParams(taskData);
+        if (inferred) {
+          taskData.parameters = taskData.parameters || {};
+          taskData.parameters.requirementCandidate = inferred;
+        } else if (taskData.type && taskData.type !== 'general') {
+          return res.status(400).json({
+            success: false,
+            error: 'strict mode: requirementCandidate required; could not infer from provided parameters',
+            hint: 'Provide parameters.requirementCandidate with { kind, outputPattern, quantity }',
+          });
+        }
+      }
+
       const task = await planningSystem.goalFormulation.addTask(taskData);
       res.json({
         success: true,

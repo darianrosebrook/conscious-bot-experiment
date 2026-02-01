@@ -202,8 +202,8 @@ async function main() {
     if (service.name === 'Memory' && !baseEnv.WORLD_SEED) {
       baseEnv.MEMORY_DEV_DEFAULT_SEED = 'true';
     }
-    if (service.name === 'Minecraft Bot') {
-      baseEnv.MINECRAFT_VERSION = '1.21.9';
+    if (service.name === 'Minecraft Bot' && !baseEnv.MINECRAFT_VERSION) {
+      baseEnv.MINECRAFT_VERSION = '1.21.4';
     }
     const child = spawn(service.command, service.args, {
       stdio: 'pipe',

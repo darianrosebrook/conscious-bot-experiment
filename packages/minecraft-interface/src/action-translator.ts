@@ -109,10 +109,33 @@ interface ActionTranslatorConfig {
 import { NavigationBridge } from './navigation-bridge';
 import { StateMachineWrapper } from './extensions/state-machine-wrapper';
 
+/**
+ * Maps action types to their canonical leaf spec names.
+ * Used by the LeafFactory-first dispatch path in executeAction.
+ * If an action type is not in this map, it is tried as-is against LeafFactory.
+ */
+const ACTION_TYPE_TO_LEAF: Record<string, string> = {
+  // move_to: uses legacy executeNavigate handler (D* Lite NavigationBridge)
+  // MoveToLeaf exists for direct leaf-level usage but REST dispatch uses proven D* Lite path
+  craft: 'craft_recipe',
+  craft_item: 'craft_recipe',
+  smelt: 'smelt',
+  smelt_item: 'smelt',
+  place_workstation: 'place_workstation',
+  prepare_site: 'prepare_site',
+  build_module: 'build_module',
+  place_feature: 'place_feature',
+  sleep: 'sleep',
+  collect_items: 'collect_items',
+  find_resource: 'find_resource',
+  equip_tool: 'equip_tool',
+  introspect_recipe: 'introspect_recipe',
+};
+
 export class ActionTranslator {
   private bot: Bot;
   private config: ActionTranslatorConfig;
-  private movements: Movements;
+  private movements?: Movements;
   private navigationBridge!: NavigationBridge;
   private stateMachineWrapper?: StateMachineWrapper;
   private raycastEngine: RaycastEngine;
@@ -145,11 +168,10 @@ export class ActionTranslator {
     });
     this.raycastEngine = new RaycastEngine(this.raycastConfig, bot as any);
 
-    // Initialize pathfinder only if bot is spawned
+    // Initialize NavigationBridge if bot is spawned.
+    // NavigationBridge.initializePathfinder() handles loadPlugin + Movements + setMovements.
+    // We no longer duplicate that work here.
     if (bot.entity && bot.entity.position) {
-      bot.loadPlugin(pathfinder);
-      this.movements = new Movements(bot);
-
       console.log('🔧 ActionTranslator initialized', {
         hasBot: !!bot,
         botSpawned: !!bot.entity?.position,
@@ -157,9 +179,7 @@ export class ActionTranslator {
         timestamp: Date.now(),
       });
 
-      // Goals are initialized inline with simple implementation
-
-      // Initialize D* Lite navigation bridge
+      // Initialize D* Lite navigation bridge (owns pathfinder lifecycle)
       this.navigationBridge = new NavigationBridge(bot, {
         maxRaycastDistance: 32,
         pathfindingTimeout: 30000,
@@ -169,15 +189,7 @@ export class ActionTranslator {
         useRaycasting: true,
         usePathfinding: true,
       });
-
-      this.movements.scafoldingBlocks = []; // Don't place blocks while pathfinding
-      this.movements.canDig = false; // Don't break blocks while pathfinding initially
     } else {
-      // Initialize with basic movements, will be updated when bot spawns
-      this.movements = new Movements(bot);
-      this.movements.scafoldingBlocks = [];
-      this.movements.canDig = false;
-
       console.log(
         '⚠️ ActionTranslator initialized without NavigationBridge - bot not fully spawned yet',
         {
@@ -188,6 +200,21 @@ export class ActionTranslator {
         }
       );
     }
+  }
+
+  /**
+   * Ensure the navigation subsystem is initialized.
+   * Safe to call multiple times — NavigationBridge's stored promise resolves idempotently.
+   */
+  async ensureReady(timeoutMs = 5000): Promise<boolean> {
+    if (!this.navigationBridge) return false;
+    const ready = await this.navigationBridge.waitForPathfinderReady(timeoutMs);
+    if (ready && this.navigationBridge.movements) {
+      this.movements = this.navigationBridge.movements;
+      this.movements.scafoldingBlocks = [];
+      this.movements.canDig = false;
+    }
+    return ready;
   }
 
   /**
@@ -897,14 +924,47 @@ export class ActionTranslator {
   }
 
   /**
-   * Execute a Minecraft action
+   * Execute a Minecraft action.
+   *
+   * Dispatch order:
+   * 1. LeafFactory-first: if a non-placeholder leaf exists for the action type
+   *    (or its normalized name via ACTION_TYPE_TO_LEAF), delegate to executeLeafAction.
+   * 2. Hardcoded handlers: legacy switch for action types without leaf implementations.
+   *
+   * As leaves are implemented for more action types, the hardcoded cases
+   * naturally become unreachable and can be removed one at a time.
    */
   async executeAction(
     action: MinecraftAction
   ): Promise<{ success: boolean; data?: any; error?: string }> {
     const timeout = action.timeout || this.config.actionTimeout;
 
+    // Action types that must use legacy handlers (D* Lite NavigationBridge, etc.)
+    const LEGACY_ONLY = new Set(['move_to', 'navigate']);
+
     try {
+      // Phase 1: LeafFactory-first dispatch (skip legacy-only actions)
+      const leafFactory = (global as any).minecraftLeafFactory;
+      if (leafFactory && !LEGACY_ONLY.has(action.type)) {
+        const leafName =
+          ACTION_TYPE_TO_LEAF[action.type] || action.type;
+        const leaf = leafFactory.get(leafName);
+        if (leaf && (leaf as any)?.spec?.placeholder !== true) {
+          // For craft, use the dedicated handler that has fallback logic
+          if (
+            leafName === 'craft_recipe' &&
+            (action.type === 'craft' || action.type === 'craft_item')
+          ) {
+            return await this.executeCraftItem(action, timeout);
+          }
+          return await this.executeLeafAction(
+            { ...action, type: leafName as any },
+            timeout
+          );
+        }
+      }
+
+      // Phase 2: Hardcoded handlers (legacy)
       switch (action.type) {
         case 'navigate':
           return await this.executeNavigate(action as NavigateAction, timeout);
@@ -960,8 +1020,18 @@ export class ActionTranslator {
           // Executing dig_block action
           return await this.executeDigBlock(action, timeout);
 
+        case 'craft':
         case 'craft_item':
           return await this.executeCraftItem(action, timeout);
+
+        case 'smelt':
+        case 'smelt_item':
+          return await this.executeSmeltItem(action, timeout);
+
+        case 'prepare_site':
+        case 'build_module':
+        case 'place_feature':
+          return await this.executeLeafAction(action, timeout);
 
         case 'pickup_item':
           return await this.executePickup(action, timeout);
@@ -1044,38 +1114,7 @@ export class ActionTranslator {
         (craftRecipeLeaf as any)?.spec?.placeholder !== true
       ) {
         try {
-          // Create leaf context
-          const context = {
-            bot: this.bot,
-            abortSignal: new AbortController().signal,
-            now: () => Date.now(),
-            snapshot: async () => ({
-              position: this.bot.entity.position,
-              biome: 'unknown',
-              time: 0,
-              lightLevel: 0,
-              nearbyHostiles: [],
-              weather: 'clear',
-              inventory: { items: this.bot.inventory.items() },
-              toolDurability: {},
-              waypoints: [],
-            }),
-            inventory: async () => ({
-              items: this.bot.inventory.items().map((item: any) => ({
-                type: item.name,
-                count: item.count,
-                slot: item.slot,
-                metadata: item.metadata,
-              })),
-            }),
-            emitMetric: (
-              name: string,
-              value: number,
-              tags?: Record<string, string>
-            ) => {
-              console.log(`📊 Metric: ${name} = ${value}`, tags);
-            },
-          };
+          const context = this.createLeafContext();
 
           // Execute the craft_recipe leaf
           const result = await craftRecipeLeaf.run(context, {
@@ -1193,6 +1232,159 @@ export class ActionTranslator {
   }
 
   /**
+   * Create a leaf execution context from the current bot state.
+   * Shared by executeCraftItem, executeSmeltItem, executeLeafAction, and executeDigBlock.
+   */
+  private createLeafContext() {
+    return {
+      bot: this.bot,
+      abortSignal: new AbortController().signal,
+      now: () => Date.now(),
+      snapshot: async () => ({
+        position: this.bot.entity.position,
+        biome: 'unknown',
+        time: 0,
+        lightLevel: 0,
+        nearbyHostiles: [],
+        weather: 'clear',
+        inventory: { items: this.bot.inventory.items() },
+        toolDurability: {},
+        waypoints: [],
+      }),
+      inventory: async () => ({
+        items: this.bot.inventory.items().map((item: any) => ({
+          type: item.name,
+          name: item.name,
+          count: item.count,
+          slot: item.slot,
+          metadata: item.metadata,
+        })),
+        selectedSlot: 0,
+        totalSlots: 36,
+        freeSlots: 36 - this.bot.inventory.items().length,
+      }),
+      emitMetric: (
+        name: string,
+        value: number,
+        tags?: Record<string, string>
+      ) => {
+        console.log(`Metric: ${name} = ${value}`, tags);
+      },
+      emitError: (error: any) => {
+        console.error('Leaf error:', error);
+      },
+    };
+  }
+
+  /**
+   * Execute smelt action via the SmeltLeaf in LeafFactory.
+   */
+  private async executeSmeltItem(
+    action: MinecraftAction,
+    timeout: number
+  ): Promise<{ success: boolean; data?: any; error?: string }> {
+    const { item, quantity = 1, fuel } = action.parameters;
+
+    try {
+      const leafFactory = (global as any).minecraftLeafFactory;
+      if (!leafFactory) {
+        return {
+          success: false,
+          error: 'Leaf factory not available for smelt',
+        };
+      }
+
+      const smeltLeaf = leafFactory.get('smelt');
+      if (!smeltLeaf) {
+        return { success: false, error: 'No leaf registered for smelt' };
+      }
+      if ((smeltLeaf as any)?.spec?.placeholder === true) {
+        return {
+          success: false,
+          error: "Leaf 'smelt' is a placeholder stub",
+        };
+      }
+
+      const context = this.createLeafContext();
+      const result = await smeltLeaf.run(context, {
+        item,
+        quantity,
+        fuel: fuel || 'coal',
+        timeoutMs: timeout,
+      });
+
+      return {
+        success: result.status === 'success',
+        data: { item, quantity, leafResult: result },
+        error:
+          result.status === 'failure'
+            ? result.error?.detail || 'Smelting failed'
+            : undefined,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : String(error),
+      };
+    }
+  }
+
+  /**
+   * Generic leaf execution via LeafFactory.
+   * Used for action types that map directly to registered leaf names
+   * (e.g. prepare_site, build_module, place_feature).
+   */
+  private async executeLeafAction(
+    action: MinecraftAction,
+    timeout: number
+  ): Promise<{ success: boolean; data?: any; error?: string }> {
+    const leafFactory = (global as any).minecraftLeafFactory;
+    if (!leafFactory) {
+      return {
+        success: false,
+        error: `Leaf factory not available for ${action.type}`,
+      };
+    }
+
+    const leaf = leafFactory.get(action.type);
+    if (!leaf) {
+      return {
+        success: false,
+        error: `No leaf registered for action type: ${action.type}`,
+      };
+    }
+
+    if ((leaf as any)?.spec?.placeholder === true) {
+      return {
+        success: false,
+        error: `Leaf '${action.type}' is a placeholder stub`,
+      };
+    }
+
+    try {
+      const context = this.createLeafContext();
+      const result = await leaf.run(context, {
+        ...action.parameters,
+        timeoutMs: timeout,
+      });
+
+      return {
+        success: result.status === 'success',
+        data: { type: action.type, leafResult: result },
+        error:
+          result.status === 'failure'
+            ? result.error?.detail || `${action.type} failed`
+            : undefined,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : String(error),
+      };
+    }
+  }
+
+  /**
    * Execute dig block action using leaf factory with fallback
    */
   private async executeDigBlock(
@@ -1227,39 +1419,7 @@ export class ActionTranslator {
         };
       }
 
-      // Create leaf context
-      const context = {
-        bot: this.bot,
-        abortSignal: new AbortController().signal,
-        now: () => Date.now(),
-        snapshot: async () => ({
-          position: this.bot.entity.position,
-          biome: 'unknown',
-          time: 0,
-          lightLevel: 0,
-          nearbyHostiles: [],
-          weather: 'clear',
-          inventory: { items: this.bot.inventory.items() },
-          toolDurability: {},
-          waypoints: [],
-        }),
-        inventory: async () => ({
-          items: this.bot.inventory.items().map((item: any) => ({
-            name: item.name,
-            count: item.count,
-            slot: item.slot,
-          })),
-          selectedSlot: 0, // Default to first slot
-          totalSlots: 36,
-          freeSlots: 36 - this.bot.inventory.items().length,
-        }),
-        emitMetric: (name: string, value: number) => {
-          // Metrics emission
-        },
-        emitError: (error: any) => {
-          // Error emission
-        },
-      };
+      const context = this.createLeafContext();
 
       // Resolve parameters and infer a target position when only a blockType is provided
       let parameters = { ...action.parameters } as any;
@@ -2018,6 +2178,15 @@ export class ActionTranslator {
           success: false,
           error:
             'NavigationBridge not initialized - bot may not be fully spawned',
+        };
+      }
+
+      // Ensure pathfinder is ready before dispatching navigation
+      const pfReady = await this.ensureReady(5000);
+      if (!pfReady) {
+        return {
+          success: false,
+          error: 'Navigation subsystem not ready (pathfinder init failed or timed out)',
         };
       }
 
