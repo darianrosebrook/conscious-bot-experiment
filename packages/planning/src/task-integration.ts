@@ -664,6 +664,7 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
         intentParams: taskData.parameters?.intentParams,
         botPosition,
         verifier,
+        goalId: taskData.parameters?.goalId,
       },
       {
         getAllTasks: () => this.taskStore.getAllTasks(),
