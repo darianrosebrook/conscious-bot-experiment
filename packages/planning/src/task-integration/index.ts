@@ -13,9 +13,16 @@ export {
   calculateTaskUrgency,
   convertThoughtToTask,
   type ConvertThoughtToTaskDeps,
+  type ConvertThoughtResult,
+  type TaskDecision,
 } from './thought-to-task-converter';
 export { TaskStore } from './task-store';
 export {
   SterlingPlanner,
   type SterlingPlannerOptions,
 } from './sterling-planner';
+export {
+  TaskManagementHandler,
+  type ManagementDecision,
+  type ManagementResult,
+} from './task-management-handler';

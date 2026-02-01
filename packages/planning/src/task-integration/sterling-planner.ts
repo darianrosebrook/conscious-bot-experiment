@@ -15,6 +15,14 @@ import { routeActionPlan } from '../modules/action-plan-backend';
 import { requirementToFallbackPlan } from '../modules/leaf-arg-contracts';
 import type { Task } from '../types/task';
 import type { TaskStep } from '../types/task-step';
+import type { PlanningDecision } from '../constraints/planning-decisions';
+import type { RigGMetadata } from '../constraints/execution-advisor';
+import { findCommutingPairs } from '../constraints/dag-builder';
+import type { MacroPlanner } from '../hierarchical/macro-planner';
+import type { MacroPlan, MacroEdge, MacroEdgeSession } from '../hierarchical/macro-state';
+import { createMacroEdgeSession, finalizeSession } from '../hierarchical/macro-state';
+import type { FeedbackStore } from '../hierarchical/feedback';
+import type { MicroOutcome } from '../hierarchical/macro-state';
 
 export interface SterlingPlannerOptions {
   /** HTTP get for Minecraft interface (path, opts) => Response */
@@ -73,8 +81,160 @@ export class SterlingPlanner {
   private readonly solverRegistry = new Map<string, BaseDomainSolver>();
   private _mcDataCache: any = null;
 
+  /** Optional macro planner for hierarchical planning (Rig E) */
+  private _macroPlanner?: MacroPlanner;
+  /** Optional feedback store for macro cost updates (Rig E) */
+  private _feedbackStore?: FeedbackStore;
+  /** Active macro edge sessions keyed by sessionId */
+  private readonly _activeSessions = new Map<string, MacroEdgeSession>();
+
   constructor(options: SterlingPlannerOptions) {
     this.minecraftGet = options.minecraftGet;
+  }
+
+  /**
+   * Set the macro planner for hierarchical planning.
+   */
+  setMacroPlanner(planner: MacroPlanner): void {
+    this._macroPlanner = planner;
+  }
+
+  /**
+   * Set the feedback store for macro cost updates.
+   */
+  setFeedbackStore(store: FeedbackStore): void {
+    this._feedbackStore = store;
+  }
+
+  get macroPlanner(): MacroPlanner | undefined {
+    return this._macroPlanner;
+  }
+
+  get feedbackStore(): FeedbackStore | undefined {
+    return this._feedbackStore;
+  }
+
+  /**
+   * Check whether the hierarchical planning subsystem is fully wired.
+   * Both MacroPlanner and FeedbackStore must be set.
+   */
+  get isHierarchicalConfigured(): boolean {
+    return !!this._macroPlanner && !!this._feedbackStore;
+  }
+
+  /**
+   * Generate dynamic steps with hierarchical macro planning.
+   *
+   * Returns PlanningDecision containing steps, macro plan, and current edge.
+   * If macro planner or feedback store is not configured, returns
+   * blocked:planner_unconfigured — never silently falls through to flat planning.
+   */
+  async generateDynamicStepsHierarchical(
+    taskData: Partial<Task>
+  ): Promise<
+    PlanningDecision<{
+      steps: TaskStep[];
+      macroPlan?: MacroPlan;
+      currentEdge?: MacroEdge;
+    }>
+  > {
+    if (!this._macroPlanner || !this._feedbackStore) {
+      return {
+        kind: 'blocked',
+        reason: 'planner_unconfigured',
+        detail: `Hierarchical planning requires both MacroPlanner and FeedbackStore. Missing: ${[
+          !this._macroPlanner && 'MacroPlanner',
+          !this._feedbackStore && 'FeedbackStore',
+        ]
+          .filter(Boolean)
+          .join(', ')}`,
+      };
+    }
+
+    const requirement = resolveRequirement(taskData);
+    if (!requirement) {
+      return {
+        kind: 'blocked',
+        reason: 'ontology_gap',
+        detail: 'No requirement resolved from task data',
+      };
+    }
+
+    const contextResult = this._macroPlanner.contextFromRequirement(
+      requirement.kind
+    );
+    if (contextResult.kind !== 'ok') {
+      return contextResult;
+    }
+
+    const { start, goal } = contextResult.value;
+    const goalId = taskData.id || 'unknown';
+    const pathResult = this._macroPlanner.planMacroPath(start, goal, goalId);
+
+    if (pathResult.kind !== 'ok') {
+      return pathResult;
+    }
+
+    const macroPlan = pathResult.value;
+
+    if (macroPlan.edges.length === 0) {
+      // Already at goal — generate micro steps directly
+      const steps = await this.generateDynamicSteps(taskData);
+      return { kind: 'ok', value: { steps, macroPlan } };
+    }
+
+    // For now, generate steps for the first macro edge
+    const currentEdge = macroPlan.edges[0];
+    const steps = await this.generateDynamicSteps(taskData);
+
+    return {
+      kind: 'ok',
+      value: { steps, macroPlan, currentEdge },
+    };
+  }
+
+  /**
+   * Create a macro edge session for tracking micro execution.
+   */
+  createEdgeSession(
+    edge: MacroEdge,
+    leafStepsIssued: number
+  ): MacroEdgeSession {
+    const session = createMacroEdgeSession(edge, leafStepsIssued);
+    this._activeSessions.set(session.sessionId, session);
+    return session;
+  }
+
+  /**
+   * Get an active session by ID.
+   */
+  getSession(sessionId: string): MacroEdgeSession | undefined {
+    return this._activeSessions.get(sessionId);
+  }
+
+  /**
+   * Finalize an edge session, produce MicroOutcome, report feedback.
+   * Returns the outcome if this is the first finalization (exactly-once).
+   */
+  finalizeEdgeSession(sessionId: string): MicroOutcome | undefined {
+    const session = this._activeSessions.get(sessionId);
+    if (!session) return undefined;
+
+    const outcome = finalizeSession(session);
+    if (!outcome) return undefined; // Already reported
+
+    // Report feedback if store is available
+    if (this._feedbackStore && this._macroPlanner) {
+      this._feedbackStore.recordOutcome(
+        this._macroPlanner.getGraph(),
+        outcome
+      );
+    }
+
+    // Clean up session
+    this._activeSessions.delete(sessionId);
+
+    return outcome;
   }
 
   private get craftingSolver(): MinecraftCraftingSolver | undefined {
@@ -197,6 +357,25 @@ export class SterlingPlanner {
           error
         );
       }
+    }
+
+    // Rig E: solver not yet implemented — return explicit blocked sentinel
+    // so TaskIntegration can transition to pending_planning with a reason.
+    if (route.requiredRig === 'E') {
+      console.warn(
+        `[PlanRoute] Rig E solver not implemented. Task "${taskData.title}" will be blocked.`
+      );
+      return [{
+        id: `step-blocked-rig-e-${taskData.id || 'unknown'}`,
+        label: '[BLOCKED] Rig E solver not implemented',
+        done: false,
+        order: 1,
+        meta: {
+          blocked: true,
+          blockedReason: 'rig_e_solver_unimplemented',
+          requiredRig: 'E',
+        },
+      }];
     }
 
     return [];
@@ -391,6 +570,21 @@ export class SterlingPlanner {
     if (taskData.metadata) {
       (taskData.metadata as any).buildingPlanId = result.planId;
       (taskData.metadata as any).buildingTemplateId = templateId;
+
+      // Store Rig G metadata for feasibility gating in startTaskStep
+      if (result.rigGSignals) {
+        const commutingPairs = result.partialOrderPlan
+          ? findCommutingPairs(result.partialOrderPlan)
+          : [];
+        const rigG: RigGMetadata = {
+          version: 1,
+          signals: result.rigGSignals,
+          commutingPairs,
+          partialOrderPlan: result.partialOrderPlan,
+          computedAt: Date.now(),
+        };
+        (taskData.metadata as any).rigG = rigG;
+      }
     }
 
     if (result.needsMaterials && replanCount >= MAX_REPLANS) {

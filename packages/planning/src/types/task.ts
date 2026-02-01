@@ -57,6 +57,10 @@ export interface Task {
     lastRepairAt?: number;
     lastStepsDigest?: string;
     pendingPlanningTicks?: number;
+    /** Tag-stripped display title (computed on read if missing) */
+    titleDisplay?: string;
+    /** Tag-stripped display description (computed on read if missing) */
+    descriptionDisplay?: string;
   };
 }
 

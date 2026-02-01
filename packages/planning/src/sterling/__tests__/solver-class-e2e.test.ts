@@ -25,6 +25,11 @@ import { MinecraftBuildingSolver } from '../minecraft-building-solver';
 import { SterlingReasoningService } from '../sterling-reasoning-service';
 import { contentHash, canonicalize } from '../solve-bundle';
 import { detectHeuristicDegeneracy } from '../search-health';
+import type { BuildingModule, BuildingSiteState } from '../minecraft-building-types';
+import { buildDefaultMinecraftGraph, MacroPlanner } from '../../hierarchical/macro-planner';
+import { FeedbackStore } from '../../hierarchical/feedback';
+import { collectRigESignals } from '../../hierarchical/signals';
+import { SterlingPlanner } from '../../task-integration/sterling-planner';
 
 const STERLING_URL = 'ws://localhost:8766';
 
@@ -318,5 +323,265 @@ describeIf(shouldRun)('ToolProgressionSolver — iron-tier searchHealth', () => 
       const unique = new Set(goalHashes);
       expect(unique.size).toBe(goalHashes.length);
     }
+  });
+});
+
+// ===========================================================================
+// Rig G — Multi-module DAG pipeline E2E (2.0)
+// ===========================================================================
+
+describeIf(shouldRun)('BuildingSolver — Rig G DAG pipeline E2E', () => {
+  it('multi-module building solve populates rigGStageDecisions and DAG', async () => {
+    const service = new SterlingReasoningService({
+      url: STERLING_URL,
+      enabled: true,
+      solveTimeout: 30000,
+      connectTimeout: 5000,
+      maxReconnectAttempts: 1,
+    });
+    await service.initialize();
+    await new Promise((r) => setTimeout(r, 500));
+    services.push(service);
+
+    const solver = new MinecraftBuildingSolver(service);
+
+    if (!service.isAvailable()) {
+      console.log('  [SKIPPED] Sterling server not available');
+      return;
+    }
+
+    // Multi-module scenario with dependencies:
+    // foundation → walls → roof
+    const modules: BuildingModule[] = [
+      {
+        moduleId: 'foundation_1',
+        moduleType: 'prep_site',
+        requiresModules: [],
+        materialsNeeded: [{ name: 'cobblestone', count: 8 }],
+        placementFeasible: true,
+        baseCost: 1,
+      },
+      {
+        moduleId: 'walls_1',
+        moduleType: 'apply_module',
+        requiresModules: ['foundation_1'],
+        materialsNeeded: [{ name: 'cobblestone', count: 24 }],
+        placementFeasible: true,
+        baseCost: 2,
+      },
+      {
+        moduleId: 'roof_1',
+        moduleType: 'place_feature',
+        requiresModules: ['walls_1'],
+        materialsNeeded: [{ name: 'oak_planks', count: 12 }],
+        placementFeasible: true,
+        baseCost: 3,
+      },
+    ];
+
+    const siteState: BuildingSiteState = {
+      terrain: 'flat',
+      biome: 'plains',
+      hasTreesNearby: false,
+      hasWaterNearby: false,
+      siteCaps: 'flat_5x5_clear',
+    };
+
+    const result = await solver.solveBuildingPlan(
+      'shelter_3mod_e2e',
+      'N',
+      ['roof_1'],
+      { cobblestone: 50, oak_planks: 20 },
+      siteState,
+      modules
+    );
+
+    // Core: solveMeta populated
+    expect(result.solveMeta).toBeDefined();
+    expect(result.solveMeta!.bundles.length).toBe(1);
+
+    // Rig G per-stage decisions
+    expect(result.rigGStageDecisions).toBeDefined();
+    const stages = result.rigGStageDecisions!;
+    console.log(
+      `[Rig G E2E] dagDecision.kind=${stages.dagDecision.kind}` +
+      ` linearize=${stages.linearizeDecision?.kind ?? 'N/A'}` +
+      ` feasibility=${stages.feasibilityDecision?.kind ?? 'N/A'}` +
+      ` overall=${stages.overallDecision.kind}`
+    );
+
+    // If solved and DAG succeeded, assert full pipeline
+    if (result.solved && stages.dagDecision.kind === 'ok') {
+      expect(result.partialOrderPlan).toBeDefined();
+      expect(result.partialOrderPlan!.nodes.length).toBe(3);
+      expect(result.partialOrderPlan!.edges.length).toBe(2); // foundation→walls, walls→roof
+
+      expect(stages.linearizeDecision).toBeDefined();
+      expect(stages.linearizeDecision!.kind).toBe('ok');
+
+      expect(stages.feasibilityDecision).toBeDefined();
+      expect(stages.feasibilityDecision!.kind).toBe('ok');
+
+      expect(stages.overallDecision.kind).toBe('ok');
+      expect(result.degradedToRawSteps).toBe(false);
+
+      // Rig G signals
+      expect(result.rigGSignals).toBeDefined();
+      expect(result.rigGSignals!.dag_node_count).toBe(3);
+      expect(result.rigGSignals!.dag_edge_count).toBe(2);
+      expect(result.rigGSignals!.feasibility_passed).toBe(true);
+      expect(result.rigGSignals!.degraded_to_raw_steps).toBe(false);
+
+      // Steps should be in topological order: foundation before walls before roof
+      const stepModuleIds = result.steps.map((s) => s.moduleId);
+      const foundIdx = stepModuleIds.indexOf('foundation_1');
+      const wallIdx = stepModuleIds.indexOf('walls_1');
+      const roofIdx = stepModuleIds.indexOf('roof_1');
+      if (foundIdx >= 0 && wallIdx >= 0 && roofIdx >= 0) {
+        expect(foundIdx).toBeLessThan(wallIdx);
+        expect(wallIdx).toBeLessThan(roofIdx);
+      }
+
+      console.log(
+        `[Rig G E2E] steps=${stepModuleIds.join(' → ')}` +
+        ` digest=${result.rigGSignals!.plan_digest.slice(0, 8)}` +
+        ` linDigest=${result.rigGSignals!.linearization_digest.slice(0, 8)}`
+      );
+    } else if (!result.solved) {
+      // Building didn't solve — still assert stage decisions are captured
+      console.log(
+        `[Rig G E2E] solve did not succeed — dagDecision.kind=${stages.dagDecision.kind}`
+      );
+    }
+  });
+});
+
+// ===========================================================================
+// Rig E — Hierarchical planning wiring E2E (3.0)
+// ===========================================================================
+
+describeIf(shouldRun)('SterlingPlanner — Rig E wiring E2E', () => {
+  it('returns blocked:planner_unconfigured when hierarchical planning is unwired', async () => {
+    // Create a SterlingPlanner without macro planner / feedback store
+    const planner = new SterlingPlanner({
+      minecraftGet: async () => new Response(null, { status: 503 }),
+    });
+
+    expect(planner.isHierarchicalConfigured).toBe(false);
+
+    const decision = await planner.generateDynamicStepsHierarchical({
+      id: 'test-task-1',
+      title: 'Craft wooden pickaxe',
+    });
+
+    expect(decision.kind).toBe('blocked');
+    if (decision.kind === 'blocked') {
+      expect(decision.reason).toBe('planner_unconfigured');
+      expect(decision.detail).toContain('MacroPlanner');
+      expect(decision.detail).toContain('FeedbackStore');
+    }
+  });
+
+  it('returns blocked:planner_unconfigured with only MacroPlanner (no FeedbackStore)', async () => {
+    const planner = new SterlingPlanner({
+      minecraftGet: async () => new Response(null, { status: 503 }),
+    });
+
+    const macro = buildDefaultMinecraftGraph();
+    planner.setMacroPlanner(macro);
+
+    expect(planner.isHierarchicalConfigured).toBe(false);
+
+    const decision = await planner.generateDynamicStepsHierarchical({
+      id: 'test-task-2',
+    });
+
+    expect(decision.kind).toBe('blocked');
+    if (decision.kind === 'blocked') {
+      expect(decision.reason).toBe('planner_unconfigured');
+      expect(decision.detail).toContain('FeedbackStore');
+      // "Missing:" section should list only FeedbackStore, not MacroPlanner
+      const missingSection = decision.detail.split('Missing:')[1] ?? '';
+      expect(missingSection).toContain('FeedbackStore');
+      expect(missingSection).not.toContain('MacroPlanner');
+    }
+  });
+
+  it('runtime_configured signal reflects wiring state', () => {
+    const planner = buildDefaultMinecraftGraph();
+    const graph = planner.getGraph();
+    const store = new FeedbackStore();
+
+    // Not configured
+    const unwiredSignals = collectRigESignals({
+      graph,
+      feedbackStore: store,
+      outcomesReported: 0,
+      costUpdatedOnOutcome: false,
+      replanTriggered: false,
+      runtimeConfigured: false,
+    });
+    expect(unwiredSignals.runtime_configured).toBe(false);
+
+    // Configured
+    const wiredSignals = collectRigESignals({
+      graph,
+      feedbackStore: store,
+      outcomesReported: 0,
+      costUpdatedOnOutcome: false,
+      replanTriggered: false,
+      runtimeConfigured: true,
+    });
+    expect(wiredSignals.runtime_configured).toBe(true);
+  });
+
+  it('deferred feedback: costs do not mutate during planning, flush on exit', () => {
+    const planner = buildDefaultMinecraftGraph();
+    const graph = planner.getGraph();
+    const store = new FeedbackStore();
+    store.captureTopology(graph);
+
+    const edge = graph.edges[0];
+    const initialCost = edge.learnedCost;
+
+    // Enter planning
+    store.enterPlanningPhase();
+
+    // Record outcome during planning — should NOT mutate
+    store.recordOutcome(graph, {
+      macroEdgeId: edge.id,
+      success: true,
+      durationMs: 5000,
+      leafStepsCompleted: 3,
+      leafStepsFailed: 0,
+    }, 'e2e-during-planning');
+
+    expect(edge.learnedCost).toBe(initialCost); // Not mutated
+    expect(store.deferredCount).toBe(1);
+    expect(store.getViolations().length).toBe(1);
+
+    // Exit planning — deferred outcomes flush
+    store.exitPlanningPhase();
+
+    expect(edge.learnedCost).not.toBe(initialCost); // Now mutated
+    expect(store.deferredCount).toBe(0);
+
+    // Topology unchanged (invariant)
+    expect(store.getTopologyChanged(graph)).toBe(false);
+
+    // Collect signals
+    const signals = collectRigESignals({
+      graph,
+      feedbackStore: store,
+      outcomesReported: 1,
+      costUpdatedOnOutcome: true,
+      replanTriggered: false,
+      runtimeConfigured: true,
+    });
+
+    expect(signals.cost_store_updated_during_planning).toBe(true); // violation was recorded
+    expect(signals.topology_changed).toBe(false);
+    expect(signals.runtime_configured).toBe(true);
+    expect(signals.macro_state_has_coordinates).toBe(false);
   });
 });

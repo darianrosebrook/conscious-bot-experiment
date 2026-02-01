@@ -15,13 +15,48 @@ import { parseRequiredQuantityFromTitle } from '../modules/requirements';
 
 // Import shared parser from cognition boundary — no local regex fork
 import type { GoalTagV1 } from '@conscious-bot/cognition';
+import type { TaskManagementHandler, ManagementResult } from './task-management-handler';
+
+/**
+ * Explicit decision state for task creation — makes "why nothing happened" visible.
+ * Downstream consumers (dashboard, telemetry) can read this without guessing.
+ */
+export type TaskDecision =
+  | 'created'              // task was successfully created
+  | 'blocked_unroutable'   // canonical action not in ROUTABLE_ACTIONS
+  | 'blocked_guard'        // thought filtered by content guard (status text, etc.)
+  | 'suppressed_dedup'     // same goal within dedup window
+  | 'dropped_sanitizer'    // no extractedGoal and keyword fallback didn't match
+  | 'dropped_seen'         // thought ID already processed
+  | 'management_applied'          // management action applied successfully
+  | 'management_needs_disambiguation' // management action ambiguous — multiple candidates
+  | 'management_failed'           // management action target not found or invalid transition
+  | 'error';               // exception during conversion
+
+export interface ConvertThoughtResult {
+  task: Task | null;
+  decision: TaskDecision;
+  /** Reason string for debugging (e.g., "action 'explore' not routable") */
+  reason?: string;
+  /** Management result when a management action was processed */
+  managementResult?: ManagementResult;
+}
+
+/**
+ * Management actions — handled by TaskManagementHandler, not by task creation.
+ * Dispatched before ROUTABLE_ACTIONS check.
+ */
+const MANAGEMENT_ACTIONS = new Set([
+  'cancel', 'prioritize', 'pause', 'resume',
+]);
 
 /**
  * Routable actions — strict subset of CANONICAL_ACTIONS that resolveRequirement + routeActionPlan can handle.
- * Unroutable actions (find, explore, navigate, check, continue) exist for cognitive observability only.
+ * Unroutable actions (check, continue) exist for cognitive observability only.
  */
 const ROUTABLE_ACTIONS = new Set([
   'collect', 'mine', 'craft', 'build', 'gather', 'smelt', 'repair',
+  'navigate', 'explore', 'find',
 ]);
 
 /** Maps routable canonical actions to task types */
@@ -33,6 +68,9 @@ const ACTION_TO_TASK_TYPE: Record<string, string> = {
   gather: 'gathering',
   smelt: 'crafting',
   repair: 'building',
+  navigate: 'navigation',
+  explore: 'exploration',
+  find: 'exploration',
 };
 
 /** Regex to strip residual [GOAL:...] tags (and optional trailing amount) from display text */
@@ -112,14 +150,24 @@ export interface ConvertThoughtToTaskDeps {
   markThoughtAsProcessed: (thoughtId: string) => Promise<void>;
   seenThoughtIds: Set<string>;
   trimSeenThoughtIds: () => void;
+  /** Current inventory for satisfaction-aware dedup. Optional for backward compat. */
+  getInventoryBand?: (itemName: string) => string;
+  /** Management handler for cancel/pause/resume/prioritize actions. Optional for backward compat. */
+  managementHandler?: TaskManagementHandler;
 }
 
 /** Recent goal hashes for 5-minute dedup window */
 const recentGoalHashes = new Map<string, number>();
 const GOAL_DEDUP_WINDOW_MS = 5 * 60 * 1000;
 
-function isGoalDuplicate(goal: GoalTagV1): boolean {
-  const hash = `${goal.action}:${goal.target}:${goal.amount ?? ''}`;
+/**
+ * Check if goal is a duplicate within the dedup window.
+ * Key includes inventory band when available so that a re-proposal
+ * after the inventory state changed (e.g., items consumed/lost) is NOT suppressed.
+ */
+function isGoalDuplicate(goal: GoalTagV1, inventoryBand?: string): boolean {
+  const invSuffix = inventoryBand ? `:inv=${inventoryBand}` : '';
+  const hash = `${goal.action}:${goal.target}:${goal.amount ?? ''}${invSuffix}`;
   const now = Date.now();
   const lastSeen = recentGoalHashes.get(hash);
   if (lastSeen && now - lastSeen < GOAL_DEDUP_WINDOW_MS) {
@@ -142,14 +190,17 @@ function isGoalDuplicate(goal: GoalTagV1): boolean {
  * Fallback: keyword-based classification from content.
  * No LLM fallback — the sanitizer is the single boundary.
  *
+ * Returns `ConvertThoughtResult` with explicit decision state so callers
+ * can distinguish "no task needed" from "task creation failed."
+ *
  * Fail-closed: unroutable actions (find, explore, navigate, check, continue) → null.
  */
 export async function convertThoughtToTask(
   thought: CognitiveStreamThought,
   deps: ConvertThoughtToTaskDeps
-): Promise<Task | null> {
+): Promise<ConvertThoughtResult> {
   try {
-    if (thought.processed) return null;
+    if (thought.processed) return { task: null, decision: 'blocked_guard', reason: 'already processed' };
 
     const lower = thought.content.trim().toLowerCase();
     if (
@@ -159,10 +210,10 @@ export async function convertThoughtToTask(
       /^\d+%\.?\s*(health|hunger|observing)/.test(lower) ||
       /is complete\.\s*i have \d+ other tasks/.test(lower)
     ) {
-      return null;
+      return { task: null, decision: 'blocked_guard', reason: 'status text filtered' };
     }
 
-    if (deps.seenThoughtIds.has(thought.id)) return null;
+    if (deps.seenThoughtIds.has(thought.id)) return { task: null, decision: 'dropped_seen', reason: 'thought ID already seen' };
     deps.seenThoughtIds.add(thought.id);
     if (deps.seenThoughtIds.size > 500) {
       deps.trimSeenThoughtIds();
@@ -176,14 +227,43 @@ export async function convertThoughtToTask(
     let taskDescription = thought.content;
 
     if (extractedGoal && extractedGoal.action) {
+      // Management action dispatch — before ROUTABLE_ACTIONS check
+      if (MANAGEMENT_ACTIONS.has(extractedGoal.action)) {
+        if (!deps.managementHandler) {
+          return { task: null, decision: 'management_failed', reason: 'management handler not available' };
+        }
+        const mgmtResult = deps.managementHandler.handle(
+          extractedGoal as GoalTagV1,
+          thought.id,
+        );
+        await deps.markThoughtAsProcessed(thought.id);
+        const decisionMap: Record<string, TaskDecision> = {
+          applied: 'management_applied',
+          needs_disambiguation: 'management_needs_disambiguation',
+          target_not_found: 'management_failed',
+          invalid_transition: 'management_failed',
+          error: 'management_failed',
+        };
+        return {
+          task: null,
+          decision: decisionMap[mgmtResult.decision] ?? 'management_failed',
+          reason: mgmtResult.reason ?? `management ${mgmtResult.action}: ${mgmtResult.decision}`,
+          managementResult: mgmtResult,
+        };
+      }
+
       // Goal acceptance gate: must be routable
       if (!ROUTABLE_ACTIONS.has(extractedGoal.action)) {
-        return null; // fail-closed: don't create task for unroutable actions
+        return { task: null, decision: 'blocked_unroutable', reason: `action '${extractedGoal.action}' not routable` };
       }
 
       // Goal dedup: skip if same goal was created recently
-      if ('version' in extractedGoal && isGoalDuplicate(extractedGoal as GoalTagV1)) {
-        return null;
+      // Include inventory band if available for satisfaction-aware dedup
+      const inventoryBand = deps.getInventoryBand
+        ? deps.getInventoryBand(extractedGoal.target.replace(/\s+/g, '_'))
+        : undefined;
+      if ('version' in extractedGoal && isGoalDuplicate(extractedGoal as GoalTagV1, inventoryBand)) {
+        return { task: null, decision: 'suppressed_dedup', reason: `duplicate goal within ${GOAL_DEDUP_WINDOW_MS / 1000}s window` };
       }
 
       actionType = ACTION_TO_TASK_TYPE[extractedGoal.action] || 'general';
@@ -223,7 +303,7 @@ export async function convertThoughtToTask(
         taskTitle = extractActionTitle(content, 'farm');
       } else {
         // Truly general — not enough signal for a task
-        taskTitle = thought.content;
+        return { task: null, decision: 'dropped_sanitizer', reason: 'no structured goal and keyword fallback did not match' };
       }
     }
 
@@ -292,6 +372,20 @@ export async function convertThoughtToTask(
         quantity: 1,
         extractionMethod: 'thought-content',
       };
+    } else if (actionType === 'navigation' && extractedGoal) {
+      parameters.requirementCandidate = {
+        kind: 'navigate',
+        outputPattern: extractedGoal.target.replace(/\s+/g, '_'),
+        quantity: 1,
+        extractionMethod: 'goal-tag',
+      };
+    } else if (actionType === 'exploration' && extractedGoal) {
+      parameters.requirementCandidate = {
+        kind: extractedGoal.action === 'find' ? 'find' : 'explore',
+        outputPattern: extractedGoal.target.replace(/\s+/g, '_'),
+        quantity: extractedGoal.amount || 1,
+        extractionMethod: 'goal-tag',
+      };
     }
 
     if (actionType === 'gathering') {
@@ -334,9 +428,9 @@ export async function convertThoughtToTask(
 
     const addedTask = await deps.addTask(task);
     await deps.markThoughtAsProcessed(thought.id);
-    return addedTask;
+    return { task: addedTask, decision: 'created' };
   } catch (error) {
     console.error('Error converting thought to task:', error);
-    return null;
+    return { task: null, decision: 'error', reason: String(error) };
   }
 }

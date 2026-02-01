@@ -3114,6 +3114,23 @@ taskIntegration.on(
   }
 );
 
+// Forward task lifecycle events to cognition service for LLM task review.
+// Events: completed, failed, high_priority_added, solver_unavailable, rig_g_replan_needed
+const cognitionEndpoint = process.env.COGNITION_ENDPOINT || 'http://localhost:3003';
+taskIntegration.on('taskLifecycleEvent', (event: { type: string; taskId: string; task?: any; reason?: string }) => {
+  const reason = `${event.type}: task ${event.taskId}${event.reason ? ` (${event.reason})` : ''}`;
+  console.log(`[Lifecycle→Review] ${reason}`);
+  fetch(`${cognitionEndpoint}/api/task-review`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ reason }),
+    signal: AbortSignal.timeout(5000),
+  }).catch((err: unknown) => {
+    // Fire-and-forget: cognition service might not be running
+    console.warn('[Lifecycle→Review] Failed to notify cognition:', String(err));
+  });
+});
+
 // Expose world state manager data for world server
 serverConfig.addEndpoint('get', '/world-state', (req, res) => {
   try {

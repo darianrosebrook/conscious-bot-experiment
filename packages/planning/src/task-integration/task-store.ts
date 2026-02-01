@@ -31,18 +31,36 @@ function createEmptyStatistics(): TaskStatistics {
   };
 }
 
+/** Regex to strip [GOAL:...] tags from display titles */
+const GOAL_TAG_STRIP = /\s*\[GOAL:[^\]]*\](?:\s*\d+\w*)?/gi;
+
 export class TaskStore {
   private tasks = new Map<string, Task>();
   private taskHistory: Task[] = [];
   private progressTracker = new Map<string, TaskProgress>();
   private statistics: TaskStatistics = createEmptyStatistics();
 
+  /**
+   * Normalize display title on read: strip [GOAL:] tags from title
+   * and cache in metadata.titleDisplay for dashboard consumption.
+   * Raw title is preserved for audit.
+   */
+  private normalizeDisplayTitle(task: Task): void {
+    if (!task.metadata.titleDisplay && GOAL_TAG_STRIP.test(task.title)) {
+      task.metadata.titleDisplay = task.title.replace(GOAL_TAG_STRIP, '').trim();
+      // Reset regex lastIndex (global flag)
+      GOAL_TAG_STRIP.lastIndex = 0;
+    }
+  }
+
   setTask(task: Task): void {
     this.tasks.set(task.id, task);
   }
 
   getTask(taskId: string): Task | undefined {
-    return this.tasks.get(taskId);
+    const task = this.tasks.get(taskId);
+    if (task) this.normalizeDisplayTitle(task);
+    return task;
   }
 
   hasTask(taskId: string): boolean {
@@ -68,6 +86,7 @@ export class TaskStore {
     limit?: number;
   }): Task[] {
     let tasks = this.getAllTasks();
+    for (const t of tasks) this.normalizeDisplayTitle(t);
     if (filters?.status) {
       const statuses = Array.isArray(filters.status)
         ? filters.status

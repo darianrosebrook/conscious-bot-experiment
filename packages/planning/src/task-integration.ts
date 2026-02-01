@@ -34,6 +34,9 @@ import {
 import { TaskStore } from './task-integration/task-store';
 import { SterlingPlanner } from './task-integration/sterling-planner';
 import { convertThoughtToTask } from './task-integration/thought-to-task-converter';
+import { TaskManagementHandler } from './task-integration/task-management-handler';
+import { adviseExecution } from './constraints/execution-advisor';
+import type { RigGMetadata } from './constraints/execution-advisor';
 
 export type { TaskStep } from './types/task-step';
 import type { TaskStep } from './types/task-step';
@@ -59,6 +62,7 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
   private config: TaskIntegrationConfig;
   private readonly taskStore: TaskStore;
   private readonly sterlingPlanner: SterlingPlanner;
+  private readonly managementHandler: TaskManagementHandler;
   private actionVerifications: Map<string, ActionVerification> = new Map();
   private cognitiveStreamClient: CognitiveStreamClient;
   private thoughtPollingInterval?: NodeJS.Timeout;
@@ -143,14 +147,53 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
 
       for (const thought of actionableThoughts) {
         try {
-          const task = await convertThoughtToTask(thought, {
+          const result = await convertThoughtToTask(thought, {
             addTask: this.addTask.bind(this),
             markThoughtAsProcessed: this.markThoughtAsProcessed.bind(this),
             seenThoughtIds: this.seenThoughtIds,
             trimSeenThoughtIds: () => this.trimSeenThoughtIds(),
+            managementHandler: this.managementHandler,
+            getInventoryBand: (itemName: string) => {
+              // Use inventory from last bot context fetch for satisfaction-aware dedup
+              const activeTasks = this.getActiveTasks();
+              const relevantTask = activeTasks.find((t) =>
+                t.parameters?.requirementCandidate?.outputPattern?.includes(
+                  itemName
+                )
+              );
+              const qty =
+                relevantTask?.parameters?.requirementCandidate?.quantity ?? 0;
+              // Band: 0, 1-4, 5-9, 10-19, 20+
+              if (qty === 0) return '0';
+              if (qty < 5) return '1-4';
+              if (qty < 10) return '5-9';
+              if (qty < 20) return '10-19';
+              return '20+';
+            },
           });
-          if (task) {
-            this.emit('thoughtConvertedToTask', { thought, task });
+          if (result.task) {
+            this.emit('thoughtConvertedToTask', { thought, task: result.task });
+          }
+          if (result.managementResult) {
+            console.log(
+              `[Thought-to-task] management ${result.managementResult.action}: ${result.managementResult.decision}` +
+              (result.managementResult.affectedTaskId ? ` → task ${result.managementResult.affectedTaskId}` : '') +
+              (result.managementResult.reason ? ` (${result.managementResult.reason})` : '')
+            );
+            this.emit('managementAction', {
+              thought,
+              result: result.managementResult,
+            });
+          }
+          if (
+            result.decision !== 'created' &&
+            result.decision !== 'dropped_seen' &&
+            result.decision !== 'blocked_guard' &&
+            !result.managementResult
+          ) {
+            console.log(
+              `[Thought-to-task] ${result.decision}: ${result.reason || thought.content.slice(0, 60)}`
+            );
           }
         } catch (error) {
           console.error('Error converting thought to task:', error);
@@ -458,6 +501,7 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
     const serviceClients = createServiceClients();
     this.minecraftClient = serviceClients.minecraft;
     this.taskStore = new TaskStore();
+    this.managementHandler = new TaskManagementHandler(this.taskStore);
     this.sterlingPlanner = new SterlingPlanner({
       minecraftGet: (path, opts) =>
         this.minecraftClient.get(path, { timeout: opts?.timeout ?? 5000 }),
@@ -485,6 +529,9 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
     if (existingTask) return existingTask;
 
     const steps = await this.sterlingPlanner.generateDynamicSteps(taskData);
+
+    // Detect blocked sentinel from solver (e.g., Rig E solver not implemented)
+    const blockedSentinel = steps.length === 1 && steps[0].meta?.blocked === true;
 
     // Resolve requirements for the task
     const requirement = resolveRequirement(taskData);
@@ -520,6 +567,25 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
       },
     };
 
+    // Propagate solver-produced metadata (Rig G, building plan IDs)
+    // These are set by generateBuildingStepsFromSterling on taskData.metadata
+    // but lost when we rebuild metadata above. Copy them through.
+    if ((taskData.metadata as any)?.rigG) {
+      (task.metadata as any).rigG = (taskData.metadata as any).rigG;
+    }
+    if ((taskData.metadata as any)?.buildingPlanId) {
+      (task.metadata as any).buildingPlanId = (taskData.metadata as any).buildingPlanId;
+      (task.metadata as any).buildingTemplateId = (taskData.metadata as any).buildingTemplateId;
+    }
+
+    // Blocked sentinel: solver explicitly reported it cannot plan (e.g., Rig E not implemented)
+    if (blockedSentinel) {
+      const reason = (steps[0].meta?.blockedReason as string) || 'solver_unavailable';
+      task.status = 'pending_planning';
+      task.metadata.blockedReason = reason;
+      task.steps = []; // Strip sentinel — no real steps to execute
+    }
+
     // Check step executability: if no step has a leaf / executable flag,
     // the task cannot make progress without manual intervention.
     const hasExecutableStep = task.steps.some(
@@ -532,6 +598,17 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
     this.taskStore.setTask(task);
     this.taskStore.updateStatistics();
     this.emit('taskAdded', task);
+    if (task.priority >= 0.8) {
+      this.emit('taskLifecycleEvent', { type: 'high_priority_added', taskId: task.id, task });
+    }
+    if (blockedSentinel) {
+      this.emit('taskLifecycleEvent', {
+        type: 'solver_unavailable',
+        taskId: task.id,
+        task,
+        reason: task.metadata.blockedReason,
+      });
+    }
 
     if (process.env.NODE_ENV === 'development') {
       console.log(
@@ -607,9 +684,11 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
           (task.metadata.startedAt || task.metadata.createdAt);
         // Report building episode on completion
         this.reportBuildingEpisode(task, true);
+        this.emit('taskLifecycleEvent', { type: 'completed', taskId, task });
       } else if (status === 'failed') {
         // Report building episode on failure
         this.reportBuildingEpisode(task, false);
+        this.emit('taskLifecycleEvent', { type: 'failed', taskId, task });
       }
     }
 
@@ -1346,6 +1425,34 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
     const step = task.steps.find((s) => s.id === stepId);
     if (!step) {
       return false;
+    }
+
+    // Rig G feasibility gate: check before starting if metadata.rigG is present
+    const rigGMeta = (task.metadata as any)?.rigG as RigGMetadata | undefined;
+    if (rigGMeta && !(task.metadata as any)._rigGChecked) {
+      const advice = adviseExecution(rigGMeta);
+      (task.metadata as any)._rigGChecked = true;
+      (task.metadata as any).suggestedParallelism = advice.suggestedParallelism;
+
+      if (!advice.shouldProceed) {
+        task.status = 'unplannable';
+        task.metadata.blockedReason = advice.blockReason || 'Rig G feasibility gate failed';
+        task.metadata.updatedAt = Date.now();
+        this.taskStore.setTask(task);
+        console.log(
+          `[RigG-Gate] Task ${taskId} blocked: ${advice.blockReason}`
+        );
+        // Enqueue re-solve
+        if (advice.shouldReplan) {
+          this.emit('taskLifecycleEvent', {
+            type: 'rig_g_replan_needed',
+            taskId,
+            task,
+            reason: advice.replanReason,
+          });
+        }
+        return false;
+      }
     }
 
     step.startedAt = Date.now();

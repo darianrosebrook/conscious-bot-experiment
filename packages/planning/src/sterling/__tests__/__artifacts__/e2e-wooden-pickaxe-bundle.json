@@ -1,7 +1,7 @@
 {
-  "bundleId": "minecraft.tool_progression:9adf4148328e47d9",
-  "bundleHash": "9adf4148328e47d9",
-  "timestamp": 1769791903319,
+  "bundleId": "minecraft.tool_progression:c20a84b98c086120",
+  "bundleHash": "c20a84b98c086120",
+  "timestamp": 1769943458921,
   "input": {
     "solverId": "minecraft.tool_progression",
     "executionMode": "tool_progression",
@@ -12,15 +12,21 @@
     "nearbyBlocksHash": "4f53cda18c2baa0c",
     "codeVersion": "0.1.0",
     "tierMatrixVersion": "1.20.0",
-    "definitionCount": 6
+    "definitionCount": 6,
+    "objectiveWeightsEffective": {
+      "costWeight": 1,
+      "timeWeight": 0,
+      "riskWeight": 0
+    },
+    "objectiveWeightsSource": "default"
   },
   "output": {
-    "planId": "cfec50983857e03e",
+    "planId": "0e45fc2435447c13",
     "solved": true,
     "stepsDigest": "8a5f0cb28696d987",
     "searchStats": {
       "totalNodes": 98,
-      "durationMs": 994,
+      "durationMs": 20,
       "solutionPathLength": 8
     },
     "searchHealth": {
@@ -36,12 +42,40 @@
       "terminationReason": "goal_found",
       "branchingEstimate": 3,
       "searchHealthVersion": 1
+    },
+    "rationale": {
+      "boundingConstraints": {
+        "maxNodes": 5000,
+        "objectiveWeightsEffective": {
+          "costWeight": 1,
+          "timeWeight": 0,
+          "riskWeight": 0
+        },
+        "objectiveWeightsSource": "default"
+      },
+      "searchEffort": {
+        "nodesExpanded": 50,
+        "frontierPeak": 48,
+        "branchingEstimate": 3
+      },
+      "searchTermination": {
+        "terminationReason": "goal_found",
+        "isDegenerate": true,
+        "degeneracyReasons": [
+          "heuristic not discriminating: 98% of nodes share the modal h value"
+        ]
+      },
+      "shapingEvidence": {
+        "compatValid": true,
+        "issueCount": 0,
+        "errorCodes": []
+      }
     }
   },
   "compatReport": {
     "valid": true,
     "issues": [],
-    "checkedAt": 1769791902315,
+    "checkedAt": 1769943458891,
     "definitionCount": 6
   }
 }
