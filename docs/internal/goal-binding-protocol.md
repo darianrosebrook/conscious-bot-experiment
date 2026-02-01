@@ -462,7 +462,7 @@ These combinations must be asserted impossible in tests:
 
 The goal-binding protocol is a pure coordination layer (`goals/`). It
 connects to the execution substrate via `TaskIntegration` in
-`task-integration.ts`. The wiring follows three principles:
+`task-integration.ts`. The wiring follows these principles:
 
 ### Origin-gated hooks
 
@@ -490,10 +490,44 @@ includes both status and hold atomically. On rejection, the prior hold is
 restored from a cloned snapshot (`cloneHold()` in
 `goals/goal-binding-normalize.ts`).
 
+After successful management actions, `handleManagementAction` fires
+`onTaskStatusChanged` and schedules the resulting protocol effects (e.g.
+`update_goal_status`). Self-targeted hold effects are filtered out since
+preconditioning already applied them.
+
+**Invariant:** Preconditioning MUST apply or clear holds for the target
+task before the handler persists. The post-action hook MUST NOT be
+responsible for self-targeted hold effects. If preconditioning is removed,
+the `partitionSelfHoldEffects` filter in the post-action hook becomes a
+silent correctness bug. A runtime tripwire logs an error if the self-hold
+effects and the task's hold state diverge.
+
 This is a workaround for the handler persisting internally. The cleaner
 model is to refactor `TaskManagementHandler.handle()` to return a patch
 without persisting, letting the wrapper apply atomically. Remove
 preconditioning once the handler returns patches.
+
+### Status transition surface restriction
+
+Only two mutators can change task status with goal protocol propagation:
+
+- `updateTaskStatus` — the canonical status transition path. Handles
+  hold semantics, self-effect partitioning, and async protocol effects.
+- `updateTaskProgress` — allowed to set status only for terminal
+  transitions (`completed`, `failed`). All other status values are
+  rejected. `active` is allowed only as a no-op (when the task is
+  already `active`), preventing callers from unpausing a held task
+  through the progress API without clearing the hold.
+
+All other code paths that previously set `task.status` directly (Rig G
+gate, Rig G replan) now route through `updateTaskStatus`.
+
+### goalBinding protection
+
+`updateTaskMetadata` strips the `goalBinding` field from incoming
+metadata before applying the spread. Goal-binding state is part of the
+protocol control plane and must only be mutated through dedicated APIs
+(`applyHold`, `clearHold`, `createGoalBinding`, etc.).
 
 ### Atomicity contract
 
@@ -527,7 +561,7 @@ needing atomic multi-field updates must mutate all fields before calling
 | File | Changes |
 |------|---------|
 | `packages/planning/src/types/task.ts` | `metadata.goalBinding` namespace (GoalBinding, GoalHoldReason types) |
-| `packages/planning/src/task-integration.ts` | Origin-gated hooks, self-effect partitioning, applyGoalProtocolEffects, handleManagementAction with hold preconditioning, goalId population |
+| `packages/planning/src/task-integration.ts` | Origin-gated hooks, self-effect partitioning, applyGoalProtocolEffects, handleManagementAction with hold preconditioning + post-action goal-status hook, goalId population, status transition surface restriction (updateTaskProgress allowlist), goalBinding protection in updateTaskMetadata, Rig G status mutations routed through updateTaskStatus |
 | `packages/planning/src/task-integration/task-store.ts` | Atomicity contract documentation |
 | `packages/planning/src/interfaces/task-integration.ts` | MutationOrigin type, options parameter on mutators |
 
@@ -535,7 +569,7 @@ needing atomic multi-field updates must mutate all fields before calling
 
 | File | Tests |
 |------|-------|
-| `packages/planning/src/task-integration/__tests__/goal-protocol-integration.test.ts` | 27 tests: status hooks, management hold protocol, origin isolation, manual_pause wall, observer-snapshot consistency, self-effect partitioning, cross-task routing, clone isolation |
+| `packages/planning/src/task-integration/__tests__/goal-protocol-integration.test.ts` | 48 tests: status hooks, management hold protocol, origin isolation, manual_pause wall, observer-snapshot consistency, self-effect partitioning, cross-task routing, clone isolation, updateTaskProgress status hook (patch A1), management goal-status propagation (patch A4), goalBinding protection (patch B1), status transition surface guard, single hook fire on completion (patch A2) |
 | `packages/planning/src/task-integration/__tests__/protocol-effects-drain.test.ts` | 3 tests: error containment, global serialization, async caller ordering |
 
 ## J. Long-horizon hardening backlog
@@ -567,11 +601,20 @@ task updates in one commit.
 maintain invariants. Direct `taskStore.setTask()` calls bypass all of
 that. Today this is enforced by convention.
 
+**Progress:** The highest-severity direct-setTask bypasses (Rig G gate
+→ unplannable, Rig G replan → pending) have been routed through
+`updateTaskStatus`. `tryUnblockParent` still uses direct setTask for
+metadata-only mutations (no status change, no goal protocol implication).
+Remaining direct setTask calls are metadata-only or pre-status-transition
+writes that persist metadata before calling `updateTaskStatus`.
+
 **Options:**
 - Lint rule flagging `taskStore.setTask` outside of `task-integration.ts`
 - Route writes through a `TaskMutator` interface that's easy to spy on
   and can later support transactional semantics
 - Restrict `setTask` visibility to a narrower interface
+- Add a dev-time trap in `setTask` that detects status deltas from
+  unsanctioned call sites
 
 ### P1: Property-based fuzz sequencing for protocol interleavings
 

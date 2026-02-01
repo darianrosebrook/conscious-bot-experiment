@@ -93,26 +93,58 @@ class GoalProtocolHarness {
   // updateTaskProgress — mirrors TaskIntegration with origin gating
   // ---------------------------------------------------------------------------
 
+  /** Terminal statuses allowed as real transitions via updateTaskProgress. Mirrors production guard. */
+  private static readonly TERMINAL_PROGRESS_STATUSES: ReadonlySet<string> = new Set(['completed', 'failed']);
+
   updateTaskProgress(taskId: string, progress: number, status?: Task['status'], options?: MutationOptions): boolean {
     const task = this.taskStore.getTask(taskId);
     if (!task) return false;
 
+    // Mirror production guard: only terminal statuses allowed as transitions.
+    // 'active' is allowed only as a no-op (when already active).
+    if (status && status !== task.status && !GoalProtocolHarness.TERMINAL_PROGRESS_STATUSES.has(status)) {
+      return false;
+    }
+
+    const oldStatus = task.status;
     task.progress = Math.max(0, Math.min(1, progress));
     task.metadata.updatedAt = Date.now();
     if (status) task.status = status;
     this.taskStore.setTask(task);
 
+    // Mirror production fix (A1): fire both progress AND status hooks
     const origin = options?.origin ?? 'runtime';
     if (origin === 'runtime') {
       const binding = (task.metadata as any).goalBinding as GoalBinding | undefined;
       if (binding) {
-        const hookResult = onTaskProgressUpdated(
+        const allEffects: SyncEffect[] = [];
+
+        // Status hook: fire if status actually changed
+        const statusChanged = status && status !== oldStatus;
+        if (statusChanged) {
+          const statusHookResult = onTaskStatusChanged(
+            task,
+            oldStatus,
+            task.status,
+            { verifierRegistry: this.verifierRegistry },
+          );
+          if (statusHookResult.syncEffects.length > 0) {
+            allEffects.push(...statusHookResult.syncEffects);
+          }
+        }
+
+        // Progress hook
+        const progressHookResult = onTaskProgressUpdated(
           task,
           task.progress,
           { verifierRegistry: this.verifierRegistry },
         );
-        if (hookResult.syncEffects.length > 0) {
-          this.applyGoalProtocolEffects(hookResult.syncEffects);
+        if (progressHookResult.syncEffects.length > 0) {
+          allEffects.push(...progressHookResult.syncEffects);
+        }
+
+        if (allEffects.length > 0) {
+          this.applyGoalProtocolEffects(allEffects);
         }
       }
     }
@@ -162,6 +194,9 @@ class GoalProtocolHarness {
       }
     }
 
+    // Snapshot status before handler (handler persists internally)
+    const beforeStatus = targetId ? this.taskStore.getTask(targetId)?.status : undefined;
+
     const result = this.managementHandler.handle(goal, sourceThoughtId);
 
     // Roll back if action was rejected
@@ -186,7 +221,46 @@ class GoalProtocolHarness {
       return result;
     }
 
+    // Mirror production fix (A4): fire goal protocol status hook after
+    // successful management action on goal-bound tasks.
+    if (targetId && result.decision === 'applied') {
+      const taskAfter = this.taskStore.getTask(targetId);
+      if (taskAfter && beforeStatus && taskAfter.status !== beforeStatus) {
+        const binding = (taskAfter.metadata as any).goalBinding as GoalBinding | undefined;
+        if (binding) {
+          const hookResult = onTaskStatusChanged(
+            taskAfter,
+            beforeStatus,
+            taskAfter.status,
+            { verifierRegistry: this.verifierRegistry },
+          );
+          if (hookResult.syncEffects.length > 0) {
+            // Self-targeted hold effects already handled by preconditioning
+            const { remaining } = partitionSelfHoldEffects(targetId, hookResult.syncEffects);
+            if (remaining.length > 0) {
+              this.applyGoalProtocolEffects(remaining);
+            }
+          }
+        }
+      }
+    }
+
     return result;
+  }
+
+  // ---------------------------------------------------------------------------
+  // updateTaskMetadata — mirrors TaskIntegration with goalBinding protection
+  // ---------------------------------------------------------------------------
+
+  updateTaskMetadata(taskId: string, metadata: Partial<Task['metadata']>): boolean {
+    const task = this.taskStore.getTask(taskId);
+    if (!task) return false;
+
+    // Mirror production fix (B1): protect goalBinding from accidental clobber
+    const { goalBinding: _ignoredGoalBinding, ...safeMetadata } = metadata as any;
+    task.metadata = { ...task.metadata, ...safeMetadata, updatedAt: Date.now() };
+    this.taskStore.setTask(task);
+    return true;
   }
 
   // ---------------------------------------------------------------------------
@@ -1108,6 +1182,367 @@ describe('Goal Protocol Integration', () => {
       expect(binding.hold).toBeUndefined();
 
       vi.restoreAllMocks();
+    });
+  });
+
+  // =========================================================================
+  // Acceptance tests for bypass-closing patches (A1, A2, A4, B1)
+  // =========================================================================
+
+  // -------------------------------------------------------------------------
+  // Test H: updateTaskProgress with status fires goal protocol (Patch A1)
+  // -------------------------------------------------------------------------
+
+  describe('updateTaskProgress status hook (patch A1)', () => {
+    it('updateTaskProgress with completed status produces update_goal_status', () => {
+      const task = harness.createGoalBoundTask({ goalId: 'g1', status: 'active' });
+
+      harness.updateTaskProgress(task.id, 1, 'completed');
+
+      // Goal protocol should have received the status change
+      expect(harness.goalStatusUpdates.length).toBeGreaterThan(0);
+      const update = harness.goalStatusUpdates.find(u => u.goalId === 'g1');
+      expect(update).toBeDefined();
+      expect(update!.status).toBe(GoalStatus.COMPLETED);
+
+      // Task should be completed
+      const updated = harness.taskStore.getTask(task.id)!;
+      expect(updated.status).toBe('completed');
+    });
+
+    it('updateTaskProgress with failed status produces update_goal_status', () => {
+      const task = harness.createGoalBoundTask({ goalId: 'g1', status: 'active' });
+
+      harness.updateTaskProgress(task.id, 0.5, 'failed');
+
+      const update = harness.goalStatusUpdates.find(u => u.goalId === 'g1');
+      expect(update).toBeDefined();
+      expect(update!.status).toBe(GoalStatus.FAILED);
+
+      const updated = harness.taskStore.getTask(task.id)!;
+      expect(updated.status).toBe('failed');
+    });
+
+    it('updateTaskProgress without status change does NOT fire status hook', () => {
+      const task = harness.createGoalBoundTask({ goalId: 'g1', status: 'active' });
+
+      // Progress update only, no status change
+      harness.updateTaskProgress(task.id, 0.5);
+
+      // No goal status update should have been produced (progress hook alone
+      // only produces effects at progress >= 1.0 with completion checking)
+      expect(harness.goalStatusUpdates.length).toBe(0);
+    });
+
+    it('updateTaskProgress passing same status does NOT fire status hook', () => {
+      const task = harness.createGoalBoundTask({ goalId: 'g1', status: 'active' });
+
+      // Explicitly pass 'active' when already active — no real status change
+      harness.updateTaskProgress(task.id, 0.5, 'active');
+
+      expect(harness.goalStatusUpdates.length).toBe(0);
+    });
+
+    it('updateTaskProgress with origin=protocol does NOT fire hooks', () => {
+      const task = harness.createGoalBoundTask({ goalId: 'g1', status: 'active' });
+
+      harness.updateTaskProgress(task.id, 1, 'completed', { origin: 'protocol' });
+
+      expect(harness.goalStatusUpdates.length).toBe(0);
+
+      // But task should still be updated
+      const updated = harness.taskStore.getTask(task.id)!;
+      expect(updated.status).toBe('completed');
+    });
+
+    it('state is consistent after status change via updateTaskProgress', () => {
+      const task = harness.createGoalBoundTask({ goalId: 'g1', status: 'active' });
+
+      harness.updateTaskProgress(task.id, 1, 'completed');
+
+      const updated = harness.taskStore.getTask(task.id)!;
+      const violations = detectIllegalStates(updated);
+      // done_but_not_completed is expected (verifier hasn't run stability window)
+      const unexpected = violations.filter(v => v.rule !== 'done_but_not_completed');
+      expect(unexpected).toEqual([]);
+    });
+
+    it('updateTaskProgress rejects paused status (requires hold semantics)', () => {
+      const task = harness.createGoalBoundTask({ goalId: 'g1', status: 'active' });
+
+      const result = harness.updateTaskProgress(task.id, 0.5, 'paused' as any);
+
+      expect(result).toBe(false);
+      // Task should remain unchanged
+      const updated = harness.taskStore.getTask(task.id)!;
+      expect(updated.status).toBe('active');
+      expect(harness.goalStatusUpdates.length).toBe(0);
+    });
+
+    it('updateTaskProgress rejects unplannable status', () => {
+      const task = harness.createGoalBoundTask({ goalId: 'g1', status: 'active' });
+
+      const result = harness.updateTaskProgress(task.id, 0.5, 'unplannable' as any);
+
+      expect(result).toBe(false);
+      const updated = harness.taskStore.getTask(task.id)!;
+      expect(updated.status).toBe('active');
+    });
+
+    it('updateTaskProgress rejects pending status', () => {
+      const task = harness.createGoalBoundTask({ goalId: 'g1', status: 'active' });
+
+      const result = harness.updateTaskProgress(task.id, 0.5, 'pending' as any);
+
+      expect(result).toBe(false);
+      const updated = harness.taskStore.getTask(task.id)!;
+      expect(updated.status).toBe('active');
+    });
+
+    it('updateTaskProgress rejects active on paused+held task (prevents active-with-hold)', () => {
+      const task = harness.createGoalBoundTask({ goalId: 'g1', status: 'active' });
+
+      // Pause with hold (simulating preemption or manual_pause)
+      applyHold(task, {
+        reason: 'preempted',
+        heldAt: Date.now(),
+        resumeHints: [],
+        nextReviewAt: Date.now() + 300_000,
+      });
+      syncHoldToTaskFields(task);
+      task.status = 'paused';
+      harness.taskStore.setTask(task);
+
+      // Attempt to unpause via progress API — this would create active-with-hold
+      const result = harness.updateTaskProgress(task.id, 0.5, 'active');
+
+      expect(result).toBe(false);
+      // Task must remain paused with hold intact
+      const updated = harness.taskStore.getTask(task.id)!;
+      expect(updated.status).toBe('paused');
+      const binding = updated.metadata.goalBinding as GoalBinding;
+      expect(binding.hold).toBeDefined();
+      expect(binding.hold!.reason).toBe('preempted');
+      expect(harness.goalStatusUpdates.length).toBe(0);
+    });
+
+    it('updateTaskProgress allows active as no-op when already active', () => {
+      const task = harness.createGoalBoundTask({ goalId: 'g1', status: 'active' });
+
+      // Passing 'active' when already active is a no-op — should succeed
+      const result = harness.updateTaskProgress(task.id, 0.5, 'active');
+
+      expect(result).toBe(true);
+      const updated = harness.taskStore.getTask(task.id)!;
+      expect(updated.status).toBe('active');
+      expect(updated.progress).toBeCloseTo(0.5);
+      // No goal status update (no actual transition)
+      expect(harness.goalStatusUpdates.length).toBe(0);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // Test I: Management actions propagate goal status (Patch A4)
+  // -------------------------------------------------------------------------
+
+  describe('management action goal-status propagation (patch A4)', () => {
+    it('management pause propagates Goal to SUSPENDED', () => {
+      const task = harness.createGoalBoundTask({ goalId: 'g1', status: 'active' });
+
+      harness.handleManagementAction({
+        action: 'pause',
+        target: task.title,
+        targetId: task.id,
+        amount: null,
+      } as GoalTagV1);
+
+      // Goal should have been notified of suspension
+      const update = harness.goalStatusUpdates.find(u => u.goalId === 'g1');
+      expect(update).toBeDefined();
+      expect(update!.status).toBe(GoalStatus.SUSPENDED);
+    });
+
+    it('management cancel propagates Goal to FAILED', () => {
+      const task = harness.createGoalBoundTask({ goalId: 'g1', status: 'active' });
+
+      harness.handleManagementAction({
+        action: 'cancel',
+        target: task.title,
+        targetId: task.id,
+        amount: null,
+      } as GoalTagV1);
+
+      const update = harness.goalStatusUpdates.find(u => u.goalId === 'g1');
+      expect(update).toBeDefined();
+      expect(update!.status).toBe(GoalStatus.FAILED);
+    });
+
+    it('management resume propagates Goal to PENDING', () => {
+      const task = harness.createGoalBoundTask({ goalId: 'g1', status: 'active' });
+
+      // First pause
+      harness.handleManagementAction({
+        action: 'pause',
+        target: task.title,
+        targetId: task.id,
+        amount: null,
+      } as GoalTagV1);
+
+      harness.goalStatusUpdates.length = 0; // clear previous updates
+
+      // Then resume
+      harness.handleManagementAction({
+        action: 'resume',
+        target: task.title,
+        targetId: task.id,
+        amount: null,
+      } as GoalTagV1);
+
+      const update = harness.goalStatusUpdates.find(u => u.goalId === 'g1');
+      expect(update).toBeDefined();
+      expect(update!.status).toBe(GoalStatus.PENDING);
+    });
+
+    it('rejected management action does NOT propagate goal status', () => {
+      const task = harness.createGoalBoundTask({ goalId: 'g1', status: 'active' });
+
+      // Pause an already-paused-via-preemption task
+      applyHold(task, {
+        reason: 'preempted',
+        heldAt: Date.now(),
+        resumeHints: [],
+        nextReviewAt: Date.now() + 300_000,
+      });
+      syncHoldToTaskFields(task);
+      task.status = 'paused';
+      harness.taskStore.setTask(task);
+
+      const result = harness.handleManagementAction({
+        action: 'pause',
+        target: task.title,
+        targetId: task.id,
+        amount: null,
+      } as GoalTagV1);
+
+      expect(result.decision).toBe('invalid_transition');
+      // No goal status update should have been produced
+      expect(harness.goalStatusUpdates.length).toBe(0);
+    });
+
+    it('management action on non-goal-bound task does not produce goal status updates', () => {
+      const task: Task = {
+        id: 'plain-mgmt',
+        title: 'Plain task',
+        description: '',
+        type: 'general',
+        priority: 0.5,
+        urgency: 0.5,
+        progress: 0,
+        status: 'active',
+        source: 'manual',
+        steps: [],
+        parameters: {},
+        metadata: {
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+          retryCount: 0,
+          maxRetries: 3,
+          childTaskIds: [],
+          tags: [],
+          category: 'general',
+        },
+      };
+      harness.taskStore.setTask(task);
+
+      harness.handleManagementAction({
+        action: 'pause',
+        target: task.title,
+        targetId: task.id,
+        amount: null,
+      } as GoalTagV1);
+
+      expect(harness.goalStatusUpdates.length).toBe(0);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // Test J: updateTaskMetadata goalBinding protection (Patch B1)
+  // -------------------------------------------------------------------------
+
+  describe('updateTaskMetadata goalBinding protection (patch B1)', () => {
+    it('updateTaskMetadata cannot remove goalBinding via spread', () => {
+      const task = harness.createGoalBoundTask({ goalId: 'g1', status: 'active' });
+      const originalBinding = task.metadata.goalBinding;
+      expect(originalBinding).toBeDefined();
+
+      // Attempt to clobber goalBinding via spread (the pattern callers use)
+      harness.updateTaskMetadata(task.id, {
+        ...task.metadata,
+        blockedReason: 'waiting_on_prereq',
+      } as any);
+
+      const updated = harness.taskStore.getTask(task.id)!;
+      expect(updated.metadata.goalBinding).toBeDefined();
+      expect(updated.metadata.goalBinding!.goalId).toBe('g1');
+      expect(updated.metadata.blockedReason).toBe('waiting_on_prereq');
+    });
+
+    it('updateTaskMetadata cannot set goalBinding to undefined', () => {
+      const task = harness.createGoalBoundTask({ goalId: 'g1', status: 'active' });
+
+      harness.updateTaskMetadata(task.id, {
+        goalBinding: undefined,
+        blockedReason: 'test',
+      } as any);
+
+      const updated = harness.taskStore.getTask(task.id)!;
+      // goalBinding should still be present — the undefined was stripped
+      expect(updated.metadata.goalBinding).toBeDefined();
+      expect(updated.metadata.goalBinding!.goalId).toBe('g1');
+    });
+
+    it('updateTaskMetadata cannot replace goalBinding with partial data', () => {
+      const task = harness.createGoalBoundTask({ goalId: 'g1', status: 'active' });
+      const originalInstanceId = task.metadata.goalBinding!.goalInstanceId;
+
+      harness.updateTaskMetadata(task.id, {
+        goalBinding: { goalInstanceId: 'WRONG' } as any,
+      } as any);
+
+      const updated = harness.taskStore.getTask(task.id)!;
+      expect(updated.metadata.goalBinding!.goalInstanceId).toBe(originalInstanceId);
+    });
+
+    it('updateTaskMetadata allows other metadata fields to be set normally', () => {
+      const task = harness.createGoalBoundTask({ goalId: 'g1', status: 'active' });
+
+      harness.updateTaskMetadata(task.id, {
+        blockedReason: 'waiting_on_prereq',
+      });
+
+      const updated = harness.taskStore.getTask(task.id)!;
+      expect(updated.metadata.blockedReason).toBe('waiting_on_prereq');
+      // goalBinding untouched
+      expect(updated.metadata.goalBinding).toBeDefined();
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // Test K: Single hook fire from completeTaskStep path (Patch A2)
+  // Proves that the progress+status combined call produces effects once.
+  // -------------------------------------------------------------------------
+
+  describe('single hook fire on completion (patch A2)', () => {
+    it('goal-bound task completing via single updateTaskProgress fires effects once', () => {
+      const task = harness.createGoalBoundTask({ goalId: 'g1', status: 'active' });
+
+      // Simulate what completeTaskStep now does: single call with final status
+      harness.updateTaskProgress(task.id, 1, 'completed');
+
+      // Should produce exactly one goal status update
+      const g1Updates = harness.goalStatusUpdates.filter(u => u.goalId === 'g1');
+      expect(g1Updates.length).toBe(1);
+      expect(g1Updates[0].status).toBe(GoalStatus.COMPLETED);
     });
   });
 });

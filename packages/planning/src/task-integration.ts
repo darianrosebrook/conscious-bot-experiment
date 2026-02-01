@@ -1022,6 +1022,9 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
       }
     }
 
+    // Snapshot status before handler (handler persists internally)
+    const beforeStatus = targetId ? this.taskStore.getTask(targetId)?.status : undefined;
+
     const result = this.managementHandler.handle(goal, sourceThoughtId);
 
     // If pre-conditioned but action was rejected, roll back
@@ -1046,6 +1049,57 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
         }
       }
       return result;
+    }
+
+    // Fire goal protocol status hook when status changed on a goal-bound task.
+    // Preconditioning handled hold state; this propagates goal-status effects
+    // (e.g. update_goal_status → Goal SUSPENDED/FAILED/PENDING).
+    //
+    // INVARIANT: Management preconditioning (above) MUST apply or clear holds
+    // for the target task before the handler persists. The hook below MUST NOT
+    // be responsible for self-targeted hold effects in this path. If
+    // preconditioning is removed or changed to delegate hold application to
+    // the hook, the partitionSelfHoldEffects filter below becomes a silent
+    // correctness bug — self-hold effects would be discarded instead of applied.
+    if (targetId && result.decision === 'applied') {
+      const taskAfter = this.taskStore.getTask(targetId);
+      if (taskAfter && beforeStatus && taskAfter.status !== beforeStatus) {
+        const binding = (taskAfter.metadata as any).goalBinding as GoalBinding | undefined;
+        if (binding) {
+          const hookResult = onTaskStatusChanged(
+            taskAfter,
+            beforeStatus,
+            taskAfter.status,
+            { verifierRegistry: this.verifierRegistry },
+          );
+          if (hookResult.syncEffects.length > 0) {
+            // Self-targeted hold effects were already handled by preconditioning.
+            // Filter them out to avoid double-application; schedule only cross-task
+            // and goal-status effects.
+            const { self, remaining } = partitionSelfHoldEffects(targetId, hookResult.syncEffects);
+
+            // Tripwire: if self-hold effects exist but don't match the already-
+            // applied state, preconditioning and the hook have diverged.
+            if (self.length > 0) {
+              for (const effect of self) {
+                if (effect.type === 'apply_hold' && !binding.hold) {
+                  console.error(
+                    `[TaskIntegration] handleManagementAction: self-hold effect produced but preconditioning did not apply hold for task ${targetId}. This indicates a preconditioning/hook invariant violation.`,
+                  );
+                } else if (effect.type === 'clear_hold' && binding.hold) {
+                  console.error(
+                    `[TaskIntegration] handleManagementAction: clear_hold effect produced but preconditioning did not clear hold for task ${targetId}. This indicates a preconditioning/hook invariant violation.`,
+                  );
+                }
+              }
+            }
+
+            if (remaining.length > 0) {
+              void this.scheduleGoalProtocolEffects(remaining);
+            }
+          }
+        }
+      }
     }
 
     return result;
@@ -1231,7 +1285,16 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
       return false;
     }
 
-    task.metadata = { ...task.metadata, ...metadata, updatedAt: Date.now() };
+    // Protect goalBinding from accidental overwrite — it's part of the goal
+    // protocol control plane, not incidental metadata. Use dedicated goal-binding
+    // APIs (applyHold, clearHold, etc.) to mutate it.
+    const { goalBinding: _ignoredGoalBinding, ...safeMetadata } = metadata as any;
+    if ('goalBinding' in (metadata as any)) {
+      console.warn(
+        `[TaskIntegration] updateTaskMetadata: goalBinding field ignored for task ${taskId}; use goal-binding APIs instead`,
+      );
+    }
+    task.metadata = { ...task.metadata, ...safeMetadata, updatedAt: Date.now() };
     this.taskStore.setTask(task);
     this.taskStore.updateStatistics();
     this.emit('taskMetadataUpdated', { task, metadata });
@@ -1266,6 +1329,22 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
     // Don't update progress for failed tasks unless explicitly changing status
     if (task.status === 'failed' && !status) {
       console.log(`🔇 Suppressing progress update for failed task: ${taskId}`);
+      return false;
+    }
+
+    // Guard: only terminal statuses are allowed as real transitions through
+    // updateTaskProgress. Everything else MUST go through updateTaskStatus,
+    // which handles self-effect partitioning, atomic hold application, and
+    // lifecycle events that require async coordination.
+    //
+    // 'active' is allowed ONLY as a no-op (when the task is already active).
+    // Allowing 'active' as a transition would let a caller unpause a held task
+    // without clearing the hold, recreating the active-with-hold illegal state.
+    const TERMINAL_PROGRESS_STATUSES: ReadonlySet<string> = new Set(['completed', 'failed']);
+    if (status && status !== oldStatus && !TERMINAL_PROGRESS_STATUSES.has(status)) {
+      console.warn(
+        `[TaskIntegration] updateTaskProgress: status transition to '${status}' not allowed via progress API for task ${taskId}; use updateTaskStatus instead`,
+      );
       return false;
     }
 
