@@ -37,6 +37,8 @@ import { convertThoughtToTask } from './task-integration/thought-to-task-convert
 import { TaskManagementHandler } from './task-integration/task-management-handler';
 import { adviseExecution } from './constraints/execution-advisor';
 import type { RigGMetadata } from './constraints/execution-advisor';
+import { buildDefaultMinecraftGraph } from './hierarchical/macro-planner';
+import { FeedbackStore } from './hierarchical/feedback';
 
 export type { TaskStep } from './types/task-step';
 import type { TaskStep } from './types/task-step';
@@ -329,6 +331,9 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
   // Ephemeral per-step snapshot to compare before/after state (key: `${taskId}-${stepId}`)
   private _stepStartSnapshots: Map<string, StepSnapshot> = new Map();
 
+  // Rig G replan timer handles (key: taskId)
+  private _rigGReplanTimers = new Map<string, ReturnType<typeof setTimeout>>();
+
   private canonicalItemId(raw: unknown): string {
     return String(raw ?? '')
       .toLowerCase()
@@ -524,6 +529,36 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
     return this.sterlingPlanner.getSolver<T>(solverId);
   }
 
+  /**
+   * Wire the hierarchical planning subsystem (Rig E).
+   * Instantiates MacroPlanner with the default Minecraft context graph
+   * and a FeedbackStore for macro cost learning.
+   *
+   * After calling this, navigate/explore/find tasks will be planned
+   * via the hierarchical planner instead of returning a blocked sentinel.
+   */
+  configureHierarchicalPlanner(overrides?: {
+    macroPlanner?: any;
+    feedbackStore?: any;
+  }): void {
+    if (this.isHierarchicalPlannerConfigured) {
+      console.log('[TaskIntegration] Hierarchical planner already configured; no-op');
+      return;
+    }
+    const macroPlanner = overrides?.macroPlanner ?? buildDefaultMinecraftGraph();
+    const feedbackStore = overrides?.feedbackStore ?? new FeedbackStore();
+    this.sterlingPlanner.setMacroPlanner(macroPlanner);
+    this.sterlingPlanner.setFeedbackStore(feedbackStore);
+    console.log('[TaskIntegration] Rig E hierarchical planner configured');
+  }
+
+  /**
+   * Check whether the hierarchical planning subsystem is configured.
+   */
+  get isHierarchicalPlannerConfigured(): boolean {
+    return this.sterlingPlanner.isHierarchicalConfigured;
+  }
+
   async addTask(taskData: Partial<Task>): Promise<Task> {
     const existingTask = this.taskStore.findSimilarTask(taskData);
     if (existingTask) return existingTask;
@@ -567,15 +602,12 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
       },
     };
 
-    // Propagate solver-produced metadata (Rig G, building plan IDs)
-    // These are set by generateBuildingStepsFromSterling on taskData.metadata
-    // but lost when we rebuild metadata above. Copy them through.
-    if ((taskData.metadata as any)?.rigG) {
-      (task.metadata as any).rigG = (taskData.metadata as any).rigG;
-    }
-    if ((taskData.metadata as any)?.buildingPlanId) {
-      (task.metadata as any).buildingPlanId = (taskData.metadata as any).buildingPlanId;
-      (task.metadata as any).buildingTemplateId = (taskData.metadata as any).buildingTemplateId;
+    // Propagate solver-produced metadata via the solver namespace.
+    // Solvers store outputs on taskData.metadata.solver during step generation;
+    // since we rebuild metadata above, merge the namespace generically so new
+    // solver outputs never require key-by-key enumeration here.
+    if (taskData.metadata?.solver) {
+      task.metadata.solver = { ...taskData.metadata.solver };
     }
 
     // Blocked sentinel: solver explicitly reported it cannot plan (e.g., Rig E not implemented)
@@ -596,6 +628,20 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
       );
       if (task.steps.length > 0 && !hasExecutableStep) {
         task.metadata.blockedReason = 'no-executable-plan';
+      }
+    }
+
+    // Seed stepsDigest so replan attempt 1 can detect identical plans
+    if (task.steps.length > 0 && !blockedSentinel) {
+      try {
+        const { hashSteps } = await import('./sterling/solve-bundle');
+        const digest = hashSteps(
+          task.steps.map((s) => ({ action: s.label || s.id }))
+        );
+        task.metadata.solver ??= {};
+        task.metadata.solver.stepsDigest = digest;
+      } catch {
+        // hashSteps unavailable — digest seeding is best-effort
       }
     }
 
@@ -1420,7 +1466,12 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
    * Start a task step and capture a before-snapshot for verification.
    * Awaits snapshot capture so verifyInventoryDelta has a baseline when the step completes.
    */
-  async startTaskStep(taskId: string, stepId: string): Promise<boolean> {
+  async startTaskStep(
+    taskId: string,
+    stepId: string,
+    options?: { dryRun?: boolean }
+  ): Promise<boolean> {
+    const dryRun = options?.dryRun ?? false;
     const task = this.taskStore.getTask(taskId);
     if (!task) {
       return false;
@@ -1431,12 +1482,33 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
       return false;
     }
 
-    // Rig G feasibility gate: check before starting if metadata.rigG is present
-    const rigGMeta = (task.metadata as any)?.rigG as RigGMetadata | undefined;
-    if (rigGMeta && !(task.metadata as any)._rigGChecked) {
+    // Rig G feasibility gate: check before starting if solver.rigG is present
+    const rigGMeta = task.metadata.solver?.rigG;
+    if (rigGMeta && !task.metadata.solver?.rigGChecked) {
       const advice = adviseExecution(rigGMeta);
-      (task.metadata as any)._rigGChecked = true;
-      (task.metadata as any).suggestedParallelism = advice.suggestedParallelism;
+
+      if (dryRun) {
+        // Shadow: evaluate + log, no mutations
+        console.log(
+          `[Shadow:RigG] Task ${taskId}: proceed=${advice.shouldProceed}, ` +
+          `replan=${advice.shouldReplan}, reason=${advice.blockReason || 'none'}`
+        );
+        this.emit('taskLifecycleEvent', {
+          type: 'shadow_rig_g_evaluation',
+          taskId,
+          advice: {
+            shouldProceed: advice.shouldProceed,
+            shouldReplan: advice.shouldReplan,
+            blockReason: advice.blockReason,
+            suggestedParallelism: advice.suggestedParallelism,
+          },
+        });
+        return advice.shouldProceed;
+      }
+
+      // Live mode: apply mutations
+      task.metadata.solver!.rigGChecked = true;
+      task.metadata.solver!.suggestedParallelism = advice.suggestedParallelism;
 
       if (!advice.shouldProceed) {
         task.status = 'unplannable';
@@ -1454,9 +1526,15 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
             task,
             reason: advice.replanReason,
           });
+          this._scheduleRigGReplan(taskId, advice);
         }
         return false;
       }
+    }
+
+    if (dryRun) {
+      // No Rig G gate to evaluate (or already checked); shadow has nothing more to do
+      return true;
     }
 
     step.startedAt = Date.now();
@@ -1637,10 +1715,10 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
 
   private reportBuildingEpisode(task: Task, success: boolean): void {
     if (!this.buildingSolver) return;
-    const templateId = (task.metadata as any)?.buildingTemplateId;
+    const templateId = task.metadata.solver?.buildingTemplateId;
     if (!templateId) return;
 
-    const planId = (task.metadata as any)?.buildingPlanId;
+    const planId = task.metadata.solver?.buildingPlanId;
 
     // Prefer structured step.meta for module IDs; fall back to label parsing
     const completedModuleIds = task.steps
@@ -1684,14 +1762,135 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
     );
   }
 
+  /**
+   * Schedule an automatic replan for a Rig G infeasible task.
+   * Idempotent: only one timer per taskId at a time.
+   * Capped at 3 attempts with exponential backoff (5s, 15s, 45s).
+   */
+  private _scheduleRigGReplan(
+    taskId: string,
+    advice: { replanReason?: string; blockReason?: string }
+  ): void {
+    // Idempotency: if a replan is already scheduled for this task, skip
+    if (this._rigGReplanTimers.has(taskId)) {
+      console.log(`[RigG] Replan already scheduled for ${taskId}; skipping`);
+      return;
+    }
+
+    // Read current attempt count from store (not from captured reference)
+    const task = this.taskStore.getTask(taskId);
+    if (!task) return;
+
+    const attempts = (task.metadata.solver?.replanAttempts ?? 0) + 1;
+    const maxAttempts = 3;
+
+    if (attempts > maxAttempts) {
+      // Terminal: exhausted replan attempts
+      task.metadata.solver ??= {};
+      task.metadata.solver.replanAttempts = attempts;
+      task.metadata.blockedReason = `rig_g_replan_exhausted: ${advice.blockReason}`;
+      this.taskStore.setTask(task);
+      this.emit('taskLifecycleEvent', {
+        type: 'rig_g_replan_exhausted',
+        taskId,
+        reason: `Exhausted ${maxAttempts} replan attempts: ${advice.replanReason}`,
+      });
+      return;
+    }
+
+    // Mark in-flight
+    task.metadata.solver ??= {};
+    task.metadata.solver.rigGReplan = {
+      inFlight: true,
+      attempt: attempts,
+      scheduledAt: Date.now(),
+    };
+    this.taskStore.setTask(task);
+
+    // Exponential backoff: 5s, 15s, 45s
+    const backoffMs = 5000 * Math.pow(3, attempts - 1);
+
+    const handle = setTimeout(async () => {
+      // Clean up timer reference
+      this._rigGReplanTimers.delete(taskId);
+
+      try {
+        // Re-read task from store (don't use stale captured reference)
+        const freshTask = this.taskStore.getTask(taskId);
+        if (!freshTask) return;
+
+        // Pre-check: is task still unplannable? Something else may have fixed it.
+        if (freshTask.status !== 'unplannable') {
+          console.log(`[RigG] Task ${taskId} no longer unplannable; skipping replan`);
+          freshTask.metadata.solver ??= {};
+          freshTask.metadata.solver.rigGReplan = undefined;
+          this.taskStore.setTask(freshTask);
+          return;
+        }
+
+        // Record attempt count
+        freshTask.metadata.solver ??= {};
+        freshTask.metadata.solver.replanAttempts = attempts;
+
+        const previousDigest = freshTask.metadata.solver.stepsDigest as string | undefined;
+
+        const result = await this.regenerateSteps(taskId, {
+          reason: advice.replanReason,
+          feasibilityRejections: advice.blockReason,
+        });
+
+        // Clear in-flight marker
+        const afterTask = this.taskStore.getTask(taskId);
+        if (afterTask) {
+          afterTask.metadata.solver ??= {};
+          afterTask.metadata.solver.rigGReplan = undefined;
+
+          // Digest comparison: if steps are identical, world hasn't changed enough
+          if (result.stepsDigest && result.stepsDigest === previousDigest) {
+            console.warn(`[RigG] Replan ${attempts} produced identical steps; stopping`);
+            this.taskStore.setTask(afterTask);
+            return;
+          }
+
+          // Store new digest
+          if (result.stepsDigest) {
+            afterTask.metadata.solver.stepsDigest = result.stepsDigest;
+          }
+
+          // If new steps are viable, transition back to pending
+          if (result.steps && result.steps.length > 0 && !result.steps[0].meta?.blocked) {
+            afterTask.status = 'pending';
+            afterTask.metadata.blockedReason = undefined;
+            afterTask.metadata.solver.rigGChecked = false; // allow re-evaluation
+          }
+
+          this.taskStore.setTask(afterTask);
+        }
+      } catch (err) {
+        console.error(`[RigG] Replan ${attempts} failed:`, err);
+        // Clear in-flight on error too
+        const errTask = this.taskStore.getTask(taskId);
+        if (errTask) {
+          errTask.metadata.solver ??= {};
+          errTask.metadata.solver.rigGReplan = undefined;
+          this.taskStore.setTask(errTask);
+        }
+      }
+    }, backoffMs);
+
+    this._rigGReplanTimers.set(taskId, handle);
+  }
+
   async regenerateSteps(
     taskId: string,
     failureContext?: {
-      failedLeaf: string;
-      reasonClass: string;
-      attemptCount: number;
+      failedLeaf?: string;
+      reasonClass?: string;
+      attemptCount?: number;
+      reason?: string;
+      feasibilityRejections?: string;
     }
-  ): Promise<{ success: boolean; stepsDigest?: string }> {
+  ): Promise<{ success: boolean; stepsDigest?: string; steps?: any[] }> {
     const task = this.taskStore.getTask(taskId);
     if (!task) return { success: false };
 
@@ -1736,7 +1935,7 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
     task.steps = updatedSteps;
     this.taskStore.setTask(task);
 
-    return { success: true, stepsDigest: digest };
+    return { success: true, stepsDigest: digest, steps: updatedSteps };
   }
 
   /**

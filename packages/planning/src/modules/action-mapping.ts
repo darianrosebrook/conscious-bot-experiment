@@ -305,6 +305,15 @@ export function mapBTActionToMinecraft(
           quantity: args.qty || args.quantity || 1,
         },
       };
+    case 'smelt':
+      return {
+        type: 'smelt',
+        parameters: {
+          item: args.item || args.recipe,
+          quantity: args.qty || args.quantity || 1,
+          fuel: args.fuel || 'coal',
+        },
+      };
     case 'place_door':
       return {
         type: 'place_block',

@@ -76,6 +76,13 @@ function deriveLeafArgs(
   }
 }
 
+/** Ensure taskData.metadata.solver exists for storing solver outputs. */
+function ensureSolverMeta(taskData: Partial<Task>): NonNullable<NonNullable<Task['metadata']>['solver']> {
+  taskData.metadata ??= {} as any;
+  taskData.metadata!.solver ??= {};
+  return taskData.metadata!.solver!;
+}
+
 export class SterlingPlanner {
   private readonly minecraftGet: SterlingPlannerOptions['minecraftGet'];
   private readonly solverRegistry = new Map<string, BaseDomainSolver>();
@@ -270,7 +277,7 @@ export class SterlingPlanner {
       try {
         const esmRequire = createRequire(import.meta.url);
         const mcDataLoader = esmRequire('minecraft-data');
-        this._mcDataCache = mcDataLoader('1.21.9');
+        this._mcDataCache = mcDataLoader(process.env.MINECRAFT_VERSION || '1.21.4');
       } catch (err) {
         console.warn(
           'minecraft-data not available for Sterling solvers:',
@@ -359,20 +366,57 @@ export class SterlingPlanner {
       }
     }
 
-    // Rig E: solver not yet implemented — return explicit blocked sentinel
-    // so TaskIntegration can transition to pending_planning with a reason.
+    // Rig E: hierarchical macro-planner for navigate/explore/find.
+    // When configured, generates steps via macro path + micro decomposition.
+    // When unconfigured, returns explicit blocked sentinel.
     if (route.requiredRig === 'E') {
-      console.warn(
-        `[PlanRoute] Rig E solver not implemented. Task "${taskData.title}" will be blocked.`
-      );
+      let rigEBlockedReason: string | undefined;
+      if (this.isHierarchicalConfigured) {
+        try {
+          const decision = await this.generateDynamicStepsHierarchical(taskData);
+          if (decision.kind === 'ok') {
+            const { steps, macroPlan, currentEdge } = decision.value;
+            // Tag steps with Rig E provenance
+            const taggedSteps = steps.map((s) => ({
+              ...s,
+              meta: {
+                ...s.meta,
+                source: 'rig-e-macro',
+                macroEdgeId: currentEdge?.id,
+                contextTarget: currentEdge?.to,
+                macroPlanDigest: macroPlan?.planDigest,
+              },
+            }));
+            if (taggedSteps.length > 0) return taggedSteps;
+          }
+          // Hierarchical planner returned blocked — capture reason for sentinel
+          if (decision.kind === 'blocked') {
+            rigEBlockedReason = decision.reason === 'ontology_gap'
+              ? 'rig_e_ontology_gap'
+              : 'rig_e_no_plan_found';
+          }
+          console.warn(
+            `[PlanRoute] Rig E hierarchical planner blocked: ${decision.kind === 'blocked' ? decision.reason : 'no steps'}. Task "${taskData.title}".`
+          );
+        } catch (error) {
+          console.warn(
+            'Sterling Rig E hierarchical planner failed, falling through to sentinel:',
+            error
+          );
+        }
+      }
+      // Unconfigured or planner failed/blocked: return explicit blocked sentinel
+      const blockedReason = !this.isHierarchicalConfigured
+        ? 'rig_e_solver_unimplemented'
+        : (rigEBlockedReason ?? 'rig_e_no_plan_found');
       return [{
         id: `step-blocked-rig-e-${taskData.id || 'unknown'}`,
-        label: '[BLOCKED] Rig E solver not implemented',
+        label: `[BLOCKED] Rig E: ${blockedReason}`,
         done: false,
         order: 1,
         meta: {
           blocked: true,
-          blockedReason: 'rig_e_solver_unimplemented',
+          blockedReason,
           requiredRig: 'E',
         },
       }];
@@ -449,8 +493,8 @@ export class SterlingPlanner {
       nearbyBlocks
     );
 
-    if (taskData.metadata && result.planId) {
-      (taskData.metadata as any).craftingPlanId = result.planId;
+    if (result.planId) {
+      ensureSolverMeta(taskData).craftingPlanId = result.planId;
     }
 
     if (!result.solved) return [];
@@ -505,8 +549,8 @@ export class SterlingPlanner {
       nearbyBlocks
     );
 
-    if (taskData.metadata && result.planId) {
-      (taskData.metadata as any).toolProgressionPlanId = result.planId;
+    if (result.planId) {
+      ensureSolverMeta(taskData).toolProgressionPlanId = result.planId;
     }
 
     if (!result.solved) return [];
@@ -554,7 +598,7 @@ export class SterlingPlanner {
 
     const templateId = 'basic_shelter_5x5__p0stub';
     const replanCount =
-      ((taskData.metadata as any)?.buildingReplanCount as number) || 0;
+      (taskData.metadata?.solver?.buildingReplanCount as number) || 0;
     const MAX_REPLANS = 1;
 
     const result = await this.buildingSolver.solveBuildingPlan(
@@ -567,26 +611,23 @@ export class SterlingPlanner {
       'stub'
     );
 
-    // Ensure metadata exists so solver-produced signals are never dropped
-    taskData.metadata ??= {} as any;
-    {
-      (taskData.metadata as any).buildingPlanId = result.planId;
-      (taskData.metadata as any).buildingTemplateId = templateId;
+    // Store solver outputs in the solver namespace
+    const solverMeta = ensureSolverMeta(taskData);
+    solverMeta.buildingPlanId = result.planId ?? undefined;
+    solverMeta.buildingTemplateId = templateId;
 
-      // Store Rig G metadata for feasibility gating in startTaskStep
-      if (result.rigGSignals) {
-        const commutingPairs = result.partialOrderPlan
-          ? findCommutingPairs(result.partialOrderPlan)
-          : [];
-        const rigG: RigGMetadata = {
-          version: 1,
-          signals: result.rigGSignals,
-          commutingPairs,
-          partialOrderPlan: result.partialOrderPlan,
-          computedAt: Date.now(),
-        };
-        (taskData.metadata as any).rigG = rigG;
-      }
+    // Store Rig G metadata for feasibility gating in startTaskStep
+    if (result.rigGSignals) {
+      const commutingPairs = result.partialOrderPlan
+        ? findCommutingPairs(result.partialOrderPlan)
+        : [];
+      solverMeta.rigG = {
+        version: 1,
+        signals: result.rigGSignals,
+        commutingPairs,
+        partialOrderPlan: result.partialOrderPlan,
+        computedAt: Date.now(),
+      };
     }
 
     if (result.needsMaterials && replanCount >= MAX_REPLANS) {
@@ -611,8 +652,8 @@ export class SterlingPlanner {
       ];
     }
 
-    if (result.needsMaterials && taskData.metadata) {
-      (taskData.metadata as any).buildingReplanCount = replanCount + 1;
+    if (result.needsMaterials) {
+      ensureSolverMeta(taskData).buildingReplanCount = replanCount + 1;
     }
 
     const steps = this.buildingSolver.toTaskStepsWithReplan(result, templateId);

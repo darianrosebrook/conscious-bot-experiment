@@ -12,7 +12,7 @@ export interface ITaskIntegration {
   updateTaskProgress(taskId: string, progress: number, status?: string): void;
   updateTaskStatus(taskId: string, status: string): Promise<void>;
   completeTaskStep(taskId: string, stepId: string): Promise<boolean>;
-  startTaskStep(taskId: string, stepId: string): Promise<boolean>;
+  startTaskStep(taskId: string, stepId: string, options?: { dryRun?: boolean }): Promise<boolean>;
   regenerateSteps(taskId: string, options?: any): Promise<any>;
   addStepsBeforeCurrent(taskId: string, steps: any[]): void;
   annotateCurrentStepWithLeaf(taskId: string, leaf: string, args?: any): void;
@@ -22,7 +22,13 @@ export interface ITaskIntegration {
     args?: Record<string, any>
   ): boolean;
   registerSolver(solver: any): void;
+  configureHierarchicalPlanner(overrides?: {
+    macroPlanner?: any;
+    feedbackStore?: any;
+  }): void;
+  readonly isHierarchicalPlannerConfigured: boolean;
   getMcDataPublic(): any;
   on(event: string, listener: (...args: any[]) => void): this;
+  emit(event: string, ...args: any[]): boolean;
   readonly outbox: { enqueue: (url: string, payload: any) => void };
 }

@@ -61,6 +61,42 @@ export interface Task {
     titleDisplay?: string;
     /** Tag-stripped display description (computed on read if missing) */
     descriptionDisplay?: string;
+    /**
+     * Solver-produced metadata namespace.
+     * All solver outputs (Rig G signals, building plan IDs, Rig E macro data, etc.)
+     * are stored here. addTask() merges this namespace generically so new solver
+     * outputs don't require key-by-key propagation.
+     */
+    solver?: {
+      /** Rig G feasibility metadata (versioned, fail-closed on unknown version) */
+      rigG?: import('../constraints/execution-advisor').RigGMetadata;
+      /** Building solver plan ID */
+      buildingPlanId?: string;
+      /** Building solver template ID */
+      buildingTemplateId?: string;
+      /** Crafting solver plan ID */
+      craftingPlanId?: string;
+      /** Tool progression solver plan ID */
+      toolProgressionPlanId?: string;
+      /** Rig G gate already checked for this task */
+      rigGChecked?: boolean;
+      /** Suggested parallelism from Rig G ready-set analysis */
+      suggestedParallelism?: number;
+      /** Rig G replan attempt count */
+      replanAttempts?: number;
+      /** Rig G replan in-flight marker */
+      rigGReplan?: {
+        inFlight: boolean;
+        attempt: number;
+        scheduledAt: number;
+      };
+      /** Steps digest for detecting identical replans */
+      stepsDigest?: string;
+      /** Building replan count */
+      buildingReplanCount?: number;
+      /** Additional solver-specific fields */
+      [key: string]: unknown;
+    };
   };
 }
 

@@ -117,7 +117,12 @@ import {
   detectActionableSteps,
   convertCognitiveReflectionToTasks,
 } from './server/cognitive-task-handler';
-import { startAutonomousExecutor as startAutonomousExecutorScheduler } from './server/autonomous-executor';
+import {
+  startAutonomousExecutor as startAutonomousExecutorScheduler,
+  parseExecutorConfig,
+  StepRateLimiter,
+  type ExecutorConfig,
+} from './server/autonomous-executor';
 
 // Create HTTP clients for inter-service communication
 const serviceClients = createServiceClients();
@@ -287,6 +292,14 @@ const BUILD_EXEC_MAX_ELAPSED_MS = Number(
 const DASHBOARD_STREAM_URL = process.env.DASHBOARD_ENDPOINT
   ? `${process.env.DASHBOARD_ENDPOINT}/api/ws/cognitive-stream`
   : 'http://localhost:3000/api/ws/cognitive-stream';
+
+const executorConfig: ExecutorConfig = (() => {
+  const cfg = parseExecutorConfig();
+  // Canonical tool names: minecraft.${leaf} — used for both allowlist check and execute()
+  cfg.leafAllowlist = new Set([...KNOWN_LEAF_NAMES].map(l => `minecraft.${l}`));
+  return cfg;
+})();
+const stepRateLimiter = new StepRateLimiter(executorConfig.maxStepsPerMinute);
 
 const executorEventThrottle = new Map<string, number>();
 const BUILDING_LEAVES = new Set([
@@ -2046,14 +2059,62 @@ async function autonomousTaskExecutor() {
             }
           }
 
+          // --- Executor guards: leaf allowlist, shadow mode, rate limiter ---
+
+          // Canonical tool name used for allowlist check AND execution
+          const toolName = `minecraft.${leafExec.leafName}`;
+
+          // 1. Leaf allowlist (free check, valid in both shadow and live)
+          if (!executorConfig.leafAllowlist.has(toolName)) {
+            // Mark step as non-executable so selector skips it on re-selection
+            if (nextStep.meta) {
+              nextStep.meta.executable = false;
+              nextStep.meta.blocked = true;
+            }
+            taskIntegration.updateTaskMetadata(currentTask.id, {
+              ...currentTask.metadata,
+              blockedReason: `unknown-leaf:${leafExec.leafName}`,
+            });
+            taskIntegration.emit('taskLifecycleEvent', {
+              type: 'unknown_leaf_rejected',
+              taskId: currentTask.id,
+              leaf: leafExec.leafName,
+            });
+            return;
+          }
+
+          // 2. Shadow mode: always observe, never throttle, never mutate
+          if (executorConfig.mode === 'shadow') {
+            console.log(
+              `[Executor:shadow] Would execute: ${toolName} ${JSON.stringify(leafExec.args)}`
+            );
+            await taskIntegration.startTaskStep(currentTask.id, nextStep.id, { dryRun: true });
+            return;
+          }
+
+          // --- Live mode execution ---
+
+          // 3. Rate limiter (live only — shadow must always observe)
+          if (!stepRateLimiter.canExecute()) {
+            return;
+          }
+
+          // 4. Rig G gate + snapshot capture (may block infeasible tasks)
+          const stepStarted = await taskIntegration.startTaskStep(currentTask.id, nextStep.id);
+          if (!stepStarted) {
+            // Rig G blocked or other gate failure — do NOT consume rate budget
+            return;
+          }
+
+          // 5. Committed to execution — consume rate budget
+          stepRateLimiter.record();
+
           const stepAuthority = nextStep.meta?.authority || 'unknown';
           console.log(
-            `🏗️ [Executor:${stepAuthority}] Executing step ${nextStep.order}: ${nextStep.label} → ${leafExec.leafName}`
+            `[Executor:${stepAuthority}] Executing step ${nextStep.order}: ${nextStep.label} → ${leafExec.leafName}`
           );
-          // Capture before-snapshot so verification can detect inventory delta
-          await taskIntegration.startTaskStep(currentTask.id, nextStep.id);
           const actionResult = await toolExecutor.execute(
-            `minecraft.${leafExec.leafName}`,
+            toolName,
             leafExec.args
           );
           if (actionResult?.ok) {
@@ -2512,10 +2573,62 @@ async function autonomousTaskExecutor() {
           console.error('[MCP] Failed to annotate current step with leaf:', e);
         }
 
+        // --- Executor guards (MCP fallback path) ---
+        const mcpToolName = `minecraft.${selectedLeaf.leafName}`;
+
+        // Derive the current incomplete step (MCP path has no nextStep from plan scope)
+        const mcpCurrentStep = currentTask.steps?.find((s: any) => !s.done);
+
+        // 1. Leaf allowlist (valid in both shadow and live)
+        if (!executorConfig.leafAllowlist.has(mcpToolName)) {
+          if (mcpCurrentStep?.meta) {
+            mcpCurrentStep.meta.executable = false;
+            mcpCurrentStep.meta.blocked = true;
+          }
+          taskIntegration.updateTaskMetadata(currentTask.id, {
+            ...currentTask.metadata,
+            blockedReason: `unknown-leaf:${selectedLeaf.leafName}`,
+          });
+          taskIntegration.emit('taskLifecycleEvent', {
+            type: 'unknown_leaf_rejected',
+            taskId: currentTask.id,
+            leaf: selectedLeaf.leafName,
+          });
+          return;
+        }
+
+        // 2. Shadow mode: always observe, never throttle
+        if (executorConfig.mode === 'shadow') {
+          console.log(
+            `[Executor:shadow] Would execute: ${mcpToolName} ${JSON.stringify(selectedLeaf.args)}`
+          );
+          if (mcpCurrentStep) {
+            await taskIntegration.startTaskStep(currentTask.id, mcpCurrentStep.id, { dryRun: true });
+          }
+          return;
+        }
+
+        // --- Live mode ---
+
+        // 3. Rate limiter (live only)
+        if (!stepRateLimiter.canExecute()) {
+          return;
+        }
+
+        // 4. Rig G gate + snapshot capture
+        if (mcpCurrentStep) {
+          const mcpStepStarted = await taskIntegration.startTaskStep(currentTask.id, mcpCurrentStep.id);
+          if (!mcpStepStarted) {
+            return;
+          }
+        }
+
+        // 5. Committed — consume budget
+        stepRateLimiter.record();
+
         // Execute the leaf via the Minecraft Interface action API
-        const actionTool = `minecraft.${selectedLeaf.leafName}`;
         const actionResult = await toolExecutor.execute(
-          actionTool,
+          mcpToolName,
           selectedLeaf.args || {}
         );
 
@@ -2931,6 +3044,14 @@ worldStateManager.on('updated', (snapshot) => {
 
 const { goalManager, reactiveExecutor, taskIntegration } =
   createPlanningBootstrap();
+
+// Rig E: Wire hierarchical planner when enabled via env config.
+// With ENABLE_RIG_E=1, navigate/explore/find tasks are planned via the
+// MacroPlanner (Dijkstra over context graph). Without it, they get the
+// blocked sentinel (rig_e_solver_unimplemented) as before.
+if (process.env.ENABLE_RIG_E === '1') {
+  taskIntegration.configureHierarchicalPlanner();
+}
 
 const memoryIntegration = new MemoryIntegration({
   enableRealTimeUpdates: true,
@@ -3559,36 +3680,31 @@ async function startServer() {
     await serverConfig.start();
     console.log('✅ Server started successfully');
 
-    // DISABLED: Legacy autonomous executor
-    // This was a workaround to force the bot to do something when it got stuck
-    // Now replaced by the minecraft-interface planning cycle which is more robust
-    const startAutonomousExecutor = () => {
-      console.log('Starting autonomous task executor...');
+    if (executorConfig.enabled) {
       console.log(
-        'Task integration has',
-        taskIntegration.getActiveTasks().length,
-        'active tasks'
+        `[Planning] Executor enabled (mode=${executorConfig.mode}, ` +
+        `maxSteps/min=${executorConfig.maxStepsPerMinute}, ` +
+        `leafAllowlist=${executorConfig.leafAllowlist.size} leaves)`
       );
-      startAutonomousExecutorScheduler(autonomousTaskExecutor, {
-        pollMs: EXECUTOR_POLL_MS,
-        maxBackoffMs: EXECUTOR_MAX_BACKOFF_MS,
-        breakerOpenMs: BOT_BREAKER_OPEN_MS,
-      });
-    };
-
-    // DISABLED: Legacy autonomous executor - now using minecraft-interface planning cycle instead
-    // if (isSystemReady()) {
-    //   startAutonomousExecutor();
-    // } else {
-    //   console.log('⏸️ Waiting for system readiness before starting executor...');
-    //   waitForSystemReady().then(() => {
-    //     console.log('✅ System readiness received; starting executor');
-    //     startAutonomousExecutor();
-    //   });
-    // }
-    console.log(
-      '[Planning] Legacy autonomous executor is disabled; execution uses minecraft-interface planning cycle (not a mock).'
-    );
+      const startExecutor = () => {
+        startAutonomousExecutorScheduler(autonomousTaskExecutor, {
+          pollMs: EXECUTOR_POLL_MS,
+          maxBackoffMs: EXECUTOR_MAX_BACKOFF_MS,
+          breakerOpenMs: BOT_BREAKER_OPEN_MS,
+        });
+      };
+      if (isSystemReady()) {
+        startExecutor();
+      } else {
+        waitForSystemReady().then(() => {
+          if (process.env.ENABLE_PLANNING_EXECUTOR === '1') {
+            startExecutor();
+          }
+        });
+      }
+    } else {
+      console.log('[Planning] Executor disabled (set ENABLE_PLANNING_EXECUTOR=1 to enable)');
+    }
 
     // Start cognitive thought processor (DISABLED - using event-driven system instead)
     // try {
