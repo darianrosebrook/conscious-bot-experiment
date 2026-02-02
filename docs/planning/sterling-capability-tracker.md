@@ -45,6 +45,15 @@ Sterling Python's `data/primitive_specs/index.json` defines engine-level primiti
 
 The bridge between namespaces is `SterlingDomainDeclaration.implementsPrimitives` → `DomainDeclarationV1` → `CapabilityClaimRegistry`. **Zero claims are registered today.** Until claims are wired, these namespaces coexist without formal alignment.
 
+**Namespace collision resolution** (2026-02-02): `primitive-namespace.ts` provides:
+- `QualifiedPrimitiveId` type (`CB-Pxx | ST-Pxx`) — bare IDs are structurally rejected
+- `SterlingDomainDeclaration.implementsPrimitives` now typed as `QualifiedPrimitiveId[]` (not `string[]`)
+- `CB_REQUIRES_ST` dependency mapping: CB-P01→[ST-P01], CB-P03→[ST-P01,ST-P02], etc.
+- `assertQualifiedPrimitiveIds()` runtime validator for claim registration
+- 22 tests proving validation, constants, and dependency mapping
+
+**Rule**: All primitive IDs in declarations, registries, and claim objects must be fully qualified (`CB-Pxx` or `ST-Pxx`). Bare IDs (`p01`, `P01`) are rejected.
+
 References in this document use the **CB-Pxx** namespace unless explicitly prefixed with **ST-**.
 
 ---

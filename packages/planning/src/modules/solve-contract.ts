@@ -8,6 +8,7 @@
  */
 
 import type { TaskRequirement } from './requirements';
+import type { QualifiedPrimitiveId } from '../sterling/primitive-namespace';
 
 // ---------------------------------------------------------------------------
 // Bot -> Sterling: Solve Input
@@ -185,8 +186,12 @@ export interface CompilerConstraints {
  * Describes what a solver on the Sterling side provides.
  */
 export interface SterlingDomainDeclaration {
-  /** Which primitive operations this solver implements. */
-  implementsPrimitives: string[];
+  /**
+   * Which primitive operations this solver implements.
+   * Must be fully qualified: CB-Pxx (domain capability) or ST-Pxx (engine primitive).
+   * Bare IDs like "p01" are rejected by assertQualifiedPrimitiveIds().
+   */
+  implementsPrimitives: QualifiedPrimitiveId[];
   /** Which SolveInput fields this solver consumes. */
   consumesFields: string[];
   /** Unique solver identifier. */
