@@ -313,6 +313,17 @@ export function lintRules(rules: LintableRule[], context?: LintContext): CompatR
     }
   }
 
+  // ACQUISITION_NO_VIABLE_STRATEGY — gated behind acquisition solverId
+  // Fires when the acquisition coordinator passes an empty rule set (0 viable candidates).
+  if (context?.solverId === 'minecraft.acquisition' && rules.length === 0) {
+    issues.push({
+      severity: 'error',
+      code: 'ACQUISITION_NO_VIABLE_STRATEGY',
+      ruleAction: '*',
+      message: 'Acquisition solver has 0 viable candidates — no rules to solve',
+    });
+  }
+
   const hasErrors = issues.some((i) => i.severity === 'error');
 
   return {

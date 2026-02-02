@@ -79,9 +79,12 @@ describe('leaf-routing conformance', () => {
       expect(actionTypeToLeaf('place', undefined)).toBe('place_block');
     });
 
+    it('maps navigate → sterling_navigate', () => {
+      expect(actionTypeToLeaf('navigate')).toBe('sterling_navigate');
+    });
+
     it('passes through unknown action types', () => {
       expect(actionTypeToLeaf('gather')).toBe('gather');
-      expect(actionTypeToLeaf('navigate')).toBe('navigate');
     });
   });
 

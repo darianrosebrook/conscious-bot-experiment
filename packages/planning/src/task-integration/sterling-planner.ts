@@ -372,6 +372,26 @@ export class SterlingPlanner {
       return { steps: [], noStepsReason: reason, route: routeInfo };
     }
 
+    // Rig D upgrade: when acquisition solver is registered, collect/mine
+    // requirements are promoted from compiler to Rig D for multi-strategy
+    // reasoning. Falls through to compiler if acquisition solver fails.
+    if (route.backend === 'compiler' && this.acquisitionSolver && requirement &&
+        (requirement.kind === 'collect' || requirement.kind === 'mine')) {
+      try {
+        const steps = await this.generateAcquisitionStepsFromSterling(taskData);
+        if (steps && steps.length > 0) {
+          const rigDRoute = { ...routeInfo, requiredRig: 'D', reason: `${routeInfo.reason}→rig-d-upgrade` };
+          return { steps, route: rigDRoute };
+        }
+      } catch (error) {
+        console.warn(
+          'Sterling acquisition solver failed for compiler-routed requirement, falling through to compiler:',
+          error
+        );
+      }
+      // Fall through to compiler if Rig D didn't produce steps
+    }
+
     if (route.backend === 'compiler') {
       const steps = this.generateLeafMappedSteps(taskData);
       if (steps.length === 0) {

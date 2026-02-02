@@ -4,6 +4,7 @@
  * Verifies:
  * - TRADE_REQUIRES_ENTITY: acq:trade:* without proximity token
  * - ACQ_FREE_PRODUCTION: structural "no free production" for all acq:* prefixes
+ * - ACQUISITION_NO_VIABLE_STRATEGY: 0 viable candidates (empty rule set)
  * - Valid rules pass all checks
  * - Existing 11 checks unaffected
  */
@@ -150,6 +151,31 @@ describe('ACQ_FREE_PRODUCTION', () => {
     };
     const report = lintRules([rule], ACQ_CONTEXT);
     expect(findIssue(report, 'ACQ_FREE_PRODUCTION')).toBeDefined();
+  });
+});
+
+// ── ACQUISITION_NO_VIABLE_STRATEGY ────────────────────────────────────────
+
+describe('ACQUISITION_NO_VIABLE_STRATEGY', () => {
+  it('empty rule set with acquisition solverId → error', () => {
+    const report = lintRules([], ACQ_CONTEXT);
+    expect(findIssue(report, 'ACQUISITION_NO_VIABLE_STRATEGY')).toBeDefined();
+    expect(report.valid).toBe(false);
+  });
+
+  it('non-empty rule set → no error', () => {
+    const report = lintRules([makeTradeRule()], ACQ_CONTEXT);
+    expect(findIssue(report, 'ACQUISITION_NO_VIABLE_STRATEGY')).toBeUndefined();
+  });
+
+  it('empty rule set with non-acquisition solverId → no error', () => {
+    const report = lintRules([], { solverId: 'minecraft.crafting' });
+    expect(findIssue(report, 'ACQUISITION_NO_VIABLE_STRATEGY')).toBeUndefined();
+  });
+
+  it('empty rule set with no context → no error', () => {
+    const report = lintRules([]);
+    expect(findIssue(report, 'ACQUISITION_NO_VIABLE_STRATEGY')).toBeUndefined();
   });
 });
 
