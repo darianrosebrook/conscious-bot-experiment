@@ -46,8 +46,8 @@ describe('leaf-routing conformance', () => {
   // ── actionTypeToLeaf ────────────────────────────────────────────
 
   describe('actionTypeToLeaf', () => {
-    it('maps mine → dig_block', () => {
-      expect(actionTypeToLeaf('mine')).toBe('dig_block');
+    it('maps mine → acquire_material', () => {
+      expect(actionTypeToLeaf('mine')).toBe('acquire_material');
     });
 
     it('maps craft → craft_recipe', () => {
@@ -93,7 +93,7 @@ describe('leaf-routing conformance', () => {
     });
 
     it('delegates non-upgrade types to base mapping', () => {
-      expect(actionTypeToLeafExtended('mine')).toBe('dig_block');
+      expect(actionTypeToLeafExtended('mine')).toBe('acquire_material');
       expect(actionTypeToLeafExtended('craft')).toBe('craft_recipe');
       expect(actionTypeToLeafExtended('place', 'place:crafting_table')).toBe('place_workstation');
     });

@@ -481,7 +481,7 @@ describe('MinecraftToolProgressionSolver', () => {
     const steps = solver.toTaskSteps(result);
 
     expect(steps).toHaveLength(4);
-    expect(steps[0].label).toBe('Leaf: minecraft.dig_block (blockType=oak_log, count=1)');
+    expect(steps[0].label).toBe('Leaf: minecraft.acquire_material (item=oak_log, count=1)');
     expect(steps[1].label).toBe('Leaf: minecraft.craft_recipe (recipe=oak_planks, qty=4)');
     expect(steps[2].label).toBe('Leaf: minecraft.craft_recipe (recipe=stick, qty=4)');
     expect(steps[3].label).toBe('Leaf: minecraft.craft_recipe (recipe=wooden_pickaxe, qty=1)');
@@ -493,7 +493,7 @@ describe('MinecraftToolProgressionSolver', () => {
     // Meta includes domain
     expect(steps[0].meta).toMatchObject({
       domain: 'tool_progression',
-      leaf: 'dig_block',
+      leaf: 'acquire_material',
       targetTool: 'wooden_pickaxe',
     });
     // Duration estimates

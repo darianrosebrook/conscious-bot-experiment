@@ -373,7 +373,7 @@ describe('CraftingSolver string label mapping', () => {
     expect(taskSteps).toHaveLength(3);
 
     // mine step
-    expect(taskSteps[0].meta.leaf).toBe('dig_block');
+    expect(taskSteps[0].meta.leaf).toBe('acquire_material');
     expect(taskSteps[0].meta.action).toBe('mine:oak_log');
     expect(taskSteps[0].meta.produces).toEqual([{ name: 'oak_log', count: 1 }]);
 

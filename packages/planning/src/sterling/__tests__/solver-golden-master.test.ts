@@ -8,6 +8,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { MinecraftCraftingSolver } from '../minecraft-crafting-solver';
 import { MinecraftBuildingSolver } from '../minecraft-building-solver';
+import { MinecraftFurnaceSolver } from '../minecraft-furnace-solver';
 import type { MinecraftCraftingSolveResult } from '../minecraft-crafting-types';
 import type { BuildingSolveResult } from '../minecraft-building-types';
 import type { SterlingReasoningService } from '../sterling-reasoning-service';
@@ -88,7 +89,7 @@ describe('MinecraftCraftingSolver — golden-master', () => {
 
     expect(steps).toHaveLength(3);
     expect(steps[0].label).toBe(
-      'Leaf: minecraft.dig_block (blockType=oak_log, count=3)'
+      'Leaf: minecraft.acquire_material (item=oak_log, count=3)'
     );
     expect(steps[1].label).toBe(
       'Leaf: minecraft.craft_recipe (recipe=oak_planks, qty=4)'
@@ -1179,6 +1180,141 @@ describe('MinecraftBuildingSolver — golden-master', () => {
 
       const snapshot = canonicalize(stablePayload);
       expect(snapshot).toMatchSnapshot();
+    });
+  });
+});
+
+// ===========================================================================
+// Furnace Solver
+// ===========================================================================
+
+describe('MinecraftFurnaceSolver — golden-master', () => {
+  let service: SterlingReasoningService;
+  let solver: MinecraftFurnaceSolver;
+
+  beforeEach(() => {
+    service = createMockService();
+    solver = new MinecraftFurnaceSolver(service);
+  });
+
+  // ---- solveMeta bundle attachment ----
+
+  describe('solveMeta bundle attachment', () => {
+    it('solved path attaches solveMeta with correct bundle shape', async () => {
+      (service.solve as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        solutionFound: true,
+        solutionPath: [{ source: 'A', target: 'B' }],
+        discoveredNodes: ['A', 'B'],
+        searchEdges: [{ source: 'A', target: 'B', label: { action: 'furnace:load:iron_ore' } }],
+        metrics: { planId: 'furnace-plan-1' },
+        durationMs: 55,
+      });
+
+      const result = await solver.solveFurnaceSchedule(
+        ['iron_ore'],
+        { iron_ore: 4, coal: 2 },
+        2,
+        0,
+      );
+
+      expect(result.solved).toBe(true);
+      expect(result.solveMeta).toBeDefined();
+      expect(result.solveMeta!.bundles).toHaveLength(1);
+
+      const bundle = result.solveMeta!.bundles[0];
+      expect(bundle.input.solverId).toBe('minecraft.furnace');
+      expect(bundle.input.definitionHash).toMatch(/^[0-9a-f]{16}$/);
+      expect(bundle.input.initialStateHash).toMatch(/^[0-9a-f]{16}$/);
+      expect(bundle.input.goalHash).toMatch(/^[0-9a-f]{16}$/);
+      expect(bundle.output.solved).toBe(true);
+      expect(bundle.output.planId).toBe('furnace-plan-1');
+      expect(bundle.output.stepsDigest).toMatch(/^[0-9a-f]{16}$/);
+      expect(bundle.compatReport.valid).toBe(true);
+      expect(bundle.bundleId).toMatch(/^minecraft\.furnace:[0-9a-f]{16}$/);
+    });
+
+    it('unsolved path attaches solveMeta with solved=false', async () => {
+      const result = await solver.solveFurnaceSchedule(
+        ['iron_ore'],
+        { iron_ore: 4, coal: 2 },
+        2,
+        0,
+      );
+
+      expect(result.solved).toBe(false);
+      expect(result.solveMeta).toBeDefined();
+      expect(result.solveMeta!.bundles).toHaveLength(1);
+
+      const bundle = result.solveMeta!.bundles[0];
+      expect(bundle.output.solved).toBe(false);
+      expect(bundle.bundleId).toMatch(/^minecraft\.furnace:[0-9a-f]{16}$/);
+    });
+  });
+
+  // ---- outbound payload stability ----
+
+  describe('outbound payload stability', () => {
+    it('solve payload matches canonical snapshot', async () => {
+      await solver.solveFurnaceSchedule(
+        ['iron_ore'],
+        { iron_ore: 4, coal: 2 },
+        2,
+        0,
+      );
+
+      expect(service.solve).toHaveBeenCalledTimes(1);
+      const call = (service.solve as ReturnType<typeof vi.fn>).mock.calls[0];
+      const payload = call[1];
+
+      const stablePayload = {
+        contractVersion: payload.contractVersion,
+        solverId: payload.solverId,
+        inventory: payload.inventory,
+        goal: payload.goal,
+        nearbyBlocks: payload.nearbyBlocks,
+        rules: payload.rules,
+        maxNodes: payload.maxNodes,
+        useLearning: payload.useLearning,
+        furnaceSlots: payload.furnaceSlots,
+        nowTicks: payload.nowTicks,
+      };
+
+      const snapshot = canonicalize(stablePayload);
+      expect(snapshot).toMatchSnapshot();
+    });
+
+    it('identical inputs produce byte-equivalent payloads', async () => {
+      await solver.solveFurnaceSchedule(['iron_ore'], { iron_ore: 4, coal: 2 }, 2, 0);
+      await solver.solveFurnaceSchedule(['iron_ore'], { iron_ore: 4, coal: 2 }, 2, 0);
+
+      expect(service.solve).toHaveBeenCalledTimes(2);
+      const calls = (service.solve as ReturnType<typeof vi.fn>).mock.calls;
+      expect(canonicalize(calls[0][1])).toBe(canonicalize(calls[1][1]));
+    });
+  });
+
+  // ---- bundle ID determinism ----
+
+  describe('bundle identity determinism', () => {
+    it('same inputs produce same bundleId across solves (R4)', async () => {
+      const mockResponse = {
+        solutionFound: false,
+        solutionPath: [],
+        discoveredNodes: [],
+        searchEdges: [],
+        metrics: {},
+        durationMs: 0,
+      };
+
+      (service.solve as ReturnType<typeof vi.fn>)
+        .mockResolvedValueOnce(mockResponse)
+        .mockResolvedValueOnce(mockResponse);
+
+      const result1 = await solver.solveFurnaceSchedule(['iron_ore'], { iron_ore: 4, coal: 2 }, 2);
+      const result2 = await solver.solveFurnaceSchedule(['iron_ore'], { iron_ore: 4, coal: 2 }, 2);
+
+      expect(result1.solveMeta!.bundles[0].bundleId)
+        .toBe(result2.solveMeta!.bundles[0].bundleId);
     });
   });
 });
