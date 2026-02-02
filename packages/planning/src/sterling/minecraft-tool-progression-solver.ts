@@ -518,7 +518,7 @@ export class MinecraftToolProgressionSolver extends BaseDomainSolver<ToolProgres
 
   /**
    * Convert a progression step to a leaf-annotated label for the BT executor.
-   * Reuses existing leaf names: minecraft.dig_block, minecraft.craft_recipe,
+   * Reuses existing leaf names: minecraft.acquire_material, minecraft.craft_recipe,
    * minecraft.smelt, minecraft.place_block.
    */
   private stepToLeafLabel(step: ToolProgressionStep): string {
@@ -526,7 +526,7 @@ export class MinecraftToolProgressionSolver extends BaseDomainSolver<ToolProgres
       case 'mine': {
         const item = step.produces[0];
         const count = item?.count ?? 1;
-        return `Leaf: minecraft.dig_block (blockType=${item?.name ?? 'unknown'}, count=${count})`;
+        return `Leaf: minecraft.acquire_material (item=${item?.name ?? 'unknown'}, count=${count})`;
       }
       case 'craft': {
         const output = step.produces[0];

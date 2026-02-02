@@ -460,7 +460,7 @@ export class MinecraftCraftingSolver extends BaseDomainSolver<MinecraftCraftingS
       case 'mine': {
         const item = step.produces[0];
         const count = item?.count ?? 1;
-        return `Leaf: minecraft.dig_block (blockType=${item?.name ?? 'unknown'}, count=${count})`;
+        return `Leaf: minecraft.acquire_material (item=${item?.name ?? 'unknown'}, count=${count})`;
       }
       case 'craft': {
         const output = step.produces[0];

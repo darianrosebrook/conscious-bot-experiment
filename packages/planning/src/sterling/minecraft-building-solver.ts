@@ -32,7 +32,7 @@ import type { TaskStep } from '../types/task-step';
 import { buildDagFromModules, findCommutingPairs } from '../constraints/dag-builder';
 import { linearize } from '../constraints/linearization';
 import { checkFeasibility } from '../constraints/feasibility-checker';
-import { extractDependencyConstraints } from '../constraints/constraint-model';
+import { extractDependencyConstraints, extractSupportConstraints } from '../constraints/constraint-model';
 import { computeRigGSignals } from '../constraints/signals';
 import type { PlanningDecision } from '../constraints/planning-decisions';
 import type { PartialOrderPlan, RigGSignals } from '../constraints/partial-order-plan';
@@ -221,8 +221,10 @@ export class MinecraftBuildingSolver extends BaseDomainSolver<BuildingSolveResul
         partialOrderPlan = dag;
         overallDecision = { kind: 'ok', value: dag };
 
-        // Feasibility check (dependency constraints from modules)
-        const constraints = extractDependencyConstraints(modules);
+        // Feasibility check (dependency + support constraints from modules)
+        const depConstraints = extractDependencyConstraints(modules);
+        const supportConstraints = extractSupportConstraints(modules);
+        const constraints = [...depConstraints, ...supportConstraints];
         feasDecision = checkFeasibility(dag, constraints);
         const feasibility =
           feasDecision.kind === 'ok' ? feasDecision.value : undefined;
@@ -478,6 +480,8 @@ export class MinecraftBuildingSolver extends BaseDomainSolver<BuildingSolveResul
       }
       case 'place_feature':
         return `Leaf: minecraft.place_feature (module=${step.moduleId})`;
+      case 'scaffold':
+        return `Leaf: minecraft.place_scaffold (module=${step.moduleId})`;
       default:
         return `Leaf: minecraft.building_step (module=${step.moduleId})`;
     }
@@ -494,6 +498,8 @@ export class MinecraftBuildingSolver extends BaseDomainSolver<BuildingSolveResul
         return 'build_module';
       case 'place_feature':
         return 'place_feature';
+      case 'scaffold':
+        return 'place_scaffold';
       default:
         return 'building_step';
     }
@@ -510,6 +516,8 @@ export class MinecraftBuildingSolver extends BaseDomainSolver<BuildingSolveResul
         return 20000;
       case 'place_feature':
         return 5000;
+      case 'scaffold':
+        return 8000;
       default:
         return 15000;
     }

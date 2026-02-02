@@ -26,7 +26,7 @@ export interface BuildingMaterial {
 // ============================================================================
 
 /** Building module types — NO 'ensure_mats' (material acquisition is out-of-band) */
-export type BuildingModuleType = 'prep_site' | 'apply_module' | 'place_feature';
+export type BuildingModuleType = 'prep_site' | 'apply_module' | 'place_feature' | 'scaffold';
 
 /** A building module that the bot can apply */
 export interface BuildingModule {
@@ -37,6 +37,12 @@ export interface BuildingModule {
   /** Client-computed site feasibility */
   placementFeasible: boolean;
   baseCost: number;
+  /** Support requirements: which modules provide structural support for this module */
+  supportRequirements?: Array<{ supportModuleId: string }>;
+  /** Reachability zone: height + access requirements */
+  reachabilityZone?: { maxHeight: number; requiresAccess?: string };
+  /** Whether this module is temporary (scaffolding — removed after use) */
+  isTemporary?: boolean;
 }
 
 // ============================================================================
