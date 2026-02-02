@@ -39,3 +39,24 @@ export type {
 // Signals
 export { collectRigESignals } from './signals';
 export type { RigESignals, CollectRigESignalsInput } from './signals';
+
+// World graph builder (E.1)
+export { buildWorldGraph } from './world-graph-builder';
+export type {
+  BiomeRegion,
+  StructureLocation,
+  ResourceZone,
+  MinecraftWorldGraphInput,
+} from './world-graph-builder';
+
+// Edge decomposer (E.2)
+export {
+  decomposeEdge,
+  registerDecomposition,
+  DECOMPOSITION_REGISTRY,
+} from './edge-decomposer';
+export type { MicroStep, BotState, DecomposeFn } from './edge-decomposer';
+
+// Feedback integration (E.3)
+export { FeedbackIntegration } from './feedback-integration';
+export type { EdgeSession, EdgeCompletionResult } from './feedback-integration';

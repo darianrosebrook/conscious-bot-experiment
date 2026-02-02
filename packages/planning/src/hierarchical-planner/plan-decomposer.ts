@@ -11,16 +11,23 @@
 import type { Goal, Plan, PlanStep, PlanStatus } from '../types';
 import type { PlanningDecision } from '../constraints/planning-decisions';
 import type { MacroPlanner } from '../hierarchical/macro-planner';
+import { decomposeEdge } from '../hierarchical/edge-decomposer';
+import type { BotState } from '../hierarchical/edge-decomposer';
 
 /**
  * Decompose a goal into a Plan using the macro planner.
  *
  * If no macro planner is provided, falls back to a stub plan
  * (backward compat for callers not yet using hierarchical planning).
+ *
+ * When botState is provided, macro edges are decomposed into micro steps
+ * via the edge decomposer registry (E.2). Otherwise macro edges are mapped
+ * to single movement PlanSteps for backward compatibility.
  */
 export function decomposeToPlan(
   goal: Goal,
-  macroPlanner?: MacroPlanner
+  macroPlanner?: MacroPlanner,
+  botState?: BotState,
 ): PlanningDecision<Plan> {
   if (!goal) {
     return {
@@ -68,27 +75,74 @@ export function decomposeToPlan(
   const now = Date.now();
 
   // Convert macro edges to plan steps
-  const steps: PlanStep[] = macroPlan.edges.map((edge, index) => ({
-    id: `macro-step-${edge.id}`,
-    planId: macroPlan.planDigest,
-    action: {
-      id: `macro-action-${edge.id}`,
-      name: `${edge.from} → ${edge.to}`,
-      description: `Transition from ${edge.from} to ${edge.to}`,
-      type: 'movement' as any,
+  // When botState is provided, decompose each macro edge into micro steps (E.2)
+  const steps: PlanStep[] = [];
+  let order = 1;
+  let prevStepId: string | undefined;
+
+  for (const edge of macroPlan.edges) {
+    if (botState) {
+      const decomposed = decomposeEdge(edge, botState);
+      if (decomposed.kind === 'ok') {
+        for (const micro of decomposed.value) {
+          const stepId = `micro-step-${edge.id}-${order}`;
+          steps.push({
+            id: stepId,
+            planId: macroPlan.planDigest,
+            action: {
+              id: `micro-action-${edge.id}-${order}`,
+              name: micro.action,
+              description: `${micro.action} (${micro.leaf})`,
+              type: 'movement' as any,
+              preconditions: [],
+              effects: [],
+              cost: micro.estimatedDurationMs / 1000,
+              duration: micro.estimatedDurationMs,
+              successProbability: 0.8,
+              parameters: micro.params,
+            },
+            preconditions: [],
+            effects: [],
+            status: 'pending' as any,
+            order,
+            estimatedDuration: micro.estimatedDurationMs,
+            dependencies: prevStepId ? [prevStepId] : [],
+            stepId: micro.leaf,
+          });
+          prevStepId = stepId;
+          order++;
+        }
+        continue;
+      }
+      // If decomposition is blocked, fall through to coarse macro step
+    }
+
+    // Coarse fallback: single movement step per macro edge
+    const stepId = `macro-step-${edge.id}`;
+    steps.push({
+      id: stepId,
+      planId: macroPlan.planDigest,
+      action: {
+        id: `macro-action-${edge.id}`,
+        name: `${edge.from} → ${edge.to}`,
+        description: `Transition from ${edge.from} to ${edge.to}`,
+        type: 'movement' as any,
+        preconditions: [],
+        effects: [],
+        cost: edge.learnedCost,
+        duration: edge.learnedCost * 1000,
+        successProbability: 0.8,
+      },
       preconditions: [],
       effects: [],
-      cost: edge.learnedCost,
-      duration: edge.learnedCost * 1000,
-      successProbability: 0.8,
-    },
-    preconditions: [],
-    effects: [],
-    status: 'pending' as any,
-    order: index + 1,
-    estimatedDuration: edge.learnedCost * 1000,
-    dependencies: index > 0 ? [`macro-step-${macroPlan.edges[index - 1].id}`] : [],
-  }));
+      status: 'pending' as any,
+      order,
+      estimatedDuration: edge.learnedCost * 1000,
+      dependencies: prevStepId ? [prevStepId] : [],
+    });
+    prevStepId = stepId;
+    order++;
+  }
 
   return {
     kind: 'ok',

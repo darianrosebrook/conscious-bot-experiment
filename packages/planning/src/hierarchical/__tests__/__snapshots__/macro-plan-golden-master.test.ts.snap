@@ -1,0 +1,5 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`macro plan golden-master (E.4) > decomposed steps match canonical snapshot 1`] = `"[]"`;
+
+exports[`macro plan golden-master (E.4) > macro plan for fixed graph + goal matches canonical snapshot 1`] = `"{"edgeSequence":[{"baseCost":4,"from":"spawn_area","to":"mountain_pass"},{"baseCost":3,"from":"mountain_pass","to":"deep_cave"}],"goal":"deep_cave","goalId":"golden-goal","planDigest":"734055994bf6a80a","start":"spawn_area","totalCost":7}"`;
