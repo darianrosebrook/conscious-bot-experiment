@@ -259,6 +259,55 @@ describe('MinecraftAcquisitionSolver', () => {
     expect(result.strategyRanking.length).toBeGreaterThan(0);
   });
 
+  // ── Mine/craft delegation regression (material fix) ──────────────────
+
+  it('mine/craft delegation: parent bundle compatReport.valid when candidateCount > 0 and rules=[]', async () => {
+    // Cobblestone → mine is only/best strategy → delegates to crafting solver.
+    // Parent level: rules=[] (child solver handles them), but candidateCount > 0.
+    // Before the fix, this triggered ACQUISITION_NO_VIABLE_STRATEGY because the
+    // linter used rules.length (0) instead of candidateCount.
+    const result = await solver.solveAcquisition(
+      'cobblestone', 1,
+      { 'cap:has_wooden_pickaxe': 1 },
+      ['stone'],
+      [],
+    );
+    expect(result.solved).toBe(true);
+    expect(result.selectedStrategy).toBe('mine');
+
+    const parentBundle = result.solveMeta!.bundles[0];
+    expect(parentBundle.compatReport.valid).toBe(true);
+    expect(parentBundle.compatReport.issues.filter(
+      (i: any) => i.code === 'ACQUISITION_NO_VIABLE_STRATEGY',
+    )).toHaveLength(0);
+  });
+
+  it('mine/craft delegation: parent bundle has parentBundleId', async () => {
+    const result = await solver.solveAcquisition(
+      'cobblestone', 1,
+      { 'cap:has_wooden_pickaxe': 1 },
+      ['stone'],
+      [],
+    );
+    expect(result.parentBundleId).toBeTruthy();
+    expect(result.parentBundleId).toBe(result.solveMeta!.bundles[0].bundleId);
+  });
+
+  it('mine/craft delegation: child bundles are appended after parent', async () => {
+    const result = await solver.solveAcquisition(
+      'cobblestone', 1,
+      { 'cap:has_wooden_pickaxe': 1 },
+      ['stone'],
+      [],
+    );
+    // Parent bundle is first, child crafting bundle follows
+    expect(result.solveMeta!.bundles.length).toBeGreaterThanOrEqual(2);
+    const parentBundle = result.solveMeta!.bundles[0];
+    const childBundle = result.solveMeta!.bundles[1];
+    expect(parentBundle.bundleId).toContain('minecraft.acquisition');
+    expect(childBundle.bundleId).toContain('minecraft.crafting');
+  });
+
   it('toTaskSteps converts solved result to steps', async () => {
     const result = await solver.solveAcquisition(
       'iron_ingot', 1,

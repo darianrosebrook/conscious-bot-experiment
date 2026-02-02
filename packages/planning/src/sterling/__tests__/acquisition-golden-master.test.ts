@@ -222,7 +222,7 @@ describe('Trade rule shape snapshot', () => {
         "requires": [
           {
             "count": 1,
-            "name": "proximity:chest",
+            "name": "proximity:container:chest",
           },
         ],
       }

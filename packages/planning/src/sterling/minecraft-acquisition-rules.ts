@@ -373,7 +373,7 @@ function buildLootCandidate(
     item,
     estimatedCost: probabilityCost + distanceCost,
     feasibility,
-    requires: ['proximity:chest'],
+    requires: ['proximity:container:chest'],
     contextSnapshot: ctx,
   };
 }

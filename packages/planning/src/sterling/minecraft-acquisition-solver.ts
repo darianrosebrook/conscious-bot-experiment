@@ -76,17 +76,18 @@ export function buildTradeRules(
 
 /**
  * Build loot rules for Sterling. Uses acq:loot:<item> prefix.
- * Container interaction modeled as craft consuming proximity:chest token.
+ * Container interaction modeled as craft consuming proximity:container:<kind> token.
  */
 export function buildLootRules(
   item: string,
+  containerKind = 'chest',
 ): LintableRule[] {
   return [{
     action: `acq:loot:${item}`,
     actionType: 'craft',
     produces: [{ name: item, count: 1 }],
     consumes: [],
-    requires: [{ name: 'proximity:chest', count: 1 }],
+    requires: [{ name: `proximity:container:${containerKind}`, count: 1 }],
   }];
 }
 
@@ -233,10 +234,10 @@ export class MinecraftAcquisitionSolver extends BaseDomainSolver<AcquisitionSolv
       objectiveWeights: options?.objectiveWeights,
     });
 
-    // Augment input with acquisition-specific fields by creating the bundle manually.
-    // Pass candidateCount so ACQUISITION_NO_VIABLE_STRATEGY checks coordinator
-    // candidate enumeration, not delegated rule count (mine/craft produces 0 rules
-    // but is valid via child solver delegation).
+    // candidateCount = structurally enumerated strategies with a known domain path.
+    // This is NOT a feasibility filter: 'unknown' candidates are still dispatchable.
+    // Distinction: candidateCount=0 means "no strategy path exists" (structural);
+    // candidateCount>0 with rules=[] means "delegation-driven" (mine/craft).
     const compatReport = lintRules(dispatchResult.rules as LintableRule[], {
       solverId: this.solverId,
       candidateCount: candidates.length,
@@ -530,8 +531,9 @@ export class MinecraftAcquisitionSolver extends BaseDomainSolver<AcquisitionSolv
 
       // Build child bundle for this sub-solve.
       // Compat report computed once here and reused for the child bundle.
+      // Linter context solverId matches the child bundle solverId for audit consistency.
       const compatReport = lintRules(rules, {
-        solverId: this.solverId,
+        solverId: childSolverId,
         enableAcqHardening: true,
       });
       const bundleInput = computeBundleInput({

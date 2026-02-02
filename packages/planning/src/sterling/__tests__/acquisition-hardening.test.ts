@@ -6,7 +6,7 @@
  * - ACQ_FREE_PRODUCTION: structural "no free production" for all acq:* prefixes
  * - ACQUISITION_NO_VIABLE_STRATEGY: uses candidateCount (not rules.length)
  * - enableAcqHardening flag gates checks without requiring minecraft solverId
- * - Token specificity: trade requires proximity:villager, loot requires proximity:chest
+ * - Token specificity: trade requires proximity:villager, loot requires proximity:container:<kind>
  * - Valid rules pass all checks
  * - Existing 11 checks unaffected
  */
@@ -35,7 +35,7 @@ function makeLootRule(overrides: Partial<LintableRule> = {}): LintableRule {
     actionType: 'craft',
     produces: [{ name: 'diamond', count: 1 }],
     consumes: [],
-    requires: [{ name: 'proximity:chest', count: 1 }],
+    requires: [{ name: 'proximity:container:chest', count: 1 }],
     ...overrides,
   };
 }
@@ -137,8 +137,16 @@ describe('ACQ_FREE_PRODUCTION', () => {
     expect(findIssue(report, 'ACQ_FREE_PRODUCTION')).toBeDefined();
   });
 
-  it('acq:loot with requires=[proximity:chest] → passes', () => {
+  it('acq:loot with requires=[proximity:container:chest] → passes', () => {
     const rule = makeLootRule();
+    const report = lintRules([rule], ACQ_CONTEXT);
+    expect(findIssue(report, 'ACQ_FREE_PRODUCTION')).toBeUndefined();
+  });
+
+  it('acq:loot with proximity:container:barrel → passes', () => {
+    const rule = makeLootRule({
+      requires: [{ name: 'proximity:container:barrel', count: 1 }],
+    });
     const report = lintRules([rule], ACQ_CONTEXT);
     expect(findIssue(report, 'ACQ_FREE_PRODUCTION')).toBeUndefined();
   });
@@ -146,6 +154,14 @@ describe('ACQ_FREE_PRODUCTION', () => {
   it('acq:loot with wrong proximity token (proximity:villager) → ACQ_FREE_PRODUCTION error', () => {
     const rule = makeLootRule({
       requires: [{ name: 'proximity:villager', count: 1 }],
+    });
+    const report = lintRules([rule], ACQ_CONTEXT);
+    expect(findIssue(report, 'ACQ_FREE_PRODUCTION')).toBeDefined();
+  });
+
+  it('acq:loot with old-style proximity:chest (no container: prefix) → ACQ_FREE_PRODUCTION error', () => {
+    const rule = makeLootRule({
+      requires: [{ name: 'proximity:chest', count: 1 }],
     });
     const report = lintRules([rule], ACQ_CONTEXT);
     expect(findIssue(report, 'ACQ_FREE_PRODUCTION')).toBeDefined();

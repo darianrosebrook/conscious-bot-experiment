@@ -61,10 +61,18 @@ export interface LintContext {
    */
   enableAcqHardening?: boolean;
   /**
-   * Number of viable candidates enumerated by the coordinator.
-   * Used by ACQUISITION_NO_VIABLE_STRATEGY to distinguish "no candidates"
-   * from "delegation produced no rules" (mine/craft delegation is valid
-   * with zero rules because the child solver handles them).
+   * Number of candidates the coordinator will attempt to dispatch.
+   *
+   * This is the set of structurally enumerated strategies for the target item
+   * (mine, trade, loot, salvage) that have a known domain path — not a
+   * feasibility filter. A candidate with `feasibility: 'unknown'` is still
+   * dispatchable (the sub-solver may succeed or fail at runtime).
+   *
+   * Used by ACQUISITION_NO_VIABLE_STRATEGY to distinguish:
+   * - candidateCount === 0: no strategy path exists for this item (structural failure)
+   * - candidateCount > 0 but rules === []: delegation-driven strategy (mine/craft)
+   *   where the child solver handles rules, not the parent
+   *
    * When undefined, falls back to rules.length for backwards compatibility.
    */
   candidateCount?: number;
@@ -302,17 +310,18 @@ export function lintRules(rules: LintableRule[], context?: LintContext): CompatR
             });
           }
         } else if (rule.action.startsWith('acq:loot:')) {
-          // Loot must require a container-proximity token (proximity:chest or proximity:barrel etc.)
+          // Loot must require a container-proximity token.
+          // Convention: proximity:container:<kind> (e.g., proximity:container:chest).
+          // Prefix check scales to new container types without linter edits.
           const hasContainerRequire = rule.requires.some(
-            r => r.name === 'proximity:chest' || r.name === 'proximity:barrel'
-              || r.name === 'proximity:trapped_chest'
+            r => r.name.startsWith('proximity:container:')
           );
           if (!hasContainerRequire) {
             issues.push({
               severity: 'error',
               code: 'ACQ_FREE_PRODUCTION',
               ruleAction: rule.action,
-              message: `Loot rule must require a container proximity token (proximity:chest, proximity:barrel, or proximity:trapped_chest)`,
+              message: `Loot rule must require a 'proximity:container:<kind>' token (e.g., proximity:container:chest)`,
             });
           }
         } else if (rule.action.startsWith('acq:salvage:')) {
