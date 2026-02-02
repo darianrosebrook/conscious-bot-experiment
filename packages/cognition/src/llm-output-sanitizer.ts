@@ -14,10 +14,13 @@
 // Types
 // ============================================================================
 
+export type IntentLabel = 'none' | 'explore' | 'gather' | 'craft' | 'shelter' | 'food' | 'mine' | 'navigate';
+
 export interface SanitizedOutput {
   text: string;
   goalTag: GoalTag | null;
   goalTagV1: GoalTagV1 | null;
+  intent: IntentLabel | null;
   flags: SanitizationFlags;
 }
 
@@ -101,7 +104,7 @@ const GENERIC_FILLER_PATTERNS = [
 // Bump NORMALIZE_MAP_VERSION when adding/removing/changing entries.
 // ============================================================================
 
-export const NORMALIZE_MAP_VERSION = 2;
+export const NORMALIZE_MAP_VERSION = 3;
 
 const ACTION_NORMALIZE_MAP: Record<string, string> = {
   dig: 'mine',
@@ -132,6 +135,7 @@ const ACTION_NORMALIZE_MAP: Record<string, string> = {
   acknowledge: 'check',
   acquire: 'gather',
   increase: 'gather',
+  farm: 'gather',
   fix: 'repair',
   mend: 'repair',
   restore: 'repair',
@@ -422,6 +426,44 @@ export function extractGoalTag(text: string): {
   return { text: cleanedText, goal, goalV1, rawGoalTag: null, failReason: 'none', tagCount };
 }
 
+// ============================================================================
+// Intent Extraction
+// ============================================================================
+
+const VALID_INTENTS = new Set<IntentLabel>([
+  'none', 'explore', 'gather', 'craft', 'shelter', 'food', 'mine', 'navigate',
+]);
+
+/**
+ * Extract INTENT label from the final line of text.
+ * Strips the INTENT line from the output.
+ * Returns null for unknown/missing intents.
+ */
+export function extractIntent(text: string): { text: string; intent: IntentLabel | null } {
+  // Match INTENT: <label> only as the final non-empty line.
+  // Walk backward past trailing blank lines (small models often emit trailing newlines).
+  const lines = text.split('\n');
+  let intentLineIdx = -1;
+  for (let i = lines.length - 1; i >= 0; i--) {
+    const trimmed = lines[i].trim();
+    if (trimmed.length === 0) continue;
+    const match = trimmed.match(/^INTENT:\s*(\w+)\s*$/i);
+    if (match) {
+      const candidate = match[1].toLowerCase() as IntentLabel;
+      if (VALID_INTENTS.has(candidate)) {
+        intentLineIdx = i;
+        // Strip INTENT line (and any trailing blanks after it) from output
+        const cleanedText = lines.slice(0, i).join('\n').trimEnd();
+        return { text: cleanedText, intent: candidate };
+      }
+    }
+    // First non-empty line from the end wasn't an INTENT line — stop looking
+    break;
+  }
+
+  return { text, intent: null };
+}
+
 /**
  * Step 4: Truncate degenerate repetitive text.
  * Detects trigram repetition (3+ occurrences) and 4+ consecutive identical words.
@@ -631,6 +673,10 @@ export function sanitizeLLMOutput(raw: string): SanitizedOutput {
   flags.goalTagFailReason = goalResult.failReason;
   flags.goalTagCount = goalResult.tagCount;
 
+  // Step 3.5: Extract INTENT label (after goal, before degeneration)
+  const intentResult = extractIntent(text);
+  text = intentResult.text;
+
   // Step 4: Truncate degeneration
   const degenResult = truncateDegeneration(text);
   text = degenResult.text;
@@ -650,6 +696,7 @@ export function sanitizeLLMOutput(raw: string): SanitizedOutput {
     text,
     goalTag: goalResult.goal,
     goalTagV1: goalResult.goalV1,
+    intent: intentResult.intent,
     flags,
   };
 }

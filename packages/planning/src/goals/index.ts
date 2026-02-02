@@ -59,3 +59,10 @@ export type { LifecycleHookResult, EffectApplierDeps } from './goal-lifecycle-ho
 // Lifecycle events (observability)
 export { GoalLifecycleCollector, goalCreatedEvent, goalResolvedEvent, goalVerificationEvent, goalCompletedEvent, goalRegressionEvent } from './goal-lifecycle-events';
 export type { GoalLifecycleEvent, GoalCreatedEvent, GoalResolvedEvent, GoalAnchoredEvent, GoalHoldAppliedEvent, GoalHoldClearedEvent, GoalActivatedEvent, GoalPreemptedEvent, GoalVerificationEvent, GoalCompletedEvent, GoalRegressionEvent, GoalDriftDetectedEvent, GoalSyncEffectEvent } from './goal-lifecycle-events';
+
+// Threat-hold bridge
+// Note: FAIL_CLOSED_SIGNAL intentionally not re-exported here — import directly
+// from './threat-hold-bridge' in tests. It has fetchedAt:0 and must be cloned
+// before use; keeping it off the public barrel reduces misuse surface.
+export { evaluateThreatHolds, shouldHold, fetchThreatSignal } from './threat-hold-bridge';
+export type { ThreatSignal, ThreatLevel, ThreatBridgeEvaluatedEvent, ThreatHoldBridgeDeps } from './threat-hold-bridge';

@@ -11,6 +11,7 @@ import {
   MinecraftCraftingSolver,
   MinecraftBuildingSolver,
   MinecraftToolProgressionSolver,
+  MinecraftNavigationSolver,
 } from '../sterling';
 
 export interface SterlingBootstrapResult {
@@ -18,6 +19,7 @@ export interface SterlingBootstrapResult {
   minecraftCraftingSolver: MinecraftCraftingSolver | undefined;
   minecraftBuildingSolver: MinecraftBuildingSolver | undefined;
   minecraftToolProgressionSolver: MinecraftToolProgressionSolver | undefined;
+  minecraftNavigationSolver: MinecraftNavigationSolver | undefined;
 }
 
 export interface TaskIntegrationSolverRegistry {
@@ -38,6 +40,7 @@ export async function createSterlingBootstrap(
   let minecraftToolProgressionSolver:
     | MinecraftToolProgressionSolver
     | undefined;
+  let minecraftNavigationSolver: MinecraftNavigationSolver | undefined;
 
   try {
     sterlingService = new SterlingReasoningService();
@@ -64,6 +67,12 @@ export async function createSterlingBootstrap(
       );
       taskIntegration.registerSolver(minecraftToolProgressionSolver);
       console.log('Minecraft tool progression solver initialized');
+
+      minecraftNavigationSolver = new MinecraftNavigationSolver(
+        sterlingService
+      );
+      taskIntegration.registerSolver(minecraftNavigationSolver);
+      console.log('Minecraft navigation solver initialized');
     }
   } catch (error) {
     console.warn(
@@ -77,5 +86,6 @@ export async function createSterlingBootstrap(
     minecraftCraftingSolver,
     minecraftBuildingSolver,
     minecraftToolProgressionSolver,
+    minecraftNavigationSolver,
   };
 }

@@ -65,6 +65,7 @@ export interface LLMResponse {
     retryAttempt?: number;
     retryReason?: string;
     extractedGoal?: GoalTagV1 | { action: string; target: string; amount: number | null };
+    extractedIntent?: string | null;
     sanitizationFlags?: SanitizationFlags;
   };
   timestamp: number;

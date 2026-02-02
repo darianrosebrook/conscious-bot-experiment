@@ -12,7 +12,7 @@ import { EventEmitter } from 'events';
 import { Vec3 } from 'vec3';
 import { BotConfig, BotEvent, BotEventType } from './types';
 import { AutomaticSafetyMonitor } from './automatic-safety-monitor';
-import { resilientFetch } from '@conscious-bot/core';
+import { resilientFetch, TTSClient } from '@conscious-bot/core';
 import { ActionTranslator } from './action-translator';
 import mcData from 'minecraft-data';
 import {
@@ -54,6 +54,9 @@ export class BotAdapter extends EventEmitter {
   private lastDeathMessage: string | null = null;
   private lastDeathMessageAt = 0;
 
+  // TTS client (Kokoro-ONNX, optional — fire-and-forget voice output)
+  private ttsClient: TTSClient;
+
   // Entity belief system (replaces per-entity /process POSTs)
   private beliefBus: BeliefBus;
   private beliefTickId = 0;
@@ -79,6 +82,7 @@ export class BotAdapter extends EventEmitter {
     const streamId = `${botId}-${instanceNonce}`;
     this.beliefBus = new BeliefBus(botId, streamId);
     this.reflexArbitrator = new ReflexArbitrator();
+    this.ttsClient = new TTSClient();
 
     // Handle error events to prevent unhandled errors
     this.on('error', (error) => {
@@ -300,16 +304,34 @@ export class BotAdapter extends EventEmitter {
   }
 
   /**
-   * Get safety monitor status
+   * Get safety monitor status with serializable threat assessment.
+   * Returns a JSON-safe object (no Vec3, no BigInt, no class instances).
+   *
+   * Async because it calls assessThreats() on the ThreatPerceptionManager.
+   * Previously sync and spread the raw getStatus() result, which included
+   * the full ThreatPerceptionManager (containing RaycastEngine with BigInt
+   * fields), causing "Do not know how to serialize a BigInt" on res.json().
    */
-  getSafetyStatus(): any {
+  async getSafetyStatus(): Promise<any> {
     if (!this.safetyMonitor) {
-      return { enabled: false };
+      return { enabled: false, overallThreatLevel: 'low', threats: [] };
     }
+
+    const status = this.safetyMonitor.getStatus();
+    const assessment = await this.safetyMonitor.getThreatManager().assessThreats();
 
     return {
       enabled: true,
-      ...this.safetyMonitor.getStatus(),
+      isMonitoring: status.isMonitoring,
+      lastHealth: status.lastHealth,
+      overallThreatLevel: assessment.overallThreatLevel,
+      threats: assessment.threats.map((t) => ({
+        type: t.type,
+        distance: t.distance,
+        threatLevel: t.threatLevel,
+        hasLineOfSight: t.hasLineOfSight,
+      })),
+      recommendedAction: assessment.recommendedAction,
     };
   }
 
@@ -813,10 +835,13 @@ export class BotAdapter extends EventEmitter {
             timestamp: Date.now(),
             environment: 'minecraft',
             botPosition: {
-              x: this.bot.entity?.position?.x,
-              y: this.bot.entity?.position?.y,
-              z: this.bot.entity?.position?.z,
+              x: this.bot?.entity?.position?.x,
+              y: this.bot?.entity?.position?.y,
+              z: this.bot?.entity?.position?.z,
             },
+            // Cheap sync reads for opportunistic cache freshness in cognition
+            botHealth: this.bot?.health,
+            botFood: this.bot?.food,
           },
         }),
       });
@@ -835,7 +860,11 @@ export class BotAdapter extends EventEmitter {
           const now = Date.now();
           if (now - this.lastSocialChatResponse >= this.socialChatCooldown) {
             const responseStart = Date.now();
-            await this.bot?.chat(this.sanitizeOutboundChat(result.response));
+            const sanitizedChat = this.sanitizeOutboundChat(result.response);
+            await this.bot?.chat(sanitizedChat);
+            if (process.env.TTS_SPEAK_CHAT !== 'false') {
+              this.ttsClient.speak(sanitizedChat);
+            }
             const responseTime = Date.now() - responseStart;
             this.recordResponseTime(responseTime);
             this.performanceMetrics.chatResponses++;
@@ -849,6 +878,12 @@ export class BotAdapter extends EventEmitter {
               `💬 Social chat response throttled (cooldown: ${(this.socialChatCooldown - (now - this.lastSocialChatResponse)) / 1000}s)`
             );
           }
+        }
+
+        // If cognition system suggests task creation, create a task
+        if (result.shouldCreateTask && result.taskSuggestion) {
+          await this.createTaskFromSocialChat(sender, message, result.taskSuggestion);
+          this.performanceMetrics.tasksCreated++;
         }
       } else if (response) {
         console.log(
@@ -965,9 +1000,11 @@ export class BotAdapter extends EventEmitter {
             if (result.shouldRespond && result.response) {
               const now = Date.now();
               if (now - this.lastChatResponse >= this.chatCooldown) {
-                await this.bot?.chat(
-                  this.sanitizeOutboundChat(result.response)
-                );
+                const sanitizedBeliefChat = this.sanitizeOutboundChat(result.response);
+                await this.bot?.chat(sanitizedBeliefChat);
+                if (process.env.TTS_SPEAK_CHAT !== 'false') {
+                  this.ttsClient.speak(sanitizedBeliefChat);
+                }
                 this.lastChatResponse = now;
                 this.performanceMetrics.chatResponses++;
               }
@@ -1111,7 +1148,11 @@ export class BotAdapter extends EventEmitter {
           const now = Date.now();
           if (now - this.lastChatResponse >= this.chatCooldown) {
             const responseStart = Date.now();
-            await this.bot?.chat(this.sanitizeOutboundChat(result.response));
+            const sanitizedEntityChat = this.sanitizeOutboundChat(result.response);
+            await this.bot?.chat(sanitizedEntityChat);
+            if (process.env.TTS_SPEAK_CHAT !== 'false') {
+              this.ttsClient.speak(sanitizedEntityChat);
+            }
             const responseTime = Date.now() - responseStart;
             this.recordResponseTime(responseTime);
             this.performanceMetrics.chatResponses++;
@@ -1212,6 +1253,53 @@ export class BotAdapter extends EventEmitter {
       }
     } catch (error) {
       console.error('❌ Error creating task from entity:', error);
+    }
+  }
+
+  /**
+   * Create a task from a social chat interaction
+   */
+  private async createTaskFromSocialChat(
+    sender: string,
+    message: string,
+    taskSuggestion: string
+  ): Promise<void> {
+    try {
+      const planningUrl =
+        process.env.PLANNING_SERVICE_URL || 'http://localhost:3002';
+
+      const response = await resilientFetch(`${planningUrl}/goal`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: `Respond to ${sender}: "${message.slice(0, 50)}"`,
+          description: taskSuggestion,
+          priority: 0.8,
+          urgency: 0.6,
+          tasks: [
+            {
+              type: 'autonomous',
+              description: taskSuggestion,
+              priority: 0.8,
+              urgency: 0.6,
+              parameters: {
+                sender,
+                message,
+                source: 'social-chat',
+              },
+            },
+          ],
+        }),
+      });
+
+      if (response?.ok) {
+        const result = await response.json();
+        console.log(`✅ Created task from social chat:`, result);
+      } else if (response) {
+        console.log(`⚠️ Failed to create task from social chat: ${response.status}`);
+      }
+    } catch (error) {
+      console.error('❌ Error creating task from social chat:', error);
     }
   }
 
@@ -1376,7 +1464,11 @@ export class BotAdapter extends EventEmitter {
             this.environmentalCooldown
           ) {
             const responseStart = Date.now();
-            await this.bot?.chat(this.sanitizeOutboundChat(result.response));
+            const sanitizedEnvChat = this.sanitizeOutboundChat(result.response);
+            await this.bot?.chat(sanitizedEnvChat);
+            if (process.env.TTS_SPEAK_CHAT !== 'false') {
+              this.ttsClient.speak(sanitizedEnvChat);
+            }
             const responseTime = Date.now() - responseStart;
             this.recordResponseTime(responseTime);
             this.performanceMetrics.chatResponses++;

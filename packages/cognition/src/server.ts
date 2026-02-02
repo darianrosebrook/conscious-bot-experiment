@@ -8,13 +8,21 @@
 
 import * as express from 'express';
 import * as cors from 'cors';
-import { createServiceClients, resilientFetch } from '@conscious-bot/core';
+import { createServiceClients, resilientFetch, TTSClient } from '@conscious-bot/core';
 import { ReActArbiter } from './react-arbiter/ReActArbiter';
 import {
   eventDrivenThoughtGenerator,
   ContextualThought,
 } from './event-driven-thought-generator';
 import { LLMInterface } from './cognitive-core/llm-interface';
+import {
+  updateBotStateCache,
+  patchBotStateCache,
+  getBotStateCache,
+  botStateCacheAgeMs,
+  STALE_THRESHOLD_MS,
+  isCompletePosition,
+} from './bot-state-cache';
 import {
   ObservationReasoner,
   ObservationPayload,
@@ -25,6 +33,7 @@ import {
   createSaliencyReasonerState,
   type BeliefStreamEnvelope,
 } from './environmental/saliency-reasoner';
+import { isUsableContent } from './llm-output-sanitizer';
 
 /**
  * Cognitive Stream Logger
@@ -903,6 +912,9 @@ const cognitionSystem = {
   socialCognition: { getAgentCount: () => 0, getRelationshipCount: () => 0 },
 };
 
+// TTS client (Kokoro-ONNX, optional — fire-and-forget voice output)
+const ttsClient = new TTSClient();
+
 // Store cognitive thoughts for external access
 let cognitiveThoughts: any[] = [];
 
@@ -947,6 +959,14 @@ async function sendThoughtToCognitiveStream(thought: any) {
         '✅ Thought sent to cognitive stream:',
         thought.content.substring(0, 50) + '...'
       );
+
+      // Speak thought aloud via TTS (fire-and-forget)
+      if (process.env.TTS_SPEAK_THOUGHTS !== 'false') {
+        const displayText = (thought.content || '').replace(GOAL_TAG_STRIP, '').trim();
+        if (isUsableContent(displayText)) {
+          ttsClient.speak(displayText);
+        }
+      }
     } else {
       console.error('❌ Failed to send thought to cognitive stream');
     }
@@ -1025,6 +1045,7 @@ function startThoughtGeneration() {
         nearbyLogs: innerData.nearbyLogs,
         nearbyOres: innerData.nearbyOres,
         nearbyWater: innerData.nearbyWater,
+        gameMode: rawState.worldState?.player?.gameMode,
       };
       const currentTasks = (planningState as any)?.state?.tasks?.current || [];
       const recentEvents = (botState as any)?.data?.recentEvents || [];
@@ -1054,7 +1075,14 @@ function startThoughtGeneration() {
       // Record intero snapshot for history/evaluation dashboard
       recordInteroSnapshot(getInteroState(), emotionalState);
 
+      // Populate cognition-side state cache for all chat surfaces
+      updateBotStateCache(currentState, currentTasks, emotionalState);
+
       const stressCtx = buildStressContext(getInteroState().stressAxes);
+
+      // Wire isNight into currentState for drive tick.
+      // hasShelterNearby left undefined until real shelter detection exists (fail-closed: drive tick skips shelter goal).
+      (currentState as any).isNight = ((currentState as any).timeOfDay ?? 0) >= 13000;
 
       await enhancedThoughtGenerator.generateThought({
         currentState,
@@ -1064,6 +1092,11 @@ function startThoughtGeneration() {
         memoryContext: {},
         stressContext: stressCtx || undefined,
       });
+
+      // Agency counter delta logging
+      const counters = enhancedThoughtGenerator.getAgencyCounters();
+      const uptimeMin = Math.round((Date.now() - counters.startedAtMs) / 60_000);
+      console.log(`[Agency ${uptimeMin}m] llm=${counters.llmCalls} goals=${counters.goalTags} drives=${counters.driveTicks} sigDedup=${counters.signatureSuppressions} contentDedup=${counters.contentSuppressions} intents=${counters.intentExtractions}`);
     } catch (error) {
       console.error('Error generating periodic thought:', error);
 
@@ -2176,6 +2209,51 @@ app.post('/process', async (req, res) => {
       logObservation('Processing social interaction', { content, metadata });
 
       try {
+        // Opportunistically patch the state cache with metadata from this chat
+        // event (health, food, position). This keeps the cache truthful between
+        // periodic loop cycles without triggering inline HTTP fetches.
+        patchBotStateCache({
+          health: metadata?.botHealth,
+          food: metadata?.botFood,
+          position: metadata?.botPosition,
+        });
+
+        // Read the (potentially patched) cache for grounded social responses.
+        // If cache is truly stale (>2× poll interval), do a background refresh
+        // but respond using whatever cache we have — never block chat on HTTP.
+        const stateForChat = getBotStateCache();
+        if (botStateCacheAgeMs() > STALE_THRESHOLD_MS) {
+          // Fire-and-forget background refresh — result goes into cache for next chat
+          const mcUrl = process.env.MINECRAFT_ENDPOINT || 'http://localhost:3005';
+          resilientFetch(`${mcUrl}/state`, { label: 'mc/state-social' })
+            .then(async (freshRes) => {
+              if (freshRes?.ok) {
+                const freshBot = await freshRes.json() as any;
+                const rawState = freshBot?.data || {};
+                const innerData = rawState.data || {};
+                const rawInventory = innerData.inventory;
+                const inventory = Array.isArray(rawInventory)
+                  ? rawInventory
+                  : Array.isArray(rawInventory?.items)
+                    ? rawInventory.items
+                    : [];
+                const gameMode = rawState.worldState?.player?.gameMode;
+                const freshState = { ...innerData, inventory, gameMode };
+                updateBotStateCache(freshState);
+              }
+            })
+            .catch(() => { /* Non-blocking — stale cache is acceptable */ });
+        }
+
+        // Derive botPosition from cache for backwards compatibility.
+        // Only accept metadata position if it's complete (all 3 finite coords).
+        const cachedPos = stateForChat?.state?.position;
+        const derivedBotPosition = (isCompletePosition(metadata?.botPosition)
+          ? metadata.botPosition
+          : undefined) ?? (isCompletePosition(cachedPos)
+          ? { x: cachedPos.x, y: cachedPos.y, z: cachedPos.z }
+          : undefined);
+
         // Create an internal thought about the social interaction
         const internalThought = {
           type: 'social',
@@ -2189,13 +2267,13 @@ app.post('/process', async (req, res) => {
             message: metadata?.message,
           },
           metadata: {
+            ...metadata,
             thoughtType: 'social',
             source: 'player-chat',
             sender: metadata?.sender,
             message: metadata?.message,
             environment: metadata?.environment,
-            botPosition: metadata?.botPosition,
-            ...metadata,
+            botPosition: derivedBotPosition,
           },
           id: `thought-${Date.now()}-social-${Math.random().toString(36).substr(2, 9)}`,
           timestamp: Date.now(),
@@ -2235,7 +2313,7 @@ app.post('/process', async (req, res) => {
           try {
             const llmResult = await llmInterface.generateSocialResponse(
               metadata?.message || message,
-              { sender }
+              { sender, botState: stateForChat }
             );
             response = llmResult.text || 'Hmm, let me think about that...';
           } catch {
@@ -2249,7 +2327,7 @@ app.post('/process', async (req, res) => {
           try {
             const llmResult = await llmInterface.generateSocialResponse(
               metadata?.message || message,
-              { sender }
+              { sender, botState: stateForChat }
             );
             response = llmResult.text || 'Sure, what do you need?';
           } catch {
@@ -2276,7 +2354,7 @@ app.post('/process', async (req, res) => {
               try {
                 const llmResult = await llmInterface.generateSocialResponse(
                   metadata?.message || message,
-                  { sender }
+                  { sender, botState: stateForChat }
                 );
                 response =
                   llmResult.text ||
@@ -3601,7 +3679,8 @@ app.listen(port, () => {
   // Load persisted interoception history from previous sessions
   loadInteroHistory();
 
-  // One-off LLM backend health check so operators see MLX/Ollama connectivity
+  // One-off LLM backend health check + model preload so operators see MLX/Ollama
+  // connectivity and the sidecar keeps the model hot.
   setTimeout(() => {
     const cfg = llmInterface.getConfig();
     const host = cfg.host ?? 'localhost';
@@ -3613,6 +3692,10 @@ app.listen(port, () => {
           console.log(
             `[Cognition] LLM backend (MLX/Ollama) reachable at ${healthUrl}`
           );
+          // Preload model into sidecar memory (keep_alive=-1) so first real
+          // request doesn't pay cold-start latency.
+          llmInterface.preloadModel().catch(() => {});
+
         } else {
           console.warn(
             `[Cognition] LLM backend at ${healthUrl} returned ${r?.status ?? 'unknown'} - observation reasoning may fall back`

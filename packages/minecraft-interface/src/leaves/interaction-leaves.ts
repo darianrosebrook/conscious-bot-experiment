@@ -1016,6 +1016,7 @@ export class AcquireMaterialLeaf implements LeafImpl {
     const bot = ctx.bot;
     const collected: Array<{ name: string; count: number }> = [];
     let totalAcquired = 0;
+    let lastToolUsed = 'hand';
 
     try {
       for (let i = 0; i < count; i++) {
@@ -1107,14 +1108,13 @@ export class AcquireMaterialLeaf implements LeafImpl {
         }
 
         // --- Phase 2: Equip tool and dig ---
-        if (tool) {
-          const toolItem = bot.inventory
-            .items()
-            .find((item: any) => item.name.includes(tool));
-          if (toolItem) {
-            await bot.equip(toolItem, 'hand');
-          }
+        // Auto-equip: if no explicit tool arg, pick the best available tool
+        // for the block material using a stable tier priority list.
+        const equippedTool = this.selectBestTool(bot, tool, block.name);
+        if (equippedTool.item) {
+          await bot.equip(equippedTool.item, 'hand');
         }
+        lastToolUsed = equippedTool.name;
 
         const inventoryBefore = bot.inventory.items().reduce(
           (sum: number, it: any) => sum + (it.count || 1),
@@ -1184,6 +1184,7 @@ export class AcquireMaterialLeaf implements LeafImpl {
           items: collected,
           collected: true,
           item: itemPattern,
+          toolUsed: lastToolUsed,
         },
         ...(totalAcquired === 0
           ? {
@@ -1211,6 +1212,7 @@ export class AcquireMaterialLeaf implements LeafImpl {
             items: collected,
             collected: true,
             item: itemPattern,
+            toolUsed: lastToolUsed,
           },
           metrics: {
             durationMs: ctx.now() - startTime,
@@ -1221,6 +1223,13 @@ export class AcquireMaterialLeaf implements LeafImpl {
       }
       return {
         status: 'failure',
+        result: {
+          success: false,
+          acquired: 0,
+          items: [],
+          item: itemPattern,
+          toolUsed: lastToolUsed,
+        },
         error: {
           code: 'acquire.failed',
           retryable: true,
@@ -1234,6 +1243,115 @@ export class AcquireMaterialLeaf implements LeafImpl {
         },
       };
     }
+  }
+
+  /**
+   * Select the best tool from inventory for mining a given block.
+   * Deterministic: stable tier priority (netherite > diamond > iron > stone > golden > wooden).
+   * If an explicit tool name is provided, uses that instead of auto-selecting.
+   *
+   * Returns { item, name } where item is the inventory item to equip (null = hand)
+   * and name is a human-readable string for metadata.
+   */
+  private selectBestTool(
+    bot: Bot,
+    explicitTool: string | undefined,
+    blockName: string
+  ): { item: any; name: string } {
+    const TIERS = ['netherite', 'diamond', 'iron', 'stone', 'golden', 'wooden'];
+    const TOOL_CLASSES = ['pickaxe', 'axe', 'shovel', 'hoe', 'sword'];
+
+    // If caller provided an explicit tool name/class, resolve it.
+    // Tool class names (e.g. "pickaxe") → select best tier among matches.
+    // Exact item names (e.g. "iron_pickaxe") → exact match.
+    if (explicitTool) {
+      const lower = explicitTool.toLowerCase();
+      if (TOOL_CLASSES.includes(lower)) {
+        // Tool class: select best tier
+        const items = bot.inventory.items();
+        let bestItem: any = null;
+        let bestTierIdx = TIERS.length;
+        for (const item of items) {
+          if (!item.name.endsWith(`_${lower}`)) continue;
+          const tierIdx = TIERS.findIndex((t) => item.name.startsWith(t));
+          if (tierIdx >= 0 && tierIdx < bestTierIdx) {
+            bestTierIdx = tierIdx;
+            bestItem = item;
+          }
+        }
+        return bestItem
+          ? { item: bestItem, name: bestItem.name }
+          : { item: null, name: 'hand' };
+      }
+      // Exact or partial name match
+      const toolItem = bot.inventory
+        .items()
+        .find((item: any) => item.name.includes(lower));
+      return toolItem
+        ? { item: toolItem, name: toolItem.name }
+        : { item: null, name: 'hand' };
+    }
+
+    // Auto-select: determine tool type from block material.
+    // Order matters — entries are checked via substring match, so specific
+    // overrides (sandstone → pickaxe) must appear before generic matches
+    // (sand → shovel) to avoid misclassification.
+    const MATERIAL_TO_TOOL: Record<string, string> = {
+      // Pickaxe — specific overrides first
+      sandstone: 'pickaxe',      // must precede 'sand'
+      cobblestone: 'pickaxe',    // must precede 'stone'
+      deepslate: 'pickaxe',
+      stone: 'pickaxe',
+      ore: 'pickaxe',
+      netherrack: 'pickaxe',
+      obsidian: 'pickaxe',
+      terracotta: 'pickaxe',
+      brick: 'pickaxe',
+      // Axe
+      wood: 'axe',
+      log: 'axe',
+      planks: 'axe',
+      // Shovel — specific overrides first
+      concrete_powder: 'shovel', // must precede 'concrete'
+      soul_sand: 'shovel',      // must precede 'sand'
+      dirt: 'shovel',
+      grass: 'shovel',
+      sand: 'shovel',
+      gravel: 'shovel',
+      clay: 'shovel',
+      snow: 'shovel',
+    };
+
+    const lowerBlock = blockName.toLowerCase();
+    let toolType: string | undefined;
+    for (const [key, type] of Object.entries(MATERIAL_TO_TOOL)) {
+      if (lowerBlock.includes(key)) {
+        toolType = type;
+        break;
+      }
+    }
+
+    if (!toolType) {
+      return { item: null, name: 'hand' };
+    }
+
+    // Find highest-tier tool of this type in inventory
+    const items = bot.inventory.items();
+    let bestItem: any = null;
+    let bestTierIdx = TIERS.length;
+
+    for (const item of items) {
+      if (!item.name.endsWith(`_${toolType}`)) continue;
+      const tierIdx = TIERS.findIndex((t) => item.name.startsWith(t));
+      if (tierIdx >= 0 && tierIdx < bestTierIdx) {
+        bestTierIdx = tierIdx;
+        bestItem = item;
+      }
+    }
+
+    return bestItem
+      ? { item: bestItem, name: bestItem.name }
+      : { item: null, name: 'hand' };
   }
 }
 

@@ -133,6 +133,32 @@ export {
 } from './minecraft-acquisition-types';
 export { actionToAcquisitionLeaf } from './leaf-routing';
 
+// Minecraft navigation domain
+export { MinecraftNavigationSolver } from './minecraft-navigation-solver';
+export type {
+  OccupancyGrid,
+  NavigationHazardPolicy,
+  NavigationPrimitive,
+  NavigationSolveResult,
+  NavigationActionType,
+} from './minecraft-navigation-types';
+export {
+  BLOCK_TYPE,
+  MOVEMENT_COSTS,
+  CARDINAL_DIRECTIONS,
+  DEFAULT_HAZARD_POLICY,
+  gridAt,
+  isPassable,
+  isSolid,
+  hashOccupancyGrid,
+  encodeGridToBase64,
+  computeHazardPolicyId,
+  hasArrived,
+  computeNavigationHeuristic,
+  hashNavigationGoal,
+  hashNavigationStart,
+} from './minecraft-navigation-types';
+
 // Rig D signals + degeneracy detection
 export { computeRigDSignals } from './signals-rig-d';
 export type { RigDSignals } from './signals-rig-d';

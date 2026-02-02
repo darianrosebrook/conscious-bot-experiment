@@ -54,6 +54,7 @@ import {
   getBotPosition,
   executeTask,
 } from './modules/mc-client';
+import { evaluateThreatHolds, fetchThreatSignal } from './goals/threat-hold-bridge';
 import {
   extractItemFromTask,
   mapTaskTypeToMinecraftAction,
@@ -116,6 +117,7 @@ import type {
   MinecraftCraftingSolver,
   MinecraftBuildingSolver,
   MinecraftToolProgressionSolver,
+  MinecraftNavigationSolver,
 } from './sterling';
 import { createSterlingBootstrap } from './server/sterling-bootstrap';
 import {
@@ -141,6 +143,7 @@ let sterlingService: SterlingReasoningService | undefined;
 let minecraftCraftingSolver: MinecraftCraftingSolver | undefined;
 let minecraftBuildingSolver: MinecraftBuildingSolver | undefined;
 let minecraftToolProgressionSolver: MinecraftToolProgressionSolver | undefined;
+let minecraftNavigationSolver: MinecraftNavigationSolver | undefined;
 import { MemoryIntegration } from './memory-integration';
 import { createPlanningBootstrap } from './modules/planning-bootstrap';
 import { EnvironmentIntegration } from './environment-integration';
@@ -223,6 +226,7 @@ const KNOWN_LEAF_NAMES = new Set([
   'move_to',
   'step_forward_safely',
   'follow_entity',
+  'sterling_navigate',
   // Interaction
   'dig_block',
   'acquire_material',
@@ -1000,6 +1004,18 @@ function stepToLeafExecution(
         },
       };
     }
+    case 'sterling_navigate': {
+      // Navigation domain — pass through target and tolerance
+      return {
+        leafName: 'sterling_navigate',
+        args: {
+          target: meta.target || (meta as any).args?.target,
+          toleranceXZ: meta.toleranceXZ ?? (meta as any).args?.toleranceXZ ?? 1,
+          toleranceY: meta.toleranceY ?? (meta as any).args?.toleranceY ?? 0,
+          ...((meta as any).args || {}),
+        },
+      };
+    }
     default:
       return null;
   }
@@ -1496,7 +1512,41 @@ async function autonomousTaskExecutor() {
     );
 
     // Get active tasks directly from the enhanced task integration
-    const activeTasks = taskIntegration.getActiveTasks();
+    let activeTasks = taskIntegration.getActiveTasks();
+
+    // ── Threat→Hold bridge: evaluate before task selection (A1.11) ──
+    try {
+      // Include paused-unsafe tasks for release evaluation (A1.7)
+      const pausedUnsafeTasks = taskIntegration
+        .getTasks({ status: 'paused' })
+        .filter((t: any) => t.metadata?.goalBinding?.hold?.reason === 'unsafe');
+
+      // Dedup by id in case store double-reports across active/paused queries
+      const byId = new Map<string, any>();
+      for (const t of [...activeTasks, ...pausedUnsafeTasks]) byId.set(t.id, t);
+      const tasksToEvaluate = [...byId.values()];
+
+      await evaluateThreatHolds({
+        fetchSignal: () => fetchThreatSignal(`${MC_ENDPOINT}/safety`),
+        getTasksToEvaluate: () => tasksToEvaluate,
+        updateTaskStatus: (id, status) =>
+          taskIntegration.updateTaskStatus(id, status),
+        updateTaskMetadata: (id, patch) =>
+          taskIntegration.updateTaskMetadata(id, patch),
+        emitLifecycleEvent: (event) =>
+          taskIntegration.emit('taskLifecycleEvent', event),
+        emitBridgeEvent: (event) =>
+          taskIntegration.emit('threatBridgeEvent', event),
+      });
+    } catch (err) {
+      // A1.16: Bridge failure must not break the executor cycle
+      console.warn('[ThreatBridge] Evaluation failed:', err);
+    }
+
+    // A1.15: Re-fetch after bridge mutations to prevent same-cycle execution
+    // of a task that was just held. Store may return immutable snapshots, so
+    // the pre-bridge `activeTasks` array can be stale.
+    activeTasks = taskIntegration.getActiveTasks();
 
     // Only log task count when it changes or every 5 minutes
     const now = Date.now();
@@ -1561,10 +1611,36 @@ async function autonomousTaskExecutor() {
       );
     }
 
+    // Auto-fail tasks that have been blocked for longer than the TTL.
+    // This prevents unplannable/dead-end tasks from occupying the active queue forever.
+    const BLOCKED_TTL_MS = 2 * 60 * 1000; // 2 minutes
+    for (const t of activeTasks) {
+      if (
+        t.metadata?.blockedReason &&
+        t.metadata?.blockedAt &&
+        // Don't auto-fail tasks waiting on prerequisites — those unblock naturally
+        t.metadata.blockedReason !== 'waiting_on_prereq' &&
+        Date.now() - t.metadata.blockedAt > BLOCKED_TTL_MS
+      ) {
+        taskIntegration.updateTaskProgress(t.id, t.progress || 0, 'failed');
+        taskIntegration.updateTaskMetadata(t.id, {
+          ...t.metadata,
+          failReason: `blocked-ttl-exceeded:${t.metadata.blockedReason}`,
+        });
+        console.log(
+          `🤖 [AUTONOMOUS EXECUTOR] Auto-failed task ${t.id}: blocked for >${BLOCKED_TTL_MS / 1000}s (${t.metadata.blockedReason})`
+        );
+      }
+    }
+
     // Filter out tasks that are blocked, in backoff, or in non-executable states
     const eligibleTasks = activeTasks.filter((t) => {
       // @pivot 4: Skip tasks in planning or terminal-unplannable states
       if (t.status === 'pending_planning' || t.status === 'unplannable') {
+        return false;
+      }
+      // Skip failed tasks (including those just auto-failed above)
+      if (t.status === 'failed') {
         return false;
       }
       // Skip tasks with a blocked reason
@@ -3301,6 +3377,7 @@ async function startServer() {
     minecraftCraftingSolver = sterling.minecraftCraftingSolver;
     minecraftBuildingSolver = sterling.minecraftBuildingSolver;
     minecraftToolProgressionSolver = sterling.minecraftToolProgressionSolver;
+    minecraftNavigationSolver = sterling.minecraftNavigationSolver;
 
     // Create MCP leaf registry for MCP integration
     const registry = new MCPLeafRegistry();
@@ -3447,6 +3524,100 @@ async function startServer() {
     // Mount planning endpoints
     const planningRouter = createPlanningEndpoints(planningSystem);
     serverConfig.mountRouter('/', planningRouter);
+
+    // Navigation solve endpoint
+    // Follows Option A: planning server owns the full scan→solve pipeline.
+    // Leaf calls POST /solve-navigation → planning calls /world-scan on mc-interface
+    // → planning calls Sterling → returns primitives to leaf.
+    const { Router: ExpressRouter } = await import('express');
+    const navRouter = ExpressRouter();
+    navRouter.post('/solve-navigation', async (req: any, res: any) => {
+      try {
+        if (!minecraftNavigationSolver) {
+          return res.status(503).json({
+            solved: false,
+            primitives: [],
+            error: 'Navigation solver not initialized (Sterling unavailable)',
+          });
+        }
+
+        const { start, goal, toleranceXZ = 1, toleranceY = 0, scanMargin = 5 } = req.body;
+
+        if (!start || !goal) {
+          return res.status(400).json({
+            solved: false,
+            primitives: [],
+            error: 'Missing start or goal position',
+          });
+        }
+
+        // 1. Fetch world scan from mc-interface
+        const sx = Math.floor(start.x);
+        const sy = Math.floor(start.y);
+        const sz = Math.floor(start.z);
+        const gx = Math.floor(goal.x);
+        const gy = Math.floor(goal.y);
+        const gz = Math.floor(goal.z);
+
+        // Compute bounding box that covers both start and goal with margin
+        const minX = Math.min(sx, gx) - scanMargin;
+        const minY = Math.min(sy, gy) - 3; // 3 blocks below for descend legality
+        const minZ = Math.min(sz, gz) - scanMargin;
+        const maxX = Math.max(sx, gx) + scanMargin;
+        const maxY = Math.max(sy, gy) + 5; // 5 blocks above for jump clearance
+        const maxZ = Math.max(sz, gz) + scanMargin;
+
+        let gridData: any;
+        try {
+          const scanResp = await mcFetch(
+            `/world-scan?x1=${minX}&y1=${minY}&z1=${minZ}&x2=${maxX}&y2=${maxY}&z2=${maxZ}`,
+          );
+          gridData = await scanResp.json();
+        } catch (e: any) {
+          return res.status(502).json({
+            solved: false,
+            primitives: [],
+            error: `World scan failed: ${e?.message ?? e}`,
+          });
+        }
+
+        // 2. Build occupancy grid from scan data
+        const dx = maxX - minX + 1;
+        const dy = maxY - minY + 1;
+        const dz = maxZ - minZ + 1;
+        if (!gridData.blocks) {
+          return res.status(502).json({
+            solved: false,
+            primitives: [],
+            error: 'World scan returned no block data',
+          });
+        }
+        const occupancyGrid = {
+          origin: { x: minX, y: minY, z: minZ },
+          size: { dx, dy, dz },
+          blocks: new Uint8Array(Buffer.from(gridData.blocks, 'base64')),
+        };
+
+        // 3. Call navigation solver
+        const result = await minecraftNavigationSolver.solveNavigation(
+          { x: sx, y: sy, z: sz },
+          { x: gx, y: gy, z: gz },
+          occupancyGrid,
+          toleranceXZ,
+          toleranceY,
+        );
+
+        return res.json(result);
+      } catch (e: any) {
+        console.error('[solve-navigation] Error:', e);
+        return res.status(500).json({
+          solved: false,
+          primitives: [],
+          error: `Navigation solve error: ${e?.message ?? e}`,
+        });
+      }
+    });
+    serverConfig.mountRouter('/', navRouter);
 
     // Mount MCP endpoints
     const { createMCPEndpoints } = await import('./modules/mcp-endpoints');

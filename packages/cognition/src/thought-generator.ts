@@ -12,6 +12,23 @@ import { LLMInterface } from './cognitive-core/llm-interface';
 import { auditLogger } from './audit/thought-action-audit-logger';
 import { getInteroState } from './interoception-store';
 import { buildStressContext } from './stress-axis-computer';
+import type { GoalTagV1 } from './llm-output-sanitizer';
+
+/**
+ * Build a canonical GoalTagV1 structure.
+ * Shared by drive tick and any future deterministic goal emitter
+ * to prevent schema drift with LLM-extracted goals.
+ */
+function buildGoalTagV1(action: string, target: string, amount: number | null): GoalTagV1 {
+  return {
+    version: 1,
+    action,
+    target,
+    targetId: null,
+    amount,
+    raw: `[GOAL: ${action} ${target}${amount != null ? ` ${amount}` : ''}]`,
+  };
+}
 
 /**
  * Thought Deduplicator - Prevents repetitive thoughts to improve performance
@@ -74,6 +91,9 @@ export interface ThoughtContext {
     nearbyLogs?: number;
     nearbyOres?: number;
     nearbyWater?: number;
+    gameMode?: string;
+    hasShelterNearby?: boolean;
+    isNight?: boolean;
   };
   currentTasks?: Array<{
     id: string;
@@ -157,7 +177,12 @@ export interface CognitiveThought {
     model?: string;
     error?: string;
     extractedGoal?: { action: string; target: string; amount: number | null };
+    extractedIntent?: string | null;
+    extractedGoalSource?: 'llm' | 'drive-tick';
   };
+  novelty?: 'high' | 'medium' | 'low';
+  /** Only thoughts with convertEligible=true should be considered for task conversion */
+  convertEligible?: boolean;
   category?:
     | 'task-related'
     | 'environmental'
@@ -213,6 +238,24 @@ export class EnhancedThoughtGenerator extends EventEmitter {
   private _idleCycleCount: number = 0;
   /** Event-driven task review request (reason string) */
   private _pendingTaskReview: string | null = null;
+  /** Counter for low-novelty thoughts to control broadcast frequency (1 per 5) */
+  private _lowNoveltyCount: number = 0;
+  /** Drive tick state */
+  private _driveTickCount: number = 0;
+  private _lastDriveTickMs: number = 0;
+  private static readonly DRIVE_TICK_INTERVAL_MS = 180_000; // 3 min fixed, no jitter in v1
+  /** Agency counters for observability */
+  private _counters = {
+    llmCalls: 0,
+    goalTags: 0,
+    driveTicks: 0,
+    signatureSuppressions: 0,
+    contentSuppressions: 0,
+    intentExtractions: 0,
+    lowNoveltyRecorded: 0,
+    lowNoveltyBroadcast: 0,
+    startedAtMs: Date.now(),
+  };
 
   constructor(config: Partial<EnhancedThoughtGeneratorConfig> = {}) {
     super();
@@ -273,13 +316,7 @@ export class EnhancedThoughtGenerator extends EventEmitter {
           return null;
         }
 
-        this.thoughtHistory.push(thought);
-
-        // Keep only last 100 thoughts to prevent memory leaks
-        if (this.thoughtHistory.length > 100) {
-          this.thoughtHistory = this.thoughtHistory.slice(-100);
-        }
-
+        this.recordThought(thought);
         this.emit('thoughtGenerated', thought);
       }
 
@@ -339,20 +376,42 @@ export class EnhancedThoughtGenerator extends EventEmitter {
       if (thought) {
         // Check if this thought is too similar to recent thoughts
         if (!this.thoughtDeduplicator.shouldGenerateThought(thought.content)) {
-          console.log(
-            '🚫 Skipping repetitive thought:',
-            thought.content.substring(0, 50) + '...'
-          );
-          return null;
+          // Task-worthy thoughts bypass broadcast suppression and keep convertEligible.
+          // This prevents drive tick goals from being silently downgraded by content dedup.
+          const isTaskWorthy = thought.convertEligible === true || !!thought.metadata?.extractedGoal;
+
+          // Tag as low-novelty for analytics, but preserve convertEligible for task-worthy thoughts
+          thought.novelty = 'low';
+          if (!isTaskWorthy) {
+            thought.convertEligible = false;
+            if (thought.metadata) {
+              (thought.metadata as any).fallback = true;
+            }
+          }
+          if (!thought.tags) thought.tags = [];
+          thought.tags.push('low-novelty');
+
+          this.recordThought(thought);
+          this._counters.contentSuppressions++;
+          this._counters.lowNoveltyRecorded++;
+
+          if (isTaskWorthy) {
+            // Task-worthy: always broadcast so planner/converter sees it
+            this.emit('thoughtGenerated', thought);
+            this._counters.lowNoveltyBroadcast++;
+          } else {
+            // Narrative noise: broadcast sparingly (1 per 5)
+            this._lowNoveltyCount++;
+            if (this._lowNoveltyCount % 5 === 1) {
+              this.emit('thoughtGenerated', thought);
+              this._counters.lowNoveltyBroadcast++;
+            }
+          }
+
+          return thought;
         }
 
-        this.thoughtHistory.push(thought);
-
-        // Keep only last 100 thoughts to prevent memory leaks
-        if (this.thoughtHistory.length > 100) {
-          this.thoughtHistory = this.thoughtHistory.slice(-100);
-        }
-
+        this.recordThought(thought);
         this.emit('thoughtGenerated', thought);
       }
 
@@ -399,6 +458,11 @@ export class EnhancedThoughtGenerator extends EventEmitter {
         situation = this.buildIdleSituation(context);
       }
 
+      // Drive tick: deterministic micro-goals when idle + comfortable
+      // Fires BEFORE dedup so it cannot be suppressed by situation signature
+      const driveTick = this.evaluateDriveTick(context);
+      if (driveTick) return driveTick;
+
       // Edge-trigger dedup: skip if same situation signature was used recently
       const sig = this.computeSituationSignature(context);
       const isDuplicate = this._recentSituationSigs.includes(sig);
@@ -415,6 +479,7 @@ export class EnhancedThoughtGenerator extends EventEmitter {
 
         if (!isHeartbeat) {
           // Same banded state — use deterministic fallback instead of LLM
+          this._counters.signatureSuppressions++;
           const fallbackContent = this.generateFallbackThought(context);
           return {
             id: `thought-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
@@ -435,6 +500,8 @@ export class EnhancedThoughtGenerator extends EventEmitter {
               context: 'environmental-monitoring',
               intensity: 0.2,
             },
+            novelty: 'low',
+            convertEligible: false,
             category: 'idle',
             tags: ['monitoring', 'dedup-skipped'],
             priority: 'low',
@@ -452,6 +519,7 @@ export class EnhancedThoughtGenerator extends EventEmitter {
       const stressCtxForLLM = context.stressContext || buildStressContext(getInteroState().stressAxes) || undefined;
 
       // Add timeout wrapper to prevent hanging
+      this._counters.llmCalls++;
       const response = await Promise.race([
         this.llm.generateInternalThought(situation, {
           currentGoals: context.currentTasks?.map((task) => task.title) || [],
@@ -476,6 +544,12 @@ export class EnhancedThoughtGenerator extends EventEmitter {
       const tags = ['monitoring', 'environmental', 'survival'];
       if (isDuplicate) tags.push('heartbeat-stagnation');
 
+      const hasGoal = !!response.metadata.extractedGoal;
+      const extractedIntent = (response.metadata as any).extractedIntent ?? null;
+      const hasIntent = extractedIntent != null && extractedIntent !== 'none';
+      if (hasGoal) this._counters.goalTags++;
+      if (hasIntent) this._counters.intentExtractions++;
+
       return {
         id: `thought-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
         type: 'reflection',
@@ -497,7 +571,11 @@ export class EnhancedThoughtGenerator extends EventEmitter {
           llmConfidence: response.confidence,
           model: response.model,
           extractedGoal: response.metadata.extractedGoal,
+          extractedIntent,
+          extractedGoalSource: hasGoal ? 'llm' as const : undefined,
         },
+        novelty: isDuplicate ? 'medium' : 'high',
+        convertEligible: hasGoal || hasIntent,
         category: 'idle',
         tags,
         priority: 'low',
@@ -651,8 +729,8 @@ export class EnhancedThoughtGenerator extends EventEmitter {
     const bounded = sorted.slice(0, 10);
 
     const taskLines = bounded.map((t, i) => {
-      // Injection hardening: strip bracket sequences from title
-      const safeTitle = (t.title || '').replace(/[\[\]]/g, '');
+      // Injection hardening: strip bracket sequences and guillemets from title
+      const safeTitle = (t.title || '').replace(/[\[\]]/g, '').replace(/[\u00AB\u00BB]/g, '');
       const progress = Math.round((t.progress ?? 0) * 100);
       return [
         `Task #${i + 1} (id=${t.id}):`,
@@ -749,7 +827,7 @@ export class EnhancedThoughtGenerator extends EventEmitter {
 
     // Assemble structured fact block
     const facts = [
-      `I am a Minecraft bot in survival mode${dimension !== 'overworld' ? ` in the ${dimension}` : ''}.`,
+      `I am in a Minecraft${context.currentState?.gameMode ? ` ${context.currentState.gameMode}` : ''} world${dimension !== 'overworld' ? `, in the ${dimension}` : ''}.`,
       `Health: ${health}/20. Food: ${food}/20.`,
       `Biome: ${biome}. Time: ${timeDesc}. Weather: ${weather}.`,
       `Position: ${posDesc}.`,
@@ -1270,6 +1348,16 @@ export class EnhancedThoughtGenerator extends EventEmitter {
   /**
    * Get thought history
    */
+  /**
+   * Record a thought to local history ring buffer. Single call site for cap enforcement.
+   */
+  private recordThought(thought: CognitiveThought): void {
+    this.thoughtHistory.push(thought);
+    if (this.thoughtHistory.length > 100) {
+      this.thoughtHistory = this.thoughtHistory.slice(-100);
+    }
+  }
+
   getThoughtHistory(limit: number = 50): CognitiveThought[] {
     return this.thoughtHistory.slice(-limit);
   }
@@ -1282,10 +1370,194 @@ export class EnhancedThoughtGenerator extends EventEmitter {
   }
 
   /**
+   * Get agency counters snapshot for observability
+   */
+  getAgencyCounters() {
+    return { ...this._counters };
+  }
+
+  /**
+   * Reset agency counters
+   */
+  resetAgencyCounters(): void {
+    this._counters = {
+      llmCalls: 0,
+      goalTags: 0,
+      driveTicks: 0,
+      signatureSuppressions: 0,
+      contentSuppressions: 0,
+      intentExtractions: 0,
+      lowNoveltyRecorded: 0,
+      lowNoveltyBroadcast: 0,
+      startedAtMs: Date.now(),
+    };
+  }
+
+  /**
    * Update configuration
    */
   updateConfig(newConfig: Partial<EnhancedThoughtGeneratorConfig>): void {
     this.config = { ...this.config, ...newConfig };
+  }
+
+  /**
+   * Select a drive-tick micro-goal based on inventory, time, and environment.
+   * Returns null if no drive is appropriate.
+   */
+  private selectDrive(
+    inventory: Array<{ name: string; count: number; displayName: string }>,
+    timeOfDay: number,
+    context: ThoughtContext
+  ): { thought: string; goalTag: string; category: string; extractedGoal: GoalTagV1 } | null {
+    // Build inventory map
+    const invMap = new Map<string, number>();
+    for (const item of inventory) {
+      const key = (item.name || '').toLowerCase();
+      invMap.set(key, (invMap.get(key) || 0) + item.count);
+    }
+
+    const hasItem = (name: string) => (invMap.get(name) || 0) > 0;
+    const itemCount = (name: string) => invMap.get(name) || 0;
+    const logCount = itemCount('oak_log') + itemCount('birch_log') + itemCount('spruce_log') + itemCount('dark_oak_log') + itemCount('acacia_log') + itemCount('jungle_log');
+    const hasShelterNearby = context.currentState?.hasShelterNearby;
+    const isNight = timeOfDay >= 13000;
+
+    // Priority 1: Empty inventory / no logs → collect wood
+    if (inventory.length === 0 || logCount === 0) {
+      const goal = buildGoalTagV1('collect', 'oak_log', 8);
+      return {
+        thought: `My inventory is bare — I should gather some wood to get started. ${goal.raw}`,
+        goalTag: goal.raw,
+        category: 'gathering',
+        extractedGoal: goal,
+      };
+    }
+
+    // Priority 2: Night approaching + no shelter → build shelter
+    // Fail-closed: hasShelterNearby must be explicitly false (not undefined) to trigger shelter drive.
+    // When undefined (signal unavailable), skip this drive to avoid confidently wrong behavior.
+    if (timeOfDay >= 11000 && hasShelterNearby === false) {
+      const goal = buildGoalTagV1('build', 'basic_shelter', 1);
+      return {
+        thought: `Night is coming and I have no shelter nearby. I should build something. ${goal.raw}`,
+        goalTag: goal.raw,
+        category: 'survival',
+        extractedGoal: goal,
+      };
+    }
+
+    // Priority 3: Has logs, no crafting table → craft one
+    if (logCount > 0 && !hasItem('crafting_table')) {
+      const goal = buildGoalTagV1('craft', 'crafting_table', 1);
+      return {
+        thought: `I have logs but no crafting table. Time to make one. ${goal.raw}`,
+        goalTag: goal.raw,
+        category: 'crafting',
+        extractedGoal: goal,
+      };
+    }
+
+    // Priority 4: Has crafting table, no pickaxe → craft one
+    if (hasItem('crafting_table') && !hasItem('wooden_pickaxe') && !hasItem('stone_pickaxe') && !hasItem('iron_pickaxe') && !hasItem('diamond_pickaxe')) {
+      const goal = buildGoalTagV1('craft', 'wooden_pickaxe', 1);
+      return {
+        thought: `I have a crafting table but no pickaxe. I should craft one. ${goal.raw}`,
+        goalTag: goal.raw,
+        category: 'crafting',
+        extractedGoal: goal,
+      };
+    }
+
+    // Priority 5: Low log stock → gather more
+    if (logCount < 16) {
+      const goal = buildGoalTagV1('collect', 'oak_log', 8);
+      return {
+        thought: `Running low on wood (${logCount} logs). I should gather more. ${goal.raw}`,
+        goalTag: goal.raw,
+        category: 'gathering',
+        extractedGoal: goal,
+      };
+    }
+
+    // Priority 6: Default curiosity → explore
+    const goal = buildGoalTagV1('explore', 'nearby', 1);
+    return {
+      thought: `Everything seems in order. I should explore and see what's around. ${goal.raw}`,
+      goalTag: goal.raw,
+      category: 'exploration',
+      extractedGoal: goal,
+    };
+  }
+
+  /**
+   * Evaluate whether a drive tick should fire.
+   * Safety-gated: only fires when comfortable (high health/food, no hostiles, survival mode).
+   * Idempotent: checks for existing matching pending/active tasks.
+   */
+  private evaluateDriveTick(context: ThoughtContext): CognitiveThought | null {
+    const health = context.currentState?.health ?? 20;
+    const food = context.currentState?.food ?? 20;
+    const hostiles = context.currentState?.nearbyHostiles ?? 0;
+    const gameMode = context.currentState?.gameMode ?? 'survival';
+    const now = Date.now();
+
+    // Safety gates — all must pass
+    if (health < 16 || food < 16 || hostiles > 0) return null;
+    if (gameMode === 'creative' || gameMode === 'spectator') return null;
+    if (now - this._lastDriveTickMs < EnhancedThoughtGenerator.DRIVE_TICK_INTERVAL_MS) return null;
+
+    const inventory = context.currentState?.inventory || [];
+    const timeOfDay = context.currentState?.timeOfDay ?? 0;
+
+    const drive = this.selectDrive(inventory, timeOfDay, context);
+    if (!drive) return null;
+
+    // Idempotency: suppress if matching pending/active task already exists.
+    // Always suppress to prevent duplicate task accumulation. Recovery/stuck detection
+    // can be added later with createdAt/updatedAt timestamps on tasks.
+    const tasks = context.currentTasks ?? [];
+    const matchingTask = tasks.find(t => {
+      if (t.status !== 'active' && t.status !== 'pending') return false;
+      const titleLower = (t.title || '').toLowerCase();
+      const goalAction = drive.extractedGoal.action.toLowerCase();
+      const goalTarget = drive.extractedGoal.target.toLowerCase();
+      return titleLower.includes(goalAction) && titleLower.includes(goalTarget);
+    });
+
+    if (matchingTask) return null;
+
+    // Fire drive tick
+    this._lastDriveTickMs = now;
+    this._driveTickCount++;
+    this._counters.driveTicks++;
+
+    return {
+      id: `drive-tick-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+      type: 'planning',
+      content: drive.thought,
+      timestamp: now,
+      context: {
+        emotionalState: 'motivated',
+        confidence: 0.7,
+        cognitiveSystem: 'drive-tick',
+        health,
+        position: context.currentState?.position,
+        inventory,
+      },
+      metadata: {
+        thoughtType: 'drive-tick',
+        trigger: 'idle-drive',
+        context: drive.category,
+        intensity: 0.6,
+        extractedGoal: drive.extractedGoal,
+        extractedGoalSource: 'drive-tick',
+      },
+      novelty: 'high',
+      convertEligible: true,
+      category: 'idle',
+      tags: ['drive-tick', 'autonomous', drive.category],
+      priority: 'medium',
+    };
   }
 
   /**

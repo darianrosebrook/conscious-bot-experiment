@@ -57,6 +57,7 @@ export type {
 // LLM Output Sanitizer (shared boundary — downstream code imports from here)
 export {
   extractGoalTag,
+  extractIntent,
   normalizeGoalAction,
   sanitizeLLMOutput,
   isUsableContent,
@@ -68,6 +69,7 @@ export type {
   GoalTag,
   GoalTagV1,
   GoalTagFailReason,
+  IntentLabel,
   SanitizedOutput,
   SanitizationFlags,
 } from './llm-output-sanitizer';

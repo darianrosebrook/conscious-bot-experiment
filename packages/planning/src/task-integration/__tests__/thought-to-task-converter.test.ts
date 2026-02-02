@@ -471,6 +471,47 @@ describe('convertThoughtToTask', () => {
       expect(result.decision).toBe('blocked_unroutable');
       expect(result.reason).toContain('check');
     });
+
+    it('convertEligible=false → blocked_not_eligible', async () => {
+      const deps = makeDeps();
+      const thought = makeThought({
+        id: 'not_eligible_1',
+        content: 'I should mine stone.',
+        convertEligible: false,
+        metadata: {
+          thoughtType: 'idle-reflection',
+          extractedGoal: makeGoalTag({
+            action: 'mine',
+            target: 'stone',
+            amount: 3,
+          }),
+        },
+      });
+
+      const result = await convertThoughtToTask(thought, deps);
+      expect(result.decision).toBe('blocked_not_eligible');
+      expect(result.task).toBeNull();
+    });
+
+    it('convertEligible=undefined (missing) defaults to eligible', async () => {
+      const deps = makeDeps();
+      const thought = makeThought({
+        id: 'eligible_undef_1',
+        content: 'Mine some eligible_undef_ore. [GOAL: mine eligible_undef_ore 3]',
+        // convertEligible is NOT set — should pass through
+        metadata: {
+          thoughtType: 'planning',
+          extractedGoal: makeGoalTag({
+            action: 'mine',
+            target: 'eligible_undef_ore',
+            amount: 3,
+          }),
+        },
+      });
+
+      const result = await convertThoughtToTask(thought, deps);
+      expect(result.decision).toBe('created');
+    });
   });
 
   // =========================================================================

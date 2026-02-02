@@ -706,6 +706,11 @@ export class IntrusiveThoughtProcessor extends EventEmitter {
         priority: 'medium' as const,
         category: 'mining',
       },
+      farm: {
+        pattern: /farm\s+(.+)/i,
+        priority: 'medium' as const,
+        category: 'gathering',
+      },
       chop: {
         pattern: /chop\s+(.+)/i,
         priority: 'medium' as const,

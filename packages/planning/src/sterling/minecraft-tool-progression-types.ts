@@ -112,6 +112,33 @@ export const ORE_DROP_MAP: Readonly<Record<string, { item: string; count: number
 } as const;
 
 /**
+ * Non-ore block → drop mappings for mine-step verification.
+ *
+ * When a step mines "stone" without silk touch, the inventory receives
+ * "cobblestone" — verification must accept the drop, not the block name.
+ *
+ * Scope: ONLY used in mine-step verification (acquire_material, dig_block).
+ * NOT a global equivalence class — crafting expects the exact item name.
+ *
+ * Entries mapped to 'air' mean "drops nothing without silk touch."
+ * These are informational only — they are NOT pushed into accepted
+ * inventory names and cannot satisfy a positive inventory delta.
+ * Mining these blocks will correctly fail verification (zero-delta).
+ */
+export const BLOCK_DROP_MAP: Readonly<Record<string, string>> = {
+  stone: 'cobblestone',
+  grass_block: 'dirt',
+  clay: 'clay_ball',
+  glowstone: 'glowstone_dust',
+  sea_lantern: 'prismarine_crystals',
+  melon: 'melon_slice',
+  snow: 'snowball',
+  ice: 'air',             // drops nothing without silk touch
+  packed_ice: 'air',
+  blue_ice: 'air',
+} as const;
+
+/**
  * Materials required to craft each tier of pickaxe.
  * Used by the rule builder to generate craft-upgrade edges.
  */

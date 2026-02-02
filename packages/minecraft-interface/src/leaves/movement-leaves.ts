@@ -21,6 +21,7 @@ import {
   LeafContext,
   LeafResult,
   LeafSpec,
+  resilientFetch,
 } from '@conscious-bot/core';
 
 // Extend Bot type to include pathfinder
@@ -523,5 +524,307 @@ export class FollowEntityLeaf implements LeafImpl {
       clearTimeout(to);
       ctx.abortSignal?.removeEventListener('abort', onCtxAbort as any);
     }
+  }
+}
+
+// ============================================================================
+// Sterling Navigate Leaf
+// ============================================================================
+
+/**
+ * Navigation primitive types returned by the planning server.
+ * Matches NavigationPrimitive from minecraft-navigation-types.ts.
+ */
+interface NavPrimitive {
+  action: string;
+  actionType: 'walk' | 'jump_up' | 'descend';
+  from: { x: number; y: number; z: number };
+  to: { x: number; y: number; z: number };
+  cost: number;
+}
+
+interface NavSolveResponse {
+  solved: boolean;
+  primitives: NavPrimitive[];
+  error?: string;
+  totalNodes?: number;
+  durationMs?: number;
+}
+
+const PLANNING_ENDPOINT = process.env.PLANNING_SERVICE_URL || 'http://localhost:3002';
+
+/**
+ * Sterling-powered navigation via occupancy grid A* pathfinding.
+ *
+ * The leaf calls the planning server's /solve-navigation endpoint,
+ * which owns the full scan → solve pipeline (Option A).
+ * The leaf is purely an executor: it receives ordered primitives
+ * and executes them sequentially with position verification.
+ *
+ * Replan loop: up to maxReplans attempts when deviation exceeds threshold.
+ * Phase 1 abort: uses ctx.abortSignal only. Threat→hold bridge (P4) not yet wired.
+ */
+export class SterlingNavigateLeaf implements LeafImpl {
+  spec: LeafSpec = {
+    name: 'sterling_navigate',
+    version: '1.0.0',
+    description: 'Navigate to a target position using Sterling A* pathfinding',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        target: {
+          type: 'object',
+          properties: {
+            x: { type: 'number' },
+            y: { type: 'number' },
+            z: { type: 'number' },
+          },
+          required: ['x', 'y', 'z'],
+        },
+        toleranceXZ: { type: 'number', default: 1 },
+        toleranceY: { type: 'number', default: 0 },
+      },
+      required: ['target'],
+    },
+    outputSchema: {
+      type: 'object',
+      properties: {
+        success: { type: 'boolean' },
+        position: { type: 'object' },
+        primitivesExecuted: { type: 'number' },
+        replansUsed: { type: 'number' },
+      },
+    },
+    timeoutMs: 60000,
+    retries: 2,
+    permissions: ['movement'],
+  };
+
+  async run(ctx: LeafContext, args: any): Promise<LeafResult> {
+    const t0 = ctx.now();
+    const bot = ctx.bot as BotWithPathfinder;
+
+    const target = args?.target;
+    if (!target || typeof target.x !== 'number' || typeof target.y !== 'number' || typeof target.z !== 'number') {
+      return fail('unknown', 'invalid target position');
+    }
+
+    const tolXZ = args?.toleranceXZ ?? 1;
+    const tolY = args?.toleranceY ?? 0;
+    const maxReplans = 3;
+    let replansUsed = 0;
+    let completedPrimitives = 0;
+    let scanMargin = 5;
+
+    // Goal metric: same formula as Python is_goal()
+    const hasArrived = (pos: Vec3) =>
+      Math.max(
+        Math.abs(Math.floor(pos.x) - Math.floor(target.x)),
+        Math.abs(Math.floor(pos.z) - Math.floor(target.z)),
+      ) <= tolXZ && Math.abs(Math.floor(pos.y) - Math.floor(target.y)) <= tolY;
+
+    // Check if already at goal
+    const startPos = bot.entity?.position;
+    if (!startPos) return fail('unknown', 'no bot position');
+    if (hasArrived(startPos)) {
+      return ok(
+        { success: true, position: { x: startPos.x, y: startPos.y, z: startPos.z }, primitivesExecuted: 0, replansUsed: 0 },
+        ctx.now() - t0,
+      );
+    }
+
+    while (replansUsed <= maxReplans) {
+      const currentPos = bot.entity!.position;
+
+      // 1. Request solve from planning server
+      let solveResult: NavSolveResponse;
+      try {
+        const resp = await resilientFetch(`${PLANNING_ENDPOINT}/solve-navigation`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            start: {
+              x: Math.floor(currentPos.x),
+              y: Math.floor(currentPos.y),
+              z: Math.floor(currentPos.z),
+            },
+            goal: {
+              x: Math.floor(target.x),
+              y: Math.floor(target.y),
+              z: Math.floor(target.z),
+            },
+            toleranceXZ: tolXZ,
+            toleranceY: tolY,
+            scanMargin,
+          }),
+        });
+        solveResult = await resp.json() as NavSolveResponse;
+      } catch (e: any) {
+        return fail('unknown', `Planning server error: ${e?.message ?? e}`, ctx.now() - t0);
+      }
+
+      if (!solveResult.solved || !solveResult.primitives?.length) {
+        return fail('path.unreachable', solveResult.error || 'No path found', ctx.now() - t0);
+      }
+
+      // 2. Execute primitives sequentially
+      let deviationDetected = false;
+      for (const primitive of solveResult.primitives) {
+        // Check abort signal
+        if (ctx.abortSignal?.aborted) {
+          return fail('aborted', 'Navigation aborted', ctx.now() - t0);
+        }
+
+        try {
+          await this.executePrimitive(bot, primitive);
+        } catch (e: any) {
+          // Primitive execution failed — trigger replan
+          deviationDetected = true;
+          break;
+        }
+
+        completedPrimitives++;
+
+        // Verify position (L∞ block distance from expected)
+        const afterPos = bot.entity!.position;
+        const dev = Math.max(
+          Math.abs(Math.floor(afterPos.x) - primitive.to.x),
+          Math.abs(Math.floor(afterPos.y) - primitive.to.y),
+          Math.abs(Math.floor(afterPos.z) - primitive.to.z),
+        );
+        if (dev > 2) {
+          deviationDetected = true;
+          break;
+        }
+      }
+
+      // Check arrival
+      const finalPos = bot.entity!.position;
+      if (hasArrived(finalPos)) {
+        return ok(
+          {
+            success: true,
+            position: { x: finalPos.x, y: finalPos.y, z: finalPos.z },
+            primitivesExecuted: completedPrimitives,
+            replansUsed,
+          },
+          ctx.now() - t0,
+        );
+      }
+
+      // Replan if needed
+      if (!deviationDetected) {
+        // Completed all primitives but not at goal — replan
+      }
+
+      replansUsed++;
+      if (replansUsed > maxReplans) break;
+
+      // Escalation: expand scan margin
+      scanMargin = Math.ceil(scanMargin * 1.5);
+    }
+
+    const endPos = bot.entity!.position;
+    return fail(
+      'path.stuck',
+      `Max replans (${maxReplans}) exceeded`,
+      ctx.now() - t0,
+    );
+  }
+
+  /**
+   * Execute a single movement primitive.
+   * Walk: pathfinder.goto for exactly 1 block (actuator only).
+   * Jump up: raw control state — no pathfinder.
+   * Descend: walk off edge, gravity handles the rest.
+   */
+  private async executePrimitive(bot: BotWithPathfinder, p: NavPrimitive): Promise<void> {
+    switch (p.actionType) {
+      case 'walk': {
+        // Ensure pathfinder is loaded
+        if (!bot.pathfinder) bot.loadPlugin(pathfinder);
+        const moves = new Movements(bot);
+        moves.scafoldingBlocks = [];
+        moves.canDig = false;
+        bot.pathfinder.setMovements(moves);
+
+        const g = new pathfinderGoals.GoalNear(p.to.x + 0.5, p.to.y, p.to.z + 0.5, 0.5);
+        bot.pathfinder.setGoal(g, false);
+
+        await new Promise<void>((resolve, reject) => {
+          const timeout = setTimeout(() => {
+            try { bot.pathfinder?.stop(); } catch {}
+            reject(new Error('walk timeout'));
+          }, 5000);
+
+          const check = setInterval(() => {
+            const pos = bot.entity?.position;
+            if (!pos) return;
+            const dist = Math.sqrt(
+              (pos.x - (p.to.x + 0.5)) ** 2 + (pos.z - (p.to.z + 0.5)) ** 2,
+            );
+            if (dist < 1.0) {
+              clearTimeout(timeout);
+              clearInterval(check);
+              resolve();
+            }
+          }, 100);
+
+          bot.once('goal_reached' as any, () => {
+            clearTimeout(timeout);
+            clearInterval(check);
+            resolve();
+          });
+        });
+        break;
+      }
+
+      case 'jump_up': {
+        // Face the direction of movement
+        const dx = p.to.x - p.from.x;
+        const dz = p.to.z - p.from.z;
+        const yaw = Math.atan2(-dx, dz);
+        await bot.look(yaw, 0, true);
+
+        bot.setControlState('jump', true);
+        bot.setControlState('forward', true);
+        await this.waitTicks(bot, 6);
+        bot.setControlState('jump', false);
+        bot.setControlState('forward', false);
+        // Allow physics to settle
+        await this.waitTicks(bot, 4);
+        break;
+      }
+
+      case 'descend': {
+        // Face the direction of movement
+        const dx = p.to.x - p.from.x;
+        const dz = p.to.z - p.from.z;
+        const yaw = Math.atan2(-dx, dz);
+        await bot.look(yaw, 0, true);
+
+        bot.setControlState('forward', true);
+        await this.waitTicks(bot, 4);
+        bot.setControlState('forward', false);
+        // Allow gravity to settle
+        await this.waitTicks(bot, 6);
+        break;
+      }
+    }
+  }
+
+  /** Wait for N physics ticks. */
+  private waitTicks(bot: Bot, ticks: number): Promise<void> {
+    return new Promise<void>((resolve) => {
+      let remaining = ticks;
+      const onTick = () => {
+        remaining--;
+        if (remaining <= 0) {
+          bot.removeListener('physicsTick' as any, onTick);
+          resolve();
+        }
+      };
+      bot.on('physicsTick' as any, onTick);
+    });
   }
 }

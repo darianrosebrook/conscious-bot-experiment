@@ -23,6 +23,7 @@ import {
 import type { Bot } from 'mineflayer';
 import { mineflayer as startMineflayerViewer } from 'prismarine-viewer';
 import { resilientFetch } from '@conscious-bot/core';
+import { Vec3 } from 'vec3';
 
 // Import viewer enhancements
 import { applyViewerEnhancements } from './viewer-enhancements';
@@ -32,6 +33,7 @@ import {
   MoveToLeaf,
   StepForwardSafelyLeaf,
   FollowEntityLeaf,
+  SterlingNavigateLeaf,
 } from './leaves/movement-leaves';
 import {
   DigBlockLeaf,
@@ -791,6 +793,7 @@ async function registerCoreLeaves() {
       new MoveToLeaf(),
       new StepForwardSafelyLeaf(),
       new FollowEntityLeaf(),
+      new SterlingNavigateLeaf(),
     ];
 
     // Register interaction leaves
@@ -1237,10 +1240,10 @@ app.get('/processed-messages', (req, res) => {
   }
 });
 
-// Get safety status
-app.get('/safety', (req, res) => {
+// Get safety status (threat assessment for the threat-hold bridge)
+app.get('/safety', async (req, res) => {
   try {
-    const safetyStatus = minecraftInterface?.botAdapter.getSafetyStatus();
+    const safetyStatus = await minecraftInterface?.botAdapter.getSafetyStatus();
     res.json({
       success: true,
       safety: safetyStatus,
@@ -2580,6 +2583,100 @@ app.get('/leaves', (req, res) => {
       success: false,
       message: 'Failed to get leaves',
       error: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
+
+// ── World Scan (navigation occupancy grid) ──────────────────────────────────
+// Returns a compact occupancy grid for the given bounding box.
+// Used by the planning server's /solve-navigation endpoint (Option A scan flow).
+// Block encoding: 0=air, 1=solid, 2=water, 3=lava, 4=ladder, 5=hazard
+app.get('/world-scan', (req, res) => {
+  try {
+    const bot = minecraftInterface?.botAdapter.getBot();
+    if (!bot) {
+      return res.status(503).json({ error: 'Bot not connected' });
+    }
+
+    const x1 = parseInt(req.query.x1 as string, 10);
+    const y1 = parseInt(req.query.y1 as string, 10);
+    const z1 = parseInt(req.query.z1 as string, 10);
+    const x2 = parseInt(req.query.x2 as string, 10);
+    const y2 = parseInt(req.query.y2 as string, 10);
+    const z2 = parseInt(req.query.z2 as string, 10);
+
+    if ([x1, y1, z1, x2, y2, z2].some(Number.isNaN)) {
+      return res.status(400).json({
+        error: 'Missing or invalid query params: x1, y1, z1, x2, y2, z2 (integers)',
+      });
+    }
+
+    const minX = Math.min(x1, x2);
+    const minY = Math.min(y1, y2);
+    const minZ = Math.min(z1, z2);
+    const maxX = Math.max(x1, x2);
+    const maxY = Math.max(y1, y2);
+    const maxZ = Math.max(z1, z2);
+
+    const dx = maxX - minX + 1;
+    const dy = maxY - minY + 1;
+    const dz = maxZ - minZ + 1;
+
+    // Safety cap: 100x100x50 = 500K blocks max
+    if (dx * dy * dz > 500_000) {
+      return res.status(400).json({
+        error: `Bounding box too large: ${dx}x${dy}x${dz} = ${dx * dy * dz} blocks (max 500000)`,
+      });
+    }
+
+    // Build occupancy grid using X→Y→Z row-major linearization
+    // index = ((lx * dy) + ly) * dz + lz
+    const blocks = new Uint8Array(dx * dy * dz);
+
+    // Hazard block names for classification
+    const HAZARD_BLOCKS = new Set([
+      'cactus', 'sweet_berry_bush', 'magma_block', 'fire', 'soul_fire',
+      'campfire', 'soul_campfire', 'wither_rose', 'powder_snow',
+    ]);
+
+    for (let lx = 0; lx < dx; lx++) {
+      for (let ly = 0; ly < dy; ly++) {
+        for (let lz = 0; lz < dz; lz++) {
+          const wx = minX + lx;
+          const wy = minY + ly;
+          const wz = minZ + lz;
+          const block = bot.blockAt(new Vec3(wx, wy, wz));
+          const idx = ((lx * dy) + ly) * dz + lz;
+
+          if (!block || block.name === 'air' || block.name === 'cave_air' || block.name === 'void_air') {
+            blocks[idx] = 0; // air
+          } else if (block.name === 'water' || block.name === 'flowing_water') {
+            blocks[idx] = 2; // water
+          } else if (block.name === 'lava' || block.name === 'flowing_lava') {
+            blocks[idx] = 3; // lava
+          } else if (block.name === 'ladder' || block.name === 'vine') {
+            blocks[idx] = 4; // ladder/climbable
+          } else if (HAZARD_BLOCKS.has(block.name)) {
+            blocks[idx] = 5; // hazard
+          } else {
+            blocks[idx] = 1; // solid
+          }
+        }
+      }
+    }
+
+    // Encode as base64
+    const blocksBase64 = Buffer.from(blocks).toString('base64');
+
+    res.json({
+      origin: { x: minX, y: minY, z: minZ },
+      size: { dx, dy, dz },
+      blocks: blocksBase64,
+    });
+  } catch (error) {
+    console.error('[world-scan] Error:', error);
+    res.status(500).json({
+      error: `World scan failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
     });
   }
 });

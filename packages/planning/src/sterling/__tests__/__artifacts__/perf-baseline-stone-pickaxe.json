@@ -1,7 +1,7 @@
 [
   {
     "meta": {
-      "gitSha": "8bbf1a76552d7fe5f12d9e4d239337b74f4ef74f",
+      "gitSha": "e0bf326a60af781f7ac4a6353af5c148f7a4b184",
       "sterlingServer": "local (manual — no programmatic version API)",
       "clientPathway": "MinecraftToolProgressionSolver (solver-class bundle pipeline, multi-tier)",
       "solverId": "minecraft.tool_progression",
@@ -17,21 +17,21 @@
     },
     "item": "stone_pickaxe:wooden_tier",
     "solved": true,
-    "nodesExpanded": 50,
-    "frontierPeak": 48,
+    "nodesExpanded": 66,
+    "frontierPeak": 64,
     "terminationReason": "goal_found",
     "solutionPathLength": 8,
-    "branchingEstimate": 3,
+    "branchingEstimate": 2.8636363636363638,
     "hMin": 0,
     "hMax": 1,
-    "hVariance": 0.0196,
-    "pctSameH": 0.98,
+    "hVariance": 0.01492194674012856,
+    "pctSameH": 0.9848484848484849,
     "searchHealthVersion": 1,
-    "timestamp": "2026-02-01T10:57:42.507Z"
+    "timestamp": "2026-02-02T09:12:32.021Z"
   },
   {
     "meta": {
-      "gitSha": "8bbf1a76552d7fe5f12d9e4d239337b74f4ef74f",
+      "gitSha": "e0bf326a60af781f7ac4a6353af5c148f7a4b184",
       "sterlingServer": "local (manual — no programmatic version API)",
       "clientPathway": "MinecraftToolProgressionSolver (solver-class bundle pipeline, multi-tier)",
       "solverId": "minecraft.tool_progression",
@@ -47,16 +47,16 @@
     },
     "item": "stone_pickaxe:stone_tier",
     "solved": true,
-    "nodesExpanded": 186,
-    "frontierPeak": 268,
+    "nodesExpanded": 18,
+    "frontierPeak": 31,
     "terminationReason": "goal_found",
-    "solutionPathLength": 8,
-    "branchingEstimate": 4.344086021505376,
+    "solutionPathLength": 3,
+    "branchingEstimate": 3.888888888888889,
     "hMin": 0,
     "hMax": 1,
-    "hVariance": 0.005347439010290207,
-    "pctSameH": 0.9946236559139785,
+    "hVariance": 0.05246913580246913,
+    "pctSameH": 0.9444444444444444,
     "searchHealthVersion": 1,
-    "timestamp": "2026-02-01T10:57:42.507Z"
+    "timestamp": "2026-02-02T09:12:32.021Z"
   }
 ]

@@ -25,6 +25,7 @@ export type TaskDecision =
   | 'created'              // task was successfully created
   | 'blocked_unroutable'   // canonical action not in ROUTABLE_ACTIONS
   | 'blocked_guard'        // thought filtered by content guard (status text, etc.)
+  | 'blocked_not_eligible' // thought has convertEligible=false (low-novelty, dedup noise)
   | 'suppressed_dedup'     // same goal within dedup window
   | 'dropped_sanitizer'    // no extractedGoal and keyword fallback didn't match
   | 'dropped_seen'         // thought ID already processed
@@ -229,6 +230,12 @@ export async function convertThoughtToTask(
       deps.trimSeenThoughtIds();
     }
 
+    // Convert-eligibility gate: if the thought explicitly declares convertEligible=false,
+    // skip conversion. Missing field (undefined) defaults to eligible for backwards compat.
+    if (thought.convertEligible === false) {
+      return { task: null, decision: 'blocked_not_eligible', reason: 'thought marked convertEligible=false' };
+    }
+
     // Primary path: use structured extractedGoal from sanitizer
     const extractedGoal = thought.metadata?.extractedGoal as GoalTagV1 | undefined;
 
@@ -309,8 +316,8 @@ export async function convertThoughtToTask(
         content.includes('plant') ||
         content.includes('harvest')
       ) {
-        actionType = 'farming';
-        taskTitle = extractActionTitle(content, 'farm');
+        actionType = 'gathering';
+        taskTitle = extractActionTitle(content, 'gather');
       } else {
         // Truly general — not enough signal for a task
         return { task: null, decision: 'dropped_sanitizer', reason: 'no structured goal and keyword fallback did not match' };

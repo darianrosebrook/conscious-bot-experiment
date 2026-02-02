@@ -13,7 +13,7 @@ import type { BaseDomainSolver } from './sterling/base-domain-solver';
 import type { MinecraftBuildingSolver } from './sterling/minecraft-building-solver';
 import { resolveRequirement } from './modules/requirements';
 import { CognitionOutbox } from './modules/cognition-outbox';
-import { ORE_DROP_MAP } from './sterling/minecraft-tool-progression-types';
+import { ORE_DROP_MAP, BLOCK_DROP_MAP } from './sterling/minecraft-tool-progression-types';
 import {
   CognitiveStreamClient,
   type CognitiveStreamThought,
@@ -684,7 +684,11 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
     const outcome = await this.goalResolver.resolveOrCreate(
       {
         goalType,
-        intentParams: taskData.parameters?.intentParams,
+        intentParams: typeof taskData.parameters?.intentParams === 'string'
+          ? taskData.parameters.intentParams
+          : taskData.parameters?.intentParams != null
+            ? JSON.stringify(taskData.parameters.intentParams)
+            : undefined,
         botPosition,
         verifier,
         goalId: taskData.parameters?.goalId,
@@ -1211,6 +1215,7 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
     // Mark them blocked so the executor's eligibility filter skips them.
     if (isAdvisory) {
       task.metadata.blockedReason = 'advisory_action';
+      task.metadata.blockedAt = Date.now();
     }
 
     // Blocked sentinel: solver explicitly reported it cannot plan (e.g., Rig E not implemented)
@@ -1218,6 +1223,7 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
       const reason = (steps[0].meta?.blockedReason as string) || 'solver_unavailable';
       task.status = 'pending_planning';
       task.metadata.blockedReason = reason;
+      task.metadata.blockedAt = Date.now();
       task.steps = []; // Strip sentinel — no real steps to execute
     }
 
@@ -1231,6 +1237,7 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
       );
       if (task.steps.length > 0 && !hasExecutableStep) {
         task.metadata.blockedReason = 'no-executable-plan';
+        task.metadata.blockedAt = Date.now();
       }
     }
 
@@ -1690,7 +1697,7 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
         );
         const acquireTimeout = Math.max(timeout, 20000);
         return this.retryUntil(
-          () => this.verifyInventoryDelta(taskId, stepId, item, 1),
+          () => this.verifyInventoryDelta(taskId, stepId, item, 1, /* isMineStep */ true),
           acquireTimeout
         );
       }
@@ -1998,12 +2005,16 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
    * Verify inventory increased by at least minDelta for itemId since step start (delta-based).
    * For block types that drop different items (e.g. coal_ore -> coal), sums counts across
    * all accepted names so mining verification matches the actual inventory item.
+   *
+   * @param isMineStep - Pass true for mine/dig steps to enable block→drop equivalences
+   *   (e.g. stone→cobblestone). Craft/smelt callers must NOT set this.
    */
   private async verifyInventoryDelta(
     taskId: string,
     stepId: string,
     itemId: string,
-    minDelta = 1
+    minDelta = 1,
+    isMineStep = false
   ): Promise<boolean> {
     try {
       const start = this._stepStartSnapshots.get(`${taskId}-${stepId}`) as
@@ -2018,7 +2029,7 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
       const inventory = Array.isArray(raw) ? raw : (raw?.items ?? []);
       const afterIdx = this.buildInventoryIndex(inventory);
 
-      const acceptedNames = this.getInventoryNamesForVerification(itemId);
+      const acceptedNames = this.getInventoryNamesForVerification(itemId, isMineStep);
       const before = acceptedNames.reduce(
         (sum, name) => sum + (start?.inventoryByName?.[name] ?? 0),
         0
@@ -2132,13 +2143,23 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
    * Resolve block type (e.g. coal_ore) to inventory item name(s) for verification.
    * Mining coal_ore yields coal; verification must accept the drop item, not the block name.
    * Wood-type blocks (oak_log, etc.) also accept "log" so APIs that return generic "log" match.
+   *
+   * @param isMineStep - When true, include non-ore block→drop mappings (stone→cobblestone).
+   *   These only apply in mine/dig contexts where the environment determines the drop.
+   *   Craft/smelt verification should NOT set this — it would create false equivalences.
    */
-  private getInventoryNamesForVerification(resourceType: string): string[] {
+  private getInventoryNamesForVerification(resourceType: string, isMineStep = false): string[] {
     const lower = resourceType.toLowerCase();
     const names = [lower];
     const drop = ORE_DROP_MAP[lower as keyof typeof ORE_DROP_MAP];
     if (drop) {
       names.push(drop.item.toLowerCase());
+    }
+    if (isMineStep) {
+      const blockDrop = BLOCK_DROP_MAP[lower as keyof typeof BLOCK_DROP_MAP];
+      if (blockDrop && blockDrop !== 'air') {
+        names.push(blockDrop);
+      }
     }
     if (lower.includes('log') || lower === 'wood') {
       if (!names.includes('log')) names.push('log');

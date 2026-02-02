@@ -242,6 +242,10 @@ export { DEFAULT_ARBITER_CONFIG } from './arbiter';
 export { DEFAULT_SIGNAL_CONFIG } from './signal-processor';
 export { DEFAULT_PERFORMANCE_CONFIG } from './performance-monitor';
 
+// TTS client (Kokoro-ONNX, optional)
+export { TTSClient } from './tts';
+export type { TTSClientConfig } from './tts';
+
 // Sterling reasoning client
 export { SterlingClient } from './sterling';
 export type {

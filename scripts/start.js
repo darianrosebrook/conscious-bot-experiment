@@ -1336,6 +1336,49 @@ async function mainVerbose() {
     );
   }
 
+  // Kokoro TTS (optional)
+  const ttsUrl = process.env.TTS_API_URL || 'http://localhost:8080';
+  if (process.env.TTS_ENABLED !== 'false') {
+    // Check for sox first
+    let soxOk = false;
+    try {
+      execSync('which sox', { stdio: 'ignore' });
+      soxOk = true;
+    } catch {
+      log(
+        '  ℹ️  sox not found on PATH — TTS playback will be disabled',
+        colors.yellow
+      );
+      log(
+        '     To enable: brew install sox',
+        colors.cyan
+      );
+    }
+
+    if (soxOk) {
+      try {
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), 3000);
+        const res = await fetch(`${ttsUrl}/health`, { signal: controller.signal });
+        clearTimeout(timer);
+        if (res.ok) {
+          log(`  Kokoro TTS available at ${ttsUrl}`, colors.green);
+        } else {
+          throw new Error('non-ok');
+        }
+      } catch {
+        log(
+          `  ℹ️  Kokoro TTS not running at ${ttsUrl} (optional)`,
+          colors.yellow
+        );
+        log(
+          '     To enable: cd ../kokoro-onnx && ./start_development.sh',
+          colors.cyan
+        );
+      }
+    }
+  }
+
   // Step 11: Display status and URLs
   logWithTimestamp(
     '\nConscious Bot System is running!',

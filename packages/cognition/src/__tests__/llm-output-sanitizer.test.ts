@@ -4,6 +4,7 @@ import {
   stripCodeFences,
   stripSystemPromptLeaks,
   extractGoalTag,
+  extractIntent,
   truncateDegeneration,
   stripTrailingGarbage,
   normalizeWhitespace,
@@ -771,7 +772,7 @@ describe('hasCodeLikeDensity (single-line code)', () => {
 
 describe('ACTION_NORMALIZE_MAP stability', () => {
   it('has a version number', () => {
-    expect(NORMALIZE_MAP_VERSION).toBe(2);
+    expect(NORMALIZE_MAP_VERSION).toBe(3);
   });
 
   it('normalizes known synonyms consistently', () => {
@@ -810,5 +811,44 @@ describe('ACTION_NORMALIZE_MAP stability', () => {
     expect(normalizeGoalAction('suspend')).toBe('pause');
     expect(normalizeGoalAction('unpause')).toBe('resume');
     expect(normalizeGoalAction('restart')).toBe('resume');
+  });
+});
+
+// ============================================================================
+// extractIntent
+// ============================================================================
+
+describe('extractIntent', () => {
+  it('extracts valid intent from final line', () => {
+    const result = extractIntent('Thought.\nINTENT: gather');
+    expect(result.intent).toBe('gather');
+    expect(result.text).toBe('Thought.');
+  });
+
+  it('returns null for unknown label', () => {
+    const result = extractIntent('Thought.\nINTENT: fly');
+    expect(result.intent).toBeNull();
+  });
+
+  it('returns null when no INTENT present', () => {
+    const result = extractIntent('Just a thought.');
+    expect(result.intent).toBeNull();
+  });
+});
+
+// ============================================================================
+// sanitizeLLMOutput — intent field
+// ============================================================================
+
+describe('sanitizeLLMOutput (intent field)', () => {
+  it('existing tests produce intent: null when no INTENT line', () => {
+    const result = sanitizeLLMOutput('I should gather wood before nightfall.');
+    expect(result.intent).toBeNull();
+  });
+
+  it('extracts intent when INTENT line is present', () => {
+    const result = sanitizeLLMOutput('I should mine stone.\nINTENT: mine');
+    expect(result.intent).toBe('mine');
+    expect(result.text).toBe('I should mine stone.');
   });
 });

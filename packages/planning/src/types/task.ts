@@ -46,6 +46,7 @@ export interface Task {
     requirement?: any;
     nextEligibleAt?: number;
     blockedReason?: string;
+    blockedAt?: number;
     prereqInjectionCount?: number;
     lastBindingFailure?: {
       stepId: string;

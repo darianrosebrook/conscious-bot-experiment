@@ -48,6 +48,7 @@ export function actionTypeToLeaf(actionType: string, action?: string): string {
     case 'mine': return 'acquire_material';
     case 'craft': return 'craft_recipe';
     case 'smelt': return 'smelt';
+    case 'navigate': return 'sterling_navigate';
     case 'place': {
       const item = parsePlaceAction(action);
       if (item && WORKSTATION_TYPES.has(item)) return 'place_workstation';
@@ -87,6 +88,7 @@ export function estimateDuration(actionType: string): number {
     case 'smelt': return 15000;
     case 'place': return 1000;
     case 'upgrade': return 2000;
+    case 'navigate': return 30000;
     default: return 3000;
   }
 }

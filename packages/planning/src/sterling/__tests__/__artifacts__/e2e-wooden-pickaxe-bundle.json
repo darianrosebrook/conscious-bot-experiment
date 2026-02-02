@@ -1,7 +1,7 @@
 {
-  "bundleId": "minecraft.tool_progression:c20a84b98c086120",
-  "bundleHash": "c20a84b98c086120",
-  "timestamp": 1769943458921,
+  "bundleId": "minecraft.tool_progression:a7e5f97dddae42a9",
+  "bundleHash": "a7e5f97dddae42a9",
+  "timestamp": 1770023549353,
   "input": {
     "solverId": "minecraft.tool_progression",
     "executionMode": "tool_progression",
@@ -21,26 +21,26 @@
     "objectiveWeightsSource": "default"
   },
   "output": {
-    "planId": "0e45fc2435447c13",
+    "planId": "9b632f45a5c2f8bc",
     "solved": true,
-    "stepsDigest": "8a5f0cb28696d987",
+    "stepsDigest": "270c723b6b0c141e",
     "searchStats": {
-      "totalNodes": 98,
+      "totalNodes": 130,
       "durationMs": 20,
       "solutionPathLength": 8
     },
     "searchHealth": {
-      "nodesExpanded": 50,
-      "frontierPeak": 48,
+      "nodesExpanded": 66,
+      "frontierPeak": 64,
       "hMin": 0,
       "hMax": 1,
-      "hMean": 0.98,
-      "hVariance": 0.0196,
+      "hMean": 0.9848484848484849,
+      "hVariance": 0.01492194674012856,
       "fMin": 1,
       "fMax": 13.5,
-      "pctSameH": 0.98,
+      "pctSameH": 0.9848484848484849,
       "terminationReason": "goal_found",
-      "branchingEstimate": 3,
+      "branchingEstimate": 2.8636363636363638,
       "searchHealthVersion": 1
     },
     "rationale": {
@@ -54,9 +54,9 @@
         "objectiveWeightsSource": "default"
       },
       "searchEffort": {
-        "nodesExpanded": 50,
-        "frontierPeak": 48,
-        "branchingEstimate": 3
+        "nodesExpanded": 66,
+        "frontierPeak": 64,
+        "branchingEstimate": 2.8636363636363638
       },
       "searchTermination": {
         "terminationReason": "goal_found",
@@ -75,7 +75,7 @@
   "compatReport": {
     "valid": true,
     "issues": [],
-    "checkedAt": 1769943458891,
+    "checkedAt": 1770023549323,
     "definitionCount": 6
   }
 }

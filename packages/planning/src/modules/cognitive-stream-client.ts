@@ -30,10 +30,16 @@ export interface CognitiveStreamThought {
     extractedGoal?: { version?: number; action: string; target: string; amount: number | null; raw?: string };
     /** Sanitization flags from the LLM output sanitizer */
     sanitizationFlags?: Record<string, any>;
+    /** Extracted intent label from INTENT: line */
+    extractedIntent?: string | null;
+    /** Source of the extracted goal ('llm' or 'drive-tick') */
+    extractedGoalSource?: string;
   };
   id: string;
   timestamp: number;
   processed: boolean;
+  /** Only thoughts with convertEligible=true should be considered for task conversion */
+  convertEligible?: boolean;
 }
 
 export interface CognitiveStreamClientConfig {
