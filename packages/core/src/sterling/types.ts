@@ -48,7 +48,16 @@ export type SterlingDomain =
 
 /** Client-to-server command */
 export interface SterlingRequest {
-  command: 'solve' | 'ping' | 'get_status' | 'get_metrics' | 'reset' | 'switch_domain' | 'update_config';
+  command:
+    | 'solve'
+    | 'ping'
+    | 'get_status'
+    | 'get_metrics'
+    | 'reset'
+    | 'switch_domain'
+    | 'update_config'
+    | 'register_domain_declaration_v1'
+    | 'get_domain_declaration_v1';
   domain?: SterlingDomain;
   [key: string]: unknown;
 }
@@ -117,6 +126,8 @@ export interface SterlingErrorMessage {
   code?: string;
   /** Domain that triggered the error, if applicable */
   domain?: string;
+  /** Echo of the client-sent requestId for response correlation (declaration commands only). */
+  requestId?: string;
 }
 
 export interface SterlingPongMessage {
@@ -155,6 +166,29 @@ export interface SterlingInitializationResultMessage {
   message: string;
 }
 
+export interface SterlingDeclarationRegisteredMessage {
+  type: 'declaration_registered';
+  digest: string;
+  solverId: string;
+  /** Echo of the client-sent requestId for response correlation. */
+  requestId?: string;
+}
+
+export interface SterlingDeclarationRetrievedMessage {
+  type: 'declaration_retrieved';
+  digest: string;
+  declaration: Record<string, unknown>;
+  /** Echo of the client-sent requestId for response correlation. */
+  requestId?: string;
+}
+
+export interface SterlingDeclarationNotFoundMessage {
+  type: 'declaration_not_found';
+  digest: string;
+  /** Echo of the client-sent requestId for response correlation. */
+  requestId?: string;
+}
+
 /** Discriminated union of all server-to-client message types */
 export type SterlingMessage =
   | SterlingDiscoverMessage
@@ -170,7 +204,10 @@ export type SterlingMessage =
   | SterlingMetricsMessage
   | SterlingResetCompleteMessage
   | SterlingDomainSwitchedMessage
-  | SterlingInitializationResultMessage;
+  | SterlingInitializationResultMessage
+  | SterlingDeclarationRegisteredMessage
+  | SterlingDeclarationRetrievedMessage
+  | SterlingDeclarationNotFoundMessage;
 
 // ============================================================================
 // Aggregated Results

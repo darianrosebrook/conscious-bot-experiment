@@ -52,6 +52,7 @@ export class SterlingClient extends EventEmitter {
   private reconnectAttempts = 0;
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private connectPromise: Promise<void> | null = null;
+  private requestIdCounter = 0;
 
   constructor(config: SterlingClientConfig = {}) {
     super();
@@ -537,6 +538,137 @@ export class SterlingClient extends EventEmitter {
           metrics: {},
           error: `Send failed: ${err instanceof Error ? err.message : String(err)}`,
           durationMs: Date.now() - startTime,
+        });
+      }
+    });
+  }
+
+  /** Generate a unique requestId for declaration command correlation. */
+  private nextRequestId(): string {
+    return `decl_${++this.requestIdCounter}_${Date.now()}`;
+  }
+
+  /**
+   * Register a domain declaration with Sterling.
+   *
+   * Sends a register_domain_declaration_v1 command and waits for
+   * declaration_registered or error response, correlated by requestId.
+   *
+   * @param declaration - The declaration object to register
+   * @param digest - Optional content-addressed digest. If omitted, server computes it.
+   */
+  async registerDomainDeclaration(
+    declaration: Record<string, unknown>,
+    digest?: string,
+  ): Promise<{ success: boolean; digest?: string; error?: string }> {
+    if (!this.isAvailable()) {
+      return { success: false, error: 'Client not available' };
+    }
+
+    const requestId = this.nextRequestId();
+
+    return new Promise((resolve) => {
+      const timeout = setTimeout(() => {
+        cleanup();
+        resolve({ success: false, error: 'Register declaration timeout' });
+      }, 5000);
+
+      const handler = (msg: SterlingMessage) => {
+        // Filter on requestId to avoid consuming another request's response
+        if (msg.type === 'declaration_registered' && msg.requestId === requestId) {
+          cleanup();
+          this.recordSuccess();
+          resolve({ success: true, digest: msg.digest });
+        } else if (msg.type === 'error' && msg.requestId === requestId) {
+          cleanup();
+          this.recordFailure();
+          resolve({ success: false, error: msg.message });
+        }
+      };
+
+      const cleanup = () => {
+        clearTimeout(timeout);
+        this.removeListener('message', handler);
+      };
+
+      this.on('message', handler);
+
+      try {
+        this.send({
+          command: 'register_domain_declaration_v1',
+          declaration,
+          digest,
+          requestId,
+        });
+      } catch (err) {
+        cleanup();
+        this.recordFailure();
+        resolve({
+          success: false,
+          error: `Send failed: ${err instanceof Error ? err.message : String(err)}`,
+        });
+      }
+    });
+  }
+
+  /**
+   * Retrieve a domain declaration from Sterling by digest.
+   *
+   * Sends a get_domain_declaration_v1 command and waits for
+   * declaration_retrieved, declaration_not_found, or error response,
+   * correlated by requestId.
+   */
+  async getDomainDeclaration(
+    digest: string,
+  ): Promise<{ found: boolean; declaration?: Record<string, unknown>; digest?: string; error?: string }> {
+    if (!this.isAvailable()) {
+      return { found: false, error: 'Client not available' };
+    }
+
+    const requestId = this.nextRequestId();
+
+    return new Promise((resolve) => {
+      const timeout = setTimeout(() => {
+        cleanup();
+        resolve({ found: false, error: 'Get declaration timeout' });
+      }, 5000);
+
+      const handler = (msg: SterlingMessage) => {
+        // Filter on requestId to avoid consuming another request's response
+        if (msg.type === 'declaration_retrieved' && msg.requestId === requestId) {
+          cleanup();
+          this.recordSuccess();
+          resolve({ found: true, declaration: msg.declaration, digest: msg.digest });
+        } else if (msg.type === 'declaration_not_found' && msg.requestId === requestId) {
+          cleanup();
+          this.recordSuccess();
+          resolve({ found: false, digest: msg.digest });
+        } else if (msg.type === 'error' && msg.requestId === requestId) {
+          cleanup();
+          this.recordFailure();
+          resolve({ found: false, error: msg.message });
+        }
+      };
+
+      const cleanup = () => {
+        clearTimeout(timeout);
+        this.removeListener('message', handler);
+      };
+
+      this.on('message', handler);
+
+      try {
+        this.send({
+          command: 'get_domain_declaration_v1',
+          digest,
+          requestId,
+        });
+      } catch (err) {
+        cleanup();
+        this.recordFailure();
+        resolve({
+          found: false,
+          error: `Send failed: ${err instanceof Error ? err.message : String(err)}`,
         });
       }
     });

@@ -16,6 +16,7 @@ import {
   type SterlingHealthStatus,
   type SterlingSolveStepCallback,
 } from '@conscious-bot/core';
+import { computeDeclarationDigest, type DomainDeclarationV1 } from './domain-declaration';
 
 // ============================================================================
 // Types
@@ -279,6 +280,49 @@ export class SterlingReasoningService {
       );
       return fallback;
     }
+  }
+
+  // --------------------------------------------------------------------------
+  // Domain Declaration (Capability-Claim Pipeline)
+  // --------------------------------------------------------------------------
+
+  /**
+   * Register a domain declaration with Sterling.
+   *
+   * If `digest` is omitted, the service computes it locally using the same
+   * canonicalize + contentHash infrastructure as the server. This keeps
+   * drift detection engaged on every registration by default: the server
+   * always receives a digest to verify against its own computation.
+   *
+   * @param declaration - The declaration object to register
+   * @param digest - Optional content-addressed digest. Computed locally if omitted.
+   */
+  async registerDomainDeclaration(
+    declaration: Record<string, unknown>,
+    digest?: string,
+  ): Promise<{ success: boolean; digest?: string; error?: string }> {
+    if (!this.isAvailable()) {
+      return { success: false, error: 'Sterling reasoning service unavailable' };
+    }
+    // Compute digest locally if caller omitted it, so the server always
+    // receives a digest and can verify canonicalization parity.
+    const effectiveDigest = digest ?? computeDeclarationDigest(
+      declaration as DomainDeclarationV1,
+    );
+    return this.client.registerDomainDeclaration(declaration, effectiveDigest);
+  }
+
+  /**
+   * Retrieve a domain declaration from Sterling by digest.
+   * Passthrough to the underlying SterlingClient.
+   */
+  async getDomainDeclaration(
+    digest: string,
+  ): Promise<{ found: boolean; declaration?: Record<string, unknown>; digest?: string; error?: string }> {
+    if (!this.isAvailable()) {
+      return { found: false, error: 'Sterling reasoning service unavailable' };
+    }
+    return this.client.getDomainDeclaration(digest);
   }
 
   // --------------------------------------------------------------------------

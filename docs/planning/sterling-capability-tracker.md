@@ -43,7 +43,7 @@ Sterling Python's `data/primitive_specs/index.json` defines engine-level primiti
 | **ST-Pxx** | Engine-level (what the search infrastructure can do) | ST-P01: deterministic transitions | `sterling/data/primitive_specs/index.json` |
 | **CB-Pxx** | Domain-level (what planning capability is proven) | CB-P01: deterministic transformation planning | `docs/planning/capability-primitives.md` |
 
-The bridge between namespaces is `SterlingDomainDeclaration.implementsPrimitives` → `DomainDeclarationV1` → `CapabilityClaimRegistry`. **Zero claims are registered today.** Until claims are wired, these namespaces coexist without formal alignment.
+The bridge between namespaces is `SterlingDomainDeclaration.implementsPrimitives` → `DomainDeclarationV1` → `CapabilityClaimRegistry`.
 
 **Namespace collision resolution** (2026-02-02): `primitive-namespace.ts` provides:
 - `QualifiedPrimitiveId` type (`CB-Pxx | ST-Pxx`) — bare IDs are structurally rejected
@@ -51,6 +51,31 @@ The bridge between namespaces is `SterlingDomainDeclaration.implementsPrimitives
 - `CB_REQUIRES_ST` dependency mapping: CB-P01→[ST-P01], CB-P03→[ST-P01,ST-P02], etc.
 - `assertQualifiedPrimitiveIds()` runtime validator for claim registration
 - 22 tests proving validation, constants, and dependency mapping
+
+**Capability-claim pipeline** (2026-02-02): End-to-end declaration registration wired:
+- `DomainDeclarationV1` type + `computeDeclarationDigest()` in `domain-declaration.ts` (TS)
+- `register_domain_declaration_v1` / `get_domain_declaration_v1` WS commands on `SterlingClient`
+- Python handlers in `sterling_unified_server.py` with in-memory registry keyed by content-addressed digest
+- Fail-closed validation on both sides: TS via `assertQualifiedPrimitiveIds()`, Python via `_QUALIFIED_PRIMITIVE_RE`
+- Digest mismatch detection: server recomputes digest and rejects if client digest doesn't match (canonicalization drift)
+- Service-layer digest default: `SterlingReasoningService.registerDomainDeclaration()` computes digest locally when omitted, so drift detection is engaged on every registration by default
+- Cross-language canonicalization parity: Python uses `ensure_ascii=False` to match JS `JSON.stringify` literal unicode output. 35 corpus tests pin the contract (edge values: unicode, -0, empty strings, nested objects, rejection of NaN/Infinity/BigInt)
+- Request correlation via `requestId` prevents phantom success/failure when concurrent ops are in-flight
+- Registry capped at 1000 entries; `reset_declaration_registry` command available for long-running dev servers
+- 54 unit tests (declaration types, validation, digest determinism, canonicalization corpus) + 9 E2E tests (round-trip, drift detection, bare ID rejection, concurrent isolation, cross-language edge cases)
+- Navigation solver certified as foundational E2E surface: declaration registered (ST-P01), solve + bundle invariants proven, registry round-trip verified
+- The claim registry plumbing is wired end-to-end; production solvers do not yet register declarations by default
+
+**Intentional schema constraints** (documented for future reference):
+- Primitive ID regex `^(CB|ST)-P\d{2}$` limits to 99 entries per namespace. If the taxonomy outgrows this, widen the regex.
+- `consumesFields` and `producesFields` must be non-empty. Marker solvers or administrative domains would need a sentinel field or a V2 relaxation.
+- Unicode normalization (NFC vs NFD) is not applied before canonicalization. Same-looking strings with different byte representations will hash differently. This is intentional: solver IDs should be ASCII-clean constants, and notes are cosmetic.
+- Numbers in declarations are constrained to integers (`contractVersion`). Arbitrary floats are not permitted, avoiding cross-language float parity issues.
+
+**Known deferred items**:
+- `reset_declaration_registry` is server-only (no TS client method or response type yet). Add if operational tooling is needed.
+- Generic server error path does not echo `requestId` for pre-handler failures (e.g., unknown command). Declaration promises will timeout rather than fail fast in this case. Acceptable trade-off: timeout is safer than phantom success.
+- `reset` command does not clear the declaration registry. Declarations are server capability metadata, independent of world/solve state.
 
 **Rule**: All primitive IDs in declarations, registries, and claim objects must be fully qualified (`CB-Pxx` or `ST-Pxx`). Bare IDs (`p01`, `P01`) are rejected.
 
@@ -130,7 +155,7 @@ Three Python solver domains exist in `sterling/scripts/eval/`. This is the compl
 |--------------|------|-------------|-------------|
 | Minecraft crafting | `minecraft_domain.py` | `MinecraftCraftingSolver`, `MinecraftToolProgressionSolver` (delegation), `MinecraftAcquisitionSolver` (all strategies) | A, B, D (mine proven; trade/loot/salvage ready, untested) |
 | Minecraft building | `building_domain.py` | `MinecraftBuildingSolver` | G |
-| Navigation | `navigation_domain.py` | `MinecraftNavigationSolver` | (new, not yet certified) |
+| Navigation | `navigation_domain.py` | `MinecraftNavigationSolver` | Certified: R2 bundle evidence, declaration registered (ST-P01), cross-language digest parity proven |
 
 Domains that do **not** exist in Python: furnace/temporal (C), hierarchical macro planner (E), valuation (F), and all later rigs.
 
