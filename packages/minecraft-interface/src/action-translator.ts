@@ -110,6 +110,7 @@ import { NavigationBridge } from './navigation-bridge';
 import { StateMachineWrapper } from './extensions/state-machine-wrapper';
 
 import {
+  ACTION_CONTRACTS,
   buildActionTypeToLeafMap,
   normalizeActionParams,
 } from './action-contract-registry';
@@ -929,7 +930,7 @@ export class ActionTranslator {
    *
    * Dispatch order:
    * 1. LeafFactory-first: if a non-placeholder leaf exists for the action type
-   *    (or its normalized name via ACTION_TYPE_TO_LEAF), delegate to executeLeafAction.
+   *    (or its normalized name via ACTION_TYPE_TO_LEAF), delegate to dispatchToLeaf.
    * 2. Hardcoded handlers: legacy switch for action types without leaf implementations.
    *
    * As leaves are implemented for more action types, the hardcoded cases
@@ -945,50 +946,81 @@ export class ActionTranslator {
     const LEGACY_ONLY = new Set(['move_to', 'navigate']);
 
     try {
-      // Phase 1: LeafFactory-first dispatch (skip legacy-only actions)
+      // Phase 1: Contract-driven dispatch (skip legacy-only actions)
       const leafFactory = (global as any).minecraftLeafFactory;
+      const contract = ACTION_CONTRACTS[action.type];
       if (leafFactory && !LEGACY_ONLY.has(action.type)) {
         const leafName =
           ACTION_TYPE_TO_LEAF[action.type] || action.type;
+        const routable = leafFactory.isRoutable
+          ? leafFactory.isRoutable(leafName)
+          : (leafFactory.get(leafName) && (leafFactory.get(leafName) as any)?.spec?.placeholder !== true);
 
-        if (leafFactory.isRoutable ? leafFactory.isRoutable(leafName) : (leafFactory.get(leafName) && (leafFactory.get(leafName) as any)?.spec?.placeholder !== true)) {
-          // Guard: craft still uses dedicated handler (has workstation proximity + fallback)
-          if (
-            leafName === 'craft_recipe' &&
-            (action.type === 'craft' || action.type === 'craft_item')
-          ) {
-            return await this.executeCraftItem(action, timeout);
+        if (routable) {
+          const dispatchMode = contract?.dispatchMode ?? 'leaf';
+
+          // 'handler' — always use dedicated handler, skip leaf dispatch entirely
+          if (dispatchMode === 'handler') {
+            // Fall through to Phase 2 switch
           }
+          // 'guarded' — check semantic guards; if none fire, dispatch to leaf
+          else if (dispatchMode === 'guarded') {
+            // Guard: place_block with pattern-based multi-block placement needs handler
+            if (
+              leafName === 'place_block' &&
+              action.parameters.placement &&
+              action.parameters.placement !== 'around_player'
+            ) {
+              return await this.executePlaceBlock(action as PlaceBlockAction, timeout);
+            }
 
-          // Guard: place_block with pattern-based multi-block placement needs handler
-          if (
-            leafName === 'place_block' &&
-            action.parameters.placement &&
-            action.parameters.placement !== 'around_player'
-          ) {
-            return await this.executePlaceBlock(action as PlaceBlockAction, timeout);
+            // Guard: place_block with count > 1 needs handler (leaf places single blocks)
+            if (leafName === 'place_block' && (action.parameters.count ?? 1) > 1) {
+              return await this.executePlaceBlock(action as PlaceBlockAction, timeout);
+            }
+
+            // Guard: collect_items_enhanced with exploreOnFail=true needs handler
+            // (CollectItemsLeaf doesn't support spiral exploration fallback)
+            if (
+              leafName === 'collect_items' &&
+              action.type === 'collect_items_enhanced' &&
+              action.parameters.exploreOnFail === true
+            ) {
+              return await this.executeCollectItemsEnhanced(action, timeout);
+            }
+
+            // No guard fired — normalize and dispatch to leaf (fall through below)
           }
+          // 'leaf' (default) — direct leaf dispatch
 
-          // Guard: place_block with count > 1 needs handler (leaf places single blocks)
-          if (leafName === 'place_block' && (action.parameters.count ?? 1) > 1) {
-            return await this.executePlaceBlock(action as PlaceBlockAction, timeout);
+          if (dispatchMode !== 'handler') {
+            // Normalize using the ORIGINAL action type (not leafName) so
+            // alias/strip/default contracts for synonyms like
+            // collect_items_enhanced apply correctly.
+            const { params: normalizedParams, warnings, missingKeys } = normalizeActionParams(
+              action.type,
+              action.parameters
+            );
+            for (const w of warnings) {
+              console.warn(`[leaf-dispatch] ${w}`);
+            }
+
+            // Fail-closed: reject if required keys are missing after normalization
+            if (missingKeys.length > 0) {
+              return {
+                success: false,
+                error: `Missing required params for ${action.type}: ${missingKeys.join(', ')}`,
+              };
+            }
+
+            return await this.dispatchToLeaf(
+              leafName,
+              action.type,
+              normalizedParams,
+              timeout,
+              signal,
+            );
           }
-
-          // Guard: collect_items_enhanced with exploreOnFail=true needs handler
-          // (CollectItemsLeaf doesn't support spiral exploration fallback)
-          if (
-            leafName === 'collect_items' &&
-            action.type === 'collect_items_enhanced' &&
-            action.parameters.exploreOnFail === true
-          ) {
-            return await this.executeCollectItemsEnhanced(action, timeout);
-          }
-
-          return await this.executeLeafAction(
-            { ...action, type: leafName as any },
-            timeout,
-            signal,
-          );
         }
       }
 
@@ -1037,16 +1069,16 @@ export class ActionTranslator {
 
         case 'craft':
         case 'craft_item':
-          return await this.executeCraftItem(action, timeout);
+          return await this.executeCraftItem(action, timeout, signal);
 
         case 'smelt':
         case 'smelt_item':
-          return await this.executeSmeltItem(action, timeout);
+          return await this.executeSmeltItem(action, timeout, signal);
 
         case 'prepare_site':
         case 'build_module':
         case 'place_feature':
-          return await this.executeLeafAction(action, timeout, signal);
+          return await this.dispatchToLeafLegacy(action, timeout, signal);
 
         case 'pickup_item':
           return await this.executePickup(action, timeout);
@@ -1100,13 +1132,29 @@ export class ActionTranslator {
    */
   private async executeCraftItem(
     action: MinecraftAction,
-    timeout: number
+    timeout: number,
+    signal?: AbortSignal,
   ): Promise<{ success: boolean; data?: any; error?: string }> {
-    const { item, quantity = 1 } = action.parameters;
+    // Normalize using contract registry (item → recipe, quantity → qty)
+    const { params: normalizedParams, warnings, missingKeys } = normalizeActionParams(
+      action.type,
+      action.parameters
+    );
+    for (const w of warnings) {
+      console.warn(`[craft-handler] ${w}`);
+    }
+    if (missingKeys.length > 0) {
+      return {
+        success: false,
+        error: `Missing required params for ${action.type}: ${missingKeys.join(', ')}`,
+      };
+    }
+    const recipe = normalizedParams.recipe;
+    const qty = normalizedParams.qty ?? 1;
 
     try {
       console.log(
-        `🔧 Attempting to craft ${quantity}x ${item} using leaf system`
+        `🔧 Attempting to craft ${qty}x ${recipe} using leaf system`
       );
 
       // Get the global leaf factory
@@ -1126,12 +1174,11 @@ export class ActionTranslator {
         (leafFactory.isRoutable ? leafFactory.isRoutable('craft_recipe') : (craftRecipeLeaf as any)?.spec?.placeholder !== true)
       ) {
         try {
-          const context = this.createLeafContext();
+          const context = this.createLeafContext(signal);
 
-          // Execute the craft_recipe leaf
+          // Execute the craft_recipe leaf with normalized params
           const result = await craftRecipeLeaf.run(context, {
-            recipe: item,
-            qty: quantity,
+            ...normalizedParams,
             timeoutMs: timeout,
           });
 
@@ -1142,6 +1189,8 @@ export class ActionTranslator {
             return {
               success: true,
               data: {
+                requestedActionType: action.type,
+                resolvedLeafName: 'craft_recipe',
                 item: result.result.recipe,
                 quantity: result.result.crafted,
                 crafted: result.result.crafted,
@@ -1245,7 +1294,7 @@ export class ActionTranslator {
 
   /**
    * Create a leaf execution context from the current bot state.
-   * Shared by executeCraftItem, executeSmeltItem, executeLeafAction, and executeDigBlock.
+   * Shared by executeCraftItem, executeSmeltItem, _runLeaf, and executeDigBlock.
    */
   private createLeafContext(signal?: AbortSignal) {
     return {
@@ -1302,10 +1351,9 @@ export class ActionTranslator {
    */
   private async executeSmeltItem(
     action: MinecraftAction,
-    timeout: number
+    timeout: number,
+    signal?: AbortSignal,
   ): Promise<{ success: boolean; data?: any; error?: string }> {
-    const { item, quantity = 1, fuel } = action.parameters;
-
     try {
       const leafFactory = (global as any).minecraftLeafFactory;
       if (!leafFactory) {
@@ -1326,17 +1374,35 @@ export class ActionTranslator {
         };
       }
 
-      const context = this.createLeafContext();
+      // Normalize using the contract registry so aliases (item → input,
+      // quantity → qty) and defaults (fuel → coal) are applied consistently.
+      const { params: normalizedParams, warnings, missingKeys } = normalizeActionParams(
+        action.type,
+        action.parameters
+      );
+      for (const w of warnings) {
+        console.warn(`[smelt-handler] ${w}`);
+      }
+      if (missingKeys.length > 0) {
+        return {
+          success: false,
+          error: `Missing required params for ${action.type}: ${missingKeys.join(', ')}`,
+        };
+      }
+
+      const context = this.createLeafContext(signal);
       const result = await smeltLeaf.run(context, {
-        item,
-        quantity,
-        fuel: fuel || 'coal',
+        ...normalizedParams,
         timeoutMs: timeout,
       });
 
       return {
         success: result.status === 'success',
-        data: { item, quantity, leafResult: result },
+        data: {
+          requestedActionType: action.type,
+          resolvedLeafName: 'smelt',
+          leafResult: result,
+        },
         error:
           result.status === 'failure'
             ? result.error?.detail || 'Smelting failed'
@@ -1351,12 +1417,51 @@ export class ActionTranslator {
   }
 
   /**
-   * Generic leaf execution via LeafFactory.
-   * Used for action types that map directly to registered leaf names
-   * (e.g. prepare_site, build_module, place_feature).
+   * Dispatch a pre-normalized action to a leaf.
+   * Called from Phase 1 (contract-driven dispatch) where normalization
+   * has already been applied using the requestedActionType.
    */
-  private async executeLeafAction(
+  private async dispatchToLeaf(
+    leafName: string,
+    requestedActionType: string,
+    params: Record<string, any>,
+    timeout: number,
+    signal?: AbortSignal,
+  ): Promise<{ success: boolean; data?: any; error?: string }> {
+    return this._runLeaf(leafName, requestedActionType, params, timeout, signal);
+  }
+
+  /**
+   * Dispatch a MinecraftAction to a leaf via LeafFactory.
+   * Called from Phase 2 (legacy switch) for action types whose .type
+   * IS the leaf name (e.g. prepare_site, build_module, place_feature).
+   * Normalizes using action.type directly.
+   */
+  private async dispatchToLeafLegacy(
     action: MinecraftAction,
+    timeout: number,
+    signal?: AbortSignal,
+  ): Promise<{ success: boolean; data?: any; error?: string }> {
+    const { params, warnings, missingKeys } = normalizeActionParams(action.type, action.parameters);
+    for (const w of warnings) {
+      console.warn(`[leaf-dispatch] ${w}`);
+    }
+    if (missingKeys.length > 0) {
+      return {
+        success: false,
+        error: `Missing required params for ${action.type}: ${missingKeys.join(', ')}`,
+      };
+    }
+    return this._runLeaf(action.type, action.type, params, timeout, signal);
+  }
+
+  /**
+   * Shared leaf execution logic for both dispatch methods.
+   */
+  private async _runLeaf(
+    leafName: string,
+    requestedActionType: string,
+    params: Record<string, any>,
     timeout: number,
     signal?: AbortSignal,
   ): Promise<{ success: boolean; data?: any; error?: string }> {
@@ -1364,22 +1469,22 @@ export class ActionTranslator {
     if (!leafFactory) {
       return {
         success: false,
-        error: `Leaf factory not available for ${action.type}`,
+        error: `Leaf factory not available for ${leafName}`,
       };
     }
 
-    const leaf = leafFactory.get(action.type);
+    const leaf = leafFactory.get(leafName);
     if (!leaf) {
       return {
         success: false,
-        error: `No leaf registered for action type: ${action.type}`,
+        error: `No leaf registered for action type: ${leafName}`,
       };
     }
 
-    if (leafFactory.isRoutable ? !leafFactory.isRoutable(action.type) : (leaf as any)?.spec?.placeholder === true) {
+    if (leafFactory.isRoutable ? !leafFactory.isRoutable(leafName) : (leaf as any)?.spec?.placeholder === true) {
       return {
         success: false,
-        error: `Leaf '${action.type}' is a placeholder stub`,
+        error: `Leaf '${leafName}' is a placeholder stub`,
       };
     }
 
@@ -1388,31 +1493,22 @@ export class ActionTranslator {
       const leafTimeout = (leaf as any)?.spec?.timeoutMs;
       const effectiveTimeout = leafTimeout ? Math.max(leafTimeout, timeout) : timeout;
 
-      // Data-driven normalization from registry
-      const { params: normalizedParams, warnings } = normalizeActionParams(
-        action.type,
-        action.parameters
-      );
-      for (const w of warnings) {
-        console.warn(`[leaf-dispatch] ${w}`);
-      }
-
       const context = this.createLeafContext(signal);
       const result = await leaf.run(context, {
-        ...normalizedParams,
+        ...params,
         timeoutMs: effectiveTimeout,
       });
 
       return {
         success: result.status === 'success',
         data: {
-          requestedActionType: action.type,
-          resolvedLeafName: action.type,
+          requestedActionType,
+          resolvedLeafName: leafName,
           leafResult: result,
         },
         error:
           result.status === 'failure'
-            ? result.error?.detail || `${action.type} failed`
+            ? result.error?.detail || `${leafName} failed`
             : undefined,
       };
     } catch (error) {

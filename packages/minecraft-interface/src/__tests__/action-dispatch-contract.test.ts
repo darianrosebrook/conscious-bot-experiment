@@ -22,6 +22,7 @@ vi.mock('../navigation-bridge', () => ({
 }));
 
 import { ActionTranslator } from '../action-translator';
+import { ACTION_CONTRACTS } from '../action-contract-registry';
 
 // ---------------------------------------------------------------------------
 // Mock helpers
@@ -601,9 +602,412 @@ describe('action dispatch contract', () => {
       });
 
       // craft goes through executeCraftItem which calls leaf.run directly
-      // (not through executeLeafAction)
+      // (not through dispatchToLeaf)
       expect(craftLeaf.run).toHaveBeenCalled();
       expectNotUnknownType(result);
+    });
+
+    it('smelt uses dedicated handler (dispatchMode: handler)', async () => {
+      const factory = setupMockLeafFactory();
+      const smeltLeaf = factory.get('smelt')!;
+
+      await translator.executeAction({
+        type: 'smelt',
+        parameters: { item: 'raw_iron', quantity: 1 },
+        timeout: 5000,
+      });
+
+      // smelt has dispatchMode: 'handler', so it goes through executeSmeltItem
+      // which calls the leaf directly with its own param mapping
+      expect(smeltLeaf.run).toHaveBeenCalled();
+    });
+  });
+
+  // -------------------------------------------------------------------
+  // Cross-type normalization proof tests
+  // -------------------------------------------------------------------
+
+  describe('Cross-type normalization proof', () => {
+    it('collect_items_enhanced (exploreOnFail=false): leaf receives itemName, not item', async () => {
+      const factory = setupMockLeafFactory();
+      const leaf = factory.get('collect_items')!;
+
+      await translator.executeAction({
+        type: 'collect_items_enhanced',
+        parameters: { item: 'oak_log', radius: 10, exploreOnFail: false },
+        timeout: 5000,
+      });
+
+      expect(leaf.run).toHaveBeenCalled();
+      const leafArgs = leaf.run.mock.calls[0][1];
+      // The alias item → itemName must apply using collect_items_enhanced contract
+      expect(leafArgs.itemName).toBe('oak_log');
+      expect(leafArgs.item).toBeUndefined();
+      // exploreOnFail should be stripped
+      expect(leafArgs.exploreOnFail).toBeUndefined();
+      // radius should pass through
+      expect(leafArgs.radius).toBe(10);
+    });
+
+    it('collect_items_enhanced: response has different requestedActionType and resolvedLeafName', async () => {
+      setupMockLeafFactory();
+
+      const result = await translator.executeAction({
+        type: 'collect_items_enhanced',
+        parameters: { item: 'oak_log', radius: 10 },
+        timeout: 5000,
+      });
+
+      expect(result.success).toBe(true);
+      expect(result.data?.requestedActionType).toBe('collect_items_enhanced');
+      expect(result.data?.resolvedLeafName).toBe('collect_items');
+    });
+
+    it('place_block: leaf receives item (aliased from block_type)', async () => {
+      const factory = setupMockLeafFactory();
+      const leaf = factory.get('place_block')!;
+
+      await translator.executeAction({
+        type: 'place_block',
+        parameters: { block_type: 'cobblestone' },
+        timeout: 5000,
+      });
+
+      expect(leaf.run).toHaveBeenCalled();
+      const leafArgs = leaf.run.mock.calls[0][1];
+      expect(leafArgs.item).toBe('cobblestone');
+      expect(leafArgs.block_type).toBeUndefined();
+      // placement and count should be stripped
+      expect(leafArgs.placement).toBeUndefined();
+      expect(leafArgs.count).toBeUndefined();
+    });
+
+    it('acquire_material: leaf receives item (aliased from blockType)', async () => {
+      const factory = setupMockLeafFactory();
+      const leaf = factory.get('acquire_material')!;
+
+      await translator.executeAction({
+        type: 'acquire_material',
+        parameters: { blockType: 'oak_log' },
+        timeout: 5000,
+      });
+
+      expect(leaf.run).toHaveBeenCalled();
+      const leafArgs = leaf.run.mock.calls[0][1];
+      expect(leafArgs.item).toBe('oak_log');
+      expect(leafArgs.blockType).toBeUndefined();
+      // count default should be injected
+      expect(leafArgs.count).toBe(1);
+    });
+
+    it('acquire_material without item rejects with missing required key', async () => {
+      setupMockLeafFactory();
+
+      const result = await translator.executeAction({
+        type: 'acquire_material',
+        parameters: {},
+        timeout: 5000,
+      });
+
+      expect(result.success).toBe(false);
+      expect(result.error).toContain('Missing required params');
+      expect(result.error).toContain('item');
+    });
+  });
+
+  // -------------------------------------------------------------------
+  // Handler normalization proof tests
+  // -------------------------------------------------------------------
+
+  describe('Handler normalization proof', () => {
+    it('smelt handler: leaf receives { input, qty, fuel } not { item, quantity }', async () => {
+      const factory = setupMockLeafFactory();
+      const smeltLeaf = factory.get('smelt')!;
+
+      await translator.executeAction({
+        type: 'smelt',
+        parameters: { item: 'raw_iron', quantity: 3 },
+        timeout: 5000,
+      });
+
+      expect(smeltLeaf.run).toHaveBeenCalled();
+      const leafArgs = smeltLeaf.run.mock.calls[0][1];
+      // Contract aliases: item → input, quantity → qty
+      expect(leafArgs.input).toBe('raw_iron');
+      expect(leafArgs.qty).toBe(3);
+      // Original keys must NOT survive
+      expect(leafArgs.item).toBeUndefined();
+      expect(leafArgs.quantity).toBeUndefined();
+      // Default fuel applied
+      expect(leafArgs.fuel).toBe('coal');
+    });
+
+    it('smelt_item handler: leaf receives normalized params identically', async () => {
+      const factory = setupMockLeafFactory();
+      const smeltLeaf = factory.get('smelt')!;
+
+      await translator.executeAction({
+        type: 'smelt_item',
+        parameters: { item: 'raw_gold', quantity: 1, fuel: 'charcoal' },
+        timeout: 5000,
+      });
+
+      expect(smeltLeaf.run).toHaveBeenCalled();
+      const leafArgs = smeltLeaf.run.mock.calls[0][1];
+      expect(leafArgs.input).toBe('raw_gold');
+      expect(leafArgs.qty).toBe(1);
+      expect(leafArgs.fuel).toBe('charcoal');
+      expect(leafArgs.item).toBeUndefined();
+      expect(leafArgs.quantity).toBeUndefined();
+    });
+
+    it('smelt handler: response includes requestedActionType and resolvedLeafName', async () => {
+      setupMockLeafFactory();
+
+      const result = await translator.executeAction({
+        type: 'smelt',
+        parameters: { item: 'raw_iron' },
+        timeout: 5000,
+      });
+
+      expect(result.success).toBe(true);
+      expect(result.data?.requestedActionType).toBe('smelt');
+      expect(result.data?.resolvedLeafName).toBe('smelt');
+    });
+
+    it('craft handler: leaf receives { recipe, qty } not { item, quantity }', async () => {
+      const factory = setupMockLeafFactory();
+      const craftLeaf = factory.get('craft_recipe')!;
+
+      await translator.executeAction({
+        type: 'craft',
+        parameters: { item: 'stick', quantity: 4 },
+        timeout: 5000,
+      });
+
+      expect(craftLeaf.run).toHaveBeenCalled();
+      const leafArgs = craftLeaf.run.mock.calls[0][1];
+      // Contract aliases: item → recipe, quantity → qty
+      expect(leafArgs.recipe).toBe('stick');
+      expect(leafArgs.qty).toBe(4);
+      // Original keys must NOT survive
+      expect(leafArgs.item).toBeUndefined();
+      expect(leafArgs.quantity).toBeUndefined();
+    });
+
+    it('craft handler: response includes requestedActionType and resolvedLeafName', async () => {
+      setupMockLeafFactory();
+
+      const result = await translator.executeAction({
+        type: 'craft',
+        parameters: { item: 'stick', quantity: 4 },
+        timeout: 5000,
+      });
+
+      expect(result.success).toBe(true);
+      expect(result.data?.requestedActionType).toBe('craft');
+      expect(result.data?.resolvedLeafName).toBe('craft_recipe');
+    });
+
+    it('craft_item handler: leaf receives normalized params', async () => {
+      const factory = setupMockLeafFactory();
+      const craftLeaf = factory.get('craft_recipe')!;
+
+      await translator.executeAction({
+        type: 'craft_item',
+        parameters: { item: 'wooden_pickaxe' },
+        timeout: 5000,
+      });
+
+      expect(craftLeaf.run).toHaveBeenCalled();
+      const leafArgs = craftLeaf.run.mock.calls[0][1];
+      expect(leafArgs.recipe).toBe('wooden_pickaxe');
+      // qty default from contract
+      expect(leafArgs.qty).toBe(1);
+      expect(leafArgs.item).toBeUndefined();
+    });
+
+    it('smelt handler: abort signal propagated to leaf context', async () => {
+      const factory = setupMockLeafFactory();
+      const smeltLeaf = factory.get('smelt')!;
+      const abortController = new AbortController();
+
+      await translator.executeAction(
+        {
+          type: 'smelt',
+          parameters: { item: 'raw_iron' },
+          timeout: 5000,
+        },
+        abortController.signal,
+      );
+
+      expect(smeltLeaf.run).toHaveBeenCalled();
+      const context = smeltLeaf.run.mock.calls[0][0];
+      expect(context.abortSignal).toBe(abortController.signal);
+    });
+
+    it('craft handler: abort signal propagated to leaf context', async () => {
+      const factory = setupMockLeafFactory();
+      const craftLeaf = factory.get('craft_recipe')!;
+      const abortController = new AbortController();
+
+      await translator.executeAction(
+        {
+          type: 'craft',
+          parameters: { item: 'stick', quantity: 4 },
+          timeout: 5000,
+        },
+        abortController.signal,
+      );
+
+      expect(craftLeaf.run).toHaveBeenCalled();
+      const context = craftLeaf.run.mock.calls[0][0];
+      expect(context.abortSignal).toBe(abortController.signal);
+    });
+  });
+
+  // -------------------------------------------------------------------
+  // requiredKeys enforcement across all dispatch paths
+  // -------------------------------------------------------------------
+
+  describe('requiredKeys enforcement across all dispatch paths', () => {
+    it('Phase 1 guarded: place_block without item rejects', async () => {
+      setupMockLeafFactory();
+
+      const result = await translator.executeAction({
+        type: 'place_block',
+        parameters: {},  // missing required 'item' (and no block_type alias)
+        timeout: 5000,
+      });
+
+      expect(result.success).toBe(false);
+      expect(result.error).toContain('Missing required params');
+      expect(result.error).toContain('item');
+    });
+
+    it('Phase 2 legacy: dispatchToLeafLegacy enforces requiredKeys', async () => {
+      // prepare_site normally has no requiredKeys. Temporarily patch it
+      // to prove the legacy dispatch path enforces requiredKeys.
+      const original = ACTION_CONTRACTS['prepare_site'];
+      const saved = { ...original };
+      try {
+        ACTION_CONTRACTS['prepare_site'] = {
+          ...original,
+          requiredKeys: ['blueprint'],
+        };
+        setupMockLeafFactory();
+
+        const result = await translator.executeAction({
+          type: 'prepare_site',
+          parameters: { blockType: 'stone' },  // missing 'blueprint'
+          timeout: 5000,
+        });
+
+        expect(result.success).toBe(false);
+        expect(result.error).toContain('Missing required params');
+        expect(result.error).toContain('blueprint');
+      } finally {
+        // Restore original contract
+        ACTION_CONTRACTS['prepare_site'] = saved;
+      }
+    });
+
+    it('Phase 2 legacy: passes when required params present', async () => {
+      const factory = setupMockLeafFactory();
+      const leaf = factory.get('prepare_site')!;
+
+      const result = await translator.executeAction({
+        type: 'prepare_site',
+        parameters: { blockType: 'stone' },
+        timeout: 5000,
+      });
+
+      // prepare_site has no requiredKeys — should succeed
+      expect(leaf.run).toHaveBeenCalled();
+      expectNotUnknownType(result);
+    });
+
+    it('error string shape is consistent across dispatch paths', async () => {
+      // Phase 1 (acquire_material)
+      setupMockLeafFactory();
+      const phase1 = await translator.executeAction({
+        type: 'acquire_material',
+        parameters: {},
+        timeout: 5000,
+      });
+
+      // Phase 1 guarded (place_block)
+      const guarded = await translator.executeAction({
+        type: 'place_block',
+        parameters: {},
+        timeout: 5000,
+      });
+
+      // All should match the pattern "Missing required params for <type>: <keys>"
+      const pattern = /^Missing required params for \w+: \w+/;
+      expect(phase1.error).toMatch(pattern);
+      expect(guarded.error).toMatch(pattern);
+    });
+  });
+
+  // -------------------------------------------------------------------
+  // AbortSignal propagation across all dispatch paths
+  // -------------------------------------------------------------------
+
+  describe('AbortSignal propagation', () => {
+    it('Phase 1: signal reaches leaf context', async () => {
+      const factory = setupMockLeafFactory();
+      const leaf = factory.get('acquire_material')!;
+      const abortController = new AbortController();
+
+      await translator.executeAction(
+        {
+          type: 'acquire_material',
+          parameters: { item: 'oak_log' },
+          timeout: 5000,
+        },
+        abortController.signal,
+      );
+
+      expect(leaf.run).toHaveBeenCalled();
+      const context = leaf.run.mock.calls[0][0];
+      expect(context.abortSignal).toBe(abortController.signal);
+    });
+
+    it('Phase 2 legacy: signal reaches leaf context', async () => {
+      const factory = setupMockLeafFactory();
+      const leaf = factory.get('prepare_site')!;
+      const abortController = new AbortController();
+
+      await translator.executeAction(
+        {
+          type: 'prepare_site',
+          parameters: { blockType: 'stone' },
+          timeout: 5000,
+        },
+        abortController.signal,
+      );
+
+      expect(leaf.run).toHaveBeenCalled();
+      const context = leaf.run.mock.calls[0][0];
+      expect(context.abortSignal).toBe(abortController.signal);
+    });
+
+    it('no signal provided: context still has an abortSignal (default)', async () => {
+      const factory = setupMockLeafFactory();
+      const leaf = factory.get('acquire_material')!;
+
+      await translator.executeAction({
+        type: 'acquire_material',
+        parameters: { item: 'oak_log' },
+        timeout: 5000,
+      });
+
+      expect(leaf.run).toHaveBeenCalled();
+      const context = leaf.run.mock.calls[0][0];
+      // Should have a default AbortSignal (from new AbortController().signal)
+      expect(context.abortSignal).toBeDefined();
+      expect(context.abortSignal).toBeInstanceOf(AbortSignal);
     });
   });
 });

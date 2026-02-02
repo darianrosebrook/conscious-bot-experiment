@@ -36,10 +36,18 @@ describe('planning ↔ MC interface normalization agreement', () => {
     expect(planningArgs).toEqual({ input: 'raw_iron' });
   });
 
-  it('smelt: MC side passes through (smelt contract has no aliases)', () => {
+  it('smelt: both sides normalize item → input', () => {
+    // MC side now also aliases item → input (matching planning side)
     const { params } = normalizeActionParams('smelt', { item: 'raw_iron' });
-    // smelt in ACTION_CONTRACTS has no aliases — item stays as-is
-    expect(params.item).toBe('raw_iron');
+    expect(params.input).toBe('raw_iron');
+    expect(params.item).toBeUndefined();
+    // MC side also aliases quantity → qty
+    const { params: params2 } = normalizeActionParams('smelt', {
+      item: 'raw_iron',
+      quantity: 3,
+    });
+    expect(params2.qty).toBe(3);
+    expect(params2.quantity).toBeUndefined();
   });
 
   it('every leaf in KNOWN_LEAVES that has a matching action type has an ACTION_CONTRACTS entry', () => {

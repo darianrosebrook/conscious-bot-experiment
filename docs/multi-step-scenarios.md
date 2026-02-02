@@ -19,6 +19,7 @@
    - [S7: Farm Lifecycle](#s7-farm-lifecycle)
    - [S8: Explore → Assess → Gather](#s8-explore--assess--gather)
    - [S9: Sterling-Powered Navigation](#s9-sterling-powered-navigation)
+   - [S10: Centralized Dispatch Validation](#s10-centralized-dispatch-validation)
 3. [Capability Primitives](#capability-primitives)
 4. [Infrastructure Components](#infrastructure-components)
 5. [Gap Matrix](#gap-matrix)
@@ -38,7 +39,8 @@
 | S6 | Build Shelter at Nightfall | **Blocked** | Construction leaves are stubs; no time-triggered task creation |
 | S7 | Farm Lifecycle | **Partially working** | Till works; plant_crop has blockUpdate bug; harvest needs mature crops |
 | S8 | Explore → Assess → Gather | **Not designed** | No composite explore-then-gather flow |
-| S9 | Sterling-Powered Navigation | **Design phase** | New Sterling domain needed; replaces broken D* Lite + mineflayer-pathfinder hybrid |
+| S9 | Sterling-Powered Navigation | **Phase 1 implemented** | Sterling navigation domain with occupancy grid solver; 4-cardinal movement (walk/jump/descend) |
+| S10 | Centralized Dispatch Validation | **Implemented** | All action types verified to route correctly through Action Contract Registry |
 
 ---
 
@@ -182,6 +184,7 @@ craft diamond_pickaxe        → craft_recipe
 - **Capability gating**: Virtual `cap:has_<tier>_pickaxe` tokens in Sterling search state
 - **Leaf routing**: `mine` → `acquire_material`, `craft` → `craft_recipe`, `smelt` → `smelt`
 - **Verified leaves**: acquire_material, craft_recipe, place_workstation, smelt, equip_tool
+- **Dispatch**: All actions route through the Action Contract Registry (`action-contract-registry.ts`). `acquire_material` uses `dispatchToLeaf` with LOS filtering (bot won't dig underground past surface). `craft`/`smelt` use dedicated handlers with contract-driven normalization (`item` → `recipe`/`input`, `quantity` → `qty`). Parameter aliases, defaults, and requiredKeys enforced consistently across all paths.
 
 **Remaining issues**:
 
@@ -250,13 +253,16 @@ craft_recipe(iron_pickaxe)           ← crafting leaf (verified)
 - Sterling tool-progression solver generates this exact sequence
 - Each leaf works in isolation
 - The gap is testing the full chain as one task with real executor loop
+- `acquire_material` now uses LOS filtering via centralized dispatch — bot won't dig underground past surface
+- `smelt` handler normalizes `{ item, quantity }` → `{ input, qty, fuel }` via Action Contract Registry before calling SmeltLeaf
+- All dispatch paths enforce `requiredKeys` (fail-closed) and thread `AbortSignal` for per-request cancellation
 
 **Remaining issues**:
 
 | Issue | Details |
 |-------|---------|
 | Smelt is sequential (12s/item) | 3 iron ingots = ~36s+ of furnace time. Executor must handle long-running steps without timing out the task. |
-| Fuel not checked before smelting | Smelt leaf doesn't verify fuel in inventory. If no coal, it stalls until timeout. |
+| Fuel not checked before smelting | Smelt leaf doesn't verify fuel in inventory. If no coal, it stalls until timeout. Default fuel (`coal`) is injected by contract defaults but not validated against inventory. |
 | `ORE_DROP_MAP` not used in verification | `iron_ore` → `raw_iron` mapping exists (`minecraft-tool-progression-types.ts:88`) but verification checks for `iron_ore` in inventory, not `raw_iron`. |
 
 **Test setup**:
@@ -366,6 +372,9 @@ move_to(home_position)                 ← movement leaf (verified)
 
 **Status**: **Not designed as a composite flow.** All individual leaves work.
 
+- `collect_items` basic mode (no `exploreOnFail`) routes through leaf via centralized dispatch; spiral exploration still uses handler when `exploreOnFail=true`
+- `collect_items_enhanced` aliases `item` → `itemName` via contract registry; `exploreOnFail` stripped with deprecation warning when routing to leaf
+
 | Gap | Component | Fix Required |
 |-----|-----------|-------------|
 | No `explore` requirement → step plan | `requirementToFallbackPlan()` has no `explore` case | Add fallback: `find_resource` → `move_to` → `acquire_material` |
@@ -375,6 +384,8 @@ move_to(home_position)                 ← movement leaf (verified)
 ---
 
 ### S9: Sterling-Powered Navigation
+
+**Status**: Phase 1 implemented. 4-cardinal movement (walk/jump_up/descend) with occupancy grid solver.
 
 **User intent**: Bot needs to move from A to B across terrain that includes ledges, gaps, hazards, and elevation changes.
 
@@ -386,230 +397,236 @@ move_to(home_position)                 ← movement leaf (verified)
 
 Result: the bot cannot reliably climb 1-block ledges, jump 2-block gaps, or choose between "go around" vs "jump across." `SimpleGoalNear` and `SimpleGoalBlock` in `action-translator.ts:22-84` are stubs with `heuristic() → 0` and `isEnd() → false` — they never guide pathfinding or signal arrival.
 
-**Why Sterling is the right solution**: Sterling's A* search is domain-agnostic. The Python backend (`escape_game_solver.py`) implements a generic solver that only needs:
-- `to_hash()` — canonical state identifier
-- `is_goal()` — goal test
-- `get_legal_moves()` — expand neighbors with costs
-- `compute_heuristic()` — admissible estimate
+#### Architecture (Implemented)
 
-This is the same pattern as the escape room (Rush Hour) domain. Minecraft navigation is just Rush Hour with a 3D grid, gravity, and movement primitives.
+**Occupancy grid approach** (escape game pattern, not rule-list pattern): TypeScript sends a compact 3D uint8 occupancy grid to Sterling. Python generates neighbors on-demand via `get_legal_moves()` against the grid — no pre-enumerated rule list.
 
-#### Sterling Navigation Domain Design
+**Single execution mode**: The planner emits exactly ONE `sterling_navigate` TaskStep per navigation requirement. The leaf owns: scan → solve → execute → verify → replan.
 
-**State representation**:
 ```
-NavigationState {
-  position: {x, y, z}        // Bot block position (floored to integers)
-  velocity: 'still' | 'walking' | 'sprinting' | 'jumping' | 'falling'
-  onGround: boolean
-  health: number              // For risk-aware pathfinding
+Task: "move to (10, 68, 280)"
+  │
+  ├─ Executor dispatches ONE sterling_navigate step
+  │   └─ POST /action → mc-interface (port 3005)
+  │       └─ SterlingNavigateLeaf.run()
+  │           │
+  │           ├─ POST /solve-navigation → Planning (port 3002)
+  │           │   └─ NavigationSolver.solveNavigation()
+  │           │       ├─ GET /world-scan → mc-interface (port 3005)
+  │           │       │   └─ Returns occupancy grid (base64 uint8, X→Y→Z order)
+  │           │       │
+  │           │       ├─ sterlingService.solve('navigation', {...})
+  │           │       │   → Sterling (port 8766)
+  │           │       │   └─ Python A* solver with on-demand neighbors
+  │           │       │
+  │           │       └─ Return solve result + SolveBundle
+  │           │
+  │           ├─ Execute micro-primitives sequentially
+  │           ├─ Before each primitive: check abortSignal (Phase 1)
+  │           │   (Phase 2: threat→hold bridge, not yet implemented)
+  │           ├─ After each primitive: verify position (L∞ block distance)
+  │           └─ On deviation > 2: internal replan (bounded by maxReplans)
+```
+
+#### Phase 1 Movement Primitives (4-Cardinal Only)
+
+| Operation | Cost | Preconditions | Effect |
+|-----------|------|---------------|--------|
+| `walk_{N/S/E/W}` | 1.0 | feet+head passable, floor solid | Move 1 block horizontally |
+| `jump_up_{N/S/E/W}` | 2.0 | takeoff head clearance, landing feet+head passable, landing floor solid | Move 1 block horizontally + 1 up |
+| `descend_{N/S/E/W}` | 0.8 | forward feet+head passable, fall-through passable, landing floor solid | Move 1 block horizontally + 1 down |
+
+**Not in Phase 1**: diagonal, sprint, swim, climb, fall_2+. Each addition requires re-proving heuristic admissibility.
+
+#### Admissible Heuristic (Coupled-Move Aware)
+
+```
+d   = |dx| + |dz|          (horizontal L1 distance)
+dy  = goal_y - y
+up  = max(dy, 0)
+down = max(-dy, 0)
+
+If dy >= 0:  h = 2.0 * up + 1.0 * max(0, d - up)
+If dy <  0:  h = 0.8 * down + 1.0 * max(0, d - down)
+```
+
+Each vertical move also covers 1 horizontal step ("coupled move"). The heuristic accounts for this coupling to avoid overestimation.
+
+#### Hazard Policy (Injected, Not Hardcoded)
+
+```typescript
+interface NavigationHazardPolicy {
+  hazardPolicyId: string;   // content-addressed hash
+  version: number;
+  riskMode: 'cautious' | 'normal' | 'aggressive';
+  penalties: Record<string, number>;  // hazard_type → cost penalty
+  maxReplans: number;       // hard cap per invocation (default 3)
+  scanMargin: number;       // blocks beyond straight-line to scan
+  replanEscalation: 'expand_scan' | 'downgrade_primitives' | 'safe_mode' | 'fail';
 }
-
-State hash: "nav:{x},{y},{z}:{velocity}:{onGround}"
 ```
 
-**Operations (movement primitives)**:
+Default penalties: `lava_adjacent: 100`, `cliff_lethal: 50`, `hostile_zone: 20`, `cactus: 15`, `deep_water: 8`, `dark_area: 5`.
 
-| Operation | Cost | Preconditions | Effect | Notes |
-|-----------|------|---------------|--------|-------|
-| `walk_north` | 1.0 | onGround, target block is air, block below target is solid | position.z -= 1 | Same for south/east/west |
-| `walk_diagonal_ne` | 1.4 | onGround, both adjacent blocks passable, target floor solid | position += (1, 0, -1) | √2 cost; same for all 4 diagonals |
-| `jump_up` | 2.0 | onGround, block at y+1 is air, block at y+2 is air | position.y += 1, then walk | 1-block ascent; standard jump height |
-| `jump_gap_2` | 3.0 | onGround, sprinting or running start, landing block solid | position += (2, 0, 0) horizontal | 2-block horizontal gap with same-level landing |
-| `jump_gap_3` | 5.0 | onGround, sprinting, landing block solid | position += (3, 0, 0) horizontal | 3-block sprint jump; requires momentum |
-| `jump_up_forward` | 3.5 | onGround, block at y+1 open, landing solid at y+1 | position += (1, 1, 0) | Diagonal jump: 1 forward + 1 up |
-| `descend_1` | 0.8 | onGround, block at y-1 below forward is solid | position += (1, -1, 0) | Step down 1 block |
-| `fall_2` | 1.5 | block below is air for 2 blocks, landing is solid | position.y -= 2 | Safe fall (no damage) |
-| `fall_3` | 4.0 | landing is solid, ≤3 blocks fall | position.y -= 3 | Takes ~1 heart damage |
-| `sprint` | 0.6 | onGround, 4+ blocks clear ahead, no obstacles | position += direction * 1, velocity = 'sprinting' | Faster than walking; lower cost per block when path is clear |
-| `swim_forward` | 2.5 | in water, target also in water or shore | position += direction | Slow but safe |
-| `climb_ladder` | 1.2 | ladder block at position | position.y += 1 | Ladder/vine climbing |
+#### Goal Metric Contract
 
-**Negative-cost / avoidance nodes** (modeled as high-cost operations):
-
-| Hazard | Cost Penalty | Encoded As |
-|--------|-------------|------------|
-| Lava (adjacent) | +100 | Walking into lava-adjacent block costs 101 instead of 1 |
-| Cliff (>3 block drop) | +50 | `fall_4+` operation cost = 50 (lethal or near-lethal) |
-| Hostile mob zone | +20 | Blocks within 5 of known hostile get penalty |
-| Dark area (light < 8) | +5 | Minor avoidance; mobs may spawn |
-| Water (deep) | +8 | Swimming is slow, risk of drowning |
-| Cactus/berry bush | +15 | Damage blocks |
-
-**Heuristic**: 3D Manhattan distance with vertical penalty:
-```
-h(state) = |dx| + |dz| + 2.0 * max(0, dy_up) + 0.8 * max(0, dy_down)
-```
-Ascending costs more than descending. This is admissible because the cheapest walk costs 1.0/block horizontally, 2.0/block up (jump), 0.8/block down (descend).
-
-**Goal test**: `distance(position, target) <= tolerance` (default tolerance = 2 blocks)
-
-#### TypeScript Solver Architecture
-
-**New files**:
+Both the Python solver `is_goal()` and the leaf arrival check use the same formula:
 
 ```
-packages/planning/src/sterling/
-  minecraft-navigation-types.ts     # NavigationState, NavigationRule, etc.
-  minecraft-navigation-rules.ts     # buildNavigationRules() from world scan
-  minecraft-navigation-solver.ts    # NavigationSolver extends BaseDomainSolver
+arrived = max(|dx|, |dz|) <= toleranceXZ  &&  |dy| <= toleranceY
 ```
 
-**Rule generation from world scan** (`buildNavigationRules()`):
-```
-Input:
-  - botPosition: {x, y, z}
-  - targetPosition: {x, y, z}
-  - worldScan: bot.blockAt() for relevant area
-  - knownHazards: lava positions, hostile mob positions
+Default: `toleranceXZ=1, toleranceY=0` (stand on target block column at target Y level).
 
-Process:
-  1. Compute bounding box: min(bot, target) - margin ... max(bot, target) + margin
-  2. For each block in bounding box:
-     a. Check block type (air, solid, water, lava, ladder)
-     b. For each valid movement from this block, emit a rule:
-        - walk: if target is air, floor is solid
-        - jump_up: if y+1 and y+2 are air, can land on solid
-        - descend: if forward-down has solid floor
-        - sprint: if 4+ blocks clear ahead
-     c. Apply hazard penalties to baseCost
-  3. Prefix all actions with 'nav:' for namespace isolation (like 'tp:' for tool progression)
+#### Canonical Scan Owner
 
-Output: NavigationRule[] ready for Sterling
-```
+**Planning server owns the scan→solve pipeline** (Option A). The leaf does NOT call `bot.blockAt()` directly for scan purposes. Flow:
 
-**Solve payload**:
+1. Leaf → `POST /solve-navigation` to Planning (port 3002)
+2. Planning → `GET /world-scan` to mc-interface (port 3005)
+3. Planning builds occupancy grid → calls Sterling (port 8766)
+4. Planning returns primitives → Leaf executes
+
+Block classification is done exclusively by the `/world-scan` endpoint in mc-interface. No other code path may independently classify blocks for navigation — this prevents drift between scan margins or classification rules.
+
+#### Occupancy Grid Encoding (contractVersion: 1)
+
+- Block types: `0=air, 1=solid, 2=water, 3=lava, 4=ladder, 5=hazard`
+- Linearization: X→Y→Z row-major. `index = ((lx * dy_size) + ly) * dz_size + lz`
+- Transport: raw `Uint8Array` bytes → base64 string
+
+**Phase 1 passability contract (enforced in all three layers):**
+- TypeScript `isPassable()`: returns `true` only for `BLOCK_TYPE.AIR` (0)
+- Python `_is_passable()`: returns `True` only for `BLOCK_AIR` (0)
+- Water (2) and ladder (4) are encoded in the grid but treated as **impassable** until swim/climb primitives are added in Phase 5
+- Adding a new passable type requires updating both Python and TypeScript simultaneously
+
+#### Solve Payload
+
 ```typescript
 {
+  command: 'solve',
+  domain: 'navigation',
   contractVersion: 1,
   solverId: 'minecraft.navigation',
-  executionMode: 'navigation',
-  position: { x: -16, y: 64, z: 300 },
+  occupancyGrid: {
+    origin: { x: -20, y: 60, z: 290 },
+    size: { dx: 40, dy: 12, dz: 40 },
+    blocks: '...base64-encoded uint8 array...',
+  },
+  start: { x: -16, y: 64, z: 300 },
   goal: { x: 10, y: 68, z: 280 },
-  tolerance: 2,
-  rules: [...],  // Generated from world scan
-  hazards: [...],  // Known lava/mob positions
+  toleranceXZ: 1,
+  toleranceY: 0,
+  hazardPolicy: { ... },
   maxNodes: 10000,
   useLearning: true,
 }
 ```
 
-**Solution mapping**: Each solution edge becomes an executable movement command:
-```
-nav:walk_north@(-16,64,300)  → bot.setControlState('forward') for 1 block
-nav:jump_up@(-16,64,299)     → bot.setControlState('jump', true) + forward
-nav:sprint@(-16,65,299)      → bot.setControlState('sprint', true) + forward × N
-```
+#### Files
 
-#### Python Backend Addition
-
-A new `NavigationState` class following the escape game pattern:
-
-```python
-# Sterling addition: navigation_domain.py
-@dataclass
-class NavigationState:
-    x: int; y: int; z: int
-    goal_x: int; goal_y: int; goal_z: int
-    world_grid: Dict[Tuple[int,int,int], str]  # block types
-
-    def to_hash(self) -> str:
-        return f"nav:{self.x},{self.y},{self.z}"
-
-    def is_goal(self) -> bool:
-        return abs(self.x - self.goal_x) + abs(self.y - self.goal_y) + abs(self.z - self.goal_z) <= 2
-
-    def get_legal_moves(self) -> List[Tuple[str, 'NavigationState', float]]:
-        moves = []
-        for (dx, dz, label) in [(0,-1,'north'),(0,1,'south'),(1,0,'east'),(-1,0,'west')]:
-            nx, nz = self.x + dx, self.z + dz
-            if self._is_passable(nx, self.y, nz) and self._is_solid(nx, self.y - 1, nz):
-                cost = self._hazard_cost(nx, self.y, nz) + 1.0
-                moves.append((f"walk_{label}", self._moved(nx, self.y, nz), cost))
-            # Jump up
-            if self._is_passable(nx, self.y + 1, nz) and self._is_passable(nx, self.y + 2, nz):
-                if self._is_solid(nx, self.y, nz):  # landing
-                    cost = self._hazard_cost(nx, self.y + 1, nz) + 2.0
-                    moves.append((f"jump_up_{label}", self._moved(nx, self.y + 1, nz), cost))
-            # Descend
-            if self._is_passable(nx, self.y, nz) and self._is_solid(nx, self.y - 2, nz):
-                cost = self._hazard_cost(nx, self.y - 1, nz) + 0.8
-                moves.append((f"descend_{label}", self._moved(nx, self.y - 1, nz), cost))
-        return moves
-
-    def compute_heuristic(self) -> float:
-        dx = abs(self.x - self.goal_x)
-        dz = abs(self.z - self.goal_z)
-        dy_up = max(0, self.goal_y - self.y)
-        dy_down = max(0, self.y - self.goal_y)
-        return dx + dz + 2.0 * dy_up + 0.8 * dy_down
-```
-
-Register in `sterling_unified_server.py` under `domain == "navigation"`.
-
-#### Execution Layer: New Navigation Leaf
-
-**New leaf**: `sterling_navigate` — replaces the D* Lite + mock + pathfinder hybrid.
-
-```
-File: packages/minecraft-interface/src/leaves/movement-leaves.ts
-
-SterlingNavigateLeaf:
-  spec: timeout=60000ms, retries=2, permissions=[movement]
-  args: { target: {x,y,z}, tolerance?, avoidHazards? }
-
-  run(ctx, args):
-    1. World scan: read blocks in bounding box around bot→target
-    2. POST to planning server: /solve-navigation with scan data
-    3. Planning server calls NavigationSolver → Sterling
-    4. Receive ordered movement primitives
-    5. Execute each primitive via bot controls:
-       - walk_* → pathfinder.goto(GoalNear) for 1 block
-       - jump_up_* → setControlState('jump') + forward
-       - sprint_* → setControlState('sprint') + forward
-       - descend_* → walk off edge, let gravity handle
-    6. After each primitive, verify position matches expected
-    7. If deviation > 1 block, re-solve from current position (replanning)
-```
+| File | Package | Description |
+|------|---------|-------------|
+| `minecraft-navigation-types.ts` | planning/sterling | Types, grid utilities, heuristic, hazard policy |
+| `minecraft-navigation-solver.ts` | planning/sterling | `MinecraftNavigationSolver extends BaseDomainSolver` |
+| `navigation_domain.py` | sterling | Python `NavigationState` + `NavigationSterlingStreaming` solver |
+| `movement-leaves.ts` | mc-interface/leaves | `SterlingNavigateLeaf` — scan→solve→execute→verify→replan |
+| `server.ts` | mc-interface | `/world-scan` endpoint — occupancy grid from bot.blockAt() |
+| `modular-server.ts` | planning | `/solve-navigation` endpoint, leaf routing, allowlist |
+| `leaf-routing.ts` | planning/sterling | `navigate` → `sterling_navigate` mapping |
+| `sterling-bootstrap.ts` | planning/server | `MinecraftNavigationSolver` initialization |
 
 #### What This Replaces
 
 | Current Component | Problem | Sterling Replacement |
 |------------------|---------|---------------------|
-| D* Lite `determineAction()` | Stub: only checks Y-delta, returns 'jump' or 'move' | Sterling A* with full movement primitives |
-| `MockNavigationSystem.planPath()` | Returns straight line through walls | Sterling world-scan rules that encode real terrain |
-| `SimpleGoalNear/SimpleGoalBlock` | `heuristic()→0`, `isEnd()→false` — never guide or terminate | Sterling heuristic: 3D Manhattan with vertical penalty |
-| mineflayer-pathfinder (constrained) | `canDig=false`, `scafoldingBlocks=[]` — can only walk existing terrain | Sterling can plan jump/sprint/descend sequences that pathfinder can't |
-| Stuck detection (6s poll) | Detects stuck but retries same impossible goal | Sterling replans from current position with updated world scan |
+| D* Lite `determineAction()` | Stub: only checks Y-delta | Sterling A* with occupancy grid + movement primitives |
+| `MockNavigationSystem.planPath()` | Returns straight line through walls | Sterling on-demand neighbor generation against real terrain |
+| `SimpleGoalNear/SimpleGoalBlock` | `heuristic()→0`, `isEnd()→false` | Admissible piecewise heuristic + L∞ goal metric |
+| mineflayer-pathfinder (constrained) | `canDig=false`, `scafoldingBlocks=[]` | Sterling plans jump/descend sequences; pathfinder as 1-block actuator only |
+| Stuck detection (6s poll) | Retries same impossible goal | Bounded replan with escalation (expand scan → downgrade → fail) |
 
 #### What This Unlocks
 
 - **1-block ledge climbing**: `jump_up` operation explicitly plans the jump
-- **2-3 block gap crossing**: `jump_gap_2/3` with sprint prerequisite
 - **Hazard avoidance**: Lava/cliff/hostile zones get high cost → A* routes around them
 - **Optimal path choice**: "go around the hill" vs "jump over the gap" — A* picks lowest total cost
 - **Learning**: Sterling's path algebra remembers which routes worked, improving over time
-- **Replanning**: If the world changes (block breaks, mob moves), re-solve from current position
+- **Replanning**: Bounded replan loop (max 3) with escalation strategy
+
+#### Future Phases
+
+- **Phase 2**: Threat→Hold bridge (parallel with Phase 1 validation)
+- **Phase 3**: Manual integration testing on flat terrain
+- **Phase 4**: Vertical terrain + hazard avoidance testing
+- **Phase 5**: Replace legacy navigation stack; add diagonal/sprint/swim primitives (requires heuristic re-proof)
 
 **Test setup**:
 ```bash
-# Create a 1-block ledge scenario
-setblock ~5 ~ ~ minecraft:stone
-setblock ~5 ~1 ~ minecraft:stone
-# Target is on top of the ledge
-# Bot should: walk to base → jump_up → arrive
-
-# Create a 2-block gap scenario
-setblock ~3 ~ ~ minecraft:air
-setblock ~4 ~ ~ minecraft:air
-setblock ~5 ~-1 ~ minecraft:stone
-# Bot should: sprint → jump_gap_2 → land on other side
-
-# Create a hazard avoidance scenario
-setblock ~2 ~-1 ~ minecraft:lava
-setblock ~3 ~-1 ~ minecraft:lava
-# Bot should: route AROUND the lava, not through it
+# Flat terrain: walk 10 blocks north
+# 1-block ledge: setblock ~5 ~ ~ stone && setblock ~5 ~1 ~ stone → navigate to top
+# Lava avoidance: place lava in direct path → verify bot routes around
+# Threat interrupt: spawn zombie during navigation → observe hold + resume
 ```
+
+---
+
+### S10: Centralized Dispatch Validation
+
+**Purpose**: Verify that all action types route correctly through the Action Contract Registry and that parameter normalization is consistent across all dispatch paths.
+
+**Status**: **Implemented and tested (376 MC tests pass).**
+
+The Action Contract Registry (`action-contract-registry.ts`) is the single source of truth for:
+- Action type → leaf name routing
+- Parameter aliasing (e.g., `block_type` → `item`, `item` → `input`)
+- Deprecated/stripped key handling
+- Default value injection
+- Required key enforcement (fail-closed)
+- Dispatch mode selection (`leaf` / `handler` / `guarded`)
+
+#### Dispatch architecture
+
+```
+POST /action { type, parameters }
+    │
+    ├─ Phase 1: Contract-driven dispatch
+    │   ├─ ACTION_CONTRACTS[action.type] → contract
+    │   ├─ dispatchMode: 'handler' → Phase 2 (dedicated handler)
+    │   ├─ dispatchMode: 'guarded' → semantic guards → leaf or handler
+    │   ├─ dispatchMode: 'leaf' → normalizeActionParams → dispatchToLeaf
+    │   └─ normalizeActionParams: aliases → strip → defaults → requiredKeys
+    │
+    ├─ Phase 2: Legacy switch (dedicated handlers)
+    │   ├─ craft/craft_item → executeCraftItem (normalizes, calls leaf)
+    │   ├─ smelt/smelt_item → executeSmeltItem (normalizes, calls leaf)
+    │   ├─ prepare_site/build_module/place_feature → dispatchToLeafLegacy
+    │   └─ move_to/navigate → legacy D* Lite handler
+    │
+    └─ Shared: _runLeaf(leafName, requestedActionType, params, timeout, signal)
+```
+
+#### Behavioral changes from centralization
+
+| Action | Before | After |
+|--------|--------|-------|
+| `acquire_material` | Hardcoded handler | Leaf with LOS filtering |
+| `place_block` (single) | Hardcoded 12-angle search | Leaf with 6-adjacent auto-placement |
+| `place_block` (pattern/multi) | Hardcoded handler | Still handler (semantic guard) |
+| `consume_food` | Name-heuristic handler | Leaf with explicit `isFoodItem()` |
+| `collect_items_enhanced` (basic) | Pickup-only handler | Leaf with pathfind-to-entity |
+| `collect_items_enhanced` (explore) | Handler with spiral exploration | Still handler (semantic guard) |
+| `smelt` | Handler passing wrong param names | Handler with contract normalization |
+| `craft` | Handler with manual param mapping | Handler with contract normalization |
+
+#### Test coverage
+
+| Test file | Tests | Coverage |
+|-----------|-------|---------|
+| `action-contract-registry.test.ts` | 41 | Aliases, defaults, requiredKeys, null handling, idempotency, craft/smelt aliases |
+| `action-dispatch-contract.test.ts` | 55 | Routing, guards, normalization proof, handler normalization, abort propagation, legacy requiredKeys |
+| `contract-alignment.test.ts` | 4 | Cross-boundary planning ↔ MC normalization agreement |
 
 ---
 
@@ -678,12 +695,12 @@ These are the atomic permissions and capabilities that gate scenario execution.
 | **Time-Aware Goal Generator** | S6 | Watches MC time, creates shelter/sleep goals when dusk approaches | ~100 lines, new module |
 | **Home Position Store** | S8 | Persistent home/base location in memory service | ~30 lines + memory API call |
 | **Verification Drop Mapper** | S3, S5 | Wire `ORE_DROP_MAP` into step verification so "mine stone" accepts "cobblestone" in inventory | ~40 lines in task-integration.ts |
-| **Navigation Domain Types** | S9 | `NavigationState`, `NavigationRule`, movement primitives (walk/jump/sprint/descend) | ~150 lines, new file `minecraft-navigation-types.ts` |
-| **Navigation Rule Builder** | S9 | `buildNavigationRules()` — world scan → movement rules with hazard costs | ~250 lines, new file `minecraft-navigation-rules.ts` |
-| **Navigation Solver** | S9 | `NavigationSolver extends BaseDomainSolver` — TypeScript solver wrapper | ~200 lines, new file `minecraft-navigation-solver.ts` |
-| **Python Navigation Domain** | S9 | `NavigationState` class for Sterling Python backend (to_hash, is_goal, get_legal_moves, heuristic) | ~150 lines in Sterling repo |
-| **Sterling Navigate Leaf** | S9 | `SterlingNavigateLeaf` — world scan → solve → execute movement primitives → replan on deviation | ~200 lines in movement-leaves.ts |
-| **World Scan API** | S9 | Endpoint or function to read block types in bounding box for rule generation | ~60 lines, new route or extend mc-interface |
+| ~~**Navigation Domain Types**~~ | S9 | ✅ Built: `minecraft-navigation-types.ts` — occupancy grid, hazard policy, movement costs, heuristic |
+| ~~**Navigation Solver**~~ | S9 | ✅ Built: `minecraft-navigation-solver.ts` — `MinecraftNavigationSolver extends BaseDomainSolver` |
+| ~~**Python Navigation Domain**~~ | S9 | ✅ Built: `navigation_domain.py` — `NavigationState` with on-demand neighbor generation |
+| ~~**Sterling Navigate Leaf**~~ | S9 | ✅ Built: `SterlingNavigateLeaf` in `movement-leaves.ts` — scan→solve→execute→verify→replan |
+| ~~**World Scan API**~~ | S9 | ✅ Built: `GET /world-scan` endpoint in mc-interface `server.ts` |
+| **Threat→Hold Bridge** | S9, S2 | Wire `onThreatLevelChanged` → `requestHold()` in modular-server.ts (~50 lines) |
 
 ---
 
@@ -723,10 +740,10 @@ Cross-reference of scenarios vs. infrastructure gaps.
    - All infrastructure exists; just needs wiring (~70 lines)
    - Files: `modular-server.ts` (executor loop), `threat-perception-manager.ts` (callback)
 
-2. **Sterling Navigation Domain** (S9)
-   - Bot cannot reliably navigate terrain with any vertical component
-   - Blocks ALL scenarios that require movement to a resource (S1, S3, S5, S6, S8)
-   - New Sterling domain + Python backend + navigate leaf + world scan
+2. **Sterling Navigation Domain** (S9) — ✅ Phase 1 implemented
+   - Sterling navigation solver, occupancy grid, SterlingNavigateLeaf, /world-scan endpoint
+   - 4-cardinal movement: walk (1.0), jump_up (2.0), descend (0.8)
+   - Remaining: integration testing, threat→hold bridge, legacy stack replacement
    - See [S9 detailed design](#s9-sterling-powered-navigation)
 
 3. **Verification Drop Mapper** (S3, S5)

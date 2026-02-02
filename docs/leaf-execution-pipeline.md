@@ -28,6 +28,20 @@
 
 ## Pipeline Overview
 
+### Service Port Map
+
+| Service              | Port | Endpoints                |
+|----------------------|------|--------------------------|
+| Dashboard            | 3000 | Static + WebSocket       |
+| Memory               | 3001 | /memories, /query        |
+| Planning             | 3002 | /solve, /solve-navigation, /task |
+| Cognition            | 3003 | /think, /reflect         |
+| World                | 3004 | /state, /entities        |
+| Minecraft Interface  | 3005 | /action, /world-scan     |
+| Viewer               | 3006 | WebSocket stream         |
+| Core API             | 3007 | /api/*                   |
+| Sterling             | 8766 | WebSocket (solve/report) |
+
 ```
 User Intent / Thought
         |
@@ -60,7 +74,7 @@ Solver     Planner
         |
 [toolExecutor.execute]  ...................  modular-server.ts:2020
         |
-HTTP POST /action --> minecraft-interface:3002
+HTTP POST /action --> minecraft-interface:3005
         |
 [POST /action handler]  ...................  server.ts:1581
         |
@@ -119,6 +133,49 @@ Rig G decision output:
 | `place:<workstation>` | `place_workstation` | crafting_table, furnace, blast_furnace |
 | `place:<other>` | `place_block` | |
 | `upgrade` | `craft_recipe` | Tool-progression only (line 59) |
+
+### Action Contract Registry (MC-side dispatch)
+
+**File**: `packages/minecraft-interface/src/action-contract-registry.ts`
+
+The `ACTION_CONTRACTS` table is the single source of truth for MC-side action→leaf routing,
+parameter normalization (aliases, defaults, strip/deprecated keys), and dispatch mode selection.
+All normalization is data-driven — no switch statements.
+
+#### Dispatch modes
+
+| Mode | Behavior | Actions |
+|------|----------|---------|
+| `'leaf'` (default) | Route directly to leaf via `dispatchToLeaf` | `acquire_material`, `consume_food`, `collect_items`, `sleep`, `find_resource`, `equip_tool`, `introspect_recipe`, `place_workstation` |
+| `'handler'` | Always route to dedicated handler method | `craft`, `craft_item`, `smelt`, `smelt_item` |
+| `'guarded'` | Check semantic guards; if none fire, dispatch to leaf | `place_block`, `collect_items_enhanced` |
+
+#### Parameter normalization (aliases)
+
+| Action Type | Alias | Notes |
+|-------------|-------|-------|
+| `acquire_material` | `blockType` → `item` | Leaf expects `item` |
+| `place_block` | `block_type` → `item` | Leaf expects `item`; `placement`, `count` stripped |
+| `collect_items_enhanced` | `item` → `itemName`, `maxSearchTime` → `timeout` | Routes to `collect_items` leaf; `exploreOnFail` stripped |
+| `collect_items` | `item` → `itemName` | |
+| `craft` / `craft_item` | `item` → `recipe`, `quantity` → `qty` | Default `qty: 1` |
+| `smelt` / `smelt_item` | `item` → `input`, `quantity` → `qty` | Default `fuel: 'coal'` |
+
+#### Semantic guards (guarded dispatch)
+
+| Guard | Condition | Routes to |
+|-------|-----------|-----------|
+| `place_block` multi-block | `placement` set and not `'around_player'` | `executePlaceBlock` handler |
+| `place_block` count > 1 | `count > 1` | `executePlaceBlock` handler |
+| `collect_items_enhanced` explore | `exploreOnFail === true` | `executeCollectItemsEnhanced` handler |
+
+#### Normalization semantics
+
+- **Null-as-absent**: `null` and `undefined` are treated identically as "not provided" for alias targets and defaults. Callers cannot use `null` to clear a value.
+- **Alias source cleanup**: Non-canonical alias source keys are always deleted from output, even if null/undefined.
+- **Alias conflict resolution**: If both source and target keys are meaningfully set, the target wins, the source is deleted, and a warning is emitted.
+- **requiredKeys**: Enforced in all dispatch paths (Phase 1, Phase 2 legacy, handler-mode). Missing keys cause immediate fail-closed rejection before the leaf runs.
+- **Idempotent**: `normalizeActionParams(normalizeActionParams(x)) === normalizeActionParams(x)`
 
 ### Fallback planner: requirementToFallbackPlan (leaf-arg-contracts.ts:175)
 
@@ -678,7 +735,9 @@ All have `permissions: ['sense']` to prevent accidental mutation.
 | Execution advisor (Rig G) | `packages/planning/src/constraints/execution-advisor.ts` | `computeExecutionAdvice` |
 | Known leaf names | `packages/planning/src/modular-server.ts` | `KNOWN_LEAF_NAMES` (221-272) |
 | MC action endpoint | `packages/minecraft-interface/src/server.ts` | POST `/action` (1581) |
-| Action dispatcher | `packages/minecraft-interface/src/action-translator.ts` | `executeAction` (949), `executeLeafAction` (1352) |
+| Action contract registry | `packages/minecraft-interface/src/action-contract-registry.ts` | `ACTION_CONTRACTS`, `normalizeActionParams`, `resolveLeafName`, `buildActionTypeToLeafMap` |
+| Action dispatcher | `packages/minecraft-interface/src/action-translator.ts` | `executeAction` (949), `dispatchToLeaf`, `dispatchToLeafLegacy`, `_runLeaf` |
+| Contract alignment tests | `packages/planning/src/modules/__tests__/contract-alignment.test.ts` | Cross-boundary normalization agreement (planning ↔ MC) |
 | Leaf registration | `packages/minecraft-interface/src/server.ts` | `registerCoreLeaves` (773) |
 | Movement leaves | `packages/minecraft-interface/src/leaves/movement-leaves.ts` | 3 leaves |
 | Interaction leaves | `packages/minecraft-interface/src/leaves/interaction-leaves.ts` | 8 leaves |
@@ -692,5 +751,5 @@ All have `permissions: ['sense']` to prevent accidental mutation.
 
 ---
 
-*Last updated: 2026-02-02*
+*Last updated: 2026-02-01*
 *Total leaves: 41 (37 real + 1 simplified + 3 P0 stubs)*
