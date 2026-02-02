@@ -23,6 +23,8 @@ import {
   computeBundleOutput,
   createSolveBundle,
   buildDefaultRationaleContext,
+  parseSterlingIdentity,
+  attachSterlingIdentity,
 } from './solve-bundle';
 import type { SolveBundle, CompatReport } from './solve-bundle-types';
 import { parseSearchHealth } from './search-health';
@@ -144,6 +146,7 @@ export class MinecraftFurnaceSolver extends BaseDomainSolver<FurnaceSchedulingSo
       });
 
       const bundle = createSolveBundle(bundleInput, bundleOutput, compatReport);
+      attachSterlingIdentity(bundle, parseSterlingIdentity(sterlingResult.metrics));
 
       return {
         solved,
@@ -277,20 +280,25 @@ export class MinecraftFurnaceSolver extends BaseDomainSolver<FurnaceSchedulingSo
   /**
    * Report execution outcome for learning.
    */
-  reportEpisodeResult(
+  async reportEpisodeResult(
     goalItems: Record<string, number>,
     success: boolean,
     itemsSmelted: number,
     planId?: string | null,
     failureReason?: string,
-  ): void {
-    this.reportEpisode({
+    linkage?: {
+      bundleHash?: string;
+      traceBundleHash?: string;
+      outcomeClass?: import('./solve-bundle-types').EpisodeOutcomeClass;
+    }
+  ): Promise<import('./solve-bundle-types').EpisodeAck | undefined> {
+    return this.reportEpisode({
       planId: planId ?? undefined,
       solverId: this.solverId,
       goalItems,
       success,
       itemsSmelted,
       failureReason,
-    });
+    }, linkage);
   }
 }

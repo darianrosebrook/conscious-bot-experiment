@@ -25,6 +25,8 @@ import {
   computeBundleOutput,
   createSolveBundle,
   buildDefaultRationaleContext,
+  parseSterlingIdentity,
+  attachSterlingIdentity,
 } from './solve-bundle';
 import { parseSearchHealth } from './search-health';
 
@@ -142,6 +144,9 @@ export class MinecraftBuildingSolver extends BaseDomainSolver<BuildingSolveResul
     // Extract planId — returned in the result for caller to store in task metadata
     const planId = this.extractPlanId(result);
 
+    // Parse Sterling identity from solve response
+    const sterlingIdentity = parseSterlingIdentity(result.metrics);
+
     // Check for needs_materials in metrics
     const needsMaterials = result.metrics?.needsMaterials as BuildingMaterialDeficit | undefined;
 
@@ -157,6 +162,7 @@ export class MinecraftBuildingSolver extends BaseDomainSolver<BuildingSolveResul
         ...rationaleCtx,
       });
       const solveBundle = createSolveBundle(bundleInput, bundleOutput, compatReport);
+      attachSterlingIdentity(solveBundle, sterlingIdentity);
 
       return {
         solved: false,
@@ -181,6 +187,7 @@ export class MinecraftBuildingSolver extends BaseDomainSolver<BuildingSolveResul
         ...rationaleCtx,
       });
       const solveBundle = createSolveBundle(bundleInput, bundleOutput, compatReport);
+      attachSterlingIdentity(solveBundle, sterlingIdentity);
 
       return {
         solved: false,
@@ -289,6 +296,7 @@ export class MinecraftBuildingSolver extends BaseDomainSolver<BuildingSolveResul
       ...rationaleCtx,
     });
     const solveBundle = createSolveBundle(bundleInput, bundleOutput, compatReport);
+    attachSterlingIdentity(solveBundle, sterlingIdentity);
 
     return {
       solved: true,
@@ -422,16 +430,21 @@ export class MinecraftBuildingSolver extends BaseDomainSolver<BuildingSolveResul
    * @param planId - planId from the solve result (stored in task metadata)
    * @param isStub - Whether this is a P0 stub episode
    */
-  reportEpisodeResult(
+  async reportEpisodeResult(
     templateId: string,
     success: boolean,
     executedModuleIds: string[],
     failureAtModuleId?: string,
     failureReason?: string,
     planId?: string | null,
-    isStub?: boolean
-  ): void {
-    this.reportEpisode({
+    isStub?: boolean,
+    linkage?: {
+      bundleHash?: string;
+      traceBundleHash?: string;
+      outcomeClass?: import('./solve-bundle-types').EpisodeOutcomeClass;
+    }
+  ): Promise<import('./solve-bundle-types').EpisodeAck | undefined> {
+    return this.reportEpisode({
       planId,
       templateId,
       success,
@@ -439,7 +452,7 @@ export class MinecraftBuildingSolver extends BaseDomainSolver<BuildingSolveResul
       failureAtModuleId,
       failureReason,
       isStub: isStub ?? false,
-    });
+    }, linkage);
   }
 
   // --------------------------------------------------------------------------

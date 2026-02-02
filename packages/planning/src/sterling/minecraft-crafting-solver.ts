@@ -20,6 +20,8 @@ import {
   computeBundleOutput,
   createSolveBundle,
   buildDefaultRationaleContext,
+  parseSterlingIdentity,
+  attachSterlingIdentity,
 } from './solve-bundle';
 import { parseSearchHealth } from './search-health';
 
@@ -198,6 +200,9 @@ export class MinecraftCraftingSolver extends BaseDomainSolver<MinecraftCraftingS
     // 5. Extract planId — returned in the result for caller to store in task metadata
     const planId = this.extractPlanId(result);
 
+    // 5a. Parse Sterling identity from solve response (absent until server emits it)
+    const sterlingIdentity = parseSterlingIdentity(result.metrics);
+
     // 6. Map Sterling's solution path to crafting steps
     if (!result.solutionFound) {
       const bundleOutput = computeBundleOutput({
@@ -211,6 +216,7 @@ export class MinecraftCraftingSolver extends BaseDomainSolver<MinecraftCraftingS
         ...rationaleCtx,
       });
       const solveBundle = createSolveBundle(bundleInput, bundleOutput, compatReport);
+      attachSterlingIdentity(solveBundle, sterlingIdentity);
 
       return {
         solved: false,
@@ -236,6 +242,7 @@ export class MinecraftCraftingSolver extends BaseDomainSolver<MinecraftCraftingS
       ...rationaleCtx,
     });
     const solveBundle = createSolveBundle(bundleInput, bundleOutput, compatReport);
+    attachSterlingIdentity(solveBundle, sterlingIdentity);
 
     // Strict mode: treat degraded mapping as a solve failure
     if (this.strictMapping && mapping?.degraded) {
@@ -306,18 +313,23 @@ export class MinecraftCraftingSolver extends BaseDomainSolver<MinecraftCraftingS
    * @param stepsCompleted - Number of steps completed
    * @param planId - planId from the solve result (stored in task metadata)
    */
-  reportEpisodeResult(
+  async reportEpisodeResult(
     goalItem: string,
     success: boolean,
     stepsCompleted: number,
-    planId?: string | null
-  ): void {
-    this.reportEpisode({
+    planId?: string | null,
+    linkage?: {
+      bundleHash?: string;
+      traceBundleHash?: string;
+      outcomeClass?: import('./solve-bundle-types').EpisodeOutcomeClass;
+    }
+  ): Promise<import('./solve-bundle-types').EpisodeAck | undefined> {
+    return this.reportEpisode({
       planId,
       goal: goalItem,
       success,
       stepsCompleted,
-    });
+    }, linkage);
   }
 
   // --------------------------------------------------------------------------

@@ -32,6 +32,7 @@ import {
   MINECRAFT_SALVAGE_TABLE,
   type NearbyEntity,
 } from './minecraft-acquisition-rules';
+import { isValidMcData, type McData } from './minecraft-crafting-rules';
 import { StrategyPriorStore } from './minecraft-acquisition-priors';
 import { lintRules, type LintableRule } from './compat-linter';
 import {
@@ -42,6 +43,8 @@ import {
   hashGoal,
   hashNearbyBlocks,
   buildDefaultRationaleContext,
+  parseSterlingIdentity,
+  attachSterlingIdentity,
 } from './solve-bundle';
 import type { SolveBundle, ObjectiveWeights, ObjectiveWeightsSource } from './solve-bundle-types';
 import { parseSearchHealth } from './search-health';
@@ -165,6 +168,7 @@ export class MinecraftAcquisitionSolver extends BaseDomainSolver<AcquisitionSolv
     nearbyBlocks: string[],
     nearbyEntities: NearbyEntity[] = [],
     options?: AcquisitionSolveOptions,
+    mcData?: McData | null,
   ): Promise<AcquisitionSolveResult> {
     if (!this.isAvailable()) return this.makeUnavailableResult();
 
@@ -182,6 +186,13 @@ export class MinecraftAcquisitionSolver extends BaseDomainSolver<AcquisitionSolv
     // Replace default salvage candidates with inventory-aware ones
     candidates = candidates.filter(c => c.strategy !== 'salvage');
     candidates.push(...salvageCandidates);
+
+    // Gate: mine strategy requires structurally valid mcData for crafting rules.
+    // Filter before digest so candidateSetDigest reflects the actual viable set.
+    // Uses isValidMcData (not truthiness) so {} from malformed metadata is rejected.
+    if (!isValidMcData(mcData)) {
+      candidates = candidates.filter(c => c.strategy !== 'mine');
+    }
 
     // 3. Compute candidate set digest (M1 semantic boundary)
     const candidateSetDigest = computeCandidateSetDigest(candidates);
@@ -222,6 +233,7 @@ export class MinecraftAcquisitionSolver extends BaseDomainSolver<AcquisitionSolv
       nearbyEntities,
       maxNodes,
       options?.objectiveWeights,
+      mcData,
     );
 
     // 8. Build parent bundle
@@ -285,14 +297,19 @@ export class MinecraftAcquisitionSolver extends BaseDomainSolver<AcquisitionSolv
   /**
    * Report episode result for learning.
    */
-  reportEpisodeResult(
+  async reportEpisodeResult(
     item: string,
     strategy: string,
     contextKey: string,
     success: boolean,
     planId: string,
     candidateSetDigest: string,
-  ): void {
+    linkage?: {
+      bundleHash?: string;
+      traceBundleHash?: string;
+      outcomeClass?: import('./solve-bundle-types').EpisodeOutcomeClass;
+    }
+  ): Promise<import('./solve-bundle-types').EpisodeAck | undefined> {
     this.priorStore.updatePrior(
       item,
       strategy as any,
@@ -301,14 +318,14 @@ export class MinecraftAcquisitionSolver extends BaseDomainSolver<AcquisitionSolv
       planId,
     );
 
-    this.reportEpisode({
+    return this.reportEpisode({
       planId,
       item,
       strategy,
       contextKey,
       success,
       candidateSetDigest,
-    });
+    }, linkage);
   }
 
   /**
@@ -348,6 +365,7 @@ export class MinecraftAcquisitionSolver extends BaseDomainSolver<AcquisitionSolv
     nearbyEntities: NearbyEntity[],
     maxNodes: number,
     objectiveWeights?: ObjectiveWeights,
+    mcData?: McData | null,
   ): Promise<{
     solved: boolean;
     steps: AcquisitionSolveStep[];
@@ -360,7 +378,7 @@ export class MinecraftAcquisitionSolver extends BaseDomainSolver<AcquisitionSolv
   }> {
     switch (candidate.strategy) {
       case 'mine':
-        return this.dispatchMineCraft(item, quantity, inventory, nearbyBlocks, maxNodes);
+        return this.dispatchMineCraft(item, quantity, inventory, nearbyBlocks, maxNodes, mcData);
 
       case 'trade':
         return this.dispatchSterlingRules(
@@ -421,6 +439,7 @@ export class MinecraftAcquisitionSolver extends BaseDomainSolver<AcquisitionSolv
     inventory: Record<string, number>,
     nearbyBlocks: string[],
     _maxNodes: number,
+    mcData?: McData | null,
   ): Promise<{
     solved: boolean;
     steps: AcquisitionSolveStep[];
@@ -447,16 +466,11 @@ export class MinecraftAcquisitionSolver extends BaseDomainSolver<AcquisitionSolv
     // Convert inventory to array format expected by crafting solver
     const inventoryArray = Object.entries(inventory).map(([name, count]) => ({ name, count }));
 
-    // We need mcData — use a minimal mock for the crafting solver
-    // In production, mcData would be injected. For now, we pass through
-    // to the crafting solver which handles its own mcData loading.
     try {
-      // The crafting solver needs mcData. We'll try to call it,
-      // but in test scenarios it's mocked.
       const result = await this._craftingSolver.solveCraftingGoal(
         item,
         inventoryArray,
-        null, // mcData — in tests this is mocked
+        mcData,
         nearbyBlocks,
       );
 
@@ -618,6 +632,7 @@ export class MinecraftAcquisitionSolver extends BaseDomainSolver<AcquisitionSolv
         ...rationaleCtx,
       });
       const childBundle = createSolveBundle(bundleInput, bundleOutput, compatReport);
+      attachSterlingIdentity(childBundle, parseSterlingIdentity(result.metrics));
 
       return {
         solved,

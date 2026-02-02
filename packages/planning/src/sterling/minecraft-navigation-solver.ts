@@ -37,6 +37,8 @@ import {
   contentHash,
   canonicalize,
   buildDefaultRationaleContext,
+  parseSterlingIdentity,
+  attachSterlingIdentity,
 } from './solve-bundle';
 import { parseSearchHealth } from './search-health';
 import type {
@@ -164,6 +166,9 @@ export class MinecraftNavigationSolver extends BaseDomainSolver<NavigationSolveR
     // 8. Extract planId
     const planId = this.extractPlanId(result);
 
+    // 8a. Parse Sterling identity from solve response
+    const sterlingIdentity = parseSterlingIdentity(result.metrics);
+
     // 9. Build rationale context
     const rationaleCtx = buildDefaultRationaleContext({ compatReport, maxNodes });
 
@@ -180,6 +185,7 @@ export class MinecraftNavigationSolver extends BaseDomainSolver<NavigationSolveR
         ...rationaleCtx,
       });
       const solveBundle = createSolveBundle(bundleInput, bundleOutput, compatReport);
+      attachSterlingIdentity(solveBundle, sterlingIdentity);
 
       return {
         solved: false,
@@ -212,6 +218,7 @@ export class MinecraftNavigationSolver extends BaseDomainSolver<NavigationSolveR
       ...rationaleCtx,
     });
     const solveBundle = createSolveBundle(bundleInput, bundleOutput, compatReport);
+    attachSterlingIdentity(solveBundle, sterlingIdentity);
 
     return {
       solved: true,
@@ -229,20 +236,25 @@ export class MinecraftNavigationSolver extends BaseDomainSolver<NavigationSolveR
   /**
    * Report navigation episode result back to Sterling for learning.
    */
-  reportEpisodeResult(
+  async reportEpisodeResult(
     start: { x: number; y: number; z: number },
     goal: { x: number; y: number; z: number },
     success: boolean,
     primitivesCompleted: number,
     planId?: string | null,
-  ): void {
-    this.reportEpisode({
+    linkage?: {
+      bundleHash?: string;
+      traceBundleHash?: string;
+      outcomeClass?: import('./solve-bundle-types').EpisodeOutcomeClass;
+    }
+  ): Promise<import('./solve-bundle-types').EpisodeAck | undefined> {
+    return this.reportEpisode({
       planId,
       start,
       goal,
       success,
       primitivesCompleted,
-    });
+    }, linkage);
   }
 
   // --------------------------------------------------------------------------

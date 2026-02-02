@@ -218,6 +218,114 @@ describeIf(shouldRun)('ToolProgressionSolver — solver-class E2E', () => {
 });
 
 // ===========================================================================
+// Sprint 1 Prerequisites — Sterling Identity E2E (proof-carrying identity loop)
+// ===========================================================================
+// These tests are EXPECTED TO FAIL until Sprint 1 lands:
+//   - Sterling server returns trace_bundle_hash, engine_commitment, operator_registry_hash
+//   - CB parses sterlingIdentity from result.metrics
+//   - reportEpisode() returns parsed response with episode_hash
+// See: docs/planning/SPRINT_0_CONTRACT_SURFACE_MAP.md
+
+describeIf(shouldRun)('Sprint 1 — Sterling identity fields', () => {
+
+  it('solve response includes sterling identity fields', async () => {
+    // This test WILL FAIL until Sterling server returns trace_bundle_hash
+    const { solver, available } = await freshSolver();
+    if (!available) {
+      console.log('  [SKIPPED] Sterling server not available');
+      return;
+    }
+
+    const result = await solver.solveToolProgression('wooden_pickaxe', {}, []);
+    expect(result.solved).toBe(true);
+
+    const bundle = result.solveMeta!.bundles[0];
+
+    // Solve-scoped identity (from Sterling complete message)
+    expect(bundle.output.sterlingIdentity).toBeDefined();
+    expect(bundle.output.sterlingIdentity!.traceBundleHash).toMatch(/^[0-9a-f]+$/);
+    expect(bundle.output.sterlingIdentity!.engineCommitment).toBeDefined();
+    expect(bundle.output.sterlingIdentity!.operatorRegistryHash).toBeDefined();
+  });
+
+  it('Regime A: identical solves produce identical trace_bundle_hash', async () => {
+    const { solver: solver1, available: a1 } = await freshSolver();
+    const { solver: solver2, available: a2 } = await freshSolver();
+
+    if (!a1 || !a2) {
+      console.log('  [SKIPPED] Sterling server not available');
+      return;
+    }
+
+    const result1 = await solver1.solveToolProgression('wooden_pickaxe', {}, []);
+    const result2 = await solver2.solveToolProgression('wooden_pickaxe', {}, []);
+
+    expect(result1.solved).toBe(true);
+    expect(result2.solved).toBe(true);
+
+    const hash1 = result1.solveMeta!.bundles[0].output.sterlingIdentity?.traceBundleHash;
+    const hash2 = result2.solveMeta!.bundles[0].output.sterlingIdentity?.traceBundleHash;
+
+    // Both must be defined (fails until server returns them)
+    expect(hash1).toBeDefined();
+    expect(hash2).toBeDefined();
+    // Structural determinism: same inputs → same trace identity
+    expect(hash1).toBe(hash2);
+  });
+
+  it('full identity loop: solve → attach → report with linkage → episode_hash ack', async () => {
+    const { solver, available } = await freshSolver();
+    if (!available) {
+      console.log('  [SKIPPED] Sterling server not available');
+      return;
+    }
+
+    // Step A: Solve — Sterling returns trace_bundle_hash in complete message
+    const result = await solver.solveToolProgression('wooden_pickaxe', {}, []);
+    expect(result.solved).toBe(true);
+
+    const bundle = result.solveMeta!.bundles[0];
+    const planId = bundle.output.planId;
+    expect(planId).toBeDefined();
+
+    // Step B: CB attaches Sterling identity and computes bindingHash
+    const identity = bundle.output.sterlingIdentity;
+    expect(identity).toBeDefined();
+    expect(identity!.traceBundleHash).toMatch(/^[0-9a-f]+$/);
+    expect(identity!.engineCommitment).toBeDefined();
+    expect(identity!.operatorRegistryHash).toBeDefined();
+
+    // bindingHash = sha256(traceBundleHash + bundleHash) — computed by attachSterlingIdentity
+    expect(identity!.bindingHash).toMatch(/^[0-9a-f]+$/);
+    // Verify it's actually derived from both hashes
+    const expectedBinding = contentHash(identity!.traceBundleHash! + bundle.bundleHash);
+    expect(identity!.bindingHash).toBe(expectedBinding);
+
+    // Step C: Report episode WITH linkage fields populated
+    const episodeResult = await solver.reportEpisodeResult(
+      'wooden_pickaxe',  // targetTool
+      'wooden',          // targetTier
+      null,              // currentTier
+      true,              // success
+      1,                 // tiersCompleted
+      planId,            // planId
+      undefined,         // failedAtTier
+      undefined,         // failureReason
+      {
+        bundleHash: bundle.bundleHash,
+        traceBundleHash: identity!.traceBundleHash,
+        outcomeClass: 'EXECUTION_SUCCESS',
+      },
+    );
+
+    // Step D: Sterling returns episode_hash in ack and echoes requestId
+    expect(episodeResult).toBeDefined();
+    expect(episodeResult!.episodeHash).toMatch(/^[0-9a-f]+$/);
+    expect(episodeResult!.requestId).toMatch(/^ep-/);  // echoed requestId
+  });
+});
+
+// ===========================================================================
 // Building Solver E2E (1.1)
 // ===========================================================================
 

@@ -42,6 +42,8 @@ import {
   computeBundleOutput,
   createSolveBundle,
   buildDefaultRationaleContext,
+  parseSterlingIdentity,
+  attachSterlingIdentity,
 } from './solve-bundle';
 import { parseSearchHealth } from './search-health';
 
@@ -259,6 +261,9 @@ export class MinecraftToolProgressionSolver extends BaseDomainSolver<ToolProgres
       totalDurationMs += result.durationMs;
       lastPlanId = this.extractPlanId(result) ?? lastPlanId;
 
+      // Parse Sterling identity from this tier's solve response
+      const sterlingIdentity = parseSterlingIdentity(result.metrics);
+
       if (!result.solutionFound) {
         const bundleOutput = computeBundleOutput({
           planId: lastPlanId,
@@ -270,7 +275,9 @@ export class MinecraftToolProgressionSolver extends BaseDomainSolver<ToolProgres
           searchHealth: parseSearchHealth(result.metrics),
           ...rationaleCtx,
         });
-        tierBundles.push(createSolveBundle(bundleInput, bundleOutput, compatReport));
+        const failBundle = createSolveBundle(bundleInput, bundleOutput, compatReport);
+        attachSterlingIdentity(failBundle, sterlingIdentity);
+        tierBundles.push(failBundle);
 
         return {
           solved: false,
@@ -306,7 +313,9 @@ export class MinecraftToolProgressionSolver extends BaseDomainSolver<ToolProgres
         searchHealth: parseSearchHealth(result.metrics),
         ...rationaleCtx,
       });
-      tierBundles.push(createSolveBundle(bundleInput, bundleOutput, compatReport));
+      const tierBundle = createSolveBundle(bundleInput, bundleOutput, compatReport);
+      attachSterlingIdentity(tierBundle, sterlingIdentity);
+      tierBundles.push(tierBundle);
 
       // Update running state for next tier
       runningTier = tierGoal;
@@ -394,7 +403,7 @@ export class MinecraftToolProgressionSolver extends BaseDomainSolver<ToolProgres
   /**
    * Report episode result back to Sterling for learning.
    */
-  reportEpisodeResult(
+  async reportEpisodeResult(
     targetTool: string,
     targetTier: ToolTier,
     currentTier: ToolTier | null,
@@ -402,9 +411,14 @@ export class MinecraftToolProgressionSolver extends BaseDomainSolver<ToolProgres
     tiersCompleted: number,
     planId?: string | null,
     failedAtTier?: ToolTier,
-    failureReason?: string
-  ): void {
-    this.reportEpisode({
+    failureReason?: string,
+    linkage?: {
+      bundleHash?: string;
+      traceBundleHash?: string;
+      outcomeClass?: import('./solve-bundle-types').EpisodeOutcomeClass;
+    }
+  ): Promise<import('./solve-bundle-types').EpisodeAck | undefined> {
+    return this.reportEpisode({
       planId,
       targetTool,
       targetTier,
@@ -413,7 +427,7 @@ export class MinecraftToolProgressionSolver extends BaseDomainSolver<ToolProgres
       tiersCompleted,
       failedAtTier,
       failureReason,
-    });
+    }, linkage);
   }
 
   // --------------------------------------------------------------------------
