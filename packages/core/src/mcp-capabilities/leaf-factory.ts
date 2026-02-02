@@ -96,6 +96,16 @@ export class LeafFactory {
   }
 
   /**
+   * Check if a leaf is registered AND implemented (not a placeholder stub).
+   * Use this instead of checking spec.placeholder directly.
+   */
+  isRoutable(name: string): boolean {
+    const leaf = this.get(name);
+    if (!leaf) return false;
+    return (leaf as any)?.spec?.placeholder !== true;
+  }
+
+  /**
    * List all registered leaves
    */
   listLeaves(): Array<{ name: string; version: string; spec: LeafSpec }> {

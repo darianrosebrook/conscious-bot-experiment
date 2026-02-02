@@ -605,45 +605,39 @@ export class SmeltLeaf implements LeafImpl {
           } catch {}
         });
 
-        // Load fuel/input as needed
-        const put = async (
-          name: string,
-          where: 'fuel' | 'input',
-          amount: number
-        ) => {
-          const it = bot.inventory.items().find((i: any) => i.name === name);
-          if (!it || it.count < 1) throw new Error(`missing:${where}`);
-          // Note: furnace.putItem API may vary by mineflayer version
-          // This is a simplified implementation
-          console.log(`Would put ${amount} ${name} in ${where} slot`);
-        };
+        // Load fuel into furnace
+        const fuelInvItem = bot.inventory.items().find((i: any) => i.name === fuel);
+        if (!fuelInvItem || fuelInvItem.count < 1) throw new Error('missing:fuel');
+        const fuelQty = Math.max(1, Math.min(8, qty));
+        await furnace.putFuel(fuelInvItem.type, null, fuelQty);
 
-        // Minimal policy: attempt to put at least qty items, bounded by stack sizes
-        await put(fuel, 'fuel', Math.max(1, Math.min(8, qty)));
-        await put(input, 'input', qty);
+        // Load input into furnace
+        const inputInvItem = bot.inventory.items().find((i: any) => i.name === input);
+        if (!inputInvItem || inputInvItem.count < 1) throw new Error('missing:input');
+        await furnace.putInput(inputInvItem.type, null, qty);
 
-        // Wait until at least one output appears or abort/timeout
-        const targetOut = this.deriveOutputName(input); // e.g., 'iron_ingot' from 'iron_ore'
-        const waitForOutput = new Promise<void>((resolve, reject) => {
-          const onUpdate = () => {
-            const out = furnace.outputItem();
-            if (out && mcData.items[out.type]?.name === targetOut) resolve();
-          };
-          furnace.on('update', onUpdate);
-          onAbort(() => {
-            furnace.removeListener('update', onUpdate);
-            reject(new Error('aborted'));
-          });
-        });
+        // Wait until output appears (poll-based — furnace 'update' events can be unreliable)
+        const targetOut = this.deriveOutputName(input);
+        let smelted = false;
+        const pollStart = Date.now();
+        const pollDeadline = pollStart + timeoutMs - 5000; // leave 5s buffer for withdrawal
+        while (Date.now() < pollDeadline) {
+          const out = furnace.outputItem();
+          if (out) {
+            smelted = true;
+            break;
+          }
+          // Also check fuel progress — furnace.fuel > 0 means smelting is active
+          await new Promise((r) => setTimeout(r, 1000));
+        }
 
-        await waitForOutput;
+        if (!smelted) {
+          await furnace.close();
+          throw new Error('timeout');
+        }
 
-        // Withdraw available output (at least one)
-        const out = furnace.outputItem();
-        if (!out) throw new Error('no_output');
-        // Note: furnace.takeOutput API may vary by mineflayer version
-        console.log(`Would take output: ${out.name}`);
-
+        // Withdraw output
+        await furnace.takeOutput();
         await furnace.close();
       });
     } catch (e: any) {
@@ -711,11 +705,25 @@ export class SmeltLeaf implements LeafImpl {
   // Minimal mapping; extend to full table or use mcData recipes
   private deriveOutputName(input: string): string {
     const map: Record<string, string> = {
+      raw_iron: 'iron_ingot',
+      raw_gold: 'gold_ingot',
+      raw_copper: 'copper_ingot',
       iron_ore: 'iron_ingot',
       gold_ore: 'gold_ingot',
+      copper_ore: 'copper_ingot',
       sand: 'glass',
+      cobblestone: 'stone',
+      clay_ball: 'brick',
+      netherrack: 'nether_brick',
       beef: 'cooked_beef',
-      // add more…
+      porkchop: 'cooked_porkchop',
+      chicken: 'cooked_chicken',
+      mutton: 'cooked_mutton',
+      rabbit: 'cooked_rabbit',
+      cod: 'cooked_cod',
+      salmon: 'cooked_salmon',
+      potato: 'baked_potato',
+      kelp: 'dried_kelp',
     };
     return map[input] ?? input; // fallback: no rename
   }

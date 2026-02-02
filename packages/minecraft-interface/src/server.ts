@@ -35,6 +35,7 @@ import {
 } from './leaves/movement-leaves';
 import {
   DigBlockLeaf,
+  AcquireMaterialLeaf,
   PlaceBlockLeaf,
   PlaceTorchIfNeededLeaf,
   RetreatAndBlockLeaf,
@@ -795,6 +796,7 @@ async function registerCoreLeaves() {
     // Register interaction leaves
     const interactionLeaves = [
       new DigBlockLeaf(),
+      new AcquireMaterialLeaf(),
       new PlaceBlockLeaf(),
       new PlaceTorchIfNeededLeaf(),
       new RetreatAndBlockLeaf(),
@@ -1679,7 +1681,11 @@ app.post('/action', async (req, res) => {
       timeout: actionTimeout,
     };
 
-    const result = await actionTranslator.executeAction(action);
+    // Create an AbortController per request — abort on client disconnect
+    const abortController = new AbortController();
+    res.on('close', () => abortController.abort());
+
+    const result = await actionTranslator.executeAction(action, abortController.signal);
 
     res.json({
       success: true,

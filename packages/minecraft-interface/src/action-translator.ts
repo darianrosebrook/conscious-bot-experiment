@@ -109,28 +109,17 @@ interface ActionTranslatorConfig {
 import { NavigationBridge } from './navigation-bridge';
 import { StateMachineWrapper } from './extensions/state-machine-wrapper';
 
+import {
+  buildActionTypeToLeafMap,
+  normalizeActionParams,
+} from './action-contract-registry';
+
 /**
  * Maps action types to their canonical leaf spec names.
- * Used by the LeafFactory-first dispatch path in executeAction.
- * If an action type is not in this map, it is tried as-is against LeafFactory.
+ * Generated from ACTION_CONTRACTS — single source of truth.
  */
-export const ACTION_TYPE_TO_LEAF: Record<string, string> = {
-  // move_to: uses legacy executeNavigate handler (D* Lite NavigationBridge)
-  // MoveToLeaf exists for direct leaf-level usage but REST dispatch uses proven D* Lite path
-  craft: 'craft_recipe',
-  craft_item: 'craft_recipe',
-  smelt: 'smelt',
-  smelt_item: 'smelt',
-  place_workstation: 'place_workstation',
-  prepare_site: 'prepare_site',
-  build_module: 'build_module',
-  place_feature: 'place_feature',
-  sleep: 'sleep',
-  collect_items: 'collect_items',
-  find_resource: 'find_resource',
-  equip_tool: 'equip_tool',
-  introspect_recipe: 'introspect_recipe',
-};
+export const ACTION_TYPE_TO_LEAF: Record<string, string> =
+  buildActionTypeToLeafMap();
 
 export class ActionTranslator {
   private bot: Bot;
@@ -552,6 +541,17 @@ export class ActionTranslator {
           timeout: 15000,
         };
 
+      case 'acquire_material':
+        // Combined dig + collect in one atomic operation
+        return {
+          type: 'acquire_material',
+          parameters: {
+            item: params.item || params.blockType,
+            count: params.count || params.quantity || 1,
+          },
+          timeout: 30000,
+        };
+
       case 'collect_items':
         // Creating collect items action with improved search
         return {
@@ -936,7 +936,8 @@ export class ActionTranslator {
    * naturally become unreachable and can be removed one at a time.
    */
   async executeAction(
-    action: MinecraftAction
+    action: MinecraftAction,
+    signal?: AbortSignal,
   ): Promise<{ success: boolean; data?: any; error?: string }> {
     const timeout = action.timeout || this.config.actionTimeout;
 
@@ -949,18 +950,44 @@ export class ActionTranslator {
       if (leafFactory && !LEGACY_ONLY.has(action.type)) {
         const leafName =
           ACTION_TYPE_TO_LEAF[action.type] || action.type;
-        const leaf = leafFactory.get(leafName);
-        if (leaf && (leaf as any)?.spec?.placeholder !== true) {
-          // For craft, use the dedicated handler that has fallback logic
+
+        if (leafFactory.isRoutable ? leafFactory.isRoutable(leafName) : (leafFactory.get(leafName) && (leafFactory.get(leafName) as any)?.spec?.placeholder !== true)) {
+          // Guard: craft still uses dedicated handler (has workstation proximity + fallback)
           if (
             leafName === 'craft_recipe' &&
             (action.type === 'craft' || action.type === 'craft_item')
           ) {
             return await this.executeCraftItem(action, timeout);
           }
+
+          // Guard: place_block with pattern-based multi-block placement needs handler
+          if (
+            leafName === 'place_block' &&
+            action.parameters.placement &&
+            action.parameters.placement !== 'around_player'
+          ) {
+            return await this.executePlaceBlock(action as PlaceBlockAction, timeout);
+          }
+
+          // Guard: place_block with count > 1 needs handler (leaf places single blocks)
+          if (leafName === 'place_block' && (action.parameters.count ?? 1) > 1) {
+            return await this.executePlaceBlock(action as PlaceBlockAction, timeout);
+          }
+
+          // Guard: collect_items_enhanced with exploreOnFail=true needs handler
+          // (CollectItemsLeaf doesn't support spiral exploration fallback)
+          if (
+            leafName === 'collect_items' &&
+            action.type === 'collect_items_enhanced' &&
+            action.parameters.exploreOnFail === true
+          ) {
+            return await this.executeCollectItemsEnhanced(action, timeout);
+          }
+
           return await this.executeLeafAction(
             { ...action, type: leafName as any },
-            timeout
+            timeout,
+            signal,
           );
         }
       }
@@ -980,12 +1007,6 @@ export class ActionTranslator {
         case 'strafe_right':
           return await this.executeDirectMovement(action, timeout);
 
-        case 'consume_food':
-          return await this.executeConsumeFood(
-            action as ConsumeFoodAction,
-            action.timeout || this.config.actionTimeout
-          );
-
         case 'experiment_with_item':
           return await this.executeExperimentWithItem(
             action,
@@ -995,13 +1016,6 @@ export class ActionTranslator {
         case 'explore_item_properties':
           return await this.executeExploreItemProperties(
             action,
-            action.timeout || this.config.actionTimeout
-          );
-
-        case 'place_block':
-          // Executing place_block action
-          return await this.executePlaceBlock(
-            action as PlaceBlockAction,
             action.timeout || this.config.actionTimeout
           );
 
@@ -1032,13 +1046,10 @@ export class ActionTranslator {
         case 'prepare_site':
         case 'build_module':
         case 'place_feature':
-          return await this.executeLeafAction(action, timeout);
+          return await this.executeLeafAction(action, timeout, signal);
 
         case 'pickup_item':
           return await this.executePickup(action, timeout);
-
-        case 'collect_items_enhanced':
-          return await this.executeCollectItemsEnhanced(action, timeout);
 
         case 'look_at':
           return await this.executeLookAt(action, timeout);
@@ -1112,7 +1123,7 @@ export class ActionTranslator {
       const craftRecipeLeaf = leafFactory.get('craft_recipe');
       if (
         craftRecipeLeaf &&
-        (craftRecipeLeaf as any)?.spec?.placeholder !== true
+        (leafFactory.isRoutable ? leafFactory.isRoutable('craft_recipe') : (craftRecipeLeaf as any)?.spec?.placeholder !== true)
       ) {
         try {
           const context = this.createLeafContext();
@@ -1236,10 +1247,10 @@ export class ActionTranslator {
    * Create a leaf execution context from the current bot state.
    * Shared by executeCraftItem, executeSmeltItem, executeLeafAction, and executeDigBlock.
    */
-  private createLeafContext() {
+  private createLeafContext(signal?: AbortSignal) {
     return {
       bot: this.bot,
-      abortSignal: new AbortController().signal,
+      abortSignal: signal ?? new AbortController().signal,
       now: () => Date.now(),
       snapshot: async () => ({
         position: this.bot.entity.position,
@@ -1274,6 +1285,15 @@ export class ActionTranslator {
       emitError: (error: any) => {
         console.error('Leaf error:', error);
       },
+      // LOS for all leaves (AcquireMaterialLeaf already consumes this)
+      hasLineOfSight: (
+        obs: { x: number; y: number; z: number },
+        tgt: { x: number; y: number; z: number }
+      ) =>
+        this.raycastEngine.hasLineOfSight(obs, tgt, {
+          maxDistance: this.raycastConfig.maxDistance,
+          assumeBlockedOnError: true,
+        }),
     };
   }
 
@@ -1299,7 +1319,7 @@ export class ActionTranslator {
       if (!smeltLeaf) {
         return { success: false, error: 'No leaf registered for smelt' };
       }
-      if ((smeltLeaf as any)?.spec?.placeholder === true) {
+      if (leafFactory.isRoutable ? !leafFactory.isRoutable('smelt') : (smeltLeaf as any)?.spec?.placeholder === true) {
         return {
           success: false,
           error: "Leaf 'smelt' is a placeholder stub",
@@ -1337,7 +1357,8 @@ export class ActionTranslator {
    */
   private async executeLeafAction(
     action: MinecraftAction,
-    timeout: number
+    timeout: number,
+    signal?: AbortSignal,
   ): Promise<{ success: boolean; data?: any; error?: string }> {
     const leafFactory = (global as any).minecraftLeafFactory;
     if (!leafFactory) {
@@ -1355,7 +1376,7 @@ export class ActionTranslator {
       };
     }
 
-    if ((leaf as any)?.spec?.placeholder === true) {
+    if (leafFactory.isRoutable ? !leafFactory.isRoutable(action.type) : (leaf as any)?.spec?.placeholder === true) {
       return {
         success: false,
         error: `Leaf '${action.type}' is a placeholder stub`,
@@ -1367,15 +1388,28 @@ export class ActionTranslator {
       const leafTimeout = (leaf as any)?.spec?.timeoutMs;
       const effectiveTimeout = leafTimeout ? Math.max(leafTimeout, timeout) : timeout;
 
-      const context = this.createLeafContext();
+      // Data-driven normalization from registry
+      const { params: normalizedParams, warnings } = normalizeActionParams(
+        action.type,
+        action.parameters
+      );
+      for (const w of warnings) {
+        console.warn(`[leaf-dispatch] ${w}`);
+      }
+
+      const context = this.createLeafContext(signal);
       const result = await leaf.run(context, {
-        ...action.parameters,
+        ...normalizedParams,
         timeoutMs: effectiveTimeout,
       });
 
       return {
         success: result.status === 'success',
-        data: { type: action.type, leafResult: result },
+        data: {
+          requestedActionType: action.type,
+          resolvedLeafName: action.type,
+          leafResult: result,
+        },
         error:
           result.status === 'failure'
             ? result.error?.detail || `${action.type} failed`
@@ -1416,7 +1450,7 @@ export class ActionTranslator {
           error: 'Dig block leaf not found',
         };
       }
-      if ((digBlockLeaf as any)?.spec?.placeholder === true) {
+      if (leafFactory.isRoutable ? !leafFactory.isRoutable('dig_block') : (digBlockLeaf as any)?.spec?.placeholder === true) {
         return {
           success: false,
           error:
@@ -1504,15 +1538,7 @@ export class ActionTranslator {
         }
       }
 
-      // Pass LOS validator so the leaf can enforce visibility when it resolves position itself
-      (context as any).hasLineOfSight = (
-        obs: { x: number; y: number; z: number },
-        tgt: { x: number; y: number; z: number }
-      ) =>
-        this.raycastEngine.hasLineOfSight(obs, tgt, {
-          maxDistance: this.raycastConfig.maxDistance,
-          assumeBlockedOnError: true,
-        });
+      // LOS validator is now provided by createLeafContext() for all leaves
 
       // Execute the dig block leaf
       const result = await digBlockLeaf.run(context, parameters);
@@ -1529,6 +1555,121 @@ export class ActionTranslator {
       );
       return await this.executeBasicDigBlock(action, timeout);
     }
+  }
+
+  /**
+   * Acquire material: combined navigate + dig + collect in one atomic operation.
+   * Finds the nearest matching block, pathfinds to within reach, mines it,
+   * then immediately picks up drops.
+   */
+  private async executeAcquireMaterial(
+    action: MinecraftAction,
+    timeout: number
+  ): Promise<{ success: boolean; data?: any; error?: string }> {
+    const { item, blockType, count = 1 } = action.parameters;
+    const targetBlock = item || blockType;
+    if (!targetBlock) {
+      return { success: false, error: 'acquire_material requires item or blockType' };
+    }
+
+    const collected: Array<{ name: string; count: number }> = [];
+    let remaining = count as number;
+    const deadline = Date.now() + timeout;
+    // Minecraft dig reach is ~4.5 blocks; navigate if farther than this
+    const DIG_REACH = 4.0;
+
+    while (remaining > 0 && Date.now() < deadline) {
+      // Step 1: Find the nearest matching block
+      let blockPos: Vec3;
+      try {
+        blockPos = this.findNearestVisibleBlock(targetBlock);
+      } catch (e) {
+        if (collected.length > 0) break;
+        return {
+          success: false,
+          error: `No visible ${targetBlock} found nearby`,
+          data: { collected },
+        };
+      }
+
+      // Step 2: Pathfind to within reach if too far away
+      const botPos = this.bot.entity.position;
+      const dist = botPos.distanceTo(blockPos);
+      if (dist > DIG_REACH) {
+        console.log(
+          `[AcquireMaterial] Block ${targetBlock} at ${blockPos} is ${dist.toFixed(1)} blocks away — pathfinding to reach`
+        );
+        const navResult = await this.executeNavigate(
+          {
+            type: 'navigate',
+            parameters: {
+              target: { x: blockPos.x, y: blockPos.y, z: blockPos.z },
+              range: 3,
+            },
+          } as any,
+          Math.min(20000, deadline - Date.now())
+        );
+        if (!navResult.success) {
+          console.warn(
+            `[AcquireMaterial] Failed to pathfind to ${targetBlock}: ${navResult.error}`
+          );
+          if (collected.length > 0) break;
+          return {
+            success: false,
+            error: `Cannot reach ${targetBlock}: ${navResult.error}`,
+            data: { collected },
+          };
+        }
+      }
+
+      // Step 3: Dig the block (now within reach)
+      const digResult = await this.executeDigBlock(
+        { type: 'dig_block', parameters: { blockType: targetBlock } },
+        Math.min(15000, deadline - Date.now())
+      );
+
+      if (!digResult.success) {
+        if (collected.length > 0) break;
+        return {
+          success: false,
+          error: `Failed to mine ${targetBlock}: ${digResult.error}`,
+          data: { collected },
+        };
+      }
+
+      // Step 4: Brief pause for drops to spawn
+      await new Promise((r) => setTimeout(r, 300));
+
+      // Step 5: Collect nearby drops
+      const collectResult = await this.executeCollectItemsEnhanced(
+        {
+          type: 'collect_items_enhanced',
+          parameters: {
+            item: targetBlock,
+            radius: 8,
+            maxSearchTime: 5000,
+            exploreOnFail: false,
+          },
+        },
+        Math.min(8000, deadline - Date.now())
+      );
+
+      if (collectResult.success && collectResult.data?.collected) {
+        const items = collectResult.data.items || [{ name: targetBlock, count: 1 }];
+        collected.push(...items);
+      }
+
+      remaining--;
+    }
+
+    return {
+      success: collected.length > 0,
+      data: {
+        collected,
+        totalCollected: collected.reduce((s, i) => s + i.count, 0),
+        requested: count,
+      },
+    };
   }
 
   /**

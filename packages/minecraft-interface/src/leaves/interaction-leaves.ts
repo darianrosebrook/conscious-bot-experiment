@@ -16,7 +16,14 @@ import {
   LeafSpec,
 } from '@conscious-bot/core';
 import { pathfinder } from 'mineflayer-pathfinder';
-// Use simple goals implementation
+// mineflayer-pathfinder doesn't expose goals/Movements as ESM named exports — use require
+import { createRequire } from 'module';
+const require_ = createRequire(import.meta.url);
+const pfModule = require_('mineflayer-pathfinder');
+const pathfinderGoals = pfModule.goals;
+const Movements = pfModule.Movements;
+
+// Fallback simple goals for contexts where real pathfinder goals aren't needed
 class SimpleGoalNear {
   constructor(x: number, y: number, z: number, range: number = 1) {
     this.x = x;
@@ -931,6 +938,306 @@ export class DigBlockLeaf implements LeafImpl {
 }
 
 // ============================================================================
+// Acquire Material Leaf
+// ============================================================================
+
+/**
+ * Composite leaf: find nearest block matching item pattern → dig → collect dropped items.
+ * Combines DigBlockLeaf and CollectItemsLeaf into a single atomic operation so the
+ * planner doesn't need to emit separate dig + pickup steps.
+ */
+export class AcquireMaterialLeaf implements LeafImpl {
+  spec: LeafSpec = {
+    name: 'acquire_material',
+    version: '1.0.0',
+    description:
+      'Find, dig, and collect a material in one operation (dig + pickup)',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        item: {
+          type: 'string',
+          description:
+            'Block/item name pattern (e.g. "oak_log", "_log" for any wood)',
+        },
+        count: {
+          type: 'number',
+          minimum: 1,
+          maximum: 8,
+          default: 1,
+          description: 'Number of blocks to acquire (capped at 8)',
+        },
+        tool: {
+          type: 'string',
+          description: 'Tool to equip before digging (optional)',
+        },
+      },
+      required: ['item'],
+    },
+    outputSchema: {
+      type: 'object',
+      properties: {
+        success: { type: 'boolean' },
+        acquired: { type: 'number' },
+        items: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              name: { type: 'string' },
+              count: { type: 'number' },
+            },
+          },
+        },
+      },
+    },
+    timeoutMs: 30000,
+    retries: 1,
+    permissions: ['dig', 'movement'],
+  };
+
+  async run(ctx: LeafContext, args: any): Promise<LeafResult> {
+    const startTime = ctx.now();
+    const itemPattern = args?.item as string | undefined;
+    if (!itemPattern) {
+      return {
+        status: 'failure',
+        error: {
+          code: 'acquire.invalidArgs',
+          retryable: false,
+          detail: 'acquire_material requires item (string)',
+        },
+        metrics: { durationMs: ctx.now() - startTime, retries: 0, timeouts: 0 },
+      };
+    }
+
+    const count = Math.max(1, Math.min(args?.count ?? 1, 8));
+    const tool = args?.tool as string | undefined;
+    const bot = ctx.bot;
+    const collected: Array<{ name: string; count: number }> = [];
+    let totalAcquired = 0;
+
+    try {
+      for (let i = 0; i < count; i++) {
+        // --- Phase 1: Find nearest matching block (expanding cube search) ---
+        const origin = bot.entity.position.clone();
+        const eyePos = origin.offset(0, bot.entity.height ?? 1.62, 0);
+        const hasLineOfSight = (ctx as any).hasLineOfSight as
+          | ((
+              obs: { x: number; y: number; z: number },
+              tgt: { x: number; y: number; z: number }
+            ) => boolean)
+          | undefined;
+
+        let resolvedPos: Vec3 | null = null;
+        // Expanding cube search for nearest matching block.
+        // Prefer blocks at or above bot Y; skip deep pits.
+        const MIN_DY = -2;
+        outer: for (let r = 1; r <= 10; r++) {
+          for (let dx = -r; dx <= r; dx++) {
+            for (let dy = Math.max(-r, MIN_DY); dy <= r; dy++) {
+              for (let dz = -r; dz <= r; dz++) {
+                const p = origin.offset(dx, dy, dz);
+                const b = bot.blockAt(p);
+                if (b && b.name && b.name.includes(itemPattern)) {
+                  if (hasLineOfSight) {
+                    const blockCenter = {
+                      x: p.x + 0.5,
+                      y: p.y + 0.5,
+                      z: p.z + 0.5,
+                    };
+                    if (!hasLineOfSight(eyePos, blockCenter)) continue;
+                  }
+                  resolvedPos = p;
+                  break outer;
+                }
+              }
+            }
+          }
+        }
+
+        if (!resolvedPos) {
+          // If we already acquired some, report partial success
+          if (totalAcquired > 0) break;
+          return {
+            status: 'failure',
+            error: {
+              code: 'world.invalidPosition',
+              retryable: true,
+              detail: `No ${itemPattern} found nearby`,
+            },
+            metrics: {
+              durationMs: ctx.now() - startTime,
+              retries: 0,
+              timeouts: 0,
+            },
+          };
+        }
+
+        const block = bot.blockAt(resolvedPos);
+        if (!block || block.name === 'air') continue;
+
+        // --- Phase 1b: Pathfind to within reach if too far ---
+        const DIG_REACH = 4.0;
+        const distToBlock = origin.distanceTo(resolvedPos);
+        if (distToBlock > DIG_REACH) {
+          try {
+            const botWithPf = bot as BotWithPathfinder;
+            if (!botWithPf.pathfinder) {
+              botWithPf.loadPlugin(pathfinder);
+            }
+            const moves = new Movements(bot);
+            moves.scafoldingBlocks = [];
+            moves.canDig = false;
+            botWithPf.pathfinder.setMovements(moves);
+
+            const goal = new pathfinderGoals.GoalNear(
+              resolvedPos.x,
+              resolvedPos.y,
+              resolvedPos.z,
+              3
+            );
+            await botWithPf.pathfinder.goto(goal);
+          } catch (navErr: any) {
+            // If pathfinding fails, still try to dig — might be close enough
+            console.warn(
+              `[AcquireMaterial] Pathfind failed (${navErr?.message}), attempting dig anyway`
+            );
+          }
+        }
+
+        // --- Phase 2: Equip tool and dig ---
+        if (tool) {
+          const toolItem = bot.inventory
+            .items()
+            .find((item: any) => item.name.includes(tool));
+          if (toolItem) {
+            await bot.equip(toolItem, 'hand');
+          }
+        }
+
+        const inventoryBefore = bot.inventory.items().reduce(
+          (sum: number, it: any) => sum + (it.count || 1),
+          0
+        );
+
+        const blockName = block.name;
+        await bot.dig(block);
+
+        // --- Phase 3: Collect dropped items ---
+        // Use playerCollect event as the primary signal, with inventory-delta
+        // as the authoritative check.  If the item isn't auto-collected within
+        // 2s, walk toward the dig site at ground level to trigger proximity pickup.
+
+        let pickupDetected = false;
+        const onCollect = (collector: any, _entity: any) => {
+          if (collector === bot.entity) pickupDetected = true;
+        };
+        bot.on('playerCollect' as any, onCollect);
+
+        // Wait up to 2s for auto-pickup (items within ~2 blocks are collected automatically)
+        for (let w = 0; w < 8 && !pickupDetected; w++) {
+          await new Promise((r) => setTimeout(r, 250));
+        }
+
+        if (!pickupDetected) {
+          // Walk toward where the item likely landed (dig site X/Z at bot's Y).
+          // Items from blocks above the bot fall to ground level.
+          const botY = bot.entity.position.y;
+          const dropTarget = resolvedPos.offset(0.5, botY - resolvedPos.y, 0.5);
+          await bot.lookAt(dropTarget);
+          (bot as any).setControlState('forward', true);
+          // Walk for up to 2s or until pickup is detected
+          for (let w = 0; w < 8 && !pickupDetected; w++) {
+            await new Promise((r) => setTimeout(r, 250));
+            const dxz = Math.hypot(
+              bot.entity.position.x - resolvedPos.x,
+              bot.entity.position.z - resolvedPos.z,
+            );
+            if (dxz < 1.5) break;
+          }
+          (bot as any).setControlState('forward', false);
+          // Final wait for pickup registration
+          await new Promise((r) => setTimeout(r, 300));
+        }
+
+        bot.removeListener('playerCollect' as any, onCollect);
+
+        // Inventory delta is the authoritative pickup check
+        const inventoryAfter = bot.inventory.items().reduce(
+          (sum: number, it: any) => sum + (it.count || 1),
+          0
+        );
+        if (inventoryAfter > inventoryBefore) {
+          totalAcquired++;
+          collected.push({ name: blockName, count: 1 });
+        }
+      }
+
+      ctx.emitMetric('acquire_material_count', totalAcquired);
+
+      return {
+        status: totalAcquired > 0 ? 'success' : 'failure',
+        result: {
+          success: totalAcquired > 0,
+          acquired: totalAcquired,
+          items: collected,
+          collected: true,
+          item: itemPattern,
+        },
+        ...(totalAcquired === 0
+          ? {
+              error: {
+                code: 'acquire.noneCollected',
+                retryable: true,
+                detail: `Dug blocks but failed to collect any ${itemPattern}`,
+              },
+            }
+          : {}),
+        metrics: {
+          durationMs: ctx.now() - startTime,
+          retries: 0,
+          timeouts: 0,
+        },
+      };
+    } catch (error) {
+      // If we partially acquired, still report what we got
+      if (totalAcquired > 0) {
+        return {
+          status: 'success',
+          result: {
+            success: true,
+            acquired: totalAcquired,
+            items: collected,
+            collected: true,
+            item: itemPattern,
+          },
+          metrics: {
+            durationMs: ctx.now() - startTime,
+            retries: 0,
+            timeouts: 0,
+          },
+        };
+      }
+      return {
+        status: 'failure',
+        error: {
+          code: 'acquire.failed',
+          retryable: true,
+          detail:
+            error instanceof Error ? error.message : 'Unknown acquire error',
+        },
+        metrics: {
+          durationMs: ctx.now() - startTime,
+          retries: 0,
+          timeouts: 0,
+        },
+      };
+    }
+  }
+}
+
+// ============================================================================
 // Place Block Leaf
 // ============================================================================
 
@@ -1682,7 +1989,7 @@ export class CollectItemsLeaf implements LeafImpl {
       // Find dropped item entities
       const itemEntities = Object.values(bot.entities)
         .filter((e: any) => {
-          if (e.name !== 'item' && e.objectType !== 'Item') return false;
+          if (e.name !== 'item' && e.type !== 'item' && e.displayName !== 'Item') return false;
           if (!e.position) return false;
           const dist = e.position.distanceTo(origin);
           if (dist > radius) return false;
@@ -1705,43 +2012,50 @@ export class CollectItemsLeaf implements LeafImpl {
         };
       }
 
-      // Move to each item to pick it up (auto-pickup on proximity)
+      // Navigate to each item using pathfinder for auto-pickup on proximity
+      const botWithPf = bot as BotWithPathfinder;
+      if (!botWithPf.pathfinder) {
+        botWithPf.loadPlugin(pathfinder);
+      }
+      const collectMoves = new Movements(bot);
+      collectMoves.scafoldingBlocks = [];
+      collectMoves.canDig = false;
+      botWithPf.pathfinder.setMovements(collectMoves);
+
       let count = 0;
       for (const entity of itemEntities) {
         if (count >= maxItems) break;
         if (ctx.now() > deadline) break;
 
-        const itemInfo = (entity as any).getDroppedItem?.();
-        const targetPos = (entity as any).position;
-
-        // Walk toward the item — simple approach using bot.lookAt + forward
-        const dist = targetPos.distanceTo(bot.entity.position);
-        if (dist > 1.5) {
-          await bot.lookAt(targetPos);
-          (bot as any).setControlState('forward', true);
-
-          // Wait until close enough or entity gone
-          await new Promise<void>((resolve) => {
-            const check = setInterval(() => {
-              const ent = bot.entities[(entity as any).id];
-              if (!ent || !ent.position) {
-                clearInterval(check);
-                resolve();
-                return;
-              }
-              const d = ent.position.distanceTo(bot.entity.position);
-              if (d < 1.0 || ctx.now() > deadline) {
-                clearInterval(check);
-                resolve();
-              }
-            }, 100);
+        // Entity may have despawned already (picked up by proximity)
+        const ent = bot.entities[(entity as any).id];
+        if (!ent) {
+          count++;
+          const itemInfo = (entity as any).getDroppedItem?.();
+          collected.push({
+            name: itemInfo?.name ?? 'unknown',
+            count: itemInfo?.count ?? 1,
           });
-
-          (bot as any).setControlState('forward', false);
+          continue;
         }
 
-        // Brief wait for pickup
-        await new Promise((r) => setTimeout(r, 200));
+        const itemInfo = (entity as any).getDroppedItem?.();
+        const targetPos = ent.position ?? (entity as any).position;
+
+        try {
+          const goal = new pathfinderGoals.GoalNear(
+            targetPos.x,
+            targetPos.y,
+            targetPos.z,
+            0
+          );
+          await botWithPf.pathfinder.goto(goal);
+        } catch {
+          // Pathfinding failed — entity may have moved or despawned
+        }
+
+        // Brief wait for auto-pickup to register
+        await new Promise((r) => setTimeout(r, 300));
 
         // Check if entity is gone (was picked up)
         const stillExists = bot.entities[(entity as any).id];

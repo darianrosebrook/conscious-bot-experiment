@@ -237,7 +237,8 @@ export type MinecraftActionType =
   | 'prepare_site'
   | 'build_module'
   | 'place_feature'
-  | 'place_workstation';
+  | 'place_workstation'
+  | 'acquire_material';
 
 export interface MinecraftAction {
   type: MinecraftActionType;

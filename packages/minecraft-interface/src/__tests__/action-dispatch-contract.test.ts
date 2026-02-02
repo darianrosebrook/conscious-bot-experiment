@@ -87,6 +87,14 @@ function setupMockLeafFactory(
     'wait',
     'attack_entity',
     'chat',
+    'acquire_material',
+    'consume_food',
+    'collect_items',
+    'sleep',
+    'find_resource',
+    'equip_tool',
+    'introspect_recipe',
+    'place_workstation',
   ];
 
   for (const name of defaultLeaves) {
@@ -100,6 +108,11 @@ function setupMockLeafFactory(
 
   const factory = {
     get: (name: string) => leaves.get(name) ?? null,
+    isRoutable: (name: string) => {
+      const leaf = leaves.get(name);
+      if (!leaf) return false;
+      return leaf.spec.placeholder !== true;
+    },
   };
 
   (global as any).minecraftLeafFactory = factory;
@@ -437,6 +450,159 @@ describe('action dispatch contract', () => {
         timeout: 1000,
       });
 
+      expectNotUnknownType(result);
+    });
+  });
+
+  // -------------------------------------------------------------------
+  // Centralized dispatch: routing + semantic guards
+  // -------------------------------------------------------------------
+
+  describe('Centralized dispatch: new leaf routing', () => {
+    it('acquire_material routes to leaf', async () => {
+      const factory = setupMockLeafFactory();
+      const leaf = factory.get('acquire_material')!;
+
+      const result = await translator.executeAction({
+        type: 'acquire_material',
+        parameters: { item: 'oak_log', count: 1 },
+        timeout: 5000,
+      });
+
+      expect(leaf.run).toHaveBeenCalled();
+      expectNotUnknownType(result);
+    });
+
+    it('place_block (single, no pattern) routes to leaf', async () => {
+      const factory = setupMockLeafFactory();
+      const leaf = factory.get('place_block')!;
+
+      const result = await translator.executeAction({
+        type: 'place_block',
+        parameters: { block_type: 'cobblestone' },
+        timeout: 5000,
+      });
+
+      expect(leaf.run).toHaveBeenCalled();
+      expectNotUnknownType(result);
+    });
+
+    it('place_block with non-default placement routes to handler (not leaf)', async () => {
+      const factory = setupMockLeafFactory();
+      const leaf = factory.get('place_block')!;
+
+      // With placement: 'pattern_3x3_floor' it should fall through to handler
+      const result = await translator.executeAction({
+        type: 'place_block',
+        parameters: { block_type: 'stone', placement: 'pattern_3x3_floor', count: 9 },
+        timeout: 5000,
+      });
+
+      // Leaf should NOT be called — handler takes over
+      expect(leaf.run).not.toHaveBeenCalled();
+      expectNotUnknownType(result);
+    });
+
+    it('place_block with count > 1 routes to handler (not leaf)', async () => {
+      const factory = setupMockLeafFactory();
+      const leaf = factory.get('place_block')!;
+
+      const result = await translator.executeAction({
+        type: 'place_block',
+        parameters: { block_type: 'stone', count: 9 },
+        timeout: 5000,
+      });
+
+      // Leaf should NOT be called — count > 1 guard redirects
+      expect(leaf.run).not.toHaveBeenCalled();
+      expectNotUnknownType(result);
+    });
+
+    it('consume_food routes to leaf', async () => {
+      const factory = setupMockLeafFactory();
+      const leaf = factory.get('consume_food')!;
+
+      const result = await translator.executeAction({
+        type: 'consume_food',
+        parameters: { food_type: 'cooked_beef' },
+        timeout: 5000,
+      });
+
+      expect(leaf.run).toHaveBeenCalled();
+      expectNotUnknownType(result);
+    });
+
+    it('collect_items_enhanced without exploreOnFail routes to leaf', async () => {
+      const factory = setupMockLeafFactory();
+      const leaf = factory.get('collect_items')!;
+
+      const result = await translator.executeAction({
+        type: 'collect_items_enhanced',
+        parameters: { item: 'oak_log', radius: 10 },
+        timeout: 5000,
+      });
+
+      expect(leaf.run).toHaveBeenCalled();
+      expectNotUnknownType(result);
+    });
+
+    it('collect_items_enhanced with exploreOnFail=true routes to handler (not leaf)', async () => {
+      const factory = setupMockLeafFactory();
+      const leaf = factory.get('collect_items')!;
+
+      const result = await translator.executeAction({
+        type: 'collect_items_enhanced',
+        parameters: { item: 'oak_log', radius: 10, exploreOnFail: true },
+        timeout: 5000,
+      });
+
+      // Leaf should NOT be called — semantic guard redirects to handler
+      expect(leaf.run).not.toHaveBeenCalled();
+      expectNotUnknownType(result);
+    });
+
+    it('response includes requestedActionType and resolvedLeafName', async () => {
+      setupMockLeafFactory();
+
+      const result = await translator.executeAction({
+        type: 'acquire_material',
+        parameters: { item: 'oak_log', count: 1 },
+        timeout: 5000,
+      });
+
+      expect(result.success).toBe(true);
+      expect(result.data?.requestedActionType).toBe('acquire_material');
+      expect(result.data?.resolvedLeafName).toBe('acquire_material');
+    });
+
+    it('move_to still uses legacy handler (not routed through leaf)', async () => {
+      const factory = setupMockLeafFactory();
+      const leaf = factory.get('move_to')!;
+
+      const result = await translator.executeAction({
+        type: 'move_to',
+        parameters: { x: 100, y: 64, z: 100 },
+        timeout: 5000,
+      });
+
+      // move_to is in LEGACY_ONLY — leaf should NOT be called
+      expect(leaf.run).not.toHaveBeenCalled();
+      expectNotUnknownType(result);
+    });
+
+    it('craft still uses dedicated handler (not generic leaf dispatch)', async () => {
+      const factory = setupMockLeafFactory();
+      const craftLeaf = factory.get('craft_recipe')!;
+
+      const result = await translator.executeAction({
+        type: 'craft',
+        parameters: { item: 'stick', quantity: 4 },
+        timeout: 5000,
+      });
+
+      // craft goes through executeCraftItem which calls leaf.run directly
+      // (not through executeLeafAction)
+      expect(craftLeaf.run).toHaveBeenCalled();
       expectNotUnknownType(result);
     });
   });
