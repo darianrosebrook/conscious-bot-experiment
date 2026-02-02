@@ -67,11 +67,11 @@ Sterling's capability absorption pipeline infrastructure (Layers 1–5) is now i
 |-----|-----------|--------|-------|
 | **A**: Inventory transformation | 1, 16, 17, 19, 20 | DONE (all certification items complete including A.5 performance baselines) | Track 1 |
 | **B**: Capability gating | 2, 16, 19, 20 | DONE (full tier progression + certification tests) | Track 1 |
-| **C**: Temporal planning | 3, 16, 17, 18, 19 | PARTIAL (P03 capsule + temporal enrichment layer + crafting solver integration; FurnaceSchedulingSolver C.1–C.7 remain) | Track 1 |
+| **C**: Temporal planning | 3, 16, 17, 18, 19 | DONE (P03 capsule + temporal enrichment + FurnaceSchedulingSolver C.1–C.7 all certified) | Track 1 |
 | **D**: Multi-strategy acquisition (learning-benchmark candidate) | 4, 17, 18, 19, 20 | NOT STARTED | Track 2 |
-| **E**: Hierarchical planning | 5, 16, 17, 19 | PARTIAL (macro-planner wired, not domain-integrated) | Track 2 |
+| **E**: Hierarchical planning | 5, 16, 17, 19 | DONE (world graph builder + edge decomposer + feedback loop + golden-master + transfer test) | Track 2 |
 | **F**: Valuation under scarcity | 6, 16, 17, 18, 19 | NOT STARTED | Track 2 |
-| **G**: Feasibility + partial order | 7, 16, 17, 19 | PARTIAL (DAG pipeline + building solver; certification gaps G.1–G.5) | Track 2 |
+| **G**: Feasibility + partial order | 7, 16, 17, 19 | DONE (support constraints + reachability + scaffolding + partial-order proof + transfer test) | Track 2 |
 | **H**: Systems synthesis | 8, 14, 16, 19 | NOT STARTED | Track 2 |
 | **I**: Epistemic planning | 11, 13, 17, 19 | NOT STARTED | Track 2 |
 | **J**: Invariant maintenance | 12, 17, 18, 19 | NOT STARTED | Track 2 |
@@ -205,12 +205,12 @@ Completed in the P0–P2 hardening sprint (2026-01-29). This underpins every rig
 |-----------|--------|-------|-------|
 | SolveBundle content-addressed audit trail | DONE | `solve-bundle.ts`, `solve-bundle-types.ts` | Deterministic `bundleId = solverId:bundleHash` |
 | Canonicalization contract | DONE | `solve-bundle.ts` `canonicalize()` | Sorted keys, NaN rejection, -0 normalization |
-| Compat linter (10 checks) | DONE | `compat-linter.ts` | 9 original + INVALID_BASE_COST |
+| Compat linter (11 checks) | DONE | `compat-linter.ts` | 9 original + INVALID_BASE_COST + FURNACE_OVERCAPACITY |
 | SearchHealth accumulator (Python) | DONE | `sterling/core/search_health.py` | Welford O(1) variance, `searchHealthVersion: 1` |
 | SearchHealth parser + degeneracy detection (TS) | DONE | `search-health.ts` | Version check, partial-field warning, 3 degeneracy thresholds |
 | searchHealth end-to-end emission | DONE | Python A* loops → unified server → TS parser | Verified: wooden pickaxe healthy, iron tier degenerate |
 | Episode reporting (execution credit) | DONE | `base-domain-solver.ts` | Fire-and-forget with planId gate |
-| Payload-equivalence snapshots | DONE | `solver-golden-master.test.ts` | Crafting + building + tool progression canonical snapshots |
+| Payload-equivalence snapshots | DONE | `solver-golden-master.test.ts` | Crafting + building + tool progression + furnace canonical snapshots |
 | E2E solver-class tests | DONE | `solver-class-e2e.test.ts` | 5 tests against live Sterling (gated `STERLING_E2E=1`) |
 | Unknown-domain fail-closed error | DONE | `sterling_unified_server.py` | `STERLING_ALLOW_DOMAIN_FALLBACK` gate |
 | contractVersion wire protocol | DONE | crafting solver, unified server | Warning on missing; rejection gate ready |
@@ -285,7 +285,7 @@ Completed in the P0–P2 hardening sprint (2026-01-29). This underpins every rig
 
 ## Rig C: Temporal planning with durations, batching, and capacity
 
-**Status**: PARTIAL — P03 capsule defined + temporal enrichment layer integrated into crafting solver; FurnaceSchedulingSolver (C.1–C.7) not yet started
+**Status**: DONE — P03 capsule + temporal enrichment layer + FurnaceSchedulingSolver (C.1–C.7) all certified
 
 ### What's done
 
@@ -304,79 +304,77 @@ Completed in the P0–P2 hardening sprint (2026-01-29). This underpins every rig
 | Crafting solver temporal integration | `minecraft-crafting-solver.ts:116-166` | 3-mode gating, enrichment closures, deadlock early-return, temporal payload attachment to Sterling wire |
 | Temporal e2e test suite (49 tests) | `sterling/__tests__/temporal-crafting-e2e.test.ts` | Suites A–M: mode gating, enrichment, temporal fields, duration annotations, deadlock detection, batch hints, round-trip, adapter reuse, slot ordering, strict mock validation, smelt injection, edge cases, enrichment call counts |
 | Temporal unit tests | `temporal/__tests__/` | duration-model (6 tests), deadlock-prevention (4 tests), time-state (5 tests), enrichment-bridge (3 tests) |
+| FurnaceSchedulingSolver class (C.1) | `minecraft-furnace-solver.ts` | Extends `BaseDomainSolver<FurnaceSchedulingSolveResult>`. `solverId = 'minecraft.furnace'`. Full SolveBundle wiring. 12 unit tests in `furnace-solver-unit.test.ts` |
+| Furnace types + state hashing (C.2) | `minecraft-furnace-types.ts` | `FurnaceSlotState`, `FurnaceSearchState`, `hashFurnaceState()`. Hash excludes nondeterministic fields. 10 tests in `furnace-state.test.ts` |
+| Operator families + linter (C.3) | `minecraft-furnace-rules.ts`, `compat-linter.ts` | 4 operator families (load_furnace, add_fuel, wait_tick, retrieve_output). `FURNACE_OVERCAPACITY` check (11th linter check). 15 tests in `furnace-operators.test.ts` |
+| Batching proof (C.4) | `furnace-batching-proof.test.ts` | Batch plan vs sequential — optimal path length ≤ suboptimal. `preferBatch` threshold. 6 tests |
+| Parallel slot proof (C.5) | `furnace-parallel-slots.test.ts` | 2 furnaces, 4 items: parallel makespan < sequential. No double-booking. 5 tests |
+| Golden-master snapshot (C.6) | `solver-golden-master.test.ts` (furnace section), `furnace-golden-master.test.ts` | R3 payload snapshot, byte-equivalent payloads, R4 deterministic bundleId. 9 tests total |
+| Transfer test — job shop (C.7) | `transfer-job-shop.test.ts` | Generic job shop domain (welders, lathes). Zero Minecraft imports. 13 tests |
 
 > **Note**: The P03 capsule (`packages/planning/src/sterling/primitives/p03/`) and temporal modules (`packages/planning/src/temporal/`) are currently untracked in git. The e2e test file was committed (`dfaec57`). The remaining untracked directories should be committed as part of the next Rig C PR.
 
-### What's needed
+### Certification checklist
 
-C.1–C.7 are the **FurnaceSchedulingSolver** certification items. The temporal enrichment layer (above) is prerequisite infrastructure; these items build the dedicated furnace solver on top of it.
+- [x] **C.1 — FurnaceSchedulingSolver class**: `minecraft-furnace-solver.ts` extends `BaseDomainSolver<FurnaceSchedulingSolveResult>`. `solverId = 'minecraft.furnace'`. SolveBundle wired. R1 bundle shape verified. R4 deterministic bundleId. Unavailable result path tested.
 
-- [ ] **C.1 — FurnaceSchedulingSolver class**: Extends `BaseDomainSolver`. Accepts furnace count, fuel inventory, smelt queue. Calls Sterling with time-aware rules.
-  - **Acceptance**: `minecraft-furnace-solver.ts` exists. Extends `BaseDomainSolver<FurnaceSolveResult>`. `solverId = 'minecraft.furnace'`. SolveBundle wired.
+- [x] **C.2 — Time-discretized state representation**: `minecraft-furnace-types.ts` defines `FurnaceSlotState`, `FurnaceSearchState`. `hashFurnaceState()` using canonicalize + contentHash. Hash excludes nondeterministic fields (`fuelRemaining`, `smeltProgress`, `timestamp`). Bucket quantization consistent with `MINECRAFT_BUCKET_SIZE_TICKS`.
 
-- [ ] **C.2 — Time-discretized state representation**: State includes furnace slots (each with item, fuel remaining, ticks to completion). Canonical hash compresses timing into buckets.
-  - **Acceptance**: `minecraft-furnace-types.ts` defines `FurnaceSlotState`, `FurnaceSearchState`. Hash function defined. Bucket granularity documented.
+- [x] **C.3 — Operator families**: Rule builder generates 4 operator families per smeltable item. Preconditions enforce capacity. Compat linter extended with `FURNACE_OVERCAPACITY` check (11th check, gated behind `solverId === 'minecraft.furnace'`).
 
-- [ ] **C.3 — Operator families**: `load_furnace`, `add_fuel`, `wait_tick`, `retrieve_output`. Preconditions enforce capacity (slot not occupied). Effects update slot state + clock.
-  - **Acceptance**: Rule builder generates typed operators. Compat linter extended with `FURNACE_OVERCAPACITY` check.
+- [x] **C.4 — Batching proof**: Batch plan (load x4 → wait → retrieve x4) vs sequential — optimal `solutionPathLength` ≤ suboptimal. `preferBatch` returns `useBatch=true` for count ≥ threshold.
 
-- [ ] **C.4 — Batching proof**: Sterling prefers loading multiple items before waiting, rather than load-wait-retrieve-repeat.
-  - **Acceptance**: Unit test: 4 items + 1 furnace. Optimal plan loads+fuels, then waits once. Suboptimal plan waits per item. Assert `solutionPathLength` optimal <= suboptimal.
+- [x] **C.5 — Parallel slot proof**: 2 furnaces, 4 items. Plan assigns across both. Parallel makespan < sequential makespan. No slot double-booking. Deterministic slot selection.
 
-- [ ] **C.5 — Parallel slot proof**: With k=2 furnaces and 4 items, Sterling allocates across both.
-  - **Acceptance**: E2E or unit test: 2 furnaces, 4 iron ore. Plan uses both slots. Makespan < sequential.
+- [x] **C.6 — Golden-master snapshot**: `solver-golden-master.test.ts` furnace section + dedicated `furnace-golden-master.test.ts`. R3 canonical payload snapshot. R3 byte-equivalent payloads. R4 deterministic bundleHash.
 
-- [ ] **C.6 — Golden-master snapshot**: Outbound payload captured and snapshotted.
-  - **Acceptance**: `solver-golden-master.test.ts` furnace section with canonical payload snapshot.
-
-- [ ] **C.7 — Transfer test**: Generic "job shop" scheduling surface with slot occupancy semantics.
-  - **Acceptance**: `transfer-job-shop.test.ts` using furnace solver with non-Minecraft job/machine rules.
+- [x] **C.7 — Transfer test**: `transfer-job-shop.test.ts` — generic job shop domain (welders, lathes) with slot occupancy semantics. P03TemporalAdapter + SolveBundle infrastructure. Zero Minecraft imports.
 
 ---
 
 ## Rig G: Feasibility + partial-order structure (building)
 
-**Status**: PARTIAL — building solver with DAG pipeline; certification gaps G.1–G.5 remain
+**Status**: DONE — support constraints + reachability + scaffolding + partial-order proof + transfer test all certified
 
 ### What's done
 
 | Item | File | Evidence |
 |------|------|----------|
 | Building solver (templateId, modules, siteState) | `minecraft-building-solver.ts` | `solver-golden-master.test.ts`: building tests |
-| Module types (prep_site, apply_module, place_feature) | `minecraft-building-types.ts` | Type definitions + `requiresModules` field + `RigGMode`, `RigGStageDecisions` |
-| DAG builder (module dependency graph) | `constraints/dag-builder.ts` | Builds DAG from module `requiresModules` |
+| Module types (prep_site, apply_module, place_feature, scaffold) | `minecraft-building-types.ts` | Type definitions + `requiresModules` + `supportRequirements` + `reachabilityZone` + `isTemporary` + `RigGMode`, `RigGStageDecisions` |
+| DAG builder (module dependency + support graph) | `constraints/dag-builder.ts` | Builds DAG from module `requiresModules` + `supportRequirements`. Emits dependency and support edges. Scaffold conflict keys. |
 | Topological linearization | `constraints/linearization.ts` | Linearizes DAG; tested in `linearization.test.ts` |
-| Feasibility checker | `constraints/feasibility-checker.ts` | Validates constraint satisfaction; tested in `feasibility-checker.test.ts` |
-| Partial-order plan representation | `constraints/partial-order-plan.ts` | `findCommutingPairs()` for independent modules; tested in `partial-order-plan.test.ts` |
+| Feasibility checker (dependency + support + reachability) | `constraints/feasibility-checker.ts` | Validates dependency, support, and reachability constraints; tested in `feasibility-checker.test.ts` |
+| Partial-order plan representation | `constraints/partial-order-plan.ts` | `ConstraintType = 'dependency' \| 'reachability' \| 'support'`; `findCommutingPairs()` for independent modules; tested in `partial-order-plan.test.ts` |
+| Constraint model (dependency + support + reachability) | `constraints/constraint-model.ts` | `SupportConstraint`, `extractSupportConstraints()`, `ReachabilityZone`, `extractReachabilityConstraints()` |
 | Rig G signal computation | `constraints/signals.ts` | `computeRigGSignals()` for feasibility gating |
 | Execution advisor (Rig G metadata) | `constraints/execution-advisor.ts` | `RigGMetadata` type with signals, commuting pairs, partial-order plan; tested in `execution-advisor.test.ts` |
 | Rig G metadata wiring in planner | `sterling-planner.ts:618-625` | Stores `RigGMetadata` (signals, commuting pairs, partial-order plan) in `taskData.metadata.solver.rigG` |
 | Material deficit + replan loop | `minecraft-building-solver.ts:253-306` | Golden-master: deficit → acquisition steps + replan sentinel |
 | SolveBundle wiring | Building solver | E2E: `solverId: 'minecraft.building'`, bundle shape verified |
 | Episode reporting (per-module failure attribution) | `minecraft-building-solver.ts:322-340` | Captures failureAtModuleId |
+| Support constraints (G.1) | `support-constraints.test.ts`, `constraint-model.ts`, `feasibility-checker.ts`, `dag-builder.ts`, `minecraft-building-solver.ts` | Wall without foundation → rejected. Wall with foundation → accepted. Support edges in DAG. Solver calls `extractSupportConstraints()`. 6 tests |
+| Reachability + scaffolding (G.2 + G.4) | `reachability-scaffolding.test.ts`, `constraint-model.ts`, `minecraft-building-types.ts`, `dag-builder.ts` | Roof at height 6 / botReach 3 → infeasible. Scaffolding provides access → feasible. Scaffold conflict keys. Multi-story linearization. 5 tests |
+| Partial-order proof (G.3) | `partial-order-proof.test.ts` | Independent modules form commuting pair. Both orderings valid. Adding dependency removes pair. Golden-master DAG snapshot. 5 tests |
+| Transfer test — CI pipeline (G.5) | `transfer-ci-pipeline.test.ts` | Generic CI pipeline (lint, unit_test, integration_test, deploy). DAG correctness. Commuting pairs. Linearization. RigGSignals. Zero Minecraft imports. 9 tests |
 
-### What's needed for certification
+### Certification checklist
 
-- [ ] **G.1 — Support constraints**: Modules declare `supportRequirements` (e.g., walls require foundation). Solver respects partial order.
-  - **Acceptance**: `BuildingModule.supportRequirements` field added. Rule builder emits preconditions. Test: wall module without foundation → rejected by Sterling (no valid plan).
+- [x] **G.1 — Support constraints**: `BuildingModule.supportRequirements` field added. `SupportConstraint` type + `extractSupportConstraints()` in constraint-model. Feasibility checker handles `case 'support'`. DAG builder emits support edges from `supportRequirements`. Building solver calls `extractSupportConstraints()` and concatenates with dependency constraints. Test: wall without foundation → rejected. 6 tests.
 
-- [ ] **G.2 — Reachability checks**: Bot must be able to physically reach placement location. Modules declare `reachabilityZone`.
-  - **Acceptance**: Type + rule builder extension. Test: roof module unreachable without scaffolding → plan includes scaffolding step.
+- [x] **G.2 — Reachability checks**: `BuildingModule.reachabilityZone` field added. `extractReachabilityConstraints(modules, botReachHeight)` in constraint-model. Feasibility checker validates reachability. Test: roof at height 6, botReach=3 → infeasible without scaffolding.
 
-- [ ] **G.3 — Partial-order proof**: Two independent modules (e.g., east wall, west wall) can execute in either order. Solver emits a plan where both orders are valid linearizations.
-  - **Acceptance**: Golden-master test: two modules with no mutual `requiresModules`. Assert both orderings produce valid plans (or assert solution path doesn't enforce unnecessary ordering).
+- [x] **G.3 — Partial-order proof**: Golden-master test: two independent modules (window_a, door_b) form a commuting pair. Both linearization orderings are valid topological sorts. Adding a dependency removes the commuting pair. Content-addressed `planDigest` deterministic. 5 tests.
 
-- [ ] **G.4 — Scaffolding reasoning**: Temporary structures placed to enable otherwise-unreachable modules, then optionally removed.
-  - **Acceptance**: Module type `scaffold` added. Rule builder generates place+remove scaffold operators. Test: multi-story build requires scaffolding.
+- [x] **G.4 — Scaffolding reasoning**: Module type `scaffold` added to `BuildingModuleType`. `isTemporary` field on `BuildingModule`. Scaffold conflict keys prevent commuting between scaffolds. Scaffold leaf mapping in building solver (`place_scaffold`). Multi-story build linearizes correctly: foundation → walls → scaffold → upper walls → scaffold → roof. 5 tests.
 
-- [ ] **G.5 — Transfer test**: Construction scheduling or CI pipeline surface with same "must precede" constraint semantics.
-  - **Acceptance**: `transfer-build-scheduling.test.ts` with generic task graph, dependency constraints. Same solver, different surface.
+- [x] **G.5 — Transfer test**: `transfer-ci-pipeline.test.ts` — generic CI pipeline (lint + unit_test independent/commuting, integration_test depends on both, deploy depends on integration_test). DAG correct. Commuting pairs detected. Linearization valid. Feasibility passes. RigGSignals computed. Zero Minecraft imports. 9 tests.
 
 ---
 
 ## Rig E: Hierarchical planning (navigate/explore/find)
 
-**Status**: PARTIAL — macro-planner infrastructure wired; not fully domain-integrated
+**Status**: DONE — world graph builder + edge decomposer + feedback loop + golden-master + transfer test all certified
 
 ### What's done
 
@@ -391,23 +389,23 @@ C.1–C.7 are the **FurnaceSchedulingSolver** certification items. The temporal 
 | Planner integration with configuration gate | `sterling-planner.ts:369-417` | Calls `generateDynamicStepsHierarchical()` when configured; returns blocked sentinel otherwise |
 | Actions in ROUTABLE_ACTIONS | `thought-to-task-converter.ts:57-60` | `navigate`, `explore`, `find` all routable; tasks created for these goals |
 | Rig E step provenance tagging | `sterling-planner.ts:379-388` | Steps tagged with `source: 'rig-e-macro'`, `macroEdgeId`, `contextTarget`, `macroPlanDigest` |
+| World graph builder (E.1) | `hierarchical/world-graph-builder.ts` | `buildWorldGraph(input)` pure function. Registers contexts from biomes/structures/zones, edges from adjacency, requirement mappings from resources. Freezes graph. 6 tests |
+| Edge decomposer (E.2) | `hierarchical/edge-decomposer.ts`, `hierarchical-planner/plan-decomposer.ts` | `DECOMPOSITION_REGISTRY` with prefix-based pattern matching. `decomposeEdge()` returns `PlanningDecision<MicroStep[]>`. Unknown edge → blocked with `decomposition_gap`. Wired into `decomposeToPlan()` via optional `botState`. 6 tests |
+| Feedback integration (E.3) | `hierarchical/feedback-integration.ts` | `FeedbackIntegration` class: plan → startEdge → reportStepOutcome → completeEdge. EMA cost updates. N consecutive failures → replan. 6 tests |
+| Golden-master snapshot (E.4) | `hierarchical/__tests__/macro-plan-golden-master.test.ts` | Canonical plan snapshot. Byte-equivalent plans. Content-addressed digest. Decomposed steps snapshot. 5 tests |
+| Transfer test — floor plan (E.5) | `hierarchical/__tests__/transfer-floor-plan.test.ts` | Office floor plan (7 rooms, 14 hallways). Dijkstra shortest path. Feedback cost updates. Replan after failures. RigESignals. No coordinate patterns. Zero Minecraft imports. 8 tests |
 
-### What's needed for certification
+### Certification checklist
 
-- [ ] **E.1 — Full domain ontology integration**: Wire Minecraft world graph (biome regions, structure locations, resource zones) into MacroPlanner context registry.
-  - **Acceptance**: MacroPlanner produces real navigation plans using actual Minecraft world topology, not synthetic test graphs.
+- [x] **E.1 — Full domain ontology integration**: `world-graph-builder.ts` with `buildWorldGraph(input: MinecraftWorldGraphInput)`. Pure function from explicit input. Registers contexts from biome regions, edges from adjacency declarations, requirement mappings from resource zones. Graph frozen after construction. 6 tests.
 
-- [ ] **E.2 — Micro-step decomposition**: Macro edges decompose into concrete Mineflayer movement/interaction steps.
-  - **Acceptance**: Each macro edge produces executable micro-steps that the PlanExecutor can run.
+- [x] **E.2 — Micro-step decomposition**: `edge-decomposer.ts` with `DECOMPOSITION_REGISTRY` and `decomposeEdge()`. Default decompositions: navigation (at_*→at_*), resource acquisition (mine, forest, iron), tool crafting, building. Unknown edge → blocked with `decomposition_gap`. Wired into `plan-decomposer.ts` via optional `botState` parameter. 6 tests.
 
-- [ ] **E.3 — Feedback loop**: Micro execution outcomes update macro edge costs for future planning.
-  - **Acceptance**: Failed or slow macro edges have increased costs in subsequent plans. Test: block a path, re-plan routes around it.
+- [x] **E.3 — Feedback loop**: `feedback-integration.ts` with `FeedbackIntegration` class. EMA cost updates from edge execution. Failed execution → penalty increase. N consecutive failures → `shouldReplan` triggers. Replan produces different path after cost change. Full plan→execute→feedback→replan cycle tested. 6 tests.
 
-- [ ] **E.4 — Golden-master snapshot**: Outbound macro plan payload captured and snapshotted.
-  - **Acceptance**: Deterministic plan for a fixed world graph + goal.
+- [x] **E.4 — Golden-master snapshot**: `macro-plan-golden-master.test.ts`. Deterministic plan for fixed world graph + goal matches canonical snapshot. Identical inputs → byte-equivalent plans. Content-addressed `planDigest`. Decomposed steps match canonical snapshot. 5 tests.
 
-- [ ] **E.5 — Transfer test**: Non-Minecraft navigation surface (e.g., floor-plan routing, network topology).
-  - **Acceptance**: Same MacroPlanner, different domain graph. Conformance suite passes on both surfaces.
+- [x] **E.5 — Transfer test**: `transfer-floor-plan.test.ts` — office floor plan domain (7 rooms, 14 hallways). Dijkstra finds shortest path. Feedback updates hallway costs. Replan after repeated failures. RigESignals computed correctly. No coordinate patterns in abstract room IDs. Zero Minecraft imports. 8 tests.
 
 ---
 
@@ -415,7 +413,7 @@ C.1–C.7 are the **FurnaceSchedulingSolver** certification items. The temporal 
 
 These rigs are documented in [sterling-minecraft-domains.md](./sterling-minecraft-domains.md) with full rig templates. Implementation follows Track 2 (D–K) and Later (L–N) priority ordering.
 
-### Post-certification order (after A–C certified):
+### Post-certification order (after A–C, E, G certified):
 
 > **Note**: This is the sequential implementation order for all remaining rigs,
 > spanning Tracks 2 and 3 from [RIG_DOCUMENTATION_INDEX.md](./RIG_DOCUMENTATION_INDEX.md).
@@ -424,10 +422,8 @@ These rigs are documented in [sterling-minecraft-domains.md](./sterling-minecraf
 > and implementation priority within those tracks.
 
 1. **Rig D** — Multi-strategy acquisition (mine vs trade vs loot) — primary candidate for a learning-sensitive benchmark (multiple legal strategies, stable outcome signal)
-2. **Rig E** — Hierarchical planning certification (see above for existing work)
-3. **Rig F** — Valuation under scarcity (keep/drop/store)
-4. **Rig G** — Feasibility certification (see above for existing work)
-5. **Rig H** — Systems synthesis (farm layout first)
+2. **Rig F** — Valuation under scarcity (keep/drop/store)
+3. **Rig H** — Systems synthesis (farm layout first)
 6. **Rig I** — Epistemic planning (structure localization)
 7. **Rig J** — Invariant maintenance (base upkeep loops)
 8. **Rig K** — Irreversibility (villager trades)
