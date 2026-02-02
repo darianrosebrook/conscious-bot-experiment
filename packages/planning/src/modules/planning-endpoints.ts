@@ -40,6 +40,21 @@ export interface PlanningSystem {
 }
 
 /**
+ * Task types that do not require a requirementCandidate (non-goal / advisory / social).
+ * Intrusive thoughts like "What was I working on?" produce social/reflection tasks;
+ * planning accepts them without inferrable parameters.
+ */
+const NON_GOAL_TASK_TYPES = new Set([
+  'general',
+  'social',
+  'reflection',
+  'status',
+  'advisory_action',
+  'inventory',
+  'survival',
+]);
+
+/**
  * Deterministic inference of `requirementCandidate` from legacy endpoint parameters.
  * Returns the candidate or null if inference fails.
  */
@@ -464,12 +479,15 @@ export function createPlanningEndpoints(
         if (inferred) {
           taskData.parameters = taskData.parameters || {};
           taskData.parameters.requirementCandidate = inferred;
-        } else if (taskData.type && taskData.type !== 'general') {
-          return res.status(400).json({
-            success: false,
-            error: 'strict mode: requirementCandidate required; could not infer from provided parameters',
-            hint: 'Provide parameters.requirementCandidate with { kind, outputPattern, quantity }',
-          });
+        } else {
+          const typeKey = (taskData.type || 'general').toLowerCase();
+          if (!NON_GOAL_TASK_TYPES.has(typeKey)) {
+            return res.status(400).json({
+              success: false,
+              error: 'strict mode: requirementCandidate required; could not infer from provided parameters',
+              hint: 'Provide parameters.requirementCandidate with { kind, outputPattern, quantity }',
+            });
+          }
         }
       }
 

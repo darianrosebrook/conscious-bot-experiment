@@ -225,6 +225,7 @@ const KNOWN_LEAF_NAMES = new Set([
   'follow_entity',
   // Interaction
   'dig_block',
+  'acquire_material',
   'place_block',
   'place_torch_if_needed',
   'retreat_and_block',
@@ -934,10 +935,11 @@ function stepToLeafExecution(
 
   switch (leaf) {
     case 'dig_block': {
+      // Legacy: remap dig_block → acquire_material (atomic mine + collect)
       const item = produces[0];
       return {
-        leafName: 'dig_block',
-        args: { blockType: item?.name || 'oak_log' },
+        leafName: 'acquire_material',
+        args: { item: item?.name || 'oak_log', count: item?.count || 1 },
       };
     }
     case 'craft_recipe': {
@@ -969,11 +971,24 @@ function stepToLeafExecution(
         args: { item: consumed?.name || 'crafting_table' },
       };
     }
+    case 'acquire_material': {
+      // Combined mine+collect. Item comes from meta.item (building domain),
+      // produces (Sterling crafting/tool-prog), or blockType (fallback plan).
+      const acquireItem =
+        (meta.item as string) ||
+        produces[0]?.name ||
+        (meta.blockType as string) ||
+        'oak_log';
+      const acquireCount = (meta.count as number) || produces[0]?.count || 1;
+      return {
+        leafName: 'acquire_material',
+        args: { item: acquireItem, count: acquireCount },
+      };
+    }
     case 'prepare_site':
     case 'build_module':
     case 'place_feature':
-    case 'building_step':
-    case 'acquire_material': {
+    case 'building_step': {
       // Building domain — pass through meta fields
       return {
         leafName: leaf,
@@ -2014,16 +2029,43 @@ async function autonomousTaskExecutor() {
             );
             if (stepCompleted) {
               console.log(`✅ [Executor] Step ${nextStep.order} completed`);
+              // Reset verification failure count on success
+              if (currentTask.metadata?.verifyFailCount) {
+                taskIntegration.updateTaskMetadata(currentTask.id, {
+                  ...currentTask.metadata,
+                  verifyFailCount: 0,
+                });
+              }
             } else {
               // Verification failed (e.g. inventory not updated yet); back off to avoid spin loop
-              const backoffMs = 5000;
-              taskIntegration.updateTaskMetadata(currentTask.id, {
-                ...currentTask.metadata,
-                nextEligibleAt: Date.now() + backoffMs,
-              });
-              console.warn(
-                `⚠️ [Executor] Step ${nextStep.order} verification failed; backing off ${backoffMs}ms`
-              );
+              const verifyFails = ((currentTask.metadata?.verifyFailCount as number) || 0) + 1;
+              const maxVerifyFails = 5;
+              const backoffMs = Math.min(5000 * verifyFails, 30_000);
+              if (verifyFails >= maxVerifyFails) {
+                // Skip this step and move on — mark done despite verification failure
+                console.warn(
+                  `⚠️ [Executor] Step ${nextStep.order} verification failed ${verifyFails} times — skipping step`
+                );
+                await taskIntegration.completeTaskStep(
+                  currentTask.id,
+                  nextStep.id,
+                  { skipVerification: true } as any,
+                );
+                taskIntegration.updateTaskMetadata(currentTask.id, {
+                  ...currentTask.metadata,
+                  verifyFailCount: 0,
+                  lastSkippedStep: nextStep.id,
+                });
+              } else {
+                taskIntegration.updateTaskMetadata(currentTask.id, {
+                  ...currentTask.metadata,
+                  verifyFailCount: verifyFails,
+                  nextEligibleAt: Date.now() + backoffMs,
+                });
+                console.warn(
+                  `⚠️ [Executor] Step ${nextStep.order} verification failed (${verifyFails}/${maxVerifyFails}); backing off ${backoffMs}ms`
+                );
+              }
             }
           } else if (isNavigatingError(actionResult?.error)) {
             // Bot is mid-navigation — retry next cycle, don't count as failure

@@ -283,7 +283,7 @@ export function mapBTActionToMinecraft(
       return {
         type: 'place_block',
         parameters: {
-          block_type: args.blockType || args.block_type || 'stone',
+          block_type: args.blockType || args.block_type || args.item || 'stone',
           count: args.count || 1,
           placement: args.placement || 'around_player',
           position: args.position || args.pos,

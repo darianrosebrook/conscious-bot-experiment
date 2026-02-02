@@ -3,7 +3,7 @@
  *
  * Verifies:
  * - Builder output resolves in strict mode
- * - collect sub-task produces dig_block steps via compiler
+ * - collect sub-task produces acquire_material steps via compiler
  * - craft sub-task produces craft_recipe step via compiler
  * - compiler-generated steps pass leaf arg validation
  * - parent blocking and unblocking lifecycle
@@ -146,15 +146,15 @@ describe('Compiler produces steps from builder tasks', () => {
     vi.useRealTimers();
   });
 
-  it('collect sub-task produces dig_block steps via compiler', async () => {
+  it('collect sub-task produces acquire_material steps via compiler', async () => {
     const taskData = buildTaskFromRequirement(
       { kind: 'collect', outputPattern: 'oak_log', quantity: 4 }
     );
     const task = await ti.addTask(taskData);
 
     expect(task.steps.length).toBeGreaterThan(0);
-    expect(task.steps[0].meta?.leaf).toBe('dig_block');
-    expect(task.steps[0].meta?.args).toEqual({ blockType: 'oak_log' });
+    expect(task.steps[0].meta?.leaf).toBe('acquire_material');
+    expect(task.steps[0].meta?.args).toEqual({ item: 'oak_log', count: 1 });
   });
 
   it('craft sub-task produces craft_recipe step via compiler', async () => {
@@ -173,15 +173,15 @@ describe('Compiler produces steps from builder tasks', () => {
     expect(req!.kind).toBe('craft');
   });
 
-  it('mine sub-task produces dig_block steps via compiler', async () => {
+  it('mine sub-task produces acquire_material steps via compiler', async () => {
     const taskData = buildTaskFromRequirement(
       { kind: 'mine', outputPattern: 'iron_ore', quantity: 3 }
     );
     const task = await ti.addTask(taskData);
 
     expect(task.steps.length).toBeGreaterThan(0);
-    expect(task.steps[0].meta?.leaf).toBe('dig_block');
-    expect(task.steps[0].meta?.args).toEqual({ blockType: 'iron_ore' });
+    expect(task.steps[0].meta?.leaf).toBe('acquire_material');
+    expect(task.steps[0].meta?.args).toEqual({ item: 'iron_ore', count: 1 });
   });
 
   it('compiler-generated steps pass leaf arg validation', async () => {
@@ -373,7 +373,7 @@ describe('Solve observability on tasks', () => {
     );
     const task = await ti.addTask(taskData);
 
-    // collect → compiler → dig_block steps
+    // collect → compiler → acquire_material steps
     expect(task.steps.length).toBeGreaterThan(0);
     expect(task.metadata.solver?.noStepsReason).toBeUndefined();
   });

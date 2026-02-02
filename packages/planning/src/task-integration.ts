@@ -1454,9 +1454,10 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
   }
 
   /**
-   * Complete a task step with action verification
+   * Complete a task step with action verification.
+   * Pass skipVerification=true to force-complete a step after repeated verification failures.
    */
-  async completeTaskStep(taskId: string, stepId: string): Promise<boolean> {
+  async completeTaskStep(taskId: string, stepId: string, opts?: { skipVerification?: boolean }): Promise<boolean> {
     const task = this.taskStore.getTask(taskId);
     if (!task) {
       return false;
@@ -1468,7 +1469,7 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
     }
 
     // Verify action was actually performed if verification is enabled
-    if (this.config.enableActionVerification) {
+    if (this.config.enableActionVerification && !opts?.skipVerification) {
       // Allow game state (e.g. inventory) to settle after dig/collect before verification
       const { effectiveLeaf } = this.deriveLeafAndArgs(step);
       const isDigOrCollect =
@@ -1603,20 +1604,14 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
           timeout
         );
 
-      case 'dig_block': {
-        const blockType = this.canonicalItemId(
-          args.blockType ?? producedItem ?? 'oak_log'
-        );
-        const minDelta = Math.max(1, producedCount);
-        // Pathfinding + break + pickup can take longer; use extended timeout
-        const digTimeout = Math.max(timeout, 20000);
-        return this.retryUntil(
-          () => this.verifyInventoryDelta(taskId, stepId, blockType, minDelta),
-          digTimeout
-        );
-      }
+      case 'dig_block':
+        // dig_block breaks a block but does NOT auto-pickup the drop.
+        // Pickup is a separate step (collect_items / pickup_item).
+        // Verification: the leaf action succeeded — skip inventory check.
+        return true;
 
       case 'pickup_item':
+      case 'collect_items':
         return this.retryUntil(
           () => this.verifyPickupFromInventoryDelta(taskId, stepId),
           timeout
@@ -1701,7 +1696,11 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
       }
 
       default:
-        return false;
+        // Unknown leaf — the action already succeeded at dispatch time.
+        // Log for audit but allow progression rather than blocking all
+        // newly-added leaves until a verification case is written.
+        console.log(`[Verification] No verifier for leaf '${leafId}' — allowing progression`);
+        return true;
     }
   }
 
