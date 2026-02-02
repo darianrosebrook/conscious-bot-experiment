@@ -1,0 +1,582 @@
+/**
+ * Minecraft Acquisition Solver (Rig D)
+ *
+ * Coordinator solver that delegates to sub-solvers per strategy.
+ * Strategies: mine/craft → MinecraftCraftingSolver, trade/loot/salvage → Sterling.
+ *
+ * Uses sterlingDomain='minecraft', solverId='minecraft.acquisition'.
+ * Does NOT introduce a new Sterling backend domain.
+ *
+ * @author @darianrosebrook
+ */
+
+import { BaseDomainSolver } from './base-domain-solver';
+import type { MinecraftCraftingSolver } from './minecraft-crafting-solver';
+import type {
+  AcquisitionSolveResult,
+  AcquisitionSolveStep,
+  AcquisitionCandidate,
+  AcquisitionContextV1,
+} from './minecraft-acquisition-types';
+import {
+  hashAcquisitionContext,
+  computeCandidateSetDigest,
+} from './minecraft-acquisition-types';
+import {
+  buildAcquisitionContext,
+  buildAcquisitionStrategies,
+  buildSalvageCandidatesWithInventory,
+  rankStrategies,
+  contextKeyFromAcquisitionContext,
+  MINECRAFT_TRADE_TABLE,
+  MINECRAFT_SALVAGE_TABLE,
+  type NearbyEntity,
+} from './minecraft-acquisition-rules';
+import { StrategyPriorStore } from './minecraft-acquisition-priors';
+import { lintRules, type LintableRule } from './compat-linter';
+import {
+  computeBundleInput,
+  computeBundleOutput,
+  createSolveBundle,
+  hashDefinition,
+  hashGoal,
+  hashNearbyBlocks,
+  buildDefaultRationaleContext,
+} from './solve-bundle';
+import type { SolveBundle, ObjectiveWeights, ObjectiveWeightsSource } from './solve-bundle-types';
+import { parseSearchHealth } from './search-health';
+import type { TaskStep } from '../types/task-step';
+import {
+  actionTypeToLeaf,
+  estimateDuration as sharedEstimateDuration,
+} from './leaf-routing';
+
+// ============================================================================
+// Acquisition Rule Builders
+// ============================================================================
+
+/**
+ * Build trade rules for Sterling. Uses acq:trade:<item> prefix.
+ * actionType remains 'craft' (zero Sterling backend changes).
+ */
+export function buildTradeRules(
+  item: string,
+): LintableRule[] {
+  const trade = MINECRAFT_TRADE_TABLE[item];
+  if (!trade) return [];
+
+  return [{
+    action: `acq:trade:${item}`,
+    actionType: 'craft',
+    produces: [{ name: item, count: 1 }],
+    consumes: trade.cost.map(c => ({ name: c.item, count: c.count })),
+    requires: [{ name: 'proximity:villager', count: 1 }],
+  }];
+}
+
+/**
+ * Build loot rules for Sterling. Uses acq:loot:<item> prefix.
+ * Container interaction modeled as craft consuming proximity:chest token.
+ */
+export function buildLootRules(
+  item: string,
+): LintableRule[] {
+  return [{
+    action: `acq:loot:${item}`,
+    actionType: 'craft',
+    produces: [{ name: item, count: 1 }],
+    consumes: [],
+    requires: [{ name: 'proximity:chest', count: 1 }],
+  }];
+}
+
+/**
+ * Build salvage rules for Sterling. Uses acq:salvage:<item> prefix.
+ * Reverse-crafting: consumes source item, produces components.
+ */
+export function buildSalvageRules(
+  item: string,
+): LintableRule[] {
+  const entries = MINECRAFT_SALVAGE_TABLE[item];
+  if (!entries) return [];
+
+  return entries.map(entry => ({
+    action: `acq:salvage:${item}:from:${entry.sourceItem}`,
+    actionType: 'craft' as const,
+    produces: entry.produces.map(p => ({ name: p.item, count: p.count })),
+    consumes: [{ name: entry.sourceItem, count: 1 }],
+    requires: [],
+  }));
+}
+
+// ============================================================================
+// Solver Options
+// ============================================================================
+
+export interface AcquisitionSolveOptions {
+  objectiveWeights?: ObjectiveWeights;
+  maxNodes?: number;
+}
+
+// ============================================================================
+// Solver
+// ============================================================================
+
+export class MinecraftAcquisitionSolver extends BaseDomainSolver<AcquisitionSolveResult> {
+  readonly sterlingDomain = 'minecraft' as const;
+  readonly solverId = 'minecraft.acquisition';
+
+  /** Sub-solver for mine/craft strategy delegation */
+  private _craftingSolver?: MinecraftCraftingSolver;
+
+  /** Prior store for learning */
+  readonly priorStore = new StrategyPriorStore();
+
+  setCraftingSolver(solver: MinecraftCraftingSolver): void {
+    this._craftingSolver = solver;
+  }
+
+  get craftingSolver(): MinecraftCraftingSolver | undefined {
+    return this._craftingSolver;
+  }
+
+  protected makeUnavailableResult(): AcquisitionSolveResult {
+    return {
+      solved: false,
+      steps: [],
+      totalNodes: 0,
+      durationMs: 0,
+      error: 'Sterling reasoning service unavailable',
+      selectedStrategy: null,
+      alternativeStrategies: [],
+      strategyRanking: [],
+      candidateSetDigest: '',
+    };
+  }
+
+  /**
+   * Solve an acquisition goal using multi-strategy coordination.
+   */
+  async solveAcquisition(
+    item: string,
+    quantity: number,
+    inventory: Record<string, number>,
+    nearbyBlocks: string[],
+    nearbyEntities: NearbyEntity[] = [],
+    options?: AcquisitionSolveOptions,
+  ): Promise<AcquisitionSolveResult> {
+    if (!this.isAvailable()) return this.makeUnavailableResult();
+
+    const startTime = Date.now();
+
+    // 1. Build context
+    const ctx = buildAcquisitionContext(item, inventory, nearbyBlocks, nearbyEntities);
+    const contextKey = contextKeyFromAcquisitionContext(ctx);
+
+    // 2. Enumerate strategies
+    let candidates = buildAcquisitionStrategies(ctx);
+
+    // Add inventory-aware salvage candidates
+    const salvageCandidates = buildSalvageCandidatesWithInventory(item, ctx, inventory);
+    // Replace default salvage candidates with inventory-aware ones
+    candidates = candidates.filter(c => c.strategy !== 'salvage');
+    candidates.push(...salvageCandidates);
+
+    // 3. Compute candidate set digest (M1 semantic boundary)
+    const candidateSetDigest = computeCandidateSetDigest(candidates);
+
+    // 4. Check for zero candidates
+    if (candidates.length === 0) {
+      return {
+        solved: false,
+        steps: [],
+        totalNodes: 0,
+        durationMs: Date.now() - startTime,
+        error: 'No viable acquisition strategies found',
+        selectedStrategy: null,
+        alternativeStrategies: [],
+        strategyRanking: [],
+        candidateSetDigest,
+      };
+    }
+
+    // 5. Get priors and rank
+    const priors = this.priorStore.getPriorsForContext(item, contextKey);
+    const ranked = rankStrategies(candidates, priors, options?.objectiveWeights);
+
+    // 6. Select top strategy
+    const selected = ranked[0];
+    const alternatives = ranked.slice(1).map(c => c.strategy);
+
+    // 7. Dispatch to sub-solver
+    const maxNodes = options?.maxNodes ?? 5000;
+    const objectiveWeightsSource: ObjectiveWeightsSource = options?.objectiveWeights ? 'provided' : 'default';
+
+    const dispatchResult = await this.dispatchStrategy(
+      selected,
+      item,
+      quantity,
+      inventory,
+      nearbyBlocks,
+      maxNodes,
+      options?.objectiveWeights,
+    );
+
+    // 8. Build parent bundle
+    const parentBundleInput = computeBundleInput({
+      solverId: this.solverId,
+      contractVersion: this.contractVersion,
+      definitions: dispatchResult.rules,
+      inventory,
+      goal: { [item]: quantity },
+      nearbyBlocks,
+      objectiveWeights: options?.objectiveWeights,
+    });
+
+    // Augment input with acquisition-specific fields by creating the bundle manually
+    const compatReport = lintRules(dispatchResult.rules as LintableRule[], { solverId: this.solverId });
+    const rationaleCtx = buildDefaultRationaleContext({
+      compatReport,
+      maxNodes,
+      objectiveWeights: options?.objectiveWeights,
+    });
+
+    const parentBundleOutput = computeBundleOutput({
+      planId: dispatchResult.planId,
+      solved: dispatchResult.solved,
+      steps: dispatchResult.steps,
+      totalNodes: dispatchResult.totalNodes,
+      durationMs: dispatchResult.durationMs,
+      solutionPathLength: dispatchResult.steps.length,
+      ...rationaleCtx,
+    });
+
+    const parentBundle = createSolveBundle(parentBundleInput, parentBundleOutput, compatReport);
+
+    // Aggregate bundles: parent first, then child bundles
+    const allBundles: SolveBundle[] = [parentBundle, ...dispatchResult.childBundles];
+
+    const totalDuration = Date.now() - startTime;
+
+    return {
+      solved: dispatchResult.solved,
+      steps: dispatchResult.steps,
+      totalNodes: dispatchResult.totalNodes,
+      durationMs: totalDuration,
+      error: dispatchResult.error,
+      planId: dispatchResult.planId,
+      solveMeta: { bundles: allBundles },
+      selectedStrategy: selected.strategy,
+      alternativeStrategies: alternatives,
+      strategyRanking: ranked,
+      candidateSetDigest,
+    };
+  }
+
+  /**
+   * Report episode result for learning.
+   */
+  reportEpisodeResult(
+    item: string,
+    strategy: string,
+    contextKey: string,
+    success: boolean,
+    planId: string,
+    candidateSetDigest: string,
+  ): void {
+    this.priorStore.updatePrior(
+      item,
+      strategy as any,
+      contextKey,
+      success,
+      planId,
+    );
+
+    this.reportEpisode({
+      planId,
+      item,
+      strategy,
+      contextKey,
+      success,
+      candidateSetDigest,
+    });
+  }
+
+  /**
+   * Convert result to TaskStep[] for the planning system.
+   */
+  toTaskSteps(result: AcquisitionSolveResult): TaskStep[] {
+    if (!result.solved || result.steps.length === 0) return [];
+
+    const now = Date.now();
+    return result.steps.map((step, index) => ({
+      id: `step-${now}-${index + 1}`,
+      label: `Acquire: ${step.action}`,
+      done: false,
+      order: index + 1,
+      estimatedDuration: sharedEstimateDuration(step.actionType),
+      meta: {
+        domain: 'acquisition',
+        leaf: actionTypeToLeaf(step.actionType, step.action),
+        action: step.action,
+        actionType: step.actionType,
+        produces: step.produces,
+        consumes: step.consumes,
+      },
+    }));
+  }
+
+  // --------------------------------------------------------------------------
+  // Private dispatch
+  // --------------------------------------------------------------------------
+
+  private async dispatchStrategy(
+    candidate: AcquisitionCandidate,
+    item: string,
+    quantity: number,
+    inventory: Record<string, number>,
+    nearbyBlocks: string[],
+    maxNodes: number,
+    objectiveWeights?: ObjectiveWeights,
+  ): Promise<{
+    solved: boolean;
+    steps: AcquisitionSolveStep[];
+    totalNodes: number;
+    durationMs: number;
+    planId: string | null;
+    error?: string;
+    rules: unknown[];
+    childBundles: SolveBundle[];
+  }> {
+    switch (candidate.strategy) {
+      case 'mine':
+        return this.dispatchMineCraft(item, quantity, inventory, nearbyBlocks, maxNodes);
+
+      case 'trade':
+        return this.dispatchSterlingRules(
+          buildTradeRules(item),
+          item,
+          quantity,
+          inventory,
+          nearbyBlocks,
+          maxNodes,
+          objectiveWeights,
+        );
+
+      case 'loot':
+        return this.dispatchSterlingRules(
+          buildLootRules(item),
+          item,
+          quantity,
+          inventory,
+          nearbyBlocks,
+          maxNodes,
+          objectiveWeights,
+        );
+
+      case 'salvage':
+        return this.dispatchSterlingRules(
+          buildSalvageRules(item),
+          item,
+          quantity,
+          inventory,
+          nearbyBlocks,
+          maxNodes,
+          objectiveWeights,
+        );
+
+      default:
+        return {
+          solved: false,
+          steps: [],
+          totalNodes: 0,
+          durationMs: 0,
+          planId: null,
+          error: `Unknown strategy: ${candidate.strategy}`,
+          rules: [],
+          childBundles: [],
+        };
+    }
+  }
+
+  private async dispatchMineCraft(
+    item: string,
+    _quantity: number,
+    inventory: Record<string, number>,
+    nearbyBlocks: string[],
+    _maxNodes: number,
+  ): Promise<{
+    solved: boolean;
+    steps: AcquisitionSolveStep[];
+    totalNodes: number;
+    durationMs: number;
+    planId: string | null;
+    error?: string;
+    rules: unknown[];
+    childBundles: SolveBundle[];
+  }> {
+    if (!this._craftingSolver) {
+      return {
+        solved: false,
+        steps: [],
+        totalNodes: 0,
+        durationMs: 0,
+        planId: null,
+        error: 'Crafting solver not configured for mine/craft delegation',
+        rules: [],
+        childBundles: [],
+      };
+    }
+
+    // Convert inventory to array format expected by crafting solver
+    const inventoryArray = Object.entries(inventory).map(([name, count]) => ({ name, count }));
+
+    // We need mcData — use a minimal mock for the crafting solver
+    // In production, mcData would be injected. For now, we pass through
+    // to the crafting solver which handles its own mcData loading.
+    try {
+      // The crafting solver needs mcData. We'll try to call it,
+      // but in test scenarios it's mocked.
+      const result = await this._craftingSolver.solveCraftingGoal(
+        item,
+        inventoryArray,
+        null, // mcData — in tests this is mocked
+        nearbyBlocks,
+      );
+
+      // Map crafting steps to acquisition steps
+      const steps: AcquisitionSolveStep[] = result.steps.map(s => ({
+        action: s.action,
+        actionType: s.actionType,
+        produces: s.produces,
+        consumes: s.consumes,
+        resultingInventory: s.resultingInventory,
+      }));
+
+      return {
+        solved: result.solved,
+        steps,
+        totalNodes: result.totalNodes,
+        durationMs: result.durationMs,
+        planId: result.planId ?? null,
+        error: result.error,
+        rules: [], // Rules handled by inner solver
+        childBundles: result.solveMeta?.bundles ?? [],
+      };
+    } catch (err) {
+      return {
+        solved: false,
+        steps: [],
+        totalNodes: 0,
+        durationMs: 0,
+        planId: null,
+        error: `Mine/craft delegation failed: ${err instanceof Error ? err.message : String(err)}`,
+        rules: [],
+        childBundles: [],
+      };
+    }
+  }
+
+  private async dispatchSterlingRules(
+    rules: LintableRule[],
+    item: string,
+    quantity: number,
+    inventory: Record<string, number>,
+    nearbyBlocks: string[],
+    maxNodes: number,
+    objectiveWeights?: ObjectiveWeights,
+  ): Promise<{
+    solved: boolean;
+    steps: AcquisitionSolveStep[];
+    totalNodes: number;
+    durationMs: number;
+    planId: string | null;
+    error?: string;
+    rules: unknown[];
+    childBundles: SolveBundle[];
+  }> {
+    const goal = { [item]: quantity };
+
+    const solvePayload: Record<string, unknown> = {
+      contractVersion: this.contractVersion,
+      solverId: this.solverId,
+      inventory,
+      goal,
+      nearbyBlocks,
+      rules,
+      maxNodes,
+      useLearning: true,
+    };
+
+    try {
+      const result = await this.sterlingService.solve(this.sterlingDomain, solvePayload);
+      const planId = this.extractPlanId(result);
+      const solved = result.solutionFound;
+
+      // Build child bundle for this sub-solve
+      const compatReport = lintRules(rules, { solverId: this.solverId });
+      const bundleInput = computeBundleInput({
+        solverId: this.solverId,
+        contractVersion: this.contractVersion,
+        definitions: rules,
+        inventory,
+        goal,
+        nearbyBlocks,
+        objectiveWeights,
+      });
+      const rationaleCtx = buildDefaultRationaleContext({
+        compatReport,
+        maxNodes,
+        objectiveWeights,
+      });
+
+      const steps: AcquisitionSolveStep[] = [];
+      if (solved && result.solutionPath) {
+        for (const edge of result.solutionPath) {
+          const label = typeof edge.label === 'string' ? edge.label : `acq-step-${steps.length}`;
+          steps.push({
+            action: label || `acq-step-${steps.length}`,
+            actionType: 'craft',
+            produces: [{ name: item, count: quantity }],
+            consumes: [],
+            resultingInventory: {},
+          });
+        }
+      }
+
+      const bundleOutput = computeBundleOutput({
+        planId,
+        solved,
+        steps,
+        totalNodes: result.discoveredNodes?.length ?? 0,
+        durationMs: result.durationMs ?? 0,
+        solutionPathLength: result.solutionPath?.length ?? 0,
+        searchHealth: parseSearchHealth(result.metrics),
+        ...rationaleCtx,
+      });
+      const childBundle = createSolveBundle(bundleInput, bundleOutput, compatReport);
+
+      return {
+        solved,
+        steps,
+        totalNodes: result.discoveredNodes?.length ?? 0,
+        durationMs: result.durationMs ?? 0,
+        planId,
+        error: result.error,
+        rules,
+        childBundles: [childBundle],
+      };
+    } catch (err) {
+      return {
+        solved: false,
+        steps: [],
+        totalNodes: 0,
+        durationMs: 0,
+        planId: null,
+        error: `Sterling solve failed: ${err instanceof Error ? err.message : String(err)}`,
+        rules,
+        childBundles: [],
+      };
+    }
+  }
+}

@@ -55,6 +55,20 @@ export type {
   BuildingEpisodeReport,
 } from './minecraft-building-types';
 
+// Minecraft furnace scheduling domain
+export { MinecraftFurnaceSolver } from './minecraft-furnace-solver';
+export { buildFurnaceRules, buildFurnaceGoal, checkSlotPrecondition, SMELTABLE_ITEMS } from './minecraft-furnace-rules';
+export type {
+  FurnaceSlotState,
+  FurnaceSearchState,
+  FurnaceSchedulingRule,
+  FurnaceOperatorFamily,
+  FurnaceSolveStep,
+  FurnaceSchedulingSolveResult,
+  FurnaceEpisodeReport,
+} from './minecraft-furnace-types';
+export { FURNACE_HASH_EXCLUDED_FIELDS } from './minecraft-furnace-types';
+
 // Minecraft tool progression domain
 export { MinecraftToolProgressionSolver } from './minecraft-tool-progression-solver';
 export {
@@ -84,6 +98,46 @@ export {
   PICKAXE_RECIPES,
   SMELT_RECIPES,
 } from './minecraft-tool-progression-types';
+
+// Minecraft acquisition domain (Rig D)
+export { MinecraftAcquisitionSolver } from './minecraft-acquisition-solver';
+export { buildTradeRules, buildLootRules, buildSalvageRules } from './minecraft-acquisition-solver';
+export {
+  buildAcquisitionContext,
+  buildAcquisitionStrategies,
+  buildSalvageCandidatesWithInventory,
+  rankStrategies,
+  distanceToBucket,
+  contextKeyFromAcquisitionContext,
+  MINECRAFT_TRADE_TABLE,
+  MINECRAFT_LOOT_TABLE,
+  MINECRAFT_SALVAGE_TABLE,
+} from './minecraft-acquisition-rules';
+export type { NearbyEntity } from './minecraft-acquisition-rules';
+export { StrategyPriorStore } from './minecraft-acquisition-priors';
+export type {
+  AcquisitionStrategy,
+  AcquisitionFeasibility,
+  AcquisitionContextV1,
+  AcquisitionCandidate,
+  AcquisitionSolveResult,
+  AcquisitionSolveStep,
+  StrategyPrior,
+  AcquisitionEpisodeReport,
+} from './minecraft-acquisition-types';
+export {
+  hashAcquisitionContext,
+  computeCandidateSetDigest,
+  PRIOR_MIN,
+  PRIOR_MAX,
+} from './minecraft-acquisition-types';
+export { actionToAcquisitionLeaf } from './leaf-routing';
+
+// Rig D signals + degeneracy detection
+export { computeRigDSignals } from './signals-rig-d';
+export type { RigDSignals } from './signals-rig-d';
+export { detectStrategyDegeneracy } from './degeneracy-detection';
+export type { StrategyDegeneracyReport } from './degeneracy-detection';
 
 // Evidence infrastructure
 export type {

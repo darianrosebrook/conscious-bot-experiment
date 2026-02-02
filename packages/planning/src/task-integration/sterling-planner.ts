@@ -10,7 +10,9 @@ import type { BaseDomainSolver } from '../sterling/base-domain-solver';
 import type { MinecraftCraftingSolver } from '../sterling/minecraft-crafting-solver';
 import type { MinecraftBuildingSolver } from '../sterling/minecraft-building-solver';
 import type { MinecraftToolProgressionSolver } from '../sterling/minecraft-tool-progression-solver';
+import type { MinecraftAcquisitionSolver } from '../sterling/minecraft-acquisition-solver';
 import { resolveRequirement } from '../modules/requirements';
+import type { TaskRequirement } from '../modules/requirements';
 import { routeActionPlan } from '../modules/action-plan-backend';
 import { requirementToFallbackPlan } from '../modules/leaf-arg-contracts';
 import type { Task } from '../types/task';
@@ -38,6 +40,28 @@ export interface SterlingPlannerOptions {
     path: string,
     opts?: { timeout?: number }
   ) => Promise<Response>;
+}
+
+/** Returns the single goal item string for acquisition solver from a TaskRequirement. */
+function getAcquisitionGoalItem(req: TaskRequirement): string | undefined {
+  switch (req.kind) {
+    case 'craft':
+      return req.outputPattern;
+    case 'collect':
+    case 'mine':
+      return req.patterns?.[0];
+    case 'tool_progression':
+      return req.targetTool;
+    case 'build':
+      return req.structure;
+    case 'navigate':
+      return req.destination;
+    case 'explore':
+    case 'find':
+      return req.target;
+    default:
+      return undefined;
+  }
 }
 
 function deriveLeafArgs(
@@ -279,6 +303,14 @@ export class SterlingPlanner {
       | undefined;
   }
 
+  private get acquisitionSolver():
+    | MinecraftAcquisitionSolver
+    | undefined {
+    return this.solverRegistry.get('minecraft.acquisition') as
+      | MinecraftAcquisitionSolver
+      | undefined;
+  }
+
   registerSolver(solver: BaseDomainSolver): void {
     this.solverRegistry.set(solver.solverId, solver);
   }
@@ -390,6 +422,21 @@ export class SterlingPlanner {
       }
     }
 
+    // Rig D: multi-strategy acquisition solver.
+    if (this.acquisitionSolver && route.requiredRig === 'D') {
+      try {
+        const steps = await this.generateAcquisitionStepsFromSterling(taskData);
+        if (steps && steps.length > 0) return { steps, route: routeInfo };
+        return { steps: [], noStepsReason: 'solver-unsolved', route: routeInfo };
+      } catch (error) {
+        console.warn(
+          'Sterling acquisition solver failed, falling through:',
+          error
+        );
+        return { steps: [], noStepsReason: 'solver-error', route: routeInfo };
+      }
+    }
+
     // Rig E: hierarchical macro-planner for navigate/explore/find.
     // When configured, generates steps via macro path + micro decomposition.
     // When unconfigured, returns explicit blocked sentinel.
@@ -467,13 +514,15 @@ export class SterlingPlanner {
       done: false,
       order: index + 1,
       estimatedDuration:
-        step.leaf === 'dig_block'
-          ? 10000
-          : step.leaf === 'collect_items'
-            ? 5000
-            : step.leaf === 'craft_recipe'
+        step.leaf === 'acquire_material'
+          ? 15000
+          : step.leaf === 'dig_block'
+            ? 10000
+            : step.leaf === 'collect_items'
               ? 5000
-              : 15000,
+              : step.leaf === 'craft_recipe'
+                ? 5000
+                : 15000,
       meta: {
         authority: 'fallback-macro',
         leaf: step.leaf,
@@ -708,6 +757,72 @@ export class SterlingPlanner {
         solverId: this.buildingSolver!.solverId,
         planId: result.planId,
         bundleId: result.solveMeta?.bundles?.[0]?.bundleId,
+        executable: !!s.meta?.leaf,
+      };
+      const args = deriveLeafArgs(enrichedMeta);
+      if (args) enrichedMeta.args = args;
+      return { ...s, meta: enrichedMeta };
+    });
+  }
+
+  private async generateAcquisitionStepsFromSterling(
+    taskData: Partial<Task>
+  ): Promise<TaskStep[]> {
+    if (!this.acquisitionSolver) return [];
+
+    const requirement = resolveRequirement(taskData);
+    if (!requirement) return [];
+
+    // Acquisition solver handles 'acquire' requirement kind
+    // It can also be triggered for craft/mine when Rig D routing is active
+    const goalItem = getAcquisitionGoalItem(requirement);
+    if (!goalItem) return [];
+
+    let inventoryItems: Array<
+      { name: string; count: number } | null | undefined
+    > = (taskData.metadata as any)?.currentState?.inventory;
+    let nearbyBlocks: string[] = (taskData.metadata as any)?.currentState
+      ?.nearbyBlocks;
+
+    if (!inventoryItems || !nearbyBlocks) {
+      const botCtx = await this.fetchBotContext();
+      if (botCtx._unavailable) return [];
+      inventoryItems = inventoryItems || botCtx.inventory;
+      nearbyBlocks = nearbyBlocks || botCtx.nearbyBlocks;
+    }
+
+    const inventory: Record<string, number> = {};
+    for (const item of inventoryItems || []) {
+      if (!item || !item.name) continue;
+      inventory[item.name] = (inventory[item.name] || 0) + item.count;
+    }
+
+    const nearbyEntities = (taskData.metadata as any)?.currentState?.nearbyEntities || [];
+
+    const result = await this.acquisitionSolver.solveAcquisition(
+      goalItem,
+      requirement.quantity || 1,
+      inventory,
+      nearbyBlocks,
+      nearbyEntities,
+    );
+
+    if (result.planId) {
+      ensureSolverMeta(taskData).acquisitionPlanId = result.planId;
+    }
+
+    if (!result.solved) return [];
+
+    const steps = this.acquisitionSolver.toTaskSteps(result);
+    return steps.map((s) => {
+      const enrichedMeta: Record<string, unknown> = {
+        ...s.meta,
+        source: 'rig-d-acquisition',
+        solverId: this.acquisitionSolver!.solverId,
+        planId: result.planId,
+        bundleId: result.solveMeta?.bundles?.[0]?.bundleId,
+        strategySelected: result.selectedStrategy,
+        candidateSetDigest: result.candidateSetDigest,
         executable: !!s.meta?.leaf,
       };
       const args = deriveLeafArgs(enrichedMeta);

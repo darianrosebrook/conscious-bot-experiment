@@ -183,14 +183,14 @@ describe('normalizeLeafArgs', () => {
 });
 
 describe('requirementToLeafMeta', () => {
-  it('maps collect requirement to dig_block', () => {
+  it('maps collect requirement to acquire_material', () => {
     const result = requirementToLeafMeta({ kind: 'collect', patterns: ['oak_log'], quantity: 8 });
-    expect(result).toEqual({ leaf: 'dig_block', args: { blockType: 'oak_log' } });
+    expect(result).toEqual({ leaf: 'acquire_material', args: { item: 'oak_log', count: 8 } });
   });
 
-  it('maps mine requirement to dig_block', () => {
+  it('maps mine requirement to acquire_material', () => {
     const result = requirementToLeafMeta({ kind: 'mine', patterns: ['iron_ore'], quantity: 3 });
-    expect(result).toEqual({ leaf: 'dig_block', args: { blockType: 'iron_ore' } });
+    expect(result).toEqual({ leaf: 'acquire_material', args: { item: 'iron_ore', count: 3 } });
   });
 
   it('maps craft requirement to craft_recipe', () => {
@@ -221,18 +221,19 @@ describe('requirementToLeafMeta', () => {
 
   it('defaults quantity to 1 when not provided', () => {
     const result = requirementToLeafMeta({ kind: 'collect', patterns: ['oak_log'] });
-    expect(result).toEqual({ leaf: 'dig_block', args: { blockType: 'oak_log' } });
+    expect(result).toEqual({ leaf: 'acquire_material', args: { item: 'oak_log', count: 1 } });
   });
 });
 
 describe('KNOWN_LEAVES', () => {
-  it('contains all 13 expected leaf names', () => {
+  it('contains all 15 expected leaf names', () => {
     const expected = [
       'dig_block', 'craft_recipe', 'smelt', 'place_block', 'place_workstation',
       'build_module', 'acquire_material', 'replan_building', 'replan_exhausted',
       'prepare_site', 'place_feature', 'building_step', 'collect_items',
+      'interact_with_entity', 'open_container',
     ];
-    expect(KNOWN_LEAVES.size).toBe(13);
+    expect(KNOWN_LEAVES.size).toBe(15);
     for (const leaf of expected) {
       expect(KNOWN_LEAVES.has(leaf)).toBe(true);
     }
@@ -240,55 +241,44 @@ describe('KNOWN_LEAVES', () => {
 });
 
 describe('requirementToFallbackPlan', () => {
-  it('maps collect requirement to dig_block + collect_items pairs', () => {
+  it('maps collect requirement to acquire_material steps', () => {
     const result = requirementToFallbackPlan({ kind: 'collect', patterns: ['oak_log'], quantity: 8 });
-    expect(result).toHaveLength(16); // 8 dig + 8 collect
+    expect(result).toHaveLength(8);
     expect(result![0]).toEqual({
-      leaf: 'dig_block',
-      args: { blockType: 'oak_log' },
-      label: 'Collect oak_log (1/8)',
+      leaf: 'acquire_material',
+      args: { item: 'oak_log', count: 1 },
+      label: 'Gather oak_log (1/8)',
     });
-    expect(result![1]).toEqual({
-      leaf: 'collect_items',
-      args: { itemName: 'oak_log', radius: 8, maxItems: 1 },
-      label: 'Pick up oak_log (1/8)',
-    });
-    // Verify last pair
-    expect(result![14]).toEqual({
-      leaf: 'dig_block',
-      args: { blockType: 'oak_log' },
-      label: 'Collect oak_log (8/8)',
-    });
-    expect(result![15]).toEqual({
-      leaf: 'collect_items',
-      args: { itemName: 'oak_log', radius: 8, maxItems: 1 },
-      label: 'Pick up oak_log (8/8)',
+    expect(result![7]).toEqual({
+      leaf: 'acquire_material',
+      args: { item: 'oak_log', count: 1 },
+      label: 'Gather oak_log (8/8)',
     });
   });
 
-  it('maps mine requirement to dig_block + collect_items pairs', () => {
+  it('maps mine requirement to acquire_material steps', () => {
     const result = requirementToFallbackPlan({ kind: 'mine', patterns: ['iron_ore'], quantity: 3 });
-    expect(result).toHaveLength(6); // 3 dig + 3 collect
+    expect(result).toHaveLength(3);
     expect(result![0]).toEqual({
-      leaf: 'dig_block',
-      args: { blockType: 'iron_ore' },
+      leaf: 'acquire_material',
+      args: { item: 'iron_ore', count: 1 },
       label: 'Mine iron_ore (1/3)',
     });
-    expect(result![1]).toEqual({
-      leaf: 'collect_items',
-      args: { itemName: 'iron_ore', radius: 8, maxItems: 1 },
-      label: 'Pick up iron_ore (1/3)',
+    expect(result![2]).toEqual({
+      leaf: 'acquire_material',
+      args: { item: 'iron_ore', count: 1 },
+      label: 'Mine iron_ore (3/3)',
     });
   });
 
-  it('alternates dig_block and collect_items steps', () => {
+  it('emits only acquire_material leaves for collect plans', () => {
     const result = requirementToFallbackPlan({ kind: 'collect', patterns: ['oak_log'], quantity: 3 });
-    expect(result).toHaveLength(6);
+    expect(result).toHaveLength(3);
     const leafSequence = result!.map(s => s.leaf);
     expect(leafSequence).toEqual([
-      'dig_block', 'collect_items',
-      'dig_block', 'collect_items',
-      'dig_block', 'collect_items',
+      'acquire_material',
+      'acquire_material',
+      'acquire_material',
     ]);
   });
 
@@ -334,8 +324,7 @@ describe('requirementToFallbackPlan', () => {
   it('defaults quantity to 1 when not provided', () => {
     const result = requirementToFallbackPlan({ kind: 'collect', patterns: ['oak_log'] });
     expect(result).toEqual([
-      { leaf: 'dig_block', args: { blockType: 'oak_log' }, label: 'Collect oak_log' },
-      { leaf: 'collect_items', args: { itemName: 'oak_log', radius: 8, maxItems: 1 }, label: 'Pick up oak_log' },
+      { leaf: 'acquire_material', args: { item: 'oak_log', count: 1 }, label: 'Gather oak_log' },
     ]);
   });
 });

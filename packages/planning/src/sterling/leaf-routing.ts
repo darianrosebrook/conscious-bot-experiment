@@ -33,13 +33,19 @@ export function parsePlaceAction(action: string | undefined): string | null {
 /**
  * Core action-type-to-leaf-name mapping for crafting-domain solvers.
  * The `action` parameter is only used for 'place' action types to distinguish
- * workstation placement from generic block placement.
+ * workstation placement from generic block placement, and for acq:* prefixed
+ * actions (acquisition domain, Rig D).
  *
  * Tool-progression solver extends this with 'upgrade' → 'craft_recipe'.
  */
 export function actionTypeToLeaf(actionType: string, action?: string): string {
+  // Acquisition domain: acq:* prefix routing (Rig D)
+  if (action?.startsWith('acq:')) {
+    return actionToAcquisitionLeaf(action);
+  }
+
   switch (actionType) {
-    case 'mine': return 'dig_block';
+    case 'mine': return 'acquire_material';
     case 'craft': return 'craft_recipe';
     case 'smelt': return 'smelt';
     case 'place': {
@@ -83,4 +89,21 @@ export function estimateDuration(actionType: string): number {
     case 'upgrade': return 2000;
     default: return 3000;
   }
+}
+
+// ── Acquisition leaf routing (Rig D) ────────────────────────────────────
+
+/**
+ * Map acq:* prefixed actions to leaf names.
+ *
+ * - acq:trade:* → interact_with_entity
+ * - acq:loot:*  → open_container
+ * - acq:salvage:* → craft_recipe (reuse existing craft leaf)
+ * - Unknown acq:* → 'blocked' (fail-safe)
+ */
+export function actionToAcquisitionLeaf(action: string): string {
+  if (action.startsWith('acq:trade:')) return 'interact_with_entity';
+  if (action.startsWith('acq:loot:')) return 'open_container';
+  if (action.startsWith('acq:salvage:')) return 'craft_recipe';
+  return 'blocked';
 }

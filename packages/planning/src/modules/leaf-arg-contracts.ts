@@ -108,6 +108,24 @@ const CONTRACTS: Record<string, LeafArgContract> = {
       return null;
     },
   },
+  interact_with_entity: {
+    leafName: 'interact_with_entity',
+    validate: (args) => {
+      if (!args.entityType || typeof args.entityType !== 'string')
+        return 'interact_with_entity requires entityType (string)';
+      if (!args.entityId && !args.entityPosition)
+        return 'interact_with_entity requires entityId or entityPosition';
+      return null;
+    },
+  },
+  open_container: {
+    leafName: 'open_container',
+    validate: (args) => {
+      if (!args.containerType && !args.position)
+        return 'open_container requires containerType or position';
+      return null;
+    },
+  },
 };
 
 /** Canonical set of leaves the executor may run. Unknown leaves are rejected in strict mode. */
@@ -116,8 +134,14 @@ export const KNOWN_LEAVES = new Set(Object.keys(CONTRACTS));
 /** Normalize legacy arg shapes to canonical form before validation.
  *  Mutates the args object in place. Call before validateLeafArgs. */
 export function normalizeLeafArgs(leafName: string, args: Record<string, unknown>): void {
+  // smelt: item → input (legacy Sterling output)
   if (leafName === 'smelt' && !args.input && typeof args.item === 'string') {
     args.input = args.item;
+    delete args.item;
+  }
+  // collect_items: item → itemName (aligns with action-contract-registry)
+  if (leafName === 'collect_items' && !args.itemName && typeof args.item === 'string') {
+    args.itemName = args.item;
     delete args.item;
   }
 }
@@ -145,9 +169,9 @@ export function requirementToLeafMeta(
     case 'mine': {
       const blockType = requirement.patterns?.[0];
       if (!blockType) return null;
-      const args = { blockType };
-      const err = validateLeafArgs('dig_block', args);
-      return err ? null : { leaf: 'dig_block', args };
+      const args = { item: blockType, count: requirement.quantity || 1 };
+      const err = validateLeafArgs('acquire_material', args);
+      return err ? null : { leaf: 'acquire_material', args };
     }
     case 'craft': {
       const recipe = requirement.outputPattern;
@@ -169,7 +193,7 @@ export function requirementToLeafMeta(
 }
 
 /** Maps requirement → fallback plan steps. Returns null if no valid mapping exists.
- *  Collect/mine plans emit dig_block + collect_items pairs (capped) for quantity.
+ *  Collect/mine plans emit acquire_material steps (atomic dig + pickup).
  *  Craft plans are single-step (craft only); the executor's prereq injection
  *  handles missing materials via recipe introspection at execution time. */
 export function requirementToFallbackPlan(
@@ -182,21 +206,16 @@ export function requirementToFallbackPlan(
     const maxSteps = 8;
     const desired = requirement.quantity || 1;
     const count = Math.max(1, Math.min(desired, maxSteps));
-    const digArgs = { blockType };
-    if (validateLeafArgs('dig_block', digArgs)) return null; // invalid args
-    const verb = requirement.kind === 'mine' ? 'Mine' : 'Collect';
+    const acquireArgs = { item: blockType, count: 1 };
+    if (validateLeafArgs('acquire_material', acquireArgs)) return null;
+    const verb = requirement.kind === 'mine' ? 'Mine' : 'Gather';
     const steps: Array<{ leaf: string; args: Record<string, unknown>; label: string }> = [];
     for (let idx = 0; idx < count; idx++) {
       const suffix = count > 1 ? ` (${idx + 1}/${count})` : '';
       steps.push({
-        leaf: 'dig_block',
-        args: { blockType },
+        leaf: 'acquire_material',
+        args: { item: blockType, count: 1 },
         label: `${verb} ${blockType}${suffix}`,
-      });
-      steps.push({
-        leaf: 'collect_items',
-        args: { itemName: blockType, radius: 8, maxItems: 1 },
-        label: `Pick up ${blockType}${suffix}`,
       });
     }
     return steps;

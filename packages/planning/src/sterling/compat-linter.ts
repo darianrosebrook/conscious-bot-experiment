@@ -6,7 +6,7 @@
  * test assertions. Returns structured CompatReport with stable error
  * codes for queryability.
  *
- * Ten checks:
+ * Fourteen checks:
  * - UNSUPPORTED_ACTION_TYPE: actionType not in {craft, mine, smelt, place}
  * - INVALID_PLACE_ID: place action doesn't match place:<item>
  * - MINE_REQUIRES_NO_INVARIANT: mine rule has requires without consume+produce invariant
@@ -17,6 +17,10 @@
  * - DUPLICATE_ACTION_ID: two rules share same action ID
  * - PLACE_HAS_CONSUMES: place rule has non-empty consumes (double-decrement)
  * - INVALID_BASE_COST: baseCost defined but not a finite number > 0 and <= 1000
+ * - FURNACE_OVERCAPACITY: furnace load rule produces without consuming slot occupancy
+ * - TRADE_REQUIRES_ENTITY: acq:trade:* without entity proximity token (acquisition)
+ * - ACQ_FREE_PRODUCTION: acq:* rule with no consumes and no requires (acquisition)
+ * - ACQUISITION_NO_VIABLE_STRATEGY: 0 viable candidates (acquisition coordinator)
  *
  * @author @darianrosebrook
  */
@@ -221,6 +225,90 @@ export function lintRules(rules: LintableRule[], context?: LintContext): CompatR
           ruleAction: rule.action,
           message: `baseCost ${cost} is invalid (must be a finite number > 0 and <= ${MAX_BASE_COST})`,
         });
+      }
+    }
+
+    // FURNACE_OVERCAPACITY — gated behind furnace solverId
+    // Detects furnace load rules that don't properly track slot occupancy.
+    // Fail-closed: if capacity cannot be proven from state, reject.
+    if (context?.solverId === 'minecraft.furnace') {
+      if (
+        rule.action.startsWith('furnace:load:') &&
+        rule.consumes.length === 0
+      ) {
+        issues.push({
+          severity: 'error',
+          code: 'FURNACE_OVERCAPACITY',
+          ruleAction: rule.action,
+          message: `Furnace load rule must consume an input item to prevent overcapacity (slot double-booking)`,
+        });
+      }
+    }
+
+    // ── Acquisition-specific checks (gated behind acquisition solverId) ──
+
+    if (context?.solverId === 'minecraft.acquisition') {
+      // TRADE_REQUIRES_ENTITY — acq:trade:* must have proximity token in requires
+      if (rule.action.startsWith('acq:trade:')) {
+        const hasProximityToken = rule.requires.some(
+          (r) => r.name.startsWith('proximity:')
+        );
+        if (!hasProximityToken) {
+          issues.push({
+            severity: 'error',
+            code: 'TRADE_REQUIRES_ENTITY',
+            ruleAction: rule.action,
+            message: `Trade rule must require an entity proximity token (e.g., proximity:villager)`,
+          });
+        }
+      }
+
+      // ACQ_FREE_PRODUCTION — structural "no free production" for acq:* rules
+      if (rule.action.startsWith('acq:')) {
+        if (rule.action.startsWith('acq:trade:')) {
+          // Trade must consume at least one currency AND require a proximity token
+          const hasCurrencyConsume = rule.consumes.length > 0;
+          const hasProximityRequire = rule.requires.some(r => r.name.startsWith('proximity:'));
+          if (!hasCurrencyConsume || !hasProximityRequire) {
+            issues.push({
+              severity: 'error',
+              code: 'ACQ_FREE_PRODUCTION',
+              ruleAction: rule.action,
+              message: `Trade rule must consume currency and require a proximity token`,
+            });
+          }
+        } else if (rule.action.startsWith('acq:loot:')) {
+          // Loot must require a container-proximity token
+          const hasContainerRequire = rule.requires.some(r => r.name.startsWith('proximity:'));
+          if (!hasContainerRequire) {
+            issues.push({
+              severity: 'error',
+              code: 'ACQ_FREE_PRODUCTION',
+              ruleAction: rule.action,
+              message: `Loot rule must require a container proximity token`,
+            });
+          }
+        } else if (rule.action.startsWith('acq:salvage:')) {
+          // Salvage must consume the source item
+          if (rule.consumes.length === 0) {
+            issues.push({
+              severity: 'error',
+              code: 'ACQ_FREE_PRODUCTION',
+              ruleAction: rule.action,
+              message: `Salvage rule must consume the source item being salvaged`,
+            });
+          }
+        } else {
+          // Generic acq:* with empty consumes AND empty requires → rejected
+          if (rule.consumes.length === 0 && rule.requires.length === 0) {
+            issues.push({
+              severity: 'error',
+              code: 'ACQ_FREE_PRODUCTION',
+              ruleAction: rule.action,
+              message: `Acquisition rule must consume or require at least one token`,
+            });
+          }
+        }
       }
     }
   }
