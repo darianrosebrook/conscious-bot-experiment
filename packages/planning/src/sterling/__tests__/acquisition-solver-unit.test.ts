@@ -20,6 +20,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { MinecraftAcquisitionSolver } from '../minecraft-acquisition-solver';
 import type { MinecraftCraftingSolver } from '../minecraft-crafting-solver';
 import type { SterlingReasoningService } from '../sterling-reasoning-service';
+import { hashInventoryState } from '../solve-bundle';
 
 // ── Mock Sterling Service ──────────────────────────────────────────────────
 
@@ -306,6 +307,117 @@ describe('MinecraftAcquisitionSolver', () => {
     const childBundle = result.solveMeta!.bundles[1];
     expect(parentBundle.bundleId).toContain('minecraft.acquisition');
     expect(childBundle.bundleId).toContain('minecraft.crafting');
+  });
+
+  // ── Context token injection ───────────────────────────────────────────
+
+  it('trade strategy injects proximity:villager when villager observed', async () => {
+    await solver.solveAcquisition(
+      'iron_ingot', 1,
+      { emerald: 5 },
+      [],
+      [{ type: 'villager', distance: 10 }],
+    );
+    expect(mockService.solve).toHaveBeenCalled();
+    const payload = (mockService.solve as any).mock.calls[0][1];
+    // Token injected because villager is in nearbyEntities
+    expect(payload.inventory['proximity:villager']).toBe(1);
+    // Original inventory items preserved
+    expect(payload.inventory['emerald']).toBe(5);
+  });
+
+  it('trade strategy does NOT inject proximity:villager when no villager observed', async () => {
+    // iron_ingot is in the trade table, so trade will be enumerated as
+    // feasibility:'unknown'. With no villager in nearbyEntities, the
+    // context token must NOT be fabricated — Python should fail the rule.
+    const result = await solver.solveAcquisition(
+      'iron_ingot', 1,
+      { emerald: 5 },
+      [],
+      [], // No entities at all
+    );
+    // Trade may or may not be selected (depends on ranking with no alternatives).
+    // If Sterling was called, assert the payload does not contain the token.
+    if ((mockService.solve as any).mock.calls.length > 0) {
+      const payload = (mockService.solve as any).mock.calls[0][1];
+      expect(payload.inventory['proximity:villager']).toBeUndefined();
+    }
+  });
+
+  it('loot strategy injects proximity:container:chest when chest observed', async () => {
+    // saddle is ONLY in the loot table (not trade, not ore, not salvage).
+    // With a chest nearby, loot is the only viable strategy.
+    const result = await solver.solveAcquisition(
+      'saddle', 1,
+      {},
+      [],
+      [{ type: 'chest', distance: 20 }],
+    );
+    expect(result.selectedStrategy).toBe('loot');
+    expect(mockService.solve).toHaveBeenCalled();
+    const payload = (mockService.solve as any).mock.calls[0][1];
+    expect(payload.inventory['proximity:container:chest']).toBe(1);
+  });
+
+  it('salvage strategy does NOT inject proximity tokens (consumes only)', async () => {
+    // stick has salvage from oak_planks, is NOT in the trade table,
+    // and oak_planks in inventory is needed for salvage.
+    // No entities, no ore → only salvage is viable.
+    const result = await solver.solveAcquisition(
+      'stick', 1,
+      { oak_planks: 1 },
+      [],
+      [],
+    );
+    expect(result.selectedStrategy).toBe('salvage');
+    expect(mockService.solve).toHaveBeenCalled();
+    const payload = (mockService.solve as any).mock.calls[0][1];
+    // No proximity tokens should be injected for salvage
+    const proximityKeys = Object.keys(payload.inventory).filter(
+      (k: string) => k.startsWith('proximity:'),
+    );
+    expect(proximityKeys).toHaveLength(0);
+  });
+
+  it('child bundle input captures contextTokensInjected and inventory hash', async () => {
+    const result = await solver.solveAcquisition(
+      'iron_ingot', 1,
+      { emerald: 5 },
+      [],
+      [{ type: 'villager', distance: 10 }],
+    );
+    expect(result.selectedStrategy).toBe('trade');
+    // Child bundle (trade sub-solve) should have contextTokensInjected
+    const childBundle = result.solveMeta!.bundles.find(
+      b => b.input.solverId.includes('.trade'),
+    );
+    expect(childBundle).toBeDefined();
+    expect(childBundle!.input.contextTokensInjected).toEqual(['proximity:villager']);
+    // Material fact: initialStateHash proves the augmented inventory
+    const expectedInventory = { emerald: 5, 'proximity:villager': 1 };
+    expect(childBundle!.input.initialStateHash).toBe(
+      hashInventoryState(expectedInventory),
+    );
+  });
+
+  it('child bundle input has no contextTokensInjected for salvage and un-augmented inventory hash', async () => {
+    const result = await solver.solveAcquisition(
+      'stick', 1,
+      { oak_planks: 1 },
+      [],
+      [],
+    );
+    expect(result.selectedStrategy).toBe('salvage');
+    const childBundle = result.solveMeta!.bundles.find(
+      b => b.input.solverId.includes('.salvage'),
+    );
+    expect(childBundle).toBeDefined();
+    expect(childBundle!.input.contextTokensInjected).toBeUndefined();
+    // Material fact: initialStateHash proves no proximity tokens leaked in
+    const expectedInventory = { oak_planks: 1 };
+    expect(childBundle!.input.initialStateHash).toBe(
+      hashInventoryState(expectedInventory),
+    );
   });
 
   it('toTaskSteps converts solved result to steps', async () => {

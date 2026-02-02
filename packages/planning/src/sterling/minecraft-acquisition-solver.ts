@@ -219,6 +219,7 @@ export class MinecraftAcquisitionSolver extends BaseDomainSolver<AcquisitionSolv
       quantity,
       inventory,
       nearbyBlocks,
+      nearbyEntities,
       maxNodes,
       options?.objectiveWeights,
     );
@@ -344,6 +345,7 @@ export class MinecraftAcquisitionSolver extends BaseDomainSolver<AcquisitionSolv
     quantity: number,
     inventory: Record<string, number>,
     nearbyBlocks: string[],
+    nearbyEntities: NearbyEntity[],
     maxNodes: number,
     objectiveWeights?: ObjectiveWeights,
   ): Promise<{
@@ -367,6 +369,7 @@ export class MinecraftAcquisitionSolver extends BaseDomainSolver<AcquisitionSolv
           quantity,
           inventory,
           nearbyBlocks,
+          nearbyEntities,
           maxNodes,
           'trade',
           objectiveWeights,
@@ -379,6 +382,7 @@ export class MinecraftAcquisitionSolver extends BaseDomainSolver<AcquisitionSolv
           quantity,
           inventory,
           nearbyBlocks,
+          nearbyEntities,
           maxNodes,
           'loot',
           objectiveWeights,
@@ -391,6 +395,7 @@ export class MinecraftAcquisitionSolver extends BaseDomainSolver<AcquisitionSolv
           quantity,
           inventory,
           nearbyBlocks,
+          nearbyEntities,
           maxNodes,
           'salvage',
           objectiveWeights,
@@ -494,6 +499,7 @@ export class MinecraftAcquisitionSolver extends BaseDomainSolver<AcquisitionSolv
     quantity: number,
     inventory: Record<string, number>,
     nearbyBlocks: string[],
+    nearbyEntities: NearbyEntity[],
     maxNodes: number,
     strategy: string,
     objectiveWeights?: ObjectiveWeights,
@@ -513,10 +519,43 @@ export class MinecraftAcquisitionSolver extends BaseDomainSolver<AcquisitionSolv
     // so audits can distinguish which strategy produced which rule family.
     const childSolverId = `${this.solverId}.${strategy}`;
 
+    // Derive observed context tokens from the real world inputs.
+    // Only tokens we can justify from actual observations get injected.
+    // This preserves fail-closed behavior: unknown-feasibility strategies
+    // are dispatchable, but Python correctly fails them unless the
+    // context token is actually present.
+    const observedTokens: Record<string, number> = {};
+    for (const entity of nearbyEntities) {
+      const t = entity.type?.toLowerCase();
+      if (t === 'villager') {
+        observedTokens['proximity:villager'] = 1;
+      } else if (t === 'chest' || t === 'trapped_chest' || t === 'barrel') {
+        observedTokens[`proximity:container:${t}`] = 1;
+      }
+    }
+
+    // Build augmented inventory: only inject tokens that are BOTH
+    // required by the dispatched rules AND observed in the world.
+    const augmentedInventory = { ...inventory };
+    const contextTokensInjected: string[] = [];
+    for (const rule of rules) {
+      for (const req of rule.requires ?? []) {
+        if (!req.name.startsWith('proximity:')) continue;
+        const observed = observedTokens[req.name];
+        if (!observed) continue; // do not fabricate context
+        const existing = augmentedInventory[req.name] ?? 0;
+        augmentedInventory[req.name] = Math.max(existing, req.count, observed);
+        if (!contextTokensInjected.includes(req.name)) {
+          contextTokensInjected.push(req.name);
+        }
+      }
+    }
+    contextTokensInjected.sort();
+
     const solvePayload: Record<string, unknown> = {
       contractVersion: this.contractVersion,
       solverId: this.solverId,
-      inventory,
+      inventory: augmentedInventory,
       goal,
       nearbyBlocks,
       rules,
@@ -536,15 +575,18 @@ export class MinecraftAcquisitionSolver extends BaseDomainSolver<AcquisitionSolv
         solverId: childSolverId,
         enableAcqHardening: true,
       });
-      const bundleInput = computeBundleInput({
-        solverId: childSolverId,
-        contractVersion: this.contractVersion,
-        definitions: rules,
-        inventory,
-        goal,
-        nearbyBlocks,
-        objectiveWeights,
-      });
+      const bundleInput = {
+        ...computeBundleInput({
+          solverId: childSolverId,
+          contractVersion: this.contractVersion,
+          definitions: rules,
+          inventory: augmentedInventory,
+          goal,
+          nearbyBlocks,
+          objectiveWeights,
+        }),
+        contextTokensInjected: contextTokensInjected.length > 0 ? contextTokensInjected : undefined,
+      };
       const rationaleCtx = buildDefaultRationaleContext({
         compatReport,
         maxNodes,

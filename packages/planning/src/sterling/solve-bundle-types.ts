@@ -42,6 +42,8 @@ export interface SolveBundleInput {
   objectiveWeightsEffective: ObjectiveWeights;
   /** Whether weights were explicitly provided or defaulted */
   objectiveWeightsSource: ObjectiveWeightsSource;
+  /** Context tokens injected into wire inventory (sorted). Acquisition solver only. */
+  contextTokensInjected?: string[];
 }
 
 /** Output snapshot captured after a Sterling solve call */
