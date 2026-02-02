@@ -73,6 +73,224 @@ export { DEFAULT_TASK_INTEGRATION_CONFIG };
 const DEFAULT_CONFIG = DEFAULT_TASK_INTEGRATION_CONFIG;
 
 /**
+ * Normalize intentParams to a stable string at the creation boundary.
+ * Objects are serialized with sorted keys at every nesting level so that
+ * identical intent payloads always produce the same provisional goal key,
+ * regardless of property insertion order in the original object.
+ *
+ * Handles edge cases: BigInt → string, undefined/function → omitted by JSON,
+ * non-plain objects (Date, Map, Set) → fail-closed to undefined.
+ */
+export function canonicalizeIntentParams(raw: unknown): string | undefined {
+  if (raw == null) return undefined;
+  if (typeof raw === 'string') return raw;
+  if (typeof raw === 'bigint') return raw.toString();
+  // Stable JSON: sort keys recursively, coerce bigints
+  try {
+    return JSON.stringify(raw, (_key, value) => {
+      if (typeof value === 'bigint') return value.toString();
+      if (value !== null && typeof value === 'object' && !Array.isArray(value)) {
+        // Reject non-plain objects (Date, Map, Set, etc.) — they serialize unpredictably
+        const proto = Object.getPrototypeOf(value);
+        if (proto !== null && proto !== Object.prototype) {
+          return undefined; // omitted from output
+        }
+        return Object.fromEntries(
+          Object.entries(value).sort(([a], [b]) => a.localeCompare(b))
+        );
+      }
+      return value;
+    });
+  } catch {
+    // Fail-closed: if serialization throws (circular ref, etc.), return undefined
+    // so the provisional key excludes intentParams rather than crashing
+    return undefined;
+  }
+}
+
+/**
+ * Thin event emitted when a task claims source='goal' but did not receive
+ * goalBinding metadata. This is the primary early warning for entry-point
+ * drift (new goal-like task types that bypass the resolver gate).
+ *
+ * Design: "queryable, not copyable" — carries only summary fields sufficient
+ * for dashboards and alerts. Consumers needing the full task query the store
+ * by taskId.
+ */
+export interface GoalBindingDriftEvent {
+  type: 'goal_binding_drift';
+  /** ID of the affected task */
+  taskId: string;
+  /** Task type (e.g. 'building', 'gathering') */
+  taskType: string;
+  /** Task source — drift events only fire for goal-sourced tasks */
+  source: 'goal';
+  /** Classification of why goalBinding was not attached */
+  reason: 'goal_resolver_disabled' | `type_not_gated:${string}` | 'resolver_fallthrough';
+  /** Origin kind inferred at creation */
+  originKind?: string;
+  /** Whether goalBinding was present (always false for drift events) */
+  hasGoalBinding: false;
+  /** Goal type if extractable from parameters */
+  goalType?: string;
+  /** Truncated title (max 80 chars) — human-friendly, not contractual */
+  title?: string;
+}
+
+/**
+ * Infer a canonical task origin from available task data signals.
+ * Set once at creation time; stripped from updateTaskMetadata patches.
+ *
+ * kind meanings:
+ * - 'api'           — created via HTTP endpoint or manual action
+ * - 'cognition'     — created by thought-to-task converter
+ * - 'executor'      — subtask spawned by executor/leaf during execution
+ * - 'goal_resolver' — routed through GoalResolver and received goalBinding
+ * - 'goal_source'   — source='goal' but did NOT receive goalBinding (drift)
+ */
+export interface TaskOrigin {
+  /** How this task entered the system */
+  kind: 'api' | 'cognition' | 'executor' | 'goal_resolver' | 'goal_source' | 'unknown';
+  /** Finer-grained source name (e.g., leaf name, thought type, endpoint) */
+  name?: string;
+  /** Parent task ID if this is a subtask */
+  parentTaskId?: string;
+  /** Goal key if goal-derived */
+  parentGoalKey?: string;
+  /** Creation timestamp (ms) */
+  createdAt: number;
+}
+
+/**
+ * Infer origin from raw task input signals.
+ * Called with the constructed task (not raw input) so we can reflect
+ * whether goalBinding was actually attached.
+ */
+function inferTaskOrigin(task: Task): TaskOrigin {
+  const meta = task.metadata;
+  const now = Date.now();
+
+  // Executor-created subtasks have taskProvenance from buildTaskFromRequirement
+  if (meta?.taskProvenance) {
+    return {
+      kind: 'executor',
+      name: meta.taskProvenance.source ?? 'executor',
+      parentTaskId: meta.parentTaskId,
+      parentGoalKey: meta.goalKey,
+      createdAt: now,
+    };
+  }
+
+  // Cognitive/autonomous tasks from thought-to-task converter
+  if (task.source === 'autonomous') {
+    const tags: string[] = meta?.tags ?? [];
+    return {
+      kind: 'cognition',
+      name: tags.includes('cognitive') ? 'thought-to-task' : 'autonomous',
+      parentGoalKey: meta?.goalKey,
+      createdAt: now,
+    };
+  }
+
+  // Goal-sourced tasks: distinguish resolved (has goalBinding) from unresolved
+  if (task.source === 'goal') {
+    const binding = meta?.goalBinding;
+    // Prefer goalBinding.goalType for name — the resolver skeleton task
+    // has empty parameters, so task.parameters?.goalType is unreliable
+    // on the most important (goal-resolved) path.
+    const name = binding?.goalType
+      ?? task.parameters?.goalType
+      ?? task.type;
+    return {
+      kind: binding ? 'goal_resolver' : 'goal_source',
+      name,
+      parentGoalKey: binding?.goalKey ?? task.parameters?.goalId,
+      createdAt: now,
+    };
+  }
+
+  // Default: API or manual entry
+  return {
+    kind: 'api',
+    name: task.source ?? 'manual',
+    createdAt: now,
+  };
+}
+
+// ============================================================================
+// Metadata Projection
+// ============================================================================
+
+/**
+ * Integration-critical metadata keys that must survive the addTask() rebuild.
+ * Fail-closed: any key NOT in this list is intentionally dropped.
+ *
+ * Add new keys here when a new pipeline (converter, executor, goal resolver)
+ * needs metadata to survive addTask(). The compile-time `satisfies` constraint
+ * ensures every key actually exists on Task['metadata'].
+ */
+const PROPAGATED_META_KEYS = [
+  'goalKey',
+  'subtaskKey',
+  'taskProvenance',
+] as const satisfies readonly (keyof Task['metadata'])[];
+
+/**
+ * Project incoming metadata onto a new task's metadata object.
+ * Fail-closed allowlist: only PROPAGATED_META_KEYS are copied.
+ * Solver metadata is handled separately (namespace merge).
+ *
+ * @param target  The task.metadata object being built (mutated in place)
+ * @param source  The incoming taskData.metadata (may be partial or undefined)
+ */
+function projectIncomingMetadata(
+  target: Task['metadata'],
+  source: Partial<Task['metadata']> | undefined,
+): void {
+  if (!source) return;
+  for (const key of PROPAGATED_META_KEYS) {
+    const value = source[key];
+    if (value !== undefined) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (target as any)[key] = value;
+    }
+  }
+}
+
+/**
+ * Set of task types routed through the GoalResolver when source='goal'.
+ * Centralizes the gating predicate so the resolver gate and the drift
+ * linter use exactly the same check.
+ */
+const GOAL_RESOLVER_GATED_TYPES = new Set(['building']);
+
+/**
+ * Apply a blocked state to a task atomically.
+ *
+ * Ensures `blockedReason` and `blockedAt` are always set together.
+ * Optionally sets `status` (e.g., `'pending_planning'` for solver sentinels).
+ *
+ * Usage: call this instead of setting `task.metadata.blockedReason` directly
+ * for any creation-time block. Runtime blocks (Rig G gate, replan exhaustion)
+ * may still set blockedReason directly when they have different lifecycle
+ * semantics, but the finalize safety net will backfill blockedAt if missing.
+ */
+function applyTaskBlock(
+  task: Task,
+  reason: string,
+  opts?: { status?: Task['status']; clearSteps?: boolean },
+): void {
+  task.metadata.blockedReason = reason;
+  task.metadata.blockedAt ??= Date.now();
+  if (opts?.status) {
+    task.status = opts.status;
+  }
+  if (opts?.clearSteps) {
+    task.steps = [];
+  }
+}
+
+/**
  * Task integration system for dashboard connectivity
  * @author @darianrosebrook
  */
@@ -197,6 +415,9 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
               handle: (goal: GoalTagV1, sourceThoughtId?: string) =>
                 this.handleManagementAction(goal, sourceThoughtId),
             } as TaskManagementHandler,
+            config: {
+              strictConvertEligibility: this.config.strictConvertEligibility,
+            },
             getInventoryBand: (itemName: string) => {
               // Use inventory from last bot context fetch for satisfaction-aware dedup
               const activeTasks = this.getActiveTasks();
@@ -681,14 +902,37 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
     const botPosition = taskData.parameters?.botPosition ?? { x: 0, y: 64, z: 0 };
     const verifier = taskData.parameters?.verifier ?? `verify_${goalType}_v0`;
 
+    const rawIntentParams = taskData.parameters?.intentParams;
+    const canonicalizedIntentParams = canonicalizeIntentParams(rawIntentParams);
+
+    // Detect unserializable intentParams: raw was non-null but canonicalized to undefined.
+    // Instead of collapsing to undefined (which would merge key-space with "no intentParams"),
+    // use a sentinel string that preserves separation. This prevents accidental dedup
+    // between tasks with unserializable params and tasks with no params at all.
+    let effectiveIntentParams = canonicalizedIntentParams;
+    if (rawIntentParams != null && canonicalizedIntentParams === undefined) {
+      const rawType = typeof rawIntentParams;
+      const rawConstructor = rawIntentParams?.constructor?.name ?? 'unknown';
+      effectiveIntentParams = `__unserializable__:${rawConstructor}`;
+      console.warn(
+        `[GoalIntake] Unserializable intentParams for goalType=${goalType} ` +
+        `(typeof=${rawType}, constructor=${rawConstructor}). ` +
+        `Using sentinel key "${effectiveIntentParams}" to prevent dedup collision.`
+      );
+      this.emit('taskLifecycleEvent', {
+        type: 'intent_params_unserializable',
+        taskType: taskData.type,
+        goalType,
+        rawType,
+        rawConstructor,
+        sentinel: effectiveIntentParams,
+      });
+    }
+
     const outcome = await this.goalResolver.resolveOrCreate(
       {
         goalType,
-        intentParams: typeof taskData.parameters?.intentParams === 'string'
-          ? taskData.parameters.intentParams
-          : taskData.parameters?.intentParams != null
-            ? JSON.stringify(taskData.parameters.intentParams)
-            : undefined,
+        intentParams: effectiveIntentParams,
         botPosition,
         verifier,
         goalId: taskData.parameters?.goalId,
@@ -696,7 +940,11 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
       {
         getAllTasks: () => this.taskStore.getAllTasks(),
         storeTask: (task: Task) => {
-          this.taskStore.setTask(task);
+          (task.metadata as any)._stage = 'skeleton';
+          this.taskStore.setTask(task, {
+            allowUnfinalized: true,
+            note: 'goal_resolver_skeleton',
+          });
           return task;
         },
         generateTaskId: () =>
@@ -741,56 +989,161 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
     // Handle blocked sentinel
     if (blockedSentinel) {
       const reason = (steps[0].meta?.blockedReason as string) || 'solver_unavailable';
-      created.status = 'pending_planning';
-      created.metadata.blockedReason = reason;
-      created.steps = [];
+      applyTaskBlock(created, reason, { status: 'pending_planning', clearSteps: true });
     }
 
-    // Check step executability
+    return this.finalizeNewTask(created, blockedSentinel);
+  }
+
+  /**
+   * Single choke-point for all new-task finalization.
+   *
+   * Both addTask (normal path) and resolveGoalTask (goal-resolver path)
+   * call this after task-specific setup is complete. This ensures that
+   * every invariant (executability check, stepsDigest, origin stamp,
+   * persistence, lifecycle events, drift linter, dashboard notify) is
+   * applied exactly once and identically regardless of creation path.
+   *
+   * If you add a new post-creation invariant, add it HERE, not in the
+   * individual creation paths.
+   */
+  private async finalizeNewTask(task: Task, blockedSentinel: boolean): Promise<Task> {
+    // ── Executability check ──
+    // If no step has a leaf / executable flag, the task cannot make progress
+    // without manual intervention. Skip when blockedSentinel already set an
+    // explicit reason — never overwrite a solver-provided block.
     if (!blockedSentinel) {
-      const hasExecutableStep = created.steps.some(
+      const hasExecutableStep = task.steps.some(
         (s) => s.meta?.leaf || s.meta?.executable === true
       );
-      if (created.steps.length > 0 && !hasExecutableStep) {
-        created.metadata.blockedReason = 'no-executable-plan';
+      if (task.steps.length > 0 && !hasExecutableStep) {
+        applyTaskBlock(task, 'no-executable-plan');
       }
     }
 
-    // Seed stepsDigest
-    if (created.steps.length > 0 && !blockedSentinel) {
+    // ── Seed stepsDigest ──
+    // So replan attempt 1 can detect identical plans
+    if (task.steps.length > 0 && !blockedSentinel) {
       try {
         const { hashSteps } = await import('./sterling/solve-bundle');
         const digest = hashSteps(
-          created.steps.map((s) => ({ action: s.label || s.id }))
+          task.steps.map((s) => ({ action: s.label || s.id }))
         );
-        created.metadata.solver ??= {};
-        created.metadata.solver.stepsDigest = digest;
+        task.metadata.solver ??= {};
+        task.metadata.solver.stepsDigest = digest;
       } catch {
         // hashSteps unavailable — digest seeding is best-effort
       }
     }
 
-    // Persist enriched task
-    this.taskStore.setTask(created);
+    // ── Clear skeleton marker ──
+    // GoalResolver skeleton persist tags tasks with _stage='skeleton'
+    // to identify incomplete intermediate state. Clear it before
+    // finalization makes the task observable to consumers.
+    if ((task.metadata as any)._stage === 'skeleton') {
+      delete (task.metadata as any)._stage;
+    }
+
+    // ── Task origin envelope ──
+    // Stamped after full construction so it reflects the actual outcome
+    // (e.g., whether goalBinding was attached). Immutable after creation —
+    // updateTaskMetadata strips 'origin' from patches.
+    task.metadata.origin = inferTaskOrigin(task);
+
+    // ── Finalization invariant ──
+    // Every task that reaches consumers must have origin stamped. This
+    // assertion catches regressions in this method itself (e.g., if the
+    // origin stamp is accidentally removed or reordered after persist).
+    const strict = process.env.PLANNING_STRICT_FINALIZE === '1';
+    if (!task.metadata.origin) {
+      const msg = `[FinalizeInvariant] Task ${task.id} reached persist without origin. This is a bug in finalizeNewTask.`;
+      this.emit('taskLifecycleEvent', {
+        type: 'task_finalize_invariant_violation',
+        taskId: task.id,
+        taskType: task.type,
+        violation: 'missing_origin',
+      });
+      if (strict) throw new Error(msg);
+      console.error(msg);
+    }
+
+    // ── Blocked-state consistency check ──
+    // If blockedReason is set, blockedAt must also be set. Catches any
+    // path that sets a reason without timestamping it.
+    if (task.metadata.blockedReason && !task.metadata.blockedAt) {
+      const msg =
+        `[FinalizeInvariant] Task ${task.id} has blockedReason="${task.metadata.blockedReason}" but missing blockedAt.`;
+      if (strict) throw new Error(msg);
+      // Non-strict: backfill from best available timestamp
+      task.metadata.blockedAt =
+        task.metadata.updatedAt ?? task.metadata.createdAt ?? Date.now();
+      console.warn(msg + ' Backfilled.');
+    }
+
+    // ── Persist ──
+    this.taskStore.setTask(task);
     this.taskStore.updateStatistics();
-    this.emit('taskAdded', created);
-    if (created.priority >= 0.8) {
-      this.emit('taskLifecycleEvent', { type: 'high_priority_added', taskId: created.id, task: created });
+
+    // ── Lifecycle events ──
+    this.emit('taskAdded', task);
+    if (task.priority >= 0.8) {
+      this.emit('taskLifecycleEvent', { type: 'high_priority_added', taskId: task.id, task });
     }
     if (blockedSentinel) {
       this.emit('taskLifecycleEvent', {
         type: 'solver_unavailable',
-        taskId: created.id,
-        task: created,
-        reason: created.metadata.blockedReason,
+        taskId: task.id,
+        task,
+        reason: task.metadata.blockedReason,
       });
     }
 
-    if (this.config.enableRealTimeUpdates) {
-      this.notifyDashboard('taskAdded', created);
+    // ── Dev log ──
+    if (process.env.NODE_ENV === 'development') {
+      console.log(
+        `[Planning] Task added: id=${task.id} title="${task.title.slice(0, 50)}" source=${task.source} priority=${task.priority}`
+      );
     }
 
-    return created;
+    // ── Goal-binding drift linter ──
+    // Detect tasks that claim to be goal-sourced but were not routed through the
+    // GoalResolver (so they lack goalBinding metadata). This is the primary early
+    // warning for entry-point drift: if new goal-like task types are introduced
+    // without extending the resolver gate, this fires.
+    if (task.source === 'goal' && !(task.metadata as any)?.goalBinding) {
+      let reason: GoalBindingDriftEvent['reason'];
+      if (!this.goalResolver) {
+        reason = 'goal_resolver_disabled';
+      } else if (!GOAL_RESOLVER_GATED_TYPES.has(task.type)) {
+        reason = `type_not_gated:${task.type}`;
+      } else {
+        reason = 'resolver_fallthrough';
+      }
+      console.warn(
+        `[GoalBindingDrift] Task ${task.id} has source='goal' but no goalBinding ` +
+        `(reason=${reason}, type=${task.type}). This task will not participate in ` +
+        `goal dedup, threat holds, or goal lifecycle events.`
+      );
+      const driftEvent: GoalBindingDriftEvent = {
+        type: 'goal_binding_drift',
+        taskId: task.id,
+        taskType: task.type,
+        source: 'goal',
+        reason,
+        originKind: task.metadata.origin?.kind,
+        hasGoalBinding: false,
+        goalType: task.parameters?.goalType,
+        title: task.title.slice(0, 80),
+      };
+      this.emit('taskLifecycleEvent', driftEvent);
+    }
+
+    // ── Dashboard ──
+    if (this.config.enableRealTimeUpdates) {
+      this.notifyDashboard('taskAdded', task);
+    }
+
+    return task;
   }
 
   /**
@@ -1111,7 +1464,7 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
 
   async addTask(taskData: Partial<Task>): Promise<Task> {
     // Goal-sourced task interception: route through GoalResolver when enabled
-    if (this.goalResolver && taskData.source === 'goal' && taskData.type === 'building') {
+    if (this.goalResolver && taskData.source === 'goal' && GOAL_RESOLVER_GATED_TYPES.has(taskData.type ?? '')) {
       const goalType = this.inferGoalType(taskData);
       if (goalType) {
         const resolved = await this.resolveGoalTask(goalType, taskData);
@@ -1172,14 +1525,9 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
       },
     };
 
-    // Propagate builder-produced metadata fields (subtaskKey, taskProvenance)
-    const incomingMeta = taskData.metadata as any;
-    if (incomingMeta?.subtaskKey) {
-      (task.metadata as any).subtaskKey = incomingMeta.subtaskKey;
-    }
-    if (incomingMeta?.taskProvenance) {
-      (task.metadata as any).taskProvenance = incomingMeta.taskProvenance;
-    }
+    // Propagate integration-critical metadata via centralized allowlist.
+    // See PROPAGATED_META_KEYS for the compile-time constrained set.
+    projectIncomingMetadata(task.metadata, taskData.metadata);
 
     // Propagate solver-produced metadata via the solver namespace.
     // Solvers store outputs on taskData.metadata.solver during step generation;
@@ -1214,73 +1562,16 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
     // Advisory actions are NL-parsed cognitive markers — non-executable by design.
     // Mark them blocked so the executor's eligibility filter skips them.
     if (isAdvisory) {
-      task.metadata.blockedReason = 'advisory_action';
-      task.metadata.blockedAt = Date.now();
+      applyTaskBlock(task, 'advisory_action');
     }
 
     // Blocked sentinel: solver explicitly reported it cannot plan (e.g., Rig E not implemented)
     if (blockedSentinel) {
       const reason = (steps[0].meta?.blockedReason as string) || 'solver_unavailable';
-      task.status = 'pending_planning';
-      task.metadata.blockedReason = reason;
-      task.metadata.blockedAt = Date.now();
-      task.steps = []; // Strip sentinel — no real steps to execute
+      applyTaskBlock(task, reason, { status: 'pending_planning', clearSteps: true });
     }
 
-    // Check step executability: if no step has a leaf / executable flag,
-    // the task cannot make progress without manual intervention.
-    // Skip when blockedSentinel already set an explicit reason — never overwrite
-    // a solver-provided block with a generic 'no-executable-plan'.
-    if (!blockedSentinel) {
-      const hasExecutableStep = task.steps.some(
-        (s) => s.meta?.leaf || s.meta?.executable === true
-      );
-      if (task.steps.length > 0 && !hasExecutableStep) {
-        task.metadata.blockedReason = 'no-executable-plan';
-        task.metadata.blockedAt = Date.now();
-      }
-    }
-
-    // Seed stepsDigest so replan attempt 1 can detect identical plans
-    if (task.steps.length > 0 && !blockedSentinel) {
-      try {
-        const { hashSteps } = await import('./sterling/solve-bundle');
-        const digest = hashSteps(
-          task.steps.map((s) => ({ action: s.label || s.id }))
-        );
-        task.metadata.solver ??= {};
-        task.metadata.solver.stepsDigest = digest;
-      } catch {
-        // hashSteps unavailable — digest seeding is best-effort
-      }
-    }
-
-    this.taskStore.setTask(task);
-    this.taskStore.updateStatistics();
-    this.emit('taskAdded', task);
-    if (task.priority >= 0.8) {
-      this.emit('taskLifecycleEvent', { type: 'high_priority_added', taskId: task.id, task });
-    }
-    if (blockedSentinel) {
-      this.emit('taskLifecycleEvent', {
-        type: 'solver_unavailable',
-        taskId: task.id,
-        task,
-        reason: task.metadata.blockedReason,
-      });
-    }
-
-    if (process.env.NODE_ENV === 'development') {
-      console.log(
-        `[Planning] Task added: id=${task.id} title="${task.title.slice(0, 50)}" source=${task.source} priority=${task.priority}`
-      );
-    }
-
-    if (this.config.enableRealTimeUpdates) {
-      this.notifyDashboard('taskAdded', task);
-    }
-
-    return task;
+    return this.finalizeNewTask(task, blockedSentinel);
   }
 
   updateTaskMetadata(
@@ -1292,13 +1583,19 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
       return false;
     }
 
-    // Protect goalBinding from accidental overwrite — it's part of the goal
-    // protocol control plane, not incidental metadata. Use dedicated goal-binding
-    // APIs (applyHold, clearHold, etc.) to mutate it.
-    const { goalBinding: _ignoredGoalBinding, ...safeMetadata } = metadata as any;
-    if ('goalBinding' in (metadata as any)) {
+    // Protect goalBinding and origin from accidental overwrite.
+    // goalBinding is part of the goal protocol control plane — use dedicated
+    // goal-binding APIs (applyHold, clearHold, etc.) to mutate it.
+    // origin is stamped once at creation and must not change afterward.
+    const { goalBinding: _gb, origin: _origin, ...safeMetadata } = metadata;
+    if (metadata.goalBinding !== undefined) {
       console.warn(
         `[TaskIntegration] updateTaskMetadata: goalBinding field ignored for task ${taskId}; use goal-binding APIs instead`,
+      );
+    }
+    if (metadata.origin !== undefined) {
+      console.warn(
+        `[TaskIntegration] updateTaskMetadata: origin field ignored for task ${taskId}; origin is immutable after creation`,
       );
     }
     task.metadata = { ...task.metadata, ...safeMetadata, updatedAt: Date.now() };

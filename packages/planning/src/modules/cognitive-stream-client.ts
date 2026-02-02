@@ -32,8 +32,12 @@ export interface CognitiveStreamThought {
     sanitizationFlags?: Record<string, any>;
     /** Extracted intent label from INTENT: line */
     extractedIntent?: string | null;
+    /** How the INTENT was parsed: 'final_line', 'inline_noncompliant', or null */
+    intentParse?: string | null;
     /** Source of the extracted goal ('llm' or 'drive-tick') */
     extractedGoalSource?: string;
+    /** Canonical goal key for exact-match idempotency (action:target) */
+    goalKey?: string;
   };
   id: string;
   timestamp: number;

@@ -102,6 +102,6 @@ export function buildTaskFromRequirement(
         builder: 'buildTaskFromRequirement',
         source: options?.source ?? 'internal',
       },
-    } as any,
+    },
   };
 }

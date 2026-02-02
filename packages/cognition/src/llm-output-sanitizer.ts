@@ -21,6 +21,8 @@ export interface SanitizedOutput {
   goalTag: GoalTag | null;
   goalTagV1: GoalTagV1 | null;
   intent: IntentLabel | null;
+  /** How the INTENT was parsed: 'final_line' (compliant), 'inline_noncompliant', or null (absent) */
+  intentParse: IntentParse | null;
   flags: SanitizationFlags;
 }
 
@@ -427,6 +429,37 @@ export function extractGoalTag(text: string): {
 }
 
 // ============================================================================
+// Goal Key Canonicalization
+// ============================================================================
+
+/**
+ * Produce a canonical goal key from action + target for exact-match idempotency.
+ * Single source of truth — used by both cognition (drive tick) and planning (converter).
+ *
+ * Rules:
+ * - lowercase everything
+ * - collapse whitespace to single underscore
+ * - strip leading/trailing underscores
+ * - collapse repeated underscores
+ * - restrict to [a-z0-9_] (replace anything else with _)
+ * - format: "action:target"
+ */
+export function canonicalGoalKey(action: string, target: string): string {
+  const normalize = (s: string) =>
+    s.toLowerCase()
+      .replace(/\s+/g, '_')
+      .replace(/[^a-z0-9_]/g, '_')
+      .replace(/_+/g, '_')
+      .replace(/^_|_$/g, '');
+  const normAction = normalize(action);
+  const normTarget = normalize(target);
+  // Reject targetless goals — an empty target after normalization means
+  // the goal is too vague for idempotency matching.
+  if (!normAction || !normTarget) return '';
+  return `${normAction}:${normTarget}`;
+}
+
+// ============================================================================
 // Intent Extraction
 // ============================================================================
 
@@ -434,34 +467,61 @@ const VALID_INTENTS = new Set<IntentLabel>([
   'none', 'explore', 'gather', 'craft', 'shelter', 'food', 'mine', 'navigate',
 ]);
 
+export type IntentParse = 'final_line' | 'inline_noncompliant' | null;
+
 /**
  * Extract INTENT label from the final line of text.
- * Strips the INTENT line from the output.
- * Returns null for unknown/missing intents.
+ * Strips the INTENT line from the output whenever the syntax matches,
+ * even if the label is unknown (returns intent: null in that case).
+ *
+ * Also strips inline `INTENT: <word>` occurrences that appear mid-sentence
+ * (LLM format non-compliance). These are removed from text but tagged as
+ * `intentParse: 'inline_noncompliant'` so the caller can measure compliance.
  */
-export function extractIntent(text: string): { text: string; intent: IntentLabel | null } {
-  // Match INTENT: <label> only as the final non-empty line.
+export function extractIntent(text: string): { text: string; intent: IntentLabel | null; intentParse: IntentParse } {
+  // Pass 1: Match INTENT: <label> only as the final non-empty line.
   // Walk backward past trailing blank lines (small models often emit trailing newlines).
   const lines = text.split('\n');
-  let intentLineIdx = -1;
   for (let i = lines.length - 1; i >= 0; i--) {
     const trimmed = lines[i].trim();
     if (trimmed.length === 0) continue;
     const match = trimmed.match(/^INTENT:\s*(\w+)\s*$/i);
     if (match) {
+      // Always strip the INTENT line from output — it's a control line, not content
+      let cleanedText = lines.slice(0, i).join('\n').trimEnd();
       const candidate = match[1].toLowerCase() as IntentLabel;
+      // Also strip any inline occurrences in the remaining text
+      cleanedText = stripInlineIntent(cleanedText);
       if (VALID_INTENTS.has(candidate)) {
-        intentLineIdx = i;
-        // Strip INTENT line (and any trailing blanks after it) from output
-        const cleanedText = lines.slice(0, i).join('\n').trimEnd();
-        return { text: cleanedText, intent: candidate };
+        return { text: cleanedText, intent: candidate, intentParse: 'final_line' };
       }
+      // Syntax matched but label invalid → strip line anyway, intent null
+      return { text: cleanedText, intent: null, intentParse: 'final_line' };
     }
     // First non-empty line from the end wasn't an INTENT line — stop looking
     break;
   }
 
-  return { text, intent: null };
+  // Pass 2: No final-line INTENT found. Check for inline occurrences.
+  // Strip them from text to prevent leakage into titles/goalKeys.
+  const stripped = stripInlineIntent(text);
+  if (stripped !== text) {
+    // Inline INTENT was found and removed — extract label for observability
+    const inlineMatch = text.match(/INTENT:\s*(\w+)/i);
+    const candidate = inlineMatch?.[1]?.toLowerCase() as IntentLabel | undefined;
+    const intent = candidate && VALID_INTENTS.has(candidate) ? candidate : null;
+    return { text: stripped, intent, intentParse: 'inline_noncompliant' };
+  }
+
+  return { text, intent: null, intentParse: null };
+}
+
+/**
+ * Strip inline `INTENT: <word>` substrings from text.
+ * Handles mid-sentence occurrences like "I will explore. INTENT: explore I notice a tree."
+ */
+function stripInlineIntent(text: string): string {
+  return text.replace(/\s*INTENT:\s*\w+/gi, '').replace(/\s{2,}/g, ' ').trim();
 }
 
 /**
@@ -697,6 +757,7 @@ export function sanitizeLLMOutput(raw: string): SanitizedOutput {
     goalTag: goalResult.goal,
     goalTagV1: goalResult.goalV1,
     intent: intentResult.intent,
+    intentParse: intentResult.intentParse,
     flags,
   };
 }

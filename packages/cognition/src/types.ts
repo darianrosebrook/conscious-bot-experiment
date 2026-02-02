@@ -66,6 +66,8 @@ export interface LLMResponse {
     retryReason?: string;
     extractedGoal?: GoalTagV1 | { action: string; target: string; amount: number | null };
     extractedIntent?: string | null;
+    /** How the INTENT was parsed: 'final_line', 'inline_noncompliant', or null */
+    intentParse?: string | null;
     sanitizationFlags?: SanitizationFlags;
   };
   timestamp: number;

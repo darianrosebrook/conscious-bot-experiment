@@ -12,6 +12,7 @@ import { LLMInterface } from './cognitive-core/llm-interface';
 import { auditLogger } from './audit/thought-action-audit-logger';
 import { getInteroState } from './interoception-store';
 import { buildStressContext } from './stress-axis-computer';
+import { canonicalGoalKey } from './llm-output-sanitizer';
 import type { GoalTagV1 } from './llm-output-sanitizer';
 
 /**
@@ -101,6 +102,10 @@ export interface ThoughtContext {
     progress: number;
     status: string;
     type: string;
+    metadata?: {
+      goalKey?: string;
+      [key: string]: unknown;
+    };
   }>;
   recentEvents?: Array<{
     id: string;
@@ -178,7 +183,11 @@ export interface CognitiveThought {
     error?: string;
     extractedGoal?: { action: string; target: string; amount: number | null };
     extractedIntent?: string | null;
+    /** How the INTENT was parsed: 'final_line', 'inline_noncompliant', or null */
+    intentParse?: string | null;
     extractedGoalSource?: 'llm' | 'drive-tick';
+    /** Canonical goal key for exact-match idempotency (action:target) */
+    goalKey?: string;
   };
   novelty?: 'high' | 'medium' | 'low';
   /** Only thoughts with convertEligible=true should be considered for task conversion */
@@ -244,7 +253,14 @@ export class EnhancedThoughtGenerator extends EventEmitter {
   private _driveTickCount: number = 0;
   private _lastDriveTickMs: number = 0;
   private static readonly DRIVE_TICK_INTERVAL_MS = 180_000; // 3 min fixed, no jitter in v1
-  /** Agency counters for observability */
+  /**
+   * Agency counters for observability.
+   * signatureSuppressions and contentSuppressions are mutually exclusive per thought:
+   *   - signatureSuppressions: LLM call avoided (same banded state), deterministic fallback returned
+   *   - contentSuppressions: LLM was called but output content matched recent thoughts
+   * A thought that triggers signatureSuppressions will NOT also trigger contentSuppressions
+   * because signature-dedup fallbacks are tagged novelty='low' and bypass content dedup.
+   */
   private _counters = {
     llmCalls: 0,
     goalTags: 0,
@@ -374,8 +390,10 @@ export class EnhancedThoughtGenerator extends EventEmitter {
       }
 
       if (thought) {
-        // Check if this thought is too similar to recent thoughts
-        if (!this.thoughtDeduplicator.shouldGenerateThought(thought.content)) {
+        // Skip content dedup for thoughts already tagged low-novelty by signature dedup.
+        // This prevents double-counting: signatureSuppressions and contentSuppressions
+        // are mutually exclusive for any single thought.
+        if (thought.novelty !== 'low' && !this.thoughtDeduplicator.shouldGenerateThought(thought.content)) {
           // Task-worthy thoughts bypass broadcast suppression and keep convertEligible.
           // This prevents drive tick goals from being silently downgraded by content dedup.
           const isTaskWorthy = thought.convertEligible === true || !!thought.metadata?.extractedGoal;
@@ -545,7 +563,8 @@ export class EnhancedThoughtGenerator extends EventEmitter {
       if (isDuplicate) tags.push('heartbeat-stagnation');
 
       const hasGoal = !!response.metadata.extractedGoal;
-      const extractedIntent = (response.metadata as any).extractedIntent ?? null;
+      const extractedIntent = response.metadata.extractedIntent ?? null;
+      const intentParse = response.metadata.intentParse ?? null;
       const hasIntent = extractedIntent != null && extractedIntent !== 'none';
       if (hasGoal) this._counters.goalTags++;
       if (hasIntent) this._counters.intentExtractions++;
@@ -572,6 +591,7 @@ export class EnhancedThoughtGenerator extends EventEmitter {
           model: response.model,
           extractedGoal: response.metadata.extractedGoal,
           extractedIntent,
+          intentParse,
           extractedGoalSource: hasGoal ? 'llm' as const : undefined,
         },
         novelty: isDuplicate ? 'medium' : 'high',
@@ -1515,9 +1535,14 @@ export class EnhancedThoughtGenerator extends EventEmitter {
     // Idempotency: suppress if matching pending/active task already exists.
     // Always suppress to prevent duplicate task accumulation. Recovery/stuck detection
     // can be added later with createdAt/updatedAt timestamps on tasks.
+    const goalKey = canonicalGoalKey(drive.extractedGoal.action, drive.extractedGoal.target);
     const tasks = context.currentTasks ?? [];
     const matchingTask = tasks.find(t => {
       if (t.status !== 'active' && t.status !== 'pending') return false;
+      // Exact match on metadata.goalKey when available (stable across title changes)
+      const taskGoalKey = t.metadata?.goalKey;
+      if (typeof taskGoalKey === 'string') return taskGoalKey === goalKey;
+      // Fuzzy fallback for legacy tasks without goalKey
       const titleLower = (t.title || '').toLowerCase();
       const goalAction = drive.extractedGoal.action.toLowerCase();
       const goalTarget = drive.extractedGoal.target.toLowerCase();
@@ -1551,6 +1576,7 @@ export class EnhancedThoughtGenerator extends EventEmitter {
         intensity: 0.6,
         extractedGoal: drive.extractedGoal,
         extractedGoalSource: 'drive-tick',
+        goalKey,
       },
       novelty: 'high',
       convertEligible: true,

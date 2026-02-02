@@ -14,6 +14,7 @@ import type { CognitiveStreamThought } from '../modules/cognitive-stream-client'
 import { parseRequiredQuantityFromTitle } from '../modules/requirements';
 
 // Import shared parser from cognition boundary — no local regex fork
+import { canonicalGoalKey } from '@conscious-bot/cognition';
 import type { GoalTagV1 } from '@conscious-bot/cognition';
 import type { TaskManagementHandler, ManagementResult } from './task-management-handler';
 
@@ -165,6 +166,15 @@ export interface ConvertThoughtToTaskDeps {
   getInventoryBand?: (itemName: string) => string;
   /** Management handler for cancel/pause/resume/prioritize actions. Optional for backward compat. */
   managementHandler?: TaskManagementHandler;
+  /** Configuration for conversion behavior */
+  config?: {
+    /**
+     * When true, require convertEligible === true for task creation (fail-closed).
+     * When false (default), only convertEligible === false blocks — undefined is eligible.
+     * Enable once all producers reliably emit the field.
+     */
+    strictConvertEligibility?: boolean;
+  };
 }
 
 /** Recent goal hashes for 5-minute dedup window */
@@ -230,10 +240,18 @@ export async function convertThoughtToTask(
       deps.trimSeenThoughtIds();
     }
 
-    // Convert-eligibility gate: if the thought explicitly declares convertEligible=false,
-    // skip conversion. Missing field (undefined) defaults to eligible for backwards compat.
-    if (thought.convertEligible === false) {
-      return { task: null, decision: 'blocked_not_eligible', reason: 'thought marked convertEligible=false' };
+    // Convert-eligibility gate.
+    // Strict mode: require convertEligible === true (fail-closed).
+    // Default mode: only convertEligible === false blocks; undefined is eligible (backwards compat).
+    const strict = deps.config?.strictConvertEligibility === true;
+    if (strict) {
+      if (thought.convertEligible !== true) {
+        return { task: null, decision: 'blocked_not_eligible', reason: 'strict mode: convertEligible !== true' };
+      }
+    } else {
+      if (thought.convertEligible === false) {
+        return { task: null, decision: 'blocked_not_eligible', reason: 'thought marked convertEligible=false' };
+      }
     }
 
     // Primary path: use structured extractedGoal from sanitizer
@@ -420,6 +438,28 @@ export async function convertThoughtToTask(
       .toString(36)
       .replace('-', 'n');
 
+    // Compute canonical goalKey for exact-match idempotency in drive tick.
+    // Prefer the thought's goalKey (already canonical from drive tick).
+    // Fall back to canonicalGoalKey() from extractedGoal to normalize LLM-produced targets.
+    const thoughtGoalKey = thought.metadata?.goalKey;
+    const computedGoalKey = extractedGoal
+      ? canonicalGoalKey(extractedGoal.action, extractedGoal.target) || undefined
+      : undefined;
+
+    // Canonical drift assertion: if a producer emitted a goalKey AND we can
+    // recompute from extractedGoal, verify they match. Log on mismatch so
+    // we catch new producers emitting non-canonical keys early.
+    if (thoughtGoalKey && computedGoalKey && thoughtGoalKey !== computedGoalKey) {
+      console.warn(
+        `[Thought-to-task] goalKey drift: thought.metadata.goalKey="${thoughtGoalKey}" !== ` +
+        `canonicalGoalKey("${extractedGoal!.action}","${extractedGoal!.target}")="${computedGoalKey}". ` +
+        `Using computed key.`
+      );
+    }
+
+    // Computed key wins on mismatch — it's the canonical source of truth
+    const goalKey = computedGoalKey ?? thoughtGoalKey;
+
     const task: Task = {
       id: `cognitive-task-${thought.id}-${extractionMethod}-${contentHash}`,
       title: taskTitle,
@@ -440,6 +480,7 @@ export async function convertThoughtToTask(
         childTaskIds: [],
         tags: ['cognitive', 'autonomous', thought.metadata.thoughtType],
         category: actionType,
+        goalKey,
       },
     };
 

@@ -127,6 +127,7 @@ export class LLMInterface {
         },
         extractedGoal: sanitized.goalTagV1 ?? sanitized.goalTag ?? undefined,
         extractedIntent: sanitized.intent ?? null,
+        intentParse: sanitized.intentParse ?? null,
         sanitizationFlags: sanitized.flags,
       } as LLMResponse['metadata'];
 

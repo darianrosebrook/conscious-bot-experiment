@@ -5,6 +5,7 @@ import {
   stripSystemPromptLeaks,
   extractGoalTag,
   extractIntent,
+  canonicalGoalKey,
   truncateDegeneration,
   stripTrailingGarbage,
   normalizeWhitespace,
@@ -850,5 +851,78 @@ describe('sanitizeLLMOutput (intent field)', () => {
     const result = sanitizeLLMOutput('I should mine stone.\nINTENT: mine');
     expect(result.intent).toBe('mine');
     expect(result.text).toBe('I should mine stone.');
+  });
+});
+
+// ============================================================================
+// canonicalGoalKey
+// ============================================================================
+
+describe('canonicalGoalKey', () => {
+  it('produces action:target format', () => {
+    expect(canonicalGoalKey('collect', 'oak_log')).toBe('collect:oak_log');
+  });
+
+  it('lowercases action and target', () => {
+    expect(canonicalGoalKey('Collect', 'Oak_Log')).toBe('collect:oak_log');
+  });
+
+  it('collapses whitespace to underscores', () => {
+    expect(canonicalGoalKey('mine', 'iron ore')).toBe('mine:iron_ore');
+  });
+
+  it('collapses multiple spaces to single underscore', () => {
+    expect(canonicalGoalKey('collect', 'dark  oak   log')).toBe('collect:dark_oak_log');
+  });
+
+  it('strips leading and trailing underscores', () => {
+    expect(canonicalGoalKey('_collect_', '_oak_log_')).toBe('collect:oak_log');
+  });
+
+  it('collapses repeated underscores', () => {
+    expect(canonicalGoalKey('collect', 'oak__log')).toBe('collect:oak_log');
+  });
+
+  it('replaces non-alphanumeric chars with underscore', () => {
+    expect(canonicalGoalKey('collect', 'oak-log!')).toBe('collect:oak_log');
+  });
+
+  it('handles mixed normalization needs', () => {
+    expect(canonicalGoalKey('  MINE ', ' Iron  Ore!! ')).toBe('mine:iron_ore');
+  });
+
+  it('same inputs always produce same key (deterministic)', () => {
+    const a = canonicalGoalKey('collect', 'oak_log');
+    const b = canonicalGoalKey('collect', 'oak_log');
+    expect(a).toBe(b);
+  });
+
+  it('different actions produce different keys', () => {
+    expect(canonicalGoalKey('collect', 'oak_log')).not.toBe(canonicalGoalKey('mine', 'oak_log'));
+  });
+
+  it('different targets produce different keys', () => {
+    expect(canonicalGoalKey('collect', 'oak_log')).not.toBe(canonicalGoalKey('collect', 'birch_log'));
+  });
+
+  it('rejects empty target (returns empty string)', () => {
+    expect(canonicalGoalKey('explore', '')).toBe('');
+  });
+
+  it('rejects whitespace-only target (normalizes to empty)', () => {
+    expect(canonicalGoalKey('explore', '   ')).toBe('');
+  });
+
+  it('rejects empty action', () => {
+    expect(canonicalGoalKey('', 'oak_log')).toBe('');
+  });
+
+  it('rejects both empty', () => {
+    expect(canonicalGoalKey('', '')).toBe('');
+  });
+
+  it('rejects target that normalizes to only special chars', () => {
+    // "!!!" normalizes to "___" then strips → ""
+    expect(canonicalGoalKey('explore', '!!!')).toBe('');
   });
 });

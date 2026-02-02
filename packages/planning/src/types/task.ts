@@ -59,6 +59,25 @@ export interface Task {
     lastRepairAt?: number;
     lastStepsDigest?: string;
     pendingPlanningTicks?: number;
+    /** Canonical goal key (action:target) for exact-match idempotency in drive tick */
+    goalKey?: string;
+    /** Sub-task dedup key — executor-created subtasks use this for idempotency */
+    subtaskKey?: string;
+    /** Provenance trail: which builder/converter/source created this task */
+    taskProvenance?: {
+      builder: string;
+      source: string;
+      actionType?: string;
+      [key: string]: unknown;
+    };
+    /** Immutable origin envelope, stamped by finalizeNewTask(). Do NOT set in callers. */
+    origin?: {
+      kind: string;
+      name?: string;
+      parentTaskId?: string;
+      parentGoalKey?: string;
+      createdAt: number;
+    };
     /** Tag-stripped display title (computed on read if missing) */
     titleDisplay?: string;
     /** Tag-stripped display description (computed on read if missing) */
@@ -162,6 +181,12 @@ export interface TaskIntegrationConfig {
   minecraftEndpoint?: string;
   enableActionVerification: boolean;
   actionVerificationTimeout: number;
+  /**
+   * When true, thought-to-task conversion requires convertEligible === true (fail-closed).
+   * When false (default), only convertEligible === false blocks — undefined is eligible.
+   * Enable once all producers reliably emit the field.
+   */
+  strictConvertEligibility: boolean;
 }
 
 export const DEFAULT_TASK_INTEGRATION_CONFIG: TaskIntegrationConfig = {
@@ -174,4 +199,5 @@ export const DEFAULT_TASK_INTEGRATION_CONFIG: TaskIntegrationConfig = {
   dashboardEndpoint: 'http://localhost:3000',
   enableActionVerification: true,
   actionVerificationTimeout: 10000,
+  strictConvertEligibility: false,
 };

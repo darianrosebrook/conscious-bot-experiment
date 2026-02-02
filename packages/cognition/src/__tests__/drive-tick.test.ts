@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { EnhancedThoughtGenerator } from '../thought-generator';
+import { canonicalGoalKey } from '../llm-output-sanitizer';
 import type { ThoughtContext, CognitiveThought } from '../thought-generator';
 
 /**
@@ -246,6 +247,23 @@ describe('Drive Tick', () => {
       expect(result!.tags).toContain('drive-tick');
       expect(result!.tags).toContain('autonomous');
     });
+
+    it('includes goalKey in metadata as action:target', () => {
+      const result = callEvaluateDriveTick(makeContext());
+      expect(result).not.toBeNull();
+      expect(result!.metadata.goalKey).toBe('collect:oak_log');
+    });
+
+    it('goalKey matches canonicalGoalKey(action, target)', () => {
+      const inv = [
+        { name: 'oak_log', count: 20, displayName: 'Oak Log' },
+        { name: 'crafting_table', count: 1, displayName: 'Crafting Table' },
+      ];
+      const result = callEvaluateDriveTick(makeContext({ inventory: inv }));
+      expect(result).not.toBeNull();
+      const goal = result!.metadata.extractedGoal!;
+      expect(result!.metadata.goalKey).toBe(canonicalGoalKey(goal.action, goal.target));
+    });
   });
 
   // ==========================================
@@ -300,6 +318,47 @@ describe('Drive Tick', () => {
       }];
       const result = callEvaluateDriveTick(makeContext({ inventory: [] }, tasks));
       expect(result).not.toBeNull();
+    });
+
+    it('suppresses via exact goalKey match even when title differs', () => {
+      const tasks = [{
+        id: 'task-1',
+        title: 'some renamed task title',
+        progress: 0.5,
+        status: 'active',
+        type: 'gathering',
+        metadata: { goalKey: 'collect:oak_log' },
+      }];
+      // Empty inventory → wants collect:oak_log, task has matching goalKey
+      const result = callEvaluateDriveTick(makeContext({ inventory: [] }, tasks));
+      expect(result).toBeNull();
+    });
+
+    it('does not suppress when goalKey differs even if title has partial match', () => {
+      const tasks = [{
+        id: 'task-1',
+        title: 'collect birch_log near oak trees',
+        progress: 0.5,
+        status: 'active',
+        type: 'gathering',
+        metadata: { goalKey: 'collect:birch_log' },
+      }];
+      // Empty inventory → wants collect:oak_log, task goalKey is collect:birch_log
+      const result = callEvaluateDriveTick(makeContext({ inventory: [] }, tasks));
+      expect(result).not.toBeNull();
+    });
+
+    it('falls back to fuzzy title match for legacy tasks without goalKey', () => {
+      const tasks = [{
+        id: 'task-1',
+        title: 'collect oak_log',
+        progress: 0.3,
+        status: 'active',
+        type: 'gathering',
+        // no metadata.goalKey — legacy task
+      }];
+      const result = callEvaluateDriveTick(makeContext({ inventory: [] }, tasks));
+      expect(result).toBeNull();
     });
   });
 

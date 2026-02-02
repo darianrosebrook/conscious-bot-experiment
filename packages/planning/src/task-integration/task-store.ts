@@ -70,7 +70,30 @@ export class TaskStore {
     }
   }
 
-  setTask(task: Task): void {
+  setTask(
+    task: Task,
+    opts?: { allowUnfinalized?: boolean; note?: string },
+  ): void {
+    // ── Persist-without-finalize detection ──
+    // When PLANNING_STRICT_FINALIZE=1, detect new tasks being stored
+    // without going through TaskIntegration.finalizeNewTask() (which
+    // stamps metadata.origin). Existing tasks (updates) are exempt.
+    //
+    // Callers that intentionally persist before finalization (e.g., the
+    // GoalResolver skeleton persist) pass { allowUnfinalized: true } to
+    // suppress the warning. All other new-task persists without origin
+    // are flagged as potential bypass paths.
+    if (
+      process.env.PLANNING_STRICT_FINALIZE === '1' &&
+      !this.tasks.has(task.id) &&
+      !task.metadata?.origin &&
+      !opts?.allowUnfinalized
+    ) {
+      console.warn(
+        `[TaskStore] STRICT: New task ${task.id} persisted without origin. ` +
+        `This may indicate a persistence path that bypasses finalizeNewTask().`
+      );
+    }
     this.tasks.set(task.id, task);
   }
 

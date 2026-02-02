@@ -8,7 +8,11 @@
 
 import * as express from 'express';
 import * as cors from 'cors';
-import { createServiceClients, resilientFetch, TTSClient } from '@conscious-bot/core';
+import {
+  createServiceClients,
+  resilientFetch,
+  TTSClient,
+} from '@conscious-bot/core';
 import { ReActArbiter } from './react-arbiter/ReActArbiter';
 import {
   eventDrivenThoughtGenerator,
@@ -962,7 +966,9 @@ async function sendThoughtToCognitiveStream(thought: any) {
 
       // Speak thought aloud via TTS (fire-and-forget)
       if (process.env.TTS_SPEAK_THOUGHTS !== 'false') {
-        const displayText = (thought.content || '').replace(GOAL_TAG_STRIP, '').trim();
+        const displayText = (thought.content || '')
+          .replace(GOAL_TAG_STRIP, '')
+          .trim();
         if (isUsableContent(displayText)) {
           ttsClient.speak(displayText);
         }
@@ -1082,7 +1088,8 @@ function startThoughtGeneration() {
 
       // Wire isNight into currentState for drive tick.
       // hasShelterNearby left undefined until real shelter detection exists (fail-closed: drive tick skips shelter goal).
-      (currentState as any).isNight = ((currentState as any).timeOfDay ?? 0) >= 13000;
+      (currentState as any).isNight =
+        ((currentState as any).timeOfDay ?? 0) >= 13000;
 
       await enhancedThoughtGenerator.generateThought({
         currentState,
@@ -1095,8 +1102,12 @@ function startThoughtGeneration() {
 
       // Agency counter delta logging
       const counters = enhancedThoughtGenerator.getAgencyCounters();
-      const uptimeMin = Math.round((Date.now() - counters.startedAtMs) / 60_000);
-      console.log(`[Agency ${uptimeMin}m] llm=${counters.llmCalls} goals=${counters.goalTags} drives=${counters.driveTicks} sigDedup=${counters.signatureSuppressions} contentDedup=${counters.contentSuppressions} intents=${counters.intentExtractions}`);
+      const uptimeMin = Math.round(
+        (Date.now() - counters.startedAtMs) / 60_000
+      );
+      console.log(
+        `[Agency ${uptimeMin}m] llm=${counters.llmCalls} goals=${counters.goalTags} drives=${counters.driveTicks} sigDedup=${counters.signatureSuppressions} contentDedup=${counters.contentSuppressions} intents=${counters.intentExtractions}`
+      );
     } catch (error) {
       console.error('Error generating periodic thought:', error);
 
@@ -1751,7 +1762,7 @@ app.post('/thoughts', (req, res) => {
     }
 
     // Create a cognitive thought object
-    const thought = {
+    const thought: Record<string, any> = {
       id:
         id ||
         `external-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
@@ -1770,6 +1781,16 @@ app.post('/thoughts', (req, res) => {
       },
       timestamp: timestamp || Date.now(),
     };
+
+    // Dev-only: allow injecting convertEligible for live verification of
+    // strict-mode gating (C2/C3 tests). Not exposed in production to prevent
+    // external callers from bypassing eligibility checks.
+    if (
+      process.env.NODE_ENV !== 'production' &&
+      req.body.convertEligible !== undefined
+    ) {
+      thought.convertEligible = req.body.convertEligible;
+    }
 
     // Store the thought
     cognitiveThoughts.push(thought);
@@ -1891,8 +1912,7 @@ app.post('/process', async (req, res) => {
                 displayContent: (result.thought.content || '')
                   .replace(GOAL_TAG_STRIP, '')
                   .trim(),
-                extractedGoal:
-                  result.thought.metadata?.extractedGoal || null,
+                extractedGoal: result.thought.metadata?.extractedGoal || null,
                 sanitizationFlags:
                   result.thought.metadata?.sanitizationFlags || null,
                 attribution: 'self',
@@ -2224,11 +2244,12 @@ app.post('/process', async (req, res) => {
         const stateForChat = getBotStateCache();
         if (botStateCacheAgeMs() > STALE_THRESHOLD_MS) {
           // Fire-and-forget background refresh — result goes into cache for next chat
-          const mcUrl = process.env.MINECRAFT_ENDPOINT || 'http://localhost:3005';
+          const mcUrl =
+            process.env.MINECRAFT_ENDPOINT || 'http://localhost:3005';
           resilientFetch(`${mcUrl}/state`, { label: 'mc/state-social' })
             .then(async (freshRes) => {
               if (freshRes?.ok) {
-                const freshBot = await freshRes.json() as any;
+                const freshBot = (await freshRes.json()) as any;
                 const rawState = freshBot?.data || {};
                 const innerData = rawState.data || {};
                 const rawInventory = innerData.inventory;
@@ -2242,17 +2263,21 @@ app.post('/process', async (req, res) => {
                 updateBotStateCache(freshState);
               }
             })
-            .catch(() => { /* Non-blocking — stale cache is acceptable */ });
+            .catch(() => {
+              /* Non-blocking — stale cache is acceptable */
+            });
         }
 
         // Derive botPosition from cache for backwards compatibility.
         // Only accept metadata position if it's complete (all 3 finite coords).
         const cachedPos = stateForChat?.state?.position;
-        const derivedBotPosition = (isCompletePosition(metadata?.botPosition)
-          ? metadata.botPosition
-          : undefined) ?? (isCompletePosition(cachedPos)
-          ? { x: cachedPos.x, y: cachedPos.y, z: cachedPos.z }
-          : undefined);
+        const derivedBotPosition =
+          (isCompletePosition(metadata?.botPosition)
+            ? metadata.botPosition
+            : undefined) ??
+          (isCompletePosition(cachedPos)
+            ? { x: cachedPos.x, y: cachedPos.y, z: cachedPos.z }
+            : undefined);
 
         // Create an internal thought about the social interaction
         const internalThought = {
@@ -3586,9 +3611,10 @@ app.post('/api/cognitive-stream/ack', async (req, res) => {
 app.post('/api/task-review', (req, res) => {
   try {
     const { reason } = req.body ?? {};
-    const reviewReason = typeof reason === 'string' && reason.length > 0
-      ? reason.slice(0, 200) // bound input length
-      : 'lifecycle event';
+    const reviewReason =
+      typeof reason === 'string' && reason.length > 0
+        ? reason.slice(0, 200) // bound input length
+        : 'lifecycle event';
     enhancedThoughtGenerator.requestTaskReview(reviewReason);
     res.json({ success: true, reason: reviewReason });
   } catch (error) {
@@ -3623,6 +3649,7 @@ eventDrivenThoughtGenerator.on(
         metadata: data.thought.metadata,
         timestamp: data.thought.timestamp,
         processed: data.thought.processed || false,
+        convertEligible: (data.thought as any).convertEligible,
       });
 
       // Cap cognitiveThoughts as a bounded ring buffer
@@ -3659,7 +3686,7 @@ eventDrivenThoughtGenerator.on(
 );
 
 // Start the server
-app.listen(port, () => {
+const server = app.listen(port, () => {
   const startupMessage = `🧠 Cognition service running on port ${port}`;
 
   // Log the server startup to cognitive stream
@@ -3695,7 +3722,6 @@ app.listen(port, () => {
           // Preload model into sidecar memory (keep_alive=-1) so first real
           // request doesn't pay cold-start latency.
           llmInterface.preloadModel().catch(() => {});
-
         } else {
           console.warn(
             `[Cognition] LLM backend at ${healthUrl} returned ${r?.status ?? 'unknown'} - observation reasoning may fall back`
@@ -3752,6 +3778,18 @@ app.listen(port, () => {
   );
 });
 
+// Prevent EPIPE/ECONNRESET from client disconnects from crashing the process.
+// When a client (e.g. Dashboard, Planning) closes the connection before Cognition
+// finishes writing the response, the socket emits 'error' with EPIPE. Without
+// a handler, Node treats it as unhandled and exits.
+server.on('connection', (socket) => {
+  socket.on('error', (err: NodeJS.ErrnoException) => {
+    if (err.code !== 'ECONNRESET' && err.code !== 'EPIPE') {
+      console.warn('[Cognition] Socket error:', err.message);
+    }
+  });
+});
+
 // ============================================================================
 // Cognitive Stream Integration for Planning System
 // ============================================================================
@@ -3801,6 +3839,9 @@ app.get('/api/cognitive-stream/recent', async (req, res) => {
       metadata: thought.metadata,
       timestamp: thought.timestamp,
       processed: thought.processed || false,
+      // convertEligible controls whether the thought-to-task converter should attempt conversion.
+      // Omitted (undefined) defaults to eligible for backwards compat.
+      convertEligible: (thought as any).convertEligible,
     }));
 
     res.json({

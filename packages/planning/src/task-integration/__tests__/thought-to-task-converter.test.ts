@@ -493,7 +493,7 @@ describe('convertThoughtToTask', () => {
       expect(result.task).toBeNull();
     });
 
-    it('convertEligible=undefined (missing) defaults to eligible', async () => {
+    it('convertEligible=undefined (missing) defaults to eligible in default mode', async () => {
       const deps = makeDeps();
       const thought = makeThought({
         id: 'eligible_undef_1',
@@ -511,6 +511,60 @@ describe('convertThoughtToTask', () => {
 
       const result = await convertThoughtToTask(thought, deps);
       expect(result.decision).toBe('created');
+    });
+
+    it('strict mode: convertEligible=undefined → blocked_not_eligible', async () => {
+      const deps = makeDeps({ config: { strictConvertEligibility: true } });
+      const thought = makeThought({
+        id: 'strict_undef_1',
+        content: 'Mine some strict_undef_ore. [GOAL: mine strict_undef_ore 3]',
+        // convertEligible is NOT set — strict mode rejects
+        metadata: {
+          thoughtType: 'planning',
+          extractedGoal: makeGoalTag({
+            action: 'mine',
+            target: 'strict_undef_ore',
+            amount: 3,
+          }),
+        },
+      });
+
+      const result = await convertThoughtToTask(thought, deps);
+      expect(result.decision).toBe('blocked_not_eligible');
+      expect(result.reason).toContain('strict mode');
+    });
+
+    it('strict mode: convertEligible=true → created', async () => {
+      const deps = makeDeps({ config: { strictConvertEligibility: true } });
+      const thought = makeThought({
+        id: 'strict_true_1',
+        content: 'Mine some strict_true_ore. [GOAL: mine strict_true_ore 3]',
+        convertEligible: true,
+        metadata: {
+          thoughtType: 'planning',
+          extractedGoal: makeGoalTag({
+            action: 'mine',
+            target: 'strict_true_ore',
+            amount: 3,
+          }),
+        },
+      });
+
+      const result = await convertThoughtToTask(thought, deps);
+      expect(result.decision).toBe('created');
+    });
+
+    it('strict mode: convertEligible=false → blocked_not_eligible', async () => {
+      const deps = makeDeps({ config: { strictConvertEligibility: true } });
+      const thought = makeThought({
+        id: 'strict_false_1',
+        content: 'Mine some strict_false_ore.',
+        convertEligible: false,
+        metadata: { thoughtType: 'idle-reflection' },
+      });
+
+      const result = await convertThoughtToTask(thought, deps);
+      expect(result.decision).toBe('blocked_not_eligible');
     });
   });
 
@@ -785,6 +839,98 @@ describe('convertThoughtToTask', () => {
 
       await convertThoughtToTask(thought, deps);
       expect(markFn).toHaveBeenCalledWith('hook_thought_2');
+    });
+  });
+
+  // =========================================================================
+  // goalKey propagation
+  // =========================================================================
+
+  describe('goalKey on created tasks', () => {
+    it('stores goalKey from thought metadata when present (drive-tick path)', async () => {
+      const deps = makeDeps();
+      const thought = makeThought({
+        id: 'goalkey_drive_1',
+        content: 'I should collect oak_log. [GOAL: collect oak_log 8]',
+        metadata: {
+          thoughtType: 'drive-tick',
+          goalKey: 'collect:oak_log',
+          extractedGoal: makeGoalTag({
+            action: 'collect',
+            target: 'oak_log',
+            amount: 8,
+            raw: '[GOAL: collect oak_log 8]',
+          }),
+        },
+      });
+
+      const result = await convertThoughtToTask(thought, deps);
+      expect(result.decision).toBe('created');
+      expect(result.task!.metadata.goalKey).toBe('collect:oak_log');
+    });
+
+    it('computes goalKey from extractedGoal when thought has no goalKey (LLM path)', async () => {
+      const deps = makeDeps();
+      const thought = makeThought({
+        id: 'goalkey_llm_1',
+        content: 'I should mine unique_goalkey_ore_zeta. [GOAL: mine unique_goalkey_ore_zeta 3]',
+        metadata: {
+          thoughtType: 'planning',
+          // no goalKey — LLM-generated thought
+          extractedGoal: makeGoalTag({
+            action: 'mine',
+            target: 'unique_goalkey_ore_zeta',
+            amount: 3,
+          }),
+        },
+      });
+
+      const result = await convertThoughtToTask(thought, deps);
+      expect(result.decision).toBe('created');
+      expect(result.task!.metadata.goalKey).toBe('mine:unique_goalkey_ore_zeta');
+    });
+
+    it('uses computed goalKey over thought goalKey on drift (mismatch)', async () => {
+      const deps = makeDeps();
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const thought = makeThought({
+        id: 'goalkey_drift_1',
+        content: 'Collect iron ore!! [GOAL: collect iron ore 5]',
+        metadata: {
+          thoughtType: 'drive-tick',
+          // Producer emitted a non-canonical key (spaces, not underscored)
+          goalKey: 'collect:iron ore',
+          extractedGoal: makeGoalTag({
+            action: 'collect',
+            target: 'iron ore',
+            amount: 5,
+            raw: '[GOAL: collect iron ore 5]',
+          }),
+        },
+      });
+
+      const result = await convertThoughtToTask(thought, deps);
+      expect(result.decision).toBe('created');
+      // Computed canonical key wins over the non-canonical thought key
+      expect(result.task!.metadata.goalKey).toBe('collect:iron_ore');
+      // Drift was logged
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('goalKey drift'),
+      );
+      warnSpy.mockRestore();
+    });
+
+    it('goalKey is undefined when no extractedGoal (keyword fallback)', async () => {
+      const deps = makeDeps();
+      const thought = makeThought({
+        id: 'goalkey_keyword_1',
+        content: 'I need to gather some wood for building.',
+        metadata: { thoughtType: 'planning' },
+      });
+
+      const result = await convertThoughtToTask(thought, deps);
+      expect(result.decision).toBe('created');
+      expect(result.task!.metadata.goalKey).toBeUndefined();
     });
   });
 });

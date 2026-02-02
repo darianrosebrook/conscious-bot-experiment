@@ -59,6 +59,7 @@ export {
   extractGoalTag,
   extractIntent,
   normalizeGoalAction,
+  canonicalGoalKey,
   sanitizeLLMOutput,
   isUsableContent,
   hasCodeLikeDensity,
@@ -70,6 +71,7 @@ export type {
   GoalTagV1,
   GoalTagFailReason,
   IntentLabel,
+  IntentParse,
   SanitizedOutput,
   SanitizationFlags,
 } from './llm-output-sanitizer';
