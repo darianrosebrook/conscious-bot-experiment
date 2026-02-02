@@ -1,194 +1,199 @@
-# Planning & Decision Making Implementation Plans
+# Planning & Decision Making
 
-**Module Suite:** `modules/planning/`  
-**Purpose:** Multi-tier planning architecture with real-time adaptation and risk management  
+**Package:** `packages/planning/`
+**Purpose:** Multi-tier planning architecture with Sterling solver integration, goal lifecycle management, and real-time adaptive execution
 **Author:** @darianrosebrook
 
 ## Overview
 
-This planning module suite implements a sophisticated cognitive decision-making system inspired by F.E.A.R.'s GOAP architecture, SHOP2's HTN planning, and modern risk management techniques. The four modules work together to provide intelligent, adaptive planning from high-level strategic thinking down to reactive execution.
+The planning package implements a cognitive decision-making system spanning goal formulation through reactive execution. The architecture centers on Sterling-backed domain solvers for Minecraft-specific reasoning (crafting, tool progression, acquisition, building, furnace scheduling, navigation), with supporting subsystems for temporal planning, behavior tree execution, constraint modeling, and skill composition.
 
-## Module Architecture
+## Architecture
 
 ### Integration Flow
 ```
-Signals → [Goal Formulation] → Goals → [Hierarchical Planner] → Plan
-    ↓                                            ↓
-[Forward Model] ← Action Candidates ← [Reactive Executor] ← Execution
-    ↓                                            ↓
-Predictions → Risk Assessment → Plan Repair ← Feedback
+Signals → [Goal Formulation] → Goals → [Goal Lifecycle] → Active Goals
+    ↓                                         ↓
+[Cognitive Router] → Sterling Solver / LLM / Compiler
+    ↓                        ↓
+[Task Integration] → Tasks → [Behavior Tree Runner] → Leaf Execution
+    ↓                                    ↓
+[Reactive Executor] ← Plan Repair ← Feedback
 ```
 
-### Module Responsibilities
+## Module Inventory
 
-#### 1. Goal Formulation (`goal_formulation/`)
+### Goal Formulation (`goal-formulation/`)
 **Signals → Needs → Goals Pipeline**
-- Transforms internal drives and external intrusions into prioritized goals
-- Multi-factor utility scoring with urgency, context, risk assessment
-- Feasibility analysis and automatic subgoal decomposition
-- Real-time performance: Sub-50ms full pipeline
+- `homeostasis-monitor.ts` — monitors health, hunger, threat against comfort thresholds
+- `need-generator.ts` — translates homeostasis signals into needs
+- `goal-manager.ts` — orchestrates generation, prioritization, feasibility
+- `goal-generator.ts` — advanced goal generation with signal processing
+- `advanced-signal-processor.ts` — complex signal analysis and weighting
+- `priority-scorer.ts` — multi-factor priority scoring
+- `utility-calculator.ts` — utility scoring across multiple dimensions
+- `task-bootstrapper.ts` — goal-to-task bootstrapping
 
-#### 2. Hierarchical Planner (`hierarchical_planner/`)  
-**HTN/HRM Multi-Tier Planning**
-- Top-down decomposition of complex projects using domain knowledge
-- HRM-inspired refinement loops for plan adaptation
-- Mixture-of-experts routing between LLM/HRM/GOAP
-- Plan caching and preference-based method selection
+### Goal Lifecycle (`goals/`)
+**Goal State Machine & Binding Protocol**
+- `goal-binding-types.ts`, `goal-binding-normalize.ts` — goal-task binding contracts
+- `goal-identity.ts` — goal equivalence and identity
+- `goal-resolver.ts` — resolves goals through task execution
+- `goal-task-sync.ts` — synchronizes goal state with task state
+- `goal-hold-manager.ts` — hold semantics for goal persistence
+- `goal-lifecycle-events.ts`, `goal-lifecycle-hooks.ts` — state transition events and hooks
+- `completion-checker.ts` — validates goal completion criteria
+- `activation-reactor.ts` — reacts to goal activation signals
+- `verifier-registry.ts` — pluggable goal verifiers
+- `threat-hold-bridge.ts` — threat detection → goal hold integration
+- `preemption-budget.ts` — preemption timing and budget management
+- `periodic-review.ts` — periodic goal review and cleanup
+- `effect-partitioning.ts` — effect aggregation and partitioning
 
-#### 3. Reactive Executor (`reactive_executor/`)
-**GOAP Real-Time Execution**
-- F.E.A.R.-style opportunistic action planning for minute-to-minute decisions
-- Plan repair vs replanning with stability metrics
-- Safety reflexes for emergency responses
-- Dynamic cost evaluation and real-time adaptation
+### Sterling Solvers (`sterling/`)
+**Domain-Specific Reasoning via Sterling Backend**
 
-#### 4. Forward Model (`forward_model/`)
-**Predictive Simulation & Risk Assessment**
-- Lightweight off-tick simulation for action candidate evaluation
-- Prediction error tracking for model improvement
-- CVaR analysis for tail-risk management
-- Counterfactual replay for learning and debugging
+Core infrastructure:
+- `base-domain-solver.ts` — abstract base class (availability gating, planId extraction, episode reporting)
+- `sterling-reasoning-service.ts` — WebSocket client to Sterling (solve, async solve, knowledge graph, reachability)
+- `solve-bundle.ts` — evidence bundle construction with content-addressed hashing (definitionHash, stepsDigest)
+- `solve-bundle-types.ts` — SolveBundle, CompatReport, SearchHealthMetrics types
+- `compat-linter.ts` — rule compatibility linting (domain errors, constraint violations)
+- `search-health.ts` — search metrics parsing (optional until Python emits data)
+- `leaf-routing.ts` — maps solve steps to capability leaves with duration estimation
+- `degeneracy-detection.ts` — detects degenerate strategies
+- `primitive-namespace.ts` — qualified primitive IDs (CB-Pxx / ST-Pxx)
 
-## Key Engineering Insights
+Domain solvers:
+- `minecraft-crafting-solver.ts` / `minecraft-crafting-rules.ts` — crafting goal solving
+- `minecraft-tool-progression-solver.ts` / `minecraft-tool-progression-rules.ts` — multi-tier tool progression (wood → stone → iron → diamond)
+- `minecraft-acquisition-solver.ts` / `minecraft-acquisition-rules.ts` — item acquisition (trade, loot, salvage strategies)
+- `minecraft-building-solver.ts` / `minecraft-building-rules.ts` — building construction
+- `minecraft-furnace-solver.ts` / `minecraft-furnace-rules.ts` — furnace scheduling and smelting batch optimization
+- `minecraft-navigation-solver.ts` — pathfinding with hazard policies and movement costs
 
-### From HTN Literature (SHOP2, Hierarchical Task Networks)
-- **Domain knowledge encoding**: HTN methods capture expert Minecraft strategies
-- **Ordered task decomposition**: Complex goals broken into sequenced subtasks
-- **Preference-based selection**: Choose methods based on context (day/night, safety, efficiency)
-- **Plan stability**: Prefer repair over replanning to maintain commitments
+Evidence capsules:
+- `primitives/p21/` — P21 evidence capsule types (contract types, reference fixtures)
+- `primitives/p03/` — P03 temporal capsule types and adapter
 
-### From GOAP in Games (F.E.A.R. AI)
-- **Opportunistic execution**: React to immediate threats and opportunities
-- **Dynamic cost functions**: Action costs adapt to current context (threat level, resources)
-- **Real-time replanning**: Continuous A* search in action space with time budgets
-- **Emergent behavior**: Complex strategies emerge from simple action interactions
+### Temporal Planning (`temporal/`)
+**Rig C — Temporal Enrichment for Crafting Rules**
+- `temporal-enrichment.ts` — orchestration entrypoint; rule enrichment facade
+- `time-state.ts` — Minecraft time bucket construction and slot inference
+- `duration-model.ts` — action duration mapping and annotation
+- `capacity-manager.ts` — slot reservation and deadlock prevention
+- `deadlock-prevention.ts` — deadlock detection across temporal constraints
+- `batch-operators.ts` — batch operation hints for parallel execution
+- `makespan-objective.ts` — makespan cost computation
 
-### From Modern Planning Research
-- **D* Lite navigation**: Efficient replanning when environment changes
-- **Plan repair techniques**: Edit distance metrics for plan stability
-- **CVaR risk management**: Conditional Value at Risk for tail event protection
-- **Anytime algorithms**: Graceful degradation under time pressure
+Modes: `on` | `off` | `legacy`
 
-## Performance Targets
+### Task Integration (`task-integration/`)
+**Thought-to-Task Conversion & Sterling Planner Routing**
+- `thought-to-task-converter.ts` — CognitiveThought → Task (extracts action/resource types, calculates priority)
+- `sterling-planner.ts` — wraps Sterling solvers; routes tasks to appropriate domain solver
+- `task-store.ts` — in-memory task queue with prioritization
+- `task-management-handler.ts` — task lifecycle (creation, completion, failure)
+- `build-task-from-requirement.ts` — task instantiation from requirements
 
-### Real-Time Constraints
-```typescript
-interface PlanningPerformanceTargets {
-  // Goal Formulation
-  signalToGoalLatency: '< 50ms p95';
-  priorityScoringLatency: '< 15ms p95';
-  
-  // Hierarchical Planning  
-  htnDecompositionLatency: '< 50ms p95';
-  methodSelectionLatency: '< 10ms p95';
-  planCacheHitRate: '> 95%';
-  
-  // Reactive Execution
-  goapPlanningLatency: '< 20ms p95';
-  safetyReflexLatency: '< 5ms p95';
-  repairToReplanRatio: '> 80%';
-  
-  // Forward Model
-  simulationRolloutLatency: '< 10ms per 5-step sequence';
-  parallelCandidateEvaluation: '< 50ms for 5 candidates';
-  predictionAccuracy: '> 80%';
-}
-```
+Also: `task-integration.ts` (top-level) — main TaskIntegration orchestrator class
 
-### Quality Metrics
-```typescript
-interface PlanningQualityMetrics {
-  // Decision Quality
-  goalSuccessRate: '> 85%';           // Goals achieved vs attempted
-  planOptimalityRatio: '> 90%';       // Efficiency vs optimal
-  priorityAccuracy: '> 90%';          // Ranking accuracy vs outcomes
-  
-  // Stability & Coherence
-  planStabilityIndex: '> 0.8';        // Minimize disruptive changes
-  commitmentViolationRate: '< 5%';    // Honor promises and persistence
-  narrativeCoherence: '> 0.85';       // Actions align with agent identity
-  
-  // Adaptability
-  threatResponseTime: '< 1000ms';     // Emergency reaction speed
-  opportunityUtilization: '> 70%';    // Capitalize on chances
-  contextAdaptationSpeed: '< 2000ms'; // Adjust to environment changes
-}
-```
+### Behavior Trees (`behavior-trees/`)
+**Robust Execution with Retries, Timeouts, and Telemetry**
+- `BehaviorTreeRunner.ts` — full BT engine
+  - Node types: SEQUENCE, SELECTOR, PARALLEL, DECORATOR, ACTION, CONDITION, COGNITIVE_REFLECTION
+  - Timeout enforcement, retry logic, guard conditions, blackboard context
+  - Emits BTTick telemetry events during execution
+- `definitions/` — 16 BT definition subdirectories
 
-## Implementation Dependencies
+### Hierarchical Planning (`hierarchical-planner/`, `hierarchical/`)
+**HTN Decomposition & Macro-Planning**
+- `cognitive-router.ts` — routes tasks to Sterling/compiler/LLM based on requirements
+- `plan-decomposer.ts` — decomposes complex tasks into subtasks
+- `task-network.ts` — task network representation
+- `macro-planner.ts` — high-level macro-planning engine
+- `world-graph-builder.ts` — constructs world knowledge graph
+- `edge-decomposer.ts` — decomposes edges in task graph
+- `feedback.ts`, `feedback-integration.ts` — feedback integration for plan refinement
 
-### Foundation Implementation
-- **Goal Formulation**: Basic signal processing and priority scoring established
-- **HTN Engine**: Method registry and decomposition functionality complete
-- **GOAP Planner**: Action system and basic repair mechanisms operational
-- **Forward Model**: Lightweight simulator with prediction tracking functional
+### Reactive Executor (`reactive-executor/`)
+**GOAP-Style Real-Time Execution**
+- `reactive-executor.ts` — plan repair vs replanning decision logic
+- `minecraft-executor.ts` — Minecraft-specific execution adapter
+- `safety-reflexes.ts` — emergency reflexes (damage avoidance, fallback patterns)
 
-### Integration & Optimization Requirements
-- **Module Integration**: Communication protocols between planning components
-- **Performance Optimization**: Real-time constraint enforcement across all planners
-- **Advanced Features**: CVaR, preferences, learning mechanisms integrated
-- **Testing Validation**: Comprehensive testing and validation framework complete
+### Constraints (`constraints/`)
+**Partial-Order Planning & Feasibility Analysis**
+- `partial-order-plan.ts` — DAG representation (PlanNode, PlanEdge)
+- `dag-builder.ts` — constructs DAG from decompositions; finds commuting pairs
+- `constraint-model.ts` — dependency, reachability, support constraints
+- `feasibility-checker.ts` — validates plan feasibility
+- `linearization.ts` — topological sort to executable sequence
+- `execution-advisor.ts` — advises on safe execution ordering
 
-### Intelligence & Learning Enhancements
-- **Adaptive Systems**: Preference learning and dynamic cost adjustment
-- **Risk Management**: Advanced tail-event protection and assessment
-- **Strategic Integration**: Social and long-term goal coordination
-- **Evaluation Optimization**: Performance tuning and behavioral analysis
+### Skill Integration (`skill-integration/`)
+**MCP & LLM-Based Skill Composition**
+- `skill-composer-adapter.ts` — composes skills from primitives
+- `llm-skill-composer.ts` — LLM-based skill generation and refinement
+- `mcp-integration.ts`, `mcp-capabilities-adapter.ts` — MCP capability discovery and adaptation
+- `skill-planner-adapter.ts` — integrates skill plans with main planner
 
-## Testing Strategy
+### Modules (`modules/`)
+**Bootstrap, Routing, Contracts, and Infrastructure**
+- `planning-bootstrap.ts` — dependency-injected planning instance creation
+- `cognitive-stream-client.ts` — cognitive stream integration client
+- `action-plan-backend.ts` — routes actions to Sterling/compiler backends
+- `solve-contract.ts` — canonical solve contract types
+- `leaf-arg-contracts.ts` — leaf action argument validation
+- `inventory-helpers.ts` — inventory transformation utilities
+- `capability-registry.ts` — available capabilities registry
 
-### Unit Testing
-- Property-based testing for plan correctness and stability
-- Golden tests for method decomposition and goal generation
-- Performance benchmarks for real-time constraint validation
-- Mock environments for isolated module testing
+### Server (`server/`)
+**Autonomous Execution Loop**
+- `autonomous-executor.ts` — main autonomous loop for continuous execution
+- `cognitive-task-handler.ts` — handles cognitive task directives
+- `execution-readiness.ts` — pre-flight checks and readiness validation
+- `sterling-bootstrap.ts` — Sterling service initialization
 
-### Integration Testing  
-- End-to-end planning scenarios with metrics collection
-- Stress testing under resource constraints and threats
-- Ablation studies to measure module contribution
-- Cross-module communication and error handling
+### World State (`world-state/`)
+- `world-state-manager.ts` — polls `/state` endpoint; emits inventory/position updates
+- `world-knowledge-integrator.ts` — integrates world knowledge into planning context
 
-### Scenario Testing
-- BASALT-style Minecraft tasks for human-comparable evaluation
-- Progressive curriculum from simple survival to complex projects
-- Long-term autonomy tests for emergent behavior observation
-- Social interaction scenarios for cooperative planning
+## Key Architectural Patterns
+
+### Multi-Tier Solver Architecture
+1. `BaseDomainSolver` — availability gating, planId extraction, episode reporting
+2. Domain-specific solvers — crafting, tool progression, acquisition, building, furnace, navigation
+3. `SterlingReasoningService` — WebSocket transport to Sterling backend
+
+### Evidence-First Observability (Rig A)
+- `SolveBundle` with content-addressed input/output hashes and compat reports
+- Deterministic JSON canonicalization for bundle identity
+- `compat-linter` validates rule semantics before solving
+
+### Temporal Integration (Rig C)
+- Rules annotated with makespan and batch hints
+- P03 temporal slot definitions
+- Configurable temporal modes (on/off/legacy)
+
+### Goal-Task Binding (Rig G)
+- Lifecycle: Activation → Execution → Completion
+- Hold semantics for goal persistence across task boundaries
+- Budget-based preemption of ongoing work
+
+## Forward Model
+
+Status: **type definitions retained but not actively integrated.** The forward model concept (predictive simulation, CVaR risk assessment, counterfactual replay) exists in type definitions but has no runtime implementation.
 
 ## Dependencies
 
-### Internal Modules
-- `@modules/core/mcp_capabilities` - Action execution through capability bus
-- `@modules/world/navigation` - D* Lite pathfinding and spatial reasoning
-- `@modules/memory/working` - Current state and context tracking
-- `@modules/memory/semantic` - World knowledge for feasibility analysis
-- `@modules/cognition/cognitive_core` - LLM integration for complex reasoning
-- `@modules/interfaces/constitution` - Ethical constraints and rule checking
+### Internal Packages
+- `@conscious-bot/core` — arbiter, leaves, Sterling client, MCP capabilities
+- `@conscious-bot/world` — navigation, perception, world state
+- `@conscious-bot/memory` — semantic knowledge, working memory
+- `@conscious-bot/cognition` — thought stream, cognitive integration
 
-### External Libraries
-- `fast-check` - Property-based testing for plan validation
-- `@opentelemetry/api` - Performance monitoring and distributed tracing
-- Planning libraries: `pyhop` (HTN), custom GOAP implementation
-- Risk analysis: Custom CVaR implementation with statistical libraries
-
-## Success Criteria
-
-### Technical Achievements
-- [ ] All modules meet real-time performance constraints
-- [ ] 95%+ plan execution success rate in evaluation scenarios
-- [ ] Seamless integration with broader cognitive architecture
-- [ ] Comprehensive telemetry and debugging capabilities
-
-### Behavioral Achievements  
-- [ ] Coherent long-term project completion (building, exploration)
-- [ ] Adaptive threat response without goal abandonment
-- [ ] Opportunistic resource gathering during planned activities
-- [ ] Stable personality and decision patterns over extended runs
-
-### Research Contributions
-- [ ] Validation of HTN+GOAP hybrid architecture in complex domains
-- [ ] Demonstration of real-time constraint satisfaction in planning
-- [ ] Evidence for improved decision quality through predictive simulation
-- [ ] Case studies of emergent intelligent behavior from modular design
-
-This planning module suite represents a state-of-the-art implementation of multi-tier cognitive decision-making, bridging classical AI planning techniques with modern real-time constraints and risk management approaches.
+### External
+- Sterling backend (WebSocket) — graph-search reasoning engine
+- `eventemitter3` — event-driven communication
+- `zod` — runtime type validation

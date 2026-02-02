@@ -28,12 +28,6 @@ These documents provide the foundational frameworks for building a safe, effecti
   - Performance benchmarking
   - Quality gates and acceptance criteria
 
-- **[Future Enhancements](FUTURE_ENHANCEMENTS.md)** - Advanced features for post-M4 development
-  - Long-term research directions
-  - Advanced cognitive capabilities
-  - Scaling and optimization strategies
-  - Community and ecosystem development
-
 ## Strategic Principles
 
 ### 1. Safety First
