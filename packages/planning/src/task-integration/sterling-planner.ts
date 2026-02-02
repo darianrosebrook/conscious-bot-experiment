@@ -840,7 +840,7 @@ export class SterlingPlanner {
         source: 'rig-d-acquisition',
         solverId: this.acquisitionSolver!.solverId,
         planId: result.planId,
-        bundleId: result.solveMeta?.bundles?.[0]?.bundleId,
+        bundleId: result.parentBundleId,
         strategySelected: result.selectedStrategy,
         candidateSetDigest: result.candidateSetDigest,
         executable: !!s.meta?.leaf,

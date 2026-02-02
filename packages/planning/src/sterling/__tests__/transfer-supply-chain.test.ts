@@ -103,13 +103,18 @@ function rankSupplyStrategies(
     const prior = priorMap.get(c.strategy);
     const successRate = prior?.successRate ?? 0.5;
     const score = c.estimatedCost * (1 - successRate);
-    return { candidate: c, score };
+    const scoreMillis = Number.isNaN(score) || !Number.isFinite(score)
+      ? Number.MAX_SAFE_INTEGER
+      : Math.round(score * 1000);
+    return { candidate: c, scoreMillis };
   });
 
   scored.sort((a, b) => {
-    const diff = a.score - b.score;
+    const diff = a.scoreMillis - b.scoreMillis;
     if (diff !== 0) return diff;
-    return a.candidate.strategy.localeCompare(b.candidate.strategy);
+    const nameA = a.candidate.strategy;
+    const nameB = b.candidate.strategy;
+    return nameA < nameB ? -1 : nameA > nameB ? 1 : 0;
   });
 
   return scored.map(s => s.candidate);
@@ -117,16 +122,20 @@ function rankSupplyStrategies(
 
 // ── Supply Chain CandidateSetDigest ───────────────────────────────────────
 
+function lexCmp(a: string, b: string): number {
+  return a < b ? -1 : a > b ? 1 : 0;
+}
+
 function computeSupplyDigest(candidates: SupplyCandidate[]): string {
   const sorted = [...candidates].sort((a, b) => {
-    const cmp1 = a.strategy.localeCompare(b.strategy);
+    const cmp1 = lexCmp(a.strategy, b.strategy);
     if (cmp1 !== 0) return cmp1;
-    return a.item.localeCompare(b.item);
+    return lexCmp(a.item, b.item);
   });
   const digestInput = sorted.map(c => ({
     strategy: c.strategy,
     item: c.item,
-    estimatedCost: c.estimatedCost,
+    estimatedCostMillis: Math.round(c.estimatedCost * 1000),
     feasibility: c.feasibility,
     requires: [...c.requires].sort(),
   }));
@@ -207,7 +216,8 @@ function computeSupplySignals(
 // Tests
 // ============================================================================
 
-const ACQ_CONTEXT: LintContext = { solverId: 'minecraft.acquisition' };
+// Use enableAcqHardening flag — transfer tests should not masquerade as minecraft.
+const ACQ_CONTEXT: LintContext = { enableAcqHardening: true };
 
 describe('Supply Chain Procurement — Strategy Enumeration', () => {
   it('enumerates all strategies when all resources available', () => {

@@ -93,6 +93,11 @@ export interface AcquisitionSolveResult {
   planId?: string | null;
   /** Observability metadata */
   solveMeta?: { bundles: SolveBundle[] };
+  /**
+   * Content-addressed ID of the parent (coordinator) bundle.
+   * First-class field so callers don't need to index into bundles[0].
+   */
+  parentBundleId?: string;
   /** The strategy that was selected and executed */
   selectedStrategy: AcquisitionStrategy | null;
   /** Strategies that were viable but not selected */
@@ -169,28 +174,47 @@ export function hashAcquisitionContext(ctx: AcquisitionContextV1): string {
  * The digest includes: strategy, item, estimatedCost, feasibility, requires,
  * and the contextSnapshot hash.
  */
+/**
+ * Environment-insensitive lexicographic string comparison.
+ * Avoids localeCompare which can vary across ICU/locale data.
+ */
+function lexCmp(a: string, b: string): number {
+  return a < b ? -1 : a > b ? 1 : 0;
+}
+
+/**
+ * Quantize a cost to integer (millicost) for deterministic comparison.
+ * Guards against NaN (sorted to end) and floating-point rounding.
+ */
+function costToMillis(cost: number): number {
+  if (Number.isNaN(cost) || !Number.isFinite(cost)) return Number.MAX_SAFE_INTEGER;
+  return Math.round(cost * 1000);
+}
+
 export function computeCandidateSetDigest(candidates: AcquisitionCandidate[]): string {
-  // Sort a copy by fully deterministic key: strategy, item, feasibility, cost, requires
+  // Sort a copy by fully deterministic key: strategy, item, feasibility, quantized cost, requires.
+  // Uses simple lexicographic comparison (not localeCompare) for cross-environment stability.
   const sorted = [...candidates].sort((a, b) => {
-    const cmp1 = a.strategy.localeCompare(b.strategy);
+    const cmp1 = lexCmp(a.strategy, b.strategy);
     if (cmp1 !== 0) return cmp1;
-    const cmp2 = a.item.localeCompare(b.item);
+    const cmp2 = lexCmp(a.item, b.item);
     if (cmp2 !== 0) return cmp2;
-    const cmp3 = a.feasibility.localeCompare(b.feasibility);
+    const cmp3 = lexCmp(a.feasibility, b.feasibility);
     if (cmp3 !== 0) return cmp3;
-    const cmp4 = a.estimatedCost - b.estimatedCost;
+    const cmp4 = costToMillis(a.estimatedCost) - costToMillis(b.estimatedCost);
     if (cmp4 !== 0) return cmp4;
     // Final tiebreaker: sorted requires array as string
     const reqA = [...a.requires].sort().join(',');
     const reqB = [...b.requires].sort().join(',');
-    return reqA.localeCompare(reqB);
+    return lexCmp(reqA, reqB);
   });
 
-  // Build a stable representation for hashing
+  // Build a stable representation for hashing.
+  // Cost is quantized to integer millicost for deterministic canonicalization.
   const digestInput = sorted.map(c => ({
     strategy: c.strategy,
     item: c.item,
-    estimatedCost: c.estimatedCost,
+    estimatedCostMillis: costToMillis(c.estimatedCost),
     feasibility: c.feasibility,
     requires: [...c.requires].sort(),
     contextHash: hashAcquisitionContext(c.contextSnapshot),

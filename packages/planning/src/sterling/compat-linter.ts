@@ -18,9 +18,13 @@
  * - PLACE_HAS_CONSUMES: place rule has non-empty consumes (double-decrement)
  * - INVALID_BASE_COST: baseCost defined but not a finite number > 0 and <= 1000
  * - FURNACE_OVERCAPACITY: furnace load rule produces without consuming slot occupancy
- * - TRADE_REQUIRES_ENTITY: acq:trade:* without entity proximity token (acquisition)
- * - ACQ_FREE_PRODUCTION: acq:* rule with no consumes and no requires (acquisition)
- * - ACQUISITION_NO_VIABLE_STRATEGY: 0 viable candidates (acquisition coordinator)
+ * - TRADE_REQUIRES_ENTITY: acq:trade:* without proximity:villager token
+ * - ACQ_FREE_PRODUCTION: acq:* rule with no consumes and no requires
+ * - ACQUISITION_NO_VIABLE_STRATEGY: 0 viable candidates (uses candidateCount, not rules.length)
+ *
+ * Acquisition checks (12-14) are gated behind enableAcqHardening flag OR
+ * solverId === 'minecraft.acquisition'. The flag-based gate allows transfer
+ * tests to exercise hardening without masquerading as a Minecraft solver.
  *
  * @author @darianrosebrook
  */
@@ -50,6 +54,20 @@ export interface LintableRule {
 export interface LintContext {
   executionMode?: string;
   solverId?: string;
+  /**
+   * When set, enables acquisition-specific hardening checks (TRADE_REQUIRES_ENTITY,
+   * ACQ_FREE_PRODUCTION, ACQUISITION_NO_VIABLE_STRATEGY) regardless of solverId.
+   * The acquisition solver and transfer tests both set this to true.
+   */
+  enableAcqHardening?: boolean;
+  /**
+   * Number of viable candidates enumerated by the coordinator.
+   * Used by ACQUISITION_NO_VIABLE_STRATEGY to distinguish "no candidates"
+   * from "delegation produced no rules" (mine/craft delegation is valid
+   * with zero rules because the child solver handles them).
+   * When undefined, falls back to rules.length for backwards compatibility.
+   */
+  candidateCount?: number;
 }
 
 // ============================================================================
@@ -245,20 +263,26 @@ export function lintRules(rules: LintableRule[], context?: LintContext): CompatR
       }
     }
 
-    // ── Acquisition-specific checks (gated behind acquisition solverId) ──
+    // ── Acquisition-specific checks ──
+    // Gated behind enableAcqHardening flag OR solverId === 'minecraft.acquisition'.
+    // The flag-based gate allows transfer tests to exercise hardening without
+    // masquerading as a Minecraft solver.
 
-    if (context?.solverId === 'minecraft.acquisition') {
-      // TRADE_REQUIRES_ENTITY — acq:trade:* must have proximity token in requires
+    const acqHardeningEnabled = context?.enableAcqHardening
+      || context?.solverId === 'minecraft.acquisition';
+
+    if (acqHardeningEnabled) {
+      // TRADE_REQUIRES_ENTITY — acq:trade:* must have proximity:villager in requires
       if (rule.action.startsWith('acq:trade:')) {
-        const hasProximityToken = rule.requires.some(
-          (r) => r.name.startsWith('proximity:')
+        const hasVillagerProximity = rule.requires.some(
+          (r) => r.name === 'proximity:villager'
         );
-        if (!hasProximityToken) {
+        if (!hasVillagerProximity) {
           issues.push({
             severity: 'error',
             code: 'TRADE_REQUIRES_ENTITY',
             ruleAction: rule.action,
-            message: `Trade rule must require an entity proximity token (e.g., proximity:villager)`,
+            message: `Trade rule must require 'proximity:villager' token`,
           });
         }
       }
@@ -266,26 +290,29 @@ export function lintRules(rules: LintableRule[], context?: LintContext): CompatR
       // ACQ_FREE_PRODUCTION — structural "no free production" for acq:* rules
       if (rule.action.startsWith('acq:')) {
         if (rule.action.startsWith('acq:trade:')) {
-          // Trade must consume at least one currency AND require a proximity token
+          // Trade must consume at least one currency AND require proximity:villager
           const hasCurrencyConsume = rule.consumes.length > 0;
-          const hasProximityRequire = rule.requires.some(r => r.name.startsWith('proximity:'));
-          if (!hasCurrencyConsume || !hasProximityRequire) {
+          const hasVillagerRequire = rule.requires.some(r => r.name === 'proximity:villager');
+          if (!hasCurrencyConsume || !hasVillagerRequire) {
             issues.push({
               severity: 'error',
               code: 'ACQ_FREE_PRODUCTION',
               ruleAction: rule.action,
-              message: `Trade rule must consume currency and require a proximity token`,
+              message: `Trade rule must consume currency and require 'proximity:villager' token`,
             });
           }
         } else if (rule.action.startsWith('acq:loot:')) {
-          // Loot must require a container-proximity token
-          const hasContainerRequire = rule.requires.some(r => r.name.startsWith('proximity:'));
+          // Loot must require a container-proximity token (proximity:chest or proximity:barrel etc.)
+          const hasContainerRequire = rule.requires.some(
+            r => r.name === 'proximity:chest' || r.name === 'proximity:barrel'
+              || r.name === 'proximity:trapped_chest'
+          );
           if (!hasContainerRequire) {
             issues.push({
               severity: 'error',
               code: 'ACQ_FREE_PRODUCTION',
               ruleAction: rule.action,
-              message: `Loot rule must require a container proximity token`,
+              message: `Loot rule must require a container proximity token (proximity:chest, proximity:barrel, or proximity:trapped_chest)`,
             });
           }
         } else if (rule.action.startsWith('acq:salvage:')) {
@@ -313,9 +340,15 @@ export function lintRules(rules: LintableRule[], context?: LintContext): CompatR
     }
   }
 
-  // ACQUISITION_NO_VIABLE_STRATEGY — gated behind acquisition solverId
-  // Fires when the acquisition coordinator passes an empty rule set (0 viable candidates).
-  if (context?.solverId === 'minecraft.acquisition' && rules.length === 0) {
+  // ACQUISITION_NO_VIABLE_STRATEGY
+  // Fires when the coordinator has 0 viable candidates. Uses candidateCount from
+  // context when provided (coordinator passes it explicitly). Falls back to
+  // rules.length for backwards compatibility. This distinction is critical:
+  // mine/craft delegation produces 0 rules but is valid (child solver handles them).
+  const acqCheckEnabled = context?.enableAcqHardening
+    || context?.solverId === 'minecraft.acquisition';
+  const effectiveCandidateCount = context?.candidateCount ?? rules.length;
+  if (acqCheckEnabled && effectiveCandidateCount === 0) {
     issues.push({
       severity: 'error',
       code: 'ACQUISITION_NO_VIABLE_STRATEGY',

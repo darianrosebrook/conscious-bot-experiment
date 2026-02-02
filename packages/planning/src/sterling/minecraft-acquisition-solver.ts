@@ -233,8 +233,14 @@ export class MinecraftAcquisitionSolver extends BaseDomainSolver<AcquisitionSolv
       objectiveWeights: options?.objectiveWeights,
     });
 
-    // Augment input with acquisition-specific fields by creating the bundle manually
-    const compatReport = lintRules(dispatchResult.rules as LintableRule[], { solverId: this.solverId });
+    // Augment input with acquisition-specific fields by creating the bundle manually.
+    // Pass candidateCount so ACQUISITION_NO_VIABLE_STRATEGY checks coordinator
+    // candidate enumeration, not delegated rule count (mine/craft produces 0 rules
+    // but is valid via child solver delegation).
+    const compatReport = lintRules(dispatchResult.rules as LintableRule[], {
+      solverId: this.solverId,
+      candidateCount: candidates.length,
+    });
     const rationaleCtx = buildDefaultRationaleContext({
       compatReport,
       maxNodes,
@@ -266,6 +272,7 @@ export class MinecraftAcquisitionSolver extends BaseDomainSolver<AcquisitionSolv
       error: dispatchResult.error,
       planId: dispatchResult.planId,
       solveMeta: { bundles: allBundles },
+      parentBundleId: parentBundle.bundleId,
       selectedStrategy: selected.strategy,
       alternativeStrategies: alternatives,
       strategyRanking: ranked,
@@ -360,6 +367,7 @@ export class MinecraftAcquisitionSolver extends BaseDomainSolver<AcquisitionSolv
           inventory,
           nearbyBlocks,
           maxNodes,
+          'trade',
           objectiveWeights,
         );
 
@@ -371,6 +379,7 @@ export class MinecraftAcquisitionSolver extends BaseDomainSolver<AcquisitionSolv
           inventory,
           nearbyBlocks,
           maxNodes,
+          'loot',
           objectiveWeights,
         );
 
@@ -382,6 +391,7 @@ export class MinecraftAcquisitionSolver extends BaseDomainSolver<AcquisitionSolv
           inventory,
           nearbyBlocks,
           maxNodes,
+          'salvage',
           objectiveWeights,
         );
 
@@ -484,6 +494,7 @@ export class MinecraftAcquisitionSolver extends BaseDomainSolver<AcquisitionSolv
     inventory: Record<string, number>,
     nearbyBlocks: string[],
     maxNodes: number,
+    strategy: string,
     objectiveWeights?: ObjectiveWeights,
   ): Promise<{
     solved: boolean;
@@ -496,6 +507,10 @@ export class MinecraftAcquisitionSolver extends BaseDomainSolver<AcquisitionSolv
     childBundles: SolveBundle[];
   }> {
     const goal = { [item]: quantity };
+    // Strategy-specific solverId for child bundle provenance.
+    // Parent uses 'minecraft.acquisition'; child uses 'minecraft.acquisition.<strategy>'
+    // so audits can distinguish which strategy produced which rule family.
+    const childSolverId = `${this.solverId}.${strategy}`;
 
     const solvePayload: Record<string, unknown> = {
       contractVersion: this.contractVersion,
@@ -513,10 +528,14 @@ export class MinecraftAcquisitionSolver extends BaseDomainSolver<AcquisitionSolv
       const planId = this.extractPlanId(result);
       const solved = result.solutionFound;
 
-      // Build child bundle for this sub-solve
-      const compatReport = lintRules(rules, { solverId: this.solverId });
-      const bundleInput = computeBundleInput({
+      // Build child bundle for this sub-solve.
+      // Compat report computed once here and reused for the child bundle.
+      const compatReport = lintRules(rules, {
         solverId: this.solverId,
+        enableAcqHardening: true,
+      });
+      const bundleInput = computeBundleInput({
+        solverId: childSolverId,
         contractVersion: this.contractVersion,
         definitions: rules,
         inventory,

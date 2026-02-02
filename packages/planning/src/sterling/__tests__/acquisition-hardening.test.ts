@@ -2,9 +2,11 @@
  * Acquisition Hardening Tests — Compat linter checks for acquisition rules.
  *
  * Verifies:
- * - TRADE_REQUIRES_ENTITY: acq:trade:* without proximity token
+ * - TRADE_REQUIRES_ENTITY: acq:trade:* without proximity:villager token
  * - ACQ_FREE_PRODUCTION: structural "no free production" for all acq:* prefixes
- * - ACQUISITION_NO_VIABLE_STRATEGY: 0 viable candidates (empty rule set)
+ * - ACQUISITION_NO_VIABLE_STRATEGY: uses candidateCount (not rules.length)
+ * - enableAcqHardening flag gates checks without requiring minecraft solverId
+ * - Token specificity: trade requires proximity:villager, loot requires proximity:chest
  * - Valid rules pass all checks
  * - Existing 11 checks unaffected
  */
@@ -79,10 +81,24 @@ describe('TRADE_REQUIRES_ENTITY', () => {
     expect(findIssue(report, 'TRADE_REQUIRES_ENTITY')).toBeUndefined();
   });
 
+  it('acq:trade with wrong proximity token (proximity:chest) → error', () => {
+    const rule = makeTradeRule({
+      requires: [{ name: 'proximity:chest', count: 1 }],
+    });
+    const report = lintRules([rule], ACQ_CONTEXT);
+    expect(findIssue(report, 'TRADE_REQUIRES_ENTITY')).toBeDefined();
+  });
+
   it('not triggered for non-acquisition solverId', () => {
     const rule = makeTradeRule({ requires: [] });
     const report = lintRules([rule], { solverId: 'minecraft.crafting' });
     expect(findIssue(report, 'TRADE_REQUIRES_ENTITY')).toBeUndefined();
+  });
+
+  it('triggered via enableAcqHardening flag (no solverId needed)', () => {
+    const rule = makeTradeRule({ requires: [] });
+    const report = lintRules([rule], { enableAcqHardening: true });
+    expect(findIssue(report, 'TRADE_REQUIRES_ENTITY')).toBeDefined();
   });
 });
 
@@ -127,6 +143,14 @@ describe('ACQ_FREE_PRODUCTION', () => {
     expect(findIssue(report, 'ACQ_FREE_PRODUCTION')).toBeUndefined();
   });
 
+  it('acq:loot with wrong proximity token (proximity:villager) → ACQ_FREE_PRODUCTION error', () => {
+    const rule = makeLootRule({
+      requires: [{ name: 'proximity:villager', count: 1 }],
+    });
+    const report = lintRules([rule], ACQ_CONTEXT);
+    expect(findIssue(report, 'ACQ_FREE_PRODUCTION')).toBeDefined();
+  });
+
   // Salvage
   it('acq:salvage with empty consumes → ACQ_FREE_PRODUCTION error', () => {
     const rule = makeSalvageRule({ consumes: [] });
@@ -157,10 +181,25 @@ describe('ACQ_FREE_PRODUCTION', () => {
 // ── ACQUISITION_NO_VIABLE_STRATEGY ────────────────────────────────────────
 
 describe('ACQUISITION_NO_VIABLE_STRATEGY', () => {
-  it('empty rule set with acquisition solverId → error', () => {
-    const report = lintRules([], ACQ_CONTEXT);
+  it('candidateCount=0 with acquisition solverId → error', () => {
+    const report = lintRules([], { ...ACQ_CONTEXT, candidateCount: 0 });
     expect(findIssue(report, 'ACQUISITION_NO_VIABLE_STRATEGY')).toBeDefined();
     expect(report.valid).toBe(false);
+  });
+
+  it('empty rules but candidateCount > 0 → no error (mine/craft delegation)', () => {
+    // This is the material fix: mine/craft delegation produces 0 rules but
+    // is valid because the child solver handles them. candidateCount reflects
+    // the coordinator's enumeration, not the delegated rule count.
+    const report = lintRules([], { ...ACQ_CONTEXT, candidateCount: 3 });
+    expect(findIssue(report, 'ACQUISITION_NO_VIABLE_STRATEGY')).toBeUndefined();
+    expect(report.valid).toBe(true);
+  });
+
+  it('falls back to rules.length when candidateCount not provided', () => {
+    // Backwards compatibility: no candidateCount → uses rules.length
+    const report = lintRules([], ACQ_CONTEXT);
+    expect(findIssue(report, 'ACQUISITION_NO_VIABLE_STRATEGY')).toBeDefined();
   });
 
   it('non-empty rule set → no error', () => {
@@ -176,6 +215,11 @@ describe('ACQUISITION_NO_VIABLE_STRATEGY', () => {
   it('empty rule set with no context → no error', () => {
     const report = lintRules([]);
     expect(findIssue(report, 'ACQUISITION_NO_VIABLE_STRATEGY')).toBeUndefined();
+  });
+
+  it('triggered via enableAcqHardening flag', () => {
+    const report = lintRules([], { enableAcqHardening: true, candidateCount: 0 });
+    expect(findIssue(report, 'ACQUISITION_NO_VIABLE_STRATEGY')).toBeDefined();
   });
 });
 

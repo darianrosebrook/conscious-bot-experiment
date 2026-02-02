@@ -441,7 +441,9 @@ function findRequiredTier(item: string): string | undefined {
  * Rank strategies by cost-adjusted prior score.
  *
  * Score = estimatedCost * (1 - prior.successRate)
- * Lower score = better ranking. Deterministic tie-break by strategy name.
+ * Lower score = better ranking. Deterministic tie-break by strategy name
+ * using simple lexicographic comparison (not localeCompare).
+ * Scores are quantized to integer millicost for deterministic ordering.
  */
 export function rankStrategies(
   candidates: AcquisitionCandidate[],
@@ -458,14 +460,20 @@ export function rankStrategies(
     const prior = priorMap.get(`${c.strategy}:${contextKey}`);
     const successRate = prior?.successRate ?? 0.5;
     const score = c.estimatedCost * (1 - successRate);
-    return { candidate: c, score };
+    // Quantize to integer millicost for deterministic comparison
+    const scoreMillis = Number.isNaN(score) || !Number.isFinite(score)
+      ? Number.MAX_SAFE_INTEGER
+      : Math.round(score * 1000);
+    return { candidate: c, scoreMillis };
   });
 
   scored.sort((a, b) => {
-    const diff = a.score - b.score;
+    const diff = a.scoreMillis - b.scoreMillis;
     if (diff !== 0) return diff;
-    // Deterministic tie-break: alphabetical by strategy name
-    return a.candidate.strategy.localeCompare(b.candidate.strategy);
+    // Deterministic tie-break: simple lexicographic by strategy name
+    const nameA = a.candidate.strategy;
+    const nameB = b.candidate.strategy;
+    return nameA < nameB ? -1 : nameA > nameB ? 1 : 0;
   });
 
   return scored.map(s => s.candidate);
