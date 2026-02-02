@@ -89,6 +89,26 @@ export function buildDagFromModules(
         constraint: 'dependency',
       });
     }
+
+    // Support edges from supportRequirements (G.1)
+    if (moduleDef.supportRequirements) {
+      for (const req of moduleDef.supportRequirements) {
+        const supportNodeId = nodeIdMap.get(req.supportModuleId);
+        if (!supportNodeId) continue;
+
+        // Avoid duplicate edges: only add if not already covered by dependency
+        const alreadyHasEdge = edges.some(
+          (e) => e.from === supportNodeId && e.to === toNodeId,
+        );
+        if (!alreadyHasEdge) {
+          edges.push({
+            from: supportNodeId,
+            to: toNodeId,
+            constraint: 'support',
+          });
+        }
+      }
+    }
   }
 
   const planDigest = computePlanDigest(nodes, edges);
@@ -208,6 +228,11 @@ function deriveConflictKeys(
   // prep_site modules always conflict (only one site prep at a time)
   if (step.moduleType === 'prep_site') {
     keys.push('type:prep_site');
+  }
+
+  // Scaffold modules conflict with each other (placement order matters)
+  if (step.moduleType === 'scaffold') {
+    keys.push('type:scaffold');
   }
 
   return keys;

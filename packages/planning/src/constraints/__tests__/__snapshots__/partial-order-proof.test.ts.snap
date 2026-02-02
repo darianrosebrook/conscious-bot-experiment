@@ -1,0 +1,3 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`partial-order proof (G.3) > golden-master: canonical snapshot of DAG structure > DAG structure matches canonical snapshot 1`] = `"{"commutingPairCount":1,"edgeCount":4,"nodeCount":4,"planDigest":"419e883295f7a1e0","schemaVersion":1}"`;

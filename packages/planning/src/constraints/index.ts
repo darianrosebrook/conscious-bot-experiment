@@ -35,11 +35,18 @@ export { buildDagFromModules, findCommutingPairs } from './dag-builder';
 export type { CommutingPair } from './dag-builder';
 
 // Constraint model
-export { extractDependencyConstraints } from './constraint-model';
+export {
+  extractDependencyConstraints,
+  extractSupportConstraints,
+  extractReachabilityConstraints,
+} from './constraint-model';
 export type {
   DependencyConstraint,
   ReachabilityConstraint,
+  SupportConstraint,
   PlanConstraint,
+  SupportRequirement,
+  ReachabilityZone,
 } from './constraint-model';
 
 // Feasibility checker

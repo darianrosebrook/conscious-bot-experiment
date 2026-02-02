@@ -42,11 +42,9 @@ export interface PlanEdge {
  * Constraint types for plan edges.
  * - 'dependency': module X requires module Y completed first
  * - 'reachability': bot must be within reach distance
- *
- * 'support' is deliberately omitted — deferred until geometric
- * block-level occupancy data is available.
+ * - 'support': module X requires structural support from module Y
  */
-export type ConstraintType = 'dependency' | 'reachability';
+export type ConstraintType = 'dependency' | 'reachability' | 'support';
 
 export interface PartialOrderPlan<T = unknown> {
   readonly schemaVersion: number;

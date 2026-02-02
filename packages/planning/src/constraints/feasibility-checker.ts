@@ -153,6 +153,41 @@ export function checkFeasibility<T>(
         }
         break;
       }
+
+      case 'support': {
+        // Check that the support module exists in the plan
+        if (!moduleIdsInPlan.has(constraint.supportModuleId)) {
+          violations.push({
+            type: 'dependency',
+            detail: `Module '${constraint.dependentModuleId}' requires support from '${constraint.supportModuleId}' but it is not in the plan`,
+            moduleId: constraint.dependentModuleId,
+            context: {
+              supportModuleId: constraint.supportModuleId,
+              dependentModuleId: constraint.dependentModuleId,
+            },
+          });
+          break;
+        }
+
+        // Check that there's a precedence path from support → dependent
+        const supportNodeId = moduleToNodeId.get(constraint.supportModuleId);
+        const supportDepNodeId = moduleToNodeId.get(constraint.dependentModuleId);
+        if (supportNodeId && supportDepNodeId) {
+          const canReach = reachable.get(supportNodeId)?.has(supportDepNodeId) ?? false;
+          if (!canReach) {
+            violations.push({
+              type: 'dependency',
+              detail: `Module '${constraint.dependentModuleId}' requires support from '${constraint.supportModuleId}' but no precedence path exists in the DAG`,
+              moduleId: constraint.dependentModuleId,
+              context: {
+                supportModuleId: constraint.supportModuleId,
+                dependentModuleId: constraint.dependentModuleId,
+              },
+            });
+          }
+        }
+        break;
+      }
     }
   }
 
