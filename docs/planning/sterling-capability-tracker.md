@@ -1,6 +1,6 @@
 # Sterling Capability Rig Tracker
 
-**Last updated**: 2026-02-01
+**Last updated**: 2026-02-02
 **Repos**: conscious-bot (TS), sterling (Python)
 **Reference**: [sterling-minecraft-domains.md](./sterling-minecraft-domains.md), [capability-primitives.md](./capability-primitives.md)
 
@@ -8,22 +8,55 @@
 
 ## Status legend
 
+Rig status has two orthogonal axes. Treating them as a single "DONE" invites the semantic lie where "contract-certified" is misread as "search-proven."
+
+### Contract certification (CB-side: TS solver + mocked Sterling)
+
 | Symbol | Meaning |
 |--------|---------|
-| DONE | Implemented, tested, verified end-to-end |
-| PARTIAL | Baseline exists, certification gaps remain |
 | NOT STARTED | No implementation |
+| IN PROGRESS | Partial implementation; some certification items remain |
+| CONTRACT-CERTIFIED | Interface, determinism, lintability, bundle identity, portability, and transfer tests all pass. All global invariants satisfied. |
+
+Evidence: unit tests, golden-master snapshots, transfer tests, linter hardening, determinism tests, bundle invariants.
+
+### Solver / E2E certification (CB → Sterling Python A* → CB)
+
+| Symbol | Meaning |
+|--------|---------|
+| NONE | No Python solver domain exists, or no E2E tests exercise it for this rig |
+| PARTIAL | Python solver domain exists; some paths/strategies tested E2E, others not. Coverage set listed explicitly. |
+| E2E-PROVEN | All primary paths/strategies exercised through real Sterling server with `STERLING_E2E=1` gated tests. SearchHealth flows. |
+
+Evidence: E2E tests gated behind `STERLING_E2E=1`, real server traces, returned SearchHealth metrics.
+
+"PARTIAL" requires an explicit **E2E coverage set** — the list of paths/strategies that are and are not proven. This prevents hand-waving.
+
+---
+
+### Primitive namespace note
+
+Sterling Python's `data/primitive_specs/index.json` defines engine-level primitives **ST-P01** through **ST-P05** (deterministic transitions, observation emission, prediction verification, discriminative K1 evaluation, macro-operator composition). These are *not* the same namespace as the domain-level capability primitives **CB-P01** through **CB-P21** defined in [capability-primitives.md](./capability-primitives.md).
+
+| Namespace | Abstraction level | Example | Defined in |
+|-----------|------------------|---------|-----------|
+| **ST-Pxx** | Engine-level (what the search infrastructure can do) | ST-P01: deterministic transitions | `sterling/data/primitive_specs/index.json` |
+| **CB-Pxx** | Domain-level (what planning capability is proven) | CB-P01: deterministic transformation planning | `docs/planning/capability-primitives.md` |
+
+The bridge between namespaces is `SterlingDomainDeclaration.implementsPrimitives` → `DomainDeclarationV1` → `CapabilityClaimRegistry`. **Zero claims are registered today.** Until claims are wired, these namespaces coexist without formal alignment.
+
+References in this document use the **CB-Pxx** namespace unless explicitly prefixed with **ST-**.
 
 ---
 
 ## Global invariants (apply to every rig)
 
-These are certifiability gates. Every rig must satisfy all of them before it can be marked DONE.
+These are certifiability gates. Every rig must satisfy all of them before it can reach CONTRACT-CERTIFIED.
 
 | # | Invariant | Status | Evidence | Gaps |
 |---|-----------|--------|----------|------|
 | 1 | **Deterministic replay** — same payload + same version = identical trace bundle hash | DONE | `solve-bundle.ts` canonicalization contract; `solve-bundle.test.ts` determinism suite; E2E two-solve identity test | None |
-| 2 | **Typed operators, fail-closed legality** — operators have type/preconditions/effects; unproven legality = illegal | DONE | `compat-linter.ts` 10-check validation; `cap:` token gating in tool progression; Sterling backend fail-closed expansion | None |
+| 2 | **Typed operators, fail-closed legality** — operators have type/preconditions/effects; unproven legality = illegal | DONE | `compat-linter.ts` 14-check validation (11 structural + 3 acquisition-gated); `cap:` token gating in tool progression; Sterling backend fail-closed expansion | None |
 | 3 | **Canonical state hashing + equivalence reduction** — stable under irrelevant variation; count-capping; symmetry | DONE | `hashInventoryState()` zero-omission + key sorting + count-capping (`INVENTORY_HASH_CAP=64`); `hashDefinition()` order-invariant; 3 unit tests prove cap semantics | Symmetry reduction only in building `siteCaps` (acceptable for current rigs) |
 | 4 | **Learning never changes semantics** — ordering/priors only; no invented transitions | DONE | Rules frozen at solve time; path algebra weights update per episode; reachable set unchanged; **negative test**: wire payload byte-equivalent before and after `reportEpisodeResult()` (2 tests in `solver-golden-master.test.ts`) | None |
 | 5 | **Credit assignment is execution-grounded** — only executed outcomes update priors | DONE | `BaseDomainSolver.reportEpisode()` requires planId from executed solve; per-tier tracking in tool progression; **negative tests**: `solveCraftingGoal()` on solved and unsolved paths never calls `reportEpisodeResult()` or sends `report_episode` message (2 tests in `solver-golden-master.test.ts`) | None |
@@ -63,22 +96,34 @@ Sterling's capability absorption pipeline infrastructure (Layers 1–5) is now i
 
 ## Rig status summary
 
-| Rig | Primitives | Status | Track |
-|-----|-----------|--------|-------|
-| **A**: Inventory transformation | 1, 16, 17, 19, 20 | DONE (all certification items complete including A.5 performance baselines) | Track 1 |
-| **B**: Capability gating | 2, 16, 19, 20 | DONE (full tier progression + certification tests) | Track 1 |
-| **C**: Temporal planning | 3, 16, 17, 18, 19 | DONE (P03 capsule + temporal enrichment + FurnaceSchedulingSolver C.1–C.7 all certified) | Track 1 |
-| **D**: Multi-strategy acquisition (learning-benchmark candidate) | 4, 17, 18, 19, 20 | NOT STARTED | Track 2 |
-| **E**: Hierarchical planning | 5, 16, 17, 19 | DONE (world graph builder + edge decomposer + feedback loop + golden-master + transfer test) | Track 2 |
-| **F**: Valuation under scarcity | 6, 16, 17, 18, 19 | NOT STARTED | Track 2 |
-| **G**: Feasibility + partial order | 7, 16, 17, 19 | DONE (support constraints + reachability + scaffolding + partial-order proof + transfer test) | Track 2 |
-| **H**: Systems synthesis | 8, 14, 16, 19 | NOT STARTED | Track 2 |
-| **I**: Epistemic planning | 11, 13, 17, 19 | NOT STARTED | Track 2 |
-| **J**: Invariant maintenance | 12, 17, 18, 19 | NOT STARTED | Track 2 |
-| **K**: Irreversibility | 13, 19, 20 | NOT STARTED | Track 2 |
-| **L**: Contingency planning | 9, 18, 19 | NOT STARTED | Later |
-| **M**: Risk-aware planning | 10, 17, 18, 19 | NOT STARTED | Later |
-| **N**: Fault diagnosis | 11, 15, 19 | NOT STARTED | Later |
+| Rig | Primitives | Contract | E2E | E2E Coverage | Track |
+|-----|-----------|----------|-----|-------------|-------|
+| **A**: Inventory transformation | CB-P1, 16, 17, 19, 20 | CONTRACT-CERTIFIED | E2E-PROVEN | {crafting} | Track 1 |
+| **B**: Capability gating | CB-P2, 16, 19, 20 | CONTRACT-CERTIFIED | PARTIAL | {crafting via delegation}. Tier decomposition is TS-only; per-tier crafting solves hit Python. | Track 1 |
+| **C**: Temporal planning | CB-P3, 16, 17, 18, 19 | CONTRACT-CERTIFIED | NONE | No furnace domain in Python. All temporal enrichment, batching, parallel slot proofs are TS-only with mocked Sterling. | Track 1 |
+| **D**: Multi-strategy acquisition | CB-P4, 17, 18, 19, 20 | IN PROGRESS | PARTIAL | {mine via crafting delegation}. Coordinator, strategy ranking, priors are TS-only. Trade/loot/salvage rules are Sterling-encodable but untested against Python. | Track 2 |
+| **E**: Hierarchical planning | CB-P5, 16, 17, 19 | CONTRACT-CERTIFIED | NONE | No hierarchical macro planner in Python. World graph, edge decomposition, feedback loop all TS-only. | Track 2 |
+| **F**: Valuation under scarcity | CB-P6, 16, 17, 18, 19 | NOT STARTED | NONE | — | Track 2 |
+| **G**: Feasibility + partial order | CB-P7, 16, 17, 19 | CONTRACT-CERTIFIED | PARTIAL | {building via module sequencing}. Python `building_domain.py` exists; E2E building test in `solver-class-e2e.test.ts`. DAG builder, constraint model, partial-order plan are TS additions not exercised by Python search. | Track 2 |
+| **H**: Systems synthesis | CB-P8, 14, 16, 19 | NOT STARTED | NONE | — | Track 2 |
+| **I**: Epistemic planning | CB-P11, 13, 17, 19 | NOT STARTED | NONE | — | Track 2 |
+| **J**: Invariant maintenance | CB-P12, 17, 18, 19 | NOT STARTED | NONE | — | Track 2 |
+| **K**: Irreversibility | CB-P13, 19, 20 | NOT STARTED | NONE | — | Track 2 |
+| **L**: Contingency planning | CB-P9, 18, 19 | NOT STARTED | NONE | — | Later |
+| **M**: Risk-aware planning | CB-P10, 17, 18, 19 | NOT STARTED | NONE | — | Later |
+| **N**: Fault diagnosis | CB-P11, 15, 19 | NOT STARTED | NONE | — | Later |
+
+### Python solver domain inventory
+
+Three Python solver domains exist in `sterling/scripts/eval/`. This is the complete set of domains that the TS solvers can call over the wire.
+
+| Python domain | File | TS solver(s) | Used by rigs |
+|--------------|------|-------------|-------------|
+| Minecraft crafting | `minecraft_domain.py` | `MinecraftCraftingSolver`, `MinecraftToolProgressionSolver` (delegation), `MinecraftAcquisitionSolver` (mine path) | A, B, D (mine only) |
+| Minecraft building | `building_domain.py` | `MinecraftBuildingSolver` | G |
+| Navigation | `navigation_domain.py` | `MinecraftNavigationSolver` | (new, not yet certified) |
+
+Domains that do **not** exist in Python: furnace/temporal (C), acquisition coordinator (D), hierarchical macro planner (E), valuation (F), and all later rigs.
 
 ---
 
@@ -205,7 +250,7 @@ Completed in the P0–P2 hardening sprint (2026-01-29). This underpins every rig
 |-----------|--------|-------|-------|
 | SolveBundle content-addressed audit trail | DONE | `solve-bundle.ts`, `solve-bundle-types.ts` | Deterministic `bundleId = solverId:bundleHash` |
 | Canonicalization contract | DONE | `solve-bundle.ts` `canonicalize()` | Sorted keys, NaN rejection, -0 normalization |
-| Compat linter (11 checks) | DONE | `compat-linter.ts` | 9 original + INVALID_BASE_COST + FURNACE_OVERCAPACITY |
+| Compat linter (14 checks) | DONE | `compat-linter.ts` | 9 original + INVALID_BASE_COST + FURNACE_OVERCAPACITY + TRADE_REQUIRES_ENTITY + ACQ_FREE_PRODUCTION + ACQUISITION_NO_VIABLE_STRATEGY |
 | SearchHealth accumulator (Python) | DONE | `sterling/core/search_health.py` | Welford O(1) variance, `searchHealthVersion: 1` |
 | SearchHealth parser + degeneracy detection (TS) | DONE | `search-health.ts` | Version check, partial-field warning, 3 degeneracy thresholds |
 | searchHealth end-to-end emission | DONE | Python A* loops → unified server → TS parser | Verified: wooden pickaxe healthy, iron tier degenerate |
@@ -224,7 +269,8 @@ Completed in the P0–P2 hardening sprint (2026-01-29). This underpins every rig
 
 ## Rig A: Inventory transformation planning
 
-**Status**: DONE — all certification items complete
+**Contract**: CONTRACT-CERTIFIED — all certification items complete
+**E2E**: E2E-PROVEN — `{crafting}`. `solver-class-e2e.test.ts` exercises crafting solver against live Sterling. SearchHealth flows. Performance baselines recorded.
 
 ### What's done
 
@@ -256,7 +302,8 @@ Completed in the P0–P2 hardening sprint (2026-01-29). This underpins every rig
 
 ## Rig B: Capability gating and legality
 
-**Status**: DONE — full tier progression with certification tests
+**Contract**: CONTRACT-CERTIFIED — full tier progression with certification tests
+**E2E**: PARTIAL — `{crafting via per-tier delegation}`. Each tier's crafting solve hits Python `minecraft_domain.py`. Tier decomposition logic is TS-only. `solver-class-e2e.test.ts` iron-tier test exercises 3 bundles with distinct goalHash and searchHealth per tier.
 
 ### What's done
 
@@ -285,7 +332,8 @@ Completed in the P0–P2 hardening sprint (2026-01-29). This underpins every rig
 
 ## Rig C: Temporal planning with durations, batching, and capacity
 
-**Status**: DONE — P03 capsule + temporal enrichment layer + FurnaceSchedulingSolver (C.1–C.7) all certified
+**Contract**: CONTRACT-CERTIFIED — P03 capsule + temporal enrichment layer + FurnaceSchedulingSolver (C.1–C.7) all certified
+**E2E**: NONE — no furnace/temporal domain in Python. All temporal enrichment, batching, parallel slot, and deadlock proofs are TS-only with mocked Sterling.
 
 ### What's done
 
@@ -334,7 +382,8 @@ Completed in the P0–P2 hardening sprint (2026-01-29). This underpins every rig
 
 ## Rig G: Feasibility + partial-order structure (building)
 
-**Status**: DONE — support constraints + reachability + scaffolding + partial-order proof + transfer test all certified
+**Contract**: CONTRACT-CERTIFIED — support constraints + reachability + scaffolding + partial-order proof + transfer test all certified
+**E2E**: PARTIAL — `{building module sequencing}`. Python `building_domain.py` exists. `solver-class-e2e.test.ts` building E2E test. DAG builder, constraint model, partial-order plan, commuting pair detection are TS additions not exercised by Python search.
 
 ### What's done
 
@@ -374,7 +423,8 @@ Completed in the P0–P2 hardening sprint (2026-01-29). This underpins every rig
 
 ## Rig E: Hierarchical planning (navigate/explore/find)
 
-**Status**: DONE — world graph builder + edge decomposer + feedback loop + golden-master + transfer test all certified
+**Contract**: CONTRACT-CERTIFIED — world graph builder + edge decomposer + feedback loop + golden-master + transfer test all certified
+**E2E**: NONE — no hierarchical macro planner in Python. All decomposition, feedback, and Dijkstra path planning are TS-only.
 
 ### What's done
 
@@ -409,11 +459,59 @@ Completed in the P0–P2 hardening sprint (2026-01-29). This underpins every rig
 
 ---
 
-## Rigs D, F, H–N: Not started
+## Rig D: Multi-strategy acquisition (mine/trade/loot/salvage)
+
+**Contract**: IN PROGRESS — coordinator solver + strategy enumeration + ranking + priors + hardening + golden-master + transfer test implemented. Review round 2 complete. Remaining: closeout doc.
+**E2E**: PARTIAL — `{mine}` only (via crafting solver delegation to Python `minecraft_domain.py`). Trade/loot/salvage rules are Sterling-encodable but no Python acquisition domain exists.
+
+### What's done
+
+| Item | File | Evidence |
+|------|------|----------|
+| Acquisition types + context hashing | `minecraft-acquisition-types.ts` | `AcquisitionContextV1`, `AcquisitionCandidate`, `computeCandidateSetDigest()`, `lexCmp()`, `costToMillis()`. 21 tests |
+| Strategy enumeration + ranking | `minecraft-acquisition-rules.ts` | `buildAcquisitionStrategies()`, `rankStrategies()` with quantized scoring, deterministic tie-break. 42 tests |
+| Prior store (EMA learning) | `minecraft-acquisition-priors.ts` | `StrategyPriorStore` with alpha=0.2, bounds [PRIOR_MIN=0.05, PRIOR_MAX=0.95], planId-required updates. 13 tests |
+| Coordinator solver class | `minecraft-acquisition-solver.ts` | `MinecraftAcquisitionSolver` extends `BaseDomainSolver`. Delegates mine/craft to crafting solver, trade/loot/salvage to Sterling via `acq:` prefix rules. `parentBundleId` first-class field. Strategy-specific child solverId. 18 tests |
+| Compat linter (3 acquisition checks) | `compat-linter.ts` | `TRADE_REQUIRES_ENTITY` (exact `proximity:villager`), `ACQ_FREE_PRODUCTION` (per-strategy), `ACQUISITION_NO_VIABLE_STRATEGY` (uses `candidateCount`, not `rules.length`). Gated behind `enableAcqHardening` flag or `solverId`. 31 hardening tests |
+| SolveBundle wiring (parent + child) | `minecraft-acquisition-solver.ts` | Parent bundle captures `candidateSetDigest`, `strategySelected`, `candidateCount`. Child bundles appended after parent with strategy-specific solverId. |
+| Deterministic digest + ranking | `minecraft-acquisition-types.ts`, `minecraft-acquisition-rules.ts` | `lexCmp()` replaces `localeCompare`, `costToMillis()` quantizes floats. Digest stable under reordering. |
+| Golden-master snapshots (R3, R4) | `acquisition-golden-master.test.ts` | Trade/loot/salvage rule shape snapshots. Payload stability. Deterministic bundleId and candidateSetDigest. RigDSignals. 12 tests |
+| Transfer test — supply chain | `transfer-supply-chain.test.ts` | Supply chain procurement domain (manufacture/purchase/recycle/barter). CandidateSetDigest, ranking, signals, SolveBundle capture. Zero Minecraft imports. 19 tests |
+| Learning benchmark (M1) | `acquisition-benchmark.test.ts` | 5 scenarios. CandidateSetDigest unchanged after learning. Strategy frequency shift. Prior stabilization. Operator set immutability proof. 15 tests |
+| Degeneracy detection (M2-a) | `degeneracy-detection.ts` | `detectStrategyDegeneracy()` with epsilon-based tie detection. Wired into SolveRationale. 8 tests |
+| Leaf routing | `leaf-routing.ts`, `acquisition-leaf-routing.test.ts` | `acq:trade:*` → `interact_with_entity`, `acq:loot:*` → `open_container`, `acq:salvage:*` → `craft_recipe`. 9 tests |
+| Planner integration | `sterling-planner.ts` | `case 'D'` dispatches to acquisition solver. Steps tagged with `source: 'rig-d-acquisition'`. |
+| Mine/craft delegation regression | `acquisition-solver-unit.test.ts` | Parent bundle `compatReport.valid` when `candidateCount > 0` and `rules=[]`. 3 regression tests |
+
+### Certification checklist
+
+- [x] **D.1 — Strategy enumeration**: `buildAcquisitionStrategies(ctx)` returns candidates with bucketed context. Distance buckets: 0=none, 1=≤16, 2=≤64, 3=>64. Trade/loot/salvage candidates include availability signals.
+- [x] **D.2 — Strategy ranking with priors**: `rankStrategies()` with `scoreMillis = round(estimatedCost * (1 - successRate) * 1000)`. Deterministic tie-break via `lexCmp()`. Quantized cost comparison.
+- [x] **D.3 — Prior learning (execution-grounded)**: `StrategyPriorStore` requires planId. EMA alpha=0.2. Bounds [0.05, 0.95]. No planId → throws.
+- [x] **D.4 — Coordinator solver + SolveBundle**: Parent bundle with `candidateSetDigest`. Child bundles aggregated. `candidateCount` distinguishes "no strategy path" from "delegation-driven." Material fix: mine/craft delegation returns `rules=[]` without triggering `ACQUISITION_NO_VIABLE_STRATEGY`.
+- [x] **D.5 — Hardening (3 checks)**: `TRADE_REQUIRES_ENTITY` (exact token), `ACQ_FREE_PRODUCTION` (per-strategy: trade=currency+villager, loot=`proximity:container:<kind>` prefix, salvage=source item, generic=any token), `ACQUISITION_NO_VIABLE_STRATEGY` (uses `candidateCount`). Gated behind `enableAcqHardening` flag.
+- [x] **D.6 — Golden-master + transfer test**: Rule shape snapshots, payload stability, deterministic identity, supply chain transfer test.
+- [x] **D.7 — Learning benchmark (M1)**: CandidateSetDigest unchanged after N episodes. Strategy ranking shifts. Prior stabilization. Operator set immutability.
+- [x] **D.8 — Closeout doc**: Update capability tracker to reflect Rig D status. Two-axis certification model (contract vs E2E), primitive namespace separation (ST-Pxx vs CB-Pxx), explicit E2E coverage sets, dependency edge declarations.
+- [ ] **D.E2E — Trade/loot/salvage against Python**: Requires either (a) extending `minecraft_domain.py` to handle `acq:` prefix rules, or (b) a new Python acquisition domain.
+
+### E2E coverage detail
+
+| Strategy | E2E status | How |
+|----------|-----------|-----|
+| mine | PROVEN | Delegates to `MinecraftCraftingSolver` → Python `minecraft_domain.py`. Covered by Rig A E2E. |
+| craft | PROVEN (via mine) | Same delegation path. |
+| trade | NOT TESTED | `acq:trade:*` rules are Sterling-encodable `actionType: 'craft'`. No Python handler for `acq:` prefix. |
+| loot | NOT TESTED | `acq:loot:*` rules same shape. No Python handler. |
+| salvage | NOT TESTED | `acq:salvage:*` rules same shape. No Python handler. |
+
+---
+
+## Rigs F, H–N: Not started
 
 These rigs are documented in [sterling-minecraft-domains.md](./sterling-minecraft-domains.md) with full rig templates. Implementation follows Track 2 (D–K) and Later (L–N) priority ordering.
 
-### Post-certification order (after A–C, E, G certified):
+### Post-certification order (remaining rigs):
 
 > **Note**: This is the sequential implementation order for all remaining rigs,
 > spanning Tracks 2 and 3 from [RIG_DOCUMENTATION_INDEX.md](./RIG_DOCUMENTATION_INDEX.md).
@@ -421,27 +519,56 @@ These rigs are documented in [sterling-minecraft-domains.md](./sterling-minecraf
 > Track 3 = representational widening); this list orders them by dependency
 > and implementation priority within those tracks.
 
-1. **Rig D** — Multi-strategy acquisition (mine vs trade vs loot) — primary candidate for a learning-sensitive benchmark (multiple legal strategies, stable outcome signal)
+1. **Rig D** — Multi-strategy acquisition (IN PROGRESS — contract close to certified, E2E partial via mine delegation)
+   - Requires contract: A (crafting solver contract)
+   - Requires E2E: A `{crafting}` (mine path delegates to crafting solver)
 2. **Rig F** — Valuation under scarcity (keep/drop/store)
+   - Requires contract: D
+   - Requires E2E: D `{mine}` if delegating acquisition
 3. **Rig H** — Systems synthesis (farm layout first)
-6. **Rig I** — Epistemic planning (structure localization)
-7. **Rig J** — Invariant maintenance (base upkeep loops)
-8. **Rig K** — Irreversibility (villager trades)
+4. **Rig I** — Epistemic planning (structure localization)
+5. **Rig J** — Invariant maintenance (base upkeep loops)
+6. **Rig K** — Irreversibility (villager trades)
 
-### Later (requires A–K certified):
-9. **Rig L** — Contingency planning (nightfall/hunger)
-10. **Rig M** — Risk-aware planning (lava, nether)
-11. **Rig N** — Fault diagnosis (jammed systems)
+### Later (requires A–K contract-certified):
+7. **Rig L** — Contingency planning (nightfall/hunger)
+8. **Rig M** — Risk-aware planning (lava, nether)
+9. **Rig N** — Fault diagnosis (jammed systems)
 
 ---
 
-## What "done" means for a rig
+## What "certified" means for a rig
 
-A rig is certified when it passes all three test categories:
+### CONTRACT-CERTIFIED
+
+A rig reaches CONTRACT-CERTIFIED when it passes all three test categories:
 
 1. **Signature tests** — Legality, determinism, boundedness, canonicalization, validation/hardening. All global invariants satisfied.
 2. **Performance tests** — Search effort is bounded and stable across repeat solves (no regression). Learning does not alter semantics. Note: current baselines prove stability, not learning efficacy. Learning-sensitive benchmarks (problems with multiple near-tied plans) are a separate milestone.
 3. **Transfer tests** — Same formal signature runs on at least one non-Minecraft surface with the same invariants and harness.
+
+CONTRACT-CERTIFIED proves the **contract shape** — wire payload stability, bundle identity, linter hardening, portability. It does **not** prove that the Sterling Python search engine can solve this problem class.
+
+### E2E-PROVEN
+
+A rig reaches E2E-PROVEN when, in addition to contract certification:
+
+4. **Solver E2E tests** — At least one test (gated behind `STERLING_E2E=1`) instantiates the real TS solver class, connects to a live Sterling Python server, solves a representative problem, and asserts on:
+   - `solveMeta.bundles` shape and content
+   - `searchHealth` metrics flowing from Python → TS
+   - `stepsDigest` matching returned steps
+   - Solution correctness (steps produce the goal item)
+
+5. **Coverage declaration** — For multi-path rigs, the E2E coverage set is listed explicitly. "E2E-PROVEN" without a coverage set is ambiguous and therefore not allowed.
+
+### Dependency edges
+
+Downstream rigs should declare which axis they require:
+
+- **Requires contract**: the upstream rig's contract shape (types, linter, bundle identity) is stable
+- **Requires E2E**: the upstream rig's solver produces correct plans via Sterling search (needed when the downstream rig delegates to the upstream solver)
+
+Example: Rig F depends on D contract-certified. If F delegates mine/craft to D's crafting path, F requires D E2E coverage to include `{mine}`.
 
 ---
 
