@@ -1,0 +1,245 @@
+{
+  "generated": "2026-02-02T20:44:05.342192",
+  "author": "@darianrosebrook",
+  "total_modules": 5,
+  "modules": [
+    {
+      "path": "cognition/src/audit/thought-action-audit-logger.ts",
+      "name": "thought-action-audit-logger.ts",
+      "category": "LLM integration, thought processing, intent extraction, cognitive stream",
+      "status": "active",
+      "description": "* Thought-to-Action Audit Logger * * Captures the complete pipeline from need identification through action execution * for debugging and validation purposes. * * @author @darianrosebrook",
+      "classes": [
+        "ThoughtActionAuditLogger"
+      ],
+      "functions": [
+        "startTwoMinuteAudit",
+        "startQuickAudit"
+      ],
+      "imports": [
+        "fs/promises",
+        "fs",
+        "path"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2025-10-01T21:25:28.826685",
+        "modified": "2026-02-02T18:52:07.219447",
+        "modified_days_ago": 0,
+        "lines": 449,
+        "size_bytes": 12524,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "cognition/src/bot-state-cache.ts",
+      "name": "bot-state-cache.ts",
+      "category": "LLM integration, thought processing, intent extraction, cognitive stream",
+      "status": "active",
+      "description": "* Bot State Cache \u2014 Cognition-Side Versioned State Singleton * * The periodic thought loop already fetches GET /state from minecraft-interface * every 60s and constructs ThoughtContext.currentState. This module promotes that * to a module-level versioned cache so all cognition surfaces (social chat, etc.) * can read grounded state without additional HTTP calls.",
+      "classes": [],
+      "functions": [
+        "buildInventoryMap",
+        "updateBotStateCache",
+        "getBotStateCache",
+        "isCompletePosition",
+        "patchBotStateCache",
+        "botStateCacheAgeMs",
+        "_resetCacheForTest"
+      ],
+      "imports": [
+        "./thought-generator"
+      ],
+      "constants": [
+        "SESSION_SEED",
+        "STALE_THRESHOLD_MS"
+      ],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-02T01:05:06.797038",
+        "modified": "2026-02-02T01:05:06.797217",
+        "modified_days_ago": 0,
+        "lines": 162,
+        "size_bytes": 5580,
+        "author": null,
+        "has_main": false
+      }
+    },
+    {
+      "path": "cognition/src/cognition-state.ts",
+      "name": "cognition-state.ts",
+      "category": "LLM integration, thought processing, intent extraction, cognitive stream",
+      "status": "active",
+      "description": "* Cognition Mutable State Container * * Replaces closure-scoped mutable variables with an explicit state * object. Server.ts creates a single instance and passes specific * fields by reference or via accessor functions to router factories.",
+      "classes": [],
+      "functions": [
+        "createInitialState"
+      ],
+      "imports": [
+        "../../memory/src/social/social-memory-manager"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "active",
+      "staleness_score": 0.0,
+      "staleness_indicators": [],
+      "recommendation": "Active development - no action needed",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2026-02-02T16:17:12.802059",
+        "modified": "2026-02-02T16:17:12.802183",
+        "modified_days_ago": 0,
+        "lines": 40,
+        "size_bytes": 1301,
+        "author": null,
+        "has_main": false
+      }
+    },
+    {
+      "path": "cognition/src/cognitive-core/context-optimizer.ts",
+      "name": "context-optimizer.ts",
+      "category": "LLM integration, thought processing, intent extraction, cognitive stream",
+      "status": "stable",
+      "description": "* Context optimization system for advanced memory integration. * * Provides sophisticated context building, memory retrieval, * and token optimization for LLM interactions. * * @author @darianrosebrook",
+      "classes": [
+        "ContextOptimizer"
+      ],
+      "functions": [],
+      "imports": [
+        "./llm-interface"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "stable",
+      "staleness_score": 0.2,
+      "staleness_indicators": [
+        "Not modified in 133 days (over 3 months)"
+      ],
+      "recommendation": "Stable - monitor for relevance",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2025-08-23T17:46:29.179689",
+        "modified": "2025-09-22T00:32:55.013544",
+        "modified_days_ago": 133,
+        "lines": 612,
+        "size_bytes": 17420,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    },
+    {
+      "path": "cognition/src/cognitive-core/conversation-manager.ts",
+      "name": "conversation-manager.ts",
+      "category": "LLM integration, thought processing, intent extraction, cognitive stream",
+      "status": "stable",
+      "description": "* Conversation flow management system. * * Manages conversation state, topic tracking, and communication style * adaptation for natural and coherent social interactions. * * @author @darianrosebrook",
+      "classes": [
+        "ConversationManager"
+      ],
+      "functions": [],
+      "imports": [
+        "./llm-interface",
+        "../types"
+      ],
+      "constants": [],
+      "decorators_used": [],
+      "todos": {
+        "P0-GOV": [],
+        "P1-METRIC": [],
+        "P2-QUAL": [],
+        "P3-UX": [],
+        "untagged": []
+      },
+      "staleness_level": "stable",
+      "staleness_score": 0.2,
+      "staleness_indicators": [
+        "Not modified in 133 days (over 3 months)"
+      ],
+      "recommendation": "Stable - monitor for relevance",
+      "archive_candidate": false,
+      "archive_reasons": [],
+      "metadata": {
+        "created": "2025-08-23T17:46:29.179885",
+        "modified": "2025-09-22T00:32:56.915086",
+        "modified_days_ago": 133,
+        "lines": 718,
+        "size_bytes": 18426,
+        "author": "@darianrosebrook",
+        "has_main": false
+      }
+    }
+  ],
+  "categories": {
+    "LLM integration, thought processing, intent extraction, cognitive stream": [
+      "cognition/src/audit/thought-action-audit-logger.ts",
+      "cognition/src/bot-state-cache.ts",
+      "cognition/src/cognition-state.ts",
+      "cognition/src/cognitive-core/context-optimizer.ts",
+      "cognition/src/cognitive-core/conversation-manager.ts"
+    ]
+  },
+  "statistics": {
+    "by_status": {
+      "active": 3,
+      "stable": 2
+    },
+    "by_category": {
+      "LLM integration, thought processing, intent extraction, cognitive stream": 5
+    },
+    "total_lines": 1981,
+    "total_classes": 3,
+    "total_functions": 10,
+    "todos_by_priority": {
+      "P0-GOV": 0,
+      "P1-METRIC": 0,
+      "P2-QUAL": 0,
+      "P3-UX": 0,
+      "untagged": 0
+    },
+    "total_todos": 0
+  }
+}

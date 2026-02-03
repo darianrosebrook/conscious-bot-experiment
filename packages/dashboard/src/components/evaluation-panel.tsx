@@ -6,8 +6,6 @@
  * @author @darianrosebrook
  */
 
-'use client';
-
 import React, { useState, useEffect } from 'react';
 import {
   BarChart3,
@@ -167,10 +165,7 @@ export function EvaluationPanel() {
           <div className={s.errorCenter}>
             <AlertTriangle className={s.errorIcon} />
             <p className={s.errorText}>{error}</p>
-            <button
-              onClick={fetchEvaluationData}
-              className={s.retryLink}
-            >
+            <button onClick={fetchEvaluationData} className={s.retryLink}>
               Retry
             </button>
           </div>
@@ -202,10 +197,16 @@ export function EvaluationPanel() {
         <div className={s.healthRow}>
           <div className={s.alertBadgeRow}>
             <div
-              className={cn(s.healthDot, getHealthBgColor(evaluationData.systemHealth))}
+              className={cn(
+                s.healthDot,
+                getHealthBgColor(evaluationData.systemHealth)
+              )}
             />
             <span
-              className={cn(s.healthLabel, getHealthColor(evaluationData.systemHealth))}
+              className={cn(
+                s.healthLabel,
+                getHealthColor(evaluationData.systemHealth)
+              )}
             >
               {evaluationData.systemHealth.charAt(0).toUpperCase() +
                 evaluationData.systemHealth.slice(1)}
@@ -221,10 +222,7 @@ export function EvaluationPanel() {
       <Section title="Performance Metrics" icon={<Target className="size-4" />}>
         <div className={s.metricsGrid}>
           {evaluationData.metrics.map((metric) => (
-            <div
-              key={metric.name}
-              className={s.metricCard}
-            >
+            <div key={metric.name} className={s.metricCard}>
               <div className={s.metricHeader}>
                 <span className={s.metricName}>{metric.name}</span>
                 {getTrendIcon(metric.trend)}
@@ -293,14 +291,14 @@ export function EvaluationPanel() {
         {evaluationData.alerts.length > 0 ? (
           <div className={s.alertSpacer}>
             {evaluationData.alerts.map((alert) => (
-              <div
-                key={alert.id}
-                className={s.alertCard}
-              >
+              <div key={alert.id} className={s.alertCard}>
                 <div className={s.alertHeader}>
                   <div className={s.alertBadgeRow}>
                     <AlertTriangle
-                      className={cn(s.alertSeverityIcon, getSeverityColor(alert.severity))}
+                      className={cn(
+                        s.alertSeverityIcon,
+                        getSeverityColor(alert.severity)
+                      )}
                     />
                     <Pill>{alert.severity}</Pill>
                   </div>

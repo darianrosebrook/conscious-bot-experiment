@@ -222,6 +222,8 @@ export interface NavigationSolveResult extends BaseSolveResult {
   replansUsed: number;
   planId?: string | null;
   error?: string;
+  /** Solve-time join keys for deferred episode reporting */
+  solveJoinKeys?: import('./solve-bundle-types').SolveJoinKeys;
 }
 
 // ============================================================================

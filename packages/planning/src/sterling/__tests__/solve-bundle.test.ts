@@ -641,8 +641,8 @@ describe('attachSterlingIdentity', () => {
 
     const identity = bundle.output.sterlingIdentity!;
     expect(identity.bindingHash).toBeDefined();
-    // bindingHash = contentHash(traceBundleHash + bundleHash)
-    const expected = contentHash('tbh-123' + bundle.bundleHash);
+    // bindingHash = contentHash("binding:v1:" + traceBundleHash + ":" + bundleHash)
+    const expected = contentHash('binding:v1:' + 'tbh-123' + ':' + bundle.bundleHash);
     expect(identity.bindingHash).toBe(expected);
   });
 
@@ -674,5 +674,132 @@ describe('attachSterlingIdentity', () => {
 
     expect(bundle1.output.sterlingIdentity!.bindingHash)
       .not.toBe(bundle2.output.sterlingIdentity!.bindingHash);
+  });
+});
+
+// ============================================================================
+// Hash Surface Regression Tests
+// ============================================================================
+
+describe('bundleHash preimage regression: no identity contamination', () => {
+  const baseInput = computeBundleInput({
+    solverId: 'minecraft.crafting',
+    contractVersion: 1,
+    definitions: [{ action: 'craft:stick', actionType: 'craft', produces: [], consumes: [] }],
+    inventory: { oak_planks: 2 },
+    goal: { stick: 1 },
+    nearbyBlocks: [],
+  });
+  const baseOutput = computeBundleOutput({
+    planId: 'plan-1',
+    solved: true,
+    steps: [{ action: 'craft:stick' }],
+    totalNodes: 10,
+    durationMs: 50,
+    solutionPathLength: 1,
+  });
+  const baseCompat: CompatReport = {
+    valid: true,
+    issues: [],
+    checkedAt: Date.now(),
+    definitionCount: 1,
+  };
+
+  it('bundleHash does NOT change when sterlingIdentity is added', () => {
+    const bundleWithout = createSolveBundle(baseInput, baseOutput, baseCompat);
+    const bundleWith = createSolveBundle(baseInput, {
+      ...baseOutput,
+      sterlingIdentity: {
+        traceBundleHash: 'trace-abc',
+        engineCommitment: 'engine-xyz',
+        operatorRegistryHash: 'reg-hash',
+      },
+    }, baseCompat);
+    expect(bundleWithout.bundleHash).toBe(bundleWith.bundleHash);
+  });
+
+  it('bundleHash does NOT change when completenessDeclaration is on sterlingIdentity', () => {
+    const bundleWithout = createSolveBundle(baseInput, baseOutput, baseCompat);
+    const bundleWith = createSolveBundle(baseInput, {
+      ...baseOutput,
+      sterlingIdentity: {
+        traceBundleHash: 'trace-abc',
+        completenessDeclaration: {
+          completenessVersion: 1,
+          kind: 'structural',
+          edgesComplete: true,
+          isProofReady: false,
+        },
+      },
+    }, baseCompat);
+    expect(bundleWithout.bundleHash).toBe(bundleWith.bundleHash);
+  });
+
+  it('solverId IS part of bundleHash via input.solverId (intentional)', () => {
+    const inputA = computeBundleInput({
+      solverId: 'minecraft.crafting',
+      contractVersion: 1,
+      definitions: [{ action: 'craft:stick' }],
+      inventory: { oak_planks: 2 },
+      goal: { stick: 1 },
+      nearbyBlocks: [],
+    });
+    const inputB = computeBundleInput({
+      solverId: 'minecraft.tool_progression',
+      contractVersion: 1,
+      definitions: [{ action: 'craft:stick' }],
+      inventory: { oak_planks: 2 },
+      goal: { stick: 1 },
+      nearbyBlocks: [],
+    });
+    const bundleA = createSolveBundle(inputA, baseOutput, baseCompat);
+    const bundleB = createSolveBundle(inputB, baseOutput, baseCompat);
+
+    // solverId is intentionally in the hash — different solvers for same
+    // input/output SHOULD have different bundleHashes.
+    expect(bundleA.bundleHash).not.toBe(bundleB.bundleHash);
+  });
+
+  it('declaration registration state does NOT affect bundleHash', () => {
+    // This is the "no identity contamination" proof.
+    // Declaration registration lives on the solver instance, not on the bundle.
+    // Creating two bundles with identical input/output/compat should always
+    // produce the same bundleHash, regardless of whether the solver was
+    // registered at the time.
+    const bundle1 = createSolveBundle(baseInput, baseOutput, baseCompat);
+    const bundle2 = createSolveBundle(baseInput, baseOutput, baseCompat);
+    expect(bundle1.bundleHash).toBe(bundle2.bundleHash);
+  });
+});
+
+// ============================================================================
+// Completeness Declaration Enforcement (Phase 2)
+// ============================================================================
+
+describe('parseSterlingIdentity: completenessDeclaration contract', () => {
+  it('Phase 2: completenessDeclaration is parsed as-is from metrics', () => {
+    const identity = parseSterlingIdentity({
+      trace_bundle_hash: 'abc',
+      completeness_declaration: {
+        completenessVersion: 1,
+        kind: 'structural',
+        isProofReady: false,
+        proofMissingReasons: ['no_operator_witnesses_emitted'],
+        edgesComplete: true,
+      },
+    });
+    expect(identity).toBeDefined();
+    expect(identity!.completenessDeclaration).toBeDefined();
+    expect(identity!.completenessDeclaration!['completenessVersion']).toBe(1);
+    expect(identity!.completenessDeclaration!['kind']).toBe('structural');
+    expect(identity!.completenessDeclaration!['isProofReady']).toBe(false);
+  });
+
+  it('Phase 2: absent completenessDeclaration is undefined (not null)', () => {
+    const identity = parseSterlingIdentity({
+      trace_bundle_hash: 'abc',
+    });
+    expect(identity).toBeDefined();
+    expect(identity!.completenessDeclaration).toBeUndefined();
   });
 });

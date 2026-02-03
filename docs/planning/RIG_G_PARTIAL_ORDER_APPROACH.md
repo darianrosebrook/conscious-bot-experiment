@@ -1,5 +1,7 @@
 # Rig G: Feasibility Under Constraints and Partial-Order Structure — Companion Approach
 
+**Implementation**: Partial — partial-order-plan, dag-builder, constraint-model, feasibility-checker, linearization exist in `planning/constraints/`
+
 This companion document distills the implementation plan with design decisions, boundaries, and implementation construction constraints. Read alongside `RIG_G_PARTIAL_ORDER_PLAN.md`.
 
 ---

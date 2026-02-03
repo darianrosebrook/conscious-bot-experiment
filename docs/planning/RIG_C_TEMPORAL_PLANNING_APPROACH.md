@@ -1,5 +1,7 @@
 # Rig C: Temporal Planning with Capacity and Batching — Companion Approach
 
+**Implementation**: Partial — temporal enrichment, time-state, duration-model, capacity-manager, batch-operators exist in `planning/temporal/`
+
 This companion document distills the implementation plan with explicit design decisions, boundaries, **concrete code references**, and implementation construction constraints so implementers cannot easily implement incorrectly. Read alongside `RIG_C_TEMPORAL_PLANNING_PLAN.md`.
 
 ---

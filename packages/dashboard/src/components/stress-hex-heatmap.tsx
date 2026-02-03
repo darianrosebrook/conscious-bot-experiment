@@ -16,8 +16,6 @@
  * @author @darianrosebrook
  */
 
-'use client';
-
 import React, { useMemo } from 'react';
 import { cn } from '@/lib/utils';
 import {
@@ -44,8 +42,22 @@ const DIRS: Axial[] = [
   { q: 0, r: 1 },
 ];
 
-const AXIS_LABELS = ['Time', 'Situational', 'Health', 'Resource', 'Protection', 'Location'] as const;
-const AXIS_KEYS = ['time', 'situational', 'healthHunger', 'resource', 'protection', 'locationDistance'] as const;
+const AXIS_LABELS = [
+  'Time',
+  'Situational',
+  'Health',
+  'Resource',
+  'Protection',
+  'Location',
+] as const;
+const AXIS_KEYS = [
+  'time',
+  'situational',
+  'healthHunger',
+  'resource',
+  'protection',
+  'locationDistance',
+] as const;
 
 export interface StressAxes {
   time: number;
@@ -241,9 +253,7 @@ export function StressHexHeatmap({
 
   return (
     <div className={cn(s.root, className)}>
-      <div className={s.label}>
-        Stress (center=low, edge=high)
-      </div>
+      <div className={s.label}>Stress (center=low, edge=high)</div>
       <div className={s.sublabel}>
         {hasAxes
           ? 'Radial = composite stress. Sector = dominant axis: Time, Situational, Health, Resource, Protection, Location.'
@@ -291,31 +301,33 @@ export function StressHexHeatmap({
                         Stress {stressRange} &middot; {label}
                       </div>
                       <div className={s.tooltipDwell}>
-                        Dwell: {hex.dwell} {hex.dwell === 1 ? 'visit' : 'visits'}
+                        Dwell: {hex.dwell}{' '}
+                        {hex.dwell === 1 ? 'visit' : 'visits'}
                       </div>
                     </div>
                   </TooltipContent>
                 </TooltipPrimitive.Root>
               );
             })}
-            {hasAxes && AXIS_LABELS.map((label, i) => {
-              const angle = (i * 60 - 90) * (Math.PI / 180);
-              const lx = labelRadius * Math.cos(angle);
-              const ly = labelRadius * Math.sin(angle);
-              return (
-                <text
-                  key={label}
-                  x={lx}
-                  y={ly}
-                  textAnchor="middle"
-                  dominantBaseline="middle"
-                  className={s.axisLabel}
-                  style={{ fontSize: 8 }}
-                >
-                  {label}
-                </text>
-              );
-            })}
+            {hasAxes &&
+              AXIS_LABELS.map((label, i) => {
+                const angle = (i * 60 - 90) * (Math.PI / 180);
+                const lx = labelRadius * Math.cos(angle);
+                const ly = labelRadius * Math.sin(angle);
+                return (
+                  <text
+                    key={label}
+                    x={lx}
+                    y={ly}
+                    textAnchor="middle"
+                    dominantBaseline="middle"
+                    className={s.axisLabel}
+                    style={{ fontSize: 8 }}
+                  >
+                    {label}
+                  </text>
+                );
+              })}
           </g>
         </svg>
       </TooltipProvider>

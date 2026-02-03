@@ -1,5 +1,7 @@
 # Minecraft Interface Client: Resilience Evaluation
 
+> **Status: Historical evaluation.** This documents the state at time of fixes. For current resilience posture, see connection handling in `packages/minecraft-interface/` and circuit breaker implementation in `packages/core/src/utils/`.
+
 **Purpose**: Evaluate the recent timeout/health-check fixes and whether the system is resilient or brittle. No code changes in this doc; assessment and recommendations only.
 
 ---

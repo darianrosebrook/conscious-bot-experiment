@@ -3,6 +3,7 @@
 **Primitive**: P3 — Temporal planning with durations, batching, and capacity
 
 **Status**: ENRICHED (2025-01-31)
+**Implementation**: Partial — temporal enrichment, time-state, duration-model, capacity-manager, batch-operators exist in `planning/temporal/`
 
 ---
 

@@ -85,6 +85,8 @@ function createMockService(overrides?: {
       error: overrides?.error,
     }),
     reportEpisode: vi.fn(),
+    getConnectionNonce: vi.fn().mockReturnValue(1),
+    registerDomainDeclaration: vi.fn().mockResolvedValue({ success: true }),
   } as unknown as SterlingReasoningService;
 }
 

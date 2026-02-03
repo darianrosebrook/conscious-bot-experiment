@@ -12,6 +12,8 @@
  */
 
 import { BaseDomainSolver } from './base-domain-solver';
+import type { DomainDeclarationV1 } from './domain-declaration';
+import { SOLVER_IDS } from './solver-ids';
 import type {
   BuildingModule,
   BuildingSiteState,
@@ -29,6 +31,7 @@ import {
   attachSterlingIdentity,
 } from './solve-bundle';
 import { parseSearchHealth } from './search-health';
+import { extractSolveJoinKeys } from './episode-classification';
 
 import type { TaskStep } from '../types/task-step';
 import { buildDagFromModules, findCommutingPairs } from '../constraints/dag-builder';
@@ -43,12 +46,29 @@ import type { FeasibilityResult } from '../constraints/feasibility-checker';
 import type { RigGMode, RigGStageDecisions } from './minecraft-building-types';
 
 // ============================================================================
+// Domain Declaration
+// ============================================================================
+
+export const BUILDING_DECLARATION: DomainDeclarationV1 = {
+  declarationVersion: 1,
+  solverId: SOLVER_IDS.BUILDING,
+  contractVersion: 1,
+  implementsPrimitives: ['CB-P07'],
+  consumesFields: ['modules', 'goalModules', 'inventory', 'siteState', 'templateId', 'facing'],
+  producesFields: ['steps', 'planId', 'solveMeta', 'needsMaterials'],
+};
+
+// ============================================================================
 // Solver
 // ============================================================================
 
 export class MinecraftBuildingSolver extends BaseDomainSolver<BuildingSolveResult> {
   readonly sterlingDomain = 'building' as const;
-  readonly solverId = 'minecraft.building';
+  readonly solverId = SOLVER_IDS.BUILDING;
+
+  override getDomainDeclaration(): DomainDeclarationV1 {
+    return BUILDING_DECLARATION;
+  }
 
   protected makeUnavailableResult(): BuildingSolveResult {
     return {
@@ -80,6 +100,7 @@ export class MinecraftBuildingSolver extends BaseDomainSolver<BuildingSolveResul
     executionMode?: string
   ): Promise<BuildingSolveResult> {
     if (!this.isAvailable()) return this.makeUnavailableResult();
+    await this.ensureDeclarationRegistered();
 
     if (modules.length === 0) {
       return {
@@ -172,6 +193,7 @@ export class MinecraftBuildingSolver extends BaseDomainSolver<BuildingSolveResul
         needsMaterials,
         planId,
         solveMeta: { bundles: [solveBundle] },
+        solveJoinKeys: planId ? extractSolveJoinKeys(solveBundle, planId) : undefined,
       };
     }
 
@@ -197,6 +219,7 @@ export class MinecraftBuildingSolver extends BaseDomainSolver<BuildingSolveResul
         error: result.error || 'No building solution found',
         planId,
         solveMeta: { bundles: [solveBundle] },
+        solveJoinKeys: planId ? extractSolveJoinKeys(solveBundle, planId) : undefined,
       };
     }
 
@@ -298,6 +321,13 @@ export class MinecraftBuildingSolver extends BaseDomainSolver<BuildingSolveResul
     const solveBundle = createSolveBundle(bundleInput, bundleOutput, compatReport);
     attachSterlingIdentity(solveBundle, sterlingIdentity);
 
+    // Phase 1 observability: log identity field status once per solverId
+    this.logIdentityFieldStatus(
+      !!sterlingIdentity?.traceBundleHash,
+      !!sterlingIdentity?.engineCommitment,
+      !!sterlingIdentity?.operatorRegistryHash,
+    );
+
     return {
       solved: true,
       steps,
@@ -305,6 +335,7 @@ export class MinecraftBuildingSolver extends BaseDomainSolver<BuildingSolveResul
       durationMs: result.durationMs,
       planId,
       solveMeta: { bundles: [solveBundle] },
+      solveJoinKeys: planId ? extractSolveJoinKeys(solveBundle, planId) : undefined,
       partialOrderPlan,
       rigGSignals,
       rigGStageDecisions,
@@ -438,11 +469,7 @@ export class MinecraftBuildingSolver extends BaseDomainSolver<BuildingSolveResul
     failureReason?: string,
     planId?: string | null,
     isStub?: boolean,
-    linkage?: {
-      bundleHash?: string;
-      traceBundleHash?: string;
-      outcomeClass?: import('./solve-bundle-types').EpisodeOutcomeClass;
-    }
+    linkage?: import('./solve-bundle-types').EpisodeLinkage,
   ): Promise<import('./solve-bundle-types').EpisodeAck | undefined> {
     return this.reportEpisode({
       planId,

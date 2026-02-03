@@ -41,6 +41,8 @@ function makeMockService(): SterlingReasoningService {
       durationMs: 50,
       metrics: {},
     }),
+    getConnectionNonce: vi.fn().mockReturnValue(1),
+    registerDomainDeclaration: vi.fn().mockResolvedValue({ success: true }),
     initialize: vi.fn(),
     destroy: vi.fn(),
     getHealthStatus: vi.fn().mockReturnValue({ enabled: true }),

@@ -119,6 +119,29 @@ export async function GET(_request: NextRequest) {
       }
     }
 
+    // Reconcile requirement.have with step completion count.
+    // The planning service sometimes reports have:0 even when steps are
+    // marked done (e.g. 5/8 steps checked but have:0). Derive from steps
+    // when the reported value is clearly stale.
+    for (const task of tasks) {
+      if (
+        task.requirement &&
+        (task.requirement.kind === 'collect' || task.requirement.kind === 'mine') &&
+        Array.isArray(task.steps) &&
+        task.steps.length > 0
+      ) {
+        const completedSteps = task.steps.filter((s) => s.done).length;
+        // If steps show more progress than requirement.have, use step count
+        if (completedSteps > (task.requirement.have ?? 0)) {
+          task.requirement = {
+            ...task.requirement,
+            have: completedSteps,
+            needed: Math.max(0, (task.requirement.quantity ?? 0) - completedSteps),
+          };
+        }
+      }
+    }
+
     // Add current action as a task if executing
     if (stateData.reactiveExecutor?.currentAction) {
       const actionDescription = parseCurrentAction(

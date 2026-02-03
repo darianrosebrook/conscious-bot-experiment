@@ -1,5 +1,7 @@
 # Rig D: Multi-Strategy Acquisition — Companion Approach
 
+**Implementation**: Not started — spec only
+
 This companion document distills the implementation plan with explicit design decisions, boundaries, code references, and implementation construction constraints. Read alongside `RIG_D_MULTI_STRATEGY_PLAN.md`.
 
 ---

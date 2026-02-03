@@ -3,6 +3,7 @@
 **Primitive**: P8 — Systems synthesis (compose components to satisfy a behavioral spec)
 
 **Status**: ENRICHED (2026-01-31)
+**Implementation**: Not started — spec only
 
 ---
 

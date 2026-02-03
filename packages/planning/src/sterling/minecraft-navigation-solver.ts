@@ -15,6 +15,7 @@
  */
 
 import { BaseDomainSolver } from './base-domain-solver';
+import { SOLVER_IDS } from './solver-ids';
 import type { SterlingDomain } from '@conscious-bot/core';
 import type {
   OccupancyGrid,
@@ -41,6 +42,7 @@ import {
   attachSterlingIdentity,
 } from './solve-bundle';
 import { parseSearchHealth } from './search-health';
+import { extractSolveJoinKeys } from './episode-classification';
 import type {
   SolveBundleInput,
   CompatReport,
@@ -54,7 +56,7 @@ import { DEFAULT_OBJECTIVE_WEIGHTS } from './solve-bundle-types';
 
 export class MinecraftNavigationSolver extends BaseDomainSolver<NavigationSolveResult> {
   readonly sterlingDomain = 'navigation' as SterlingDomain;
-  readonly solverId = 'minecraft.navigation';
+  readonly solverId = SOLVER_IDS.NAVIGATION;
 
   protected makeUnavailableResult(): NavigationSolveResult {
     return {
@@ -198,6 +200,7 @@ export class MinecraftNavigationSolver extends BaseDomainSolver<NavigationSolveR
         error: result.error || 'No path found',
         planId,
         solveMeta: { bundles: [solveBundle] },
+        solveJoinKeys: planId ? extractSolveJoinKeys(solveBundle, planId) : undefined,
       };
     }
 
@@ -230,6 +233,7 @@ export class MinecraftNavigationSolver extends BaseDomainSolver<NavigationSolveR
       replansUsed: 0,
       planId,
       solveMeta: { bundles: [solveBundle] },
+      solveJoinKeys: planId ? extractSolveJoinKeys(solveBundle, planId) : undefined,
     };
   }
 
@@ -242,11 +246,7 @@ export class MinecraftNavigationSolver extends BaseDomainSolver<NavigationSolveR
     success: boolean,
     primitivesCompleted: number,
     planId?: string | null,
-    linkage?: {
-      bundleHash?: string;
-      traceBundleHash?: string;
-      outcomeClass?: import('./solve-bundle-types').EpisodeOutcomeClass;
-    }
+    linkage?: import('./solve-bundle-types').EpisodeLinkage,
   ): Promise<import('./solve-bundle-types').EpisodeAck | undefined> {
     return this.reportEpisode({
       planId,

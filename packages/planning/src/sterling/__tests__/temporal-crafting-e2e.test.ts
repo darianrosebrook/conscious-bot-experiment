@@ -156,6 +156,8 @@ function createMockService(response?: Record<string, unknown>) {
     solve,
     isAvailable: () => true,
     available: true,
+    getConnectionNonce: () => 1,
+    registerDomainDeclaration: vi.fn(async () => ({ success: true })),
   };
 }
 
@@ -177,6 +179,8 @@ function createStrictMockService(
     solve,
     isAvailable: () => true,
     available: true,
+    getConnectionNonce: vi.fn().mockReturnValue(1),
+    registerDomainDeclaration: vi.fn(async () => ({ success: true })),
   };
 }
 

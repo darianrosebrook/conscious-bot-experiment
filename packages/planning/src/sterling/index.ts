@@ -2,8 +2,12 @@
  * Sterling reasoning integration for planning
  */
 
+// Solver ID constants (single source of truth)
+export { SOLVER_IDS, isValidSolverId, getAcquisitionStrategySolverId } from './solver-ids';
+export type { SolverId } from './solver-ids';
+
 export { BaseDomainSolver } from './base-domain-solver';
-export type { BaseSolveResult } from './base-domain-solver';
+export type { BaseSolveResult, DeclarationMode } from './base-domain-solver';
 
 export { SterlingReasoningService } from './sterling-reasoning-service';
 export type {
@@ -13,7 +17,7 @@ export type {
 } from './sterling-reasoning-service';
 
 // Minecraft crafting domain
-export { MinecraftCraftingSolver } from './minecraft-crafting-solver';
+export { MinecraftCraftingSolver, CRAFTING_DECLARATION } from './minecraft-crafting-solver';
 export {
   buildCraftingRules,
   inventoryToRecord,
@@ -29,7 +33,7 @@ export type {
 } from './minecraft-crafting-types';
 
 // Minecraft building domain
-export { MinecraftBuildingSolver } from './minecraft-building-solver';
+export { MinecraftBuildingSolver, BUILDING_DECLARATION } from './minecraft-building-solver';
 export {
   buildModulesWithFeasibility,
   inventoryForBuilding,
@@ -70,7 +74,7 @@ export type {
 export { FURNACE_HASH_EXCLUDED_FIELDS } from './minecraft-furnace-types';
 
 // Minecraft tool progression domain
-export { MinecraftToolProgressionSolver } from './minecraft-tool-progression-solver';
+export { MinecraftToolProgressionSolver, TOOL_PROGRESSION_DECLARATION } from './minecraft-tool-progression-solver';
 export {
   buildToolProgressionRules,
   detectCurrentTier,
@@ -100,7 +104,7 @@ export {
 } from './minecraft-tool-progression-types';
 
 // Minecraft acquisition domain (Rig D)
-export { MinecraftAcquisitionSolver } from './minecraft-acquisition-solver';
+export { MinecraftAcquisitionSolver, ACQUISITION_DECLARATION } from './minecraft-acquisition-solver';
 export { buildTradeRules, buildLootRules, buildSalvageRules } from './minecraft-acquisition-solver';
 export {
   buildAcquisitionContext,
@@ -179,6 +183,12 @@ export type {
   ObjectiveWeights,
   ObjectiveWeightsSource,
   SolveRationale,
+  EpisodeLinkage,
+  EpisodeOutcomeClass,
+  OutcomeClassSource,
+  ClassifiedOutcome,
+  EpisodeAck,
+  SolveJoinKeys,
 } from './solve-bundle-types';
 export { DEFAULT_OBJECTIVE_WEIGHTS } from './solve-bundle-types';
 export type { LintableRule, LintContext } from './compat-linter';
@@ -198,6 +208,19 @@ export {
 } from './solve-bundle';
 export { lintRules, lintGoal } from './compat-linter';
 export { parseSearchHealth, detectHeuristicDegeneracy } from './search-health';
+
+// Domain declarations (Phase 2A)
+export type { DomainDeclarationV1 } from './domain-declaration';
+export {
+  computeDeclarationDigest,
+  computeRegistrationDigest,
+  validateDeclaration,
+  buildRegisterMessage,
+  buildGetMessage,
+} from './domain-declaration';
+
+// Episode classification (Phase 2C)
+export { classifyOutcome, extractSolveJoinKeys, buildEpisodeLinkage } from './episode-classification';
 
 // P21 Primitive Capsule (contract types + reference fixtures only)
 export type {

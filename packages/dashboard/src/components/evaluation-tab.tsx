@@ -8,8 +8,6 @@
  * @author @darianrosebrook
  */
 
-'use client';
-
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   Activity,
@@ -24,6 +22,7 @@ import { Section } from './section';
 import { InteroTimelineChart } from './intero-timeline-chart';
 import { SparklineChart, type SparklinePoint } from './sparkline-chart';
 import { InteroCurrentSnapshot } from './intero-current-snapshot';
+import { ValuationPanel } from './valuation-panel';
 import { cn } from '@/lib/utils';
 import s from './evaluation-tab.module.scss';
 import type { InteroSnapshot, ServiceHealthStatus, Task } from '@/types';
@@ -62,8 +61,11 @@ const REFRESH_INTERVAL = 30_000;
 
 export function EvaluationTab() {
   const [snapshots, setSnapshots] = useState<InteroSnapshot[]>([]);
-  const [currentIntero, setCurrentIntero] = useState<InteroSnapshot | null>(null);
-  const [boundaryStats, setBoundaryStats] = useState<BoundaryStatsResponse | null>(null);
+  const [currentIntero, setCurrentIntero] = useState<InteroSnapshot | null>(
+    null
+  );
+  const [boundaryStats, setBoundaryStats] =
+    useState<BoundaryStatsResponse | null>(null);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [tasksFallback, setTasksFallback] = useState(false);
   const [services, setServices] = useState<ServiceHealthStatus[]>([]);
@@ -71,18 +73,16 @@ export function EvaluationTab() {
 
   const fetchAll = useCallback(async () => {
     const results = await Promise.allSettled([
-      fetch('/api/intero/history?limit=300').then((r) => r.json()) as Promise<InteroHistoryResponse>,
+      fetch('/api/intero/history?limit=300').then((r) =>
+        r.json()
+      ) as Promise<InteroHistoryResponse>,
       fetch('/api/tasks').then((r) => r.json()) as Promise<TasksResponse>,
-      fetch('/api/service-health').then((r) => r.json()) as Promise<ServiceHealthResponse>,
-      fetch('/api/intero/history?limit=0')
-        .then((r) => r.json())
-        .then(() =>
-          // boundary stats go through the cognition service directly via proxy
-          fetch(
-            `${typeof window !== 'undefined' ? '' : 'http://localhost:3003'}/api/intero/history?limit=0`
-          )
-        )
-        .catch(() => null),
+      fetch('/api/service-health').then((r) =>
+        r.json()
+      ) as Promise<ServiceHealthResponse>,
+      fetch('/api/intero/boundary-stats', {
+        signal: AbortSignal.timeout(3000),
+      }).then((r) => r.json()) as Promise<BoundaryStatsResponse>,
     ]);
 
     // Intero history
@@ -119,19 +119,10 @@ export function EvaluationTab() {
       if (data.services) setServices(data.services);
     }
 
-    // Boundary stats — fetch directly from cognition proxy
-    try {
-      const cognitionUrl =
-        process.env.NEXT_PUBLIC_COGNITION_URL || 'http://localhost:3003';
-      const bsRes = await fetch(`${cognitionUrl}/intero/boundary-stats`, {
-        signal: AbortSignal.timeout(3000),
-      }).catch(() => null);
-      if (bsRes?.ok) {
-        const bsData = await bsRes.json();
-        setBoundaryStats(bsData);
-      }
-    } catch {
-      // Boundary stats unavailable
+    // Boundary stats
+    if (results[3].status === 'fulfilled') {
+      const data = results[3].value;
+      if (data.success !== false) setBoundaryStats(data);
     }
 
     setLastRefresh(Date.now());
@@ -227,35 +218,25 @@ export function EvaluationTab() {
           {tasksFallback ? (
             <div className={s.fallbackCenter}>
               <Server className={s.fallbackIcon} />
-              <p className={s.fallbackText}>
-                Planning service offline
-              </p>
+              <p className={s.fallbackText}>Planning service offline</p>
             </div>
           ) : (
             <div className={s.statsGrid}>
               <div className={s.statCard}>
                 <div className={s.statLabel}>Total</div>
-                <div className={s.statValueDefault}>
-                  {tasks.length}
-                </div>
+                <div className={s.statValueDefault}>{tasks.length}</div>
               </div>
               <div className={s.statCard}>
                 <div className={s.statLabel}>Completed</div>
-                <div className={s.statValueGreen}>
-                  {completedTasks.length}
-                </div>
+                <div className={s.statValueGreen}>{completedTasks.length}</div>
               </div>
               <div className={s.statCard}>
                 <div className={s.statLabel}>Failed</div>
-                <div className={s.statValueRed}>
-                  {failedTasks.length}
-                </div>
+                <div className={s.statValueRed}>{failedTasks.length}</div>
               </div>
               <div className={s.statCard}>
                 <div className={s.statLabel}>Success Rate</div>
-                <div className={s.statValueDefault}>
-                  {successRate}%
-                </div>
+                <div className={s.statValueDefault}>{successRate}%</div>
               </div>
             </div>
           )}
@@ -320,26 +301,20 @@ export function EvaluationTab() {
                   key={svc.name}
                   className={cn(
                     s.serviceBadge,
-                    svc.status === 'up'
-                      ? s.serviceBadgeUp
-                      : s.serviceBadgeDown
+                    svc.status === 'up' ? s.serviceBadgeUp : s.serviceBadgeDown
                   )}
                 >
                   <span
                     className={cn(
                       s.serviceDot,
-                      svc.status === 'up'
-                        ? s.serviceDotUp
-                        : s.serviceDotDown
+                      svc.status === 'up' ? s.serviceDotUp : s.serviceDotDown
                     )}
                   />
                   {svc.name}
                 </div>
               ))
             ) : (
-              <div className={s.healthChecking}>
-                Checking services...
-              </div>
+              <div className={s.healthChecking}>Checking services...</div>
             )}
           </div>
           {lastRefresh > 0 && (
@@ -348,6 +323,9 @@ export function EvaluationTab() {
             </div>
           )}
         </Section>
+
+        {/* Valuation Observability */}
+        <ValuationPanel />
 
         {/* Recent Task History */}
         <Section
@@ -358,10 +336,7 @@ export function EvaluationTab() {
           {tasks.length > 0 ? (
             <div className={s.taskList}>
               {tasks.slice(0, 10).map((task) => (
-                <div
-                  key={task.id}
-                  className={s.taskRow}
-                >
+                <div key={task.id} className={s.taskRow}>
                   <span
                     className={cn(
                       s.taskDot,
@@ -372,9 +347,7 @@ export function EvaluationTab() {
                           : s.taskDotPending
                     )}
                   />
-                  <span className={s.taskTitle}>
-                    {task.title}
-                  </span>
+                  <span className={s.taskTitle}>{task.title}</span>
                   <span
                     className={
                       task.progress >= 1

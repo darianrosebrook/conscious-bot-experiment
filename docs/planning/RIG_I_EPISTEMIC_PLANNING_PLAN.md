@@ -3,6 +3,7 @@
 **Primitive**: P11 — Epistemic planning (belief-state and active sensing)
 
 **Status**: ENRICHED (2025-01-31)
+**Implementation**: Partial — P21/Rig I-ext evidence capsule types exist in `planning/sterling/primitives/p21/`
 
 ---
 

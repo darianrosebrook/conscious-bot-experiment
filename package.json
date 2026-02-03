@@ -48,6 +48,8 @@
     "docker:ps": "docker compose ps",
     "docker:logs": "docker compose logs -f",
     "benchmark:mlx": "node scripts/benchmark-mlx.js",
+    "moc": "python3 scripts/utils/generate_core_inventory.py",
+    "moc:dry-run": "python3 scripts/utils/generate_core_inventory.py --dry-run --no-ai",
     "test:p21": "pnpm --filter @conscious-bot/testkits test:p21 && pnpm --filter @conscious-bot/minecraft-interface test:p21"
   },
   "workspaces": [

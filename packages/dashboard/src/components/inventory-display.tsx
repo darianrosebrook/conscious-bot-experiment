@@ -1,14 +1,15 @@
 /**
  * Inventory Display Component
  *
- * Displays the bot's current inventory items with sprites, counts, and durability.
+ * Displays the bot's main inventory (slots 9-44) and item details.
+ * The hotbar (slots 0-8) is rendered by ViewerHudOverlay as a stream overlay.
  *
  * @author @darianrosebrook
  */
 
-import React from 'react';
+import React, { useState } from 'react';
 import Image from 'next/image';
-import { Package } from 'lucide-react';
+import { ChevronDown, ChevronUp, Package } from 'lucide-react';
 import { Section } from './section';
 import { EmptyState } from './empty-state';
 import { getItemSprite, getFallbackSprite } from '@/lib/minecraft-sprites';
@@ -126,24 +127,31 @@ export const InventoryDisplay: React.FC<InventoryDisplayProps> = ({
   selectedSlot = 0,
   className = '',
 }) => {
-  const hotbarItems = inventory.filter((item) => item.slot >= 0 && item.slot <= 8);
+  const [expanded, setExpanded] = useState(false);
   const mainInventoryItems = inventory.filter((item) => item.slot >= 9 && item.slot <= 44);
+  const totalItems = inventory.length;
 
   return (
-    <Section title="Inventory" icon={<Package className="size-4" />} className={className}>
-      {inventory.length === 0 ? (
+    <Section
+      title="Inventory"
+      icon={<Package className="size-4" />}
+      className={className}
+      actions={
+        totalItems > 0 ? (
+          <button
+            onClick={() => setExpanded((prev) => !prev)}
+            className={s.expandToggle}
+          >
+            {totalItems} items
+            {expanded ? <ChevronUp className={s.toggleIcon} /> : <ChevronDown className={s.toggleIcon} />}
+          </button>
+        ) : null
+      }
+    >
+      {!expanded ? null : inventory.length === 0 ? (
         <EmptyState icon={Package} title="No items in inventory" description="The bot's inventory is empty." />
       ) : (
         <div className={s.spacer}>
-          <div>
-            <h4 className={s.sectionTitle}>Hotbar</h4>
-            <div className={s.grid9}>
-              {Array.from({ length: 9 }, (_, index) => {
-                const item = hotbarItems.find((item) => item.slot === index);
-                return <SlotCell key={index} item={item} isSelected={selectedSlot === index} slotLabel={`${index + 1}`} />;
-              })}
-            </div>
-          </div>
           <div>
             <h4 className={s.sectionTitle}>Main Inventory</h4>
             <div className={s.grid9}>

@@ -1,0 +1,18 @@
+=== Agency Emission Soak Test ===
+Duration: 5 minutes
+Cognition: http://localhost:3003
+Planning: http://localhost:3002
+Log: /Users/darianrosebrook/Desktop/Projects/conscious-bot/scripts/../docs/testing/soak-results/soak-20260202-142430.log
+Started: 2026-02-02T22:24:30Z
+---
+[pre-check] Verifying service health...
+  Cognition: healthy
+  Planning: healthy
+
+[pre-check] Bot state...
+  (could not reach MC interface)
+
+[t=0] Capturing initial state...
+  Recent thoughts: 5
+
+[t=0m sample=1]

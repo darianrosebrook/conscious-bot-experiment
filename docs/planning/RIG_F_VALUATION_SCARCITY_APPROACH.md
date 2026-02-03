@@ -1,5 +1,7 @@
 # Rig F: Goal-Conditioned Valuation Under Scarcity — Companion Approach
 
+**Implementation**: Not started — spec only
+
 This companion document distills the implementation plan with design decisions, boundaries, and implementation construction constraints. Read alongside `RIG_F_VALUATION_SCARCITY_PLAN.md`.
 
 ---

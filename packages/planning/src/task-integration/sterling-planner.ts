@@ -11,6 +11,7 @@ import type { MinecraftCraftingSolver } from '../sterling/minecraft-crafting-sol
 import type { MinecraftBuildingSolver } from '../sterling/minecraft-building-solver';
 import type { MinecraftToolProgressionSolver } from '../sterling/minecraft-tool-progression-solver';
 import type { MinecraftAcquisitionSolver } from '../sterling/minecraft-acquisition-solver';
+import { SOLVER_IDS } from '../sterling/solver-ids';
 import { resolveRequirement } from '../modules/requirements';
 import type { TaskRequirement } from '../modules/requirements';
 import { routeActionPlan } from '../modules/action-plan-backend';
@@ -284,13 +285,13 @@ export class SterlingPlanner {
   }
 
   private get craftingSolver(): MinecraftCraftingSolver | undefined {
-    return this.solverRegistry.get('minecraft.crafting') as
+    return this.solverRegistry.get(SOLVER_IDS.CRAFTING) as
       | MinecraftCraftingSolver
       | undefined;
   }
 
   private get buildingSolver(): MinecraftBuildingSolver | undefined {
-    return this.solverRegistry.get('minecraft.building') as
+    return this.solverRegistry.get(SOLVER_IDS.BUILDING) as
       | MinecraftBuildingSolver
       | undefined;
   }
@@ -298,7 +299,7 @@ export class SterlingPlanner {
   private get toolProgressionSolver():
     | MinecraftToolProgressionSolver
     | undefined {
-    return this.solverRegistry.get('minecraft.tool_progression') as
+    return this.solverRegistry.get(SOLVER_IDS.TOOL_PROGRESSION) as
       | MinecraftToolProgressionSolver
       | undefined;
   }
@@ -306,7 +307,7 @@ export class SterlingPlanner {
   private get acquisitionSolver():
     | MinecraftAcquisitionSolver
     | undefined {
-    return this.solverRegistry.get('minecraft.acquisition') as
+    return this.solverRegistry.get(SOLVER_IDS.ACQUISITION) as
       | MinecraftAcquisitionSolver
       | undefined;
   }
@@ -595,6 +596,10 @@ export class SterlingPlanner {
     if (result.planId) {
       ensureSolverMeta(taskData).craftingPlanId = result.planId;
     }
+    if (result.solveJoinKeys) {
+      // Per-domain keys prevent cross-solver clobbering
+      ensureSolverMeta(taskData).craftingSolveJoinKeys = result.solveJoinKeys;
+    }
     if (result.mappingDegraded) {
       const solverMeta = ensureSolverMeta(taskData);
       solverMeta.mappingDegraded = true;
@@ -657,6 +662,10 @@ export class SterlingPlanner {
 
     if (result.planId) {
       ensureSolverMeta(taskData).toolProgressionPlanId = result.planId;
+    }
+    if (result.solveJoinKeys) {
+      // Per-domain keys prevent cross-solver clobbering
+      ensureSolverMeta(taskData).toolProgressionSolveJoinKeys = result.solveJoinKeys;
     }
     if (result.mappingDegraded) {
       const solverMeta = ensureSolverMeta(taskData);
@@ -728,6 +737,10 @@ export class SterlingPlanner {
     const solverMeta = ensureSolverMeta(taskData);
     solverMeta.buildingPlanId = result.planId ?? undefined;
     solverMeta.buildingTemplateId = templateId;
+    if (result.solveJoinKeys) {
+      // Per-domain keys prevent cross-solver clobbering
+      solverMeta.buildingSolveJoinKeys = result.solveJoinKeys;
+    }
 
     // Store Rig G metadata for feasibility gating in startTaskStep
     if (result.rigGSignals) {
@@ -819,16 +832,24 @@ export class SterlingPlanner {
 
     const nearbyEntities = (taskData.metadata as any)?.currentState?.nearbyEntities || [];
 
+    // Load mcData once per solve — same precedence as Rig A (metadata override || planner cache).
+    const mcData = (taskData.metadata as any)?.mcData || this.getMcData();
+
     const result = await this.acquisitionSolver.solveAcquisition(
       goalItem,
       requirement.quantity || 1,
       inventory,
       nearbyBlocks,
       nearbyEntities,
+      undefined, // options
+      mcData,
     );
 
     if (result.planId) {
       ensureSolverMeta(taskData).acquisitionPlanId = result.planId;
+    }
+    if (result.solveJoinKeys) {
+      ensureSolverMeta(taskData).acquisitionSolveJoinKeys = result.solveJoinKeys;
     }
 
     if (!result.solved) return [];

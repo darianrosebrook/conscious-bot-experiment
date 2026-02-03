@@ -11,6 +11,7 @@
  */
 
 import { BaseDomainSolver } from './base-domain-solver';
+import { SOLVER_IDS } from './solver-ids';
 import type {
   FurnaceSchedulingSolveResult,
   FurnaceSolveStep,
@@ -28,6 +29,7 @@ import {
 } from './solve-bundle';
 import type { SolveBundle, CompatReport } from './solve-bundle-types';
 import { parseSearchHealth } from './search-health';
+import { extractSolveJoinKeys } from './episode-classification';
 import { P03ReferenceAdapter } from './primitives/p03/p03-reference-adapter';
 import { MAX_WAIT_BUCKETS } from '../temporal/time-state';
 
@@ -43,7 +45,7 @@ const MAX_NODES = 5000;
 
 export class MinecraftFurnaceSolver extends BaseDomainSolver<FurnaceSchedulingSolveResult> {
   readonly sterlingDomain = 'minecraft' as const;
-  readonly solverId = 'minecraft.furnace';
+  readonly solverId = SOLVER_IDS.FURNACE;
 
   /** Shared temporal adapter. */
   private readonly temporalAdapter = new P03ReferenceAdapter(MAX_WAIT_BUCKETS, 8);
@@ -155,6 +157,7 @@ export class MinecraftFurnaceSolver extends BaseDomainSolver<FurnaceSchedulingSo
         durationMs: sterlingResult.durationMs ?? 0,
         planId,
         solveMeta: { bundles: [bundle] },
+        solveJoinKeys: planId ? extractSolveJoinKeys(bundle, planId) : undefined,
       };
     } catch (err) {
       // Still produce a bundle on error for observability
@@ -176,6 +179,7 @@ export class MinecraftFurnaceSolver extends BaseDomainSolver<FurnaceSchedulingSo
         durationMs: 0,
         error: err instanceof Error ? err.message : String(err),
         solveMeta: { bundles: [bundle] },
+        // No solveJoinKeys — planId is null in error path
       };
     }
   }
@@ -286,11 +290,7 @@ export class MinecraftFurnaceSolver extends BaseDomainSolver<FurnaceSchedulingSo
     itemsSmelted: number,
     planId?: string | null,
     failureReason?: string,
-    linkage?: {
-      bundleHash?: string;
-      traceBundleHash?: string;
-      outcomeClass?: import('./solve-bundle-types').EpisodeOutcomeClass;
-    }
+    linkage?: import('./solve-bundle-types').EpisodeLinkage,
   ): Promise<import('./solve-bundle-types').EpisodeAck | undefined> {
     return this.reportEpisode({
       planId: planId ?? undefined,

@@ -91,7 +91,12 @@ async function loadThoughts(): Promise<CognitiveThought[]> {
     await ensureDataDirectory(targetPath);
     const data = await fs.readFile(targetPath, 'utf-8');
     const thoughts = JSON.parse(data);
-    return Array.isArray(thoughts) ? thoughts : [];
+    if (!Array.isArray(thoughts)) return [];
+    // Backfill displayContent for older persisted thoughts that lack it
+    return thoughts.map((t: CognitiveThought) => {
+      if (t.displayContent) return t;
+      return { ...t, displayContent: cleanDisplayContent(t.content) };
+    });
   } catch (error) {
     // File doesn't exist or is invalid, start with empty array
     console.log('No existing thoughts file found, starting fresh');
@@ -510,10 +515,16 @@ export const GET = async (req: NextRequest) => {
           Number.isFinite(Number(initLimitParam)) ? Number(initLimitParam) : 50
         )
       );
+      // Ensure every thought has displayContent populated (older persisted
+      // thoughts may be missing it, causing GOAL tags to leak through).
+      const initThoughts = thoughtHistory.slice(-initLimit).map((t) => {
+        if (t.displayContent) return t;
+        return { ...t, displayContent: cleanDisplayContent(t.content) };
+      });
       const initialData = {
         type: 'cognitive_stream_init',
         timestamp: Date.now(),
-        data: { thoughts: thoughtHistory.slice(-initLimit) },
+        data: { thoughts: initThoughts },
       };
 
       // Only log in development mode
@@ -938,6 +949,35 @@ export const POST = async (req: NextRequest) => {
         }),
         { headers: { 'Content-Type': 'application/json' } }
       );
+    }
+
+    // Deduplicate cross-type repeats: the cognition pipeline emits the same
+    // semantic message under different types (e.g. "drive-tick" and "internal"
+    // with a [GOAL:] tag). Canonicalize by stripping GOAL tags and comparing
+    // regardless of type with a 3-minute window.
+    const crossTypeCutoff = Date.now() - 180_000; // 3 minutes
+    const canonicalNoGoal = canonicalContent.replace(GOAL_TAG_RE, '').replace(/\s+/g, ' ').trim();
+    if (canonicalNoGoal) {
+      const crossTypeDup = thoughtHistory.find(
+        (old) =>
+          old.timestamp > crossTypeCutoff &&
+          old.content
+            .toLowerCase()
+            .replace(GOAL_TAG_RE, '')
+            .replace(/\s+/g, ' ')
+            .trim() === canonicalNoGoal
+      );
+      if (crossTypeDup) {
+        return new Response(
+          JSON.stringify({
+            success: true,
+            deduplicated: true,
+            id: crossTypeDup.id,
+            reason: 'cross_type_dedup',
+          }),
+          { headers: { 'Content-Type': 'application/json' } }
+        );
+      }
     }
 
     // Deduplicate: skip if identical content+type was added within the last 30s

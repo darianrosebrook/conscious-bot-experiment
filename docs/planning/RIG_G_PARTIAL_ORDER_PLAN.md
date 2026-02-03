@@ -3,6 +3,7 @@
 **Primitive**: P7 — Feasibility under constraints and partial-order structure
 
 **Status**: ENRICHED (2026-01-31)
+**Implementation**: Partial — partial-order-plan, dag-builder, constraint-model, feasibility-checker, linearization exist in `planning/constraints/`
 
 ---
 

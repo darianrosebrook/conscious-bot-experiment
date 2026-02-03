@@ -15,6 +15,11 @@
     "test:ollama-memory": "vitest run src/__tests__/ollama-memory-integration.test.ts",
     "test:complete-flow": "vitest run src/__tests__/complete-cognitive-flow.test.ts",
     "test:asset-memory": "vitest run src/asset/__tests__/asset-memory-acceptance.test.ts",
+    "test:reflection-contract": "vitest run src/__tests__/reflection-persistence-contract.test.ts",
+    "test:reflection-integration": "POSTGRES_AVAILABLE=true MEMORY_ALLOW_DEDUPE_CLEANUP=true vitest run src/__tests__/reflection-persistence-integration.test.ts",
+    "soak:pipeline": "tsx src/__tests__/reflection-soak-harness.ts --pipeline",
+    "soak:quality": "tsx src/__tests__/reflection-soak-harness.ts --quality",
+    "soak:both": "tsx src/__tests__/reflection-soak-harness.ts --both",
     "lint": "eslint src/**/*.ts",
     "type-check": "tsc --noEmit"
   },

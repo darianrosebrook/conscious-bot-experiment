@@ -30,6 +30,7 @@
  */
 
 import type { CompatReport, CompatIssue } from './solve-bundle-types';
+import { SOLVER_IDS } from './solver-ids';
 
 // ============================================================================
 // Lintable Types
@@ -257,7 +258,7 @@ export function lintRules(rules: LintableRule[], context?: LintContext): CompatR
     // FURNACE_OVERCAPACITY — gated behind furnace solverId
     // Detects furnace load rules that don't properly track slot occupancy.
     // Fail-closed: if capacity cannot be proven from state, reject.
-    if (context?.solverId === 'minecraft.furnace') {
+    if (context?.solverId === SOLVER_IDS.FURNACE) {
       if (
         rule.action.startsWith('furnace:load:') &&
         rule.consumes.length === 0
@@ -277,7 +278,7 @@ export function lintRules(rules: LintableRule[], context?: LintContext): CompatR
     // masquerading as a Minecraft solver.
 
     const acqHardeningEnabled = context?.enableAcqHardening
-      || context?.solverId === 'minecraft.acquisition';
+      || context?.solverId === SOLVER_IDS.ACQUISITION;
 
     if (acqHardeningEnabled) {
       // TRADE_REQUIRES_ENTITY — acq:trade:* must have proximity:villager in requires
@@ -355,7 +356,7 @@ export function lintRules(rules: LintableRule[], context?: LintContext): CompatR
   // rules.length for backwards compatibility. This distinction is critical:
   // mine/craft delegation produces 0 rules but is valid (child solver handles them).
   const acqCheckEnabled = context?.enableAcqHardening
-    || context?.solverId === 'minecraft.acquisition';
+    || context?.solverId === SOLVER_IDS.ACQUISITION;
   const effectiveCandidateCount = context?.candidateCount ?? rules.length;
   if (acqCheckEnabled && effectiveCandidateCount === 0) {
     issues.push({

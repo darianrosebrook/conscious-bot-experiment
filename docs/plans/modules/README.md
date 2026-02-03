@@ -73,6 +73,6 @@ This directory contains implementation specifications for all modules, organized
 
 ## Strategic Documents
 
-- [Integration Strategy](../../strategy/integration_strategy.md) — cross-module coordination
-- [Risk Management](../../strategy/risk_management.md) — risk assessment and mitigation
-- [Verification Framework](../../strategy/verification_framework.md) — quality assurance methodology
+- [Strategy Overview](../../strategy/README.md) — strategic principles and current references
+- [Rig Implementation Plans](../../planning/) — phased capability specifications (A-K)
+- [Sterling Capability Tracker](../../planning/sterling-capability-tracker.md) — live solver status

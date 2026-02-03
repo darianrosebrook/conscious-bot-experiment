@@ -1,0 +1,4 @@
+flask>=3.0
+flask-cors>=4.0
+umap-learn>=0.5.5
+numpy>=1.24

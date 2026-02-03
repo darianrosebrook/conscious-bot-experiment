@@ -1,0 +1,3927 @@
+[
+  {
+    "signature": "<no-component> | ERROR | [Minecraft Interface] Planning cycle error: Error: No plan available for execution",
+    "severity": "ERROR",
+    "component": "<no-component>",
+    "count": 7,
+    "first_seen_line": 203,
+    "last_seen_line": 807,
+    "examples": [
+      "[Minecraft Interface] Planning cycle error: Error: No plan available for execution",
+      "[Minecraft Interface] Planning cycle error: Error: No plan available for execution",
+      "[Minecraft Interface] Planning cycle error: Error: No plan available for execution"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "<no-component> | WARN | at async Timeout._onTimeout (/Users/darianrosebrook/Desktop/Projects/conscious-bot/packages/minecraft-interface/src/server.ts:<NUM>:11)",
+    "severity": "WARN",
+    "component": "<no-component>",
+    "count": 7,
+    "first_seen_line": 206,
+    "last_seen_line": 810,
+    "examples": [
+      "    at async Timeout._onTimeout (/Users/darianrosebrook/Desktop/Projects/conscious-bot/packages/minecraft-interface/src/server.ts:281:11)",
+      "    at async Timeout._onTimeout (/Users/darianrosebrook/Desktop/Projects/conscious-bot/packages/minecraft-interface/src/server.ts:281:11)",
+      "    at async Timeout._onTimeout (/Users/darianrosebrook/Desktop/Projects/conscious-bot/packages/minecraft-interface/src/server.ts:281:11)"
+    ],
+    "keywords": [
+      "timeout"
+    ]
+  },
+  {
+    "signature": "<no-component> | INFO | }",
+    "severity": "INFO",
+    "component": "<no-component>",
+    "count": 67,
+    "first_seen_line": 10,
+    "last_seen_line": 1045,
+    "examples": [
+      "}",
+      "}",
+      "}"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "ThreatPerception | INFO | [Minecraft Interface] [ThreatPerception] \ud83e\udde0 localized threat assessment: 0 threats, level: low",
+    "severity": "INFO",
+    "component": "ThreatPerception",
+    "count": 62,
+    "first_seen_line": 22,
+    "last_seen_line": 1036,
+    "examples": [
+      "[Minecraft Interface] [ThreatPerception] \ud83e\udde0 localized threat assessment: 0 threats, level: low",
+      "[Minecraft Interface] [ThreatPerception] \ud83e\udde0 localized threat assessment: 0 threats, level: low",
+      "[Minecraft Interface] [ThreatPerception] \ud83e\udde0 localized threat assessment: 0 threats, level: low"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "<no-component> | INFO | position: { x: 67.5, y: 63, z: -<NUM>.5 },",
+    "severity": "INFO",
+    "component": "<no-component>",
+    "count": 42,
+    "first_seen_line": 86,
+    "last_seen_line": 1042,
+    "examples": [
+      "  position: { x: 67.5, y: 63, z: -105.5 },",
+      "  position: { x: 67.5, y: 63, z: -105.5 },",
+      "  position: { x: 67.5, y: 63, z: -105.5 },"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "<no-component> | INFO | health: 20,",
+    "severity": "INFO",
+    "component": "<no-component>",
+    "count": 42,
+    "first_seen_line": 87,
+    "last_seen_line": 1043,
+    "examples": [
+      "  health: 20,",
+      "  health: 20,",
+      "  health: 20,"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "Planning | INFO | [Planning] WorldStateManager poll result: {",
+    "severity": "INFO",
+    "component": "Planning",
+    "count": 38,
+    "first_seen_line": 83,
+    "last_seen_line": 1039,
+    "examples": [
+      "[Planning] WorldStateManager poll result: {",
+      "[Planning] WorldStateManager poll result: {",
+      "[Planning] WorldStateManager poll result: {"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "<no-component> | INFO | connected: true,",
+    "severity": "INFO",
+    "component": "<no-component>",
+    "count": 38,
+    "first_seen_line": 84,
+    "last_seen_line": 1040,
+    "examples": [
+      "  connected: true,",
+      "  connected: true,",
+      "  connected: true,"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "<no-component> | INFO | hasPosition: true,",
+    "severity": "INFO",
+    "component": "<no-component>",
+    "count": 38,
+    "first_seen_line": 85,
+    "last_seen_line": 1041,
+    "examples": [
+      "  hasPosition: true,",
+      "  hasPosition: true,",
+      "  hasPosition: true,"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "<no-component> | INFO | inventoryCount: 0",
+    "severity": "INFO",
+    "component": "<no-component>",
+    "count": 38,
+    "first_seen_line": 88,
+    "last_seen_line": 1044,
+    "examples": [
+      "  inventoryCount: 0",
+      "  inventoryCount: 0",
+      "  inventoryCount: 0"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "<no-component> | INFO | WorldStateManager no meaningful change",
+    "severity": "INFO",
+    "component": "<no-component>",
+    "count": 30,
+    "first_seen_line": 170,
+    "last_seen_line": 1046,
+    "examples": [
+      "WorldStateManager no meaningful change",
+      "WorldStateManager no meaningful change",
+      "WorldStateManager no meaningful change"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "<no-component> | INFO | [Minecraft Interface] No world state available for HUD update",
+    "severity": "INFO",
+    "component": "<no-component>",
+    "count": 25,
+    "first_seen_line": 18,
+    "last_seen_line": 920,
+    "examples": [
+      "[Minecraft Interface] No world state available for HUD update",
+      "[Minecraft Interface] No world state available for HUD update",
+      "[Minecraft Interface] No world state available for HUD update"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "<no-component> | INFO | },",
+    "severity": "INFO",
+    "component": "<no-component>",
+    "count": 22,
+    "first_seen_line": 6,
+    "last_seen_line": 1022,
+    "examples": [
+      "  },",
+      "  },",
+      "  },"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "Dashboard | INFO | [Dashboard] POST /api/ws/bot-state <NUM> in 7ms",
+    "severity": "INFO",
+    "component": "Dashboard",
+    "count": 22,
+    "first_seen_line": 37,
+    "last_seen_line": 1038,
+    "examples": [
+      "[Dashboard] POST /api/ws/bot-state 200 in 7ms",
+      "[Dashboard] POST /api/ws/bot-state 200 in 7ms",
+      "[Dashboard] POST /api/ws/bot-state 200 in 7ms"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "Dashboard | INFO | [Dashboard] POST /api/ws/bot-state <NUM> in 6ms",
+    "severity": "INFO",
+    "component": "Dashboard",
+    "count": 17,
+    "first_seen_line": 235,
+    "last_seen_line": 786,
+    "examples": [
+      "[Dashboard] POST /api/ws/bot-state 200 in 6ms",
+      "[Dashboard] POST /api/ws/bot-state 200 in 6ms",
+      "[Dashboard] POST /api/ws/bot-state 200 in 6ms"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "Dashboard | INFO | [Dashboard] POST /api/ws/cognitive-stream received: {",
+    "severity": "INFO",
+    "component": "Dashboard",
+    "count": 11,
+    "first_seen_line": 210,
+    "last_seen_line": 1000,
+    "examples": [
+      "[Dashboard] POST /api/ws/cognitive-stream received: {",
+      "[Dashboard] POST /api/ws/cognitive-stream received: {",
+      "[Dashboard] POST /api/ws/cognitive-stream received: {"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "<no-component> | INFO | type: 'status',",
+    "severity": "INFO",
+    "component": "<no-component>",
+    "count": 11,
+    "first_seen_line": 211,
+    "last_seen_line": 815,
+    "examples": [
+      "  type: 'status',",
+      "  type: 'status',",
+      "  type: 'status',"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "<no-component> | INFO | content: 'Health: <NUM>%, Hunger: <NUM>%. Observing environment and deciding next action.',",
+    "severity": "INFO",
+    "component": "<no-component>",
+    "count": 11,
+    "first_seen_line": 212,
+    "last_seen_line": 816,
+    "examples": [
+      "  content: 'Health: 100%, Hunger: 100%. Observing environment and deciding next action.',",
+      "  content: 'Health: 100%, Hunger: 100%. Observing environment and deciding next action.',",
+      "  content: 'Health: 100%, Hunger: 100%. Observing environment and deciding next action.',"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "<no-component> | INFO | attribution: 'self'",
+    "severity": "INFO",
+    "component": "<no-component>",
+    "count": 10,
+    "first_seen_line": 213,
+    "last_seen_line": 1003,
+    "examples": [
+      "  attribution: 'self'",
+      "  attribution: 'self'",
+      "  attribution: 'self'"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "<no-component> | INFO | timestamp: <HEX>,",
+    "severity": "INFO",
+    "component": "<no-component>",
+    "count": 9,
+    "first_seen_line": 8,
+    "last_seen_line": 1024,
+    "examples": [
+      "  timestamp: 1769907445608,",
+      "  timestamp: 1769907475490,",
+      "  timestamp: 1769907490399,"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "<no-component> | INFO | processed: false",
+    "severity": "INFO",
+    "component": "<no-component>",
+    "count": 9,
+    "first_seen_line": 9,
+    "last_seen_line": 1025,
+    "examples": [
+      "  processed: false",
+      "  processed: false",
+      "  processed: false"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "<no-component> | INFO | Successfully sent message to 0 connections (0 dead connections removed)",
+    "severity": "INFO",
+    "component": "<no-component>",
+    "count": 9,
+    "first_seen_line": 12,
+    "last_seen_line": 1028,
+    "examples": [
+      "Successfully sent message to 0 connections (0 dead connections removed)",
+      "Successfully sent message to 0 connections (0 dead connections removed)",
+      "Successfully sent message to 0 connections (0 dead connections removed)"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "<no-component> | INFO | '\"Health: <NUM>%, Hunger: <NUM>%. Observing environment and deciding next action.\"',",
+    "severity": "INFO",
+    "component": "<no-component>",
+    "count": 9,
+    "first_seen_line": 345,
+    "last_seen_line": 739,
+    "examples": [
+      "  '\"Health: 100%, Hunger: 100%. Observing environment and deciding next action.\"',",
+      "  '\"Health: 100%, Hunger: 100%. Observing environment and deciding next action.\"',",
+      "  '\"Health: 100%, Hunger: 100%. Observing environment and deciding next action.\"',"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "Dashboard | INFO | [Dashboard] POST /api/ws/bot-state <NUM> in 8ms",
+    "severity": "INFO",
+    "component": "Dashboard",
+    "count": 8,
+    "first_seen_line": 34,
+    "last_seen_line": 759,
+    "examples": [
+      "[Dashboard] POST /api/ws/bot-state 200 in 8ms",
+      "[Dashboard] POST /api/ws/bot-state 200 in 8ms",
+      "[Dashboard] POST /api/ws/bot-state 200 in 8ms"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "Dashboard | INFO | [Dashboard] New thought added to history: {",
+    "severity": "INFO",
+    "component": "Dashboard",
+    "count": 8,
+    "first_seen_line": 215,
+    "last_seen_line": 1005,
+    "examples": [
+      "[Dashboard] New thought added to history: {",
+      "[Dashboard] New thought added to history: {",
+      "[Dashboard] New thought added to history: {"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "Dashboard | INFO | [Dashboard] POST /api/ws/bot-state <NUM> in 9ms",
+    "severity": "INFO",
+    "component": "Dashboard",
+    "count": 7,
+    "first_seen_line": 17,
+    "last_seen_line": 792,
+    "examples": [
+      "[Dashboard] POST /api/ws/bot-state 200 in 9ms",
+      "[Dashboard] POST /api/ws/bot-state 200 in 9ms",
+      "[Dashboard] POST /api/ws/bot-state 200 in 9ms"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "Planning | INFO | [Planning] WorldStateManager no meaningful change",
+    "severity": "INFO",
+    "component": "Planning",
+    "count": 7,
+    "first_seen_line": 139,
+    "last_seen_line": 805,
+    "examples": [
+      "[Planning] WorldStateManager no meaningful change",
+      "[Planning] WorldStateManager no meaningful change",
+      "[Planning] WorldStateManager no meaningful change"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "<no-component> | INFO | [Minecraft Interface] \ud83d\udd04 Starting autonomous planning cycle...",
+    "severity": "INFO",
+    "component": "<no-component>",
+    "count": 7,
+    "first_seen_line": 202,
+    "last_seen_line": 806,
+    "examples": [
+      "[Minecraft Interface] \ud83d\udd04 Starting autonomous planning cycle...",
+      "[Minecraft Interface] \ud83d\udd04 Starting autonomous planning cycle...",
+      "[Minecraft Interface] \ud83d\udd04 Starting autonomous planning cycle..."
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "<no-component> | INFO | at PlanExecutor.executePlanningCycle (/Users/darianrosebrook/Desktop/Projects/conscious-bot/packages/minecraft-interface/src/plan-executor.ts:<NUM>:15)",
+    "severity": "INFO",
+    "component": "<no-component>",
+    "count": 7,
+    "first_seen_line": 204,
+    "last_seen_line": 808,
+    "examples": [
+      "    at PlanExecutor.executePlanningCycle (/Users/darianrosebrook/Desktop/Projects/conscious-bot/packages/minecraft-interface/src/plan-executor.ts:197:15)",
+      "    at PlanExecutor.executePlanningCycle (/Users/darianrosebrook/Desktop/Projects/conscious-bot/packages/minecraft-interface/src/plan-executor.ts:197:15)",
+      "    at PlanExecutor.executePlanningCycle (/Users/darianrosebrook/Desktop/Projects/conscious-bot/packages/minecraft-interface/src/plan-executor.ts:197:15)"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "<no-component> | INFO | at process.processTicksAndRejections (node:internal/process/task_queues:<NUM>:5)",
+    "severity": "INFO",
+    "component": "<no-component>",
+    "count": 7,
+    "first_seen_line": 205,
+    "last_seen_line": 809,
+    "examples": [
+      "    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)",
+      "    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)",
+      "    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "<no-component> | INFO | [Minecraft Interface] \u26a0\ufe0f Planning cycle ended: No plan available for execution (0/0 steps)",
+    "severity": "INFO",
+    "component": "<no-component>",
+    "count": 7,
+    "first_seen_line": 207,
+    "last_seen_line": 811,
+    "examples": [
+      "[Minecraft Interface] \u26a0\ufe0f Planning cycle ended: No plan available for execution (0/0 steps)",
+      "[Minecraft Interface] \u26a0\ufe0f Planning cycle ended: No plan available for execution (0/0 steps)",
+      "[Minecraft Interface] \u26a0\ufe0f Planning cycle ended: No plan available for execution (0/0 steps)"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "Cognition | INFO | [Cognition] \u2705 Received external thought: status - Health: <NUM>%, Hunger: <NUM>%. Observing environment ...",
+    "severity": "INFO",
+    "component": "Cognition",
+    "count": 7,
+    "first_seen_line": 208,
+    "last_seen_line": 812,
+    "examples": [
+      "[Cognition] \u2705 Received external thought: status - Health: 100%, Hunger: 100%. Observing environment ...",
+      "[Cognition] \u2705 Received external thought: status - Health: 100%, Hunger: 100%. Observing environment ...",
+      "[Cognition] \u2705 Received external thought: status - Health: 100%, Hunger: 100%. Observing environment ..."
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "<no-component> | INFO | [Minecraft Interface] \u2705 Sent thought to cognition server: status",
+    "severity": "INFO",
+    "component": "<no-component>",
+    "count": 7,
+    "first_seen_line": 209,
+    "last_seen_line": 813,
+    "examples": [
+      "[Minecraft Interface] \u2705 Sent thought to cognition server: status",
+      "[Minecraft Interface] \u2705 Sent thought to cognition server: status",
+      "[Minecraft Interface] \u2705 Sent thought to cognition server: status"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "<no-component> | INFO | attribution: 'self',",
+    "severity": "INFO",
+    "component": "<no-component>",
+    "count": 7,
+    "first_seen_line": 218,
+    "last_seen_line": 1008,
+    "examples": [
+      "  attribution: 'self',",
+      "  attribution: 'self',",
+      "  attribution: 'self',"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "<no-component> | INFO | context: {",
+    "severity": "INFO",
+    "component": "<no-component>",
+    "count": 7,
+    "first_seen_line": 219,
+    "last_seen_line": 1009,
+    "examples": [
+      "  context: {",
+      "  context: {",
+      "  context: {"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "Cognition | INFO | [Cognition] \u2705 Thought sent to cognitive stream: Health: <NUM>%, Hunger: <NUM>%. Observing environment ...",
+    "severity": "INFO",
+    "component": "Cognition",
+    "count": 7,
+    "first_seen_line": 233,
+    "last_seen_line": 820,
+    "examples": [
+      "[Cognition] \u2705 Thought sent to cognitive stream: Health: 100%, Hunger: 100%. Observing environment ...",
+      "[Cognition] \u2705 Thought sent to cognitive stream: Health: 100%, Hunger: 100%. Observing environment ...",
+      "[Cognition] \u2705 Thought sent to cognitive stream: Health: 100%, Hunger: 100%. Observing environment ..."
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "ThreatPerception | INFO | [Minecraft Interface] [ThreatPerception] suppressed 3 LOS logs in last 5000ms (creeper:3)",
+    "severity": "INFO",
+    "component": "ThreatPerception",
+    "count": 7,
+    "first_seen_line": 565,
+    "last_seen_line": 1037,
+    "examples": [
+      "[Minecraft Interface] [ThreatPerception] suppressed 3 LOS logs in last 5000ms (creeper:3)",
+      "[Minecraft Interface] [ThreatPerception] suppressed 3 LOS logs in last 5000ms (creeper:3)",
+      "[Minecraft Interface] [ThreatPerception] suppressed 3 LOS logs in last 5000ms (creeper:3)"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "Cognition | INFO | [Cognition] \ud83d\udccb Enhanced thought generator has 0 recent thoughts",
+    "severity": "INFO",
+    "component": "Cognition",
+    "count": 4,
+    "first_seen_line": 140,
+    "last_seen_line": 733,
+    "examples": [
+      "[Cognition] \ud83d\udccb Enhanced thought generator has 0 recent thoughts",
+      "[Cognition] \ud83d\udccb Enhanced thought generator has 0 recent thoughts",
+      "[Cognition] \ud83d\udccb Enhanced thought generator has 0 recent thoughts"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "Planning | INFO | [Planning] [MCP] Bot instance updated successfully",
+    "severity": "INFO",
+    "component": "Planning",
+    "count": 4,
+    "first_seen_line": 158,
+    "last_seen_line": 760,
+    "examples": [
+      "[Planning] [MCP] Bot instance updated successfully",
+      "[Planning] [MCP] Bot instance updated successfully",
+      "[Planning] [MCP] Bot instance updated successfully"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "<no-component> | INFO | [Minecraft Interface] \u2705 Bot instance updated in planning server",
+    "severity": "INFO",
+    "component": "<no-component>",
+    "count": 4,
+    "first_seen_line": 159,
+    "last_seen_line": 761,
+    "examples": [
+      "[Minecraft Interface] \u2705 Bot instance updated in planning server",
+      "[Minecraft Interface] \u2705 Bot instance updated in planning server",
+      "[Minecraft Interface] \u2705 Bot instance updated in planning server"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "<no-component> | INFO | [Minecraft Interface] \ud83d\udd0d [MINECRAFT INTERFACE] Bot state updated: {",
+    "severity": "INFO",
+    "component": "<no-component>",
+    "count": 4,
+    "first_seen_line": 188,
+    "last_seen_line": 793,
+    "examples": [
+      "[Minecraft Interface] \ud83d\udd0d [MINECRAFT INTERFACE] Bot state updated: {",
+      "[Minecraft Interface] \ud83d\udd0d [MINECRAFT INTERFACE] Bot state updated: {",
+      "[Minecraft Interface] \ud83d\udd0d [MINECRAFT INTERFACE] Bot state updated: {"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "<no-component> | INFO | inventoryItems: 0",
+    "severity": "INFO",
+    "component": "<no-component>",
+    "count": 4,
+    "first_seen_line": 191,
+    "last_seen_line": 796,
+    "examples": [
+      "  inventoryItems: 0",
+      "  inventoryItems: 0",
+      "  inventoryItems: 0"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "<no-component> | INFO | emotionalState: 'neutral',",
+    "severity": "INFO",
+    "component": "<no-component>",
+    "count": 4,
+    "first_seen_line": 220,
+    "last_seen_line": 706,
+    "examples": [
+      "    emotionalState: 'neutral',",
+      "    emotionalState: 'neutral',",
+      "    emotionalState: 'neutral',"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "<no-component> | INFO | confidence: 0.5,",
+    "severity": "INFO",
+    "component": "<no-component>",
+    "count": 4,
+    "first_seen_line": 221,
+    "last_seen_line": 707,
+    "examples": [
+      "    confidence: 0.5,",
+      "    confidence: 0.5,",
+      "    confidence: 0.5,"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "<no-component> | INFO | cognitiveSystem: 'minecraft-interface'",
+    "severity": "INFO",
+    "component": "<no-component>",
+    "count": 4,
+    "first_seen_line": 222,
+    "last_seen_line": 708,
+    "examples": [
+      "    cognitiveSystem: 'minecraft-interface'",
+      "    cognitiveSystem: 'minecraft-interface'",
+      "    cognitiveSystem: 'minecraft-interface'"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "<no-component> | INFO | metadata: { thoughtType: 'status', source: 'minecraft-interface' },",
+    "severity": "INFO",
+    "component": "<no-component>",
+    "count": 4,
+    "first_seen_line": 224,
+    "last_seen_line": 710,
+    "examples": [
+      "  metadata: { thoughtType: 'status', source: 'minecraft-interface' },",
+      "  metadata: { thoughtType: 'status', source: 'minecraft-interface' },",
+      "  metadata: { thoughtType: 'status', source: 'minecraft-interface' },"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "<no-component> | INFO | \"health\": 20,",
+    "severity": "INFO",
+    "component": "<no-component>",
+    "count": 4,
+    "first_seen_line": 860,
+    "last_seen_line": 917,
+    "examples": [
+      "        \"health\": 20,",
+      "      \"health\": 20,",
+      "    \"health\": 20,"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "<no-component> | INFO | timestamp: <HEX>",
+    "severity": "INFO",
+    "component": "<no-component>",
+    "count": 3,
+    "first_seen_line": 5,
+    "last_seen_line": 955,
+    "examples": [
+      "    timestamp: 1769907427645",
+      "  timestamp: 1769907568135",
+      "    timestamp: 1769907568119"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "Dashboard | INFO | [Dashboard] POST /api/live-stream-updates <NUM> in 8ms",
+    "severity": "INFO",
+    "component": "Dashboard",
+    "count": 3,
+    "first_seen_line": 141,
+    "last_seen_line": 588,
+    "examples": [
+      "[Dashboard] POST /api/live-stream-updates 200 in 8ms",
+      "[Dashboard] POST /api/live-stream-updates 200 in 8ms",
+      "[Dashboard] POST /api/live-stream-updates 200 in 8ms"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "Dashboard | INFO | [Dashboard] POST /api/live-stream-updates <NUM> in 13ms",
+    "severity": "INFO",
+    "component": "Dashboard",
+    "count": 3,
+    "first_seen_line": 264,
+    "last_seen_line": 393,
+    "examples": [
+      "[Dashboard] POST /api/live-stream-updates 200 in 13ms",
+      "[Dashboard] POST /api/live-stream-updates 200 in 13ms",
+      "[Dashboard] POST /api/live-stream-updates 200 in 13ms"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "<no-component> | INFO | '\"Health: <NUM>%, Hunger: <NUM>%. Observing environment and deciding next action.\"'",
+    "severity": "INFO",
+    "component": "<no-component>",
+    "count": 3,
+    "first_seen_line": 346,
+    "last_seen_line": 740,
+    "examples": [
+      "  '\"Health: 100%, Hunger: 100%. Observing environment and deciding next action.\"'",
+      "  '\"Health: 100%, Hunger: 100%. Observing environment and deciding next action.\"'",
+      "  '\"Health: 100%, Hunger: 100%. Observing environment and deciding next action.\"'"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "<no-component> | INFO | ]",
+    "severity": "INFO",
+    "component": "<no-component>",
+    "count": 3,
+    "first_seen_line": 347,
+    "last_seen_line": 741,
+    "examples": [
+      "]",
+      "]",
+      "]"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "<no-component> | INFO | metadata: {",
+    "severity": "INFO",
+    "component": "<no-component>",
+    "count": 3,
+    "first_seen_line": 833,
+    "last_seen_line": 1018,
+    "examples": [
+      "  metadata: {",
+      "  metadata: {",
+      "  metadata: {"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "<no-component> | INFO | \"position\": {",
+    "severity": "INFO",
+    "component": "<no-component>",
+    "count": 3,
+    "first_seen_line": 855,
+    "last_seen_line": 895,
+    "examples": [
+      "        \"position\": {",
+      "      \"position\": {",
+      "  \"position\": {"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "<no-component> | INFO | source: 'cognition-system',",
+    "severity": "INFO",
+    "component": "<no-component>",
+    "count": 2,
+    "first_seen_line": 4,
+    "last_seen_line": 954,
+    "examples": [
+      "    source: 'cognition-system',",
+      "    source: 'cognition-system',"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "Dashboard | INFO | [Dashboard] POST /api/ws/bot-state <NUM> in 12ms",
+    "severity": "INFO",
+    "component": "Dashboard",
+    "count": 2,
+    "first_seen_line": 23,
+    "last_seen_line": 380,
+    "examples": [
+      "[Dashboard] POST /api/ws/bot-state 200 in 12ms",
+      "[Dashboard] POST /api/ws/bot-state 200 in 12ms"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "Dashboard | INFO | [Dashboard] POST /api/live-stream-updates <NUM> in 12ms",
+    "severity": "INFO",
+    "component": "Dashboard",
+    "count": 2,
+    "first_seen_line": 38,
+    "last_seen_line": 184,
+    "examples": [
+      "[Dashboard] POST /api/live-stream-updates 200 in 12ms",
+      "[Dashboard] POST /api/live-stream-updates 200 in 12ms"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "Sterling | INFO | [Sterling] INFO:websockets.server:connection open",
+    "severity": "INFO",
+    "component": "Sterling",
+    "count": 2,
+    "first_seen_line": 50,
+    "last_seen_line": 96,
+    "examples": [
+      "[Sterling] INFO:websockets.server:connection open",
+      "[Sterling] INFO:websockets.server:connection open"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "2026-02-01T00:57:40.571Z | INFO | [<NUM>-02-01T00:57:40.571Z] [INFO]   Dashboard:     http://localhost:<NUM>",
+    "severity": "INFO",
+    "component": "2026-02-01T00:57:40.571Z",
+    "count": 2,
+    "first_seen_line": 109,
+    "last_seen_line": 113,
+    "examples": [
+      "[2026-02-01T00:57:40.571Z] [INFO]   Dashboard:     http://localhost:3000",
+      "[2026-02-01T00:57:40.571Z] [INFO]   Dashboard:     http://localhost:3000"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "2026-02-01T00:57:40.571Z | INFO | [<NUM>-02-01T00:57:40.571Z] [INFO]",
+    "severity": "INFO",
+    "component": "2026-02-01T00:57:40.571Z",
+    "count": 2,
+    "first_seen_line": 111,
+    "last_seen_line": 117,
+    "examples": [
+      "[2026-02-01T00:57:40.571Z] [INFO] ",
+      "[2026-02-01T00:57:40.571Z] [INFO] "
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "2026-02-01T00:57:40.572Z | INFO | [<NUM>-02-01T00:57:40.572Z] [INFO]",
+    "severity": "INFO",
+    "component": "2026-02-01T00:57:40.572Z",
+    "count": 2,
+    "first_seen_line": 122,
+    "last_seen_line": 125,
+    "examples": [
+      "[2026-02-01T00:57:40.572Z] [INFO] ",
+      "[2026-02-01T00:57:40.572Z] [INFO] "
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "Dashboard | INFO | [Dashboard] POST /api/live-stream-updates <NUM> in 16ms",
+    "severity": "INFO",
+    "component": "Dashboard",
+    "count": 2,
+    "first_seen_line": 185,
+    "last_seen_line": 589,
+    "examples": [
+      "[Dashboard] POST /api/live-stream-updates 200 in 16ms",
+      "[Dashboard] POST /api/live-stream-updates 200 in 16ms"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "<no-component> | INFO | POST /api/live-stream-updates <NUM> in 16ms",
+    "severity": "INFO",
+    "component": "<no-component>",
+    "count": 2,
+    "first_seen_line": 186,
+    "last_seen_line": 590,
+    "examples": [
+      " POST /api/live-stream-updates 200 in 16ms",
+      " POST /api/live-stream-updates 200 in 16ms"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "Dashboard | INFO | [Dashboard] POST /api/ws/cognitive-stream <NUM> in 26ms",
+    "severity": "INFO",
+    "component": "Dashboard",
+    "count": 2,
+    "first_seen_line": 231,
+    "last_seen_line": 988,
+    "examples": [
+      "[Dashboard] POST /api/ws/cognitive-stream 200 in 26ms",
+      "[Dashboard] POST /api/ws/cognitive-stream 200 in 26ms"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "Dashboard | INFO | [Dashboard] POST /api/environment-updates <NUM> in 8ms",
+    "severity": "INFO",
+    "component": "Dashboard",
+    "count": 2,
+    "first_seen_line": 245,
+    "last_seen_line": 633,
+    "examples": [
+      "[Dashboard] POST /api/environment-updates 200 in 8ms",
+      "[Dashboard] POST /api/environment-updates 200 in 8ms"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "Dashboard | INFO | [Dashboard] POST /api/environment-updates <NUM> in 12ms",
+    "severity": "INFO",
+    "component": "Dashboard",
+    "count": 2,
+    "first_seen_line": 246,
+    "last_seen_line": 1033,
+    "examples": [
+      "[Dashboard] POST /api/environment-updates 200 in 12ms",
+      "[Dashboard] POST /api/environment-updates 200 in 12ms"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "Dashboard | INFO | [Dashboard] POST /api/live-stream-updates <NUM> in 7ms",
+    "severity": "INFO",
+    "component": "Dashboard",
+    "count": 2,
+    "first_seen_line": 263,
+    "last_seen_line": 544,
+    "examples": [
+      "[Dashboard] POST /api/live-stream-updates 200 in 7ms",
+      "[Dashboard] POST /api/live-stream-updates 200 in 7ms"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "Dashboard | INFO | [Dashboard] POST /api/ws/cognitive-stream <NUM> in 13ms",
+    "severity": "INFO",
+    "component": "Dashboard",
+    "count": 2,
+    "first_seen_line": 327,
+    "last_seen_line": 521,
+    "examples": [
+      "[Dashboard] POST /api/ws/cognitive-stream 200 in 13ms",
+      "[Dashboard] POST /api/ws/cognitive-stream 200 in 13ms"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "<no-component> | INFO | POST /api/live-stream-updates <NUM> in 17ms",
+    "severity": "INFO",
+    "component": "<no-component>",
+    "count": 2,
+    "first_seen_line": 350,
+    "last_seen_line": 789,
+    "examples": [
+      " POST /api/live-stream-updates 200 in 17ms",
+      " POST /api/live-stream-updates 200 in 17ms"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "Dashboard | INFO | [Dashboard] POST /api/ws/bot-state <NUM> in 11ms",
+    "severity": "INFO",
+    "component": "Dashboard",
+    "count": 2,
+    "first_seen_line": 354,
+    "last_seen_line": 748,
+    "examples": [
+      "[Dashboard] POST /api/ws/bot-state 200 in 11ms",
+      "[Dashboard] POST /api/ws/bot-state 200 in 11ms"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "<no-component> | INFO | POST /api/live-stream-updates <NUM> in 12ms",
+    "severity": "INFO",
+    "component": "<no-component>",
+    "count": 2,
+    "first_seen_line": 394,
+    "last_seen_line": 459,
+    "examples": [
+      " POST /api/live-stream-updates 200 in 12ms",
+      " POST /api/live-stream-updates 200 in 12ms"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "Dashboard | INFO | [Dashboard] POST /api/environment-updates <NUM> in 9ms",
+    "severity": "INFO",
+    "component": "Dashboard",
+    "count": 2,
+    "first_seen_line": 438,
+    "last_seen_line": 1032,
+    "examples": [
+      "[Dashboard] POST /api/environment-updates 200 in 9ms",
+      "[Dashboard] POST /api/environment-updates 200 in 9ms"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "ThreatPerception | INFO | [ThreatPerception] suppressed 6 LOS logs in last 5000ms (creeper:3, spider:3)",
+    "severity": "INFO",
+    "component": "ThreatPerception",
+    "count": 2,
+    "first_seen_line": 444,
+    "last_seen_line": 471,
+    "examples": [
+      "[ThreatPerception] suppressed 6 LOS logs in last 5000ms (creeper:3, spider:3)",
+      "[ThreatPerception] suppressed 6 LOS logs in last 5000ms (creeper:3, spider:3)"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "Dashboard | INFO | [Dashboard] POST /api/live-stream-updates <NUM> in 11ms",
+    "severity": "INFO",
+    "component": "Dashboard",
+    "count": 2,
+    "first_seen_line": 458,
+    "last_seen_line": 742,
+    "examples": [
+      "[Dashboard] POST /api/live-stream-updates 200 in 11ms",
+      "[Dashboard] POST /api/live-stream-updates 200 in 11ms"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "ThreatPerception | INFO | [ThreatPerception] suppressed 3 LOS logs in last 5000ms (creeper:3)",
+    "severity": "INFO",
+    "component": "ThreatPerception",
+    "count": 2,
+    "first_seen_line": 527,
+    "last_seen_line": 638,
+    "examples": [
+      "[ThreatPerception] suppressed 3 LOS logs in last 5000ms (creeper:3)",
+      "[ThreatPerception] suppressed 3 LOS logs in last 5000ms (creeper:3)"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "Dashboard | INFO | [Dashboard] POST /api/live-stream-updates <NUM> in 14ms",
+    "severity": "INFO",
+    "component": "Dashboard",
+    "count": 2,
+    "first_seen_line": 545,
+    "last_seen_line": 787,
+    "examples": [
+      "[Dashboard] POST /api/live-stream-updates 200 in 14ms",
+      "[Dashboard] POST /api/live-stream-updates 200 in 14ms"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "Dashboard | INFO | [Dashboard] POST /api/environment-updates <NUM> in 11ms",
+    "severity": "INFO",
+    "component": "Dashboard",
+    "count": 2,
+    "first_seen_line": 547,
+    "last_seen_line": 634,
+    "examples": [
+      "[Dashboard] POST /api/environment-updates 200 in 11ms",
+      "[Dashboard] POST /api/environment-updates 200 in 11ms"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "Dashboard | INFO | [Dashboard] POST /api/ws/cognitive-stream <NUM> in 9ms",
+    "severity": "INFO",
+    "component": "Dashboard",
+    "count": 2,
+    "first_seen_line": 620,
+    "last_seen_line": 717,
+    "examples": [
+      "[Dashboard] POST /api/ws/cognitive-stream 200 in 9ms",
+      "[Dashboard] POST /api/ws/cognitive-stream 200 in 9ms"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "Dashboard | INFO | [Dashboard] POST /api/live-stream-updates <NUM> in 18ms",
+    "severity": "INFO",
+    "component": "Dashboard",
+    "count": 2,
+    "first_seen_line": 743,
+    "last_seen_line": 788,
+    "examples": [
+      "[Dashboard] POST /api/live-stream-updates 200 in 18ms",
+      "[Dashboard] POST /api/live-stream-updates 200 in 18ms"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "<no-component> | INFO | type: 'intrusive',",
+    "severity": "INFO",
+    "component": "<no-component>",
+    "count": 2,
+    "first_seen_line": 824,
+    "last_seen_line": 829,
+    "examples": [
+      "  type: 'intrusive',",
+      "  type: 'intrusive',"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "<no-component> | INFO | content: \"In the water, there's probably good loot\",",
+    "severity": "INFO",
+    "component": "<no-component>",
+    "count": 2,
+    "first_seen_line": 825,
+    "last_seen_line": 830,
+    "examples": [
+      "  content: \"In the water, there's probably good loot\",",
+      "  content: \"In the water, there's probably good loot\","
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "<no-component> | INFO | \"status\": \"connected\",",
+    "severity": "INFO",
+    "component": "<no-component>",
+    "count": 2,
+    "first_seen_line": 851,
+    "last_seen_line": 874,
+    "examples": [
+      "  \"status\": \"connected\",",
+      "    \"status\": \"connected\","
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "<no-component> | INFO | \"data\": {",
+    "severity": "INFO",
+    "component": "<no-component>",
+    "count": 2,
+    "first_seen_line": 852,
+    "last_seen_line": 875,
+    "examples": [
+      "  \"data\": {",
+      "    \"data\": {"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "<no-component> | INFO | \"x\": 67.5,",
+    "severity": "INFO",
+    "component": "<no-component>",
+    "count": 2,
+    "first_seen_line": 856,
+    "last_seen_line": 877,
+    "examples": [
+      "          \"x\": 67.5,",
+      "        \"x\": 67.5,"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "<no-component> | INFO | \"y\": 63,",
+    "severity": "INFO",
+    "component": "<no-component>",
+    "count": 2,
+    "first_seen_line": 857,
+    "last_seen_line": 878,
+    "examples": [
+      "          \"y\": 63,",
+      "        \"y\": 63,"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "<no-component> | INFO | \"z\": -<NUM>.5",
+    "severity": "INFO",
+    "component": "<no-component>",
+    "count": 2,
+    "first_seen_line": 858,
+    "last_seen_line": 879,
+    "examples": [
+      "          \"z\": -105.5",
+      "        \"z\": -105.5"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "<no-component> | INFO | \"food\": 20,",
+    "severity": "INFO",
+    "component": "<no-component>",
+    "count": 2,
+    "first_seen_line": 861,
+    "last_seen_line": 882,
+    "examples": [
+      "        \"food\": 20,",
+      "      \"food\": 20,"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "<no-component> | INFO | \"weather\": \"clear\",",
+    "severity": "INFO",
+    "component": "<no-component>",
+    "count": 2,
+    "first_seen_line": 868,
+    "last_seen_line": 904,
+    "examples": [
+      "        \"weather\": \"clear\",",
+      "  \"weather\": \"clear\","
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "<no-component> | INFO | \"inventory\": {",
+    "severity": "INFO",
+    "component": "<no-component>",
+    "count": 2,
+    "first_seen_line": 883,
+    "last_seen_line": 905,
+    "examples": [
+      "      \"inventory\": {",
+      "  \"inventory\": {"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "<no-component> | INFO | \"items\": [],",
+    "severity": "INFO",
+    "component": "<no-component>",
+    "count": 2,
+    "first_seen_line": 884,
+    "last_seen_line": 906,
+    "examples": [
+      "        \"items\": [],",
+      "    \"items\": [],"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "<no-component> | INFO | \"totalSlots\": 36,",
+    "severity": "INFO",
+    "component": "<no-component>",
+    "count": 2,
+    "first_seen_line": 885,
+    "last_seen_line": 908,
+    "examples": [
+      "        \"totalSlots\": 36,",
+      "    \"totalSlots\": 36,"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "<no-component> | INFO | \"isAlive\": true",
+    "severity": "INFO",
+    "component": "<no-component>",
+    "count": 2,
+    "first_seen_line": 889,
+    "last_seen_line": 891,
+    "examples": [
+      "    \"isAlive\": true",
+      "  \"isAlive\": true"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "<no-component> | INFO | type: 'thought_processing',",
+    "severity": "INFO",
+    "component": "<no-component>",
+    "count": 2,
+    "first_seen_line": 935,
+    "last_seen_line": 940,
+    "examples": [
+      "  type: 'thought_processing',",
+      "  type: 'thought_processing',"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "<no-component> | INFO | content: `Thought processing started: \"in the water, there's probably good loot\"`,",
+    "severity": "INFO",
+    "component": "<no-component>",
+    "count": 2,
+    "first_seen_line": 936,
+    "last_seen_line": 941,
+    "examples": [
+      "  content: `Thought processing started: \"in the water, there's probably good loot\"`,",
+      "  content: `Thought processing started: \"in the water, there's probably good loot\"`,"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "<no-component> | INFO | emotionalState: 'focused',",
+    "severity": "INFO",
+    "component": "<no-component>",
+    "count": 2,
+    "first_seen_line": 944,
+    "last_seen_line": 976,
+    "examples": [
+      "    emotionalState: 'focused',",
+      "    emotionalState: 'focused',"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "<no-component> | INFO | confidence: 0.6,",
+    "severity": "INFO",
+    "component": "<no-component>",
+    "count": 2,
+    "first_seen_line": 945,
+    "last_seen_line": 977,
+    "examples": [
+      "    confidence: 0.6,",
+      "    confidence: 0.6,"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "<no-component> | INFO | category: 'processing',",
+    "severity": "INFO",
+    "component": "<no-component>",
+    "count": 2,
+    "first_seen_line": 947,
+    "last_seen_line": 952,
+    "examples": [
+      "    category: 'processing',",
+      "    category: 'processing',"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "<no-component> | INFO | type: 'reflection',",
+    "severity": "INFO",
+    "component": "<no-component>",
+    "count": 2,
+    "first_seen_line": 967,
+    "last_seen_line": 972,
+    "examples": [
+      "  type: 'reflection',",
+      "  type: 'reflection',"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "<no-component> | INFO | content: `Processing intrusive thought: \"in the water, there's probably good loot\"`,",
+    "severity": "INFO",
+    "component": "<no-component>",
+    "count": 2,
+    "first_seen_line": 968,
+    "last_seen_line": 973,
+    "examples": [
+      "  content: `Processing intrusive thought: \"in the water, there's probably good loot\"`,",
+      "  content: `Processing intrusive thought: \"in the water, there's probably good loot\"`,"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "<no-component> | INFO | type: 'social',",
+    "severity": "INFO",
+    "component": "<no-component>",
+    "count": 2,
+    "first_seen_line": 1001,
+    "last_seen_line": 1006,
+    "examples": [
+      "  type: 'social',",
+      "  type: 'social',"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "<no-component> | INFO | content: `From thought \"In the water, there's probably good loot\" \u2014 bucket Tactical, cap 60000ms.`,",
+    "severity": "INFO",
+    "component": "<no-component>",
+    "count": 2,
+    "first_seen_line": 1002,
+    "last_seen_line": 1007,
+    "examples": [
+      "  content: `From thought \"In the water, there's probably good loot\" \u2014 bucket Tactical, cap 60000ms.`,",
+      "  content: `From thought \"In the water, there's probably good loot\" \u2014 bucket Tactical, cap 60000ms.`,"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "<no-component> | INFO | thoughtType: 'system_status',",
+    "severity": "INFO",
+    "component": "<no-component>",
+    "count": 1,
+    "first_seen_line": 1,
+    "last_seen_line": 1,
+    "examples": [
+      "    thoughtType: 'system_status',"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "<no-component> | INFO | category: 'system',",
+    "severity": "INFO",
+    "component": "<no-component>",
+    "count": 1,
+    "first_seen_line": 2,
+    "last_seen_line": 2,
+    "examples": [
+      "    category: 'system',"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "<no-component> | INFO | tags: [ 'server', 'startup' ],",
+    "severity": "INFO",
+    "component": "<no-component>",
+    "count": 1,
+    "first_seen_line": 3,
+    "last_seen_line": 3,
+    "examples": [
+      "    tags: [ 'server', 'startup' ],"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "<no-component> | INFO | id: 'thought-<HEX>-bqjfc4m',",
+    "severity": "INFO",
+    "component": "<no-component>",
+    "count": 1,
+    "first_seen_line": 7,
+    "last_seen_line": 7,
+    "examples": [
+      "  id: 'thought-1769907445608-bqjfc4m',"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "Dashboard | INFO | [Dashboard] Broadcasting message to 0 connections: {\"type\":\"cognitive_thoughts\",\"timestamp\":<HEX>,\"data\":{\"thoughts\":[{\"type\":\"system_status\",\"content\":\"System status: cognition_service_started - \ud83e\udde0 Cognition service running on port <NUM>\",\"attribution\":\"self\",\"context\":{\"emotionalState\":\"neutral\",\"confidence\":0.5,\"cognitiveSystem\":\"cognition-system\",\"category\":\"system\",\"tags\":[\"server\",\"startup\"],\"port\":<NUM>},\"metadata\":{\"thoughtType\":\"system_status\",\"category\":\"system\",\"tags\":[\"server\",\"startup\"],\"source\":\"cognition-system\",\"timestamp\":<HEX>},\"id\":\"thought-<HEX>-bqjfc4m\",\"timestamp\":<HEX>,\"processed\":false}]}}",
+    "severity": "INFO",
+    "component": "Dashboard",
+    "count": 1,
+    "first_seen_line": 11,
+    "last_seen_line": 11,
+    "examples": [
+      "[Dashboard] Broadcasting message to 0 connections: {\"type\":\"cognitive_thoughts\",\"timestamp\":1769907445609,\"data\":{\"thoughts\":[{\"type\":\"system_status\",\"content\":\"System status: cognition_service_started - \ud83e\udde0 Cognition service running on port 3003\",\"attribution\":\"self\",\"context\":{\"emotionalState\":\"neutral\",\"confidence\":0.5,\"cognitiveSystem\":\"cognition-system\",\"category\":\"system\",\"tags\":[\"server\",\"startup\"],\"port\":3003},\"metadata\":{\"thoughtType\":\"system_status\",\"category\":\"system\",\"tags\":[\"server\",\"startup\"],\"source\":\"cognition-system\",\"timestamp\":1769907427645},\"id\":\"thought-1769907445608-bqjfc4m\",\"timestamp\":1769907445608,\"processed\":false}]}}"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "Dashboard | INFO | [Dashboard] POST /api/ws/cognitive-stream <NUM> in 2426ms",
+    "severity": "INFO",
+    "component": "Dashboard",
+    "count": 1,
+    "first_seen_line": 13,
+    "last_seen_line": 13,
+    "examples": [
+      "[Dashboard] POST /api/ws/cognitive-stream 200 in 2426ms"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "Dashboard | INFO | [Dashboard] Loaded 3 thoughts from persistent storage",
+    "severity": "INFO",
+    "component": "Dashboard",
+    "count": 1,
+    "first_seen_line": 14,
+    "last_seen_line": 14,
+    "examples": [
+      "[Dashboard] Loaded 3 thoughts from persistent storage"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "<no-component> | INFO | \u23f3 Waiting for services to start...",
+    "severity": "INFO",
+    "component": "<no-component>",
+    "count": 1,
+    "first_seen_line": 16,
+    "last_seen_line": 16,
+    "examples": [
+      "\u23f3 Waiting for services to start..."
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "Dashboard | INFO | [Dashboard] \u2713 Compiled /api/environment-updates in 244ms (<NUM> modules)",
+    "severity": "INFO",
+    "component": "Dashboard",
+    "count": 1,
+    "first_seen_line": 19,
+    "last_seen_line": 19,
+    "examples": [
+      "[Dashboard] \u2713 Compiled /api/environment-updates in 244ms (784 modules)"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "Dashboard | INFO | [Dashboard] POST /api/environment-updates <NUM> in 295ms",
+    "severity": "INFO",
+    "component": "Dashboard",
+    "count": 1,
+    "first_seen_line": 20,
+    "last_seen_line": 20,
+    "examples": [
+      "[Dashboard] POST /api/environment-updates 200 in 295ms"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "<no-component> | INFO | POST /api/environment-updates <NUM> in 296ms",
+    "severity": "INFO",
+    "component": "<no-component>",
+    "count": 1,
+    "first_seen_line": 21,
+    "last_seen_line": 21,
+    "examples": [
+      " POST /api/environment-updates 200 in 296ms"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "Dashboard | INFO | [Dashboard] \u2713 Compiled /api/inventory in 358ms (<NUM> modules)",
+    "severity": "INFO",
+    "component": "Dashboard",
+    "count": 1,
+    "first_seen_line": 24,
+    "last_seen_line": 24,
+    "examples": [
+      "[Dashboard] \u2713 Compiled /api/inventory in 358ms (792 modules)"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "<no-component> | INFO | [Minecraft Interface] \ud83d\udd0d [MINECRAFT INTERFACE] /inventory endpoint called",
+    "severity": "INFO",
+    "component": "<no-component>",
+    "count": 1,
+    "first_seen_line": 25,
+    "last_seen_line": 25,
+    "examples": [
+      "[Minecraft Interface] \ud83d\udd0d [MINECRAFT INTERFACE] /inventory endpoint called"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "Dashboard | INFO | [Dashboard] GET /api/ws/cognitive-stream/history?limit=<NUM> <NUM> in 396ms",
+    "severity": "INFO",
+    "component": "Dashboard",
+    "count": 1,
+    "first_seen_line": 26,
+    "last_seen_line": 26,
+    "examples": [
+      "[Dashboard] GET /api/ws/cognitive-stream/history?limit=100 200 in 396ms"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "Dashboard | INFO | [Dashboard] GET /api/tasks <NUM> in 401ms",
+    "severity": "INFO",
+    "component": "Dashboard",
+    "count": 1,
+    "first_seen_line": 27,
+    "last_seen_line": 27,
+    "examples": [
+      "[Dashboard] GET /api/tasks 200 in 401ms"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "Dashboard | INFO | [Dashboard] GET /api/inventory <NUM> in 402ms",
+    "severity": "INFO",
+    "component": "Dashboard",
+    "count": 1,
+    "first_seen_line": 28,
+    "last_seen_line": 28,
+    "examples": [
+      "[Dashboard] GET /api/inventory 200 in 402ms"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "Dashboard | INFO | [Dashboard] \u2713 Compiled /api/notes in 359ms (<NUM> modules)",
+    "severity": "INFO",
+    "component": "Dashboard",
+    "count": 1,
+    "first_seen_line": 29,
+    "last_seen_line": 29,
+    "examples": [
+      "[Dashboard] \u2713 Compiled /api/notes in 359ms (798 modules)"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "Dashboard | INFO | [Dashboard] GET /api/memories <NUM> in 397ms",
+    "severity": "INFO",
+    "component": "Dashboard",
+    "count": 1,
+    "first_seen_line": 30,
+    "last_seen_line": 30,
+    "examples": [
+      "[Dashboard] GET /api/memories 200 in 397ms"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "Dashboard | INFO | [Dashboard] GET /api/notes <NUM> in 399ms",
+    "severity": "INFO",
+    "component": "Dashboard",
+    "count": 1,
+    "first_seen_line": 31,
+    "last_seen_line": 31,
+    "examples": [
+      "[Dashboard] GET /api/notes 200 in 399ms"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "Dashboard | INFO | [Dashboard] GET /api/events <NUM> in 400ms",
+    "severity": "INFO",
+    "component": "Dashboard",
+    "count": 1,
+    "first_seen_line": 32,
+    "last_seen_line": 32,
+    "examples": [
+      "[Dashboard] GET /api/events 200 in 400ms"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "Dashboard | INFO | [Dashboard] POST /api/live-stream-updates <NUM> in 15ms",
+    "severity": "INFO",
+    "component": "Dashboard",
+    "count": 1,
+    "first_seen_line": 39,
+    "last_seen_line": 39,
+    "examples": [
+      "[Dashboard] POST /api/live-stream-updates 200 in 15ms"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "<no-component> | INFO | POST /api/live-stream-updates <NUM> in 15ms",
+    "severity": "INFO",
+    "component": "<no-component>",
+    "count": 1,
+    "first_seen_line": 40,
+    "last_seen_line": 40,
+    "examples": [
+      " POST /api/live-stream-updates 200 in 15ms"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "<no-component> | INFO | \ud83d\udd0d Checking service health...",
+    "severity": "INFO",
+    "component": "<no-component>",
+    "count": 1,
+    "first_seen_line": 42,
+    "last_seen_line": 42,
+    "examples": [
+      "\ud83d\udd0d Checking service health..."
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "2026-02-01T00:57:34.603Z | INFO | [<NUM>-02-01T00:57:34.603Z] [Core API] [HEALTH] Health check passed",
+    "severity": "INFO",
+    "component": "2026-02-01T00:57:34.603Z",
+    "count": 1,
+    "first_seen_line": 43,
+    "last_seen_line": 43,
+    "examples": [
+      "[2026-02-01T00:57:34.603Z] [Core API] [HEALTH] Health check passed"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "2026-02-01T00:57:35.106Z | INFO | [<NUM>-02-01T00:57:35.106Z] [Memory] [HEALTH] Health check passed",
+    "severity": "INFO",
+    "component": "2026-02-01T00:57:35.106Z",
+    "count": 1,
+    "first_seen_line": 44,
+    "last_seen_line": 44,
+    "examples": [
+      "[2026-02-01T00:57:35.106Z] [Memory] [HEALTH] Health check passed"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "2026-02-01T00:57:35.609Z | INFO | [<NUM>-02-01T00:57:35.609Z] [World] [HEALTH] Health check passed",
+    "severity": "INFO",
+    "component": "2026-02-01T00:57:35.609Z",
+    "count": 1,
+    "first_seen_line": 47,
+    "last_seen_line": 47,
+    "examples": [
+      "[2026-02-01T00:57:35.609Z] [World] [HEALTH] Health check passed"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "<no-component> | INFO | [MLX-LM Sidecar] <NUM>.0.0.1 - - [31/Jan/<NUM> 16:57:36] \"GET /health HTTP/1.1\" <NUM> -",
+    "severity": "INFO",
+    "component": "<no-component>",
+    "count": 1,
+    "first_seen_line": 48,
+    "last_seen_line": 48,
+    "examples": [
+      "[MLX-LM Sidecar] 127.0.0.1 - - [31/Jan/2026 16:57:36] \"GET /health HTTP/1.1\" 200 -"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "2026-02-01T00:57:36.112Z | INFO | [<NUM>-02-01T00:57:36.112Z] [MLX-LM Sidecar] [HEALTH] Health check passed",
+    "severity": "INFO",
+    "component": "2026-02-01T00:57:36.112Z",
+    "count": 1,
+    "first_seen_line": 49,
+    "last_seen_line": 49,
+    "examples": [
+      "[2026-02-01T00:57:36.112Z] [MLX-LM Sidecar] [HEALTH] Health check passed"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "2026-02-01T00:57:36.614Z | INFO | [<NUM>-02-01T00:57:36.614Z] [Sterling] [HEALTH] Health check passed",
+    "severity": "INFO",
+    "component": "2026-02-01T00:57:36.614Z",
+    "count": 1,
+    "first_seen_line": 51,
+    "last_seen_line": 51,
+    "examples": [
+      "[2026-02-01T00:57:36.614Z] [Sterling] [HEALTH] Health check passed"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "2026-02-01T00:57:37.115Z | INFO | [<NUM>-02-01T00:57:37.115Z] [Cognition] [HEALTH] Health check passed",
+    "severity": "INFO",
+    "component": "2026-02-01T00:57:37.115Z",
+    "count": 1,
+    "first_seen_line": 53,
+    "last_seen_line": 53,
+    "examples": [
+      "[2026-02-01T00:57:37.115Z] [Cognition] [HEALTH] Health check passed"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "2026-02-01T00:57:37.619Z | INFO | [<NUM>-02-01T00:57:37.619Z] [Planning] [HEALTH] Health check passed",
+    "severity": "INFO",
+    "component": "2026-02-01T00:57:37.619Z",
+    "count": 1,
+    "first_seen_line": 55,
+    "last_seen_line": 55,
+    "examples": [
+      "[2026-02-01T00:57:37.619Z] [Planning] [HEALTH] Health check passed"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "2026-02-01T00:57:38.121Z | INFO | [<NUM>-02-01T00:57:38.121Z] [Minecraft Interface] [HEALTH] Health check passed",
+    "severity": "INFO",
+    "component": "2026-02-01T00:57:38.121Z",
+    "count": 1,
+    "first_seen_line": 57,
+    "last_seen_line": 57,
+    "examples": [
+      "[2026-02-01T00:57:38.121Z] [Minecraft Interface] [HEALTH] Health check passed"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "2026-02-01T00:57:38.782Z | INFO | [<NUM>-02-01T00:57:38.782Z] [Dashboard] [HEALTH] Health check passed",
+    "severity": "INFO",
+    "component": "2026-02-01T00:57:38.782Z",
+    "count": 1,
+    "first_seen_line": 58,
+    "last_seen_line": 58,
+    "examples": [
+      "[2026-02-01T00:57:38.782Z] [Dashboard] [HEALTH] Health check passed"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "Dashboard | INFO | [Dashboard] GET / <NUM> in 161ms",
+    "severity": "INFO",
+    "component": "Dashboard",
+    "count": 1,
+    "first_seen_line": 59,
+    "last_seen_line": 59,
+    "examples": [
+      "[Dashboard] GET / 200 in 161ms"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "<no-component> | INFO | \ud83d\udcca Health Check Summary:",
+    "severity": "INFO",
+    "component": "<no-component>",
+    "count": 1,
+    "first_seen_line": 63,
+    "last_seen_line": 63,
+    "examples": [
+      "\ud83d\udcca Health Check Summary:"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "<no-component> | INFO | \u2705 Core API",
+    "severity": "INFO",
+    "component": "<no-component>",
+    "count": 1,
+    "first_seen_line": 64,
+    "last_seen_line": 64,
+    "examples": [
+      "  \u2705 Core API"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "<no-component> | INFO | \u2705 Memory",
+    "severity": "INFO",
+    "component": "<no-component>",
+    "count": 1,
+    "first_seen_line": 65,
+    "last_seen_line": 65,
+    "examples": [
+      "  \u2705 Memory"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "<no-component> | INFO | \u2705 World",
+    "severity": "INFO",
+    "component": "<no-component>",
+    "count": 1,
+    "first_seen_line": 66,
+    "last_seen_line": 66,
+    "examples": [
+      "  \u2705 World"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "<no-component> | INFO | \u2705 MLX-LM Sidecar",
+    "severity": "INFO",
+    "component": "<no-component>",
+    "count": 1,
+    "first_seen_line": 67,
+    "last_seen_line": 67,
+    "examples": [
+      "  \u2705 MLX-LM Sidecar"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "<no-component> | INFO | \u2705 Sterling",
+    "severity": "INFO",
+    "component": "<no-component>",
+    "count": 1,
+    "first_seen_line": 68,
+    "last_seen_line": 68,
+    "examples": [
+      "  \u2705 Sterling"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "<no-component> | INFO | \u2705 Cognition",
+    "severity": "INFO",
+    "component": "<no-component>",
+    "count": 1,
+    "first_seen_line": 69,
+    "last_seen_line": 69,
+    "examples": [
+      "  \u2705 Cognition"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "<no-component> | INFO | \u2705 Planning",
+    "severity": "INFO",
+    "component": "<no-component>",
+    "count": 1,
+    "first_seen_line": 70,
+    "last_seen_line": 70,
+    "examples": [
+      "  \u2705 Planning"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "<no-component> | INFO | \u2705 Minecraft Interface",
+    "severity": "INFO",
+    "component": "<no-component>",
+    "count": 1,
+    "first_seen_line": 71,
+    "last_seen_line": 71,
+    "examples": [
+      "  \u2705 Minecraft Interface"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "<no-component> | INFO | \u2705 Dashboard",
+    "severity": "INFO",
+    "component": "<no-component>",
+    "count": 1,
+    "first_seen_line": 72,
+    "last_seen_line": 72,
+    "examples": [
+      "  \u2705 Dashboard"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "2026-02-01T00:57:39.284Z | INFO | [<NUM>-02-01T00:57:39.284Z] [SUCCESS]",
+    "severity": "INFO",
+    "component": "2026-02-01T00:57:39.284Z",
+    "count": 1,
+    "first_seen_line": 73,
+    "last_seen_line": 73,
+    "examples": [
+      "[2026-02-01T00:57:39.284Z] [SUCCESS] "
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "<no-component> | INFO | \ud83c\udf89 All services passed health checks!",
+    "severity": "INFO",
+    "component": "<no-component>",
+    "count": 1,
+    "first_seen_line": 74,
+    "last_seen_line": 74,
+    "examples": [
+      "\ud83c\udf89 All services passed health checks!"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "2026-02-01T00:57:39.284Z | INFO | [<NUM>-02-01T00:57:39.284Z] [INFO]",
+    "severity": "INFO",
+    "component": "2026-02-01T00:57:39.284Z",
+    "count": 1,
+    "first_seen_line": 75,
+    "last_seen_line": 75,
+    "examples": [
+      "[2026-02-01T00:57:39.284Z] [INFO] "
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "<no-component> | INFO | \ud83d\udea6 Broadcasting system readiness...",
+    "severity": "INFO",
+    "component": "<no-component>",
+    "count": 1,
+    "first_seen_line": 76,
+    "last_seen_line": 76,
+    "examples": [
+      "\ud83d\udea6 Broadcasting system readiness..."
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "2026-02-01T00:57:39.302Z | INFO | [<NUM>-02-01T00:57:39.302Z] [Core API] [HEALTH] Readiness acknowledged",
+    "severity": "INFO",
+    "component": "2026-02-01T00:57:39.302Z",
+    "count": 1,
+    "first_seen_line": 77,
+    "last_seen_line": 77,
+    "examples": [
+      "[2026-02-01T00:57:39.302Z] [Core API] [HEALTH] Readiness acknowledged"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "2026-02-01T00:57:39.512Z | INFO | [<NUM>-02-01T00:57:39.512Z] [Memory] [HEALTH] Readiness acknowledged",
+    "severity": "INFO",
+    "component": "2026-02-01T00:57:39.512Z",
+    "count": 1,
+    "first_seen_line": 78,
+    "last_seen_line": 78,
+    "examples": [
+      "[2026-02-01T00:57:39.512Z] [Memory] [HEALTH] Readiness acknowledged"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "2026-02-01T00:57:39.739Z | INFO | [<NUM>-02-01T00:57:39.739Z] [World] [HEALTH] Readiness acknowledged",
+    "severity": "INFO",
+    "component": "2026-02-01T00:57:39.739Z",
+    "count": 1,
+    "first_seen_line": 79,
+    "last_seen_line": 79,
+    "examples": [
+      "[2026-02-01T00:57:39.739Z] [World] [HEALTH] Readiness acknowledged"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "2026-02-01T00:57:39.949Z | INFO | [<NUM>-02-01T00:57:39.949Z] [Cognition] [HEALTH] Readiness acknowledged",
+    "severity": "INFO",
+    "component": "2026-02-01T00:57:39.949Z",
+    "count": 1,
+    "first_seen_line": 80,
+    "last_seen_line": 80,
+    "examples": [
+      "[2026-02-01T00:57:39.949Z] [Cognition] [HEALTH] Readiness acknowledged"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "2026-02-01T00:57:40.157Z | INFO | [<NUM>-02-01T00:57:40.157Z] [Planning] [HEALTH] Readiness acknowledged",
+    "severity": "INFO",
+    "component": "2026-02-01T00:57:40.157Z",
+    "count": 1,
+    "first_seen_line": 81,
+    "last_seen_line": 81,
+    "examples": [
+      "[2026-02-01T00:57:40.157Z] [Planning] [HEALTH] Readiness acknowledged"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "Planning | INFO | [Planning] \u2705 System readiness received; starting world state polling",
+    "severity": "INFO",
+    "component": "Planning",
+    "count": 1,
+    "first_seen_line": 82,
+    "last_seen_line": 82,
+    "examples": [
+      "[Planning] \u2705 System readiness received; starting world state polling"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "Planning | INFO | [Planning] WorldStateManager emitting update",
+    "severity": "INFO",
+    "component": "Planning",
+    "count": 1,
+    "first_seen_line": 90,
+    "last_seen_line": 90,
+    "examples": [
+      "[Planning] WorldStateManager emitting update"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "<no-component> | INFO | [Minecraft Interface] \u2705 Autonomous planning loop started (15s intervals)",
+    "severity": "INFO",
+    "component": "<no-component>",
+    "count": 1,
+    "first_seen_line": 91,
+    "last_seen_line": 91,
+    "examples": [
+      "[Minecraft Interface] \u2705 Autonomous planning loop started (15s intervals)"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "2026-02-01T00:57:40.366Z | INFO | [<NUM>-02-01T00:57:40.366Z] [Minecraft Interface] [HEALTH] Readiness acknowledged",
+    "severity": "INFO",
+    "component": "2026-02-01T00:57:40.366Z",
+    "count": 1,
+    "first_seen_line": 92,
+    "last_seen_line": 92,
+    "examples": [
+      "[2026-02-01T00:57:40.366Z] [Minecraft Interface] [HEALTH] Readiness acknowledged"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "2026-02-01T00:57:40.567Z | INFO | [<NUM>-02-01T00:57:40.567Z] [SUCCESS] \u2705 Readiness broadcast complete",
+    "severity": "INFO",
+    "component": "2026-02-01T00:57:40.567Z",
+    "count": 1,
+    "first_seen_line": 93,
+    "last_seen_line": 93,
+    "examples": [
+      "[2026-02-01T00:57:40.567Z] [SUCCESS] \u2705 Readiness broadcast complete"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "<no-component> | INFO | \ud83d\udd0d Checking optional external services...",
+    "severity": "INFO",
+    "component": "<no-component>",
+    "count": 1,
+    "first_seen_line": 95,
+    "last_seen_line": 95,
+    "examples": [
+      "\ud83d\udd0d Checking optional external services..."
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "<no-component> | INFO | \u2705 Sterling reasoning server available at ws://localhost:<NUM>",
+    "severity": "INFO",
+    "component": "<no-component>",
+    "count": 1,
+    "first_seen_line": 97,
+    "last_seen_line": 97,
+    "examples": [
+      "  \u2705 Sterling reasoning server available at ws://localhost:8766"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "<no-component> | INFO | \u2705 Minecraft server available at localhost:<NUM>",
+    "severity": "INFO",
+    "component": "<no-component>",
+    "count": 1,
+    "first_seen_line": 98,
+    "last_seen_line": 98,
+    "examples": [
+      "  \u2705 Minecraft server available at localhost:25565"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "2026-02-01T00:57:40.571Z | INFO | [<NUM>-02-01T00:57:40.571Z] [SUCCESS]",
+    "severity": "INFO",
+    "component": "2026-02-01T00:57:40.571Z",
+    "count": 1,
+    "first_seen_line": 99,
+    "last_seen_line": 99,
+    "examples": [
+      "[2026-02-01T00:57:40.571Z] [SUCCESS] "
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "<no-component> | INFO | \ud83c\udf89 Conscious Bot System is running!",
+    "severity": "INFO",
+    "component": "<no-component>",
+    "count": 1,
+    "first_seen_line": 100,
+    "last_seen_line": 100,
+    "examples": [
+      "\ud83c\udf89 Conscious Bot System is running!"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "2026-02-01T00:57:40.571Z | INFO | [<NUM>-02-01T00:57:40.571Z] [INFO] \ud83d\udcca Service Status:",
+    "severity": "INFO",
+    "component": "2026-02-01T00:57:40.571Z",
+    "count": 1,
+    "first_seen_line": 101,
+    "last_seen_line": 101,
+    "examples": [
+      "[2026-02-01T00:57:40.571Z] [INFO] \ud83d\udcca Service Status:"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "2026-02-01T00:57:40.571Z | INFO | [<NUM>-02-01T00:57:40.571Z] [INFO]   Core API:     http://localhost:<NUM>",
+    "severity": "INFO",
+    "component": "2026-02-01T00:57:40.571Z",
+    "count": 1,
+    "first_seen_line": 102,
+    "last_seen_line": 102,
+    "examples": [
+      "[2026-02-01T00:57:40.571Z] [INFO]   Core API:     http://localhost:3007"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "2026-02-01T00:57:40.571Z | INFO | [<NUM>-02-01T00:57:40.571Z] [INFO]   Memory:     http://localhost:<NUM>",
+    "severity": "INFO",
+    "component": "2026-02-01T00:57:40.571Z",
+    "count": 1,
+    "first_seen_line": 103,
+    "last_seen_line": 103,
+    "examples": [
+      "[2026-02-01T00:57:40.571Z] [INFO]   Memory:     http://localhost:3001"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "2026-02-01T00:57:40.571Z | INFO | [<NUM>-02-01T00:57:40.571Z] [INFO]   World:     http://localhost:<NUM>",
+    "severity": "INFO",
+    "component": "2026-02-01T00:57:40.571Z",
+    "count": 1,
+    "first_seen_line": 104,
+    "last_seen_line": 104,
+    "examples": [
+      "[2026-02-01T00:57:40.571Z] [INFO]   World:     http://localhost:3004"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "2026-02-01T00:57:40.571Z | INFO | [<NUM>-02-01T00:57:40.571Z] [INFO]   Cognition:     http://localhost:<NUM>",
+    "severity": "INFO",
+    "component": "2026-02-01T00:57:40.571Z",
+    "count": 1,
+    "first_seen_line": 105,
+    "last_seen_line": 105,
+    "examples": [
+      "[2026-02-01T00:57:40.571Z] [INFO]   Cognition:     http://localhost:3003"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "2026-02-01T00:57:40.571Z | INFO | [<NUM>-02-01T00:57:40.571Z] [INFO]   Planning:     http://localhost:<NUM>",
+    "severity": "INFO",
+    "component": "2026-02-01T00:57:40.571Z",
+    "count": 1,
+    "first_seen_line": 106,
+    "last_seen_line": 106,
+    "examples": [
+      "[2026-02-01T00:57:40.571Z] [INFO]   Planning:     http://localhost:3002"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "2026-02-01T00:57:40.571Z | INFO | [<NUM>-02-01T00:57:40.571Z] [INFO]   Minecraft Interface:     http://localhost:<NUM>",
+    "severity": "INFO",
+    "component": "2026-02-01T00:57:40.571Z",
+    "count": 1,
+    "first_seen_line": 107,
+    "last_seen_line": 107,
+    "examples": [
+      "[2026-02-01T00:57:40.571Z] [INFO]   Minecraft Interface:     http://localhost:3005"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "2026-02-01T00:57:40.571Z | INFO | [<NUM>-02-01T00:57:40.571Z] [INFO]   MLX-LM Sidecar:     http://localhost:<NUM>",
+    "severity": "INFO",
+    "component": "2026-02-01T00:57:40.571Z",
+    "count": 1,
+    "first_seen_line": 108,
+    "last_seen_line": 108,
+    "examples": [
+      "[2026-02-01T00:57:40.571Z] [INFO]   MLX-LM Sidecar:     http://localhost:5002"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "2026-02-01T00:57:40.571Z | INFO | [<NUM>-02-01T00:57:40.571Z] [INFO]   Sterling:     ws://localhost:<NUM>",
+    "severity": "INFO",
+    "component": "2026-02-01T00:57:40.571Z",
+    "count": 1,
+    "first_seen_line": 110,
+    "last_seen_line": 110,
+    "examples": [
+      "[2026-02-01T00:57:40.571Z] [INFO]   Sterling:     ws://localhost:8766"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "2026-02-01T00:57:40.571Z | INFO | [<NUM>-02-01T00:57:40.571Z] [INFO] \ud83d\udd17 Quick Actions:",
+    "severity": "INFO",
+    "component": "2026-02-01T00:57:40.571Z",
+    "count": 1,
+    "first_seen_line": 112,
+    "last_seen_line": 112,
+    "examples": [
+      "[2026-02-01T00:57:40.571Z] [INFO] \ud83d\udd17 Quick Actions:"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "2026-02-01T00:57:40.571Z | INFO | [<NUM>-02-01T00:57:40.571Z] [INFO]   Core API:      http://localhost:<NUM>",
+    "severity": "INFO",
+    "component": "2026-02-01T00:57:40.571Z",
+    "count": 1,
+    "first_seen_line": 114,
+    "last_seen_line": 114,
+    "examples": [
+      "[2026-02-01T00:57:40.571Z] [INFO]   Core API:      http://localhost:3007"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "2026-02-01T00:57:40.571Z | INFO | [<NUM>-02-01T00:57:40.571Z] [INFO]   Minecraft Bot: http://localhost:<NUM>",
+    "severity": "INFO",
+    "component": "2026-02-01T00:57:40.571Z",
+    "count": 1,
+    "first_seen_line": 115,
+    "last_seen_line": 115,
+    "examples": [
+      "[2026-02-01T00:57:40.571Z] [INFO]   Minecraft Bot: http://localhost:3005"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "2026-02-01T00:57:40.571Z | INFO | [<NUM>-02-01T00:57:40.571Z] [INFO]   MLX-LM Sidecar: http://localhost:<NUM>",
+    "severity": "INFO",
+    "component": "2026-02-01T00:57:40.571Z",
+    "count": 1,
+    "first_seen_line": 116,
+    "last_seen_line": 116,
+    "examples": [
+      "[2026-02-01T00:57:40.571Z] [INFO]   MLX-LM Sidecar: http://localhost:5002"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "2026-02-01T00:57:40.572Z | INFO | [<NUM>-02-01T00:57:40.572Z] [INFO] \ud83c\udfae Minecraft Commands:",
+    "severity": "INFO",
+    "component": "2026-02-01T00:57:40.572Z",
+    "count": 1,
+    "first_seen_line": 118,
+    "last_seen_line": 118,
+    "examples": [
+      "[2026-02-01T00:57:40.572Z] [INFO] \ud83c\udfae Minecraft Commands:"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "2026-02-01T00:57:40.572Z | INFO | [<NUM>-02-01T00:57:40.572Z] [INFO]   Connect bot: curl -X POST http://localhost:<NUM>/connect",
+    "severity": "INFO",
+    "component": "2026-02-01T00:57:40.572Z",
+    "count": 1,
+    "first_seen_line": 119,
+    "last_seen_line": 119,
+    "examples": [
+      "[2026-02-01T00:57:40.572Z] [INFO]   Connect bot: curl -X POST http://localhost:3005/connect"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "2026-02-01T00:57:40.572Z | INFO | [<NUM>-02-01T00:57:40.572Z] [INFO]   Disconnect bot: curl -X POST http://localhost:<NUM>/disconnect",
+    "severity": "INFO",
+    "component": "2026-02-01T00:57:40.572Z",
+    "count": 1,
+    "first_seen_line": 120,
+    "last_seen_line": 120,
+    "examples": [
+      "[2026-02-01T00:57:40.572Z] [INFO]   Disconnect bot: curl -X POST http://localhost:3005/disconnect"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "2026-02-01T00:57:40.572Z | INFO | [<NUM>-02-01T00:57:40.572Z] [INFO]   Get status: curl http://localhost:<NUM>/status",
+    "severity": "INFO",
+    "component": "2026-02-01T00:57:40.572Z",
+    "count": 1,
+    "first_seen_line": 121,
+    "last_seen_line": 121,
+    "examples": [
+      "[2026-02-01T00:57:40.572Z] [INFO]   Get status: curl http://localhost:3005/status"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "2026-02-01T00:57:40.572Z | INFO | [<NUM>-02-01T00:57:40.572Z] [INFO] \ud83d\uded1 To stop all services:",
+    "severity": "INFO",
+    "component": "2026-02-01T00:57:40.572Z",
+    "count": 1,
+    "first_seen_line": 123,
+    "last_seen_line": 123,
+    "examples": [
+      "[2026-02-01T00:57:40.572Z] [INFO] \ud83d\uded1 To stop all services:"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "2026-02-01T00:57:40.572Z | INFO | [<NUM>-02-01T00:57:40.572Z] [INFO]   Press Ctrl+C or run: pnpm kill",
+    "severity": "INFO",
+    "component": "2026-02-01T00:57:40.572Z",
+    "count": 1,
+    "first_seen_line": 124,
+    "last_seen_line": 124,
+    "examples": [
+      "[2026-02-01T00:57:40.572Z] [INFO]   Press Ctrl+C or run: pnpm kill"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "2026-02-01T00:57:40.572Z | INFO | [<NUM>-02-01T00:57:40.572Z] [INFO] \ud83d\udca1 Services are running. Press Ctrl+C to stop.",
+    "severity": "INFO",
+    "component": "2026-02-01T00:57:40.572Z",
+    "count": 1,
+    "first_seen_line": 126,
+    "last_seen_line": 126,
+    "examples": [
+      "[2026-02-01T00:57:40.572Z] [INFO] \ud83d\udca1 Services are running. Press Ctrl+C to stop."
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "Dashboard | INFO | [Dashboard] POST /api/live-stream-updates <NUM> in 20ms",
+    "severity": "INFO",
+    "component": "Dashboard",
+    "count": 1,
+    "first_seen_line": 142,
+    "last_seen_line": 142,
+    "examples": [
+      "[Dashboard] POST /api/live-stream-updates 200 in 20ms"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "<no-component> | INFO | POST /api/live-stream-updates <NUM> in 19ms",
+    "severity": "INFO",
+    "component": "<no-component>",
+    "count": 1,
+    "first_seen_line": 143,
+    "last_seen_line": 143,
+    "examples": [
+      " POST /api/live-stream-updates 200 in 19ms"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "Dashboard | INFO | [Dashboard] POST /api/environment-updates <NUM> in 20ms",
+    "severity": "INFO",
+    "component": "Dashboard",
+    "count": 1,
+    "first_seen_line": 144,
+    "last_seen_line": 144,
+    "examples": [
+      "[Dashboard] POST /api/environment-updates 200 in 20ms"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "<no-component> | INFO | POST /api/environment-updates <NUM> in 18ms",
+    "severity": "INFO",
+    "component": "<no-component>",
+    "count": 1,
+    "first_seen_line": 145,
+    "last_seen_line": 145,
+    "examples": [
+      " POST /api/environment-updates 200 in 18ms"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "Dashboard | INFO | [Dashboard] POST /api/ws/bot-state <NUM> in 100ms",
+    "severity": "INFO",
+    "component": "Dashboard",
+    "count": 1,
+    "first_seen_line": 201,
+    "last_seen_line": 201,
+    "examples": [
+      "[Dashboard] POST /api/ws/bot-state 200 in 100ms"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "<no-component> | INFO | id: 'thought-<HEX>-3f0oelq',",
+    "severity": "INFO",
+    "component": "<no-component>",
+    "count": 1,
+    "first_seen_line": 225,
+    "last_seen_line": 225,
+    "examples": [
+      "  id: 'thought-1769907475490-3f0oelq',"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "Dashboard | INFO | [Dashboard] Broadcasting message to 0 connections: {\"type\":\"cognitive_thoughts\",\"timestamp\":<HEX>,\"data\":{\"thoughts\":[{\"type\":\"status\",\"content\":\"Health: <NUM>%, Hunger: <NUM>%. Observing environment and deciding next action.\",\"attribution\":\"self\",\"context\":{\"emotionalState\":\"neutral\",\"confidence\":0.5,\"cognitiveSystem\":\"minecraft-interface\"},\"metadata\":{\"thoughtType\":\"status\",\"source\":\"minecraft-interface\"},\"id\":\"thought-<HEX>-3f0oelq\",\"timestamp\":<HEX>,\"processed\":false}]}}",
+    "severity": "INFO",
+    "component": "Dashboard",
+    "count": 1,
+    "first_seen_line": 229,
+    "last_seen_line": 229,
+    "examples": [
+      "[Dashboard] Broadcasting message to 0 connections: {\"type\":\"cognitive_thoughts\",\"timestamp\":1769907475491,\"data\":{\"thoughts\":[{\"type\":\"status\",\"content\":\"Health: 100%, Hunger: 100%. Observing environment and deciding next action.\",\"attribution\":\"self\",\"context\":{\"emotionalState\":\"neutral\",\"confidence\":0.5,\"cognitiveSystem\":\"minecraft-interface\"},\"metadata\":{\"thoughtType\":\"status\",\"source\":\"minecraft-interface\"},\"id\":\"thought-1769907475490-3f0oelq\",\"timestamp\":1769907475490,\"processed\":false}]}}"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "Dashboard | INFO | [Dashboard] Loaded 4 thoughts from persistent storage",
+    "severity": "INFO",
+    "component": "Dashboard",
+    "count": 1,
+    "first_seen_line": 232,
+    "last_seen_line": 232,
+    "examples": [
+      "[Dashboard] Loaded 4 thoughts from persistent storage"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "ThreatPerception | INFO | [Minecraft Interface] [ThreatPerception] suppressed 3 LOS logs in last 5000ms (drowned:3)",
+    "severity": "INFO",
+    "component": "ThreatPerception",
+    "count": 1,
+    "first_seen_line": 250,
+    "last_seen_line": 250,
+    "examples": [
+      "[Minecraft Interface] [ThreatPerception] suppressed 3 LOS logs in last 5000ms (drowned:3)"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "<no-component> | INFO | POST /api/live-stream-updates <NUM> in 13ms",
+    "severity": "INFO",
+    "component": "<no-component>",
+    "count": 1,
+    "first_seen_line": 265,
+    "last_seen_line": 265,
+    "examples": [
+      " POST /api/live-stream-updates 200 in 13ms"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "ThreatPerception | INFO | [Minecraft Interface] [ThreatPerception] suppressed 7 LOS logs in last 5000ms (drowned:3, creeper:2, spider:2)",
+    "severity": "INFO",
+    "component": "ThreatPerception",
+    "count": 1,
+    "first_seen_line": 277,
+    "last_seen_line": 277,
+    "examples": [
+      "[Minecraft Interface] [ThreatPerception] suppressed 7 LOS logs in last 5000ms (drowned:3, creeper:2, spider:2)"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "<no-component> | INFO | id: 'thought-<HEX>-hh4skh1',",
+    "severity": "INFO",
+    "component": "<no-component>",
+    "count": 1,
+    "first_seen_line": 321,
+    "last_seen_line": 321,
+    "examples": [
+      "  id: 'thought-1769907490399-hh4skh1',"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "Dashboard | INFO | [Dashboard] Broadcasting message to 0 connections: {\"type\":\"cognitive_thoughts\",\"timestamp\":<HEX>,\"data\":{\"thoughts\":[{\"type\":\"status\",\"content\":\"Health: <NUM>%, Hunger: <NUM>%. Observing environment and deciding next action.\",\"attribution\":\"self\",\"context\":{\"emotionalState\":\"neutral\",\"confidence\":0.5,\"cognitiveSystem\":\"minecraft-interface\"},\"metadata\":{\"thoughtType\":\"status\",\"source\":\"minecraft-interface\"},\"id\":\"thought-<HEX>-hh4skh1\",\"timestamp\":<HEX>,\"processed\":false}]}}",
+    "severity": "INFO",
+    "component": "Dashboard",
+    "count": 1,
+    "first_seen_line": 325,
+    "last_seen_line": 325,
+    "examples": [
+      "[Dashboard] Broadcasting message to 0 connections: {\"type\":\"cognitive_thoughts\",\"timestamp\":1769907490400,\"data\":{\"thoughts\":[{\"type\":\"status\",\"content\":\"Health: 100%, Hunger: 100%. Observing environment and deciding next action.\",\"attribution\":\"self\",\"context\":{\"emotionalState\":\"neutral\",\"confidence\":0.5,\"cognitiveSystem\":\"minecraft-interface\"},\"metadata\":{\"thoughtType\":\"status\",\"source\":\"minecraft-interface\"},\"id\":\"thought-1769907490399-hh4skh1\",\"timestamp\":1769907490399,\"processed\":false}]}}"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "ThreatPerception | INFO | [Minecraft Interface] [ThreatPerception] suppressed 9 LOS logs in last 5000ms (drowned:3, creeper:3, spider:3)",
+    "severity": "INFO",
+    "component": "ThreatPerception",
+    "count": 1,
+    "first_seen_line": 333,
+    "last_seen_line": 333,
+    "examples": [
+      "[Minecraft Interface] [ThreatPerception] suppressed 9 LOS logs in last 5000ms (drowned:3, creeper:3, spider:3)"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "Planning | INFO | [Planning] [CognitiveStream] Fetched 2 thoughts [",
+    "severity": "INFO",
+    "component": "Planning",
+    "count": 1,
+    "first_seen_line": 344,
+    "last_seen_line": 344,
+    "examples": [
+      "[Planning] [CognitiveStream] Fetched 2 thoughts ["
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "Dashboard | INFO | [Dashboard] POST /api/live-stream-updates <NUM> in 17ms",
+    "severity": "INFO",
+    "component": "Dashboard",
+    "count": 1,
+    "first_seen_line": 349,
+    "last_seen_line": 349,
+    "examples": [
+      "[Dashboard] POST /api/live-stream-updates 200 in 17ms"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "Dashboard | INFO | [Dashboard] POST /api/environment-updates <NUM> in 17ms",
+    "severity": "INFO",
+    "component": "Dashboard",
+    "count": 1,
+    "first_seen_line": 351,
+    "last_seen_line": 351,
+    "examples": [
+      "[Dashboard] POST /api/environment-updates 200 in 17ms"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "Dashboard | INFO | [Dashboard] POST /api/environment-updates <NUM> in 14ms",
+    "severity": "INFO",
+    "component": "Dashboard",
+    "count": 1,
+    "first_seen_line": 352,
+    "last_seen_line": 352,
+    "examples": [
+      "[Dashboard] POST /api/environment-updates 200 in 14ms"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "ThreatPerception | INFO | [Minecraft Interface] [ThreatPerception] suppressed 8 LOS logs in last 5000ms (drowned:2, creeper:3, spider:3)",
+    "severity": "INFO",
+    "component": "ThreatPerception",
+    "count": 1,
+    "first_seen_line": 369,
+    "last_seen_line": 369,
+    "examples": [
+      "[Minecraft Interface] [ThreatPerception] suppressed 8 LOS logs in last 5000ms (drowned:2, creeper:3, spider:3)"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "ThreatPerception | INFO | [Minecraft Interface] [ThreatPerception] suppressed 6 LOS logs in last 5000ms (creeper:3, spider:3)",
+    "severity": "INFO",
+    "component": "ThreatPerception",
+    "count": 1,
+    "first_seen_line": 396,
+    "last_seen_line": 396,
+    "examples": [
+      "[Minecraft Interface] [ThreatPerception] suppressed 6 LOS logs in last 5000ms (creeper:3, spider:3)"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "Dashboard | INFO | [Dashboard] POST /api/ws/bot-state <NUM> in 14ms",
+    "severity": "INFO",
+    "component": "Dashboard",
+    "count": 1,
+    "first_seen_line": 397,
+    "last_seen_line": 397,
+    "examples": [
+      "[Dashboard] POST /api/ws/bot-state 200 in 14ms"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "Dashboard | INFO | [Dashboard] POST /api/ws/cognitive-stream <NUM> in 84ms",
+    "severity": "INFO",
+    "component": "Dashboard",
+    "count": 1,
+    "first_seen_line": 424,
+    "last_seen_line": 424,
+    "examples": [
+      "[Dashboard] POST /api/ws/cognitive-stream 200 in 84ms"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "Dashboard | INFO | [Dashboard] POST /api/environment-updates <NUM> in 6ms",
+    "severity": "INFO",
+    "component": "Dashboard",
+    "count": 1,
+    "first_seen_line": 437,
+    "last_seen_line": 437,
+    "examples": [
+      "[Dashboard] POST /api/environment-updates 200 in 6ms"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "Dashboard | INFO | [Dashboard] GET /api/tasks <NUM> in 19ms",
+    "severity": "INFO",
+    "component": "Dashboard",
+    "count": 1,
+    "first_seen_line": 441,
+    "last_seen_line": 441,
+    "examples": [
+      "[Dashboard] GET /api/tasks 200 in 19ms"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "Dashboard | INFO | [Dashboard] GET /api/ws/cognitive-stream/history?limit=<NUM> <NUM> in 20ms",
+    "severity": "INFO",
+    "component": "Dashboard",
+    "count": 1,
+    "first_seen_line": 442,
+    "last_seen_line": 442,
+    "examples": [
+      "[Dashboard] GET /api/ws/cognitive-stream/history?limit=100 200 in 20ms"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "Dashboard | INFO | [Dashboard] POST /api/ws/bot-state <NUM> in 10ms",
+    "severity": "INFO",
+    "component": "Dashboard",
+    "count": 1,
+    "first_seen_line": 445,
+    "last_seen_line": 445,
+    "examples": [
+      "[Dashboard] POST /api/ws/bot-state 200 in 10ms"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "Dashboard | INFO | [Dashboard] POST /api/live-stream-updates <NUM> in 9ms",
+    "severity": "INFO",
+    "component": "Dashboard",
+    "count": 1,
+    "first_seen_line": 457,
+    "last_seen_line": 457,
+    "examples": [
+      "[Dashboard] POST /api/live-stream-updates 200 in 9ms"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "<no-component> | INFO | id: 'thought-<HEX>-y5ov6wj',",
+    "severity": "INFO",
+    "component": "<no-component>",
+    "count": 1,
+    "first_seen_line": 515,
+    "last_seen_line": 515,
+    "examples": [
+      "  id: 'thought-1769907520399-y5ov6wj',"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "Dashboard | INFO | [Dashboard] Broadcasting message to 0 connections: {\"type\":\"cognitive_thoughts\",\"timestamp\":<HEX>,\"data\":{\"thoughts\":[{\"type\":\"status\",\"content\":\"Health: <NUM>%, Hunger: <NUM>%. Observing environment and deciding next action.\",\"attribution\":\"self\",\"context\":{\"emotionalState\":\"neutral\",\"confidence\":0.5,\"cognitiveSystem\":\"minecraft-interface\"},\"metadata\":{\"thoughtType\":\"status\",\"source\":\"minecraft-interface\"},\"id\":\"thought-<HEX>-y5ov6wj\",\"timestamp\":<HEX>,\"processed\":false}]}}",
+    "severity": "INFO",
+    "component": "Dashboard",
+    "count": 1,
+    "first_seen_line": 519,
+    "last_seen_line": 519,
+    "examples": [
+      "[Dashboard] Broadcasting message to 0 connections: {\"type\":\"cognitive_thoughts\",\"timestamp\":1769907520400,\"data\":{\"thoughts\":[{\"type\":\"status\",\"content\":\"Health: 100%, Hunger: 100%. Observing environment and deciding next action.\",\"attribution\":\"self\",\"context\":{\"emotionalState\":\"neutral\",\"confidence\":0.5,\"cognitiveSystem\":\"minecraft-interface\"},\"metadata\":{\"thoughtType\":\"status\",\"source\":\"minecraft-interface\"},\"id\":\"thought-1769907520399-y5ov6wj\",\"timestamp\":1769907520399,\"processed\":false}]}}"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "Planning | INFO | [Planning] [CognitiveStream] Fetched 4 thoughts [",
+    "severity": "INFO",
+    "component": "Planning",
+    "count": 1,
+    "first_seen_line": 538,
+    "last_seen_line": 538,
+    "examples": [
+      "[Planning] [CognitiveStream] Fetched 4 thoughts ["
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "<no-component> | INFO | POST /api/live-stream-updates <NUM> in 14ms",
+    "severity": "INFO",
+    "component": "<no-component>",
+    "count": 1,
+    "first_seen_line": 546,
+    "last_seen_line": 546,
+    "examples": [
+      " POST /api/live-stream-updates 200 in 14ms"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "Dashboard | INFO | [Dashboard] POST /api/environment-updates <NUM> in 19ms",
+    "severity": "INFO",
+    "component": "Dashboard",
+    "count": 1,
+    "first_seen_line": 548,
+    "last_seen_line": 548,
+    "examples": [
+      "[Dashboard] POST /api/environment-updates 200 in 19ms"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "Dashboard | INFO | [Dashboard] POST /api/live-stream-updates <NUM> in 84ms",
+    "severity": "INFO",
+    "component": "Dashboard",
+    "count": 1,
+    "first_seen_line": 651,
+    "last_seen_line": 651,
+    "examples": [
+      "[Dashboard] POST /api/live-stream-updates 200 in 84ms"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "Dashboard | INFO | [Dashboard] POST /api/live-stream-updates <NUM> in 152ms",
+    "severity": "INFO",
+    "component": "Dashboard",
+    "count": 1,
+    "first_seen_line": 652,
+    "last_seen_line": 652,
+    "examples": [
+      "[Dashboard] POST /api/live-stream-updates 200 in 152ms"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "Dashboard | INFO | [Dashboard] POST /api/live-stream-updates <NUM> in 158ms",
+    "severity": "INFO",
+    "component": "Dashboard",
+    "count": 1,
+    "first_seen_line": 653,
+    "last_seen_line": 653,
+    "examples": [
+      "[Dashboard] POST /api/live-stream-updates 200 in 158ms"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "Dashboard | INFO | [Dashboard] GET /api/tasks <NUM> in 15ms",
+    "severity": "INFO",
+    "component": "Dashboard",
+    "count": 1,
+    "first_seen_line": 664,
+    "last_seen_line": 664,
+    "examples": [
+      "[Dashboard] GET /api/tasks 200 in 15ms"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "Dashboard | INFO | [Dashboard] GET /api/ws/cognitive-stream/history?limit=<NUM> <NUM> in 18ms",
+    "severity": "INFO",
+    "component": "Dashboard",
+    "count": 1,
+    "first_seen_line": 665,
+    "last_seen_line": 665,
+    "examples": [
+      "[Dashboard] GET /api/ws/cognitive-stream/history?limit=100 200 in 18ms"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "<no-component> | INFO | id: 'thought-<HEX>-sv138dt',",
+    "severity": "INFO",
+    "component": "<no-component>",
+    "count": 1,
+    "first_seen_line": 711,
+    "last_seen_line": 711,
+    "examples": [
+      "  id: 'thought-1769907550400-sv138dt',"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "Dashboard | INFO | [Dashboard] Broadcasting message to 0 connections: {\"type\":\"cognitive_thoughts\",\"timestamp\":<HEX>,\"data\":{\"thoughts\":[{\"type\":\"status\",\"content\":\"Health: <NUM>%, Hunger: <NUM>%. Observing environment and deciding next action.\",\"attribution\":\"self\",\"context\":{\"emotionalState\":\"neutral\",\"confidence\":0.5,\"cognitiveSystem\":\"minecraft-interface\"},\"metadata\":{\"thoughtType\":\"status\",\"source\":\"minecraft-interface\"},\"id\":\"thought-<HEX>-sv138dt\",\"timestamp\":<HEX>,\"processed\":false}]}}",
+    "severity": "INFO",
+    "component": "Dashboard",
+    "count": 1,
+    "first_seen_line": 715,
+    "last_seen_line": 715,
+    "examples": [
+      "[Dashboard] Broadcasting message to 0 connections: {\"type\":\"cognitive_thoughts\",\"timestamp\":1769907550400,\"data\":{\"thoughts\":[{\"type\":\"status\",\"content\":\"Health: 100%, Hunger: 100%. Observing environment and deciding next action.\",\"attribution\":\"self\",\"context\":{\"emotionalState\":\"neutral\",\"confidence\":0.5,\"cognitiveSystem\":\"minecraft-interface\"},\"metadata\":{\"thoughtType\":\"status\",\"source\":\"minecraft-interface\"},\"id\":\"thought-1769907550400-sv138dt\",\"timestamp\":1769907550400,\"processed\":false}]}}"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "Planning | INFO | [Planning] [CognitiveStream] Fetched 6 thoughts [",
+    "severity": "INFO",
+    "component": "Planning",
+    "count": 1,
+    "first_seen_line": 734,
+    "last_seen_line": 734,
+    "examples": [
+      "[Planning] [CognitiveStream] Fetched 6 thoughts ["
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "<no-component> | INFO | POST /api/live-stream-updates <NUM> in 18ms",
+    "severity": "INFO",
+    "component": "<no-component>",
+    "count": 1,
+    "first_seen_line": 744,
+    "last_seen_line": 744,
+    "examples": [
+      " POST /api/live-stream-updates 200 in 18ms"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "Dashboard | INFO | [Dashboard] POST /api/environment-updates <NUM> in 13ms",
+    "severity": "INFO",
+    "component": "Dashboard",
+    "count": 1,
+    "first_seen_line": 745,
+    "last_seen_line": 745,
+    "examples": [
+      "[Dashboard] POST /api/environment-updates 200 in 13ms"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "<no-component> | INFO | POST /api/environment-updates <NUM> in 13ms",
+    "severity": "INFO",
+    "component": "<no-component>",
+    "count": 1,
+    "first_seen_line": 746,
+    "last_seen_line": 746,
+    "examples": [
+      " POST /api/environment-updates 200 in 13ms"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "Dashboard | INFO | [Dashboard] GET /api/ws/cognitive-stream/history?limit=<NUM> <NUM> in 6ms",
+    "severity": "INFO",
+    "component": "Dashboard",
+    "count": 1,
+    "first_seen_line": 757,
+    "last_seen_line": 757,
+    "examples": [
+      "[Dashboard] GET /api/ws/cognitive-stream/history?limit=100 200 in 6ms"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "Dashboard | INFO | [Dashboard] POST /api/ws/bot-state <NUM> in 5ms",
+    "severity": "INFO",
+    "component": "Dashboard",
+    "count": 1,
+    "first_seen_line": 765,
+    "last_seen_line": 765,
+    "examples": [
+      "[Dashboard] POST /api/ws/bot-state 200 in 5ms"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "Dashboard | INFO | [Dashboard] POST /api/ws/cognitive-stream <NUM> in 10ms",
+    "severity": "INFO",
+    "component": "Dashboard",
+    "count": 1,
+    "first_seen_line": 819,
+    "last_seen_line": 819,
+    "examples": [
+      "[Dashboard] POST /api/ws/cognitive-stream 200 in 10ms"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "<no-component> | INFO | attribution: 'intrusive'",
+    "severity": "INFO",
+    "component": "<no-component>",
+    "count": 1,
+    "first_seen_line": 826,
+    "last_seen_line": 826,
+    "examples": [
+      "  attribution: 'intrusive'"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "<no-component> | INFO | attribution: 'intrusive',",
+    "severity": "INFO",
+    "component": "<no-component>",
+    "count": 1,
+    "first_seen_line": 831,
+    "last_seen_line": 831,
+    "examples": [
+      "  attribution: 'intrusive',"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "<no-component> | INFO | context: { emotionalState: 'curious', confidence: 0.8 },",
+    "severity": "INFO",
+    "component": "<no-component>",
+    "count": 1,
+    "first_seen_line": 832,
+    "last_seen_line": 832,
+    "examples": [
+      "  context: { emotionalState: 'curious', confidence: 0.8 },"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "<no-component> | INFO | messageType: 'intrusion',",
+    "severity": "INFO",
+    "component": "<no-component>",
+    "count": 1,
+    "first_seen_line": 834,
+    "last_seen_line": 834,
+    "examples": [
+      "    messageType: 'intrusion',"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "<no-component> | INFO | intent: 'external_suggestion',",
+    "severity": "INFO",
+    "component": "<no-component>",
+    "count": 1,
+    "first_seen_line": 835,
+    "last_seen_line": 835,
+    "examples": [
+      "    intent: 'external_suggestion',"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "<no-component> | INFO | thoughtType: 'intrusive'",
+    "severity": "INFO",
+    "component": "<no-component>",
+    "count": 1,
+    "first_seen_line": 836,
+    "last_seen_line": 836,
+    "examples": [
+      "    thoughtType: 'intrusive'"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "<no-component> | INFO | id: 'thought-<HEX>-usrw3tv',",
+    "severity": "INFO",
+    "component": "<no-component>",
+    "count": 1,
+    "first_seen_line": 838,
+    "last_seen_line": 838,
+    "examples": [
+      "  id: 'thought-1769907567781-usrw3tv',"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "Dashboard | INFO | [Dashboard] Broadcasting message to 0 connections: {\"type\":\"cognitive_thoughts\",\"timestamp\":<HEX>,\"data\":{\"thoughts\":[{\"type\":\"intrusive\",\"content\":\"In the water, there's probably good loot\",\"attribution\":\"intrusive\",\"context\":{\"emotionalState\":\"curious\",\"confidence\":0.8},\"metadata\":{\"messageType\":\"intrusion\",\"intent\":\"external_suggestion\",\"thoughtType\":\"intrusive\"},\"id\":\"thought-<HEX>-usrw3tv\",\"timestamp\":<HEX>,\"processed\":false}]}}",
+    "severity": "INFO",
+    "component": "Dashboard",
+    "count": 1,
+    "first_seen_line": 842,
+    "last_seen_line": 842,
+    "examples": [
+      "[Dashboard] Broadcasting message to 0 connections: {\"type\":\"cognitive_thoughts\",\"timestamp\":1769907567781,\"data\":{\"thoughts\":[{\"type\":\"intrusive\",\"content\":\"In the water, there's probably good loot\",\"attribution\":\"intrusive\",\"context\":{\"emotionalState\":\"curious\",\"confidence\":0.8},\"metadata\":{\"messageType\":\"intrusion\",\"intent\":\"external_suggestion\",\"thoughtType\":\"intrusive\"},\"id\":\"thought-1769907567781-usrw3tv\",\"timestamp\":1769907567781,\"processed\":false}]}}"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "Dashboard | INFO | [Dashboard] POST /api/ws/cognitive-stream <NUM> in 11ms",
+    "severity": "INFO",
+    "component": "Dashboard",
+    "count": 1,
+    "first_seen_line": 844,
+    "last_seen_line": 844,
+    "examples": [
+      "[Dashboard] POST /api/ws/cognitive-stream 200 in 11ms"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "Dashboard | INFO | [Dashboard] \u2713 Compiled /api/intrusive in 273ms (<NUM> modules)",
+    "severity": "INFO",
+    "component": "Dashboard",
+    "count": 1,
+    "first_seen_line": 845,
+    "last_seen_line": 845,
+    "examples": [
+      "[Dashboard] \u2713 Compiled /api/intrusive in 273ms (451 modules)"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "Cognition | INFO | [Cognition] Processing intrusion request",
+    "severity": "INFO",
+    "component": "Cognition",
+    "count": 1,
+    "first_seen_line": 846,
+    "last_seen_line": 846,
+    "examples": [
+      "[Cognition] Processing intrusion request"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "Planning | INFO | [Planning] [MCP] createWorldSnapshot called",
+    "severity": "INFO",
+    "component": "Planning",
+    "count": 1,
+    "first_seen_line": 847,
+    "last_seen_line": 847,
+    "examples": [
+      "[Planning] [MCP] createWorldSnapshot called"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "MCP | INFO | [MCP] Fetching world state from minecraft interface...",
+    "severity": "INFO",
+    "component": "MCP",
+    "count": 1,
+    "first_seen_line": 848,
+    "last_seen_line": 848,
+    "examples": [
+      "[MCP] Fetching world state from minecraft interface..."
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "Planning | INFO | [Planning] [MCP] Received data from minecraft interface: {",
+    "severity": "INFO",
+    "component": "Planning",
+    "count": 1,
+    "first_seen_line": 849,
+    "last_seen_line": 849,
+    "examples": [
+      "[Planning] [MCP] Received data from minecraft interface: {"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "<no-component> | INFO | \"success\": true,",
+    "severity": "INFO",
+    "component": "<no-component>",
+    "count": 1,
+    "first_seen_line": 850,
+    "last_seen_line": 850,
+    "examples": [
+      "  \"success\": true,"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "<no-component> | INFO | \"worldState\": {",
+    "severity": "INFO",
+    "component": "<no-component>",
+    "count": 1,
+    "first_seen_line": 853,
+    "last_seen_line": 853,
+    "examples": [
+      "    \"worldState\": {"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "<no-component> | INFO | \"player\": {",
+    "severity": "INFO",
+    "component": "<no-component>",
+    "count": 1,
+    "first_seen_line": 854,
+    "last_seen_line": 854,
+    "examples": [
+      "      \"player\": {"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "<no-component> | INFO | \"experience\": 0,",
+    "severity": "INFO",
+    "component": "<no-component>",
+    "count": 1,
+    "first_seen_line": 862,
+    "last_seen_line": 862,
+    "examples": [
+      "        \"experience\": 0,"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "<no-component> | INFO | \"gameMode\": \"survival\",",
+    "severity": "INFO",
+    "component": "<no-component>",
+    "count": 1,
+    "first_seen_line": 863,
+    "last_seen_line": 863,
+    "examples": [
+      "        \"gameMode\": \"survival\","
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "<no-component> | INFO | \"dimension\": \"overworld\"",
+    "severity": "INFO",
+    "component": "<no-component>",
+    "count": 1,
+    "first_seen_line": 864,
+    "last_seen_line": 864,
+    "examples": [
+      "        \"dimension\": \"overworld\""
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "<no-component> | INFO | \"environment\": {",
+    "severity": "INFO",
+    "component": "<no-component>",
+    "count": 1,
+    "first_seen_line": 866,
+    "last_seen_line": 866,
+    "examples": [
+      "      \"environment\": {"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "<no-component> | INFO | \"timeOfDay\": <NUM>,",
+    "severity": "INFO",
+    "component": "<no-component>",
+    "count": 1,
+    "first_seen_line": 867,
+    "last_seen_line": 867,
+    "examples": [
+      "        \"timeOfDay\": 6000,"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "<no-component> | INFO | \"biome\": \"plains\"",
+    "severity": "INFO",
+    "component": "<no-component>",
+    "count": 1,
+    "first_seen_line": 869,
+    "last_seen_line": 869,
+    "examples": [
+      "        \"biome\": \"plains\""
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "<no-component> | INFO | \"nearbyEntities\": [],",
+    "severity": "INFO",
+    "component": "<no-component>",
+    "count": 1,
+    "first_seen_line": 871,
+    "last_seen_line": 871,
+    "examples": [
+      "      \"nearbyEntities\": [],"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "<no-component> | INFO | \"nearbyBlocks\": []",
+    "severity": "INFO",
+    "component": "<no-component>",
+    "count": 1,
+    "first_seen_line": 872,
+    "last_seen_line": 872,
+    "examples": [
+      "      \"nearbyBlocks\": []"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "<no-component> | INFO | \"usedSlots\": 0",
+    "severity": "INFO",
+    "component": "<no-component>",
+    "count": 1,
+    "first_seen_line": 886,
+    "last_seen_line": 886,
+    "examples": [
+      "        \"usedSlots\": 0"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "MCP | INFO | [MCP] Creating snapshot from world state...",
+    "severity": "INFO",
+    "component": "MCP",
+    "count": 1,
+    "first_seen_line": 893,
+    "last_seen_line": 893,
+    "examples": [
+      "[MCP] Creating snapshot from world state..."
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "Planning | INFO | [Planning] [MCP] Snapshot created successfully: {",
+    "severity": "INFO",
+    "component": "Planning",
+    "count": 1,
+    "first_seen_line": 894,
+    "last_seen_line": 894,
+    "examples": [
+      "[Planning] [MCP] Snapshot created successfully: {"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "<no-component> | INFO | \"x\": 0,",
+    "severity": "INFO",
+    "component": "<no-component>",
+    "count": 1,
+    "first_seen_line": 896,
+    "last_seen_line": 896,
+    "examples": [
+      "    \"x\": 0,"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "<no-component> | INFO | \"y\": 64,",
+    "severity": "INFO",
+    "component": "<no-component>",
+    "count": 1,
+    "first_seen_line": 897,
+    "last_seen_line": 897,
+    "examples": [
+      "    \"y\": 64,"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "<no-component> | INFO | \"z\": 0",
+    "severity": "INFO",
+    "component": "<no-component>",
+    "count": 1,
+    "first_seen_line": 898,
+    "last_seen_line": 898,
+    "examples": [
+      "    \"z\": 0"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "<no-component> | INFO | \"biome\": \"plains\",",
+    "severity": "INFO",
+    "component": "<no-component>",
+    "count": 1,
+    "first_seen_line": 900,
+    "last_seen_line": 900,
+    "examples": [
+      "  \"biome\": \"plains\","
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "<no-component> | INFO | \"time\": 0,",
+    "severity": "INFO",
+    "component": "<no-component>",
+    "count": 1,
+    "first_seen_line": 901,
+    "last_seen_line": 901,
+    "examples": [
+      "  \"time\": 0,"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "<no-component> | INFO | \"lightLevel\": 15,",
+    "severity": "INFO",
+    "component": "<no-component>",
+    "count": 1,
+    "first_seen_line": 902,
+    "last_seen_line": 902,
+    "examples": [
+      "  \"lightLevel\": 15,"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "<no-component> | INFO | \"nearbyHostiles\": [],",
+    "severity": "INFO",
+    "component": "<no-component>",
+    "count": 1,
+    "first_seen_line": 903,
+    "last_seen_line": 903,
+    "examples": [
+      "  \"nearbyHostiles\": [],"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "<no-component> | INFO | \"selectedSlot\": 0,",
+    "severity": "INFO",
+    "component": "<no-component>",
+    "count": 1,
+    "first_seen_line": 907,
+    "last_seen_line": 907,
+    "examples": [
+      "    \"selectedSlot\": 0,"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "<no-component> | INFO | \"freeSlots\": 36",
+    "severity": "INFO",
+    "component": "<no-component>",
+    "count": 1,
+    "first_seen_line": 909,
+    "last_seen_line": 909,
+    "examples": [
+      "    \"freeSlots\": 36"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "<no-component> | INFO | \"toolDurability\": {},",
+    "severity": "INFO",
+    "component": "<no-component>",
+    "count": 1,
+    "first_seen_line": 911,
+    "last_seen_line": 911,
+    "examples": [
+      "  \"toolDurability\": {},"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "<no-component> | INFO | \"waypoints\": [],",
+    "severity": "INFO",
+    "component": "<no-component>",
+    "count": 1,
+    "first_seen_line": 912,
+    "last_seen_line": 912,
+    "examples": [
+      "  \"waypoints\": [],"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "<no-component> | INFO | \"vitals\": {",
+    "severity": "INFO",
+    "component": "<no-component>",
+    "count": 1,
+    "first_seen_line": 913,
+    "last_seen_line": 913,
+    "examples": [
+      "  \"vitals\": {"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "<no-component> | INFO | \"food\": 20",
+    "severity": "INFO",
+    "component": "<no-component>",
+    "count": 1,
+    "first_seen_line": 915,
+    "last_seen_line": 915,
+    "examples": [
+      "    \"food\": 20"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "<no-component> | INFO | \"hunger\": 20",
+    "severity": "INFO",
+    "component": "<no-component>",
+    "count": 1,
+    "first_seen_line": 918,
+    "last_seen_line": 918,
+    "examples": [
+      "  \"hunger\": 20"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "Planning | INFO | [Planning] [PlanRoute] {",
+    "severity": "INFO",
+    "component": "Planning",
+    "count": 1,
+    "first_seen_line": 921,
+    "last_seen_line": 921,
+    "examples": [
+      "[Planning] [PlanRoute] {"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "<no-component> | INFO | backend: 'unplannable',",
+    "severity": "INFO",
+    "component": "<no-component>",
+    "count": 1,
+    "first_seen_line": 922,
+    "last_seen_line": 922,
+    "examples": [
+      "  backend: 'unplannable',"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "<no-component> | INFO | rig: null,",
+    "severity": "INFO",
+    "component": "<no-component>",
+    "count": 1,
+    "first_seen_line": 923,
+    "last_seen_line": 923,
+    "examples": [
+      "  rig: null,"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "<no-component> | INFO | reason: 'no-requirement',",
+    "severity": "INFO",
+    "component": "<no-component>",
+    "count": 1,
+    "first_seen_line": 924,
+    "last_seen_line": 924,
+    "examples": [
+      "  reason: 'no-requirement',"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "<no-component> | INFO | taskTitle: 'Ask for clarification on next step (seq)'",
+    "severity": "INFO",
+    "component": "<no-component>",
+    "count": 1,
+    "first_seen_line": 925,
+    "last_seen_line": 925,
+    "examples": [
+      "  taskTitle: 'Ask for clarification on next step (seq)'"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "Planning | INFO | [Planning] Task added to enhanced integration: Ask for clarification on next step (seq)",
+    "severity": "INFO",
+    "component": "Planning",
+    "count": 1,
+    "first_seen_line": 927,
+    "last_seen_line": 927,
+    "examples": [
+      "[Planning] Task added to enhanced integration: Ask for clarification on next step (seq)"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "Cognition | INFO | [Cognition] Task created in planning system: {",
+    "severity": "INFO",
+    "component": "Cognition",
+    "count": 1,
+    "first_seen_line": 928,
+    "last_seen_line": 928,
+    "examples": [
+      "[Cognition] Task created in planning system: {"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "<no-component> | INFO | success: true,",
+    "severity": "INFO",
+    "component": "<no-component>",
+    "count": 1,
+    "first_seen_line": 929,
+    "last_seen_line": 929,
+    "examples": [
+      "  success: true,"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "<no-component> | INFO | taskId: 'task-<HEX>-2vzece94q',",
+    "severity": "INFO",
+    "component": "<no-component>",
+    "count": 1,
+    "first_seen_line": 930,
+    "last_seen_line": 930,
+    "examples": [
+      "  taskId: 'task-1769907568135-2vzece94q',"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "<no-component> | INFO | message: `Task added: social - From thought \"In the water, there's probably good loot\" \u2014 bucket Tactical, cap 60000ms.`,",
+    "severity": "INFO",
+    "component": "<no-component>",
+    "count": 1,
+    "first_seen_line": 931,
+    "last_seen_line": 931,
+    "examples": [
+      "  message: `Task added: social - From thought \"In the water, there's probably good loot\" \u2014 bucket Tactical, cap 60000ms.`,"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "<no-component> | INFO | cognitiveSystem: 'intrusive-processor',",
+    "severity": "INFO",
+    "component": "<no-component>",
+    "count": 1,
+    "first_seen_line": 946,
+    "last_seen_line": 946,
+    "examples": [
+      "    cognitiveSystem: 'intrusive-processor',"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "<no-component> | INFO | tags: [ 'intrusive', 'processing', 'started' ]",
+    "severity": "INFO",
+    "component": "<no-component>",
+    "count": 1,
+    "first_seen_line": 948,
+    "last_seen_line": 948,
+    "examples": [
+      "    tags: [ 'intrusive', 'processing', 'started' ]"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "<no-component> | INFO | thoughtType: 'thought_processing',",
+    "severity": "INFO",
+    "component": "<no-component>",
+    "count": 1,
+    "first_seen_line": 951,
+    "last_seen_line": 951,
+    "examples": [
+      "    thoughtType: 'thought_processing',"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "<no-component> | INFO | tags: [ 'intrusive', 'processing', 'started' ],",
+    "severity": "INFO",
+    "component": "<no-component>",
+    "count": 1,
+    "first_seen_line": 953,
+    "last_seen_line": 953,
+    "examples": [
+      "    tags: [ 'intrusive', 'processing', 'started' ],"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "<no-component> | INFO | id: 'thought-<HEX>-42ovwat',",
+    "severity": "INFO",
+    "component": "<no-component>",
+    "count": 1,
+    "first_seen_line": 957,
+    "last_seen_line": 957,
+    "examples": [
+      "  id: 'thought-1769907568144-42ovwat',"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "Dashboard | INFO | [Dashboard] Broadcasting message to 0 connections: {\"type\":\"cognitive_thoughts\",\"timestamp\":<HEX>,\"data\":{\"thoughts\":[{\"type\":\"thought_processing\",\"content\":\"Thought processing started: \\\"in the water, there's probably good loot\\\"\",\"attribution\":\"self\",\"context\":{\"emotionalState\":\"focused\",\"confidence\":0.6,\"cognitiveSystem\":\"intrusive-processor\",\"category\":\"processing\",\"tags\":[\"intrusive\",\"processing\",\"started\"]},\"metadata\":{\"thoughtType\":\"thought_processing\",\"category\":\"processing\",\"tags\":[\"intrusive\",\"processing\",\"started\"],\"source\":\"cognition-system\",\"timestamp\":<HEX>},\"id\":\"thought-<HEX>-42ovwat\",\"timestamp\":<HEX>,\"processed\":false}]}}",
+    "severity": "INFO",
+    "component": "Dashboard",
+    "count": 1,
+    "first_seen_line": 961,
+    "last_seen_line": 961,
+    "examples": [
+      "[Dashboard] Broadcasting message to 0 connections: {\"type\":\"cognitive_thoughts\",\"timestamp\":1769907568144,\"data\":{\"thoughts\":[{\"type\":\"thought_processing\",\"content\":\"Thought processing started: \\\"in the water, there's probably good loot\\\"\",\"attribution\":\"self\",\"context\":{\"emotionalState\":\"focused\",\"confidence\":0.6,\"cognitiveSystem\":\"intrusive-processor\",\"category\":\"processing\",\"tags\":[\"intrusive\",\"processing\",\"started\"]},\"metadata\":{\"thoughtType\":\"thought_processing\",\"category\":\"processing\",\"tags\":[\"intrusive\",\"processing\",\"started\"],\"source\":\"cognition-system\",\"timestamp\":1769907568119},\"id\":\"thought-1769907568144-42ovwat\",\"timestamp\":1769907568144,\"processed\":false}]}}"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "Dashboard | INFO | [Dashboard] POST /api/ws/cognitive-stream <NUM> in 24ms",
+    "severity": "INFO",
+    "component": "Dashboard",
+    "count": 1,
+    "first_seen_line": 963,
+    "last_seen_line": 963,
+    "examples": [
+      "[Dashboard] POST /api/ws/cognitive-stream 200 in 24ms"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "Dashboard | INFO | [Dashboard] Loaded 8 thoughts from persistent storage",
+    "severity": "INFO",
+    "component": "Dashboard",
+    "count": 1,
+    "first_seen_line": 964,
+    "last_seen_line": 964,
+    "examples": [
+      "[Dashboard] Loaded 8 thoughts from persistent storage"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "Dashboard | INFO | [Dashboard] No existing thoughts file found, starting fresh",
+    "severity": "INFO",
+    "component": "Dashboard",
+    "count": 1,
+    "first_seen_line": 965,
+    "last_seen_line": 965,
+    "examples": [
+      "[Dashboard] No existing thoughts file found, starting fresh"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "<no-component> | INFO | cognitiveSystem: 'intrusive-processor'",
+    "severity": "INFO",
+    "component": "<no-component>",
+    "count": 1,
+    "first_seen_line": 978,
+    "last_seen_line": 978,
+    "examples": [
+      "    cognitiveSystem: 'intrusive-processor'"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "<no-component> | INFO | metadata: { thoughtType: 'reflection', source: 'intrusive-thought' },",
+    "severity": "INFO",
+    "component": "<no-component>",
+    "count": 1,
+    "first_seen_line": 980,
+    "last_seen_line": 980,
+    "examples": [
+      "  metadata: { thoughtType: 'reflection', source: 'intrusive-thought' },"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "<no-component> | INFO | id: 'thought-<HEX>-d5e050n',",
+    "severity": "INFO",
+    "component": "<no-component>",
+    "count": 1,
+    "first_seen_line": 981,
+    "last_seen_line": 981,
+    "examples": [
+      "  id: 'thought-1769907568148-d5e050n',"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "Dashboard | INFO | [Dashboard] Broadcasting message to 0 connections: {\"type\":\"cognitive_thoughts\",\"timestamp\":<HEX>,\"data\":{\"thoughts\":[{\"type\":\"reflection\",\"content\":\"Processing intrusive thought: \\\"in the water, there's probably good loot\\\"\",\"attribution\":\"self\",\"context\":{\"emotionalState\":\"focused\",\"confidence\":0.6,\"cognitiveSystem\":\"intrusive-processor\"},\"metadata\":{\"thoughtType\":\"reflection\",\"source\":\"intrusive-thought\"},\"id\":\"thought-<HEX>-d5e050n\",\"timestamp\":<HEX>,\"processed\":false}]}}",
+    "severity": "INFO",
+    "component": "Dashboard",
+    "count": 1,
+    "first_seen_line": 985,
+    "last_seen_line": 985,
+    "examples": [
+      "[Dashboard] Broadcasting message to 0 connections: {\"type\":\"cognitive_thoughts\",\"timestamp\":1769907568149,\"data\":{\"thoughts\":[{\"type\":\"reflection\",\"content\":\"Processing intrusive thought: \\\"in the water, there's probably good loot\\\"\",\"attribution\":\"self\",\"context\":{\"emotionalState\":\"focused\",\"confidence\":0.6,\"cognitiveSystem\":\"intrusive-processor\"},\"metadata\":{\"thoughtType\":\"reflection\",\"source\":\"intrusive-thought\"},\"id\":\"thought-1769907568148-d5e050n\",\"timestamp\":1769907568148,\"processed\":false}]}}"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "Cognition | INFO | [Cognition] \u2705 Thought sent to cognitive stream: Processing intrusive thought: \"in the water, there...",
+    "severity": "INFO",
+    "component": "Cognition",
+    "count": 1,
+    "first_seen_line": 987,
+    "last_seen_line": 987,
+    "examples": [
+      "[Cognition] \u2705 Thought sent to cognitive stream: Processing intrusive thought: \"in the water, there..."
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "Dashboard | INFO | [Dashboard] \u2713 Compiled /api/task-updates in 73ms (<NUM> modules)",
+    "severity": "INFO",
+    "component": "Dashboard",
+    "count": 1,
+    "first_seen_line": 997,
+    "last_seen_line": 997,
+    "examples": [
+      "[Dashboard] \u2713 Compiled /api/task-updates in 73ms (120 modules)"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "Dashboard | INFO | [Dashboard] POST /api/task-updates <NUM> in 166ms",
+    "severity": "INFO",
+    "component": "Dashboard",
+    "count": 1,
+    "first_seen_line": 998,
+    "last_seen_line": 998,
+    "examples": [
+      "[Dashboard] POST /api/task-updates 200 in 166ms"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "Dashboard | INFO | [Dashboard] Loaded 1 thoughts from persistent storage",
+    "severity": "INFO",
+    "component": "Dashboard",
+    "count": 1,
+    "first_seen_line": 999,
+    "last_seen_line": 999,
+    "examples": [
+      "[Dashboard] Loaded 1 thoughts from persistent storage"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "<no-component> | INFO | action: {",
+    "severity": "INFO",
+    "component": "<no-component>",
+    "count": 1,
+    "first_seen_line": 1010,
+    "last_seen_line": 1010,
+    "examples": [
+      "    action: {"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "<no-component> | INFO | type: 'ask',",
+    "severity": "INFO",
+    "component": "<no-component>",
+    "count": 1,
+    "first_seen_line": 1011,
+    "last_seen_line": 1011,
+    "examples": [
+      "      type: 'ask',"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "<no-component> | INFO | target: 'for clarification on next step',",
+    "severity": "INFO",
+    "component": "<no-component>",
+    "count": 1,
+    "first_seen_line": 1012,
+    "last_seen_line": 1012,
+    "examples": [
+      "      target: 'for clarification on next step',"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "<no-component> | INFO | priority: 'low',",
+    "severity": "INFO",
+    "component": "<no-component>",
+    "count": 1,
+    "first_seen_line": 1013,
+    "last_seen_line": 1013,
+    "examples": [
+      "      priority: 'low',"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "<no-component> | INFO | category: 'social'",
+    "severity": "INFO",
+    "component": "<no-component>",
+    "count": 1,
+    "first_seen_line": 1014,
+    "last_seen_line": 1014,
+    "examples": [
+      "      category: 'social'"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "<no-component> | INFO | bucket: 'Tactical'",
+    "severity": "INFO",
+    "component": "<no-component>",
+    "count": 1,
+    "first_seen_line": 1016,
+    "last_seen_line": 1016,
+    "examples": [
+      "    bucket: 'Tactical'"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "<no-component> | INFO | taskId: 'task-<HEX>-k0isfq',",
+    "severity": "INFO",
+    "component": "<no-component>",
+    "count": 1,
+    "first_seen_line": 1019,
+    "last_seen_line": 1019,
+    "examples": [
+      "    taskId: 'task-1769907568133-k0isfq',"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "<no-component> | INFO | bucket: 'Tactical',",
+    "severity": "INFO",
+    "component": "<no-component>",
+    "count": 1,
+    "first_seen_line": 1020,
+    "last_seen_line": 1020,
+    "examples": [
+      "    bucket: 'Tactical',"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "<no-component> | INFO | thoughtType: 'social'",
+    "severity": "INFO",
+    "component": "<no-component>",
+    "count": 1,
+    "first_seen_line": 1021,
+    "last_seen_line": 1021,
+    "examples": [
+      "    thoughtType: 'social'"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "<no-component> | INFO | id: 'thought-<HEX>-w9l7puz',",
+    "severity": "INFO",
+    "component": "<no-component>",
+    "count": 1,
+    "first_seen_line": 1023,
+    "last_seen_line": 1023,
+    "examples": [
+      "  id: 'thought-1769907568317-w9l7puz',"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "Dashboard | INFO | [Dashboard] Broadcasting message to 0 connections: {\"type\":\"cognitive_thoughts\",\"timestamp\":<HEX>,\"data\":{\"thoughts\":[{\"type\":\"social\",\"content\":\"From thought \\\"In the water, there's probably good loot\\\" \u2014 bucket Tactical, cap 60000ms.\",\"attribution\":\"self\",\"context\":{\"action\":{\"type\":\"ask\",\"target\":\"for clarification on next step\",\"priority\":\"low\",\"category\":\"social\"},\"bucket\":\"Tactical\"},\"metadata\":{\"taskId\":\"task-<HEX>-k0isfq\",\"bucket\":\"Tactical\",\"thoughtType\":\"social\"},\"id\":\"thought-<HEX>-w9l7puz\",\"timestamp\":<HEX>,\"processed\":false}]}}",
+    "severity": "INFO",
+    "component": "Dashboard",
+    "count": 1,
+    "first_seen_line": 1027,
+    "last_seen_line": 1027,
+    "examples": [
+      "[Dashboard] Broadcasting message to 0 connections: {\"type\":\"cognitive_thoughts\",\"timestamp\":1769907568317,\"data\":{\"thoughts\":[{\"type\":\"social\",\"content\":\"From thought \\\"In the water, there's probably good loot\\\" \u2014 bucket Tactical, cap 60000ms.\",\"attribution\":\"self\",\"context\":{\"action\":{\"type\":\"ask\",\"target\":\"for clarification on next step\",\"priority\":\"low\",\"category\":\"social\"},\"bucket\":\"Tactical\"},\"metadata\":{\"taskId\":\"task-1769907568133-k0isfq\",\"bucket\":\"Tactical\",\"thoughtType\":\"social\"},\"id\":\"thought-1769907568317-w9l7puz\",\"timestamp\":1769907568317,\"processed\":false}]}}"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "Dashboard | INFO | [Dashboard] POST /api/ws/cognitive-stream <NUM> in 176ms",
+    "severity": "INFO",
+    "component": "Dashboard",
+    "count": 1,
+    "first_seen_line": 1029,
+    "last_seen_line": 1029,
+    "examples": [
+      "[Dashboard] POST /api/ws/cognitive-stream 200 in 176ms"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "Cognition | INFO | [Cognition] [Cognition] Intrusive thought processed and sent to cognitive stream",
+    "severity": "INFO",
+    "component": "Cognition",
+    "count": 1,
+    "first_seen_line": 1030,
+    "last_seen_line": 1030,
+    "examples": [
+      "[Cognition] [Cognition] Intrusive thought processed and sent to cognitive stream"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "Dashboard | INFO | [Dashboard] POST /api/intrusive <NUM> in 519ms",
+    "severity": "INFO",
+    "component": "Dashboard",
+    "count": 1,
+    "first_seen_line": 1031,
+    "last_seen_line": 1031,
+    "examples": [
+      "[Dashboard] POST /api/intrusive 200 in 519ms"
+    ],
+    "keywords": []
+  },
+  {
+    "signature": "Dashboard | INFO | [Dashboard] POST /api/ws/bot-state <NUM> in 13ms",
+    "severity": "INFO",
+    "component": "Dashboard",
+    "count": 1,
+    "first_seen_line": 1035,
+    "last_seen_line": 1035,
+    "examples": [
+      "[Dashboard] POST /api/ws/bot-state 200 in 13ms"
+    ],
+    "keywords": []
+  }
+]

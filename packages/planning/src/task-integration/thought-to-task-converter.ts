@@ -441,7 +441,9 @@ export async function convertThoughtToTask(
     // Compute canonical goalKey for exact-match idempotency in drive tick.
     // Prefer the thought's goalKey (already canonical from drive tick).
     // Fall back to canonicalGoalKey() from extractedGoal to normalize LLM-produced targets.
-    const thoughtGoalKey = thought.metadata?.goalKey;
+    // Empty-string coercion: canonicalGoalKey() returns '' for targetless goals.
+    // Coerce both paths to undefined so '' never reaches task.metadata.goalKey.
+    const thoughtGoalKey = thought.metadata?.goalKey || undefined;
     const computedGoalKey = extractedGoal
       ? canonicalGoalKey(extractedGoal.action, extractedGoal.target) || undefined
       : undefined;

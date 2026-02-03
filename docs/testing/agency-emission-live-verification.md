@@ -509,3 +509,68 @@ position near (263, 64, 187).
 - The `addTask()` goalKey propagation bug would have been caught by any end-to-end
   integration test that checks `task.metadata.goalKey` after creation. The unit tests
   all used mock `addTask` functions that didn't exhibit this behavior.
+
+---
+
+## Soak Test
+
+An automated soak test script exists at `scripts/soak-test-agency.sh`. It monitors
+the cognition and planning services for 10-15 minutes and captures:
+
+- Drive-tick thought cadence
+- Goal tag production rates
+- Task creation and status transitions
+- Novelty distribution
+- INTENT extraction rates
+
+### Running the soak
+
+```bash
+# Prerequisites: all services running, bot in stable survival environment
+./scripts/soak-test-agency.sh 12   # 12 minutes (default)
+```
+
+Results are written to `docs/testing/soak-results/soak-<timestamp>.log`.
+
+### Acceptance criteria
+
+See `docs/contracts/agency-pipeline-invariants.md` section 7 for the full criteria.
+The soak script evaluates basic checks automatically and logs detailed per-sample
+data for manual review of behavioral closure (task lifecycle completion,
+idempotency, stuck-timeout recovery).
+
+### First soak results (2026-02-02)
+
+Full analysis: `docs/testing/soak-results/soak-20260202-analysis.md`
+
+**Run**: 5-minute soak + 11 minutes of cognition log data. Bot: Sterling,
+survival mode, health 20, food 17, pos (263, 64, 187).
+
+**Key findings**:
+
+| Area | Result |
+|------|--------|
+| Drive tick emission | 3 ticks in 11 min (correct ~3m interval) |
+| Drive tick idempotency | Suppressed duplicates after task created |
+| Task creation | `collect:oak_log` task created with correct metadata |
+| LLM goal tags | 0% (model too cautious in idle state) |
+| INTENT extraction | 100% rate on LLM calls (2/2) |
+| Task execution | **Stuck in verification loop** — tool failures masked as ok:true |
+
+**Stall diagnosis** (corrected): NOT `executor_unavailable`. The executor IS
+running and invoking `minecraft.acquire_material`. Three root causes:
+
+1. **False-positive ok**: MC interface wraps all non-throwing responses with
+   `success: true`. `executeActionWithBotCheck` returned `ok: true` even when
+   the leaf reported `status: 'failure'`. Executor entered verification for
+   actions that never acquired items. **Fixed**: leaf-level success check added.
+2. **Origin mutation**: `persistStepBudget` spread full `task.metadata`
+   (including immutable `origin`) into metadata patches. **Fixed**: send only
+   `{ executionBudget }`.
+3. **Verification diagnostics**: insufficient logging made root cause
+   disambiguation impossible. **Fixed**: START/FAIL/FINAL_FAIL diagnostic logs.
+
+**Phase 4 decision**: Defer intent-to-task fallback (unchanged). The blocking
+problem is now tool-level — if `acquire_material` finds no reachable tree,
+the executor will correctly receive `ok: false` and enter retry/fail logic
+instead of the verification backoff loop.

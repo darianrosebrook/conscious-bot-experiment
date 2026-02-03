@@ -1,4 +1,7 @@
 # Rig-Primitive Alignment Analysis
+
+> **Status: Point-in-time snapshot (2026-01-31).** For current implementation status, see `docs/planning/sterling-capability-tracker.md`.
+
 **Date**: 2026-01-31
 **Purpose**: Assess alignment between conscious-bot's 11 RIG implementation plans (A-K) and Sterling's 21 capability primitive specifications (P01-P21)
 

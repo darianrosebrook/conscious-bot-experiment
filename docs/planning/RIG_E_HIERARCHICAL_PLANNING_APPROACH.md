@@ -1,5 +1,7 @@
 # Rig E: Hierarchical Planning — Companion Approach
 
+**Implementation**: Partial — cognitive-router, plan-decomposer, task-network exist in `planning/hierarchical-planner/`
+
 This companion document distills the implementation plan with design decisions, boundaries, and implementation construction constraints. Read alongside `RIG_E_HIERARCHICAL_PLANNING_PLAN.md`.
 
 ---

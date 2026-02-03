@@ -106,6 +106,8 @@ export interface AcquisitionSolveResult {
   strategyRanking: AcquisitionCandidate[];
   /** Content-addressed hash of the full enumerated candidate set */
   candidateSetDigest: string;
+  /** Solve-time join keys for deferred episode reporting */
+  solveJoinKeys?: import('./solve-bundle-types').SolveJoinKeys;
 }
 
 /** A single step in the acquisition solution */

@@ -519,9 +519,16 @@ export function extractIntent(text: string): { text: string; intent: IntentLabel
 /**
  * Strip inline `INTENT: <word>` substrings from text.
  * Handles mid-sentence occurrences like "I will explore. INTENT: explore I notice a tree."
+ *
+ * Contract: newlines in the original text are preserved. Only horizontal
+ * whitespace immediately surrounding the INTENT token is consumed. The
+ * cleanup pass collapses horizontal whitespace runs but never touches `\n`.
  */
 function stripInlineIntent(text: string): string {
-  return text.replace(/\s*INTENT:\s*\w+/gi, '').replace(/\s{2,}/g, ' ').trim();
+  return text
+    .replace(/[^\S\n]*INTENT:[^\S\n]*\w+/gi, '')
+    .replace(/[^\S\n]{2,}/g, ' ')
+    .trim();
 }
 
 /**

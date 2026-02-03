@@ -11,6 +11,8 @@
  */
 
 import { BaseDomainSolver } from './base-domain-solver';
+import type { DomainDeclarationV1 } from './domain-declaration';
+import { SOLVER_IDS } from './solver-ids';
 import type { MinecraftCraftingSolver } from './minecraft-crafting-solver';
 import type {
   AcquisitionSolveResult,
@@ -48,6 +50,7 @@ import {
 } from './solve-bundle';
 import type { SolveBundle, ObjectiveWeights, ObjectiveWeightsSource } from './solve-bundle-types';
 import { parseSearchHealth } from './search-health';
+import { extractSolveJoinKeys } from './episode-classification';
 import type { TaskStep } from '../types/task-step';
 import {
   actionTypeToLeaf,
@@ -123,12 +126,25 @@ export interface AcquisitionSolveOptions {
 }
 
 // ============================================================================
+// Domain Declaration
+// ============================================================================
+
+export const ACQUISITION_DECLARATION: DomainDeclarationV1 = {
+  declarationVersion: 1,
+  solverId: SOLVER_IDS.ACQUISITION,
+  contractVersion: 1,
+  implementsPrimitives: ['CB-P01', 'CB-P04'],
+  consumesFields: ['inventory', 'goal', 'nearbyBlocks', 'nearbyEntities', 'rules', 'maxNodes'],
+  producesFields: ['steps', 'planId', 'solveMeta', 'strategyRanking'],
+};
+
+// ============================================================================
 // Solver
 // ============================================================================
 
 export class MinecraftAcquisitionSolver extends BaseDomainSolver<AcquisitionSolveResult> {
   readonly sterlingDomain = 'minecraft' as const;
-  readonly solverId = 'minecraft.acquisition';
+  readonly solverId = SOLVER_IDS.ACQUISITION;
 
   /** Sub-solver for mine/craft strategy delegation */
   private _craftingSolver?: MinecraftCraftingSolver;
@@ -142,6 +158,10 @@ export class MinecraftAcquisitionSolver extends BaseDomainSolver<AcquisitionSolv
 
   get craftingSolver(): MinecraftCraftingSolver | undefined {
     return this._craftingSolver;
+  }
+
+  override getDomainDeclaration(): DomainDeclarationV1 {
+    return ACQUISITION_DECLARATION;
   }
 
   protected makeUnavailableResult(): AcquisitionSolveResult {
@@ -171,6 +191,7 @@ export class MinecraftAcquisitionSolver extends BaseDomainSolver<AcquisitionSolv
     mcData?: McData | null,
   ): Promise<AcquisitionSolveResult> {
     if (!this.isAvailable()) return this.makeUnavailableResult();
+    await this.ensureDeclarationRegistered();
 
     const startTime = Date.now();
 
@@ -291,6 +312,9 @@ export class MinecraftAcquisitionSolver extends BaseDomainSolver<AcquisitionSolv
       alternativeStrategies: alternatives,
       strategyRanking: ranked,
       candidateSetDigest,
+      solveJoinKeys: dispatchResult.planId
+        ? extractSolveJoinKeys(parentBundle, dispatchResult.planId)
+        : undefined,
     };
   }
 
@@ -304,11 +328,7 @@ export class MinecraftAcquisitionSolver extends BaseDomainSolver<AcquisitionSolv
     success: boolean,
     planId: string,
     candidateSetDigest: string,
-    linkage?: {
-      bundleHash?: string;
-      traceBundleHash?: string;
-      outcomeClass?: import('./solve-bundle-types').EpisodeOutcomeClass;
-    }
+    linkage?: import('./solve-bundle-types').EpisodeLinkage,
   ): Promise<import('./solve-bundle-types').EpisodeAck | undefined> {
     this.priorStore.updatePrior(
       item,

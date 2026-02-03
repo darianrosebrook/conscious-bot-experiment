@@ -7,6 +7,11 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 
+const PLANNING_URL =
+  process.env.PLANNING_SERVICE_URL || 'http://localhost:3002';
+const COGNITION_URL =
+  process.env.COGNITION_SERVICE_URL || 'http://localhost:3003';
+
 export async function GET(_request: NextRequest) {
   try {
     const notes = [];
@@ -14,7 +19,7 @@ export async function GET(_request: NextRequest) {
     // Fetch cognitive insights from planning system
     try {
       const cognitiveRes = await fetch(
-        'http://localhost:3002/cognitive-insights'
+        `${PLANNING_URL}/cognitive-insights`
       );
       if (cognitiveRes.ok) {
         const cognitiveData = await cognitiveRes.json();
@@ -43,7 +48,7 @@ export async function GET(_request: NextRequest) {
 
     // Fetch reflective notes from planning system
     try {
-      const notesRes = await fetch('http://localhost:3002/notes');
+      const notesRes = await fetch(`${PLANNING_URL}/notes`);
       if (notesRes.ok) {
         const notesData = await notesRes.json();
         if (notesData.notes && Array.isArray(notesData.notes)) {
@@ -66,7 +71,7 @@ export async function GET(_request: NextRequest) {
 
     // Fetch telemetry from cognition system
     try {
-      const cognitionRes = await fetch('http://localhost:3003/telemetry');
+      const cognitionRes = await fetch(`${COGNITION_URL}/telemetry`);
       if (cognitionRes.ok) {
         const cognitionData = await cognitionRes.json();
         if (cognitionData.events) {

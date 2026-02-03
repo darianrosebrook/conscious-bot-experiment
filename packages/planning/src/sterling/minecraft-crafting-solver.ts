@@ -8,6 +8,8 @@
  */
 
 import { BaseDomainSolver } from './base-domain-solver';
+import type { DomainDeclarationV1 } from './domain-declaration';
+import { SOLVER_IDS } from './solver-ids';
 import type {
   MinecraftCraftingRule,
   MinecraftCraftingSolveResult,
@@ -24,6 +26,7 @@ import {
   attachSterlingIdentity,
 } from './solve-bundle';
 import { parseSearchHealth } from './search-health';
+import { extractSolveJoinKeys } from './episode-classification';
 
 import type { TaskStep } from '../types/task-step';
 
@@ -75,12 +78,25 @@ interface StepMappingResult {
 }
 
 // ============================================================================
+// Domain Declaration
+// ============================================================================
+
+export const CRAFTING_DECLARATION: DomainDeclarationV1 = {
+  declarationVersion: 1,
+  solverId: SOLVER_IDS.CRAFTING,
+  contractVersion: 1,
+  implementsPrimitives: ['CB-P01'],
+  consumesFields: ['inventory', 'goal', 'nearbyBlocks', 'rules', 'maxNodes'],
+  producesFields: ['steps', 'planId', 'solveMeta'],
+};
+
+// ============================================================================
 // Solver
 // ============================================================================
 
 export class MinecraftCraftingSolver extends BaseDomainSolver<MinecraftCraftingSolveResult> {
   readonly sterlingDomain = 'minecraft' as const;
-  readonly solverId = 'minecraft.crafting';
+  readonly solverId = SOLVER_IDS.CRAFTING;
 
   /**
    * When true, a successful solve with degraded step mapping (unknown-* steps)
@@ -96,6 +112,10 @@ export class MinecraftCraftingSolver extends BaseDomainSolver<MinecraftCraftingS
 
   /** Shared temporal adapter — initialized once, reused across solves. */
   private readonly temporalAdapter = new P03ReferenceAdapter(MAX_WAIT_BUCKETS, 8);
+
+  override getDomainDeclaration(): DomainDeclarationV1 {
+    return CRAFTING_DECLARATION;
+  }
 
   protected makeUnavailableResult(): MinecraftCraftingSolveResult {
     return {
@@ -124,6 +144,7 @@ export class MinecraftCraftingSolver extends BaseDomainSolver<MinecraftCraftingS
     temporalOptions?: CraftingTemporalOptions,
   ): Promise<MinecraftCraftingSolveResult> {
     if (!this.isAvailable()) return this.makeUnavailableResult();
+    await this.ensureDeclarationRegistered();
 
     // 1. Build rule set from mcData recipe tree
     const rules = buildCraftingRules(mcData, goalItem);
@@ -226,6 +247,7 @@ export class MinecraftCraftingSolver extends BaseDomainSolver<MinecraftCraftingS
         error: result.error || 'No solution found',
         planId,
         solveMeta: { bundles: [solveBundle] },
+        solveJoinKeys: planId ? extractSolveJoinKeys(solveBundle, planId) : undefined,
       };
     }
 
@@ -244,6 +266,13 @@ export class MinecraftCraftingSolver extends BaseDomainSolver<MinecraftCraftingS
     const solveBundle = createSolveBundle(bundleInput, bundleOutput, compatReport);
     attachSterlingIdentity(solveBundle, sterlingIdentity);
 
+    // Phase 1 observability: log identity field status once per solverId
+    this.logIdentityFieldStatus(
+      !!sterlingIdentity?.traceBundleHash,
+      !!sterlingIdentity?.engineCommitment,
+      !!sterlingIdentity?.operatorRegistryHash,
+    );
+
     // Strict mode: treat degraded mapping as a solve failure
     if (this.strictMapping && mapping?.degraded) {
       return {
@@ -253,6 +282,7 @@ export class MinecraftCraftingSolver extends BaseDomainSolver<MinecraftCraftingS
         durationMs: result.durationMs,
         planId,
         solveMeta: { bundles: [solveBundle] },
+        solveJoinKeys: planId ? extractSolveJoinKeys(solveBundle, planId) : undefined,
         mappingDegraded: true,
         noActionLabelEdges: mapping.noLabelEdges,
         unmatchedRuleEdges: mapping.unmatchedRuleEdges,
@@ -270,6 +300,7 @@ export class MinecraftCraftingSolver extends BaseDomainSolver<MinecraftCraftingS
       durationMs: result.durationMs,
       planId,
       solveMeta: { bundles: [solveBundle] },
+      solveJoinKeys: planId ? extractSolveJoinKeys(solveBundle, planId) : undefined,
       mappingDegraded: mapping?.degraded,
       noActionLabelEdges: mapping?.noLabelEdges,
       unmatchedRuleEdges: mapping?.unmatchedRuleEdges,
@@ -318,11 +349,7 @@ export class MinecraftCraftingSolver extends BaseDomainSolver<MinecraftCraftingS
     success: boolean,
     stepsCompleted: number,
     planId?: string | null,
-    linkage?: {
-      bundleHash?: string;
-      traceBundleHash?: string;
-      outcomeClass?: import('./solve-bundle-types').EpisodeOutcomeClass;
-    }
+    linkage?: import('./solve-bundle-types').EpisodeLinkage,
   ): Promise<import('./solve-bundle-types').EpisodeAck | undefined> {
     return this.reportEpisode({
       planId,

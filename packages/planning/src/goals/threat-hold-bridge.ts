@@ -190,7 +190,6 @@ export async function evaluateThreatHolds(
 
       // Capture previous status for restoration on release (A1.9)
       deps.updateTaskMetadata(task.id, {
-        ...task.metadata,
         threatHoldPrevStatus: task.status,
       });
 
@@ -230,7 +229,6 @@ export async function evaluateThreatHolds(
 
         // Clear the captured status
         deps.updateTaskMetadata(task.id, {
-          ...task.metadata,
           threatHoldPrevStatus: undefined,
         });
 

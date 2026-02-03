@@ -138,6 +138,8 @@ export interface FurnaceSchedulingSolveResult {
   makespanBuckets?: number;
   /** Whether batch operators were used. */
   usedBatch?: boolean;
+  /** Solve-time join keys for deferred episode reporting */
+  solveJoinKeys?: import('./solve-bundle-types').SolveJoinKeys;
 }
 
 // ============================================================================

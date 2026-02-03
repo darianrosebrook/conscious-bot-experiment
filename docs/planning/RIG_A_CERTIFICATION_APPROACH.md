@@ -1,5 +1,7 @@
 # Rig A: Certification Hardening — Companion Approach
 
+**Implementation**: Partial — crafting solver baseline exists, certification hardening not yet applied
+
 This companion document distills the implementation plan with explicit design decisions, boundaries, code references, and implementation construction constraints. Read alongside `RIG_A_CERTIFICATION_PLAN.md`.
 
 ---

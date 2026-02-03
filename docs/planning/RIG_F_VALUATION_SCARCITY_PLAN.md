@@ -3,6 +3,7 @@
 **Primitive**: P6 — Goal-conditioned valuation under scarcity (keep/drop/allocate)
 
 **Status**: ENRICHED (2026-01-31)
+**Implementation**: Not started — spec only
 
 ---
 

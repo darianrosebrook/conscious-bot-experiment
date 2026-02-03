@@ -1,5 +1,7 @@
 # Rig B: Capability Gating and Legality — Companion Approach
 
+**Implementation**: Not started — spec only
+
 This companion document distills the implementation plan into a recommended approach, with explicit design decisions, boundaries, **concrete code references and signatures**, and implementation construction constraints so that implementers cannot easily implement the boundary incorrectly. Read alongside `RIG_B_CAPABILITY_GATING_PLAN.md`.
 
 ---

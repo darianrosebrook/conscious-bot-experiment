@@ -1,5 +1,7 @@
 # Primitive 21 / Rig I-ext Implementation Plan
 
+**Implementation**: Partial — evidence capsule types and reference fixtures exist in `planning/sterling/primitives/p21/`
+
 This document outlines how to tackle the P21 (Entity belief maintenance and saliency under partial observability) and Rig I-ext (Entity belief tracking and saliency) work: what to investigate, what to implement or change, where, and why.
 
 ---

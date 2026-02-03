@@ -3,6 +3,7 @@
 **Primitive**: P1 — Deterministic transformation planning (resource → product)
 
 **Status**: Implemented baseline; needs certification hardening
+**Implementation**: Partial — crafting solver baseline exists, certification hardening not yet applied
 
 ---
 

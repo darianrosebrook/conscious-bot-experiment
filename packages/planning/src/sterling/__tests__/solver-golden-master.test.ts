@@ -33,6 +33,8 @@ function createMockService(overrides?: Partial<SterlingReasoningService>) {
     initialize: vi.fn().mockResolvedValue(undefined),
     destroy: vi.fn(),
     getHealthStatus: vi.fn().mockReturnValue({ enabled: true }),
+    getConnectionNonce: vi.fn().mockReturnValue(1),
+    registerDomainDeclaration: vi.fn().mockResolvedValue({ success: true }),
     verifyReachability: vi.fn(),
     queryKnowledgeGraph: vi.fn(),
     withFallback: vi.fn(),

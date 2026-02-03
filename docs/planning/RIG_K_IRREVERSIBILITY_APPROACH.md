@@ -1,5 +1,7 @@
 # Rig K: Irreversibility and Commitment Planning — Companion Approach
 
+**Implementation**: Not started — spec only
+
 This companion document distills the implementation plan with design decisions, boundaries, and implementation construction constraints. Read alongside `RIG_K_IRREVERSIBILITY_PLAN.md`.
 
 ---

@@ -3,6 +3,7 @@
 **Primitive**: P4 — Multi-strategy acquisition (alternative methods, different failure modes)
 
 **Status**: ENRICHED (2026-01-31)
+**Implementation**: Not started — spec only
 
 ---
 

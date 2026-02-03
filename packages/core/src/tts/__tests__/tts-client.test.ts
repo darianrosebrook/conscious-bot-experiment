@@ -1,7 +1,7 @@
 /**
  * TTSClient Unit Tests
  *
- * Tests fire-and-forget TTS behavior, circuit breaker, latest-wins,
+ * Tests fire-and-forget TTS behavior, circuit breaker, queue (no cut-off),
  * sox detection, and graceful degradation.
  */
 
@@ -17,7 +17,7 @@ const activeClients: TTSClient[] = [];
 
 /** Build a client with sox stubbed as available and fetch mocked globally. */
 function createTestClient(
-  overrides: ConstructorParameters<typeof TTSClient>[0] = {},
+  overrides: ConstructorParameters<typeof TTSClient>[0] = {}
 ) {
   // Always pretend sox is available in tests (we don't want to spawn real sox)
   vi.spyOn(TTSClient, 'checkSoxAvailable').mockReturnValue(true);
@@ -100,7 +100,7 @@ describe('TTSClient', () => {
       activeClients.push(client);
       expect(client.isEnabled).toBe(false);
       expect(warnSpy).toHaveBeenCalledWith(
-        expect.stringContaining('sox not found'),
+        expect.stringContaining('sox not found')
       );
     });
   });
@@ -133,9 +133,9 @@ describe('TTSClient', () => {
     });
 
     it('POSTs to the correct endpoint with correct payload', async () => {
-      const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-        new Response(null, { status: 200 }),
-      );
+      const fetchSpy = vi
+        .spyOn(globalThis, 'fetch')
+        .mockResolvedValue(new Response(null, { status: 200 }));
 
       const client = createTestClient({
         apiUrl: 'http://kokoro:8080',
@@ -170,7 +170,9 @@ describe('TTSClient', () => {
       const client = createTestClient({ circuitBreakerThreshold: 3 });
       const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
-      vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('ECONNREFUSED'));
+      vi.spyOn(globalThis, 'fetch').mockRejectedValue(
+        new Error('ECONNREFUSED')
+      );
 
       // Trigger 3 failures
       for (let i = 0; i < 3; i++) {
@@ -188,7 +190,7 @@ describe('TTSClient', () => {
       expect(fetchSpy).not.toHaveBeenCalled();
 
       expect(warnSpy).toHaveBeenCalledWith(
-        expect.stringContaining('Circuit breaker open'),
+        expect.stringContaining('Circuit breaker open')
       );
     });
 
@@ -199,7 +201,9 @@ describe('TTSClient', () => {
       });
       vi.spyOn(console, 'warn').mockImplementation(() => {});
 
-      vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('ECONNREFUSED'));
+      vi.spyOn(globalThis, 'fetch').mockRejectedValue(
+        new Error('ECONNREFUSED')
+      );
 
       // Trigger 1 failure to open circuit
       client.speak('fail');
@@ -215,40 +219,37 @@ describe('TTSClient', () => {
   });
 
   // -------------------------------------------------------------------------
-  // Latest-wins
+  // Queue (no cut-off)
   // -------------------------------------------------------------------------
 
-  describe('latest-wins', () => {
-    it('aborts previous request when new speak() is called', async () => {
+  describe('queue', () => {
+    it('queues second utterance when first is in progress (does not abort)', async () => {
       let abortCount = 0;
-      vi.spyOn(globalThis, 'fetch').mockImplementation(
-        async (_url, opts) => {
-          const signal = (opts as any)?.signal as AbortSignal;
-          return new Promise((resolve, reject) => {
-            // Simulate a long response
-            const timer = setTimeout(() => {
-              resolve(new Response(null, { status: 200 }));
-            }, 5000);
+      vi.spyOn(globalThis, 'fetch').mockImplementation(async (_url, opts) => {
+        const signal = (opts as any)?.signal as AbortSignal;
+        return new Promise((resolve, reject) => {
+          const timer = setTimeout(() => {
+            resolve(new Response(null, { status: 200 }));
+          }, 5000);
 
-            if (signal) {
-              signal.addEventListener('abort', () => {
-                clearTimeout(timer);
-                abortCount++;
-                reject(new DOMException('Aborted', 'AbortError'));
-              });
-            }
-          });
-        },
-      );
+          if (signal) {
+            signal.addEventListener('abort', () => {
+              clearTimeout(timer);
+              abortCount++;
+              reject(new DOMException('Aborted', 'AbortError'));
+            });
+          }
+        });
+      });
 
       const client = createTestClient();
 
       client.speak('first');
       await new Promise((r) => setTimeout(r, 5));
-      client.speak('second'); // should abort "first"
+      client.speak('second'); // queued; first is not aborted
 
       await new Promise((r) => setTimeout(r, 20));
-      expect(abortCount).toBe(1);
+      expect(abortCount).toBe(0);
     });
   });
 
@@ -259,7 +260,7 @@ describe('TTSClient', () => {
   describe('isAvailable()', () => {
     it('returns true when health endpoint responds OK', async () => {
       vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-        new Response('OK', { status: 200 }),
+        new Response('OK', { status: 200 })
       );
       const client = createTestClient();
       expect(await client.isAvailable()).toBe(true);
@@ -267,7 +268,7 @@ describe('TTSClient', () => {
 
     it('returns false when health endpoint is unreachable', async () => {
       vi.spyOn(globalThis, 'fetch').mockRejectedValue(
-        new Error('ECONNREFUSED'),
+        new Error('ECONNREFUSED')
       );
       const client = createTestClient();
       expect(await client.isAvailable()).toBe(false);

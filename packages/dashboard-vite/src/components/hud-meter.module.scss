@@ -1,0 +1,42 @@
+.root {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.labelRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.75rem;
+  line-height: 1rem;
+  color: rgb(212 212 216);
+}
+
+.labelText {
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.valueText {
+  font-variant-numeric: tabular-nums;
+  color: rgb(161 161 170);
+}
+
+.track {
+  height: 0.5rem;
+  width: 100%;
+  border-radius: 0.25rem;
+  background-color: rgb(39 39 42);
+}
+
+.fill {
+  height: 0.5rem;
+  border-radius: 0.25rem;
+  transition: all 300ms;
+}
+
+.hint {
+  font-size: 10px;
+  color: rgb(113 113 122);
+}

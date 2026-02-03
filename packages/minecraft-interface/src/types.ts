@@ -182,7 +182,7 @@ export interface BotConfig {
   port: number;
   username: string;
   version: string;
-  auth: 'mojang' | 'offline';
+  auth: 'microsoft' | 'offline';
 
   // World configuration for memory versioning
   worldSeed?: string; // Optional world seed for memory isolation

@@ -48,6 +48,8 @@ export class TTSClient {
   private soxAvailable: boolean;
   private activeSox: ChildProcess | null = null;
   private activeAbort: AbortController | null = null;
+  /** Queued utterances; played in order after current playback finishes. */
+  private queue: string[] = [];
   private circuitBreaker: CircuitBreakerState = {
     failures: 0,
     lastFailureTime: 0,
@@ -57,31 +59,21 @@ export class TTSClient {
 
   constructor(config: TTSClientConfig = {}) {
     this.apiUrl =
-      config.apiUrl ||
-      process.env.TTS_API_URL ||
-      'http://localhost:8080';
-    this.enabled =
-      config.enabled ??
-      process.env.TTS_ENABLED !== 'false';
-    this.voice =
-      config.voice ||
-      process.env.TTS_VOICE ||
-      'af_heart';
-    this.speed =
-      config.speed ??
-      parseFloat(process.env.TTS_SPEED || '1.25');
+      config.apiUrl || process.env.TTS_API_URL || 'http://localhost:8080';
+    this.enabled = config.enabled ?? process.env.TTS_ENABLED !== 'false';
+    this.voice = config.voice || process.env.TTS_VOICE || 'af_heart';
+    this.speed = config.speed ?? parseFloat(process.env.TTS_SPEED || '1.25');
     this.timeoutMs =
-      config.timeoutMs ??
-      parseInt(process.env.TTS_TIMEOUT_MS || '15000', 10);
-    this.cbThreshold =
-      config.circuitBreakerThreshold ?? 3;
-    this.cbTimeoutMs =
-      config.circuitBreakerTimeoutMs ?? 60_000;
+      config.timeoutMs ?? parseInt(process.env.TTS_TIMEOUT_MS || '15000', 10);
+    this.cbThreshold = config.circuitBreakerThreshold ?? 3;
+    this.cbTimeoutMs = config.circuitBreakerTimeoutMs ?? 60_000;
 
     // Probe for sox on PATH
     this.soxAvailable = TTSClient.checkSoxAvailable();
     if (!this.soxAvailable) {
-      console.warn('[TTS] sox not found on PATH — TTS playback disabled. Install: brew install sox');
+      console.warn(
+        '[TTS] sox not found on PATH — TTS playback disabled. Install: brew install sox'
+      );
       this.enabled = false;
     }
 
@@ -97,18 +89,21 @@ export class TTSClient {
   /**
    * Fire-and-forget: POST text to Kokoro API, pipe streaming PCM to sox.
    * Returns immediately. Errors are silently absorbed (circuit breaker handles backoff).
-   * Latest-wins: if a previous utterance is still playing, it is killed.
+   * Queued: if playback is in progress, this utterance is queued and played after
+   * the current one finishes, so playback is not cut off.
    */
   speak(text: string): void {
     if (!this.enabled) return;
     if (this.isCircuitOpen()) return;
-    if (!text || text.trim().length === 0) return;
+    const trimmed = text?.trim();
+    if (!trimmed || trimmed.length === 0) return;
 
-    // Latest-wins — kill any in-flight utterance
-    this.killActive();
+    if (this.activeSox !== null || this.activeAbort !== null) {
+      this.queue.push(trimmed);
+      return;
+    }
 
-    // Fire-and-forget — errors handled internally
-    this.doSpeak(text).catch(() => {
+    this.doSpeak(trimmed).catch(() => {
       // Swallow — circuit breaker already incremented inside doSpeak
     });
   }
@@ -134,9 +129,10 @@ export class TTSClient {
     return this.enabled && this.soxAvailable && !this.isCircuitOpen();
   }
 
-  /** Kill active playback and remove process listeners. */
+  /** Kill active playback, clear queue, and remove process listeners. */
   destroy(): void {
     this.killActive();
+    this.queue = [];
     if (this.cleanupHandler) {
       process.removeListener('exit', this.cleanupHandler);
       this.cleanupHandler = null;
@@ -169,21 +165,34 @@ export class TTSClient {
       clearTimeout(timer);
 
       if (!res.ok || !res.body) {
+        clearTimeout(timer);
         this.recordFailure();
+        this.activeAbort = null;
+        this.playNextFromQueue();
         return;
       }
 
       // Spawn sox to play raw PCM (24kHz, 16-bit signed, mono)
-      const sox = spawn('sox', [
-        '-t', 'raw',
-        '-e', 'signed-integer',
-        '-b', '16',
-        '-c', '1',
-        '-r', '24000',
-        '-', '-d',
-      ], {
-        stdio: ['pipe', 'ignore', 'ignore'],
-      });
+      const sox = spawn(
+        'sox',
+        [
+          '-t',
+          'raw',
+          '-e',
+          'signed-integer',
+          '-b',
+          '16',
+          '-c',
+          '1',
+          '-r',
+          '24000',
+          '-',
+          '-d',
+        ],
+        {
+          stdio: ['pipe', 'ignore', 'ignore'],
+        }
+      );
       this.activeSox = sox;
 
       sox.on('error', () => {
@@ -193,6 +202,11 @@ export class TTSClient {
       sox.on('close', () => {
         if (this.activeSox === sox) {
           this.activeSox = null;
+          if (this.activeAbort) {
+            this.activeAbort.abort();
+            this.activeAbort = null;
+          }
+          this.playNextFromQueue();
         }
       });
 
@@ -209,8 +223,16 @@ export class TTSClient {
       this.recordSuccess();
     } catch (err) {
       clearTimeout(timer);
+      this.activeAbort = null;
       this.recordFailure();
+      this.playNextFromQueue();
     }
+  }
+
+  private playNextFromQueue(): void {
+    if (this.queue.length === 0) return;
+    const next = this.queue.shift()!;
+    this.doSpeak(next).catch(() => {});
   }
 
   // --------------------------------------------------------------------------
@@ -236,7 +258,7 @@ export class TTSClient {
       if (!this.circuitBreaker.isOpen) {
         console.warn(
           `[TTS] Circuit breaker open after ${this.circuitBreaker.failures} failures. ` +
-          `Will retry in ${this.cbTimeoutMs / 1000}s.`
+            `Will retry in ${this.cbTimeoutMs / 1000}s.`
         );
       }
       this.circuitBreaker.isOpen = true;

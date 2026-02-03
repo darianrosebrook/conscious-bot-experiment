@@ -162,15 +162,15 @@ export class ThoughtActionAuditLogger {
 
     session.entries.push(entry);
 
-    // Log to console for immediate visibility
-    const statusEmoji =
+    // Log to console for immediate visibility (approved debug emoji: ✅ only)
+    const statusPrefix =
       options?.success === false
-        ? '❌'
+        ? '[FAIL]'
         : options?.success === true
           ? '✅'
-          : '🔵';
+          : '[INFO]';
     const durationStr = options?.duration ? ` (${options.duration}ms)` : '';
-    console.log(`${statusEmoji} [AuditLogger] ${stage}${durationStr}`);
+    console.log(`${statusPrefix} [AuditLogger] ${stage}${durationStr}`);
 
     if (options?.error) {
       console.log(`   Error: ${options.error}`);

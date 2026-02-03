@@ -8,7 +8,7 @@ We propose and implement a unified cognitive architecture that integrates **embo
 - **Visible-range world model** with ray-cast perception and D* Lite navigation
 - **Advanced memory system** with vector search, GraphRAG retrieval, neuroscience-inspired consolidation, and human-like decay management
 - **Memory system integration** across all cognitive components with real-time context enhancement and adaptive planning
-- **Identity memory system** with emotional preservation (2% daily decay), self-narrative construction, and LLM fine-tuning
+- **Identity memory system** with emotional preservation (2% daily decay) and self-narrative construction
 - **Signal→need→goal pipeline** for drive-based goal formulation with advanced priority scoring
 - **Hybrid planner** combining Sterling symbolic reasoning with hierarchical task decomposition and HTN effectiveness tracking
 - **Constitutional filter** with ethical rules engine and safety oversight
@@ -16,7 +16,7 @@ We propose and implement a unified cognitive architecture that integrates **embo
 - **Social cognition** with theory of mind and relationship management
 - **Real-time performance monitoring** with graceful degradation and fail-safes
 
-The system demonstrates how tightly coupled feedback loops – from low-level sensory data up to high-level self-reflection – can produce **meaningful analogues of conscious cognition** such as internal dialogue, intentional planning, self-identity continuity, and adaptive social interaction. With **95% implementation completion** across 11 core packages, dependency-aware architecture, and comprehensive testing infrastructure, this work provides a concrete platform for consciousness research and validates the hypothesis that **integrative design (architecture)**, not merely scale, can yield robust, situated intelligence approaching features of human-like consciousness.
+The system demonstrates how tightly coupled feedback loops – from low-level sensory data up to high-level self-reflection – can produce **meaningful analogues of conscious cognition** such as internal dialogue, intentional planning, self-identity continuity, and adaptive social interaction. With 11 core TypeScript packages, dependency-aware architecture, and comprehensive testing infrastructure, this work provides a concrete platform for consciousness research and validates the hypothesis that **integrative design (architecture)**, not merely scale, can yield robust, situated intelligence approaching features of human-like consciousness.
 
 ## Quick Start
 
@@ -326,6 +326,8 @@ Python sidecars (MLX-LM; Sterling in separate repo) are independent processes
 
 This layered approach ensures clean separation of concerns and reliable builds while enabling shared contracts for tool execution.
 
+> **A note on scope:** This document describes both the *implemented architecture* (service topology, packages, data flows, Sterling solvers) and the *theoretical framework* motivating the design (embodied cognition, predictive processing, neuroscience-inspired consolidation). Sections under **Background and Motivation**, **Experimental Design**, and **Implementation Considerations** are aspirational design direction — goals the project is working toward. The **Implemented Core Systems**, **Cognitive Architecture Overview**, and **Quick Start** sections reflect the current state of the codebase.
+
 ## Background and Motivation
 
 Scientific investigation of consciousness is challenging due to its subjective nature, yet theories of **embodied and enactive cognition** suggest that what we experience as consciousness arises from dynamic sensorimotor loops and integrative cognitive processes rather than a single mechanism. In particular, **predictive processing** views the brain as a prediction machine continually adjusting its internal models based on sensory feedback[\[1\]](https://www.psychologytoday.com/ca/blog/finding-purpose/202311/the-predictive-brain-and-the-hard-problem-of-consciousness#:~:text=The%20essence%20of%20predictive%20coding,to%20reduce%20the%20prediction%20errors). Similarly, **embodied cognition** and **enactive** theories argue that intelligence and awareness emerge from an agent's active engagement with its environment and internal physiology, not from disembodied computation. These perspectives inspire our approach: to construct an artificial agent that **actively perceives, learns, and reflects** within a simulated world, in order to investigate whether consciousness-like cognitive phenomena can emerge from such embodied loops.
@@ -338,80 +340,73 @@ Finally, we draw on cognitive theories to inform specific components. For exampl
  
 ### Implemented Core Systems
 
-####  **Executor Contracts Package** (`packages/executor-contracts/`) - 100% Complete
+####  **Executor Contracts Package** (`packages/executor-contracts/`)
 - **Plan-Body Interface (PBI)**: Enforces contracts between planning and execution systems
-- **Capability Registry** (378 lines) - Built-in capabilities with permissions and rate limiting  
-- **PBI Enforcer** (440 lines) - Runtime guards for reliable plan execution with acceptance criteria
-- **Leaf Interfaces** (189 lines) - Shared tool contracts (`LeafImpl`, `LeafSpec`, `LeafContext`, `LeafResult`)
-- **Leaf Factory** (195 lines) - Tool registration and execution with validation and error handling
-- **Execution Verification** - Input/output schema validation and postcondition checking
+- **Capability Registry** — Built-in capabilities with permissions and rate limiting
+- **PBI Enforcer** — Runtime guards for reliable plan execution with acceptance criteria
+- **Leaf Interfaces** — Shared tool contracts (`LeafImpl`, `LeafSpec`, `LeafContext`, `LeafResult`)
+- **Leaf Factory** — Tool registration and execution with validation and error handling
+- **Execution Verification** — Input/output schema validation and postcondition checking
 
-####  **Core Package** (`packages/core/`) - 85% Complete
-- **Arbiter & Signal Processing** (915 lines) - Central coordination and signal routing
-- **MCP Capabilities** - Capability-driven action system with constitutional filtering
-- **Real-Time Performance** - Budget enforcement and graceful degradation
-- **Advanced Need Generation** (1306 lines) - Sophisticated drive-based goal formulation
-- **Enhanced Task Parser** - Unified task parsing and environmental immersion
+####  **Core Package** (`packages/core/`)
+- **Arbiter & Signal Processing** — Central coordination and signal routing
+- **MCP Capabilities** — Capability-driven action system with constitutional filtering
+- **Real-Time Performance** — Budget enforcement and graceful degradation
+- **Advanced Need Generation** — Sophisticated drive-based goal formulation
 
-####  **World Package** (`packages/world/`) - 85% Complete
-- **Visible-Only Sensing** - Ray-casting perception with occlusion discipline
-- **D* Lite Navigation** - Dynamic pathfinding with real-time cost updates
-- **Perception Integration** - Object recognition and confidence tracking
-- **Sensorimotor System** (1030 lines) - Motor control and sensory feedback
-- **Place Graph** (810 lines) - Spatial memory and topological navigation
+####  **World Package** (`packages/world/`)
+- **Visible-Only Sensing** — Ray-casting perception with occlusion discipline
+- **D* Lite Navigation** — Dynamic pathfinding with real-time cost updates
+- **Perception Integration** — Object recognition and confidence tracking
+- **Sensorimotor System** — Motor control, sensory feedback, and sensory processing (multi-file module)
+- **Place Graph** — Spatial memory, topological navigation, and place memory (multi-file module)
 
-####  **Memory Package** (`packages/memory/`) - **Complete Cognitive Domain Coverage**
-- **Multi-Store Memory Architecture** - Episodic, semantic, working, and procedural memory systems
-- **Vector Search Integration** - PostgreSQL + pgvector with 768D embeddings for semantic similarity
-- **GraphRAG-First Retrieval** - Knowledge graph queries with hybrid vector/graph ranking
-- **Memory Decay Management** (557 lines) - "Use it or lose it" system mimicking human forgetting
-- **Reflection & Learning** - Self-reflection, lesson extraction, and narrative development
-- **Cognitive Task Memory** - Task progress tracking with learning and adaptation
-- **Memory Signal Generation** - Memory-based signals influence goal formulation
-- **Importance-Based Retention** - Critical memories preserved, trivial ones forgotten
-- **Per-Seed Database Isolation** - Complete memory separation between world seeds
+####  **Memory Package** (`packages/memory/`)
+- **Multi-Store Memory Architecture** — Episodic, semantic, working, and procedural memory systems
+- **Vector Search Integration** — PostgreSQL + pgvector with 768D embeddings for semantic similarity
+- **GraphRAG-First Retrieval** — Knowledge graph queries with hybrid vector/graph ranking
+- **Memory Decay Management** — "Use it or lose it" system mimicking human forgetting
+- **Reflection & Learning** — Self-reflection, lesson extraction, and narrative development
+- **Reflection Persistence** — Event-triggered reflections (sleep/death) with replay-stable deduplication, PostgreSQL storage, and dashboard listing
+- **Cognitive Task Memory** — Task progress tracking with learning and adaptation
+- **Memory Signal Generation** — Memory-based signals influence goal formulation
+- **Importance-Based Retention** — Critical memories preserved, trivial ones forgotten
+- **Per-Seed Database Isolation** — Complete memory separation between world seeds
 
 #### **Advanced Cognitive Memory Domains**
-- **Social Memory Manager** (572 lines) - Relationship tracking, trust dynamics, social pattern learning
+- **Social Memory Manager** — Relationship tracking, trust dynamics, social pattern learning
   - Tracks trust levels, reputation scores, and relationship evolution
   - Learns social patterns: "Gifts improve trust", "Conflicts damage relationships"
   - Provides interaction recommendations based on relationship history
   - Manages conflict resolution and relationship repair strategies
 
-- **Spatial Memory Manager** (756 lines) - Location intelligence and path optimization
+- **Spatial Memory Manager** — Location intelligence and path optimization
   - Records locations with importance scoring, safety ratings, and resource density
   - Learns optimal paths with success rates and danger analysis
   - Recognizes environmental patterns and biome characteristics
   - Provides context-aware location recommendations for activities (mining, building, hiding)
 
-- **Emotional Memory Manager** (880 lines) - Emotional pattern tracking and regulation
+- **Emotional Memory Manager** — Emotional pattern tracking and regulation
   - Records emotional states with triggers, context, and coping strategies
   - Learns emotional patterns and predicts responses based on situations
   - Provides emotion-specific coping strategies and trigger avoidance
   - Monitors emotional health trends and mood stability over time
 
-- **Identity Memory Guardian** (New - 639 lines) - Protects key identity memories from decay
+- **Identity Memory Guardian** — Protects key identity memories from decay
   - **Significance-based protection**: Core, Important, Contextual, Ephemeral levels
   - **Auto-protection** for high-salience memories (≥70% salience score)
   - **Self-concept snapshots** track personality and value evolution over time
   - **Narrative integration** ensures identity-defining memories persist
   - **Emotional memory preservation** with 2% daily decay rate as specified
 
-- **Self-Narrative Constructor** (New - 651 lines) - Generates coherent life stories at milestones
+- **Self-Narrative Constructor** — Generates coherent life stories at milestones
   - **Milestone-based construction** every 10-24 game days (configurable)
   - **Multiple narrative types**: Growth Reflection, Achievement Celebration, Emotional Processing
   - **Emotional context integration** weaves emotional experiences into identity narrative
   - **Identity reinforcement** through narrative integration and self-reflection
   - **Configurable milestone conditions** based on experience count, emotional intensity, identity change
 
-- **Emotional Memory LLM Adapter** (New - 680 lines) - Fine-tunes LLM with emotional context
-  - **Emotional memory integration** into LLM prompts and responses
-  - **Self-narrative context** provides identity-aware responses
-  - **Emotional state tracking** and automatic emotional updates
-  - **Identity reinforcement analysis** validates response alignment with self-concept
-  - **Emotional processing validation** ensures responses support emotional health
-
-- **Enhanced Memory System Integration** (Latest - Full Integration) - Complete memory system integration across all components
+- **Enhanced Memory System Integration** — Memory system integration across cognitive components
   - **Neuroscience-Inspired Memory System** with SWR tagging, cognitive map tracking, and importance-based decay
   - **Memory-Aware Planning** that uses historical context for better decision making
   - **Dynamic Endpoint Discovery** with automatic failover and circuit breaker protection
@@ -419,7 +414,7 @@ Finally, we draw on cognitive theories to inform specific components. For exampl
   - **Real-Time Health Monitoring** with comprehensive telemetry and graceful degradation
   - **Cross-System Memory Integration** between planning, execution, and learning components
 
-- **Tool Efficiency Memory** (Previously implemented) - Context-aware tool selection and optimization
+- **Tool Efficiency Memory** — Context-aware tool selection and optimization
   - Different tools for different materials/biomes with efficiency scoring
   - Learns optimal tool usage patterns through experience
   - Provides adaptive recommendations based on historical performance
@@ -430,47 +425,47 @@ Finally, we draw on cognitive theories to inform specific components. For exampl
 - **Emotional-Spatial Integration** - Emotional states influence spatial preferences
 - **Holistic Decision Making** - Combines insights from all domains for comprehensive recommendations
 
-####  **MCP Server Package** (`packages/mcp-server/`) - 100% Complete
-- **Model Context Protocol Server** (1341 lines) - Standardized integration layer for tool capabilities
-- **Tool Registration & Execution** - Dynamic tool discovery and validation with schema enforcement
-- **Behavior Tree Integration** - BT option management and execution through MCP protocol
-- **Permission System** - Fine-grained capability permissions and safety enforcement
-- **Resource Management** - World state and policy resource provisioning
-- **Fallback Support** - Graceful degradation when dependencies are unavailable
+####  **MCP Server Package** (`packages/mcp-server/`)
+- **Model Context Protocol Server** — Standardized integration layer for tool capabilities
+- **Tool Registration & Execution** — Dynamic tool discovery and validation with schema enforcement
+- **Behavior Tree Integration** — BT option management and execution through MCP protocol
+- **Permission System** — Fine-grained capability permissions and safety enforcement
+- **Resource Management** — World state and policy resource provisioning
+- **Fallback Support** — Graceful degradation when dependencies are unavailable
 
-####  **Planning Package** (`packages/planning/`) - 100% Complete
-- **Hierarchical Planner** (939 lines) - Sterling + HTN planning
-- **HTN Memory Manager Integration** - Task effectiveness tracking and method optimization
-- **Integrated Planning Coordinator** - Multi-planner routing and execution coordination
-- **Reactive Executor** (590 lines) - Enhanced GOAP with plan repair
-- **Goal Formulation** (421 lines) - Advanced signal processing and priority scoring
-- **Cognitive Integration** (436 lines) - LLM-assisted planning coordination
-- **MCP Integration** (681 lines) - Tool registration and execution through shared contracts
+####  **Planning Package** (`packages/planning/`)
+- **Hierarchical Planner** — Sterling + HTN planning with cognitive routing and plan decomposition
+- **HTN Memory Manager Integration** — Task effectiveness tracking and method optimization
+- **Integrated Planning Coordinator** — Multi-planner routing and execution coordination
+- **Reactive Executor** — Enhanced GOAP with plan repair
+- **Goal Formulation** — Advanced signal processing, priority scoring, and homeostasis monitoring
+- **Cognitive Integration** — LLM-assisted planning coordination
+- **Sterling Solvers** — Crafting, building, tool progression, acquisition, furnace, and navigation solvers
+- **Task Integration Pipeline** — Thought-to-task conversion, fallback-macro planner, leaf-arg contracts
 
-####  **Cognition Package** (`packages/cognition/`) - 85% Complete
-- **Cognitive Core** (366 lines) - LLM integration and internal dialogue
-- **Self-Model** (532 lines) - Identity tracking and narrative management
-- **Social Cognition** (1021 lines) - Theory of mind and relationship management
-- **Constitutional Filter** (673 lines) - Ethical rules engine and safety oversight
-- **Intrusion Interface** (604 lines) - External suggestion processing and filtering
+####  **Cognition Package** (`packages/cognition/`)
+- **Thought Generation** — Event-driven and LLM-based thought generation with context awareness
+- **Social Cognition** — Theory of mind, relationship management, social learning, agent modeling (multi-file module)
+- **Intrusive Thought Processor** — External suggestion processing and filtering
+- **LLM Output Sanitizer** — GoalTag extraction and intent routing
+- **Social Awareness Manager** — Social context integration
 
 ####  **Safety Package** (`packages/safety/`)
-- **Privacy System** (559 lines) - Data protection and consent management
-- **Monitoring System** (671 lines) - Telemetry and health monitoring
-- **Fail-Safes** (725 lines) - Emergency response and watchdog management
+- **Privacy System** — Data protection, consent management, geofencing, rate limiting, and data anonymization
+- **Monitoring System** — Telemetry, health monitoring, and safety monitoring
+- **Fail-Safes** — Emergency response, watchdog management, and preemption
 
 ####  **Evaluation Package** (`packages/evaluation/`)
-- **Performance Analyzer** (916 lines) - Comprehensive metrics and analytics
-- **Scenario Manager** (804 lines) - Test environment orchestration
-- **Curriculum System** (797 lines) - Progressive learning and regression testing
+- **Type Definitions** — Evaluation types and interfaces
+- **Thought Generator Test** — Evaluation harness for cognitive testing
 
-####  **Minecraft Interface** (`packages/minecraft-interface/`) - 100% Complete
-- **Full Mineflayer Integration** - Complete bot lifecycle management with auto-reconnection
-- **Prismarine-Viewer Integration** - Real-time 3D visualization and debugging interface
-- **HTTP & WebSocket Server** - REST API and real-time communication for bot control
-- **Safety Monitoring** - Automatic health monitoring with emergency response behaviors
-- **Plan Executor** (551 lines) - Task execution and progress tracking
-- **Chat Processor** (618 lines) - Multi-player communication handling
+####  **Minecraft Interface** (`packages/minecraft-interface/`)
+- **Full Mineflayer Integration** — Complete bot lifecycle management with auto-reconnection
+- **Prismarine-Viewer Integration** — Real-time 3D visualization and debugging interface
+- **HTTP & WebSocket Server** — REST API and real-time communication for bot control
+- **Safety Monitoring** — Automatic health monitoring with emergency response behaviors
+- **Plan Executor** — Task execution and progress tracking
+- **Chat Processor** — Multi-player communication handling
 
 ####  **Dashboard Package** (`packages/dashboard/`)
 - **Next.js 15 Interface** - Real-time monitoring and control
@@ -486,40 +481,34 @@ Finally, we draw on cognitive theories to inform specific components. For exampl
 
 **Current Focus**: E2E test hardening, Sterling solver integration, and MLX sidecar reliability.
 
-###  **Identity Memory System** (Latest Addition)
+### Identity Memory System
 
-The system now includes a comprehensive **identity memory system** that enables the bot to maintain a coherent sense of self through:
+The system includes an **identity memory system** that enables the bot to maintain a coherent sense of self through:
 
-#### ** Core Identity Preservation**
+#### Core Identity Preservation
 - **Emotional Memory Decay**: Precisely 2% daily decay rate for emotional memories (as specified)
 - **Identity Memory Guardian**: Protects core identity-defining experiences from excessive forgetting
 - **Significance-Based Protection**: Automatic protection of high-salience memories (≥70% salience threshold)
 - **Self-Concept Snapshots**: Regular tracking of personality traits and value evolution
 
-#### ** Self-Narrative Construction**
+#### Self-Narrative Construction
 - **Milestone-Based Narratives**: Automatic generation every 10-24 game days
 - **Multiple Narrative Types**: Growth Reflection, Achievement Celebration, Emotional Processing
 - **Emotional Context Integration**: Weaves emotional experiences into coherent life stories
 - **Identity Reinforcement**: Uses narratives to strengthen and evolve self-concept
 
-#### ** LLM Fine-Tuning with Identity**
-- **Emotional Memory Integration**: LLM responses incorporate relevant emotional experiences
-- **Self-Narrative Context**: Provides identity-aware responses based on life story
-- **Emotional State Tracking**: Automatic updates and emotional processing validation
-- **Identity Alignment**: Validates responses against established personality and values
-
-#### ** Cross-System Coordination**
+#### Cross-System Coordination
 - **Memory System Orchestration**: Coordinates emotional, identity, and narrative systems
 - **Event-Driven Architecture**: Automatic milestone detection and narrative triggering
 - **Cross-Domain Intelligence**: Integrates insights from all memory domains for holistic decision-making
 
 This identity system ensures the bot maintains **personal continuity** and **emotional authenticity** while evolving through experiences, creating a more coherent and self-aware artificial consciousness.
 
-###  **Enhanced Memory System Integration** (Latest Addition)
+### Enhanced Memory System Integration
 
-The system now features **complete memory system integration** across all cognitive components, enabling the bot to learn from experience and adapt strategies based on historical performance. This represents a major milestone in creating truly cognitive AI behavior.
+The system features memory system integration across cognitive components, enabling the bot to learn from experience and adapt strategies based on historical performance.
 
-#### ** Core Memory Integration Features**
+#### Core Memory Integration Features
 
 **Dynamic Memory System Discovery & Connection**
 - **Automatic Endpoint Discovery**: Multiple endpoint support with intelligent failover
@@ -540,7 +529,7 @@ The system now features **complete memory system integration** across all cognit
 - **Temporal Compression**: Memory replay occurs at accelerated speeds during consolidation
 - **Neural Competition**: Memory patterns compete for expression, stronger ones win
 
-#### ** Memory System Architecture**
+#### Memory System Architecture
 
 ```mermaid
 flowchart TD
@@ -574,34 +563,32 @@ flowchart TD
     class EXECUTION execution;
 ```
 
-#### ** Memory System Performance**
+#### Memory System Design Targets
+
+> Throughput numbers below are design targets, not production benchmarks.
 
 - **Memory-Enhanced Context Retrieval**: <200ms for planning decisions
-- **Neural Competition Simulation**: <30ms for memory consolidation prioritization
-- **SWR Tagging Rate**: 50,000 memories/second during active processing
-- **Memory Consolidation Rate**: 294 memories/second during idle periods
-- **System Health Monitoring**: Real-time telemetry with automatic failover
+- **SWR Tagging**: Batched during active processing
+- **Memory Consolidation**: Runs during idle periods
+- **Health Monitoring**: Real-time telemetry with automatic failover
 
-#### ** Integration Status**
+#### Integration Status
 
- **Complete Integration**: Memory system fully integrated across all components
- **Production Ready**: All TypeScript errors resolved and tested
- **Health Monitoring**: Comprehensive system telemetry with graceful degradation
- **Performance Optimized**: Efficient memory operations with caching and compression
- **Fallback Support**: Graceful degradation when memory system unavailable
+- Memory system integrated across cognitive components
+- Health monitoring with graceful degradation
+- Fallback support when memory system unavailable
 
 The memory system integration enables the bot to:
 - **Learn from experience** and avoid past mistakes
 - **Adapt strategies** based on historical success rates
 - **Provide context-aware planning** using real memory data
-- **Monitor system health** and automatically recover from failures
-- **Scale efficiently** with memory system load
+- **Monitor system health** and recover from failures
 
-##  **Dynamic Thought Generation: Revolutionary Enhancement**
+## Dynamic Thought Generation
 
-### **From Hard-Coded to Context-Aware Cognition**
+### Context-Aware Cognition
 
-**Major Breakthrough**: The bot now generates thoughts dynamically based on real-time context and memory, rather than relying on hard-coded or pre-loaded understanding. This represents a fundamental shift from static rule-based thinking to adaptive, situation-aware cognitive processing.
+The bot generates thoughts dynamically based on real-time context and memory, rather than relying on hard-coded or pre-loaded understanding.
 
 #### **Key Features**
 - **Context-Aware Generation**: Thoughts based on health status, inventory levels, environmental factors, biome, time of day, and position
@@ -707,7 +694,7 @@ flowchart TD
 
 ### Recent Major Improvements
 
-#### **Architecture & Dependency Resolution** (Latest)
+#### **Architecture & Dependency Resolution**
 - **Circular Dependency Elimination**: Resolved core ↔ planning ↔ mcp-server dependency cycles
 - **Executor Contracts Package**: New shared interface package prevents future circular dependencies
 - **MCP Integration Resilience**: Fallback support ensures continued operation when dependencies are unavailable
@@ -720,8 +707,8 @@ flowchart TD
 - **Working Intrusive Thought System**: Functional external suggestion processing and filtering
 - **Enhanced Cognitive Stream**: Consciousness flow implementation with real-time reasoning
 
-#### **Dynamic Thought Generation System** (Latest Revolutionary Enhancement)
-- **Context-Aware Thinking**: Bot now generates thoughts dynamically based on real-time situation analysis
+#### **Dynamic Thought Generation System**
+- **Context-Aware Thinking**: Bot generates thoughts dynamically based on real-time situation analysis
 - **Memory-Integrated Cognition**: Historical context and recommendations influence thought generation
 - **Biome-Specific Intelligence**: Different thought patterns for forests, deserts, mountains, caves, oceans, etc.
 - **Real-Time Adaptation**: Health, inventory, position, time, and threat analysis drive thought generation
@@ -749,49 +736,36 @@ flowchart TD
 - **Social Learner**: Adaptive learning from social interactions
 - **Relationship Manager**: Dynamic relationship tracking and management
 
-### Performance Metrics
+### Performance Targets
+
+> These are design targets. Actual benchmarks vary by hardware and workload.
 
 - **Real-Time Constraints**: ≤50ms p95 in hazardous contexts, ≤200ms p95 in routine contexts
-- **Enhanced Memory System Performance**:
+- **Memory System**:
   - Vector search: 50-150ms for similarity queries with HNSW indexing
   - GraphRAG retrieval: 100-300ms for structured knowledge queries
-  - **Neuroscience Consolidation**: <50ms for SWR tagging and cognitive map updates
   - Memory decay evaluation: <100ms for 1000+ memory assessment with importance-based decay
   - Hybrid ranking: 2-3x better relevance than keyword-only search
-  - **Memory-Enhanced Context**: <200ms for planning context enhancement
-  - **Neural Competition Simulation**: <30ms for memory consolidation prioritization
-  - **Social Memory**: <100ms for entity interaction recommendations
-  - **Spatial Memory**: <200ms for path optimization and location recommendations
-  - **Emotional Memory**: <150ms for trigger analysis and coping strategy recommendations
-  - **Cross-Domain Integration**: <300ms for multi-domain recommendations
-- **Memory Efficiency**: 95% space reduction through neuroscience-inspired decay management
-  - **Cognitive Domain Coverage**: 100% across social, spatial, emotional, and procedural domains
-  - **Memory System Health**: Real-time monitoring with automatic failover and graceful degradation
-  - **Pattern Learning Speed**: Identifies patterns after 3-5 similar experiences
-  - **Recommendation Accuracy**: 85-95% based on historical performance across domains
-- **Safety Compliance**: 100% constitutional rule adherence with detailed audit trails
+- **Safety Compliance**: Constitutional rule adherence with audit trails
 - **Planning Latency**: <100ms for reactive execution, <500ms for hierarchical planning
 
 ### Research Readiness
 
-The system is **research-ready** for consciousness studies with:
-- **Complete Architecture**: All major cognitive modules implemented and integrated
-- **Safety Framework**: Comprehensive ethical oversight and fail-safe mechanisms
-- **Performance Monitoring**: Detailed telemetry and performance analytics
-- **Advanced Memory System**: Human-like decay management with vector search and GraphRAG
-- **Cognitive Integration**: Memory-based goal formulation and self-reflection capabilities
-- **Planning Capabilities**: Hierarchical and reactive planning with cognitive integration
-- **Memory System Integration**: Complete integration across all components with neuroscience-inspired features
-- **Current Status**: All critical integration completed - system fully operational with memory enhancement
+The system provides a research platform for consciousness studies with:
+- **Architecture**: All major cognitive modules implemented and integrated
+- **Safety Framework**: Ethical oversight and fail-safe mechanisms
+- **Memory System**: Decay management with vector search and GraphRAG
+- **Planning**: Hierarchical and reactive planning with Sterling symbolic reasoning
+- **Current Focus**: Sterling solver E2E hardening, MLX sidecar reliability, and evaluation infrastructure
 
 ### Next Development Phase
 
-**MILESTONE 4 (ADVANCED FEATURES)** - Focus areas:
-1. **Enhanced Task Parser** - Complete environmental immersion capabilities
-2. **Social Cognition Enhancement** - Advanced theory of mind and social learning
-3. **Curriculum System** - Progressive skill development and regression testing
-4. **Interface Systems** - Web dashboard and human controls completion
-5. **Forward Model** - Predictive simulation and counterfactual reasoning
+**Current focus areas:**
+1. **Sterling Solver Hardening** — E2E test hardening, SolveBundle evidence, and solver observability (see `CLAUDE.md`)
+2. **Social Cognition Enhancement** — Advanced theory of mind and social learning
+3. **Curriculum System** — Progressive skill development and regression testing
+4. **Interface Systems** — Web dashboard and human controls completion
+5. **Forward Model** — Predictive simulation and counterfactual reasoning
 
 ## Cognitive Architecture Overview
 
@@ -859,10 +833,10 @@ The cognitive stream carries four categories of thought, each with distinct orig
 |------|------------|--------|---------|
 | **Reflection** | `self` | Cognition service LLM (`packages/cognition/src/event-driven-thought-generator.ts`) | Periodic self-reflection, task completion analysis, idle-period planning |
 | **Environmental** | `self` | Cognition service observation pipeline (with `cognitiveSystem: 'environmental-fallback'` when LLM fails) | Observations about the world — health, inventory, biome, threats. Deduplicated at 30s intervals |
-| **Internal** | `self` | Planning service (`packages/planning/src/task-integration.ts:414`) | Internal reasoning during task creation, step generation, and execution |
+| **Internal** | `self` | Planning service (`packages/planning/src/task-integration.ts`) | Internal reasoning during task creation, step generation, and execution |
 | **Intrusive** | `intrusive` | Dashboard UI → `POST /api/ws/cognitive-stream` → Cognition service | External suggestions injected by human operators through the dashboard |
 
-The cognition service generates thoughts in response to bot lifecycle events (`packages/cognition/src/event-driven-thought-generator.ts:81`):
+The cognition service generates thoughts in response to bot lifecycle events (`packages/cognition/src/event-driven-thought-generator.ts`):
 
 - `task_completed` → **reflection** thought
 - `task_failed` → **internal_dialogue** thought
@@ -884,14 +858,14 @@ sequenceDiagram
     participant DASH as Dashboard API :3000
     participant UI as Browser (SSE)
 
-    Note over PLAN: Executor loop (10s interval)<br/>modular-server.ts:249
+    Note over PLAN: Executor loop (10s interval)<br/>modular-server.ts
     PLAN->>MI: GET /state (world snapshot)
     MI->>MC: mineflayer events
     MC-->>MI: bot state, entities, blocks
     MI-->>PLAN: world state JSON
 
     PLAN->>COG: POST lifecycle event<br/>(idle_period, task_completed, etc.)
-    COG->>COG: event-driven-thought-generator.ts:81<br/>generateThoughtForEvent()
+    COG->>COG: event-driven-thought-generator.ts<br/>generateThoughtForEvent()
     COG-->>DASH: POST /api/ws/cognitive-stream<br/>{ type, content, attribution }
 
     DASH->>DASH: route.ts: addThought()<br/>30s content dedup
@@ -902,10 +876,10 @@ sequenceDiagram
 ```
 
 **Key code paths:**
-- Thought generation: `packages/cognition/src/event-driven-thought-generator.ts:81`
+- Thought generation: `packages/cognition/src/event-driven-thought-generator.ts`
 - SSE endpoint + persistence: `packages/dashboard/src/app/api/ws/cognitive-stream/route.ts`
-- Client SSE hook: `packages/dashboard/src/hooks/use-cognitive-stream.ts:111`
-- Zustand store with dedup: `packages/dashboard/src/stores/dashboard-store.ts:142`
+- Client SSE hook: `packages/dashboard/src/hooks/use-cognitive-stream.ts`
+- Zustand store with dedup: `packages/dashboard/src/stores/dashboard-store.ts`
 
 ### Task Execution Pipeline
 
@@ -914,36 +888,34 @@ Tasks are the bridge between cognitive thoughts and physical actions in the Mine
 ```mermaid
 flowchart TD
     %% Thought to Task
-    THOUGHTS["Cognitive Thoughts<br/>task-integration.ts:349<br/>(polled every 30s)"]
-    FILTER["Action Word Filter<br/>task-integration.ts:100<br/>(gather, craft, mine, explore...)"]
-    CONVERT["convertThoughtToTask()<br/>task-integration.ts:414"]
+    THOUGHTS["Cognitive Thoughts<br/>task-integration.ts<br/>(polled every 30s)"]
+    FILTER["GoalTag Extraction + ROUTABLE_ACTIONS<br/>thought-to-task-converter.ts"]
+    CONVERT["convertThoughtToTask()<br/>thought-to-task-converter.ts"]
 
     THOUGHTS --> FILTER
     FILTER -->|"actionable thoughts"| CONVERT
 
     %% Step Generation (4 paths)
-    CONVERT --> STEPS["generateDynamicSteps()<br/>task-integration.ts:2206"]
+    CONVERT --> STEPS["generateDynamicSteps()<br/>sterling-planner.ts"]
 
-    STEPS -->|"path 1"| STERLING_TP["Sterling Tool Progression<br/>task-integration.ts:2210<br/>meta.executable = !!meta.leaf"]
-    STEPS -->|"path 2"| STERLING_CR["Sterling Crafting Solver<br/>task-integration.ts:2222<br/>meta.executable = !!meta.leaf"]
-    STEPS -->|"path 3"| STERLING_BL["Sterling Building Solver<br/>task-integration.ts:2234<br/>meta.executable = !!meta.leaf"]
-    STEPS -->|"path 4 (fallback)"| COG_STEPS["generateStepsFromCognitive()<br/>task-integration.ts:2580<br/>narrative/display only"]
-    STEPS -->|"path 5 (last resort)"| INTEL_STEPS["generateIntelligentSteps()<br/>task-integration.ts:2645<br/>→ generateLeafMappedSteps()"]
+    STEPS -->|"path 1"| STERLING_TP["Sterling Tool Progression<br/>meta.executable = !!meta.leaf"]
+    STEPS -->|"path 2"| STERLING_CR["Sterling Crafting Solver<br/>meta.executable = !!meta.leaf"]
+    STEPS -->|"path 3"| STERLING_BL["Sterling Building Solver<br/>meta.executable = !!meta.leaf"]
+    STEPS -->|"path 4 (fallback)"| LEAF_STEPS["generateLeafMappedSteps()<br/>sterling-planner.ts<br/>fallback-macro authority"]
 
     %% Executability Check
     STERLING_TP --> EXEC_CHECK
     STERLING_CR --> EXEC_CHECK
     STERLING_BL --> EXEC_CHECK
-    COG_STEPS --> EXEC_CHECK
-    INTEL_STEPS --> EXEC_CHECK
+    LEAF_STEPS --> EXEC_CHECK
 
-    EXEC_CHECK["Executability Check<br/>task-integration.ts:1015<br/>step.meta?.leaf || meta?.executable"]
+    EXEC_CHECK["Executability Check<br/>task-integration.ts<br/>step.meta?.leaf || meta?.executable"]
 
-    EXEC_CHECK -->|"has executable steps"| QUEUE["Task Queue<br/>modular-server.ts:1665"]
+    EXEC_CHECK -->|"has executable steps"| QUEUE["Task Queue<br/>modular-server.ts"]
     EXEC_CHECK -->|"no executable steps"| BLOCKED["blockedReason: no-executable-plan"]
 
     %% Execution
-    QUEUE --> EXECUTOR["Executor Loop (10s)<br/>modular-server.ts:249<br/>stepToLeafExecution()"]
+    QUEUE --> EXECUTOR["Executor Loop (10s)<br/>modular-server.ts<br/>stepToLeafExecution()"]
     EXECUTOR -->|"authority check +<br/>arg validation"| VALIDATE["validateLeafArgs()<br/>leaf-arg-contracts.ts"]
     VALIDATE -->|"valid"| MI["Minecraft Interface :3005<br/>bot.dig(), bot.navigate(), etc."]
     VALIDATE -->|"invalid"| ARG_BLOCK["blockedReason: invalid-args"]
@@ -954,8 +926,8 @@ flowchart TD
     classDef validation fill:#4682b4,stroke:#2c5f8a,color:#fff;
 
     class STERLING_TP,STERLING_CR,STERLING_BL sterling;
-    class COG_STEPS fallback;
-    class INTEL_STEPS,VALIDATE validation;
+    class LEAF_STEPS fallback;
+    class VALIDATE validation;
 ```
 
 ### Fallback Macro Planner (Cognitive Task Execution)
@@ -964,15 +936,15 @@ flowchart TD
 
 **How it works now:** When Sterling symbolic solvers cannot handle a thought (e.g., "I should gather wood"), the system uses the **fallback-macro planner** to produce executable steps:
 
-1. **Requirement resolution** (`requirements.ts`): `resolveRequirement()` maps task type/title/candidate to a structured `TaskRequirement` (collect, mine, craft, build, tool_progression).
+1. **Requirement resolution** (`modules/requirements.ts`): `resolveRequirement()` maps task type/title/candidate to a structured `TaskRequirement` (collect, mine, craft, build, tool_progression).
 
-2. **Leaf arg mapping** (`leaf-arg-contracts.ts`): `requirementToLeafMeta()` maps the requirement to a validated `{ leaf, args }` pair (e.g., `{ leaf: 'dig_block', args: { blockType: 'oak_log', count: 8 } }`).
+2. **Leaf arg mapping** (`modules/leaf-arg-contracts.ts`): `requirementToLeafMeta()` maps the requirement to a validated `{ leaf, args }` pair (e.g., `{ leaf: 'dig_block', args: { blockType: 'oak_log', count: 8 } }`).
 
-3. **Step generation** (`task-integration.ts`): `generateLeafMappedSteps()` emits steps with `meta.authority: 'fallback-macro'`, `meta.executable: true`, and validated `meta.args`.
+3. **Step generation** (`task-integration/sterling-planner.ts`): `generateLeafMappedSteps()` emits steps with `meta.authority: 'fallback-macro'`, `meta.executable: true`, and validated `meta.args`.
 
 4. **Executor dispatch** (`modular-server.ts`): The executor accepts steps from `AUTHORIZED_SOURCES` (`sterling` and `fallback-macro`), validates args via `validateLeafArgs()` before execution, and rejects steps with invalid args (marking them blocked rather than sending junk to the bot).
 
-**Cognitive steps remain narrative/display only** — `generateStepsFromCognitive()` returns steps without execution metadata. Execution authority comes exclusively from Sterling or the fallback-macro planner.
+Execution authority comes exclusively from Sterling or the fallback-macro planner.
 
 **Limitations:**
 - Fallback steps don't plan prerequisites (e.g., `craft_recipe wooden_pickaxe` will fail if materials are missing). Failed steps use the existing backoff + retry logic.
@@ -1099,22 +1071,26 @@ In conclusion, the journey toward artificial consciousness is as much an enginee
 
 ## Documentation
 
-### Strategic Planning
-- **[Strategy Overview](docs/strategy/README.md)** - High-level strategic documents and frameworks
-- **[Integration Strategy](docs/strategy/INTEGRATION_STRATEGY.md)** - Cross-module coordination and data flow validation  
-- **[Risk Management](docs/strategy/RISK_MANAGEMENT.md)** - Comprehensive risk assessment and mitigation strategies
-- **[Verification Framework](docs/strategy/VERIFICATION_FRAMEWORK.md)** - Quality assurance and testing methodology
-- **[Future Enhancements](docs/strategy/FUTURE_ENHANCEMENTS.md)** - Advanced features for post-M4 development
+### Architecture & Specifications
+- **[Module Overview](docs/plans/modules/README.md)** — Master index mapping every package to its documentation
+- **[Module Plans](docs/plans/modules/)** — Detailed technical specifications for each cognitive module
+- **[Cognitive Flow (Detailed)](docs/planning/cognitive-flow-detailed.md)** — Component-level architecture and data flows
+- **[Leaf Execution Pipeline](docs/leaf-execution-pipeline.md)** — Full inventory of leaves with end-to-end flows
+- **[Multi-Step Scenarios](docs/multi-step-scenarios.md)** — Scenario definitions with capability matrix
 
-### Implementation Status & Plans
-- **[Module Overview](docs/plans/modules/README.md)** - Complete module implementation roadmap and progress tracker
-- **[Module Plans](docs/plans/modules/)** - Detailed technical specifications for each cognitive module
-- **[Working Specs](docs/working_specs/)** - Implementation-first specifications and iteration plans
+### Sterling & Planning
+- **[Sterling Capability Tracker](docs/planning/sterling-capability-tracker.md)** — Live solver status
+- **[Capability Primitives](docs/planning/capability-primitives.md)** — Formal primitive specifications
+- **[Rig Specifications (A-K)](docs/planning/)** — Phased capability implementation plans
+
+### Strategic References
+- **[Strategy Overview](docs/strategy/README.md)** — Strategic principles and current references
+- **[Logging Configuration](docs/logging-configuration.md)** — Debug flag setup
 
 ### Development & Testing
-- **Comprehensive Test Suite** - Integration testing, autonomous task execution, and performance benchmarking
-- **Real-Time Monitoring** - Live performance metrics and system health monitoring
-- **Safety Validation** - Constitutional compliance and ethical behavior verification
+- **Comprehensive Test Suite** — Integration testing, autonomous task execution, and performance benchmarking
+- **Real-Time Monitoring** — Live performance metrics and system health monitoring
+- **Safety Validation** — Constitutional compliance and ethical behavior verification
 
 ## References
 

@@ -1,7 +1,8 @@
 /**
- * Cognition System HTTP Server
+ * Cognition System HTTP Server — Composition Root
  *
- * Provides HTTP API endpoints for the cognition system.
+ * Creates services, state, event listeners, and mounts route modules.
+ * All route handlers live in ./routes/; helpers in ./server-utils/.
  *
  * @author @darianrosebrook
  */
@@ -32,207 +33,59 @@ import {
   ObservationPayload,
   ObservationInsight,
 } from './environmental/observation-reasoner';
+import { createSaliencyReasonerState } from './environmental/saliency-reasoner';
+
+import { EnhancedThoughtGenerator } from './thought-generator';
 import {
-  applySaliencyEnvelope,
-  createSaliencyReasonerState,
-  type BeliefStreamEnvelope,
-} from './environmental/saliency-reasoner';
-import { isUsableContent } from './llm-output-sanitizer';
+  getInteroState,
+  halveStressAxes,
+  setStressAxes,
+  decayStressAxes,
+  updateStressFromIntrusion,
+} from './interoception-store';
+import { logStressAtBoundary } from './stress-boundary-logger';
+import {
+  recordInteroSnapshot,
+  getInteroHistory,
+  loadInteroHistory,
+  getInteroHistorySummary,
+} from './intero-history';
+import {
+  buildWorldStateSnapshot,
+  computeStressAxes,
+  blendAxes,
+  buildStressContext,
+} from './stress-axis-computer';
+import { IntrusiveThoughtProcessor } from './intrusive-thought-processor';
+import { SocialAwarenessManager } from './social-awareness-manager';
+import { SocialMemoryManager } from '../../memory/src/social/social-memory-manager';
 
-/**
- * Cognitive Stream Logger
- *
- * Centralized logging system that sends cognition system logs to the cognitive stream
- * for dashboard visibility and emergent behavior observation.
- *
- * @author @darianrosebrook
- */
-class CognitiveStreamLogger {
-  private static instance: CognitiveStreamLogger;
-  private cognitiveStreamUrl: string;
+// Extracted modules
+import { CognitiveStreamLogger } from './cognitive-stream-logger';
+import { CognitiveMetricsTracker } from './cognitive-metrics-tracker';
+import { CognitiveStateTracker } from './cognitive-state-tracker';
+import { createInitialState, CognitionMutableState } from './cognition-state';
+import { THOUGHT_CYCLE_MS } from './server-utils/constants';
+import { ObservationQueueItem } from './server-utils/observation-helpers';
+import { createThoughtStreamHelpers } from './server-utils/thought-stream-helpers';
 
-  private constructor() {
-    this.cognitiveStreamUrl = process.env.DASHBOARD_ENDPOINT
-      ? `${process.env.DASHBOARD_ENDPOINT}/api/ws/cognitive-stream`
-      : 'http://localhost:3000/api/ws/cognitive-stream';
-  }
+// Route modules
+import { createSystemRoutes } from './routes/system-routes';
+import { createTelemetryRoutes } from './routes/telemetry-routes';
+import { createReasoningRoutes } from './routes/reasoning-routes';
+import { createThoughtRoutes } from './routes/thought-routes';
+import { createCognitiveStreamRoutes } from './routes/cognitive-stream-routes';
+import { createSocialRoutes } from './routes/social-routes';
+import { createProcessRoutes } from './routes/process-routes';
+import { createSocialMemoryRoutes } from './routes/social-memory-routes';
 
-  public static getInstance(): CognitiveStreamLogger {
-    if (!CognitiveStreamLogger.instance) {
-      CognitiveStreamLogger.instance = new CognitiveStreamLogger();
-    }
-    return CognitiveStreamLogger.instance;
-  }
+// ============================================================================
+// Service creation
+// ============================================================================
 
-  /**
-   * Send a log entry to the cognitive stream
-   */
-  async logToCognitiveStream(
-    type: string,
-    content: string,
-    context: {
-      emotionalState?: string;
-      confidence?: number;
-      cognitiveSystem?: string;
-      category?: string;
-      tags?: string[];
-    } = {}
-  ): Promise<void> {
-    try {
-      const response = await resilientFetch(this.cognitiveStreamUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        label: 'dashboard/cognitive-stream',
-        body: JSON.stringify({
-          type: type || 'system_log',
-          content: content,
-          attribution: 'self',
-          context: {
-            emotionalState: context.emotionalState || 'neutral',
-            confidence: context.confidence || 0.5,
-            cognitiveSystem: context.cognitiveSystem || 'cognition-system',
-            ...context,
-          },
-          metadata: {
-            thoughtType: type || 'system_log',
-            category: context.category || 'system',
-            tags: context.tags || ['system', 'log'],
-            source: 'cognition-system',
-            timestamp: Date.now(),
-          },
-        }),
-      });
-
-      if (!response?.ok) {
-        console.warn(
-          '❌ Failed to send log to cognitive stream:',
-          response?.status ?? 'unavailable'
-        );
-      }
-    } catch (error: unknown) {
-      console.warn('❌ Error sending log to cognitive stream:', error);
-    }
-  }
-
-  /**
-   * Log a cognition system event
-   */
-  async logEvent(
-    eventType: string,
-    content: string,
-    context: any = {}
-  ): Promise<void> {
-    await this.logToCognitiveStream('system_event', content, {
-      emotionalState: 'neutral',
-      confidence: 0.7,
-      cognitiveSystem: 'cognition-system',
-      category: 'system',
-      tags: ['event', eventType],
-      ...context,
-    });
-  }
-
-  /**
-   * Log a thought processing event
-   */
-  async logThoughtProcessing(
-    thought: string,
-    status: 'started' | 'completed' | 'error',
-    context: any = {}
-  ): Promise<void> {
-    const content = `Thought processing ${status}: "${thought}"`;
-    await this.logToCognitiveStream('thought_processing', content, {
-      emotionalState: status === 'error' ? 'concerned' : 'focused',
-      confidence: status === 'error' ? 0.3 : 0.6,
-      cognitiveSystem: 'intrusive-processor',
-      category: 'processing',
-      tags: ['thought', 'processing', status],
-      ...context,
-    });
-  }
-
-  /**
-   * Log a task creation event
-   */
-  async logTaskCreation(
-    taskTitle: string,
-    source: string,
-    context: any = {}
-  ): Promise<void> {
-    const content = `Task created: "${taskTitle}" (from ${source})`;
-    await this.logToCognitiveStream('task_creation', content, {
-      emotionalState: 'focused',
-      confidence: 0.8,
-      cognitiveSystem: 'planning-integration',
-      category: 'task',
-      tags: ['task', 'created', source],
-      ...context,
-    });
-  }
-
-  /**
-   * Log a social consideration
-   */
-  async logSocialConsideration(
-    entity: string,
-    reasoning: string,
-    context: any = {}
-  ): Promise<void> {
-    const content = `Social consideration: ${entity} - ${reasoning}`;
-    await this.logToCognitiveStream('social_consideration', content, {
-      emotionalState: 'thoughtful',
-      confidence: 0.7,
-      cognitiveSystem: 'social-awareness',
-      category: 'social',
-      tags: ['social', 'consideration', entity],
-      ...context,
-    });
-  }
-
-  /**
-   * Log a system status update
-   */
-  async logStatus(
-    status: string,
-    details: string,
-    context: any = {}
-  ): Promise<void> {
-    const content = `System status: ${status} - ${details}`;
-    await this.logToCognitiveStream('system_status', content, {
-      emotionalState: 'neutral',
-      confidence: 0.5,
-      cognitiveSystem: 'cognition-system',
-      category: 'status',
-      tags: ['status', status.toLowerCase()],
-      ...context,
-    });
-  }
-
-  /**
-   * Log a performance metric
-   */
-  async logMetric(
-    metric: string,
-    value: number | string,
-    context: any = {}
-  ): Promise<void> {
-    const content = `Metric: ${metric} = ${value}`;
-    await this.logToCognitiveStream('system_metric', content, {
-      emotionalState: 'neutral',
-      confidence: 0.5,
-      cognitiveSystem: 'cognition-system',
-      category: 'metric',
-      tags: ['metric', metric.toLowerCase()],
-      ...context,
-    });
-  }
-}
-
-// Initialize the cognitive stream logger
 const cognitiveLogger = CognitiveStreamLogger.getInstance();
 
 const observationLogDebug = process.env.OBSERVATION_LOG_DEBUG === '1';
-
 function logObservation(message: string, payload?: unknown): void {
   if (observationLogDebug && payload !== undefined) {
     console.log(message, payload);
@@ -250,19 +103,95 @@ const observationReasoner = new ObservationReasoner(llmInterface, {
   timeoutMs: observationTimeoutMs,
 });
 
-// Saliency reasoner state (replaces per-entity LLM observation calls)
 const saliencyState = createSaliencyReasonerState();
+const metricsTracker = new CognitiveMetricsTracker();
+const cognitiveStateTracker = new CognitiveStateTracker(metricsTracker);
+const ttsClient = new TTSClient();
+const dashboardUrl = process.env.DASHBOARD_ENDPOINT || 'http://localhost:3000';
 
-/**
- * Observation queue: serialize LLM calls and cull stale.
- * When draining, run the newest observation only; resolve all others with stale fallback.
- */
-interface ObservationQueueItem {
-  observation: ObservationPayload;
-  resolve: (insight: ObservationInsight) => void;
-  reject: (err: unknown) => void;
-  createdAt: number;
-}
+const reactArbiter = new ReActArbiter({
+  provider: 'mlx',
+  model: 'gemma3n:e2b',
+  maxTokens: 1000,
+  temperature: 0.3,
+  timeout: 30000,
+  retries: 3,
+});
+
+const enhancedThoughtGenerator = new EnhancedThoughtGenerator({
+  thoughtInterval: 60000,
+  maxThoughtsPerCycle: 1,
+  enableIdleThoughts: true,
+  enableContextualThoughts: true,
+  enableEventDrivenThoughts: true,
+});
+
+const intrusiveThoughtProcessor = new IntrusiveThoughtProcessor({
+  enableActionParsing: true,
+  enableTaskCreation: true,
+  enablePlanningIntegration: true,
+  enableMinecraftIntegration: true,
+  planningEndpoint: process.env.PLANNING_ENDPOINT || 'http://localhost:3002',
+  minecraftEndpoint: process.env.MINECRAFT_ENDPOINT || 'http://localhost:3005',
+});
+
+const socialAwarenessManager = new SocialAwarenessManager({
+  maxDistance: 15,
+  considerationCooldownMs: 30000,
+  enableVerboseLogging: true,
+  cognitionEndpoint: 'http://localhost:3003',
+  enableSocialMemory: true,
+  socialMemoryManager: null as any,
+});
+
+const cognitionSystem = {
+  cognitiveCore: {
+    contextOptimizer: { isActive: () => false },
+    conversationManager: { isActive: () => false },
+    creativeSolver: { isActive: () => false },
+  },
+  constitutionalFilter: { getRulesCount: () => 0 },
+  intrusionInterface: { isActive: () => false },
+  selfModel: {
+    getIdentityCount: () => 0,
+    getActiveIdentities: () => [] as any[],
+  },
+  socialCognition: { getAgentCount: () => 0, getRelationshipCount: () => 0 },
+};
+
+// ============================================================================
+// State container
+// ============================================================================
+
+const state = createInitialState();
+
+// Initialize social memory manager asynchronously
+(async () => {
+  try {
+    const memoryModule = await import('@conscious-bot/memory');
+    const { KnowledgeGraphCore } = memoryModule;
+    const knowledgeGraph = new KnowledgeGraphCore({
+      persistToStorage: true,
+      storageDirectory: './memory-storage',
+    });
+    state.socialMemoryManager = new SocialMemoryManager(knowledgeGraph as any, {
+      enableVerboseLogging: true,
+    });
+    // Update social awareness manager with the initialized manager
+    (socialAwarenessManager as any).socialMemoryManager =
+      state.socialMemoryManager;
+  } catch (error) {
+    console.warn(
+      '⚠️ Social memory system could not be initialized:',
+      (error as Error)?.message
+    );
+  }
+})();
+
+// ============================================================================
+// Observation queue
+// ============================================================================
+
 let observationQueue: ObservationQueueItem[] = [];
 let observationQueueRunning = false;
 
@@ -309,687 +238,26 @@ function enqueueObservation(
   });
 }
 
-const app = express.default();
-const port = process.env.PORT ? parseInt(process.env.PORT) : 3003;
+// ============================================================================
+// Thought stream helpers
+// ============================================================================
 
-// Network request tracking
-let networkRequestCount = 0;
-
-// Cognitive metrics tracking
-app.use(cors.default());
-
-// Type definitions for Express
-interface Request extends express.Request {}
-interface Response extends express.Response {}
-class CognitiveMetricsTracker {
-  private optimizationCount = 0;
-  private conversationCount = 0;
-  private solutionsGenerated = 0;
-  private violationsBlocked = 0;
-  private intrusionsHandled = 0;
-
-  incrementOptimizationCount(): void {
-    this.optimizationCount++;
-  }
-
-  getOptimizationCount(): number {
-    return this.optimizationCount;
-  }
-
-  incrementConversationCount(): void {
-    this.conversationCount++;
-  }
-
-  getConversationCount(): number {
-    return this.conversationCount;
-  }
-
-  incrementSolutionsGenerated(): void {
-    this.solutionsGenerated++;
-  }
-
-  getSolutionsGenerated(): number {
-    return this.solutionsGenerated;
-  }
-
-  incrementViolationsBlocked(): void {
-    this.violationsBlocked++;
-  }
-
-  getViolationsBlocked(): number {
-    return this.violationsBlocked;
-  }
-
-  incrementIntrusionsHandled(): void {
-    this.intrusionsHandled++;
-  }
-
-  getIntrusionsHandled(): number {
-    return this.intrusionsHandled;
-  }
-
-  reset(): void {
-    this.optimizationCount = 0;
-    this.conversationCount = 0;
-    this.solutionsGenerated = 0;
-    this.violationsBlocked = 0;
-    this.intrusionsHandled = 0;
-  }
-
-  getAllMetrics(): Record<string, number> {
-    return {
-      optimizationCount: this.optimizationCount,
-      conversationCount: this.conversationCount,
-      solutionsGenerated: this.solutionsGenerated,
-      violationsBlocked: this.violationsBlocked,
-      intrusionsHandled: this.intrusionsHandled,
-    };
-  }
-}
-
-const POSITION_REDACTION_GRANULARITY = 5;
-const HOSTILE_KEYWORDS = [
-  'zombie',
-  'skeleton',
-  'creeper',
-  'spider',
-  'witch',
-  'enderman',
-  'pillager',
-  'vindicator',
-  'evoker',
-  'ravager',
-  'phantom',
-  'blaze',
-  'ghast',
-  'guardian',
-  'warden',
-];
-
-function redactPositionForLog(position?: { x: number; y: number; z: number }) {
-  if (!position) return undefined;
-  const round = (value: number) =>
-    Math.round(value / POSITION_REDACTION_GRANULARITY) *
-    POSITION_REDACTION_GRANULARITY;
-  return {
-    x: round(position.x),
-    y: round(position.y),
-    z: round(position.z),
-  };
-}
-
-function coerceNumber(value: unknown): number | undefined {
-  if (value === null || value === undefined) return undefined;
-  const num = Number(value);
-  return Number.isFinite(num) ? num : undefined;
-}
-
-function inferThreatLevel(
-  name?: string
-): 'unknown' | 'friendly' | 'neutral' | 'hostile' {
-  if (!name) return 'unknown';
-  const lowerName = name.toLowerCase();
-  if (HOSTILE_KEYWORDS.some((keyword) => lowerName.includes(keyword))) {
-    return 'hostile';
-  }
-  if (lowerName.includes('villager') || lowerName.includes('golem')) {
-    return 'friendly';
-  }
-  if (
-    lowerName.includes('cow') ||
-    lowerName.includes('sheep') ||
-    lowerName.includes('pig')
-  ) {
-    return 'neutral';
-  }
-  return 'unknown';
-}
-
-function buildObservationPayload(
-  raw: any,
-  metadata: any = {}
-): ObservationPayload | null {
-  if (!raw || typeof raw !== 'object') {
-    return null;
-  }
-
-  let bot = raw.bot || metadata?.bot || undefined;
-  if (!bot || !bot.position) {
-    // Try to get bot position from metadata
-    if (metadata?.botPosition) {
-      bot = { position: metadata.botPosition };
-    } else {
-      return null;
-    }
-  }
-
-  const position = bot.position;
-  if (
-    position === undefined ||
-    position.x === undefined ||
-    position.y === undefined ||
-    position.z === undefined
-  ) {
-    return null;
-  }
-
-  const observationId =
-    typeof raw.observationId === 'string'
-      ? raw.observationId
-      : `obs-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
-
-  const baseCategory =
-    raw.category === 'environment' ? 'environment' : 'entity';
-  const rawEntity = raw.entity || metadata?.entity;
-  // Bot-adapter sends flat metadata (entityType, entityId, distance, position);
-  // construct entity from that when raw.entity/metadata.entity is absent
-  const entityFromMetadata =
-    !rawEntity &&
-    (metadata?.entityType ?? metadata?.entityId ?? metadata?.distance != null)
-      ? {
-          id: metadata?.entityId ?? observationId,
-          name: metadata?.entityType ?? 'unknown',
-          distance: coerceNumber(metadata?.distance),
-          position: metadata?.position,
-        }
-      : undefined;
-  const entity = rawEntity ?? entityFromMetadata;
-  const event = raw.event ?? metadata?.event ?? undefined;
-
-  const payload: ObservationPayload = {
-    observationId,
-    category: entity ? 'entity' : baseCategory,
-    bot: {
-      position: {
-        x: Number(position.x) || 0,
-        y: Number(position.y) || 0,
-        z: Number(position.z) || 0,
-      },
-      health: coerceNumber(bot.health) || coerceNumber(metadata?.botHealth),
-      food: coerceNumber(bot.food) || coerceNumber(metadata?.botFood),
-      dimension: typeof bot.dimension === 'string' ? bot.dimension : undefined,
-      gameMode: typeof bot.gameMode === 'string' ? bot.gameMode : undefined,
-    },
-    entity: entity
-      ? {
-          id: (entity.id ?? metadata?.entityId ?? observationId).toString(),
-          name:
-            typeof entity.name === 'string'
-              ? entity.name
-              : (metadata?.entityType ?? 'unknown'),
-          displayName: entity.displayName,
-          kind: entity.kind,
-          threatLevel:
-            entity.threatLevel ??
-            metadata?.threatLevel ??
-            inferThreatLevel(
-              typeof entity.name === 'string'
-                ? entity.name
-                : metadata?.entityType
-            ),
-          distance:
-            coerceNumber(entity.distance ?? metadata?.distance) ?? undefined,
-          position: entity.position
-            ? {
-                x: Number(entity.position.x) || 0,
-                y: Number(entity.position.y) || 0,
-                z: Number(entity.position.z) || 0,
-              }
-            : metadata?.position
-              ? {
-                  x: Number(metadata.position.x) || 0,
-                  y: Number(metadata.position.y) || 0,
-                  z: Number(metadata.position.z) || 0,
-                }
-              : undefined,
-          velocity: entity.velocity
-            ? {
-                x: Number(entity.velocity.x) || 0,
-                y: Number(entity.velocity.y) || 0,
-                z: Number(entity.velocity.z) || 0,
-              }
-            : undefined,
-        }
-      : undefined,
-    event: event
-      ? {
-          type: event.type ?? metadata?.eventType ?? 'unknown',
-          description: event.description ?? metadata?.description,
-          severity: event.severity ?? metadata?.severity,
-          position: event.position
-            ? {
-                x: Number(event.position.x) || 0,
-                y: Number(event.position.y) || 0,
-                z: Number(event.position.z) || 0,
-              }
-            : undefined,
-        }
-      : undefined,
-    context:
-      raw.context ??
-      (metadata && Object.keys(metadata).length > 0 ? metadata : undefined),
-    timestamp: coerceNumber(raw.timestamp) ?? Date.now(),
-  };
-
-  return payload;
-}
-
-const metricsTracker = new CognitiveMetricsTracker();
-
-// Enhanced cognitive state tracking
-class CognitiveStateTracker {
-  private activeConversations = new Set<string>();
-  private recentOperations: Array<{
-    type: string;
-    timestamp: number;
-    duration?: number;
-    success: boolean;
-  }> = [];
-  private cognitiveStates: Array<{
-    timestamp: number;
-    cognitiveLoad: number;
-    attentionLevel: number;
-    creativityLevel: number;
-    activeProcesses: number;
-  }> = [];
-
-  // Conversation tracking
-  startConversation(conversationId: string): void {
-    this.activeConversations.add(conversationId);
-    metricsTracker.incrementConversationCount();
-    this.recordOperation('conversation_start', true);
-  }
-
-  endConversation(conversationId: string): void {
-    this.activeConversations.delete(conversationId);
-    this.recordOperation('conversation_end', true);
-  }
-
-  getActiveConversationCount(): number {
-    return this.activeConversations.size;
-  }
-
-  // Operation tracking
-  recordOperation(type: string, success: boolean, startTime?: number): void {
-    const operation = {
-      type,
-      timestamp: Date.now(),
-      duration: startTime ? Date.now() - startTime : undefined,
-      success,
-    };
-
-    this.recentOperations.push(operation);
-
-    // Keep only last 100 operations
-    if (this.recentOperations.length > 100) {
-      this.recentOperations.shift();
-    }
-
-    // Update specific metrics based on operation type
-    switch (type) {
-      case 'optimization':
-        metricsTracker.incrementOptimizationCount();
-        break;
-      case 'solution_generation':
-        metricsTracker.incrementSolutionsGenerated();
-        break;
-      case 'violation_blocked':
-        metricsTracker.incrementViolationsBlocked();
-        break;
-      case 'intrusion_handled':
-        metricsTracker.incrementIntrusionsHandled();
-        break;
-    }
-  }
-
-  // Cognitive state tracking
-  recordCognitiveState(): void {
-    const state = {
-      timestamp: Date.now(),
-      cognitiveLoad: calculateCognitiveLoad(),
-      attentionLevel: calculateAttentionLevel(),
-      creativityLevel: calculateCreativityLevel(),
-      activeProcesses: getActiveProcessCount(),
-    };
-
-    this.cognitiveStates.push(state);
-
-    // Keep only last 1000 states (about 16 minutes at 1 per second)
-    if (this.cognitiveStates.length > 1000) {
-      this.cognitiveStates.shift();
-    }
-  }
-
-  // Analytics and insights
-  getOperationStats(timeWindow: number = 300000): {
-    // Default 5 minutes
-    total: number;
-    successful: number;
-    failed: number;
-    byType: Record<string, number>;
-    averageDuration: number;
-  } {
-    const cutoff = Date.now() - timeWindow;
-    const recentOps = this.recentOperations.filter(
-      (op) => op.timestamp > cutoff
-    );
-
-    const stats = {
-      total: recentOps.length,
-      successful: recentOps.filter((op) => op.success).length,
-      failed: recentOps.filter((op) => !op.success).length,
-      byType: {} as Record<string, number>,
-      averageDuration: 0,
-    };
-
-    // Group by type
-    recentOps.forEach((op) => {
-      stats.byType[op.type] = (stats.byType[op.type] || 0) + 1;
-    });
-
-    // Calculate average duration
-    const opsWithDuration = recentOps.filter((op) => op.duration !== undefined);
-    if (opsWithDuration.length > 0) {
-      stats.averageDuration =
-        opsWithDuration.reduce((sum, op) => sum + (op.duration || 0), 0) /
-        opsWithDuration.length;
-    }
-
-    return stats;
-  }
-
-  getCognitiveStateHistory(timeWindow: number = 300000): Array<{
-    timestamp: number;
-    cognitiveLoad: number;
-    attentionLevel: number;
-    creativityLevel: number;
-    activeProcesses: number;
-  }> {
-    const cutoff = Date.now() - timeWindow;
-    return this.cognitiveStates.filter((state) => state.timestamp > cutoff);
-  }
-
-  getHealthMetrics(): {
-    averageCognitiveLoad: number;
-    averageAttentionLevel: number;
-    averageCreativityLevel: number;
-    operationSuccessRate: number;
-    systemStability: number;
-  } {
-    const recentStates = this.getCognitiveStateHistory();
-    const recentStats = this.getOperationStats();
-
-    const averageCognitiveLoad =
-      recentStates.length > 0
-        ? recentStates.reduce((sum, state) => sum + state.cognitiveLoad, 0) /
-          recentStates.length
-        : 0;
-
-    const averageAttentionLevel =
-      recentStates.length > 0
-        ? recentStates.reduce((sum, state) => sum + state.attentionLevel, 0) /
-          recentStates.length
-        : 0;
-
-    const averageCreativityLevel =
-      recentStates.length > 0
-        ? recentStates.reduce((sum, state) => sum + state.creativityLevel, 0) /
-          recentStates.length
-        : 0;
-
-    const operationSuccessRate =
-      recentStats.total > 0 ? recentStats.successful / recentStats.total : 1;
-
-    // System stability based on variance in cognitive states
-    const cognitiveLoadVariance =
-      recentStates.length > 1
-        ? this.calculateVariance(recentStates.map((s) => s.cognitiveLoad))
-        : 0;
-
-    const systemStability = Math.max(0, 1 - cognitiveLoadVariance);
-
-    return {
-      averageCognitiveLoad,
-      averageAttentionLevel,
-      averageCreativityLevel,
-      operationSuccessRate,
-      systemStability,
-    };
-  }
-
-  private calculateVariance(values: number[]): number {
-    if (values.length < 2) return 0;
-
-    const mean = values.reduce((sum, val) => sum + val, 0) / values.length;
-    const squaredDiffs = values.map((val) => Math.pow(val - mean, 2));
-    return squaredDiffs.reduce((sum, val) => sum + val, 0) / values.length;
-  }
-
-  reset(): void {
-    this.activeConversations.clear();
-    this.recentOperations = [];
-    this.cognitiveStates = [];
-  }
-}
-
-const cognitiveStateTracker = new CognitiveStateTracker();
-
-// Middleware
-app.use(cors.default());
-app.use(express.json());
-
-// Middleware to track network requests
-app.use((req, res, next) => {
-  networkRequestCount++;
-
-  // Reset counter every minute to prevent overflow
-  if (networkRequestCount > 1000) {
-    networkRequestCount = networkRequestCount % 100; // Keep some history
-  }
-
-  const startTime = Date.now();
-
-  // Track successful operations
-  res.on('finish', () => {
-    const success = res.statusCode < 400;
-    const duration = Date.now() - startTime;
-
-    // Record operation based on endpoint
-    const operationType = req.path.includes('/chat')
-      ? 'conversation'
-      : req.path.includes('/optimize')
-        ? 'optimization'
-        : req.path.includes('/solve')
-          ? 'solution_generation'
-          : req.path.includes('/intrusion')
-            ? 'intrusion_handled'
-            : 'api_request';
-
-    cognitiveStateTracker.recordOperation(operationType, success, startTime);
+const { sendThoughtToCognitiveStream, runConsiderationStep } =
+  createThoughtStreamHelpers({
+    dashboardUrl,
+    ttsClient,
+    llmInterface,
   });
 
-  next();
-});
-
-// Initialize ReAct Arbiter
-const reactArbiter = new ReActArbiter({
-  provider: 'mlx',
-  model: 'gemma3n:e2b',
-  maxTokens: 1000,
-  temperature: 0.3,
-  timeout: 30000,
-  retries: 3,
-});
-
-// Import enhanced components
-import { EnhancedThoughtGenerator } from './thought-generator';
-import {
-  getInteroState,
-  halveStressAxes,
-  setStressAxes,
-  decayStressAxes,
-  updateStressFromIntrusion,
-} from './interoception-store';
-import { logStressAtBoundary } from './stress-boundary-logger';
-import {
-  recordInteroSnapshot,
-  getInteroHistory,
-  loadInteroHistory,
-  getInteroHistorySummary,
-} from './intero-history';
-import {
-  buildWorldStateSnapshot,
-  computeStressAxes,
-  blendAxes,
-  buildStressContext,
-} from './stress-axis-computer';
-import { IntrusiveThoughtProcessor } from './intrusive-thought-processor';
-import { SocialAwarenessManager } from './social-awareness-manager';
-import { SocialMemoryManager } from '../../memory/src/social/social-memory-manager';
-
-// Spawn position and timing counters for stress axis computation
-let spawnPosition: { x: number; y: number; z: number } | null = null;
-let msSinceLastRest = 0;
-let msSinceLastProgress = 0;
-const THOUGHT_CYCLE_MS = 60000;
-
-// Initialize enhanced thought generator
-const enhancedThoughtGenerator = new EnhancedThoughtGenerator({
-  thoughtInterval: 60000, // 60 seconds between thoughts to reduce spam
-  maxThoughtsPerCycle: 1,
-  enableIdleThoughts: true,
-  enableContextualThoughts: true,
-  enableEventDrivenThoughts: true,
-});
-
-// Initialize enhanced intrusive thought processor
-const intrusiveThoughtProcessor = new IntrusiveThoughtProcessor({
-  enableActionParsing: true,
-  enableTaskCreation: true,
-  enablePlanningIntegration: true,
-  enableMinecraftIntegration: true,
-  planningEndpoint: process.env.PLANNING_ENDPOINT || 'http://localhost:3002',
-  minecraftEndpoint: process.env.MINECRAFT_ENDPOINT || 'http://localhost:3005',
-});
-
-// Initialize social memory manager
-let socialMemoryManager: SocialMemoryManager | null = null;
-(async () => {
-  try {
-    const memoryModule = await import('@conscious-bot/memory');
-    const { KnowledgeGraphCore } = memoryModule;
-    const knowledgeGraph = new KnowledgeGraphCore({
-      persistToStorage: true,
-      storageDirectory: './memory-storage',
-    });
-    socialMemoryManager = new SocialMemoryManager(knowledgeGraph as any, {
-      enableVerboseLogging: true,
-    });
-  } catch (error) {
-    console.warn(
-      '⚠️ Social memory system could not be initialized:',
-      (error as Error)?.message
-    );
-  }
-})();
-
-// Initialize social awareness manager
-const socialAwarenessManager = new SocialAwarenessManager({
-  maxDistance: 15,
-  considerationCooldownMs: 30000,
-  enableVerboseLogging: true,
-  cognitionEndpoint: 'http://localhost:3003',
-  enableSocialMemory: true,
-  socialMemoryManager: socialMemoryManager,
-});
-
-// Initialize cognition system (simplified for now)
-const cognitionSystem = {
-  cognitiveCore: {
-    contextOptimizer: { isActive: () => false },
-    conversationManager: { isActive: () => false },
-    creativeSolver: { isActive: () => false },
-  },
-  constitutionalFilter: { getRulesCount: () => 0 },
-  intrusionInterface: { isActive: () => false },
-  selfModel: { getIdentityCount: () => 0, getActiveIdentities: () => [] },
-  socialCognition: { getAgentCount: () => 0, getRelationshipCount: () => 0 },
-};
-
-// TTS client (Kokoro-ONNX, optional — fire-and-forget voice output)
-const ttsClient = new TTSClient();
-
-// Store cognitive thoughts for external access
-let cognitiveThoughts: any[] = [];
-
-// Regex to strip residual [GOAL:...] tags (and optional trailing amount) from display text
-const GOAL_TAG_STRIP = /\s*\[GOAL:[^\]]*\](?:\s*\d+\w*)?/gi;
-
-// Function to send thoughts to cognitive stream
-async function sendThoughtToCognitiveStream(thought: any) {
-  try {
-    const dashboardUrl =
-      process.env.DASHBOARD_ENDPOINT || 'http://localhost:3000';
-    const response = await resilientFetch(
-      `${dashboardUrl}/api/ws/cognitive-stream`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          payloadVersion: 2,
-          type: thought.type || 'reflection',
-          content: thought.content, // raw sanitized text (may contain failed tags)
-          displayContent: (thought.content || '') // UI-safe version: strip any residual tags
-            .replace(GOAL_TAG_STRIP, '')
-            .trim(),
-          extractedGoal: thought.metadata?.extractedGoal || null, // structured goal for routing
-          sanitizationFlags: thought.metadata?.sanitizationFlags || null,
-          attribution: 'self',
-          context: {
-            emotionalState: thought.context?.emotionalState || 'neutral',
-            confidence: thought.context?.confidence || 0.5,
-            cognitiveSystem: thought.context?.cognitiveSystem || 'generator',
-          },
-          metadata: {
-            thoughtType: thought.metadata?.thoughtType || thought.type,
-            ...thought.metadata,
-          },
-        }),
-      }
-    );
-
-    if (response?.ok) {
-      console.log(
-        '✅ Thought sent to cognitive stream:',
-        thought.content.substring(0, 50) + '...'
-      );
-
-      // Speak thought aloud via TTS (fire-and-forget)
-      if (process.env.TTS_SPEAK_THOUGHTS !== 'false') {
-        const displayText = (thought.content || '')
-          .replace(GOAL_TAG_STRIP, '')
-          .trim();
-        if (isUsableContent(displayText)) {
-          ttsClient.speak(displayText);
-        }
-      }
-    } else {
-      console.error('❌ Failed to send thought to cognitive stream');
-    }
-  } catch (error) {
-    console.error('❌ Error sending thought to cognitive stream:', error);
-  }
-}
-
-// Start periodic thought generation
-let thoughtGenerationInterval: NodeJS.Timeout | null = null;
+// ============================================================================
+// Thought generation control
+// ============================================================================
 
 function startThoughtGeneration() {
-  if (thoughtGenerationInterval) {
-    clearInterval(thoughtGenerationInterval);
+  if (state.thoughtGenerationInterval) {
+    clearInterval(state.thoughtGenerationInterval);
   }
 
-  // Log the start of thought generation
   cognitiveLogger
     .logStatus(
       'thought_generation_started',
@@ -1015,9 +283,8 @@ function startThoughtGeneration() {
   });
 
   // Set up periodic thought generation every 60 seconds
-  thoughtGenerationInterval = setInterval(async () => {
+  state.thoughtGenerationInterval = setInterval(async () => {
     try {
-      // Fetch real bot state and planning data
       const mcUrl = process.env.MINECRAFT_ENDPOINT || 'http://localhost:3005';
       const planningUrl =
         process.env.PLANNING_SERVICE_URL || 'http://localhost:3002';
@@ -1028,11 +295,8 @@ function startThoughtGeneration() {
       const botState = botRes?.ok ? await botRes.json() : null;
       const planningState = planningRes?.ok ? await planningRes.json() : null;
 
-      // botState.data is convertedState: { worldState, status, data: {pos,health,food,inventory,...env}, isAlive }
-      // Flatten inner data (which has environment fields after wiring fix) into currentState
       const rawState = (botState as any)?.data || {};
       const innerData = rawState.data || {};
-      // Normalize inventory: server sends { items, totalSlots, usedSlots }, thought generator expects Array
       const rawInventory = innerData.inventory;
       const inventory = Array.isArray(rawInventory)
         ? rawInventory
@@ -1058,17 +322,21 @@ function startThoughtGeneration() {
 
       // Compute and blend stress axes from world state
       if (botState) {
-        const snapshot = buildWorldStateSnapshot(botState, spawnPosition, {
-          msSinceLastRest,
-          msSinceLastProgress,
-        });
+        const snapshot = buildWorldStateSnapshot(
+          botState,
+          state.spawnPosition,
+          {
+            msSinceLastRest: state.msSinceLastRest,
+            msSinceLastProgress: state.msSinceLastProgress,
+          }
+        );
         const computed = computeStressAxes(snapshot);
         const blended = blendAxes(getInteroState().stressAxes, computed);
         setStressAxes(blended);
         decayStressAxes();
       }
-      msSinceLastRest += THOUGHT_CYCLE_MS;
-      msSinceLastProgress += THOUGHT_CYCLE_MS;
+      state.msSinceLastRest += THOUGHT_CYCLE_MS;
+      state.msSinceLastProgress += THOUGHT_CYCLE_MS;
 
       const compositeStress = getInteroState().stress;
       const emotionalState =
@@ -1078,16 +346,11 @@ function startThoughtGeneration() {
             ? 'attentive'
             : 'neutral';
 
-      // Record intero snapshot for history/evaluation dashboard
       recordInteroSnapshot(getInteroState(), emotionalState);
-
-      // Populate cognition-side state cache for all chat surfaces
       updateBotStateCache(currentState, currentTasks, emotionalState);
 
       const stressCtx = buildStressContext(getInteroState().stressAxes);
 
-      // Wire isNight into currentState for drive tick.
-      // hasShelterNearby left undefined until real shelter detection exists (fail-closed: drive tick skips shelter goal).
       (currentState as any).isNight =
         ((currentState as any).timeOfDay ?? 0) >= 13000;
 
@@ -1111,7 +374,6 @@ function startThoughtGeneration() {
     } catch (error) {
       console.error('Error generating periodic thought:', error);
 
-      // Log the error to cognitive stream
       cognitiveLogger
         .logEvent(
           'thought_generation_error',
@@ -1127,17 +389,16 @@ function startThoughtGeneration() {
           console.warn('Failed to log thought generation error:', logError);
         });
     }
-  }, 60000); // 60 seconds
+  }, 60000);
 
   console.log('Enhanced thought generator started with 60-second intervals');
 }
 
 function stopThoughtGeneration() {
-  if (thoughtGenerationInterval) {
-    clearInterval(thoughtGenerationInterval);
-    thoughtGenerationInterval = null;
+  if (state.thoughtGenerationInterval) {
+    clearInterval(state.thoughtGenerationInterval);
+    state.thoughtGenerationInterval = null;
 
-    // Log the stop of thought generation
     cognitiveLogger
       .logStatus(
         'thought_generation_stopped',
@@ -1156,20 +417,23 @@ function stopThoughtGeneration() {
   }
 }
 
-// Set up event listeners for enhanced components
+// ============================================================================
+// Event listeners (with .catch() on fire-and-forget async calls)
+// ============================================================================
+
 enhancedThoughtGenerator.on('thoughtGenerated', (thought) => {
-  // Log the thought generation to cognitive stream
-
-  cognitiveThoughts.push(thought);
-
-  // Send the thought to the cognitive stream
-  sendThoughtToCognitiveStream(thought);
+  state.cognitiveThoughts.push(thought);
+  sendThoughtToCognitiveStream(thought).catch((err: any) => {
+    console.warn(
+      '[Cognition] Failed to send thought to stream:',
+      err?.message || err
+    );
+  });
 });
 
 intrusiveThoughtProcessor.on(
   'thoughtProcessingStarted',
   ({ thought, timestamp }) => {
-    // Log the processing start to cognitive stream
     cognitiveLogger
       .logThoughtProcessing(thought, 'started', {
         cognitiveSystem: 'intrusive-processor',
@@ -1196,12 +460,16 @@ intrusiveThoughtProcessor.on(
       },
     };
 
-    sendThoughtToCognitiveStream(processingThought);
+    sendThoughtToCognitiveStream(processingThought).catch((err: any) => {
+      console.warn(
+        '[Cognition] Failed to send thought to stream:',
+        err?.message || err
+      );
+    });
   }
 );
 
 intrusiveThoughtProcessor.on('thoughtGenerated', ({ thought, timestamp }) => {
-  // Log the intrusive thought generation to cognitive stream
   cognitiveLogger
     .logEvent(
       'intrusive_thought_generated',
@@ -1227,152 +495,13 @@ intrusiveThoughtProcessor.on('thoughtGenerated', ({ thought, timestamp }) => {
     metadata: thought.metadata,
   };
 
-  sendThoughtToCognitiveStream(generatedThought);
+  sendThoughtToCognitiveStream(generatedThought).catch((err: any) => {
+    console.warn(
+      '[Cognition] Failed to send thought to stream:',
+      err?.message || err
+    );
+  });
 });
-
-// Legacy event listeners for action parsing and task creation - now disabled
-// since intrusive thoughts generate internal thoughts instead of tasks
-/*
-intrusiveThoughtProcessor.on(
-  'actionParsed',
-  ({ thought, action, timestamp }) => {
-    console.log('Action parsed from intrusive thought:', { thought, action });
-
-    const parsingThought = {
-      id: `action-parsed-${timestamp}`,
-      type: 'planning',
-      content: action
-        ? `Parsed action from thought: "${thought}" → ${action.type} ${action.target}`
-        : `No actionable content found in: "${thought}"`,
-      timestamp,
-      context: {
-        emotionalState: action ? 'focused' : 'neutral',
-        confidence: action ? 0.7 : 0.5,
-        cognitiveSystem: 'intrusive-processor',
-      },
-      metadata: {
-        thoughtType: 'action-parsing',
-        actionType: action?.type,
-        actionTarget: action?.target,
-        source: 'intrusive-thought',
-      },
-    };
-
-    sendThoughtToCognitiveStream(parsingThought);
-  }
-);
-
-intrusiveThoughtProcessor.on(
-  'taskCreationStarted',
-  ({ thought, action, timestamp }) => {
-    console.log('Started creating task from intrusive thought:', {
-      thought,
-      action,
-    });
-
-    const taskStartThought = {
-      id: `task-creation-started-${timestamp}`,
-      type: 'planning',
-      content: `Creating task from action: ${action.type} ${action.target}`,
-      timestamp,
-      context: {
-        emotionalState: 'focused',
-        confidence: 0.8,
-        cognitiveSystem: 'intrusive-processor',
-      },
-      metadata: {
-        thoughtType: 'task-creation-start',
-        actionType: action.type,
-        actionTarget: action.target,
-        source: 'intrusive-thought',
-      },
-    };
-
-    sendThoughtToCognitiveStream(taskStartThought);
-  }
-);
-
-intrusiveThoughtProcessor.on(
-  'taskCreated',
-  ({ thought, task, action, timestamp }) => {
-    console.log('Task created from intrusive thought:', {
-      thought,
-      task,
-      action,
-    });
-
-    // Send task creation thought to cognitive stream
-    const taskThought = {
-      id: `task-created-${timestamp}`,
-      type: 'planning',
-      content: `Created task from intrusive thought: "${thought}". Task: ${task.title}`,
-      timestamp,
-      context: {
-        emotionalState: 'focused',
-        confidence: 0.8,
-        cognitiveSystem: 'intrusive-processor',
-      },
-      metadata: {
-        thoughtType: 'task-creation',
-        taskId: task.id,
-        source: 'intrusive-thought',
-      },
-    };
-
-    sendThoughtToCognitiveStream(taskThought);
-  }
-);
-
-intrusiveThoughtProcessor.on(
-  'planningIntegrationStarted',
-  ({ task, timestamp }) => {
-    console.log('Started planning integration for task:', task.title);
-
-    const planningStartThought = {
-      id: `planning-integration-started-${timestamp}`,
-      type: 'planning',
-      content: `Integrating task into planning system: ${task.title}`,
-      timestamp,
-      context: {
-        emotionalState: 'focused',
-        confidence: 0.7,
-        cognitiveSystem: 'planning-integration',
-      },
-      metadata: {
-        thoughtType: 'planning-integration-start',
-        taskId: task.id,
-        source: 'intrusive-thought',
-      },
-    };
-
-    sendThoughtToCognitiveStream(planningStartThought);
-  }
-);
-
-intrusiveThoughtProcessor.on('planningSystemUpdated', ({ task, result }) => {
-  console.log('Planning system updated with task:', { task, result });
-
-  // Send planning update thought to cognitive stream
-  const planningThought = {
-    id: `planning-update-${Date.now()}`,
-    type: 'planning',
-    content: `Planning system updated: ${task.title} - ${result.success ? 'Success' : 'Failed'}`,
-    timestamp: Date.now(),
-    context: {
-      emotionalState: 'focused',
-      confidence: 0.7,
-      cognitiveSystem: 'planning-integration',
-    },
-    metadata: {
-      thoughtType: 'planning-update',
-      taskId: task.id,
-      success: result.success,
-    },
-  };
-
-  sendThoughtToCognitiveStream(planningThought);
-});
-*/
 
 intrusiveThoughtProcessor.on(
   'thoughtRecorded',
@@ -1396,14 +525,18 @@ intrusiveThoughtProcessor.on(
       },
     };
 
-    sendThoughtToCognitiveStream(recordedThought);
+    sendThoughtToCognitiveStream(recordedThought).catch((err: any) => {
+      console.warn(
+        '[Cognition] Failed to send thought to stream:',
+        err?.message || err
+      );
+    });
   }
 );
 
 intrusiveThoughtProcessor.on('processingError', ({ thought, error }) => {
   console.error('Error processing intrusive thought:', { thought, error });
 
-  // Send error thought to cognitive stream
   const errorThought = {
     id: `processing-error-${Date.now()}`,
     type: 'reflection',
@@ -1420,12 +553,15 @@ intrusiveThoughtProcessor.on('processingError', ({ thought, error }) => {
     },
   };
 
-  sendThoughtToCognitiveStream(errorThought);
+  sendThoughtToCognitiveStream(errorThought).catch((err: any) => {
+    console.warn(
+      '[Cognition] Failed to send thought to stream:',
+      err?.message || err
+    );
+  });
 });
 
-// Social awareness manager event listeners
 socialAwarenessManager.on('socialConsiderationGenerated', (result: any) => {
-  // Log the social consideration to cognitive stream
   cognitiveLogger
     .logSocialConsideration(
       `${result.entity.type} ${result.entity.id}`,
@@ -1464,12 +600,15 @@ socialAwarenessManager.on('socialConsiderationGenerated', (result: any) => {
     },
   };
 
-  sendThoughtToCognitiveStream(considerationThought);
+  sendThoughtToCognitiveStream(considerationThought).catch((err: any) => {
+    console.warn(
+      '[Cognition] Failed to send thought to stream:',
+      err?.message || err
+    );
+  });
 });
 
-// Chat consideration event listeners
 socialAwarenessManager.on('chatConsiderationGenerated', (result: any) => {
-  // Log the chat consideration to cognitive stream
   cognitiveLogger
     .logSocialConsideration(
       `chat from ${result.message.sender}`,
@@ -1510,2120 +649,15 @@ socialAwarenessManager.on('chatConsiderationGenerated', (result: any) => {
     },
   };
 
-  sendThoughtToCognitiveStream(chatConsiderationThought);
-});
-
-let systemReady = process.env.SYSTEM_READY_ON_BOOT === '1';
-let readyAt: string | null = systemReady ? new Date().toISOString() : null;
-let readySource: string | null = systemReady ? 'env' : null;
-
-// Health check endpoint
-app.get('/health', (req, res) => {
-  res.json({
-    status: 'healthy',
-    system: 'cognition',
-    timestamp: Date.now(),
-    version: '0.1.0',
+  sendThoughtToCognitiveStream(chatConsiderationThought).catch((err: any) => {
+    console.warn(
+      '[Cognition] Failed to send thought to stream:',
+      err?.message || err
+    );
   });
 });
 
-// Startup readiness endpoint
-app.get('/system/ready', (_req, res) => {
-  res.json({ ready: systemReady, readyAt, source: readySource });
-});
-
-app.post('/system/ready', (req, res) => {
-  if (!systemReady) {
-    systemReady = true;
-    readyAt = new Date().toISOString();
-    readySource =
-      typeof req.body?.source === 'string' ? req.body.source : 'startup';
-  }
-  res.json({ ready: systemReady, readyAt, accepted: true });
-});
-
-// Start thought generation endpoint
-app.post('/start-thoughts', (req, res) => {
-  try {
-    startThoughtGeneration();
-    res.json({
-      success: true,
-      message: 'Enhanced thought generator started',
-      timestamp: Date.now(),
-    });
-  } catch (error) {
-    console.error('Error starting thought generation:', error);
-    res.status(500).json({
-      error: 'Failed to start thought generation',
-      details: error instanceof Error ? error.message : 'Unknown error',
-    });
-  }
-});
-
-// Stop thought generation endpoint
-app.post('/stop-thoughts', (req, res) => {
-  try {
-    stopThoughtGeneration();
-    res.json({
-      success: true,
-      message: 'Enhanced thought generator stopped',
-      timestamp: Date.now(),
-    });
-  } catch (error) {
-    console.error('Error stopping thought generation:', error);
-    res.status(500).json({
-      error: 'Failed to stop thought generation',
-      details: error instanceof Error ? error.message : 'Unknown error',
-    });
-  }
-});
-
-// Get thought generation status endpoint
-app.get('/thoughts-status', (req, res) => {
-  res.json({
-    isRunning: thoughtGenerationInterval !== null,
-    interval: thoughtGenerationInterval ? 30000 : null,
-    timestamp: Date.now(),
-  });
-});
-
-// Get cognition system state
-app.get('/state', (req, res) => {
-  try {
-    const state = {
-      cognitiveCore: {
-        contextOptimizer: {
-          active: cognitionSystem.cognitiveCore.contextOptimizer.isActive(),
-          optimizationCount: metricsTracker.getOptimizationCount(),
-        },
-        conversationManager: {
-          activeConversations:
-            cognitiveStateTracker.getActiveConversationCount(),
-          totalConversations: metricsTracker.getConversationCount(),
-        },
-        creativeSolver: {
-          active: cognitionSystem.cognitiveCore.creativeSolver.isActive(),
-          solutionsGenerated: metricsTracker.getSolutionsGenerated(),
-        },
-      },
-      constitutionalFilter: {
-        rulesCount: cognitionSystem.constitutionalFilter.getRulesCount(),
-        violationsBlocked: metricsTracker.getViolationsBlocked(),
-      },
-      intrusionInterface: {
-        active: cognitionSystem.intrusionInterface.isActive(),
-        intrusionsHandled: metricsTracker.getIntrusionsHandled(),
-      },
-      selfModel: {
-        identityCount: cognitionSystem.selfModel.getIdentityCount(),
-        activeIdentities: cognitionSystem.selfModel.getActiveIdentities(),
-      },
-      socialCognition: {
-        agentModels: cognitionSystem.socialCognition.getAgentCount(),
-        relationships: cognitionSystem.socialCognition.getRelationshipCount(),
-      },
-      intero: getInteroState(),
-    };
-
-    res.json(state);
-  } catch (error) {
-    console.error('Error getting cognition state:', error);
-    res.status(500).json({ error: 'Failed to get cognition state' });
-  }
-});
-
-// Halve stress axes (e.g. after sleep or respawn at bed)
-app.post('/stress/reset', (req, res) => {
-  try {
-    const body = req.body || {};
-    if (body.spawnPosition && typeof body.spawnPosition === 'object') {
-      spawnPosition = {
-        x: body.spawnPosition.x ?? 0,
-        y: body.spawnPosition.y ?? 64,
-        z: body.spawnPosition.z ?? 0,
-      };
-    }
-    msSinceLastRest = 0;
-    halveStressAxes();
-    res.json({ intero: getInteroState() });
-  } catch (error) {
-    console.error('Error resetting stress:', error);
-    res.status(500).json({ error: 'Failed to reset stress' });
-  }
-});
-
-// Interoception history for evaluation dashboard
-app.get('/intero/history', (req, res) => {
-  const since = parseInt(req.query.since as string) || 0;
-  const limit = Math.min(parseInt(req.query.limit as string) || 300, 1800);
-  res.json({
-    success: true,
-    snapshots: getInteroHistory(since, limit),
-    summary: getInteroHistorySummary(),
-    currentIntero: getInteroState(),
-  });
-});
-
-// Stress boundary decision stats for evaluation dashboard
-app.get('/intero/boundary-stats', (req, res) => {
-  try {
-    const fs = require('fs');
-    const logPath =
-      process.env.STRESS_BOUNDARY_LOG_PATH || 'stress-boundary.log';
-    const eventCounts: Record<string, number> = {
-      observation_thought: 0,
-      intrusion_accept: 0,
-      intrusion_resist: 0,
-      task_selected: 0,
-    };
-    let totalEvents = 0;
-
-    try {
-      if (fs.existsSync(logPath)) {
-        const raw = fs.readFileSync(logPath, 'utf-8');
-        const lines = raw.split('\n').filter((l: string) => l.trim());
-        for (const line of lines) {
-          try {
-            const entry = JSON.parse(line);
-            if (entry.event && eventCounts[entry.event] !== undefined) {
-              eventCounts[entry.event]++;
-              totalEvents++;
-            }
-          } catch {
-            // Skip malformed lines
-          }
-        }
-      }
-    } catch {
-      // Log file unreadable
-    }
-
-    const accepts = eventCounts.intrusion_accept;
-    const resists = eventCounts.intrusion_resist;
-    const acceptResistRatio =
-      accepts + resists > 0 ? accepts / (accepts + resists) : 0;
-
-    res.json({
-      success: true,
-      totalEvents,
-      eventCounts,
-      acceptResistRatio: Math.round(acceptResistRatio * 100) / 100,
-    });
-  } catch (error) {
-    console.error('Error reading boundary stats:', error);
-    res.status(500).json({ error: 'Failed to read boundary stats' });
-  }
-});
-
-// Get cognitive thoughts
-app.get('/thoughts', (req, res) => {
-  try {
-    const limit = parseInt(req.query.limit as string) || 50;
-    const since = parseInt(req.query.since as string) || 0;
-
-    // Get thoughts from both sources
-    const generatedThoughts = enhancedThoughtGenerator.getThoughtHistory(1000); // Get all generated thoughts
-    const allThoughts = [...cognitiveThoughts, ...generatedThoughts];
-
-    // Filter by timestamp if specified
-    const filteredThoughts =
-      since > 0
-        ? allThoughts.filter((thought) => thought.timestamp > since)
-        : allThoughts;
-
-    // Sort by timestamp (newest first)
-    filteredThoughts.sort((a, b) => b.timestamp - a.timestamp);
-
-    // Apply limit
-    const limitedThoughts = filteredThoughts.slice(0, limit);
-
-    res.json({
-      thoughts: limitedThoughts,
-      count: limitedThoughts.length,
-      total: allThoughts.length,
-      timestamp: Date.now(),
-    });
-  } catch (error) {
-    console.error('Error getting cognitive thoughts:', error);
-    res.status(500).json({ error: 'Failed to get cognitive thoughts' });
-  }
-});
-
-// Receive and store thoughts from external sources (like Minecraft interface)
-app.post('/thoughts', (req, res) => {
-  try {
-    const { type, content, attribution, context, metadata, id, timestamp } =
-      req.body;
-
-    if (!type || !content) {
-      return res.status(400).json({
-        error: 'Missing required fields: type and content are required',
-      });
-    }
-
-    // Create a cognitive thought object
-    const thought: Record<string, any> = {
-      id:
-        id ||
-        `external-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-      type: type,
-      content: content,
-      attribution: attribution || 'minecraft-interface',
-      context: context || {
-        emotionalState: 'neutral',
-        confidence: 0.5,
-        cognitiveSystem: 'minecraft-interface',
-      },
-      metadata: {
-        thoughtType: 'external-input',
-        source: 'minecraft-interface',
-        ...metadata,
-      },
-      timestamp: timestamp || Date.now(),
-    };
-
-    // Dev-only: allow injecting convertEligible for live verification of
-    // strict-mode gating (C2/C3 tests). Not exposed in production to prevent
-    // external callers from bypassing eligibility checks.
-    if (
-      process.env.NODE_ENV !== 'production' &&
-      req.body.convertEligible !== undefined
-    ) {
-      thought.convertEligible = req.body.convertEligible;
-    }
-
-    // Store the thought
-    cognitiveThoughts.push(thought);
-
-    // Send to cognitive stream if available
-    sendThoughtToCognitiveStream(thought);
-
-    console.log(
-      `✅ Received external thought: ${thought.type} - ${thought.content.substring(0, 50)}...`
-    );
-
-    res.json({
-      success: true,
-      thoughtId: thought.id,
-      timestamp: Date.now(),
-    });
-  } catch (error) {
-    console.error('Error storing external thought:', error);
-    res.status(500).json({ error: 'Failed to store external thought' });
-  }
-});
-
-/** Consideration step: ask bot to accept or resist thought; bias default accept. */
-async function runConsiderationStep(
-  content: string,
-  llm: LLMInterface
-): Promise<'accept' | 'resist'> {
-  const stressCtx = buildStressContext(getInteroState().stressAxes);
-  const contextLine = stressCtx ? `\nCurrent situation: ${stressCtx}` : '';
-  const prompt = `You had the thought: ${content.slice(0, 500)}.${contextLine} Do you want to act on it (accept) or dismiss it (resist)? Reply with only one word: accept or resist. If unsure, reply accept.`;
-  try {
-    const response = await llm.generateResponse(prompt, undefined, {
-      maxTokens: 32,
-      temperature: 0.3,
-    });
-    const text = (
-      response?.text ??
-      (response as { content?: string })?.content ??
-      ''
-    )
-      .trim()
-      .toLowerCase();
-    if (/resist/.test(text) && !/accept/.test(text)) return 'resist';
-    if (/resist/.test(text) && /accept/.test(text)) {
-      const resistPos = text.indexOf('resist');
-      const acceptPos = text.indexOf('accept');
-      return resistPos < acceptPos ? 'resist' : 'accept';
-    }
-    return 'accept';
-  } catch {
-    return 'accept';
-  }
-}
-
-// Process cognitive task
-app.post('/process', async (req, res) => {
-  try {
-    const { type, content, metadata } = req.body;
-
-    logObservation(`Processing ${type} request`, { content, metadata });
-
-    if (type === 'intrusion') {
-      const considerationEnabled =
-        process.env.ENABLE_CONSIDERATION_STEP === 'true';
-      if (considerationEnabled) {
-        const decision = await runConsiderationStep(content, llmInterface);
-        if (decision === 'resist') {
-          logStressAtBoundary('intrusion_resist', {
-            thoughtSummary: 'Dismissed',
-          });
-          res.json({
-            processed: false,
-            type: 'intrusion',
-            response: 'Dismissed',
-            thought: null,
-            timestamp: Date.now(),
-            recorded: true,
-          });
-          return;
-        }
-      }
-
-      // Use enhanced intrusive thought processor to generate internal thought
-      const result =
-        await intrusiveThoughtProcessor.processIntrusiveThought(content);
-
-      updateStressFromIntrusion({
-        accepted: result.accepted,
-        task: result.task,
-      });
-
-      logStressAtBoundary(
-        result.accepted ? 'intrusion_accept' : 'intrusion_resist',
-        {
-          thoughtSummary: result.response?.slice(0, 200),
-        }
-      );
-      if (result.accepted && result.task) {
-        logStressAtBoundary('task_selected', {
-          actionSummary: result.task.title?.slice(0, 200),
-        });
-      }
-
-      // Send the generated internal thought to the cognitive stream with self attribution
-      if (result.thought) {
-        try {
-          const cognitiveStreamUrl = process.env.DASHBOARD_ENDPOINT
-            ? `${process.env.DASHBOARD_ENDPOINT}/api/ws/cognitive-stream`
-            : 'http://localhost:3000/api/ws/cognitive-stream';
-          const cognitiveStreamResponse = await resilientFetch(
-            cognitiveStreamUrl,
-            {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                payloadVersion: 2,
-                type: result.thought.type || 'reflection',
-                content: result.thought.content,
-                displayContent: (result.thought.content || '')
-                  .replace(GOAL_TAG_STRIP, '')
-                  .trim(),
-                extractedGoal: result.thought.metadata?.extractedGoal || null,
-                sanitizationFlags:
-                  result.thought.metadata?.sanitizationFlags || null,
-                attribution: 'self',
-                context: result.thought.context,
-                metadata: {
-                  ...result.thought.metadata,
-                  thoughtType: 'intrusive',
-                  provenance: 'intrusion',
-                },
-                id: result.thought.id,
-                timestamp: result.thought.timestamp,
-                processed: true,
-              }),
-            }
-          );
-
-          if (cognitiveStreamResponse?.ok) {
-            console.log(
-              '[Cognition] Intrusive thought processed and sent to cognitive stream'
-            );
-          } else if (cognitiveStreamResponse) {
-            const errBody = await cognitiveStreamResponse.text();
-            console.error(
-              '[Cognition] Failed to send intrusive thought to cognitive stream:',
-              cognitiveStreamResponse.status,
-              errBody
-            );
-          }
-        } catch (error) {
-          console.error(
-            '[Cognition] Error sending intrusive thought to cognitive stream:',
-            error
-          );
-        }
-      }
-
-      res.json({
-        processed: result.accepted,
-        type: 'intrusion',
-        response: result.response,
-        thought: result.thought,
-        timestamp: Date.now(),
-      });
-    } else if (type === 'environmental_awareness') {
-      // Route belief-stream envelopes to saliency reasoner (no per-entity LLM call)
-      if (req.body?.request_version === 'saliency_delta') {
-        try {
-          const envelope = req.body as BeliefStreamEnvelope;
-          const insight = applySaliencyEnvelope(envelope, saliencyState);
-
-          if (!insight.processed) {
-            res.json({
-              processed: false,
-              type: 'environmental_awareness',
-              reason: 'out_of_order',
-              timestamp: Date.now(),
-            });
-            return;
-          }
-
-          // Stream non-empty awareness to dashboard
-          if (insight.thought.text !== 'No significant entities nearby.') {
-            const dashboardUrl =
-              process.env.DASHBOARD_ENDPOINT || 'http://localhost:3000';
-            const internalThought = {
-              type: 'environmental',
-              content: insight.thought.text,
-              attribution: 'self',
-              context: {
-                emotionalState: insight.actions.shouldRespond
-                  ? 'alert'
-                  : 'aware',
-                confidence: insight.thought.confidence,
-                cognitiveSystem: 'saliency-reasoner',
-              },
-              metadata: {
-                thoughtType: 'environmental',
-                source: 'saliency',
-                trackCount: insight.trackCount,
-                deltaCount: insight.deltaCount,
-              },
-              id: `thought-${Date.now()}-sal-${envelope.seq}`,
-              timestamp: Date.now(),
-              processed: true,
-            };
-
-            await resilientFetch(`${dashboardUrl}/api/ws/cognitive-stream`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(internalThought),
-              label: 'dashboard/cognitive-stream-saliency',
-            });
-          }
-
-          res.json({
-            processed: true,
-            type: 'environmental_awareness',
-            thought: insight.thought,
-            actions: insight.actions,
-            fallback: false,
-            shouldRespond: insight.actions.shouldRespond,
-            response: insight.actions.response ?? '',
-            shouldCreateTask: false,
-            taskSuggestion: undefined,
-            trackCount: insight.trackCount,
-            deltaCount: insight.deltaCount,
-            timestamp: Date.now(),
-          });
-          return;
-        } catch (error) {
-          console.error('[SaliencyReasoner] Error processing envelope:', error);
-          res.json({
-            processed: false,
-            type: 'environmental_awareness',
-            error: error instanceof Error ? error.message : 'Unknown error',
-            timestamp: Date.now(),
-          });
-          return;
-        }
-      }
-
-      // Legacy path: per-entity observation processing
-      // Process environmental awareness (entity detection, events, etc.)
-      logObservation('Processing environmental awareness', {
-        content,
-        metadata,
-      });
-
-      try {
-        // The minecraft interface sends data directly in req.body, not in req.body.observation
-        const rawObservation = req.body as any;
-        const observation = buildObservationPayload(
-          rawObservation,
-          rawObservation?.metadata
-        );
-
-        if (observation) {
-          console.log('cognition.observation.llm_request', {
-            observationId: observation.observationId,
-            category: observation.category,
-          });
-
-          const insight = await enqueueObservation(observation);
-
-          if (insight.fallback) {
-            console.warn('cognition.observation.fallback', {
-              observationId: observation.observationId,
-              reason: insight.error,
-            });
-          }
-
-          const sanitizedBotPosition = redactPositionForLog(
-            observation.bot.position
-          );
-          const sanitizedEntityPosition = redactPositionForLog(
-            observation.entity?.position
-          );
-
-          const internalThought = {
-            type: 'environmental',
-            content: insight.thought.text,
-            attribution: 'self',
-            context: {
-              emotionalState: insight.fallback ? 'cautious' : 'curious',
-              confidence: insight.thought.confidence ?? 0.75,
-              cognitiveSystem:
-                insight.thought.source === 'llm'
-                  ? 'environmental-llm'
-                  : 'environmental-fallback',
-              observationId: observation.observationId,
-            },
-            metadata: {
-              thoughtType: 'environmental',
-              source: observation.category,
-              observationId: observation.observationId,
-              fallback: insight.fallback,
-              entity: observation.entity
-                ? {
-                    name:
-                      observation.entity.displayName || observation.entity.name,
-                    threatLevel: observation.entity.threatLevel,
-                    distance: observation.entity.distance,
-                    position: sanitizedEntityPosition,
-                  }
-                : undefined,
-              event: observation.event
-                ? {
-                    type: observation.event.type,
-                    description: observation.event.description,
-                    severity: observation.event.severity,
-                    position: redactPositionForLog(observation.event.position),
-                  }
-                : undefined,
-              botPosition: sanitizedBotPosition,
-              timestamp: observation.timestamp,
-            },
-            id: `thought-${Date.now()}-env-${Math.random()
-              .toString(36)
-              .substr(2, 9)}`,
-            timestamp: Date.now(),
-            processed: true,
-          };
-
-          const isGenericFallback =
-            insight.fallback &&
-            insight.thought.text ===
-              ObservationReasoner.GENERIC_FALLBACK_THOUGHT;
-          if (!isGenericFallback) {
-            const dashboardUrl =
-              process.env.DASHBOARD_ENDPOINT || 'http://localhost:3000';
-            const cognitiveStreamResponse = await resilientFetch(
-              `${dashboardUrl}/api/ws/cognitive-stream`,
-              {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(internalThought),
-                label: 'dashboard/cognitive-stream',
-              }
-            );
-            if (!cognitiveStreamResponse?.ok) {
-              console.warn(
-                '❌ Failed to send observation thought to cognitive stream'
-              );
-            }
-          }
-
-          const primaryTask = insight.actions.tasks?.[0];
-
-          res.json({
-            processed: true,
-            type: 'environmental_awareness',
-            observationId: observation.observationId,
-            thought: insight.thought,
-            actions: insight.actions,
-            fallback: insight.fallback,
-            error: insight.error,
-            shouldRespond: insight.actions.shouldRespond,
-            response: insight.actions.response ?? '',
-            shouldCreateTask: insight.actions.shouldCreateTask,
-            taskSuggestion: primaryTask?.description,
-            internalThought,
-            timestamp: Date.now(),
-          });
-          return;
-        }
-
-        // Fallback to minimal processing when observation payload missing
-        const fallbackThought = {
-          type: 'environmental',
-          content: content || 'Maintaining awareness of surroundings.',
-          attribution: 'self',
-          context: {
-            emotionalState: 'alert',
-            confidence: 0.5,
-            cognitiveSystem: 'environmental-fallback',
-          },
-          metadata: {
-            thoughtType: 'environmental',
-            source: 'legacy-content',
-            fallback: true,
-            botPosition: redactPositionForLog(metadata?.botPosition),
-            entityType: metadata?.entityType,
-            distance: metadata?.distance,
-          },
-          id: `thought-${Date.now()}-env-${Math.random().toString(36).substr(2, 9)}`,
-          timestamp: Date.now(),
-          processed: true,
-        };
-
-        const dashboardUrl =
-          process.env.DASHBOARD_ENDPOINT || 'http://localhost:3000';
-        await resilientFetch(`${dashboardUrl}/api/ws/cognitive-stream`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(fallbackThought),
-          label: 'dashboard/cognitive-stream',
-        });
-
-        res.json({
-          processed: true,
-          type: 'environmental_awareness',
-          observationId: fallbackThought.id,
-          thought: {
-            text: fallbackThought.content,
-            confidence: 0.5,
-            categories: ['fallback'],
-            source: 'fallback',
-          },
-          actions: {
-            shouldRespond: false,
-            response: undefined,
-            shouldCreateTask: false,
-            tasks: [],
-          },
-          fallback: true,
-          shouldRespond: false,
-          response: '',
-          shouldCreateTask: false,
-          taskSuggestion: undefined,
-          internalThought: fallbackThought,
-          timestamp: Date.now(),
-        });
-      } catch (error) {
-        console.error('❌ Error processing environmental awareness:', error);
-        res.json({
-          processed: false,
-          type: 'environmental_awareness',
-          error: error instanceof Error ? error.message : 'Unknown error',
-          timestamp: Date.now(),
-        });
-      }
-    } else if (type === 'social_interaction') {
-      // Process social interaction (chat from players, etc.)
-      logObservation('Processing social interaction', { content, metadata });
-
-      try {
-        // Opportunistically patch the state cache with metadata from this chat
-        // event (health, food, position). This keeps the cache truthful between
-        // periodic loop cycles without triggering inline HTTP fetches.
-        patchBotStateCache({
-          health: metadata?.botHealth,
-          food: metadata?.botFood,
-          position: metadata?.botPosition,
-        });
-
-        // Read the (potentially patched) cache for grounded social responses.
-        // If cache is truly stale (>2× poll interval), do a background refresh
-        // but respond using whatever cache we have — never block chat on HTTP.
-        const stateForChat = getBotStateCache();
-        if (botStateCacheAgeMs() > STALE_THRESHOLD_MS) {
-          // Fire-and-forget background refresh — result goes into cache for next chat
-          const mcUrl =
-            process.env.MINECRAFT_ENDPOINT || 'http://localhost:3005';
-          resilientFetch(`${mcUrl}/state`, { label: 'mc/state-social' })
-            .then(async (freshRes) => {
-              if (freshRes?.ok) {
-                const freshBot = (await freshRes.json()) as any;
-                const rawState = freshBot?.data || {};
-                const innerData = rawState.data || {};
-                const rawInventory = innerData.inventory;
-                const inventory = Array.isArray(rawInventory)
-                  ? rawInventory
-                  : Array.isArray(rawInventory?.items)
-                    ? rawInventory.items
-                    : [];
-                const gameMode = rawState.worldState?.player?.gameMode;
-                const freshState = { ...innerData, inventory, gameMode };
-                updateBotStateCache(freshState);
-              }
-            })
-            .catch(() => {
-              /* Non-blocking — stale cache is acceptable */
-            });
-        }
-
-        // Derive botPosition from cache for backwards compatibility.
-        // Only accept metadata position if it's complete (all 3 finite coords).
-        const cachedPos = stateForChat?.state?.position;
-        const derivedBotPosition =
-          (isCompletePosition(metadata?.botPosition)
-            ? metadata.botPosition
-            : undefined) ??
-          (isCompletePosition(cachedPos)
-            ? { x: cachedPos.x, y: cachedPos.y, z: cachedPos.z }
-            : undefined);
-
-        // Create an internal thought about the social interaction
-        const internalThought = {
-          type: 'social',
-          content: `Social interaction: ${content}`,
-          attribution: 'self',
-          context: {
-            emotionalState: 'interested',
-            confidence: 0.9,
-            cognitiveSystem: 'social-processor',
-            sender: metadata?.sender,
-            message: metadata?.message,
-          },
-          metadata: {
-            ...metadata,
-            thoughtType: 'social',
-            source: 'player-chat',
-            sender: metadata?.sender,
-            message: metadata?.message,
-            environment: metadata?.environment,
-            botPosition: derivedBotPosition,
-          },
-          id: `thought-${Date.now()}-social-${Math.random().toString(36).substr(2, 9)}`,
-          timestamp: Date.now(),
-          processed: false,
-        };
-
-        // Send to cognitive stream
-        const dashboardUrl =
-          process.env.DASHBOARD_ENDPOINT || 'http://localhost:3000';
-        await resilientFetch(`${dashboardUrl}/api/ws/cognitive-stream`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(internalThought),
-          label: 'dashboard/cognitive-stream',
-        });
-
-        let shouldRespond = false;
-        let response = '';
-        let shouldCreateTask = false;
-        let taskSuggestion = '';
-
-        // Decide on response based on message content - be selective
-        const message = metadata?.message?.toLowerCase() || '';
-        const sender = metadata?.sender || 'unknown';
-
-        if (message.includes('danger') || message.includes('threat')) {
-          // Immediate safety concern — latency-critical, no LLM round-trip
-          shouldRespond = true;
-          response = 'On it -- checking the area now.';
-          shouldCreateTask = true;
-          taskSuggestion = `Address safety concern from ${sender}`;
-        } else if (message.includes('?')) {
-          // Question — use LLM for a natural answer
-          shouldRespond = true;
-          shouldCreateTask = true;
-          taskSuggestion = `Answer question from ${sender}: "${message}"`;
-          try {
-            const llmResult = await llmInterface.generateSocialResponse(
-              metadata?.message || message,
-              { sender, botState: stateForChat }
-            );
-            response = llmResult.text || 'Hmm, let me think about that...';
-          } catch {
-            response = 'Hmm, let me think about that...';
-          }
-        } else if (message.includes('help') || message.includes('assist')) {
-          // Help request — use LLM
-          shouldRespond = true;
-          shouldCreateTask = true;
-          taskSuggestion = `Provide assistance requested by ${sender}`;
-          try {
-            const llmResult = await llmInterface.generateSocialResponse(
-              metadata?.message || message,
-              { sender, botState: stateForChat }
-            );
-            response = llmResult.text || 'Sure, what do you need?';
-          } catch {
-            response = 'Sure, what do you need?';
-          }
-        } else if (
-          message.length < 15 &&
-          (message.includes('hello') ||
-            message.includes('hi') ||
-            message.includes('hey'))
-        ) {
-          // Short greeting — 60% respond, of those 50/50 template vs LLM
-          shouldRespond = Math.random() < 0.6;
-          if (shouldRespond) {
-            const greetingTemplates = [
-              `Hey ${sender}!`,
-              'Oh, hi there!',
-              "Hey! What's going on?",
-              `Yo ${sender}.`,
-              "Oh hey, didn't see you there.",
-            ];
-            const useLLM = Math.random() < 0.5;
-            if (useLLM) {
-              try {
-                const llmResult = await llmInterface.generateSocialResponse(
-                  metadata?.message || message,
-                  { sender, botState: stateForChat }
-                );
-                response =
-                  llmResult.text ||
-                  greetingTemplates[
-                    Math.floor(Math.random() * greetingTemplates.length)
-                  ];
-              } catch {
-                response =
-                  greetingTemplates[
-                    Math.floor(Math.random() * greetingTemplates.length)
-                  ];
-              }
-            } else {
-              response =
-                greetingTemplates[
-                  Math.floor(Math.random() * greetingTemplates.length)
-                ];
-            }
-          }
-          shouldCreateTask = false;
-        }
-        // For other messages, stay silent — don't spam responses
-
-        res.json({
-          processed: true,
-          type: 'social_interaction',
-          shouldRespond,
-          response,
-          shouldCreateTask,
-          taskSuggestion,
-          internalThought,
-          timestamp: Date.now(),
-        });
-      } catch (error) {
-        console.error('❌ Error processing social interaction:', error);
-        res.json({
-          processed: false,
-          type: 'social_interaction',
-          error: error instanceof Error ? error.message : 'Unknown error',
-          timestamp: Date.now(),
-        });
-      }
-    } else if (type === 'environmental_event') {
-      // Process environmental events (block changes, item pickups, health changes, etc.)
-      logObservation('Processing environmental event', { content, metadata });
-
-      try {
-        // Create an internal thought about the environmental event
-        const internalThought = {
-          type: 'environmental',
-          content: `Environmental observation: ${content}`,
-          attribution: 'self',
-          context: {
-            emotionalState: 'observant',
-            confidence: 0.8,
-            cognitiveSystem: 'environmental-processor',
-            eventType: metadata?.eventType,
-            eventData: metadata?.eventData,
-          },
-          metadata: {
-            thoughtType: 'environmental',
-            source: 'environmental-event',
-            eventType: metadata?.eventType,
-            eventData: metadata?.eventData,
-            botPosition: metadata?.botPosition,
-            ...metadata,
-          },
-          id: `thought-${Date.now()}-env-event-${Math.random().toString(36).substr(2, 9)}`,
-          timestamp: Date.now(),
-          processed: false,
-        };
-
-        // Send to cognitive stream
-        const dashboardUrl =
-          process.env.DASHBOARD_ENDPOINT || 'http://localhost:3000';
-        await resilientFetch(`${dashboardUrl}/api/ws/cognitive-stream`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(internalThought),
-          label: 'dashboard/cognitive-stream',
-        });
-
-        let shouldRespond = false;
-        let response = '';
-        let shouldCreateTask = false;
-        let taskSuggestion = '';
-
-        // Decide on response based on event type - be very selective
-        const eventType = metadata?.eventType || '';
-        const eventData = metadata?.eventData || {};
-
-        // Only respond to critical or very interesting events
-        if (eventType === 'health_loss' && eventData.damage > 5) {
-          // Only respond to significant damage
-          shouldRespond = true;
-          response = `That hurt! I should be more careful in this area.`;
-          shouldCreateTask = true;
-          taskSuggestion = `Investigate and avoid the source of damage`;
-        } else if (
-          eventType === 'block_break' &&
-          eventData.oldBlock &&
-          eventData.oldBlock !== 'air'
-        ) {
-          // Only respond to interesting block changes, not every fire tick
-          shouldRespond = Math.random() < 0.2; // 20% chance for interesting blocks
-          if (shouldRespond) {
-            response = `Interesting environmental change detected.`;
-          }
-          shouldCreateTask = false; // Don't spam tasks for every block change
-        }
-        // Most environmental events (item pickups, minor changes) should be silent
-
-        res.json({
-          processed: true,
-          type: 'environmental_event',
-          shouldRespond,
-          response,
-          shouldCreateTask,
-          taskSuggestion,
-          internalThought,
-          timestamp: Date.now(),
-        });
-      } catch (error) {
-        console.error('❌ Error processing environmental event:', error);
-        res.json({
-          processed: false,
-          type: 'environmental_event',
-          error: error instanceof Error ? error.message : 'Unknown error',
-          timestamp: Date.now(),
-        });
-      }
-    } else if (type === 'external_chat') {
-      // Process external chat message
-      logObservation('Processing external chat message', { content, metadata });
-
-      try {
-        // Get actual inventory data
-        let actualInventory = { items: [], armor: [], tools: [] };
-        try {
-          const mcUrl =
-            process.env.MINECRAFT_ENDPOINT || 'http://localhost:3005';
-          const inventoryResponse = await resilientFetch(`${mcUrl}/inventory`, {
-            label: 'mc/inventory',
-          });
-          if (inventoryResponse?.ok) {
-            const inventoryData = await inventoryResponse.json();
-            actualInventory = (await (inventoryData as any).data) || {
-              items: [],
-              armor: [],
-              tools: [],
-            };
-          }
-        } catch (error) {
-          console.error('Failed to fetch actual inventory:', error);
-        }
-
-        // Use ReAct arbiter for all responses - let the bot use its own tools and reasoning
-        const response = await reactArbiter.reason({
-          snapshot: {
-            stateId: 'chat-response',
-            position: { x: 0, y: 64, z: 0 },
-            biome: 'unknown',
-            time: 6000,
-            light: 15,
-            hazards: ['none'],
-            nearbyEntities: [],
-            nearbyBlocks: [],
-            weather: 'clear',
-          },
-          inventory: {
-            stateId: 'chat-inventory',
-            items: actualInventory.items || [],
-            armor: actualInventory.armor || [],
-            tools: actualInventory.tools || [],
-          },
-          goalStack: [
-            {
-              id: 'chat-response-goal',
-              type: 'social',
-              description: 'Respond to player message',
-              priority: 0.8,
-              utility: 0.9,
-              source: 'user',
-            },
-          ],
-          memorySummaries: [],
-        });
-
-        const responseText = response.thoughts || `What now?`;
-
-        // Generate cognitive thoughts about the interaction
-        const cognitiveThought = await enhancedThoughtGenerator.generateThought(
-          {
-            currentState: {
-              position: { x: 0, y: 64, z: 0 },
-              health: 20,
-              inventory: [],
-            },
-            currentTasks: [
-              {
-                id: 'chat-response',
-                title: 'Respond to player message',
-                progress: 0.5,
-                status: 'active',
-                type: 'social',
-              },
-            ],
-            recentEvents: [
-              {
-                id: 'chat-event',
-                type: 'player_message',
-                timestamp: Date.now(),
-                data: { sender: metadata?.sender, content },
-              },
-            ],
-            emotionalState: metadata?.emotion || 'neutral',
-            memoryContext: {},
-          }
-        );
-
-        const cognitiveThoughts = cognitiveThought ? [cognitiveThought] : [];
-
-        res.json({
-          processed: true,
-          type: 'external_chat',
-          response: responseText,
-          cognitiveThoughts: cognitiveThoughts,
-          metadata: {
-            sender: metadata?.sender,
-            messageType: metadata?.messageType,
-            intent: metadata?.intent,
-            emotion: metadata?.emotion,
-            requiresResponse: metadata?.requiresResponse,
-            responsePriority: metadata?.responsePriority,
-          },
-          timestamp: Date.now(),
-        });
-      } catch (error) {
-        console.error('Error processing external chat:', error);
-
-        // Fallback response
-        res.json({
-          processed: false,
-          type: 'external_chat',
-          response: `I received your message: "${content}". I'm having trouble processing it right now, but I'll try to help!`,
-          cognitiveThoughts: [],
-          error: error instanceof Error ? error.message : 'Unknown error',
-          timestamp: Date.now(),
-        });
-      }
-    } else {
-      // Handle other cognitive tasks
-      const result = {
-        processed: true,
-        type,
-        content,
-        context: req.body.context,
-        timestamp: Date.now(),
-      };
-
-      res.json(result);
-    }
-  } catch (error) {
-    console.error('Error processing cognitive task:', error);
-    res.status(500).json({ error: 'Failed to process cognitive task' });
-  }
-});
-
-// Generate authentic thoughts using enhanced thought generator
-app.post('/generate-thoughts', async (req, res) => {
-  try {
-    const { situation, context, thoughtTypes } = req.body;
-
-    console.log(`Generating thoughts for situation:`, {
-      situation,
-      thoughtTypes,
-    });
-
-    // Use enhanced thought generator
-    const thought = await enhancedThoughtGenerator.generateThought({
-      currentState: context.currentState,
-      currentTasks: context.currentState?.currentTasks || [],
-      recentEvents: context.recentEvents || [],
-      emotionalState: context.emotional || 'neutral',
-      memoryContext: context.memoryContext,
-    });
-
-    const thoughts = thought ? [thought] : [];
-
-    // Store thoughts for external access
-    thoughts.forEach((thought) => {
-      cognitiveThoughts.push(thought);
-    });
-
-    // Keep only the last 100 thoughts to prevent memory leaks
-    if (cognitiveThoughts.length > 100) {
-      cognitiveThoughts.splice(0, cognitiveThoughts.length - 100);
-    }
-
-    const result = {
-      thoughts,
-      count: thoughts.length,
-      timestamp: Date.now(),
-    };
-
-    res.json(result);
-  } catch (error) {
-    console.error('Error generating thoughts:', error);
-    res.status(500).json({ error: 'Failed to generate thoughts' });
-  }
-});
-
-// Process social consideration for nearby entities
-app.post('/consider-social', async (req, res) => {
-  try {
-    const { entity, context } = req.body;
-
-    if (!entity || !entity.type) {
-      return res.status(400).json({
-        error: 'Missing required fields: entity.type',
-      });
-    }
-
-    console.log(`🤔 Processing social consideration for ${entity.type}:`, {
-      entityId: entity.id,
-      distance: entity.distance,
-      hostile: entity.hostile,
-      friendly: entity.friendly,
-    });
-
-    // Use enhanced thought generator for social consideration
-    const thought = await enhancedThoughtGenerator.generateSocialConsideration(
-      entity,
-      context
-    );
-
-    const thoughts = thought ? [thought] : [];
-
-    // Store thoughts for external access
-    thoughts.forEach((thought) => {
-      cognitiveThoughts.push(thought);
-    });
-
-    // Keep only the last 100 thoughts to prevent memory leaks
-    if (cognitiveThoughts.length > 100) {
-      cognitiveThoughts.splice(0, cognitiveThoughts.length - 100);
-    }
-
-    const result = {
-      processed: true,
-      entity: entity,
-      thought: thought,
-      socialDecision: thoughts.length > 0 ? thought?.content : null,
-      timestamp: Date.now(),
-    };
-
-    res.json(result);
-  } catch (error) {
-    console.error('Error processing social consideration:', error);
-    res.status(500).json({ error: 'Failed to process social consideration' });
-  }
-});
-
-// Process nearby entities for social consideration
-app.post('/process-nearby-entities', async (req, res) => {
-  try {
-    const { entities, context } = req.body;
-
-    if (!Array.isArray(entities)) {
-      return res.status(400).json({
-        error: 'entities must be an array',
-      });
-    }
-
-    console.log(
-      `🤔 Processing ${entities.length} nearby entities for social consideration`
-    );
-
-    // Use social awareness manager
-    const results = await socialAwarenessManager.processNearbyEntities(
-      entities,
-      context
-    );
-
-    // Send social consideration thoughts to cognitive stream
-    for (const result of results) {
-      const considerationThought = {
-        id: `social-consideration-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-        type: 'social_consideration',
-        content: result.reasoning,
-        timestamp: result.timestamp,
-        context: {
-          emotionalState: 'thoughtful',
-          confidence: 0.7,
-          cognitiveSystem: 'social-awareness',
-        },
-        metadata: {
-          thoughtType: 'social-consideration',
-          entityType: result.entity.type,
-          entityId: result.entity.id,
-          distance: result.entity.distance,
-          shouldAcknowledge: result.shouldAcknowledge,
-          priority: result.priority,
-          action: result.action,
-          trigger: 'entity-nearby',
-        },
-        category: 'social',
-        tags: ['social', 'entity-nearby', 'consideration'],
-      };
-
-      await sendThoughtToCognitiveStream(considerationThought);
-    }
-
-    res.json({
-      processed: true,
-      entitiesConsidered: entities.length,
-      considerationsGenerated: results.length,
-      results: results.map((r) => ({
-        entity: r.entity,
-        shouldAcknowledge: r.shouldAcknowledge,
-        priority: r.priority,
-        action: r.action,
-      })),
-      timestamp: Date.now(),
-    });
-  } catch (error) {
-    console.error('Error processing nearby entities:', error);
-    res.status(500).json({ error: 'Failed to process nearby entities' });
-  }
-});
-
-// Process chat messages for response consideration
-app.post('/consider-chat', async (req, res) => {
-  try {
-    const { message, context } = req.body;
-
-    if (!message || !message.sender || !message.content) {
-      return res.status(400).json({
-        error: 'Missing required fields: message.sender, message.content',
-      });
-    }
-
-    console.log(`💬 Processing chat consideration for ${message.sender}:`, {
-      message: message.content.substring(0, 50) + '...',
-      senderType: message.senderType,
-      isDirect: message.isDirect,
-    });
-
-    // Use social awareness manager for chat consideration
-    const result = await socialAwarenessManager.processChatMessage(
-      message,
-      context
-    );
-
-    // Send chat consideration to cognitive stream
-    if (result) {
-      const chatConsiderationThought = {
-        id: `chat-consideration-${result.timestamp}`,
-        type: 'social_consideration',
-        content: result.reasoning,
-        timestamp: result.timestamp,
-        context: {
-          emotionalState: 'thoughtful',
-          confidence: 0.7,
-          cognitiveSystem: 'social-awareness',
-        },
-        metadata: {
-          thoughtType: 'chat-consideration',
-          sender: result.message.sender,
-          senderType: result.message.senderType,
-          shouldRespond: result.shouldRespond,
-          priority: result.priority,
-          responseContent: result.responseContent,
-          responseType: result.responseType,
-          trigger: 'incoming-chat',
-        },
-        category: 'social',
-        tags: ['social', 'chat', 'consideration'],
-      };
-
-      await sendThoughtToCognitiveStream(chatConsiderationThought);
-    }
-
-    res.json({
-      processed: true,
-      message: message,
-      shouldRespond: result?.shouldRespond || false,
-      reasoning: result?.reasoning || 'No consideration generated',
-      responseContent: result?.responseContent,
-      responseType: result?.responseType,
-      priority: result?.priority || 'low',
-      timestamp: Date.now(),
-    });
-  } catch (error) {
-    console.error('Error processing chat consideration:', error);
-    res.status(500).json({ error: 'Failed to process chat consideration' });
-  }
-});
-
-// Consider departure communication
-app.post('/consider-departure', async (req, res) => {
-  try {
-    const { currentArea, newTask, context } = req.body;
-
-    if (!currentArea || !newTask) {
-      return res.status(400).json({
-        error: 'Missing required fields: currentArea, newTask',
-      });
-    }
-
-    console.log(`🚪 Considering departure communication:`, {
-      area: currentArea.name,
-      newTask: newTask.title,
-      entitiesNearby: currentArea.entities.length,
-    });
-
-    // Use social awareness manager for departure communication
-    const result = await socialAwarenessManager.generateDepartureCommunication(
-      currentArea,
-      newTask,
-      context
-    );
-
-    // Send departure consideration to cognitive stream
-    if (result.shouldAnnounce) {
-      const departureThought = {
-        id: `departure-consideration-${Date.now()}`,
-        type: 'social_consideration',
-        content: result.reasoning,
-        timestamp: Date.now(),
-        context: {
-          emotionalState: 'focused',
-          confidence: 0.8,
-          cognitiveSystem: 'social-awareness',
-        },
-        metadata: {
-          thoughtType: 'departure-consideration',
-          area: currentArea.name,
-          task: newTask.title,
-          shouldAnnounce: result.shouldAnnounce,
-          priority: result.priority,
-          trigger: 'task-departure',
-        },
-        category: 'social',
-        tags: ['social', 'departure', 'communication'],
-      };
-
-      await sendThoughtToCognitiveStream(departureThought);
-    }
-
-    res.json({
-      processed: true,
-      shouldAnnounce: result.shouldAnnounce,
-      message: result.message,
-      reasoning: result.reasoning,
-      priority: result.priority,
-      timestamp: Date.now(),
-    });
-  } catch (error) {
-    console.error('Error processing departure consideration:', error);
-    res
-      .status(500)
-      .json({ error: 'Failed to process departure consideration' });
-  }
-});
-
-// Process social cognition for external messages
-app.post('/process-social', async (req, res) => {
-  try {
-    const { message, sender, context } = req.body;
-
-    console.log(`Processing social cognition for message from ${sender}:`, {
-      message,
-    });
-
-    // Mock social cognition system (dev-only)
-    if (process.env.ALLOW_COGNITION_MOCKS !== 'true') {
-      return res.status(503).json({
-        error: 'Social cognition not configured (mocks disabled)',
-      });
-    }
-    // In a real implementation, this would use the actual TheoryOfMindEngine
-    const thoughts = [];
-
-    // Analyze the message content and generate social thoughts
-    const lowerMessage = message.toLowerCase();
-
-    if (
-      lowerMessage.includes('hello') ||
-      lowerMessage.includes('hi') ||
-      lowerMessage.includes('hey')
-    ) {
-      thoughts.push({
-        type: 'social',
-        content: `${sender} seems to be greeting me. They appear friendly and want to interact.`,
-        emotionalState: 'welcoming',
-        confidence: 0.8,
-      });
-    } else if (
-      lowerMessage.includes('help') ||
-      lowerMessage.includes('please')
-    ) {
-      thoughts.push({
-        type: 'social',
-        content: `${sender} is asking for help. They seem to trust me and think I can assist them.`,
-        emotionalState: 'helpful',
-        confidence: 0.7,
-      });
-    } else if (lowerMessage.includes('thank')) {
-      thoughts.push({
-        type: 'social',
-        content: `${sender} is expressing gratitude. This suggests they appreciate my assistance.`,
-        emotionalState: 'appreciated',
-        confidence: 0.9,
-      });
-    } else {
-      thoughts.push({
-        type: 'social',
-        content: `${sender} said: "${message}". I should consider how to respond appropriately.`,
-        emotionalState: 'thoughtful',
-        confidence: 0.6,
-      });
-    }
-
-    const result = {
-      thoughts,
-      count: thoughts.length,
-      timestamp: Date.now(),
-    };
-
-    res.json(result);
-  } catch (error) {
-    console.error('Error processing social cognition:', error);
-    res.status(500).json({ error: 'Failed to process social cognition' });
-  }
-});
-
-// Get telemetry data
-app.get('/telemetry', (req, res) => {
-  try {
-    const telemetry = {
-      events: [
-        {
-          id: `cognition-${Date.now()}`,
-          timestamp: Date.now(),
-          source: 'cognition-system',
-          type: 'cognition_state',
-          data: {
-            cognitiveLoad: calculateCognitiveLoad(),
-            attentionLevel: calculateAttentionLevel(),
-            creativityLevel: calculateCreativityLevel(),
-            metrics: {
-              activeProcesses: getActiveProcessCount(),
-              memoryUsage: process.memoryUsage(),
-              uptime: process.uptime(),
-              cpuUsage: getSystemCpuUsage(),
-              networkRequests: getNetworkRequestCount(),
-            },
-          },
-        },
-      ],
-    };
-
-    res.json(telemetry);
-  } catch (error) {
-    console.error('Error getting cognition telemetry:', error);
-    res.status(500).json({ error: 'Failed to get telemetry' });
-  }
-});
-
-// ============================================================================
-// ReAct Endpoints
-// ============================================================================
-
-// POST /reason - Execute a single ReAct reasoning step
-app.post('/reason', async (req, res) => {
-  try {
-    const {
-      snapshot,
-      inventory,
-      goalStack,
-      memorySummaries,
-      lastToolResult,
-      reflexionHints,
-    } = req.body;
-
-    // Validate required fields
-    if (!snapshot || !inventory || !goalStack) {
-      return res.status(400).json({
-        error: 'Missing required fields: snapshot, inventory, goalStack',
-      });
-    }
-
-    const context = {
-      snapshot,
-      inventory,
-      goalStack,
-      memorySummaries: memorySummaries || [],
-      lastToolResult,
-      reflexionHints,
-    };
-
-    const step = await reactArbiter.reason(context);
-
-    res.json({
-      success: true,
-      step,
-      timestamp: Date.now(),
-    });
-  } catch (error) {
-    console.error('ReAct reasoning failed:', error);
-    res.status(500).json({
-      error: 'ReAct reasoning failed',
-      details: error instanceof Error ? error.message : 'Unknown error',
-    });
-  }
-});
-
-/**
- * Generate task-specific steps using LLM
- */
-async function generateTaskSteps(task: any, context?: any): Promise<any[]> {
-  try {
-    // Use the ReAct Arbiter's new method for step generation
-    const responseText = await reactArbiter.generateTaskSteps(task);
-
-    // Parse the numbered list response
-    const steps = parseNumberedListResponse(responseText, task);
-
-    // If parsing failed, use intelligent fallback based on task type
-    if (steps.length === 0) {
-      return generateIntelligentFallbackSteps(task);
-    }
-
-    return steps;
-  } catch (error) {
-    console.warn('LLM step generation failed, using fallback:', error);
-    return generateIntelligentFallbackSteps(task);
-  }
-}
-
-/**
- * Parse numbered list response from LLM
- */
-function parseNumberedListResponse(text: string, task: any): any[] {
-  const steps: any[] = [];
-  const lines = text.split('\n');
-
-  for (const line of lines) {
-    const trimmedLine = line.trim();
-
-    // Look for numbered list items
-    const match = trimmedLine.match(/^(\d+)\.\s*(.+)$/);
-    if (match) {
-      const stepNumber = parseInt(match[1]);
-      const stepContent = match[2].trim();
-
-      // Estimate duration based on step content
-      let estimatedDuration = 3000; // Default 3 seconds
-      if (
-        stepContent.toLowerCase().includes('move') ||
-        stepContent.toLowerCase().includes('navigate')
-      ) {
-        estimatedDuration = 5000;
-      } else if (
-        stepContent.toLowerCase().includes('gather') ||
-        stepContent.toLowerCase().includes('collect')
-      ) {
-        estimatedDuration = 4000;
-      } else if (
-        stepContent.toLowerCase().includes('craft') ||
-        stepContent.toLowerCase().includes('build')
-      ) {
-        estimatedDuration = 6000;
-      } else if (
-        stepContent.toLowerCase().includes('analyze') ||
-        stepContent.toLowerCase().includes('plan')
-      ) {
-        estimatedDuration = 2000;
-      }
-
-      steps.push({
-        label: stepContent,
-        estimatedDuration,
-      });
-    }
-  }
-
-  return steps;
-}
-
-/**
- * Generate intelligent fallback steps based on task type
- */
-function generateIntelligentFallbackSteps(task: any): any[] {
-  const taskType = task.type || 'general';
-  const title = task.title.toLowerCase();
-
-  switch (taskType) {
-    case 'crafting':
-      if (title.includes('pickaxe')) {
-        return [
-          {
-            label: 'Check if crafting table is available',
-            estimatedDuration: 2000,
-          },
-          { label: 'Place crafting table if needed', estimatedDuration: 3000 },
-          {
-            label: 'Gather required materials (sticks, planks)',
-            estimatedDuration: 4000,
-          },
-          {
-            label: 'Craft wooden pickaxe at crafting table',
-            estimatedDuration: 5000,
-          },
-          {
-            label: 'Verify pickaxe was created successfully',
-            estimatedDuration: 2000,
-          },
-        ];
-      } else if (title.includes('crafting table')) {
-        return [
-          {
-            label: 'Gather oak logs from nearby trees',
-            estimatedDuration: 4000,
-          },
-          { label: 'Convert logs to oak planks', estimatedDuration: 3000 },
-          {
-            label: 'Craft crafting table from planks',
-            estimatedDuration: 3000,
-          },
-          {
-            label: 'Place crafting table in suitable location',
-            estimatedDuration: 3000,
-          },
-        ];
-      }
-      return [
-        { label: 'Gather required materials', estimatedDuration: 4000 },
-        { label: 'Set up crafting area', estimatedDuration: 3000 },
-        { label: 'Craft the requested item', estimatedDuration: 5000 },
-        { label: 'Verify crafting success', estimatedDuration: 2000 },
-      ];
-
-    case 'gathering':
-      if (title.includes('wood') || title.includes('log')) {
-        return [
-          { label: 'Locate nearby trees', estimatedDuration: 3000 },
-          { label: 'Move to tree location', estimatedDuration: 4000 },
-          {
-            label: 'Break tree blocks to collect logs',
-            estimatedDuration: 5000,
-          },
-          { label: 'Collect dropped items', estimatedDuration: 2000 },
-        ];
-      }
-      return [
-        { label: 'Search for target resources', estimatedDuration: 3000 },
-        { label: 'Navigate to resource location', estimatedDuration: 4000 },
-        { label: 'Extract or collect resources', estimatedDuration: 5000 },
-        { label: 'Verify collection success', estimatedDuration: 2000 },
-      ];
-
-    case 'mining':
-      return [
-        { label: 'Find suitable mining location', estimatedDuration: 3000 },
-        { label: 'Ensure proper tools are available', estimatedDuration: 2000 },
-        { label: 'Begin mining operation', estimatedDuration: 6000 },
-        { label: 'Collect mined resources', estimatedDuration: 3000 },
-      ];
-
-    case 'building':
-    case 'placement':
-      return [
-        { label: 'Select suitable building location', estimatedDuration: 3000 },
-        {
-          label: 'Gather required building materials',
-          estimatedDuration: 4000,
-        },
-        { label: 'Place blocks in desired pattern', estimatedDuration: 5000 },
-        { label: 'Verify structure completion', estimatedDuration: 2000 },
-      ];
-
-    case 'exploration':
-      return [
-        { label: 'Choose exploration direction', estimatedDuration: 2000 },
-        { label: 'Navigate to new area', estimatedDuration: 5000 },
-        { label: 'Survey surroundings for resources', estimatedDuration: 4000 },
-        { label: 'Document findings', estimatedDuration: 2000 },
-      ];
-
-    default:
-      return [
-        { label: 'Analyze task requirements', estimatedDuration: 2000 },
-        { label: 'Plan execution approach', estimatedDuration: 3000 },
-        { label: 'Execute task', estimatedDuration: 5000 },
-        { label: 'Verify completion', estimatedDuration: 2000 },
-      ];
-  }
-}
-
-/** @deprecated Planning service no longer calls this endpoint (Phase 2, Change C).
- *  Kept for dashboard/external consumers. Do not add new callers. */
-// POST /generate-steps - Generate task steps from cognitive system
-app.post('/generate-steps', async (req, res) => {
-  try {
-    const { task, context } = req.body;
-
-    // Validate required fields
-    if (!task || !task.title) {
-      return res.status(400).json({
-        error: 'Missing required fields: task.title',
-      });
-    }
-
-    console.log('Generating dynamic steps for task:', task.title);
-
-    // Use the new method from ReAct Arbiter to generate task-specific steps
-    const steps = await generateTaskSteps(task, context);
-
-    console.log('Generated dynamic steps:', steps);
-
-    res.json({
-      success: true,
-      steps,
-      reasoning: `Generated ${steps.length} steps for task: ${task.title}`,
-      timestamp: Date.now(),
-    });
-  } catch (error) {
-    console.error('Dynamic step generation failed:', error);
-    res.status(500).json({
-      error: 'Dynamic step generation failed',
-      details: error instanceof Error ? error.message : 'Unknown error',
-    });
-  }
-});
-
-// POST /reflect - Generate Reflexion-style verbal self-feedback
-app.post('/reflect', async (req, res) => {
-  try {
-    const { episodeTrace, outcome, errors } = req.body;
-
-    // Validate required fields
-    if (!episodeTrace || !outcome) {
-      return res.status(400).json({
-        error: 'Missing required fields: episodeTrace, outcome',
-      });
-    }
-
-    if (!['success', 'failure'].includes(outcome)) {
-      return res.status(400).json({
-        error: 'Outcome must be either "success" or "failure"',
-      });
-    }
-
-    const reflection = await reactArbiter.reflect(
-      episodeTrace,
-      outcome,
-      errors
-    );
-
-    res.json({
-      success: true,
-      reflection,
-      timestamp: Date.now(),
-    });
-  } catch (error) {
-    console.error('Reflection generation failed:', error);
-    res.status(500).json({
-      error: 'Reflection generation failed',
-      details: error instanceof Error ? error.message : 'Unknown error',
-    });
-  }
-});
-
-// ============================================================================
-// Cognitive Load Calculation Methods
-// ============================================================================
-
-/**
- * Calculate current cognitive load based on system resources and activity
- */
-function calculateCognitiveLoad(): number {
-  const cpuLoad = getSystemCpuUsage();
-  const memoryLoad = getMemoryLoad();
-  const processLoad = getProcessLoad();
-  const networkLoad = getNetworkLoad();
-
-  // Weighted average of different load factors
-  const cognitiveLoad =
-    cpuLoad * 0.3 + // CPU usage 30%
-    memoryLoad * 0.25 + // Memory usage 25%
-    processLoad * 0.25 + // Active processes 25%
-    networkLoad * 0.2; // Network activity 20%
-
-  // Normalize to 0-1 range
-  return Math.min(1.0, Math.max(0.0, cognitiveLoad));
-}
-
-/**
- * Calculate attention level based on system responsiveness
- */
-function calculateAttentionLevel(): number {
-  const uptime = process.uptime();
-  const memoryUsage = process.memoryUsage();
-
-  // High attention when system is fresh and not overloaded
-  const attentionBase = Math.max(0, 1 - uptime / 3600); // Decreases over time
-  const memoryAttention = Math.max(
-    0,
-    1 - memoryUsage.heapUsed / memoryUsage.heapTotal
-  );
-
-  return Math.min(1.0, Math.max(0.0, (attentionBase + memoryAttention) / 2));
-}
-
-/**
- * Calculate creativity level based on system capacity and rest periods
- */
-function calculateCreativityLevel(): number {
-  const uptime = process.uptime();
-  const memoryUsage = process.memoryUsage();
-
-  // Creativity is higher when system is rested and has available resources
-  const restFactor = Math.max(0, 1 - Math.min(1, uptime / 1800)); // Higher after rest
-  const capacityFactor = Math.max(
-    0,
-    1 - memoryUsage.heapUsed / memoryUsage.heapTotal
-  );
-
-  return Math.min(1.0, Math.max(0.0, (restFactor + capacityFactor) / 2));
-}
-
-/**
- * Get number of active processes
- */
-function getActiveProcessCount(): number {
-  // In a real implementation, this would track active cognitive processes
-  // For now, return a simulated value based on system activity
-  const baseProcesses = 3; // Base cognitive processes always running
-  const uptime = process.uptime();
-  const activityBonus = Math.floor(uptime / 300); // +1 process per 5 minutes of uptime
-
-  return baseProcesses + Math.min(5, activityBonus); // Cap at 8 processes
-}
-
-/**
- * Get system CPU usage as percentage (0-1)
- */
-function getSystemCpuUsage(): number {
-  try {
-    // Get current CPU usage
-    const cpuUsage = process.cpuUsage();
-    const totalTime = cpuUsage.user + cpuUsage.system;
-
-    // Convert to percentage (simplified calculation)
-    // In production, this would track over time intervals
-    return Math.min(1.0, Math.max(0.0, totalTime / 100000)); // Normalize to 0-1
-  } catch (error) {
-    console.warn('Failed to get CPU usage:', error);
-    return 0.5; // Default moderate load
-  }
-}
-
-/**
- * Get memory load as percentage (0-1)
- */
-function getMemoryLoad(): number {
-  try {
-    const memoryUsage = process.memoryUsage();
-    const memoryLoad = memoryUsage.heapUsed / memoryUsage.heapTotal;
-
-    return Math.min(1.0, Math.max(0.0, memoryLoad));
-  } catch (error) {
-    console.warn('Failed to get memory usage:', error);
-    return 0.5; // Default moderate load
-  }
-}
-
-/**
- * Get process load based on active operations
- */
-function getProcessLoad(): number {
-  try {
-    // Simulate process load based on uptime and activity patterns
-    const uptime = process.uptime();
-    const timeOfDay = new Date().getHours();
-
-    // Higher load during peak hours and after long uptime
-    const uptimeLoad = Math.min(1.0, uptime / 3600); // Max after 1 hour
-    const timeLoad = timeOfDay >= 9 && timeOfDay <= 17 ? 0.7 : 0.3; // Higher during business hours
-
-    return (uptimeLoad + timeLoad) / 2;
-  } catch (error) {
-    console.warn('Failed to calculate process load:', error);
-    return 0.5; // Default moderate load
-  }
-}
-
-/**
- * Get network load based on recent activity
- */
-function getNetworkLoad(): number {
-  try {
-    // Track recent network requests
-    const recentRequests = networkRequestCount || 0;
-    const timeWindow = 60; // Last minute
-
-    // Normalize to 0-1 based on request rate
-    return Math.min(1.0, Math.max(0.0, recentRequests / 100)); // Max 100 requests per minute
-  } catch (error) {
-    console.warn('Failed to calculate network load:', error);
-    return 0.5; // Default moderate load
-  }
-}
-
-/**
- * Get network request count (simulated)
- */
-function getNetworkRequestCount(): number {
-  // In a real implementation, this would track actual HTTP requests
-  // For now, return a simulated value
-  return networkRequestCount || 0;
-}
-
-// Endpoint to receive thoughts from planning system and forward to dashboard
-app.post('/thought-generated', async (req: Request, res: Response) => {
-  try {
-    const { thought, event } = req.body;
-
-    console.log(
-      '🧠 Received thought from planning system:',
-      thought.type,
-      '-',
-      thought.content.substring(0, 60)
-    );
-
-    // Forward the thought to the dashboard
-    try {
-      const dashboardUrl =
-        process.env.DASHBOARD_ENDPOINT || 'http://localhost:3000';
-      const dashboardResponse = await resilientFetch(
-        `${dashboardUrl}/api/ws/cognitive-stream`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            type: thought.type,
-            content: thought.content,
-            attribution: thought.attribution,
-            context: thought.context,
-            metadata: thought.metadata,
-            id: thought.id,
-            timestamp: thought.timestamp,
-            processed: thought.processed,
-          }),
-        }
-      );
-
-      if (dashboardResponse?.ok) {
-        console.log('✅ Thought forwarded to dashboard successfully');
-        res.json({ success: true, message: 'Thought forwarded to dashboard' });
-      } else {
-        console.warn(
-          '⚠️ Failed to forward thought to dashboard:',
-          dashboardResponse?.status ?? 'unavailable'
-        );
-        res
-          .status(500)
-          .json({ error: 'Failed to forward thought to dashboard' });
-      }
-    } catch (error) {
-      console.error('❌ Error forwarding thought to dashboard:', error);
-      res.status(500).json({ error: 'Failed to forward thought to dashboard' });
-    }
-  } catch (error) {
-    console.error('❌ Error processing thought generation:', error);
-    res.status(500).json({ error: 'Failed to process thought generation' });
-  }
-});
-
-// ── POST /api/cognitive-stream/events ──
-// Accepts BotLifecycleEvent and generates a thought via the event-driven generator
-app.post('/api/cognitive-stream/events', async (req, res) => {
-  try {
-    const event = req.body; // { type, timestamp, data }
-    if (!event.type || !event.timestamp) {
-      return res.status(400).json({ error: 'Missing type or timestamp' });
-    }
-    const thought =
-      await eventDrivenThoughtGenerator.generateThoughtForEvent(event);
-    res.json({
-      success: true,
-      thoughtGenerated: !!thought,
-      thoughtId: thought?.id || null,
-    });
-  } catch (error) {
-    console.error('Error processing lifecycle event:', error);
-    res.status(500).json({ error: 'Failed to process event' });
-  }
-});
-
-// ── POST /api/cognitive-stream/ack ──
-// Marks thoughts as processed in cognition's own store
-app.post('/api/cognitive-stream/ack', async (req, res) => {
-  try {
-    const { thoughtIds } = req.body; // string[]
-    if (!Array.isArray(thoughtIds)) {
-      return res.status(400).json({ error: 'thoughtIds must be an array' });
-    }
-    const idSet = new Set(thoughtIds);
-    let acked = 0;
-    for (const thought of cognitiveThoughts) {
-      if (idSet.has(thought.id) && !thought.processed) {
-        thought.processed = true;
-        acked++;
-      }
-    }
-    res.json({ success: true, ackedCount: acked });
-  } catch (error) {
-    res.status(500).json({ error: 'Failed to ack thoughts' });
-  }
-});
-
-// ── POST /api/task-review ──
-// Called by the planning service when a lifecycle event (completed, failed,
-// solver_unavailable, rig_g_replan_needed, high_priority_added) warrants LLM review.
-// Coalesces: if a review is already pending, the reason is appended rather than duplicated.
-app.post('/api/task-review', (req, res) => {
-  try {
-    const { reason } = req.body ?? {};
-    const reviewReason =
-      typeof reason === 'string' && reason.length > 0
-        ? reason.slice(0, 200) // bound input length
-        : 'lifecycle event';
-    enhancedThoughtGenerator.requestTaskReview(reviewReason);
-    res.json({ success: true, reason: reviewReason });
-  } catch (error) {
-    console.error('[Cognition] Failed to request task review:', error);
-    res.status(500).json({ error: 'Failed to request task review' });
-  }
-});
-
-// Listen for thought generation events and forward them to dashboard
+// Event-driven thought generator: forward to dashboard
 eventDrivenThoughtGenerator.on(
   'thoughtGenerated',
   async (data: {
@@ -3639,8 +673,7 @@ eventDrivenThoughtGenerator.on(
         data.thought.content.substring(0, 60)
       );
 
-      // Store in cognitiveThoughts so /api/cognitive-stream/recent can poll them
-      cognitiveThoughts.push({
+      state.cognitiveThoughts.push({
         id: data.thought.id,
         type: data.thought.type,
         content: data.thought.content,
@@ -3652,15 +685,13 @@ eventDrivenThoughtGenerator.on(
         convertEligible: (data.thought as any).convertEligible,
       });
 
-      // Cap cognitiveThoughts as a bounded ring buffer
       const MAX_COGNITIVE_THOUGHTS = 200;
-      if (cognitiveThoughts.length > MAX_COGNITIVE_THOUGHTS) {
-        cognitiveThoughts = cognitiveThoughts.slice(-MAX_COGNITIVE_THOUGHTS);
+      if (state.cognitiveThoughts.length > MAX_COGNITIVE_THOUGHTS) {
+        state.cognitiveThoughts = state.cognitiveThoughts.slice(
+          -MAX_COGNITIVE_THOUGHTS
+        );
       }
 
-      // Forward to dashboard
-      const dashboardUrl =
-        process.env.DASHBOARD_ENDPOINT || 'http://localhost:3000';
       await resilientFetch(`${dashboardUrl}/api/ws/cognitive-stream`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -3685,11 +716,161 @@ eventDrivenThoughtGenerator.on(
   }
 );
 
-// Start the server
+// ============================================================================
+// Express app + middleware
+// ============================================================================
+
+const app = express.default();
+const port = process.env.PORT ? parseInt(process.env.PORT) : 3003;
+
+app.use(cors.default());
+app.use(express.json());
+
+// Middleware to track network requests
+app.use((req, res, next) => {
+  state.networkRequestCount++;
+  if (state.networkRequestCount > 1000) {
+    state.networkRequestCount = state.networkRequestCount % 100;
+  }
+
+  const startTime = Date.now();
+  res.on('finish', () => {
+    const success = res.statusCode < 400;
+    const operationType = req.path.includes('/chat')
+      ? 'conversation'
+      : req.path.includes('/optimize')
+        ? 'optimization'
+        : req.path.includes('/solve')
+          ? 'solution_generation'
+          : req.path.includes('/intrusion')
+            ? 'intrusion_handled'
+            : 'api_request';
+    cognitiveStateTracker.recordOperation(operationType, success, startTime);
+  });
+
+  next();
+});
+
+// ============================================================================
+// Mount route modules
+// ============================================================================
+
+app.use(
+  createSystemRoutes({
+    startThoughtGeneration,
+    stopThoughtGeneration,
+    isRunning: () => state.thoughtGenerationInterval !== null,
+    getReadyState: () => ({
+      ready: state.systemReady,
+      readyAt: state.readyAt,
+      source: state.readySource,
+    }),
+    markReady: (source: string) => {
+      if (!state.systemReady) {
+        state.systemReady = true;
+        state.readyAt = new Date().toISOString();
+        state.readySource = source;
+      }
+    },
+    getTtsEnabled: () => state.ttsEnabled,
+    setTtsEnabled: (enabled: boolean) => { state.ttsEnabled = enabled; },
+  })
+);
+
+app.use(
+  createTelemetryRoutes({
+    metricsTracker,
+    cognitiveStateTracker,
+    cognitionSystem,
+    getInteroState,
+    getInteroHistory,
+    getInteroHistorySummary,
+    halveStressAxes,
+    setSpawnPosition: (pos) => {
+      state.spawnPosition = pos;
+    },
+    resetTimers: () => {
+      state.msSinceLastRest = 0;
+    },
+    getNetworkRequestCount: () => state.networkRequestCount,
+  })
+);
+
+app.use(
+  createReasoningRoutes({
+    reactArbiter,
+  })
+);
+
+app.use(
+  createThoughtRoutes({
+    state,
+    enhancedThoughtGenerator,
+    sendThoughtToCognitiveStream,
+  })
+);
+
+app.use(
+  createCognitiveStreamRoutes({
+    state,
+    enhancedThoughtGenerator,
+  })
+);
+
+app.use(
+  createSocialRoutes({
+    state,
+    enhancedThoughtGenerator,
+    socialAwarenessManager,
+    sendThoughtToCognitiveStream,
+  })
+);
+
+app.use(
+  createProcessRoutes({
+    state,
+    intrusiveThoughtProcessor,
+    llmInterface,
+    observationReasoner,
+    saliencyState,
+    enhancedThoughtGenerator,
+    reactArbiter,
+    sendThoughtToCognitiveStream,
+    runConsiderationStep,
+    enqueueObservation,
+    logObservation,
+  })
+);
+
+app.use(
+  createSocialMemoryRoutes({
+    getSocialMemoryManager: () => state.socialMemoryManager,
+  })
+);
+
+// ============================================================================
+// Process error handlers
+// ============================================================================
+
+process.on('uncaughtException', (err: NodeJS.ErrnoException) => {
+  if (err.code === 'EPIPE' || err.code === 'ECONNRESET') {
+    return;
+  }
+  console.error('[Cognition] Uncaught exception:', err);
+  process.exit(1);
+});
+
+process.on('unhandledRejection', (reason: any) => {
+  console.error('[Cognition] Unhandled rejection:', reason);
+});
+
+// ============================================================================
+// Start server
+// ============================================================================
+
 const server = app.listen(port, () => {
   const startupMessage = `🧠 Cognition service running on port ${port}`;
 
-  // Log the server startup to cognitive stream
   cognitiveLogger
     .logStatus('cognition_service_started', startupMessage, {
       port: port,
@@ -3703,24 +884,20 @@ const server = app.listen(port, () => {
 
   console.log(startupMessage);
 
-  // Load persisted interoception history from previous sessions
   loadInteroHistory();
 
-  // One-off LLM backend health check + model preload so operators see MLX/Ollama
-  // connectivity and the sidecar keeps the model hot.
+  // LLM backend health check + model preload
   setTimeout(() => {
     const cfg = llmInterface.getConfig();
     const host = cfg.host ?? 'localhost';
-    const port = cfg.port ?? 5002;
-    const healthUrl = `http://${host}:${port}/health`;
+    const llmPort = cfg.port ?? 5002;
+    const healthUrl = `http://${host}:${llmPort}/health`;
     resilientFetch(healthUrl, { timeoutMs: 5000, label: 'llm/health' })
       .then((r) => {
         if (r?.ok) {
           console.log(
             `[Cognition] LLM backend (MLX/Ollama) reachable at ${healthUrl}`
           );
-          // Preload model into sidecar memory (keep_alive=-1) so first real
-          // request doesn't pay cold-start latency.
           llmInterface.preloadModel().catch(() => {});
         } else {
           console.warn(
@@ -3778,230 +955,10 @@ const server = app.listen(port, () => {
   );
 });
 
-// Prevent EPIPE/ECONNRESET from client disconnects from crashing the process.
-// When a client (e.g. Dashboard, Planning) closes the connection before Cognition
-// finishes writing the response, the socket emits 'error' with EPIPE. Without
-// a handler, Node treats it as unhandled and exits.
 server.on('connection', (socket) => {
   socket.on('error', (err: NodeJS.ErrnoException) => {
     if (err.code !== 'ECONNRESET' && err.code !== 'EPIPE') {
       console.warn('[Cognition] Socket error:', err.message);
     }
   });
-});
-
-// ============================================================================
-// Cognitive Stream Integration for Planning System
-// ============================================================================
-
-// Get recent thoughts for planning system
-app.get('/api/cognitive-stream/recent', async (req, res) => {
-  try {
-    const { limit = 10, processed = false } = req.query;
-    const limitNum = parseInt(limit as string, 10);
-
-    // Get recent thoughts from the actual cognitive stream
-    // Filter out processed thoughts if requested
-    let recentThoughts = cognitiveThoughts.slice();
-
-    // Clean up old processed thoughts to prevent memory buildup
-    const now = Date.now();
-    const cutoffTime = now - 24 * 60 * 60 * 1000; // 24 hours ago
-    cognitiveThoughts = cognitiveThoughts.filter(
-      (thought) => !thought.processed || thought.timestamp > cutoffTime
-    );
-
-    // Also get thoughts from enhanced thought generator (limit to recent ones)
-    const generatedThoughts = enhancedThoughtGenerator.getThoughtHistory(5); // Only get the 5 most recent
-    console.log(
-      `Enhanced thought generator has ${generatedThoughts.length} recent thoughts`
-    );
-
-    // Combine all thoughts
-    recentThoughts = [...recentThoughts, ...generatedThoughts];
-
-    if (processed === 'false') {
-      recentThoughts = recentThoughts.filter((thought) => !thought.processed);
-    }
-
-    // Sort by timestamp (newest first) and limit results
-    recentThoughts = recentThoughts
-      .sort((a, b) => b.timestamp - a.timestamp)
-      .slice(0, limitNum);
-
-    // Ensure we have the required fields for the planning system
-    const formattedThoughts = recentThoughts.map((thought) => ({
-      id: thought.id,
-      type: thought.type || 'reflection',
-      content: thought.content,
-      attribution: thought.attribution || 'self',
-      context: thought.context,
-      metadata: thought.metadata,
-      timestamp: thought.timestamp,
-      processed: thought.processed || false,
-      // convertEligible controls whether the thought-to-task converter should attempt conversion.
-      // Omitted (undefined) defaults to eligible for backwards compat.
-      convertEligible: (thought as any).convertEligible,
-    }));
-
-    res.json({
-      success: true,
-      thoughts: formattedThoughts,
-      count: formattedThoughts.length,
-      timestamp: Date.now(),
-    });
-  } catch (error) {
-    console.error('Error retrieving recent thoughts:', error);
-    res.status(500).json({ error: 'Failed to retrieve recent thoughts' });
-  }
-});
-
-// Mark thought as processed
-app.post('/api/cognitive-stream/:thoughtId/processed', async (req, res) => {
-  try {
-    const { thoughtId } = req.params;
-    const { processed } = req.body;
-
-    console.log(`📝 Marking thought ${thoughtId} as processed: ${processed}`);
-
-    // In a real implementation, you'd update the thought in the database
-    // For now, just return success
-    res.json({
-      success: true,
-      thoughtId,
-      processed,
-      timestamp: Date.now(),
-    });
-  } catch (error) {
-    console.error('Error marking thought as processed:', error);
-    res.status(500).json({ error: 'Failed to mark thought as processed' });
-  }
-});
-
-// ============================================================================
-// Social Memory Endpoints
-// ============================================================================
-
-// Get remembered entities
-app.get('/social-memory/entities', async (req, res) => {
-  try {
-    const minStrength = parseFloat(req.query.minStrength as string) || 0.1;
-
-    if (!socialMemoryManager) {
-      return res.status(503).json({
-        error: 'Social memory system not available',
-        entities: [],
-      });
-    }
-
-    const entities =
-      await socialMemoryManager.getRememberedEntities(minStrength);
-
-    res.json({
-      success: true,
-      entities,
-      count: entities.length,
-      minStrength,
-      timestamp: Date.now(),
-    });
-  } catch (error) {
-    console.error('Error retrieving remembered entities:', error);
-    res.status(500).json({ error: 'Failed to retrieve remembered entities' });
-  }
-});
-
-// Search entities by fact content
-app.get('/social-memory/search', async (req, res) => {
-  try {
-    const { query, minStrength } = req.query;
-
-    if (!query || typeof query !== 'string') {
-      return res.status(400).json({
-        error: 'Query parameter is required',
-      });
-    }
-
-    if (!socialMemoryManager) {
-      return res.status(503).json({
-        error: 'Social memory system not available',
-        entities: [],
-      });
-    }
-
-    const entities = await socialMemoryManager.searchByFact(query);
-    const filteredEntities = minStrength
-      ? entities.filter(
-          (e: any) => e.memoryStrength >= parseFloat(minStrength as string)
-        )
-      : entities;
-
-    res.json({
-      success: true,
-      query,
-      entities: filteredEntities,
-      count: filteredEntities.length,
-      timestamp: Date.now(),
-    });
-  } catch (error) {
-    console.error('Error searching entities by fact:', error);
-    res.status(500).json({ error: 'Failed to search entities by fact' });
-  }
-});
-
-// Get social memory statistics
-app.get('/social-memory/stats', async (req, res) => {
-  try {
-    if (!socialMemoryManager) {
-      return res.status(503).json({
-        error: 'Social memory system not available',
-        stats: null,
-      });
-    }
-
-    const stats = await socialMemoryManager.getStats();
-
-    res.json({
-      success: true,
-      stats,
-      timestamp: Date.now(),
-    });
-  } catch (error) {
-    console.error('Error retrieving social memory stats:', error);
-    res.status(500).json({ error: 'Failed to retrieve social memory stats' });
-  }
-});
-
-// Record a social fact manually
-app.post('/social-memory/fact', async (req, res) => {
-  try {
-    const { entityId, factContent, category, confidence } = req.body;
-
-    if (!entityId || !factContent || !category) {
-      return res.status(400).json({
-        error: 'Missing required fields: entityId, factContent, category',
-      });
-    }
-
-    if (!socialMemoryManager) {
-      return res.status(503).json({
-        error: 'Social memory system not available',
-      });
-    }
-
-    // Note: Social facts are automatically recorded through encounters
-    // Manual fact recording not yet implemented
-    console.warn('Manual social fact recording not implemented yet');
-
-    res.json({
-      success: true,
-      message: 'Social fact recorded successfully',
-      entityId,
-      factContent,
-      category,
-      timestamp: Date.now(),
-    });
-  } catch (error) {
-    console.error('Error recording social fact:', error);
-    res.status(500).json({ error: 'Failed to record social fact' });
-  }
 });

@@ -7,8 +7,6 @@
  * @author @darianrosebrook
  */
 
-'use client';
-
 import React, { useMemo } from 'react';
 
 export interface SparklinePoint {
@@ -56,9 +54,18 @@ export function SparklineChart({
 
   if (data.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center" style={{ width, height }}>
-        {label && <span className="text-[10px] text-zinc-500 mb-1">{label}</span>}
-        <svg width={width} height={height - (label ? 14 : 0)} viewBox={`0 0 ${width} ${height}`}>
+      <div
+        className="flex flex-col items-center justify-center"
+        style={{ width, height }}
+      >
+        {label && (
+          <span className="text-[10px] text-zinc-500 mb-1">{label}</span>
+        )}
+        <svg
+          width={width}
+          height={height - (label ? 14 : 0)}
+          viewBox={`0 0 ${width} ${height}`}
+        >
           <line
             x1={padX}
             y1={height / 2}

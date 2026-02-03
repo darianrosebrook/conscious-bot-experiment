@@ -1,0 +1,86 @@
+// Color palette reference — matching Tailwind's zinc/emerald/amber/red scales
+// These are SCSS maps for reference; actual usage is via CSS custom properties
+// or direct HSL values in component modules.
+
+$zinc: (
+  50: #fafafa,
+  100: #f4f4f5,
+  200: #e4e4e7,
+  300: #d4d4d8,
+  400: #a1a1aa,
+  500: #71717a,
+  600: #52525b,
+  700: #3f3f46,
+  800: #27272a,
+  900: #18181b,
+  950: #09090b,
+);
+
+$emerald: (
+  300: #6ee7b7,
+  500: #10b981,
+  600: #059669,
+);
+
+$amber: (
+  300: #fcd34d,
+  500: #f59e0b,
+  600: #d97706,
+);
+
+$red: (
+  300: #fca5a5,
+  400: #f87171,
+  500: #ef4444,
+  600: #dc2626,
+);
+
+$green: (
+  400: #4ade80,
+  500: #22c55e,
+);
+
+$yellow: (
+  400: #facc15,
+  500: #eab308,
+);
+
+$blue: (
+  500: #3b82f6,
+  600: #2563eb,
+);
+
+$sky: (
+  500: #0ea5e9,
+  600: #0284c7,
+);
+
+$orange: (
+  400: #fb923c,
+  500: #f97316,
+);
+
+$purple: (
+  500: #a855f7,
+  600: #9333ea,
+);
+
+$indigo: (
+  600: #4f46e5,
+);
+
+$cyan: (
+  600: #0891b2,
+);
+
+$pink: (
+  600: #db2777,
+);
+
+$teal: (
+  600: #0d9488,
+);
+
+$rose: (
+  500: #f43f5e,
+);

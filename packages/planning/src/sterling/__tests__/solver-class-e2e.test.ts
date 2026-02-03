@@ -273,7 +273,7 @@ describeIf(shouldRun)('Sprint 1 — Sterling identity fields', () => {
     expect(hash1).toBe(hash2);
   });
 
-  it('full identity loop: solve → attach → report with linkage → episode_hash ack', async () => {
+  it('full identity loop: solve → attach → report with linkage → episode_hash ack', { timeout: 30000 }, async () => {
     const { solver, available } = await freshSolver();
     if (!available) {
       console.log('  [SKIPPED] Sterling server not available');
@@ -295,10 +295,10 @@ describeIf(shouldRun)('Sprint 1 — Sterling identity fields', () => {
     expect(identity!.engineCommitment).toBeDefined();
     expect(identity!.operatorRegistryHash).toBeDefined();
 
-    // bindingHash = sha256(traceBundleHash + bundleHash) — computed by attachSterlingIdentity
+    // bindingHash = sha256("binding:v1:" + traceBundleHash + ":" + bundleHash) — computed by attachSterlingIdentity
     expect(identity!.bindingHash).toMatch(/^[0-9a-f]+$/);
-    // Verify it's actually derived from both hashes
-    const expectedBinding = contentHash(identity!.traceBundleHash! + bundle.bundleHash);
+    // Verify it's actually derived from both hashes (domain-separated preimage)
+    const expectedBinding = contentHash('binding:v1:' + identity!.traceBundleHash! + ':' + bundle.bundleHash);
     expect(identity!.bindingHash).toBe(expectedBinding);
 
     // Step C: Report episode WITH linkage fields populated

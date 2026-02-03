@@ -1,5 +1,7 @@
 # Companion Approach for P21 / Rig I-ext
 
+**Implementation**: Partial — evidence capsule types and reference fixtures exist in `planning/sterling/primitives/p21/`
+
 This companion document distills the implementation plan into a recommended, staged approach, with explicit design decisions, boundaries, validation focus, and **concrete code references and signatures** so that implementers cannot easily implement the boundary incorrectly. It is intended to be read alongside `docs/planning/P21_RIG_I_EXT_IMPLEMENTATION_PLAN.md`.
 
 ---

@@ -1635,6 +1635,26 @@ describe('Task origin envelope', () => {
     }));
     expect((task.metadata as any).dangerousField).toBeUndefined();
   });
+
+  it('addTask drops empty-string goalKey (never reaches task.metadata)', async () => {
+    const task = await ti.addTask(makeTaskData({
+      title: 'Empty goalKey guard',
+      type: 'general',
+      source: 'manual',
+      metadata: {
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+        retryCount: 0,
+        maxRetries: 3,
+        childTaskIds: [],
+        tags: [],
+        category: 'general',
+        goalKey: '',
+      },
+    }));
+    // Empty string must not survive projection — goalKey should be undefined
+    expect(task.metadata.goalKey).toBeUndefined();
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -1974,5 +1994,426 @@ describe('Strict-mode enforcement (PLANNING_STRICT_FINALIZE)', () => {
     // No invariant violations should fire
     const violations = events.filter((e) => e.type === 'task_finalize_invariant_violation');
     expect(violations).toHaveLength(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// L. Building episode reporting with join keys
+// ---------------------------------------------------------------------------
+
+describe('Building episode reporting with join keys', () => {
+  let ti: TaskIntegration;
+  let reportEpisodeSpy: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    vi.useFakeTimers({ shouldAdvanceTime: false });
+    ti = new TaskIntegration({
+      enableProgressTracking: false,
+      enableRealTimeUpdates: false,
+    });
+
+    // Mock the buildingSolver with a spy on reportEpisodeResult
+    reportEpisodeSpy = vi.fn().mockResolvedValue({ episodeId: 'mock-episode-id' });
+    const mockBuildingSolver = {
+      reportEpisodeResult: reportEpisodeSpy,
+    };
+
+    // Inject mock solver via sterlingPlanner.getSolver
+    const sterlingPlanner = (ti as any).sterlingPlanner;
+    const originalGetSolver = sterlingPlanner.getSolver.bind(sterlingPlanner);
+    sterlingPlanner.getSolver = (solverId: string) => {
+      if (solverId === 'minecraft.building') {
+        return mockBuildingSolver;
+      }
+      return originalGetSolver(solverId);
+    };
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('reports linkage with hashes when buildingSolveJoinKeys.planId matches buildingPlanId', async () => {
+    const task = await ti.addTask(makeTaskData({
+      title: 'Build shelter',
+      type: 'building',
+      steps: [
+        { id: 'step-1', label: 'build_module:wall', done: true, order: 1, meta: { domain: 'building', moduleId: 'wall-1' } },
+      ],
+    }));
+
+    // Set up matching join keys
+    task.metadata.solver = {
+      buildingTemplateId: 'shelter-template',
+      buildingPlanId: 'plan-A',
+      buildingSolveJoinKeys: {
+        planId: 'plan-A',
+        bundleHash: 'hash-A',
+        traceBundleHash: 'trace-A',
+      },
+    };
+
+    // Trigger episode report via status update to 'completed'
+    ti.updateTaskProgress(task.id, 100, 'completed');
+
+    expect(reportEpisodeSpy).toHaveBeenCalledTimes(1);
+    const linkageArg = reportEpisodeSpy.mock.calls[0][7];
+    expect(linkageArg.bundleHash).toBe('hash-A');
+    expect(linkageArg.traceBundleHash).toBe('trace-A');
+    expect(linkageArg.outcomeClass).toBe('EXECUTION_SUCCESS');
+  });
+
+  it('reports linkage without hashes when buildingSolveJoinKeys.planId differs from buildingPlanId (stale keys)', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    const task = await ti.addTask(makeTaskData({
+      title: 'Build shelter',
+      type: 'building',
+      steps: [
+        { id: 'step-1', label: 'build_module:wall', done: true, order: 1, meta: { domain: 'building', moduleId: 'wall-1' } },
+      ],
+    }));
+
+    // Set up MISMATCHED join keys (stale from previous plan)
+    task.metadata.solver = {
+      buildingTemplateId: 'shelter-template',
+      buildingPlanId: 'plan-B', // Current plan
+      buildingSolveJoinKeys: {
+        planId: 'plan-A', // Stale keys from previous plan
+        bundleHash: 'hash-A',
+        traceBundleHash: 'trace-A',
+      },
+    };
+
+    // Trigger episode report via status update to 'completed'
+    ti.updateTaskProgress(task.id, 100, 'completed');
+
+    expect(reportEpisodeSpy).toHaveBeenCalledTimes(1);
+    const linkageArg = reportEpisodeSpy.mock.calls[0][7];
+
+    // Assert linkage semantics only (not exact warning strings)
+    expect(linkageArg.bundleHash).toBeUndefined();  // omitted due to stale
+    expect(linkageArg.traceBundleHash).toBeUndefined();
+    expect(linkageArg.outcomeClass).toBe('EXECUTION_SUCCESS');
+
+    // Assert warning contains both planIds (semantic check, not exact sentence)
+    const staleWarnings = warnSpy.mock.calls.filter(
+      (call) => typeof call[0] === 'string' &&
+        call[0].includes('plan-A') &&
+        call[0].includes('plan-B')
+    );
+    expect(staleWarnings.length).toBeGreaterThan(0);
+
+    warnSpy.mockRestore();
+  });
+
+  it('reports linkage without hashes when buildingSolveJoinKeys.solverId mismatches', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    const task = await ti.addTask(makeTaskData({
+      title: 'Build shelter',
+      type: 'building',
+      steps: [
+        { id: 'step-1', label: 'build_module:wall', done: true, order: 1, meta: { domain: 'building', moduleId: 'wall-1' } },
+      ],
+    }));
+
+    // Set up join keys with WRONG solverId (cross-domain clobber scenario)
+    task.metadata.solver = {
+      buildingTemplateId: 'shelter-template',
+      buildingPlanId: 'plan-A',
+      buildingSolveJoinKeys: {
+        planId: 'plan-A', // planId matches
+        bundleHash: 'hash-A',
+        traceBundleHash: 'trace-A',
+        solverId: 'minecraft.crafting', // WRONG solver
+      },
+    };
+
+    ti.updateTaskProgress(task.id, 100, 'completed');
+
+    expect(reportEpisodeSpy).toHaveBeenCalledTimes(1);
+    const linkageArg = reportEpisodeSpy.mock.calls[0][7];
+
+    // Hashes should be undefined due to solverId mismatch
+    expect(linkageArg.bundleHash).toBeUndefined();
+    expect(linkageArg.traceBundleHash).toBeUndefined();
+    expect(linkageArg.outcomeClass).toBe('EXECUTION_SUCCESS');
+
+    // Warning should mention solverId mismatch and be classified as "unexpected"
+    // (cross-domain clobber is never expected)
+    const solverWarnings = warnSpy.mock.calls.filter(
+      (call) => typeof call[0] === 'string' &&
+        call[0].includes('solverId mismatch') &&
+        call[0].includes('unexpected')
+    );
+    expect(solverWarnings.length).toBeGreaterThan(0);
+
+    warnSpy.mockRestore();
+  });
+
+  it('does NOT use deprecated solveJoinKeys when compat is disabled (default)', async () => {
+    // Ensure compat is off
+    const originalEnv = process.env.JOIN_KEYS_DEPRECATED_COMPAT;
+    delete process.env.JOIN_KEYS_DEPRECATED_COMPAT;
+
+    const task = await ti.addTask(makeTaskData({
+      title: 'Build shelter',
+      type: 'building',
+      steps: [
+        { id: 'step-1', label: 'build_module:wall', done: true, order: 1, meta: { domain: 'building', moduleId: 'wall-1' } },
+      ],
+    }));
+
+    // Set up deprecated keys only (migration scenario)
+    task.metadata.solver = {
+      buildingTemplateId: 'shelter-template',
+      buildingPlanId: 'plan-A',
+      // buildingSolveJoinKeys is undefined
+      solveJoinKeys: {
+        planId: 'plan-A',
+        bundleHash: 'hash-A',
+        traceBundleHash: 'trace-A',
+      },
+    };
+
+    ti.updateTaskProgress(task.id, 100, 'completed');
+
+    expect(reportEpisodeSpy).toHaveBeenCalledTimes(1);
+    const linkageArg = reportEpisodeSpy.mock.calls[0][7];
+
+    // Compat disabled: deprecated keys are NOT used
+    expect(linkageArg.bundleHash).toBeUndefined();
+    expect(linkageArg.outcomeClass).toBe('EXECUTION_SUCCESS');
+
+    // Restore env
+    if (originalEnv !== undefined) {
+      process.env.JOIN_KEYS_DEPRECATED_COMPAT = originalEnv;
+    }
+  });
+
+  it('uses deprecated solveJoinKeys when compat is ENABLED (JOIN_KEYS_DEPRECATED_COMPAT=1)', async () => {
+    // Enable compat at runtime (function checks env at call time, not module load)
+    const originalEnv = process.env.JOIN_KEYS_DEPRECATED_COMPAT;
+    process.env.JOIN_KEYS_DEPRECATED_COMPAT = '1';
+
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+
+    const task = await ti.addTask(makeTaskData({
+      title: 'Build shelter',
+      type: 'building',
+      steps: [
+        { id: 'step-1', label: 'build_module:wall', done: true, order: 1, meta: { domain: 'building', moduleId: 'wall-1' } },
+      ],
+    }));
+
+    // Set up deprecated keys only (migration scenario)
+    // Must satisfy isSafeForDeprecatedFallback: building type, templateId, no other per-domain keys
+    task.metadata.solver = {
+      buildingTemplateId: 'shelter-template',
+      buildingPlanId: 'plan-A',
+      // buildingSolveJoinKeys is undefined — triggers fallback
+      solveJoinKeys: {
+        planId: 'plan-A', // matches current plan
+        bundleHash: 'hash-A',
+        traceBundleHash: 'trace-A',
+        // solverId is undefined (migration keys don't have it)
+      },
+    };
+
+    ti.updateTaskProgress(task.id, 100, 'completed');
+
+    expect(reportEpisodeSpy).toHaveBeenCalledTimes(1);
+    const linkageArg = reportEpisodeSpy.mock.calls[0][7];
+
+    // Compat enabled: deprecated keys ARE used
+    expect(linkageArg.bundleHash).toBe('hash-A');
+    expect(linkageArg.traceBundleHash).toBe('trace-A');
+    expect(linkageArg.outcomeClass).toBe('EXECUTION_SUCCESS');
+
+    // "Fallback exercised" log should be emitted (specific token, not just [JoinKeys] prefix)
+    const fallbackLogs = logSpy.mock.calls.filter(
+      (call) => typeof call[0] === 'string' && call[0].includes('Migration fallback exercised')
+    );
+    expect(fallbackLogs.length).toBeGreaterThan(0);
+
+    logSpy.mockRestore();
+
+    // Restore env
+    if (originalEnv === undefined) {
+      delete process.env.JOIN_KEYS_DEPRECATED_COMPAT;
+    } else {
+      process.env.JOIN_KEYS_DEPRECATED_COMPAT = originalEnv;
+    }
+  });
+
+  it('does NOT use deprecated fallback when other per-domain keys exist (narrowed scope)', async () => {
+    // Enable compat
+    const originalEnv = process.env.JOIN_KEYS_DEPRECATED_COMPAT;
+    process.env.JOIN_KEYS_DEPRECATED_COMPAT = '1';
+
+    const task = await ti.addTask(makeTaskData({
+      title: 'Build shelter',
+      type: 'building',
+      steps: [
+        { id: 'step-1', label: 'build_module:wall', done: true, order: 1, meta: { domain: 'building', moduleId: 'wall-1' } },
+      ],
+    }));
+
+    // Set up deprecated keys BUT also have crafting keys (violates narrowed scope)
+    task.metadata.solver = {
+      buildingTemplateId: 'shelter-template',
+      buildingPlanId: 'plan-A',
+      solveJoinKeys: {
+        planId: 'plan-A',
+        bundleHash: 'hash-A',
+      },
+      // This triggers isSafeForDeprecatedFallback to return false
+      craftingSolveJoinKeys: {
+        planId: 'plan-X',
+        bundleHash: 'hash-X',
+      },
+    };
+
+    ti.updateTaskProgress(task.id, 100, 'completed');
+
+    expect(reportEpisodeSpy).toHaveBeenCalledTimes(1);
+    const linkageArg = reportEpisodeSpy.mock.calls[0][7];
+
+    // Narrowed scope: deprecated keys NOT used because craftingSolveJoinKeys exists
+    expect(linkageArg.bundleHash).toBeUndefined();
+
+    // Restore env
+    if (originalEnv === undefined) {
+      delete process.env.JOIN_KEYS_DEPRECATED_COMPAT;
+    } else {
+      process.env.JOIN_KEYS_DEPRECATED_COMPAT = originalEnv;
+    }
+  });
+
+  it('classifies missing buildingPlanId warning as unexpected', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    const task = await ti.addTask(makeTaskData({
+      title: 'Build shelter',
+      type: 'building',
+      steps: [
+        { id: 'step-1', label: 'build_module:wall', done: true, order: 1, meta: { domain: 'building', moduleId: 'wall-1' } },
+      ],
+    }));
+
+    // Set up join keys but NO buildingPlanId
+    task.metadata.solver = {
+      buildingTemplateId: 'shelter-template',
+      // buildingPlanId is undefined
+      buildingSolveJoinKeys: {
+        planId: 'plan-A',
+        bundleHash: 'hash-A',
+      },
+    };
+
+    ti.updateTaskProgress(task.id, 100, 'completed');
+
+    expect(reportEpisodeSpy).toHaveBeenCalledTimes(1);
+    const linkageArg = reportEpisodeSpy.mock.calls[0][7];
+    expect(linkageArg.bundleHash).toBeUndefined();
+
+    // Warning should be classified as unexpected
+    const unexpectedWarnings = warnSpy.mock.calls.filter(
+      (call) => typeof call[0] === 'string' &&
+        call[0].includes('unexpected') &&
+        call[0].includes('buildingPlanId missing')
+    );
+    expect(unexpectedWarnings.length).toBeGreaterThan(0);
+
+    warnSpy.mockRestore();
+  });
+
+  it('classifies planId mismatch warning as expected under replans', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    const task = await ti.addTask(makeTaskData({
+      title: 'Build shelter',
+      type: 'building',
+      steps: [
+        { id: 'step-1', label: 'build_module:wall', done: true, order: 1, meta: { domain: 'building', moduleId: 'wall-1' } },
+      ],
+    }));
+
+    task.metadata.solver = {
+      buildingTemplateId: 'shelter-template',
+      buildingPlanId: 'plan-B',
+      buildingSolveJoinKeys: {
+        planId: 'plan-A',
+        bundleHash: 'hash-A',
+      },
+    };
+
+    ti.updateTaskProgress(task.id, 100, 'completed');
+
+    // Warning should be classified as expected under replans
+    const expectedWarnings = warnSpy.mock.calls.filter(
+      (call) => typeof call[0] === 'string' &&
+        call[0].includes('expected under replans') &&
+        call[0].includes('planId mismatch')
+    );
+    expect(expectedWarnings.length).toBeGreaterThan(0);
+
+    warnSpy.mockRestore();
+  });
+
+  it('reports linkage without hashes when buildingSolveJoinKeys is undefined', async () => {
+    const task = await ti.addTask(makeTaskData({
+      title: 'Build shelter',
+      type: 'building',
+      steps: [
+        { id: 'step-1', label: 'build_module:wall', done: false, order: 1, meta: { domain: 'building', moduleId: 'wall-1' } },
+      ],
+    }));
+
+    // Set up solver metadata with NO join keys (old task)
+    task.metadata.solver = {
+      buildingTemplateId: 'shelter-template',
+      buildingPlanId: 'plan-A',
+      // buildingSolveJoinKeys is undefined
+    };
+
+    // Trigger episode report via status update to 'failed'
+    ti.updateTaskProgress(task.id, 50, 'failed');
+
+    expect(reportEpisodeSpy).toHaveBeenCalledTimes(1);
+    const linkageArg = reportEpisodeSpy.mock.calls[0][7];
+
+    // Hashes should be undefined
+    expect(linkageArg.bundleHash).toBeUndefined();
+    expect(linkageArg.traceBundleHash).toBeUndefined();
+    // outcomeClass reflects failure
+    expect(linkageArg.outcomeClass).toBe('EXECUTION_FAILURE');
+  });
+
+  it('uses EXECUTION_FAILURE outcomeClass for failed tasks', async () => {
+    const task = await ti.addTask(makeTaskData({
+      title: 'Build shelter',
+      type: 'building',
+      steps: [
+        { id: 'step-1', label: 'build_module:wall', done: false, order: 1, meta: { domain: 'building', moduleId: 'wall-1' } },
+      ],
+    }));
+
+    task.metadata.solver = {
+      buildingTemplateId: 'shelter-template',
+      buildingPlanId: 'plan-A',
+      buildingSolveJoinKeys: {
+        planId: 'plan-A',
+        bundleHash: 'hash-A',
+      },
+    };
+
+    ti.updateTaskProgress(task.id, 50, 'failed');
+
+    expect(reportEpisodeSpy).toHaveBeenCalledTimes(1);
+    const linkageArg = reportEpisodeSpy.mock.calls[0][7];
+    expect(linkageArg.outcomeClass).toBe('EXECUTION_FAILURE');
+    expect(linkageArg.bundleHash).toBe('hash-A');
   });
 });

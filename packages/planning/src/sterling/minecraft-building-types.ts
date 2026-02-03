@@ -146,6 +146,8 @@ export interface BuildingSolveResult {
   planDecision?: import('../constraints/planning-decisions').PlanningDecision<
     import('../constraints/partial-order-plan').PartialOrderPlan<BuildingSolveStep>
   >;
+  /** Solve-time join keys for deferred episode reporting */
+  solveJoinKeys?: import('./solve-bundle-types').SolveJoinKeys;
 }
 
 // ============================================================================

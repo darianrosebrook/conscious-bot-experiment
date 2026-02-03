@@ -1,0 +1,59 @@
+.root {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+}
+
+.label {
+  font-size: 0.75rem;
+  line-height: 1rem;
+  color: rgb(161 161 170);
+  margin-bottom: 0.25rem;
+}
+
+.sublabel {
+  font-size: 10px;
+  color: rgb(113 113 122);
+  margin-bottom: 0.25rem;
+  max-width: 280px;
+  text-align: center;
+}
+
+.svg {
+  width: 100%;
+  height: 100%;
+}
+
+.hexPath {
+  cursor: pointer;
+  transition: opacity 150ms;
+
+  &:hover {
+    opacity: 0.8;
+  }
+}
+
+.tooltipBody {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+}
+
+.tooltipTitle {
+  font-weight: 500;
+}
+
+.tooltipDetail {
+  font-size: 11px;
+  color: rgb(161 161 170);
+}
+
+.tooltipDwell {
+  font-size: 11px;
+  color: rgb(113 113 122);
+}
+
+.axisLabel {
+  fill: rgb(113 113 122);
+}

@@ -1,10 +1,10 @@
 # Cognitive Architecture: Component Design & Rationale
 
+> **Status: Architectural overview (Jan 2026).** Some implementation details may have evolved since writing. See individual package READMEs in `docs/plans/modules/` and source code for current implementation.
+
 This document explains the design decisions behind our autonomous bot's cognitive architecture. Each component serves a specific purpose in creating a robust, learning system that can operate independently in Minecraft while maintaining safety and accountability.
 
 This section extends the "why" behind each architectural choice and makes the handoff from **brain → body** explicit, so plans reliably become actions. Where relevant, it borrows the **capability discipline** from MCP while keeping **behavior trees (BTs)** as our execution substrate.
-
-> **Last updated:** January 2026. Phase 2 integration gaps closed — see "Resolved Bugs" section at the end.
 
 ## Running Service Topology
 

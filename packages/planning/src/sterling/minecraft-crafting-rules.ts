@@ -37,10 +37,25 @@ interface McDataItem {
 }
 
 /** Minimal slice of minecraft-data we consume */
-interface McData {
+export interface McData {
   recipes: Record<number, McDataRecipe[]>;
   items: Record<number, McDataItem>;
   itemsByName: Record<string, McDataItem>;
+}
+
+/**
+ * Validate that a value is a structurally valid McData instance.
+ * Guards against truthy-but-malformed values (e.g. `{}` from metadata)
+ * that would pass a simple nullish check but crash on property access.
+ */
+export function isValidMcData(x: unknown): x is McData {
+  if (!x || typeof x !== 'object') return false;
+  const obj = x as Record<string, unknown>;
+  return (
+    typeof obj.recipes === 'object' && obj.recipes !== null &&
+    typeof obj.items === 'object' && obj.items !== null &&
+    typeof obj.itemsByName === 'object' && obj.itemsByName !== null
+  );
 }
 
 // ============================================================================
@@ -60,6 +75,14 @@ export function buildCraftingRules(
   goalItem: string,
   maxDepth = 8
 ): MinecraftCraftingRule[] {
+  if (!isValidMcData(mcData)) {
+    throw new Error(
+      'MISSING_MCDATA: buildCraftingRules requires a valid minecraft-data instance ' +
+      '(with recipes, items, itemsByName). ' +
+      'The planner must load mcData via getMcData() and pass it through the solver chain.',
+    );
+  }
+
   const rules = new Map<string, MinecraftCraftingRule>();
   const visited = new Set<string>();
 

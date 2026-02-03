@@ -7,9 +7,10 @@
  * - Availability gating
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { BaseDomainSolver, type BaseSolveResult } from '../base-domain-solver';
 import type { SterlingReasoningService } from '../sterling-reasoning-service';
+import type { EpisodeLinkage } from '../solve-bundle-types';
 
 // ---------------------------------------------------------------------------
 // Stub subclass
@@ -21,7 +22,7 @@ interface StubResult extends BaseSolveResult {
 
 class StubSolver extends BaseDomainSolver<StubResult> {
   readonly sterlingDomain = 'stub' as const;
-  readonly solverId = 'test.stub';
+  get solverId() { return 'test.stub'; }
 
   protected makeUnavailableResult(): StubResult {
     return {
@@ -46,8 +47,8 @@ class StubSolver extends BaseDomainSolver<StubResult> {
     return this.extractPlanId(result);
   }
 
-  public testReportEpisode(payload: Record<string, unknown>): void {
-    this.reportEpisode(payload);
+  public testReportEpisode(payload: Record<string, unknown>, linkage?: EpisodeLinkage): Promise<any> {
+    return this.reportEpisode(payload, linkage);
   }
 }
 
@@ -66,6 +67,8 @@ function createMockService() {
       metrics: {},
       durationMs: 0,
     }),
+    getConnectionNonce: vi.fn().mockReturnValue(1),
+    registerDomainDeclaration: vi.fn().mockResolvedValue({ success: true }),
   } as unknown as SterlingReasoningService;
 }
 
@@ -200,5 +203,168 @@ describe('BaseDomainSolver', () => {
     expect(solver.solverId).toBe('test.stub');
     expect(solver.sterlingDomain).toBe('stub');
     expect(solver.contractVersion).toBe(1);
+  });
+});
+
+// ===========================================================================
+// Phase 1 Identity Field Toggle Tests
+// ===========================================================================
+
+describe('BaseDomainSolver Phase 1 identity fields', () => {
+  let service: SterlingReasoningService;
+  let solver: StubSolver;
+  const originalEnv = process.env.STERLING_REPORT_IDENTITY_FIELDS;
+
+  beforeEach(() => {
+    service = createMockService();
+    solver = new StubSolver(service);
+    // Reset toggle
+    delete process.env.STERLING_REPORT_IDENTITY_FIELDS;
+  });
+
+  afterEach(() => {
+    // Restore original env
+    if (originalEnv !== undefined) {
+      process.env.STERLING_REPORT_IDENTITY_FIELDS = originalEnv;
+    } else {
+      delete process.env.STERLING_REPORT_IDENTITY_FIELDS;
+    }
+  });
+
+  it('does NOT include identity fields when toggle is OFF (default)', async () => {
+    // Toggle OFF by default (env var not set)
+    const linkage: EpisodeLinkage = {
+      bundleHash: 'b-hash',
+      traceBundleHash: 't-hash',
+      outcomeClass: 'EXECUTION_SUCCESS',
+      engineCommitment: 'engine-v1',
+      operatorRegistryHash: 'registry-v1',
+    };
+
+    await solver.testReportEpisode({ planId: 'plan-1', success: true }, linkage);
+
+    const call = (service.solve as ReturnType<typeof vi.fn>).mock.calls[0];
+    expect(call[1]).toMatchObject({
+      command: 'report_episode',
+      bundle_hash: 'b-hash',
+      trace_bundle_hash: 't-hash',
+      outcome_class: 'EXECUTION_SUCCESS',
+    });
+    // Identity fields should NOT be present
+    expect(call[1]).not.toHaveProperty('engine_commitment');
+    expect(call[1]).not.toHaveProperty('operator_registry_hash');
+  });
+
+  it('includes identity fields when toggle is ON', async () => {
+    process.env.STERLING_REPORT_IDENTITY_FIELDS = '1';
+
+    // Use a different solverId to avoid latch interference
+    class StubPhase1 extends StubSolver {
+      override get solverId() { return 'test.stub.phase1'; }
+    }
+    const solver2 = new StubPhase1(service);
+
+    const linkage: EpisodeLinkage = {
+      bundleHash: 'b-hash-2',
+      traceBundleHash: 't-hash-2',
+      outcomeClass: 'EXECUTION_SUCCESS',
+      engineCommitment: 'engine-v2',
+      operatorRegistryHash: 'registry-v2',
+    };
+
+    await solver2.testReportEpisode({ planId: 'plan-2', success: true }, linkage);
+
+    const call = (service.solve as ReturnType<typeof vi.fn>).mock.calls[0];
+    expect(call[1]).toMatchObject({
+      command: 'report_episode',
+      bundle_hash: 'b-hash-2',
+      trace_bundle_hash: 't-hash-2',
+      outcome_class: 'EXECUTION_SUCCESS',
+      engine_commitment: 'engine-v2',
+      operator_registry_hash: 'registry-v2',
+    });
+  });
+
+  it('still sends core linkage fields even when identity fields are undefined', async () => {
+    process.env.STERLING_REPORT_IDENTITY_FIELDS = '1';
+
+    // Use a different solverId
+    class StubCoreOnly extends StubSolver {
+      override get solverId() { return 'test.stub.core-only'; }
+    }
+    const solver3 = new StubCoreOnly(service);
+
+    const linkage: EpisodeLinkage = {
+      bundleHash: 'b-core',
+      traceBundleHash: 't-core',
+      outcomeClass: 'EXECUTION_FAILURE',
+      // No engineCommitment or operatorRegistryHash
+    };
+
+    await solver3.testReportEpisode({ planId: 'plan-3', success: false }, linkage);
+
+    const call = (service.solve as ReturnType<typeof vi.fn>).mock.calls[0];
+    expect(call[1]).toMatchObject({
+      command: 'report_episode',
+      bundle_hash: 'b-core',
+      trace_bundle_hash: 't-core',
+      outcome_class: 'EXECUTION_FAILURE',
+    });
+    // Fields not present because linkage didn't have them
+    expect(call[1]).not.toHaveProperty('engine_commitment');
+    expect(call[1]).not.toHaveProperty('operator_registry_hash');
+  });
+
+  it('downgrades and latches when Sterling rejects unknown fields', async () => {
+    process.env.STERLING_REPORT_IDENTITY_FIELDS = '1';
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    // Use a different solverId for this test
+    class StubDowngrade extends StubSolver {
+      override get solverId() { return 'test.stub.downgrade'; }
+    }
+    const solver4 = new StubDowngrade(service);
+
+    // First call: reject with "unknown field" error
+    (service.solve as ReturnType<typeof vi.fn>)
+      .mockRejectedValueOnce(new Error('validation error: unknown field engine_commitment'))
+      .mockResolvedValueOnce({
+        solutionFound: false,
+        solutionPath: [],
+        discoveredNodes: [],
+        searchEdges: [],
+        metrics: { episode_hash: 'ep-123' },
+        durationMs: 0,
+      });
+
+    const linkage: EpisodeLinkage = {
+      bundleHash: 'b-downgrade',
+      engineCommitment: 'engine-rejected',
+      operatorRegistryHash: 'registry-rejected',
+    };
+
+    const result = await solver4.testReportEpisode({ planId: 'plan-4', success: true }, linkage);
+
+    // Should have called solve twice (first with fields, then without)
+    expect(service.solve).toHaveBeenCalledTimes(2);
+
+    // First call included identity fields
+    const firstCall = (service.solve as ReturnType<typeof vi.fn>).mock.calls[0];
+    expect(firstCall[1]).toHaveProperty('engine_commitment', 'engine-rejected');
+
+    // Second call did NOT include identity fields
+    const secondCall = (service.solve as ReturnType<typeof vi.fn>).mock.calls[1];
+    expect(secondCall[1]).not.toHaveProperty('engine_commitment');
+    expect(secondCall[1]).not.toHaveProperty('operator_registry_hash');
+
+    // Should have logged downgrade warning
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining('Identity fields rejected for test.stub.downgrade')
+    );
+
+    // Result should still return the ack from retry
+    expect(result).toEqual({ episodeHash: 'ep-123', requestId: undefined });
+
+    warnSpy.mockRestore();
   });
 });

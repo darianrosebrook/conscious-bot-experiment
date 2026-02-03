@@ -1,5 +1,7 @@
 # Rig J: Invariant Maintenance — Companion Approach
 
+**Implementation**: Partial — goal-hold-manager, periodic-review, preemption-budget exist in `planning/goals/`
+
 This companion document distills the implementation plan with design decisions, boundaries, and implementation construction constraints. Read alongside `RIG_J_INVARIANT_MAINTENANCE_PLAN.md`.
 
 ---

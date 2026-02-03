@@ -9,10 +9,13 @@
 
 import { NextRequest } from 'next/server';
 
+const PLANNING_URL =
+  process.env.PLANNING_SERVICE_URL || 'http://localhost:3002';
+
 export async function GET(_req: NextRequest) {
   try {
     // Fetch goals from planning server
-    const response = await fetch('http://localhost:3002/state', {
+    const response = await fetch(`${PLANNING_URL}/state`, {
       headers: {
         Accept: 'application/json',
       },
@@ -60,7 +63,7 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
 
     // Forward goal creation to planning server
-    const response = await fetch('http://localhost:3002/goal', {
+    const response = await fetch(`${PLANNING_URL}/goal`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

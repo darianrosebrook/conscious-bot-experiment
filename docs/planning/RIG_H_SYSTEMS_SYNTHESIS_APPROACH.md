@@ -1,5 +1,7 @@
 # Rig H: Systems Synthesis — Companion Approach
 
+**Implementation**: Not started — spec only
+
 This companion document distills the implementation plan with design decisions, boundaries, and implementation construction constraints. Read alongside `RIG_H_SYSTEMS_SYNTHESIS_PLAN.md`.
 
 ---

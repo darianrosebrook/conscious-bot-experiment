@@ -60,18 +60,23 @@ export class SterlingReasoningService {
   private enabled: boolean;
   private initialized = false;
 
+  /** Monotonically incrementing nonce — incremented on each (re)connect. */
+  private _connectionNonce = 0;
+
   constructor(config: SterlingReasoningConfig = {}) {
     this.enabled = config.enabled ?? (process.env.STERLING_ENABLED !== 'false');
     this.client = new SterlingClient(config);
 
     // Forward client events
     this.client.on('connected', () => {
+      this._connectionNonce++;
       console.log('[Sterling] Connected to reasoning server');
     });
     this.client.on('disconnected', ({ code, reason }: { code: number; reason: string }) => {
       console.log(`[Sterling] Disconnected (code=${code}, reason=${reason})`);
     });
     this.client.on('reconnected', ({ attempts }: { attempts: number }) => {
+      this._connectionNonce++;
       console.log(`[Sterling] Reconnected after ${attempts} attempt(s)`);
     });
     this.client.on('reconnect_failed', ({ attempts }: { attempts: number }) => {
@@ -127,6 +132,17 @@ export class SterlingReasoningService {
       enabled: this.enabled,
       ...this.client.getHealthStatus(),
     };
+  }
+
+  /**
+   * Connection-scoped nonce for declaration registration.
+   *
+   * Incremented on each successful connect/reconnect. Solvers compare their
+   * stored registration nonce against this value to decide whether to
+   * re-register after a reconnection.
+   */
+  getConnectionNonce(): number {
+    return this._connectionNonce;
   }
 
   // --------------------------------------------------------------------------
@@ -306,8 +322,10 @@ export class SterlingReasoningService {
     }
     // Compute digest locally if caller omitted it, so the server always
     // receives a digest and can verify canonicalization parity.
+    // TODO: Validate declaration shape at this boundary instead of trusting the cast.
+    // The caller passes Record<string, unknown>; we trust it conforms to DomainDeclarationV1.
     const effectiveDigest = digest ?? computeDeclarationDigest(
-      declaration as DomainDeclarationV1,
+      declaration as unknown as DomainDeclarationV1,
     );
     return this.client.registerDomainDeclaration(declaration, effectiveDigest);
   }

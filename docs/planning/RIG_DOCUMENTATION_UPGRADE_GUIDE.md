@@ -1,5 +1,7 @@
 # Rig Documentation Upgrade Guide
 
+> **Status: Process guide.** All targeted rigs have been upgraded to ENRICHED status. Use when new rigs are added or when implementation gaps require doc updates.
+
 This guide documents the engineering rigor applied to Rig I-ext (P21) and how to maintain consistency across all rig companion documents. Use this when creating or updating rig documentation.
 
 ---

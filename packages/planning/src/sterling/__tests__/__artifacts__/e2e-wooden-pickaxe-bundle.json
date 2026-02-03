@@ -1,7 +1,7 @@
 {
-  "bundleId": "minecraft.tool_progression:a7e5f97dddae42a9",
-  "bundleHash": "a7e5f97dddae42a9",
-  "timestamp": 1770023549353,
+  "bundleId": "minecraft.tool_progression:b028cdba21a314f8",
+  "bundleHash": "b028cdba21a314f8",
+  "timestamp": 1770077373230,
   "input": {
     "solverId": "minecraft.tool_progression",
     "executionMode": "tool_progression",
@@ -21,26 +21,26 @@
     "objectiveWeightsSource": "default"
   },
   "output": {
-    "planId": "9b632f45a5c2f8bc",
+    "planId": "47a3d2a1caea7eaf",
     "solved": true,
     "stepsDigest": "270c723b6b0c141e",
     "searchStats": {
-      "totalNodes": 130,
-      "durationMs": 20,
+      "totalNodes": 98,
+      "durationMs": 15,
       "solutionPathLength": 8
     },
     "searchHealth": {
-      "nodesExpanded": 66,
-      "frontierPeak": 64,
+      "nodesExpanded": 50,
+      "frontierPeak": 48,
       "hMin": 0,
       "hMax": 1,
-      "hMean": 0.9848484848484849,
-      "hVariance": 0.01492194674012856,
+      "hMean": 0.98,
+      "hVariance": 0.0196,
       "fMin": 1,
       "fMax": 13.5,
-      "pctSameH": 0.9848484848484849,
+      "pctSameH": 0.98,
       "terminationReason": "goal_found",
-      "branchingEstimate": 2.8636363636363638,
+      "branchingEstimate": 3,
       "searchHealthVersion": 1
     },
     "rationale": {
@@ -54,9 +54,9 @@
         "objectiveWeightsSource": "default"
       },
       "searchEffort": {
-        "nodesExpanded": 66,
-        "frontierPeak": 64,
-        "branchingEstimate": 2.8636363636363638
+        "nodesExpanded": 50,
+        "frontierPeak": 48,
+        "branchingEstimate": 3
       },
       "searchTermination": {
         "terminationReason": "goal_found",
@@ -70,12 +70,18 @@
         "issueCount": 0,
         "errorCodes": []
       }
+    },
+    "sterlingIdentity": {
+      "traceBundleHash": "44c479b788cc0737c86f64859b70234e34c747fe3e9be9734ef6724407833eec",
+      "engineCommitment": "fd8ed7e62e04c50aab0eaa14597d5411d34f7b3bae29f95926d61ee6de2d7828",
+      "operatorRegistryHash": "d6590a986f022faf77acda6bdb0f89508e021abfecae03141d87d0abcb5398a1",
+      "bindingHash": "5c155ed230c8cb00"
     }
   },
   "compatReport": {
     "valid": true,
     "issues": [],
-    "checkedAt": 1770023549323,
+    "checkedAt": 1770077373206,
     "definitionCount": 6
   }
 }

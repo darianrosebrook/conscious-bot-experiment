@@ -19,6 +19,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { MinecraftAcquisitionSolver } from '../minecraft-acquisition-solver';
 import type { MinecraftCraftingSolver } from '../minecraft-crafting-solver';
+import { isValidMcData, type McData } from '../minecraft-crafting-rules';
 import type { SterlingReasoningService } from '../sterling-reasoning-service';
 import { hashInventoryState } from '../solve-bundle';
 
@@ -37,6 +38,8 @@ function makeMockService(overrides: Partial<SterlingReasoningService> = {}): Ste
       durationMs: 100,
       metrics: {},
     }),
+    getConnectionNonce: vi.fn().mockReturnValue(1),
+    registerDomainDeclaration: vi.fn().mockResolvedValue({ success: true }),
     ...overrides,
   } as any;
 }
@@ -85,6 +88,14 @@ const baseEntities = [
   { type: 'villager', distance: 10 },
   { type: 'chest', distance: 20 },
 ];
+
+/** Minimal mock mcData — satisfies McData interface for gate checks.
+ *  Crafting solver is mocked, so recipes are never actually read. */
+const mockMcData: McData = {
+  recipes: {},
+  items: {},
+  itemsByName: {},
+};
 
 // ── Tests ──────────────────────────────────────────────────────────────────
 
@@ -190,6 +201,8 @@ describe('MinecraftAcquisitionSolver', () => {
       { 'cap:has_wooden_pickaxe': 1 },
       ['stone'],    // stone block can produce cobblestone
       [],           // No villager/chest
+      undefined,    // options
+      mockMcData,   // mcData required for mine strategy gate
     );
     expect(result.solved).toBe(true);
     expect(result.selectedStrategy).toBe('mine');
@@ -272,6 +285,8 @@ describe('MinecraftAcquisitionSolver', () => {
       { 'cap:has_wooden_pickaxe': 1 },
       ['stone'],
       [],
+      undefined,    // options
+      mockMcData,   // mcData required for mine strategy gate
     );
     expect(result.solved).toBe(true);
     expect(result.selectedStrategy).toBe('mine');
@@ -289,6 +304,8 @@ describe('MinecraftAcquisitionSolver', () => {
       { 'cap:has_wooden_pickaxe': 1 },
       ['stone'],
       [],
+      undefined,    // options
+      mockMcData,   // mcData required for mine strategy gate
     );
     expect(result.parentBundleId).toBeTruthy();
     expect(result.parentBundleId).toBe(result.solveMeta!.bundles[0].bundleId);
@@ -300,6 +317,8 @@ describe('MinecraftAcquisitionSolver', () => {
       { 'cap:has_wooden_pickaxe': 1 },
       ['stone'],
       [],
+      undefined,    // options
+      mockMcData,   // mcData required for mine strategy gate
     );
     // Parent bundle is first, child crafting bundle follows
     expect(result.solveMeta!.bundles.length).toBeGreaterThanOrEqual(2);
@@ -307,6 +326,63 @@ describe('MinecraftAcquisitionSolver', () => {
     const childBundle = result.solveMeta!.bundles[1];
     expect(parentBundle.bundleId).toContain('minecraft.acquisition');
     expect(childBundle.bundleId).toContain('minecraft.crafting');
+  });
+
+  // ── mcData dependency gate ────────────────────────────────────────────
+
+  it('mine strategy is excluded when mcData is absent', async () => {
+    // cobblestone + stone nearby would normally select mine.
+    // Without mcData, mine is gated out before digest computation.
+    const result = await solver.solveAcquisition(
+      'cobblestone', 1,
+      { 'cap:has_wooden_pickaxe': 1 },
+      ['stone'],
+      [],
+      // options and mcData both omitted
+    );
+
+    // Mine was not selected
+    expect(result.selectedStrategy).not.toBe('mine');
+    // strategyRanking should not contain mine
+    expect(result.strategyRanking.map(c => c.strategy)).not.toContain('mine');
+    // candidateSetDigest is still computed (for the filtered set)
+    expect(result.candidateSetDigest).toMatch(/^[0-9a-f]{16}$/);
+  });
+
+  it('mine strategy is included when mcData is provided', async () => {
+    const result = await solver.solveAcquisition(
+      'cobblestone', 1,
+      { 'cap:has_wooden_pickaxe': 1 },
+      ['stone'],
+      [],
+      undefined,
+      mockMcData,
+    );
+
+    // Mine was selected and the candidate set includes it
+    expect(result.selectedStrategy).toBe('mine');
+    expect(result.strategyRanking.map(c => c.strategy)).toContain('mine');
+  });
+
+  it('candidateSetDigest differs with and without mcData (gate changes viable set)', async () => {
+    const withMcData = await solver.solveAcquisition(
+      'cobblestone', 1,
+      { 'cap:has_wooden_pickaxe': 1 },
+      ['stone'],
+      [],
+      undefined,
+      mockMcData,
+    );
+    const withoutMcData = await solver.solveAcquisition(
+      'cobblestone', 1,
+      { 'cap:has_wooden_pickaxe': 1 },
+      ['stone'],
+      [],
+      // mcData omitted
+    );
+
+    // Digests differ because the candidate sets differ (mine present vs absent)
+    expect(withMcData.candidateSetDigest).not.toBe(withoutMcData.candidateSetDigest);
   });
 
   // ── Context token injection ───────────────────────────────────────────
@@ -420,6 +496,23 @@ describe('MinecraftAcquisitionSolver', () => {
     );
   });
 
+  it('mine strategy is excluded when mcData is {} (malformed metadata)', async () => {
+    // {} is truthy but structurally invalid — isValidMcData rejects it.
+    // Must behave identically to undefined: mine gated out, no null-deref.
+    const result = await solver.solveAcquisition(
+      'cobblestone', 1,
+      { 'cap:has_wooden_pickaxe': 1 },
+      ['stone'],
+      [],
+      undefined,
+      {} as any, // truthy but malformed
+    );
+
+    expect(result.selectedStrategy).not.toBe('mine');
+    expect(result.strategyRanking.map(c => c.strategy)).not.toContain('mine');
+    expect(result.candidateSetDigest).toMatch(/^[0-9a-f]{16}$/);
+  });
+
   it('toTaskSteps converts solved result to steps', async () => {
     const result = await solver.solveAcquisition(
       'iron_ingot', 1,
@@ -432,5 +525,39 @@ describe('MinecraftAcquisitionSolver', () => {
       expect(steps.length).toBeGreaterThan(0);
       expect(steps[0].meta?.domain).toBe('acquisition');
     }
+  });
+});
+
+// ── isValidMcData predicate ─────────────────────────────────────────────
+
+describe('isValidMcData', () => {
+  it('accepts a well-formed McData object', () => {
+    expect(isValidMcData({ recipes: {}, items: {}, itemsByName: {} })).toBe(true);
+  });
+
+  it('rejects null', () => {
+    expect(isValidMcData(null)).toBe(false);
+  });
+
+  it('rejects undefined', () => {
+    expect(isValidMcData(undefined)).toBe(false);
+  });
+
+  it('rejects empty object (truthy but malformed)', () => {
+    expect(isValidMcData({})).toBe(false);
+  });
+
+  it('rejects partial object (missing itemsByName)', () => {
+    expect(isValidMcData({ recipes: {}, items: {} })).toBe(false);
+  });
+
+  it('rejects object where a required field is null', () => {
+    expect(isValidMcData({ recipes: {}, items: null, itemsByName: {} })).toBe(false);
+  });
+
+  it('rejects non-object types', () => {
+    expect(isValidMcData('string')).toBe(false);
+    expect(isValidMcData(42)).toBe(false);
+    expect(isValidMcData(true)).toBe(false);
   });
 });

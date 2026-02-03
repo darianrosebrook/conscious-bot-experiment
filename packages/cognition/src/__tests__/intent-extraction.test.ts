@@ -111,6 +111,27 @@ describe('extractIntent', () => {
     expect(result.intentParse).toBe('inline_noncompliant');
     expect(result.text).not.toContain('INTENT');
   });
+
+  it('preserves newlines when stripping inline INTENT', () => {
+    const input = 'Line one.\nINTENT: gather\nLine three.';
+    const result = extractIntent(input);
+    expect(result.intent).toBe('gather');
+    expect(result.intentParse).toBe('inline_noncompliant');
+    // Newline between line one and line three must survive
+    expect(result.text).toContain('\n');
+    expect(result.text).toMatch(/Line one\.\s*\nLine three\./);
+  });
+
+  it('preserves multi-line structure with inline INTENT mid-paragraph', () => {
+    const input = 'First paragraph.\n\nINTENT: explore\n\nSecond paragraph.';
+    const result = extractIntent(input);
+    expect(result.intent).toBe('explore');
+    expect(result.intentParse).toBe('inline_noncompliant');
+    // Double newline (paragraph break) must survive
+    expect(result.text).toContain('\n\n');
+    expect(result.text).toContain('First paragraph.');
+    expect(result.text).toContain('Second paragraph.');
+  });
 });
 
 describe('sanitizeLLMOutput with INTENT', () => {

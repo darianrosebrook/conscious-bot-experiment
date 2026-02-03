@@ -93,7 +93,7 @@ export function parseBotConfigFromArgs(args: string[]): Partial<BotConfig> {
         config.version = args[++i];
         break;
       case '--auth':
-        config.auth = args[++i] as 'mojang' | 'offline';
+        config.auth = args[++i] as 'microsoft' | 'offline';
         break;
       case '--timeout':
         const timeout = parseInt(args[++i]);

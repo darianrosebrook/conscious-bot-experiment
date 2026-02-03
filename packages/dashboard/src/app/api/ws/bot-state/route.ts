@@ -433,21 +433,44 @@ export const GET = async (req: NextRequest) => {
  */
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json();
+    const raw = await req.text();
+    if (!raw?.trim()) {
+      return new Response(
+        JSON.stringify({ success: false, error: 'Empty body' }),
+        { status: 400, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
+    let body: unknown;
+    try {
+      body = JSON.parse(raw);
+    } catch {
+      return new Response(
+        JSON.stringify({ success: false, error: 'Invalid JSON' }),
+        { status: 400, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const b = body as {
+      type?: string;
+      timestamp?: number;
+      data?: unknown;
+      cognition?: unknown;
+      environment?: unknown;
+    };
     let payload: { type: string; timestamp: number; data: unknown };
 
-    if (body?.type === 'bot_state_update' && body?.data != null) {
+    if (b?.type === 'bot_state_update' && b?.data != null) {
       payload = {
         type: 'bot_state_update',
-        timestamp: body.timestamp ?? Date.now(),
-        data: body.data,
+        timestamp: b.timestamp ?? Date.now(),
+        data: b.data,
       };
-    } else if (body?.data != null) {
-      const m = body.data as MinecraftStateResponse;
+    } else if (b?.data != null) {
+      const m = b.data as MinecraftStateResponse;
       payload = buildBotStatePayload(
         m,
-        body.cognition ?? null,
-        body.environment ?? null
+        b.cognition ?? null,
+        b.environment ?? null
       );
     } else {
       return new Response(

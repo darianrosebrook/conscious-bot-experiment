@@ -74,6 +74,17 @@ const sterlingAvailable =
   fs.existsSync(sterlingPython) &&
   fs.existsSync(sterlingScript);
 
+// UMAP service path (for embedding visualization)
+const umapDir = path.join(projectRoot, 'umap-service');
+const umapVenv = path.join(umapDir, 'venv');
+const umapPython = path.join(umapVenv, 'bin', 'python');
+const umapScript = path.join(umapDir, 'umap_server.py');
+const umapRequirements = path.join(umapDir, 'requirements.txt');
+const umapAvailable =
+  fs.existsSync(umapDir) &&
+  fs.existsSync(umapScript) &&
+  fs.existsSync(umapRequirements);
+
 // Load .env file if present
 const envPath = path.join(path.dirname(__dirname), '.env');
 if (fs.existsSync(envPath)) {
@@ -222,6 +233,23 @@ if (sterlingAvailable) {
   });
 }
 
+// UMAP service for embedding visualization (optional - only if venv exists)
+const umapVenvExists = fs.existsSync(umapPython);
+if (umapAvailable && umapVenvExists) {
+  services.push({
+    name: 'UMAP Service',
+    command: umapPython,
+    args: [umapScript],
+    port: 5003,
+    healthUrl: 'http://localhost:5003/health',
+    description:
+      'UMAP dimensionality reduction service for embedding visualization',
+    priority: 2,
+    dependencies: [],
+    cwd: umapDir,
+  });
+}
+
 // Utility functions with output mode support
 function log(message, color = colors.reset) {
   if (OUTPUT_MODE === 'quiet') return;
@@ -273,6 +301,7 @@ function getServiceColor(serviceName) {
     Planning: colors.red,
     'MLX-LM Sidecar': colors.purple,
     Sterling: colors.cyan,
+    'UMAP Service': colors.purple,
   };
   return colorMap[serviceName] || colors.reset;
 }
@@ -595,6 +624,57 @@ print('OK')
   }
 }
 
+async function setupUMAPEnvironment() {
+  log('\nSetting up UMAP service environment...', colors.purple);
+
+  if (!umapAvailable) {
+    log(
+      ' ⚠️  umap-service directory not found, skipping UMAP setup',
+      colors.yellow
+    );
+    return;
+  }
+
+  // Create virtual environment if it doesn't exist
+  if (!fs.existsSync(umapVenv)) {
+    log(' 📦 Creating UMAP virtual environment...', colors.purple);
+    try {
+      execSync(`cd ${umapDir} && python3 -m venv venv`, {
+        stdio: 'inherit',
+      });
+      log(' UMAP virtual environment created', colors.green);
+    } catch (error) {
+      log(' Failed to create UMAP virtual environment', colors.red);
+      return;
+    }
+  } else {
+    log(' UMAP virtual environment already exists', colors.green);
+  }
+
+  // Install Python dependencies
+  log(' Installing UMAP dependencies...', colors.purple);
+  try {
+    const pipStdio =
+      OUTPUT_MODE === 'quiet' || OUTPUT_MODE === 'production'
+        ? 'pipe'
+        : 'inherit';
+    execSync(`cd ${umapDir} && ./venv/bin/pip install -q --upgrade pip`, {
+      stdio: pipStdio,
+      shell: true,
+    });
+    execSync(
+      `cd ${umapDir} && ./venv/bin/pip install -q -r requirements.txt`,
+      {
+        stdio: pipStdio,
+        shell: true,
+      }
+    );
+    log(' UMAP dependencies installed', colors.green);
+  } catch (error) {
+    log(' Failed to install UMAP dependencies', colors.red);
+  }
+}
+
 // Docker compose management
 async function startDockerServices() {
   log('\n🐳 Starting Docker services...', colors.cyan);
@@ -721,6 +801,30 @@ async function mainWithProgress() {
         },
       },
       {
+        title: 'UMAP Service',
+        skip: () => !umapAvailable,
+        task: async (ctx, task) => {
+          if (!fs.existsSync(umapVenv)) {
+            task.output = 'Creating virtual environment...';
+            execSync(`cd ${umapDir} && python3 -m venv venv`, {
+              stdio: 'pipe',
+            });
+          }
+
+          task.output = 'Installing dependencies...';
+          execSync(
+            `cd ${umapDir} && ./venv/bin/pip install -q --upgrade pip`,
+            { stdio: 'pipe' }
+          );
+          execSync(
+            `cd ${umapDir} && ./venv/bin/pip install -q -r requirements.txt`,
+            { stdio: 'pipe' }
+          );
+
+          task.title = 'UMAP Service (Ready)';
+        },
+      },
+      {
         title: 'Docker Services',
         skip: () => process.argv.includes('--skip-docker'),
         task: async (ctx, task) => {
@@ -743,6 +847,7 @@ async function mainWithProgress() {
             'python3.*mlx_server.py',
             'mlx_server.py',
             'sterling_unified_server.py',
+            'umap_server.py',
           ];
           for (const pattern of processPatterns) {
             killProcessesByPattern(pattern);
@@ -896,6 +1001,9 @@ async function mainVerbose() {
   // Step 3: Setup MLX-LM sidecar environment
   await setupMLXEnvironment();
 
+  // Step 3a: Setup UMAP service environment (for embedding visualization)
+  await setupUMAPEnvironment();
+
   // Step 3b: Start Docker services (Postgres + Minecraft)
   const skipDocker = process.argv.includes('--skip-docker');
   if (skipDocker) {
@@ -916,6 +1024,7 @@ async function mainVerbose() {
     'python3.*mlx_server.py',
     'mlx_server.py',
     'sterling_unified_server.py',
+    'umap_server.py',
   ];
 
   for (const pattern of processPatterns) {

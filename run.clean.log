@@ -1,0 +1,4305 @@
+
+> conscious-bot@0.1.0 start /Users/darianrosebrook/Desktop/Projects/conscious-bot
+> node scripts/start.js
+
+ Loaded environment from .env
+
+Conscious Bot System
+========================
+
+Checking system requirements...
+ Node.js v22.19.0 is supported
+ pnpm is available
+
+Setting up MLX-LM sidecar environment...
+ MLX virtual environment already exists
+ Installing MLX dependencies...
+ MLX dependencies installed
+ Verifying MLX model cache...
+ MLX models are cached locally
+
+🐳 Starting Docker services...
+ Docker compose started
+ ⏳ Waiting for Postgres...
+ Postgres is ready
+ Minecraft server is ready
+
+Cleaning up existing processes...
+
+Checking port availability...
+[2026-02-03T01:24:08.593Z] [Core API] [INFO] Port 3007 is available
+[2026-02-03T01:24:08.733Z] [Memory] [INFO] Port 3001 is available
+[2026-02-03T01:24:08.836Z] [World] [INFO] Port 3004 is available
+[2026-02-03T01:24:08.942Z] [Cognition] [INFO] Port 3003 is available
+[2026-02-03T01:24:09.046Z] [Planning] [INFO] Port 3002 is available
+[2026-02-03T01:24:09.153Z] [Minecraft Interface] [INFO] Port 3005 is available
+[2026-02-03T01:24:09.259Z] [MLX-LM Sidecar] [INFO] Port 5002 is available
+[2026-02-03T01:24:09.362Z] [Dashboard] [INFO] Port 3000 is available
+[2026-02-03T01:24:09.465Z] [Sterling] [INFO] Port 8766 is available
+
+Installing Node.js dependencies...
+Scope: all 13 workspace projects
+Lockfile is up to date, resolution step is skipped
+Already up to date
+
+packages/minecraft-interface postinstall$ node scripts/rebuild-prismarine-viewer.cjs 2>/dev/null || true
+packages/minecraft-interface postinstall: Done
+Done in 8.3s using pnpm v10.15.0
+ Node.js dependencies installed
+
+Building packages...
+
+> conscious-bot@0.1.0 build /Users/darianrosebrook/Desktop/Projects/conscious-bot
+> turbo build
+
+• Packages in scope: @conscious-bot/cognition, @conscious-bot/core, @conscious-bot/dashboard, @conscious-bot/evaluation, @conscious-bot/executor-contracts, @conscious-bot/mcp-server, @conscious-bot/memory, @conscious-bot/minecraft-interface, @conscious-bot/planning, @conscious-bot/safety, @conscious-bot/testkits, @conscious-bot/world
+• Running build in 12 packages
+• Remote caching disabled
+@conscious-bot/executor-contracts:build: cache hit, replaying logs 87c26469bb8fa440
+@conscious-bot/executor-contracts:build: 
+@conscious-bot/executor-contracts:build: 
+@conscious-bot/executor-contracts:build: > @conscious-bot/executor-contracts@1.0.0 build /Users/darianrosebrook/Desktop/Projects/conscious-bot/packages/executor-contracts
+@conscious-bot/executor-contracts:build: > tsc
+@conscious-bot/executor-contracts:build: 
+@conscious-bot/mcp-server:build: cache hit, replaying logs 47f1ce7d0831a9e8
+@conscious-bot/mcp-server:build: 
+@conscious-bot/mcp-server:build: 
+@conscious-bot/mcp-server:build: > @conscious-bot/mcp-server@0.1.0 build /Users/darianrosebrook/Desktop/Projects/conscious-bot/packages/mcp-server
+@conscious-bot/mcp-server:build: > tsc
+@conscious-bot/mcp-server:build: 
+@conscious-bot/safety:build: cache hit, replaying logs a9eee9b40eb3aded
+@conscious-bot/safety:build: 
+@conscious-bot/safety:build: 
+@conscious-bot/safety:build: > @conscious-bot/safety@0.1.0 build /Users/darianrosebrook/Desktop/Projects/conscious-bot/packages/safety
+@conscious-bot/safety:build: > tsc
+@conscious-bot/safety:build: 
+@conscious-bot/world:build: cache hit, replaying logs 95d81cbfb56dd8ce
+@conscious-bot/world:build: 
+@conscious-bot/world:build: 
+@conscious-bot/world:build: > @conscious-bot/world@0.1.0 build /Users/darianrosebrook/Desktop/Projects/conscious-bot/packages/world
+@conscious-bot/world:build: > tsc
+@conscious-bot/world:build: 
+@conscious-bot/core:build: cache hit, replaying logs 07c53d892bb65839
+@conscious-bot/core:build: 
+@conscious-bot/core:build: 
+@conscious-bot/core:build: > @conscious-bot/core@0.1.0 build /Users/darianrosebrook/Desktop/Projects/conscious-bot/packages/core
+@conscious-bot/core:build: > tsc
+@conscious-bot/core:build: 
+@conscious-bot/memory:build: cache hit, replaying logs b4d9bf21376ca2fc
+@conscious-bot/memory:build: 
+@conscious-bot/memory:build: 
+@conscious-bot/memory:build: > @conscious-bot/memory@0.1.0 build /Users/darianrosebrook/Desktop/Projects/conscious-bot/packages/memory
+@conscious-bot/memory:build: > tsc
+@conscious-bot/memory:build: 
+@conscious-bot/cognition:build: cache miss, executing 0d5b2dca898f3788
+@conscious-bot/cognition:build: 
+@conscious-bot/cognition:build: > @conscious-bot/cognition@0.1.0 build /Users/darianrosebrook/Desktop/Projects/conscious-bot/packages/cognition
+@conscious-bot/cognition:build: > tsc
+@conscious-bot/cognition:build: 
+@conscious-bot/planning:build: cache miss, executing e821c93f2d533d12
+@conscious-bot/planning:build: 
+@conscious-bot/planning:build: > @conscious-bot/planning@0.1.0 build /Users/darianrosebrook/Desktop/Projects/conscious-bot/packages/planning
+@conscious-bot/planning:build: > tsc --build --force
+@conscious-bot/planning:build: 
+@conscious-bot/testkits:build: cache miss, executing f23ef37d440b185d
+@conscious-bot/evaluation:build: cache miss, executing 292680410fd03341
+@conscious-bot/testkits:build: 
+@conscious-bot/testkits:build: > @conscious-bot/testkits@0.1.0 build /Users/darianrosebrook/Desktop/Projects/conscious-bot/packages/testkits
+@conscious-bot/testkits:build: > tsc
+@conscious-bot/testkits:build: 
+@conscious-bot/evaluation:build: 
+@conscious-bot/evaluation:build: > @conscious-bot/evaluation@0.1.0 build /Users/darianrosebrook/Desktop/Projects/conscious-bot/packages/evaluation
+@conscious-bot/evaluation:build: > tsc
+@conscious-bot/evaluation:build: 
+@conscious-bot/minecraft-interface:build: cache miss, executing 1d37c624002675e0
+@conscious-bot/minecraft-interface:build: 
+@conscious-bot/minecraft-interface:build: > @conscious-bot/minecraft-interface@0.1.0 build /Users/darianrosebrook/Desktop/Projects/conscious-bot/packages/minecraft-interface
+@conscious-bot/minecraft-interface:build: > tsc
+@conscious-bot/minecraft-interface:build: 
+@conscious-bot/dashboard:build: cache miss, executing 6ef3410cc9ab4027
+@conscious-bot/dashboard:build: 
+@conscious-bot/dashboard:build: > @conscious-bot/dashboard@0.1.0 build /Users/darianrosebrook/Desktop/Projects/conscious-bot/packages/dashboard
+@conscious-bot/dashboard:build: > next build
+@conscious-bot/dashboard:build: 
+@conscious-bot/dashboard:build:    ▲ Next.js 15.5.10
+@conscious-bot/dashboard:build: 
+@conscious-bot/dashboard:build:    Creating an optimized production build ...
+@conscious-bot/dashboard:build:  ✓ Compiled successfully in 2.7s
+@conscious-bot/dashboard:build:    Skipping linting
+@conscious-bot/dashboard:build:    Checking validity of types ...
+@conscious-bot/dashboard:build:    Collecting page data ...
+@conscious-bot/dashboard:build: Loaded 1000 thoughts from persistent storage
+@conscious-bot/dashboard:build:    Generating static pages (0/38) ...
+@conscious-bot/dashboard:build:    Generating static pages (9/38) 
+@conscious-bot/dashboard:build:    Generating static pages (18/38) 
+@conscious-bot/dashboard:build:    Generating static pages (28/38) 
+@conscious-bot/dashboard:build:  ✓ Generating static pages (38/38)
+@conscious-bot/dashboard:build:    Finalizing page optimization ...
+@conscious-bot/dashboard:build:    Collecting build traces ...
+@conscious-bot/dashboard:build: 
+@conscious-bot/dashboard:build: Route (app)                                 Size  First Load JS
+@conscious-bot/dashboard:build: ┌ ○ /                                    73.1 kB         182 kB
+@conscious-bot/dashboard:build: ├ ○ /_not-found                            993 B         102 kB
+@conscious-bot/dashboard:build: ├ ƒ /api/bot/health                        198 B         102 kB
+@conscious-bot/dashboard:build: ├ ƒ /api/bot/state                         198 B         102 kB
+@conscious-bot/dashboard:build: ├ ƒ /api/bot/status                        198 B         102 kB
+@conscious-bot/dashboard:build: ├ ƒ /api/database                          198 B         102 kB
+@conscious-bot/dashboard:build: ├ ƒ /api/database/danger                   198 B         102 kB
+@conscious-bot/dashboard:build: ├ ƒ /api/database/health                   198 B         102 kB
+@conscious-bot/dashboard:build: ├ ƒ /api/database/memories                 198 B         102 kB
+@conscious-bot/dashboard:build: ├ ƒ /api/evaluation                        198 B         102 kB
+@conscious-bot/dashboard:build: ├ ƒ /api/events                            198 B         102 kB
+@conscious-bot/dashboard:build: ├ ƒ /api/goals                             198 B         102 kB
+@conscious-bot/dashboard:build: ├ ƒ /api/intero/boundary-stats             198 B         102 kB
+@conscious-bot/dashboard:build: ├ ƒ /api/intero/history                    198 B         102 kB
+@conscious-bot/dashboard:build: ├ ƒ /api/intrusive                         198 B         102 kB
+@conscious-bot/dashboard:build: ├ ƒ /api/inventory                         198 B         102 kB
+@conscious-bot/dashboard:build: ├ ƒ /api/memories                          198 B         102 kB
+@conscious-bot/dashboard:build: ├ ƒ /api/memory-updates                    198 B         102 kB
+@conscious-bot/dashboard:build: ├ ƒ /api/notes                             198 B         102 kB
+@conscious-bot/dashboard:build: ├ ƒ /api/planner                           198 B         102 kB
+@conscious-bot/dashboard:build: ├ ƒ /api/screenshots                       198 B         102 kB
+@conscious-bot/dashboard:build: ├ ƒ /api/service-health                    198 B         102 kB
+@conscious-bot/dashboard:build: ├ ƒ /api/stream                            198 B         102 kB
+@conscious-bot/dashboard:build: ├ ƒ /api/task-updates                      198 B         102 kB
+@conscious-bot/dashboard:build: ├ ƒ /api/tasks                             198 B         102 kB
+@conscious-bot/dashboard:build: ├ ƒ /api/tts                               198 B         102 kB
+@conscious-bot/dashboard:build: ├ ƒ /api/valuation-updates                 198 B         102 kB
+@conscious-bot/dashboard:build: ├ ƒ /api/viewer/start                      198 B         102 kB
+@conscious-bot/dashboard:build: ├ ƒ /api/viewer/status                     198 B         102 kB
+@conscious-bot/dashboard:build: ├ ƒ /api/viewer/stop                       198 B         102 kB
+@conscious-bot/dashboard:build: ├ ƒ /api/world                             198 B         102 kB
+@conscious-bot/dashboard:build: ├ ƒ /api/ws/bot-state                      198 B         102 kB
+@conscious-bot/dashboard:build: ├ ƒ /api/ws/cognitive-stream               198 B         102 kB
+@conscious-bot/dashboard:build: ├ ƒ /api/ws/cognitive-stream/history       198 B         102 kB
+@conscious-bot/dashboard:build: ├ ƒ /api/ws/cot                            198 B         102 kB
+@conscious-bot/dashboard:build: └ ƒ /api/ws/hud                            198 B         102 kB
+@conscious-bot/dashboard:build: + First Load JS shared by all             101 kB
+@conscious-bot/dashboard:build:   ├ chunks/321-81fa4a2894876fe7.js       45.3 kB
+@conscious-bot/dashboard:build:   ├ chunks/b7c9b7cc-7bdc71ac8e543392.js  54.2 kB
+@conscious-bot/dashboard:build:   └ other shared chunks (total)          1.89 kB
+@conscious-bot/dashboard:build: 
+@conscious-bot/dashboard:build: 
+@conscious-bot/dashboard:build: ○  (Static)   prerendered as static content
+@conscious-bot/dashboard:build: ƒ  (Dynamic)  server-rendered on demand
+@conscious-bot/dashboard:build: 
+
+ Tasks:    12 successful, 12 total
+Cached:    6 cached, 12 total
+  Time:    22.042s 
+
+ Packages built successfully
+
+🚀 Starting services in dependency order...
+
+[2026-02-03T01:24:41.318Z] [Core API] [START] Starting service on port 3007
+[2026-02-03T01:24:41.318Z] [Core API] [INFO] Core API and capability registry
+[Core API] > @conscious-bot/core@0.1.0 dev:server /Users/darianrosebrook/Desktop/Projects/conscious-bot/packages/core
+> tsx src/server.ts
+[Core API] Core API server ready on port 3007
+[Core API] Health check: http://localhost:3007/health
+Capability registry endpoints available
+[2026-02-03T01:24:46.346Z] [Core API] [HEALTH] Service is healthy and ready
+ ⏳ Waiting for dependencies: Core API
+[2026-02-03T01:24:47.347Z] [Memory] [START] Starting service on port 3001
+[2026-02-03T01:24:47.347Z] [Memory] [INFO] Memory storage and retrieval system
+[Memory] > @conscious-bot/memory@0.1.0 dev:server /Users/darianrosebrook/Desktop/Projects/conscious-bot/packages/memory
+> tsx src/server.ts
+[Memory] ✅ Skill registered: opt.shelter_basic
+[Memory] ✅ Skill registered: opt.chop_tree_safe
+✅ Skill registered: opt.ore_ladder_iron
+✅ Skill registered: opt.smelt_iron_basic
+✅ Skill registered: opt.craft_tool_tiered
+✅ Skill registered: opt.food_pipeline_starter
+✅ Skill registered: opt.torch_corridor
+✅ Skill registered: opt.bridge_gap_safe
+✅ Skill registered: opt.biome_probe
+[Memory] ✅ Skill registered: opt.emergency_retreat_and_block
+[Memory] Memory system server running on port 3001
+[Memory] Health check: http://localhost:3001/health
+Enhanced system status: http://localhost:3001/enhanced/status
+Current seed info: http://localhost:3001/enhanced/seed
+Database info: http://localhost:3001/enhanced/database
+Database stats: http://localhost:3001/enhanced/stats
+[2026-02-03T01:24:52.355Z] [Memory] [HEALTH] Service is healthy and ready
+ ⏳ Waiting for dependencies: Core API
+[2026-02-03T01:24:53.357Z] [World] [START] Starting service on port 3004
+[2026-02-03T01:24:53.357Z] [World] [INFO] World state management and simulation
+[World] > @conscious-bot/world@0.1.0 dev:server /Users/darianrosebrook/Desktop/Projects/conscious-bot/packages/world
+> tsx src/server.ts
+[World] World system server running on port 3004
+[2026-02-03T01:24:58.364Z] [World] [HEALTH] Service is healthy and ready
+[2026-02-03T01:24:59.365Z] [MLX-LM Sidecar] [START] Starting service on port 5002
+[2026-02-03T01:24:59.365Z] [MLX-LM Sidecar] [INFO] MLX-LM inference and embedding server for Apple Silicon
+[MLX-LM Sidecar] * Serving Flask app 'mlx_server'
+ * Debug mode: off
+[MLX-LM Sidecar] Loading generation model: mlx-community/gemma-3n-E2B-it-lm-4bit ...
+[MLX-LM Sidecar] Generation model loaded: gemma-3n-E2B-it-lm-4bit
+[MLX-LM Sidecar] Loading embedding model: mlx-community/embeddinggemma-300m-4bit ...
+[MLX-LM Sidecar] Embedding model loaded: embeddinggemma-300m-4bit
+
+MLX-LM sidecar ready on http://localhost:5002
+[2026-02-03T01:25:09.008Z] [MLX-LM Sidecar] [HEALTH] Service is healthy and ready
+[2026-02-03T01:25:10.009Z] [Sterling] [START] Starting service on port 8766
+[2026-02-03T01:25:10.009Z] [Sterling] [INFO] Sterling symbolic reasoning server (crafting, building, tool progression)
+[2026-02-03T01:25:15.033Z] [Sterling] [HEALTH] Service is healthy and ready
+ ⏳ Waiting for dependencies: Core API
+[2026-02-03T01:25:16.034Z] [Cognition] [START] Starting service on port 3003
+[2026-02-03T01:25:16.034Z] [Cognition] [INFO] Cognitive reasoning and decision making
+[Cognition] > @conscious-bot/cognition@0.1.0 dev:server /Users/darianrosebrook/Desktop/Projects/conscious-bot/packages/cognition
+> tsx src/server.ts
+[Cognition] 🧠 Cognition service running on port 3003
+[Cognition] [INTERO_HISTORY] Loaded 11 snapshots from intero-history.jsonl
+[Cognition] 📊 Cognitive metrics endpoint: http://localhost:3003/metrics
+💭 Thought generation endpoint: http://localhost:3003/generate-thoughts
+🎯 ReAct arbiter endpoint: http://localhost:3003/react-arbiter
+🤝 Social cognition endpoint: http://localhost:3003/social-cognition
+🧠 Social consideration endpoint: http://localhost:3003/consider-social
+[Cognition] 🤔 Nearby entities processing endpoint: http://localhost:3003/process-nearby-entities
+[Cognition] 💬 Chat consideration endpoint: http://localhost:3003/consider-chat
+🚪 Departure communication endpoint: http://localhost:3003/consider-departure
+🧠 Cognitive stream endpoints:
+  Get recent thoughts: http://localhost:3003/api/cognitive-stream/recent
+  ✅ Mark thoughts processed: http://localhost:3003/api/cognitive-stream/:id/processed
+🧠 Social memory endpoints:
+  Get remembered entities: http://localhost:3003/social-memory/entities
+  🔍 Search entities by fact: http://localhost:3003/social-memory/search
+[Cognition] 📊 Social memory stats: http://localhost:3003/social-memory/stats
+[Cognition] [Cognition] LLM backend (MLX/Ollama) reachable at http://localhost:5002/health
+[2026-02-03T01:25:21.042Z] [Cognition] [HEALTH] Service is healthy and ready
+ ⏳ Waiting for dependencies: Core API, Memory, World
+[2026-02-03T01:25:22.044Z] [Planning] [START] Starting service on port 3002
+[2026-02-03T01:25:22.044Z] [Planning] [INFO] Task planning and execution coordination
+[Planning] > @conscious-bot/planning@0.1.0 dev:server /Users/darianrosebrook/Desktop/Projects/conscious-bot/packages/planning
+> tsx src/modular-server.ts
+[Planning] [Thought-to-task] Started conversion polling
+[Planning] [TaskIntegration] Goal resolver enabled
+[Planning] ✅ Event-driven thought generator initialized in server
+[Planning] [memory] Discovery: endpoint UP → http://localhost:3001
+[Planning] [Sterling] Connected to reasoning server
+[Planning] Sterling reasoning service connected
+[Planning] Minecraft crafting solver initialized
+Minecraft building solver initialized
+[Planning] Minecraft tool progression solver initialized
+[Planning] Minecraft navigation solver initialized
+[Planning] [MCP] MCP server import successful
+[Planning] [MCP] MCP server created successfully
+[Planning] [MCP] Integration initialized successfully
+[Planning] [Server] MCP integration initialized and mounted at /mcp
+[Planning] ✅ MCP integration initialized successfully
+🔗 Connecting MCP integration to behavior tree runner...
+[Planning] MCP integration connected to behavior tree runner
+Registering core Minecraft leaves in planning...
+[Planning] Registered leaf: move_to
+[Planning] Registered leaf: step_forward_safely
+[Planning] Registered leaf: follow_entity
+[Planning] Registered leaf: dig_block
+[Planning] Registered leaf: place_block
+[Planning] Registered leaf: place_workstation
+[Planning] Registered leaf: place_torch_if_needed
+[Planning] Registered leaf: retreat_and_block
+[Planning] Registered leaf: consume_food
+[Planning] Registered leaf: sense_hostiles
+[Planning] Registered leaf: chat
+[Planning] Registered leaf: wait
+[Planning] Registered leaf: get_light_level
+[Planning] Registered leaf: craft_recipe
+[Planning] Registered leaf: smelt
+[Planning] Registered 15 core leaves in planning
+[Planning] [Server] Router mounted at /
+[Planning] [Server] Router mounted at /
+[Planning] [Server] Router mounted at /mcp
+📝 Seeding default MCP options...
+[Planning] 📝 Stored inline BT definition for gather_wood@1@1.0.0
+[Planning] ✅ Registered MCP option: gather_wood
+🔗 Adding MCP option gather_wood to behavior tree runner
+📝 Stored inline BT definition for gather_wood@1
+[Planning] 🚀 Promoted MCP option to active: gather_wood@1@1.0.0
+[Planning] 📝 Stored inline BT definition for craft_wooden_pickaxe@1@1.0.0
+[Planning] ✅ Registered MCP option: craft_wooden_pickaxe
+🔗 Adding MCP option craft_wooden_pickaxe to behavior tree runner
+📝 Stored inline BT definition for craft_wooden_pickaxe@1
+[Planning] 🚀 Promoted MCP option to active: craft_wooden_pickaxe@1@1.0.0
+[Planning] 📝 Stored inline BT definition for explore_move@1@1.0.0
+[Planning] ✅ Registered MCP option: explore_move
+🔗 Adding MCP option explore_move to behavior tree runner
+📝 Stored inline BT definition for explore_move@1
+[Planning] 🚀 Promoted MCP option to active: explore_move@1@1.0.0
+[Planning] [Server] Planning system server running on port 3002
+[Server] Environment: development
+[Planning] [Server] MCP Integration: ✅ Active
+✅ Server started successfully
+[Planning] [Planning:startup] Service readiness: minecraft=down(6ms), memory=up(4ms), cognition=up(5ms), dashboard=down(5ms)
+[Planning] [Planning:startup] Executor ready: false
+[Planning] Executor enabled (mode=live, maxSteps/min=6, leafAllowlist=42 leaves)
+[Pipeline] Cognition: http://localhost:3003
+[Pipeline] MC interface: http://localhost:3005
+[Planning] [Planning] Executor enabled but not ready — will start when dependencies are reachable
+[Planning] Using event-driven thought generation (cognition) instead of legacy cognitive processor.
+✅ Modular planning server started successfully
+[2026-02-03T01:25:25.052Z] [Planning] [HEALTH] Service is healthy and ready
+ ⏳ Waiting for dependencies: Core API, Planning
+[2026-02-03T01:25:26.053Z] [Minecraft Interface] [START] Starting service on port 3005
+[2026-02-03T01:25:26.053Z] [Minecraft Interface] [INFO] Minecraft bot interface and control
+[Minecraft Interface] > @conscious-bot/minecraft-interface@0.1.0 dev:server /Users/darianrosebrook/Desktop/Projects/conscious-bot/packages/minecraft-interface
+> NODE_OPTIONS='--max-old-space-size=8192' tsx src/server.ts
+[Minecraft Interface] Minecraft bot server running on port 3005
+[Minecraft Interface] Bot config: Sterling@localhost:25565
+Use POST /connect to start the bot
+Prismarine viewer port reserved at 3006
+[Minecraft Interface] 📝 Registering core leaves...
+[Minecraft Interface] Registered leaf: move_to@1.0.0
+[Minecraft Interface] Registered leaf: step_forward_safely@1.0.0
+[Minecraft Interface] Registered leaf: follow_entity@1.0.0
+[Minecraft Interface] Registered leaf: sterling_navigate@1.0.0
+[Minecraft Interface] Registered leaf: dig_block@1.0.0
+[Minecraft Interface] Registered leaf: acquire_material@1.0.0
+[Minecraft Interface] Registered leaf: place_block@1.0.0
+[Minecraft Interface] Registered leaf: place_torch_if_needed@1.0.0
+[Minecraft Interface] Registered leaf: retreat_and_block@1.0.0
+[Minecraft Interface] Registered leaf: consume_food@1.0.0
+[Minecraft Interface] Registered leaf: sleep@1.0.0
+[Minecraft Interface] Registered leaf: collect_items@1.0.0
+[Minecraft Interface] Registered leaf: sense_hostiles@1.0.0
+[Minecraft Interface] Registered leaf: chat@1.0.0
+[Minecraft Interface] Registered leaf: wait@1.0.0
+[Minecraft Interface] Registered leaf: get_light_level@1.0.0
+[Minecraft Interface] Registered leaf: find_resource@1.0.0
+[Minecraft Interface] Registered leaf: craft_recipe@1.1.0
+[Minecraft Interface] Registered leaf: smelt@1.1.0
+[Minecraft Interface] Registered leaf: place_workstation@1.0.0
+[Minecraft Interface] Registered leaf: introspect_recipe@1.0.0
+[Minecraft Interface] Registered leaf: open_container@1.0.0
+[Minecraft Interface] Registered leaf: transfer_items@1.0.0
+[Minecraft Interface] Registered leaf: close_container@1.0.0
+[Minecraft Interface] Registered leaf: manage_inventory@1.0.0
+[Minecraft Interface] Registered leaf: attack_entity@1.0.0
+[Minecraft Interface] Registered leaf: equip_weapon@1.0.0
+[Minecraft Interface] Registered leaf: retreat_from_threat@1.0.0
+[Minecraft Interface] Registered leaf: use_item@1.0.0
+[Minecraft Interface] Registered leaf: equip_tool@1.0.0
+[Minecraft Interface] Registered leaf: till_soil@1.0.0
+[Minecraft Interface] Registered leaf: plant_crop@1.0.0
+[Minecraft Interface] Registered leaf: harvest_crop@1.0.0
+[Minecraft Interface] Registered leaf: manage_farm@1.0.0
+[Minecraft Interface] Registered leaf: interact_with_block@1.0.0
+[Minecraft Interface] Registered leaf: operate_piston@1.0.0
+[Minecraft Interface] Registered leaf: control_redstone@1.0.0
+[Minecraft Interface] Registered leaf: build_structure@1.0.0
+[Minecraft Interface] Registered leaf: control_environment@1.0.0
+[Minecraft Interface] Registered leaf: prepare_site@1.0.0
+[Minecraft Interface] Registered leaf: build_module@1.0.0
+[Minecraft Interface] Registered leaf: place_feature@1.0.0
+Registered 42 core leaves with local leaf factory
+[2026-02-03T01:25:29.063Z] [Minecraft Interface] [HEALTH] Service is healthy and ready
+ ⏳ Waiting for dependencies: Core API, Planning, Minecraft Interface
+[2026-02-03T01:25:30.064Z] [Dashboard] [START] Starting service on port 3000
+[2026-02-03T01:25:30.064Z] [Dashboard] [INFO] Web dashboard for monitoring and control
+[Dashboard] > @conscious-bot/dashboard@0.1.0 dev /Users/darianrosebrook/Desktop/Projects/conscious-bot/packages/dashboard
+> next dev
+[Dashboard] ▲ Next.js 15.5.10
+[Dashboard] - Local:        http://localhost:3000
+   - Network:      http://10.0.0.11:3000
+[Dashboard] ✓ Starting...
+[Dashboard] ✓ Ready in 1287ms
+[Minecraft Interface] 🔧 Added mcData for version 1.21.4
+[Minecraft Interface] [BeliefBus] Entity belief ingestion activated (5Hz)
+[Minecraft Interface] [BeliefBus] Cognition emission activated (1Hz)
+[Minecraft Interface] 🌍 Environmental event detection activated
+[Minecraft Interface] 🔧 ActionTranslator initialized {
+  hasBot: true,
+  botSpawned: true,
+  hasStateMachine: true,
+  timestamp: 1770081932577
+}
+[Minecraft Interface] 🚀 NavigationBridge constructor called
+[Minecraft Interface] 🔍 Bot state: {
+  hasBot: true,
+  hasEntity: true,
+  hasPosition: true,
+  hasPathfinder: false,
+  version: '1.21.4'
+}
+[Minecraft Interface] 🧠 Initializing neural terrain prediction...
+[Minecraft Interface] ✅ Neural terrain prediction initialized
+🌍 Initializing environmental monitoring...
+[Minecraft Interface] 🌍 Environmental monitoring started
+✅ Environmental monitoring initialized
+[Minecraft Interface] 🔧 Loading mineflayer-pathfinder...
+[Minecraft Interface] 🛡️ Automatic safety monitoring started
+[Minecraft Interface] 🛡️ Automatic safety monitoring enabled
+[Minecraft Interface] Waiting for system readiness; observation broadcast paused
+[Minecraft Interface] 🖥️ Prismarine viewer started at http://localhost:3006
+[Minecraft Interface] Prismarine viewer web server running on *:3006
+[Minecraft Interface] ✅ mineflayer-pathfinder loaded: true goals: true
+[Minecraft Interface] 🔧 Loading pathfinder plugin...
+[Minecraft Interface] ✅ Pathfinder plugin loaded
+🔧 Loading minecraft-data...
+[Minecraft Interface] ✅ Minecraft data loaded for version: 1.21.4
+🔧 Creating movements...
+[Minecraft Interface] ✅ Movements created
+🔧 Setting pathfinder movements...
+[Minecraft Interface] ✅ Pathfinder movements set
+✅ Mineflayer pathfinder fully initialized
+[Dashboard] ✓ Compiled /api/ws/cognitive-stream in 391ms (277 modules)
+[Minecraft Interface] [MINECRAFT INTERFACE] Bot state updated: {
+  position: { x: 198.10611052152393, y: 90, z: 197.8938894784757 },
+  health: 20,
+  inventoryItems: 0
+}
+[Dashboard] Loaded 1000 thoughts from persistent storage
+[Planning] [livestream] MC interface UP
+[Dashboard] POST /api/ws/cognitive-stream received: {
+  type: 'system_status',
+  content: 'System status: cognition_service_started - 🧠 Cognition service running on port 3003',
+  attribution: 'self'
+}
+[Dashboard] New thought added to history: {
+  type: 'system_status',
+  content: 'System status: cognition_service_started - 🧠 Cognition service running on port 3003',
+  displayContent: undefined,
+  attribution: 'self',
+  context: {
+    emotionalState: 'neutral',
+    confidence: 0.5,
+    cognitiveSystem: 'cognition-system',
+    category: 'system',
+    tags: [ 'server', 'startup' ],
+    port: 3003
+  },
+  metadata: {
+    thoughtType: 'system_status',
+    category: 'system',
+    tags: [ 'server', 'startup' ],
+    source: 'cognition-system',
+    timestamp: 1770081916982,
+    provenance: 'chain-of-thought'
+  },
+  id: 'thought-1770081933059-8e5ldo9',
+  timestamp: 1770081933059,
+  processed: false
+}
+[Dashboard] Broadcasting message to 0 connections: {"type":"cognitive_thoughts","timestamp":1770081933060,"data":{"thoughts":[{"type":"system_status","content":"System status: cognition_service_started - 🧠 Cognition service running on port 3003","attribution":"self","context":{"emotionalState":"neutral","confidence":0.5,"cognitiveSystem":"cognition-system","category":"system","tags":["server","startup"],"port":3003},"metadata":{"thoughtType":"system_status","category":"system","tags":["server","startup"],"source":"cognition-system","timestamp":1770081916982,"provenance":"chain-of-thought"},"id":"thought-1770081933059-8e5ldo9","timestamp":1770081933059,"processed":false}]}}
+Successfully sent message to 0 connections (0 dead connections removed)
+[Dashboard] POST /api/ws/cognitive-stream 200 in 540ms
+[Cognition] Processing environmental_awareness request
+[Dashboard] ○ Compiling / ...
+[Dashboard] ✓ Compiled / in 1137ms (881 modules)
+[Planning] [livestream] Dashboard UP
+[Minecraft Interface] [ThreatPerception] localized threat assessment: 0 threats, level: low
+[2026-02-03T01:25:34.637Z] [Dashboard] [HEALTH] Service is healthy and ready
+[Dashboard] GET / 200 in 1565ms
+[Dashboard] POST /api/live-stream-updates 404 in 1560ms
+[Dashboard] POST /api/live-stream-updates 404 in 1565ms
+[Dashboard] POST /api/live-stream-updates 404 in 1563ms
+[Dashboard] ✓ Compiled /api/ws/bot-state in 137ms (883 modules)
+[Dashboard] POST /api/ws/bot-state 200 in 173ms
+
+⏳ Waiting for services to start...
+[Dashboard] ✓ Compiled in 384ms (883 modules)
+[Dashboard] POST /api/ws/bot-state 200 in 40ms
+[Dashboard] GET /api/ws/cognitive-stream: New connection, total connections: 0
+[Dashboard] GET /api/ws/cognitive-stream: Connection added, total connections: 1
+[Dashboard] Sending initial data with 1000 thoughts
+[Dashboard] Loaded 1000 thoughts from persistent storage
+[Dashboard] POST /api/environment-updates 404 in 125ms
+[Dashboard] POST /api/environment-updates 404 in 123ms
+[Cognition] Processing environmental_awareness request
+[Dashboard] POST /api/ws/bot-state 200 in 6ms
+[Dashboard] GET / 200 in 89ms
+[Minecraft Interface] WebSocket client connected (unknown)
+[Dashboard] ✓ Compiled /api/memory-updates in 467ms (904 modules)
+[Dashboard] SSE connection established. Total connections: 1
+[Dashboard] GET /api/ws/cognitive-stream/history 200 in 589ms
+[Dashboard] GET /api/viewer/status 200 in 595ms
+[Dashboard] Loaded 1000 thoughts from persistent storage
+[Dashboard] GET /api/ws/cognitive-stream: New connection, total connections: 0
+[Dashboard] GET /api/ws/cognitive-stream: Connection added, total connections: 1
+Sending initial data with 1000 thoughts
+[Dashboard] ✓ Compiled /api/tasks in 177ms (907 modules)
+[Dashboard] GET /api/tasks 200 in 211ms
+[Dashboard] ✓ Compiled /api/planner in 160ms (909 modules)
+[Dashboard] GET /api/planner 200 in 182ms
+[Dashboard] ✓ Compiled /api/world in 169ms (911 modules)
+[Dashboard] GET /api/world 200 in 196ms
+[Dashboard] ✓ Compiled /api/inventory in 310ms (914 modules)
+[Minecraft Interface] [MINECRAFT INTERFACE] /inventory endpoint called
+[Dashboard] POST /api/ws/bot-state 200 in 195ms
+[Dashboard] GET /api/inventory 200 in 339ms
+[Dashboard] GET /api/ws/bot-state 200 in 14ms
+[Minecraft Interface] WebSocket client disconnected (unknown)
+[Dashboard] ✓ Compiled /api/bot/health in 379ms (918 modules)
+[Dashboard] SSE connection established. Total connections: 1
+[Dashboard] GET /api/bot/state 200 in 409ms
+[Dashboard] GET /api/bot/health 200 in 410ms
+[Dashboard] GET /api/viewer/status 200 in 10ms
+[Minecraft Interface] WebSocket client connected (unknown)
+[Dashboard] GET /api/ws/bot-state 200 in 433ms
+[Dashboard] SSE connection closed. Total connections: 0
+[Dashboard] GET /api/ws/cognitive-stream/history?limit=100 200 in 13ms
+[Minecraft Interface] [MINECRAFT INTERFACE] /inventory endpoint called
+[Dashboard] GET /api/inventory 200 in 16ms
+[Dashboard] ○ Compiling /api/notes ...
+[Minecraft Interface] WebSocket client disconnected (unknown)
+[Dashboard] GET /api/memory-updates 200 in 3182ms
+[Dashboard] GET /api/task-updates 200 in 3184ms
+[Dashboard] GET /api/ws/cognitive-stream 200 in 3184ms
+[Dashboard] GET /api/ws/cognitive-stream: Connection removed, total connections: 0
+[Dashboard] ✓ Compiled /api/notes in 1062ms (924 modules)
+[Dashboard] SSE connection established. Total connections: 1
+[Dashboard] POST /api/ws/bot-state 200 in 367ms
+[Dashboard] GET /api/viewer/status 200 in 546ms
+[Dashboard] GET /api/ws/cognitive-stream/history 200 in 554ms
+[Dashboard] GET /api/notes 200 in 1307ms
+[Dashboard] GET /api/memories 200 in 1316ms
+[Dashboard] GET /api/events 200 in 1319ms
+[Dashboard] Loaded 1000 thoughts from persistent storage
+[Dashboard] GET /api/ws/cognitive-stream: New connection, total connections: 0
+GET /api/ws/cognitive-stream: Connection added, total connections: 1
+Sending initial data with 1000 thoughts
+[Cognition] Processing environmental_awareness request
+
+Checking service health...
+[2026-02-03T01:25:43.641Z] [Core API] [HEALTH] Health check passed
+[2026-02-03T01:25:44.144Z] [Memory] [HEALTH] Health check passed
+[Dashboard] ✓ Compiled in 1432ms (934 modules)
+[2026-02-03T01:25:44.646Z] [World] [HEALTH] Health check passed
+[Dashboard] ✓ Compiled in 0ms (520 modules)
+[Dashboard] ✓ Compiled in 359ms (924 modules)
+[2026-02-03T01:25:45.148Z] [MLX-LM Sidecar] [HEALTH] Health check passed
+[Dashboard] GET /api/viewer/status 200 in 915ms
+[Dashboard] GET /api/tasks 200 in 2143ms
+[Dashboard] GET /api/bot/state 200 in 2103ms
+[Dashboard] GET /api/bot/health 200 in 2119ms
+[Dashboard] POST /api/ws/bot-state 200 in 636ms
+[Dashboard] POST /api/live-stream-updates 404 in 2160ms
+[Dashboard] POST /api/live-stream-updates 404 in 2164ms
+[Dashboard] POST /api/live-stream-updates 404 in 2163ms
+[2026-02-03T01:25:45.651Z] [Sterling] [HEALTH] Health check passed
+[Dashboard] ○ Compiling /api/viewer/start ...
+[Dashboard] ✓ Compiled /api/viewer/start in 624ms (926 modules)
+[Dashboard] GET / 200 in 700ms
+[Dashboard] POST /api/viewer/start 200 in 698ms
+[Dashboard] GET /api/viewer/status 200 in 644ms
+[Dashboard] GET /api/planner 200 in 11ms
+[Dashboard] GET /api/viewer/status 200 in 7ms
+[Minecraft Interface] WebSocket client connected (unknown)
+[Dashboard] GET /api/ws/cognitive-stream/history 200 in 13ms
+[Dashboard] GET /api/viewer/status 200 in 19ms
+[Dashboard] GET /api/world 200 in 19ms
+[Dashboard] GET /api/ws/bot-state 200 in 3575ms
+[Dashboard] SSE connection closed. Total connections: 0
+[Dashboard] GET /api/memory-updates 200 in 3577ms
+[Dashboard] GET /api/task-updates 200 in 3580ms
+[Dashboard] GET /api/ws/cognitive-stream 200 in 3580ms
+[Dashboard] GET /api/ws/cognitive-stream: Connection removed, total connections: 0
+[Dashboard] SSE connection established. Total connections: 1
+[Dashboard] GET /api/ws/bot-state 200 in 55ms
+[Dashboard] GET /api/ws/cognitive-stream: New connection, total connections: 0
+[Dashboard] GET /api/ws/cognitive-stream: Connection added, total connections: 1
+Sending initial data with 1000 thoughts
+[Dashboard] Loaded 1000 thoughts from persistent storage
+[2026-02-03T01:25:46.154Z] [Cognition] [HEALTH] Health check passed
+[Dashboard] GET /api/tasks 200 in 55ms
+[Minecraft Interface] [MINECRAFT INTERFACE] /inventory endpoint called
+[Dashboard] GET /api/inventory 200 in 44ms
+[Dashboard] GET /api/planner 200 in 16ms
+[Dashboard] GET /api/ws/bot-state 200 in 18ms
+[Dashboard] GET /api/world 200 in 20ms
+[Minecraft Interface] WebSocket client disconnected (unknown)
+[Dashboard] GET /api/bot/state 200 in 25ms
+[Dashboard] GET /api/bot/health 200 in 26ms
+[Dashboard] SSE connection established. Total connections: 2
+[Minecraft Interface] [MINECRAFT INTERFACE] /inventory endpoint called
+[Dashboard] GET /api/inventory 200 in 21ms
+[Dashboard] GET /api/viewer/status 200 in 16ms
+[Dashboard] GET /api/ws/bot-state 200 in 20ms
+[Dashboard] GET /api/bot/state 200 in 14ms
+[Dashboard] GET /api/bot/health 200 in 15ms
+[Dashboard] GET /api/viewer/status 200 in 11ms
+[Dashboard] POST /api/ws/bot-state 200 in 13ms
+[2026-02-03T01:25:46.664Z] [Planning] [HEALTH] Health check passed
+[2026-02-03T01:25:47.173Z] [Minecraft Interface] [HEALTH] Health check passed
+[Dashboard] ○ Compiling /api/intero/boundary-stats ...
+[Dashboard] ✓ Compiled /api/intero/boundary-stats in 628ms (932 modules)
+[Dashboard] GET /api/intero/history?limit=300 200 in 673ms
+[Dashboard] GET /api/service-health 200 in 676ms
+[Dashboard] GET /api/tasks 200 in 678ms
+[Dashboard] GET /api/intero/boundary-stats 200 in 679ms
+[2026-02-03T01:25:47.801Z] [Dashboard] [HEALTH] Health check passed
+[Dashboard] GET / 200 in 128ms
+
+Health Check Summary:
+  Core API
+  Memory
+  World
+  MLX-LM Sidecar
+  Sterling
+  Cognition
+  Planning
+  Minecraft Interface
+  Dashboard
+[2026-02-03T01:25:48.303Z] [SUCCESS] 
+All services passed health checks!
+[2026-02-03T01:25:48.303Z] [INFO] 
+Broadcasting system readiness...
+[2026-02-03T01:25:48.319Z] [Core API] [HEALTH] Readiness acknowledged
+[Cognition] Processing environmental_awareness request
+[2026-02-03T01:25:48.531Z] [Memory] [HEALTH] Readiness acknowledged
+[Dashboard] GET /api/viewer/status 200 in 12ms
+[Dashboard] POST /api/ws/bot-state 200 in 17ms
+[Dashboard] POST /api/viewer/start 200 in 17ms
+[Dashboard] GET /api/viewer/status 200 in 8ms
+[2026-02-03T01:25:48.766Z] [World] [HEALTH] Readiness acknowledged
+[2026-02-03T01:25:49.016Z] [Cognition] [HEALTH] Readiness acknowledged
+[2026-02-03T01:25:49.263Z] [Planning] [HEALTH] Readiness acknowledged
+[Planning] System readiness received; starting world state polling
+[Planning] [WorldStateManager] State update: {
+  connected: true,
+  position: { x: 198.10611052152393, y: 90, z: 197.8938894784757 },
+  health: 20,
+  inventoryCount: 0
+}
+[Minecraft Interface] Observation broadcast started (30s intervals)
+[2026-02-03T01:25:49.665Z] [Minecraft Interface] [HEALTH] Readiness acknowledged
+[2026-02-03T01:25:49.902Z] [SUCCESS] Readiness broadcast complete
+
+Checking optional external services...
+  Sterling reasoning server available at ws://localhost:8766
+  Minecraft server available at localhost:25565
+  Kokoro TTS available at http://localhost:8080
+[2026-02-03T01:25:49.926Z] [SUCCESS] 
+Conscious Bot System is running!
+[2026-02-03T01:25:49.926Z] [INFO] Service Status:
+[2026-02-03T01:25:49.926Z] [INFO]   Core API:     http://localhost:3007
+[2026-02-03T01:25:49.926Z] [INFO]   Memory:     http://localhost:3001
+[2026-02-03T01:25:49.926Z] [INFO]   World:     http://localhost:3004
+[2026-02-03T01:25:49.926Z] [INFO]   Cognition:     http://localhost:3003
+[2026-02-03T01:25:49.926Z] [INFO]   Planning:     http://localhost:3002
+[2026-02-03T01:25:49.926Z] [INFO]   Minecraft Interface:     http://localhost:3005
+[2026-02-03T01:25:49.926Z] [INFO]   MLX-LM Sidecar:     http://localhost:5002
+[2026-02-03T01:25:49.926Z] [INFO]   Dashboard:     http://localhost:3000
+[2026-02-03T01:25:49.926Z] [INFO]   Sterling:     ws://localhost:8766
+[2026-02-03T01:25:49.926Z] [INFO] 
+[2026-02-03T01:25:49.926Z] [INFO] Quick Actions:
+[2026-02-03T01:25:49.926Z] [INFO]   Dashboard:     http://localhost:3000
+[2026-02-03T01:25:49.926Z] [INFO]   Core API:      http://localhost:3007
+[2026-02-03T01:25:49.926Z] [INFO]   Minecraft Bot: http://localhost:3005
+[2026-02-03T01:25:49.926Z] [INFO]   MLX-LM Sidecar: http://localhost:5002
+[2026-02-03T01:25:49.926Z] [INFO] 
+[2026-02-03T01:25:49.926Z] [INFO] Minecraft Commands:
+[2026-02-03T01:25:49.926Z] [INFO]   Connect bot: curl -X POST http://localhost:3005/connect
+[2026-02-03T01:25:49.926Z] [INFO]   Disconnect bot: curl -X POST http://localhost:3005/disconnect
+[2026-02-03T01:25:49.926Z] [INFO]   Get status: curl http://localhost:3005/status
+[2026-02-03T01:25:49.926Z] [INFO] 
+[2026-02-03T01:25:49.926Z] [INFO] To stop all services:
+[2026-02-03T01:25:49.926Z] [INFO]   Press Ctrl+C or run: pnpm kill
+[2026-02-03T01:25:49.926Z] [INFO] 
+[2026-02-03T01:25:49.926Z] [INFO] Services are running. Press Ctrl+C to stop.
+[Minecraft Interface] WebSocket client connected (unknown)
+[Dashboard] GET /api/memory-updates 200 in 4852ms
+[Dashboard] GET /api/task-updates 200 in 4852ms
+[Dashboard] GET /api/ws/cognitive-stream 200 in 4854ms
+[Dashboard] GET /api/ws/cognitive-stream: Connection removed, total connections: 0
+[Dashboard] GET /api/ws/bot-state 200 in 4677ms
+SSE connection closed. Total connections: 0
+[Dashboard] ✓ Compiled in 2.4s (942 modules)
+[Dashboard] ✓ Compiled in 0ms (528 modules)
+[Dashboard] ✓ Compiled in 1ms (528 modules)
+[Dashboard] ✓ Compiled in 0ms (528 modules)
+[Dashboard] POST /api/ws/bot-state 200 in 1199ms
+[Dashboard] GET /api/viewer/status 200 in 1065ms
+[Dashboard] GET /api/ws/cognitive-stream/history 200 in 1074ms
+[Dashboard] Loaded 1000 thoughts from persistent storage
+[Dashboard] GET /api/ws/cognitive-stream: New connection, total connections: 0
+[Dashboard] GET /api/ws/cognitive-stream: Connection added, total connections: 1
+[Dashboard] Sending initial data with 1000 thoughts
+[Dashboard] ✓ Compiled in 1ms (528 modules)
+[Dashboard] GET / 200 in 873ms
+[Dashboard] GET /api/tasks 200 in 401ms
+[Dashboard] GET /api/planner 200 in 10ms
+[Dashboard] GET /api/world 200 in 20ms
+[Minecraft Interface] [MINECRAFT INTERFACE] /inventory endpoint called
+[Dashboard] GET /api/inventory 200 in 17ms
+[Dashboard] GET /api/ws/bot-state 200 in 20ms
+[Minecraft Interface] WebSocket client disconnected (unknown)
+[Dashboard] GET /api/bot/state 200 in 18ms
+[Dashboard] GET /api/bot/health 200 in 20ms
+[Dashboard] SSE connection established. Total connections: 1
+[Dashboard] GET /api/viewer/status 200 in 19ms
+[Dashboard] POST /api/ws/bot-state 200 in 8ms
+[Cognition] Enhanced thought generator has 0 recent thoughts
+[Dashboard] POST /api/live-stream-updates 404 in 156ms
+[Dashboard] POST /api/live-stream-updates 404 in 155ms
+[Dashboard] POST /api/live-stream-updates 404 in 155ms
+[Dashboard] POST /api/environment-updates 404 in 47ms
+[Dashboard] POST /api/environment-updates 404 in 58ms
+[Dashboard] GET /api/viewer/status 200 in 7ms
+[Dashboard] POST /api/viewer/start 200 in 10ms
+[Dashboard] GET /api/viewer/status 200 in 8ms
+[Cognition] Processing environmental_awareness request
+[Dashboard] POST /api/ws/bot-state 200 in 9ms
+[Minecraft Interface] WebSocket client connected (unknown)
+[Dashboard] GET /api/ws/bot-state 200 in 2241ms
+[Dashboard] SSE connection closed. Total connections: 0
+[Dashboard] POST /api/ws/bot-state 200 in 8ms
+[Planning] [MCP] Bot instance updated successfully
+[Minecraft Interface] Bot instance updated in planning server
+[Dashboard] POST /api/ws/bot-state 200 in 10ms
+[Cognition] Processing environmental_awareness request
+[Dashboard] POST /api/ws/bot-state 200 in 7ms
+[Dashboard] GET /api/ws/cognitive-stream/history?limit=100 200 in 13ms
+[Dashboard] GET /api/viewer/status 200 in 13ms
+[Dashboard] POST /api/viewer/start 200 in 13ms
+[Dashboard] GET /api/viewer/status 200 in 9ms
+[Dashboard] POST /api/ws/bot-state 200 in 6ms
+[Minecraft Interface] [MINECRAFT INTERFACE] Bot state updated: {
+  position: { x: 198.10611052152393, y: 90, z: 197.8938894784757 },
+  health: 20,
+  inventoryItems: 0
+}
+[Dashboard] POST /api/live-stream-updates 404 in 130ms
+[Dashboard] POST /api/live-stream-updates 404 in 131ms
+[Dashboard] POST /api/live-stream-updates 404 in 132ms
+[Cognition] Processing environmental_awareness request
+[Minecraft Interface] [ThreatPerception] localized threat assessment: 0 threats, level: low
+[Dashboard] POST /api/ws/bot-state 200 in 15ms
+[Dashboard] POST /api/ws/bot-state 200 in 11ms
+[Dashboard] POST /api/environment-updates 404 in 53ms
+[Dashboard] POST /api/environment-updates 404 in 53ms
+[Dashboard] POST /api/ws/bot-state 200 in 8ms
+[Cognition] Processing environmental_awareness request
+[Dashboard] POST /api/ws/bot-state 200 in 7ms
+[Dashboard] GET /api/ws/cognitive-stream/history?limit=100 200 in 13ms
+[Dashboard] POST /api/ws/bot-state 200 in 6ms
+[Dashboard] POST /api/live-stream-updates 404 in 71ms
+[Dashboard] POST /api/live-stream-updates 404 in 70ms
+[Dashboard] POST /api/live-stream-updates 404 in 72ms
+[Dashboard] POST /api/ws/bot-state 200 in 7ms
+[Cognition] Processing environmental_awareness request
+[Dashboard] POST /api/ws/bot-state 200 in 8ms
+[Dashboard] GET /api/intero/history?limit=300 200 in 36ms
+[Dashboard] GET /api/tasks 200 in 39ms
+[Dashboard] GET /api/service-health 200 in 39ms
+[Dashboard] GET /api/intero/boundary-stats 200 in 40ms
+[Dashboard] POST /api/ws/bot-state 200 in 8ms
+[Minecraft Interface] [Observation] Cognition service reachable
+[Cognition] Processing environmental_awareness request
+[Dashboard] POST /api/ws/bot-state 200 in 7ms
+[Dashboard] GET /api/tasks 200 in 12ms
+[Dashboard] GET /api/ws/cognitive-stream/history?limit=100 200 in 26ms
+[Dashboard] GET /api/viewer/status 200 in 28ms
+[Dashboard] POST /api/ws/bot-state 200 in 8ms
+[Minecraft Interface] 💬 Processing chat from Heliotropism: "Sterling, where are you at?"
+[Cognition] Processing social_interaction request
+[Cognition] Processing social interaction
+[Dashboard] Loaded 1000 thoughts from persistent storage
+[Dashboard] POST /api/ws/cognitive-stream received: {
+  type: 'social',
+  content: 'Social interaction: Chat from Heliotropism: "Sterling, where are you at?"',
+  attribution: 'self'
+}
+[Dashboard] New thought added to history: {
+  type: 'social',
+  content: 'Social interaction: Chat from Heliotropism: "Sterling, where are you at?"',
+  displayContent: 'Sterling, where are you at?',
+  attribution: 'self',
+  context: {
+    emotionalState: 'interested',
+    confidence: 0.9,
+    cognitiveSystem: 'social-processor',
+    sender: 'Heliotropism',
+    message: 'Sterling, where are you at?'
+  },
+  metadata: {
+    sender: 'Heliotropism',
+    message: 'Sterling, where are you at?',
+    timestamp: 1770081982906,
+    environment: 'minecraft',
+    botPosition: { x: 198.10611052152393, y: 90, z: 197.8938894784757 },
+    botHealth: 20,
+    botFood: 20,
+    thoughtType: 'social',
+    source: 'player-chat',
+    provenance: 'chain-of-thought'
+  },
+  id: 'thought-1770081982946-yo7rggr',
+  timestamp: 1770081982946,
+  processed: false
+}
+[Dashboard] Broadcasting message to 0 connections: {"type":"cognitive_thoughts","timestamp":1770081982947,"data":{"thoughts":[{"type":"social","content":"Social interaction: Chat from Heliotropism: \"Sterling, where are you at?\"","displayContent":"Sterling, where are you at?","attribution":"self","context":{"emotionalState":"interested","confidence":0.9,"cognitiveSystem":"social-processor","sender":"Heliotropism","message":"Sterling, where are you at?"},"metadata":{"sender":"Heliotropism","message":"Sterling, where are you at?","timestamp":1770081982906,"environment":"minecraft","botPosition":{"x":198.10611052152393,"y":90,"z":197.8938894784757},"botHealth":20,"botFood":20,"thoughtType":"social","source":"player-chat","provenance":"chain-of-thought"},"id":"thought-1770081982946-yo7rggr","timestamp":1770081982946,"processed":false}]}}
+Successfully sent message to 0 connections (0 dead connections removed)
+[Dashboard] POST /api/ws/cognitive-stream 200 in 37ms
+[Cognition] Enhanced thought generator has 0 recent thoughts
+[Dashboard] POST /api/live-stream-updates 404 in 109ms
+[Dashboard] POST /api/live-stream-updates 404 in 109ms
+[Dashboard] POST /api/live-stream-updates 404 in 109ms
+[Dashboard] POST /api/environment-updates 404 in 46ms
+[Dashboard] POST /api/environment-updates 404 in 46ms
+[Minecraft Interface] 🧠 Cognition system processed chat: {
+  processed: true,
+  type: 'social_interaction',
+  shouldRespond: true,
+  response: 'Just exploring around here!',
+  shouldCreateTask: true,
+  taskSuggestion: 'Answer question from Heliotropism: "sterling, where are you at?"',
+  internalThought: {
+    type: 'social',
+    content: 'Social interaction: Chat from Heliotropism: "Sterling, where are you at?"',
+    attribution: 'self',
+    context: {
+      emotionalState: 'interested',
+      confidence: 0.9,
+      cognitiveSystem: 'social-processor',
+      sender: 'Heliotropism',
+      message: 'Sterling, where are you at?'
+    },
+    metadata: {
+      sender: 'Heliotropism',
+      message: 'Sterling, where are you at?',
+      timestamp: 1770081982906,
+      environment: 'minecraft',
+      botPosition: [Object],
+      botHealth: 20,
+      botFood: 20,
+      thoughtType: 'social',
+      source: 'player-chat'
+    },
+    id: 'thought-1770081982909-social-sevfh204s',
+    timestamp: 1770081982909,
+    processed: false
+  },
+  timestamp: 1770081983621
+}
+[Minecraft Interface] ✅ Bot responded: "Just exploring around here!" (2ms)
+[Planning] [PlanRoute] {
+  backend: 'unplannable',
+  requiredRig: null,
+  reason: 'no-requirement',
+  taskTitle: 'Answer question from Heliotropism: "sterling, where are you at?"'
+}
+[Planning] Task added to enhanced integration: Answer question from Heliotropism: "sterling, where are you at?"
+[Lifecycle→Review] high_priority_added: task task-1770081983627-bfoi72qo3
+[Planning] [Lifecycle→Review] goal_binding_drift: task task-1770081983627-bfoi72qo3 (type_not_gated:gathering)
+[Minecraft Interface] ✅ Created task from social chat: {
+  success: true,
+  goalId: 'goal-1770081983626-kcp5p',
+  goal: {
+    id: 'goal-1770081983626-kcp5p',
+    type: 'general',
+    priority: 0.8,
+    urgency: 0.6,
+    utility: 0.7,
+    description: 'Answer question from Heliotropism: "sterling, where are you at?"',
+    preconditions: [],
+    effects: [],
+    status: 'pending',
+    createdAt: 1770081983626,
+    updatedAt: 1770081983626,
+    subGoals: []
+  }
+}
+[Dashboard] POST /api/task-updates 200 in 9ms
+[Dashboard] POST /api/ws/bot-state 200 in 7ms
+[Cognition] Processing environmental_awareness request
+[Dashboard] POST /api/ws/bot-state 200 in 8ms
+[Planning] [MCP] Bot instance updated successfully
+[Minecraft Interface] Bot instance updated in planning server
+[Dashboard] POST /api/ws/bot-state 200 in 8ms
+[Cognition] Processing environmental_awareness request
+[Dashboard] POST /api/ws/bot-state 200 in 8ms
+[Dashboard] GET /api/ws/cognitive-stream/history?limit=100 200 in 14ms
+[Dashboard] POST /api/ws/bot-state 200 in 9ms
+[Dashboard] POST /api/live-stream-updates 404 in 81ms
+[Dashboard] POST /api/live-stream-updates 404 in 82ms
+[Dashboard] POST /api/live-stream-updates 404 in 81ms
+[Minecraft Interface] [MINECRAFT INTERFACE] Bot state updated: {
+  position: { x: 198.10611052152393, y: 90, z: 197.8938894784757 },
+  health: 20,
+  inventoryItems: 0
+}
+[Minecraft Interface] [ThreatPerception] localized threat assessment: 0 threats, level: low
+[Dashboard] POST /api/ws/bot-state 200 in 9ms
+[Cognition] Processing environmental_awareness request
+[Dashboard] POST /api/ws/bot-state 200 in 8ms
+[Cognition] Generating thoughts for situation: {
+  situation: 'environment',
+  thoughtTypes: [ 'reflection', 'observation', 'planning' ]
+}
+[Dashboard] Sending 1 new thoughts to 1 connections
+[Dashboard] POST /api/ws/cognitive-stream received: {
+  type: 'planning',
+  content: 'My inventory is bare — I should gather some wood to get started. [GOAL: collect oak_log 8]',
+  attribution: 'self'
+}
+[Dashboard] New thought added to history: {
+  type: 'planning',
+  content: 'My inventory is bare — I should gather some wood to get started. [GOAL: collect oak_log 8]',
+  displayContent: 'My inventory is bare — I should gather some wood to get started.',
+  attribution: 'self',
+  context: {
+    emotionalState: 'motivated',
+    confidence: 0.7,
+    cognitiveSystem: 'drive-tick'
+  },
+  metadata: {
+    thoughtType: 'drive-tick',
+    trigger: 'idle-drive',
+    context: 'gathering',
+    intensity: 0.6,
+    extractedGoal: {
+      version: 1,
+      action: 'collect',
+      target: 'oak_log',
+      targetId: null,
+      amount: 8,
+      raw: '[GOAL: collect oak_log 8]'
+    },
+    extractedGoalSource: 'drive-tick',
+    goalKey: 'collect:oak_log',
+    provenance: 'chain-of-thought'
+  },
+  id: 'thought-1770081997621-01c32eb',
+  timestamp: 1770081997621,
+  processed: false
+}
+[Dashboard] Broadcasting message to 0 connections: {"type":"cognitive_thoughts","timestamp":1770081997622,"data":{"thoughts":[{"type":"planning","content":"My inventory is bare — I should gather some wood to get started. [GOAL: collect oak_log 8]","displayContent":"My inventory is bare — I should gather some wood to get started.","attribution":"self","context":{"emotionalState":"motivated","confidence":0.7,"cognitiveSystem":"drive-tick"},"metadata":{"thoughtType":"drive-tick","trigger":"idle-drive","context":"gathering","intensity":0.6,"extractedGoal":{"version":1,"action":"collect","target":"oak_log","targetId":null,"amount":8,"raw":"[GOAL: collect oak_log 8]"},"extractedGoalSource":"drive-tick","goalKey":"collect:oak_log","provenance":"chain-of-thought"},"id":"thought-1770081997621-01c32eb","timestamp":1770081997621,"processed":false}]}}
+Successfully sent message to 0 connections (0 dead connections removed)
+[Dashboard] POST /api/ws/cognitive-stream 200 in 16ms
+[Cognition] ✅ Thought sent to cognitive stream: My inventory is bare — I should gather some wood t...
+[Dashboard] POST /api/environment-updates 404 in 44ms
+[Dashboard] POST /api/environment-updates 404 in 44ms
+[Dashboard] POST /api/ws/bot-state 200 in 8ms
+[Minecraft Interface] 💬 Processing chat from Heliotropism: "do you know which y level?"
+[Cognition] Processing social_interaction request
+[Cognition] Processing social interaction
+[Dashboard] POST /api/ws/cognitive-stream received: {
+  type: 'social',
+  content: 'Social interaction: Chat from Heliotropism: "do you know which y level?"',
+  attribution: 'self'
+}
+[Dashboard] New thought added to history: {
+  type: 'social',
+  content: 'Social interaction: Chat from Heliotropism: "do you know which y level?"',
+  displayContent: 'do you know which y level?',
+  attribution: 'self',
+  context: {
+    emotionalState: 'interested',
+    confidence: 0.9,
+    cognitiveSystem: 'social-processor',
+    sender: 'Heliotropism',
+    message: 'do you know which y level?'
+  },
+  metadata: {
+    sender: 'Heliotropism',
+    message: 'do you know which y level?',
+    timestamp: 1770081999076,
+    environment: 'minecraft',
+    botPosition: { x: 198.10611052152393, y: 90, z: 197.8938894784757 },
+    botHealth: 20,
+    botFood: 20,
+    thoughtType: 'social',
+    source: 'player-chat',
+    provenance: 'chain-of-thought'
+  },
+  id: 'thought-1770081999088-hyngumd',
+  timestamp: 1770081999088,
+  processed: false
+}
+[Dashboard] Broadcasting message to 0 connections: {"type":"cognitive_thoughts","timestamp":1770081999088,"data":{"thoughts":[{"type":"social","content":"Social interaction: Chat from Heliotropism: \"do you know which y level?\"","displayContent":"do you know which y level?","attribution":"self","context":{"emotionalState":"interested","confidence":0.9,"cognitiveSystem":"social-processor","sender":"Heliotropism","message":"do you know which y level?"},"metadata":{"sender":"Heliotropism","message":"do you know which y level?","timestamp":1770081999076,"environment":"minecraft","botPosition":{"x":198.10611052152393,"y":90,"z":197.8938894784757},"botHealth":20,"botFood":20,"thoughtType":"social","source":"player-chat","provenance":"chain-of-thought"},"id":"thought-1770081999088-hyngumd","timestamp":1770081999088,"processed":false}]}}
+[Dashboard] Successfully sent message to 0 connections (0 dead connections removed)
+[Dashboard] POST /api/ws/cognitive-stream 200 in 11ms
+[Minecraft Interface] 🧠 Cognition system processed chat: {
+  processed: true,
+  type: 'social_interaction',
+  shouldRespond: true,
+  response: 'No idea.',
+  shouldCreateTask: true,
+  taskSuggestion: 'Answer question from Heliotropism: "do you know which y level?"',
+  internalThought: {
+    type: 'social',
+    content: 'Social interaction: Chat from Heliotropism: "do you know which y level?"',
+    attribution: 'self',
+    context: {
+      emotionalState: 'interested',
+      confidence: 0.9,
+      cognitiveSystem: 'social-processor',
+      sender: 'Heliotropism',
+      message: 'do you know which y level?'
+    },
+    metadata: {
+      sender: 'Heliotropism',
+      message: 'do you know which y level?',
+      timestamp: 1770081999076,
+      environment: 'minecraft',
+      botPosition: [Object],
+      botHealth: 20,
+      botFood: 20,
+      thoughtType: 'social',
+      source: 'player-chat'
+    },
+    id: 'thought-1770081999077-social-1vkely45n',
+    timestamp: 1770081999077,
+    processed: false
+  },
+  timestamp: 1770081999731
+}
+[Minecraft Interface] ✅ Bot responded: "No idea." (0ms)
+[Planning] [PlanRoute] {
+  backend: 'unplannable',
+  requiredRig: null,
+  reason: 'no-requirement',
+  taskTitle: 'Answer question from Heliotropism: "do you know which y level?"'
+}
+[Planning] Task added to enhanced integration: Answer question from Heliotropism: "do you know which y level?"
+[Lifecycle→Review] high_priority_added: task task-1770081999735-ixovtn45p
+[Planning] [Lifecycle→Review] goal_binding_drift: task task-1770081999735-ixovtn45p (type_not_gated:gathering)
+[Minecraft Interface] ✅ Created task from social chat: {
+  success: true,
+  goalId: 'goal-1770081999734-7pczt',
+  goal: {
+    id: 'goal-1770081999734-7pczt',
+    type: 'general',
+    priority: 0.8,
+    urgency: 0.6,
+    utility: 0.7,
+    description: 'Answer question from Heliotropism: "do you know which y level?"',
+    preconditions: [],
+    effects: [],
+    status: 'pending',
+    createdAt: 1770081999734,
+    updatedAt: 1770081999734,
+    subGoals: []
+  }
+}
+[Dashboard] POST /api/task-updates 200 in 7ms
+[Cognition] Processing environmental_awareness request
+[Dashboard] POST /api/ws/bot-state 200 in 12ms
+[Dashboard] GET /api/ws/cognitive-stream/history?limit=100 200 in 11ms
+[Dashboard] POST /api/ws/bot-state 200 in 10ms
+[Dashboard] POST /api/live-stream-updates 404 in 64ms
+[Dashboard] POST /api/live-stream-updates 404 in 63ms
+[Dashboard] POST /api/live-stream-updates 404 in 63ms
+[Dashboard] POST /api/ws/bot-state 200 in 8ms
+[Cognition] Processing environmental_awareness request
+[Dashboard] POST /api/ws/bot-state 200 in 9ms
+[Dashboard] GET /api/intero/history?limit=300 200 in 22ms
+[Dashboard] GET /api/tasks 200 in 24ms
+[Dashboard] GET /api/service-health 200 in 26ms
+[Dashboard] GET /api/intero/boundary-stats 200 in 27ms
+[Cognition] Processing environmental_awareness request
+[Dashboard] POST /api/ws/cognitive-stream received: {
+  type: 'environmental',
+  content: 'Awareness: 1 neutral nearby [new: player]',
+  attribution: 'self'
+}
+[Dashboard] New thought added to history: {
+  type: 'environmental',
+  content: 'Awareness: 1 neutral nearby [new: player]',
+  displayContent: undefined,
+  attribution: 'self',
+  context: {
+    emotionalState: 'aware',
+    confidence: 0.85,
+    cognitiveSystem: 'saliency-reasoner'
+  },
+  metadata: {
+    thoughtType: 'environmental',
+    source: 'saliency',
+    trackCount: 1,
+    deltaCount: 2,
+    provenance: 'chain-of-thought'
+  },
+  id: 'thought-1770082008466-bbvcmsy',
+  timestamp: 1770082008466,
+  processed: false
+}
+[Dashboard] Broadcasting message to 0 connections: {"type":"cognitive_thoughts","timestamp":1770082008467,"data":{"thoughts":[{"type":"environmental","content":"Awareness: 1 neutral nearby [new: player]","attribution":"self","context":{"emotionalState":"aware","confidence":0.85,"cognitiveSystem":"saliency-reasoner"},"metadata":{"thoughtType":"environmental","source":"saliency","trackCount":1,"deltaCount":2,"provenance":"chain-of-thought"},"id":"thought-1770082008466-bbvcmsy","timestamp":1770082008466,"processed":false}]}}
+Successfully sent message to 0 connections (0 dead connections removed)
+[Dashboard] POST /api/ws/cognitive-stream 200 in 10ms
+[Dashboard] POST /api/ws/bot-state 200 in 10ms
+[Cognition] Processing environmental_awareness request
+[Dashboard] POST /api/ws/cognitive-stream received: {
+  type: 'environmental',
+  content: 'Awareness: 1 hostile (zombie ~6 blocks (high)) 1 neutral nearby [new: zombie]',
+  attribution: 'self'
+}
+[Dashboard] New thought added to history: {
+  type: 'environmental',
+  content: 'Awareness: 1 hostile (zombie ~6 blocks (high)) 1 neutral nearby [new: zombie]',
+  displayContent: undefined,
+  attribution: 'self',
+  context: {
+    emotionalState: 'alert',
+    confidence: 0.85,
+    cognitiveSystem: 'saliency-reasoner'
+  },
+  metadata: {
+    thoughtType: 'environmental',
+    source: 'saliency',
+    trackCount: 2,
+    deltaCount: 2,
+    provenance: 'chain-of-thought'
+  },
+  id: 'thought-1770082010468-oi8bvte',
+  timestamp: 1770082010468,
+  processed: false
+}
+[Dashboard] Broadcasting message to 0 connections: {"type":"cognitive_thoughts","timestamp":1770082010468,"data":{"thoughts":[{"type":"environmental","content":"Awareness: 1 hostile (zombie ~6 blocks (high)) 1 neutral nearby [new: zombie]","attribution":"self","context":{"emotionalState":"alert","confidence":0.85,"cognitiveSystem":"saliency-reasoner"},"metadata":{"thoughtType":"environmental","source":"saliency","trackCount":2,"deltaCount":2,"provenance":"chain-of-thought"},"id":"thought-1770082010468-oi8bvte","timestamp":1770082010468,"processed":false}]}}
+Successfully sent message to 0 connections (0 dead connections removed)
+[Dashboard] POST /api/ws/cognitive-stream 200 in 10ms
+[Dashboard] POST /api/ws/bot-state 200 in 7ms
+[Dashboard] GET /api/tasks 200 in 89ms
+[Dashboard] GET /api/viewer/status 200 in 71ms
+[Dashboard] GET /api/ws/cognitive-stream/history?limit=100 200 in 89ms
+[Cognition] Processing environmental_awareness request
+[Dashboard] POST /api/ws/cognitive-stream received: {
+  type: 'environmental',
+  content: 'Awareness: 1 hostile (zombie ~4 blocks (high)) 1 neutral nearby',
+  attribution: 'self'
+}
+[Dashboard] New thought added to history: {
+  type: 'environmental',
+  content: 'Awareness: 1 hostile (zombie ~4 blocks (high)) 1 neutral nearby',
+  displayContent: undefined,
+  attribution: 'self',
+  context: {
+    emotionalState: 'alert',
+    confidence: 0.85,
+    cognitiveSystem: 'saliency-reasoner'
+  },
+  metadata: {
+    thoughtType: 'environmental',
+    source: 'saliency',
+    trackCount: 2,
+    deltaCount: 1,
+    provenance: 'chain-of-thought'
+  },
+  id: 'thought-1770082011467-1yck7yg',
+  timestamp: 1770082011467,
+  processed: false
+}
+[Dashboard] Broadcasting message to 0 connections: {"type":"cognitive_thoughts","timestamp":1770082011468,"data":{"thoughts":[{"type":"environmental","content":"Awareness: 1 hostile (zombie ~4 blocks (high)) 1 neutral nearby","attribution":"self","context":{"emotionalState":"alert","confidence":0.85,"cognitiveSystem":"saliency-reasoner"},"metadata":{"thoughtType":"environmental","source":"saliency","trackCount":2,"deltaCount":1,"provenance":"chain-of-thought"},"id":"thought-1770082011467-1yck7yg","timestamp":1770082011467,"processed":false}]}}
+Successfully sent message to 0 connections (0 dead connections removed)
+[Dashboard] POST /api/ws/cognitive-stream 200 in 9ms
+[Cognition] Generating thoughts for situation: {
+  situation: 'environment',
+  thoughtTypes: [ 'reflection', 'observation', 'planning' ]
+}
+[Dashboard] No new thoughts to send
+[Cognition] Processing environmental_awareness request
+[Dashboard] POST /api/ws/cognitive-stream received: {
+  type: 'environmental',
+  content: 'Awareness: 1 hostile (zombie ~4 blocks (critical)) 1 neutral nearby',
+  attribution: 'self'
+}
+[Dashboard] New thought added to history: {
+  type: 'environmental',
+  content: 'Awareness: 1 hostile (zombie ~4 blocks (critical)) 1 neutral nearby',
+  displayContent: undefined,
+  attribution: 'self',
+  context: {
+    emotionalState: 'alert',
+    confidence: 0.85,
+    cognitiveSystem: 'saliency-reasoner'
+  },
+  metadata: {
+    thoughtType: 'environmental',
+    source: 'saliency',
+    trackCount: 2,
+    deltaCount: 1,
+    provenance: 'chain-of-thought'
+  },
+  id: 'thought-1770082012469-7uw6ppb',
+  timestamp: 1770082012469,
+  processed: false
+}
+[Dashboard] Broadcasting message to 0 connections: {"type":"cognitive_thoughts","timestamp":1770082012469,"data":{"thoughts":[{"type":"environmental","content":"Awareness: 1 hostile (zombie ~4 blocks (critical)) 1 neutral nearby","attribution":"self","context":{"emotionalState":"alert","confidence":0.85,"cognitiveSystem":"saliency-reasoner"},"metadata":{"thoughtType":"environmental","source":"saliency","trackCount":2,"deltaCount":1,"provenance":"chain-of-thought"},"id":"thought-1770082012469-7uw6ppb","timestamp":1770082012469,"processed":false}]}}
+Successfully sent message to 0 connections (0 dead connections removed)
+[Dashboard] POST /api/ws/cognitive-stream 200 in 10ms
+[Minecraft Interface] [SafetyMonitor] 🚨 Immediate threat: zombie at 2.6 blocks! Triggering response
+[Minecraft Interface] [SafetyMonitor] 🚨 Emergency response triggered: hostile_nearby { entity: 'zombie', entityId: '85887', distance: 2.601046008332881 }
+[Minecraft Interface] [ThreatPerception] suppressed 2 LOS logs in last 5000ms (zombie:2)
+[Minecraft Interface] [SafetyMonitor] No emergency action needed
+[Dashboard] POST /api/ws/bot-state 200 in 6ms
+[Minecraft Interface] [SafetyMonitor] 🚫 Emergency response suppressed (cooldown): hostile_nearby
+[Cognition] Enhanced thought generator has 1 recent thoughts
+[Planning] [CognitiveStream] Fetched 3 thoughts [
+  '"My inventory is bare — I should gather some wood to get started. [GOAL: collect oak_log 8]"',
+  '"My inventory is bare — I should gather some wood to get started. [GOAL: collect oak_log 8]"',
+  '"My inventory is bare — I should gather some wood to get started. [GOAL: collect oak_log 8]"'
+]
+[Planning] [PlanRoute] {
+  backend: 'compiler',
+  requiredRig: null,
+  reason: 'collect-requirement',
+  taskTitle: 'My inventory is bare — I should gather some wood to get started.'
+}
+[Planning] Task added to enhanced integration: My inventory is bare — I should gather some wood to get started.
+[Dashboard] POST /api/task-updates 200 in 6ms
+[Minecraft Interface] Broadcasting health_changed to 1 clients
+[Minecraft Interface] WebSocket client disconnected (unknown)
+[Minecraft Interface] WebSocket client connected (unknown)
+[Dashboard] POST /api/live-stream-updates 404 in 106ms
+[Dashboard] POST /api/live-stream-updates 404 in 109ms
+[Dashboard] POST /api/live-stream-updates 404 in 108ms
+[Dashboard] SSE connection established. Total connections: 1
+[Dashboard] POST /api/environment-updates 404 in 56ms
+[Dashboard] POST /api/environment-updates 404 in 53ms
+[Minecraft Interface] WebSocket client disconnected (unknown)
+[Dashboard] GET /api/ws/bot-state 200 in 97ms
+[Dashboard] SSE connection closed. Total connections: 0
+[Dashboard] SSE connection established. Total connections: 1
+[Cognition] Processing environmental_awareness request
+[Dashboard] POST /api/ws/cognitive-stream received: {
+  type: 'environmental',
+  content: 'Awareness: 1 hostile (zombie ~0 blocks (critical)) 1 neutral nearby',
+  attribution: 'self'
+}
+[Dashboard] New thought added to history: {
+  type: 'environmental',
+  content: 'Awareness: 1 hostile (zombie ~0 blocks (critical)) 1 neutral nearby',
+  displayContent: undefined,
+  attribution: 'self',
+  context: {
+    emotionalState: 'alert',
+    confidence: 0.85,
+    cognitiveSystem: 'saliency-reasoner'
+  },
+  metadata: {
+    thoughtType: 'environmental',
+    source: 'saliency',
+    trackCount: 2,
+    deltaCount: 1,
+    provenance: 'chain-of-thought'
+  },
+  id: 'thought-1770082013471-pvhecw2',
+  timestamp: 1770082013471,
+  processed: false
+}
+[Dashboard] Broadcasting message to 0 connections: {"type":"cognitive_thoughts","timestamp":1770082013471,"data":{"thoughts":[{"type":"environmental","content":"Awareness: 1 hostile (zombie ~0 blocks (critical)) 1 neutral nearby","attribution":"self","context":{"emotionalState":"alert","confidence":0.85,"cognitiveSystem":"saliency-reasoner"},"metadata":{"thoughtType":"environmental","source":"saliency","trackCount":2,"deltaCount":1,"provenance":"chain-of-thought"},"id":"thought-1770082013471-pvhecw2","timestamp":1770082013471,"processed":false}]}}
+Successfully sent message to 0 connections (0 dead connections removed)
+[Dashboard] POST /api/ws/cognitive-stream 200 in 11ms
+[Minecraft Interface] Broadcasting health_changed to 0 clients
+[Minecraft Interface] Broadcasting position_changed to 0 clients
+[Minecraft Interface] Broadcasting health_changed to 0 clients
+[Minecraft Interface] Broadcasting health_changed to 0 clients
+[Minecraft Interface] [SafetyMonitor] 🚨 Immediate threat: zombie at 1.7 blocks! Triggering response
+[Minecraft Interface] [SafetyMonitor] 🚨 Emergency response triggered: hostile_nearby { entity: 'zombie', entityId: '85887', distance: 1.657311168408394 }
+[Minecraft Interface] [SafetyMonitor] No emergency action needed
+[Cognition] Processing environmental_awareness request
+[Dashboard] POST /api/ws/cognitive-stream received: {
+  type: 'environmental',
+  content: 'Awareness: 1 hostile (zombie ~0 blocks (critical)) 1 neutral nearby',
+  attribution: 'self'
+}
+[Dashboard] POST /api/ws/cognitive-stream 200 in 9ms
+[Minecraft Interface] Broadcasting health_changed to 0 clients
+[Dashboard] POST /api/ws/bot-state 200 in 6ms
+[Minecraft Interface] Broadcasting position_changed to 0 clients
+[Minecraft Interface] Broadcasting health_changed to 0 clients
+[Planning] [WorldStateManager] State update: {
+  connected: true,
+  position: { x: 197.6684843027931, y: 73.78735896612814, z: 195.54176098586518 },
+  health: 17.33333396911621,
+  inventoryCount: 0
+}
+[Cognition] Processing environmental_awareness request
+[Dashboard] POST /api/ws/cognitive-stream received: {
+  type: 'environmental',
+  content: 'Awareness: 1 hostile (zombie ~2 blocks (high)) 1 neutral nearby',
+  attribution: 'self'
+}
+[Dashboard] New thought added to history: {
+  type: 'environmental',
+  content: 'Awareness: 1 hostile (zombie ~2 blocks (high)) 1 neutral nearby',
+  displayContent: undefined,
+  attribution: 'self',
+  context: {
+    emotionalState: 'alert',
+    confidence: 0.85,
+    cognitiveSystem: 'saliency-reasoner'
+  },
+  metadata: {
+    thoughtType: 'environmental',
+    source: 'saliency',
+    trackCount: 2,
+    deltaCount: 3,
+    provenance: 'chain-of-thought'
+  },
+  id: 'thought-1770082015475-25sff3e',
+  timestamp: 1770082015475,
+  processed: false
+}
+[Dashboard] Broadcasting message to 0 connections: {"type":"cognitive_thoughts","timestamp":1770082015476,"data":{"thoughts":[{"type":"environmental","content":"Awareness: 1 hostile (zombie ~2 blocks (high)) 1 neutral nearby","attribution":"self","context":{"emotionalState":"alert","confidence":0.85,"cognitiveSystem":"saliency-reasoner"},"metadata":{"thoughtType":"environmental","source":"saliency","trackCount":2,"deltaCount":3,"provenance":"chain-of-thought"},"id":"thought-1770082015475-25sff3e","timestamp":1770082015475,"processed":false}]}}
+Successfully sent message to 0 connections (0 dead connections removed)
+[Dashboard] POST /api/ws/cognitive-stream 200 in 9ms
+[Minecraft Interface] Broadcasting health_changed to 0 clients
+[Minecraft Interface] Broadcasting position_changed to 0 clients
+[Minecraft Interface] Broadcasting health_changed to 0 clients
+[Minecraft Interface] Broadcasting health_changed to 0 clients
+[Dashboard] POST /api/ws/bot-state 200 in 10ms
+[Minecraft Interface] Broadcasting position_changed to 0 clients
+[Minecraft Interface] WebSocket client connected (unknown)
+[Dashboard] GET /api/ws/bot-state 200 in 3521ms
+[Dashboard] SSE connection closed. Total connections: 0
+[Minecraft Interface] Broadcasting health_changed to 1 clients
+[Minecraft Interface] WebSocket client disconnected (unknown)
+[Dashboard] SSE connection established. Total connections: 1
+[Planning] [MCP] Bot instance updated successfully
+[Minecraft Interface] Bot instance updated in planning server
+[Minecraft Interface] Broadcasting health_changed to 0 clients
+[Minecraft Interface] Broadcasting health_changed to 0 clients
+[Minecraft Interface] Broadcasting position_changed to 0 clients
+[Planning] [WorldStateManager] State update: {
+  connected: true,
+  position: { x: 197.6684843027931, y: 50.71873683492763, z: 195.46526282521856 },
+  health: 18.333332061767578,
+  inventoryCount: 0
+}
+[Cognition] Processing environmental_awareness request
+[Minecraft Interface] [ThreatPerception] suppressed 5 LOS logs in last 5000ms (zombie:5)
+[Dashboard] POST /api/ws/bot-state 200 in 7ms
+[Minecraft Interface] Broadcasting position_changed to 0 clients
+[Minecraft Interface] Broadcasting position_changed to 0 clients
+[Cognition] Processing environmental_awareness request
+[Dashboard] POST /api/ws/bot-state 200 in 6ms
+[Minecraft Interface] Broadcasting position_changed to 0 clients
+[Minecraft Interface] WebSocket client connected (unknown)
+[Dashboard] GET /api/ws/bot-state 200 in 3734ms
+[Dashboard] SSE connection closed. Total connections: 0
+[Planning] [WorldStateManager] State update: {
+  connected: true,
+  position: { x: 197.6684843027931, y: 49.19365534368992, z: 195.46526282521856 },
+  health: 18.333332061767578,
+  inventoryCount: 0
+}
+[Minecraft Interface] Broadcasting health_changed to 1 clients
+[Minecraft Interface] WebSocket client disconnected (unknown)
+[Dashboard] SSE connection established. Total connections: 1
+[Minecraft Interface] Broadcasting health_changed to 0 clients
+[Dashboard] GET /api/ws/cognitive-stream/history?limit=100 200 in 11ms
+[Minecraft Interface] Broadcasting position_changed to 0 clients
+[Dashboard] POST /api/ws/bot-state 200 in 9ms
+[Minecraft Interface] Broadcasting position_changed to 0 clients
+[Minecraft Interface] WebSocket client connected (unknown)
+[Dashboard] GET /api/ws/bot-state 200 in 1240ms
+[Dashboard] SSE connection closed. Total connections: 0
+[Dashboard] POST /api/live-stream-updates 404 in 62ms
+[Dashboard] POST /api/live-stream-updates 404 in 62ms
+[Dashboard] POST /api/live-stream-updates 404 in 63ms
+[Cognition] Processing environmental_awareness request
+[Dashboard] POST /api/ws/cognitive-stream received: {
+  type: 'environmental',
+  content: 'Awareness: 1 neutral nearby [new: cod]',
+  attribution: 'self'
+}
+[Dashboard] New thought added to history: {
+  type: 'environmental',
+  content: 'Awareness: 1 neutral nearby [new: cod]',
+  displayContent: undefined,
+  attribution: 'self',
+  context: {
+    emotionalState: 'aware',
+    confidence: 0.85,
+    cognitiveSystem: 'saliency-reasoner'
+  },
+  metadata: {
+    thoughtType: 'environmental',
+    source: 'saliency',
+    trackCount: 1,
+    deltaCount: 1,
+    provenance: 'chain-of-thought'
+  },
+  id: 'thought-1770082023484-xnueuu1',
+  timestamp: 1770082023484,
+  processed: false
+}
+[Dashboard] Broadcasting message to 0 connections: {"type":"cognitive_thoughts","timestamp":1770082023485,"data":{"thoughts":[{"type":"environmental","content":"Awareness: 1 neutral nearby [new: cod]","attribution":"self","context":{"emotionalState":"aware","confidence":0.85,"cognitiveSystem":"saliency-reasoner"},"metadata":{"thoughtType":"environmental","source":"saliency","trackCount":1,"deltaCount":1,"provenance":"chain-of-thought"},"id":"thought-1770082023484-xnueuu1","timestamp":1770082023484,"processed":false}]}}
+Successfully sent message to 0 connections (0 dead connections removed)
+[Dashboard] POST /api/ws/cognitive-stream 200 in 15ms
+[Minecraft Interface] Broadcasting position_changed to 1 clients
+[Minecraft Interface] [MINECRAFT INTERFACE] Bot state updated: {
+  position: {
+    x: 197.6684843027931,
+    y: 47.693655343590024,
+    z: 195.46526282521856
+  },
+  health: 19.333332061767578,
+  inventoryItems: 0
+}
+[Planning] [WorldStateManager] State update: {
+  connected: true,
+  position: {
+    x: 197.6684843027931,
+    y: 47.693655343590024,
+    z: 195.46526282521856
+  },
+  health: 19.333332061767578,
+  inventoryCount: 0
+}
+[Minecraft Interface] [ThreatPerception] localized threat assessment: 0 threats, level: low
+[ThreatPerception] suppressed 3 LOS logs in last 5000ms (zombie:3)
+[Dashboard] POST /api/ws/bot-state 200 in 9ms
+[Cognition] Processing environmental_awareness request
+[Dashboard] POST /api/ws/cognitive-stream received: {
+  type: 'environmental',
+  content: 'Awareness: 1 neutral nearby',
+  attribution: 'self'
+}
+[Dashboard] New thought added to history: {
+  type: 'environmental',
+  content: 'Awareness: 1 neutral nearby',
+  displayContent: undefined,
+  attribution: 'self',
+  context: {
+    emotionalState: 'aware',
+    confidence: 0.85,
+    cognitiveSystem: 'saliency-reasoner'
+  },
+  metadata: {
+    thoughtType: 'environmental',
+    source: 'saliency',
+    trackCount: 1,
+    deltaCount: 1,
+    provenance: 'chain-of-thought'
+  },
+  id: 'thought-1770082025481-2femr42',
+  timestamp: 1770082025481,
+  processed: false
+}
+[Dashboard] Broadcasting message to 0 connections: {"type":"cognitive_thoughts","timestamp":1770082025481,"data":{"thoughts":[{"type":"environmental","content":"Awareness: 1 neutral nearby","attribution":"self","context":{"emotionalState":"aware","confidence":0.85,"cognitiveSystem":"saliency-reasoner"},"metadata":{"thoughtType":"environmental","source":"saliency","trackCount":1,"deltaCount":1,"provenance":"chain-of-thought"},"id":"thought-1770082025481-2femr42","timestamp":1770082025481,"processed":false}]}}
+Successfully sent message to 0 connections (0 dead connections removed)
+[Dashboard] POST /api/ws/cognitive-stream 200 in 10ms
+[Minecraft Interface] Broadcasting health_changed to 1 clients
+[Minecraft Interface] WebSocket client disconnected (unknown)
+[Minecraft Interface] WebSocket client connected (unknown)
+[Minecraft Interface] Broadcasting health_changed to 1 clients
+[Dashboard] SSE connection established. Total connections: 1
+[Minecraft Interface] Broadcasting health_changed to 1 clients
+[Minecraft Interface] Broadcasting position_changed to 1 clients
+[Minecraft Interface] WebSocket client disconnected (unknown)
+[Dashboard] GET /api/ws/bot-state 200 in 74ms
+[Dashboard] SSE connection closed. Total connections: 0
+[Dashboard] SSE connection established. Total connections: 1
+[Cognition] Processing environmental_awareness request
+[Dashboard] POST /api/ws/cognitive-stream received: {
+  type: 'environmental',
+  content: 'Awareness: 3 neutral nearby [new: cod, cod]',
+  attribution: 'self'
+}
+[Dashboard] New thought added to history: {
+  type: 'environmental',
+  content: 'Awareness: 3 neutral nearby [new: cod, cod]',
+  displayContent: undefined,
+  attribution: 'self',
+  context: {
+    emotionalState: 'aware',
+    confidence: 0.85,
+    cognitiveSystem: 'saliency-reasoner'
+  },
+  metadata: {
+    thoughtType: 'environmental',
+    source: 'saliency',
+    trackCount: 3,
+    deltaCount: 5,
+    provenance: 'chain-of-thought'
+  },
+  id: 'thought-1770082026483-pl4dhld',
+  timestamp: 1770082026483,
+  processed: false
+}
+Broadcasting message to 0 connections: {"type":"cognitive_thoughts","timestamp":1770082026484,"data":{"thoughts":[{"type":"environmental","content":"Awareness: 3 neutral nearby [new: cod, cod]","attribution":"self","context":{"emotionalState":"aware","confidence":0.85,"cognitiveSystem":"saliency-reasoner"},"metadata":{"thoughtType":"environmental","source":"saliency","trackCount":3,"deltaCount":5,"provenance":"chain-of-thought"},"id":"thought-1770082026483-pl4dhld","timestamp":1770082026483,"processed":false}]}}
+Successfully sent message to 0 connections (0 dead connections removed)
+[Dashboard] POST /api/ws/cognitive-stream 200 in 16ms
+[Dashboard] POST /api/ws/bot-state 200 in 7ms
+[Planning] [WorldStateManager] State update: {
+  connected: true,
+  position: { x: 197.6684843027931, y: 46.19365534359011, z: 195.46526282521856 },
+  health: 20,
+  inventoryCount: 0
+}
+[Cognition] Processing environmental_awareness request
+[Dashboard] POST /api/ws/cognitive-stream received: {
+  type: 'environmental',
+  content: 'Awareness: 4 neutral nearby [new: cod]',
+  attribution: 'self'
+}
+[Dashboard] New thought added to history: {
+  type: 'environmental',
+  content: 'Awareness: 4 neutral nearby [new: cod]',
+  displayContent: undefined,
+  attribution: 'self',
+  context: {
+    emotionalState: 'aware',
+    confidence: 0.85,
+    cognitiveSystem: 'saliency-reasoner'
+  },
+  metadata: {
+    thoughtType: 'environmental',
+    source: 'saliency',
+    trackCount: 4,
+    deltaCount: 2,
+    provenance: 'chain-of-thought'
+  },
+  id: 'thought-1770082027479-m5o80xa',
+  timestamp: 1770082027479,
+  processed: false
+}
+Broadcasting message to 0 connections: {"type":"cognitive_thoughts","timestamp":1770082027479,"data":{"thoughts":[{"type":"environmental","content":"Awareness: 4 neutral nearby [new: cod]","attribution":"self","context":{"emotionalState":"aware","confidence":0.85,"cognitiveSystem":"saliency-reasoner"},"metadata":{"thoughtType":"environmental","source":"saliency","trackCount":4,"deltaCount":2,"provenance":"chain-of-thought"},"id":"thought-1770082027479-m5o80xa","timestamp":1770082027479,"processed":false}]}}
+[Dashboard] Successfully sent message to 0 connections (0 dead connections removed)
+[Dashboard] POST /api/ws/cognitive-stream 200 in 9ms
+[Minecraft Interface] Broadcasting position_changed to 0 clients
+[Dashboard] POST /api/environment-updates 404 in 48ms
+[Dashboard] POST /api/environment-updates 404 in 48ms
+[Cognition] Processing environmental_awareness request
+[Dashboard] POST /api/ws/cognitive-stream received: {
+  type: 'environmental',
+  content: 'Awareness: 4 neutral nearby',
+  attribution: 'self'
+}
+[Dashboard] New thought added to history: {
+  type: 'environmental',
+  content: 'Awareness: 4 neutral nearby',
+  displayContent: undefined,
+  attribution: 'self',
+  context: {
+    emotionalState: 'aware',
+    confidence: 0.85,
+    cognitiveSystem: 'saliency-reasoner'
+  },
+  metadata: {
+    thoughtType: 'environmental',
+    source: 'saliency',
+    trackCount: 4,
+    deltaCount: 3,
+    provenance: 'chain-of-thought'
+  },
+  id: 'thought-1770082028486-mno6ebh',
+  timestamp: 1770082028486,
+  processed: false
+}
+[Dashboard] Broadcasting message to 0 connections: {"type":"cognitive_thoughts","timestamp":1770082028486,"data":{"thoughts":[{"type":"environmental","content":"Awareness: 4 neutral nearby","attribution":"self","context":{"emotionalState":"aware","confidence":0.85,"cognitiveSystem":"saliency-reasoner"},"metadata":{"thoughtType":"environmental","source":"saliency","trackCount":4,"deltaCount":3,"provenance":"chain-of-thought"},"id":"thought-1770082028486-mno6ebh","timestamp":1770082028486,"processed":false}]}}
+Successfully sent message to 0 connections (0 dead connections removed)
+[Dashboard] POST /api/ws/cognitive-stream 200 in 15ms
+[Dashboard] POST /api/ws/bot-state 200 in 7ms
+[Minecraft Interface] Broadcasting position_changed to 0 clients
+[Minecraft Interface] WebSocket client connected (unknown)
+[Dashboard] GET /api/ws/bot-state 200 in 3100ms
+[Dashboard] SSE connection closed. Total connections: 0
+[Cognition] Processing environmental_awareness request
+[Dashboard] POST /api/ws/cognitive-stream received: {
+  type: 'environmental',
+  content: 'Awareness: 4 neutral nearby',
+  attribution: 'self'
+}
+[Dashboard] POST /api/ws/cognitive-stream 200 in 16ms
+[Planning] [WorldStateManager] State update: {
+  connected: true,
+  position: { x: 197.6684843027931, y: 44.71865534359019, z: 195.46526282521856 },
+  health: 20,
+  inventoryCount: 0
+}
+[Cognition] Processing environmental_awareness request
+[Dashboard] POST /api/ws/cognitive-stream received: {
+  type: 'environmental',
+  content: 'Awareness: 4 neutral nearby',
+  attribution: 'self'
+}
+[Dashboard] POST /api/ws/cognitive-stream 200 in 9ms
+[Minecraft Interface] [ThreatPerception] suppressed 3 LOS logs in last 5000ms (zombie:3)
+[Dashboard] POST /api/ws/bot-state 200 in 7ms
+[Minecraft Interface] Broadcasting position_changed to 1 clients
+[Dashboard] GET /api/ws/cognitive-stream/history?limit=100 200 in 12ms
+[Cognition] Processing environmental_awareness request
+[Dashboard] POST /api/ws/cognitive-stream received: {
+  type: 'environmental',
+  content: 'Awareness: 4 neutral nearby',
+  attribution: 'self'
+}
+[Dashboard] POST /api/ws/cognitive-stream 200 in 16ms
+[Minecraft Interface] Broadcasting health_changed to 1 clients
+[Minecraft Interface] WebSocket client disconnected (unknown)
+[Minecraft Interface] WebSocket client connected (unknown)
+[Dashboard] SSE connection established. Total connections: 1
+[Minecraft Interface] WebSocket client disconnected (unknown)
+[Dashboard] GET /api/ws/bot-state 200 in 117ms
+[Dashboard] SSE connection closed. Total connections: 0
+[Dashboard] SSE connection established. Total connections: 1
+[Minecraft Interface] Broadcasting health_changed to 0 clients
+[Dashboard] POST /api/ws/bot-state 200 in 10ms
+[Minecraft Interface] Broadcasting position_changed to 0 clients
+[Dashboard] POST /api/live-stream-updates 404 in 62ms
+[Dashboard] POST /api/live-stream-updates 404 in 64ms
+[Dashboard] POST /api/live-stream-updates 404 in 63ms
+[Planning] [WorldStateManager] State update: {
+  connected: true,
+  position: { x: 197.6684843027931, y: 44, z: 195.46526282521856 },
+  health: 16,
+  inventoryCount: 0
+}
+[Cognition] Processing environmental_awareness request
+[Dashboard] POST /api/ws/cognitive-stream received: {
+  type: 'environmental',
+  content: 'Awareness: 4 neutral nearby',
+  attribution: 'self'
+}
+[Dashboard] POST /api/ws/cognitive-stream 200 in 11ms
+[Minecraft Interface] Broadcasting health_changed to 0 clients
+[Cognition] Processing environmental_awareness request
+[Dashboard] POST /api/ws/cognitive-stream received: {
+  type: 'environmental',
+  content: 'Awareness: 4 neutral nearby',
+  attribution: 'self'
+}
+[Dashboard] POST /api/ws/cognitive-stream 200 in 11ms
+[Minecraft Interface] Broadcasting health_changed to 0 clients
+[Dashboard] POST /api/ws/bot-state 200 in 8ms
+[Minecraft Interface] WebSocket client connected (unknown)
+[Dashboard] GET /api/ws/bot-state 200 in 2964ms
+[Dashboard] SSE connection closed. Total connections: 0
+[Cognition] Processing environmental_awareness request
+[Dashboard] POST /api/ws/cognitive-stream received: {
+  type: 'environmental',
+  content: 'Awareness: 4 neutral nearby',
+  attribution: 'self'
+}
+[Dashboard] POST /api/ws/cognitive-stream 200 in 11ms
+[Minecraft Interface] Broadcasting health_changed to 1 clients
+[Minecraft Interface] WebSocket client disconnected (unknown)
+[Dashboard] SSE connection established. Total connections: 1
+[Planning] [WorldStateManager] State update: {
+  connected: true,
+  position: { x: 197.6684843027931, y: 44, z: 195.46526282521856 },
+  health: 10,
+  inventoryCount: 0
+}
+[Cognition] Processing environmental_awareness request
+[Dashboard] POST /api/ws/cognitive-stream received: {
+  type: 'environmental',
+  content: 'Awareness: 4 neutral nearby',
+  attribution: 'self'
+}
+[Dashboard] POST /api/ws/cognitive-stream 200 in 9ms
+[Minecraft Interface] Broadcasting health_changed to 0 clients
+[Minecraft Interface] [ThreatPerception] suppressed 1 LOS logs in last 5000ms (zombie:1)
+[Dashboard] POST /api/ws/bot-state 200 in 7ms
+[Minecraft Interface] WebSocket client connected (unknown)
+[Dashboard] GET /api/ws/bot-state 200 in 1143ms
+[Dashboard] SSE connection closed. Total connections: 0
+[Dashboard] GET /api/intero/history?limit=300 200 in 14ms
+[Dashboard] GET /api/intero/boundary-stats 200 in 22ms
+[Dashboard] GET /api/tasks 200 in 25ms
+[Dashboard] GET /api/service-health 200 in 25ms
+[Cognition] Processing environmental_awareness request
+[Dashboard] POST /api/ws/cognitive-stream received: {
+  type: 'environmental',
+  content: 'Awareness: 4 neutral nearby',
+  attribution: 'self'
+}
+[Dashboard] POST /api/ws/cognitive-stream 200 in 13ms
+[Minecraft Interface] Broadcasting health_changed to 1 clients
+[Minecraft Interface] [SafetyMonitor] 🚨 Critical health (6)! Fleeing immediately
+[Minecraft Interface] [SafetyMonitor] 🚨 Emergency response triggered: critical_health { health: 6 }
+[Minecraft Interface] [SafetyMonitor] 🏃 Fleeing from threats...
+[Minecraft Interface] [SafetyMonitor] 🏃 Calculating flee direction from position: 197.7, 44.0, 195.5
+[Minecraft Interface] [SafetyMonitor] 💧 Bot is in water block: water at 197.7, 44.0, 195.5
+[Minecraft Interface] 🌊 Water environment analysis: {
+  waterDepth: 19,
+  surfaceLevel: 63,
+  safeSurfacePositions: 0,
+  hasCurrent: false,
+  nearestDistance: 'Infinity'
+}
+[Minecraft Interface] [SafetyMonitor] 🌊 WaterNav buoyancy_float (neutral_buoyancy) depth=19 current=false safeSurfaces=0
+[Minecraft Interface] [ActionTranslator] 🧭 executeNavigate called with target: 216.18876674468572, 45, 203.01504019097734
+[ActionTranslator] 🔍 state: {
+  hasNavigationBridge: true,
+  hasBot: true,
+  botSpawned: true,
+  botPathfinder: true,
+  timestamp: 1770082037631
+}
+[Minecraft Interface] [ActionTranslator] 🧭 Using D* Lite navigation to target: 216.18876674468572, 45, 203.01504019097734
+[Minecraft Interface] [NavigationBridge] 🧭 state check: {
+  usePathfinding: true,
+  hasBotPathfinder: true,
+  hasPf: true,
+  hasMovements: true,
+  timestamp: 1770082037631
+}
+[Minecraft Interface] 🧠 Performing neural terrain prediction...
+[Minecraft Interface] ✅ Neural prediction completed: {
+  terrainType: 'hazard',
+  confidence: '0.03',
+  riskAssessment: '0.00',
+  predictedChanges: 21
+}
+[Minecraft Interface] [NavigationSystem] Building graph for region with ~1024 estimated nodes
+[Minecraft Interface] Navigation graph built: { success: true, nodes: 1024 }
+[Minecraft Interface] WebSocket client disconnected (unknown)
+[Dashboard] SSE connection established. Total connections: 1
+[Cognition] Processing environmental_awareness request
+[Dashboard] POST /api/ws/cognitive-stream received: {
+  type: 'environmental',
+  content: 'Awareness: 4 neutral nearby',
+  attribution: 'self'
+}
+[Dashboard] POST /api/ws/cognitive-stream 200 in 11ms
+[Minecraft Interface] Broadcasting health_changed to 0 clients
+[SafetyMonitor] 🚨 Critical health (4)! Fleeing immediately
+[SafetyMonitor] 🚨 Emergency response triggered: critical_health { health: 4 }
+[SafetyMonitor] 🏃 Fleeing from threats...
+[SafetyMonitor] 🏃 Calculating flee direction from position: 198.6, 46.6, 196.6
+[SafetyMonitor] 💧 Bot is in water block: water at 198.6, 46.6, 196.6
+🌊 Water environment analysis: {
+  waterDepth: 17,
+  surfaceLevel: 63.63508806316531,
+  safeSurfacePositions: 0,
+  hasCurrent: false,
+  nearestDistance: 'Infinity'
+}
+[Minecraft Interface] [SafetyMonitor] 🌊 WaterNav buoyancy_float (neutral_buoyancy) depth=17 current=false safeSurfaces=0
+[Minecraft Interface] [ActionTranslator] 🧭 navigate gated: already navigating
+[Minecraft Interface] [SafetyMonitor] ✅ Flee action completed
+[Minecraft Interface] [SafetyMonitor] ⚠️ High threat level detected! Taking defensive action
+[Minecraft Interface] [SafetyMonitor] 🚨 Emergency response triggered: high_threat {
+  threatLevel: 'high',
+  threats: [ { type: 'low_health', distance: 0, threatLevel: 80 } ],
+  recommendedAction: 'flee'
+}
+[Minecraft Interface] 🌊 Water environment analysis: {
+  waterDepth: 17,
+  surfaceLevel: 63.80807045053225,
+  safeSurfacePositions: 0,
+  hasCurrent: false,
+  nearestDistance: 'Infinity'
+}
+[Dashboard] POST /api/ws/bot-state 200 in 6ms
+[Minecraft Interface] WebSocket client connected (unknown)
+[Minecraft Interface] Broadcasting position_changed to 1 clients
+[Dashboard] GET /api/ws/bot-state 200 in 1148ms
+[Dashboard] SSE connection closed. Total connections: 0
+[Planning] [WorldStateManager] State update: {
+  connected: true,
+  position: { x: 198.5049936485001, y: 48.90055459713759, z: 196.50626410302698 },
+  health: 4,
+  inventoryCount: 0
+}
+[Cognition] Processing environmental_awareness request
+[Dashboard] POST /api/ws/cognitive-stream received: {
+  type: 'environmental',
+  content: 'Awareness: 4 neutral nearby',
+  attribution: 'self'
+}
+[Dashboard] POST /api/ws/cognitive-stream 200 in 12ms
+[Minecraft Interface] Broadcasting health_changed to 1 clients
+[Minecraft Interface] Broadcasting warning to 1 clients
+[SafetyMonitor] 🚨 Critical health (2)! Fleeing immediately
+[SafetyMonitor] 🚨 Emergency response triggered: critical_health { health: 2 }
+[Minecraft Interface] [SafetyMonitor] 🏃 Fleeing from threats...
+[Minecraft Interface] [SafetyMonitor] 🏃 Calculating flee direction from position: 198.5, 50.1, 196.5
+[Minecraft Interface] [SafetyMonitor] 💧 Bot is in water block: water at 198.5, 50.1, 196.5
+[Minecraft Interface] 🌊 Water environment analysis: {
+  waterDepth: 13,
+  surfaceLevel: 63.125116307449616,
+  safeSurfacePositions: 0,
+  hasCurrent: false,
+  nearestDistance: 'Infinity'
+}
+[Minecraft Interface] [SafetyMonitor] 🌊 WaterNav deep_dive (neutral_buoyancy) depth=13 current=false safeSurfaces=0
+[Minecraft Interface] WebSocket client disconnected (unknown)
+[Dashboard] SSE connection established. Total connections: 1
+[Minecraft Interface] Broadcasting position_changed to 0 clients
+[Cognition] Processing environmental_awareness request
+[Dashboard] POST /api/ws/cognitive-stream received: {
+  type: 'environmental',
+  content: 'Awareness: 4 neutral nearby',
+  attribution: 'self'
+}
+[Dashboard] POST /api/ws/cognitive-stream 200 in 9ms
+[Minecraft Interface] Broadcasting health_changed to 0 clients
+[Minecraft Interface] Broadcasting warning to 0 clients
+[Minecraft Interface] Broadcasting health_changed to 0 clients
+💀 Bot died, stopping thought generation...
+Observation broadcast stopped
+Broadcasting error to 0 clients
+[Minecraft Interface] Broadcasting health_changed to 0 clients
+[Minecraft Interface] Broadcasting respawned to 0 clients
+[Minecraft Interface] Bot respawned, restarting thought generation...
+[Minecraft Interface] Observation broadcast started (30s intervals)
+[Minecraft Interface] [SafetyMonitor] 🚨 Critical threat level detected! Taking immediate action
+[Minecraft Interface] [SafetyMonitor] 🚨 Emergency response triggered: critical_threat {
+  threatLevel: 'critical',
+  threats: [ { type: 'low_health', distance: 0, threatLevel: 100 } ],
+  recommendedAction: 'flee'
+}
+[SafetyMonitor] 🏃 Fleeing from threats...
+[SafetyMonitor] 🏃 Calculating flee direction from position: 262.5, 63.0, 178.5
+[SafetyMonitor] 💧 Bot is near water block: water at 261.5, 62.0, 177.5
+[Minecraft Interface] 🌊 Water environment analysis: {
+  waterDepth: 0,
+  surfaceLevel: 63,
+  safeSurfacePositions: 52,
+  hasCurrent: true,
+  nearestDistance: '0.00'
+}
+[SafetyMonitor] 🌊 WaterNav surface_escape (float_up) depth=0 current=true safeSurfaces=52
+[Minecraft Interface] [SafetyMonitor] ✅ Flee action completed
+[Dashboard] POST /api/ws/bot-state 200 in 9ms
+[Minecraft Interface] Broadcasting health_changed to 0 clients
+[Minecraft Interface] WebSocket client connected (unknown)
+[Minecraft Interface] Broadcasting position_changed to 1 clients
+[Minecraft Interface] 🔄 Path reset #1 (pathfinder replanning)
+[Dashboard] GET /api/ws/bot-state 200 in 1154ms
+[Dashboard] SSE connection closed. Total connections: 0
+[Minecraft Interface] 🔄 Path reset #2 (pathfinder replanning)
+[Dashboard] GET /api/tasks 200 in 14ms
+[Dashboard] GET /api/ws/cognitive-stream/history?limit=100 200 in 27ms
+[Dashboard] GET /api/viewer/status 200 in 50ms
+[Minecraft Interface] Broadcasting position_changed to 1 clients
+[Planning] [WorldStateManager] State update: {
+  connected: true,
+  position: { x: 256.9118692308201, y: 63, z: 179.9427269098577 },
+  health: 20,
+  inventoryCount: 0
+}
+[Cognition] Processing environmental_awareness request
+[Dashboard] POST /api/ws/cognitive-stream received: {
+  type: 'environmental',
+  content: 'Awareness: 5 neutral nearby [new: player]',
+  attribution: 'self'
+}
+[Dashboard] New thought added to history: {
+  type: 'environmental',
+  content: 'Awareness: 5 neutral nearby [new: player]',
+  displayContent: undefined,
+  attribution: 'self',
+  context: {
+    emotionalState: 'aware',
+    confidence: 0.85,
+    cognitiveSystem: 'saliency-reasoner'
+  },
+  metadata: {
+    thoughtType: 'environmental',
+    source: 'saliency',
+    trackCount: 5,
+    deltaCount: 2,
+    provenance: 'chain-of-thought'
+  },
+  id: 'thought-1770082042485-uuagxaj',
+  timestamp: 1770082042485,
+  processed: false
+}
+[Dashboard] Broadcasting message to 0 connections: {"type":"cognitive_thoughts","timestamp":1770082042486,"data":{"thoughts":[{"type":"environmental","content":"Awareness: 5 neutral nearby [new: player]","attribution":"self","context":{"emotionalState":"aware","confidence":0.85,"cognitiveSystem":"saliency-reasoner"},"metadata":{"thoughtType":"environmental","source":"saliency","trackCount":5,"deltaCount":2,"provenance":"chain-of-thought"},"id":"thought-1770082042485-uuagxaj","timestamp":1770082042485,"processed":false}]}}
+Successfully sent message to 0 connections (0 dead connections removed)
+[Dashboard] POST /api/ws/cognitive-stream 200 in 9ms
+[Dashboard] POST /api/ws/bot-state 200 in 7ms
+[Minecraft Interface] Broadcasting position_changed to 1 clients
+[Cognition] Enhanced thought generator has 1 recent thoughts
+[Planning] [CognitiveStream] Fetched 3 thoughts [
+  '"My inventory is bare — I should gather some wood to get started. [GOAL: collect oak_log 8]"',
+  '"My inventory is bare — I should gather some wood to get started. [GOAL: collect oak_log 8]"',
+  '"My inventory is bare — I should gather some wood to get started. [GOAL: collect oak_log 8]"'
+]
+[Planning] [readiness] minecraft: down → up
+[readiness] dashboard: down → unhealthy
+[Planning] [Planning] Starting executor — system ready and dependencies reachable
+[Planning] ✅ [AuditLogger] Started audit session: executor-1770082043129
+[Planning] Audit session started: executor-1770082043129
+[Dashboard] GET /health 404 in 26ms
+[Dashboard] POST /api/live-stream-updates 404 in 105ms
+[Dashboard] POST /api/live-stream-updates 404 in 104ms
+[Dashboard] POST /api/live-stream-updates 404 in 104ms
+[Dashboard] POST /api/environment-updates 404 in 44ms
+[Dashboard] POST /api/environment-updates 404 in 45ms
+[Minecraft Interface] 🔄 Path reset #3 (pathfinder replanning)
+[Cognition] Processing environmental_awareness request
+[Dashboard] POST /api/ws/cognitive-stream received: {
+  type: 'environmental',
+  content: 'Awareness: 1 neutral nearby',
+  attribution: 'self'
+}
+[Dashboard] POST /api/ws/cognitive-stream 200 in 9ms
+[Minecraft Interface] Broadcasting position_changed to 1 clients
+[Dashboard] POST /api/ws/bot-state 200 in 8ms
+[Planning] [WorldStateManager] State update: {
+  connected: true,
+  position: { x: 256.7294549635696, y: 63, z: 181.921130999211 },
+  health: 20,
+  inventoryCount: 0
+}
+[Cognition] Processing environmental_awareness request
+[Dashboard] POST /api/ws/cognitive-stream received: {
+  type: 'environmental',
+  content: 'Awareness: 1 neutral nearby',
+  attribution: 'self'
+}
+[Dashboard] POST /api/ws/cognitive-stream 200 in 9ms
+[Minecraft Interface] Broadcasting position_changed to 1 clients
+[Cognition] Processing environmental_awareness request
+[Dashboard] POST /api/ws/cognitive-stream received: {
+  type: 'environmental',
+  content: 'Awareness: 1 neutral nearby',
+  attribution: 'self'
+}
+[Dashboard] POST /api/ws/cognitive-stream 200 in 13ms
+[Minecraft Interface] Broadcasting position_changed to 1 clients
+[Dashboard] POST /api/ws/bot-state 200 in 8ms
+[Planning] [MCP] Bot instance updated successfully
+[Minecraft Interface] Bot instance updated in planning server
+[Cognition] Processing environmental_awareness request
+[Dashboard] POST /api/ws/cognitive-stream received: {
+  type: 'environmental',
+  content: 'Awareness: 1 neutral nearby',
+  attribution: 'self'
+}
+[Dashboard] POST /api/ws/cognitive-stream 200 in 10ms
+[Minecraft Interface] Broadcasting position_changed to 1 clients
+[Minecraft Interface] 🔄 Path reset #4 (pathfinder replanning)
+[Planning] [WorldStateManager] State update: {
+  connected: true,
+  position: {
+    x: 258.23988649749896,
+    y: 61.52866168525349,
+    z: 180.25390842585978
+  },
+  health: 20,
+  inventoryCount: 0
+}
+[Minecraft Interface] 💬 Processing chat from Heliotropism: "are you okay? what just happened?"
+[Cognition] Processing social_interaction request
+Processing social interaction
+[Dashboard] POST /api/ws/cognitive-stream received: {
+  type: 'social',
+  content: 'Social interaction: Chat from Heliotropism: "are you okay? what just happened?"',
+  attribution: 'self'
+}
+[Dashboard] New thought added to history: {
+  type: 'social',
+  content: 'Social interaction: Chat from Heliotropism: "are you okay? what just happened?"',
+  displayContent: 'are you okay? what just happened?',
+  attribution: 'self',
+  context: {
+    emotionalState: 'interested',
+    confidence: 0.9,
+    cognitiveSystem: 'social-processor',
+    sender: 'Heliotropism',
+    message: 'are you okay? what just happened?'
+  },
+  metadata: {
+    sender: 'Heliotropism',
+    message: 'are you okay? what just happened?',
+    timestamp: 1770082048697,
+    environment: 'minecraft',
+    botPosition: {
+      x: 258.1233763933697,
+      y: 62.69856733205029,
+      z: 180.31278005879088
+    },
+    botHealth: 20,
+    botFood: 20,
+    thoughtType: 'social',
+    source: 'player-chat',
+    provenance: 'chain-of-thought'
+  },
+  id: 'thought-1770082048708-qhijxo3',
+  timestamp: 1770082048708,
+  processed: false
+}
+Broadcasting message to 0 connections: {"type":"cognitive_thoughts","timestamp":1770082048708,"data":{"thoughts":[{"type":"social","content":"Social interaction: Chat from Heliotropism: \"are you okay? what just happened?\"","displayContent":"are you okay? what just happened?","attribution":"self","context":{"emotionalState":"interested","confidence":0.9,"cognitiveSystem":"social-processor","sender":"Heliotropism","message":"are you okay? what just happened?"},"metadata":{"sender":"Heliotropism","message":"are you okay? what just happened?","timestamp":1770082048697,"environment":"minecraft","botPosition":{"x":258.1233763933697,"y":62.69856733205029,"z":180.31278005879088},"botHealth":20,"botFood":20,"thoughtType":"social","source":"player-chat","provenance":"chain-of-thought"},"id":"thought-1770082048708-qhijxo3","timestamp":1770082048708,"processed":false}]}}
+Successfully sent message to 0 connections (0 dead connections removed)
+[Dashboard] POST /api/ws/cognitive-stream 200 in 10ms
+[Minecraft Interface] Broadcasting position_changed to 1 clients
+[Dashboard] POST /api/ws/bot-state 200 in 10ms
+[Minecraft Interface] 🧠 Cognition system processed chat: {
+  processed: true,
+  type: 'social_interaction',
+  shouldRespond: true,
+  response: 'Yeah, just exploring!',
+  shouldCreateTask: true,
+  taskSuggestion: 'Answer question from Heliotropism: "are you okay? what just happened?"',
+  internalThought: {
+    type: 'social',
+    content: 'Social interaction: Chat from Heliotropism: "are you okay? what just happened?"',
+    attribution: 'self',
+    context: {
+      emotionalState: 'interested',
+      confidence: 0.9,
+      cognitiveSystem: 'social-processor',
+      sender: 'Heliotropism',
+      message: 'are you okay? what just happened?'
+    },
+    metadata: {
+      sender: 'Heliotropism',
+      message: 'are you okay? what just happened?',
+      timestamp: 1770082048697,
+      environment: 'minecraft',
+      botPosition: [Object],
+      botHealth: 20,
+      botFood: 20,
+      thoughtType: 'social',
+      source: 'player-chat'
+    },
+    id: 'thought-1770082048698-social-auh0gbih7',
+    timestamp: 1770082048698,
+    processed: false
+  },
+  timestamp: 1770082049389
+}
+[Minecraft Interface] ✅ Bot responded: "Yeah, just exploring!" (1ms)
+[Planning] [PlanRoute] {
+  backend: 'unplannable',
+  requiredRig: null,
+  reason: 'no-requirement',
+  taskTitle: 'Answer question from Heliotropism: "are you okay? what just happened?"'
+}
+[Planning] Task added to enhanced integration: Answer question from Heliotropism: "are you okay? what just happened?"
+[Planning] [Lifecycle→Review] high_priority_added: task task-1770082049400-i7y0zq1im
+[Planning] [Lifecycle→Review] goal_binding_drift: task task-1770082049400-i7y0zq1im (type_not_gated:gathering)
+[Minecraft Interface] ✅ Created task from social chat: {
+  success: true,
+  goalId: 'goal-1770082049400-w0eer',
+  goal: {
+    id: 'goal-1770082049400-w0eer',
+    type: 'general',
+    priority: 0.8,
+    urgency: 0.6,
+    utility: 0.7,
+    description: 'Answer question from Heliotropism: "are you okay? what just happened?"',
+    preconditions: [],
+    effects: [],
+    status: 'pending',
+    createdAt: 1770082049400,
+    updatedAt: 1770082049400,
+    subGoals: []
+  }
+}
+[Dashboard] POST /api/task-updates 200 in 7ms
+[Cognition] Processing environmental_awareness request
+[Dashboard] POST /api/ws/cognitive-stream received: {
+  type: 'environmental',
+  content: 'Awareness: 1 neutral nearby',
+  attribution: 'self'
+}
+[Dashboard] POST /api/ws/cognitive-stream 200 in 9ms
+[Minecraft Interface] Broadcasting position_changed to 1 clients
+[Cognition] Processing environmental_awareness request
+[Dashboard] POST /api/ws/cognitive-stream received: {
+  type: 'environmental',
+  content: 'Awareness: 1 neutral nearby',
+  attribution: 'self'
+}
+[Dashboard] POST /api/ws/cognitive-stream 200 in 9ms
+[Dashboard] POST /api/ws/bot-state 200 in 7ms
+[Minecraft Interface] Broadcasting position_changed to 1 clients
+[Dashboard] GET /api/ws/cognitive-stream/history?limit=100 200 in 13ms
+[Planning] [WorldStateManager] State update: {
+  connected: true,
+  position: { x: 257.7932877447332, y: 61.89598154985317, z: 180.29998525757543 },
+  health: 20,
+  inventoryCount: 0
+}
+[Minecraft Interface] 🔄 Path reset #5 (pathfinder replanning)
+🚫 Too many path resets (5), giving up
+[Cognition] Processing environmental_awareness request
+[Dashboard] POST /api/ws/cognitive-stream received: {
+  type: 'environmental',
+  content: 'Awareness: 1 neutral nearby',
+  attribution: 'self'
+}
+[Dashboard] POST /api/ws/cognitive-stream 200 in 8ms
+[Minecraft Interface] Broadcasting position_changed to 1 clients
+[Minecraft Interface] 🔄 Retry 1/5: moved 64.4 blocks, 50.2 from target
+[Cognition] Processing environmental_awareness request
+[Dashboard] POST /api/ws/cognitive-stream received: {
+  type: 'environmental',
+  content: 'Awareness: 1 neutral nearby',
+  attribution: 'self'
+}
+[Dashboard] POST /api/ws/cognitive-stream 200 in 11ms
+[Dashboard] POST /api/ws/bot-state 200 in 7ms
+[Minecraft Interface] Broadcasting position_changed to 1 clients
+[Dashboard] POST /api/live-stream-updates 404 in 65ms
+[Dashboard] POST /api/live-stream-updates 404 in 67ms
+[Dashboard] POST /api/live-stream-updates 404 in 66ms
+[Planning] 🤖 [AUTONOMOUS EXECUTOR] Initializing executor state...
+[Planning] 🤖 Running autonomous task executor...
+[Planning] 🤖 [AUTONOMOUS EXECUTOR] Found 4 active tasks
+🤖 [AUTONOMOUS EXECUTOR] Top task: Answer question from Heliotropism: "sterling, where are you at?"
+🤖 [AUTONOMOUS EXECUTOR] Top task: Answer question from Heliotropism: "sterling, where are you at?" (gathering)
+🤖 [AUTONOMOUS EXECUTOR] Task status: pending, priority: 0.8
+🤖 [AUTONOMOUS EXECUTOR] Found 4 active tasks, executing...
+[Planning] 🤖 [AUTONOMOUS EXECUTOR] Executing task: Answer question from Heliotropism: "sterling, where are you at?" (gathering)
+🤖 [AUTONOMOUS EXECUTOR] Task details: {
+  id: 'task-1770081983627-bfoi72qo3',
+  type: 'gathering',
+  priority: 0.8,
+  urgency: 0.6,
+  status: 'pending'
+}
+🎯 Executing task: Answer question from Heliotropism: "sterling, where are you at?" (0% complete)
+🤖 [AUTONOMOUS EXECUTOR] Checking bot connection...
+[Planning] 🤖 [AUTONOMOUS EXECUTOR] Bot connected: true
+[Planning] 🎯 Found MCP option: Safe Tree Chopping (1.0.0) (opt.chop_tree_safe) - delegating to MCP execution pipeline
+✅ Found MCP option for task: Safe Tree Chopping (1.0.0)
+[Planning] [MCP] Executing option opt.chop_tree_safe via BT runner
+[Planning] Loading BT definition from: /Users/darianrosebrook/Desktop/Projects/conscious-bot/packages/planning/src/behavior-trees/definitions/chop_tree_safe.json
+Current working directory: /Users/darianrosebrook/Desktop/Projects/conscious-bot/packages/planning
+[Planning] File exists check: YES
+[Planning] Loaded BT definition for opt.chop_tree_safe: {
+  "id": "opt.chop_tree_safe",
+  "name": "Safe Tree Chopping",
+  "description": "Gather N logs from target species with safety checks",
+  "root": {
+    "type": "sequence",
+    "children": [
+      {
+        "type": "selector",
+        "name": "ensure_axe",
+        "children": [
+          {
+            "type": "condition",
+            "name": "check_has_axe",
+            "condition": "has_axe"
+          },
+          {
+            "type": "action",
+            "name": "craft_axe",
+            "action": "execute_bt",
+            "args": {
+              "bt_id": "opt.craft_wooden_axe"
+            }
+          }
+        ]
+      },
+      {
+        "type": "condition",
+        "name": "check_light",
+        "condition": "light_level >= 7 || has_torch"
+      },
+      {
+        "type": "selector",
+        "name": "find_tree",
+        "children": [
+          {
+            "type": "action",
+            "name": "find_nearby_tree",
+            "action": "scan_for_trees",
+            "args": {
+              "radius": 50,
+              "species": "target_species"
+            }
+          },
+          {
+            "type": "action",
+            "name": "pathfind_to_tree",
+            "action": "pathfind",
+            "args": {
+              "target": "nearest_tree",
+              "avoid_water": true
+            }
+          }
+        ]
+      },
+      {
+        "type": "sequence",
+        "name": "chop_tree",
+        "children": [
+          {
+            "type": "action",
+            "name": "scan_canopy",
+            "action": "scan_tree_structure",
+            "args": {
+              "method": "top_down"
+            }
+          },
+          {
+            "type": "action",
+            "name": "chop_logs",
+            "action": "dig_blocks",
+            "args": {
+              "pattern": "tree_logs_top_down",
+              "tool": "axe"
+            }
+          },
+          {
+            "type": "action",
+            "name": "collect_drops",
+            "action": "collect_items",
+            "args": {
+              "radius": 10
+            }
+          }
+        ]
+      },
+      {
+        "type": "condition",
+        "name": "verify_logs",
+        "condition": "inventory.logs >= target_amount"
+      }
+    ]
+  },
+  "metadata": {
+    "timeout": 45000,
+    "retries": 2,
+    "priority": "medium",
+    "interruptible": true
+  }
+}
+[Planning] Executing action: scan_for_trees with args: {
+  recipe: undefined,
+  qty: undefined,
+  blockType: 'oak_log',
+  pos: undefined,
+  radius: 50,
+  species: 'target_species'
+}
+[Planning] [toolExecutor] Executing tool: minecraft.scan_for_trees (normalized: minecraft.scan_for_trees) with args: {
+  recipe: undefined,
+  qty: undefined,
+  blockType: 'oak_log',
+  pos: undefined,
+  radius: 50,
+  species: 'target_species'
+}
+[Minecraft Interface] 🔍 Scanning environment for oak_log within 50 blocks
+[Minecraft Interface] ❌ No oak_log blocks found within 50 blocks
+[Planning] Action result: {
+  ok: false,
+  error: 'No oak_log blocks found within 50 blocks',
+  failureCode: undefined,
+  data: { success: false, error: 'No oak_log blocks found within 50 blocks' },
+  environmentDeltas: {},
+  confidence: 0.2,
+  cost: 1,
+  duration: 4,
+  metadata: {
+    originalTool: 'minecraft.scan_for_trees',
+    normalizedTool: 'minecraft.scan_for_trees',
+    args: {
+      recipe: undefined,
+      qty: undefined,
+      blockType: 'oak_log',
+      pos: undefined,
+      radius: 50,
+      species: 'target_species'
+    },
+    mappedAction: 'scan_environment'
+  }
+}
+[Planning] Retrying find_nearby_tree (attempt 1/1) after 1000ms
+[Planning] ❌ [AuditLogger] tool_executed (4ms)
+[Planning] Executing action: scan_for_trees with args: {
+  recipe: undefined,
+  qty: undefined,
+  blockType: 'oak_log',
+  pos: undefined,
+  radius: 50,
+  species: 'target_species'
+}
+[toolExecutor] Executing tool: minecraft.scan_for_trees (normalized: minecraft.scan_for_trees) with args: {
+  recipe: undefined,
+  qty: undefined,
+  blockType: 'oak_log',
+  pos: undefined,
+  radius: 50,
+  species: 'target_species'
+}
+[Minecraft Interface] 🔍 Scanning environment for oak_log within 50 blocks
+[Minecraft Interface] ❌ No oak_log blocks found within 50 blocks
+[Planning] Action result: {
+  ok: false,
+  error: 'No oak_log blocks found within 50 blocks',
+  failureCode: undefined,
+  data: { success: false, error: 'No oak_log blocks found within 50 blocks' },
+  environmentDeltas: {},
+  confidence: 0.2,
+  cost: 1,
+  duration: 5,
+  metadata: {
+    originalTool: 'minecraft.scan_for_trees',
+    normalizedTool: 'minecraft.scan_for_trees',
+    args: {
+      recipe: undefined,
+      qty: undefined,
+      blockType: 'oak_log',
+      pos: undefined,
+      radius: 50,
+      species: 'target_species'
+    },
+    mappedAction: 'scan_environment'
+  }
+}
+[Planning] Executing action: pathfind with args: {
+  recipe: undefined,
+  qty: undefined,
+  blockType: 'oak_log',
+  pos: undefined,
+  target: 'nearest_tree',
+  avoid_water: true
+}
+[toolExecutor] Executing tool: minecraft.pathfind (normalized: minecraft.pathfind) with args: {
+  recipe: undefined,
+  qty: undefined,
+  blockType: 'oak_log',
+  pos: undefined,
+  target: 'nearest_tree',
+  avoid_water: true
+}
+[Planning] ❌ [AuditLogger] tool_executed (5ms)
+[Minecraft Interface] [MINECRAFT INTERFACE] Bot state updated: {
+  position: { x: 257.6826317440411, y: 58.38370544701554, z: 180.68807688768587 },
+  health: 20,
+  inventoryItems: 0
+}
+[Planning] [WorldStateManager] State update: {
+  connected: true,
+  position: { x: 257.6826317440411, y: 58.38370544701554, z: 180.68807688768587 },
+  health: 20,
+  inventoryCount: 0
+}
+[Minecraft Interface] [ThreatPerception] localized threat assessment: 0 threats, level: low
+[Dashboard] POST /api/ws/bot-state 200 in 14ms
+[Minecraft Interface] Broadcasting position_changed to 1 clients
+[Planning] Action result: {
+  ok: true,
+  data: {
+    success: true,
+    data: {
+      distanceMoved: 0.7274818390310226,
+      startPosition: [Object],
+      endPosition: [Object]
+    }
+  },
+  environmentDeltas: {},
+  confidence: 0.8,
+  cost: 1,
+  duration: 1003,
+  metadata: {
+    originalTool: 'minecraft.pathfind',
+    normalizedTool: 'minecraft.pathfind',
+    args: {
+      recipe: undefined,
+      qty: undefined,
+      blockType: 'oak_log',
+      pos: undefined,
+      target: 'nearest_tree',
+      avoid_water: true
+    },
+    mappedAction: 'move_forward'
+  }
+}
+[Planning] Executing action: scan_tree_structure with args: {
+  recipe: undefined,
+  qty: undefined,
+  blockType: 'oak_log',
+  pos: undefined,
+  method: 'top_down'
+}
+[toolExecutor] Executing tool: minecraft.scan_tree_structure (normalized: minecraft.scan_tree_structure) with args: {
+  recipe: undefined,
+  qty: undefined,
+  blockType: 'oak_log',
+  pos: undefined,
+  method: 'top_down'
+}
+[Planning] ✅ [AuditLogger] tool_executed (1003ms)
+[Minecraft Interface] 🔍 Scanning environment for oak_log within 10 blocks
+[Minecraft Interface] ❌ No oak_log blocks found within 10 blocks
+[Planning] Action result: {
+  ok: false,
+  error: 'No oak_log blocks found within 10 blocks',
+  failureCode: undefined,
+  data: { success: false, error: 'No oak_log blocks found within 10 blocks' },
+  environmentDeltas: {},
+  confidence: 0.2,
+  cost: 1,
+  duration: 3,
+  metadata: {
+    originalTool: 'minecraft.scan_tree_structure',
+    normalizedTool: 'minecraft.scan_tree_structure',
+    args: {
+      recipe: undefined,
+      qty: undefined,
+      blockType: 'oak_log',
+      pos: undefined,
+      method: 'top_down'
+    },
+    mappedAction: 'scan_environment'
+  }
+}
+[Planning] Retrying scan_canopy (attempt 1/1) after 1000ms
+[Planning] ❌ [AuditLogger] tool_executed (3ms)
+[Minecraft Interface] Broadcasting position_changed to 1 clients
+[Planning] Executing action: scan_tree_structure with args: {
+  recipe: undefined,
+  qty: undefined,
+  blockType: 'oak_log',
+  pos: undefined,
+  method: 'top_down'
+}
+[toolExecutor] Executing tool: minecraft.scan_tree_structure (normalized: minecraft.scan_tree_structure) with args: {
+  recipe: undefined,
+  qty: undefined,
+  blockType: 'oak_log',
+  pos: undefined,
+  method: 'top_down'
+}
+[Minecraft Interface] 🔍 Scanning environment for oak_log within 10 blocks
+[Minecraft Interface] ❌ No oak_log blocks found within 10 blocks
+[Planning] Action result: {
+  ok: false,
+  error: 'No oak_log blocks found within 10 blocks',
+  failureCode: undefined,
+  data: { success: false, error: 'No oak_log blocks found within 10 blocks' },
+  environmentDeltas: {},
+  confidence: 0.2,
+  cost: 1,
+  duration: 8,
+  metadata: {
+    originalTool: 'minecraft.scan_tree_structure',
+    normalizedTool: 'minecraft.scan_tree_structure',
+    args: {
+      recipe: undefined,
+      qty: undefined,
+      blockType: 'oak_log',
+      pos: undefined,
+      method: 'top_down'
+    },
+    mappedAction: 'scan_environment'
+  }
+}
+[Planning] Retrying chop_tree (attempt 1/1) after 1000ms
+[Planning] ❌ [AuditLogger] tool_executed (8ms)
+[Cognition] Processing environmental_awareness request
+[Dashboard] POST /api/ws/cognitive-stream received: {
+  type: 'environmental',
+  content: 'Awareness: 1 neutral nearby',
+  attribution: 'self'
+}
+[Dashboard] POST /api/ws/cognitive-stream 200 in 13ms
+[Dashboard] POST /api/ws/bot-state 200 in 6ms
+[Minecraft Interface] Broadcasting position_changed to 1 clients
+[Planning] Executing action: scan_tree_structure with args: {
+  recipe: undefined,
+  qty: undefined,
+  blockType: 'oak_log',
+  pos: undefined,
+  method: 'top_down'
+}
+[Planning] [toolExecutor] Executing tool: minecraft.scan_tree_structure (normalized: minecraft.scan_tree_structure) with args: {
+  recipe: undefined,
+  qty: undefined,
+  blockType: 'oak_log',
+  pos: undefined,
+  method: 'top_down'
+}
+[Minecraft Interface] 🔍 Scanning environment for oak_log within 10 blocks
+[Minecraft Interface] ❌ No oak_log blocks found within 10 blocks
+[Planning] Action result: {
+  ok: false,
+  error: 'No oak_log blocks found within 10 blocks',
+  failureCode: undefined,
+  data: { success: false, error: 'No oak_log blocks found within 10 blocks' },
+  environmentDeltas: {},
+  confidence: 0.2,
+  cost: 1,
+  duration: 4,
+  metadata: {
+    originalTool: 'minecraft.scan_tree_structure',
+    normalizedTool: 'minecraft.scan_tree_structure',
+    args: {
+      recipe: undefined,
+      qty: undefined,
+      blockType: 'oak_log',
+      pos: undefined,
+      method: 'top_down'
+    },
+    mappedAction: 'scan_environment'
+  }
+}
+[Planning] Retrying scan_canopy (attempt 1/1) after 1000ms
+[Planning] ❌ [AuditLogger] tool_executed (4ms)
+[Planning] [WorldStateManager] State update: {
+  connected: true,
+  position: { x: 257.09287229735156, y: 56.858685190736594, z: 180.7 },
+  health: 20,
+  inventoryCount: 0
+}
+[Cognition] Generating thoughts for situation: {
+  situation: 'environment',
+  thoughtTypes: [ 'reflection', 'observation', 'planning' ]
+}
+[Minecraft Interface] Broadcasting position_changed to 1 clients
+[Dashboard] POST /api/environment-updates 404 in 42ms
+[Dashboard] POST /api/environment-updates 404 in 42ms
+[Planning] Executing action: scan_tree_structure with args: {
+  recipe: undefined,
+  qty: undefined,
+  blockType: 'oak_log',
+  pos: undefined,
+  method: 'top_down'
+}
+[Planning] [toolExecutor] Executing tool: minecraft.scan_tree_structure (normalized: minecraft.scan_tree_structure) with args: {
+  recipe: undefined,
+  qty: undefined,
+  blockType: 'oak_log',
+  pos: undefined,
+  method: 'top_down'
+}
+[Minecraft Interface] 🔍 Scanning environment for oak_log within 10 blocks
+[Minecraft Interface] ❌ No oak_log blocks found within 10 blocks
+[Planning] Action result: {
+  ok: false,
+  error: 'No oak_log blocks found within 10 blocks',
+  failureCode: undefined,
+  data: { success: false, error: 'No oak_log blocks found within 10 blocks' },
+  environmentDeltas: {},
+  confidence: 0.2,
+  cost: 1,
+  duration: 4,
+  metadata: {
+    originalTool: 'minecraft.scan_tree_structure',
+    normalizedTool: 'minecraft.scan_tree_structure',
+    args: {
+      recipe: undefined,
+      qty: undefined,
+      blockType: 'oak_log',
+      pos: undefined,
+      method: 'top_down'
+    },
+    mappedAction: 'scan_environment'
+  }
+}
+[Planning] Retrying opt.chop_tree_safe (attempt 1/2) after 1000ms
+[Planning] ❌ [AuditLogger] tool_executed (4ms)
+[Dashboard] POST /api/ws/bot-state 200 in 7ms
+[Minecraft Interface] Broadcasting position_changed to 1 clients
+[Dashboard] Sending 1 new thoughts to 1 connections
+[Dashboard] POST /api/ws/cognitive-stream received: {
+  type: 'reflection',
+  content: 'Maintaining awareness of surroundings.',
+  attribution: 'self'
+}
+[Dashboard] New thought added to history: {
+  type: 'reflection',
+  content: 'Maintaining awareness of surroundings.',
+  displayContent: undefined,
+  attribution: 'self',
+  context: {
+    emotionalState: 'neutral',
+    confidence: 0.7,
+    cognitiveSystem: 'llm-core'
+  },
+  metadata: {
+    thoughtType: 'idle-reflection',
+    trigger: 'time-based',
+    context: 'environmental-monitoring',
+    intensity: 0.4,
+    llmConfidence: 0.7,
+    model: 'gemma3n:e2b',
+    extractedGoal: {
+      version: 1,
+      action: 'gather',
+      target: 'wood',
+      targetId: null,
+      amount: null,
+      raw: '[GOAL: gather <wood> <10>]'
+    },
+    extractedIntent: 'gather',
+    intentParse: 'final_line',
+    extractedGoalSource: 'llm',
+    provenance: 'chain-of-thought'
+  },
+  id: 'thought-1770082059137-niciu2r',
+  timestamp: 1770082059137,
+  processed: false
+}
+[Dashboard] Broadcasting message to 0 connections: {"type":"cognitive_thoughts","timestamp":1770082059137,"data":{"thoughts":[{"type":"reflection","content":"Maintaining awareness of surroundings.","attribution":"self","context":{"emotionalState":"neutral","confidence":0.7,"cognitiveSystem":"llm-core"},"metadata":{"thoughtType":"idle-reflection","trigger":"time-based","context":"environmental-monitoring","intensity":0.4,"llmConfidence":0.7,"model":"gemma3n:e2b","extractedGoal":{"version":1,"action":"gather","target":"wood","targetId":null,"amount":null,"raw":"[GOAL: gather <wood> <10>]"},"extractedIntent":"gather","intentParse":"final_line","extractedGoalSource":"llm","provenance":"chain-of-thought"},"id":"thought-1770082059137-niciu2r","timestamp":1770082059137,"processed":false}]}}
+Successfully sent message to 0 connections (0 dead connections removed)
+[Dashboard] POST /api/ws/cognitive-stream 200 in 10ms
+[Cognition] ✅ Thought sent to cognitive stream: Maintaining awareness of surroundings....
+[Planning] Executing action: scan_for_trees with args: {
+  recipe: undefined,
+  qty: undefined,
+  blockType: 'oak_log',
+  pos: undefined,
+  radius: 50,
+  species: 'target_species'
+}
+[Planning] [toolExecutor] Executing tool: minecraft.scan_for_trees (normalized: minecraft.scan_for_trees) with args: {
+  recipe: undefined,
+  qty: undefined,
+  blockType: 'oak_log',
+  pos: undefined,
+  radius: 50,
+  species: 'target_species'
+}
+[Minecraft Interface] 🔍 Scanning environment for oak_log within 50 blocks
+[Minecraft Interface] ❌ No oak_log blocks found within 50 blocks
+[Planning] Action result: {
+  ok: false,
+  error: 'No oak_log blocks found within 50 blocks',
+  failureCode: undefined,
+  data: { success: false, error: 'No oak_log blocks found within 50 blocks' },
+  environmentDeltas: {},
+  confidence: 0.2,
+  cost: 1,
+  duration: 3,
+  metadata: {
+    originalTool: 'minecraft.scan_for_trees',
+    normalizedTool: 'minecraft.scan_for_trees',
+    args: {
+      recipe: undefined,
+      qty: undefined,
+      blockType: 'oak_log',
+      pos: undefined,
+      radius: 50,
+      species: 'target_species'
+    },
+    mappedAction: 'scan_environment'
+  }
+}
+Retrying find_nearby_tree (attempt 1/1) after 1000ms
+[Planning] ❌ [AuditLogger] tool_executed (3ms)
+[Minecraft Interface] Broadcasting position_changed to 1 clients
+[Planning] Executing action: scan_for_trees with args: {
+  recipe: undefined,
+  qty: undefined,
+  blockType: 'oak_log',
+  pos: undefined,
+  radius: 50,
+  species: 'target_species'
+}
+[Planning] [toolExecutor] Executing tool: minecraft.scan_for_trees (normalized: minecraft.scan_for_trees) with args: {
+  recipe: undefined,
+  qty: undefined,
+  blockType: 'oak_log',
+  pos: undefined,
+  radius: 50,
+  species: 'target_species'
+}
+[Minecraft Interface] 🔍 Scanning environment for oak_log within 50 blocks
+[Minecraft Interface] ❌ No oak_log blocks found within 50 blocks
+[Planning] Action result: {
+  ok: false,
+  error: 'No oak_log blocks found within 50 blocks',
+  failureCode: undefined,
+  data: { success: false, error: 'No oak_log blocks found within 50 blocks' },
+  environmentDeltas: {},
+  confidence: 0.2,
+  cost: 1,
+  duration: 3,
+  metadata: {
+    originalTool: 'minecraft.scan_for_trees',
+    normalizedTool: 'minecraft.scan_for_trees',
+    args: {
+      recipe: undefined,
+      qty: undefined,
+      blockType: 'oak_log',
+      pos: undefined,
+      radius: 50,
+      species: 'target_species'
+    },
+    mappedAction: 'scan_environment'
+  }
+}
+[Planning] Executing action: pathfind with args: {
+  recipe: undefined,
+  qty: undefined,
+  blockType: 'oak_log',
+  pos: undefined,
+  target: 'nearest_tree',
+  avoid_water: true
+}
+[Planning] [toolExecutor] Executing tool: minecraft.pathfind (normalized: minecraft.pathfind) with args: {
+  recipe: undefined,
+  qty: undefined,
+  blockType: 'oak_log',
+  pos: undefined,
+  target: 'nearest_tree',
+  avoid_water: true
+}
+[Planning] ❌ [AuditLogger] tool_executed (3ms)
+[Planning] [WorldStateManager] State update: {
+  connected: true,
+  position: { x: 257.07550404139266, y: 55.3586851907118, z: 180.75205917868104 },
+  health: 20,
+  inventoryCount: 0
+}
+[Cognition] Processing environmental_awareness request
+[Dashboard] POST /api/ws/cognitive-stream received: {
+  type: 'environmental',
+  content: 'Awareness: 1 neutral nearby',
+  attribution: 'self'
+}
+[Dashboard] POST /api/ws/cognitive-stream 200 in 10ms
+[Dashboard] POST /api/ws/bot-state 200 in 7ms
+[Minecraft Interface] Broadcasting position_changed to 1 clients
+[Planning] Action result: {
+  ok: true,
+  data: {
+    success: true,
+    data: {
+      distanceMoved: 1.6187034102225222,
+      startPosition: [Object],
+      endPosition: [Object]
+    }
+  },
+  environmentDeltas: {},
+  confidence: 0.8,
+  cost: 1,
+  duration: 1004,
+  metadata: {
+    originalTool: 'minecraft.pathfind',
+    normalizedTool: 'minecraft.pathfind',
+    args: {
+      recipe: undefined,
+      qty: undefined,
+      blockType: 'oak_log',
+      pos: undefined,
+      target: 'nearest_tree',
+      avoid_water: true
+    },
+    mappedAction: 'move_forward'
+  }
+}
+[Planning] Executing action: scan_tree_structure with args: {
+  recipe: undefined,
+  qty: undefined,
+  blockType: 'oak_log',
+  pos: undefined,
+  method: 'top_down'
+}
+[toolExecutor] Executing tool: minecraft.scan_tree_structure (normalized: minecraft.scan_tree_structure) with args: {
+  recipe: undefined,
+  qty: undefined,
+  blockType: 'oak_log',
+  pos: undefined,
+  method: 'top_down'
+}
+[Planning] ✅ [AuditLogger] tool_executed (1004ms)
+[Minecraft Interface] 🔍 Scanning environment for oak_log within 10 blocks
+[Minecraft Interface] ❌ No oak_log blocks found within 10 blocks
+[Planning] Action result: {
+  ok: false,
+  error: 'No oak_log blocks found within 10 blocks',
+  failureCode: undefined,
+  data: { success: false, error: 'No oak_log blocks found within 10 blocks' },
+  environmentDeltas: {},
+  confidence: 0.2,
+  cost: 1,
+  duration: 3,
+  metadata: {
+    originalTool: 'minecraft.scan_tree_structure',
+    normalizedTool: 'minecraft.scan_tree_structure',
+    args: {
+      recipe: undefined,
+      qty: undefined,
+      blockType: 'oak_log',
+      pos: undefined,
+      method: 'top_down'
+    },
+    mappedAction: 'scan_environment'
+  }
+}
+[Planning] Retrying scan_canopy (attempt 1/1) after 1000ms
+[Planning] ❌ [AuditLogger] tool_executed (3ms)
+[Cognition] Processing environmental_awareness request
+[Dashboard] POST /api/ws/cognitive-stream received: {
+  type: 'environmental',
+  content: 'Awareness: 2 neutral nearby',
+  attribution: 'self'
+}
+[Dashboard] New thought added to history: {
+  type: 'environmental',
+  content: 'Awareness: 2 neutral nearby',
+  displayContent: undefined,
+  attribution: 'self',
+  context: {
+    emotionalState: 'aware',
+    confidence: 0.85,
+    cognitiveSystem: 'saliency-reasoner'
+  },
+  metadata: {
+    thoughtType: 'environmental',
+    source: 'saliency',
+    trackCount: 2,
+    deltaCount: 0,
+    provenance: 'chain-of-thought'
+  },
+  id: 'thought-1770082061578-j7dbxo6',
+  timestamp: 1770082061578,
+  processed: false
+}
+[Dashboard] Broadcasting message to 0 connections: {"type":"cognitive_thoughts","timestamp":1770082061579,"data":{"thoughts":[{"type":"environmental","content":"Awareness: 2 neutral nearby","attribution":"self","context":{"emotionalState":"aware","confidence":0.85,"cognitiveSystem":"saliency-reasoner"},"metadata":{"thoughtType":"environmental","source":"saliency","trackCount":2,"deltaCount":0,"provenance":"chain-of-thought"},"id":"thought-1770082061578-j7dbxo6","timestamp":1770082061578,"processed":false}]}}
+Successfully sent message to 0 connections (0 dead connections removed)
+[Dashboard] POST /api/ws/cognitive-stream 200 in 11ms
+[Dashboard] GET /api/ws/cognitive-stream/history?limit=100 200 in 11ms
+[Minecraft Interface] Broadcasting position_changed to 1 clients
+[Planning] Executing action: scan_tree_structure with args: {
+  recipe: undefined,
+  qty: undefined,
+  blockType: 'oak_log',
+  pos: undefined,
+  method: 'top_down'
+}
+[Planning] [toolExecutor] Executing tool: minecraft.scan_tree_structure (normalized: minecraft.scan_tree_structure) with args: {
+  recipe: undefined,
+  qty: undefined,
+  blockType: 'oak_log',
+  pos: undefined,
+  method: 'top_down'
+}
+[Minecraft Interface] 🔍 Scanning environment for oak_log within 10 blocks
+[Minecraft Interface] ❌ No oak_log blocks found within 10 blocks
+[Planning] Action result: {
+  ok: false,
+  error: 'No oak_log blocks found within 10 blocks',
+  failureCode: undefined,
+  data: { success: false, error: 'No oak_log blocks found within 10 blocks' },
+  environmentDeltas: {},
+  confidence: 0.2,
+  cost: 1,
+  duration: 5,
+  metadata: {
+    originalTool: 'minecraft.scan_tree_structure',
+    normalizedTool: 'minecraft.scan_tree_structure',
+    args: {
+      recipe: undefined,
+      qty: undefined,
+      blockType: 'oak_log',
+      pos: undefined,
+      method: 'top_down'
+    },
+    mappedAction: 'scan_environment'
+  }
+}
+[Planning] Retrying chop_tree (attempt 1/1) after 1000ms
+[Planning] ❌ [AuditLogger] tool_executed (5ms)
+[Cognition] Processing environmental_awareness request
+[Dashboard] POST /api/ws/cognitive-stream received: {
+  type: 'environmental',
+  content: 'Awareness: 2 neutral nearby [new: cod]',
+  attribution: 'self'
+}
+[Dashboard] New thought added to history: {
+  type: 'environmental',
+  content: 'Awareness: 2 neutral nearby [new: cod]',
+  displayContent: undefined,
+  attribution: 'self',
+  context: {
+    emotionalState: 'aware',
+    confidence: 0.85,
+    cognitiveSystem: 'saliency-reasoner'
+  },
+  metadata: {
+    thoughtType: 'environmental',
+    source: 'saliency',
+    trackCount: 2,
+    deltaCount: 1,
+    provenance: 'chain-of-thought'
+  },
+  id: 'thought-1770082062577-lg41d0e',
+  timestamp: 1770082062577,
+  processed: false
+}
+Broadcasting message to 0 connections: {"type":"cognitive_thoughts","timestamp":1770082062578,"data":{"thoughts":[{"type":"environmental","content":"Awareness: 2 neutral nearby [new: cod]","attribution":"self","context":{"emotionalState":"aware","confidence":0.85,"cognitiveSystem":"saliency-reasoner"},"metadata":{"thoughtType":"environmental","source":"saliency","trackCount":2,"deltaCount":1,"provenance":"chain-of-thought"},"id":"thought-1770082062577-lg41d0e","timestamp":1770082062577,"processed":false}]}}
+[Dashboard] Successfully sent message to 0 connections (0 dead connections removed)
+[Dashboard] POST /api/ws/cognitive-stream 200 in 10ms
+[Dashboard] POST /api/ws/bot-state 200 in 6ms
+[Minecraft Interface] Broadcasting position_changed to 1 clients
+[Dashboard] POST /api/live-stream-updates 404 in 65ms
+[Dashboard] POST /api/live-stream-updates 404 in 65ms
+[Dashboard] POST /api/live-stream-updates 404 in 70ms
+[Planning] Executing action: scan_tree_structure with args: {
+  recipe: undefined,
+  qty: undefined,
+  blockType: 'oak_log',
+  pos: undefined,
+  method: 'top_down'
+}
+[Planning] [toolExecutor] Executing tool: minecraft.scan_tree_structure (normalized: minecraft.scan_tree_structure) with args: {
+  recipe: undefined,
+  qty: undefined,
+  blockType: 'oak_log',
+  pos: undefined,
+  method: 'top_down'
+}
+[Minecraft Interface] 🔍 Scanning environment for oak_log within 10 blocks
+[Minecraft Interface] ❌ No oak_log blocks found within 10 blocks
+[Planning] Action result: {
+  ok: false,
+  error: 'No oak_log blocks found within 10 blocks',
+  failureCode: undefined,
+  data: { success: false, error: 'No oak_log blocks found within 10 blocks' },
+  environmentDeltas: {},
+  confidence: 0.2,
+  cost: 1,
+  duration: 3,
+  metadata: {
+    originalTool: 'minecraft.scan_tree_structure',
+    normalizedTool: 'minecraft.scan_tree_structure',
+    args: {
+      recipe: undefined,
+      qty: undefined,
+      blockType: 'oak_log',
+      pos: undefined,
+      method: 'top_down'
+    },
+    mappedAction: 'scan_environment'
+  }
+}
+Retrying scan_canopy (attempt 1/1) after 1000ms
+[Planning] ❌ [AuditLogger] tool_executed (3ms)
+[Planning] [WorldStateManager] State update: {
+  connected: true,
+  position: {
+    x: 256.51672094309504,
+    y: 53.85868519071189,
+    z: 182.59416186888743
+  },
+  health: 20,
+  inventoryCount: 0
+}
+[Planning] Executing action: scan_tree_structure with args: {
+  recipe: undefined,
+  qty: undefined,
+  blockType: 'oak_log',
+  pos: undefined,
+  method: 'top_down'
+}
+[Planning] [toolExecutor] Executing tool: minecraft.scan_tree_structure (normalized: minecraft.scan_tree_structure) with args: {
+  recipe: undefined,
+  qty: undefined,
+  blockType: 'oak_log',
+  pos: undefined,
+  method: 'top_down'
+}
+[Minecraft Interface] 🔍 Scanning environment for oak_log within 10 blocks
+[Minecraft Interface] ❌ No oak_log blocks found within 10 blocks
+[Planning] Action result: {
+  ok: false,
+  error: 'No oak_log blocks found within 10 blocks',
+  failureCode: undefined,
+  data: { success: false, error: 'No oak_log blocks found within 10 blocks' },
+  environmentDeltas: {},
+  confidence: 0.2,
+  cost: 1,
+  duration: 4,
+  metadata: {
+    originalTool: 'minecraft.scan_tree_structure',
+    normalizedTool: 'minecraft.scan_tree_structure',
+    args: {
+      recipe: undefined,
+      qty: undefined,
+      blockType: 'oak_log',
+      pos: undefined,
+      method: 'top_down'
+    },
+    mappedAction: 'scan_environment'
+  }
+}
+[Planning] Retrying opt.chop_tree_safe (attempt 2/2) after 2000ms
+[Planning] ❌ [AuditLogger] tool_executed (4ms)
+[Cognition] Processing environmental_awareness request
+[Dashboard] POST /api/ws/cognitive-stream received: {
+  type: 'environmental',
+  content: 'Awareness: 2 neutral nearby',
+  attribution: 'self'
+}
+[Dashboard] POST /api/ws/cognitive-stream 200 in 10ms
+[Dashboard] POST /api/ws/bot-state 200 in 8ms
+[Minecraft Interface] Broadcasting position_changed to 1 clients
+[Planning] Executing action: scan_for_trees with args: {
+  recipe: undefined,
+  qty: undefined,
+  blockType: 'oak_log',
+  pos: undefined,
+  radius: 50,
+  species: 'target_species'
+}
+[Planning] [toolExecutor] Executing tool: minecraft.scan_for_trees (normalized: minecraft.scan_for_trees) with args: {
+  recipe: undefined,
+  qty: undefined,
+  blockType: 'oak_log',
+  pos: undefined,
+  radius: 50,
+  species: 'target_species'
+}
+[Minecraft Interface] 🔍 Scanning environment for oak_log within 50 blocks
+[Minecraft Interface] ❌ No oak_log blocks found within 50 blocks
+[Planning] Action result: {
+  ok: false,
+  error: 'No oak_log blocks found within 50 blocks',
+  failureCode: undefined,
+  data: { success: false, error: 'No oak_log blocks found within 50 blocks' },
+  environmentDeltas: {},
+  confidence: 0.2,
+  cost: 1,
+  duration: 5,
+  metadata: {
+    originalTool: 'minecraft.scan_for_trees',
+    normalizedTool: 'minecraft.scan_for_trees',
+    args: {
+      recipe: undefined,
+      qty: undefined,
+      blockType: 'oak_log',
+      pos: undefined,
+      radius: 50,
+      species: 'target_species'
+    },
+    mappedAction: 'scan_environment'
+  }
+}
+[Planning] Retrying find_nearby_tree (attempt 1/1) after 1000ms
+[Planning] ❌ [AuditLogger] tool_executed (5ms)
+[Planning] [WorldStateManager] State update: {
+  connected: true,
+  position: { x: 256.51672094309504, y: 53, z: 182.59416186888743 },
+  health: 20,
+  inventoryCount: 0
+}
+[Cognition] Processing environmental_awareness request
+[Dashboard] POST /api/ws/cognitive-stream received: {
+  type: 'environmental',
+  content: 'Awareness: 2 neutral nearby',
+  attribution: 'self'
+}
+[Dashboard] POST /api/ws/cognitive-stream 200 in 9ms
+[Dashboard] POST /api/ws/bot-state 200 in 12ms
+[Dashboard] GET /api/intero/history?limit=300 200 in 24ms
+[Dashboard] GET /api/intero/boundary-stats 200 in 25ms
+[Dashboard] GET /api/tasks 200 in 28ms
+[Dashboard] GET /api/service-health 200 in 29ms
+[Planning] Executing action: scan_for_trees with args: {
+  recipe: undefined,
+  qty: undefined,
+  blockType: 'oak_log',
+  pos: undefined,
+  radius: 50,
+  species: 'target_species'
+}
+[Planning] [toolExecutor] Executing tool: minecraft.scan_for_trees (normalized: minecraft.scan_for_trees) with args: {
+  recipe: undefined,
+  qty: undefined,
+  blockType: 'oak_log',
+  pos: undefined,
+  radius: 50,
+  species: 'target_species'
+}
+[Minecraft Interface] 🔍 Scanning environment for oak_log within 50 blocks
+[Minecraft Interface] ❌ No oak_log blocks found within 50 blocks
+[Planning] Action result: {
+  ok: false,
+  error: 'No oak_log blocks found within 50 blocks',
+  failureCode: undefined,
+  data: { success: false, error: 'No oak_log blocks found within 50 blocks' },
+  environmentDeltas: {},
+  confidence: 0.2,
+  cost: 1,
+  duration: 7,
+  metadata: {
+    originalTool: 'minecraft.scan_for_trees',
+    normalizedTool: 'minecraft.scan_for_trees',
+    args: {
+      recipe: undefined,
+      qty: undefined,
+      blockType: 'oak_log',
+      pos: undefined,
+      radius: 50,
+      species: 'target_species'
+    },
+    mappedAction: 'scan_environment'
+  }
+}
+[Planning] Executing action: pathfind with args: {
+  recipe: undefined,
+  qty: undefined,
+  blockType: 'oak_log',
+  pos: undefined,
+  target: 'nearest_tree',
+  avoid_water: true
+}
+[toolExecutor] Executing tool: minecraft.pathfind (normalized: minecraft.pathfind) with args: {
+  recipe: undefined,
+  qty: undefined,
+  blockType: 'oak_log',
+  pos: undefined,
+  target: 'nearest_tree',
+  avoid_water: true
+}
+[Planning] ❌ [AuditLogger] tool_executed (7ms)
+[Minecraft Interface] Broadcasting position_changed to 1 clients
+[Minecraft Interface] Broadcasting health_changed to 1 clients
+[Minecraft Interface] WebSocket client disconnected (unknown)
+[Minecraft Interface] WebSocket client connected (unknown)
+[Dashboard] SSE connection established. Total connections: 1
+[Minecraft Interface] WebSocket client disconnected (unknown)
+[Dashboard] GET /api/ws/bot-state 200 in 44ms
+[Dashboard] SSE connection closed. Total connections: 0
+[Dashboard] SSE connection established. Total connections: 1
+[Planning] Action result: {
+  ok: true,
+  data: {
+    success: true,
+    data: {
+      distanceMoved: 1.4756493153725645,
+      startPosition: [Object],
+      endPosition: [Object]
+    }
+  },
+  environmentDeltas: {},
+  confidence: 0.8,
+  cost: 1,
+  duration: 1003,
+  metadata: {
+    originalTool: 'minecraft.pathfind',
+    normalizedTool: 'minecraft.pathfind',
+    args: {
+      recipe: undefined,
+      qty: undefined,
+      blockType: 'oak_log',
+      pos: undefined,
+      target: 'nearest_tree',
+      avoid_water: true
+    },
+    mappedAction: 'move_forward'
+  }
+}
+[Planning] Executing action: scan_tree_structure with args: {
+  recipe: undefined,
+  qty: undefined,
+  blockType: 'oak_log',
+  pos: undefined,
+  method: 'top_down'
+}
+[Planning] [toolExecutor] Executing tool: minecraft.scan_tree_structure (normalized: minecraft.scan_tree_structure) with args: {
+  recipe: undefined,
+  qty: undefined,
+  blockType: 'oak_log',
+  pos: undefined,
+  method: 'top_down'
+}
+[Planning] ✅ [AuditLogger] tool_executed (1003ms)
+[Minecraft Interface] 🔍 Scanning environment for oak_log within 10 blocks
+[Minecraft Interface] ❌ No oak_log blocks found within 10 blocks
+[Planning] Action result: {
+  ok: false,
+  error: 'No oak_log blocks found within 10 blocks',
+  failureCode: undefined,
+  data: { success: false, error: 'No oak_log blocks found within 10 blocks' },
+  environmentDeltas: {},
+  confidence: 0.2,
+  cost: 1,
+  duration: 2,
+  metadata: {
+    originalTool: 'minecraft.scan_tree_structure',
+    normalizedTool: 'minecraft.scan_tree_structure',
+    args: {
+      recipe: undefined,
+      qty: undefined,
+      blockType: 'oak_log',
+      pos: undefined,
+      method: 'top_down'
+    },
+    mappedAction: 'scan_environment'
+  }
+}
+[Planning] Retrying scan_canopy (attempt 1/1) after 1000ms
+[Planning] ❌ [AuditLogger] tool_executed (2ms)
+[Minecraft Interface] Broadcasting health_changed to 0 clients
+[Dashboard] POST /api/ws/bot-state 200 in 9ms
+[Minecraft Interface] Broadcasting position_changed to 0 clients
+[Minecraft Interface] Broadcasting health_changed to 0 clients
+[Minecraft Interface] 💬 Processing chat from Heliotropism: "can you come here?"
+[Cognition] Processing social_interaction request
+Processing social interaction
+[Dashboard] POST /api/ws/cognitive-stream received: {
+  type: 'social',
+  content: 'Social interaction: Chat from Heliotropism: "can you come here?"',
+  attribution: 'self'
+}
+[Dashboard] New thought added to history: {
+  type: 'social',
+  content: 'Social interaction: Chat from Heliotropism: "can you come here?"',
+  displayContent: 'can you come here?',
+  attribution: 'self',
+  context: {
+    emotionalState: 'interested',
+    confidence: 0.9,
+    cognitiveSystem: 'social-processor',
+    sender: 'Heliotropism',
+    message: 'can you come here?'
+  },
+  metadata: {
+    sender: 'Heliotropism',
+    message: 'can you come here?',
+    timestamp: 1770082068904,
+    environment: 'minecraft',
+    botPosition: { x: 255.94056958883854, y: 53, z: 184.34030730210927 },
+    botHealth: 19.5,
+    botFood: 20,
+    thoughtType: 'social',
+    source: 'player-chat',
+    provenance: 'chain-of-thought'
+  },
+  id: 'thought-1770082068916-ommdqze',
+  timestamp: 1770082068916,
+  processed: false
+}
+Broadcasting message to 0 connections: {"type":"cognitive_thoughts","timestamp":1770082068917,"data":{"thoughts":[{"type":"social","content":"Social interaction: Chat from Heliotropism: \"can you come here?\"","displayContent":"can you come here?","attribution":"self","context":{"emotionalState":"interested","confidence":0.9,"cognitiveSystem":"social-processor","sender":"Heliotropism","message":"can you come here?"},"metadata":{"sender":"Heliotropism","message":"can you come here?","timestamp":1770082068904,"environment":"minecraft","botPosition":{"x":255.94056958883854,"y":53,"z":184.34030730210927},"botHealth":19.5,"botFood":20,"thoughtType":"social","source":"player-chat","provenance":"chain-of-thought"},"id":"thought-1770082068916-ommdqze","timestamp":1770082068916,"processed":false}]}}
+Successfully sent message to 0 connections (0 dead connections removed)
+[Dashboard] POST /api/ws/cognitive-stream 200 in 11ms
+[Minecraft Interface] Broadcasting health_changed to 0 clients
+[Planning] Executing action: scan_tree_structure with args: {
+  recipe: undefined,
+  qty: undefined,
+  blockType: 'oak_log',
+  pos: undefined,
+  method: 'top_down'
+}
+[Planning] [toolExecutor] Executing tool: minecraft.scan_tree_structure (normalized: minecraft.scan_tree_structure) with args: {
+  recipe: undefined,
+  qty: undefined,
+  blockType: 'oak_log',
+  pos: undefined,
+  method: 'top_down'
+}
+[Minecraft Interface] 🔍 Scanning environment for oak_log within 10 blocks
+[Minecraft Interface] ❌ No oak_log blocks found within 10 blocks
+[Planning] Action result: {
+  ok: false,
+  error: 'No oak_log blocks found within 10 blocks',
+  failureCode: undefined,
+  data: { success: false, error: 'No oak_log blocks found within 10 blocks' },
+  environmentDeltas: {},
+  confidence: 0.2,
+  cost: 1,
+  duration: 3,
+  metadata: {
+    originalTool: 'minecraft.scan_tree_structure',
+    normalizedTool: 'minecraft.scan_tree_structure',
+    args: {
+      recipe: undefined,
+      qty: undefined,
+      blockType: 'oak_log',
+      pos: undefined,
+      method: 'top_down'
+    },
+    mappedAction: 'scan_environment'
+  }
+}
+[Planning] Retrying chop_tree (attempt 1/1) after 1000ms
+[Planning] ❌ [AuditLogger] tool_executed (3ms)
+[Planning] [WorldStateManager] State update: {
+  connected: true,
+  position: { x: 255.94056958883854, y: 53, z: 184.3475606286108 },
+  health: 17.5,
+  inventoryCount: 0
+}
+[Minecraft Interface] Broadcasting health_changed to 0 clients
+[Minecraft Interface] 🧠 Cognition system processed chat: {
+  processed: true,
+  type: 'social_interaction',
+  shouldRespond: true,
+  response: 'Sure, heading over now!',
+  shouldCreateTask: true,
+  taskSuggestion: 'Answer question from Heliotropism: "can you come here?"',
+  internalThought: {
+    type: 'social',
+    content: 'Social interaction: Chat from Heliotropism: "can you come here?"',
+    attribution: 'self',
+    context: {
+      emotionalState: 'interested',
+      confidence: 0.9,
+      cognitiveSystem: 'social-processor',
+      sender: 'Heliotropism',
+      message: 'can you come here?'
+    },
+    metadata: {
+      sender: 'Heliotropism',
+      message: 'can you come here?',
+      timestamp: 1770082068904,
+      environment: 'minecraft',
+      botPosition: [Object],
+      botHealth: 19.5,
+      botFood: 20,
+      thoughtType: 'social',
+      source: 'player-chat'
+    },
+    id: 'thought-1770082068905-social-j4imswvaz',
+    timestamp: 1770082068905,
+    processed: false
+  },
+  timestamp: 1770082069591
+}
+[Minecraft Interface] ✅ Bot responded: "Sure, heading over now!" (1ms)
+[Planning] [PlanRoute] {
+  backend: 'unplannable',
+  requiredRig: null,
+  reason: 'no-requirement',
+  taskTitle: 'Answer question from Heliotropism: "can you come here?"'
+}
+[Planning] Task added to enhanced integration: Answer question from Heliotropism: "can you come here?"
+[Lifecycle→Review] high_priority_added: task task-1770082069596-vl6elz0u9
+[Planning] [Lifecycle→Review] goal_binding_drift: task task-1770082069596-vl6elz0u9 (type_not_gated:gathering)
+[Minecraft Interface] ✅ Created task from social chat: {
+  success: true,
+  goalId: 'goal-1770082069596-p3kgq',
+  goal: {
+    id: 'goal-1770082069596-p3kgq',
+    type: 'general',
+    priority: 0.8,
+    urgency: 0.6,
+    utility: 0.7,
+    description: 'Answer question from Heliotropism: "can you come here?"',
+    preconditions: [],
+    effects: [],
+    status: 'pending',
+    createdAt: 1770082069596,
+    updatedAt: 1770082069596,
+    subGoals: []
+  }
+}
+[Dashboard] POST /api/task-updates 200 in 8ms
+[Minecraft Interface] Broadcasting health_changed to 0 clients
+[Minecraft Interface] Broadcasting health_changed to 0 clients
+[Planning] Executing action: scan_tree_structure with args: {
+  recipe: undefined,
+  qty: undefined,
+  blockType: 'oak_log',
+  pos: undefined,
+  method: 'top_down'
+}
+[toolExecutor] Executing tool: minecraft.scan_tree_structure (normalized: minecraft.scan_tree_structure) with args: {
+  recipe: undefined,
+  qty: undefined,
+  blockType: 'oak_log',
+  pos: undefined,
+  method: 'top_down'
+}
+[Minecraft Interface] 🔍 Scanning environment for oak_log within 10 blocks
+[Minecraft Interface] ❌ No oak_log blocks found within 10 blocks
+[Planning] Action result: {
+  ok: false,
+  error: 'No oak_log blocks found within 10 blocks',
+  failureCode: undefined,
+  data: { success: false, error: 'No oak_log blocks found within 10 blocks' },
+  environmentDeltas: {},
+  confidence: 0.2,
+  cost: 1,
+  duration: 8,
+  metadata: {
+    originalTool: 'minecraft.scan_tree_structure',
+    normalizedTool: 'minecraft.scan_tree_structure',
+    args: {
+      recipe: undefined,
+      qty: undefined,
+      blockType: 'oak_log',
+      pos: undefined,
+      method: 'top_down'
+    },
+    mappedAction: 'scan_environment'
+  }
+}
+[Planning] Retrying scan_canopy (attempt 1/1) after 1000ms
+[Planning] ❌ [AuditLogger] tool_executed (8ms)
+[Minecraft Interface] Broadcasting health_changed to 0 clients
+[Minecraft Interface] [Observation] Cognition service reachable
+[Dashboard] POST /api/ws/bot-state 200 in 11ms
+[Minecraft Interface] WebSocket client connected (unknown)
+[Dashboard] GET /api/tasks 200 in 16ms
+[Minecraft Interface] Broadcasting health_changed to 1 clients
+[Dashboard] GET /api/ws/cognitive-stream/history?limit=100 200 in 24ms
+[Dashboard] GET /api/viewer/status 200 in 12ms
+[Dashboard] GET /api/ws/bot-state 200 in 2863ms
+[Dashboard] SSE connection closed. Total connections: 0
+[Minecraft Interface] Broadcasting health_changed to 1 clients
+[Minecraft Interface] WebSocket client disconnected (unknown)
+[Dashboard] SSE connection established. Total connections: 1
+[Planning] Executing action: scan_tree_structure with args: {
+  recipe: undefined,
+  qty: undefined,
+  blockType: 'oak_log',
+  pos: undefined,
+  method: 'top_down'
+}
+[Planning] [toolExecutor] Executing tool: minecraft.scan_tree_structure (normalized: minecraft.scan_tree_structure) with args: {
+  recipe: undefined,
+  qty: undefined,
+  blockType: 'oak_log',
+  pos: undefined,
+  method: 'top_down'
+}
+[Minecraft Interface] 🔍 Scanning environment for oak_log within 10 blocks
+[Minecraft Interface] ❌ No oak_log blocks found within 10 blocks
+[Planning] Action result: {
+  ok: false,
+  error: 'No oak_log blocks found within 10 blocks',
+  failureCode: undefined,
+  data: { success: false, error: 'No oak_log blocks found within 10 blocks' },
+  environmentDeltas: {},
+  confidence: 0.2,
+  cost: 1,
+  duration: 4,
+  metadata: {
+    originalTool: 'minecraft.scan_tree_structure',
+    normalizedTool: 'minecraft.scan_tree_structure',
+    args: {
+      recipe: undefined,
+      qty: undefined,
+      blockType: 'oak_log',
+      pos: undefined,
+      method: 'top_down'
+    },
+    mappedAction: 'scan_environment'
+  }
+}
+[Planning] ✅ MCP option executed successfully: Safe Tree Chopping (1.0.0)
+[Planning] 🎯 Executing goal: goal-1770081983626-kcp5p
+[Planning] ❌ [AuditLogger] tool_executed (4ms)
+[Planning] 🔧 [REACTIVE EXECUTOR] Executing task directly via Minecraft: undefined
+[Planning] 🎯 Executing goal: goal-1770081999734-7pczt
+[Planning] 🔧 [REACTIVE EXECUTOR] Executing task directly via Minecraft: undefined
+[Planning] 🎯 Executing goal: goal-1770082049400-w0eer
+[Planning] 🔧 [REACTIVE EXECUTOR] Executing task directly via Minecraft: undefined
+🎯 Executing goal: goal-1770082069596-p3kgq
+[Planning] 🔧 [REACTIVE EXECUTOR] Executing task directly via Minecraft: undefined
+[Minecraft Interface] Broadcasting health_changed to 0 clients
+[Minecraft Interface] Broadcasting health_changed to 0 clients
+[Cognition] Generating thoughts for situation: {
+  situation: 'environment',
+  thoughtTypes: [ 'reflection', 'observation', 'planning' ]
+}
+[Dashboard] No new thoughts to send
+[Minecraft Interface] Broadcasting health_changed to 0 clients
+[Planning] [WorldStateManager] State update: {
+  connected: true,
+  position: { x: 255.94056958883854, y: 53, z: 184.3475606286108 },
+  health: 13.166667938232422,
+  inventoryCount: 0
+}
+[Minecraft Interface] Broadcasting health_changed to 0 clients
+[Minecraft Interface] Broadcasting health_changed to 0 clients
+[Cognition] Processing environmental_awareness request
+[Dashboard] POST /api/ws/cognitive-stream received: {
+  type: 'environmental',
+  content: 'Awareness: 2 neutral nearby',
+  attribution: 'self'
+}
+[Dashboard] POST /api/ws/cognitive-stream 200 in 11ms
+[Dashboard] POST /api/ws/bot-state 200 in 8ms
+[Minecraft Interface] WebSocket client connected (unknown)
+[Minecraft Interface] Broadcasting health_changed to 1 clients
+[Dashboard] GET /api/ws/bot-state 200 in 1982ms
+[Dashboard] SSE connection closed. Total connections: 0
+[Minecraft Interface] WebSocket client disconnected (unknown)
+[Dashboard] SSE connection established. Total connections: 1
+[Cognition] Enhanced thought generator has 2 recent thoughts
+[Planning] [CognitiveStream] Fetched 6 thoughts [
+  '"Maintaining awareness of surroundings."',
+  '"Maintaining awareness of surroundings."',
+  '"Maintaining awareness of surroundings."',
+  '"My inventory is bare — I should gather some wood to get started. [GOAL: collect oak_log 8]"',
+  '"My inventory is bare — I should gather some wood to get started. [GOAL: collect oak_log 8]"',
+  '"My inventory is bare — I should gather some wood to get started. [GOAL: collect oak_log 8]"'
+]
+[Planning] 🤖 [AUTONOMOUS EXECUTOR] Found 5 active tasks
+🤖 [AUTONOMOUS EXECUTOR] Top task: Answer question from Heliotropism: "sterling, where are you at?"
+🤖 [AUTONOMOUS EXECUTOR] Top task: Answer question from Heliotropism: "sterling, where are you at?" (gathering)
+🤖 [AUTONOMOUS EXECUTOR] Task status: pending, priority: 0.8
+🤖 [AUTONOMOUS EXECUTOR] Found 5 active tasks, executing...
+[Planning] 🤖 [AUTONOMOUS EXECUTOR] Executing task: Answer question from Heliotropism: "sterling, where are you at?" (gathering)
+[Planning] 🤖 [AUTONOMOUS EXECUTOR] Task details: {
+  id: 'task-1770081983627-bfoi72qo3',
+  type: 'gathering',
+  priority: 0.8,
+  urgency: 0.6,
+  status: 'pending'
+}
+[Planning] 🤖 [AUTONOMOUS EXECUTOR] Checking bot connection...
+[Planning] 🤖 [AUTONOMOUS EXECUTOR] Bot connected: true
+[Planning] 🎯 Found MCP option: Safe Tree Chopping (1.0.0) (opt.chop_tree_safe) - delegating to MCP execution pipeline
+✅ Found MCP option for task: Safe Tree Chopping (1.0.0)
+[Planning] [MCP] Executing option opt.chop_tree_safe via BT runner
+[Planning] Loading BT definition from: /Users/darianrosebrook/Desktop/Projects/conscious-bot/packages/planning/src/behavior-trees/definitions/chop_tree_safe.json
+Current working directory: /Users/darianrosebrook/Desktop/Projects/conscious-bot/packages/planning
+[Planning] File exists check: YES
+[Planning] Loaded BT definition for opt.chop_tree_safe: {
+  "id": "opt.chop_tree_safe",
+  "name": "Safe Tree Chopping",
+  "description": "Gather N logs from target species with safety checks",
+  "root": {
+    "type": "sequence",
+    "children": [
+      {
+        "type": "selector",
+        "name": "ensure_axe",
+        "children": [
+          {
+            "type": "condition",
+            "name": "check_has_axe",
+            "condition": "has_axe"
+          },
+          {
+            "type": "action",
+            "name": "craft_axe",
+            "action": "execute_bt",
+            "args": {
+              "bt_id": "opt.craft_wooden_axe"
+            }
+          }
+        ]
+      },
+      {
+        "type": "condition",
+        "name": "check_light",
+        "condition": "light_level >= 7 || has_torch"
+      },
+      {
+        "type": "selector",
+        "name": "find_tree",
+        "children": [
+          {
+            "type": "action",
+            "name": "find_nearby_tree",
+            "action": "scan_for_trees",
+            "args": {
+              "radius": 50,
+              "species": "target_species"
+            }
+          },
+          {
+            "type": "action",
+            "name": "pathfind_to_tree",
+            "action": "pathfind",
+            "args": {
+              "target": "nearest_tree",
+              "avoid_water": true
+            }
+          }
+        ]
+      },
+      {
+        "type": "sequence",
+        "name": "chop_tree",
+        "children": [
+          {
+            "type": "action",
+            "name": "scan_canopy",
+            "action": "scan_tree_structure",
+            "args": {
+              "method": "top_down"
+            }
+          },
+          {
+            "type": "action",
+            "name": "chop_logs",
+            "action": "dig_blocks",
+            "args": {
+              "pattern": "tree_logs_top_down",
+              "tool": "axe"
+            }
+          },
+          {
+            "type": "action",
+            "name": "collect_drops",
+            "action": "collect_items",
+            "args": {
+              "radius": 10
+            }
+          }
+        ]
+      },
+      {
+        "type": "condition",
+        "name": "verify_logs",
+        "condition": "inventory.logs >= target_amount"
+      }
+    ]
+  },
+  "metadata": {
+    "timeout": 45000,
+    "retries": 2,
+    "priority": "medium",
+    "interruptible": true
+  }
+}
+[Planning] Executing action: scan_for_trees with args: {
+  recipe: undefined,
+  qty: undefined,
+  blockType: 'oak_log',
+  pos: undefined,
+  radius: 50,
+  species: 'target_species'
+}
+[toolExecutor] Executing tool: minecraft.scan_for_trees (normalized: minecraft.scan_for_trees) with args: {
+  recipe: undefined,
+  qty: undefined,
+  blockType: 'oak_log',
+  pos: undefined,
+  radius: 50,
+  species: 'target_species'
+}
+[Minecraft Interface] 🔍 Scanning environment for oak_log within 50 blocks
+[Minecraft Interface] ❌ No oak_log blocks found within 50 blocks
+[Planning] Action result: {
+  ok: false,
+  error: 'No oak_log blocks found within 50 blocks',
+  failureCode: undefined,
+  data: { success: false, error: 'No oak_log blocks found within 50 blocks' },
+  environmentDeltas: {},
+  confidence: 0.2,
+  cost: 1,
+  duration: 3,
+  metadata: {
+    originalTool: 'minecraft.scan_for_trees',
+    normalizedTool: 'minecraft.scan_for_trees',
+    args: {
+      recipe: undefined,
+      qty: undefined,
+      blockType: 'oak_log',
+      pos: undefined,
+      radius: 50,
+      species: 'target_species'
+    },
+    mappedAction: 'scan_environment'
+  }
+}
+Retrying find_nearby_tree (attempt 1/1) after 1000ms
+[Planning] ❌ [AuditLogger] tool_executed (3ms)
+[Dashboard] POST /api/live-stream-updates 404 in 116ms
+[Dashboard] POST /api/live-stream-updates 404 in 117ms
+ POST /api/live-stream-updates 404 in 117ms
+[Dashboard] POST /api/environment-updates 404 in 52ms
+[Dashboard] POST /api/environment-updates 404 in 57ms
+[Minecraft Interface] Broadcasting health_changed to 0 clients
+[Minecraft Interface] 🚫 Stuck detected: moved 0.00 blocks in 6s, 44.6 blocks from target
+[Planning] Executing action: scan_for_trees with args: {
+  recipe: undefined,
+  qty: undefined,
+  blockType: 'oak_log',
+  pos: undefined,
+  radius: 50,
+  species: 'target_species'
+}
+[Planning] [toolExecutor] Executing tool: minecraft.scan_for_trees (normalized: minecraft.scan_for_trees) with args: {
+  recipe: undefined,
+  qty: undefined,
+  blockType: 'oak_log',
+  pos: undefined,
+  radius: 50,
+  species: 'target_species'
+}
+[Minecraft Interface] 🔍 Scanning environment for oak_log within 50 blocks
+[Minecraft Interface] ❌ No oak_log blocks found within 50 blocks
+[Planning] Action result: {
+  ok: false,
+  error: 'No oak_log blocks found within 50 blocks',
+  failureCode: undefined,
+  data: { success: false, error: 'No oak_log blocks found within 50 blocks' },
+  environmentDeltas: {},
+  confidence: 0.2,
+  cost: 1,
+  duration: 3,
+  metadata: {
+    originalTool: 'minecraft.scan_for_trees',
+    normalizedTool: 'minecraft.scan_for_trees',
+    args: {
+      recipe: undefined,
+      qty: undefined,
+      blockType: 'oak_log',
+      pos: undefined,
+      radius: 50,
+      species: 'target_species'
+    },
+    mappedAction: 'scan_environment'
+  }
+}
+[Planning] Executing action: pathfind with args: {
+  recipe: undefined,
+  qty: undefined,
+  blockType: 'oak_log',
+  pos: undefined,
+  target: 'nearest_tree',
+  avoid_water: true
+}
+[Planning] [toolExecutor] Executing tool: minecraft.pathfind (normalized: minecraft.pathfind) with args: {
+  recipe: undefined,
+  qty: undefined,
+  blockType: 'oak_log',
+  pos: undefined,
+  target: 'nearest_tree',
+  avoid_water: true
+}
+[Planning] ❌ [AuditLogger] tool_executed (3ms)
+[Minecraft Interface] 🔄 Retry 2/5: moved 8.3 blocks, 44.6 from target
+[Cognition] Processing environmental_awareness request
+[Dashboard] POST /api/ws/cognitive-stream received: {
+  type: 'environmental',
+  content: 'Awareness: 2 neutral nearby',
+  attribution: 'self'
+}
+[Dashboard] POST /api/ws/cognitive-stream 200 in 12ms
+[Dashboard] POST /api/ws/bot-state 200 in 8ms
+[Minecraft Interface] Broadcasting position_changed to 0 clients
+[Minecraft Interface] Broadcasting health_changed to 0 clients
+[SafetyMonitor] 🚨 Critical health (7.333334922790527)! Fleeing immediately
+[Minecraft Interface] [SafetyMonitor] 🚨 Emergency response triggered: critical_health { health: 7.333334922790527 }
+[Minecraft Interface] [SafetyMonitor] No emergency action needed
+[Planning] Action result: {
+  ok: true,
+  data: {
+    success: true,
+    data: {
+      distanceMoved: 0.5238506600396041,
+      startPosition: [Object],
+      endPosition: [Object]
+    }
+  },
+  environmentDeltas: {},
+  confidence: 0.8,
+  cost: 1,
+  duration: 1004,
+  metadata: {
+    originalTool: 'minecraft.pathfind',
+    normalizedTool: 'minecraft.pathfind',
+    args: {
+      recipe: undefined,
+      qty: undefined,
+      blockType: 'oak_log',
+      pos: undefined,
+      target: 'nearest_tree',
+      avoid_water: true
+    },
+    mappedAction: 'move_forward'
+  }
+}
+Executing action: scan_tree_structure with args: {
+  recipe: undefined,
+  qty: undefined,
+  blockType: 'oak_log',
+  pos: undefined,
+  method: 'top_down'
+}
+[toolExecutor] Executing tool: minecraft.scan_tree_structure (normalized: minecraft.scan_tree_structure) with args: {
+  recipe: undefined,
+  qty: undefined,
+  blockType: 'oak_log',
+  pos: undefined,
+  method: 'top_down'
+}
+[Planning] ✅ [AuditLogger] tool_executed (1004ms)
+[Minecraft Interface] 🔍 Scanning environment for oak_log within 10 blocks
+[Minecraft Interface] ❌ No oak_log blocks found within 10 blocks
+[Planning] Action result: {
+  ok: false,
+  error: 'No oak_log blocks found within 10 blocks',
+  failureCode: undefined,
+  data: { success: false, error: 'No oak_log blocks found within 10 blocks' },
+  environmentDeltas: {},
+  confidence: 0.2,
+  cost: 1,
+  duration: 5,
+  metadata: {
+    originalTool: 'minecraft.scan_tree_structure',
+    normalizedTool: 'minecraft.scan_tree_structure',
+    args: {
+      recipe: undefined,
+      qty: undefined,
+      blockType: 'oak_log',
+      pos: undefined,
+      method: 'top_down'
+    },
+    mappedAction: 'scan_environment'
+  }
+}
+[Planning] Retrying scan_canopy (attempt 1/1) after 1000ms
+[Planning] ❌ [AuditLogger] tool_executed (5ms)
+[Planning] [WorldStateManager] State update: {
+  connected: true,
+  position: { x: 255.5, y: 53, z: 184.63096484773 },
+  health: 7.333334922790527,
+  inventoryCount: 0
+}
+[Cognition] Processing environmental_awareness request
+[Dashboard] POST /api/ws/cognitive-stream received: {
+  type: 'environmental',
+  content: 'Awareness: 2 neutral nearby',
+  attribution: 'self'
+}
+[Dashboard] POST /api/ws/cognitive-stream 200 in 9ms
+[Minecraft Interface] Broadcasting health_changed to 0 clients
+[SafetyMonitor] 🚨 Critical health (5.333334922790527)! Fleeing immediately
+[SafetyMonitor] 🚨 Emergency response triggered: critical_health { health: 5.333334922790527 }
+[Minecraft Interface] [SafetyMonitor] 🏃 Fleeing from threats...
+[Minecraft Interface] [SafetyMonitor] 🏃 Calculating flee direction from position: 255.5, 53.0, 184.6
+[Minecraft Interface] [SafetyMonitor] 💧 Bot is in water block: water at 255.5, 53.0, 184.6
+[Minecraft Interface] 🌊 Water environment analysis: {
+  waterDepth: 10,
+  surfaceLevel: 63,
+  safeSurfacePositions: 59,
+  hasCurrent: true,
+  nearestDistance: '10.00'
+}
+[Minecraft Interface] [SafetyMonitor] 🌊 WaterNav surface_escape (controlled_sink) depth=10 current=true safeSurfaces=59
+[Minecraft Interface] [ActionTranslator] 🧭 navigate gated: already navigating
+[Minecraft Interface] [SafetyMonitor] ✅ Flee action completed
+[Planning] Executing action: scan_tree_structure with args: {
+  recipe: undefined,
+  qty: undefined,
+  blockType: 'oak_log',
+  pos: undefined,
+  method: 'top_down'
+}
+[Planning] [toolExecutor] Executing tool: minecraft.scan_tree_structure (normalized: minecraft.scan_tree_structure) with args: {
+  recipe: undefined,
+  qty: undefined,
+  blockType: 'oak_log',
+  pos: undefined,
+  method: 'top_down'
+}
+[Minecraft Interface] 🔍 Scanning environment for oak_log within 10 blocks
+[Minecraft Interface] ❌ No oak_log blocks found within 10 blocks
+[Planning] Action result: {
+  ok: false,
+  error: 'No oak_log blocks found within 10 blocks',
+  failureCode: undefined,
+  data: { success: false, error: 'No oak_log blocks found within 10 blocks' },
+  environmentDeltas: {},
+  confidence: 0.2,
+  cost: 1,
+  duration: 8,
+  metadata: {
+    originalTool: 'minecraft.scan_tree_structure',
+    normalizedTool: 'minecraft.scan_tree_structure',
+    args: {
+      recipe: undefined,
+      qty: undefined,
+      blockType: 'oak_log',
+      pos: undefined,
+      method: 'top_down'
+    },
+    mappedAction: 'scan_environment'
+  }
+}
+[Planning] Retrying chop_tree (attempt 1/1) after 1000ms
+[Planning] ❌ [AuditLogger] tool_executed (8ms)
+[Minecraft Interface] Broadcasting health_changed to 0 clients
+[SafetyMonitor] 🚫 Emergency response suppressed (cooldown): critical_health
+[Minecraft Interface] Broadcasting health_changed to 0 clients
+[Dashboard] POST /api/ws/bot-state 200 in 10ms
+[Minecraft Interface] WebSocket client connected (unknown)
+[Minecraft Interface] Broadcasting health_changed to 1 clients
+[Dashboard] GET /api/ws/bot-state 200 in 3972ms
+[Dashboard] SSE connection closed. Total connections: 0
+[Minecraft Interface] WebSocket client disconnected (unknown)
+[Dashboard] SSE connection established. Total connections: 1
+[Planning] Executing action: scan_tree_structure with args: {
+  recipe: undefined,
+  qty: undefined,
+  blockType: 'oak_log',
+  pos: undefined,
+  method: 'top_down'
+}
+[Planning] [toolExecutor] Executing tool: minecraft.scan_tree_structure (normalized: minecraft.scan_tree_structure) with args: {
+  recipe: undefined,
+  qty: undefined,
+  blockType: 'oak_log',
+  pos: undefined,
+  method: 'top_down'
+}
+[Minecraft Interface] 🔍 Scanning environment for oak_log within 10 blocks
+[Minecraft Interface] ❌ No oak_log blocks found within 10 blocks
+[Planning] Action result: {
+  ok: false,
+  error: 'No oak_log blocks found within 10 blocks',
+  failureCode: undefined,
+  data: { success: false, error: 'No oak_log blocks found within 10 blocks' },
+  environmentDeltas: {},
+  confidence: 0.2,
+  cost: 1,
+  duration: 3,
+  metadata: {
+    originalTool: 'minecraft.scan_tree_structure',
+    normalizedTool: 'minecraft.scan_tree_structure',
+    args: {
+      recipe: undefined,
+      qty: undefined,
+      blockType: 'oak_log',
+      pos: undefined,
+      method: 'top_down'
+    },
+    mappedAction: 'scan_environment'
+  }
+}
+[Planning] Retrying scan_canopy (attempt 1/1) after 1000ms
+[Planning] ❌ [AuditLogger] tool_executed (3ms)
+[Planning] [MCP] Bot instance updated successfully
+[Minecraft Interface] Bot instance updated in planning server
+[Cognition] Processing environmental_awareness request
+[Dashboard] POST /api/ws/cognitive-stream received: {
+  type: 'environmental',
+  content: 'Awareness: 2 neutral nearby',
+  attribution: 'self'
+}
+[Dashboard] POST /api/ws/cognitive-stream 200 in 14ms
+[Minecraft Interface] Broadcasting health_changed to 0 clients
+[Minecraft Interface] [SafetyMonitor] 🚨 Critical health (2.3333349227905273)! Fleeing immediately
+[SafetyMonitor] 🚨 Emergency response triggered: critical_health { health: 2.3333349227905273 }
+[Minecraft Interface] [SafetyMonitor] 🏃 Fleeing from threats...
+[SafetyMonitor] 🏃 Calculating flee direction from position: 255.5, 53.0, 184.6
+[SafetyMonitor] 💧 Bot is in water block: water at 255.5, 53.0, 184.6
+[Minecraft Interface] 🌊 Water environment analysis: {
+  waterDepth: 10,
+  surfaceLevel: 63,
+  safeSurfacePositions: 59,
+  hasCurrent: false,
+  nearestDistance: '10.00'
+}
+[SafetyMonitor] 🌊 WaterNav surface_escape (controlled_sink) depth=10 current=false safeSurfaces=59
+[Minecraft Interface] [SafetyMonitor] ✅ Flee action completed
+[Planning] Executing action: scan_tree_structure with args: {
+  recipe: undefined,
+  qty: undefined,
+  blockType: 'oak_log',
+  pos: undefined,
+  method: 'top_down'
+}
+[Planning] [toolExecutor] Executing tool: minecraft.scan_tree_structure (normalized: minecraft.scan_tree_structure) with args: {
+  recipe: undefined,
+  qty: undefined,
+  blockType: 'oak_log',
+  pos: undefined,
+  method: 'top_down'
+}
+[Minecraft Interface] 🔍 Scanning environment for oak_log within 10 blocks
+[Minecraft Interface] ❌ No oak_log blocks found within 10 blocks
+[Planning] Action result: {
+  ok: false,
+  error: 'No oak_log blocks found within 10 blocks',
+  failureCode: undefined,
+  data: { success: false, error: 'No oak_log blocks found within 10 blocks' },
+  environmentDeltas: {},
+  confidence: 0.2,
+  cost: 1,
+  duration: 5,
+  metadata: {
+    originalTool: 'minecraft.scan_tree_structure',
+    normalizedTool: 'minecraft.scan_tree_structure',
+    args: {
+      recipe: undefined,
+      qty: undefined,
+      blockType: 'oak_log',
+      pos: undefined,
+      method: 'top_down'
+    },
+    mappedAction: 'scan_environment'
+  }
+}
+[Planning] Retrying opt.chop_tree_safe (attempt 1/2) after 1000ms
+[Planning] ❌ [AuditLogger] tool_executed (5ms)
+[Planning] [WorldStateManager] State update: {
+  connected: true,
+  position: { x: 255.5, y: 53, z: 184.63096484773 },
+  health: 2.3333349227905273,
+  inventoryCount: 0
+}
+[Cognition] Processing environmental_awareness request
+[Dashboard] POST /api/ws/cognitive-stream received: {
+  type: 'environmental',
+  content: 'Awareness: 1 neutral nearby',
+  attribution: 'self'
+}
+[Dashboard] POST /api/ws/cognitive-stream 200 in 9ms
+[Minecraft Interface] [SafetyMonitor] 🚨 Critical threat level detected! Taking immediate action
+[Minecraft Interface] [SafetyMonitor] 🚨 Emergency response triggered: critical_threat {
+  threatLevel: 'critical',
+  threats: [
+    { type: 'low_health', distance: 0, threatLevel: 88.33332538604736 }
+  ],
+  recommendedAction: 'flee'
+}
+[Minecraft Interface] 🌊 Water environment analysis: {
+  waterDepth: 10,
+  surfaceLevel: 63,
+  safeSurfacePositions: 59,
+  hasCurrent: false,
+  nearestDistance: '10.00'
+}
+[Dashboard] POST /api/ws/bot-state 200 in 6ms
+[Minecraft Interface] Broadcasting health_changed to 0 clients
+[Minecraft Interface] Broadcasting warning to 0 clients
+[SafetyMonitor] 🚫 Emergency response suppressed (cooldown): critical_health
+[Planning] Executing action: scan_for_trees with args: {
+  recipe: undefined,
+  qty: undefined,
+  blockType: 'oak_log',
+  pos: undefined,
+  radius: 50,
+  species: 'target_species'
+}
+[Planning] [toolExecutor] Executing tool: minecraft.scan_for_trees (normalized: minecraft.scan_for_trees) with args: {
+  recipe: undefined,
+  qty: undefined,
+  blockType: 'oak_log',
+  pos: undefined,
+  radius: 50,
+  species: 'target_species'
+}
+[Minecraft Interface] 🔍 Scanning environment for oak_log within 50 blocks
+[Minecraft Interface] ❌ No oak_log blocks found within 50 blocks
+[Planning] Action result: {
+  ok: false,
+  error: 'No oak_log blocks found within 50 blocks',
+  failureCode: undefined,
+  data: { success: false, error: 'No oak_log blocks found within 50 blocks' },
+  environmentDeltas: {},
+  confidence: 0.2,
+  cost: 1,
+  duration: 5,
+  metadata: {
+    originalTool: 'minecraft.scan_for_trees',
+    normalizedTool: 'minecraft.scan_for_trees',
+    args: {
+      recipe: undefined,
+      qty: undefined,
+      blockType: 'oak_log',
+      pos: undefined,
+      radius: 50,
+      species: 'target_species'
+    },
+    mappedAction: 'scan_environment'
+  }
+}
+Retrying find_nearby_tree (attempt 1/1) after 1000ms
+[Planning] ❌ [AuditLogger] tool_executed (5ms)
+[Cognition] Processing environmental_awareness request
+[Dashboard] POST /api/ws/cognitive-stream received: {
+  type: 'environmental',
+  content: 'Awareness: 1 neutral nearby',
+  attribution: 'self'
+}
+[Dashboard] POST /api/ws/cognitive-stream 200 in 12ms
+[Minecraft Interface] Broadcasting health_changed to 0 clients
+[Minecraft Interface] Broadcasting warning to 0 clients
+[Minecraft Interface] Broadcasting health_changed to 0 clients
+[Minecraft Interface] 💀 Bot died, stopping thought generation...
+[Minecraft Interface] Observation broadcast stopped
+Broadcasting error to 0 clients
+[Minecraft Interface] Broadcasting health_changed to 0 clients
+Broadcasting respawned to 0 clients
+[Minecraft Interface] Bot respawned, restarting thought generation...
+[Minecraft Interface] Observation broadcast started (30s intervals)
+[Minecraft Interface] Broadcasting health_changed to 0 clients
+[Planning] Executing action: scan_for_trees with args: {
+  recipe: undefined,
+  qty: undefined,
+  blockType: 'oak_log',
+  pos: undefined,
+  radius: 50,
+  species: 'target_species'
+}
+[Planning] [toolExecutor] Executing tool: minecraft.scan_for_trees (normalized: minecraft.scan_for_trees) with args: {
+  recipe: undefined,
+  qty: undefined,
+  blockType: 'oak_log',
+  pos: undefined,
+  radius: 50,
+  species: 'target_species'
+}
+[Minecraft Interface] 🔍 Scanning environment for oak_log within 50 blocks
+[Minecraft Interface] ❌ No oak_log blocks found within 50 blocks
+[Planning] Action result: {
+  ok: false,
+  error: 'No oak_log blocks found within 50 blocks',
+  failureCode: undefined,
+  data: { success: false, error: 'No oak_log blocks found within 50 blocks' },
+  environmentDeltas: {},
+  confidence: 0.2,
+  cost: 1,
+  duration: 10,
+  metadata: {
+    originalTool: 'minecraft.scan_for_trees',
+    normalizedTool: 'minecraft.scan_for_trees',
+    args: {
+      recipe: undefined,
+      qty: undefined,
+      blockType: 'oak_log',
+      pos: undefined,
+      radius: 50,
+      species: 'target_species'
+    },
+    mappedAction: 'scan_environment'
+  }
+}
+[Planning] Executing action: pathfind with args: {
+  recipe: undefined,
+  qty: undefined,
+  blockType: 'oak_log',
+  pos: undefined,
+  target: 'nearest_tree',
+  avoid_water: true
+}
+[toolExecutor] Executing tool: minecraft.pathfind (normalized: minecraft.pathfind) with args: {
+  recipe: undefined,
+  qty: undefined,
+  blockType: 'oak_log',
+  pos: undefined,
+  target: 'nearest_tree',
+  avoid_water: true
+}
+[Planning] ❌ [AuditLogger] tool_executed (10ms)
+[Dashboard] POST /api/ws/bot-state 200 in 7ms
+[Minecraft Interface] WebSocket client connected (unknown)
+[Minecraft Interface] Broadcasting position_changed to 1 clients
+[Dashboard] GET /api/ws/bot-state 200 in 3966ms
+[Dashboard] SSE connection closed. Total connections: 0
+[Planning] Action result: {
+  ok: true,
+  data: {
+    success: true,
+    data: {
+      distanceMoved: 1.1999999999999886,
+      startPosition: [Object],
+      endPosition: [Object]
+    }
+  },
+  environmentDeltas: {},
+  confidence: 0.8,
+  cost: 1,
+  duration: 1007,
+  metadata: {
+    originalTool: 'minecraft.pathfind',
+    normalizedTool: 'minecraft.pathfind',
+    args: {
+      recipe: undefined,
+      qty: undefined,
+      blockType: 'oak_log',
+      pos: undefined,
+      target: 'nearest_tree',
+      avoid_water: true
+    },
+    mappedAction: 'move_forward'
+  }
+}
+[Planning] Executing action: scan_tree_structure with args: {
+  recipe: undefined,
+  qty: undefined,
+  blockType: 'oak_log',
+  pos: undefined,
+  method: 'top_down'
+}
+[toolExecutor] Executing tool: minecraft.scan_tree_structure (normalized: minecraft.scan_tree_structure) with args: {
+  recipe: undefined,
+  qty: undefined,
+  blockType: 'oak_log',
+  pos: undefined,
+  method: 'top_down'
+}
+[Planning] ✅ [AuditLogger] tool_executed (1007ms)
+[Minecraft Interface] 🔍 Scanning environment for oak_log within 10 blocks
+[Minecraft Interface] ❌ No oak_log blocks found within 10 blocks
+[Planning] Action result: {
+  ok: false,
+  error: 'No oak_log blocks found within 10 blocks',
+  failureCode: undefined,
+  data: { success: false, error: 'No oak_log blocks found within 10 blocks' },
+  environmentDeltas: {},
+  confidence: 0.2,
+  cost: 1,
+  duration: 3,
+  metadata: {
+    originalTool: 'minecraft.scan_tree_structure',
+    normalizedTool: 'minecraft.scan_tree_structure',
+    args: {
+      recipe: undefined,
+      qty: undefined,
+      blockType: 'oak_log',
+      pos: undefined,
+      method: 'top_down'
+    },
+    mappedAction: 'scan_environment'
+  }
+}
+[Planning] Retrying scan_canopy (attempt 1/1) after 1000ms
+[Planning] ❌ [AuditLogger] tool_executed (3ms)
+[Planning] [WorldStateManager] State update: {
+  connected: true,
+  position: { x: 262.5, y: 63, z: 184.7 },
+  health: 20,
+  inventoryCount: 0
+}
+[Cognition] Processing environmental_awareness request
+[Dashboard] POST /api/ws/cognitive-stream received: {
+  type: 'environmental',
+  content: 'Awareness: 2 neutral nearby [new: player]',
+  attribution: 'self'
+}
+[Dashboard] New thought added to history: {
+  type: 'environmental',
+  content: 'Awareness: 2 neutral nearby [new: player]',
+  displayContent: undefined,
+  attribution: 'self',
+  context: {
+    emotionalState: 'aware',
+    confidence: 0.85,
+    cognitiveSystem: 'saliency-reasoner'
+  },
+  metadata: {
+    thoughtType: 'environmental',
+    source: 'saliency',
+    trackCount: 3,
+    deltaCount: 1,
+    provenance: 'chain-of-thought'
+  },
+  id: 'thought-1770082081589-l7cqjii',
+  timestamp: 1770082081589,
+  processed: false
+}
+Broadcasting message to 0 connections: {"type":"cognitive_thoughts","timestamp":1770082081589,"data":{"thoughts":[{"type":"environmental","content":"Awareness: 2 neutral nearby [new: player]","attribution":"self","context":{"emotionalState":"aware","confidence":0.85,"cognitiveSystem":"saliency-reasoner"},"metadata":{"thoughtType":"environmental","source":"saliency","trackCount":3,"deltaCount":1,"provenance":"chain-of-thought"},"id":"thought-1770082081589-l7cqjii","timestamp":1770082081589,"processed":false}]}}
+Successfully sent message to 0 connections (0 dead connections removed)
+[Dashboard] POST /api/ws/cognitive-stream 200 in 10ms
+[Dashboard] GET /api/ws/cognitive-stream/history?limit=100 200 in 10ms
+[Planning] Executing action: scan_tree_structure with args: {
+  recipe: undefined,
+  qty: undefined,
+  blockType: 'oak_log',
+  pos: undefined,
+  method: 'top_down'
+}
+[Planning] [toolExecutor] Executing tool: minecraft.scan_tree_structure (normalized: minecraft.scan_tree_structure) with args: {
+  recipe: undefined,
+  qty: undefined,
+  blockType: 'oak_log',
+  pos: undefined,
+  method: 'top_down'
+}
+[Minecraft Interface] 🔍 Scanning environment for oak_log within 10 blocks
+[Minecraft Interface] ❌ No oak_log blocks found within 10 blocks
+[Planning] Action result: {
+  ok: false,
+  error: 'No oak_log blocks found within 10 blocks',
+  failureCode: undefined,
+  data: { success: false, error: 'No oak_log blocks found within 10 blocks' },
+  environmentDeltas: {},
+  confidence: 0.2,
+  cost: 1,
+  duration: 3,
+  metadata: {
+    originalTool: 'minecraft.scan_tree_structure',
+    normalizedTool: 'minecraft.scan_tree_structure',
+    args: {
+      recipe: undefined,
+      qty: undefined,
+      blockType: 'oak_log',
+      pos: undefined,
+      method: 'top_down'
+    },
+    mappedAction: 'scan_environment'
+  }
+}
+[Planning] Retrying chop_tree (attempt 1/1) after 1000ms
+[Planning] ❌ [AuditLogger] tool_executed (3ms)

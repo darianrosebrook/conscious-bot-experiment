@@ -28,37 +28,43 @@ export async function GET(_request: NextRequest) {
 }
 
 async function checkAllBotConnections() {
+  const memoryUrl = process.env.MEMORY_SERVICE_URL || 'http://localhost:3001';
+  const planningUrl = process.env.PLANNING_SERVICE_URL || 'http://localhost:3002';
+  const cognitionUrl = process.env.COGNITION_SERVICE_URL || 'http://localhost:3003';
+  const worldUrl = process.env.WORLD_SERVICE_URL || 'http://localhost:3004';
+  const minecraftUrl = process.env.MINECRAFT_ENDPOINT || 'http://localhost:3005';
+
   // Check all bot systems
   const endpoints = [
     {
       name: 'memory',
-      url: 'http://localhost:3001/health',
+      url: `${memoryUrl}/health`,
       type: 'memory',
-      metadata: { type: 'memory', host: 'localhost', port: 3001 },
+      metadata: { type: 'memory' },
     },
     {
       name: 'planning',
-      url: 'http://localhost:3002/health',
+      url: `${planningUrl}/health`,
       type: 'planning',
-      metadata: { type: 'planning', host: 'localhost', port: 3002 },
+      metadata: { type: 'planning' },
     },
     {
       name: 'cognition',
-      url: 'http://localhost:3003/health',
+      url: `${cognitionUrl}/health`,
       type: 'cognition',
-      metadata: { type: 'cognition', host: 'localhost', port: 3003 },
+      metadata: { type: 'cognition' },
     },
     {
       name: 'world',
-      url: 'http://localhost:3004/health',
+      url: `${worldUrl}/health`,
       type: 'world',
-      metadata: { type: 'world', host: 'localhost', port: 3004 },
+      metadata: { type: 'world' },
     },
     {
       name: 'minecraft-bot',
-      url: 'http://localhost:3005/health',
+      url: `${minecraftUrl}/health`,
       type: 'minecraft-bot',
-      metadata: { type: 'minecraft-bot', host: 'localhost', port: 3005 },
+      metadata: { type: 'minecraft-bot' },
     },
   ];
 

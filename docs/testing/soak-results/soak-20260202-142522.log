@@ -1,0 +1,55 @@
+=== Agency Emission Soak Test ===
+Duration: 5 minutes
+Cognition: http://localhost:3003
+Planning: http://localhost:3002
+Log: /Users/darianrosebrook/Desktop/Projects/conscious-bot/scripts/../docs/testing/soak-results/soak-20260202-142522.log
+Started: 2026-02-02T22:25:22Z
+---
+[pre-check] Verifying service health...
+  Cognition: healthy
+  Planning: healthy
+
+[pre-check] Bot state...
+  Sterling | hp=20 food=17 mode=survival pos=(263,64,187)
+
+[t=0] Capturing initial state...
+  Recent thoughts: 5
+
+[t=0m sample=1]
+
+[t=1m sample=2]
+
+[t=1m sample=3]
+
+[t=2m sample=4]
+
+[t=2m sample=5]
+
+[t=3m sample=6]
+
+[t=3m sample=7]
+
+[t=4m sample=8]
+
+[t=4m sample=9]
+
+[t=5m sample=10]
+
+===================================
+=== SOAK TEST SUMMARY ===
+===================================
+Duration: 5 minutes (10 samples)
+Ended: 2026-02-02T22:30:24Z
+
+--- Final thought analysis ---
+
+--- Final task analysis ---
+
+--- Acceptance criteria ---
+  [PASS] Drive ticks fired
+  [PASS] Goal tags produced
+  [PASS] Novelty markers present
+  [PASS] Intent extractions: 6
+
+Full log: /Users/darianrosebrook/Desktop/Projects/conscious-bot/scripts/../docs/testing/soak-results/soak-20260202-142522.log
+Done.

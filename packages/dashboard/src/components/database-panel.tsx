@@ -1,17 +1,18 @@
-'use client';
-
 import React, { useState, useEffect, useCallback } from 'react';
+import dynamic from 'next/dynamic';
 import {
   Database,
   HardDrive,
   Network,
   Activity,
   AlertTriangle,
+  BookOpen,
   ChevronDown,
   ChevronRight,
   RefreshCw,
   Search,
   Trash2,
+  ScatterChart,
 } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
@@ -21,11 +22,23 @@ import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import s from './database-panel.module.scss';
 
+// Dynamic import for Three.js component to avoid SSR issues
+const EmbeddingVizPanel = dynamic(
+  () =>
+    import('@/components/embedding-viz-panel').then((mod) => ({
+      default: mod.EmbeddingVizPanel,
+    })),
+  { ssr: false }
+);
+
 import type {
   DatabaseOverview,
   MemoryChunkSummary,
   KnowledgeGraphSummary,
   EmbeddingHealth,
+  ReflectionSummary,
+  LessonSummary,
+  NarrativeSummary,
 } from '@/types';
 
 // ============================================================================
@@ -47,10 +60,7 @@ function CollapsibleSection({
 
   return (
     <div className={s.collapsible}>
-      <button
-        onClick={() => setOpen(!open)}
-        className={s.collapsibleBtn}
-      >
+      <button onClick={() => setOpen(!open)} className={s.collapsibleBtn}>
         <div className={s.collapsibleTitle}>
           {icon}
           <h3 className={s.collapsibleTitleText}>{title}</h3>
@@ -83,6 +93,21 @@ export function DatabasePanel() {
     useState<KnowledgeGraphSummary | null>(null);
   const [embeddingHealth, setEmbeddingHealth] =
     useState<EmbeddingHealth | null>(null);
+
+  // Reflections & narrative state
+  const [reflections, setReflections] = useState<ReflectionSummary[]>([]);
+  const [lessons, setLessons] = useState<LessonSummary[]>([]);
+  const [narrative, setNarrative] = useState<NarrativeSummary | null>(null);
+  const [reflectionsPage, setReflectionsPage] = useState(1);
+  const [reflectionsTotal, setReflectionsTotal] = useState(0);
+
+  // Lazy full-content state for memory expansion
+  const [fullContentCache, setFullContentCache] = useState<
+    Record<string, string>
+  >({});
+  const [fullContentLoading, setFullContentLoading] = useState<string | null>(
+    null
+  );
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -133,6 +158,56 @@ export function DatabasePanel() {
     }
   }, [memoriesPage, memoriesType, memoriesSortBy]);
 
+  // Fetch reflections
+  const fetchReflections = useCallback(async () => {
+    try {
+      const params = new URLSearchParams({
+        page: reflectionsPage.toString(),
+        limit: '20',
+        includePlaceholders: 'true',
+      });
+      const res = await fetch(
+        `/api/database/reflections?${params.toString()}`,
+        {
+          signal: AbortSignal.timeout(10000),
+        }
+      );
+      if (res.ok) {
+        const data = await res.json();
+        setReflections(data.reflections ?? []);
+        setLessons(data.lessons ?? []);
+        setNarrative(data.narrative ?? null);
+        setReflectionsTotal(data.total ?? 0);
+      }
+    } catch (err) {
+      console.error('Failed to fetch reflections:', err);
+    }
+  }, [reflectionsPage]);
+
+  // Fetch full content for a memory by ID
+  const fetchFullContent = useCallback(
+    async (id: string) => {
+      if (fullContentCache[id]) return; // Already cached
+      setFullContentLoading(id);
+      try {
+        const res = await fetch(`/api/database/memories/${id}`, {
+          signal: AbortSignal.timeout(10000),
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data?.content) {
+            setFullContentCache((prev) => ({ ...prev, [id]: data.content }));
+          }
+        }
+      } catch (err) {
+        console.error('Failed to fetch full content:', err);
+      } finally {
+        setFullContentLoading(null);
+      }
+    },
+    [fullContentCache]
+  );
+
   // Fetch health data
   const fetchHealth = useCallback(async () => {
     try {
@@ -155,7 +230,12 @@ export function DatabasePanel() {
       setLoading(true);
       setError(null);
       try {
-        await Promise.all([fetchOverview(), fetchMemories(), fetchHealth()]);
+        await Promise.all([
+          fetchOverview(),
+          fetchMemories(),
+          fetchHealth(),
+          fetchReflections(),
+        ]);
       } catch (err) {
         setError('Failed to load database information');
       } finally {
@@ -163,12 +243,17 @@ export function DatabasePanel() {
       }
     };
     load();
-  }, [fetchOverview, fetchMemories, fetchHealth]);
+  }, [fetchOverview, fetchMemories, fetchHealth, fetchReflections]);
 
   // Refetch memories when filters change
   useEffect(() => {
     fetchMemories();
   }, [fetchMemories]);
+
+  // Refetch reflections when page changes
+  useEffect(() => {
+    fetchReflections();
+  }, [fetchReflections]);
 
   // Danger zone actions
   const handleDangerAction = async (
@@ -232,6 +317,7 @@ export function DatabasePanel() {
                 fetchOverview(),
                 fetchMemories(),
                 fetchHealth(),
+                fetchReflections(),
               ]).finally(() => setLoading(false));
             }}
           >
@@ -266,33 +352,21 @@ export function DatabasePanel() {
             <div className={s.overviewSpacer}>
               <div className={s.overviewGrid}>
                 <div className={s.statCard}>
-                  <div className={s.statLabel}>
-                    Database
-                  </div>
-                  <div className={s.statValue}>
-                    {overview.databaseName}
-                  </div>
+                  <div className={s.statLabel}>Database</div>
+                  <div className={s.statValue}>{overview.databaseName}</div>
                 </div>
                 <div className={s.statCard}>
-                  <div className={s.statLabel}>
-                    World Seed
-                  </div>
-                  <div className={s.statValue}>
-                    {overview.worldSeed}
-                  </div>
+                  <div className={s.statLabel}>World Seed</div>
+                  <div className={s.statValue}>{overview.worldSeed}</div>
                 </div>
                 <div className={s.statCard}>
-                  <div className={s.statLabel}>
-                    Total Chunks
-                  </div>
+                  <div className={s.statLabel}>Total Chunks</div>
                   <div className={s.statValue}>
                     {overview.totalChunks.toLocaleString()}
                   </div>
                 </div>
                 <div className={s.statCard}>
-                  <div className={s.statLabel}>
-                    Entities / Relationships
-                  </div>
+                  <div className={s.statLabel}>Entities / Relationships</div>
                   <div className={s.statValue}>
                     {overview.entityCount} / {overview.relationshipCount}
                   </div>
@@ -302,9 +376,7 @@ export function DatabasePanel() {
               {/* Memory type distribution */}
               {Object.keys(overview.memoryTypeDistribution).length > 0 && (
                 <div>
-                  <div className={s.sectionLabel}>
-                    Memory Type Distribution
-                  </div>
+                  <div className={s.sectionLabel}>Memory Type Distribution</div>
                   <div className={s.distBar}>
                     {(() => {
                       const entries = Object.entries(
@@ -341,15 +413,10 @@ export function DatabasePanel() {
               {/* Index info */}
               {overview.indexInfo.length > 0 && (
                 <div>
-                  <div className={s.sectionLabel}>
-                    Indexes
-                  </div>
+                  <div className={s.sectionLabel}>Indexes</div>
                   <div className={s.indexSpacer}>
                     {overview.indexInfo.map((idx, i) => (
-                      <div
-                        key={i}
-                        className={s.indexRow}
-                      >
+                      <div key={i} className={s.indexRow}>
                         <span className={s.indexName}>{idx.name}</span>
                         <span className={s.indexMeta}>
                           {idx.type} &middot; {idx.size}
@@ -420,16 +487,17 @@ export function DatabasePanel() {
             {memories.length > 0 ? (
               <div className={s.memorySpacer}>
                 {memories.map((mem) => (
-                  <div
-                    key={mem.id}
-                    className={s.memoryCard}
-                  >
+                  <div key={mem.id} className={s.memoryCard}>
                     <button
-                      onClick={() =>
-                        setExpandedMemory(
-                          expandedMemory === mem.id ? null : mem.id
-                        )
-                      }
+                      onClick={() => {
+                        const newExpanded =
+                          expandedMemory === mem.id ? null : mem.id;
+                        setExpandedMemory(newExpanded);
+                        // Lazy fetch full content on expand
+                        if (newExpanded && !fullContentCache[mem.id]) {
+                          fetchFullContent(mem.id);
+                        }
+                      }}
                       className={s.memoryBtn}
                     >
                       {expandedMemory === mem.id ? (
@@ -437,12 +505,8 @@ export function DatabasePanel() {
                       ) : (
                         <ChevronRight className={s.memChevron} />
                       )}
-                      <span className={s.memId}>
-                        {mem.id.slice(0, 8)}
-                      </span>
-                      <span className={s.memContent}>
-                        {mem.content}
-                      </span>
+                      <span className={s.memId}>{mem.id.slice(0, 8)}</span>
+                      <span className={s.memContent}>{mem.content}</span>
                       <Pill>{mem.memoryType}</Pill>
                       <span className={s.memImportance}>
                         imp: {mem.importance.toFixed(2)}
@@ -450,9 +514,15 @@ export function DatabasePanel() {
                     </button>
                     {expandedMemory === mem.id && (
                       <div className={s.memExpanded}>
-                        <p className={s.memExpandedText}>
-                          {mem.content}
-                        </p>
+                        {fullContentLoading === mem.id ? (
+                          <p className={s.memFullContentLoading}>
+                            Loading full content...
+                          </p>
+                        ) : (
+                          <p className={s.memExpandedText}>
+                            {fullContentCache[mem.id] || mem.content}
+                          </p>
+                        )}
                         <div className={s.memExpandedMeta}>
                           <span>Access Count: {mem.accessCount}</span>
                           <span>Entities: {mem.entityCount}</span>
@@ -494,7 +564,7 @@ export function DatabasePanel() {
                       variant="outline"
                       size="sm"
                       className={s.paginationBtn}
-                      disabled={memories.length < 20}
+                      disabled={memoriesPage * 20 >= memoriesTotal}
                       onClick={() => setMemoriesPage((p) => p + 1)}
                     >
                       Next
@@ -522,17 +592,13 @@ export function DatabasePanel() {
             <div className={s.overviewSpacer}>
               <div className={s.kgGrid}>
                 <div className={s.statCard}>
-                  <div className={s.statLabel}>
-                    Total Entities
-                  </div>
+                  <div className={s.statLabel}>Total Entities</div>
                   <div className={s.statValue}>
                     {knowledgeGraph.totalEntities}
                   </div>
                 </div>
                 <div className={s.statCard}>
-                  <div className={s.statLabel}>
-                    Total Relationships
-                  </div>
+                  <div className={s.statLabel}>Total Relationships</div>
                   <div className={s.statValue}>
                     {knowledgeGraph.totalRelationships}
                   </div>
@@ -542,15 +608,10 @@ export function DatabasePanel() {
               {/* Top entities */}
               {knowledgeGraph.topEntities.length > 0 && (
                 <div>
-                  <div className={s.sectionLabel}>
-                    Top Entities
-                  </div>
+                  <div className={s.sectionLabel}>Top Entities</div>
                   <div className={s.indexSpacer}>
                     {knowledgeGraph.topEntities.map((entity, i) => (
-                      <div
-                        key={i}
-                        className={s.kgEntityRow}
-                      >
+                      <div key={i} className={s.kgEntityRow}>
                         <div className={s.kgEntityName}>
                           <span>{entity.name}</span>
                           <Pill>{entity.type}</Pill>
@@ -568,9 +629,7 @@ export function DatabasePanel() {
               {Object.keys(knowledgeGraph.entityTypeDistribution).length >
                 0 && (
                 <div>
-                  <div className={s.sectionLabel}>
-                    Entity Types
-                  </div>
+                  <div className={s.sectionLabel}>Entity Types</div>
                   <div className={s.pillWrap}>
                     {Object.entries(knowledgeGraph.entityTypeDistribution).map(
                       ([type, count]) => (
@@ -587,9 +646,7 @@ export function DatabasePanel() {
               {Object.keys(knowledgeGraph.relationshipTypeDistribution).length >
                 0 && (
                 <div>
-                  <div className={s.sectionLabel}>
-                    Relationship Types
-                  </div>
+                  <div className={s.sectionLabel}>Relationship Types</div>
                   <div className={s.pillWrap}>
                     {Object.entries(
                       knowledgeGraph.relationshipTypeDistribution
@@ -611,7 +668,148 @@ export function DatabasePanel() {
           )}
         </CollapsibleSection>
 
-        {/* 4D: Embedding Health */}
+        {/* 4D: Reflections & Narrative */}
+        <CollapsibleSection
+          title="Reflections & Narrative"
+          icon={<BookOpen className="size-4" />}
+          defaultOpen={false}
+        >
+          <div className={s.overviewSpacer}>
+            {/* Latest narrative checkpoint */}
+            {narrative && (
+              <div>
+                <div className={s.sectionLabel}>Latest Narrative</div>
+                <div className={s.narrativeCard}>
+                  <div className={s.narrativeTitle}>{narrative.title}</div>
+                  <div className={s.narrativeSummary}>{narrative.summary}</div>
+                  <div className={s.narrativeMeta}>
+                    <span>Arc: {narrative.narrativeArc}</span>
+                    <span>Tone: {narrative.emotionalTone}</span>
+                    <span>
+                      Significance: {(narrative.significance * 100).toFixed(0)}%
+                    </span>
+                    {narrative.timestamp > 0 && (
+                      <span>
+                        {new Date(narrative.timestamp).toLocaleString()}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Lessons learned */}
+            {lessons.length > 0 && (
+              <div>
+                <div className={s.sectionLabel}>
+                  Lessons Learned ({lessons.length})
+                </div>
+                <div className={s.memorySpacer}>
+                  {lessons.slice(0, 10).map((lesson) => (
+                    <div key={lesson.id} className={s.lessonCard}>
+                      <span className={s.lessonContent}>{lesson.content}</span>
+                      <Pill>{lesson.category}</Pill>
+                      <span className={s.lessonEffectiveness}>
+                        eff: {(lesson.effectiveness * 100).toFixed(0)}%
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Reflections list */}
+            {reflections.length > 0 ? (
+              <div>
+                <div className={s.sectionLabel}>Reflections</div>
+                <div className={s.memorySpacer}>
+                  {reflections.map((ref) => (
+                    <div
+                      key={ref.id}
+                      className={cn(
+                        s.reflectionCard,
+                        ref.isPlaceholder && s.reflectionCardPlaceholder
+                      )}
+                    >
+                      <div className={s.reflectionHeader}>
+                        <span className={s.reflectionType}>{ref.type}</span>
+                        <Pill>{ref.memorySubtype || 'reflection'}</Pill>
+                        {ref.isPlaceholder && (
+                          <span className={s.placeholderBadge}>
+                            Placeholder
+                          </span>
+                        )}
+                        {ref.timestamp > 0 && (
+                          <span className={s.reflectionTime}>
+                            {new Date(ref.timestamp).toLocaleString()}
+                          </span>
+                        )}
+                      </div>
+                      <div className={s.reflectionContent}>{ref.content}</div>
+                      <div className={s.reflectionMeta}>
+                        {ref.emotionalValence !== 0 && (
+                          <span>
+                            Valence: {ref.emotionalValence.toFixed(2)}
+                          </span>
+                        )}
+                        <span>
+                          Confidence: {(ref.confidence * 100).toFixed(0)}%
+                        </span>
+                        {ref.insights.length > 0 && (
+                          <span>Insights: {ref.insights.length}</span>
+                        )}
+                        {ref.lessons.length > 0 && (
+                          <span>Lessons: {ref.lessons.length}</span>
+                        )}
+                        {ref.tags.length > 0 && (
+                          <span>Tags: {ref.tags.join(', ')}</span>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Pagination */}
+                <div className={s.paginationRow}>
+                  <span className={s.paginationLabel}>
+                    Showing {reflections.length} of {reflectionsTotal}{' '}
+                    reflections (page {reflectionsPage})
+                  </span>
+                  <div className={s.paginationBtns}>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className={s.paginationBtn}
+                      disabled={reflectionsPage <= 1}
+                      onClick={() =>
+                        setReflectionsPage((p) => Math.max(1, p - 1))
+                      }
+                    >
+                      Prev
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className={s.paginationBtn}
+                      disabled={reflectionsPage * 20 >= reflectionsTotal}
+                      onClick={() => setReflectionsPage((p) => p + 1)}
+                    >
+                      Next
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <EmptyState
+                icon={BookOpen}
+                title="No reflections yet"
+                description="Reflections will appear here when the bot sleeps, dies, or triggers memory consolidation."
+              />
+            )}
+          </div>
+        </CollapsibleSection>
+
+        {/* 4E: Embedding Health */}
         <CollapsibleSection
           title="Embedding Health"
           icon={<Activity className="size-4" />}
@@ -621,53 +819,32 @@ export function DatabasePanel() {
             <div className={s.overviewSpacer}>
               <div className={s.overviewGrid}>
                 <div className={s.statCard}>
-                  <div className={s.statLabel}>
-                    Dimension
-                  </div>
-                  <div className={s.statValue}>
-                    {embeddingHealth.dimension}
-                  </div>
+                  <div className={s.statLabel}>Dimension</div>
+                  <div className={s.statValue}>{embeddingHealth.dimension}</div>
                 </div>
                 <div className={s.statCard}>
-                  <div className={s.statLabel}>
-                    Total Embeddings
-                  </div>
+                  <div className={s.statLabel}>Total Embeddings</div>
                   <div className={s.statValue}>
                     {embeddingHealth.totalEmbeddings.toLocaleString()}
                   </div>
                 </div>
                 <div className={s.statCard}>
-                  <div className={s.statLabel}>
-                    Index Type
-                  </div>
-                  <div className={s.statValue}>
-                    {embeddingHealth.indexType}
-                  </div>
+                  <div className={s.statLabel}>Index Type</div>
+                  <div className={s.statValue}>{embeddingHealth.indexType}</div>
                 </div>
                 <div className={s.statCard}>
-                  <div className={s.statLabel}>
-                    Index Size
-                  </div>
-                  <div className={s.statValue}>
-                    {embeddingHealth.indexSize}
-                  </div>
+                  <div className={s.statLabel}>Index Size</div>
+                  <div className={s.statValue}>{embeddingHealth.indexSize}</div>
                 </div>
               </div>
 
               {/* Norm statistics */}
               <div>
-                <div className={s.sectionLabel}>
-                  Norm Statistics
-                </div>
+                <div className={s.sectionLabel}>Norm Statistics</div>
                 <div className={s.normGrid}>
                   {(['min', 'max', 'avg', 'stddev'] as const).map((stat) => (
-                    <div
-                      key={stat}
-                      className={s.normCard}
-                    >
-                      <div className={s.normLabel}>
-                        {stat}
-                      </div>
+                    <div key={stat} className={s.normCard}>
+                      <div className={s.normLabel}>{stat}</div>
                       <div className={s.normValue}>
                         {embeddingHealth.normStats[stat].toFixed(4)}
                       </div>
@@ -679,19 +856,12 @@ export function DatabasePanel() {
               {/* Similarity distribution */}
               {embeddingHealth.sampleSimilarityDistribution.length > 0 && (
                 <div>
-                  <div className={s.sectionLabel}>
-                    Similarity Distribution
-                  </div>
+                  <div className={s.sectionLabel}>Similarity Distribution</div>
                   <div className={s.indexSpacer}>
                     {embeddingHealth.sampleSimilarityDistribution.map(
                       (bucket) => (
-                        <div
-                          key={bucket.bucket}
-                          className={s.simRow}
-                        >
-                          <span className={s.simBucket}>
-                            {bucket.bucket}
-                          </span>
+                        <div key={bucket.bucket} className={s.simRow}>
+                          <span className={s.simBucket}>{bucket.bucket}</span>
                           <div className={s.simBar}>
                             <div
                               className={s.simBarFill}
@@ -700,9 +870,7 @@ export function DatabasePanel() {
                               }}
                             />
                           </div>
-                          <span className={s.simCount}>
-                            {bucket.count}
-                          </span>
+                          <span className={s.simCount}>{bucket.count}</span>
                         </div>
                       )
                     )}
@@ -719,7 +887,16 @@ export function DatabasePanel() {
           )}
         </CollapsibleSection>
 
-        {/* 4E: Danger Zone */}
+        {/* 4F: Embedding Space Visualization */}
+        <CollapsibleSection
+          title="Embedding Space Visualization"
+          icon={<ScatterChart className="size-4" />}
+          defaultOpen={false}
+        >
+          <EmbeddingVizPanel />
+        </CollapsibleSection>
+
+        {/* 4G: Danger Zone */}
         <CollapsibleSection
           title="Danger Zone"
           icon={<AlertTriangle className="size-4" />}
@@ -741,9 +918,7 @@ export function DatabasePanel() {
 
             {/* Reset Database */}
             <div>
-              <h4 className={s.dangerTitle}>
-                Reset Database
-              </h4>
+              <h4 className={s.dangerTitle}>Reset Database</h4>
               <p className={s.dangerDesc}>
                 Truncates all memory tables for the current seed database. This
                 removes all stored memories, entities, and relationships but
@@ -797,9 +972,7 @@ export function DatabasePanel() {
 
             {/* Drop Database */}
             <div>
-              <h4 className={s.dangerTitle}>
-                Drop Database
-              </h4>
+              <h4 className={s.dangerTitle}>Drop Database</h4>
               <p className={s.dangerDesc}>
                 Drops the entire per-seed database. This is the most destructive
                 operation and removes all data including the database itself.

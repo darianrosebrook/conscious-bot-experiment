@@ -3,6 +3,7 @@
 **Primitive**: P12 — Invariant maintenance (non-terminal goals; control-by-receding-horizon)
 
 **Status**: ENRICHED (2025-01-31)
+**Implementation**: Partial — goal-hold-manager, periodic-review, preemption-budget exist in `planning/goals/`
 
 ---
 

@@ -267,6 +267,8 @@ export interface ToolProgressionSolveResult extends BaseSolveResult {
   unmatchedRuleEdges?: number;
   /** Number of search_edge (source,target) pairs with conflicting action names. */
   searchEdgeCollisions?: number;
+  /** Solve-time join keys for deferred episode reporting */
+  solveJoinKeys?: import('./solve-bundle-types').SolveJoinKeys;
 }
 
 // ============================================================================

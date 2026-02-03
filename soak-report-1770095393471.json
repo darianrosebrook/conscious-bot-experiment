@@ -1,0 +1,22 @@
+{
+  "timestamp": "2026-02-03T05:04:52.994Z",
+  "mode": "pipeline",
+  "durationMs": 300477,
+  "passed": true,
+  "summary": "Pipeline: 30 emitted, 30 persisted, 0 violations",
+  "pipeline": {
+    "signalsEmitted": 30,
+    "reflectionsPersisted": 30,
+    "dedupeRejects": 30,
+    "missingMetadataRows": 0,
+    "paginationViolations": 0,
+    "uniqueConstraintErrors": 0,
+    "violations": [],
+    "latency": {
+      "memoryPostP50": 3,
+      "memoryPostP95": 9,
+      "findByDedupeKeyP50": 0,
+      "findByDedupeKeyP95": 0
+    }
+  }
+}

@@ -64,6 +64,26 @@ export function computeDeclarationDigest(decl: DomainDeclarationV1): string {
   return contentHash(DECLARATION_DIGEST_PREFIX + canonical);
 }
 
+/** Domain separation prefix for registration digests. */
+const REGISTRATION_DIGEST_PREFIX = 'domain_registration_v1:';
+
+/**
+ * Compute a notes-excluded digest for server-side registration.
+ *
+ * Design Decision D1: `notes` is stripped before hashing so that
+ * documentation edits do not cause digest drift in the registry.
+ * Declarations keep `notes` for human readability; the registration
+ * key ignores it.
+ *
+ * This is distinct from computeDeclarationDigest() which includes
+ * ALL fields (including notes) in the hash.
+ */
+export function computeRegistrationDigest(decl: DomainDeclarationV1): string {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const { notes, ...hashable } = decl;
+  return contentHash(REGISTRATION_DIGEST_PREFIX + canonicalize(hashable));
+}
+
 // ============================================================================
 // Validation
 // ============================================================================

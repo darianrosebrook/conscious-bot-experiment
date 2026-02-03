@@ -49,12 +49,6 @@ export interface ServiceEndpoints {
     state: () => string;
     environment: () => string;
   };
-  evaluation: {
-    baseUrl: string;
-    health: () => string;
-    metrics: () => string;
-    alerts: () => string;
-  };
 }
 
 export interface DashboardConfig {
@@ -100,7 +94,6 @@ export class ServiceDiscovery {
     memory: 3001,
     planning: 3002,
     world: 3004,
-    evaluation: 3008, // 3006 reserved for Prismarine viewer
   };
 
   private constructor() {}
@@ -135,7 +128,6 @@ export class ServiceDiscovery {
       memory: `http://localhost:${this.DEFAULT_PORTS.memory}`,
       planning: `http://localhost:${this.DEFAULT_PORTS.planning}`,
       world: `http://localhost:${this.DEFAULT_PORTS.world}`,
-      evaluation: `http://localhost:${this.DEFAULT_PORTS.evaluation}`,
     };
 
     return this.createEndpoints(baseUrls);
@@ -148,7 +140,6 @@ export class ServiceDiscovery {
       memory: 'http://memory:3001',
       planning: 'http://planning:3002',
       world: 'http://world:3004',
-      evaluation: 'http://evaluation:3006',
     };
 
     return this.createEndpoints(baseUrls);
@@ -161,7 +152,6 @@ export class ServiceDiscovery {
       memory: 'http://memory.default.svc.cluster.local:3001',
       planning: 'http://planning.default.svc.cluster.local:3002',
       world: 'http://world.default.svc.cluster.local:3004',
-      evaluation: 'http://evaluation.default.svc.cluster.local:3006',
     };
 
     return this.createEndpoints(baseUrls);
@@ -184,9 +174,6 @@ export class ServiceDiscovery {
       world:
         process.env.WORLD_SERVICE_URL ||
         `http://world:${this.DEFAULT_PORTS.world}`,
-      evaluation:
-        process.env.EVALUATION_SERVICE_URL ||
-        `http://evaluation:${this.DEFAULT_PORTS.evaluation}`,
     };
 
     return this.createEndpoints(baseUrls);
@@ -236,12 +223,6 @@ export class ServiceDiscovery {
         health: () => `${baseUrls.world}/health`,
         state: () => `${baseUrls.world}/state`,
         environment: () => `${baseUrls.world}/environment`,
-      },
-      evaluation: {
-        baseUrl: baseUrls.evaluation,
-        health: () => `${baseUrls.evaluation}/health`,
-        metrics: () => `${baseUrls.evaluation}/metrics`,
-        alerts: () => `${baseUrls.evaluation}/alerts`,
       },
     };
   }

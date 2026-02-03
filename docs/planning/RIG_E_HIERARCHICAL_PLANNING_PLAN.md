@@ -3,6 +3,7 @@
 **Primitive**: P5 — Hierarchical planning (macro policy over micro solvers)
 
 **Status**: ENRICHED (2026-01-31)
+**Implementation**: Partial — cognitive-router, plan-decomposer, task-network exist in `planning/hierarchical-planner/`
 
 ---
 

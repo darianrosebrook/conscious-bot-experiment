@@ -576,7 +576,7 @@ export class CognitiveThoughtProcessor extends EventEmitter {
           this.processedThoughts.add(thought.id);
         } else {
           console.log(
-            `❌ [COGNITIVE THOUGHT PROCESSOR] Failed to translate thought: "${thought.content.substring(0, 60)}..."`
+            `[COGNITIVE THOUGHT PROCESSOR] Failed to translate thought: "${thought.content.substring(0, 60)}..."`
           );
         }
         this.lastSeenTs = Math.max(this.lastSeenTs, thought.timestamp || 0);
@@ -959,7 +959,7 @@ export class CognitiveThoughtProcessor extends EventEmitter {
       const result = await this.planning.addTask(task);
       if (!result.ok) {
         console.error(
-          `❌ [COGNITIVE THOUGHT PROCESSOR] Failed to submit task to planning system: ${result.error || 'unknown'}`
+          `[COGNITIVE THOUGHT PROCESSOR] Failed to submit task to planning system: ${result.error || 'unknown'}`
         );
         return;
       }
@@ -970,7 +970,7 @@ export class CognitiveThoughtProcessor extends EventEmitter {
       this.emit('taskSubmitted', { task, result });
     } catch (error) {
       console.error(
-        '❌ [COGNITIVE THOUGHT PROCESSOR] Error submitting task to planning system:',
+        '[COGNITIVE THOUGHT PROCESSOR] Error submitting task to planning system:',
         error
       );
     }

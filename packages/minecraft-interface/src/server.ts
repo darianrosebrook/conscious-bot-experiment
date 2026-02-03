@@ -174,6 +174,9 @@ if (!process.env.WORLD_SEED || process.env.WORLD_SEED === '0') {
 }
 
 // Bot configuration
+// Auth mode: 'microsoft' for real accounts with skins, 'offline' for local testing
+const authMode = (process.env.MINECRAFT_AUTH || 'offline') as 'microsoft' | 'offline';
+console.log(`🔐 Minecraft auth mode: ${authMode}${authMode === 'microsoft' ? ' (will prompt for Microsoft login on first connect)' : ''}`);
 const botConfig: BotConfig = {
   host: process.env.MINECRAFT_HOST || 'localhost',
   port: process.env.MINECRAFT_PORT
@@ -181,7 +184,7 @@ const botConfig: BotConfig = {
     : 25565,
   username: process.env.MINECRAFT_USERNAME || 'Sterling',
   version: process.env.MINECRAFT_VERSION || '1.21.4',
-  auth: 'offline',
+  auth: authMode,
 
   // World configuration for memory versioning
   worldSeed: process.env.WORLD_SEED,
@@ -418,12 +421,19 @@ function setupBotStateWebSocket() {
 
     // S8: Death/respawn signals — minecraft-interface emits signals only; memory service owns policy
     const memoryUrl = process.env.MEMORY_ENDPOINT || 'http://localhost:3001';
-    // Replay-stable dedupe key: position is deterministic per death event.
-    // Two deaths at the exact same block are deduplicated (likely the same event double-reported).
+    // Replay-stable dedupe key: position + coarse game-tick bucket.
+    // Position alone dedupes double-reported events from the same death.
+    // The game-tick bucket (~10s of in-game time, 200 ticks) ensures:
+    //   (a) HTTP retries of the same death still dedupe (same tick range)
+    //   (b) Real subsequent deaths at the same location (e.g. spawn) produce distinct keys
+    //   (c) Replays produce the same key (no wall-clock dependency)
+    // gameTick is snapshot at event emission in bot-adapter.ts, not re-queried here,
+    // so delayed handler execution doesn't shift the bucket.
     const dx = Math.floor(data.position?.x ?? 0);
     const dy = Math.floor(data.position?.y ?? 0);
     const dz = Math.floor(data.position?.z ?? 0);
-    const deathDedupeKey = `death-${dx}-${dy}-${dz}`;
+    const tickBucket = Math.floor((data.gameTick ?? 0) / 200);
+    const deathDedupeKey = `death-${dx}-${dy}-${dz}-${tickBucket}`;
 
     // Signal consolidation
     resilientFetch(`${memoryUrl}/enhanced/consolidate`, {
@@ -1766,9 +1776,9 @@ app.post('/action', async (req, res) => {
     // S8: Post-sleep signals — minecraft-interface emits signals only; memory service owns policy
     if (type === 'sleep' && result?.success) {
       const memoryUrl = process.env.MEMORY_ENDPOINT || 'http://localhost:3001';
-      // Replay-stable dedupe key: wakeTime is a game tick from the action result,
-      // deterministic per sleep event. Retries of the same sleep produce the same key.
-      const sleepDedupeKey = `sleep-${result?.data?.wakeTime ?? 'unknown'}`;
+      // Replay-stable dedupe key: day + timeOfDay is unique per sleep event.
+      // timeOfDay alone (0-24000) is cyclic and collides daily since bots wake at tick 0.
+      const sleepDedupeKey = `sleep-${result?.data?.wakeDay ?? 0}-${result?.data?.wakeTime ?? 'unknown'}`;
 
       // Signal consolidation (memory service decides what to do)
       resilientFetch(`${memoryUrl}/enhanced/consolidate`, {

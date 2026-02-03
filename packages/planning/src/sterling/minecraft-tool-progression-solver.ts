@@ -13,6 +13,8 @@
  */
 
 import { BaseDomainSolver } from './base-domain-solver';
+import type { DomainDeclarationV1 } from './domain-declaration';
+import { SOLVER_IDS } from './solver-ids';
 import type {
   ToolProgressionSolveResult,
   ToolProgressionStep,
@@ -46,6 +48,7 @@ import {
   attachSterlingIdentity,
 } from './solve-bundle';
 import { parseSearchHealth } from './search-health';
+import { extractSolveJoinKeys } from './episode-classification';
 
 import type { TaskStep } from '../types/task-step';
 
@@ -65,13 +68,26 @@ interface TPStepMappingResult {
 }
 
 // ============================================================================
+// Domain Declaration
+// ============================================================================
+
+export const TOOL_PROGRESSION_DECLARATION: DomainDeclarationV1 = {
+  declarationVersion: 1,
+  solverId: SOLVER_IDS.TOOL_PROGRESSION,
+  contractVersion: 1,
+  implementsPrimitives: ['CB-P01', 'CB-P02'],
+  consumesFields: ['inventory', 'goal', 'nearbyBlocks', 'rules', 'maxNodes', 'executionMode'],
+  producesFields: ['steps', 'planId', 'solveMeta'],
+};
+
+// ============================================================================
 // Solver
 // ============================================================================
 
 export class MinecraftToolProgressionSolver extends BaseDomainSolver<ToolProgressionSolveResult> {
   /** Shares the existing 'minecraft' backend handler — no backend changes */
   readonly sterlingDomain = 'minecraft' as const;
-  readonly solverId = 'minecraft.tool_progression';
+  readonly solverId = SOLVER_IDS.TOOL_PROGRESSION;
 
   /**
    * When true, a successful solve with degraded step mapping is treated as a failure.
@@ -83,6 +99,10 @@ export class MinecraftToolProgressionSolver extends BaseDomainSolver<ToolProgres
    * `solver.strictMapping = true`.
    */
   strictMapping = false;
+
+  override getDomainDeclaration(): DomainDeclarationV1 {
+    return TOOL_PROGRESSION_DECLARATION;
+  }
 
   protected makeUnavailableResult(): ToolProgressionSolveResult {
     return {
@@ -107,6 +127,7 @@ export class MinecraftToolProgressionSolver extends BaseDomainSolver<ToolProgres
     nearbyBlocks: string[] = []
   ): Promise<ToolProgressionSolveResult> {
     if (!this.isAvailable()) return this.makeUnavailableResult();
+    await this.ensureDeclarationRegistered();
 
     // Validate no cap: tokens in input
     validateInventoryInput(inventory);
@@ -186,6 +207,9 @@ export class MinecraftToolProgressionSolver extends BaseDomainSolver<ToolProgres
           },
           planId: lastPlanId,
           solveMeta: tierBundles.length > 0 ? { bundles: tierBundles } : undefined,
+          solveJoinKeys: lastPlanId && tierBundles.length > 0
+            ? extractSolveJoinKeys(tierBundles[0], lastPlanId)
+            : undefined,
         };
       }
 
@@ -201,6 +225,9 @@ export class MinecraftToolProgressionSolver extends BaseDomainSolver<ToolProgres
           targetTool,
           planId: lastPlanId,
           solveMeta: tierBundles.length > 0 ? { bundles: tierBundles } : undefined,
+          solveJoinKeys: lastPlanId && tierBundles.length > 0
+            ? extractSolveJoinKeys(tierBundles[0], lastPlanId)
+            : undefined,
         };
       }
 
@@ -290,6 +317,7 @@ export class MinecraftToolProgressionSolver extends BaseDomainSolver<ToolProgres
           targetTool,
           planId: lastPlanId,
           solveMeta: { bundles: tierBundles },
+          solveJoinKeys: lastPlanId ? extractSolveJoinKeys(tierBundles[0], lastPlanId) : undefined,
         };
       }
 
@@ -344,6 +372,7 @@ export class MinecraftToolProgressionSolver extends BaseDomainSolver<ToolProgres
         targetTool,
         planId: lastPlanId,
         solveMeta: { bundles: tierBundles },
+        solveJoinKeys: lastPlanId ? extractSolveJoinKeys(tierBundles[0], lastPlanId) : undefined,
         mappingDegraded: true,
         noActionLabelEdges: totalNoLabelEdges,
         unmatchedRuleEdges: totalUnmatchedRuleEdges,
@@ -364,6 +393,7 @@ export class MinecraftToolProgressionSolver extends BaseDomainSolver<ToolProgres
       targetTool,
       planId: lastPlanId,
       solveMeta: { bundles: tierBundles },
+      solveJoinKeys: lastPlanId ? extractSolveJoinKeys(tierBundles[0], lastPlanId) : undefined,
       ...(anyDegraded ? {
         mappingDegraded: true,
         noActionLabelEdges: totalNoLabelEdges,
@@ -412,11 +442,7 @@ export class MinecraftToolProgressionSolver extends BaseDomainSolver<ToolProgres
     planId?: string | null,
     failedAtTier?: ToolTier,
     failureReason?: string,
-    linkage?: {
-      bundleHash?: string;
-      traceBundleHash?: string;
-      outcomeClass?: import('./solve-bundle-types').EpisodeOutcomeClass;
-    }
+    linkage?: import('./solve-bundle-types').EpisodeLinkage,
   ): Promise<import('./solve-bundle-types').EpisodeAck | undefined> {
     return this.reportEpisode({
       planId,

@@ -19,8 +19,10 @@ export async function GET(request: NextRequest) {
     params.append('limit', limit);
 
     // Forward to minecraft bot
+    const minecraftUrl =
+      process.env.MINECRAFT_ENDPOINT || 'http://localhost:3005';
     const response = await fetch(
-      `http://localhost:3005/screenshots?${params}`,
+      `${minecraftUrl}/screenshots?${params}`,
       {
         method: 'GET',
         headers: {

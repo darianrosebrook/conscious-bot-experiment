@@ -123,24 +123,34 @@ export async function GET(_request: NextRequest) {
         // Mineflayer items have: id, type, count, slot, metadata, name, displayName, etc.
         const itemType = item.type || item.id || null;
 
-        // Mineflayer slot mapping:
-        // - Hotbar: slots 0-8 (standard Minecraft hotbar)
-        // - Main inventory: slots 9-35 (standard Minecraft main inventory)
-        // - Extended inventory: slots 36-44 (additional inventory slots)
-        // - Armor: slots 5-8 (maps to 100-103)
-        // - Offhand: slot 45 (maps to 104)
+        // Mineflayer (protocol) slot mapping:
+        //   0-4:   crafting area (not displayed in inventory)
+        //   5-8:   armor slots
+        //   9-35:  main inventory (3 rows of 9)
+        //   36-44: hotbar
+        //   45:    offhand
+        //
+        // Dashboard display expects:
+        //   0-8:   hotbar
+        //   9-35:  main inventory
+        //   100+:  armor/offhand (hidden from grid)
         let mappedSlot = item.slot;
 
         if (typeof item.slot === 'number') {
-          if (item.slot >= 5 && item.slot <= 8) {
-            // Armor items (5-8 -> 100-103)
+          if (item.slot >= 36 && item.slot <= 44) {
+            // Hotbar: protocol 36-44 → display 0-8
+            mappedSlot = item.slot - 36;
+          } else if (item.slot >= 5 && item.slot <= 8) {
+            // Armor items (5-8 -> 100-103, hidden from main grid)
             mappedSlot = item.slot + 95;
+          } else if (item.slot >= 0 && item.slot <= 4) {
+            // Crafting area (0-4 -> 105-109, hidden from main grid)
+            mappedSlot = item.slot + 105;
           } else if (item.slot === 45) {
             // Offhand (45 -> 104)
             mappedSlot = 104;
           }
-          // All other slots (0-44) stay the same for proper display
-          // This includes hotbar (0-8), main inventory (9-35), and extended inventory (36-44)
+          // Slots 9-35 (main inventory) stay the same
         }
 
         // Safely get display name

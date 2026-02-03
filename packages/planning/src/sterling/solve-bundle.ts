@@ -28,6 +28,7 @@ import type {
   ObjectiveWeights,
   ObjectiveWeightsSource,
   SolveRationale,
+  SterlingIdentity,
 } from './solve-bundle-types';
 import { DEFAULT_OBJECTIVE_WEIGHTS } from './solve-bundle-types';
 
@@ -359,20 +360,27 @@ export function buildDefaultRationaleContext(params: {
 
 /**
  * Strip nondeterministic fields before hashing for content-addressed identity.
- * Excluded: timestamp, checkedAt
+ * Excluded: timestamp, checkedAt, sterlingIdentity
+ *
+ * sterlingIdentity is explicitly excluded because Sterling-provided fields
+ * (traceBundleHash, engineCommitment, etc.) must NOT contaminate CB's
+ * content-addressed bundleHash. See Hash Coupling Policy in
+ * STERLING_INTEGRATION_REVIEW.md.
  */
 function hashableBundlePayload(
   input: SolveBundleInput,
   output: SolveBundleOutput,
   compatReport: CompatReport
 ): string {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const { sterlingIdentity, ...hashableOutput } = output;
   const hashableReport: Record<string, unknown> = {
     valid: compatReport.valid,
     issues: compatReport.issues,
     definitionCount: compatReport.definitionCount,
     // checkedAt excluded
   };
-  return canonicalize({ input, output, compatReport: hashableReport });
+  return canonicalize({ input, output: hashableOutput, compatReport: hashableReport });
 }
 
 /**
@@ -396,4 +404,79 @@ export function createSolveBundle(
     output,
     compatReport,
   };
+}
+
+// ============================================================================
+// Sterling Identity Parsing
+// ============================================================================
+
+/**
+ * Parse Sterling-provided identity fields from a solve result.
+ *
+ * Currently reads from `result.metrics` because the Sterling client
+ * flattens the `complete` message into `metrics: Record<string, unknown>`.
+ * Field names match what the server will emit at the root of `complete`:
+ *   - trace_bundle_hash → traceBundleHash
+ *   - engine_commitment → engineCommitment
+ *   - operator_registry_hash → operatorRegistryHash
+ *   - completeness_declaration → completenessDeclaration (forwarded verbatim)
+ *
+ * Returns undefined if none of the identity fields are present.
+ */
+export function parseSterlingIdentity(
+  metrics: Record<string, unknown> | undefined
+): SterlingIdentity | undefined {
+  if (!metrics) return undefined;
+
+  const traceBundleHash = typeof metrics.trace_bundle_hash === 'string'
+    ? metrics.trace_bundle_hash : undefined;
+  const engineCommitment = typeof metrics.engine_commitment === 'string'
+    ? metrics.engine_commitment : undefined;
+  const operatorRegistryHash = typeof metrics.operator_registry_hash === 'string'
+    ? metrics.operator_registry_hash : undefined;
+  const completenessDeclaration = (
+    metrics.completeness_declaration !== null &&
+    metrics.completeness_declaration !== undefined &&
+    typeof metrics.completeness_declaration === 'object'
+  ) ? metrics.completeness_declaration as Record<string, unknown> : undefined;
+
+  // Return undefined if no identity fields present (pre-Sprint-1 server)
+  if (!traceBundleHash && !engineCommitment && !operatorRegistryHash && !completenessDeclaration) {
+    return undefined;
+  }
+
+  return {
+    traceBundleHash,
+    engineCommitment,
+    operatorRegistryHash,
+    completenessDeclaration,
+  };
+}
+
+/**
+ * Attach Sterling identity to a SolveBundle and compute bindingHash.
+ *
+ * Must be called AFTER createSolveBundle() so that bundleHash is finalized.
+ * sterlingIdentity is excluded from bundleHash (see hashableBundlePayload).
+ *
+ * When traceBundleHash is available, computes:
+ *   bindingHash = contentHash("binding:v1:" + traceBundleHash + ":" + bundleHash)
+ * This is CB's regression anchor linking Sterling solve identity to CB bundle identity.
+ * The "binding:v1:" domain separator prevents accidental preimage collisions.
+ */
+export function attachSterlingIdentity(
+  bundle: SolveBundle,
+  identity: SterlingIdentity | undefined
+): void {
+  if (!identity) return;
+
+  // Compute bindingHash when traceBundleHash is available.
+  // Domain-separated preimage prevents accidental collisions.
+  if (identity.traceBundleHash) {
+    identity.bindingHash = contentHash(
+      'binding:v1:' + identity.traceBundleHash + ':' + bundle.bundleHash
+    );
+  }
+
+  bundle.output.sterlingIdentity = identity;
 }

@@ -3,6 +3,7 @@
 **Primitive**: P2 — Capability gating and legality (what actions are permitted)
 
 **Status**: Planned (natural next after Rig A certification)
+**Implementation**: Not started — spec only
 
 ---
 

@@ -2,11 +2,13 @@
 
 // ── Root ──
 .root {
-  height: 100vh;
+  height: 100dvh;
   width: 100vw;
   background: linear-gradient(to bottom, rgb(9 9 11), rgb(9 9 11), rgb(0 0 0));
   color: rgb(244 244 245); // zinc-100
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 
 // ── Header ──
@@ -69,6 +71,17 @@
   display: flex;
   align-items: center;
   gap: 0.5rem;
+}
+
+.headerTabsMobile {
+  padding: 0.5rem 1rem 0.75rem;
+  border-bottom: 1px solid rgb(24 24 27 / 0.8); // zinc-900/80
+  background-color: rgb(9 9 11 / 0.7); // zinc-950/70
+  backdrop-filter: blur(8px);
+
+  @include md {
+    display: none;
+  }
 }
 
 .headerBtn {
@@ -136,7 +149,8 @@
 
 // ── Main Content ──
 .mainContent {
-  height: calc(100vh - 136px);
+  flex: 1;
+  min-height: 0;
 }
 
 .tabsFull {
@@ -174,10 +188,12 @@
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
-  overflow: hidden;
+  overflow: auto;
+  min-height: 0;
 
   @include md {
     grid-column: span 6;
+    overflow: hidden;
   }
 }
 
@@ -187,10 +203,12 @@
   flex-direction: column;
   gap: 0.75rem;
   height: 100%;
-  overflow: hidden;
+  overflow: auto;
+  min-height: 0;
 
   @include md {
     grid-column: span 3;
+    overflow: hidden;
   }
 }
 
@@ -725,10 +743,16 @@
 
 // ── Thought Card ──
 .thoughtCard {
+  position: relative;
   border-radius: 0.75rem;
   border-width: 1px;
   border-style: solid;
   padding: 0.625rem;
+  padding-bottom: 1.75rem; // room for expand button when present
+}
+
+.thoughtCardNoExpand {
+  padding-bottom: 0.625rem;
 }
 
 .thoughtHeader {
@@ -744,10 +768,72 @@
   letter-spacing: 0.05em;
 }
 
-.thoughtText {
+.thoughtTextTruncated {
   margin-top: 0.25rem;
   font-size: 0.875rem;
   line-height: 1.25rem;
+  text-overflow: ellipsis;
+  @include line-clamp(2);
+}
+
+.thoughtTextExpanded {
+  margin-top: 0.25rem;
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.thoughtExpandBtn {
+  position: absolute;
+  bottom: 0.375rem;
+  right: 0.375rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.25rem;
+  border: none;
+  border-radius: 0.375rem;
+  background: transparent;
+  color: rgb(161 161 170); // zinc-400
+  cursor: pointer;
+
+  &:hover {
+    color: rgb(228 228 231); // zinc-200
+    background: rgb(39 39 42 / 0.5); // zinc-800
+  }
+}
+
+.thoughtExpandIcon {
+  width: 1rem;
+  height: 1rem;
+}
+
+.thoughtGoalTags {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.375rem;
+  margin-top: 0.5rem;
+  padding-top: 0.375rem;
+  border-top: 1px solid rgb(39 39 42 / 0.6); // zinc-800
+}
+
+.thoughtGoalTagIcon {
+  width: 0.875rem;
+  height: 0.875rem;
+  color: rgb(161 161 170); // zinc-400
+  flex-shrink: 0;
+}
+
+.thoughtGoalChip {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: rgb(161 161 170); // zinc-400
+  background: rgb(39 39 42 / 0.6); // zinc-800
+  padding: 0.125rem 0.375rem;
+  border-radius: 0.25rem;
 }
 
 // ── Intrusive Thought Input ──

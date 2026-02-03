@@ -8,8 +8,6 @@
  * @author @darianrosebrook
  */
 
-'use client';
-
 import React from 'react';
 import { cn } from '@/lib/utils';
 import type { InteroSnapshot } from '@/types';
@@ -38,7 +36,9 @@ const MOOD_CLASSES: Record<string, string> = {
   uneasy: 'moodUneasy',
 };
 
-export function InteroCurrentSnapshot({ snapshot }: InteroCurrentSnapshotProps) {
+export function InteroCurrentSnapshot({
+  snapshot,
+}: InteroCurrentSnapshotProps) {
   if (!snapshot) {
     return (
       <div className={styles.emptyState}>
@@ -48,7 +48,8 @@ export function InteroCurrentSnapshot({ snapshot }: InteroCurrentSnapshotProps) 
   }
 
   const moodKey = MOOD_CLASSES[snapshot.emotionalState] || MOOD_CLASSES.neutral;
-  const moodClass = styles[moodKey as keyof typeof styles] || styles.moodNeutral;
+  const moodClass =
+    styles[moodKey as keyof typeof styles] || styles.moodNeutral;
 
   return (
     <div className={styles.root}>
@@ -72,9 +73,7 @@ export function InteroCurrentSnapshot({ snapshot }: InteroCurrentSnapshotProps) 
             {Math.round(snapshot.curiosity)}
           </div>
         </div>
-        <div
-          className={cn(styles.moodBadge, moodClass)}
-        >
+        <div className={cn(styles.moodBadge, moodClass)}>
           {snapshot.emotionalState}
         </div>
       </div>
@@ -85,9 +84,7 @@ export function InteroCurrentSnapshot({ snapshot }: InteroCurrentSnapshotProps) 
           const value = snapshot.stressAxes?.[key] ?? 0;
           return (
             <div key={key} className={styles.axisBar}>
-              <span className={styles.axisLabel}>
-                {label}
-              </span>
+              <span className={styles.axisLabel}>{label}</span>
               <div className={styles.axisTrack}>
                 <div
                   className={styles.axisFill}
@@ -98,9 +95,7 @@ export function InteroCurrentSnapshot({ snapshot }: InteroCurrentSnapshotProps) 
                   }}
                 />
               </div>
-              <span className={styles.axisValue}>
-                {Math.round(value)}
-              </span>
+              <span className={styles.axisValue}>{Math.round(value)}</span>
             </div>
           );
         })}

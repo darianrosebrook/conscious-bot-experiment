@@ -592,6 +592,10 @@ export class BotAdapter extends EventEmitter {
         health: this.bot?.health || 20,
         food: this.bot?.food || 20,
         position: this.bot?.entity?.position?.clone(),
+        // Snapshot game tick at respawn for replay-stable dedupe keys.
+        // Captured once here so downstream handlers get a consistent value
+        // even if handler execution is delayed.
+        gameTick: this.bot?.time?.time ?? 0,
       });
     });
 

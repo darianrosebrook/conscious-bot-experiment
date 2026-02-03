@@ -3,6 +3,7 @@
 **Primitive**: P13 — Irreversibility and commitment planning
 
 **Status**: ENRICHED (2026-01-31)
+**Implementation**: Not started — spec only
 
 ---
 

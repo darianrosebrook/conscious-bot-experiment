@@ -28,6 +28,8 @@ function createMockService(
       metrics: {},
       durationMs: 0,
     }),
+    getConnectionNonce: vi.fn().mockReturnValue(1),
+    registerDomainDeclaration: vi.fn().mockResolvedValue({ success: true }),
     initialize: vi.fn().mockResolvedValue(undefined),
     destroy: vi.fn(),
     getHealthStatus: vi.fn().mockReturnValue({ enabled: true }),

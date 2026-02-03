@@ -2013,6 +2013,7 @@ export class SleepLeaf implements LeafImpl {
           bedPosition: { x: bedPos.x, y: bedPos.y, z: bedPos.z },
           placed,
           wakeTime: (bot as any).time?.timeOfDay ?? 0,
+          wakeDay: (bot as any).time?.day ?? 0,
         },
         metrics: { durationMs: ctx.now() - t0, retries: 0, timeouts: 0 },
       };

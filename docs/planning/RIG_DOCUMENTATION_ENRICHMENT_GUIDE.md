@@ -1,5 +1,7 @@
 # Rig Documentation Enrichment Guide
 
+> **Status: Process guide.** All 12 rigs (A-K + I-ext) are now ENRICHED. Use this guide when creating new rigs or when implementation reveals docs need updating.
+
 **Purpose**: This document provides a systematic template for enriching rig documentation to make incorrect implementation nearly impossible.
 
 **Gold standard**: Rig I-ext (P21) — use as reference for all sections below.

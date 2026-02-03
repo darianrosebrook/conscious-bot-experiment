@@ -1,5 +1,7 @@
 # Rig I: Epistemic Planning — Companion Approach
 
+**Implementation**: Partial — P21/Rig I-ext evidence capsule types exist in `planning/sterling/primitives/p21/`
+
 This companion document distills the implementation plan with design decisions, boundaries, and implementation construction constraints. Read alongside `RIG_I_EPISTEMIC_PLANNING_PLAN.md`.
 
 ---
