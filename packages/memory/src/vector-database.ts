@@ -1145,10 +1145,12 @@ export class EnhancedVectorDatabase {
   }> {
     const client = await this.pool.connect();
     try {
+      // Note: pgvector's vector type can't be cast to float[] directly.
+      // Use vector_dims() to get the dimension count.
       const result = await client.query(`
         SELECT
           COUNT(*) as total_chunks,
-          AVG(array_length(embedding::float[], 1)) as avg_dimension,
+          AVG(vector_dims(embedding)) as avg_dimension,
           COUNT(DISTINCT (metadata->>'type')) as memory_types,
           COUNT(DISTINCT e.entity_id) as entity_count,
           COUNT(DISTINCT r.relationship_id) as relationship_count,

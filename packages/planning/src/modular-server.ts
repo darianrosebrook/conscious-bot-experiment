@@ -1660,8 +1660,8 @@ async function autonomousTaskExecutor() {
       // Only log once per minute to avoid spam
       const now = Date.now();
       if (!global.lastNoTasksLog || now - global.lastNoTasksLog > 60000) {
-        console.log('[AUTONOMOUS EXECUTOR] No active tasks to execute');
-        logOptimizer.log('No active tasks to execute', 'no-active-tasks');
+        console.log('[AUTONOMOUS EXECUTOR] No runnable tasks (pending/active) to execute');
+        logOptimizer.log('No runnable tasks to execute', 'no-runnable-tasks');
         global.lastNoTasksLog = now;
       }
 
@@ -1686,8 +1686,10 @@ async function autonomousTaskExecutor() {
       }
       return;
     } else {
+      const pendingCount = activeTasks.filter((t) => t.status === 'pending').length;
+      const activeCount = activeTasks.filter((t) => t.status === 'active' || t.status === 'in_progress').length;
       console.log(
-        `[AUTONOMOUS EXECUTOR] Found ${activeTasks.length} active tasks, executing...`
+        `[AUTONOMOUS EXECUTOR] Found ${activeTasks.length} runnable tasks (${activeCount} active, ${pendingCount} pending)`
       );
     }
 
@@ -1720,6 +1722,23 @@ async function autonomousTaskExecutor() {
         console.log(
           `[AUTONOMOUS EXECUTOR] Auto-failed task ${t.id}: ${blockState.failReason}`
         );
+      }
+    }
+
+    // Activate pending tasks that are ready to run (not blocked, not in backoff).
+    // This bridges the gap between task creation (pending) and execution (active).
+    // Without this, tasks stay pending forever because isTaskEligible() only allows active/in_progress.
+    for (const t of activeTasks) {
+      if (
+        t.status === 'pending' &&
+        !t.metadata?.blockedReason &&
+        (!t.metadata?.nextEligibleAt || nowMs >= t.metadata.nextEligibleAt)
+      ) {
+        console.log(
+          `[AUTONOMOUS EXECUTOR] Activating pending task: ${t.id} (${t.title?.slice(0, 50)})`
+        );
+        taskIntegration.updateTaskStatus(t.id, 'active');
+        t.status = 'active'; // Update local copy for this cycle
       }
     }
 
