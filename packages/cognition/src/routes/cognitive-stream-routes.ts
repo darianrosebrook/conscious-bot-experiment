@@ -1,6 +1,8 @@
 /**
  * Cognitive stream routes: lifecycle events, thought acking, task review,
  * recent thoughts, mark processed, and SSE streaming.
+ *
+ * Supports eval isolation via evalRunId filtering (AC-ISO-01, AC-ISO-02, AC-ISO-03).
  */
 
 import { Router, Request, Response } from 'express';
@@ -15,6 +17,14 @@ import type { CognitionMutableState } from '../cognition-state';
 export interface CognitiveStreamRouteDeps {
   state: CognitionMutableState;
   enhancedThoughtGenerator: EnhancedThoughtGenerator;
+}
+
+// ── Eval Metadata Interface ────────────────────────────────────────────
+export interface EvalThoughtMetadata {
+  eval?: {
+    run_id: string;
+    scenario_id: string;
+  };
 }
 
 // Track connected SSE clients for broadcasting
@@ -164,9 +174,16 @@ export function createCognitiveStreamRoutes(deps: CognitiveStreamRouteDeps): Rou
   // Marks thoughts as processed by planning.
   // Planning MUST call this for EVERY evaluated thought (converted OR skipped).
   // This is the ONLY way thoughts transition to processed=true.
+  //
+  // Supports eval isolation (LF-3, AC-ISO-03):
+  // - If evalRunId is provided, verifies thought metadata matches before acking
+  // - Emits eval_ack_mismatch event if metadata doesn't match
   router.post('/api/cognitive-stream/ack', async (req, res) => {
     try {
-      const { thoughtIds } = req.body as { thoughtIds: string[] };
+      const { thoughtIds, evalRunId } = req.body as {
+        thoughtIds: string[];
+        evalRunId?: string;
+      };
 
       if (!Array.isArray(thoughtIds) || thoughtIds.length === 0) {
         return res.status(400).json({ error: 'thoughtIds array required' });
@@ -174,24 +191,51 @@ export function createCognitiveStreamRoutes(deps: CognitiveStreamRouteDeps): Rou
 
       const ackedIds = new Set(thoughtIds);
       let ackedCount = 0;
+      let mismatchCount = 0;
+      const mismatches: Array<{ thoughtId: string; expected: string; actual: string | null }> = [];
       const now = Date.now();
 
       // Mark matching thoughts as processed with provenance
       for (const thought of deps.state.cognitiveThoughts) {
         if (ackedIds.has(thought.id) && !thought.processed) {
+          // If evalRunId is provided, verify metadata match (LF-3, AC-ISO-03)
+          if (evalRunId) {
+            const evalMeta = (thought as any).metadata?.eval as EvalThoughtMetadata['eval'] | undefined;
+            const actualRunId = evalMeta?.run_id ?? null;
+
+            if (actualRunId !== evalRunId) {
+              // Mismatch: thought doesn't belong to this eval run
+              mismatchCount++;
+              mismatches.push({
+                thoughtId: thought.id,
+                expected: evalRunId,
+                actual: actualRunId,
+              });
+              console.warn(
+                `[CognitiveStream] Ack mismatch: thought ${thought.id} has run_id=${actualRunId}, expected=${evalRunId}`
+              );
+              continue; // Skip acking this thought
+            }
+          }
+
           thought.processed = true;
           (thought as any).processedAt = now;
-          (thought as any).processedBy = 'planning';
+          (thought as any).processedBy = evalRunId ? `eval:${evalRunId}` : 'planning';
           ackedCount++;
         }
       }
 
-      console.log(`[CognitiveStream] Acked ${ackedCount}/${thoughtIds.length} thoughts`);
+      console.log(
+        `[CognitiveStream] Acked ${ackedCount}/${thoughtIds.length} thoughts` +
+        (mismatchCount > 0 ? ` (${mismatchCount} mismatches)` : '')
+      );
 
       res.json({
         success: true,
         ackedCount,
         requestedCount: thoughtIds.length,
+        mismatchCount,
+        mismatches: mismatches.length > 0 ? mismatches : undefined,
       });
     } catch (error) {
       console.error('Error acking thoughts:', error);
@@ -204,12 +248,14 @@ export function createCognitiveStreamRoutes(deps: CognitiveStreamRouteDeps): Rou
   // - Not yet processed
   // - Marked convertEligible === true (OPT-IN, not opt-out!)
   // - Within the last 5 minutes
+  // - Optionally filtered by evalRunId (AC-ISO-02)
   //
   // This prevents percept spam from crowding out actionable intents.
   // Thoughts without convertEligible field are NOT returned (explicit opt-in).
   router.get('/api/cognitive-stream/actionable', async (req, res) => {
     try {
       const limitNum = parseInt(String(req.query.limit ?? '10'), 10);
+      const evalRunId = req.query.evalRunId as string | undefined;
       const maxAgeMs = 5 * 60 * 1000; // 5 minutes
       const now = Date.now();
 
@@ -221,11 +267,19 @@ export function createCognitiveStreamRoutes(deps: CognitiveStreamRouteDeps): Rou
       const allThoughts = deps.state.cognitiveThoughts;
 
       // Filter: unprocessed, EXPLICITLY actionable (convertEligible === true), recent
+      // Plus optional evalRunId filter (AC-ISO-02)
       const actionable = allThoughts.filter((thought) => {
         if (thought.processed) return false;
         // OPT-IN: only convertEligible === true passes (not undefined, not missing)
         if ((thought as any).convertEligible !== true) return false;
         if (now - thought.timestamp > maxAgeMs) return false;
+
+        // Eval isolation filter (AC-ISO-02)
+        if (evalRunId) {
+          const evalMeta = (thought as any).metadata?.eval as EvalThoughtMetadata['eval'] | undefined;
+          if (evalMeta?.run_id !== evalRunId) return false;
+        }
+
         return true;
       });
 
@@ -247,13 +301,18 @@ export function createCognitiveStreamRoutes(deps: CognitiveStreamRouteDeps): Rou
         convertEligible: (thought as any).convertEligible,
       }));
 
-      console.log(`[CognitiveStream] /actionable: returned=${result.length} queue_size=${allThoughts.length} filtered_out=${allThoughts.length - actionable.length}`);
+      console.log(
+        `[CognitiveStream] /actionable: returned=${result.length} queue_size=${allThoughts.length}` +
+        ` filtered_out=${allThoughts.length - actionable.length}` +
+        (evalRunId ? ` evalRunId=${evalRunId}` : '')
+      );
 
       res.json({
         success: true,
         thoughts: formattedThoughts,
         count: formattedThoughts.length,
         timestamp: now,
+        evalRunId: evalRunId || undefined,
       });
     } catch (error) {
       console.error('Error retrieving actionable thoughts:', error);
@@ -349,6 +408,7 @@ export function createCognitiveStreamRoutes(deps: CognitiveStreamRouteDeps): Rou
   });
 
   // Get recent thoughts for planning system
+  // Supports eval isolation via evalRunId filter (AC-ISO-02)
   router.get('/api/cognitive-stream/recent', async (req, res) => {
     try {
       // CRITICAL FIX: Express query params are ALWAYS strings.
@@ -356,6 +416,7 @@ export function createCognitiveStreamRoutes(deps: CognitiveStreamRouteDeps): Rou
       // with `=== 'false'` (string), so the filter NEVER ran.
       const limitParam = req.query.limit;
       const processedParam = req.query.processed;
+      const evalRunId = req.query.evalRunId as string | undefined;
 
       const limitNum = parseInt(String(limitParam ?? '10'), 10);
       // Default to 'false' (string) — only unprocessed thoughts by default
@@ -385,12 +446,24 @@ export function createCognitiveStreamRoutes(deps: CognitiveStreamRouteDeps): Rou
       // processedFilter === 'true' returns all thoughts (including processed)
       // This allows dashboard to fetch full history
 
-      // 3. Sort by timestamp (newest first) and limit results
+      // 3. Eval isolation filter (AC-ISO-02)
+      if (evalRunId) {
+        recentThoughts = recentThoughts.filter((thought) => {
+          const evalMeta = (thought as any).metadata?.eval as EvalThoughtMetadata['eval'] | undefined;
+          return evalMeta?.run_id === evalRunId;
+        });
+      }
+
+      // 4. Sort by timestamp (newest first) and limit results
       recentThoughts = recentThoughts
         .sort((a, b) => b.timestamp - a.timestamp)
         .slice(0, limitNum);
 
-      console.log(`[CognitiveStream] /recent: filter=${processedFilter} returned=${recentThoughts.length} queue_size=${deps.state.cognitiveThoughts.length}`);
+      console.log(
+        `[CognitiveStream] /recent: filter=${processedFilter} returned=${recentThoughts.length}` +
+        ` queue_size=${deps.state.cognitiveThoughts.length}` +
+        (evalRunId ? ` evalRunId=${evalRunId}` : '')
+      );
 
       // Ensure we have the required fields for the planning system
       const formattedThoughts = recentThoughts.map((thought) => ({
@@ -410,6 +483,7 @@ export function createCognitiveStreamRoutes(deps: CognitiveStreamRouteDeps): Rou
         thoughts: formattedThoughts,
         count: formattedThoughts.length,
         timestamp: Date.now(),
+        evalRunId: evalRunId || undefined,
       });
     } catch (error) {
       console.error('Error retrieving recent thoughts:', error);

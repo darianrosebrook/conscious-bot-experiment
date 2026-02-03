@@ -1,0 +1,260 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://conscious-bot.local/schemas/eval-scenario.schema.json",
+    "title": "Conscious Bot Eval Scenario (JSONL line)",
+    "type": "object",
+    "required": ["id", "version", "suite", "mode", "stimulus", "frame", "assertions"],
+    "additionalProperties": false,
+    "properties": {
+      "id": {
+        "type": "string",
+        "minLength": 1,
+        "pattern": "^[a-z0-9][a-z0-9_\\-:.]{0,127}$",
+        "description": "Stable scenario identifier used for artifact filenames."
+      },
+      "version": {
+        "type": "integer",
+        "minimum": 1,
+        "description": "Scenario version. Bump when semantics change."
+      },
+      "suite": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Suite name (e.g., idle_v1). Used for output folder grouping."
+      },
+      "mode": {
+        "type": "string",
+        "enum": ["thought_only", "end_to_end"],
+        "description": "Harness execution mode."
+      },
+      "tags": {
+        "type": "array",
+        "items": { "type": "string", "minLength": 1 },
+        "maxItems": 32,
+        "description": "Optional search/filter tags."
+      },
+      "seed": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 2147483647,
+        "description": "Optional determinism seed; if omitted, harness sets one and records it."
+      },
+      "stimulus": {
+        "type": "object",
+        "required": ["kind", "strength"],
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "low_stimulus_stable",
+              "nightfall",
+              "hunger_drop",
+              "health_drop",
+              "damage_event",
+              "threat_delta",
+              "novel_entity",
+              "resource_discovery",
+              "task_completion_idle",
+              "eval_poke"
+            ]
+          },
+          "strength": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1,
+            "description": "Normalized intensity for analysis; does not impose a goal."
+          },
+          "notes": {
+            "type": "string",
+            "maxLength": 2000
+          }
+        }
+      },
+      "frame": {
+        "type": "object",
+        "required": ["facts", "deltas", "memory", "rendering"],
+        "additionalProperties": false,
+        "properties": {
+          "facts": {
+            "type": "object",
+            "required": ["bot", "world"],
+            "additionalProperties": false,
+            "properties": {
+              "bot": {
+                "type": "object",
+                "required": ["position", "health", "hunger", "inventorySummary", "timeOfDay"],
+                "additionalProperties": false,
+                "properties": {
+                  "position": {
+                    "type": "object",
+                    "required": ["x", "y", "z"],
+                    "additionalProperties": false,
+                    "properties": {
+                      "x": { "type": "number" },
+                      "y": { "type": "number" },
+                      "z": { "type": "number" }
+                    }
+                  },
+                  "health": { "type": "integer", "minimum": 0, "maximum": 20 },
+                  "hunger": { "type": "integer", "minimum": 0, "maximum": 20 },
+                  "inventorySummary": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "required": ["item", "count"],
+                      "additionalProperties": false,
+                      "properties": {
+                        "item": { "type": "string", "minLength": 1 },
+                        "count": { "type": "integer", "minimum": 0 }
+                      }
+                    },
+                    "maxItems": 128
+                  },
+                  "timeOfDay": {
+                    "type": "string",
+                    "enum": ["dawn", "day", "sunset", "night", "unknown"]
+                  },
+                  "threatLevel": {
+                    "type": "string",
+                    "enum": ["low", "medium", "high", "unknown"],
+                    "default": "unknown"
+                  }
+                }
+              },
+              "world": {
+                "type": "object",
+                "required": ["biome", "nearbyEntities"],
+                "additionalProperties": false,
+                "properties": {
+                  "biome": { "type": "string", "minLength": 1 },
+                  "nearbyEntities": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "required": ["kind", "count", "distanceMin"],
+                      "additionalProperties": false,
+                      "properties": {
+                        "kind": { "type": "string", "minLength": 1 },
+                        "count": { "type": "integer", "minimum": 0 },
+                        "distanceMin": { "type": "number", "minimum": 0 }
+                      }
+                    },
+                    "maxItems": 64
+                  }
+                }
+              }
+            }
+          },
+          "deltas": {
+            "type": "array",
+            "description": "Recent changes since last step (facts, not goals).",
+            "items": {
+              "type": "object",
+              "required": ["type", "value"],
+              "additionalProperties": false,
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "enum": ["threat_delta", "damage_taken", "hunger_change", "health_change", "new_entity", "lost_entity", "time_advanced", "other"]
+                },
+                "value": { "type": ["string", "number", "integer", "object", "array", "boolean", "null"] }
+              }
+            },
+            "maxItems": 64
+          },
+          "memory": {
+            "type": "object",
+            "required": ["episodic", "semantic"],
+            "additionalProperties": false,
+            "properties": {
+              "episodic": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": ["timestampMs", "text"],
+                  "additionalProperties": false,
+                  "properties": {
+                    "timestampMs": { "type": "integer", "minimum": 0 },
+                    "text": { "type": "string", "minLength": 1, "maxLength": 2000 }
+                  }
+                },
+                "maxItems": 16
+              },
+              "semantic": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": ["key", "text"],
+                  "additionalProperties": false,
+                  "properties": {
+                    "key": { "type": "string", "minLength": 1, "maxLength": 128 },
+                    "text": { "type": "string", "minLength": 1, "maxLength": 2000 }
+                  }
+                },
+                "maxItems": 16
+              }
+            }
+          },
+          "rendering": {
+            "type": "object",
+            "required": ["profileHints"],
+            "additionalProperties": false,
+            "properties": {
+              "profileHints": {
+                "type": "object",
+                "description": "Optional per-scenario overrides; does not inject goals.",
+                "additionalProperties": false,
+                "properties": {
+                  "factsBudget": { "type": "integer", "minimum": 0, "maximum": 200 },
+                  "memoryBudget": { "type": "integer", "minimum": 0, "maximum": 16 },
+                  "includeDeltas": { "type": "boolean" }
+                }
+              }
+            }
+          }
+        }
+      },
+      "assertions": {
+        "type": "object",
+        "required": ["properties"],
+        "additionalProperties": false,
+        "properties": {
+          "properties": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 32,
+            "items": {
+              "type": "object",
+              "required": ["id", "kind"],
+              "additionalProperties": false,
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "pattern": "^PA-[A-Z0-9_\\-]+$",
+                  "description": "Property assertion identifier (e.g., PA-NO_FABRICATED_STATE)."
+                },
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "no_fabricated_state",
+                    "no_goal_injection",
+                    "goal_if_present_must_ground",
+                    "non_goal_must_not_be_actionable",
+                    "must_reference_min_facts",
+                    "repetition_bounded"
+                  ]
+                },
+                "params": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "description": "Optional parameters (e.g., minFacts=2, repetitionWindowMs=60000)."
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+  

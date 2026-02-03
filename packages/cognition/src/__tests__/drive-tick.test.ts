@@ -229,10 +229,29 @@ describe('Drive Tick', () => {
       expect(result!.metadata.extractedGoalSource).toBe('drive-tick');
     });
 
-    it('sets convertEligible to true', () => {
+    it('derives convertEligible through single choke point (LF-2)', () => {
+      // LF-2: convertEligible is now derived, not hard-coded
+      // With empty inventory, drive-tick generates "collect oak_log" but grounding may fail
       const result = callEvaluateDriveTick(makeContext());
       expect(result).not.toBeNull();
+      // Eligibility depends on grounding; with sparse context, it may be false
+      expect(typeof result!.convertEligible).toBe('boolean');
+      // Must include eligibility reasoning for audit trail
+      expect(result!.metadata.eligibilityReasoning).toBeDefined();
+    });
+
+    it('sets convertEligible to true when grounding passes', () => {
+      // Provide context that will make grounding pass (inventory contains wood)
+      const result = callEvaluateDriveTick(makeContext({
+        inventory: [
+          { name: 'oak_log', count: 1, displayName: 'Oak Log' },
+        ],
+      }));
+      expect(result).not.toBeNull();
+      // With wood in inventory, "collect oak_log" should ground successfully
+      // Note: the drive-tick with wood triggers low-stock path (< 16 logs)
       expect(result!.convertEligible).toBe(true);
+      expect(result!.metadata.groundingResult?.pass).toBe(true);
     });
 
     it('sets novelty to high', () => {

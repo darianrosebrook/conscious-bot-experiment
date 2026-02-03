@@ -14,6 +14,11 @@
     "postinstall": "node scripts/rebuild-prismarine-viewer.cjs 2>/dev/null || true",
     "generate-textures": "node scripts/generate-textures.cjs",
     "generate-textures:force": "node scripts/generate-textures.cjs -f",
+    "mc:assets": "npx tsx scripts/mc-assets.ts",
+    "mc:assets:extract": "npx tsx scripts/mc-assets.ts extract",
+    "mc:assets:list": "npx tsx scripts/mc-assets.ts list",
+    "mc:assets:clean": "npx tsx scripts/mc-assets.ts clean",
+    "mc:assets:inject": "npx tsx scripts/mc-assets.ts inject",
     "build": "tsc",
     "dev": "tsc --watch",
     "test": "vitest run --passWithNoTests",
@@ -69,10 +74,11 @@
     "@conscious-bot/planning": "workspace:*",
     "@conscious-bot/world": "workspace:*",
     "@types/three": "^0.179.0",
+    "canvas": "^3.1.0",
     "cors": "^2.8.5",
     "express": "^4.21.2",
     "js-yaml": "^4.1.0",
-    "minecraft-data": "^3.97.0",
+    "minecraft-data": "^3.103.0",
     "mineflayer": "^4.34.0",
     "mineflayer-auto-eat": "^5.0.3",
     "mineflayer-blockfinder": "^0.0.7",
@@ -85,7 +91,8 @@
     "prismarine-viewer": "^1.33.0",
     "three": "^0.179.1",
     "vec3": "^0.1.10",
-    "ws": "^8.18.3"
+    "ws": "^8.18.3",
+    "yauzl": "^3.2.0"
   },
   "devDependencies": {
     "@conscious-bot/testkits": "workspace:*",
@@ -94,12 +101,13 @@
     "@types/js-yaml": "^4.0.9",
     "@types/node": "^20.19.11",
     "@types/ws": "^8.18.1",
+    "@types/yauzl": "^2.10.3",
+    "minecraft-assets": "^1.17.0",
     "tsx": "^4.20.5",
     "typescript": "^5.9.2",
     "vitest": "^3.2.4",
     "webpack": "^5.95.0",
-    "webpack-cli": "^6.0.0",
-    "minecraft-assets": "^1.17.0"
+    "webpack-cli": "^6.0.0"
   },
   "keywords": [
     "minecraft",

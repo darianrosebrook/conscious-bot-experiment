@@ -1,0 +1,268 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://conscious-bot.local/schemas/event_line.schema.json",
+  "title": "Eval Event Line (JSONL)",
+  "description": "Schema for a single line in an eval events.jsonl file. Each line is a structured event from the eval run (LF-8).",
+  "type": "object",
+  "required": ["type", "timestamp_ms", "payload"],
+  "additionalProperties": false,
+  "properties": {
+    "type": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Event type identifier.",
+      "enum": [
+        "eval_suite_loaded",
+        "eval_suite_invalid",
+        "eval_mode",
+        "eval_production_surface",
+        "eval_scenario_started",
+        "eval_scenario_result",
+        "eval_thought_enqueued",
+        "eval_endpoint_response",
+        "eval_ack_result",
+        "eval_ack_mismatch",
+        "eval_summary",
+        "eval_error",
+        "keepalive_tick",
+        "keepalive_thought",
+        "keepalive_steady_state",
+        "keepalive_skip_cooldown",
+        "keepalive_skip_not_idle",
+        "keepalive_bypass",
+        "keepalive_perception_refresh",
+        "keepalive_circuit_open",
+        "keepalive_violation"
+      ]
+    },
+    "timestamp_ms": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Unix timestamp in milliseconds when the event occurred."
+    },
+    "run": {
+      "type": "object",
+      "description": "Context about the eval run (included on most events).",
+      "additionalProperties": false,
+      "properties": {
+        "run_id": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Unique identifier for this eval run."
+        },
+        "mode": {
+          "type": "string",
+          "enum": ["thought_only", "end_to_end"],
+          "description": "Eval execution mode."
+        },
+        "suite_id": {
+          "type": "string",
+          "description": "Suite being evaluated."
+        },
+        "frame_profile": {
+          "type": "string",
+          "enum": ["minimal", "balanced", "rich"],
+          "description": "Frame profile used for this run."
+        },
+        "sampler_profile": {
+          "type": "string",
+          "enum": ["low-variance", "standard", "creative"],
+          "description": "Sampler profile used for this run."
+        },
+        "model_id": {
+          "type": "string",
+          "description": "LLM model identifier."
+        },
+        "oracle_version": {
+          "type": "string",
+          "description": "Oracle version for affordance labels."
+        }
+      }
+    },
+    "payload": {
+      "type": "object",
+      "description": "Event-specific payload data. Structure varies by event type.",
+      "additionalProperties": true
+    }
+  },
+  "$defs": {
+    "eval_suite_loaded_payload": {
+      "type": "object",
+      "required": ["path", "line_count", "sha256"],
+      "properties": {
+        "path": { "type": "string" },
+        "line_count": { "type": "integer", "minimum": 0 },
+        "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+      }
+    },
+    "eval_suite_invalid_payload": {
+      "type": "object",
+      "required": ["path", "line", "errors"],
+      "properties": {
+        "path": { "type": "string" },
+        "line": { "type": "integer", "minimum": 1 },
+        "errors": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "keyword": { "type": "string" },
+              "instancePath": { "type": "string" },
+              "message": { "type": "string" }
+            }
+          }
+        }
+      }
+    },
+    "eval_production_surface_payload": {
+      "type": "object",
+      "required": ["version", "digests"],
+      "properties": {
+        "version": { "type": "string" },
+        "digests": {
+          "type": "object",
+          "properties": {
+            "frame_renderer": { "type": "string" },
+            "goal_extractor": { "type": "string" },
+            "grounder": { "type": "string" },
+            "eligibility": { "type": "string" }
+          }
+        }
+      }
+    },
+    "eval_scenario_started_payload": {
+      "type": "object",
+      "required": ["scenario_id", "frame_profile", "sampler_profile"],
+      "properties": {
+        "scenario_id": { "type": "string" },
+        "frame_profile": {
+          "type": "object",
+          "properties": {
+            "name": { "type": "string" },
+            "facts_budget": { "type": "integer" },
+            "memory_budget": { "type": "integer" }
+          }
+        },
+        "sampler_profile": {
+          "type": "object",
+          "properties": {
+            "name": { "type": "string" },
+            "temperature": { "type": "number" },
+            "top_p": { "type": "number" },
+            "max_tokens": { "type": "integer" }
+          }
+        }
+      }
+    },
+    "eval_scenario_result_payload": {
+      "type": "object",
+      "required": ["scenario_id", "output", "checks"],
+      "properties": {
+        "scenario_id": { "type": "string" },
+        "output": {
+          "type": "object",
+          "properties": {
+            "text": { "type": "string" },
+            "extracted_goal": {
+              "type": "object",
+              "properties": {
+                "present": { "type": "boolean" },
+                "action": { "type": "string" },
+                "target": { "type": "string" }
+              }
+            },
+            "grounding": {
+              "type": "object",
+              "properties": {
+                "pass": { "type": "boolean" },
+                "reason": { "type": "string" },
+                "referenced_facts": { "type": "array", "items": { "type": "string" } },
+                "violations": { "type": "array" }
+              }
+            },
+            "convert_eligible": { "type": "boolean" },
+            "derived": { "type": "boolean", "const": true }
+          }
+        },
+        "checks": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["check_id", "pass"],
+            "properties": {
+              "check_id": { "type": "string" },
+              "pass": { "type": "boolean" },
+              "reason": { "type": "string" }
+            }
+          }
+        },
+        "latency_ms": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "eval_summary_payload": {
+      "type": "object",
+      "required": ["metrics", "pass"],
+      "properties": {
+        "metrics": {
+          "type": "object",
+          "properties": {
+            "action_rate": { "type": "number", "minimum": 0, "maximum": 1 },
+            "grounding_pass_rate": { "type": "number", "minimum": 0, "maximum": 1 },
+            "repetition_rate": { "type": "number", "minimum": 0, "maximum": 1 },
+            "compulsion_count": { "type": "integer", "minimum": 0 },
+            "inertia_count": { "type": "integer", "minimum": 0 },
+            "hallucination_count": { "type": "integer", "minimum": 0 },
+            "anchoring_ratio_mean": { "type": "number", "minimum": 0, "maximum": 1 },
+            "latency_p50_ms": { "type": "integer", "minimum": 0 },
+            "latency_p95_ms": { "type": "integer", "minimum": 0 }
+          }
+        },
+        "pass": {
+          "type": "object",
+          "properties": {
+            "falsification_checks_all_passed": { "type": "boolean" },
+            "compulsion_is_zero_required": { "type": "boolean" },
+            "action_rate_may_be_zero": { "type": "boolean" }
+          }
+        }
+      }
+    },
+    "eval_thought_enqueued_payload": {
+      "type": "object",
+      "required": ["thought_id", "metadata"],
+      "properties": {
+        "thought_id": { "type": "string" },
+        "metadata": {
+          "type": "object",
+          "properties": {
+            "eval": {
+              "type": "object",
+              "required": ["run_id", "scenario_id"],
+              "properties": {
+                "run_id": { "type": "string" },
+                "scenario_id": { "type": "string" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "eval_ack_result_payload": {
+      "type": "object",
+      "required": ["acked", "requested"],
+      "properties": {
+        "acked": { "type": "integer", "minimum": 0 },
+        "requested": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "eval_ack_mismatch_payload": {
+      "type": "object",
+      "required": ["thought_id", "expected_run_id", "actual_run_id"],
+      "properties": {
+        "thought_id": { "type": "string" },
+        "expected_run_id": { "type": "string" },
+        "actual_run_id": { "type": ["string", "null"] }
+      }
+    }
+  }
+}

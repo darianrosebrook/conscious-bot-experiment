@@ -11,6 +11,8 @@
 declare global {
   var lastIdleEvent: number | undefined;
   var lastNoTasksLog: number | undefined;
+  var keepAliveIntegration: KeepAliveIntegration | undefined;
+  var lastUserCommand: number | undefined;
 }
 
 /**
@@ -64,6 +66,10 @@ import {
   PlanningSystem,
 } from './modules/planning-endpoints';
 import { MCPIntegration } from './modules/mcp-integration';
+import {
+  createKeepAliveIntegration,
+  type KeepAliveIntegration,
+} from './modules/keep-alive-integration';
 // Dynamic import to avoid TypeScript path resolution issues
 // import { eventDrivenThoughtGenerator, BotLifecycleEvent } from '@conscious-bot/cognition';
 
@@ -98,6 +104,64 @@ import {
   waitForBotConnection,
   getBotPosition,
 } from './modules/mc-client';
+
+/**
+ * Get current bot state for keep-alive context.
+ * Returns a minimal state object suitable for the keep-alive integration.
+ *
+ * Uses the /state endpoint which returns bot state in data.data structure.
+ */
+async function getBotState(): Promise<{
+  position?: { x: number; y: number; z: number };
+  health?: number;
+  food?: number;
+  inventory?: Array<{ name: string; count: number }>;
+  timeOfDay?: number;
+  biome?: string;
+  nearbyHostiles?: number;
+  nearbyPassives?: number;
+}> {
+  try {
+    const stateRes = await mcFetch('/state').catch(() => null);
+    if (!stateRes || !stateRes.ok) {
+      return {};
+    }
+
+    const stateJson = (await stateRes.json()) as {
+      data?: {
+        data?: {
+          position?: { x: number; y: number; z: number };
+          health?: number;
+          food?: number;
+          inventory?: { items?: Array<{ name: string; count: number }> };
+          timeOfDay?: number;
+          biome?: string;
+          nearbyHostiles?: number;
+          nearbyPassives?: number;
+        };
+      };
+    };
+
+    const botData = stateJson?.data?.data;
+    if (!botData) {
+      return {};
+    }
+
+    return {
+      position: botData.position,
+      health: botData.health,
+      food: botData.food,
+      inventory: botData.inventory?.items,
+      timeOfDay: botData.timeOfDay,
+      biome: botData.biome,
+      nearbyHostiles: botData.nearbyHostiles,
+      nearbyPassives: botData.nearbyPassives,
+    };
+  } catch (error) {
+    console.warn('[getBotState] Failed to fetch bot state:', error);
+    return {};
+  }
+}
 import {
   evaluateThreatHolds,
   fetchThreatSignal,
@@ -1774,6 +1838,37 @@ async function autonomousTaskExecutor() {
           }
         );
       }
+
+      // Keep-alive integration: trigger intention check on true idle (LF-9)
+      // This provides a non-injective pathway for goal emission
+      if (global.keepAliveIntegration?.isActive() && idleReason === 'no_tasks') {
+        try {
+          // Get bot state for keep-alive context
+          const botState = await getBotState().catch(() => ({}));
+
+          const result = await global.keepAliveIntegration.onIdle(
+            {
+              activeTasks: activeTasks.length,
+              eligibleTasks: eligibleTasks.length,
+              idleReason,
+              circuitBreakerOpen,
+              lastUserCommand: global.lastUserCommand || 0,
+              recentTaskConversions: 0, // Tracked internally by integration
+            },
+            botState
+          );
+
+          if (result?.ticked) {
+            console.log(
+              `[AUTONOMOUS EXECUTOR] Keep-alive tick: thought=${result.thought?.id?.slice(0, 8)}, ` +
+              `eligible=${result.thought?.eligibility.convertEligible}`
+            );
+          }
+        } catch (error) {
+          console.error('[AUTONOMOUS EXECUTOR] Keep-alive tick failed:', error);
+        }
+      }
+
       return;
     }
 
@@ -3451,6 +3546,87 @@ serverConfig.addEndpoint('get', '/world-state', (req, res) => {
   }
 });
 
+// Keep-alive diagnostics endpoint
+serverConfig.addEndpoint('get', '/keep-alive/status', (_req, res) => {
+  const integration = global.keepAliveIntegration;
+  if (!integration) {
+    res.json({
+      initialized: false,
+      reason: 'Keep-alive integration not created',
+      globalExists: 'keepAliveIntegration' in global,
+    });
+    return;
+  }
+  const state = integration.getState();
+  res.json({
+    initialized: true,
+    active: integration.isActive(),
+    state,
+  });
+});
+
+// Keep-alive force tick endpoint (diagnostic only)
+serverConfig.addEndpoint('post', '/keep-alive/force-tick', async (req, res) => {
+  const integration = global.keepAliveIntegration;
+  if (!integration || !integration.isActive()) {
+    res.status(400).json({
+      error: 'Keep-alive integration not active',
+    });
+    return;
+  }
+
+  try {
+    // Create minimal context for forced tick
+    const result = await integration.onIdle(
+      {
+        activeTasks: 0,
+        eligibleTasks: 0,
+        idleReason: 'no_tasks',
+        circuitBreakerOpen: false,
+        lastUserCommand: 0,
+        recentTaskConversions: 0,
+      },
+      {
+        // Minimal bot state
+        health: 20,
+        food: 20,
+        position: { x: 0, y: 64, z: 0 },
+        biome: 'plains',
+        timeOfDay: 6000,
+        inventory: [
+          { name: 'oak_log', count: 4, displayName: 'Oak Log' },
+          { name: 'cobblestone', count: 16, displayName: 'Cobblestone' },
+        ],
+      }
+    );
+
+    res.json({
+      success: true,
+      result: result ? {
+        ticked: result.ticked,
+        skipped: result.skipped,
+        skipReason: result.skipReason,
+        thought: result.thought ? {
+          id: result.thought.id,
+          content: result.thought.content?.slice(0, 200),
+          extractedGoal: result.thought.extractedGoal,
+          eligibility: result.thought.eligibility,
+          groundingResult: result.thought.groundingResult ? {
+            pass: result.thought.groundingResult.pass,
+            reason: result.thought.groundingResult.reason,
+          } : null,
+        } : null,
+      } : null,
+    });
+  } catch (error) {
+    console.error('[Keep-alive force-tick] Error:', error);
+    res.status(500).json({
+      error: 'Force tick failed',
+      message: (error as Error).message,
+    });
+  }
+});
+
 // Sterling health endpoint
 serverConfig.addEndpoint('get', '/sterling/health', (_req, res) => {
   if (!sterlingService) {
@@ -3547,6 +3723,21 @@ async function startServer() {
     } catch (error) {
       console.warn(
         '⚠️ Failed to initialize event-driven thought generator:',
+        error
+      );
+    }
+
+    // Initialize keep-alive integration for intention checking during idle
+    try {
+      global.keepAliveIntegration = await createKeepAliveIntegration({
+        enabled: process.env.KEEPALIVE_ENABLED !== 'false',
+        baseIntervalMs: parseInt(process.env.KEEPALIVE_INTERVAL_MS || '120000', 10),
+        cognitionServiceUrl: process.env.COGNITION_SERVICE_URL || 'http://localhost:3003',
+      });
+      console.log('✅ Keep-alive integration initialized');
+    } catch (error) {
+      console.warn(
+        '⚠️ Failed to initialize keep-alive integration:',
         error
       );
     }

@@ -26,7 +26,71 @@ class MockLLMInterface {
     // Handle both string prompts and LLMContext objects
     const promptText =
       typeof prompt === 'string' ? prompt : prompt.messages?.[0]?.content || '';
-    // Generate realistic responses based on prompt content
+
+    // JSON format responses for theory of mind inference
+    // These prompts expect JSON output
+    if (promptText.includes('Infer the current mental state') && promptText.includes('JSON format')) {
+      return {
+        text: JSON.stringify({
+          beliefs: {
+            "situation_safe": { content: "The environment is safe", confidence: 0.8, accuracy: true, source: "observation", lastUpdated: Date.now() },
+            "resources_available": { content: "Resources are nearby", confidence: 0.7, accuracy: null, source: "inference", lastUpdated: Date.now() }
+          },
+          goals: [
+            { id: "goal_1", description: "Build shelter", priority: 0.9, urgency: 0.7, progress: 0.3, obstacles: [], subgoals: [] },
+            { id: "goal_2", description: "Gather resources", priority: 0.7, urgency: 0.5, progress: 0.2, obstacles: [], subgoals: [] }
+          ],
+          emotions: {
+            primary: "curious",
+            intensity: 0.6,
+            secondary: ["hopeful"],
+            triggers: ["new environment"],
+            duration: 5000,
+            stability: 0.8
+          },
+          attention: {
+            focusTarget: "surroundings",
+            focusIntensity: 0.7,
+            distractions: []
+          },
+          knowledge: {
+            knownFacts: ["terrain is plains"],
+            uncertainAreas: ["nearby threats"],
+            recentLearning: []
+          },
+          confidence: 0.7,
+          reasoning: "Inferred from observation patterns and agent behavior"
+        })
+      };
+    } else if (promptText.includes('Predict actions') && promptText.includes('JSON format')) {
+      return {
+        text: JSON.stringify({
+          actions: [
+            { action: "explore", probability: 0.7, timing: "immediate", prerequisites: [] },
+            { action: "gather_wood", probability: 0.5, timing: "soon", prerequisites: ["find trees"] }
+          ],
+          confidence: 0.6,
+          reasoning: ["Agent shows exploratory behavior", "Resource gathering is a priority"],
+          alternatives: [],
+          timeline: { immediate: 0.4, short_term: 0.4, long_term: 0.2 }
+        })
+      };
+    } else if (promptText.includes('perspective simulation') || promptText.includes('viewpoint')) {
+      return {
+        text: JSON.stringify({
+          viewpoint: "From this agent's perspective, the situation appears manageable",
+          beliefs: { safety: 0.8 },
+          goals: ["survival", "exploration"],
+          emotions: ["curiosity"],
+          reactions: ["observe carefully"],
+          confidence: 0.6,
+          reasoning: "Based on agent's personality profile",
+          limitations: ["limited visibility"]
+        })
+      };
+    }
+
+    // Generate realistic responses based on prompt content (non-JSON responses)
     if (promptText.includes('capabilities')) {
       return {
         text: `- Movement and navigation

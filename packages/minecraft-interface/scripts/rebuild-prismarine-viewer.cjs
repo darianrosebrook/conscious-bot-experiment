@@ -44,12 +44,22 @@ function run() {
     const webpack = require('webpack');
     process.chdir(pvRoot);
     const configs = require(configPath);
-    const indexConfig = Array.isArray(configs) ? configs[0] : configs;
-    webpack(indexConfig, (err, stats) => {
+
+    // Build both index.js and worker.js bundles
+    // The worker.js contains minecraft-data which needs to be updated for new MC versions
+    const configsArray = Array.isArray(configs) ? configs : [configs];
+
+    console.log(`[rebuild-prismarine-viewer] Building ${configsArray.length} bundle(s)...`);
+
+    webpack(configsArray, (err, stats) => {
       if (err) {
         console.warn('[rebuild-prismarine-viewer] webpack error:', err.message);
       } else if (stats && stats.hasErrors()) {
-        console.warn('[rebuild-prismarine-viewer] webpack build errors:', stats.compilation.errors.length);
+        const errors = stats.toJson().errors;
+        console.warn('[rebuild-prismarine-viewer] webpack build errors:', errors.length);
+        errors.slice(0, 3).forEach(e => console.warn('  -', e.message?.slice(0, 200)));
+      } else {
+        console.log('[rebuild-prismarine-viewer] Build complete!');
       }
     });
   } catch {

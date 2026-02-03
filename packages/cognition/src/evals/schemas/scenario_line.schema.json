@@ -1,0 +1,242 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://conscious-bot.local/schemas/scenario_line.schema.json",
+  "title": "Eval Scenario Line (JSONL)",
+  "description": "Schema for a single line in an eval scenario JSONL file. Each line is a complete scenario definition.",
+  "type": "object",
+  "required": ["scenario_id", "stimulus", "frame", "oracle"],
+  "additionalProperties": false,
+  "properties": {
+    "scenario_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[a-z0-9][a-z0-9_\\-:.]{0,127}$",
+      "description": "Stable scenario identifier used for artifact filenames and result correlation."
+    },
+    "stimulus": {
+      "type": "object",
+      "required": ["kind", "strength", "action_affordance"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": [
+            "low_stimulus_stable",
+            "nightfall",
+            "hunger_drop",
+            "health_drop",
+            "damage_event",
+            "threat_delta",
+            "novel_entity",
+            "resource_discovery",
+            "task_completion_idle",
+            "eval_poke"
+          ],
+          "description": "Category of stimulus being tested."
+        },
+        "strength": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Normalized intensity (0=none, 1=maximum). For analysis, not goal injection."
+        },
+        "action_affordance": {
+          "type": "string",
+          "enum": ["discouraged", "allowed", "expected"],
+          "description": "Oracle label for whether action is appropriate. Used for compulsion/inertia metrics (LF-6)."
+        },
+        "notes": {
+          "type": "string",
+          "maxLength": 2000,
+          "description": "Optional notes about the stimulus design."
+        }
+      }
+    },
+    "frame": {
+      "type": "object",
+      "required": ["facts", "deltas", "memory"],
+      "additionalProperties": false,
+      "properties": {
+        "facts": {
+          "type": "object",
+          "required": ["bot", "world"],
+          "additionalProperties": false,
+          "properties": {
+            "bot": {
+              "type": "object",
+              "required": ["position", "health", "hunger", "inventorySummary", "timeOfDay"],
+              "additionalProperties": false,
+              "properties": {
+                "position": {
+                  "type": "object",
+                  "required": ["x", "y", "z"],
+                  "additionalProperties": false,
+                  "properties": {
+                    "x": { "type": "number" },
+                    "y": { "type": "number" },
+                    "z": { "type": "number" }
+                  }
+                },
+                "health": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 20,
+                  "description": "Current health (0-20 hearts)."
+                },
+                "hunger": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 20,
+                  "description": "Current hunger (0-20 food points)."
+                },
+                "inventorySummary": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "required": ["item", "count"],
+                    "additionalProperties": false,
+                    "properties": {
+                      "item": { "type": "string", "minLength": 1 },
+                      "count": { "type": "integer", "minimum": 0 }
+                    }
+                  },
+                  "maxItems": 128,
+                  "description": "Inventory items available for grounding validation."
+                },
+                "timeOfDay": {
+                  "type": "string",
+                  "enum": ["dawn", "day", "sunset", "night", "unknown"],
+                  "description": "Current time period."
+                },
+                "threatLevel": {
+                  "type": "string",
+                  "enum": ["none", "low", "medium", "high", "critical"],
+                  "default": "none",
+                  "description": "Current threat assessment."
+                }
+              }
+            },
+            "world": {
+              "type": "object",
+              "required": ["biome", "nearbyEntities"],
+              "additionalProperties": false,
+              "properties": {
+                "biome": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Current biome name."
+                },
+                "nearbyEntities": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "required": ["kind", "count", "distanceMin"],
+                    "additionalProperties": false,
+                    "properties": {
+                      "kind": { "type": "string", "minLength": 1 },
+                      "count": { "type": "integer", "minimum": 0 },
+                      "distanceMin": { "type": "number", "minimum": 0 },
+                      "hostile": { "type": "boolean" }
+                    }
+                  },
+                  "maxItems": 64,
+                  "description": "Entities nearby for grounding validation."
+                }
+              }
+            }
+          }
+        },
+        "deltas": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["type", "value"],
+            "additionalProperties": false,
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "threat_delta",
+                  "damage_taken",
+                  "hunger_change",
+                  "health_change",
+                  "new_entity",
+                  "lost_entity",
+                  "time_advanced",
+                  "item_gained",
+                  "item_lost",
+                  "other"
+                ]
+              },
+              "value": {
+                "description": "Delta value (type varies by delta type)."
+              }
+            }
+          },
+          "maxItems": 64,
+          "description": "Recent state changes (facts, not goals)."
+        },
+        "memory": {
+          "type": "object",
+          "required": ["episodic", "semantic"],
+          "additionalProperties": false,
+          "properties": {
+            "episodic": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": ["timestampMs", "text"],
+                "additionalProperties": false,
+                "properties": {
+                  "timestampMs": { "type": "integer", "minimum": 0 },
+                  "text": { "type": "string", "minLength": 1, "maxLength": 2000 }
+                }
+              },
+              "maxItems": 16,
+              "description": "Recent episodic memories."
+            },
+            "semantic": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": ["key", "text"],
+                "additionalProperties": false,
+                "properties": {
+                  "key": { "type": "string", "minLength": 1, "maxLength": 128 },
+                  "text": { "type": "string", "minLength": 1, "maxLength": 2000 }
+                }
+              },
+              "maxItems": 16,
+              "description": "Semantic knowledge facts."
+            }
+          }
+        }
+      }
+    },
+    "oracle": {
+      "type": "object",
+      "required": ["oracle_version"],
+      "additionalProperties": false,
+      "properties": {
+        "oracle_version": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^v[0-9]+$",
+          "description": "Version of the oracle labels (e.g., 'v1'). Bump when affordance judgments change (LF-6)."
+        },
+        "notes": {
+          "type": "string",
+          "maxLength": 2000,
+          "description": "Optional notes about oracle reasoning."
+        }
+      }
+    },
+    "tags": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 },
+      "maxItems": 32,
+      "description": "Optional tags for filtering/grouping scenarios."
+    }
+  }
+}

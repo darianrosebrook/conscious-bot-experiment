@@ -12,6 +12,117 @@ import { AgentModeler } from './agent-modeler';
 import { AgentModel, Intention } from './types';
 
 // ============================================================================
+// JSON Parsing Utilities (robust extraction from LLM output)
+// ============================================================================
+
+/**
+ * Event emitted when JSON parsing fails.
+ */
+export interface TomParseFailedEvent {
+  type: 'tom_inference_parse_failed';
+  payload: {
+    error: string;
+    prefix: string;
+    length: number;
+    method: string;
+  };
+}
+
+/**
+ * Strip markdown code fences from response.
+ */
+function stripCodeFences(s: string): string {
+  const t = s.trim();
+  if (t.startsWith('```')) {
+    const lines = t.split('\n');
+    if (lines.length >= 2) {
+      // drop first line (``` or ```json)
+      const body = lines.slice(1).join('\n');
+      const end = body.lastIndexOf('```');
+      return (end >= 0 ? body.slice(0, end) : body).trim();
+    }
+  }
+  return t;
+}
+
+/**
+ * Strip leading markdown bullet if present.
+ * Only strips if it looks like a bullet (followed by whitespace/bracket),
+ * NOT a negative number (followed by digit).
+ */
+function stripLeadingBulletIfPresent(s: string): string {
+  const t = s.trimStart();
+  if (t.startsWith('-')) {
+    const next = t.charAt(1);
+    // Only strip if followed by whitespace, bracket, or backtick (not digit)
+    if (next === ' ' || next === '\t' || next === '\n' || next === '\r' ||
+        next === '{' || next === '[' || next === '`' || next === '') {
+      return t.slice(1).trimStart();
+    }
+  }
+  return s.trim();
+}
+
+/**
+ * Extract the first complete JSON object or array from a string.
+ * Uses brace matching to handle nested structures.
+ */
+function extractFirstJsonValue(s: string): string | null {
+  const t = s.trim();
+  const startObj = t.indexOf('{');
+  const startArr = t.indexOf('[');
+  const start = startObj === -1
+    ? startArr
+    : startArr === -1
+      ? startObj
+      : Math.min(startObj, startArr);
+
+  if (start === -1) return null;
+
+  let inString = false;
+  let escape = false;
+  let depth = 0;
+
+  for (let i = start; i < t.length; i++) {
+    const ch = t[i];
+
+    if (inString) {
+      if (escape) {
+        escape = false;
+        continue;
+      }
+      if (ch === '\\') {
+        escape = true;
+        continue;
+      }
+      if (ch === '"') {
+        inString = false;
+        continue;
+      }
+      continue;
+    } else {
+      if (ch === '"') {
+        inString = true;
+        continue;
+      }
+      if (ch === '{' || ch === '[') depth++;
+      if (ch === '}' || ch === ']') depth--;
+      if (depth === 0) return t.slice(start, i + 1);
+    }
+  }
+  return null;
+}
+
+/**
+ * Robustly extract JSON from LLM response.
+ * Handles code fences, markdown bullets, and preamble text.
+ */
+function extractJson(raw: string): string {
+  const cleaned = stripLeadingBulletIfPresent(stripCodeFences(raw));
+  return extractFirstJsonValue(cleaned) ?? cleaned;
+}
+
+// ============================================================================
 // Theory of Mind Core Types
 // ============================================================================
 
@@ -201,6 +312,16 @@ export class TheoryOfMindEngine {
   private config: TheoryOfMindConfig;
   private mentalStateCache: Map<string, MentalStateInference> = new Map();
   private activeInferences: Set<string> = new Set();
+
+  /**
+   * Optional callback for structured parse failure events.
+   * Set this to emit metrics/events when JSON parsing fails.
+   */
+  public emitParseFailedEvent?: (
+    method: string,
+    rawResponse: string,
+    error: unknown
+  ) => void;
 
   constructor(
     llm: LLMInterface,
@@ -616,7 +737,8 @@ Respond in JSON format.`,
     agentId: string
   ): MentalStateInference {
     try {
-      const parsed = JSON.parse(response);
+      const candidate = extractJson(response);
+      const parsed = JSON.parse(candidate);
       return {
         agentId,
         currentBeliefs: this.parseBeliefs(parsed.beliefs || {}),
@@ -629,7 +751,9 @@ Respond in JSON format.`,
         timestamp: Date.now(),
       };
     } catch (error) {
-      console.warn('Failed to parse mental state inference:', error);
+      // Emit structured error for observability (not just console.error)
+      console.error('Failed to parse mental state inference:', error);
+      this.emitParseFailedEvent?.('parseMentalStateInference', response, error);
       return this.createEmptyMentalStateInference(agentId);
     }
   }
@@ -639,7 +763,8 @@ Respond in JSON format.`,
     agentId: string
   ): ActionPrediction {
     try {
-      const parsed = JSON.parse(response);
+      const candidate = extractJson(response);
+      const parsed = JSON.parse(candidate);
       return {
         agentId,
         predictedActions: this.parsePredictedActions(parsed.actions || []),
@@ -652,7 +777,8 @@ Respond in JSON format.`,
         timestamp: Date.now(),
       };
     } catch (error) {
-      console.warn('Failed to parse action prediction:', error);
+      console.error('Failed to parse action prediction:', error);
+      this.emitParseFailedEvent?.('parseActionPrediction', response, error);
       return this.createEmptyActionPrediction(agentId);
     }
   }
@@ -663,7 +789,8 @@ Respond in JSON format.`,
     scenario: Scenario
   ): PerspectiveSimulation {
     try {
-      const parsed = JSON.parse(response);
+      const candidate = extractJson(response);
+      const parsed = JSON.parse(candidate);
       return {
         agentId,
         scenario: scenario.description,

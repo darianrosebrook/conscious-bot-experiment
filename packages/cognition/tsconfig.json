@@ -19,7 +19,7 @@
     "noEmit": false,
     "downlevelIteration": true
   },
-  "include": ["src/**/*"],
+  "include": ["src/**/*", "src/**/*.json"],
   "references": [
     { "path": "../core" },
     { "path": "../memory" },

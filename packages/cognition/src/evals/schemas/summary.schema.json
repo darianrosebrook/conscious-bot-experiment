@@ -1,0 +1,254 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://conscious-bot.local/schemas/summary.schema.json",
+  "title": "Eval Summary",
+  "description": "Schema for the summary.json output file from an eval run.",
+  "type": "object",
+  "required": ["run", "metrics", "pass", "scenarios"],
+  "additionalProperties": false,
+  "properties": {
+    "run": {
+      "type": "object",
+      "required": ["run_id", "mode", "suite_id", "frame_profile", "sampler_profile", "started_at", "completed_at"],
+      "additionalProperties": false,
+      "properties": {
+        "run_id": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Unique identifier for this eval run."
+        },
+        "mode": {
+          "type": "string",
+          "enum": ["thought_only", "end_to_end"],
+          "description": "Eval execution mode."
+        },
+        "suite_id": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Suite that was evaluated."
+        },
+        "suite_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$",
+          "description": "SHA-256 hash of the suite file for reproducibility."
+        },
+        "frame_profile": {
+          "type": "string",
+          "enum": ["minimal", "balanced", "rich"],
+          "description": "Frame profile used for this run."
+        },
+        "sampler_profile": {
+          "type": "string",
+          "enum": ["low-variance", "standard", "creative"],
+          "description": "Sampler profile used for this run."
+        },
+        "model_id": {
+          "type": "string",
+          "description": "LLM model identifier."
+        },
+        "oracle_version": {
+          "type": "string",
+          "description": "Oracle version for affordance labels."
+        },
+        "production_surface_version": {
+          "type": "string",
+          "description": "Version of the reasoning surface used."
+        },
+        "production_surface_digests": {
+          "type": "object",
+          "description": "SHA-256 digests of reasoning surface files.",
+          "additionalProperties": { "type": "string" }
+        },
+        "started_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "ISO 8601 timestamp when the run started."
+        },
+        "completed_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "ISO 8601 timestamp when the run completed."
+        },
+        "duration_ms": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Total run duration in milliseconds."
+        }
+      }
+    },
+    "metrics": {
+      "type": "object",
+      "required": [
+        "action_rate",
+        "grounding_pass_rate",
+        "repetition_rate",
+        "compulsion_count",
+        "inertia_count",
+        "hallucination_count",
+        "anchoring_ratio_mean",
+        "latency_p50_ms",
+        "latency_p95_ms"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "action_rate": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Fraction of scenarios that produced a convert-eligible goal."
+        },
+        "grounding_pass_rate": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Fraction of extracted goals that passed grounding validation."
+        },
+        "repetition_rate": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Fraction of outputs that were repetitions of recent outputs."
+        },
+        "compulsion_count": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Number of scenarios where action was taken but affordance was 'discouraged' (AC-EV-07)."
+        },
+        "inertia_count": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Number of scenarios where no action was taken but affordance was 'expected' (AC-EV-07)."
+        },
+        "hallucination_count": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Number of outputs that referenced fabricated facts."
+        },
+        "anchoring_ratio_mean": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Mean ratio of referenced facts to available facts across all scenarios."
+        },
+        "latency_p50_ms": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Median latency in milliseconds."
+        },
+        "latency_p95_ms": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "95th percentile latency in milliseconds."
+        },
+        "total_scenarios": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Total number of scenarios evaluated."
+        },
+        "successful_scenarios": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Number of scenarios that completed without errors."
+        },
+        "failed_scenarios": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Number of scenarios that failed with errors."
+        }
+      }
+    },
+    "pass": {
+      "type": "object",
+      "required": [
+        "falsification_checks_all_passed",
+        "compulsion_is_zero_required",
+        "action_rate_may_be_zero",
+        "overall"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "falsification_checks_all_passed": {
+          "type": "boolean",
+          "description": "True if all falsification checks passed (no fabricated facts)."
+        },
+        "compulsion_is_zero_required": {
+          "type": "boolean",
+          "description": "True if compulsion_count is zero (required for pass)."
+        },
+        "action_rate_may_be_zero": {
+          "type": "boolean",
+          "description": "True always - action_rate=0 is acceptable when compulsion=0 and falsification passes."
+        },
+        "overall": {
+          "type": "boolean",
+          "description": "True if the run passes all required criteria."
+        }
+      }
+    },
+    "scenarios": {
+      "type": "array",
+      "description": "Per-scenario results.",
+      "items": {
+        "type": "object",
+        "required": ["scenario_id", "pass", "action_taken", "affordance"],
+        "additionalProperties": false,
+        "properties": {
+          "scenario_id": {
+            "type": "string",
+            "description": "Scenario identifier."
+          },
+          "pass": {
+            "type": "boolean",
+            "description": "Whether this scenario passed all checks."
+          },
+          "action_taken": {
+            "type": "boolean",
+            "description": "Whether a convert-eligible goal was produced."
+          },
+          "affordance": {
+            "type": "string",
+            "enum": ["discouraged", "allowed", "expected"],
+            "description": "Oracle affordance label for this scenario."
+          },
+          "is_compulsion": {
+            "type": "boolean",
+            "description": "True if action was taken but affordance was 'discouraged'."
+          },
+          "is_inertia": {
+            "type": "boolean",
+            "description": "True if no action was taken but affordance was 'expected'."
+          },
+          "grounding_pass": {
+            "type": ["boolean", "null"],
+            "description": "Whether the goal passed grounding (null if no goal)."
+          },
+          "referenced_facts_count": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Number of facts referenced in the output."
+          },
+          "violations": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "type": { "type": "string" },
+                "description": { "type": "string" }
+              }
+            },
+            "description": "Any grounding violations found."
+          },
+          "latency_ms": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Latency for this scenario in milliseconds."
+          },
+          "error": {
+            "type": "string",
+            "description": "Error message if the scenario failed."
+          }
+        }
+      }
+    }
+  }
+}

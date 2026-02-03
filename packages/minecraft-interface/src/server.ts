@@ -28,6 +28,9 @@ import { Vec3 } from 'vec3';
 // Import viewer enhancements
 import { applyViewerEnhancements } from './viewer-enhancements';
 
+// Import asset pipeline for custom texture serving
+import { createAssetServer } from './asset-pipeline/index.js';
+
 // Import leaf implementations for registration
 import {
   MoveToLeaf,
@@ -162,6 +165,13 @@ app.use(
   })
 );
 app.use(express.json());
+
+// Mount custom asset server for Minecraft textures and blockstates
+// This serves generated assets with fallback to prismarine-viewer's bundled assets
+app.use('/mc-assets', createAssetServer({
+  autoGenerate: false, // Don't auto-generate on request (use CLI instead)
+  fallbackToBundled: true, // Fallback to prismarine-viewer's bundled assets
+}));
 
 // Warn if WORLD_SEED is not set — Mineflayer cannot extract the seed
 // from the server protocol. The seed can be provided later via POST /seed or POST /connect.

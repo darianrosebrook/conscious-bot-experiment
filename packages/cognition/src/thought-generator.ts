@@ -14,6 +14,12 @@ import { getInteroState } from './interoception-store';
 import { buildStressContext } from './stress-axis-computer';
 import { canonicalGoalKey } from './llm-output-sanitizer';
 import type { GoalTagV1 } from './llm-output-sanitizer';
+import {
+  deriveEligibility,
+  createGroundingContext,
+  groundGoal,
+} from './reasoning-surface';
+import type { EligibilityOutput, GroundingResult } from './reasoning-surface';
 
 /**
  * Build a canonical GoalTagV1 structure.
@@ -29,6 +35,61 @@ function buildGoalTagV1(action: string, target: string, amount: number | null): 
     amount,
     raw: `[GOAL: ${action} ${target}${amount != null ? ` ${amount}` : ''}]`,
   };
+}
+
+/**
+ * LF-2: Single choke point for eligibility derivation.
+ *
+ * This helper wraps the reasoning-surface deriveEligibility() to ensure
+ * ALL convertEligible decisions in this file flow through the canonical path.
+ *
+ * Contract: convertEligible is whatever deriveEligibility() returns.
+ * This helper ensures all callers use that path; the actual rule is owned
+ * by the reasoning-surface module and may evolve independently.
+ *
+ * @param extractedGoal - The goal extracted from LLM output, or null
+ * @param context - The thought context for grounding validation
+ * @returns Eligibility output with derived=true marker
+ */
+function computeEligibility(
+  extractedGoal: GoalTagV1 | null,
+  context: ThoughtContext
+): { eligibility: EligibilityOutput; grounding: GroundingResult | null } {
+  // If no goal, fast path to ineligible
+  if (!extractedGoal) {
+    return {
+      grounding: null,
+      eligibility: deriveEligibility({
+        extractedGoal: null,
+        groundingResult: null,
+      }),
+    };
+  }
+
+  // Ground the goal against the situation frame
+  // Wrapped in try-catch to fail closed if grounding throws
+  const groundingContext = createGroundingContext(context);
+  let grounding: GroundingResult | null;
+  try {
+    grounding = groundGoal(extractedGoal, groundingContext);
+  } catch (error) {
+    // Fail closed: grounding exception means ineligible
+    console.error('[computeEligibility] Grounding threw, failing closed:', error);
+    grounding = {
+      pass: false,
+      reason: `grounding_exception: ${error instanceof Error ? error.message : 'unknown'}`,
+      referencedFacts: [],
+      violations: [{ type: 'unknown_reference', description: 'Grounding threw an exception', trigger: extractedGoal.target }],
+    };
+  }
+
+  // Derive eligibility through the single choke point
+  const eligibility = deriveEligibility({
+    extractedGoal,
+    groundingResult: grounding,
+  });
+
+  return { eligibility, grounding };
 }
 
 /**
@@ -190,6 +251,16 @@ export interface CognitiveThought {
     goalKey?: string;
     /** IDLE-4: Whether goal emission was suppressed by budget limits */
     budgetSuppressed?: boolean;
+    /**
+     * Raw extracted goal for audit trail, captured even when budget-suppressed.
+     * Use this for telemetry on suppressed-goal frequency and distribution.
+     * Distinct from `extractedGoal` which is only set when the goal is exposed.
+     */
+    extractedGoalRaw?: { action: string; target: string; amount: number | null; raw?: string };
+    /** LF-2: Reasoning for eligibility decision from single choke point */
+    eligibilityReasoning?: string;
+    /** LF-2: Summary of grounding result (pass/fail and reason) */
+    groundingResult?: { pass: boolean; reason: string };
   };
   novelty?: 'high' | 'medium' | 'low';
   /** Only thoughts with convertEligible=true should be considered for task conversion */
@@ -420,9 +491,13 @@ export class EnhancedThoughtGenerator extends EventEmitter {
           // Tag as low-novelty for analytics, but preserve convertEligible for task-worthy thoughts
           thought.novelty = 'low';
           if (!isTaskWorthy) {
-            thought.convertEligible = false;
+            // LF-2: Route eligibility through single choke point even for dedup path
+            // When !isTaskWorthy, there's no goal, so this will return convertEligible: false
+            const { eligibility: dedupEligibility } = computeEligibility(null, context);
+            thought.convertEligible = dedupEligibility.convertEligible;
             if (thought.metadata) {
               (thought.metadata as any).fallback = true;
+              (thought.metadata as any).eligibilityReasoning = dedupEligibility.reasoning;
             }
           }
           if (!thought.tags) thought.tags = [];
@@ -532,6 +607,8 @@ export class EnhancedThoughtGenerator extends EventEmitter {
           // Same banded state — use deterministic fallback instead of LLM
           this._counters.signatureSuppressions++;
           const fallbackContent = this.generateFallbackThought(context);
+          // LF-2: Derive eligibility through single choke point (no goal in fallback)
+          const { eligibility: fallbackEligibility } = computeEligibility(null, context);
           return {
             id: `thought-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
             type: 'reflection',
@@ -550,9 +627,10 @@ export class EnhancedThoughtGenerator extends EventEmitter {
               trigger: 'time-based',
               context: 'environmental-monitoring',
               intensity: 0.2,
+              eligibilityReasoning: fallbackEligibility.reasoning,
             },
             novelty: 'low',
-            convertEligible: false,
+            convertEligible: fallbackEligibility.convertEligible,
             category: 'idle',
             tags: ['monitoring', 'dedup-skipped'],
             priority: 'low',
@@ -622,6 +700,15 @@ export class EnhancedThoughtGenerator extends EventEmitter {
         }
       }
 
+      // LF-2: Derive eligibility through single choke point
+      // If budget suppressed the goal, we derive with null goal (no exposure = no eligibility)
+      // Otherwise, derive with the actual extracted goal
+      const goalForEligibility = goalAllowed ? response.metadata.extractedGoal : null;
+      const { eligibility, grounding } = computeEligibility(
+        goalForEligibility as GoalTagV1 | null,
+        context
+      );
+
       // IDLE-5: Log provenance for the idle cycle
       const decisionOutcome = budgetSuppressed
         ? 'budget_suppressed' as const
@@ -665,16 +752,21 @@ export class EnhancedThoughtGenerator extends EventEmitter {
           intensity: 0.4,
           llmConfidence: response.confidence,
           model: response.model,
-          // IDLE-4: Only include extractedGoal if budget allows
+          // IDLE-4: Only include extractedGoal if budget allows (for downstream conversion)
           extractedGoal: goalAllowed ? response.metadata.extractedGoal : undefined,
+          // Always capture raw goal for audit trail (even when budget-suppressed)
+          extractedGoalRaw: hasGoal ? response.metadata.extractedGoal : undefined,
           extractedIntent: goalAllowed ? extractedIntent : undefined,
           intentParse,
           extractedGoalSource: goalAllowed && hasGoal ? 'llm' as const : undefined,
           budgetSuppressed,
+          // LF-2: Include eligibility derivation provenance
+          eligibilityReasoning: eligibility.reasoning,
+          groundingResult: grounding ? { pass: grounding.pass, reason: grounding.reason } : undefined,
         },
         novelty: isDuplicate ? 'medium' : 'high',
-        // IDLE-4: Only mark convertEligible if goal was allowed
-        convertEligible: goalAllowed && (hasGoal || hasIntent),
+        // LF-2: Use derived eligibility (single choke point)
+        convertEligible: eligibility.convertEligible,
         category: 'idle',
         tags,
         priority: 'low',
@@ -684,6 +776,8 @@ export class EnhancedThoughtGenerator extends EventEmitter {
 
       // Fallback to contextually aware thought if LLM fails
       const fallbackContent = this.generateFallbackThought(context);
+      // LF-2: Derive eligibility through single choke point (no goal in error fallback)
+      const { eligibility: errorEligibility } = computeEligibility(null, context);
 
       return {
         id: `thought-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
@@ -704,7 +798,10 @@ export class EnhancedThoughtGenerator extends EventEmitter {
           context: 'environmental-monitoring',
           intensity: 0.2,
           error: 'llm-generation-failed',
+          eligibilityReasoning: errorEligibility.reasoning,
         },
+        // LF-2: Use derived eligibility (single choke point)
+        convertEligible: errorEligibility.convertEligible,
         category: 'idle',
         tags: ['monitoring', 'fallback'],
         priority: 'low',
@@ -1709,6 +1806,13 @@ export class EnhancedThoughtGenerator extends EventEmitter {
     this._driveTickCount++;
     this._counters.driveTicks++;
 
+    // LF-2: Derive eligibility through single choke point
+    // Drive-ticks always have extractedGoal, so eligibility depends on grounding
+    const { eligibility: driveEligibility, grounding: driveGrounding } = computeEligibility(
+      drive.extractedGoal,
+      context
+    );
+
     return {
       id: `drive-tick-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
       type: 'planning',
@@ -1730,9 +1834,13 @@ export class EnhancedThoughtGenerator extends EventEmitter {
         extractedGoal: drive.extractedGoal,
         extractedGoalSource: 'drive-tick',
         goalKey,
+        // LF-2: Include eligibility derivation provenance
+        eligibilityReasoning: driveEligibility.reasoning,
+        groundingResult: driveGrounding ? { pass: driveGrounding.pass, reason: driveGrounding.reason } : undefined,
       },
       novelty: 'high',
-      convertEligible: true,
+      // LF-2: Use derived eligibility (single choke point)
+      convertEligible: driveEligibility.convertEligible,
       category: 'idle',
       tags: ['drive-tick', 'autonomous', drive.category],
       priority: 'medium',

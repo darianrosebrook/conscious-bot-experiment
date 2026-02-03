@@ -11,7 +11,7 @@ overrides:
 
 patchedDependencies:
   prismarine-viewer@1.33.0:
-    hash: 1fd19882493cd2585a51b2cda570cbb48c1b00667a87527019d21f097b9d8ae5
+    hash: 22e3d4e219d3e3eabb66431c9c26119c8a0b6795bd6cdf7a8a0b5daaef1534d8
     path: patches/prismarine-viewer@1.33.0.patch
 
 importers:
@@ -73,6 +73,12 @@ importers:
       '@conscious-bot/memory':
         specifier: workspace:*
         version: link:../memory
+      ajv:
+        specifier: ^8.17.1
+        version: 8.17.1
+      ajv-formats:
+        specifier: ^3.0.1
+        version: 3.0.1(ajv@8.17.1)
       cors:
         specifier: ^2.8.5
         version: 2.8.6
@@ -467,6 +473,9 @@ importers:
       '@types/three':
         specifier: ^0.179.0
         version: 0.179.0
+      canvas:
+        specifier: ^3.1.0
+        version: 3.2.1
       cors:
         specifier: ^2.8.5
         version: 2.8.6
@@ -477,7 +486,7 @@ importers:
         specifier: ^4.1.0
         version: 4.1.1
       minecraft-data:
-        specifier: ^3.97.0
+        specifier: ^3.103.0
         version: 3.103.0
       mineflayer:
         specifier: ^4.34.0
@@ -508,7 +517,7 @@ importers:
         version: 1.2.0
       prismarine-viewer:
         specifier: ^1.33.0
-        version: 1.33.0(patch_hash=1fd19882493cd2585a51b2cda570cbb48c1b00667a87527019d21f097b9d8ae5)
+        version: 1.33.0(patch_hash=22e3d4e219d3e3eabb66431c9c26119c8a0b6795bd6cdf7a8a0b5daaef1534d8)
       three:
         specifier: ^0.179.1
         version: 0.179.1
@@ -518,6 +527,9 @@ importers:
       ws:
         specifier: ^8.18.3
         version: 8.19.0
+      yauzl:
+        specifier: ^3.2.0
+        version: 3.2.0
     devDependencies:
       '@conscious-bot/testkits':
         specifier: workspace:*
@@ -537,6 +549,9 @@ importers:
       '@types/ws':
         specifier: ^8.18.1
         version: 8.18.1
+      '@types/yauzl':
+        specifier: ^2.10.3
+        version: 2.10.3
       minecraft-assets:
         specifier: ^1.17.0
         version: 1.17.0
@@ -2076,6 +2091,9 @@ packages:
   '@types/ws@8.18.1':
     resolution: {integrity: sha512-ThVF6DCVhA8kUGy+aazFQ4kXQ7E1Ty7A3ypFOe0IcJV8O/M511G99AW24irKrW56Wt44yG9+ij8FaqoBGkuBXg==}
 
+  '@types/yauzl@2.10.3':
+    resolution: {integrity: sha512-oJoftv0LSuaDZE3Le4DbKX+KS9G36NzOeSap90UIK0yMA/NhKJhqlSGtNDORNRaIbQfzjXDrQa0ytJ6mNRGz/Q==}
+
   '@typescript-eslint/eslint-plugin@6.21.0':
     resolution: {integrity: sha512-oy9+hTPCUFpngkEZUSzbf9MxI65wbKFoQYsgPdILTfbUldp5ovUuphZVe4i30emU9M/kP+T64Di0mxl7dSw3MA==}
     engines: {node: ^16.0.0 || >=18.0.0}
@@ -2332,6 +2350,14 @@ packages:
       ajv:
         optional: true
 
+  ajv-formats@3.0.1:
+    resolution: {integrity: sha512-8iUql50EUR+uUcdRQ3HDqa6EVyo3docL8g5WJ3FNcWmu62IbkGUue/pEyLBW8VGKKucTPgqeks4fIU1DA4yowQ==}
+    peerDependencies:
+      ajv: ^8.0.0
+    peerDependenciesMeta:
+      ajv:
+        optional: true
+
   ajv-keywords@5.1.0:
     resolution: {integrity: sha512-YCS/JNFAUyr5vAuhk1DWm1CBxRHW9LbJ2ozWeemrIqpbsqKjHVxYPyi5GC0rjZIT5JxJ3virVTS8wk4i/Z+krw==}
     peerDependencies:
@@ -2510,6 +2536,9 @@ packages:
     resolution: {integrity: sha512-ZC5Bd0LgJXgwGqUknZY/vkUQ04r8NXnJZ3yYi4vDmSiZmC/pdSN0NbNRPxZpbtO4uAfDUAFffO8IZoM3Gj8IkA==}
     engines: {node: ^6 || ^7 || ^8 || ^9 || ^10 || ^11 || ^12 || >=13.7}
     hasBin: true
+
+  buffer-crc32@0.2.13:
+    resolution: {integrity: sha512-VO9Ht/+p3SN7SKWqcrgEzjGbRSJYTx+Q1pTQC0wrWqHx0vpJraQ6GtHx8tvcg1rlK1byhU5gccxgOgj7B0TDkQ==}
 
   buffer-crc32@1.0.0:
     resolution: {integrity: sha512-Db1SbgBS/fg/392AblrMJk97KggmvYhr4pB5ZIMTWtaivCPMWLkmb7m21cJvpvgK+J3nsU2CmmixNBZx4vFj/w==}
@@ -3937,6 +3966,9 @@ packages:
     resolution: {integrity: sha512-//nshmD55c46FuFw26xV/xFAaB5HF9Xdap7HJBBnrKdAd6/GxDBaNA1870O79+9ueg61cZLSVc+OaFlfmObYVQ==}
     engines: {node: '>= 14.16'}
 
+  pend@1.2.0:
+    resolution: {integrity: sha512-F3asv42UuXchdzt+xXqfW1OGlVBe+mxa2mqI0pg5yAHZPvFmY3Y6drSf/GQ1A86WgWEN9Kzh/WrgKa6iGcHXLg==}
+
   pg-cloudflare@1.3.0:
     resolution: {integrity: sha512-6lswVVSztmHiRtD6I8hw4qP/nDm1EJbKMRhf3HCYaqud7frGysPv7FYJ5noZQdhQtN2xJnimfMtvQq21pdbzyQ==}
 
@@ -5142,6 +5174,10 @@ packages:
 
   yargs@17.7.2:
     resolution: {integrity: sha512-7dSzzRQ++CKnNI/krKnYRV7JKKPUXMEh61soaHKg9mrWEhzFWhFnxPxGl+69cD1Ou63C13NUPCnmIcrvqCuM6w==}
+    engines: {node: '>=12'}
+
+  yauzl@3.2.0:
+    resolution: {integrity: sha512-Ow9nuGZE+qp1u4JIPvg+uCiUr7xGQWdff7JQSk5VGYTAZMDe2q8lxJ10ygv10qmSj031Ty/6FNJpLO4o1Sgc+w==}
     engines: {node: '>=12'}
 
   yggdrasil@1.7.0:
@@ -6459,6 +6495,10 @@ snapshots:
     dependencies:
       '@types/node': 20.19.30
 
+  '@types/yauzl@2.10.3':
+    dependencies:
+      '@types/node': 20.19.30
+
   '@typescript-eslint/eslint-plugin@6.21.0(@typescript-eslint/parser@6.21.0(eslint@8.57.1)(typescript@5.9.3))(eslint@8.57.1)(typescript@5.9.3)':
     dependencies:
       '@eslint-community/regexpp': 4.12.2
@@ -6798,6 +6838,10 @@ snapshots:
     optionalDependencies:
       ajv: 8.17.1
 
+  ajv-formats@3.0.1(ajv@8.17.1):
+    optionalDependencies:
+      ajv: 8.17.1
+
   ajv-keywords@5.1.0(ajv@8.17.1):
     dependencies:
       ajv: 8.17.1
@@ -6998,6 +7042,8 @@ snapshots:
       electron-to-chromium: 1.5.279
       node-releases: 2.0.27
       update-browserslist-db: 1.2.3(browserslist@4.28.1)
+
+  buffer-crc32@0.2.13: {}
 
   buffer-crc32@1.0.0: {}
 
@@ -8228,7 +8274,7 @@ snapshots:
   mineflayer-pathfinder@2.4.5:
     dependencies:
       minecraft-data: 3.103.0
-      prismarine-block: 1.22.0
+      prismarine-block: 1.22.0(prismarine-registry@1.11.0)
       prismarine-entity: 2.5.0
       prismarine-item: 1.17.0
       prismarine-nbt: 2.8.0
@@ -8252,7 +8298,7 @@ snapshots:
       mineflayer: 4.34.0
       mineflayer-pathfinder: 2.4.5
       node: 19.8.1
-      prismarine-block: 1.22.0
+      prismarine-block: 1.22.0(prismarine-registry@1.11.0)
       prismarine-entity: 2.5.0
       prismarine-item: 1.17.0
       socket.io: 4.8.3
@@ -8289,7 +8335,7 @@ snapshots:
       minecraft-data: 2.221.0
       minecraft-protocol: 1.63.0
       prismarine-biome: 1.3.0(minecraft-data@2.221.0)(prismarine-registry@1.11.0)
-      prismarine-block: 1.22.0
+      prismarine-block: 1.22.0(prismarine-registry@1.11.0)
       prismarine-chat: 1.12.0
       prismarine-chunk: 1.39.0(minecraft-data@2.221.0)
       prismarine-entity: 1.2.0
@@ -8311,7 +8357,7 @@ snapshots:
       minecraft-data: 3.103.0
       minecraft-protocol: 1.63.0
       prismarine-biome: 1.3.0(minecraft-data@3.103.0)(prismarine-registry@1.11.0)
-      prismarine-block: 1.22.0
+      prismarine-block: 1.22.0(prismarine-registry@1.11.0)
       prismarine-chat: 1.12.0
       prismarine-chunk: 1.39.0(minecraft-data@3.103.0)
       prismarine-entity: 2.5.0
@@ -8538,6 +8584,8 @@ snapshots:
 
   pathval@2.0.1: {}
 
+  pend@1.2.0: {}
+
   pg-cloudflare@1.3.0:
     optional: true
 
@@ -8654,7 +8702,7 @@ snapshots:
       minecraft-data: 3.103.0
       prismarine-registry: 1.11.0
 
-  prismarine-block@1.22.0:
+  prismarine-block@1.22.0(prismarine-registry@1.11.0):
     dependencies:
       minecraft-data: 3.103.0
       prismarine-biome: 1.3.0(minecraft-data@3.103.0)(prismarine-registry@1.11.0)
@@ -8662,6 +8710,8 @@ snapshots:
       prismarine-item: 1.17.0
       prismarine-nbt: 2.8.0
       prismarine-registry: 1.11.0
+    transitivePeerDependencies:
+      - prismarine-registry
 
   prismarine-chat@1.12.0:
     dependencies:
@@ -8672,7 +8722,7 @@ snapshots:
   prismarine-chunk@1.39.0(minecraft-data@2.221.0):
     dependencies:
       prismarine-biome: 1.3.0(minecraft-data@2.221.0)(prismarine-registry@1.11.0)
-      prismarine-block: 1.22.0
+      prismarine-block: 1.22.0(prismarine-registry@1.11.0)
       prismarine-nbt: 2.8.0
       prismarine-registry: 1.11.0
       smart-buffer: 4.2.0
@@ -8685,7 +8735,7 @@ snapshots:
   prismarine-chunk@1.39.0(minecraft-data@3.103.0):
     dependencies:
       prismarine-biome: 1.3.0(minecraft-data@3.103.0)(prismarine-registry@1.11.0)
-      prismarine-block: 1.22.0
+      prismarine-block: 1.22.0(prismarine-registry@1.11.0)
       prismarine-nbt: 2.8.0
       prismarine-registry: 1.11.0
       smart-buffer: 4.2.0
@@ -8736,16 +8786,16 @@ snapshots:
   prismarine-registry@1.11.0:
     dependencies:
       minecraft-data: 3.103.0
-      prismarine-block: 1.22.0
+      prismarine-block: 1.22.0(prismarine-registry@1.11.0)
       prismarine-nbt: 2.8.0
 
-  prismarine-viewer@1.33.0(patch_hash=1fd19882493cd2585a51b2cda570cbb48c1b00667a87527019d21f097b9d8ae5):
+  prismarine-viewer@1.33.0(patch_hash=22e3d4e219d3e3eabb66431c9c26119c8a0b6795bd6cdf7a8a0b5daaef1534d8):
     dependencies:
       '@tweenjs/tween.js': 23.1.3
       compression: 1.8.1
       express: 4.22.1
       minecraft-data: 3.103.0
-      prismarine-block: 1.22.0
+      prismarine-block: 1.22.0(prismarine-registry@1.11.0)
       prismarine-chunk: 1.39.0(minecraft-data@3.103.0)
       prismarine-world: 3.6.3
       socket.io: 4.8.3
@@ -9961,6 +10011,11 @@ snapshots:
       string-width: 4.2.3
       y18n: 5.0.8
       yargs-parser: 21.1.1
+
+  yauzl@3.2.0:
+    dependencies:
+      buffer-crc32: 0.2.13
+      pend: 1.2.0
 
   yggdrasil@1.7.0:
     dependencies:

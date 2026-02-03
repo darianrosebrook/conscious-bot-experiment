@@ -85,6 +85,10 @@ export function createThoughtRoutes(deps: ThoughtRouteDeps): Router {
       // Dev-only: allow injecting convertEligible for live verification of
       // strict-mode gating (C2/C3 tests). Not exposed in production to prevent
       // external callers from bypassing eligibility checks.
+      //
+      // LF-2 NOTE: This is a deliberate test bypass, NOT a violation of the
+      // single choke point. Production code paths cannot set convertEligible
+      // to true except through deriveEligibility() in reasoning-surface.
       if (
         process.env.NODE_ENV !== 'production' &&
         req.body.convertEligible !== undefined

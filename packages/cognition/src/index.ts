@@ -76,6 +76,42 @@ export type {
   SanitizationFlags,
 } from './llm-output-sanitizer';
 
+// Keep-Alive Module
+export {
+  KeepAliveController,
+  detectIdle,
+  buildIdleContext,
+  estimateThreatLevel,
+  renderIntentionCheckPrompt,
+  getIntentionCheckVariants,
+  validateNonInjectivePrompt,
+  DEFAULT_IDLE_CONFIG,
+  DEFAULT_KEEPALIVE_CONFIG,
+} from './keep-alive';
+export type {
+  KeepAliveConfig,
+  KeepAliveContext,
+  KeepAliveTickResult,
+  KeepAliveThought,
+  IdleContext,
+  IdleDecision,
+  IdleDetectorConfig,
+  IntentionCheckVariant,
+} from './keep-alive';
+
+// Reasoning Surface (production code boundary)
+export {
+  deriveEligibility,
+  assertEligibilityInvariant,
+  SURFACE_VERSION,
+  SURFACE_DIGESTS,
+} from './reasoning-surface';
+export type {
+  EligibilityInput,
+  EligibilityOutput,
+  GroundingResult,
+} from './reasoning-surface';
+
 // Core Types (specific exports to avoid conflicts)
 export type {
   LLMConfig,

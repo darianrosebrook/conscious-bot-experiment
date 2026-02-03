@@ -849,6 +849,47 @@ app.use(
 );
 
 // ============================================================================
+// LLM Generation Endpoint (for keep-alive integration)
+// ============================================================================
+
+/**
+ * Simple LLM generation endpoint for keep-alive intention checking.
+ * This allows the planning service's keep-alive integration to generate
+ * thoughts via the cognition service's LLM interface.
+ */
+app.post('/api/llm/generate', async (req, res) => {
+  const { prompt } = req.body;
+
+  if (!prompt || typeof prompt !== 'string') {
+    res.status(400).json({ error: 'Missing or invalid prompt' });
+    return;
+  }
+
+  try {
+    // Use the LLM interface to generate a response
+    const response = await llmInterface.generateInternalThought(prompt, {
+      currentGoals: [],
+      recentMemories: [],
+      agentState: {},
+    });
+
+    res.json({
+      text: response.text,
+      content: response.text,
+      confidence: response.confidence,
+      model: response.model,
+      metadata: response.metadata,
+    });
+  } catch (error) {
+    console.error('[LLM Generate] Error:', error);
+    res.status(500).json({
+      error: 'LLM generation failed',
+      message: (error as Error).message,
+    });
+  }
+});
+
+// ============================================================================
 // Process error handlers
 // ============================================================================
 

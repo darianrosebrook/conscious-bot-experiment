@@ -2,6 +2,16 @@
  * Process routes: the mega POST /process route handling intrusion,
  * environmental_awareness, social_interaction, environmental_event,
  * and external_chat.
+ *
+ * LF-2 CONFORMANCE NOTE:
+ * This file sets `convertEligible: false` for thoughts created by route handlers.
+ * This is acceptable under LF-2 because:
+ * - All `false` assignments are conservative (no false positives)
+ * - No `true` assignments exist in this file
+ * - The single choke point for `true` is in thought-generator.ts via deriveEligibility()
+ *
+ * If you need to set convertEligible: true, you MUST use the reasoning-surface
+ * derivation pipeline, not a direct assignment.
  */
 
 import { Router } from 'express';
