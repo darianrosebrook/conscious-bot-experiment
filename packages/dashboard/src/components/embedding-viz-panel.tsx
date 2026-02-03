@@ -1,5 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import dynamic from 'next/dynamic';
+import { useState, useEffect, useCallback, lazy, Suspense } from 'react';
 import { ScatterChart, RefreshCw, Eye } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -18,19 +17,20 @@ const TYPE_COLORS: Record<string, string> = {
   unknown: '#9ca3af', // lighter gray
 };
 
-// Dynamic import of Three.js canvas component - completely avoids SSR
-const EmbeddingVizCanvas = dynamic(
-  () => import('./embedding-viz-canvas').then((mod) => mod.EmbeddingVizCanvas),
-  {
-    ssr: false,
-    loading: () => (
-      <div className={s.empty}>
-        <Eye className={s.emptyIcon} />
-        <p>Loading 3D renderer...</p>
-      </div>
-    ),
-  }
+// Lazy load Three.js canvas component for code splitting
+const EmbeddingVizCanvas = lazy(() =>
+  import('./embedding-viz-canvas').then((mod) => ({ default: mod.EmbeddingVizCanvas }))
 );
+
+// Loading fallback component
+function LoadingFallback() {
+  return (
+    <div className={s.empty}>
+      <Eye className={s.emptyIcon} />
+      <p>Loading 3D renderer...</p>
+    </div>
+  );
+}
 
 export function EmbeddingVizPanel() {
   const [points, setPoints] = useState<EmbeddingPoint3D[]>([]);
@@ -119,12 +119,14 @@ export function EmbeddingVizPanel() {
           </div>
         ) : (
           <>
-            <EmbeddingVizCanvas
-              points={points}
-              selectedId={selected?.id || null}
-              onSelect={setSelected}
-              onCanvasClick={handleCanvasClick}
-            />
+            <Suspense fallback={<LoadingFallback />}>
+              <EmbeddingVizCanvas
+                points={points}
+                selectedId={selected?.id || null}
+                onSelect={setSelected}
+                onCanvasClick={handleCanvasClick}
+              />
+            </Suspense>
 
             {loading && (
               <div className={s.loadingOverlay}>

@@ -1,4 +1,4 @@
-import React from 'react';
+
 import { cn, getHudColor } from '@/lib/utils';
 import styles from './hud-meter.module.scss';
 

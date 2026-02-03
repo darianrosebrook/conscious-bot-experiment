@@ -7,8 +7,7 @@
  * @author @darianrosebrook
  */
 
-import React, { useState } from 'react';
-import Image from 'next/image';
+import { useState, type SyntheticEvent } from 'react';
 import { ChevronDown, ChevronUp, Package } from 'lucide-react';
 import { Section } from './section';
 import { EmptyState } from './empty-state';
@@ -97,13 +96,13 @@ function SlotCell({ item, isSelected, slotLabel }: { item?: InventoryItem; isSel
           <div className={cn(s.indicator, topRightColor)}>{topRightIndicator}</div>
         )}
         <div className={s.spriteCenter}>
-          <Image
+          <img
             src={getItemSpriteLocal(item.type, item.name || undefined)}
             alt={itemName}
             width={32}
             height={32}
             className={s.spriteImg}
-            onError={(e) => { (e.target as HTMLImageElement).src = getFallbackSprite(); }}
+            onError={(e: SyntheticEvent<HTMLImageElement>) => { e.currentTarget.src = getFallbackSprite(); }}
           />
         </div>
         <div className={s.itemNameWrapper}>
@@ -124,9 +123,10 @@ function SlotCell({ item, isSelected, slotLabel }: { item?: InventoryItem; isSel
 
 export const InventoryDisplay: React.FC<InventoryDisplayProps> = ({
   inventory,
-  selectedSlot = 0,
+  selectedSlot: _selectedSlot = 0,
   className = '',
 }) => {
+  void _selectedSlot; // Reserved for future use
   const [expanded, setExpanded] = useState(false);
   const mainInventoryItems = inventory.filter((item) => item.slot >= 9 && item.slot <= 44);
   const totalItems = inventory.length;
@@ -168,13 +168,13 @@ export const InventoryDisplay: React.FC<InventoryDisplayProps> = ({
               {inventory.slice(0, 8).map((item, index) => (
                 <div key={index} className={s.detailRow}>
                   <div className={s.detailThumb}>
-                    <Image
+                    <img
                       src={getItemSpriteLocal(item.type, item.name || undefined)}
                       alt={getItemDisplayName(item)}
                       width={32}
                       height={32}
                       className={s.detailThumbImg}
-                      onError={(e) => { (e.target as HTMLImageElement).src = getFallbackSprite(); }}
+                      onError={(e: SyntheticEvent<HTMLImageElement>) => { e.currentTarget.src = getFallbackSprite(); }}
                     />
                   </div>
                   <div className={s.detailInfo}>

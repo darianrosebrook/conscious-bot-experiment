@@ -1,33 +1,32 @@
 {
   "compilerOptions": {
     "target": "ES2020",
-    "lib": ["dom", "dom.iterable", "es6"],
-    "allowJs": true,
+    "useDefineForClassFields": true,
+    "lib": ["ES2020", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
     "skipLibCheck": true,
-    "strict": true,
-    "noEmit": true,
-    "esModuleInterop": true,
-    "module": "esnext",
+
+    /* Bundler mode */
     "moduleResolution": "bundler",
-    "resolveJsonModule": true,
+    "allowImportingTsExtensions": true,
     "isolatedModules": true,
-    "jsx": "preserve",
-    "incremental": true,
-    "plugins": [
-      {
-        "name": "next"
-      }
-    ],
+    "moduleDetection": "force",
+    "noEmit": true,
+    "jsx": "react-jsx",
+
+    /* Linting */
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUncheckedSideEffectImports": true,
+
+    /* Path aliases */
     "baseUrl": ".",
     "paths": {
-      "@/*": ["./src/*"],
-      "@/components/*": ["./src/components/*"],
-      "@/lib/*": ["./src/lib/*"],
-      "@/types/*": ["./src/types/*"],
-      "@/hooks/*": ["./src/hooks/*"],
-      "@/stores/*": ["./src/stores/*"]
+      "@/*": ["./src/*"]
     }
   },
-  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
-  "exclude": ["node_modules", "src/__tests__/**/*", "**/*.test.ts", "**/*.test.tsx", "**/*.spec.ts", "**/*.spec.tsx"]
+  "include": ["src"],
+  "references": [{ "path": "./tsconfig.node.json" }]
 }

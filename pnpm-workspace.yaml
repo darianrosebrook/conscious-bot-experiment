@@ -4,3 +4,4 @@ packages:
 onlyBuiltDependencies:
   - canvas
   - node
+  - "@swc/core"

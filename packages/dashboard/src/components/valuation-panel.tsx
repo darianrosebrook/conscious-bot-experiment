@@ -175,7 +175,8 @@ export function ValuationPanel() {
 
   const totalRecords = records.length;
   const solvedCount = records.filter((r) => r.solved).length;
-  const failedCount = records.filter((r) => !r.solved).length;
+  const _failedCount = records.filter((r) => !r.solved).length;
+  void _failedCount; // Reserved for future use
   const uniqueDecisions = new Set(records.map((r) => r.decisionId)).size;
   const solveRate =
     totalRecords > 0 ? Math.round((solvedCount / totalRecords) * 100) : 0;

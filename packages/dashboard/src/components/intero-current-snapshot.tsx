@@ -8,7 +8,7 @@
  * @author @darianrosebrook
  */
 
-import React from 'react';
+
 import { cn } from '@/lib/utils';
 import type { InteroSnapshot } from '@/types';
 import styles from './intero-current-snapshot.module.scss';

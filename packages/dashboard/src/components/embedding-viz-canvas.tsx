@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { EmbeddingPoint3D } from '@/types';
 
 // Color mapping by memory type - brighter colors for dark background

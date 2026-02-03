@@ -1,5 +1,4 @@
-import React from 'react';
-import Image from 'next/image';
+import type { SyntheticEvent } from 'react';
 import { cn } from '@/lib/utils';
 import { getItemSprite, getFallbackSprite } from '@/lib/minecraft-sprites';
 import {
@@ -221,14 +220,14 @@ export function ViewerHudOverlay({
             >
               {item ? (
                 <>
-                  <Image
+                  <img
                     src={getHotbarItemSprite(item.type, item.name || undefined)}
                     alt={getHotbarItemName(item)}
                     width={32}
                     height={32}
                     className={s.hotbarSprite}
-                    onError={(e) => {
-                      (e.target as HTMLImageElement).src = getFallbackSprite();
+                    onError={(e: SyntheticEvent<HTMLImageElement>) => {
+                      e.currentTarget.src = getFallbackSprite();
                     }}
                   />
                   {item.count > 1 && (

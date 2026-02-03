@@ -1,5 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import dynamic from 'next/dynamic';
+import { useState, useEffect, useCallback, lazy, Suspense } from 'react';
 import {
   Database,
   HardDrive,
@@ -22,13 +21,11 @@ import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import s from './database-panel.module.scss';
 
-// Dynamic import for Three.js component to avoid SSR issues
-const EmbeddingVizPanel = dynamic(
-  () =>
-    import('@/components/embedding-viz-panel').then((mod) => ({
-      default: mod.EmbeddingVizPanel,
-    })),
-  { ssr: false }
+// Lazy load for Three.js component (code splitting)
+const EmbeddingVizPanel = lazy(() =>
+  import('@/components/embedding-viz-panel').then((mod) => ({
+    default: mod.EmbeddingVizPanel,
+  }))
 );
 
 import type {
@@ -893,7 +890,9 @@ export function DatabasePanel() {
           icon={<ScatterChart className="size-4" />}
           defaultOpen={false}
         >
-          <EmbeddingVizPanel />
+          <Suspense fallback={<div className={s.loadingFallback}>Loading 3D visualization...</div>}>
+            <EmbeddingVizPanel />
+          </Suspense>
         </CollapsibleSection>
 
         {/* 4G: Danger Zone */}

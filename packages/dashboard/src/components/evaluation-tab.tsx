@@ -8,7 +8,7 @@
  * @author @darianrosebrook
  */
 
-import React, { useState, useEffect, useCallback } from 'react';
+import  { useState, useEffect, useCallback } from 'react';
 import {
   Activity,
   BarChart3,

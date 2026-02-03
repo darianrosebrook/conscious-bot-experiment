@@ -7,7 +7,7 @@
  * @author @darianrosebrook
  */
 
-import React, { useMemo } from 'react';
+import  { useMemo } from 'react';
 
 export interface SparklinePoint {
   ts: number;
