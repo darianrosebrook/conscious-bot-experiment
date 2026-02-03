@@ -189,12 +189,12 @@ if [[ -f "$AGENCY_LOG" ]]; then
     AGENCY_PASS="true"
   fi
 
-  # Extract metrics from final analysis
-  AGENCY_DRIVE_TICKS=$(grep -oP 'Drive-tick: \K\d+' "$AGENCY_LOG" | tail -1 || echo "0")
-  AGENCY_GOALS=$(grep -oP 'With goals: \K\d+' "$AGENCY_LOG" | tail -1 || echo "0")
-  AGENCY_TASKS_CREATED=$(grep -oP 'Total tasks: \K\d+' "$AGENCY_LOG" | tail -1 || echo "0")
-  AGENCY_DET_FAILURES=$(grep -oP 'Deterministic failures: \K\d+' "$AGENCY_LOG" | tail -1 || echo "0")
-  AGENCY_POSTCOND_FAILURES=$(grep -oP 'Postcondition failures: \K\d+' "$AGENCY_LOG" | tail -1 || echo "0")
+  # Extract metrics from final analysis (macOS-compatible sed)
+  AGENCY_DRIVE_TICKS=$(grep "Drive-tick:" "$AGENCY_LOG" | tail -1 | sed 's/.*Drive-tick: \([0-9]*\).*/\1/' || echo "0")
+  AGENCY_GOALS=$(grep "With goals:" "$AGENCY_LOG" | tail -1 | sed 's/.*With goals: \([0-9]*\).*/\1/' || echo "0")
+  AGENCY_TASKS_CREATED=$(grep "Total tasks:" "$AGENCY_LOG" | tail -1 | sed 's/.*Total tasks: \([0-9]*\).*/\1/' || echo "0")
+  AGENCY_DET_FAILURES=$(grep "Deterministic failures:" "$AGENCY_LOG" | tail -1 | sed 's/.*Deterministic failures: \([0-9]*\).*/\1/' || echo "0")
+  AGENCY_POSTCOND_FAILURES=$(grep "Postcondition failures:" "$AGENCY_LOG" | tail -1 | sed 's/.*Postcondition failures: \([0-9]*\).*/\1/' || echo "0")
 fi
 
 # Extract reflection results
@@ -210,11 +210,11 @@ if [[ -f "$REFLECTION_LOG" ]]; then
     REFLECTION_PASS="true"
   fi
 
-  # Extract metrics
-  REFLECTION_EVENTS=$(grep -oP 'Unique events: \K\d+' "$REFLECTION_LOG" | tail -1 || echo "0")
-  REFLECTION_DEDUPE_REJECTS=$(grep -oP 'Dedupe \(status\): \K\d+' "$REFLECTION_LOG" | tail -1 || echo "0")
-  REFLECTION_VIOLATIONS=$(grep -oP 'Violations: \K\d+' "$REFLECTION_LOG" | tail -1 || echo "0")
-  REFLECTION_SCHEMA_VALID=$(grep -oP 'Schema valid: \K\d+' "$REFLECTION_LOG" | tail -1 || echo "0")
+  # Extract metrics (macOS-compatible sed)
+  REFLECTION_EVENTS=$(grep "Unique events:" "$REFLECTION_LOG" | tail -1 | sed 's/.*Unique events: \([0-9]*\).*/\1/' || echo "0")
+  REFLECTION_DEDUPE_REJECTS=$(grep "Dedupe (status):" "$REFLECTION_LOG" | tail -1 | sed 's/.*Dedupe (status): \([0-9]*\).*/\1/' || echo "0")
+  REFLECTION_VIOLATIONS=$(grep "Violations:" "$REFLECTION_LOG" | tail -1 | sed 's/.*Violations: \([0-9]*\).*/\1/' || echo "0")
+  REFLECTION_SCHEMA_VALID=$(grep "Schema valid:" "$REFLECTION_LOG" | tail -1 | sed 's/.*Schema valid: \([0-9]*\).*/\1/' || echo "0")
 fi
 
 # Determine overall pass/fail
