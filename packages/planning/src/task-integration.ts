@@ -504,7 +504,7 @@ function selectJoinKeysForPlan(
   planId: string | undefined,
   joinKeys: { planId?: string; solverId?: string; bundleHash?: string; traceBundleHash?: string } | undefined,
   expectedSolverId: string,
-): { bundleHash?: string; traceBundleHash?: string } | undefined {
+): { planId?: string; bundleHash?: string; traceBundleHash?: string } | undefined {
   if (!planId || !joinKeys?.planId) return undefined;
   if (joinKeys.planId !== planId) return undefined;
   // If solverId is present, it must match (migration keys lack solverId)
