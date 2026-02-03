@@ -126,6 +126,19 @@ import { normalizeActionResponse } from './server/action-response';
 import { executeViaGateway, getExecutorMode } from './server/execution-gateway';
 import { createSterlingBootstrap } from './server/sterling-bootstrap';
 import {
+  shouldAutoUnblockTask,
+  evaluateTaskBlockState,
+  isTaskEligible,
+  DEFAULT_BLOCKED_TTL_MS,
+} from './server/task-block-evaluator';
+import {
+  isCircuitBreakerOpen,
+  tripCircuitBreaker,
+  recordSuccess,
+  getCircuitBreakerState,
+} from './server/executor-circuit-breaker';
+import { executeTaskViaGateway } from './server/gateway-wrappers';
+import {
   detectActionableSteps,
   convertCognitiveReflectionToTasks,
 } from './server/cognitive-task-handler';
@@ -460,7 +473,10 @@ const toolExecutor = {
       }
 
       // Use the bot connection check for Minecraft actions
-      const result = await executeActionWithBotCheck(mappedAction, signal);
+      // Pass taskId if available in mappedAction parameters for proper context
+      const params = mappedAction.parameters as Record<string, any> | undefined;
+      const taskId = params?.__nav?.scope as string | undefined;
+      const result = await executeActionWithBotCheck(mappedAction, taskId, signal);
       const duration = Date.now() - startTime;
 
       // Enhance result with metrics
@@ -543,10 +559,19 @@ const toolExecutor = {
  *
  * Delegates to the ExecutionGateway, which applies bot-check, mode gating,
  * mcPostJson transport, normalizeActionResponse, and audit emission.
- * This function is kept as a thin wrapper so existing callers in the
- * autonomous executor don't need to change their call pattern.
+ *
+ * When taskId is provided (recommended), uses executeTaskViaGateway which
+ * enforces proper context alignment at compile time.
+ *
+ * @param action - The Minecraft action to execute
+ * @param taskId - The task ID for audit correlation and lease scoping (recommended)
+ * @param signal - Optional abort signal
  */
-async function executeActionWithBotCheck(action: any, signal?: AbortSignal) {
+async function executeActionWithBotCheck(
+  action: any,
+  taskId?: string,
+  signal?: AbortSignal
+) {
   if (!action) {
     return {
       ok: false,
@@ -557,21 +582,34 @@ async function executeActionWithBotCheck(action: any, signal?: AbortSignal) {
       environmentDeltas: {},
     };
   }
-  const result = await executeViaGateway(
-    {
-      origin: 'executor',
-      priority: 'normal',
-      action: {
-        type: action.type,
-        parameters: action.parameters,
-        timeout: action.timeout,
-      },
-      context: action.parameters?.__nav?.scope
-        ? { taskId: action.parameters.__nav.scope }
-        : undefined,
-    },
-    signal
-  );
+
+  // Use typed wrapper when taskId is available (preferred path)
+  // Falls back to deriving from __nav.scope for backward compatibility
+  const effectiveTaskId = taskId ?? action.parameters?.__nav?.scope;
+
+  const result = effectiveTaskId
+    ? await executeTaskViaGateway(
+        effectiveTaskId,
+        {
+          type: action.type,
+          parameters: action.parameters,
+          timeout: action.timeout,
+        },
+        signal
+      )
+    : await executeViaGateway(
+        {
+          origin: 'executor',
+          priority: 'normal',
+          action: {
+            type: action.type,
+            parameters: action.parameters,
+            timeout: action.timeout,
+          },
+        },
+        signal
+      );
+
   return {
     ...result,
     environmentDeltas: {},
@@ -1534,6 +1572,18 @@ async function autonomousTaskExecutor() {
       };
     }
     if (global.__planningExecutorState.running) return;
+
+    // Circuit breaker check: skip cycle if infra errors have tripped the breaker
+    const cbNowMs = Date.now();
+    if (isCircuitBreakerOpen(cbNowMs)) {
+      const cbState = getCircuitBreakerState();
+      console.log(
+        `[AUTONOMOUS EXECUTOR] Circuit breaker open (trips=${cbState.tripCount}), ` +
+        `skipping cycle. Resume at ${new Date(cbState.resumeAt!).toISOString()}`
+      );
+      return;
+    }
+
     global.__planningExecutorState.running = true;
     const startTs = Date.now();
 
@@ -1643,65 +1693,38 @@ async function autonomousTaskExecutor() {
     // Auto-unblock shadow-blocked tasks when mode switches to live.
     // This makes shadow mode useful for observation: tasks resume when you go live.
     const currentMode = getExecutorMode();
-    if (currentMode === 'live') {
-      for (const t of activeTasks) {
-        if (t.metadata?.blockedReason === 'shadow_mode') {
-          taskIntegration.updateTaskMetadata(t.id, {
-            blockedReason: undefined,
-            blockedAt: undefined,
-            // Keep shadowObservationCount for audit trail
-          });
-          console.log(
-            `[AUTONOMOUS EXECUTOR] Auto-unblocked shadow task ${t.id}: mode is now live`
-          );
-        }
-      }
-    }
-
-    // Auto-fail tasks that have been blocked for longer than the TTL.
-    // This prevents unplannable/dead-end tasks from occupying the active queue forever.
-    const BLOCKED_TTL_MS = 2 * 60 * 1000; // 2 minutes
+    const nowMs = Date.now();
     for (const t of activeTasks) {
-      if (
-        t.metadata?.blockedReason &&
-        t.metadata?.blockedAt &&
-        // Don't auto-fail tasks waiting on prerequisites — those unblock naturally
-        t.metadata.blockedReason !== 'waiting_on_prereq' &&
-        Date.now() - t.metadata.blockedAt > BLOCKED_TTL_MS
-      ) {
-        taskIntegration.updateTaskProgress(t.id, t.progress || 0, 'failed');
+      if (shouldAutoUnblockTask(t, currentMode)) {
         taskIntegration.updateTaskMetadata(t.id, {
-          failReason: `blocked-ttl-exceeded:${t.metadata.blockedReason}`,
+          blockedReason: undefined,
+          blockedAt: undefined,
+          // Keep shadowObservationCount for audit trail
         });
         console.log(
-          `[AUTONOMOUS EXECUTOR] Auto-failed task ${t.id}: blocked for >${BLOCKED_TTL_MS / 1000}s (${t.metadata.blockedReason})`
+          `[AUTONOMOUS EXECUTOR] Auto-unblocked shadow task ${t.id}: mode is now live`
         );
       }
     }
 
-    // Filter out tasks that are blocked, in backoff, or in non-executable states
-    const eligibleTasks = activeTasks.filter((t) => {
-      // @pivot 4: Skip tasks in planning or terminal-unplannable states
-      if (t.status === 'pending_planning' || t.status === 'unplannable') {
-        return false;
+    // Auto-fail tasks that have been blocked for longer than the TTL.
+    // Uses the TTL policy table (task-block-evaluator.ts) for per-reason exemptions.
+    for (const t of activeTasks) {
+      const blockState = evaluateTaskBlockState(t, nowMs, DEFAULT_BLOCKED_TTL_MS);
+      if (blockState.shouldFail) {
+        taskIntegration.updateTaskProgress(t.id, t.progress || 0, 'failed');
+        taskIntegration.updateTaskMetadata(t.id, {
+          failReason: blockState.failReason,
+        });
+        console.log(
+          `[AUTONOMOUS EXECUTOR] Auto-failed task ${t.id}: ${blockState.failReason}`
+        );
       }
-      // Skip failed tasks (including those just auto-failed above)
-      if (t.status === 'failed') {
-        return false;
-      }
-      // Skip tasks with a blocked reason
-      if (t.metadata?.blockedReason) {
-        return false;
-      }
-      // Skip tasks in exponential backoff
-      if (
-        t.metadata?.nextEligibleAt &&
-        Date.now() < t.metadata.nextEligibleAt
-      ) {
-        return false;
-      }
-      return true;
-    });
+    }
+
+    // Filter out tasks that are blocked, in backoff, or in non-executable states.
+    // Uses isTaskEligible() which has a status allowlist for safety.
+    const eligibleTasks = activeTasks.filter((t) => isTaskEligible(t, nowMs));
 
     if (eligibleTasks.length === 0) {
       console.log(
@@ -2972,8 +2995,8 @@ async function autonomousTaskExecutor() {
         if (scopedAction) {
           console.log(`🔄 Executing task: ${currentTask.title}`);
 
-          // Execute real Minecraft action
-          const actionResult = await executeActionWithBotCheck(scopedAction);
+          // Execute real Minecraft action (pass taskId explicitly for typed wrapper)
+          const actionResult = await executeActionWithBotCheck(scopedAction, currentTask.id);
 
           if (actionResult.outcome === 'shadow') {
             // Shadow mode: observation recorded. Task is blocked until mode changes.
@@ -2987,11 +3010,20 @@ async function autonomousTaskExecutor() {
             // Task stays 'active' with blockedReason. Executor skips blocked tasks.
             // Auto-fail TTL (2 min) applies: if shadow mode persists, task will
             // auto-fail rather than spin indefinitely.
+          } else if (actionResult.outcome === 'error') {
+            // Infra error: trip circuit breaker, don't touch task metadata.
+            // This is a systemic failure (bot disconnected, network), not task-specific.
+            // Circuit breaker handles retry timing at the executor level.
+            tripCircuitBreaker(actionResult.error || 'Unknown infra error');
+            // Task stays as-is; executor will pause until breaker resets
           } else if (actionResult.ok) {
             console.log(`✅ Task executed successfully: ${currentTask.title}`);
-
+            // Record success for circuit breaker reset
+            recordSuccess();
             await recomputeProgressAndMaybeComplete(currentTask);
           } else {
+            // Action-level failure (outcome='executed', ok=false)
+            // This is a task-specific failure, not infra — use retry logic
             console.error(
               `[Executor] Task execution failed: ${currentTask.title}`,
               actionResult.error

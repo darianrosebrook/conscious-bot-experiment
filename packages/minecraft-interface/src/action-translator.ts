@@ -163,6 +163,22 @@ export function deriveNavLeaseContext(
   return { holder, priority };
 }
 
+/**
+ * Strip reserved metadata namespaces before passing to leaf functions.
+ * `__nav` is consumed for lease routing but should never reach leaf implementations.
+ *
+ * This is called at the final dispatch boundary (_runLeaf, executeCraftItem, etc.)
+ * rather than in normalizeActionParams() to avoid call-order issues where lease
+ * context might be derived after normalization.
+ *
+ * @param params - The action parameters that may contain __nav
+ * @returns A shallow copy with __nav removed
+ */
+export function stripReservedMeta(params: Record<string, any>): Record<string, any> {
+  const { __nav, ...clean } = params;
+  return clean;
+}
+
 export class ActionTranslator {
   private bot: Bot;
   private config: ActionTranslatorConfig;
@@ -1263,9 +1279,9 @@ export class ActionTranslator {
         try {
           const context = this.createLeafContext(signal);
 
-          // Execute the craft_recipe leaf with normalized params
+          // Execute the craft_recipe leaf with normalized params (strip __nav)
           const result = await craftRecipeLeaf.run(context, {
-            ...normalizedParams,
+            ...stripReservedMeta(normalizedParams),
             timeoutMs: timeout,
           });
 
@@ -1478,8 +1494,9 @@ export class ActionTranslator {
       }
 
       const context = this.createLeafContext(signal);
+      // Strip __nav before passing to leaf
       const result = await smeltLeaf.run(context, {
-        ...normalizedParams,
+        ...stripReservedMeta(normalizedParams),
         timeoutMs: timeout,
       });
 
@@ -1582,7 +1599,7 @@ export class ActionTranslator {
 
       const context = this.createLeafContext(signal);
       const result = await leaf.run(context, {
-        ...params,
+        ...stripReservedMeta(params),
         timeoutMs: effectiveTimeout,
       });
 
@@ -1644,7 +1661,8 @@ export class ActionTranslator {
       const context = this.createLeafContext();
 
       // Resolve parameters and infer a target position when only a blockType is provided
-      let parameters = { ...action.parameters } as any;
+      // Strip __nav at dispatch boundary — consumed for lease routing, not leaf semantics
+      let parameters = stripReservedMeta({ ...action.parameters }) as any;
 
       // If a blockType is provided without an explicit position, find the nearest *visible* block
       if (!parameters.pos && parameters.blockType) {

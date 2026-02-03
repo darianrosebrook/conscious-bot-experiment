@@ -315,7 +315,7 @@ describe('Navigation Lease', () => {
 // action-translator.ts. No local copy — tests the real implementation.
 // ---------------------------------------------------------------------------
 
-import { deriveNavLeaseContext } from '../action-translator';
+import { deriveNavLeaseContext, stripReservedMeta } from '../action-translator';
 
 describe('deriveNavLeaseContext', () => {
   it('defaults to action:type + normal when no params', () => {
@@ -437,5 +437,59 @@ describe('deriveNavLeaseContext', () => {
       __nav: { scope: 'nav-scope' },
     });
     expect(ctx.holder).toBe('action:navigate:nav-scope');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// stripReservedMeta — tests the __nav stripping at leaf dispatch boundary.
+// ---------------------------------------------------------------------------
+
+describe('stripReservedMeta', () => {
+  it('removes __nav from params', () => {
+    const params = { item: 'pickaxe', quantity: 1, __nav: { scope: 'task-1' } };
+    const clean = stripReservedMeta(params);
+    expect(clean.__nav).toBeUndefined();
+    expect(clean.item).toBe('pickaxe');
+    expect(clean.quantity).toBe(1);
+  });
+
+  it('returns empty object if only __nav present', () => {
+    const clean = stripReservedMeta({ __nav: { scope: 'x' } });
+    expect(Object.keys(clean)).toHaveLength(0);
+  });
+
+  it('preserves all other properties', () => {
+    const params = {
+      item: 'stone',
+      count: 5,
+      pos: { x: 1, y: 2, z: 3 },
+      extra: true,
+      __nav: { scope: 'task-42', priority: 'high' },
+    };
+    const clean = stripReservedMeta(params);
+    expect(clean).toEqual({
+      item: 'stone',
+      count: 5,
+      pos: { x: 1, y: 2, z: 3 },
+      extra: true,
+    });
+  });
+
+  it('returns input unchanged if __nav is not present', () => {
+    const params = { item: 'wood', quantity: 3 };
+    const clean = stripReservedMeta(params);
+    expect(clean).toEqual(params);
+  });
+
+  it('handles empty object', () => {
+    const clean = stripReservedMeta({});
+    expect(clean).toEqual({});
+  });
+
+  it('does not mutate the original object', () => {
+    const params = { item: 'test', __nav: { scope: 'x' } };
+    const clean = stripReservedMeta(params);
+    expect(params.__nav).toEqual({ scope: 'x' }); // Original preserved
+    expect(clean.__nav).toBeUndefined();
   });
 });

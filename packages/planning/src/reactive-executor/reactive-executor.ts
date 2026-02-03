@@ -40,6 +40,7 @@ import {
 } from '../modules/mcp-integration';
 import type { IReactiveExecutor } from '../interfaces/reactive-executor';
 import { executeViaGateway } from '../server/execution-gateway';
+import { executeReactiveViaGateway } from '../server/gateway-wrappers';
 
 export interface ExecutionResult {
   success: boolean;
@@ -1100,18 +1101,13 @@ export class ReactiveExecutor implements IReactiveExecutor {
     const itemToCraft = task.parameters?.item || 'item';
     const taskScope = task.id;
 
-    const result = await executeViaGateway({
-      origin: 'reactive',
-      priority: 'normal',
-      action: {
-        type: 'craft_item',
-        parameters: {
-          item: itemToCraft,
-          quantity: task.parameters?.quantity || 1,
-          __nav: { ...(task.parameters?.__nav ?? {}), scope: taskScope },
-        },
+    const result = await executeReactiveViaGateway(taskScope, {
+      type: 'craft_item',
+      parameters: {
+        item: itemToCraft,
+        quantity: task.parameters?.quantity || 1,
+        __nav: { ...(task.parameters?.__nav ?? {}), scope: taskScope },
       },
-      context: taskScope ? { taskId: taskScope } : undefined,
     });
 
     return {
@@ -1129,14 +1125,9 @@ export class ReactiveExecutor implements IReactiveExecutor {
    */
   private async executeMoveTask(task: any, _minecraftUrl: string) {
     const taskScope = task.id;
-    const result = await executeViaGateway({
-      origin: 'reactive',
-      priority: 'normal',
-      action: {
-        type: 'move_forward',
-        parameters: { distance: task.parameters?.distance || 1, __nav: { ...(task.parameters?.__nav ?? {}), scope: taskScope } },
-      },
-      context: taskScope ? { taskId: taskScope } : undefined,
+    const result = await executeReactiveViaGateway(taskScope, {
+      type: 'move_forward',
+      parameters: { distance: task.parameters?.distance || 1, __nav: { ...(task.parameters?.__nav ?? {}), scope: taskScope } },
     });
 
     return {
@@ -1153,14 +1144,9 @@ export class ReactiveExecutor implements IReactiveExecutor {
    */
   private async executeGatherTask(task: any, _minecraftUrl: string) {
     const taskScope = task.id;
-    const result = await executeViaGateway({
-      origin: 'reactive',
-      priority: 'normal',
-      action: {
-        type: 'gather',
-        parameters: { ...task.parameters, __nav: { ...(task.parameters?.__nav ?? {}), scope: taskScope } },
-      },
-      context: taskScope ? { taskId: taskScope } : undefined,
+    const result = await executeReactiveViaGateway(taskScope, {
+      type: 'gather',
+      parameters: { ...task.parameters, __nav: { ...(task.parameters?.__nav ?? {}), scope: taskScope } },
     });
 
     return {
@@ -1177,14 +1163,9 @@ export class ReactiveExecutor implements IReactiveExecutor {
    */
   private async executeExploreTask(task: any, _minecraftUrl: string) {
     const taskScope = task.id;
-    const result = await executeViaGateway({
-      origin: 'reactive',
-      priority: 'normal',
-      action: {
-        type: 'explore',
-        parameters: { ...task.parameters, __nav: { ...(task.parameters?.__nav ?? {}), scope: taskScope } },
-      },
-      context: taskScope ? { taskId: taskScope } : undefined,
+    const result = await executeReactiveViaGateway(taskScope, {
+      type: 'explore',
+      parameters: { ...task.parameters, __nav: { ...(task.parameters?.__nav ?? {}), scope: taskScope } },
     });
 
     return {
@@ -1203,19 +1184,14 @@ export class ReactiveExecutor implements IReactiveExecutor {
     console.log(`⛏️ Executing mining task: ${task.title}`);
 
     const taskScope = task.id;
-    const result = await executeViaGateway({
-      origin: 'reactive',
-      priority: 'normal',
-      action: {
-        type: 'dig_block',
-        parameters: {
-          block: task.parameters?.block || 'stone',
-          position: task.parameters?.position || 'current',
-          __nav: { ...(task.parameters?.__nav ?? {}), scope: taskScope },
-        },
-        timeout: 30000,
+    const result = await executeReactiveViaGateway(taskScope, {
+      type: 'dig_block',
+      parameters: {
+        block: task.parameters?.block || 'stone',
+        position: task.parameters?.position || 'current',
+        __nav: { ...(task.parameters?.__nav ?? {}), scope: taskScope },
       },
-      context: taskScope ? { taskId: taskScope } : undefined,
+      timeout: 30000,
     });
 
     return {
@@ -1524,15 +1500,10 @@ export class ReactiveExecutor implements IReactiveExecutor {
 
       // Execute the inferred action via the gateway
       const taskScope = task.id;
-      const result = await executeViaGateway({
-        origin: 'reactive',
-        priority: 'normal',
-        action: {
-          type: actionType,
-          parameters: { ...parameters, __nav: { ...(task.parameters?.__nav ?? {}), scope: taskScope } },
-          timeout: 30000,
-        },
-        context: taskScope ? { taskId: taskScope } : undefined,
+      const result = await executeReactiveViaGateway(taskScope, {
+        type: actionType,
+        parameters: { ...parameters, __nav: { ...(task.parameters?.__nav ?? {}), scope: taskScope } },
+        timeout: 30000,
       });
 
       return {

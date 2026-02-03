@@ -9,6 +9,7 @@
 
 import { Plan, PlanStep, ActionType } from '../types';
 import { executeViaGateway } from '../server/execution-gateway';
+import { executeReactiveViaGateway } from '../server/gateway-wrappers';
 
 export interface MinecraftAction {
   type: string;
@@ -338,14 +339,22 @@ export class MinecraftExecutor {
   private async executeMinecraftAction(
     action: MinecraftAction
   ): Promise<{ success: boolean; shadow?: boolean; data?: any; error?: string }> {
-    const result = await executeViaGateway({
-      origin: 'reactive',
-      priority: 'normal',
-      action: {
-        type: action.type,
-        parameters: action.parameters,
-      },
-    });
+    // Try to extract taskId from __nav.scope if present
+    const taskId = action.parameters?.__nav?.scope as string | undefined;
+
+    const result = taskId
+      ? await executeReactiveViaGateway(taskId, {
+          type: action.type,
+          parameters: action.parameters,
+        })
+      : await executeViaGateway({
+          origin: 'reactive',
+          priority: 'normal',
+          action: {
+            type: action.type,
+            parameters: action.parameters,
+          },
+        });
 
     return {
       success: result.ok,
