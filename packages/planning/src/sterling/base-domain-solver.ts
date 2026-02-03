@@ -31,51 +31,109 @@ function isReportIdentityFieldsEnabled(): boolean {
 }
 
 /**
- * Tracks which solverIds have been latched to "server is pre-Phase-1" mode.
+ * Tracks which latchKeys have been latched to "server is pre-Phase-1" mode.
  * When report_episode rejects unknown fields, we downgrade and latch so we
  * don't retry with identity fields on every subsequent report.
+ *
+ * Keyed by latchKey (solverId@contractVersion) so version bumps re-probe.
+ * Bounded to prevent unbounded growth if solverIds become parameterized.
  */
-const _identityFieldsRejectedBySolverId = new Set<string>();
+const _identityFieldsRejectedByLatchKey = new Set<string>();
+const IDENTITY_LATCH_MAX = 256;
 
 /**
- * Check if identity fields were rejected for this solverId.
- * If latched, we skip sending identity fields even when toggle is ON.
+ * Build latch key from solverId and contractVersion.
+ * Keying by both prevents latch from sticking across version boundaries.
  */
-function areIdentityFieldsRejected(solverId: string): boolean {
-  return _identityFieldsRejectedBySolverId.has(solverId);
+function buildLatchKey(solverId: string, contractVersion: number): string {
+  return `${solverId}@${contractVersion}`;
 }
 
 /**
- * Latch a solverId as "identity fields rejected" and emit a single warning.
- * This prevents repeated retry → reject cycles and makes the downgrade visible.
+ * Check if identity fields were rejected for this (solverId, contractVersion).
+ * If latched, we skip sending identity fields even when toggle is ON.
  */
-function latchIdentityFieldsRejected(solverId: string, errorHint: string): void {
-  if (_identityFieldsRejectedBySolverId.has(solverId)) return;
-  _identityFieldsRejectedBySolverId.add(solverId);
+function areIdentityFieldsRejected(solverId: string, contractVersion: number): boolean {
+  return _identityFieldsRejectedByLatchKey.has(buildLatchKey(solverId, contractVersion));
+}
+
+/**
+ * Latch a (solverId, contractVersion) as "identity fields rejected" and emit a single warning.
+ * This prevents repeated retry → reject cycles and makes the downgrade visible.
+ *
+ * Keyed by (solverId, contractVersion) to prevent latch sticking across version boundaries.
+ * If Sterling is upgraded to accept identity fields, a contractVersion bump will re-probe.
+ *
+ * Operational note: Latch persists until process restart for a given (solverId, version).
+ */
+function latchIdentityFieldsRejected(solverId: string, contractVersion: number, errorHint: string): void {
+  const latchKey = buildLatchKey(solverId, contractVersion);
+  if (_identityFieldsRejectedByLatchKey.has(latchKey)) return;
+
+  // Bound the set to prevent unbounded growth
+  if (_identityFieldsRejectedByLatchKey.size >= IDENTITY_LATCH_MAX) {
+    console.warn(
+      `[Sterling] Identity latch set overflow (${IDENTITY_LATCH_MAX}) — clearing. ` +
+      `This may cause repeated downgrade probes.`
+    );
+    _identityFieldsRejectedByLatchKey.clear();
+  }
+
+  _identityFieldsRejectedByLatchKey.add(latchKey);
   console.warn(
-    `[Sterling] Identity fields rejected for ${solverId} — downgrading to core linkage only. ` +
-    `Hint: ${errorHint}. Toggle STERLING_REPORT_IDENTITY_FIELDS=0 or wait for server upgrade.`
+    `[Sterling] Identity fields rejected for ${latchKey} — downgrading to core linkage only. ` +
+    `Hint: ${errorHint}. Latch persists until restart; toggle STERLING_REPORT_IDENTITY_FIELDS=0 to suppress probes.`
   );
 }
 
 /**
- * Tracks which solverIds have logged their identity field status.
- * Once-per-solverId logging prevents log spam while remaining observable.
+ * Result from _doReportEpisode with structured discrimination.
  */
-const _loggedIdentityStatusBySolverId = new Set<string>();
+type ReportEpisodeResult =
+  | { kind: 'success'; ack: EpisodeAck }
+  | { kind: 'failure'; ack: undefined }
+  | { kind: 'identity_rejected'; ack: undefined; hint: string };
 
 /**
- * Log identity field presence/absence once per solverId.
+ * Test-only: reset identity latch state to prevent cross-test coupling.
+ * Only available in test environment.
+ */
+export function __resetIdentityLatchForTests(): void {
+  if (process.env.NODE_ENV === 'test' || process.env.VITEST) {
+    _identityFieldsRejectedByLatchKey.clear();
+    _loggedIdentityStatusByLatchKey.clear();
+    _missingOutcomeClassWarnedByLatchKey.clear();
+  }
+}
+
+/**
+ * Tracks which latchKeys have logged their identity field status.
+ * Once-per-latchKey logging prevents log spam while re-logging after version bumps.
+ * Keyed by latchKey (solverId@contractVersion) so upgrades re-surface the signal.
+ */
+const _loggedIdentityStatusByLatchKey = new Set<string>();
+
+/**
+ * Tracks which latchKeys have been warned about missing outcomeClass.
+ * Once-per-latchKey warning to avoid log spam while re-warning after version bumps.
+ * Bounded with clear-on-overflow like identity latch.
+ */
+const _missingOutcomeClassWarnedByLatchKey = new Set<string>();
+const MISSING_OUTCOME_CLASS_WARN_MAX = 256;
+
+/**
+ * Log identity field presence/absence once per latchKey.
  * Makes "identity fields absent" visible without spamming.
+ * Keyed by latchKey so contractVersion bumps re-log.
  */
 function logIdentityFieldStatusOnce(
-  solverId: string,
+  latchKey: string,
   hasTraceBundleHash: boolean,
   hasEngineCommitment: boolean,
   hasOperatorRegistryHash: boolean,
 ): void {
-  if (_loggedIdentityStatusBySolverId.has(solverId)) return;
-  _loggedIdentityStatusBySolverId.add(solverId);
+  if (_loggedIdentityStatusByLatchKey.has(latchKey)) return;
+  _loggedIdentityStatusByLatchKey.add(latchKey);
 
   const present: string[] = [];
   const absent: string[] = [];
@@ -90,12 +148,12 @@ function logIdentityFieldStatusOnce(
   else absent.push('operatorRegistryHash');
 
   if (absent.length === 0) {
-    console.log(`[Sterling] Identity fields for ${solverId}: all present (${present.join(', ')})`);
+    console.log(`[Sterling] Identity fields for ${latchKey}: all present (${present.join(', ')})`);
   } else if (present.length === 0) {
-    console.log(`[Sterling] Identity fields for ${solverId}: none present (server may be pre-Phase-1)`);
+    console.log(`[Sterling] Identity fields for ${latchKey}: none present (server may be pre-Phase-1)`);
   } else {
     console.log(
-      `[Sterling] Identity fields for ${solverId}: present=[${present.join(', ')}], absent=[${absent.join(', ')}]`
+      `[Sterling] Identity fields for ${latchKey}: present=[${present.join(', ')}], absent=[${absent.join(', ')}]`
     );
   }
 }
@@ -318,47 +376,75 @@ export abstract class BaseDomainSolver<
       return undefined;
     }
 
+    // Coverage warning: outcomeClass should be set by canonical linkage builder
+    // If undefined, caller may have constructed linkage manually without classification
+    // Bounded once-per-latchKey to avoid log spam while re-warning after version bumps
+    const latchKey = buildLatchKey(this.solverId, this.contractVersion);
+    if (linkage && linkage.outcomeClass === undefined) {
+      if (!_missingOutcomeClassWarnedByLatchKey.has(latchKey)) {
+        // Bound the set to prevent unbounded growth
+        if (_missingOutcomeClassWarnedByLatchKey.size >= MISSING_OUTCOME_CLASS_WARN_MAX) {
+          _missingOutcomeClassWarnedByLatchKey.clear();
+        }
+        _missingOutcomeClassWarnedByLatchKey.add(latchKey);
+        console.warn(
+          `[Sterling] Episode linkage for ${latchKey} has no outcomeClass. ` +
+          `Use buildSterlingEpisodeLinkage() or buildSterlingEpisodeLinkageFromResult() ` +
+          `to ensure proper classification.`
+        );
+      }
+    }
+
     // Generate a requestId for correlation
     const requestId = `ep-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
     // Phase 1 identity fields: enabled by toggle AND not latched as rejected
     const toggleEnabled = isReportIdentityFieldsEnabled();
-    const rejected = areIdentityFieldsRejected(this.solverId);
+    const rejected = areIdentityFieldsRejected(this.solverId, this.contractVersion);
     const includeIdentityFields = toggleEnabled && !rejected;
 
     // Attempt with identity fields if enabled
-    const ack = await this._doReportEpisode(payload, linkage, requestId, includeIdentityFields);
-    if (ack !== 'IDENTITY_REJECTED') {
+    const firstAttempt = await this._doReportEpisode(payload, linkage, requestId, includeIdentityFields);
+    if (firstAttempt.kind === 'success' || firstAttempt.kind === 'failure') {
       // Normal case: return the ack (or undefined on generic failure)
-      return ack;
+      return firstAttempt.ack;
     }
 
-    // Identity fields were rejected — latch and retry without them
-    latchIdentityFieldsRejected(this.solverId, 'server rejected unknown fields');
-    const retryAck = await this._doReportEpisode(payload, linkage, requestId, false);
-    // Retry should not return IDENTITY_REJECTED (no identity fields sent), but handle defensively
-    return retryAck === 'IDENTITY_REJECTED' ? undefined : retryAck;
+    // Identity fields may have been rejected — retry without them to confirm
+    const retryAttempt = await this._doReportEpisode(payload, linkage, requestId, false);
+
+    // Only latch if retry succeeds (positive evidence that dropping identity fields fixes it)
+    if (retryAttempt.kind === 'success') {
+      latchIdentityFieldsRejected(this.solverId, this.contractVersion, firstAttempt.hint);
+    }
+    // If retry also fails, don't latch — we don't have evidence it was identity fields
+
+    return retryAttempt.ack;
   }
 
   /**
    * Internal: send report_episode to Sterling.
    *
-   * Returns EpisodeAck on success, undefined on generic failure, or
-   * 'IDENTITY_REJECTED' if the error looks like unknown-field rejection.
+   * Returns a structured result:
+   * - { kind: 'success', ack } on success
+   * - { kind: 'failure', ack: undefined } on generic failure
+   * - { kind: 'identity_rejected', ack: undefined, hint } if error looks like unknown-field rejection
    */
   private async _doReportEpisode(
     payload: Record<string, unknown>,
     linkage: EpisodeLinkage | undefined,
     requestId: string,
     includeIdentityFields: boolean,
-  ): Promise<EpisodeAck | undefined | 'IDENTITY_REJECTED'> {
+  ): Promise<ReportEpisodeResult> {
     try {
       const result = await this.sterlingService.solve(this.sterlingDomain, {
         command: 'report_episode',
         domain: this.sterlingDomain,
         contractVersion: this.contractVersion,
         solverId: this.solverId,
+        // Send both formats during migration — cheap, avoids silent correlation loss
         requestId,
+        request_id: requestId,
         // Core identity linkage fields — always sent when available
         ...(linkage?.bundleHash ? { bundle_hash: linkage.bundleHash } : {}),
         ...(linkage?.traceBundleHash ? { trace_bundle_hash: linkage.traceBundleHash } : {}),
@@ -371,35 +457,51 @@ export abstract class BaseDomainSolver<
         ...payload,
       });
 
-      // Parse episode_hash from response (absent until Sterling emits it)
-      const episodeHash = typeof result.metrics?.episode_hash === 'string'
-        ? result.metrics.episode_hash
-        : undefined;
-      const echoedRequestId = typeof result.metrics?.requestId === 'string'
-        ? result.metrics.requestId
-        : undefined;
+      // Parse episode_hash from response — accept both snake_case and camelCase
+      const episodeHash =
+        (typeof result.metrics?.episode_hash === 'string' ? result.metrics.episode_hash : undefined) ??
+        (typeof result.metrics?.episodeHash === 'string' ? result.metrics.episodeHash : undefined);
+      // Parse requestId — accept both formats
+      const echoedRequestId =
+        (typeof result.metrics?.request_id === 'string' ? result.metrics.request_id : undefined) ??
+        (typeof result.metrics?.requestId === 'string' ? result.metrics.requestId : undefined);
 
-      return { episodeHash, requestId: echoedRequestId };
+      return { kind: 'success', ack: { episodeHash, requestId: echoedRequestId } };
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
 
-      // Detect unknown-field rejection (heuristic: error mentions "unknown field", "schema", etc.)
-      // This is intentionally loose — we'd rather downgrade unnecessarily than fail repeatedly.
-      if (
-        includeIdentityFields &&
-        (msg.includes('unknown field') ||
-         msg.includes('unknown_field') ||
-         msg.includes('unexpected field') ||
-         msg.includes('schema') ||
-         msg.includes('validation'))
-      ) {
-        return 'IDENTITY_REJECTED';
+      // Detect unknown-field rejection specific to identity fields.
+      // Tightened heuristic: require both "unknown/unexpected field" semantics AND
+      // mention of an identity field name. This avoids double-calling on unrelated
+      // schema failures while still degrading safely for identity rejections.
+      if (includeIdentityFields) {
+        const looksLikeUnknownField =
+          msg.includes('unknown field') ||
+          msg.includes('unknown_field') ||
+          msg.includes('unexpected field');
+
+        const mentionsIdentityField =
+          msg.includes('engine_commitment') ||
+          msg.includes('operator_registry_hash') ||
+          msg.includes('engineCommitment') ||
+          msg.includes('operatorRegistryHash');
+
+        // Primary path: clear evidence of identity field rejection
+        if (looksLikeUnknownField && mentionsIdentityField) {
+          return { kind: 'identity_rejected', ack: undefined, hint: msg };
+        }
+
+        // Secondary path: looser match for weird validator wordings, but only
+        // if identity field is mentioned (prevents retry tax on unrelated errors)
+        if (mentionsIdentityField && (msg.includes('schema') || msg.includes('validation'))) {
+          return { kind: 'identity_rejected', ack: undefined, hint: msg };
+        }
       }
 
       console.warn(
         `[Sterling] Failed to report ${this.sterlingDomain} episode: ${msg}`
       );
-      return undefined;
+      return { kind: 'failure', ack: undefined };
     }
   }
 
@@ -412,8 +514,9 @@ export abstract class BaseDomainSolver<
     hasEngineCommitment: boolean,
     hasOperatorRegistryHash: boolean,
   ): void {
+    const latchKey = buildLatchKey(this.solverId, this.contractVersion);
     logIdentityFieldStatusOnce(
-      this.solverId,
+      latchKey,
       hasTraceBundleHash,
       hasEngineCommitment,
       hasOperatorRegistryHash,

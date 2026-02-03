@@ -14,6 +14,7 @@ import {
 } from '../environmental/observation-reasoner';
 import {
   applySaliencyEnvelope,
+  shouldEmitAwareness,
   type BeliefStreamEnvelope,
 } from '../environmental/saliency-reasoner';
 import { IntrusiveThoughtProcessor } from '../intrusive-thought-processor';
@@ -132,14 +133,17 @@ export function createProcessRoutes(deps: ProcessRouteDeps): Router {
                   },
                   id: result.thought.id,
                   timestamp: result.thought.timestamp,
-                  processed: true,
+                  // CRITICAL FIX: Thoughts start unprocessed; planning marks them processed via /ack
+                  processed: false,
+                  // Intrusive thoughts need explicit intent extraction before task conversion
+                  convertEligible: false,
                 }),
               }
             );
 
             if (cognitiveStreamResponse?.ok) {
               console.log(
-                '[Cognition] Intrusive thought processed and sent to cognitive stream'
+                '[Cognition] Intrusive thought sent to cognitive stream (unprocessed, awaiting planning ack)'
               );
             } else if (cognitiveStreamResponse) {
               const errBody = await cognitiveStreamResponse.text();
@@ -181,13 +185,20 @@ export function createProcessRoutes(deps: ProcessRouteDeps): Router {
               return;
             }
 
-            // Stream non-empty awareness to dashboard
-            if (insight.thought.text !== 'No significant entities nearby.') {
+            // Stream non-empty awareness to dashboard (with deduplication)
+            // Only emit if:
+            // 1. Not the generic "no entities" message
+            // 2. Not a duplicate within 30-second window
+            const awarenessText = insight.thought.text;
+            if (
+              awarenessText !== 'No significant entities nearby.' &&
+              shouldEmitAwareness(awarenessText)
+            ) {
               const dashboardUrl =
                 process.env.DASHBOARD_ENDPOINT || 'http://localhost:3000';
               const internalThought = {
                 type: 'environmental',
-                content: insight.thought.text,
+                content: awarenessText,
                 attribution: 'self',
                 context: {
                   emotionalState: insight.actions.shouldRespond
@@ -204,7 +215,10 @@ export function createProcessRoutes(deps: ProcessRouteDeps): Router {
                 },
                 id: `thought-${Date.now()}-sal-${envelope.seq}`,
                 timestamp: Date.now(),
-                processed: true,
+                // CRITICAL FIX: Thoughts start unprocessed; planning marks them processed via /ack
+                processed: false,
+                // Awareness/percept thoughts are informational, not actionable
+                convertEligible: false,
               };
 
               await resilientFetch(`${dashboardUrl}/api/ws/cognitive-stream`, {
@@ -214,6 +228,7 @@ export function createProcessRoutes(deps: ProcessRouteDeps): Router {
                 label: 'dashboard/cognitive-stream-saliency',
               });
             }
+            // If suppressed: NO thought object created, NO POST sent (AC-E2)
 
             res.json({
               processed: true,
@@ -319,7 +334,10 @@ export function createProcessRoutes(deps: ProcessRouteDeps): Router {
                 .toString(36)
                 .substr(2, 9)}`,
               timestamp: Date.now(),
-              processed: true,
+              // CRITICAL FIX: Thoughts start unprocessed; planning marks them processed via /ack
+              processed: false,
+              // Legacy observation thoughts are informational, not actionable
+              convertEligible: false,
             };
 
             const isGenericFallback =
@@ -385,7 +403,10 @@ export function createProcessRoutes(deps: ProcessRouteDeps): Router {
             },
             id: `thought-${Date.now()}-env-${Math.random().toString(36).substr(2, 9)}`,
             timestamp: Date.now(),
-            processed: true,
+            // CRITICAL FIX: Thoughts start unprocessed; planning marks them processed via /ack
+            processed: false,
+            // Fallback awareness thoughts are informational, not actionable
+            convertEligible: false,
           };
 
           const dashboardUrl =

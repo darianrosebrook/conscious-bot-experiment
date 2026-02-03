@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 /**
  * Rebuild prismarine-viewer client bundle after patch is applied.
+ * Also generates texture atlases for newer Minecraft versions.
  * Applies POV switcher and right-click orbit patch before bundling.
  * Requires webpack. Runs silently; failures are non-fatal.
  * @author @darianrosebrook
@@ -8,6 +9,7 @@
 
 const path = require('path');
 const fs = require('fs');
+const { spawn } = require('child_process');
 
 function run() {
   try {
@@ -24,6 +26,19 @@ function run() {
     if (fs.existsSync(povPatchPath) && fs.existsSync(pvLibIndex)) {
       fs.copyFileSync(povPatchPath, pvLibIndex);
     }
+
+    // Generate textures for newer Minecraft versions (1.21.5-1.21.8)
+    // This runs in background and doesn't block postinstall
+    const generateTexturesPath = path.join(__dirname, 'generate-textures.cjs');
+    if (fs.existsSync(generateTexturesPath)) {
+      const child = spawn('node', [generateTexturesPath], {
+        stdio: 'ignore',
+        detached: true,
+        cwd: path.join(__dirname, '..'),
+      });
+      child.unref();
+    }
+
     const configPath = path.join(pvRoot, 'webpack.config.js');
     if (!fs.existsSync(configPath)) return;
     const webpack = require('webpack');

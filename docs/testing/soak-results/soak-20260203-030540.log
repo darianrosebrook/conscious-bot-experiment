@@ -1,0 +1,611 @@
+=== Agency Emission Soak Test ===
+Duration: 720 minutes
+Cognition: http://localhost:3003
+Planning: http://localhost:3002
+Log: ./scripts/../docs/testing/soak-results/soak-20260203-030540.log
+Started: 2026-02-03T11:05:40Z
+---
+[pre-check] Verifying service health...
+  Cognition: healthy
+  Planning: healthy
+
+[pre-check] Bot state...
+  BotSterling | hp=20 food=20 mode=survival pos=(303,62,174)
+
+[t=0] Capturing initial state...
+  Recent thoughts: 5
+
+[t=0m sample=1]
+  thoughts=20 drive-ticks=0 goals=0 intents=0
+  novelty: unmarked=20
+  tasks:  | goalKeyed: none
+
+[t=1m sample=2]
+  thoughts=20 drive-ticks=0 goals=0 intents=0
+  novelty: unmarked=20
+  tasks:  | goalKeyed: none
+
+[t=1m sample=3]
+  thoughts=20 drive-ticks=0 goals=0 intents=0
+  novelty: unmarked=20
+  tasks:  | goalKeyed: none
+
+[t=2m sample=4]
+  thoughts=20 drive-ticks=0 goals=0 intents=0
+  novelty: unmarked=20
+  tasks:  | goalKeyed: none
+
+[t=2m sample=5]
+  thoughts=20 drive-ticks=0 goals=0 intents=0
+  novelty: unmarked=20
+  tasks:  | goalKeyed: none
+
+[t=3m sample=6]
+  thoughts=20 drive-ticks=0 goals=0 intents=0
+  novelty: unmarked=20
+  tasks:  | goalKeyed: none
+
+[t=3m sample=7]
+  thoughts=20 drive-ticks=0 goals=0 intents=0
+  novelty: unmarked=20
+  tasks:  | goalKeyed: none
+
+[t=4m sample=8]
+  thoughts=20 drive-ticks=0 goals=0 intents=0
+  novelty: unmarked=20
+  tasks:  | goalKeyed: none
+
+[t=4m sample=9]
+  thoughts=20 drive-ticks=0 goals=0 intents=0
+  novelty: unmarked=20
+  tasks:  | goalKeyed: none
+
+[t=5m sample=10]
+  thoughts=20 drive-ticks=0 goals=0 intents=0
+  novelty: unmarked=20
+  tasks:  | goalKeyed: none
+
+[t=5m sample=11]
+  thoughts=20 drive-ticks=0 goals=0 intents=0
+  novelty: unmarked=20
+  tasks:  | goalKeyed: none
+
+[t=6m sample=12]
+  thoughts=20 drive-ticks=0 goals=0 intents=0
+  novelty: unmarked=20
+  tasks:  | goalKeyed: none
+
+[t=6m sample=13]
+  thoughts=20 drive-ticks=0 goals=0 intents=0
+  novelty: unmarked=20
+  tasks:  | goalKeyed: none
+
+[t=7m sample=14]
+  thoughts=20 drive-ticks=0 goals=0 intents=0
+  novelty: unmarked=20
+  tasks:  | goalKeyed: none
+
+[t=7m sample=15]
+  thoughts=20 drive-ticks=0 goals=0 intents=0
+  novelty: unmarked=20
+  tasks:  | goalKeyed: none
+
+[t=8m sample=16]
+  thoughts=20 drive-ticks=0 goals=0 intents=0
+  novelty: unmarked=20
+  tasks:  | goalKeyed: none
+
+[t=8m sample=17]
+  thoughts=20 drive-ticks=0 goals=0 intents=0
+  novelty: unmarked=20
+  tasks:  | goalKeyed: none
+
+[t=9m sample=18]
+  thoughts=20 drive-ticks=0 goals=0 intents=0
+  novelty: unmarked=20
+  tasks:  | goalKeyed: none
+
+[t=9m sample=19]
+  thoughts=20 drive-ticks=0 goals=0 intents=0
+  novelty: unmarked=20
+  tasks:  | goalKeyed: none
+
+[t=10m sample=20]
+  thoughts=20 drive-ticks=0 goals=0 intents=0
+  novelty: unmarked=20
+  tasks:  | goalKeyed: none
+
+[t=10m sample=21]
+  thoughts=20 drive-ticks=0 goals=0 intents=0
+  novelty: unmarked=20
+  tasks:  | goalKeyed: none
+
+[t=11m sample=22]
+  thoughts=20 drive-ticks=0 goals=0 intents=0
+  novelty: unmarked=20
+  tasks:  | goalKeyed: none
+
+[t=11m sample=23]
+  thoughts=20 drive-ticks=0 goals=0 intents=0
+  novelty: unmarked=20
+  tasks:  | goalKeyed: none
+
+[t=12m sample=24]
+  thoughts=20 drive-ticks=0 goals=0 intents=0
+  novelty: unmarked=20
+  tasks:  | goalKeyed: none
+
+[t=12m sample=25]
+  thoughts=20 drive-ticks=0 goals=0 intents=0
+  novelty: unmarked=20
+  tasks:  | goalKeyed: none
+
+[t=13m sample=26]
+  thoughts=20 drive-ticks=0 goals=0 intents=0
+  novelty: unmarked=20
+  tasks:  | goalKeyed: none
+
+[t=13m sample=27]
+  thoughts=20 drive-ticks=0 goals=0 intents=0
+  novelty: unmarked=20
+  tasks:  | goalKeyed: none
+
+[t=14m sample=28]
+  thoughts=20 drive-ticks=0 goals=0 intents=0
+  novelty: unmarked=20
+  tasks:  | goalKeyed: none
+
+[t=14m sample=29]
+  thoughts=20 drive-ticks=0 goals=0 intents=0
+  novelty: unmarked=20
+  tasks:  | goalKeyed: none
+
+[t=15m sample=30]
+  thoughts=20 drive-ticks=0 goals=0 intents=0
+  novelty: unmarked=20
+  tasks:  | goalKeyed: none
+
+[t=15m sample=31]
+  thoughts=20 drive-ticks=0 goals=0 intents=0
+  novelty: unmarked=20
+  tasks:  | goalKeyed: none
+
+[t=16m sample=32]
+  thoughts=20 drive-ticks=0 goals=0 intents=0
+  novelty: unmarked=20
+  tasks:  | goalKeyed: none
+
+[t=16m sample=33]
+  thoughts=20 drive-ticks=0 goals=0 intents=0
+  novelty: unmarked=20
+  tasks:  | goalKeyed: none
+
+[t=17m sample=34]
+  thoughts=20 drive-ticks=0 goals=0 intents=0
+  novelty: unmarked=20
+  tasks:  | goalKeyed: none
+
+[t=17m sample=35]
+  thoughts=20 drive-ticks=0 goals=0 intents=0
+  novelty: unmarked=20
+  tasks:  | goalKeyed: none
+
+[t=18m sample=36]
+  thoughts=20 drive-ticks=0 goals=0 intents=0
+  novelty: unmarked=20
+  tasks:  | goalKeyed: none
+
+[t=18m sample=37]
+  thoughts=20 drive-ticks=0 goals=0 intents=0
+  novelty: unmarked=20
+  tasks:  | goalKeyed: none
+
+[t=19m sample=38]
+  thoughts=20 drive-ticks=0 goals=0 intents=0
+  novelty: unmarked=20
+  tasks:  | goalKeyed: none
+
+[t=19m sample=39]
+  thoughts=20 drive-ticks=0 goals=0 intents=0
+  novelty: unmarked=20
+  tasks:  | goalKeyed: none
+
+[t=20m sample=40]
+  thoughts=20 drive-ticks=0 goals=0 intents=0
+  novelty: unmarked=20
+  tasks:  | goalKeyed: none
+
+[t=20m sample=41]
+  thoughts=20 drive-ticks=0 goals=0 intents=0
+  novelty: unmarked=20
+  tasks:  | goalKeyed: none
+
+[t=21m sample=42]
+  thoughts=0 drive-ticks=0 goals=0 intents=0
+  tasks:  | goalKeyed: none
+
+[t=21m sample=43]
+  thoughts=0 drive-ticks=0 goals=0 intents=0
+  tasks:  | goalKeyed: none
+
+[t=22m sample=44]
+  thoughts=0 drive-ticks=0 goals=0 intents=0
+  tasks:  | goalKeyed: none
+
+[t=22m sample=45]
+  thoughts=1 drive-ticks=0 goals=0 intents=0
+  novelty: unmarked=1
+  tasks:  | goalKeyed: none
+
+[t=23m sample=46]
+  thoughts=20 drive-ticks=0 goals=0 intents=0
+  novelty: unmarked=20
+  tasks:  | goalKeyed: none
+
+[t=23m sample=47]
+  thoughts=20 drive-ticks=0 goals=0 intents=0
+  novelty: unmarked=20
+  tasks:  | goalKeyed: none
+
+[t=24m sample=48]
+  thoughts=0 drive-ticks=0 goals=0 intents=0
+  tasks:  | goalKeyed: none
+
+[t=24m sample=49]
+  thoughts=0 drive-ticks=0 goals=0 intents=0
+  tasks:  | goalKeyed: none
+
+[t=25m sample=50]
+  thoughts=0 drive-ticks=0 goals=0 intents=0
+  tasks:  | goalKeyed: none
+
+[t=25m sample=51]
+  thoughts=0 drive-ticks=0 goals=0 intents=0
+  tasks:  | goalKeyed: none
+
+[t=26m sample=52]
+  thoughts=0 drive-ticks=0 goals=0 intents=0
+  tasks:  | goalKeyed: none
+
+[t=26m sample=53]
+  thoughts=0 drive-ticks=0 goals=0 intents=0
+  tasks:  | goalKeyed: none
+
+[t=27m sample=54]
+  thoughts=0 drive-ticks=0 goals=0 intents=0
+  tasks:  | goalKeyed: none
+
+[t=27m sample=55]
+  thoughts=0 drive-ticks=0 goals=0 intents=0
+  tasks:  | goalKeyed: none
+
+[t=28m sample=56]
+  thoughts=0 drive-ticks=0 goals=0 intents=0
+  tasks:  | goalKeyed: none
+
+[t=28m sample=57]
+  thoughts=0 drive-ticks=0 goals=0 intents=0
+  tasks:  | goalKeyed: none
+
+[t=29m sample=58]
+  thoughts=0 drive-ticks=0 goals=0 intents=0
+  tasks:  | goalKeyed: none
+
+[t=29m sample=59]
+  thoughts=0 drive-ticks=0 goals=0 intents=0
+  tasks:  | goalKeyed: none
+
+[t=30m sample=60]
+  thoughts=0 drive-ticks=0 goals=0 intents=0
+  tasks:  | goalKeyed: none
+
+[t=30m sample=61]
+  thoughts=0 drive-ticks=0 goals=0 intents=0
+  tasks:  | goalKeyed: none
+
+[t=31m sample=62]
+  thoughts=0 drive-ticks=0 goals=0 intents=0
+  tasks:  | goalKeyed: none
+
+[t=31m sample=63]
+  thoughts=0 drive-ticks=0 goals=0 intents=0
+  tasks:  | goalKeyed: none
+
+[t=32m sample=64]
+  thoughts=0 drive-ticks=0 goals=0 intents=0
+  tasks:  | goalKeyed: none
+
+[t=32m sample=65]
+  thoughts=0 drive-ticks=0 goals=0 intents=0
+  tasks:  | goalKeyed: none
+
+[t=33m sample=66]
+  thoughts=0 drive-ticks=0 goals=0 intents=0
+  tasks:  | goalKeyed: none
+
+[t=33m sample=67]
+  thoughts=0 drive-ticks=0 goals=0 intents=0
+  tasks:  | goalKeyed: none
+
+[t=34m sample=68]
+  thoughts=0 drive-ticks=0 goals=0 intents=0
+  tasks:  | goalKeyed: none
+
+[t=34m sample=69]
+  thoughts=0 drive-ticks=0 goals=0 intents=0
+  tasks:  | goalKeyed: none
+
+[t=35m sample=70]
+  thoughts=0 drive-ticks=0 goals=0 intents=0
+  tasks:  | goalKeyed: none
+
+[t=35m sample=71]
+  thoughts=0 drive-ticks=0 goals=0 intents=0
+  tasks:  | goalKeyed: none
+
+[t=36m sample=72]
+  thoughts=0 drive-ticks=0 goals=0 intents=0
+  tasks:  | goalKeyed: none
+
+[t=36m sample=73]
+  thoughts=0 drive-ticks=0 goals=0 intents=0
+  tasks:  | goalKeyed: none
+
+[t=37m sample=74]
+  thoughts=0 drive-ticks=0 goals=0 intents=0
+  tasks:  | goalKeyed: none
+
+[t=37m sample=75]
+  thoughts=0 drive-ticks=0 goals=0 intents=0
+  tasks:  | goalKeyed: none
+
+[t=38m sample=76]
+  thoughts=0 drive-ticks=0 goals=0 intents=0
+  tasks:  | goalKeyed: none
+
+[t=38m sample=77]
+  thoughts=0 drive-ticks=0 goals=0 intents=0
+  tasks:  | goalKeyed: none
+
+[t=39m sample=78]
+  thoughts=0 drive-ticks=0 goals=0 intents=0
+  tasks:  | goalKeyed: none
+
+[t=39m sample=79]
+  thoughts=0 drive-ticks=0 goals=0 intents=0
+  tasks:  | goalKeyed: none
+
+[t=40m sample=80]
+  thoughts=0 drive-ticks=0 goals=0 intents=0
+  tasks:  | goalKeyed: none
+
+[t=40m sample=81]
+  thoughts=0 drive-ticks=0 goals=0 intents=0
+  tasks:  | goalKeyed: none
+
+[t=41m sample=82]
+  thoughts=0 drive-ticks=0 goals=0 intents=0
+  tasks:  | goalKeyed: none
+
+[t=41m sample=83]
+  thoughts=0 drive-ticks=0 goals=0 intents=0
+  tasks:  | goalKeyed: none
+
+[t=42m sample=84]
+  thoughts=1 drive-ticks=0 goals=0 intents=0
+  novelty: unmarked=1
+  tasks:  | goalKeyed: none
+
+[t=42m sample=85]
+  thoughts=0 drive-ticks=0 goals=0 intents=0
+  tasks:  | goalKeyed: none
+
+[t=43m sample=86]
+  thoughts=0 drive-ticks=0 goals=0 intents=0
+  tasks:  | goalKeyed: none
+
+[t=43m sample=87]
+  thoughts=0 drive-ticks=0 goals=0 intents=0
+  tasks:  | goalKeyed: none
+
+[t=44m sample=88]
+  thoughts=0 drive-ticks=0 goals=0 intents=0
+  tasks:  | goalKeyed: none
+
+[t=44m sample=89]
+  thoughts=0 drive-ticks=0 goals=0 intents=0
+  tasks:  | goalKeyed: none
+
+[t=45m sample=90]
+  thoughts=0 drive-ticks=0 goals=0 intents=0
+  tasks:  | goalKeyed: none
+
+[t=45m sample=91]
+  thoughts=0 drive-ticks=0 goals=0 intents=0
+  tasks:  | goalKeyed: none
+
+[t=46m sample=92]
+  thoughts=0 drive-ticks=0 goals=0 intents=0
+  tasks:  | goalKeyed: none
+
+[t=46m sample=93]
+  thoughts=0 drive-ticks=0 goals=0 intents=0
+  tasks:  | goalKeyed: none
+
+[t=47m sample=94]
+  thoughts=0 drive-ticks=0 goals=0 intents=0
+  tasks:  | goalKeyed: none
+
+[t=47m sample=95]
+  thoughts=0 drive-ticks=0 goals=0 intents=0
+  tasks:  | goalKeyed: none
+
+[t=48m sample=96]
+  thoughts=6 drive-ticks=0 goals=0 intents=0
+  novelty: unmarked=6
+  tasks:  | goalKeyed: none
+
+[t=48m sample=97]
+  thoughts=10 drive-ticks=0 goals=0 intents=0
+  novelty: unmarked=10
+  tasks:  | goalKeyed: none
+
+[t=49m sample=98]
+  thoughts=11 drive-ticks=0 goals=0 intents=0
+  novelty: unmarked=11
+  tasks:  | goalKeyed: none
+
+[t=49m sample=99]
+  thoughts=12 drive-ticks=0 goals=0 intents=0
+  novelty: unmarked=12
+  tasks:  | goalKeyed: none
+
+[t=50m sample=100]
+  thoughts=15 drive-ticks=0 goals=0 intents=0
+  novelty: unmarked=15
+  tasks:  | goalKeyed: none
+
+[t=50m sample=101]
+  thoughts=16 drive-ticks=0 goals=0 intents=0
+  novelty: unmarked=16
+  tasks:  | goalKeyed: none
+
+[t=51m sample=102]
+  thoughts=17 drive-ticks=0 goals=0 intents=0
+  novelty: unmarked=17
+  tasks:  | goalKeyed: none
+
+[t=51m sample=103]
+  thoughts=18 drive-ticks=0 goals=0 intents=0
+  novelty: unmarked=18
+  tasks:  | goalKeyed: none
+
+[t=52m sample=104]
+  thoughts=19 drive-ticks=0 goals=0 intents=0
+  novelty: unmarked=19
+  tasks:  | goalKeyed: none
+
+[t=52m sample=105]
+  thoughts=20 drive-ticks=0 goals=0 intents=0
+  novelty: unmarked=20
+  tasks:  | goalKeyed: none
+
+[t=53m sample=106]
+  thoughts=20 drive-ticks=0 goals=0 intents=0
+  novelty: unmarked=20
+  tasks:  | goalKeyed: none
+
+[t=53m sample=107]
+  thoughts=20 drive-ticks=0 goals=0 intents=0
+  novelty: unmarked=20
+  tasks:  | goalKeyed: none
+
+[t=54m sample=108]
+  thoughts=20 drive-ticks=0 goals=0 intents=0
+  novelty: unmarked=20
+  tasks:  | goalKeyed: none
+
+[t=54m sample=109]
+  thoughts=20 drive-ticks=0 goals=0 intents=0
+  novelty: unmarked=20
+  tasks:  | goalKeyed: none
+
+[t=55m sample=110]
+  thoughts=20 drive-ticks=0 goals=0 intents=0
+  novelty: unmarked=20
+  tasks:  | goalKeyed: none
+
+[t=55m sample=111]
+  thoughts=20 drive-ticks=0 goals=0 intents=0
+  novelty: unmarked=20
+  tasks:  | goalKeyed: none
+
+[t=56m sample=112]
+  thoughts=20 drive-ticks=0 goals=0 intents=0
+  novelty: unmarked=20
+  tasks:  | goalKeyed: none
+
+[t=56m sample=113]
+  thoughts=20 drive-ticks=0 goals=0 intents=0
+  novelty: unmarked=20
+  tasks:  | goalKeyed: none
+
+[t=57m sample=114]
+  thoughts=20 drive-ticks=0 goals=0 intents=0
+  novelty: unmarked=20
+  tasks:  | goalKeyed: none
+
+[t=57m sample=115]
+  thoughts=20 drive-ticks=0 goals=0 intents=0
+  novelty: unmarked=20
+  tasks:  | goalKeyed: none
+
+[t=58m sample=116]
+  thoughts=20 drive-ticks=0 goals=0 intents=0
+  novelty: unmarked=20
+  tasks:  | goalKeyed: none
+
+[t=58m sample=117]
+  thoughts=20 drive-ticks=0 goals=0 intents=0
+  novelty: unmarked=20
+  tasks:  | goalKeyed: none
+
+[t=59m sample=118]
+  thoughts=20 drive-ticks=0 goals=0 intents=0
+  novelty: unmarked=20
+  tasks:  | goalKeyed: none
+
+[t=59m sample=119]
+  thoughts=20 drive-ticks=0 goals=0 intents=0
+  novelty: unmarked=20
+  tasks:  | goalKeyed: none
+
+[t=60m sample=120]
+  thoughts=20 drive-ticks=0 goals=0 intents=0
+  novelty: unmarked=20
+  tasks:  | goalKeyed: none
+
+[t=60m sample=121]
+  thoughts=20 drive-ticks=0 goals=0 intents=0
+  novelty: unmarked=20
+  tasks:  | goalKeyed: none
+
+[t=61m sample=122]
+  thoughts=20 drive-ticks=0 goals=0 intents=0
+  novelty: unmarked=20
+  tasks:  | goalKeyed: none
+
+[t=61m sample=123]
+  thoughts=20 drive-ticks=0 goals=0 intents=0
+  novelty: unmarked=20
+  tasks:  | goalKeyed: none
+
+[t=62m sample=124]
+  thoughts=20 drive-ticks=0 goals=0 intents=0
+  novelty: unmarked=20
+  tasks:  | goalKeyed: none
+
+[t=62m sample=125]
+  thoughts=20 drive-ticks=0 goals=0 intents=0
+  novelty: unmarked=20
+  tasks:  | goalKeyed: none
+
+[t=63m sample=126]
+  thoughts=20 drive-ticks=0 goals=0 intents=0
+  novelty: unmarked=20
+  tasks:  | goalKeyed: none
+
+[t=63m sample=127]
+  thoughts=20 drive-ticks=0 goals=0 intents=0
+  novelty: unmarked=20
+  tasks:  | goalKeyed: none
+
+[t=64m sample=128]
+  thoughts=20 drive-ticks=0 goals=0 intents=0
+  novelty: unmarked=20
+  tasks:  | goalKeyed: none
+
+[t=64m sample=129]
+  thoughts=20 drive-ticks=0 goals=0 intents=0
+  novelty: unmarked=20
+  tasks:  | goalKeyed: none

@@ -106,6 +106,9 @@ export class BotAdapter extends EventEmitter {
         reject(new Error('Connection timeout'));
       }, 30000); // 30 second timeout
 
+      // Skin: with auth 'microsoft', the account's selected skin is sent via session;
+      // with 'offline' the server typically shows a default. Third-party servers often
+      // need a skin plugin (e.g. SkinRestorer) to apply skins from the session.
       this.bot = createBot({
         host: this.config.host,
         port: this.config.port,
@@ -318,7 +321,9 @@ export class BotAdapter extends EventEmitter {
     }
 
     const status = this.safetyMonitor.getStatus();
-    const assessment = await this.safetyMonitor.getThreatManager().assessThreats();
+    const assessment = await this.safetyMonitor
+      .getThreatManager()
+      .assessThreats();
 
     return {
       enabled: true,
@@ -886,7 +891,11 @@ export class BotAdapter extends EventEmitter {
 
         // If cognition system suggests task creation, create a task
         if (result.shouldCreateTask && result.taskSuggestion) {
-          await this.createTaskFromSocialChat(sender, message, result.taskSuggestion);
+          await this.createTaskFromSocialChat(
+            sender,
+            message,
+            result.taskSuggestion
+          );
           this.performanceMetrics.tasksCreated++;
         }
       } else if (response) {
@@ -1004,7 +1013,9 @@ export class BotAdapter extends EventEmitter {
             if (result.shouldRespond && result.response) {
               const now = Date.now();
               if (now - this.lastChatResponse >= this.chatCooldown) {
-                const sanitizedBeliefChat = this.sanitizeOutboundChat(result.response);
+                const sanitizedBeliefChat = this.sanitizeOutboundChat(
+                  result.response
+                );
                 await this.bot?.chat(sanitizedBeliefChat);
                 if (process.env.TTS_SPEAK_CHAT !== 'false') {
                   this.ttsClient.speak(sanitizedBeliefChat);
@@ -1152,7 +1163,9 @@ export class BotAdapter extends EventEmitter {
           const now = Date.now();
           if (now - this.lastChatResponse >= this.chatCooldown) {
             const responseStart = Date.now();
-            const sanitizedEntityChat = this.sanitizeOutboundChat(result.response);
+            const sanitizedEntityChat = this.sanitizeOutboundChat(
+              result.response
+            );
             await this.bot?.chat(sanitizedEntityChat);
             if (process.env.TTS_SPEAK_CHAT !== 'false') {
               this.ttsClient.speak(sanitizedEntityChat);
@@ -1300,7 +1313,9 @@ export class BotAdapter extends EventEmitter {
         const result = await response.json();
         console.log(`✅ Created task from social chat:`, result);
       } else if (response) {
-        console.log(`⚠️ Failed to create task from social chat: ${response.status}`);
+        console.log(
+          `⚠️ Failed to create task from social chat: ${response.status}`
+        );
       }
     } catch (error) {
       console.error('❌ Error creating task from social chat:', error);

@@ -181,13 +181,15 @@ export interface CognitiveThought {
     llmConfidence?: number;
     model?: string;
     error?: string;
-    extractedGoal?: { action: string; target: string; amount: number | null };
+    extractedGoal?: { action: string; target: string; amount: number | null; raw?: string };
     extractedIntent?: string | null;
     /** How the INTENT was parsed: 'final_line', 'inline_noncompliant', or null */
     intentParse?: string | null;
     extractedGoalSource?: 'llm' | 'drive-tick';
     /** Canonical goal key for exact-match idempotency (action:target) */
     goalKey?: string;
+    /** IDLE-4: Whether goal emission was suppressed by budget limits */
+    budgetSuppressed?: boolean;
   };
   novelty?: 'high' | 'medium' | 'low';
   /** Only thoughts with convertEligible=true should be considered for task conversion */
@@ -272,6 +274,23 @@ export class EnhancedThoughtGenerator extends EventEmitter {
     lowNoveltyBroadcast: 0,
     startedAtMs: Date.now(),
   };
+
+  /**
+   * IDLE-4: Goal emission budget for bounded introspection.
+   * Limits goal emissions to prevent compulsive action.
+   */
+  private _goalEmissionBudget = {
+    lastEmissionTime: 0,
+    emissionsThisHour: 0,
+    hourStart: Date.now(),
+    suppressedThisHour: 0,
+  };
+
+  /** IDLE-5: Contract version for provenance logging */
+  private static readonly IDLE_INTROSPECTION_CONTRACT_VERSION = 'v2.0.0';
+
+  /** IDLE-5: Prompt template hash for provenance (simplified - could be actual hash) */
+  private static readonly PROMPT_TEMPLATE_HASH = 'internal-thought-v1';
 
   constructor(config: Partial<EnhancedThoughtGeneratorConfig> = {}) {
     super();
@@ -476,10 +495,24 @@ export class EnhancedThoughtGenerator extends EventEmitter {
         situation = this.buildIdleSituation(context);
       }
 
-      // Drive tick: deterministic micro-goals when idle + comfortable
-      // Fires BEFORE dedup so it cannot be suppressed by situation signature
-      const driveTick = this.evaluateDriveTick(context);
-      if (driveTick) return driveTick;
+      // IDLE-3: Build interoceptive summary (salience facts, not goals)
+      // This replaces the old drive tick approach of directly injecting goals
+      const inventory = context.currentState?.inventory || [];
+      const timeOfDay = context.currentState?.timeOfDay ?? 0;
+      const salienceSummary = this.buildInteroceptiveSummary(inventory, timeOfDay, context);
+      if (salienceSummary) {
+        situation += `\n\nCurrent pressures: ${salienceSummary}`;
+      }
+
+      // IDLE-3: Drive ticks are gated behind ablation flag
+      // Default: disabled (DISABLE_DRIVE_TICKS=true or unset)
+      // Set DISABLE_DRIVE_TICKS=false to enable for comparison experiments
+      const driveTicksEnabled = process.env.DISABLE_DRIVE_TICKS === 'false';
+      if (driveTicksEnabled) {
+        // Legacy behavior: deterministic micro-goals when idle + comfortable
+        const driveTick = this.evaluateDriveTick(context);
+        if (driveTick) return driveTick;
+      }
 
       // Edge-trigger dedup: skip if same situation signature was used recently
       const sig = this.computeSituationSignature(context);
@@ -569,6 +602,49 @@ export class EnhancedThoughtGenerator extends EventEmitter {
       if (hasGoal) this._counters.goalTags++;
       if (hasIntent) this._counters.intentExtractions++;
 
+      // IDLE-4: Check goal emission budget
+      // Get idle reason from context if available (passed through from planning service)
+      const idleReason = (context as any).idleReason as string | undefined;
+      let goalAllowed = hasGoal || hasIntent;
+      let budgetSuppressed = false;
+
+      if (goalAllowed && hasGoal) {
+        // Check if goal emission is allowed under budget
+        const canEmit = this.canEmitGoal(idleReason, false);
+        if (!canEmit) {
+          // Budget exceeded - suppress the goal, keep the thought
+          goalAllowed = false;
+          budgetSuppressed = true;
+          this.recordGoalSuppression();
+          tags.push('budget-suppressed');
+        } else {
+          this.recordGoalEmission();
+        }
+      }
+
+      // IDLE-5: Log provenance for the idle cycle
+      const decisionOutcome = budgetSuppressed
+        ? 'budget_suppressed' as const
+        : (hasGoal || hasIntent)
+          ? 'intent_emitted' as const
+          : 'thought_only' as const;
+
+      // Build intentEmitted string from extractedGoal (may or may not have .raw)
+      const extractedGoalForLog = response.metadata.extractedGoal;
+      const intentEmittedStr = goalAllowed && extractedGoalForLog
+        ? ('raw' in extractedGoalForLog && extractedGoalForLog.raw)
+          ? extractedGoalForLog.raw
+          : `[GOAL: ${extractedGoalForLog.action} ${extractedGoalForLog.target}${extractedGoalForLog.amount != null ? ` ${extractedGoalForLog.amount}` : ''}]`
+        : undefined;
+
+      this.logIdleCycleProvenance({
+        idleReason,
+        salienceSummary,
+        decisionOutcome,
+        intentEmitted: intentEmittedStr,
+        retrievalMode: 'none', // No memory retrieval in current implementation
+      });
+
       return {
         id: `thought-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
         type: 'reflection',
@@ -589,13 +665,16 @@ export class EnhancedThoughtGenerator extends EventEmitter {
           intensity: 0.4,
           llmConfidence: response.confidence,
           model: response.model,
-          extractedGoal: response.metadata.extractedGoal,
-          extractedIntent,
+          // IDLE-4: Only include extractedGoal if budget allows
+          extractedGoal: goalAllowed ? response.metadata.extractedGoal : undefined,
+          extractedIntent: goalAllowed ? extractedIntent : undefined,
           intentParse,
-          extractedGoalSource: hasGoal ? 'llm' as const : undefined,
+          extractedGoalSource: goalAllowed && hasGoal ? 'llm' as const : undefined,
+          budgetSuppressed,
         },
         novelty: isDuplicate ? 'medium' : 'high',
-        convertEligible: hasGoal || hasIntent,
+        // IDLE-4: Only mark convertEligible if goal was allowed
+        convertEligible: goalAllowed && (hasGoal || hasIntent),
         category: 'idle',
         tags,
         priority: 'low',
@@ -1421,8 +1500,82 @@ export class EnhancedThoughtGenerator extends EventEmitter {
   }
 
   /**
+   * IDLE-3: Build interoceptive summary for idle thought generation.
+   * Annotates salience (what's pressing) WITHOUT injecting goals.
+   * The LLM may choose to act based on these facts, or may not.
+   *
+   * This replaces the old selectDrive() approach of directly emitting [GOAL:] tags.
+   */
+  private buildInteroceptiveSummary(
+    inventory: Array<{ name: string; count: number; displayName: string }>,
+    timeOfDay: number,
+    context: ThoughtContext
+  ): string {
+    const pressures: string[] = [];
+
+    // Build inventory map
+    const invMap = new Map<string, number>();
+    for (const item of inventory) {
+      const key = (item.name || '').toLowerCase();
+      invMap.set(key, (invMap.get(key) || 0) + item.count);
+    }
+
+    const hasItem = (name: string) => (invMap.get(name) || 0) > 0;
+    const logCount = ['oak_log', 'birch_log', 'spruce_log', 'dark_oak_log', 'acacia_log', 'jungle_log']
+      .reduce((sum, k) => sum + (invMap.get(k) || 0), 0);
+
+    // Inventory pressure
+    if (inventory.length === 0) {
+      pressures.push('My inventory is empty.');
+    } else if (logCount === 0) {
+      pressures.push('I have no wood.');
+    } else if (logCount < 8) {
+      pressures.push(`Wood supply is low (${logCount} logs).`);
+    }
+
+    // Tool status (fact, not goal)
+    if (!hasItem('wooden_pickaxe') && !hasItem('stone_pickaxe') && !hasItem('iron_pickaxe') && !hasItem('diamond_pickaxe')) {
+      pressures.push('I have no pickaxe.');
+    }
+    if (!hasItem('crafting_table') && logCount > 0) {
+      pressures.push('I have wood but no crafting table.');
+    }
+
+    // Time pressure
+    if (timeOfDay >= 11000 && timeOfDay < 13000) {
+      pressures.push('Sunset is approaching.');
+    } else if (timeOfDay >= 13000) {
+      pressures.push('It is nighttime.');
+    }
+
+    // Health/hunger from context
+    const health = context.currentState?.health ?? 20;
+    const food = context.currentState?.food ?? 20;
+    if (health < 10) pressures.push('Health is critically low.');
+    else if (health < 15) pressures.push('Health is moderate.');
+    if (food < 10) pressures.push('Hunger is becoming urgent.');
+    else if (food < 15) pressures.push('Getting hungry.');
+
+    // Threat awareness
+    const hostiles = context.currentState?.nearbyHostiles ?? 0;
+    if (hostiles > 0) pressures.push(`${hostiles} hostile mob${hostiles > 1 ? 's' : ''} nearby.`);
+
+    // Shelter status (only if signal available)
+    const hasShelterNearby = context.currentState?.hasShelterNearby;
+    if (hasShelterNearby === false && timeOfDay >= 11000) {
+      pressures.push('No shelter nearby as night approaches.');
+    }
+
+    return pressures.length > 0 ? pressures.join(' ') : '';
+  }
+
+  /**
    * Select a drive-tick micro-goal based on inventory, time, and environment.
    * Returns null if no drive is appropriate.
+   *
+   * DEPRECATED: This method directly injects goals, violating IDLE-3.
+   * Use buildInteroceptiveSummary() instead for salience annotation.
+   * This method is kept for ablation testing (DISABLE_DRIVE_TICKS=false).
    */
   private selectDrive(
     inventory: Array<{ name: string; count: number; displayName: string }>,
@@ -1628,5 +1781,105 @@ export class EnhancedThoughtGenerator extends EventEmitter {
    */
   getConfig(): EnhancedThoughtGeneratorConfig {
     return { ...this.config };
+  }
+
+  /**
+   * IDLE-4: Check if goal emission is allowed under current budget.
+   * @param idleReason - The reason for idle state (affects budget limits)
+   * @param hasInteroceptiveThreshold - True if an interoceptive threshold was crossed
+   */
+  private canEmitGoal(idleReason?: string, hasInteroceptiveThreshold = false): boolean {
+    const now = Date.now();
+
+    // Reset hourly counter if hour has passed
+    if (now - this._goalEmissionBudget.hourStart > 3600000) {
+      this._goalEmissionBudget.emissionsThisHour = 0;
+      this._goalEmissionBudget.suppressedThisHour = 0;
+      this._goalEmissionBudget.hourStart = now;
+    }
+
+    // Interoceptive threshold crossing bypasses spacing (but not hourly budget)
+    if (!hasInteroceptiveThreshold) {
+      // Minimum spacing: 5 minutes between goal-tagged outputs
+      const minSpacing = 300000;
+      if (now - this._goalEmissionBudget.lastEmissionTime < minSpacing) {
+        return false;
+      }
+    }
+
+    // Budget when in backoff state: max 2 per hour
+    if (idleReason === 'all_in_backoff') {
+      const maxPerHourInBackoff = 2;
+      if (this._goalEmissionBudget.emissionsThisHour >= maxPerHourInBackoff) {
+        return false;
+      }
+    }
+
+    // General budget: max 6 per hour
+    const maxPerHour = 6;
+    if (this._goalEmissionBudget.emissionsThisHour >= maxPerHour) {
+      return false;
+    }
+
+    return true;
+  }
+
+  /**
+   * IDLE-4: Record a goal emission for budget tracking.
+   */
+  private recordGoalEmission(): void {
+    this._goalEmissionBudget.lastEmissionTime = Date.now();
+    this._goalEmissionBudget.emissionsThisHour++;
+  }
+
+  /**
+   * IDLE-4: Record a suppressed goal emission.
+   */
+  private recordGoalSuppression(): void {
+    this._goalEmissionBudget.suppressedThisHour++;
+  }
+
+  /**
+   * IDLE-4: Get goal emission budget state for observability.
+   */
+  getGoalEmissionBudget() {
+    return { ...this._goalEmissionBudget };
+  }
+
+  /**
+   * IDLE-5: Log provenance for an idle cycle.
+   * This creates an audit trail for research interpretability.
+   */
+  private logIdleCycleProvenance(params: {
+    idleReason?: string;
+    salienceSummary: string;
+    decisionOutcome: 'no_op' | 'thought_only' | 'intent_emitted' | 'budget_suppressed';
+    intentEmitted?: string;
+    retrievalMode: 'structured' | 'semantic' | 'hybrid' | 'none';
+    retrievalParams?: { time_window_ms?: number; max_events?: number; semantic_top_k?: number };
+  }): void {
+    const provenance = {
+      idle_introspection_contract_version: EnhancedThoughtGenerator.IDLE_INTROSPECTION_CONTRACT_VERSION,
+      prompt_template_hash: EnhancedThoughtGenerator.PROMPT_TEMPLATE_HASH,
+      retrieval_mode: params.retrievalMode,
+      retrieval_params: params.retrievalParams || {},
+      model_params: {
+        model: this.llm.getConfig().model,
+        temperature: this.llm.getConfig().temperature,
+        max_tokens: this.llm.getConfig().maxTokens,
+      },
+      idle_reason: params.idleReason || 'unknown',
+      salience_summary: params.salienceSummary,
+      decision_outcome: params.decisionOutcome,
+      intent_emitted: params.intentEmitted,
+      goal_budget: {
+        emissions_this_hour: this._goalEmissionBudget.emissionsThisHour,
+        suppressed_this_hour: this._goalEmissionBudget.suppressedThisHour,
+      },
+      timestamp: Date.now(),
+    };
+
+    // Log as structured JSON for parsing
+    console.log('[IDLE-PROVENANCE]', JSON.stringify(provenance));
   }
 }

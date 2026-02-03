@@ -441,7 +441,23 @@ export class HybridSearchService {
   private async performGraphSearch(
     options: HybridSearchOptions & { graphWeight: number; vectorWeight: number }
   ): Promise<GraphRAGResult> {
-    return this.config.graphRag.query(options.query, options.graphOptions);
+    try {
+      return await this.config.graphRag.query(options.query, options.graphOptions);
+    } catch (error) {
+      // GraphRAG query can fail if the underlying knowledge graph doesn't support
+      // the query interface (e.g., EnhancedKnowledgeGraphCore vs KnowledgeGraphCore).
+      // Gracefully degrade to empty results.
+      console.warn('[HybridSearch] Graph search failed, returning empty results:', error);
+      return {
+        query: options.query,
+        entities: [],
+        relationships: [],
+        context: '',
+        success: false,
+        confidence: 0,
+        queryTime: 0,
+      };
+    }
   }
 
   private combineResults(

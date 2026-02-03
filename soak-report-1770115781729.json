@@ -1,0 +1,94 @@
+{
+  "timestamp": "2026-02-03T10:44:33.249Z",
+  "mode": "both",
+  "durationMs": 308480,
+  "passed": false,
+  "summary": "Pipeline: 30 unique events, 60 HTTP attempts, 30 persisted, 30 dedupe rejects, 0 violations | Quality: 10 checked, 10 schema issues, 0 grounding failures",
+  "preflight": {
+    "memoryServiceHealthy": true,
+    "embeddingServiceHealthy": true,
+    "singleReflectionPersisted": true,
+    "metadataContractValid": true,
+    "effectiveEmbeddingHost": "http://localhost:11434",
+    "preflightDurationMs": 8048
+  },
+  "pipeline": {
+    "uniqueEventsEmitted": 30,
+    "totalHttpAttempts": 60,
+    "freshPostsAccepted": 30,
+    "dedupeRejectsViaStatus": 30,
+    "dedupeRejectsViaConstraint": 0,
+    "missingMetadataRows": 0,
+    "paginationViolations": 0,
+    "violations": [],
+    "latency": {
+      "memoryPostP50": 3,
+      "memoryPostP95": 6,
+      "findByDedupeKeyP50": 0,
+      "findByDedupeKeyP95": 0
+    }
+  },
+  "quality": {
+    "reflectionsChecked": 10,
+    "schemaValid": 0,
+    "schemaInvalid": 10,
+    "groundingPassed": 0,
+    "groundingFailed": 0,
+    "provenancePresent": 0,
+    "provenanceMissing": 0,
+    "placeholderCount": 0,
+    "generatedCount": 0,
+    "issues": [
+      {
+        "reflectionId": "chunk-1770115773587-0-[soak-test]-pipeline-invariant-check-at-2026-02-03",
+        "issue": "missing_metadata_object",
+        "detail": "Row has no metadata object"
+      },
+      {
+        "reflectionId": "chunk-1770115763584-0-[soak-test]-pipeline-invariant-check-at-2026-02-03",
+        "issue": "missing_metadata_object",
+        "detail": "Row has no metadata object"
+      },
+      {
+        "reflectionId": "chunk-1770115753583-0-[soak-test]-pipeline-invariant-check-at-2026-02-03",
+        "issue": "missing_metadata_object",
+        "detail": "Row has no metadata object"
+      },
+      {
+        "reflectionId": "chunk-1770115743581-0-[soak-test]-pipeline-invariant-check-at-2026-02-03",
+        "issue": "missing_metadata_object",
+        "detail": "Row has no metadata object"
+      },
+      {
+        "reflectionId": "chunk-1770115733581-0-[soak-test]-pipeline-invariant-check-at-2026-02-03",
+        "issue": "missing_metadata_object",
+        "detail": "Row has no metadata object"
+      },
+      {
+        "reflectionId": "chunk-1770115723575-0-[soak-test]-pipeline-invariant-check-at-2026-02-03",
+        "issue": "missing_metadata_object",
+        "detail": "Row has no metadata object"
+      },
+      {
+        "reflectionId": "chunk-1770115713574-0-[soak-test]-pipeline-invariant-check-at-2026-02-03",
+        "issue": "missing_metadata_object",
+        "detail": "Row has no metadata object"
+      },
+      {
+        "reflectionId": "chunk-1770115703572-0-[soak-test]-pipeline-invariant-check-at-2026-02-03",
+        "issue": "missing_metadata_object",
+        "detail": "Row has no metadata object"
+      },
+      {
+        "reflectionId": "chunk-1770115693570-0-[soak-test]-pipeline-invariant-check-at-2026-02-03",
+        "issue": "missing_metadata_object",
+        "detail": "Row has no metadata object"
+      },
+      {
+        "reflectionId": "chunk-1770115683568-0-[soak-test]-pipeline-invariant-check-at-2026-02-03",
+        "issue": "missing_metadata_object",
+        "detail": "Row has no metadata object"
+      }
+    ]
+  }
+}

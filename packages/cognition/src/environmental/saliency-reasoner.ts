@@ -67,6 +67,41 @@ export interface BeliefStreamEnvelope {
   saliency_events: SaliencyDelta[];
 }
 
+// ── Awareness Deduplication ─────────────────────────────────────────
+// Prevents identical awareness messages from flooding the thought queue
+
+const AWARENESS_DEDUP_WINDOW_MS = 30_000; // 30 seconds
+const recentAwarenessContent = new Map<string, number>(); // content -> timestamp
+
+function cleanupOldAwareness(): void {
+  const now = Date.now();
+  for (const [content, timestamp] of recentAwarenessContent) {
+    if (now - timestamp > AWARENESS_DEDUP_WINDOW_MS) {
+      recentAwarenessContent.delete(content);
+    }
+  }
+}
+
+/**
+ * Check if awareness text should be emitted (not a duplicate).
+ * Returns true if should emit, false if suppressed.
+ *
+ * Suppression means "no emit" — not a null-content thought object.
+ * This prevents duplicate awareness from creating thought objects at all.
+ */
+export function shouldEmitAwareness(text: string): boolean {
+  cleanupOldAwareness();
+  const lastEmit = recentAwarenessContent.get(text);
+  const now = Date.now();
+
+  if (lastEmit && now - lastEmit < AWARENESS_DEDUP_WINDOW_MS) {
+    return false;  // Suppress duplicate
+  }
+
+  recentAwarenessContent.set(text, now);
+  return true;
+}
+
 // ── State ───────────────────────────────────────────────────────────
 
 /** Maximum number of superseded stream_ids to retain per bot_id before GC */

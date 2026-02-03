@@ -13,6 +13,7 @@ import type { BaseDomainSolver } from './sterling/base-domain-solver';
 import type { MinecraftBuildingSolver } from './sterling/minecraft-building-solver';
 import { resolveRequirement } from './modules/requirements';
 import { CognitionOutbox } from './modules/cognition-outbox';
+import { broadcastTaskUpdate } from './modules/planning-endpoints';
 import {
   ORE_DROP_MAP,
   BLOCK_DROP_MAP,
@@ -20,7 +21,9 @@ import {
 import type {
   EpisodeLinkage,
   EpisodeOutcomeClass,
+  EpisodeAck,
 } from './sterling';
+import { buildSterlingEpisodeLinkage, buildSterlingEpisodeLinkageFromResult } from './sterling';
 import { SOLVER_IDS } from './sterling/solver-ids';
 import {
   CognitiveStreamClient,
@@ -509,20 +512,11 @@ function selectJoinKeysForPlan(
   return joinKeys;
 }
 
-/**
- * Build episode linkage from join keys + execution outcome.
- * Single place to update when linkage schema grows.
- */
-function buildEpisodeLinkage(
-  joinKeys: { bundleHash?: string; traceBundleHash?: string } | undefined,
-  success: boolean,
-): EpisodeLinkage {
-  return {
-    bundleHash: joinKeys?.bundleHash,
-    traceBundleHash: joinKeys?.traceBundleHash,
-    outcomeClass: success ? 'EXECUTION_SUCCESS' : 'EXECUTION_FAILURE',
-  };
-}
+// NOTE: Local buildEpisodeLinkage was removed in 2026-02-03 commit.
+// Use buildSterlingEpisodeLinkage from './sterling' instead.
+// This ensures Phase 1 identity fields (engineCommitment, operatorRegistryHash)
+// are properly forwarded from join keys to report_episode.
+// See: STERLING_INTEGRATION_REVIEW.md "Gap 1: Solver Adoption"
 
 // ------------------------------------------------------------------
 
@@ -653,6 +647,11 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
     if (this.thoughtPollInFlight) return;
     this.thoughtPollInFlight = true;
 
+    // Track all evaluated thoughts for batch acking
+    const thoughtsToAck: string[] = [];
+    let convertedCount = 0;
+    let skippedCount = 0;
+
     try {
       const actionableThoughts =
         await this.cognitiveStreamClient.getActionableThoughts();
@@ -691,6 +690,14 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
               return '20+';
             },
           });
+
+          // Track conversion stats
+          if (result.task || result.managementResult) {
+            convertedCount++;
+          } else {
+            skippedCount++;
+          }
+
           if (result.task) {
             this.emit('thoughtConvertedToTask', { thought, task: result.task });
           }
@@ -721,7 +728,18 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
           }
         } catch (error) {
           console.error('Error converting thought to task:', error);
+          skippedCount++;
+        } finally {
+          // CRITICAL: Always ack, even if conversion failed or was skipped
+          // This prevents thoughts from re-appearing in /actionable indefinitely
+          thoughtsToAck.push(thought.id);
         }
+      }
+
+      // Batch ack all evaluated thoughts
+      if (thoughtsToAck.length > 0) {
+        await this.cognitiveStreamClient.ackThoughts(thoughtsToAck);
+        console.log(`[Thought-to-task] Census: fetched=${actionableThoughts.length} converted=${convertedCount} skipped=${skippedCount} acked=${thoughtsToAck.length}`);
       }
     } catch (error) {
       console.error('Error processing actionable thoughts:', error);
@@ -787,6 +805,9 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
 
       // Persist status change (with any self-targeted hold effects already applied)
       this.taskStore.setTask(task);
+
+      // SSE broadcast for dashboard
+      broadcastTaskUpdate('taskStatusUpdated', task);
 
       // Unblock parent when prerequisite children reach terminal state
       if (status === 'completed' || status === 'failed') {
@@ -1412,6 +1433,10 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
 
     // ── Lifecycle events ──
     this.emit('taskAdded', task);
+
+    // ── SSE broadcast for dashboard ──
+    broadcastTaskUpdate('taskAdded', task);
+
     if (task.priority >= 0.8) {
       this.emit('taskLifecycleEvent', {
         type: 'high_priority_added',
@@ -2064,6 +2089,9 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
     });
 
     this.taskStore.updateStatistics();
+
+    // SSE broadcast for dashboard
+    broadcastTaskUpdate('taskProgressUpdated', task);
 
     // Goal-binding protocol: fire progress hook AND status hook (runtime origin only).
     // Both hooks produce effects that are collected and scheduled once.
@@ -3179,6 +3207,55 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
     }
   }
 
+  // ────────────────────────────────────────────────────────────────────────
+  // Gap 1: Persist episode_hash from report_episode ack without blocking
+  // ────────────────────────────────────────────────────────────────────────
+
+  /** Domain → episode hash slot mapping */
+  private static readonly EPISODE_HASH_SLOT = {
+    building: 'buildingEpisodeHash',
+    crafting: 'craftingEpisodeHash',
+    toolProgression: 'toolProgressionEpisodeHash',
+    acquisition: 'acquisitionEpisodeHash',
+  } as const;
+
+  /**
+   * Persist episode hash from Sterling ack into task metadata.
+   * Re-reads latest task from store to avoid clobbering concurrent updates.
+   * Fails silently if task is gone (expected during cleanup).
+   *
+   * @param taskId - Task to update
+   * @param domain - Domain name (looked up in EPISODE_HASH_SLOT)
+   * @param ack - Episode ack from Sterling (may be undefined on failure)
+   */
+  private persistEpisodeAck(
+    taskId: string,
+    domain: keyof typeof TaskIntegration.EPISODE_HASH_SLOT,
+    ack: EpisodeAck | undefined,
+  ): void {
+    const slot = TaskIntegration.EPISODE_HASH_SLOT[domain];
+    if (!ack?.episodeHash) return;
+
+    const latest = this.taskStore.getTask(taskId);
+    if (!latest) return; // Task gone, drop silently
+
+    // Ensure solver namespace exists
+    if (!latest.metadata.solver) {
+      latest.metadata.solver = {};
+    }
+
+    // Merge episode hash without clobbering other fields
+    latest.metadata.solver[slot] = ack.episodeHash;
+    latest.metadata.updatedAt = Date.now();
+    this.taskStore.setTask(latest);
+
+    if (process.env.STERLING_EPISODE_DEBUG === '1') {
+      console.log(
+        `[Sterling] Persisted ${slot}=${ack.episodeHash.slice(0, 8)}... for task ${taskId}`
+      );
+    }
+  }
+
   private reportBuildingEpisode(task: Task, success: boolean): void {
     if (!this.buildingSolver) return;
     const templateId = task.metadata.solver?.buildingTemplateId;
@@ -3262,8 +3339,57 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
       warnStaleKeysOnce(reason, context);
     }
 
-    // Build linkage: join keys (solve-time) + outcome (execution-time)
-    const linkage = buildEpisodeLinkage(keysForThisPlan, success);
+    // ────────────────────────────────────────────────────────────────────
+    // Gap 3: Richer outcome taxonomy using solve-time substrate when available
+    // Core rule: success always → EXECUTION_SUCCESS
+    //            failure + solver failed + coherent substrate → use substrate for richer class
+    //            failure + solver succeeded (or no/stale substrate) → EXECUTION_FAILURE
+    //
+    // COHERENCE CHECK: Substrate must match episode's bundleHash to prevent
+    // misclassifying replan A's failure as replan B's outcome.
+    // ────────────────────────────────────────────────────────────────────
+    let linkage: EpisodeLinkage;
+    const substrate = task.metadata.solver?.buildingSolveResultSubstrate;
+
+    // Coherence check: substrate must belong to this episode (same bundleHash)
+    // If either side lacks bundleHash, we can't verify — fall back to binary
+    const substrateIsCoherent =
+      substrate?.bundleHash && keysForThisPlan?.bundleHash
+        ? substrate.bundleHash === keysForThisPlan.bundleHash
+        : false; // conservative: if we can't verify, don't use substrate
+
+    if (success) {
+      // Success is always EXECUTION_SUCCESS regardless of substrate
+      linkage = buildSterlingEpisodeLinkage(keysForThisPlan, 'EXECUTION_SUCCESS');
+    } else if (substrate && substrate.solved === false && substrateIsCoherent) {
+      // Solver itself failed AND substrate is coherent — use richer classification
+      const { linkage: classifiedLinkage, classified } = buildSterlingEpisodeLinkageFromResult(
+        keysForThisPlan,
+        {
+          solved: substrate.solved,
+          error: substrate.error,
+          totalNodes: substrate.totalNodes,
+          searchHealth: substrate.searchHealth,
+        },
+        substrate.opts,
+      );
+      linkage = classifiedLinkage;
+      if (process.env.STERLING_EPISODE_DEBUG === '1') {
+        console.log(
+          `[Building] Using richer outcome class from substrate: ${classified.outcomeClass} (${classified.source})`
+        );
+      }
+    } else {
+      // Solver succeeded, or no substrate, or substrate is stale/incoherent
+      linkage = buildSterlingEpisodeLinkage(keysForThisPlan, 'EXECUTION_FAILURE');
+      // Log if substrate was present but incoherent (helps debug replan issues)
+      if (substrate && !substrateIsCoherent && process.env.STERLING_EPISODE_DEBUG === '1') {
+        console.log(
+          `[Building] Substrate incoherent (substrate.bundleHash=${substrate.bundleHash?.slice(0, 8)}, ` +
+          `keys.bundleHash=${keysForThisPlan?.bundleHash?.slice(0, 8)}); using binary EXECUTION_FAILURE`
+        );
+      }
+    }
 
     // Prefer structured step.meta for module IDs; fall back to label parsing
     const completedModuleIds = task.steps
@@ -3291,8 +3417,12 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
         this.getLeafParamFromLabel(failedStep.label, 'module')
       : undefined;
 
-    // P0: all episodes are stub — server can distinguish via isStub + executionMode digest
-    this.buildingSolver.reportEpisodeResult(
+    // ────────────────────────────────────────────────────────────────────
+    // Gap 1: Persist episode_hash asynchronously without blocking completion
+    // Fire-and-forget with .then() continuation that re-reads latest task
+    // ────────────────────────────────────────────────────────────────────
+    const taskId = task.id;
+    const reportPromise = this.buildingSolver.reportEpisodeResult(
       templateId,
       success,
       completedModuleIds,
@@ -3303,9 +3433,14 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
       linkage,
     );
 
+    // Persist episode hash asynchronously — does not block task completion
+    void reportPromise
+      .then((ack) => this.persistEpisodeAck(taskId, 'building', ack))
+      .catch(() => {}); // Swallow errors — episode reporting is best-effort
+
     console.log(
       `[Building] Episode reported: planId=${planId}, success=${success}, modules=${completedModuleIds.length}, ` +
-        `bundleHash=${keysForThisPlan?.bundleHash?.slice(0, 8) ?? 'none'}`
+        `bundleHash=${keysForThisPlan?.bundleHash?.slice(0, 8) ?? 'none'}, outcomeClass=${linkage.outcomeClass}`
     );
   }
 

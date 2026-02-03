@@ -174,16 +174,20 @@ if (!process.env.WORLD_SEED || process.env.WORLD_SEED === '0') {
 }
 
 // Bot configuration
-// Auth mode: 'microsoft' for real accounts with skins, 'offline' for local testing
-const authMode = (process.env.MINECRAFT_AUTH || 'offline') as 'microsoft' | 'offline';
-console.log(`🔐 Minecraft auth mode: ${authMode}${authMode === 'microsoft' ? ' (will prompt for Microsoft login on first connect)' : ''}`);
+// Auth: 'microsoft' = real account; session includes skin (default). 'offline' = no session; server usually shows default skin.
+const authMode = (process.env.MINECRAFT_AUTH || 'microsoft') as
+  | 'microsoft'
+  | 'offline';
+console.log(
+  `Minecraft auth mode: ${authMode}${authMode === 'microsoft' ? ' (will prompt for Microsoft login on first connect)' : ''}`
+);
 const botConfig: BotConfig = {
   host: process.env.MINECRAFT_HOST || 'localhost',
   port: process.env.MINECRAFT_PORT
     ? parseInt(process.env.MINECRAFT_PORT)
     : 25565,
   username: process.env.MINECRAFT_USERNAME || 'Sterling',
-  version: process.env.MINECRAFT_VERSION || '1.21.4',
+  version: process.env.MINECRAFT_VERSION || '1.21.9',
   auth: authMode,
 
   // World configuration for memory versioning
@@ -439,7 +443,10 @@ function setupBotStateWebSocket() {
     resilientFetch(`${memoryUrl}/enhanced/consolidate`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ trigger: 'death-respawn', dedupeKey: deathDedupeKey }),
+      body: JSON.stringify({
+        trigger: 'death-respawn',
+        dedupeKey: deathDedupeKey,
+      }),
       label: 'memory/consolidate-death',
     }).catch(() => {});
 
@@ -461,8 +468,15 @@ function setupBotStateWebSocket() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         type: 'failure',
-        content: '[PLACEHOLDER] Died and respawned. Need to reflect on what went wrong and be more careful.',
-        context: { emotionalState: 'cautious', recentEvents: ['death', 'respawn'], location: data.position, currentGoals: [], timeOfDay: 'unknown' },
+        content:
+          '[PLACEHOLDER] Died and respawned. Need to reflect on what went wrong and be more careful.',
+        context: {
+          emotionalState: 'cautious',
+          recentEvents: ['death', 'respawn'],
+          location: data.position,
+          currentGoals: [],
+          timeOfDay: 'unknown',
+        },
         lessons: ['Review what caused the death'],
         insights: ['Safety should be prioritized'],
         dedupeKey: deathDedupeKey,
@@ -1398,7 +1412,7 @@ app.get('/state', async (req, res) => {
           server: {
             playerCount: 1,
             difficulty: executionStatus?.bot?.server?.difficulty || 'normal',
-            version: executionStatus?.bot?.server?.version || '1.21.4',
+            version: executionStatus?.bot?.server?.version || '1.21.9',
           },
         },
         planningContext: {
@@ -1784,7 +1798,10 @@ app.post('/action', async (req, res) => {
       resilientFetch(`${memoryUrl}/enhanced/consolidate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ trigger: 'sleep-wake', dedupeKey: sleepDedupeKey }),
+        body: JSON.stringify({
+          trigger: 'sleep-wake',
+          dedupeKey: sleepDedupeKey,
+        }),
         label: 'memory/consolidate-sleep',
       }).catch(() => {});
 
@@ -1807,8 +1824,15 @@ app.post('/action', async (req, res) => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           type: 'narrative',
-          content: '[PLACEHOLDER] Woke up after sleeping through the night. A good time to reflect on recent experiences and consolidate what was learned.',
-          context: { emotionalState: 'rested', timeOfDay: 'morning', recentEvents: ['sleep'], currentGoals: [], location: null },
+          content:
+            '[PLACEHOLDER] Woke up after sleeping through the night. A good time to reflect on recent experiences and consolidate what was learned.',
+          context: {
+            emotionalState: 'rested',
+            timeOfDay: 'morning',
+            recentEvents: ['sleep'],
+            currentGoals: [],
+            location: null,
+          },
           lessons: [],
           insights: [],
           dedupeKey: sleepDedupeKey,
@@ -1818,7 +1842,8 @@ app.post('/action', async (req, res) => {
       }).catch(() => {});
 
       // Also reset stress
-      const cognitionUrl = process.env.COGNITION_SERVICE_URL || 'http://localhost:3003';
+      const cognitionUrl =
+        process.env.COGNITION_SERVICE_URL || 'http://localhost:3003';
       resilientFetch(`${cognitionUrl}/stress/reset`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

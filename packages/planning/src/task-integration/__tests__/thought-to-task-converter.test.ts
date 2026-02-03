@@ -655,12 +655,65 @@ describe('convertThoughtToTask', () => {
   });
 
   // =========================================================================
-  // Keyword fallback (no extractedGoal)
+  // IDLE-2 Intent Contract Enforcement (default behavior)
   // =========================================================================
 
-  describe('Keyword fallback path', () => {
-    it('content with "gather" + "wood" → gathering task', async () => {
+  describe('IDLE-2 Intent Contract — requireExplicitGoalTag (default: true)', () => {
+    it('content with action verbs but no [GOAL:] tag → dropped_sanitizer (IDLE-2 enforced)', async () => {
       const deps = makeDeps();
+      const thought = makeThought({
+        id: 'idle2_gather_1',
+        content: 'I need to gather some wood for crafting.',
+        metadata: { thoughtType: 'planning' },
+      });
+
+      const result = await convertThoughtToTask(thought, deps);
+      expect(result.decision).toBe('dropped_sanitizer');
+      expect(result.reason).toContain('IDLE-2');
+    });
+
+    it('soft language with action verbs → no task (IDLE-2 enforced)', async () => {
+      const deps = makeDeps();
+      const thought = makeThought({
+        id: 'idle2_soft_1',
+        content: 'Maybe I should craft a pickaxe from cobblestone.',
+        metadata: { thoughtType: 'idle-reflection' },
+      });
+
+      const result = await convertThoughtToTask(thought, deps);
+      expect(result.decision).toBe('dropped_sanitizer');
+      expect(result.reason).toContain('IDLE-2');
+    });
+
+    it('explicit [GOAL:] tag → task created (intent contract satisfied)', async () => {
+      const deps = makeDeps();
+      const thought = makeThought({
+        id: 'idle2_goal_1',
+        content: 'I should gather wood. [GOAL: collect oak_log 8]',
+        metadata: {
+          thoughtType: 'planning',
+          extractedGoal: makeGoalTag({
+            action: 'collect',
+            target: 'oak_log',
+            amount: 8,
+            raw: '[GOAL: collect oak_log 8]',
+          }),
+        },
+      });
+
+      const result = await convertThoughtToTask(thought, deps);
+      expect(result.decision).toBe('created');
+      expect(result.task!.type).toBe('gathering');
+    });
+  });
+
+  // =========================================================================
+  // Keyword fallback (legacy mode, requireExplicitGoalTag: false)
+  // =========================================================================
+
+  describe('Keyword fallback path (legacy mode: requireExplicitGoalTag=false)', () => {
+    it('content with "gather" + "wood" → gathering task', async () => {
+      const deps = makeDeps({ config: { requireExplicitGoalTag: false } });
       const thought = makeThought({
         id: 'keyword_gather_1',
         content: 'I need to gather some wood for crafting.',
@@ -673,7 +726,7 @@ describe('convertThoughtToTask', () => {
     });
 
     it('content with "craft" → crafting task', async () => {
-      const deps = makeDeps();
+      const deps = makeDeps({ config: { requireExplicitGoalTag: false } });
       const thought = makeThought({
         id: 'keyword_craft_1',
         content: 'I should craft a pickaxe from cobblestone.',
@@ -686,7 +739,7 @@ describe('convertThoughtToTask', () => {
     });
 
     it('content with "mine" → mining task', async () => {
-      const deps = makeDeps();
+      const deps = makeDeps({ config: { requireExplicitGoalTag: false } });
       const thought = makeThought({
         id: 'keyword_mine_1',
         content: 'Time to mine some ore from the cave.',
@@ -699,7 +752,7 @@ describe('convertThoughtToTask', () => {
     });
 
     it('general content with no keywords → dropped_sanitizer', async () => {
-      const deps = makeDeps();
+      const deps = makeDeps({ config: { requireExplicitGoalTag: false } });
       const thought = makeThought({
         id: 'keyword_general_1',
         content: 'The sky is very blue today and I feel calm.',
@@ -851,22 +904,22 @@ describe('convertThoughtToTask', () => {
       const deps = makeDeps();
       const thought = makeThought({
         id: 'goalkey_drive_1',
-        content: 'I should collect oak_log. [GOAL: collect oak_log 8]',
+        content: 'I should collect unique_goalkey_oak_log. [GOAL: collect unique_goalkey_oak_log 8]',
         metadata: {
           thoughtType: 'drive-tick',
-          goalKey: 'collect:oak_log',
+          goalKey: 'collect:unique_goalkey_oak_log',
           extractedGoal: makeGoalTag({
             action: 'collect',
-            target: 'oak_log',
+            target: 'unique_goalkey_oak_log',
             amount: 8,
-            raw: '[GOAL: collect oak_log 8]',
+            raw: '[GOAL: collect unique_goalkey_oak_log 8]',
           }),
         },
       });
 
       const result = await convertThoughtToTask(thought, deps);
       expect(result.decision).toBe('created');
-      expect(result.task!.metadata.goalKey).toBe('collect:oak_log');
+      expect(result.task!.metadata.goalKey).toBe('collect:unique_goalkey_oak_log');
     });
 
     it('computes goalKey from extractedGoal when thought has no goalKey (LLM path)', async () => {
@@ -920,8 +973,9 @@ describe('convertThoughtToTask', () => {
       warnSpy.mockRestore();
     });
 
-    it('goalKey is undefined when no extractedGoal (keyword fallback)', async () => {
-      const deps = makeDeps();
+    it('goalKey is undefined when no extractedGoal (keyword fallback, legacy mode)', async () => {
+      // Requires legacy mode since IDLE-2 enforces explicit [GOAL:] tags by default
+      const deps = makeDeps({ config: { requireExplicitGoalTag: false } });
       const thought = makeThought({
         id: 'goalkey_keyword_1',
         content: 'I need to gather some wood for building.',

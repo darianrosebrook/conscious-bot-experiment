@@ -28,8 +28,9 @@ services:
     container_name: conscious-bot-minecraft
     environment:
       EULA: "TRUE"
-      VERSION: "1.21.4"
-      ONLINE_MODE: "FALSE"
+      VERSION: "1.21.9"
+      # ONLINE_MODE=TRUE required for custom skins - authenticates via Mojang session servers
+      ONLINE_MODE: "TRUE"
       GAMEMODE: survival
       DIFFICULTY: peaceful
       SPAWN_PROTECTION: "0"

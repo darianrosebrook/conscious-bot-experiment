@@ -174,6 +174,14 @@ export interface ConvertThoughtToTaskDeps {
      * Enable once all producers reliably emit the field.
      */
     strictConvertEligibility?: boolean;
+    /**
+     * IDLE-2 Intent Contract Enforcement.
+     * When true (default), only explicit [GOAL:] tags from the sanitizer create tasks.
+     * When false, allow keyword-based fallback for backward compatibility.
+     *
+     * This enforces: "Thoughts never create tasks unless an explicit intent contract is emitted."
+     */
+    requireExplicitGoalTag?: boolean;
   };
 }
 
@@ -304,7 +312,22 @@ export async function convertThoughtToTask(
       actionType = ACTION_TO_TASK_TYPE[extractedGoal.action] || 'general';
       taskTitle = extractActionTitle(lower, extractedGoal.action);
     } else {
-      // Fallback: keyword-based classification (no LLM re-parse)
+      // IDLE-2 Intent Contract: By default, require explicit [GOAL:] tags.
+      // Keyword fallback is gated behind requireExplicitGoalTag=false for backward compat.
+      const requireExplicitGoalTag = deps.config?.requireExplicitGoalTag !== false;
+
+      if (requireExplicitGoalTag) {
+        // Strict mode (default): no [GOAL:] tag → no task.
+        // This enforces: "Thoughts never create tasks unless an explicit intent contract is emitted."
+        return {
+          task: null,
+          decision: 'dropped_sanitizer',
+          reason: 'IDLE-2: no explicit [GOAL:] tag — keyword fallback disabled',
+        };
+      }
+
+      // Legacy fallback: keyword-based classification (no LLM re-parse)
+      // Only reachable when requireExplicitGoalTag=false
       const content = lower;
       if (
         content.includes('gather') ||

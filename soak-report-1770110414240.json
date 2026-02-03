@@ -1,0 +1,43 @@
+{
+  "timestamp": "2026-02-03T09:15:05.892Z",
+  "mode": "both",
+  "durationMs": 308348,
+  "passed": true,
+  "summary": "Pipeline: 12 unique events, 42 HTTP attempts, 12 persisted, 12 dedupe rejects, 0 violations | Quality: 0 checked, 0 schema issues, 0 grounding failures",
+  "preflight": {
+    "memoryServiceHealthy": true,
+    "embeddingServiceHealthy": true,
+    "singleReflectionPersisted": true,
+    "metadataContractValid": true,
+    "effectiveEmbeddingHost": "http://localhost:11434",
+    "preflightDurationMs": 8048
+  },
+  "pipeline": {
+    "uniqueEventsEmitted": 12,
+    "totalHttpAttempts": 42,
+    "freshPostsAccepted": 12,
+    "dedupeRejectsViaStatus": 12,
+    "dedupeRejectsViaConstraint": 0,
+    "missingMetadataRows": 0,
+    "paginationViolations": 0,
+    "violations": [],
+    "latency": {
+      "memoryPostP50": 3,
+      "memoryPostP95": 6,
+      "findByDedupeKeyP50": 0,
+      "findByDedupeKeyP95": 0
+    }
+  },
+  "quality": {
+    "reflectionsChecked": 0,
+    "schemaValid": 0,
+    "schemaInvalid": 0,
+    "groundingPassed": 0,
+    "groundingFailed": 0,
+    "provenancePresent": 0,
+    "provenanceMissing": 0,
+    "placeholderCount": 0,
+    "generatedCount": 0,
+    "issues": []
+  }
+}

@@ -1,5 +1,13 @@
 # UMAP Dimensionality Reduction Service
 
+> **⚠️ DEPRECATED**: This standalone service has been consolidated into the MLX sidecar (`mlx-lm-sidecar/`).
+> The UMAP `/reduce` and `/clear-cache` endpoints are now available on the MLX sidecar server (port 5002).
+> This directory is kept for reference but should not be used in production.
+>
+> See `mlx-lm-sidecar/` for the consolidated service.
+
+---
+
 This service provides UMAP-based dimensionality reduction for visualizing the 768-dimensional embedding space of memories stored in PostgreSQL/pgvector.
 
 ## Setup

@@ -332,14 +332,38 @@ npx tsc --noEmit
 5. **Tighten Deprecated Fallback Heuristic**: `isSafeForDeprecatedFallback()` could additionally require at least one building-specific signal beyond `task.type === 'building'` (e.g., a step with `meta.domain === 'building'`). This reduces risk if tasks get mis-typed or misrouted.
 
 6. ~~**Phase 1 Identity Chain Pre-wiring**~~: ✅ **DONE** (2026-02-03). CB now:
+   - **LatchKey scoping** (2026-02-03): Latch now keyed by `${solverId}@${contractVersion}` (not just solverId). Version bumps automatically re-probe Sterling. All three bounded Sets use consistent `ByLatchKey` naming.
    - Parses `engineCommitment` and `operatorRegistryHash` from solve responses (via `parseSterlingIdentity`)
    - Stores them in `SolveJoinKeys` alongside `bundleHash`/`traceBundleHash` (closed loop: solve → store → report)
    - Added `engineCommitment` and `operatorRegistryHash` to both `SolveJoinKeys` and `EpisodeLinkage` interfaces
    - Added `buildEpisodeLinkage()` helper — single canonical place for linkage construction
    - Forwards new fields on `report_episode` **behind toggle** (`STERLING_REPORT_IDENTITY_FIELDS=1`, default OFF)
-   - **Downgrade-on-rejection**: If Sterling rejects unknown fields, retries once without identity fields and latches per-solverId
-   - Added once-per-solverId observability logging for identity field presence/absence
+   - **Downgrade-on-rejection**: If Sterling rejects unknown fields:
+     - **Identity-specific detection**: Only triggers retry if error mentions `engine_commitment` or `operator_registry_hash` (avoids retry tax on unrelated schema errors)
+     - Retries once without identity fields
+     - Only latches if retry succeeds (positive evidence that dropping fields fixed it)
+     - Preserves actual error hint in warning log for debugging
+     - Latch bounded to 256 entries (clear-on-overflow)
+   - **Wire compatibility**: Sends both `requestId` and `request_id` during migration; parses both `episode_hash`/`episodeHash` and `request_id`/`requestId` from responses
+   - Added once-per-latchKey observability logging for identity field presence/absence (latchKey = `${solverId}@${contractVersion}`)
    - Behavior remains identical against older Sterling versions (graceful degradation)
+   - **Latch lifetime**: Persists until process restart. If Sterling is upgraded mid-process, restart CB to re-probe.
+   - **Test reset hook**: `__resetIdentityLatchForTests()` available to prevent cross-test coupling
+
+7. ~~**Episode Hash Persistence**~~: ✅ **DONE** (2026-02-03). CB now:
+   - Parses `episode_hash` from `report_episode` ack (type: `EpisodeAck`)
+   - `persistEpisodeAck()` helper stores it in `task.metadata.solver.{domain}EpisodeHash` asynchronously
+   - Fire-and-forget pattern: uses `.then()` continuation to avoid blocking hot path
+   - Re-reads latest task before writing to avoid clobbering concurrent updates
+   - Domain→slot mapping via `EPISODE_HASH_SLOT` constant for cleaner signature
+
+8. ~~**Richer Outcome Taxonomy via Substrate**~~: ✅ **DONE** (2026-02-03). CB now:
+   - Captures `buildingSolveResultSubstrate` at solve-time with identity fields (`planId`, `bundleHash`)
+   - Stores solve outcome (`solved`, `error`, `totalNodes`, `searchHealth`, `compatIssues`)
+   - **Coherence check**: Substrate only used when `substrate.bundleHash === keysForThisPlan.bundleHash`
+   - Classification boundary: success → EXECUTION_SUCCESS; failure + solver failed + coherent → use `buildEpisodeLinkageFromResult()`; else → EXECUTION_FAILURE
+   - Debug logging gated behind `STERLING_EPISODE_DEBUG=1` environment variable
+   - `compatIssues` explicitly mapped to stable `{ code, severity }` shape (max 10 issues)
 
 ### Operational Checklist
 
@@ -363,7 +387,7 @@ This logs even if no tasks exercise the fallback. Intentional: makes compat path
 [JoinKeys] Migration fallback exercised: task=task-123, planId=plan-A
 ```
 
-**Phase 1 Identity Field Status** (emitted once per solverId on first solve with identity parsing):
+**Phase 1 Identity Field Status** (emitted once per latchKey on first solve with identity parsing):
 ```
 [Sterling] Identity fields for minecraft.building: all present (traceBundleHash, engineCommitment, operatorRegistryHash)
 [Sterling] Identity fields for minecraft.crafting: none present (server may be pre-Phase-1)
@@ -371,7 +395,7 @@ This logs even if no tasks exercise the fallback. Intentional: makes compat path
 ```
 This helps diagnose whether Sterling is emitting identity fields without spamming logs.
 
-**Identity Fields Rejected (Downgrade)** (emitted once per solverId when Sterling rejects unknown fields):
+**Identity Fields Rejected (Downgrade)** (emitted once per latchKey when Sterling rejects unknown fields):
 ```
 [Sterling] Identity fields rejected for minecraft.building — downgrading to core linkage only. Hint: validation error: unknown field engine_commitment. Toggle STERLING_REPORT_IDENTITY_FIELDS=0 or wait for server upgrade.
 ```
@@ -388,8 +412,12 @@ This makes misconfiguration visible and confirms the retry succeeded without ide
 | Linkage builder | Low | Pure refactor, same semantics |
 | Bounded Set | Low | Prevents memory leak, clear-on-overflow is conservative |
 | Phase 1 identity fields | Low | Toggle default OFF, no egress change until enabled |
-| Identity observability logging | Low | Once-per-solverId, informational only |
+| Identity observability logging | Low | Once-per-latchKey, informational only |
 | Downgrade-on-rejection | Low | Retry logic is transparent; worst case = two network calls |
+| Episode hash persistence | Low | Fire-and-forget continuation; re-reads task to avoid clobbering |
+| Solve result substrate | Low | Captured at solve-time; coherence-checked before use |
+| Substrate coherence check | Low | Conservative: incoherent → falls back to binary classification |
+| LatchKey scoping | Low | Version-aware; bumps automatically re-probe Sterling |
 
 ## What This Does NOT Change
 

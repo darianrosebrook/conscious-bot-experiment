@@ -9,6 +9,17 @@
 
 import { EventEmitter } from 'events';
 
+/**
+ * IDLE-1: Idle reason types for eligibility-based idle detection.
+ * Cognition treats different idle states appropriately based on this.
+ */
+export type IdleReason =
+  | 'no_tasks'           // True cognitive idle (no work exists)
+  | 'all_in_backoff'     // Tasks exist but are cooling down
+  | 'circuit_breaker_open' // Executor is in protection mode
+  | 'blocked_on_prereq'  // Tasks waiting on dependencies
+  | 'manual_pause';      // Tasks are manually paused
+
 export interface BotLifecycleEvent {
   type:
     | 'task_completed'
@@ -25,6 +36,8 @@ export interface BotLifecycleEvent {
     taskTitle?: string;
     previousTask?: string;
     activeTasksCount?: number;
+    eligibleTaskCount?: number;  // IDLE-1: Number of eligible tasks
+    idleReason?: IdleReason;     // IDLE-1: Why we're idle
     currentGoal?: string;
     worldState?: any;
     emotionalState?: string;
@@ -246,17 +259,39 @@ export class EventDrivenThoughtGenerator extends EventEmitter {
   }
 
   /**
-   * Generate thought content for idle periods
+   * Generate thought content for idle periods.
+   *
+   * IDLE-2: Replaced hardcoded goal-suggesting strings with context-aware
+   * observations based on idle_reason. These are observations, not goal
+   * suggestions - any goals must emerge from the LLM reasoning, not from
+   * this template.
    */
   private generateIdleThought(event: BotLifecycleEvent): string {
-    const thoughts = [
-      'I have some time now. What should I work on next?',
-      'I should check my progress and see if there are any resources I need.',
-      "Maybe I should explore a bit and see what's around here.",
-      'I could use this time to organize my thoughts and plan ahead.',
-    ];
+    const idleReason = event.data?.idleReason || 'no_tasks';
+    const activeCount = event.data?.activeTasksCount ?? 0;
+    const eligibleCount = event.data?.eligibleTaskCount ?? 0;
 
-    return thoughts[Math.floor(Math.random() * thoughts.length)];
+    // Generate observation based on idle reason (IDLE-1/IDLE-2)
+    // These are facts about the current state, not goal suggestions
+    switch (idleReason) {
+      case 'no_tasks':
+        return 'I have no active tasks. Observing my surroundings.';
+
+      case 'all_in_backoff':
+        return `My ${activeCount} task${activeCount !== 1 ? 's are' : ' is'} cooling down. Taking a moment to observe.`;
+
+      case 'circuit_breaker_open':
+        return 'The executor is recovering from errors. Waiting and watching.';
+
+      case 'blocked_on_prereq':
+        return `${activeCount} task${activeCount !== 1 ? 's are' : ' is'} waiting for prerequisites. Observing what I can do.`;
+
+      case 'manual_pause':
+        return 'Tasks are paused. Reflecting on the current situation.';
+
+      default:
+        return 'Observing my surroundings.';
+    }
   }
 
   /**

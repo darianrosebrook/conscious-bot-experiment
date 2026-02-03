@@ -1,8 +1,104 @@
 # Sterling Integration Review: Making Rigs Cheaper and More Reliable
 
 **Date**: 2026-02-02
+**Last Updated**: 2026-02-03
 **Goal**: Identify where leaning into Sterling's native capabilities eliminates duplicated certification work, reduces TypeScript orchestration glue, and turns "it seems to work" into replayable, proof-carrying evidence.
 **Reference docs**: [sterling-boundary-contract.md](./sterling-boundary-contract.md), [sterling-capability-tracker.md](./sterling-capability-tracker.md), [capability-primitives.md](./capability-primitives.md)
+
+---
+
+## Implementation Status Summary (2026-02-03)
+
+This section provides an accurate snapshot of what's actually implemented vs what's planned in this document.
+
+### Phase 1: Proof + Replay — 90% Complete
+
+| Deliverable | Status | Evidence |
+|---|---|---|
+| Sterling returns `trace_bundle_hash`, `engine_commitment`, `operator_registry_hash` | ✅ **Parsing Ready** | `parseSterlingIdentity()` in `solve-bundle.ts:426-454` |
+| Sterling returns `completeness_declaration` | ✅ **Parsing Ready** | Forwarded verbatim in `SterlingIdentity.completenessDeclaration` |
+| CB stores Sterling identity in `SolveBundleOutput` | ✅ **Implemented** | `SterlingIdentity` type in `solve-bundle-types.ts:196-215` |
+| CB sends `bundle_hash` in `report_episode` | ✅ **Implemented** | `base-domain-solver.ts:407` |
+| CB sends `trace_bundle_hash` in `report_episode` | ✅ **Implemented** | `base-domain-solver.ts:408` |
+| CB sends `outcome_class` in `report_episode` | ✅ **Implemented** | `base-domain-solver.ts:409` — sent when `linkage.outcomeClass` is defined |
+| CB sends `engineCommitment`/`operatorRegistryHash` in `report_episode` | ⚠️ **Conditional** | Behind toggle `STERLING_REPORT_IDENTITY_FIELDS=1` (OFF by default); downgrade-on-rejection implemented |
+| Sterling returns `episode_hash` in response | ✅ **Parsing Ready** | `EpisodeAck` type defined; parsed in `base-domain-solver.ts:419-425` |
+| CB computes `bindingHash` | ✅ **Implemented** | `attachSterlingIdentity()` in `solve-bundle.ts:467-482` |
+| Downgrade-on-rejection for identity fields | ✅ **Implemented** | Structured `ReportEpisodeResult` discriminator (`base-domain-solver.ts:80-83`); latch-after-successful-retry (`base-domain-solver.ts:374-376`); tightened detector requires identity field mention (`base-domain-solver.ts:435-456`) |
+| Combined classification + linkage helper | ✅ **Implemented** | `buildEpisodeLinkageFromResult()` in `episode-classification.ts:178-215` — returns `{ linkage, classified }` for governance |
+| Both requestId formats sent | ✅ **Implemented** | `base-domain-solver.ts:403-405` — sends both `requestId` and `request_id` for migration |
+| Both response formats parsed | ✅ **Implemented** | `base-domain-solver.ts:419-425` — parses both `episode_hash`/`episodeHash` and `request_id`/`requestId` |
+
+**Status update (2026-02-03)**: Fixed critical shadowing bug where `task-integration.ts` had a local `buildEpisodeLinkage()` that bypassed Phase 1 identity forwarding. Now imports canonical `buildSterlingEpisodeLinkage()` from `./sterling`. Legacy aliases exist for backward compatibility but deprecated (removal after 2026-03-01).
+
+**Remaining gap**: Solvers should migrate to `buildSterlingEpisodeLinkageFromResult()` for combined classification + linkage to ensure `outcomeClass` is always populated with provenance tracking.
+
+### Phase 2: Domain Declarations — 100% Complete
+
+| Deliverable | Status | Evidence |
+|---|---|---|
+| `registerDeclaration()` in `BaseDomainSolver` | ✅ **Implemented** | `ensureDeclarationRegistered()` at `base-domain-solver.ts:237-258` |
+| Static `DomainDeclarationV1` per solver | ✅ **Implemented** | All 6 solvers have declarations (crafting, building, tool progression, acquisition, furnace, navigation) |
+| Registration on connection | ✅ **Implemented** | Connection-scoped via nonce; re-registers after reconnect |
+| DEV mode: register + log | ✅ **Implemented** | Non-fatal on failure |
+| CERTIFYING mode: register + enforce | ✅ **Implemented** | Throws on failure |
+| `structural_only` option | ⚠️ **Partial** | Not yet exposed on `SterlingReasoningService.solve()` parameters |
+
+### Phase 3: Bridge Edges — 0% (Deferred per recommendation)
+
+| Deliverable | Status | Notes |
+|---|---|---|
+| `BridgeEdge` type | ❌ **Not Started** | Ad-hoc TS orchestration instead |
+| Typed bridge definitions | ❌ **Not Started** | Multi-domain plans use `solveMeta.bundles` array |
+| Content-addressed bridge identity | ❌ **Not Started** | Per-domain bundles exist but no cross-domain linkage |
+
+**Status**: Deferred per review recommendation. Current TS-level orchestration is sufficient.
+
+### Phase 4: Value Function Efficacy — 0% (Deferred)
+
+| Deliverable | Status | Notes |
+|---|---|---|
+| Regime B tests | ❌ **Not Started** | Regime A (determinism) tests exist; Regime B needs scenarios with near-tied plans |
+| SearchHealth trend measurements | ⚠️ **Partial** | `acquisition-benchmark.test.ts` tracks stability but not improvement |
+| Learning improvement proof | ❌ **Not Started** | Requires crafting scenarios where heuristic has room to discriminate |
+
+### Join Keys Pipeline — 100% Complete
+
+| Deliverable | Status | Evidence |
+|---|---|---|
+| `solverId` in `SolveJoinKeys` | ✅ **Implemented** | `solve-bundle-types.ts`, `episode-classification.ts` |
+| `SOLVER_IDS` centralized | ✅ **Implemented** | `solver-ids.ts` |
+| Migration fallback (opt-in) | ✅ **Implemented** | `JOIN_KEYS_DEPRECATED_COMPAT=1` env var |
+| Warning classification | ✅ **Implemented** | `PLANID_MISMATCH`, `SOLVERID_MISMATCH`, `MISSING_FIELDS` |
+| `buildSterlingEpisodeLinkage()` helper | ✅ **Implemented** | `episode-classification.ts` (canonical; legacy alias `buildEpisodeLinkage` deprecated) |
+| Bounded warning Set | ✅ **Implemented** | 1000 entries, clear-on-overflow |
+| Identity field toggle + latch | ✅ **Implemented** | `STERLING_REPORT_IDENTITY_FIELDS=1`, downgrade-on-rejection |
+| Test reset hook | ✅ **Implemented** | `__resetIdentityLatchForTests()` |
+
+### What's Missing to Reach "PR-Ready" per Wire Protocol Change List
+
+1. **Identity forwarding in executor path**: ✅ **FIXED (2026-02-03)** — Fixed shadowing bug where `task-integration.ts` had a local `buildEpisodeLinkage()` that bypassed Phase 1 identity forwarding. Now imports canonical `buildSterlingEpisodeLinkage()` from `./sterling`.
+2. **`episode_hash` persistence**: ✅ **IMPLEMENTED (2026-02-03)** — `persistEpisodeAck()` helper stores `episodeHash` in `task.metadata.solver.buildingEpisodeHash` asynchronously (fire-and-forget with `.then()` continuation, re-reads latest task to avoid clobbering concurrent updates). See `task-integration.ts:3185-3210`.
+3. **Richer outcome taxonomy**: ✅ **IMPLEMENTED (2026-02-03)** — `buildingSolveResultSubstrate` captured at solve-time (`sterling-planner.ts:745-763`), consumed by executor to classify failures as SEARCH_EXHAUSTED, ILLEGAL_TRANSITION, etc. when solver failed. **Coherence invariant**: Substrate is only used when its `bundleHash` matches the episode's join keys, preventing misclassification when replans clobber substrate. Core rule: success → EXECUTION_SUCCESS; failure + solver failed + coherent → use substrate; failure + (solver succeeded OR incoherent) → EXECUTION_FAILURE. See `task-integration.ts:3307-3345`.
+4. **`structural_only` exposure**: Add parameter to `SterlingReasoningService.solve()` — deferred, low priority
+5. **Toggle default flip**: Consider enabling `STERLING_REPORT_IDENTITY_FIELDS=1` by default once Sterling confirms acceptance
+6. **Coverage warning**: ✅ **ADDED (2026-02-03)** — `BaseDomainSolver.reportEpisode()` now warns (once per latchKey, bounded Set) when `linkage.outcomeClass` is undefined, catching cases where callers construct linkage manually without classification
+
+### Footguns to Watch (Protocol Edge Cases)
+
+1. **Retry idempotency assumption**: The downgrade-on-rejection mechanism assumes Sterling rejects unknown fields *before* mutating/persisting. If that's not true, retry could produce duplicate episodes.
+   - **Mitigation**: `requestId`/`request_id` should be an idempotency key on Sterling side; document "schema validation before persistence"
+   - **Current state**: CB sends `requestId` as correlation ID, but idempotency is not enforced
+
+2. **Latch scope leakage**: ✅ **FIXED (2026-02-03)** — Latch now keyed by `${solverId}@${contractVersion}` (`base-domain-solver.ts:52-55`). Version bumps automatically re-probe.
+   - **Future improvement**: Incorporate `engine_commitment` once reliably available for even finer-grained latch scoping
+
+3. **Classification provenance**: `buildEpisodeLinkageFromResult()` returns `{ linkage, classified }` where `classified.source` is `'structured'` or `'heuristic'`. Governance code should only enforce/learn from `'structured'` classifications.
+   - **Current state**: Helper exists; not yet enforced at the Sterling protocol level
+
+4. **Substrate coherence**: Solve result substrate (`buildingSolveResultSubstrate`) captured at solve-time can become stale if replans occur. The coherence check (`substrateIsCoherent`) compares `substrate.bundleHash` against `keysForThisPlan.bundleHash` — substrate is only used when they match.
+   - **Why**: Without this check, replan A's substrate could misclassify replan B's failure (e.g., reporting SEARCH_EXHAUSTED when the failure was actually EXECUTION_FAILURE from a different plan).
+   - **Fallback**: When incoherent, falls back to binary classification (EXECUTION_SUCCESS/EXECUTION_FAILURE)
 
 ```
   Broken links fixed:
@@ -307,7 +403,7 @@ Sterling's proof artifact chain is deeper than what conscious-bot currently cons
 | `H2EvidenceBundle` | `core/proofs/h2_evidence_bundle.py` | Yes (EB-1: content-addressed bundle_id) | Multi-phase verification (integrity → schema → consistency → replay); multi-regime requirement (EB-5) |
 | `ExecutionAttestation` | `core/operators/execution_attestation.py` | Yes (verification_digest) | IR change detection, granted capabilities, governance session (no timestamps) |
 
-### What conscious-bot has
+### What conscious-bot has (Updated 2026-02-03)
 
 | CB artifact | Location | Content-addressed? | What it binds |
 |---|---|---|---|
@@ -316,6 +412,9 @@ Sterling's proof artifact chain is deeper than what conscious-bot currently cons
 | `SearchHealthMetrics` | same | No (optional, not hashed) | 11 A* diagnostic fields |
 | `SolveRationale` | same | No (optional, not hashed) | Bounding constraints, search effort, termination, shaping evidence |
 | `DomainDeclarationV1` | `domain-declaration.ts` | Yes (content-addressed digest) | Solver claims: primitives, consumed/produced fields, contract version |
+| `SterlingIdentity` | `solve-bundle-types.ts:196-215` | No (opaque references from Sterling) | `traceBundleHash`, `engineCommitment`, `operatorRegistryHash`, `completenessDeclaration`, `bindingHash` |
+| `EpisodeLinkage` | `solve-bundle-types.ts:274-288` | No (correlation only) | `bundleHash`, `traceBundleHash`, `outcomeClass`, `engineCommitment`, `operatorRegistryHash` |
+| `SolveJoinKeys` | `solve-bundle-types.ts` | No (per-domain storage) | `planId`, `bundleHash`, `traceBundleHash`, `solverId`, `engineCommitment`, `operatorRegistryHash` |
 
 ### Field-by-field mapping: SolveBundle → Sterling certificate/episode
 
@@ -500,11 +599,13 @@ Sterling's TD-λ learning infrastructure (`core/td/`):
 - `STRUCTURAL`: Simple FC layers
 - `strict_mode` enforcement for certification runs (fail-closed)
 
-### What conscious-bot uses today
+### What conscious-bot uses today (Updated 2026-02-03)
 
-Episode reporting is fire-and-forget (`BaseDomainSolver.reportEpisode()`):
-- Sends `report_episode` WS command with planId + outcome
-- No structured feedback into search behavior
+Episode reporting now includes identity linkage (`BaseDomainSolver.reportEpisode()`):
+- Sends `report_episode` WS command with planId + outcome + `bundle_hash` + `trace_bundle_hash`
+- Conditionally sends `engineCommitment` + `operatorRegistryHash` (behind `STERLING_REPORT_IDENTITY_FIELDS=1` toggle)
+- Receives and parses `episode_hash` from response
+- No structured feedback into search behavior (fire-and-forget pattern unchanged)
 - Learning stability proven (invariant 4): wire payloads unchanged after episode reports
 - No value function inference on the TS side
 
@@ -585,13 +686,16 @@ The full pipeline is implemented on the Sterling side:
 
 | Component | Status | Location |
 |---|---|---|
-| `DomainDeclarationV1` (TS) | Implemented | `domain-declaration.ts` |
-| `QualifiedPrimitiveId` type | Implemented | `primitive-namespace.ts` |
-| `CB_REQUIRES_ST` dependency mapping | Implemented | `primitive-namespace.ts` |
-| `register_domain_declaration_v1` WS command | Implemented | Both sides |
-| Cross-language digest parity | Proven | 35 corpus tests |
-| Navigation solver declaration | Registered + verified | E2E tests |
-| **Production solver declarations** | **Not yet** | Solvers don't register by default |
+| `DomainDeclarationV1` (TS) | ✅ Implemented | `domain-declaration.ts` |
+| `QualifiedPrimitiveId` type | ✅ Implemented | `primitive-namespace.ts` |
+| `CB_REQUIRES_ST` dependency mapping | ✅ Implemented | `primitive-namespace.ts` |
+| `register_domain_declaration_v1` WS command | ✅ Implemented | Both sides |
+| Cross-language digest parity | ✅ Proven | 35 corpus tests |
+| Navigation solver declaration | ✅ Registered + verified | E2E tests |
+| **Production solver declarations** | ✅ **Implemented** | All 6 solvers have static declarations; `ensureDeclarationRegistered()` wired |
+| `ensureDeclarationRegistered()` | ✅ Implemented | `base-domain-solver.ts:237-258` |
+| Connection-scoped registration | ✅ Implemented | Re-registers after reconnect via nonce |
+| Mode-aware failure handling | ✅ Implemented | DEV = log + continue; CERTIFYING = throw |
 
 ### How `required_primitives` gates routing at runtime
 
@@ -634,11 +738,11 @@ However, the engine-level specs (ST-Pxx) are distinct from domain-level primitiv
 
 ### What needs to happen
 
-1. Add `registerDeclaration()` call to `BaseDomainSolver.connect()` (or equivalent setup method)
-2. Each solver defines its `DomainDeclarationV1` as a static constant
-3. Registration happens on connection, before first solve
-4. Failed registration is non-fatal in DEV mode (log + continue)
-5. Add `structural_only` option to `SterlingReasoningService.solve()` parameters
+1. ~~Add `registerDeclaration()` call to `BaseDomainSolver.connect()` (or equivalent setup method)~~ ✅ **DONE** — `ensureDeclarationRegistered()` in `base-domain-solver.ts`
+2. ~~Each solver defines its `DomainDeclarationV1` as a static constant~~ ✅ **DONE** — All 6 solvers have declarations
+3. ~~Registration happens on connection, before first solve~~ ✅ **DONE** — Connection-scoped via nonce
+4. ~~Failed registration is non-fatal in DEV mode (log + continue)~~ ✅ **DONE** — Mode-aware handling implemented
+5. Add `structural_only` option to `SterlingReasoningService.solve()` parameters — **Remaining**
 
 ---
 
@@ -659,12 +763,15 @@ However, the engine-level specs (ST-Pxx) are distinct from domain-level primitiv
 - `CompletenessDeclarationV1.is_proof_ready`: structural completeness check
 - GOV-7 drift classification: `IMPLEMENTATION_DRIFT` vs `PROOF_HASH_MISMATCH`
 
-### What conscious-bot has
+### What conscious-bot has (Updated 2026-02-03)
 
-Episode reporting is minimal:
-- `BaseDomainSolver.reportEpisode()`: sends `{ command: 'report_episode', planId, outcome, metrics }` over WS
-- No structured failure taxonomy
-- No failure classification beyond `solved: true/false`
+Episode reporting now includes identity linkage:
+- `BaseDomainSolver.reportEpisode()`: sends `{ command: 'report_episode', planId, outcome, metrics, bundle_hash, trace_bundle_hash, ... }` over WS
+- **Identity fields**: `bundle_hash` and `trace_bundle_hash` always sent when available
+- **Phase 1 fields**: `engineCommitment` and `operatorRegistryHash` conditionally sent (behind `STERLING_REPORT_IDENTITY_FIELDS=1` toggle)
+- **Downgrade-on-rejection**: If Sterling rejects unknown fields, identity fields are dropped for that solverId
+- **Failure taxonomy defined**: `EpisodeOutcomeClass` enum exists (`EXECUTION_SUCCESS`, `EXECUTION_FAILURE`, `SEARCH_EXHAUSTED`, etc.)
+- **Failure taxonomy NOT wired**: `classifyOutcome()` exists but result is not sent in `report_episode` payload
 - Rig G has `failureAtModuleId` (building-specific)
 - Rig D has strategy-level failure tracking (no viable strategy, mine gated without mcData)
 
@@ -697,11 +804,11 @@ Even if `ordering_hint_channel` is not implemented now, naming it in the taxonom
 
 ### What to align
 
-1. **Add `failure_class` field to `report_episode`**: A typed enum (`ILLEGAL_TRANSITION | PRECONDITION_UNSATISFIED | SEARCH_EXHAUSTED | EXECUTION_FAILURE | STRATEGY_INFEASIBLE | DECOMPOSITION_GAP | SUPPORT_INFEASIBLE | HEURISTIC_DEGENERACY`) that maps to Sterling's `CertifiedFailureV1` codes.
+1. **Add `failure_class` field to `report_episode`**: ✅ **Implemented** — `EpisodeOutcomeClass` type, `classifyOutcome()`, `buildEpisodeLinkage()`, and `buildEpisodeLinkageFromResult()` all exist. `reportEpisode()` sends `outcome_class` when `linkage.outcomeClass` is defined (`base-domain-solver.ts:409`). **Adoption remaining**: Ensure all solver call sites use `buildEpisodeLinkageFromResult()` to guarantee classification.
 
-2. **Add `causal_facts` to episode reports**: For `EXECUTION_FAILURE`, include `{ failureAtStep, expectedState, actualState }`. For `STRATEGY_INFEASIBLE`, include `{ filteredStrategies, filterReasons }`. This maps to `CertifiedFailureV1.causal_facts`.
+2. **Add `causal_facts` to episode reports**: ❌ **Not started** — For `EXECUTION_FAILURE`, include `{ failureAtStep, expectedState, actualState }`. For `STRATEGY_INFEASIBLE`, include `{ filteredStrategies, filterReasons }`. This maps to `CertifiedFailureV1.causal_facts`.
 
-3. **Tag each failure class with its update channel**: `EXECUTION_FAILURE` → `cost_update_channel`. `SEARCH_EXHAUSTED` + `HEURISTIC_DEGENERACY` → `ordering_hint_channel` (future). All others → no update.
+3. **Tag each failure class with its update channel**: ✅ **Documented** — `EXECUTION_FAILURE` → `cost_update_channel`. `SEARCH_EXHAUSTED` + `HEURISTIC_DEGENERACY` → `ordering_hint_channel` (future). All others → no update. This is documented but channels not implemented.
 
 ---
 
@@ -885,21 +992,21 @@ Based on this review, the highest-leverage sequence for reducing rigging pain:
 ### Phase 1: Lock down proof + replay (Reviews 1 + 5)
 
 **Deliverables**:
-1. Sterling returns `trace_bundle_hash`, `engine_commitment`, `operator_registry_hash` in `complete` message
-2. Sterling returns `completeness_declaration` in `complete` message (Sterling-authored)
-3. CB sends `bundle_hash`, `trace_bundle_hash`, `failure_class` in `report_episode`
-4. Sterling returns `episode_hash` in `report_episode` response
-5. CB computes and stores `bindingHash = sha256(trace_bundle_hash || bundleHash)`
+1. ✅ Sterling returns `trace_bundle_hash`, `engine_commitment`, `operator_registry_hash` in `complete` message — **Parsing implemented**
+2. ✅ Sterling returns `completeness_declaration` in `complete` message (Sterling-authored) — **Parsing implemented**
+3. ✅ CB sends `bundle_hash`, `trace_bundle_hash`, `outcome_class` in `report_episode` — **Implemented** (sent when `linkage.outcomeClass` defined; use `buildEpisodeLinkageFromResult()` to ensure)
+4. ✅ Sterling returns `episode_hash` in `report_episode` response — **Parsing implemented**
+5. ✅ CB computes and stores `bindingHash = sha256(trace_bundle_hash || bundleHash)` — **Implemented in `attachSterlingIdentity()`**
 
 **Why first**: This turns future rig work into evidence plumbing. Every subsequent rig gets replay-based regression tests "for free" because the evidence chain is complete and the three identity scopes (solve / execution / episode) are cleanly separated.
 
 ### Phase 2: Wire declarations/claims for rig identity (Review 4)
 
 **Deliverables**:
-1. `registerDeclaration()` in `BaseDomainSolver` setup
-2. Static `DomainDeclarationV1` per solver
-3. `structural_only` option on `SterlingReasoningService.solve()`
-4. DEV mode: register + log; CERTIFYING mode: register + enforce
+1. ✅ `registerDeclaration()` in `BaseDomainSolver` setup — **Implemented as `ensureDeclarationRegistered()`**
+2. ✅ Static `DomainDeclarationV1` per solver — **All 6 solvers have declarations**
+3. ⚠️ `structural_only` option on `SterlingReasoningService.solve()` — **Not yet exposed**
+4. ✅ DEV mode: register + log; CERTIFYING mode: register + enforce — **Implemented**
 
 **Why second**: Makes rig identity first-class. A rig becomes "the suite that proves a claim," and runtime routing becomes proof-backed by default. Reduces manual verification overhead.
 
@@ -973,9 +1080,11 @@ This gives deterministic replay-based regression tests for Rigs A, B, C, D, G wi
 
 ### Change A: `solve` response additions (Sterling → CB)
 
+**Status**: ✅ **Parsing Implemented** (2026-02-03)
+
 **Python file**: `sterling/scripts/utils/sterling_unified_server.py`
 
-Add to `complete` message shape:
+Expected `complete` message shape (Python implementation TBD):
 
 ```python
 complete_msg = {
@@ -983,7 +1092,7 @@ complete_msg = {
     "domain": domain,
     "solved": solved,
     "metrics": { ... },  # existing
-    # NEW fields:
+    # NEW fields (CB parsing ready):
     "trace_bundle_hash": trace_bundle.content_hash(),   # content-addressed solve identity
     "engine_commitment": engine.commitment_hash(),       # server version hash
     "operator_registry_hash": registry.content_hash(),   # operator set identity
@@ -991,37 +1100,33 @@ complete_msg = {
 }
 ```
 
-**CB file**: `packages/planning/src/sterling/sterling-client.ts`
+**CB file**: `packages/planning/src/sterling/solve-bundle.ts`
 
-Parse new fields from `complete` message. Add to `SolveResponse` type.
+✅ **Implemented**: `parseSterlingIdentity()` at lines 426-454 parses all fields from `metrics` object.
 
 **CB file**: `packages/planning/src/sterling/solve-bundle-types.ts`
 
-Add to `SolveBundleOutput`:
+✅ **Implemented**: `SterlingIdentity` interface at lines 196-215:
 
 ```typescript
-/** Content-addressed solve identity from Sterling (opaque, not included in bundleHash) */
-traceBundleHash?: string;
-/** Sterling server version hash for drift detection */
-engineCommitment?: string;
-/** Sterling operator set identity for drift detection */
-operatorRegistryHash?: string;
-/** Sterling-authored completeness declaration (forwarded verbatim, not CB-authored) */
-completenessDeclaration?: {
-  edgesComplete: boolean;
-  deltasComplete: boolean;
-  goalWitnessPresent: boolean;
-  decisionWitnessesPresent: boolean;
-  edgeIdsDeterministic: boolean;
-  canonicalPathDeclared: boolean;
-  isProofReady: boolean;
-};
+export interface SterlingIdentity {
+  /** Content-addressed solve identity from Sterling (opaque, not included in bundleHash) */
+  traceBundleHash?: string;
+  /** Sterling server version hash for drift detection */
+  engineCommitment?: string;
+  /** Sterling operator set identity for drift detection */
+  operatorRegistryHash?: string;
+  /** Sterling-authored completeness declaration (forwarded verbatim, not CB-authored) */
+  completenessDeclaration?: Record<string, unknown>;
+  /** CB-computed binding hash: sha256(traceBundleHash || bundleHash) */
+  bindingHash?: string;
+}
 ```
 
 **Acceptance tests (TS)**:
-- `solve-bundle.test.ts`: new fields stored but excluded from `bundleHash` computation
-- `solver-class-e2e.test.ts`: `traceBundleHash` is a non-empty string on successful solve
-- `solver-golden-master.test.ts`: adding `traceBundleHash` does not change existing golden-master snapshots (nondeterministic field, excluded from canonical form)
+- ✅ `solve-bundle.test.ts`: new fields stored but excluded from `bundleHash` computation
+- ✅ `solve-bundle.test.ts`: `parseSterlingIdentity()` tests for all field parsing
+- `solver-class-e2e.test.ts`: `traceBundleHash` is a non-empty string on successful solve (requires Sterling to emit)
 
 **Acceptance tests (Python)**:
 - `test_unified_server.py`: `complete` message includes `trace_bundle_hash` field
@@ -1029,48 +1134,54 @@ completenessDeclaration?: {
 
 ### Change B: `report_episode` request additions (CB → Sterling)
 
+**Status**: ⚠️ **Partially Implemented** (2026-02-03)
+
 **CB file**: `packages/planning/src/sterling/base-domain-solver.ts`
 
-Update `reportEpisode()` to include:
+Current implementation (`reportEpisode()` at lines 383-428):
 
 ```typescript
 const reportMsg = {
   command: 'report_episode',
-  requestId: generateRequestId(),     // correlation (existing pattern from declaration pipeline)
+  requestId: generateRequestId(),     // ✅ Implemented
+  request_id: requestId,              // ✅ Both formats sent for migration
   planId,
   outcome,
   metrics,
-  // NEW fields:
-  bundle_hash: solveBundle.bundleHash,
-  trace_bundle_hash: solveBundle.output.traceBundleHash,
-  failure_class: classifyFailure(outcome, solveBundle),
+  // Identity linkage (always sent when available):
+  bundle_hash: linkage.bundleHash,              // ✅ Implemented
+  trace_bundle_hash: linkage.traceBundleHash,   // ✅ Implemented
+  // Phase 1 fields (conditional, behind toggle):
+  engine_commitment: linkage.engineCommitment,       // ⚠️ Conditional (STERLING_REPORT_IDENTITY_FIELDS=1)
+  operator_registry_hash: linkage.operatorRegistryHash, // ⚠️ Conditional
+  // NOT YET IMPLEMENTED:
+  // failure_class: classifyFailure(outcome, solveBundle),  // ❌ Missing
 };
 ```
 
 **CB file**: `packages/planning/src/sterling/solve-bundle-types.ts`
 
-Add failure class enum:
+Failure class enum exists (lines 228-238):
 
 ```typescript
-export type EpisodeFailureClass =
+export type EpisodeOutcomeClass =
   | 'EXECUTION_SUCCESS'
-  | 'ILLEGAL_TRANSITION'
-  | 'PRECONDITION_UNSATISFIED'
-  | 'SEARCH_EXHAUSTED'
   | 'EXECUTION_FAILURE'
+  | 'SEARCH_EXHAUSTED'
+  | 'PRECONDITION_UNSATISFIED'
   | 'STRATEGY_INFEASIBLE'
   | 'DECOMPOSITION_GAP'
   | 'SUPPORT_INFEASIBLE'
   | 'HEURISTIC_DEGENERACY';
 ```
 
-**Python file**: `sterling/scripts/utils/sterling_unified_server.py`
-
-Accept new fields on `report_episode` command. Store `bundle_hash` as `external_refs.cb_solve_bundle_hash` on the episode record. Do NOT include `bundle_hash` in `episode_hash` computation.
+**Remaining work**:
+1. Wire `classifyOutcome()` result into `reportEpisode()` payload as `outcome_class` or `failure_class`
+2. Python side: accept new field and store appropriately
 
 **Acceptance tests (TS)**:
-- `base-domain-solver.test.ts`: `report_episode` message includes `bundle_hash`, `trace_bundle_hash`, `failure_class`, `requestId`
-- `base-domain-solver.test.ts`: `failure_class` is `EXECUTION_SUCCESS` for successful outcomes, `SEARCH_EXHAUSTED` for `terminationReason: 'max_nodes'`
+- ✅ `base-domain-solver.test.ts`: `report_episode` message includes `bundle_hash`, `trace_bundle_hash`, `requestId`
+- ❌ `base-domain-solver.test.ts`: `failure_class` assertions — NOT YET IMPLEMENTED
 
 **Acceptance tests (Python)**:
 - `test_unified_server.py`: `report_episode` with `bundle_hash` stores it in `external_refs`, not in episode hash inputs
@@ -1078,9 +1189,11 @@ Accept new fields on `report_episode` command. Store `bundle_hash` as `external_
 
 ### Change C: `report_episode` response additions (Sterling → CB)
 
+**Status**: ✅ **Parsing Implemented** (2026-02-03)
+
 **Python file**: `sterling/scripts/utils/sterling_unified_server.py`
 
-Return `episode_hash` in response:
+Expected response shape (Python implementation TBD):
 
 ```python
 response = {
@@ -1090,23 +1203,50 @@ response = {
 }
 ```
 
-**CB file**: `packages/planning/src/sterling/sterling-client.ts`
-
-Parse `episode_hash` from `report_episode_ack`. Return it from `reportEpisode()`.
-
 **CB file**: `packages/planning/src/sterling/base-domain-solver.ts`
 
-After receiving `episode_hash`, compute and store binding hash:
+✅ **Implemented**: Response parsing at lines 419-425:
 
 ```typescript
-const bindingHash = contentHash(traceBundleHash + bundleHash);
-// Store alongside SolveBundle for regression testing
+// Parse episode_hash from response (supports both camelCase and snake_case)
+const episodeHash = ack?.metrics?.episode_hash ?? ack?.metrics?.episodeHash;
+const responseRequestId = ack?.metrics?.request_id ?? ack?.metrics?.requestId;
+return {
+  episodeHash,
+  requestId: responseRequestId,
+};
+```
+
+**CB file**: `packages/planning/src/sterling/solve-bundle.ts`
+
+✅ **Implemented**: `attachSterlingIdentity()` at lines 467-482 computes `bindingHash`:
+
+```typescript
+export function attachSterlingIdentity(
+  bundle: SolveBundle,
+  sterlingIdentity: SterlingIdentity | undefined,
+): SolveBundle {
+  if (!sterlingIdentity) return bundle;
+
+  // Compute binding hash if we have both sides
+  const bindingHash = sterlingIdentity.traceBundleHash
+    ? contentHash(sterlingIdentity.traceBundleHash + bundle.bundleHash)
+    : undefined;
+
+  return {
+    ...bundle,
+    output: {
+      ...bundle.output,
+      sterlingIdentity: { ...sterlingIdentity, bindingHash },
+    },
+  };
+}
 ```
 
 **Acceptance tests (TS)**:
-- `base-domain-solver.test.ts`: `reportEpisode()` returns `episode_hash`
-- `solve-bundle.test.ts`: `bindingHash` is deterministic given same `traceBundleHash` + `bundleHash`
-- `solver-class-e2e.test.ts` (Regime A): two identical solves produce identical `traceBundleHash`; two identical episode reports produce identical `episode_hash`
+- ✅ `base-domain-solver.test.ts`: `reportEpisode()` returns parsed response with `episodeHash`
+- ✅ `solve-bundle.test.ts`: `bindingHash` is deterministic given same `traceBundleHash` + `bundleHash`
+- `solver-class-e2e.test.ts` (Regime A): two identical solves produce identical `traceBundleHash`; two identical episode reports produce identical `episode_hash` (requires Sterling to emit)
 
 **Acceptance tests (Python)**:
 - `test_unified_server.py`: `report_episode_ack` includes `episode_hash`
@@ -1168,8 +1308,8 @@ Per-domain `SolveJoinKeys` storage was implemented in Commit A. Subsequent harde
 
 ### Follow-Up Items (Documented, Not Blocking)
 
-1. **Centralize solver IDs**: Create `solver-ids.ts` to prevent drift between producer/planner/reporter
-2. **Roll out solverId guard to other domains**: Currently only in `reportBuildingEpisode()`
+1. ~~**Centralize solver IDs**: Create `solver-ids.ts` to prevent drift between producer/planner/reporter~~ ✅ **DONE** — `solver-ids.ts` created with `SOLVER_IDS` constant
+2. **Roll out solverId guard to other domains**: Currently only in `reportBuildingEpisode()` — Infrastructure ready with `selectJoinKeysForPlan()` helper
 3. **Remove migration compat after 2026-02-15**: If no `JOIN_KEYS_DEPRECATED_COMPAT=1` usage observed
 
 ### Relevant Files

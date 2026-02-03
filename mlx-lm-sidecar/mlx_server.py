@@ -6,18 +6,25 @@ Ollama-compatible REST API for text generation and embeddings using MLX
 on Apple Silicon. Drop-in replacement so existing TypeScript consumers
 (LLMInterface, EmbeddingService) need zero API changes.
 
+Also includes UMAP dimensionality reduction for embedding visualization
+(consolidated from the standalone umap-service).
+
 Endpoints:
   GET  /health          - Health check
   GET  /api/tags        - List loaded models (Ollama compat)
   POST /api/generate    - Text generation (Ollama compat)
   POST /api/embeddings  - Embedding generation (Ollama compat)
+  POST /reduce          - UMAP 768D → 3D reduction for visualization
+  POST /clear-cache     - Clear UMAP reduction cache
 """
 
 import argparse
+import hashlib
 import threading
 import time
 
 import mlx.core as mx
+import numpy as np
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 
@@ -41,6 +48,10 @@ generation_model_name = ""
 embedding_model = None
 embedding_tokenizer = None
 embedding_model_name = ""
+
+# UMAP reduction cache (keyed by content hash of embeddings)
+umap_reduction_cache: dict = {}
+umap_reducer = None  # Lazy-loaded on first /reduce call
 
 
 # ---------------------------------------------------------------------------
@@ -89,6 +100,8 @@ def health():
     payload = {
         "generation_model": generation_model_name or None,
         "embedding_model": embedding_model_name or None,
+        "umap_cache_size": len(umap_reduction_cache),
+        "umap_available": True,  # UMAP is always available (lazy-loaded on first use)
     }
     if not ready:
         return jsonify({"status": "loading", **payload}), 503
@@ -190,6 +203,89 @@ def api_embeddings():
         vec = embeds[0].tolist()
 
     return jsonify({"embedding": vec})
+
+
+# ---------------------------------------------------------------------------
+# UMAP Dimensionality Reduction Routes
+# ---------------------------------------------------------------------------
+
+@app.route("/reduce", methods=["POST"])
+def reduce_embeddings():
+    """
+    Reduce high-dimensional embeddings to 3D for visualization.
+
+    Input: { embeddings: [[...768 floats...], ...], ids: [...], metadata: [...] }
+    Output: { points: [{ id, x, y, z, metadata }, ...], hash, count }
+    """
+    global umap_reduction_cache
+
+    data = request.get_json(force=True)
+    if not data or "embeddings" not in data:
+        return jsonify({"error": "Missing embeddings field"}), 400
+
+    embeddings = np.array(data["embeddings"], dtype=np.float32)
+    ids = data.get("ids", [str(i) for i in range(len(embeddings))])
+    metadata = data.get("metadata", [{}] * len(embeddings))
+
+    if len(embeddings) < 5:
+        return jsonify({"error": "Need at least 5 embeddings for UMAP", "points": []}), 400
+
+    # Hash for cache key
+    content_hash = hashlib.sha256(embeddings.tobytes()).hexdigest()[:16]
+
+    if content_hash in umap_reduction_cache:
+        _log(f"[UMAP] Cache hit for hash {content_hash}")
+        return jsonify(umap_reduction_cache[content_hash])
+
+    # Lazy import umap to avoid startup delay if not used
+    import umap
+
+    # Fit UMAP reducer with appropriate n_neighbors
+    n_neighbors = min(15, max(2, len(embeddings) - 1))
+    reducer = umap.UMAP(
+        n_components=3,
+        n_neighbors=n_neighbors,
+        min_dist=0.1,
+        metric="cosine",
+        random_state=42,  # Deterministic for reproducibility
+    )
+
+    _log(f"[UMAP] Reducing {len(embeddings)} embeddings to 3D...")
+    coords_3d = reducer.fit_transform(embeddings)
+
+    # Normalize to [-1, 1] range for Three.js
+    mins = coords_3d.min(axis=0)
+    maxs = coords_3d.max(axis=0)
+    ranges = maxs - mins + 1e-8  # Avoid division by zero
+    coords_3d = (coords_3d - mins) / ranges
+    coords_3d = coords_3d * 2 - 1
+
+    points = [
+        {
+            "id": ids[i],
+            "x": float(coords_3d[i, 0]),
+            "y": float(coords_3d[i, 1]),
+            "z": float(coords_3d[i, 2]),
+            "metadata": metadata[i],
+        }
+        for i in range(len(coords_3d))
+    ]
+
+    result = {"points": points, "hash": content_hash, "count": len(points)}
+    umap_reduction_cache[content_hash] = result
+    _log(f"[UMAP] Reduction complete: {len(points)} points, cached as {content_hash}")
+
+    return jsonify(result)
+
+
+@app.route("/clear-cache", methods=["POST"])
+def clear_umap_cache():
+    """Clear the UMAP reduction cache."""
+    global umap_reduction_cache
+    count = len(umap_reduction_cache)
+    umap_reduction_cache = {}
+    _log(f"[UMAP] Cache cleared: {count} entries removed")
+    return jsonify({"cleared": count})
 
 
 # ---------------------------------------------------------------------------

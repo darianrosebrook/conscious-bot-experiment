@@ -153,6 +153,49 @@ export interface Task {
       toolProgressionSolveJoinKeys?: import('../sterling/solve-bundle-types').SolveJoinKeys;
       /** Acquisition solver join keys */
       acquisitionSolveJoinKeys?: import('../sterling/solve-bundle-types').SolveJoinKeys;
+
+      // ────────────────────────────────────────────────────────────────────
+      // Episode hash slots (Gap 1: persist episode_hash from report_episode ack)
+      // ────────────────────────────────────────────────────────────────────
+
+      /** Last episode hash returned by Sterling for building domain */
+      buildingEpisodeHash?: string;
+      /** Last episode hash returned by Sterling for crafting domain */
+      craftingEpisodeHash?: string;
+      /** Last episode hash returned by Sterling for tool progression domain */
+      toolProgressionEpisodeHash?: string;
+      /** Last episode hash returned by Sterling for acquisition domain */
+      acquisitionEpisodeHash?: string;
+
+      // ────────────────────────────────────────────────────────────────────
+      // Solve result substrate (Gap 3: richer outcome taxonomy in executor path)
+      // Stored at solve-time, consumed at report-time for classification
+      // ────────────────────────────────────────────────────────────────────
+
+      /**
+       * Building solver outcome substrate for deferred classification.
+       * Captured at solve-time; used by executor to classify failures richer than binary.
+       *
+       * COHERENCE INVARIANT: Only consumed when `bundleHash` matches the episode's
+       * join keys. Prevents misclassifying replan A's failure as replan B's outcome.
+       */
+      buildingSolveResultSubstrate?: {
+        /** Identity fields for coherence check — must match episode's join keys */
+        planId?: string;
+        bundleHash?: string;
+        /** Solve outcome */
+        solved: boolean;
+        error?: string;
+        totalNodes?: number;
+        searchHealth?: { terminationReason?: string };
+        /** Classification options snapshot */
+        opts?: {
+          maxNodes?: number;
+          compatIssues?: Array<{ code: string; severity: string }>;
+        };
+        capturedAt: number;
+      };
+
       /** Additional solver-specific fields */
       [key: string]: unknown;
     };

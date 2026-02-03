@@ -883,7 +883,7 @@ export default function Dashboard() {
                       </div>
                       <div className={styles.envCell}>
                         <span className={styles.envLabel}>Nearby</span>
-                        <div>{environment.nearbyEntities.join(', ')}</div>
+                        <div>{environment.nearbyEntities?.join(', ') || 'None'}</div>
                       </div>
                     </div>
                   ) : (
@@ -1048,7 +1048,7 @@ export default function Dashboard() {
                           armor={0}
                           breath={20}
                           experience={0}
-                          hotbarItems={inventory.filter(
+                          hotbarItems={(inventory || []).filter(
                             (item) => item.slot >= 0 && item.slot <= 8
                           )}
                           selectedSlot={botState?.selectedSlot ?? 0}
@@ -1194,7 +1194,7 @@ export default function Dashboard() {
                           armor={0}
                           breath={20}
                           experience={0}
-                          hotbarItems={inventory.filter(
+                          hotbarItems={(inventory || []).filter(
                             (item) => item.slot >= 0 && item.slot <= 8
                           )}
                           selectedSlot={botState?.selectedSlot ?? 0}

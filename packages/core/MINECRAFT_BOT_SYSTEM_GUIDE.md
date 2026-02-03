@@ -61,6 +61,11 @@ export MINECRAFT_USERNAME=ConsciousBot
 export MINECRAFT_VERSION=1.21.4
 ```
 
+**Auth and skin display**
+
+- `MINECRAFT_AUTH` (default: `microsoft`) — `microsoft` logs in with a real account so the **account’s selected skin** is sent in the session. Use `offline` for local/testing (no Microsoft login; server usually shows a default skin).
+- For the in-game bot to show that skin on a **third-party server**, the server must support skins (e.g. fetch from Mojang session or run a plugin like SkinRestorer). The bot side only needs `MINECRAFT_AUTH=microsoft` and the account to have the desired skin set at minecraft.net.
+
 ### Programmatic Usage
 
 ```typescript

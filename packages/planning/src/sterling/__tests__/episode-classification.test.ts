@@ -7,7 +7,15 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { classifyOutcome, extractSolveJoinKeys, buildEpisodeLinkage } from '../episode-classification';
+import {
+  classifyOutcome,
+  extractSolveJoinKeys,
+  buildSterlingEpisodeLinkage,
+  buildSterlingEpisodeLinkageFromResult,
+  // Test legacy aliases still work
+  buildEpisodeLinkage,
+  buildEpisodeLinkageFromResult,
+} from '../episode-classification';
 import type { SolveBundle, SterlingIdentity } from '../solve-bundle-types';
 
 describe('classifyOutcome', () => {
@@ -432,5 +440,130 @@ describe('buildEpisodeLinkage', () => {
       const linkage = buildEpisodeLinkage({ bundleHash: 'test' }, outcome);
       expect(linkage.outcomeClass).toBe(outcome);
     }
+  });
+});
+
+// ============================================================================
+// buildEpisodeLinkageFromResult tests (combined classification + linkage)
+// ============================================================================
+
+describe('buildEpisodeLinkageFromResult', () => {
+  it('classifies and builds linkage in one call (success case)', () => {
+    const joinKeys = { bundleHash: 'b-combined', traceBundleHash: 't-combined' };
+    const result = { solved: true };
+
+    const { linkage, classified } = buildEpisodeLinkageFromResult(joinKeys, result);
+
+    expect(linkage.bundleHash).toBe('b-combined');
+    expect(linkage.traceBundleHash).toBe('t-combined');
+    expect(linkage.outcomeClass).toBe('EXECUTION_SUCCESS');
+    expect(classified.outcomeClass).toBe('EXECUTION_SUCCESS');
+    expect(classified.source).toBe('structured');
+  });
+
+  it('classifies and builds linkage in one call (search exhausted)', () => {
+    const joinKeys = { bundleHash: 'b-exhausted' };
+    const result = { solved: false, searchHealth: { terminationReason: 'max_nodes' } };
+
+    const { linkage, classified } = buildEpisodeLinkageFromResult(joinKeys, result);
+
+    expect(linkage.outcomeClass).toBe('SEARCH_EXHAUSTED');
+    expect(classified.outcomeClass).toBe('SEARCH_EXHAUSTED');
+    expect(classified.source).toBe('structured');
+  });
+
+  it('uses opts for classification (compat errors)', () => {
+    const joinKeys = { bundleHash: 'b-compat' };
+    const result = { solved: false };
+    const opts = { compatIssues: [{ code: 'E001', severity: 'error' }] };
+
+    const { linkage, classified } = buildEpisodeLinkageFromResult(joinKeys, result, opts);
+
+    expect(linkage.outcomeClass).toBe('ILLEGAL_TRANSITION');
+    expect(classified.outcomeClass).toBe('ILLEGAL_TRANSITION');
+    expect(classified.source).toBe('structured');
+  });
+
+  it('uses opts for classification (maxNodes budget)', () => {
+    const joinKeys = { bundleHash: 'b-nodes' };
+    const result = { solved: false, totalNodes: 5000 };
+    const opts = { maxNodes: 3000 };
+
+    const { linkage, classified } = buildEpisodeLinkageFromResult(joinKeys, result, opts);
+
+    expect(linkage.outcomeClass).toBe('SEARCH_EXHAUSTED');
+    expect(classified.outcomeClass).toBe('SEARCH_EXHAUSTED');
+  });
+
+  it('includes Phase 1 identity from explicit identity param', () => {
+    const joinKeys = { bundleHash: 'b-identity' };
+    const result = { solved: true };
+    const identity: SterlingIdentity = {
+      engineCommitment: 'engine-from-result',
+      operatorRegistryHash: 'registry-from-result',
+    };
+
+    const { linkage } = buildEpisodeLinkageFromResult(joinKeys, result, undefined, identity);
+
+    expect(linkage.engineCommitment).toBe('engine-from-result');
+    expect(linkage.operatorRegistryHash).toBe('registry-from-result');
+  });
+
+  it('falls back to joinKeys for Phase 1 identity when identity param is undefined', () => {
+    const joinKeys = {
+      bundleHash: 'b-fallback',
+      engineCommitment: 'engine-from-keys',
+      operatorRegistryHash: 'registry-from-keys',
+    };
+    const result = { solved: true };
+
+    const { linkage } = buildEpisodeLinkageFromResult(joinKeys, result);
+
+    expect(linkage.engineCommitment).toBe('engine-from-keys');
+    expect(linkage.operatorRegistryHash).toBe('registry-from-keys');
+  });
+
+  it('returns heuristic source for string-matched classifications', () => {
+    const joinKeys = { bundleHash: 'b-heuristic' };
+    const result = { solved: false, error: 'temporal deadlock detected' };
+
+    const { linkage, classified } = buildEpisodeLinkageFromResult(joinKeys, result);
+
+    expect(linkage.outcomeClass).toBe('STRATEGY_INFEASIBLE');
+    expect(classified.outcomeClass).toBe('STRATEGY_INFEASIBLE');
+    expect(classified.source).toBe('heuristic');
+  });
+
+  it('handles undefined joinKeys gracefully', () => {
+    const result = { solved: false };
+
+    const { linkage, classified } = buildEpisodeLinkageFromResult(undefined, result);
+
+    expect(linkage.bundleHash).toBeUndefined();
+    expect(linkage.outcomeClass).toBe('EXECUTION_FAILURE');
+    expect(classified.outcomeClass).toBe('EXECUTION_FAILURE');
+  });
+
+  it('provides provenance for governance decisions', () => {
+    // This test documents that the returned classified object contains
+    // source info that can be used to restrict learning/enforcement
+    // to structured classifications only
+    const joinKeys = { bundleHash: 'b-governance' };
+
+    // Structured classification — safe for learning
+    const structuredResult = { solved: true };
+    const { classified: structuredClassified } = buildEpisodeLinkageFromResult(
+      joinKeys,
+      structuredResult,
+    );
+    expect(structuredClassified.source).toBe('structured');
+
+    // Heuristic classification — telemetry only
+    const heuristicResult = { solved: false, error: 'infeasible constraint' };
+    const { classified: heuristicClassified } = buildEpisodeLinkageFromResult(
+      joinKeys,
+      heuristicResult,
+    );
+    expect(heuristicClassified.source).toBe('heuristic');
   });
 });

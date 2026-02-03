@@ -2,6 +2,9 @@
  * Dashboard Configuration
  * Centralized configuration for all dashboard services and connections
  *
+ * Note: Uses Vite's import.meta.env instead of process.env
+ * Environment variables must be prefixed with VITE_ to be exposed
+ *
  * @author @darianrosebrook
  */
 
@@ -109,7 +112,7 @@ export class ServiceDiscovery {
    * Auto-discover service endpoints based on environment
    */
   async discoverServices(): Promise<ServiceEndpoints> {
-    const env = process.env.NODE_ENV || 'development';
+    const env = import.meta.env.MODE || 'development';
 
     switch (env) {
       case 'production':
@@ -148,19 +151,19 @@ export class ServiceDiscovery {
   private async discoverProductionServices(): Promise<ServiceEndpoints> {
     const baseUrls = {
       minecraft:
-        process.env.MINECRAFT_SERVICE_URL ||
+        import.meta.env.VITE_MINECRAFT_SERVICE_URL ||
         `http://minecraft-interface:${this.DEFAULT_PORTS.minecraft}`,
       cognition:
-        process.env.COGNITION_SERVICE_URL ||
+        import.meta.env.VITE_COGNITION_SERVICE_URL ||
         `http://cognition:${this.DEFAULT_PORTS.cognition}`,
       memory:
-        process.env.MEMORY_SERVICE_URL ||
+        import.meta.env.VITE_MEMORY_SERVICE_URL ||
         `http://memory:${this.DEFAULT_PORTS.memory}`,
       planning:
-        process.env.PLANNING_SERVICE_URL ||
+        import.meta.env.VITE_PLANNING_SERVICE_URL ||
         `http://planning:${this.DEFAULT_PORTS.planning}`,
       world:
-        process.env.WORLD_SERVICE_URL ||
+        import.meta.env.VITE_WORLD_SERVICE_URL ||
         `http://world:${this.DEFAULT_PORTS.world}`,
     };
 
@@ -230,44 +233,58 @@ export class ServiceDiscovery {
       return false;
     }
   }
+
+  /**
+   * Synchronous default endpoints (no async discovery)
+   */
+  getDefaultEndpoints(): ServiceEndpoints {
+    return this.createEndpoints({
+      minecraft: `http://localhost:${this.DEFAULT_PORTS.minecraft}`,
+      cognition: `http://localhost:${this.DEFAULT_PORTS.cognition}`,
+      memory: `http://localhost:${this.DEFAULT_PORTS.memory}`,
+      planning: `http://localhost:${this.DEFAULT_PORTS.planning}`,
+      world: `http://localhost:${this.DEFAULT_PORTS.world}`,
+    });
+  }
 }
 
 /**
  * Default configuration
+ * Uses Vite's import.meta.env for environment variables
  */
 export const defaultConfig: DashboardConfig = {
-  environment:
-    (process.env.NODE_ENV as 'development' | 'production') || 'development',
+  environment: import.meta.env.PROD ? 'production' : 'development',
   serviceDiscovery: {
-    enabled: process.env.DASHBOARD_SERVICE_DISCOVERY === 'true',
-    healthCheckInterval: parseInt(process.env.HEALTH_CHECK_INTERVAL || '30000'),
+    enabled: import.meta.env.VITE_DASHBOARD_SERVICE_DISCOVERY === 'true',
+    healthCheckInterval: parseInt(import.meta.env.VITE_HEALTH_CHECK_INTERVAL || '30000'),
   },
-  endpoints: await ServiceDiscovery.getInstance().discoverServices(),
+  // Use synchronous default endpoints to avoid top-level await
+  endpoints: ServiceDiscovery.getInstance().getDefaultEndpoints(),
   api: {
-    timeout: parseInt(process.env.API_TIMEOUT || '10000'),
-    retryAttempts: parseInt(process.env.API_RETRY_ATTEMPTS || '3'),
-    retryDelay: parseInt(process.env.API_RETRY_DELAY || '1000'),
+    timeout: parseInt(import.meta.env.VITE_API_TIMEOUT || '10000'),
+    retryAttempts: parseInt(import.meta.env.VITE_API_RETRY_ATTEMPTS || '3'),
+    retryDelay: parseInt(import.meta.env.VITE_API_RETRY_DELAY || '1000'),
   },
   websocket: {
-    url: process.env.WEBSOCKET_URL || 'ws://localhost:3005',
+    url: import.meta.env.VITE_WEBSOCKET_URL || 'ws://localhost:3005',
     reconnectInterval: parseInt(
-      process.env.WEBSOCKET_RECONNECT_INTERVAL || '5000'
+      import.meta.env.VITE_WEBSOCKET_RECONNECT_INTERVAL || '5000'
     ),
     maxReconnectAttempts: parseInt(
-      process.env.WEBSOCKET_MAX_RECONNECT_ATTEMPTS || '5'
+      import.meta.env.VITE_WEBSOCKET_MAX_RECONNECT_ATTEMPTS || '5'
     ),
   },
   dashboard: {
     refreshInterval: parseInt(
-      process.env.DASHBOARD_REFRESH_INTERVAL || '10000'
+      import.meta.env.VITE_DASHBOARD_REFRESH_INTERVAL || '10000'
     ),
-    maxThoughts: parseInt(process.env.DASHBOARD_MAX_THOUGHTS || '1000'),
-    maxEvents: parseInt(process.env.DASHBOARD_MAX_EVENTS || '500'),
+    maxThoughts: parseInt(import.meta.env.VITE_DASHBOARD_MAX_THOUGHTS || '1000'),
+    maxEvents: parseInt(import.meta.env.VITE_DASHBOARD_MAX_EVENTS || '500'),
   },
   features: {
-    evaluation: process.env.DASHBOARD_ENABLE_EVALUATION !== 'false',
-    advancedMetrics: process.env.DASHBOARD_ENABLE_ADVANCED_METRICS !== 'false',
-    systemHealth: process.env.DASHBOARD_ENABLE_SYSTEM_HEALTH !== 'false',
-    realTimeUpdates: process.env.DASHBOARD_ENABLE_REAL_TIME_UPDATES !== 'false',
+    evaluation: import.meta.env.VITE_DASHBOARD_ENABLE_EVALUATION !== 'false',
+    advancedMetrics: import.meta.env.VITE_DASHBOARD_ENABLE_ADVANCED_METRICS !== 'false',
+    systemHealth: import.meta.env.VITE_DASHBOARD_ENABLE_SYSTEM_HEALTH !== 'false',
+    realTimeUpdates: import.meta.env.VITE_DASHBOARD_ENABLE_REAL_TIME_UPDATES !== 'false',
   },
 };

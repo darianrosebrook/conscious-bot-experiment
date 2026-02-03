@@ -338,690 +338,687 @@ export function DatabasePanel() {
   ];
 
   return (
-    <ScrollArea className={s.scrollRoot}>
-      <div className={s.scrollContent}>
-        {/* 4A: Overview Panel */}
-        <CollapsibleSection
-          title="Overview"
-          icon={<Database className={s.icon4} />}
-        >
-          {overview ? (
-            <div className={s.overviewSpacer}>
-              <div className={s.overviewGrid}>
-                <div className={s.statCard}>
-                  <div className={s.statLabel}>Database</div>
-                  <div className={s.statValue}>{overview.databaseName}</div>
-                </div>
-                <div className={s.statCard}>
-                  <div className={s.statLabel}>World Seed</div>
-                  <div className={s.statValue}>{overview.worldSeed}</div>
-                </div>
-                <div className={s.statCard}>
-                  <div className={s.statLabel}>Total Chunks</div>
-                  <div className={s.statValue}>
-                    {overview.totalChunks.toLocaleString()}
-                  </div>
-                </div>
-                <div className={s.statCard}>
-                  <div className={s.statLabel}>Entities / Relationships</div>
-                  <div className={s.statValue}>
-                    {overview.entityCount} / {overview.relationshipCount}
-                  </div>
-                </div>
+    <div className={s.splitContainer}>
+      {/* ================================================================== */}
+      {/* LEFT PANEL: Details (scrollable) */}
+      {/* ================================================================== */}
+      <aside className={s.detailsPanel}>
+        <ScrollArea className={s.detailsScroll}>
+          <div className={s.detailsContent}>
+            {/* Overview - always visible stats card */}
+            <div className={s.statsSection}>
+              <div className={s.statsSectionHeader}>
+                <Database className={s.icon4} />
+                <span className={s.statsSectionTitle}>Overview</span>
               </div>
-
-              {/* Memory type distribution */}
-              {Object.keys(overview.memoryTypeDistribution).length > 0 && (
-                <div>
-                  <div className={s.sectionLabel}>Memory Type Distribution</div>
-                  <div className={s.distBar}>
-                    {(() => {
-                      const entries = Object.entries(
-                        overview.memoryTypeDistribution
-                      );
-                      const total = entries.reduce(
-                        (sum, [, count]) => sum + count,
-                        0
-                      );
-                      return entries.map(([type, count], i) => (
-                        <div
-                          key={type}
-                          className={distColors[i % distColors.length]}
-                          style={{
-                            width: `${total > 0 ? (count / total) * 100 : 0}%`,
-                          }}
-                          title={`${type}: ${count}`}
-                        />
-                      ));
-                    })()}
-                  </div>
-                  <div className={s.pillWrap}>
-                    {Object.entries(overview.memoryTypeDistribution).map(
-                      ([type, count]) => (
-                        <Pill key={type}>
-                          {type}: {count}
-                        </Pill>
-                      )
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* Index info */}
-              {overview.indexInfo.length > 0 && (
-                <div>
-                  <div className={s.sectionLabel}>Indexes</div>
-                  <div className={s.indexSpacer}>
-                    {overview.indexInfo.map((idx, i) => (
-                      <div key={i} className={s.indexRow}>
-                        <span className={s.indexName}>{idx.name}</span>
-                        <span className={s.indexMeta}>
-                          {idx.type} &middot; {idx.size}
-                        </span>
+              {overview ? (
+                <div className={s.overviewSpacer}>
+                  <div className={s.overviewGrid}>
+                    <div className={s.statCard}>
+                      <div className={s.statLabel}>Database</div>
+                      <div className={s.statValue}>{overview.databaseName}</div>
+                    </div>
+                    <div className={s.statCard}>
+                      <div className={s.statLabel}>World Seed</div>
+                      <div className={s.statValue}>{overview.worldSeed}</div>
+                    </div>
+                    <div className={s.statCard}>
+                      <div className={s.statLabel}>Total Chunks</div>
+                      <div className={s.statValue}>
+                        {overview.totalChunks.toLocaleString()}
                       </div>
-                    ))}
+                    </div>
+                    <div className={s.statCard}>
+                      <div className={s.statLabel}>Entities / Rel.</div>
+                      <div className={s.statValue}>
+                        {overview.entityCount} / {overview.relationshipCount}
+                      </div>
+                    </div>
                   </div>
                 </div>
+              ) : (
+                <EmptyState
+                  icon={Database}
+                  title="No overview data"
+                  description="Database overview will appear when the memory service is connected."
+                />
               )}
             </div>
-          ) : (
-            <EmptyState
-              icon={Database}
-              title="No overview data"
-              description="Database overview will appear when the memory service is connected."
-            />
-          )}
-        </CollapsibleSection>
 
-        {/* 4B: Memory Explorer */}
-        <CollapsibleSection
-          title="Memory Explorer"
-          icon={<Search className={s.icon4} />}
-          defaultOpen={false}
-        >
-          <div className={s.overviewSpacer}>
-            {/* Filters */}
-            <div className={s.filterRow}>
-              <select
-                value={memoriesType}
-                onChange={(e) => {
-                  setMemoriesType(e.target.value);
-                  setMemoriesPage(1);
-                }}
-                className={s.filterSelect}
-              >
-                <option value="">All Types</option>
-                <option value="episodic">Episodic</option>
-                <option value="semantic">Semantic</option>
-                <option value="procedural">Procedural</option>
-                <option value="emotional">Emotional</option>
-                <option value="social">Social</option>
-              </select>
-              <select
-                value={memoriesSortBy}
-                onChange={(e) => {
-                  setMemoriesSortBy(e.target.value);
-                  setMemoriesPage(1);
-                }}
-                className={s.filterSelect}
-              >
-                <option value="created">Sort: Created</option>
-                <option value="accessed">Sort: Last Accessed</option>
-                <option value="importance">Sort: Importance</option>
-              </select>
-              <Button
-                variant="outline"
-                size="sm"
-                className={s.refreshBtn}
-                onClick={() => fetchMemories()}
-              >
-                <RefreshCw className={s.refreshIcon} />
-                Refresh
-              </Button>
-            </div>
-
-            {/* Memory table */}
-            {memories.length > 0 ? (
-              <div className={s.memorySpacer}>
-                {memories.map((mem) => (
-                  <div key={mem.id} className={s.memoryCard}>
-                    <button
-                      onClick={() => {
-                        const newExpanded =
-                          expandedMemory === mem.id ? null : mem.id;
-                        setExpandedMemory(newExpanded);
-                        // Lazy fetch full content on expand
-                        if (newExpanded && !fullContentCache[mem.id]) {
-                          fetchFullContent(mem.id);
-                        }
-                      }}
-                      className={s.memoryBtn}
-                    >
-                      {expandedMemory === mem.id ? (
-                        <ChevronDown className={s.memChevron} />
-                      ) : (
-                        <ChevronRight className={s.memChevron} />
-                      )}
-                      <span className={s.memId}>{mem.id.slice(0, 8)}</span>
-                      <span className={s.memContent}>{mem.content}</span>
-                      <Pill>{mem.memoryType}</Pill>
-                      <span className={s.memImportance}>
-                        imp: {mem.importance.toFixed(2)}
-                      </span>
-                    </button>
-                    {expandedMemory === mem.id && (
-                      <div className={s.memExpanded}>
-                        {fullContentLoading === mem.id ? (
-                          <p className={s.memFullContentLoading}>
-                            Loading full content...
-                          </p>
-                        ) : (
-                          <p className={s.memExpandedText}>
-                            {fullContentCache[mem.id] || mem.content}
-                          </p>
-                        )}
-                        <div className={s.memExpandedMeta}>
-                          <span>Access Count: {mem.accessCount}</span>
-                          <span>Entities: {mem.entityCount}</span>
-                          <span>Relationships: {mem.relationshipCount}</span>
-                          {mem.createdAt > 0 && (
-                            <span>
-                              Created:{' '}
-                              {new Date(mem.createdAt).toLocaleString()}
-                            </span>
-                          )}
-                          {mem.lastAccessed > 0 && (
-                            <span>
-                              Last Accessed:{' '}
-                              {new Date(mem.lastAccessed).toLocaleString()}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                ))}
-
-                {/* Pagination */}
-                <div className={s.paginationRow}>
-                  <span className={s.paginationLabel}>
-                    Showing {memories.length} of {memoriesTotal} memories
-                  </span>
-                  <div className={s.paginationBtns}>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className={s.paginationBtn}
-                      disabled={memoriesPage <= 1}
-                      onClick={() => setMemoriesPage((p) => Math.max(1, p - 1))}
-                    >
-                      Prev
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className={s.paginationBtn}
-                      disabled={memoriesPage * 20 >= memoriesTotal}
-                      onClick={() => setMemoriesPage((p) => p + 1)}
-                    >
-                      Next
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <EmptyState
-                icon={Search}
-                title="No memories found"
-                description="Memory chunks will appear here when the memory system has stored data."
-              />
-            )}
-          </div>
-        </CollapsibleSection>
-
-        {/* 4C: Knowledge Graph Stats */}
-        <CollapsibleSection
-          title="Knowledge Graph"
-          icon={<Network className={s.icon4} />}
-          defaultOpen={false}
-        >
-          {knowledgeGraph ? (
-            <div className={s.overviewSpacer}>
-              <div className={s.kgGrid}>
-                <div className={s.statCard}>
-                  <div className={s.statLabel}>Total Entities</div>
-                  <div className={s.statValue}>
-                    {knowledgeGraph.totalEntities}
-                  </div>
-                </div>
-                <div className={s.statCard}>
-                  <div className={s.statLabel}>Total Relationships</div>
-                  <div className={s.statValue}>
-                    {knowledgeGraph.totalRelationships}
-                  </div>
-                </div>
-              </div>
-
-              {/* Top entities */}
-              {knowledgeGraph.topEntities.length > 0 && (
-                <div>
-                  <div className={s.sectionLabel}>Top Entities</div>
-                  <div className={s.indexSpacer}>
-                    {knowledgeGraph.topEntities.map((entity, i) => (
-                      <div key={i} className={s.kgEntityRow}>
-                        <div className={s.kgEntityName}>
-                          <span>{entity.name}</span>
-                          <Pill>{entity.type}</Pill>
-                        </div>
-                        <span className={s.kgEntityConn}>
-                          {entity.connectionCount} connections
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Entity type distribution */}
-              {Object.keys(knowledgeGraph.entityTypeDistribution).length >
-                0 && (
-                <div>
-                  <div className={s.sectionLabel}>Entity Types</div>
-                  <div className={s.pillWrap}>
-                    {Object.entries(knowledgeGraph.entityTypeDistribution).map(
-                      ([type, count]) => (
-                        <Pill key={type}>
-                          {type}: {count}
-                        </Pill>
-                      )
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* Relationship type distribution */}
-              {Object.keys(knowledgeGraph.relationshipTypeDistribution).length >
-                0 && (
-                <div>
-                  <div className={s.sectionLabel}>Relationship Types</div>
-                  <div className={s.pillWrap}>
-                    {Object.entries(
-                      knowledgeGraph.relationshipTypeDistribution
-                    ).map(([type, count]) => (
-                      <Pill key={type}>
-                        {type}: {count}
-                      </Pill>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          ) : (
-            <EmptyState
-              icon={Network}
-              title="No knowledge graph data"
-              description="Knowledge graph statistics will appear when the memory system has entity data."
-            />
-          )}
-        </CollapsibleSection>
-
-        {/* 4D: Reflections & Narrative */}
-        <CollapsibleSection
-          title="Reflections & Narrative"
-          icon={<BookOpen className={s.icon4} />}
-          defaultOpen={false}
-        >
-          <div className={s.overviewSpacer}>
-            {/* Latest narrative checkpoint */}
-            {narrative && (
-              <div>
-                <div className={s.sectionLabel}>Latest Narrative</div>
-                <div className={s.narrativeCard}>
-                  <div className={s.narrativeTitle}>{narrative.title}</div>
-                  <div className={s.narrativeSummary}>{narrative.summary}</div>
-                  <div className={s.narrativeMeta}>
-                    <span>Arc: {narrative.narrativeArc}</span>
-                    <span>Tone: {narrative.emotionalTone}</span>
-                    <span>
-                      Significance: {(narrative.significance * 100).toFixed(0)}%
+            {/* Memory Distribution - always visible */}
+            {overview &&
+              Object.keys(overview.memoryTypeDistribution).length > 0 && (
+                <div className={s.statsSection}>
+                  <div className={s.statsSectionHeader}>
+                    <HardDrive className={s.icon4} />
+                    <span className={s.statsSectionTitle}>
+                      Memory Distribution
                     </span>
-                    {narrative.timestamp > 0 && (
-                      <span>
-                        {new Date(narrative.timestamp).toLocaleString()}
-                      </span>
-                    )}
                   </div>
-                </div>
-              </div>
-            )}
-
-            {/* Lessons learned */}
-            {lessons.length > 0 && (
-              <div>
-                <div className={s.sectionLabel}>
-                  Lessons Learned ({lessons.length})
-                </div>
-                <div className={s.memorySpacer}>
-                  {lessons.slice(0, 10).map((lesson) => (
-                    <div key={lesson.id} className={s.lessonCard}>
-                      <span className={s.lessonContent}>{lesson.content}</span>
-                      <Pill>{lesson.category}</Pill>
-                      <span className={s.lessonEffectiveness}>
-                        eff: {(lesson.effectiveness * 100).toFixed(0)}%
-                      </span>
+                  <div className={s.overviewSpacer}>
+                    <div className={s.distBar}>
+                      {(() => {
+                        const entries = Object.entries(
+                          overview.memoryTypeDistribution
+                        );
+                        const total = entries.reduce(
+                          (sum, [, count]) => sum + count,
+                          0
+                        );
+                        return entries.map(([type, count], i) => (
+                          <div
+                            key={type}
+                            className={distColors[i % distColors.length]}
+                            style={{
+                              width: `${total > 0 ? (count / total) * 100 : 0}%`,
+                            }}
+                            title={`${type}: ${count}`}
+                          />
+                        ));
+                      })()}
                     </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Reflections list */}
-            {reflections.length > 0 ? (
-              <div>
-                <div className={s.sectionLabel}>Reflections</div>
-                <div className={s.memorySpacer}>
-                  {reflections.map((ref) => (
-                    <div
-                      key={ref.id}
-                      className={cn(
-                        s.reflectionCard,
-                        ref.isPlaceholder && s.reflectionCardPlaceholder
+                    <div className={s.pillWrap}>
+                      {Object.entries(overview.memoryTypeDistribution).map(
+                        ([type, count]) => (
+                          <Pill key={type}>
+                            {type}: {count}
+                          </Pill>
+                        )
                       )}
-                    >
-                      <div className={s.reflectionHeader}>
-                        <span className={s.reflectionType}>{ref.type}</span>
-                        <Pill>{ref.memorySubtype || 'reflection'}</Pill>
-                        {ref.isPlaceholder && (
-                          <span className={s.placeholderBadge}>
-                            Placeholder
-                          </span>
-                        )}
-                        {ref.timestamp > 0 && (
-                          <span className={s.reflectionTime}>
-                            {new Date(ref.timestamp).toLocaleString()}
-                          </span>
-                        )}
-                      </div>
-                      <div className={s.reflectionContent}>{ref.content}</div>
-                      <div className={s.reflectionMeta}>
-                        {ref.emotionalValence !== 0 && (
-                          <span>
-                            Valence: {ref.emotionalValence.toFixed(2)}
-                          </span>
-                        )}
-                        <span>
-                          Confidence: {(ref.confidence * 100).toFixed(0)}%
-                        </span>
-                        {ref.insights.length > 0 && (
-                          <span>Insights: {ref.insights.length}</span>
-                        )}
-                        {ref.lessons.length > 0 && (
-                          <span>Lessons: {ref.lessons.length}</span>
-                        )}
-                        {ref.tags.length > 0 && (
-                          <span>Tags: {ref.tags.join(', ')}</span>
-                        )}
-                      </div>
                     </div>
-                  ))}
-                </div>
-
-                {/* Pagination */}
-                <div className={s.paginationRow}>
-                  <span className={s.paginationLabel}>
-                    Showing {reflections.length} of {reflectionsTotal}{' '}
-                    reflections (page {reflectionsPage})
-                  </span>
-                  <div className={s.paginationBtns}>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className={s.paginationBtn}
-                      disabled={reflectionsPage <= 1}
-                      onClick={() =>
-                        setReflectionsPage((p) => Math.max(1, p - 1))
-                      }
-                    >
-                      Prev
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className={s.paginationBtn}
-                      disabled={reflectionsPage * 20 >= reflectionsTotal}
-                      onClick={() => setReflectionsPage((p) => p + 1)}
-                    >
-                      Next
-                    </Button>
                   </div>
                 </div>
-              </div>
-            ) : (
-              <EmptyState
-                icon={BookOpen}
-                title="No reflections yet"
-                description="Reflections will appear here when the bot sleeps, dies, or triggers memory consolidation."
-              />
-            )}
-          </div>
-        </CollapsibleSection>
+              )}
 
-        {/* 4E: Embedding Health */}
-        <CollapsibleSection
-          title="Embedding Health"
-          icon={<Activity className={s.icon4} />}
-          defaultOpen={false}
-        >
-          {embeddingHealth ? (
-            <div className={s.overviewSpacer}>
-              <div className={s.overviewGrid}>
-                <div className={s.statCard}>
-                  <div className={s.statLabel}>Dimension</div>
-                  <div className={s.statValue}>{embeddingHealth.dimension}</div>
-                </div>
-                <div className={s.statCard}>
-                  <div className={s.statLabel}>Total Embeddings</div>
-                  <div className={s.statValue}>
-                    {embeddingHealth.totalEmbeddings.toLocaleString()}
-                  </div>
-                </div>
-                <div className={s.statCard}>
-                  <div className={s.statLabel}>Index Type</div>
-                  <div className={s.statValue}>{embeddingHealth.indexType}</div>
-                </div>
-                <div className={s.statCard}>
-                  <div className={s.statLabel}>Index Size</div>
-                  <div className={s.statValue}>{embeddingHealth.indexSize}</div>
-                </div>
+            {/* Embedding Health - always visible stats card */}
+            <div className={s.statsSection}>
+              <div className={s.statsSectionHeader}>
+                <Activity className={s.icon4} />
+                <span className={s.statsSectionTitle}>Embedding Health</span>
               </div>
-
-              {/* Norm statistics */}
-              <div>
-                <div className={s.sectionLabel}>Norm Statistics</div>
-                <div className={s.normGrid}>
-                  {(['min', 'max', 'avg', 'stddev'] as const).map((stat) => (
-                    <div key={stat} className={s.normCard}>
-                      <div className={s.normLabel}>{stat}</div>
-                      <div className={s.normValue}>
-                        {embeddingHealth.normStats[stat].toFixed(4)}
+              {embeddingHealth ? (
+                <div className={s.overviewSpacer}>
+                  <div className={s.overviewGrid}>
+                    <div className={s.statCard}>
+                      <div className={s.statLabel}>Dimension</div>
+                      <div className={s.statValue}>
+                        {embeddingHealth.dimension}
                       </div>
                     </div>
-                  ))}
+                    <div className={s.statCard}>
+                      <div className={s.statLabel}>Total</div>
+                      <div className={s.statValue}>
+                        {embeddingHealth.totalEmbeddings.toLocaleString()}
+                      </div>
+                    </div>
+                    <div className={s.statCard}>
+                      <div className={s.statLabel}>Avg Norm</div>
+                      <div className={s.statValue}>
+                        {embeddingHealth.normStats.avg.toFixed(4)}
+                      </div>
+                    </div>
+                    <div className={s.statCard}>
+                      <div className={s.statLabel}>Index</div>
+                      <div className={s.statValue}>
+                        {embeddingHealth.indexType}
+                      </div>
+                    </div>
+                  </div>
                 </div>
-              </div>
+              ) : (
+                <EmptyState
+                  icon={Activity}
+                  title="No embedding data"
+                  description="Embedding health metrics will appear when the vector database is active."
+                />
+              )}
+            </div>
 
-              {/* Similarity distribution */}
-              {embeddingHealth.sampleSimilarityDistribution.length > 0 && (
-                <div>
-                  <div className={s.sectionLabel}>Similarity Distribution</div>
-                  <div className={s.indexSpacer}>
-                    {embeddingHealth.sampleSimilarityDistribution.map(
-                      (bucket) => (
-                        <div key={bucket.bucket} className={s.simRow}>
-                          <span className={s.simBucket}>{bucket.bucket}</span>
-                          <div className={s.simBar}>
-                            <div
-                              className={s.simBarFill}
-                              style={{
-                                width: `${Math.min(100, bucket.count * 5)}%`,
-                              }}
-                            />
+            {/* Memory Explorer - collapsible (list is long) */}
+            <CollapsibleSection
+              title="Memory Explorer"
+              icon={<Search className={s.icon4} />}
+              defaultOpen={false}
+            >
+              <div className={s.overviewSpacer}>
+                {/* Filters */}
+                <div className={s.filterRow}>
+                  <select
+                    value={memoriesType}
+                    onChange={(e) => {
+                      setMemoriesType(e.target.value);
+                      setMemoriesPage(1);
+                    }}
+                    className={s.filterSelect}
+                  >
+                    <option value="">All Types</option>
+                    <option value="episodic">Episodic</option>
+                    <option value="semantic">Semantic</option>
+                    <option value="procedural">Procedural</option>
+                    <option value="emotional">Emotional</option>
+                    <option value="social">Social</option>
+                  </select>
+                  <select
+                    value={memoriesSortBy}
+                    onChange={(e) => {
+                      setMemoriesSortBy(e.target.value);
+                      setMemoriesPage(1);
+                    }}
+                    className={s.filterSelect}
+                  >
+                    <option value="created">Sort: Created</option>
+                    <option value="accessed">Sort: Last Accessed</option>
+                    <option value="importance">Sort: Importance</option>
+                  </select>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className={s.refreshBtn}
+                    onClick={() => fetchMemories()}
+                  >
+                    <RefreshCw className={s.refreshIcon} />
+                    Refresh
+                  </Button>
+                </div>
+
+                {/* Memory table */}
+                {memories.length > 0 ? (
+                  <div className={s.memorySpacer}>
+                    {memories.map((mem) => (
+                      <div key={mem.id} className={s.memoryCard}>
+                        <button
+                          onClick={() => {
+                            const newExpanded =
+                              expandedMemory === mem.id ? null : mem.id;
+                            setExpandedMemory(newExpanded);
+                            // Lazy fetch full content on expand
+                            if (newExpanded && !fullContentCache[mem.id]) {
+                              fetchFullContent(mem.id);
+                            }
+                          }}
+                          className={s.memoryBtn}
+                        >
+                          {expandedMemory === mem.id ? (
+                            <ChevronDown className={s.memChevron} />
+                          ) : (
+                            <ChevronRight className={s.memChevron} />
+                          )}
+                          <span className={s.memId}>{mem.id.slice(0, 8)}</span>
+                          <span className={s.memContent}>{mem.content}</span>
+                          <Pill>{mem.memoryType}</Pill>
+                          <span className={s.memImportance}>
+                            imp: {mem.importance.toFixed(2)}
+                          </span>
+                        </button>
+                        {expandedMemory === mem.id && (
+                          <div className={s.memExpanded}>
+                            {fullContentLoading === mem.id ? (
+                              <p className={s.memFullContentLoading}>
+                                Loading full content...
+                              </p>
+                            ) : (
+                              <p className={s.memExpandedText}>
+                                {fullContentCache[mem.id] || mem.content}
+                              </p>
+                            )}
+                            <div className={s.memExpandedMeta}>
+                              <span>Access Count: {mem.accessCount}</span>
+                              <span>Entities: {mem.entityCount}</span>
+                              <span>Relationships: {mem.relationshipCount}</span>
+                              {mem.createdAt > 0 && (
+                                <span>
+                                  Created:{' '}
+                                  {new Date(mem.createdAt).toLocaleString()}
+                                </span>
+                              )}
+                              {mem.lastAccessed > 0 && (
+                                <span>
+                                  Last Accessed:{' '}
+                                  {new Date(mem.lastAccessed).toLocaleString()}
+                                </span>
+                              )}
+                            </div>
                           </div>
-                          <span className={s.simCount}>{bucket.count}</span>
-                        </div>
-                      )
-                    )}
+                        )}
+                      </div>
+                    ))}
+
+                    {/* Pagination */}
+                    <div className={s.paginationRow}>
+                      <span className={s.paginationLabel}>
+                        Showing {memories.length} of {memoriesTotal} memories
+                      </span>
+                      <div className={s.paginationBtns}>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className={s.paginationBtn}
+                          disabled={memoriesPage <= 1}
+                          onClick={() =>
+                            setMemoriesPage((p) => Math.max(1, p - 1))
+                          }
+                        >
+                          Prev
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className={s.paginationBtn}
+                          disabled={memoriesPage * 20 >= memoriesTotal}
+                          onClick={() => setMemoriesPage((p) => p + 1)}
+                        >
+                          Next
+                        </Button>
+                      </div>
+                    </div>
                   </div>
-                </div>
-              )}
-            </div>
-          ) : (
-            <EmptyState
-              icon={Activity}
-              title="No embedding data"
-              description="Embedding health metrics will appear when the vector database is active."
-            />
-          )}
-        </CollapsibleSection>
-
-        {/* 4F: Embedding Space Visualization */}
-        <CollapsibleSection
-          title="Embedding Space Visualization"
-          icon={<ScatterChart className={s.icon4} />}
-          defaultOpen={false}
-        >
-          <Suspense fallback={<div className={s.loadingFallback}>Loading 3D visualization...</div>}>
-            <EmbeddingVizPanel />
-          </Suspense>
-        </CollapsibleSection>
-
-        {/* 4G: Danger Zone */}
-        <CollapsibleSection
-          title="Danger Zone"
-          icon={<AlertTriangle className={s.icon4} />}
-          defaultOpen={false}
-        >
-          <div className={s.dangerOuter}>
-            {dangerResult && (
-              <div
-                className={cn(
-                  s.dangerResult,
-                  dangerResult.startsWith('Error')
-                    ? s.dangerResultError
-                    : s.dangerResultOk
+                ) : (
+                  <EmptyState
+                    icon={Search}
+                    title="No memories found"
+                    description="Memory chunks will appear here when the memory system has stored data."
+                  />
                 )}
-              >
-                {dangerResult}
               </div>
-            )}
+            </CollapsibleSection>
 
-            {/* Reset Database */}
-            <div>
-              <h4 className={s.dangerTitle}>Reset Database</h4>
-              <p className={s.dangerDesc}>
-                Truncates all memory tables for the current seed database. This
-                removes all stored memories, entities, and relationships but
-                keeps the database structure intact.
-              </p>
-              <div className={s.dangerInputRow}>
-                <input
-                  value={resetConfirm}
-                  onChange={(e) => setResetConfirm(e.target.value)}
-                  placeholder={`Type "${seedStr}" to confirm`}
-                  className={s.dangerInput}
-                />
-                <Button
-                  variant="destructive"
-                  size="sm"
-                  disabled={resetConfirm !== seedStr || dangerLoading}
-                  onClick={() => setShowResetDialog(true)}
-                >
-                  <Trash2 className={s.dangerBtnIcon} />
-                  Reset
-                </Button>
+            {/* Reflections & Narrative - collapsible */}
+            <CollapsibleSection
+              title="Reflections & Narrative"
+              icon={<BookOpen className={s.icon4} />}
+              defaultOpen={false}
+            >
+              <div className={s.overviewSpacer}>
+                {/* Latest narrative checkpoint */}
+                {narrative && (
+                  <div>
+                    <div className={s.sectionLabel}>Latest Narrative</div>
+                    <div className={s.narrativeCard}>
+                      <div className={s.narrativeTitle}>{narrative.title}</div>
+                      <div className={s.narrativeSummary}>
+                        {narrative.summary}
+                      </div>
+                      <div className={s.narrativeMeta}>
+                        <span>Arc: {narrative.narrativeArc}</span>
+                        <span>Tone: {narrative.emotionalTone}</span>
+                        <span>
+                          Significance:{' '}
+                          {(narrative.significance * 100).toFixed(0)}%
+                        </span>
+                        {narrative.timestamp > 0 && (
+                          <span>
+                            {new Date(narrative.timestamp).toLocaleString()}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Lessons learned */}
+                {lessons.length > 0 && (
+                  <div>
+                    <div className={s.sectionLabel}>
+                      Lessons Learned ({lessons.length})
+                    </div>
+                    <div className={s.memorySpacer}>
+                      {lessons.slice(0, 10).map((lesson) => (
+                        <div key={lesson.id} className={s.lessonCard}>
+                          <span className={s.lessonContent}>
+                            {lesson.content}
+                          </span>
+                          <Pill>{lesson.category}</Pill>
+                          <span className={s.lessonEffectiveness}>
+                            eff: {(lesson.effectiveness * 100).toFixed(0)}%
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Reflections list */}
+                {reflections.length > 0 ? (
+                  <div>
+                    <div className={s.sectionLabel}>Reflections</div>
+                    <div className={s.memorySpacer}>
+                      {reflections.map((ref) => (
+                        <div
+                          key={ref.id}
+                          className={cn(
+                            s.reflectionCard,
+                            ref.isPlaceholder && s.reflectionCardPlaceholder
+                          )}
+                        >
+                          <div className={s.reflectionHeader}>
+                            <span className={s.reflectionType}>{ref.type}</span>
+                            <Pill>{ref.memorySubtype || 'reflection'}</Pill>
+                            {ref.isPlaceholder && (
+                              <span className={s.placeholderBadge}>
+                                Placeholder
+                              </span>
+                            )}
+                            {ref.timestamp > 0 && (
+                              <span className={s.reflectionTime}>
+                                {new Date(ref.timestamp).toLocaleString()}
+                              </span>
+                            )}
+                          </div>
+                          <div className={s.reflectionContent}>
+                            {ref.content}
+                          </div>
+                          <div className={s.reflectionMeta}>
+                            {ref.emotionalValence !== 0 && (
+                              <span>
+                                Valence: {ref.emotionalValence.toFixed(2)}
+                              </span>
+                            )}
+                            <span>
+                              Confidence: {(ref.confidence * 100).toFixed(0)}%
+                            </span>
+                            {ref.insights.length > 0 && (
+                              <span>Insights: {ref.insights.length}</span>
+                            )}
+                            {ref.lessons.length > 0 && (
+                              <span>Lessons: {ref.lessons.length}</span>
+                            )}
+                            {ref.tags.length > 0 && (
+                              <span>Tags: {ref.tags.join(', ')}</span>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Pagination */}
+                    <div className={s.paginationRow}>
+                      <span className={s.paginationLabel}>
+                        Showing {reflections.length} of {reflectionsTotal}{' '}
+                        reflections (page {reflectionsPage})
+                      </span>
+                      <div className={s.paginationBtns}>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className={s.paginationBtn}
+                          disabled={reflectionsPage <= 1}
+                          onClick={() =>
+                            setReflectionsPage((p) => Math.max(1, p - 1))
+                          }
+                        >
+                          Prev
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className={s.paginationBtn}
+                          disabled={reflectionsPage * 20 >= reflectionsTotal}
+                          onClick={() => setReflectionsPage((p) => p + 1)}
+                        >
+                          Next
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <EmptyState
+                    icon={BookOpen}
+                    title="No reflections yet"
+                    description="Reflections will appear here when the bot sleeps, dies, or triggers memory consolidation."
+                  />
+                )}
               </div>
-              {showResetDialog && resetConfirm === seedStr && (
-                <div className={s.dangerConfirmBox}>
-                  <p className={s.dangerConfirmText}>
-                    Are you sure? This will remove all memory data for seed{' '}
-                    {seedStr}. This action cannot be undone.
+            </CollapsibleSection>
+
+            {/* Danger Zone - collapsible at the bottom */}
+            <CollapsibleSection
+              title="Danger Zone"
+              icon={<AlertTriangle className={s.icon4} />}
+              defaultOpen={false}
+            >
+              <div className={s.dangerOuter}>
+                {dangerResult && (
+                  <div
+                    className={cn(
+                      s.dangerResult,
+                      dangerResult.startsWith('Error')
+                        ? s.dangerResultError
+                        : s.dangerResultOk
+                    )}
+                  >
+                    {dangerResult}
+                  </div>
+                )}
+
+                {/* Reset Database */}
+                <div>
+                  <h4 className={s.dangerTitle}>Reset Database</h4>
+                  <p className={s.dangerDesc}>
+                    Truncates all memory tables for the current seed database.
+                    This removes all stored memories, entities, and
+                    relationships but keeps the database structure intact.
                   </p>
-                  <div className={s.dangerConfirmBtns}>
+                  <div className={s.dangerInputRow}>
+                    <input
+                      value={resetConfirm}
+                      onChange={(e) => setResetConfirm(e.target.value)}
+                      placeholder={`Type "${seedStr}" to confirm`}
+                      className={s.dangerInput}
+                    />
                     <Button
                       variant="destructive"
                       size="sm"
-                      disabled={dangerLoading}
-                      onClick={() => handleDangerAction('reset', resetConfirm)}
+                      disabled={resetConfirm !== seedStr || dangerLoading}
+                      onClick={() => setShowResetDialog(true)}
                     >
-                      {dangerLoading ? 'Resetting...' : 'Yes, Reset'}
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setShowResetDialog(false)}
-                    >
-                      Cancel
+                      <Trash2 className={s.dangerBtnIcon} />
+                      Reset
                     </Button>
                   </div>
+                  {showResetDialog && resetConfirm === seedStr && (
+                    <div className={s.dangerConfirmBox}>
+                      <p className={s.dangerConfirmText}>
+                        Are you sure? This will remove all memory data for seed{' '}
+                        {seedStr}. This action cannot be undone.
+                      </p>
+                      <div className={s.dangerConfirmBtns}>
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          disabled={dangerLoading}
+                          onClick={() =>
+                            handleDangerAction('reset', resetConfirm)
+                          }
+                        >
+                          {dangerLoading ? 'Resetting...' : 'Yes, Reset'}
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setShowResetDialog(false)}
+                        >
+                          Cancel
+                        </Button>
+                      </div>
+                    </div>
+                  )}
                 </div>
-              )}
+
+                <hr className={s.dangerSep} />
+
+                {/* Drop Database */}
+                <div>
+                  <h4 className={s.dangerTitle}>Drop Database</h4>
+                  <p className={s.dangerDesc}>
+                    Drops the entire per-seed database. This is the most
+                    destructive operation and removes all data including the
+                    database itself.
+                  </p>
+                  <div className={s.dangerInputRow}>
+                    <input
+                      value={dropConfirm}
+                      onChange={(e) => setDropConfirm(e.target.value)}
+                      placeholder={`Type "${dbName}" to confirm`}
+                      className={s.dangerInput}
+                    />
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      disabled={dropConfirm !== dbName || dangerLoading}
+                      onClick={() => setShowDropDialog(true)}
+                    >
+                      <HardDrive className={s.dangerBtnIcon} />
+                      Drop
+                    </Button>
+                  </div>
+                  {showDropDialog && dropConfirm === dbName && (
+                    <div className={s.dangerConfirmBox}>
+                      <p className={s.dangerConfirmText}>
+                        Are you sure? This will permanently drop the database
+                        &quot;
+                        {dbName}&quot;. This action cannot be undone.
+                      </p>
+                      <div className={s.dangerConfirmBtns}>
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          disabled={dangerLoading}
+                          onClick={() =>
+                            handleDangerAction('drop', dropConfirm)
+                          }
+                        >
+                          {dangerLoading ? 'Dropping...' : 'Yes, Drop'}
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setShowDropDialog(false)}
+                        >
+                          Cancel
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </CollapsibleSection>
+          </div>
+        </ScrollArea>
+      </aside>
+
+      {/* ================================================================== */}
+      {/* RIGHT PANEL: Visualizations (fixed layout) */}
+      {/* ================================================================== */}
+      <main className={s.vizPanel}>
+        {/* Primary: 3D Embedding Space Visualization */}
+        <div className={s.vizPrimary}>
+          <div className={s.vizCard} style={{ height: '100%' }}>
+            <Suspense
+              fallback={
+                <div className={s.loadingFallback}>
+                  Loading 3D visualization...
+                </div>
+              }
+            >
+              <EmbeddingVizPanel />
+            </Suspense>
+          </div>
+        </div>
+
+        {/* Secondary: Knowledge Graph + Similarity Distribution */}
+        <div className={s.vizSecondary}>
+          {/* Knowledge Graph Summary */}
+          <div className={s.vizCard}>
+            <div className={s.vizCardHeader}>
+              <Network className={s.icon4} />
+              <span className={s.vizCardTitle}>Knowledge Graph</span>
             </div>
-
-            <hr className={s.dangerSep} />
-
-            {/* Drop Database */}
-            <div>
-              <h4 className={s.dangerTitle}>Drop Database</h4>
-              <p className={s.dangerDesc}>
-                Drops the entire per-seed database. This is the most destructive
-                operation and removes all data including the database itself.
-              </p>
-              <div className={s.dangerInputRow}>
-                <input
-                  value={dropConfirm}
-                  onChange={(e) => setDropConfirm(e.target.value)}
-                  placeholder={`Type "${dbName}" to confirm`}
-                  className={s.dangerInput}
-                />
-                <Button
-                  variant="destructive"
-                  size="sm"
-                  disabled={dropConfirm !== dbName || dangerLoading}
-                  onClick={() => setShowDropDialog(true)}
-                >
-                  <HardDrive className={s.dangerBtnIcon} />
-                  Drop
-                </Button>
-              </div>
-              {showDropDialog && dropConfirm === dbName && (
-                <div className={s.dangerConfirmBox}>
-                  <p className={s.dangerConfirmText}>
-                    Are you sure? This will permanently drop the database &quot;
-                    {dbName}&quot;. This action cannot be undone.
-                  </p>
-                  <div className={s.dangerConfirmBtns}>
-                    <Button
-                      variant="destructive"
-                      size="sm"
-                      disabled={dangerLoading}
-                      onClick={() => handleDangerAction('drop', dropConfirm)}
-                    >
-                      {dangerLoading ? 'Dropping...' : 'Yes, Drop'}
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setShowDropDialog(false)}
-                    >
-                      Cancel
-                    </Button>
+            <div className={s.vizCardBody}>
+              {knowledgeGraph ? (
+                <div className={s.overviewSpacer}>
+                  <div className={s.kgGrid}>
+                    <div className={s.statCard}>
+                      <div className={s.statLabel}>Entities</div>
+                      <div className={s.statValue}>
+                        {knowledgeGraph.totalEntities}
+                      </div>
+                    </div>
+                    <div className={s.statCard}>
+                      <div className={s.statLabel}>Relationships</div>
+                      <div className={s.statValue}>
+                        {knowledgeGraph.totalRelationships}
+                      </div>
+                    </div>
                   </div>
+
+                  {/* Top entities (limit to 5 in this compact view) */}
+                  {knowledgeGraph.topEntities.length > 0 && (
+                    <div>
+                      <div className={s.sectionLabel}>Top Entities</div>
+                      <div className={s.indexSpacer}>
+                        {knowledgeGraph.topEntities.slice(0, 5).map((entity, i) => (
+                          <div key={i} className={s.kgEntityRow}>
+                            <div className={s.kgEntityName}>
+                              <span>{entity.name}</span>
+                              <Pill>{entity.type}</Pill>
+                            </div>
+                            <span className={s.kgEntityConn}>
+                              {entity.connectionCount}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
+              ) : (
+                <EmptyState
+                  icon={Network}
+                  title="No graph data"
+                  description="Knowledge graph will appear when entities are stored."
+                />
               )}
             </div>
           </div>
-        </CollapsibleSection>
-      </div>
-    </ScrollArea>
+
+          {/* Similarity Distribution */}
+          <div className={s.vizCard}>
+            <div className={s.vizCardHeader}>
+              <ScatterChart className={s.icon4} />
+              <span className={s.vizCardTitle}>Similarity Distribution</span>
+            </div>
+            <div className={s.vizCardBody}>
+              {embeddingHealth &&
+              embeddingHealth.sampleSimilarityDistribution.length > 0 ? (
+                <div className={s.indexSpacer}>
+                  {embeddingHealth.sampleSimilarityDistribution.map(
+                    (bucket) => (
+                      <div key={bucket.bucket} className={s.simRow}>
+                        <span className={s.simBucket}>{bucket.bucket}</span>
+                        <div className={s.simBar}>
+                          <div
+                            className={s.simBarFill}
+                            style={{
+                              width: `${Math.min(100, bucket.count * 5)}%`,
+                            }}
+                          />
+                        </div>
+                        <span className={s.simCount}>{bucket.count}</span>
+                      </div>
+                    )
+                  )}
+                </div>
+              ) : (
+                <EmptyState
+                  icon={ScatterChart}
+                  title="No distribution data"
+                  description="Similarity distribution will appear when embeddings are indexed."
+                />
+              )}
+            </div>
+          </div>
+        </div>
+      </main>
+    </div>
   );
 }

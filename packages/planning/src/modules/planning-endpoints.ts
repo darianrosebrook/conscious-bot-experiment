@@ -104,10 +104,74 @@ export function inferRequirementFromEndpointParams(
   return null;
 }
 
+// Track connected SSE clients for task updates
+const taskUpdateClients: Set<Response> = new Set();
+
+/**
+ * Broadcast a task update to all connected SSE clients
+ */
+export function broadcastTaskUpdate(event: string, task: any): void {
+  const message = JSON.stringify({
+    type: 'task_update',
+    event,
+    data: { task },
+    timestamp: Date.now(),
+  });
+
+  for (const client of taskUpdateClients) {
+    try {
+      client.write(`data: ${message}\n\n`);
+    } catch (error) {
+      // Client disconnected, will be cleaned up
+      taskUpdateClients.delete(client);
+    }
+  }
+}
+
 export function createPlanningEndpoints(
   planningSystem: PlanningSystem
 ): Router {
   const router = Router();
+
+  // GET /task-updates - SSE endpoint for real-time task updates
+  router.get('/task-updates', (req: Request, res: Response) => {
+    // Set SSE headers
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.flushHeaders();
+
+    // Add client to the set
+    taskUpdateClients.add(res);
+    console.log(`[SSE] Client connected to task-updates (${taskUpdateClients.size} total)`);
+
+    // Send initial task state
+    const currentTasks = planningSystem.goalFormulation.getCurrentTasks();
+    const initMessage = JSON.stringify({
+      type: 'task_stream_init',
+      data: { tasks: currentTasks },
+      timestamp: Date.now(),
+    });
+    res.write(`data: ${initMessage}\n\n`);
+
+    // Send keepalive every 30 seconds
+    const keepaliveInterval = setInterval(() => {
+      try {
+        res.write(`: keepalive\n\n`);
+      } catch {
+        clearInterval(keepaliveInterval);
+        taskUpdateClients.delete(res);
+      }
+    }, 30000);
+
+    // Clean up on disconnect
+    req.on('close', () => {
+      clearInterval(keepaliveInterval);
+      taskUpdateClients.delete(res);
+      console.log(`[SSE] Client disconnected from task-updates (${taskUpdateClients.size} remaining)`);
+    });
+  });
 
   // GET /health - Health check endpoint
   router.get('/health', (req: Request, res: Response) => {

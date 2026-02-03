@@ -1145,8 +1145,6 @@ export class EnhancedVectorDatabase {
   }> {
     const client = await this.pool.connect();
     try {
-      // Note: pgvector's vector type can't be cast to float[] directly.
-      // Use vector_dims() to get the dimension count.
       const result = await client.query(`
         SELECT
           COUNT(*) as total_chunks,

@@ -1,0 +1,30 @@
+{
+  "timestamp": "2026-02-03T09:27:35Z",
+  "durationMinutes": 12,
+  "overall": {
+    "passed": true,
+    "agencyPassed": false,
+    "reflectionPassed": true
+  },
+  "agency": {
+    "exitCode": 0,
+    "logFile": "./scripts/../docs/testing/soak-results/agency-20260203-011504.log",
+    "metrics": {
+      "driveTicks": 0,
+      "goalsExtracted": 0,
+      "tasksCreated": 0,
+      "deterministicFailures": 0,
+      "postconditionFailures": 0
+    }
+  },
+  "reflection": {
+    "exitCode": 0,
+    "logFile": "./scripts/../docs/testing/soak-results/reflection-20260203-011504.log",
+    "metrics": {
+      "uniqueEvents": 0,
+      "dedupeRejects": 0,
+      "violations": 0,
+      "schemaValid": 0
+    }
+  }
+}

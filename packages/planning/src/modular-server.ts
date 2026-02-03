@@ -13,6 +13,51 @@ declare global {
   var lastNoTasksLog: number | undefined;
 }
 
+/**
+ * IDLE-1: Eligibility-based idle detection.
+ * Idle events only fire when no tasks are eligible to run, not when activeTasks.length === 0.
+ * The idle_reason allows cognition to treat different idle states appropriately.
+ */
+export type IdleReason =
+  | 'no_tasks'           // True cognitive idle (no work exists)
+  | 'all_in_backoff'     // Tasks exist but are cooling down
+  | 'circuit_breaker_open' // Executor is in protection mode
+  | 'blocked_on_prereq'  // Tasks waiting on dependencies
+  | 'manual_pause';      // Tasks are manually paused
+
+/**
+ * Determine the idle reason based on task and system state.
+ * Returns null if not idle (there are eligible tasks to run).
+ */
+function determineIdleReason(
+  activeTasks: any[],
+  eligibleTasks: any[],
+  circuitBreakerOpen: boolean
+): IdleReason | null {
+  // If there are eligible tasks, we're not idle
+  if (eligibleTasks.length > 0) return null;
+
+  // No active tasks at all = true idle
+  if (activeTasks.length === 0) return 'no_tasks';
+
+  // Circuit breaker is open
+  if (circuitBreakerOpen) return 'circuit_breaker_open';
+
+  // Tasks exist but none are eligible - determine why
+  const allManualPaused = activeTasks.every(
+    (t) => t.metadata?.manualPause === true
+  );
+  if (allManualPaused) return 'manual_pause';
+
+  const allBlocked = activeTasks.every(
+    (t) => t.metadata?.blockedReason != null
+  );
+  if (allBlocked) return 'blocked_on_prereq';
+
+  // Default: tasks are in backoff
+  return 'all_in_backoff';
+}
+
 import { ServerConfiguration } from './modules/server-config';
 import {
   createPlanningEndpoints,
@@ -132,10 +177,6 @@ import {
   isTaskEligible,
   DEFAULT_BLOCKED_TTL_MS,
 } from './server/task-block-evaluator';
-import {
-  selectIdleBehavior,
-  type IdleContext,
-} from './server/idle-behavior-selector';
 import {
   isCircuitBreakerOpen,
   tripCircuitBreaker,
@@ -1660,93 +1701,6 @@ async function autonomousTaskExecutor() {
       );
     }
 
-    if (activeTasks.length === 0) {
-      // Only log once per minute to avoid spam
-      const now = Date.now();
-      if (!global.lastNoTasksLog || now - global.lastNoTasksLog > 60000) {
-        console.log('[AUTONOMOUS EXECUTOR] No runnable tasks (pending/active) to execute');
-        logOptimizer.log('No runnable tasks to execute', 'no-runnable-tasks');
-        global.lastNoTasksLog = now;
-      }
-
-      // Post idle event to cognition service for thought generation
-      if (!global.lastIdleEvent || now - global.lastIdleEvent > 300000) {
-        console.log(
-          '[AUTONOMOUS EXECUTOR] Bot is idle — posting lifecycle event to cognition'
-        );
-        const prevIdleAt = global.lastIdleEvent || 0;
-        global.lastIdleEvent = now;
-        taskIntegration.outbox.enqueue(
-          'http://localhost:3003/api/cognitive-stream/events',
-          {
-            type: 'idle_period',
-            timestamp: now,
-            data: {
-              durationMs: prevIdleAt ? now - prevIdleAt : 0,
-              activeTaskCount: activeTasks.length,
-            },
-          }
-        );
-      }
-
-      // Try to select an idle behavior when no tasks are available
-      try {
-        const idleContext: IdleContext = {
-          inventoryCount: 0, // TODO: fetch from bot state
-          timeSinceLastTask: global.lastIdleEvent ? now - global.lastIdleEvent : 0,
-          gameTimeOfDay: 'unknown',
-          hasInterruptedTasks: false, // TODO: check memory for interrupted tasks
-          consecutiveIdleCycles: 0,
-        };
-
-        const idleSelection = selectIdleBehavior(idleContext);
-        if (idleSelection) {
-          console.log(
-            `[AUTONOMOUS EXECUTOR] Creating idle task: ${idleSelection.behavior.name}`
-          );
-
-          // Create a low-priority idle task
-          const idleTask = {
-            title: idleSelection.task.title,
-            description: idleSelection.task.description,
-            type: idleSelection.task.type,
-            priority: idleSelection.task.priority,
-            urgency: 0.1,
-            status: 'pending' as const,
-            source: 'autonomous' as const,
-            progress: 0,
-            steps: [],
-            parameters: idleSelection.task.parameters,
-            metadata: {
-              createdAt: now,
-              updatedAt: now,
-              retryCount: 0,
-              maxRetries: 1, // Idle tasks don't need many retries
-              childTaskIds: [],
-              tags: idleSelection.task.metadata.tags,
-              category: idleSelection.task.metadata.category,
-            },
-          };
-
-          taskIntegration.addTask(idleTask);
-          console.log(
-            `[AUTONOMOUS EXECUTOR] Idle task created: ${idleTask.title}`
-          );
-        }
-      } catch (idleErr) {
-        // Don't let idle behavior selection break the main loop
-        console.warn('[AUTONOMOUS EXECUTOR] Idle behavior selection failed:', idleErr);
-      }
-
-      return;
-    } else {
-      const pendingCount = activeTasks.filter((t) => t.status === 'pending').length;
-      const activeCount = activeTasks.filter((t) => t.status === 'active' || t.status === 'in_progress').length;
-      console.log(
-        `[AUTONOMOUS EXECUTOR] Found ${activeTasks.length} runnable tasks (${activeCount} active, ${pendingCount} pending)`
-      );
-    }
-
     // Auto-unblock shadow-blocked tasks when mode switches to live.
     // This makes shadow mode useful for observation: tasks resume when you go live.
     const currentMode = getExecutorMode();
@@ -1779,33 +1733,53 @@ async function autonomousTaskExecutor() {
       }
     }
 
-    // Activate pending tasks that are ready to run (not blocked, not in backoff).
-    // This bridges the gap between task creation (pending) and execution (active).
-    // Without this, tasks stay pending forever because isTaskEligible() only allows active/in_progress.
-    for (const t of activeTasks) {
-      if (
-        t.status === 'pending' &&
-        !t.metadata?.blockedReason &&
-        (!t.metadata?.nextEligibleAt || nowMs >= t.metadata.nextEligibleAt)
-      ) {
-        console.log(
-          `[AUTONOMOUS EXECUTOR] Activating pending task: ${t.id} (${t.title?.slice(0, 50)})`
-        );
-        taskIntegration.updateTaskStatus(t.id, 'active');
-        t.status = 'active'; // Update local copy for this cycle
-      }
-    }
-
     // Filter out tasks that are blocked, in backoff, or in non-executable states.
     // Uses isTaskEligible() which has a status allowlist for safety.
     const eligibleTasks = activeTasks.filter((t) => isTaskEligible(t, nowMs));
 
-    if (eligibleTasks.length === 0) {
-      console.log(
-        '[AUTONOMOUS EXECUTOR] All active tasks are in backoff or blocked — skipping cycle'
-      );
+    // IDLE-1: Eligibility-based idle detection
+    // Determine idle reason based on task state, not just activeTasks.length === 0
+    const circuitBreakerOpen = isCircuitBreakerOpen(nowMs);
+    const idleReason = determineIdleReason(activeTasks, eligibleTasks, circuitBreakerOpen);
+
+    if (idleReason !== null) {
+      // Only log once per minute to avoid spam
+      if (!global.lastNoTasksLog || now - global.lastNoTasksLog > 60000) {
+        console.log(
+          `[AUTONOMOUS EXECUTOR] Idle detected: ${idleReason} (active=${activeTasks.length}, eligible=${eligibleTasks.length})`
+        );
+        logOptimizer.log(`Idle: ${idleReason}`, `idle-${idleReason}`);
+        global.lastNoTasksLog = now;
+      }
+
+      // Post idle event to cognition service for thought generation
+      // Include idle_reason so cognition can respond appropriately (IDLE-1)
+      if (!global.lastIdleEvent || now - global.lastIdleEvent > 300000) {
+        console.log(
+          `[AUTONOMOUS EXECUTOR] Bot is idle (${idleReason}) — posting lifecycle event to cognition`
+        );
+        const prevIdleAt = global.lastIdleEvent || 0;
+        global.lastIdleEvent = now;
+        taskIntegration.outbox.enqueue(
+          'http://localhost:3003/api/cognitive-stream/events',
+          {
+            type: 'idle_period',
+            timestamp: now,
+            data: {
+              idleReason,  // IDLE-1: Include reason for eligibility-based detection
+              durationMs: prevIdleAt ? now - prevIdleAt : 0,
+              activeTaskCount: activeTasks.length,
+              eligibleTaskCount: eligibleTasks.length,
+            },
+          }
+        );
+      }
       return;
     }
+
+    console.log(
+      `[AUTONOMOUS EXECUTOR] Found ${eligibleTasks.length} eligible tasks (of ${activeTasks.length} active), executing...`
+    );
 
     // Execute the highest priority eligible task, prioritizing prerequisite tasks
     const currentTask = eligibleTasks[0]; // Tasks are already sorted by priority

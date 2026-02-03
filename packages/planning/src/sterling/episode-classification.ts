@@ -61,7 +61,8 @@ export function extractSolveJoinKeys(
 /**
  * Build EpisodeLinkage from join keys and outcome for report_episode.
  *
- * This is the single canonical place to construct linkage payloads.
+ * CANONICAL LINKAGE BUILDER — use this instead of constructing linkage manually.
+ * This ensures Phase 1 identity fields are properly forwarded.
  *
  * Phase 1 identity fields (engineCommitment, operatorRegistryHash) are read
  * from joinKeys if present (populated by extractSolveJoinKeys at solve-time).
@@ -73,7 +74,7 @@ export function extractSolveJoinKeys(
  * @param outcome   - Outcome class from classification or execution result
  * @param identity  - Optional Sterling identity override for Phase 1 fields
  */
-export function buildEpisodeLinkage(
+export function buildSterlingEpisodeLinkage(
   joinKeys: {
     bundleHash?: string;
     traceBundleHash?: string;
@@ -169,3 +170,68 @@ export function classifyOutcome(
   // 6. Default
   return { outcomeClass: 'EXECUTION_FAILURE', source: 'structured' };
 }
+
+// ============================================================================
+// Combined Linkage + Classification Helper
+// ============================================================================
+
+/**
+ * Build EpisodeLinkage with classification in one call.
+ *
+ * CANONICAL LINKAGE + CLASSIFICATION BUILDER — use this when you have solve result details.
+ * This helper ensures solvers can't accidentally forget to classify outcomes.
+ * It calls classifyOutcome() internally and returns both the linkage and
+ * the classified outcome for logging/governance purposes.
+ *
+ * Use this when you have a solve result and want to construct linkage for
+ * episode reporting without manually threading classification through.
+ *
+ * @param joinKeys - SolveJoinKeys from task metadata
+ * @param result   - Solve result for classification
+ * @param opts     - Classification options (maxNodes, compatIssues)
+ * @param identity - Optional Sterling identity override
+ * @returns { linkage, classified } for reporting and logging
+ */
+export function buildSterlingEpisodeLinkageFromResult(
+  joinKeys: {
+    bundleHash?: string;
+    traceBundleHash?: string;
+    engineCommitment?: string;
+    operatorRegistryHash?: string;
+  } | undefined,
+  result: {
+    solved: boolean;
+    error?: string;
+    totalNodes?: number;
+    searchHealth?: { terminationReason?: string };
+  },
+  opts?: {
+    maxNodes?: number;
+    compatIssues?: Array<{ code: string; severity: string }>;
+  },
+  identity?: SterlingIdentity,
+): { linkage: EpisodeLinkage; classified: ClassifiedOutcome } {
+  const classified = classifyOutcome(result, opts);
+  const linkage = buildSterlingEpisodeLinkage(joinKeys, classified.outcomeClass, identity);
+  return { linkage, classified };
+}
+
+// ============================================================================
+// Legacy Aliases (for backward compatibility during migration)
+// TODO(2026-03-01): Remove these aliases and update all call sites to use
+// buildSterlingEpisodeLinkage / buildSterlingEpisodeLinkageFromResult directly.
+// ============================================================================
+
+/**
+ * @deprecated Use buildSterlingEpisodeLinkage instead. This alias exists for
+ * backward compatibility and will be removed after 2026-03-01.
+ */
+// TODO(2026-03-01): remove alias
+export const buildEpisodeLinkage = buildSterlingEpisodeLinkage;
+
+/**
+ * @deprecated Use buildSterlingEpisodeLinkageFromResult instead. This alias exists for
+ * backward compatibility and will be removed after 2026-03-01.
+ */
+// TODO(2026-03-01): remove alias
+export const buildEpisodeLinkageFromResult = buildSterlingEpisodeLinkageFromResult;

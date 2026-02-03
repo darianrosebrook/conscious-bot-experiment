@@ -102,7 +102,7 @@ export function usePeriodicRefresh({
         const currentIds = new Set(
           useDashboardStore.getState().thoughts.map((t) => t.id),
         );
-        const res = await fetch('/api/ws/cognitive-stream/history?limit=100', {
+        const res = await fetch('/api/ws/cognitive-stream/recent?limit=100', {
           signal: AbortSignal.timeout(5000),
         });
         if (!res.ok) return;

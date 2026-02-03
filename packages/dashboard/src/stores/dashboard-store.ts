@@ -319,7 +319,7 @@ export const useDashboardStore = create<DashboardStore>()(
         // Load thoughts from server (for initial load)
         loadThoughtsFromServer: async () => {
           try {
-            const response = await fetch('/api/ws/cognitive-stream/history');
+            const response = await fetch('/api/ws/cognitive-stream/recent');
             if (response.ok) {
               const data = await response.json();
               if (data.thoughts && Array.isArray(data.thoughts)) {

@@ -33,6 +33,12 @@
   font-variant-numeric: tabular-nums;
 }
 
+.autoLoadHint {
+  font-size: 0.625rem;
+  color: rgb(99 102 241);
+  opacity: 0.8;
+}
+
 .controls {
   display: flex;
   align-items: center;

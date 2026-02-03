@@ -145,7 +145,54 @@ export class CognitiveStreamClient {
     }
   }
 
+  /**
+   * Get actionable thoughts from the dedicated /actionable endpoint.
+   * This returns ONLY thoughts with convertEligible === true (opt-in model).
+   *
+   * Falls back to local filtering of /recent if the endpoint fails.
+   */
   async getActionableThoughts(): Promise<CognitiveStreamThought[]> {
+    try {
+      // Use dedicated actionable endpoint to prevent starvation
+      const url = `${this.baseUrl}/api/cognitive-stream/actionable?limit=10`;
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json' },
+        signal: AbortSignal.timeout(this.timeoutMs),
+      });
+
+      if (response.ok) {
+        const data = (await response.json()) as {
+          thoughts?: CognitiveStreamThought[];
+        };
+        const thoughts = data.thoughts ?? [];
+        if (thoughts.length > 0) {
+          console.log(
+            `[CognitiveStream] Fetched ${thoughts.length} actionable thoughts`,
+            thoughts.map((t) => `"${t.content?.slice(0, 40)}..."`)
+          );
+        }
+        return thoughts;
+      }
+
+      // Fallback: endpoint may not exist yet, use legacy filtering
+      console.warn(
+        '[CognitiveStream] /actionable endpoint failed, falling back to /recent filtering:',
+        response.statusText
+      );
+    } catch (error) {
+      console.warn('[CognitiveStream] Error fetching actionable thoughts, falling back:', error);
+    }
+
+    // Legacy fallback: filter /recent locally
+    return this.getActionableThoughtsLegacy();
+  }
+
+  /**
+   * Legacy fallback for getActionableThoughts.
+   * Used when /actionable endpoint is unavailable.
+   */
+  private async getActionableThoughtsLegacy(): Promise<CognitiveStreamThought[]> {
     const recentThoughts = await this.getRecentThoughts();
     const now = Date.now();
     const fiveMinutesMs = 5 * 60 * 1000;
@@ -169,5 +216,32 @@ export class CognitiveStreamClient {
       const content = thought.content.toLowerCase();
       return ACTIONABLE_WORDS.some((word) => content.includes(word));
     });
+  }
+
+  /**
+   * Acknowledge thoughts as processed by planning.
+   * Planning MUST call this for EVERY evaluated thought (converted OR skipped).
+   */
+  async ackThoughts(thoughtIds: string[]): Promise<void> {
+    if (thoughtIds.length === 0) return;
+
+    try {
+      const url = `${this.baseUrl}/api/cognitive-stream/ack`;
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ thoughtIds }),
+        signal: AbortSignal.timeout(this.timeoutMs),
+      });
+
+      if (response.ok) {
+        const data = (await response.json()) as { ackedCount?: number };
+        console.log(`[CognitiveStream] Acked ${data.ackedCount ?? 0}/${thoughtIds.length} thoughts`);
+      } else {
+        console.warn('[CognitiveStream] Failed to ack thoughts:', response.statusText);
+      }
+    } catch (error) {
+      console.warn('[CognitiveStream] Error acking thoughts:', error);
+    }
   }
 }

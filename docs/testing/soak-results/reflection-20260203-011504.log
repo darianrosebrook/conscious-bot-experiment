@@ -1,0 +1,132 @@
+
+🧪 REFLECTION PERSISTENCE SOAK TEST
+Mode: both
+Memory URL: http://localhost:3001
+OLLAMA_HOST: http://localhost:11434
+Started: 2026-02-03T09:15:05.891Z
+
+
+=== PREFLIGHT CHECKS ===
+
+1. Checking memory service at http://localhost:3001...
+   ✅ Memory service: healthy
+2. Checking embedding service health...
+   ✅ Embedding service: healthy
+3. Testing single reflection persistence + metadata contract...
+   ⏳ Waiting 8s for async flush...
+   ✅ Reflection persisted and queryable (id: chunk-1770110110023-0-[preflight]-single-reflection-persistence-check)
+   ✅ Metadata contract valid (dedupeKey, memorySubtype, isPlaceholder)
+
+Preflight completed in 8048ms
+
+✅ All preflight checks passed.
+
+
+=== A. DETERMINISTIC PIPELINE SOAK ===
+
+Sample 1...
+Sample 2...
+Sample 3...
+Sample 4...
+Sample 5...
+Sample 6...
+Sample 7...
+Sample 8...
+Sample 9...
+Sample 10...
+Sample 11...
+Sample 12...
+Sample 13...
+POST failed: Error: HTTP 404: 
+Duplicate check failed unexpectedly: Error: HTTP 404: 
+Pagination check failed: SyntaxError: Unexpected token '<', "<!DOCTYPE "... is not valid JSON
+Sample 14...
+POST failed: Error: HTTP 404: 
+Duplicate check failed unexpectedly: Error: HTTP 404: 
+Pagination check failed: SyntaxError: Unexpected token '<', "<!DOCTYPE "... is not valid JSON
+Sample 15...
+POST failed: Error: HTTP 404: 
+Duplicate check failed unexpectedly: Error: HTTP 404: 
+Pagination check failed: SyntaxError: Unexpected token '<', "<!DOCTYPE "... is not valid JSON
+Sample 16...
+POST failed: Error: HTTP 404: 
+Duplicate check failed unexpectedly: Error: HTTP 404: 
+Pagination check failed: SyntaxError: Unexpected token '<', "<!DOCTYPE "... is not valid JSON
+Sample 17...
+POST failed: Error: HTTP 404: 
+Duplicate check failed unexpectedly: Error: HTTP 404: 
+Pagination check failed: SyntaxError: Unexpected token '<', "<!DOCTYPE "... is not valid JSON
+Sample 18...
+POST failed: Error: HTTP 404: 
+Duplicate check failed unexpectedly: Error: HTTP 404: 
+Pagination check failed: SyntaxError: Unexpected token '<', "<!DOCTYPE "... is not valid JSON
+Sample 19...
+POST failed: Error: HTTP 404: 
+Duplicate check failed unexpectedly: Error: HTTP 404: 
+Pagination check failed: SyntaxError: Unexpected token '<', "<!DOCTYPE "... is not valid JSON
+Sample 20...
+POST failed: Error: HTTP 404: 
+Duplicate check failed unexpectedly: Error: HTTP 404: 
+Pagination check failed: SyntaxError: Unexpected token '<', "<!DOCTYPE "... is not valid JSON
+Sample 21...
+POST failed: Error: HTTP 404: 
+Duplicate check failed unexpectedly: Error: HTTP 404: 
+Pagination check failed: SyntaxError: Unexpected token '<', "<!DOCTYPE "... is not valid JSON
+Sample 22...
+POST failed: Error: HTTP 404: 
+Duplicate check failed unexpectedly: Error: HTTP 404: 
+Pagination check failed: SyntaxError: Unexpected token '<', "<!DOCTYPE "... is not valid JSON
+Sample 23...
+POST failed: Error: HTTP 404: 
+Duplicate check failed unexpectedly: Error: HTTP 404: 
+Pagination check failed: SyntaxError: Unexpected token '<', "<!DOCTYPE "... is not valid JSON
+Sample 24...
+POST failed: Error: HTTP 404: 
+Duplicate check failed unexpectedly: Error: HTTP 404: 
+Pagination check failed: SyntaxError: Unexpected token '<', "<!DOCTYPE "... is not valid JSON
+Sample 25...
+POST failed: Error: HTTP 404: 
+Duplicate check failed unexpectedly: Error: HTTP 404: 
+Pagination check failed: SyntaxError: Unexpected token '<', "<!DOCTYPE "... is not valid JSON
+Sample 26...
+POST failed: Error: HTTP 404: 
+Duplicate check failed unexpectedly: Error: HTTP 404: 
+Pagination check failed: SyntaxError: Unexpected token '<', "<!DOCTYPE "... is not valid JSON
+Sample 27...
+POST failed: Error: HTTP 404: 
+Duplicate check failed unexpectedly: Error: HTTP 404: 
+Pagination check failed: SyntaxError: Unexpected token '<', "<!DOCTYPE "... is not valid JSON
+Sample 28...
+POST failed: Error: HTTP 404: 
+Duplicate check failed unexpectedly: Error: HTTP 404: 
+Pagination check failed: SyntaxError: Unexpected token '<', "<!DOCTYPE "... is not valid JSON
+Sample 29...
+POST failed: Error: HTTP 404: 
+Duplicate check failed unexpectedly: Error: HTTP 404: 
+Pagination check failed: SyntaxError: Unexpected token '<', "<!DOCTYPE "... is not valid JSON
+Sample 30...
+POST failed: Error: HTTP 404: 
+Duplicate check failed unexpectedly: Error: HTTP 404: 
+Pagination check failed: SyntaxError: Unexpected token '<', "<!DOCTYPE "... is not valid JSON
+
+Running final audit query...
+Final audit failed: SyntaxError: Unexpected token '<', "<!DOCTYPE "... is not valid JSON
+
+Pipeline soak complete.
+  Unique events: 12
+  HTTP attempts: 42
+  Fresh posts accepted: 12
+  Dedupe (status): 12
+  Dedupe (constraint): 0
+  Violations: 0
+
+=== B. REFLECTION QUALITY SOAK ===
+
+Failed to fetch reflections: SyntaxError: Unexpected token '<', "<!DOCTYPE "... is not valid JSON
+
+============================================================
+SOAK TEST PASSED ✅
+Duration: 308.3s
+Pipeline: 12 unique events, 42 HTTP attempts, 12 persisted, 12 dedupe rejects, 0 violations | Quality: 0 checked, 0 schema issues, 0 grounding failures
+Report: ./soak-report-1770110414240.json
+============================================================

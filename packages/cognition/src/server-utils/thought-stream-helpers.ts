@@ -9,6 +9,7 @@ import { isUsableContent } from '../llm-output-sanitizer';
 import { GOAL_TAG_STRIP, TTS_EXCLUDED_TYPES, TTS_STATUS_LIKE } from './constants';
 import { getInteroState } from '../interoception-store';
 import { buildStressContext } from '../stress-axis-computer';
+import { broadcastThought } from '../routes/cognitive-stream-routes';
 
 export interface ThoughtStreamDeps {
   dashboardUrl: string;
@@ -46,6 +47,20 @@ export function createThoughtStreamHelpers(deps: ThoughtStreamDeps) {
           }),
         }
       );
+
+      // Broadcast to all connected SSE clients
+      const displayContent = (thought.content || '')
+        .replace(GOAL_TAG_STRIP, '')
+        .trim();
+      broadcastThought({
+        id: thought.id || `thought-${Date.now()}`,
+        type: thought.type || 'reflection',
+        content: thought.content,
+        displayContent,
+        attribution: 'self',
+        timestamp: thought.timestamp || Date.now(),
+        metadata: thought.metadata,
+      });
 
       if (response?.ok) {
         console.log(

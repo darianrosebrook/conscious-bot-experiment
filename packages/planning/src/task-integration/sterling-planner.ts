@@ -742,6 +742,34 @@ export class SterlingPlanner {
       solverMeta.buildingSolveJoinKeys = result.solveJoinKeys;
     }
 
+    // ────────────────────────────────────────────────────────────────────
+    // Gap 3: Capture solve result substrate for deferred classification
+    // Enables richer outcome taxonomy (SEARCH_EXHAUSTED, ILLEGAL_TRANSITION, etc.)
+    // when executor reports episode failure.
+    //
+    // COHERENCE: Include planId + bundleHash so executor can verify substrate
+    // belongs to the episode being reported (prevents replan misclassification).
+    // ────────────────────────────────────────────────────────────────────
+    const bundle = result.solveMeta?.bundles?.[0];
+    const issues = bundle?.compatReport?.issues;
+    solverMeta.buildingSolveResultSubstrate = {
+      // Identity fields for coherence check
+      planId: result.solveJoinKeys?.planId,
+      bundleHash: result.solveJoinKeys?.bundleHash,
+      // Solve outcome
+      solved: result.solved,
+      error: result.error,
+      totalNodes: result.totalNodes,
+      searchHealth: bundle?.output?.searchHealth,
+      // Classification options — explicitly map to stable shape, cap at 10
+      opts: issues
+        ? {
+            compatIssues: issues.slice(0, 10).map((i) => ({ code: i.code, severity: i.severity })),
+          }
+        : undefined,
+      capturedAt: Date.now(),
+    };
+
     // Store Rig G metadata for feasibility gating in startTaskStep
     if (result.rigGSignals) {
       const commutingPairs = result.partialOrderPlan

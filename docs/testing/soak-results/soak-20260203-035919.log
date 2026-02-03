@@ -1,0 +1,102 @@
+=== Agency Emission Soak Test ===
+Duration: 4 minutes
+Cognition: http://localhost:3003
+Planning: http://localhost:3002
+Log: ./scripts/../docs/testing/soak-results/soak-20260203-035919.log
+Started: 2026-02-03T11:59:19Z
+---
+[pre-check] Verifying service health...
+  Cognition: healthy
+  Planning: healthy
+
+[pre-check] Bot state...
+  BotSterling | hp=20 food=20 mode=survival pos=(303,62,174)
+
+[t=0] Capturing initial state...
+  Recent thoughts: 5
+
+[t=0m sample=1]
+  thoughts=20 drive-ticks=0 goals=0 intents=0
+  novelty: unmarked=20
+  tasks:  | goalKeyed: none
+
+[t=1m sample=2]
+  thoughts=20 drive-ticks=0 goals=0 intents=0
+  novelty: unmarked=20
+  tasks:  | goalKeyed: none
+
+[t=1m sample=3]
+  thoughts=20 drive-ticks=0 goals=0 intents=0
+  novelty: unmarked=20
+  tasks:  | goalKeyed: none
+
+[t=2m sample=4]
+  thoughts=20 drive-ticks=0 goals=0 intents=0
+  novelty: unmarked=20
+  tasks:  | goalKeyed: none
+
+[t=2m sample=5]
+  thoughts=20 drive-ticks=0 goals=0 intents=0
+  novelty: unmarked=20
+  tasks:  | goalKeyed: none
+
+[t=3m sample=6]
+  thoughts=20 drive-ticks=0 goals=0 intents=0
+  novelty: unmarked=20
+  tasks:  | goalKeyed: none
+
+[t=3m sample=7]
+  thoughts=20 drive-ticks=0 goals=0 intents=0
+  novelty: unmarked=20
+  tasks:  | goalKeyed: none
+
+[t=4m sample=8]
+  thoughts=20 drive-ticks=0 goals=0 intents=0
+  novelty: unmarked=20
+  tasks:  | goalKeyed: none
+
+===================================
+=== SOAK TEST SUMMARY ===
+===================================
+Duration: 4 minutes (8 samples)
+Ended: 2026-02-03T12:03:20Z
+
+--- Final thought analysis ---
+  Total thoughts: 32
+  Drive-tick: 0
+  With goals: 0
+  With intents: 0
+  Low novelty: 0
+  High novelty: 0
+  Convert eligible: 0
+
+--- Final task analysis ---
+  Total tasks: 0
+  By status: {}
+  By source: {}
+  Goal-keyed tasks (0):
+  No duplicate active goalKeys (idempotency OK)
+
+--- Execution hardening analysis (Phase 2.5) ---
+  Failure codes: none
+  Blocked reasons: none
+  Deterministic failures: 0
+  Postcondition failures: 0
+  Retryable failures: 0
+
+--- Acceptance criteria ---
+  [FAIL] Drive ticks fired
+  [FAIL] Goal tags produced
+  [FAIL] Novelty markers present
+  [INFO] No intent extractions (expected for small models)
+  [FAIL] Tasks created from goals
+  [FAIL] At least one task claimed (active or terminal)
+  [PASS] No duplicate active goalKeys
+
+--- Execution hardening acceptance (Phase 2.5) ---
+  [PASS] Failed tasks have failureCode
+  [PASS] Deterministic failures marked (no backoff)
+  [PASS] No pending tasks with retry attempts (activation invariant)
+
+Full log: ./scripts/../docs/testing/soak-results/soak-20260203-035919.log
+Done.

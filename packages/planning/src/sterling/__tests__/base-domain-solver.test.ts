@@ -8,7 +8,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { BaseDomainSolver, type BaseSolveResult } from '../base-domain-solver';
+import { BaseDomainSolver, type BaseSolveResult, __resetIdentityLatchForTests } from '../base-domain-solver';
 import type { SterlingReasoningService } from '../sterling-reasoning-service';
 import type { EpisodeLinkage } from '../solve-bundle-types';
 
@@ -218,8 +218,9 @@ describe('BaseDomainSolver Phase 1 identity fields', () => {
   beforeEach(() => {
     service = createMockService();
     solver = new StubSolver(service);
-    // Reset toggle
+    // Reset toggle and latch state
     delete process.env.STERLING_REPORT_IDENTITY_FIELDS;
+    __resetIdentityLatchForTests();
   });
 
   afterEach(() => {
@@ -325,7 +326,7 @@ describe('BaseDomainSolver Phase 1 identity fields', () => {
     }
     const solver4 = new StubDowngrade(service);
 
-    // First call: reject with "unknown field" error
+    // First call: reject with "unknown field" error, then succeed on retry
     (service.solve as ReturnType<typeof vi.fn>)
       .mockRejectedValueOnce(new Error('validation error: unknown field engine_commitment'))
       .mockResolvedValueOnce({
@@ -357,13 +358,233 @@ describe('BaseDomainSolver Phase 1 identity fields', () => {
     expect(secondCall[1]).not.toHaveProperty('engine_commitment');
     expect(secondCall[1]).not.toHaveProperty('operator_registry_hash');
 
-    // Should have logged downgrade warning
+    // Should have logged downgrade warning with actual error hint
     expect(warnSpy).toHaveBeenCalledWith(
       expect.stringContaining('Identity fields rejected for test.stub.downgrade')
+    );
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining('unknown field engine_commitment')
     );
 
     // Result should still return the ack from retry
     expect(result).toEqual({ episodeHash: 'ep-123', requestId: undefined });
+
+    warnSpy.mockRestore();
+  });
+
+  it('does NOT latch if retry also fails (no positive evidence)', async () => {
+    process.env.STERLING_REPORT_IDENTITY_FIELDS = '1';
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    // Use a different solverId for this test
+    class StubNoLatch extends StubSolver {
+      override get solverId() { return 'test.stub.no-latch'; }
+    }
+    const solver5 = new StubNoLatch(service);
+
+    // Both calls fail — first mentions identity field (triggers retry), second fails
+    (service.solve as ReturnType<typeof vi.fn>)
+      .mockRejectedValueOnce(new Error('unknown field engine_commitment'))
+      .mockRejectedValueOnce(new Error('network timeout'));
+
+    const linkage: EpisodeLinkage = {
+      bundleHash: 'b-no-latch',
+      engineCommitment: 'engine-test',
+    };
+
+    await solver5.testReportEpisode({ planId: 'plan-5', success: true }, linkage);
+
+    // Should have tried twice (identity rejection detected, retry attempted)
+    expect(service.solve).toHaveBeenCalledTimes(2);
+
+    // Should NOT have logged latch warning (no positive evidence — retry also failed)
+    const latchWarnings = warnSpy.mock.calls.filter(
+      (call) => typeof call[0] === 'string' && call[0].includes('Identity fields rejected')
+    );
+    expect(latchWarnings.length).toBe(0);
+
+    warnSpy.mockRestore();
+  });
+
+  it('latch prevents identity fields on subsequent calls', async () => {
+    process.env.STERLING_REPORT_IDENTITY_FIELDS = '1';
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    // Use a different solverId for this test
+    class StubLatchPersist extends StubSolver {
+      override get solverId() { return 'test.stub.latch-persist'; }
+    }
+    const solver6 = new StubLatchPersist(service);
+
+    // First call: reject then succeed (triggers latch)
+    (service.solve as ReturnType<typeof vi.fn>)
+      .mockRejectedValueOnce(new Error('unknown field engine_commitment'))
+      .mockResolvedValueOnce({ metrics: { episode_hash: 'ep-first' } })
+      // Second call: should succeed directly (no identity fields sent)
+      .mockResolvedValueOnce({ metrics: { episode_hash: 'ep-second' } });
+
+    const linkage: EpisodeLinkage = {
+      bundleHash: 'b-persist',
+      engineCommitment: 'engine-latched',
+      operatorRegistryHash: 'registry-latched',
+    };
+
+    // First reportEpisode triggers latch
+    await solver6.testReportEpisode({ planId: 'plan-6a', success: true }, linkage);
+    expect(service.solve).toHaveBeenCalledTimes(2); // reject + retry
+
+    // Reset mock to track second reportEpisode independently
+    (service.solve as ReturnType<typeof vi.fn>).mockClear();
+    (service.solve as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      metrics: { episode_hash: 'ep-second' },
+    });
+
+    // Second reportEpisode — latch should prevent identity fields
+    await solver6.testReportEpisode({ planId: 'plan-6b', success: true }, linkage);
+
+    // Should only call once (no retry needed because latch skipped identity fields)
+    expect(service.solve).toHaveBeenCalledTimes(1);
+
+    // The call should NOT include identity fields (due to latch)
+    const thirdCall = (service.solve as ReturnType<typeof vi.fn>).mock.calls[0];
+    expect(thirdCall[1]).not.toHaveProperty('engine_commitment');
+    expect(thirdCall[1]).not.toHaveProperty('operator_registry_hash');
+    // But should still include core linkage
+    expect(thirdCall[1]).toHaveProperty('bundle_hash', 'b-persist');
+  });
+
+  it('does NOT retry on unrelated schema errors (no identity field mentioned)', async () => {
+    process.env.STERLING_REPORT_IDENTITY_FIELDS = '1';
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    class StubUnrelated extends StubSolver {
+      override get solverId() { return 'test.stub.unrelated-error'; }
+    }
+    const solver7 = new StubUnrelated(service);
+
+    // Error mentions "schema" but NOT an identity field — should NOT trigger retry
+    (service.solve as ReturnType<typeof vi.fn>)
+      .mockRejectedValueOnce(new Error('schema validation failed: planId is required'));
+
+    const linkage: EpisodeLinkage = {
+      bundleHash: 'b-unrelated',
+      engineCommitment: 'engine-test',
+      operatorRegistryHash: 'registry-test',
+    };
+
+    await solver7.testReportEpisode({ planId: 'plan-7', success: true }, linkage);
+
+    // Should only call ONCE (no retry because error isn't identity-specific)
+    expect(service.solve).toHaveBeenCalledTimes(1);
+
+    // Should log generic failure, not identity rejection
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining('Failed to report stub episode')
+    );
+
+    warnSpy.mockRestore();
+  });
+
+  it('retries on schema error that mentions identity field', async () => {
+    process.env.STERLING_REPORT_IDENTITY_FIELDS = '1';
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    class StubSchemaIdentity extends StubSolver {
+      override get solverId() { return 'test.stub.schema-identity'; }
+    }
+    const solver8 = new StubSchemaIdentity(service);
+
+    // Error mentions "schema" AND an identity field — should trigger retry
+    (service.solve as ReturnType<typeof vi.fn>)
+      .mockRejectedValueOnce(new Error('schema error: operator_registry_hash not accepted'))
+      .mockResolvedValueOnce({ metrics: { episode_hash: 'ep-schema' } });
+
+    const linkage: EpisodeLinkage = {
+      bundleHash: 'b-schema',
+      engineCommitment: 'engine-schema',
+      operatorRegistryHash: 'registry-schema',
+    };
+
+    await solver8.testReportEpisode({ planId: 'plan-8', success: true }, linkage);
+
+    // Should call twice (first with fields, retry without)
+    expect(service.solve).toHaveBeenCalledTimes(2);
+  });
+
+  it('latch is scoped by (solverId, contractVersion) — different versions re-probe', async () => {
+    process.env.STERLING_REPORT_IDENTITY_FIELDS = '1';
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    // Version 1 solver that gets latched
+    class StubV1 extends StubSolver {
+      override get solverId() { return 'test.stub.versioned'; }
+      override readonly contractVersion = 1;
+    }
+    // Version 2 solver — should NOT be affected by v1 latch
+    class StubV2 extends StubSolver {
+      override get solverId() { return 'test.stub.versioned'; }
+      override readonly contractVersion = 2;
+    }
+
+    const solverV1 = new StubV1(service);
+    const solverV2 = new StubV2(service);
+
+    // V1: reject then succeed (triggers latch for v1)
+    (service.solve as ReturnType<typeof vi.fn>)
+      .mockRejectedValueOnce(new Error('unknown field engine_commitment'))
+      .mockResolvedValueOnce({ metrics: { episode_hash: 'ep-v1' } });
+
+    const linkage: EpisodeLinkage = {
+      bundleHash: 'b-versioned',
+      engineCommitment: 'engine-test',
+      operatorRegistryHash: 'registry-test',
+    };
+
+    await solverV1.testReportEpisode({ planId: 'plan-v1', success: true }, linkage);
+    expect(service.solve).toHaveBeenCalledTimes(2); // reject + retry
+
+    // V2: should still attempt with identity fields (different version, not latched)
+    (service.solve as ReturnType<typeof vi.fn>).mockClear();
+    (service.solve as ReturnType<typeof vi.fn>)
+      .mockRejectedValueOnce(new Error('unknown field engine_commitment'))
+      .mockResolvedValueOnce({ metrics: { episode_hash: 'ep-v2' } });
+
+    await solverV2.testReportEpisode({ planId: 'plan-v2', success: true }, linkage);
+
+    // V2 should ALSO have tried with identity fields (not latched by v1)
+    expect(service.solve).toHaveBeenCalledTimes(2);
+    const firstV2Call = (service.solve as ReturnType<typeof vi.fn>).mock.calls[0];
+    expect(firstV2Call[1]).toHaveProperty('engine_commitment', 'engine-test');
+  });
+
+  it('missing outcomeClass warning fires once per latchKey (tripwire not siren)', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    class StubOutcomeWarn extends StubSolver {
+      override get solverId() { return 'test.stub.outcome-warn'; }
+    }
+    const solver = new StubOutcomeWarn(service);
+
+    // Linkage with undefined outcomeClass
+    const linkageNoOutcome: EpisodeLinkage = {
+      bundleHash: 'b-no-outcome',
+      // outcomeClass intentionally undefined
+    };
+
+    // First call should warn
+    await solver.testReportEpisode({ planId: 'plan-warn-1', success: true }, linkageNoOutcome);
+    const warnCalls = warnSpy.mock.calls.filter(
+      (call) => call[0]?.includes('has no outcomeClass')
+    );
+    expect(warnCalls).toHaveLength(1);
+    expect(warnCalls[0][0]).toContain('test.stub.outcome-warn@1'); // latchKey format
+
+    // Second call should NOT warn (already warned for this latchKey)
+    await solver.testReportEpisode({ planId: 'plan-warn-2', success: true }, linkageNoOutcome);
+    const warnCallsAfter = warnSpy.mock.calls.filter(
+      (call) => call[0]?.includes('has no outcomeClass')
+    );
+    expect(warnCallsAfter).toHaveLength(1); // Still just 1
 
     warnSpy.mockRestore();
   });

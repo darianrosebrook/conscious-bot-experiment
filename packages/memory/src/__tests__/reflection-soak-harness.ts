@@ -135,6 +135,16 @@ interface ReflectionRow {
   memorySubtype?: string;
   isPlaceholder?: boolean;
   timestamp?: number;
+  // Additional top-level fields that may be returned by API
+  insights?: string[];
+  lessons?: string[];
+  emotionalValence?: number;
+  provenance?: {
+    model?: string;
+    tokensUsed?: number;
+    latencyMs?: number;
+    schemaVersion?: number;
+  };
   // Legacy nested metadata (for backwards compatibility with raw chunk queries)
   metadata?: {
     dedupeKey?: string;
@@ -607,18 +617,31 @@ async function runQualitySoak(): Promise<SoakReport['quality']> {
   for (const ref of reflections) {
     result.reflectionsChecked++;
 
-    // Defensive: skip rows without metadata
-    if (!ref.metadata) {
+    // Handle both top-level fields (new API format) and nested metadata (legacy format)
+    // The /enhanced/reflections endpoint returns fields at top-level, not nested in metadata
+    const meta = ref.metadata ?? {
+      dedupeKey: ref.dedupeKey,
+      memorySubtype: ref.memorySubtype,
+      isPlaceholder: ref.isPlaceholder,
+      insights: ref.insights,
+      lessons: ref.lessons,
+      emotionalValence: ref.emotionalValence,
+      provenance: ref.provenance,
+    };
+
+    // Check if we have the essential fields in either location
+    const hasEssentialFields = (ref.dedupeKey || meta.dedupeKey) &&
+                               (ref.memorySubtype || meta.memorySubtype);
+
+    if (!hasEssentialFields) {
       result.schemaInvalid++;
       result.issues.push({
         reflectionId: ref.id,
         issue: 'missing_metadata_object',
-        detail: 'Row has no metadata object',
+        detail: 'Row has no metadata object or essential top-level fields',
       });
       continue;
     }
-
-    const meta = ref.metadata;
 
     // --- Check 1: Schema validity ---
     const schemaIssues: string[] = [];

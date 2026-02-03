@@ -19,12 +19,21 @@ export default defineConfig({
     port: 3000,
     open: true,
     // Proxy API requests to backend services during development
+    // Service ports: memory=3001, planning=3002, cognition=3003, world=3004, minecraft=3005
     proxy: {
-      // Memory service
+      // =====================================================================
+      // Memory service (port 3001)
+      // =====================================================================
       '/api/database': {
         target: 'http://localhost:3001',
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api\/database/, '/enhanced'),
+      },
+      // Embeddings visualization endpoint - maps /api/embeddings/viz to /enhanced/embeddings-3d
+      '/api/embeddings/viz': {
+        target: 'http://localhost:3001',
+        changeOrigin: true,
+        rewrite: () => '/enhanced/embeddings-3d',
       },
       '/api/embeddings': {
         target: 'http://localhost:3001',
@@ -34,61 +43,129 @@ export default defineConfig({
       '/api/memories': {
         target: 'http://localhost:3001',
         changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api\/memories/, ''),
+        rewrite: (path) => path.replace(/^\/api\/memories/, '/memories'),
       },
-      // Cognition service
-      '/api/stream': {
-        target: 'http://localhost:3002',
+      '/api/memory-updates': {
+        target: 'http://localhost:3001',
         changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api\/stream/, '/stream'),
+        rewrite: (path) => path.replace(/^\/api\/memory-updates/, '/memory-updates'),
       },
-      '/api/intrusive': {
-        target: 'http://localhost:3002',
-        changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api\/intrusive/, '/intrusive'),
-      },
-      // Minecraft interface service
-      '/api/bot': {
-        target: 'http://localhost:3003',
-        changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api\/bot/, '/bot'),
-      },
-      '/api/viewer': {
-        target: 'http://localhost:3003',
-        changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api\/viewer/, '/viewer'),
-      },
-      '/api/inventory': {
-        target: 'http://localhost:3003',
-        changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api\/inventory/, '/inventory'),
-      },
-      '/api/world': {
-        target: 'http://localhost:3003',
-        changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api\/world/, '/world'),
-      },
-      // Planning service
+
+      // =====================================================================
+      // Planning service (port 3002)
+      // =====================================================================
       '/api/tasks': {
-        target: 'http://localhost:3004',
+        target: 'http://localhost:3002',
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api\/tasks/, '/tasks'),
       },
+      '/api/task-updates': {
+        target: 'http://localhost:3002',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api\/task-updates/, '/task-updates'),
+      },
       '/api/goals': {
-        target: 'http://localhost:3004',
+        target: 'http://localhost:3002',
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api\/goals/, '/goals'),
       },
       '/api/planner': {
-        target: 'http://localhost:3004',
+        target: 'http://localhost:3002',
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api\/planner/, '/planner'),
       },
-      // Evaluation service
+
+      // =====================================================================
+      // Cognition service (port 3003)
+      // =====================================================================
+      // Cognitive stream - maps /api/ws/cognitive-stream/* to /api/cognitive-stream/*
+      '/api/ws/cognitive-stream': {
+        target: 'http://localhost:3003',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api\/ws\/cognitive-stream/, '/api/cognitive-stream'),
+      },
+      '/api/stream': {
+        target: 'http://localhost:3003',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api\/stream/, '/stream'),
+      },
+      '/api/intrusive': {
+        target: 'http://localhost:3003',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api\/intrusive/, '/intrusive'),
+      },
+      '/api/events': {
+        target: 'http://localhost:3003',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api\/events/, '/events'),
+      },
+      '/api/notes': {
+        target: 'http://localhost:3003',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api\/notes/, '/notes'),
+      },
+
+      // =====================================================================
+      // World service (port 3004)
+      // =====================================================================
+      '/api/world': {
+        target: 'http://localhost:3004',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api\/world/, '/state'),
+      },
+
+      // =====================================================================
+      // Minecraft interface service (port 3005)
+      // =====================================================================
+      // Bot state - dashboard polls this for current bot state
+      '/api/ws/bot-state': {
+        target: 'http://localhost:3005',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api\/ws\/bot-state/, '/state'),
+      },
+      '/api/bot/state': {
+        target: 'http://localhost:3005',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api\/bot\/state/, '/state'),
+      },
+      '/api/bot/health': {
+        target: 'http://localhost:3005',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api\/bot\/health/, '/health'),
+      },
+      '/api/bot': {
+        target: 'http://localhost:3005',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api\/bot/, ''),
+      },
+      '/api/viewer/status': {
+        target: 'http://localhost:3005',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api\/viewer\/status/, '/viewer-status'),
+      },
+      '/api/viewer/start': {
+        target: 'http://localhost:3005',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api\/viewer\/start/, '/start-viewer'),
+      },
+      '/api/viewer/stop': {
+        target: 'http://localhost:3005',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api\/viewer\/stop/, '/stop-viewer'),
+      },
+      '/api/inventory': {
+        target: 'http://localhost:3005',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api\/inventory/, '/inventory'),
+      },
+
+      // =====================================================================
+      // Evaluation service (port 3006 - if separate, otherwise part of another)
+      // =====================================================================
       '/api/evaluation': {
         target: 'http://localhost:3005',
         changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api\/evaluation/, ''),
+        rewrite: (path) => path.replace(/^\/api\/evaluation/, '/evaluation'),
       },
     },
   },

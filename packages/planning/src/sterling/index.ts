@@ -220,7 +220,16 @@ export {
 } from './domain-declaration';
 
 // Episode classification (Phase 2C)
-export { classifyOutcome, extractSolveJoinKeys, buildEpisodeLinkage } from './episode-classification';
+export {
+  classifyOutcome,
+  extractSolveJoinKeys,
+  // Canonical linkage builders (use these)
+  buildSterlingEpisodeLinkage,
+  buildSterlingEpisodeLinkageFromResult,
+  // Legacy aliases (deprecated, for backward compat)
+  buildEpisodeLinkage,
+  buildEpisodeLinkageFromResult,
+} from './episode-classification';
 
 // P21 Primitive Capsule (contract types + reference fixtures only)
 export type {

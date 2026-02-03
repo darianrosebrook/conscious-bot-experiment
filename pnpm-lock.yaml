@@ -11,7 +11,7 @@ overrides:
 
 patchedDependencies:
   prismarine-viewer@1.33.0:
-    hash: 0e9f1e8d6f8de4959d3c2416a5d07c097d645f854241d1f4ab7528fa07d64f88
+    hash: 1fd19882493cd2585a51b2cda570cbb48c1b00667a87527019d21f097b9d8ae5
     path: patches/prismarine-viewer@1.33.0.patch
 
 importers:
@@ -508,7 +508,7 @@ importers:
         version: 1.2.0
       prismarine-viewer:
         specifier: ^1.33.0
-        version: 1.33.0(patch_hash=0e9f1e8d6f8de4959d3c2416a5d07c097d645f854241d1f4ab7528fa07d64f88)
+        version: 1.33.0(patch_hash=1fd19882493cd2585a51b2cda570cbb48c1b00667a87527019d21f097b9d8ae5)
       three:
         specifier: ^0.179.1
         version: 0.179.1
@@ -537,6 +537,9 @@ importers:
       '@types/ws':
         specifier: ^8.18.1
         version: 8.18.1
+      minecraft-assets:
+        specifier: ^1.17.0
+        version: 1.17.0
       tsx:
         specifier: ^4.20.5
         version: 4.21.0
@@ -3637,6 +3640,9 @@ packages:
   mimic-response@3.1.0:
     resolution: {integrity: sha512-z0yWI+4FDrrweS8Zmt4Ej5HdJmky15+L2e6Wgn3+iK5fWzb6T3fhNFq2+MeTRb064c6Wr4N/wv0DzQTjNzHNGQ==}
     engines: {node: '>=10'}
+
+  minecraft-assets@1.17.0:
+    resolution: {integrity: sha512-dBs+8ABdnUp9E19LVg4Y2d6BPxUI02+qLXEEsGhcaB4VHfpIMZXcH6jVWg1pFNtBCOipPdQuIb2dBnXdVZlqfQ==}
 
   minecraft-data@2.221.0:
     resolution: {integrity: sha512-0AhqzbIKb6WqPSF6qBevaPryeWOz545hLxt6q+gfJF8YIQX/YfkyX/nXWhl+pSIS2rTBcQ0RJkRCtTeRzQwHDA==}
@@ -8151,6 +8157,8 @@ snapshots:
 
   mimic-response@3.1.0: {}
 
+  minecraft-assets@1.17.0: {}
+
   minecraft-data@2.221.0: {}
 
   minecraft-data@3.103.0: {}
@@ -8731,7 +8739,7 @@ snapshots:
       prismarine-block: 1.22.0
       prismarine-nbt: 2.8.0
 
-  prismarine-viewer@1.33.0(patch_hash=0e9f1e8d6f8de4959d3c2416a5d07c097d645f854241d1f4ab7528fa07d64f88):
+  prismarine-viewer@1.33.0(patch_hash=1fd19882493cd2585a51b2cda570cbb48c1b00667a87527019d21f097b9d8ae5):
     dependencies:
       '@tweenjs/tween.js': 23.1.3
       compression: 1.8.1

@@ -67,7 +67,15 @@ export function useInitialDataFetch({
       });
       if (worldRes.ok) {
         const worldData = await worldRes.json();
-        setEnvironment(worldData.environment);
+        // Build environment from world state - API returns flat structure
+        const env = worldData.environment || {};
+        const perception = worldData.perception || {};
+        setEnvironment({
+          biome: env.biome || 'unknown',
+          weather: env.weather || 'clear',
+          timeOfDay: env.timeOfDay || 'day',
+          nearbyEntities: perception.visibleEntities || [],
+        });
       }
 
       // Fetch inventory
@@ -77,7 +85,9 @@ export function useInitialDataFetch({
       if (inventoryRes.ok) {
         const inventoryData = await inventoryRes.json();
         if (inventoryData.success) {
-          setInventory(inventoryData.inventory);
+          // API returns inventory in 'data' or 'inventory' field
+          const items = inventoryData.inventory || inventoryData.data || [];
+          setInventory(Array.isArray(items) ? items : []);
         }
       }
 

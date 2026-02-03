@@ -2416,4 +2416,138 @@ describe('Building episode reporting with join keys', () => {
     expect(linkageArg.outcomeClass).toBe('EXECUTION_FAILURE');
     expect(linkageArg.bundleHash).toBe('hash-A');
   });
+
+  it('uses richer outcome taxonomy when buildingSolveResultSubstrate indicates solver failure AND is coherent', async () => {
+    const task = await ti.addTask(makeTaskData({
+      title: 'Build shelter',
+      type: 'building',
+      steps: [
+        { id: 'step-1', label: 'build_module:wall', done: false, order: 1, meta: { domain: 'building', moduleId: 'wall-1' } },
+      ],
+    }));
+
+    task.metadata.solver = {
+      buildingTemplateId: 'shelter-template',
+      buildingPlanId: 'plan-A',
+      buildingSolveJoinKeys: {
+        planId: 'plan-A',
+        bundleHash: 'hash-A',
+      },
+      // Substrate indicates solver failed with max_nodes termination
+      // bundleHash matches join keys — coherent
+      buildingSolveResultSubstrate: {
+        planId: 'plan-A',
+        bundleHash: 'hash-A', // MATCHES join keys
+        solved: false,
+        totalNodes: 10000,
+        searchHealth: { terminationReason: 'max_nodes' },
+        capturedAt: Date.now(),
+      },
+    };
+
+    ti.updateTaskProgress(task.id, 50, 'failed');
+
+    expect(reportEpisodeSpy).toHaveBeenCalledTimes(1);
+    const linkageArg = reportEpisodeSpy.mock.calls[0][7];
+    // Should use richer classification from substrate
+    expect(linkageArg.outcomeClass).toBe('SEARCH_EXHAUSTED');
+  });
+
+  it('uses EXECUTION_FAILURE when substrate bundleHash does NOT match join keys (stale/incoherent)', async () => {
+    const task = await ti.addTask(makeTaskData({
+      title: 'Build shelter',
+      type: 'building',
+      steps: [
+        { id: 'step-1', label: 'build_module:wall', done: false, order: 1, meta: { domain: 'building', moduleId: 'wall-1' } },
+      ],
+    }));
+
+    task.metadata.solver = {
+      buildingTemplateId: 'shelter-template',
+      buildingPlanId: 'plan-B', // Current plan is B
+      buildingSolveJoinKeys: {
+        planId: 'plan-B',
+        bundleHash: 'hash-B', // Current bundle is B
+      },
+      // Substrate is from plan A (stale from previous replan)
+      buildingSolveResultSubstrate: {
+        planId: 'plan-A',
+        bundleHash: 'hash-A', // DOES NOT MATCH current join keys
+        solved: false,
+        searchHealth: { terminationReason: 'max_nodes' },
+        capturedAt: Date.now(),
+      },
+    };
+
+    ti.updateTaskProgress(task.id, 50, 'failed');
+
+    expect(reportEpisodeSpy).toHaveBeenCalledTimes(1);
+    const linkageArg = reportEpisodeSpy.mock.calls[0][7];
+    // Should NOT use stale substrate — fall back to binary
+    expect(linkageArg.outcomeClass).toBe('EXECUTION_FAILURE');
+  });
+
+  it('uses EXECUTION_FAILURE when substrate.solved=true but execution failed', async () => {
+    const task = await ti.addTask(makeTaskData({
+      title: 'Build shelter',
+      type: 'building',
+      steps: [
+        { id: 'step-1', label: 'build_module:wall', done: false, order: 1, meta: { domain: 'building', moduleId: 'wall-1' } },
+      ],
+    }));
+
+    task.metadata.solver = {
+      buildingTemplateId: 'shelter-template',
+      buildingPlanId: 'plan-A',
+      buildingSolveJoinKeys: {
+        planId: 'plan-A',
+        bundleHash: 'hash-A',
+      },
+      // Substrate indicates solver SUCCEEDED
+      buildingSolveResultSubstrate: {
+        solved: true,
+        totalNodes: 50,
+        capturedAt: Date.now(),
+      },
+    };
+
+    // But execution failed anyway
+    ti.updateTaskProgress(task.id, 50, 'failed');
+
+    expect(reportEpisodeSpy).toHaveBeenCalledTimes(1);
+    const linkageArg = reportEpisodeSpy.mock.calls[0][7];
+    // Should NOT mis-classify as search exhausted — execution failed, not solve
+    expect(linkageArg.outcomeClass).toBe('EXECUTION_FAILURE');
+  });
+
+  it('uses EXECUTION_SUCCESS for successful tasks regardless of substrate', async () => {
+    const task = await ti.addTask(makeTaskData({
+      title: 'Build shelter',
+      type: 'building',
+      steps: [
+        { id: 'step-1', label: 'build_module:wall', done: true, order: 1, meta: { domain: 'building', moduleId: 'wall-1' } },
+      ],
+    }));
+
+    task.metadata.solver = {
+      buildingTemplateId: 'shelter-template',
+      buildingPlanId: 'plan-A',
+      buildingSolveJoinKeys: {
+        planId: 'plan-A',
+        bundleHash: 'hash-A',
+      },
+      // Even if substrate looks weird, success is success
+      buildingSolveResultSubstrate: {
+        solved: false,
+        searchHealth: { terminationReason: 'max_nodes' },
+        capturedAt: Date.now(),
+      },
+    };
+
+    ti.updateTaskProgress(task.id, 100, 'completed');
+
+    expect(reportEpisodeSpy).toHaveBeenCalledTimes(1);
+    const linkageArg = reportEpisodeSpy.mock.calls[0][7];
+    expect(linkageArg.outcomeClass).toBe('EXECUTION_SUCCESS');
+  });
 });

@@ -186,6 +186,29 @@ let systemReady = process.env.SYSTEM_READY_ON_BOOT === '1';
 let readyAt: string | null = systemReady ? new Date().toISOString() : null;
 let readySource: string | null = systemReady ? 'env' : null;
 
+// Track connected SSE clients for memory updates
+const memoryUpdateClients: Set<express.Response> = new Set();
+
+/**
+ * Broadcast a memory update to all connected SSE clients
+ */
+export function broadcastMemoryUpdate(event: string, data: any): void {
+  const message = JSON.stringify({
+    event,
+    data,
+    timestamp: Date.now(),
+  });
+
+  for (const client of memoryUpdateClients) {
+    try {
+      client.write(`data: ${message}\n\n`);
+    } catch (error) {
+      // Client disconnected, will be cleaned up
+      memoryUpdateClients.delete(client);
+    }
+  }
+}
+
 // Health check endpoint
 app.get('/health', (req, res) => {
   res.json({
@@ -199,6 +222,45 @@ app.get('/health', (req, res) => {
         'New vector search + GraphRAG system with per-seed isolation',
       endpoints: ['/enhanced/status', '/enhanced/seed', '/enhanced/database'],
     },
+  });
+});
+
+// GET /memory-updates - SSE endpoint for real-time memory updates
+app.get('/memory-updates', (req, res) => {
+  // Set SSE headers
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.flushHeaders();
+
+  // Add client to the set
+  memoryUpdateClients.add(res);
+  console.log(`[SSE] Client connected to memory-updates (${memoryUpdateClients.size} total)`);
+
+  // Send initial connection confirmation
+  const initMessage = JSON.stringify({
+    event: 'connected',
+    data: { message: 'Connected to memory updates stream' },
+    timestamp: Date.now(),
+  });
+  res.write(`data: ${initMessage}\n\n`);
+
+  // Send keepalive every 30 seconds
+  const keepaliveInterval = setInterval(() => {
+    try {
+      res.write(`: keepalive\n\n`);
+    } catch {
+      clearInterval(keepaliveInterval);
+      memoryUpdateClients.delete(res);
+    }
+  }, 30000);
+
+  // Clean up on disconnect
+  req.on('close', () => {
+    clearInterval(keepaliveInterval);
+    memoryUpdateClients.delete(res);
+    console.log(`[SSE] Client disconnected from memory-updates (${memoryUpdateClients.size} remaining)`);
   });
 });
 
@@ -366,6 +428,14 @@ app.post('/action', (req, res) => {
     switch (action) {
       case 'store_episodic':
         result = memorySystem.episodic.storeMemory(parameters);
+        // Broadcast to SSE clients
+        broadcastMemoryUpdate('eventAdded', {
+          id: result?.id || `event-${Date.now()}`,
+          timestamp: new Date().toISOString(),
+          type: parameters.type || 'episodic',
+          content: parameters.description || parameters.content,
+          payload: parameters,
+        });
         break;
       case 'retrieve_episodic':
         result = memorySystem.episodic.retrieveMemories(parameters);
@@ -1018,9 +1088,10 @@ app.get('/enhanced/embeddings-3d', async (req, res) => {
       });
     }
 
-    // Call UMAP service for dimensionality reduction
-    const umapHost = process.env.UMAP_SERVICE_HOST || 'localhost';
-    const umapPort = process.env.UMAP_SERVICE_PORT || '5003';
+    // Call UMAP endpoint on MLX sidecar for dimensionality reduction
+    // (UMAP is now consolidated into the MLX sidecar service on port 5002)
+    const umapHost = process.env.MLX_SIDECAR_HOST || process.env.UMAP_SERVICE_HOST || 'localhost';
+    const umapPort = process.env.MLX_SIDECAR_PORT || process.env.UMAP_SERVICE_PORT || '5002';
 
     const umapResponse = await fetch(`http://${umapHost}:${umapPort}/reduce`, {
       method: 'POST',
@@ -1322,6 +1393,17 @@ app.post('/enhanced/reflections', async (req, res) => {
       dedupeKey,
       isPlaceholder
     );
+
+    // Broadcast to SSE clients
+    broadcastMemoryUpdate('noteAdded', {
+      id: reflection.id,
+      timestamp: new Date().toISOString(),
+      type: type,
+      title: reflection.title || '',
+      content: content,
+      source: 'reflection',
+      confidence: reflection.confidence || 0,
+    });
 
     res.json({
       success: true,

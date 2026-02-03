@@ -5,10 +5,152 @@
 .spinIcon { width: 1rem; height: 1rem; animation: spin 1s linear infinite; }
 @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 
-// Root scroll container - takes full height of parent
+// Root scroll container - takes full height of parent (legacy, still used for fallback)
 .scrollRoot { height: 100%; }
 
 .scrollContent { display: flex; flex-direction: column; gap: 0.75rem; padding: 0.75rem; }
+
+// ===========================================================================
+// Split Panel Layout
+// ===========================================================================
+.splitContainer {
+  display: flex;
+  height: 100%;
+  overflow: hidden;
+  gap: 0.75rem;
+  padding: 0.75rem;
+}
+
+// Left panel: scrollable details
+.detailsPanel {
+  width: 40%;
+  min-width: 320px;
+  max-width: 480px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid rgb(39 39 42);
+  padding-right: 0.75rem;
+}
+
+.detailsScroll {
+  flex: 1;
+  height: 100%;
+}
+
+.detailsContent {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+// Right panel: visualizations (fixed, not scrollable)
+.vizPanel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  min-width: 0; // Allow shrinking below content size
+  overflow: hidden;
+}
+
+// Primary viz area (3D embedding) - takes most vertical space
+.vizPrimary {
+  flex: 1;
+  min-height: 300px;
+  display: flex;
+  flex-direction: column;
+}
+
+// Secondary viz area (Knowledge Graph + Similarity) - grid of smaller cards
+.vizSecondary {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+  flex-shrink: 0;
+}
+
+// Always-visible stats section (non-collapsible card)
+.statsSection {
+  border-radius: 1rem;
+  border: 1px solid rgb(39 39 42);
+  background-color: rgb(9 9 11 / 0.6);
+  padding: 0.75rem;
+}
+
+.statsSectionHeader {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.625rem;
+  color: rgb(228 228 231);
+}
+
+.statsSectionTitle {
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+// Viz card (for right panel items)
+.vizCard {
+  border-radius: 1rem;
+  border: 1px solid rgb(39 39 42);
+  background-color: rgb(9 9 11 / 0.6);
+  padding: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.vizCardHeader {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+  color: rgb(228 228 231);
+  flex-shrink: 0;
+}
+
+.vizCardTitle {
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.vizCardBody {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+// Responsive: stack panels vertically on smaller screens
+@media (max-width: 1024px) {
+  .splitContainer {
+    flex-direction: column;
+    overflow-y: auto;
+  }
+
+  .detailsPanel {
+    width: 100%;
+    max-width: none;
+    min-width: 0;
+    border-right: none;
+    border-bottom: 1px solid rgb(39 39 42);
+    padding-right: 0;
+    padding-bottom: 0.75rem;
+    flex-shrink: 0;
+    max-height: 50vh;
+  }
+
+  .vizPanel {
+    flex-shrink: 0;
+    min-height: 50vh;
+  }
+
+  .vizSecondary {
+    grid-template-columns: 1fr;
+  }
+}
 
 // Icon sizing utilities
 .icon4 { width: 1rem; height: 1rem; }
@@ -192,3 +334,13 @@
 .lessonContent { flex: 1; color: rgb(212 212 216); }
 .lessonEffectiveness { font-size: 10px; color: rgb(113 113 122); font-variant-numeric: tabular-nums; }
 .memFullContentLoading { font-size: 0.75rem; color: rgb(113 113 122); padding: 0.25rem 0; }
+
+// Loading fallback for lazy components
+.loadingFallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+  font-size: 0.75rem;
+  color: rgb(113 113 122);
+}
