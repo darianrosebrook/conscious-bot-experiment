@@ -1,12 +1,11 @@
 diff --git a/lib/mineflayer.js b/lib/mineflayer.js
-index 06634bf6415ec41410e95ec816bebcc239726497..f634efe72acaa1431cdd8890b9bb98f50cb39b63 100644
+index 06634bf6415ec41410e95ec816bebcc239726497..3743b616cf0b3daaf0eb2cb4ec964d52a1d9cc9e 100644
 --- a/lib/mineflayer.js
 +++ b/lib/mineflayer.js
-@@ -71,8 +71,17 @@ module.exports = (bot, { viewDistance = 6, firstPerson = false, port = 3000, pre
+@@ -69,10 +69,18 @@ module.exports = (bot, { viewDistance = 6, firstPerson = false, port = 3000, pre
+       worldView.updatePosition(bot.entity.position)
+     }
  
-     bot.on('move', botPosition)
-     worldView.listenToBot(bot)
-+
 +    function emitTime () {
 +      const time = (bot.time && bot.time.timeOfDay != null) ? bot.time.timeOfDay : (bot.world && bot.world.time != null ? bot.world.time : 6000)
 +      socket.emit('time', time)
@@ -14,6 +13,8 @@ index 06634bf6415ec41410e95ec816bebcc239726497..f634efe72acaa1431cdd8890b9bb98f5
 +    emitTime()
 +    bot.on('time', emitTime)
 +
+     bot.on('move', botPosition)
+     worldView.listenToBot(bot)
      socket.on('disconnect', () => {
        bot.removeListener('move', botPosition)
 +      bot.removeListener('time', emitTime)
@@ -189,10 +190,48 @@ index db02d904690f4066555dbea72b00dd11fbd99640..b63729acd40c6b4e059c74ab22e224ca
        const raycaster = new THREE.Raycaster()
        const mouse = new THREE.Vector2()
 diff --git a/viewer/lib/worldrenderer.js b/viewer/lib/worldrenderer.js
-index 744224a71ec6d73b3da405df9f8a5fdd55dfbd66..4b6891684b482140bf118933bde025de7bb7d84d 100644
+index 744224a71ec6d73b3da405df9f8a5fdd55dfbd66..59a788e687ef26b8132c5f12359ec8fc565d0f10 100644
 --- a/viewer/lib/worldrenderer.js
 +++ b/viewer/lib/worldrenderer.js
-@@ -21,7 +21,14 @@ class WorldRenderer {
+@@ -9,11 +9,37 @@ function mod (x, n) {
+   return ((x % n) + n) % n
+ }
+ 
++/**
++ * Version fallback map for unsupported Minecraft versions.
++ * Maps newer versions to the closest supported asset version.
++ * Supported versions: 1.8.8, 1.9.4, 1.10.2, 1.11.2, 1.12.2, 1.13.2, 1.14.4,
++ * 1.15.2, 1.16.1, 1.16.4, 1.17.1, 1.18.1, 1.19, 1.20.1, 1.21.1, 1.21.4
++ */
++const VERSION_FALLBACK = {
++  '1.21.9': '1.21.4',
++  '1.21.8': '1.21.4',
++  '1.21.7': '1.21.4',
++  '1.21.6': '1.21.4',
++  '1.21.5': '1.21.4',
++  '1.21.3': '1.21.1',
++  '1.21.2': '1.21.1',
++  '1.21': '1.21.1',
++  '1.20.6': '1.20.1',
++  '1.20.4': '1.20.1',
++  '1.20.2': '1.20.1',
++  '1.20': '1.20.1',
++}
++
++function resolveAssetVersion(version) {
++  return VERSION_FALLBACK[version] || version
++}
++
+ class WorldRenderer {
+   constructor (scene, numWorkers = 4) {
+     this.sectionMeshs = {}
+     this.active = false
+     this.version = undefined
++    this.assetVersion = undefined
+     this.scene = scene
+     this.loadedChunks = {}
+     this.sectionsOutstanding = new Set()
+@@ -21,7 +47,14 @@ class WorldRenderer {
      this.blockStatesData = undefined
      this.texturesDataUrl = undefined
  
@@ -208,12 +247,28 @@ index 744224a71ec6d73b3da405df9f8a5fdd55dfbd66..4b6891684b482140bf118933bde025de
  
      this.workers = []
      for (let i = 0; i < numWorkers; i++) {
-@@ -87,24 +94,39 @@ class WorldRenderer {
+@@ -77,33 +110,52 @@ class WorldRenderer {
+ 
+   setVersion (version) {
+     this.version = version
++    this.assetVersion = resolveAssetVersion(version)
++    if (this.assetVersion !== version) {
++      console.log(`[prismarine-viewer] Version ${version} not supported, falling back to ${this.assetVersion} assets`)
++    }
+     this.resetWorld()
+     this.active = true
+     for (const worker of this.workers) {
+-      worker.postMessage({ type: 'version', version })
++      worker.postMessage({ type: 'version', version: this.assetVersion })
+     }
+ 
+     this.updateTexturesData()
    }
  
    updateTexturesData () {
 -    loadTexture(this.texturesDataUrl || `textures/${this.version}.png`, texture => {
-+    const url = this.texturesDataUrl || `/textures/${this.version}.png`
++    const assetVer = this.assetVersion || this.version
++    const url = this.texturesDataUrl || `/textures/${assetVer}.png`
 +    loadTexture(url, texture => {
 +      if (!texture) return
        texture.magFilter = THREE.NearestFilter
@@ -226,9 +281,10 @@ index 744224a71ec6d73b3da405df9f8a5fdd55dfbd66..4b6891684b482140bf118933bde025de
      const loadBlockStates = () => {
 -      return new Promise(resolve => {
 +      return new Promise((resolve, reject) => {
++        const assetVer = this.assetVersion || this.version
          if (this.blockStatesData) return resolve(this.blockStatesData)
 -        return loadJSON(`blocksStates/${this.version}.json`, resolve)
-+        const blockStatesUrl = `/blocksStates/${this.version}.json`
++        const blockStatesUrl = `/blocksStates/${assetVer}.json`
 +        loadJSON(blockStatesUrl, (data) => {
 +          if (data) {
 +            this.blockStatesData = data
@@ -240,19 +296,12 @@ index 744224a71ec6d73b3da405df9f8a5fdd55dfbd66..4b6891684b482140bf118933bde025de
        })
      }
 -    loadBlockStates().then((blockStates) => {
--      for (const worker of this.workers) {
--        worker.postMessage({ type: 'blockStates', json: blockStates })
--      }
--    })
-+    loadBlockStates()
-+      .then((blockStates) => {
-+        for (const worker of this.workers) {
-+          worker.postMessage({ type: 'blockStates', json: blockStates })
-+        }
-+      })
-+      .catch((err) => {
-+        console.warn('[prismarine-viewer] blocksStates load failed:', err)
-+      })
++    loadBlockStates().then(blockStates => {
+       for (const worker of this.workers) {
+         worker.postMessage({ type: 'blockStates', json: blockStates })
+       }
++    }).catch(err => {
++      console.warn('[prismarine-viewer] blocksStates load failed:', err)
+     })
    }
  
-   addColumn (x, z, chunk) {

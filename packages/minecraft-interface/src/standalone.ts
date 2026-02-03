@@ -205,14 +205,16 @@ export function createStandaloneMinecraftInterface(
 }
 
 /**
- * Default configuration for standalone testing
+ * Default configuration for standalone testing.
+ * Uses 'microsoft' auth by default to support custom skins on online-mode servers.
+ * Override with auth: 'offline' if connecting to offline-mode servers.
  */
 export const DEFAULT_STANDALONE_CONFIG: BotConfig = {
   host: 'localhost',
   port: 25565,
   username: 'StandaloneBot',
-  version: process.env.MINECRAFT_VERSION || '1.21.4',
-  auth: 'offline',
+  version: process.env.MINECRAFT_VERSION || '1.21.9',
+  auth: (process.env.MINECRAFT_AUTH as 'microsoft' | 'offline') || 'microsoft',
   pathfindingTimeout: 30000,
   actionTimeout: 10000,
   observationRadius: 10,
