@@ -130,9 +130,11 @@ export interface IntrusiveThoughtProcessorConfig {
   enableActionParsing: boolean;
   enableTaskCreation: boolean;
   enablePlanningIntegration: boolean;
-  enableMinecraftIntegration: boolean;
+  /** @deprecated Cognition no longer calls MC interface directly. Actions route through planning. */
+  enableMinecraftIntegration?: boolean;
   planningEndpoint: string;
-  minecraftEndpoint: string;
+  /** @deprecated Cognition no longer calls MC interface directly. Actions route through planning. */
+  minecraftEndpoint?: string;
   mcp?: MCPClient;
   suppressionMs?: number;
 }
@@ -1320,39 +1322,43 @@ export class IntrusiveThoughtProcessor extends EventEmitter {
   }
 
   /**
-   * Execute a direct action on the Minecraft bot
+   * Execute an action by submitting it as a task to the planning service.
+   *
+   * This routes through the planning service's guard pipeline (geofence,
+   * rate limiter, threat holds, shadow mode) instead of calling the
+   * minecraft-interface /action endpoint directly.
    */
   async executeDirectAction(action: Action): Promise<BotResponse> {
     try {
-      const response = await fetch(`${this.config.minecraftEndpoint}/action`, {
+      const response = await fetch(`${this.config.planningEndpoint}/task`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          title: `${action.type}: ${action.target}`,
+          description: `Cognition-triggered action (origin: intrusive-thought)`,
           type: action.type,
-          parameters: {
-            target: action.target,
-            priority: action.priority,
-          },
+          priority: action.priority || 'normal',
+          origin: 'cognition:intrusive-thought',
         }),
-        signal: AbortSignal.timeout(10000), // 10 second timeout
+        signal: AbortSignal.timeout(10000),
       });
 
       if (!response.ok) {
-        throw new Error(`Minecraft bot responded with ${response.status}`);
+        throw new Error(`Planning service responded with ${response.status}`);
       }
 
       const result = await response.json();
-      console.log(`Direct action executed:`, result);
+      console.log(`Action submitted to planning service:`, result);
 
       this.emit('directActionExecuted', { action, result });
 
       return {
         accepted: true,
-        response: `Direct action executed: ${action.type} ${action.target}`,
+        response: `Action submitted to planning: ${action.type} ${action.target}`,
         taskId: (result as any).taskId,
       };
     } catch (error) {
-      console.error('Failed to execute direct action:', error);
+      console.error('Failed to submit action to planning service:', error);
       this.emit('directActionError', { action, error });
 
       const errorMessage =
@@ -1360,7 +1366,7 @@ export class IntrusiveThoughtProcessor extends EventEmitter {
 
       return {
         accepted: false,
-        response: `Failed to execute action: ${action.type} ${action.target}. Error: ${errorMessage}`,
+        response: `Failed to submit action: ${action.type} ${action.target}. Error: ${errorMessage}`,
         error: errorMessage,
       };
     }

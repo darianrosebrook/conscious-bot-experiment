@@ -314,62 +314,14 @@ async function verifyTaskCompletion(
   }
 }
 
-export async function executeTask(task: any): Promise<TaskExecutionResult> {
-  try {
-    if (mcCircuitOpen()) {
-      return { success: false, error: 'Bot circuit is open' };
-    }
-
-    const response = await mcFetch('/execute-scenario', {
-      method: 'POST',
-      timeoutMs: 30000,
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        scenario: task.title || 'Autonomous Task',
-        signals: [
-          {
-            type: 'task_execution',
-            value: 80,
-            urgency: 'high',
-            taskId: task.id,
-            taskType: task.type,
-          },
-        ],
-        timeout: 60000, // 1 minute timeout
-      }),
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      return { success: false, error: `HTTP ${response.status}: ${errorText}` };
-    }
-
-    const result = (await response.json()) as any;
-
-    // Before declaring success, verify the task was actually accomplished
-    const verification = await verifyTaskCompletion(task, result);
-    if (!verification.verified) {
-      return {
-        success: false,
-        error: verification.error || 'Task verification failed',
-        taskId: task.id,
-        completedSteps: result.executedSteps || 0,
-      };
-    }
-
-    return {
-      success: result.success || false,
-      error: result.error,
-      taskId: task.id,
-      completedSteps: result.executedSteps || 0,
-    };
-  } catch (error) {
-    console.error('Task execution failed:', error);
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : 'Unknown error',
-    };
-  }
+/**
+ * @deprecated The /execute-scenario endpoint is retired (returns 410 Gone).
+ * Planning execution flows through the planning service (port 3002).
+ * Kept as a stub so existing imports don't break during transition.
+ */
+export async function executeTask(_task: any): Promise<TaskExecutionResult> {
+  return {
+    success: false,
+    error: 'executeTask is retired — /execute-scenario endpoint no longer exists. Use the planning service executor.',
+  };
 }

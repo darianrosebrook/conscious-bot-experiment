@@ -10,6 +10,7 @@
 import { EventEmitter } from 'events';
 import { Bot } from 'mineflayer';
 import { Plan, PlanStep, PlanningContext, MinecraftAction } from './types';
+import { registerActionTranslator } from './action-translator-singleton';
 
 // Minimal type definitions to avoid circular dependency
 export interface IntegratedPlanningCoordinator {
@@ -123,6 +124,10 @@ export class PlanExecutor extends EventEmitter {
         this.config,
         this.stateMachineWrapper
       );
+
+      // Register as the canonical singleton so the /action endpoint
+      // uses the same instance (prevents dual-pathfinder corruption).
+      registerActionTranslator(this.actionTranslator, bot);
 
       // Initialize safety monitor with the shared ActionTranslator
       // This avoids creating duplicate ActionTranslator/NavigationBridge instances

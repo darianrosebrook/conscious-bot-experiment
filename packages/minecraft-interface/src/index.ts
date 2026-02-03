@@ -10,7 +10,13 @@
 export { BotAdapter } from './bot-adapter';
 export { ObservationMapper } from './observation-mapper';
 export { ActionTranslator } from './action-translator';
+export type { NavigationPriority } from './action-translator';
 export { PlanExecutor } from './plan-executor';
+export {
+  getActionTranslator,
+  registerActionTranslator,
+  clearActionTranslator,
+} from './action-translator-singleton';
 export { ChatProcessor } from './chat-processor';
 export { MemoryIntegrationService } from './memory-integration';
 export type {

@@ -39,6 +39,7 @@ import {
   ToolDiscoveryResult,
 } from '../modules/mcp-integration';
 import type { IReactiveExecutor } from '../interfaces/reactive-executor';
+import { executeViaGateway } from '../server/execution-gateway';
 
 export interface ExecutionResult {
   success: boolean;
@@ -1075,162 +1076,118 @@ export class ReactiveExecutor implements IReactiveExecutor {
   /**
    * Execute crafting task with proper validation
    */
-  private async executeCraftTask(task: any, minecraftUrl: string) {
+  private async executeCraftTask(task: any, _minecraftUrl: string) {
     const itemToCraft = task.parameters?.item || 'item';
 
-    // Skip can_craft check since it's not supported by the Minecraft interface
-    // The Minecraft interface will handle validation internally
-
-    // Actually attempt to craft the item
-    const craftResult = await fetch(`${minecraftUrl}/action`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
+    const result = await executeViaGateway({
+      origin: 'reactive',
+      priority: 'normal',
+      action: {
         type: 'craft_item',
         parameters: {
           item: itemToCraft,
           quantity: task.parameters?.quantity || 1,
         },
-      }),
-    }).then((res) => res.json());
+      },
+    });
 
     return {
-      success: (craftResult as any).success,
-      error: (craftResult as any).error,
+      success: result.ok,
+      error: result.error,
       item: itemToCraft,
       type: 'craft',
-      data: craftResult,
+      data: result.data,
     };
   }
 
   /**
    * Execute movement task with proper validation
    */
-  private async executeMoveTask(task: any, minecraftUrl: string) {
-    try {
-      const result = await fetch(`${minecraftUrl}/action`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          type: 'move_forward',
-          parameters: { distance: task.parameters?.distance || 1 },
-        }),
-      }).then((res) => res.json());
+  private async executeMoveTask(task: any, _minecraftUrl: string) {
+    const result = await executeViaGateway({
+      origin: 'reactive',
+      priority: 'normal',
+      action: {
+        type: 'move_forward',
+        parameters: { distance: task.parameters?.distance || 1 },
+      },
+    });
 
-      return {
-        success: (result as any).success,
-        error: (result as any).error,
-        type: 'move',
-        data: result,
-      };
-    } catch (error) {
-      return {
-        success: false,
-        error: `Failed to execute move task: ${error}`,
-        type: 'move',
-      };
-    }
+    return {
+      success: result.ok,
+      error: result.error,
+      type: 'move',
+      data: result.data,
+    };
   }
 
   /**
    * Execute gathering task
    */
-  private async executeGatherTask(task: any, minecraftUrl: string) {
-    try {
-      const result = await fetch(`${minecraftUrl}/action`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          type: 'gather',
-          parameters: task.parameters || {},
-        }),
-      }).then((res) => res.json());
+  private async executeGatherTask(task: any, _minecraftUrl: string) {
+    const result = await executeViaGateway({
+      origin: 'reactive',
+      priority: 'normal',
+      action: {
+        type: 'gather',
+        parameters: task.parameters || {},
+      },
+    });
 
-      return {
-        success: (result as any).success,
-        error: (result as any).error,
-        type: 'gather',
-        data: result,
-      };
-    } catch (error) {
-      return {
-        success: false,
-        error: `Failed to execute gather task: ${error}`,
-        type: 'gather',
-      };
-    }
+    return {
+      success: result.ok,
+      error: result.error,
+      type: 'gather',
+      data: result.data,
+    };
   }
 
   /**
    * Execute exploration task
    */
-  private async executeExploreTask(task: any, minecraftUrl: string) {
-    try {
-      const result = await fetch(`${minecraftUrl}/action`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          type: 'explore',
-          parameters: task.parameters || {},
-        }),
-      }).then((res) => res.json());
+  private async executeExploreTask(task: any, _minecraftUrl: string) {
+    const result = await executeViaGateway({
+      origin: 'reactive',
+      priority: 'normal',
+      action: {
+        type: 'explore',
+        parameters: task.parameters || {},
+      },
+    });
 
-      return {
-        success: (result as any).success,
-        error: (result as any).error,
-        type: 'explore',
-        data: result,
-      };
-    } catch (error) {
-      return {
-        success: false,
-        error: `Failed to execute explore task: ${error}`,
-        type: 'explore',
-      };
-    }
+    return {
+      success: result.ok,
+      error: result.error,
+      type: 'explore',
+      data: result.data,
+    };
   }
 
   /**
    * Execute mining task
    */
-  private async executeMineTask(task: any, minecraftUrl: string) {
-    try {
-      console.log(`⛏️ Executing mining task: ${task.title}`);
+  private async executeMineTask(task: any, _minecraftUrl: string) {
+    console.log(`⛏️ Executing mining task: ${task.title}`);
 
-      // Execute mining action
-      const response = await fetch(`${minecraftUrl}/action`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          type: 'dig_block',
-          parameters: {
-            block: task.parameters?.block || 'stone',
-            position: task.parameters?.position || 'current',
-          },
-        }),
-        signal: AbortSignal.timeout(30000),
-      });
+    const result = await executeViaGateway({
+      origin: 'reactive',
+      priority: 'normal',
+      action: {
+        type: 'dig_block',
+        parameters: {
+          block: task.parameters?.block || 'stone',
+          position: task.parameters?.position || 'current',
+        },
+        timeout: 30000,
+      },
+    });
 
-      if (!response.ok) {
-        throw new Error(
-          `Minecraft interface responded with ${response.status}`
-        );
-      }
-
-      const result = await response.json();
-      return {
-        success: (result as any).success,
-        error: (result as any).error,
-        type: 'mining',
-        data: (result as any).data,
-      };
-    } catch (error) {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Unknown error',
-        type: 'mining',
-      };
-    }
+    return {
+      success: result.ok,
+      error: result.error,
+      type: 'mining',
+      data: result.data,
+    };
   }
 
   /**
@@ -1368,7 +1325,7 @@ export class ReactiveExecutor implements IReactiveExecutor {
     } catch (error) {
       const totalTime = performance.now() - startTime;
 
-      console.error('❌ PBI Execution failed:', error);
+      console.error('[REACTIVE EXECUTOR] PBI Execution failed:', error);
 
       return {
         success: false,
@@ -1528,31 +1485,19 @@ export class ReactiveExecutor implements IReactiveExecutor {
         parameters
       );
 
-      // Execute the inferred action via the minecraft interface
-      const response = await fetch(`${minecraftUrl}/action`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          type: actionType,
-          parameters,
-        }),
-        signal: AbortSignal.timeout(30000),
+      // Execute the inferred action via the gateway
+      const result = await executeViaGateway({
+        origin: 'reactive',
+        priority: 'normal',
+        action: { type: actionType, parameters, timeout: 30000 },
       });
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(
-          `Minecraft interface responded with ${response.status}: ${errorText}`
-        );
-      }
-
-      const result = await response.json();
       return {
-        success: (result as any).success,
-        error: (result as any).error,
+        success: result.ok,
+        error: result.error,
         type: 'action',
         actionType,
-        data: (result as any).data,
+        data: result.data,
       };
     } catch (error) {
       return {
@@ -2021,7 +1966,7 @@ class DefaultRealTimeAdapter implements RealTimeAdapter {
       return taskResult;
     } catch (error) {
       console.error(
-        `❌ [REACTIVE EXECUTOR] MCP execution failed for task: ${task.title}`,
+        `[REACTIVE EXECUTOR] MCP execution failed for task: ${task.title}`,
         error
       );
 

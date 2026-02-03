@@ -8,6 +8,7 @@
  */
 
 import { Plan, PlanStep, ActionType } from '../types';
+import { executeViaGateway } from '../server/execution-gateway';
 
 export interface MinecraftAction {
   type: string;
@@ -334,38 +335,20 @@ export class MinecraftExecutor {
   private async executeMinecraftAction(
     action: MinecraftAction
   ): Promise<{ success: boolean; data?: any; error?: string }> {
-    try {
-      const response = await fetch(`${this.minecraftInterfaceUrl}/action`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          type: action.type,
-          parameters: action.parameters,
-        }),
-      });
+    const result = await executeViaGateway({
+      origin: 'reactive',
+      priority: 'normal',
+      action: {
+        type: action.type,
+        parameters: action.parameters,
+      },
+    });
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        return {
-          success: false,
-          error: `HTTP ${response.status}: ${errorText}`,
-        };
-      }
-
-      const result = (await response.json()) as any;
-      return {
-        success: result.success,
-        data: result.result,
-        error: result.error,
-      };
-    } catch (error) {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Network error',
-      };
-    }
+    return {
+      success: result.ok,
+      data: result.data,
+      error: result.error,
+    };
   }
 
   /**

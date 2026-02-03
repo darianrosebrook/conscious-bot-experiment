@@ -122,6 +122,37 @@ import {
 export const ACTION_TYPE_TO_LEAF: Record<string, string> =
   buildActionTypeToLeafMap();
 
+/** Navigation priority levels for the lease system. */
+export type NavigationPriority = 'normal' | 'high' | 'emergency';
+
+/** Optional params that callers can pass through action parameters to control nav lease identity. */
+export interface NavLeaseParams {
+  navLeaseHolder?: string;
+  navigationPriority?: NavigationPriority;
+}
+
+/**
+ * Derive nav lease holder and priority from action parameters.
+ * Validates types at runtime — invalid inputs fall back to defaults.
+ * Exported so tests can call the same implementation used in production.
+ */
+export function deriveNavLeaseContext(
+  actionType: string,
+  params: Record<string, any> | undefined,
+): { holder: string; priority: NavigationPriority } {
+  const rawHolder = params?.navLeaseHolder;
+  const holder: string =
+    typeof rawHolder === 'string' && rawHolder.length > 0
+      ? rawHolder
+      : `action:${actionType}`;
+  const rawPriority = params?.navigationPriority;
+  const priority: NavigationPriority =
+    rawPriority === 'normal' || rawPriority === 'high' || rawPriority === 'emergency'
+      ? rawPriority
+      : 'normal';
+  return { holder, priority };
+}
+
 export class ActionTranslator {
   private bot: Bot;
   private config: ActionTranslatorConfig;
@@ -135,6 +166,12 @@ export class ActionTranslator {
   private navDebounceMs = 1500;
   private navLogThrottleMs = 5000; // 5 seconds between identical nav logs
   private lastLogAt = new Map<string, number>();
+
+  // ── Navigation lease: prevents concurrent pathfinder corruption ──
+  private _navLeaseHolder: string | null = null;
+  private _navLeasePriority: NavigationPriority = 'normal';
+  private _navLeaseRelease: (() => void) | null = null;
+  private _navLeaseRefCount = 0;
 
   constructor(
     bot: Bot,
@@ -189,6 +226,122 @@ export class ActionTranslator {
           timestamp: Date.now(),
         }
       );
+    }
+  }
+
+  // ── Navigation lease API ──
+
+  /**
+   * Acquire the navigation lease. Returns a release function on success.
+   *
+   * Rules:
+   * - If no lease is held, the caller acquires it.
+   * - 'emergency' preempts any held lease (stops current pathfinding).
+   * - Otherwise, returns null (caller should not navigate).
+   */
+  acquireNavigationLease(
+    holder: string,
+    priority: NavigationPriority = 'normal',
+  ): (() => void) | null {
+    const PRIORITY_RANK: Record<NavigationPriority, number> = {
+      normal: 0,
+      high: 1,
+      emergency: 2,
+    };
+
+    // No current holder — grant immediately
+    if (!this._navLeaseHolder) {
+      return this._grantLease(holder, priority);
+    }
+
+    // Emergency preempts anything
+    if (
+      priority === 'emergency' &&
+      PRIORITY_RANK[priority] > PRIORITY_RANK[this._navLeasePriority]
+    ) {
+      // Stop the current navigation before granting
+      try { this.navigationBridge?.stopNavigation(); } catch {}
+      // Force-clear the old lease (bypass ref-counting — holder is evicted)
+      this._navLeaseHolder = null;
+      this._navLeasePriority = 'normal';
+      this._navLeaseRelease = null;
+      this._navLeaseRefCount = 0;
+      return this._grantLease(holder, priority);
+    }
+
+    // Same holder re-acquiring (idempotent)
+    if (this._navLeaseHolder === holder) {
+      return this._grantLease(holder, priority);
+    }
+
+    // Otherwise, lease is busy
+    return null;
+  }
+
+  /** Release the navigation lease. Ref-counted: only clears when all nested acquires are released. */
+  releaseNavigationLease(holder: string): void {
+    if (this._navLeaseHolder === holder) {
+      this._navLeaseRefCount--;
+      if (this._navLeaseRefCount < 0) {
+        console.warn(`[NavLease] refcount underflow for holder=${holder} — possible double-release`);
+        this._navLeaseRefCount = 0;
+      }
+      if (this._navLeaseRefCount === 0) {
+        this._navLeaseHolder = null;
+        this._navLeasePriority = 'normal';
+        this._navLeaseRelease = null;
+      }
+    }
+  }
+
+  /** Whether navigation is currently leased. */
+  get isNavigationBusy(): boolean {
+    return this._navLeaseHolder !== null;
+  }
+
+  private _grantLease(
+    holder: string,
+    priority: NavigationPriority,
+  ): () => void {
+    const isReacquire = this._navLeaseHolder === holder;
+    this._navLeaseHolder = holder;
+    this._navLeasePriority = priority;
+    if (isReacquire) {
+      this._navLeaseRefCount++;
+    } else {
+      this._navLeaseRefCount = 1;
+    }
+    // One-shot release closure: warns on double-call instead of silently underflowing.
+    let released = false;
+    const release = () => {
+      if (released) {
+        console.warn(`[NavLease] double-release for holder=${holder} — ignoring`);
+        return;
+      }
+      released = true;
+      this.releaseNavigationLease(holder);
+    };
+    this._navLeaseRelease = release;
+    return release;
+  }
+
+  /**
+   * Execute an async function that requires pathfinder access under the nav lease.
+   * Acquires the lease before calling `fn`, releases in `finally`.
+   * Returns the function's result on success, or `busyResult` if the lease is busy.
+   */
+  async withNavLease(
+    holder: string,
+    priority: NavigationPriority,
+    fn: () => Promise<{ success: boolean; error?: string }>,
+    busyResult: { success: false; error: string },
+  ): Promise<{ success: boolean; error?: string }> {
+    const release = this.acquireNavigationLease(holder, priority);
+    if (!release) return busyResult;
+    try {
+      return await fn();
+    } finally {
+      release();
     }
   }
 
@@ -2142,7 +2295,7 @@ export class ActionTranslator {
       }
 
       if (shelterFound && shelterPosition) {
-        // Move to the shelter
+        // Move to the shelter (under nav lease)
         const Goals = await getGoals();
         console.log('🔍 Using Goals module:', !!Goals, typeof Goals);
 
@@ -2151,13 +2304,26 @@ export class ActionTranslator {
           throw new Error('Goals module not properly initialized');
         }
 
-        await this.bot.pathfinder.goto(
-          new Goals.GoalBlock(
-            shelterPosition.x,
-            shelterPosition.y,
-            shelterPosition.z
-          )
+        const { holder, priority: pri } = deriveNavLeaseContext('find_shelter', action.parameters as any);
+
+        const gotoResult = await this.withNavLease(
+          holder,
+          pri,
+          async () => {
+            await this.bot.pathfinder.goto(
+              new Goals.GoalBlock(
+                shelterPosition!.x,
+                shelterPosition!.y,
+                shelterPosition!.z
+              )
+            );
+            return { success: true };
+          },
+          { success: false, error: 'NAV_BUSY' },
         );
+        if (!gotoResult.success) {
+          return { success: false, error: gotoResult.error, data: { shelterFound: false } };
+        }
 
         // Place light sources if requested
         if (light_sources) {
@@ -2344,6 +2510,19 @@ export class ActionTranslator {
       return null;
     };
 
+    // ── Navigation lease: no navigation starts without one ──
+    // Callers (e.g. SafetyMonitor) can propagate their lease context through
+    // action parameters to avoid self-blocking when they pre-acquire the lease.
+    const { holder: leaseHolder, priority: navPriority } = deriveNavLeaseContext(action.type, params);
+    const release = this.acquireNavigationLease(leaseHolder, navPriority);
+    if (!release) {
+      return {
+        success: false,
+        error: 'NAV_BUSY',
+        data: { targetReached: false },
+      };
+    }
+
     let targetVec: Vec3 | null = null;
     try {
       const now = Date.now();
@@ -2522,6 +2701,8 @@ export class ActionTranslator {
             pos && targetVec ? pos.distanceTo(targetVec) : undefined,
         },
       };
+    } finally {
+      release();
     }
   }
 
@@ -2633,16 +2814,27 @@ export class ActionTranslator {
           };
         }
 
-        // Move to crafting table
+        // Move to crafting table (under nav lease)
         const Goals = await getGoals();
-        await this.bot.pathfinder.goto(
-          new Goals.GoalNear(
-            craftingTable.position.x,
-            craftingTable.position.y,
-            craftingTable.position.z,
-            2
-          )
+        const gotoResult = await this.withNavLease(
+          'action:craft',
+          'normal',
+          async () => {
+            await this.bot.pathfinder.goto(
+              new Goals.GoalNear(
+                craftingTable.position.x,
+                craftingTable.position.y,
+                craftingTable.position.z,
+                2
+              )
+            );
+            return { success: true };
+          },
+          { success: false, error: 'NAV_BUSY' },
         );
+        if (!gotoResult.success) {
+          return { success: false, error: 'Navigation busy — cannot reach crafting table' };
+        }
 
         // Use the crafting table
         await this.bot.activateBlock(craftingTable);
@@ -3126,16 +3318,27 @@ export class ActionTranslator {
           current.distance < closest.distance ? current : closest
         );
 
-        // Move to the item using pathfinding
+        // Move to the item using pathfinding (under nav lease)
         try {
           const Goals = await getGoals();
-          await this.bot.pathfinder.goto(
-            new Goals.GoalBlock(
-              closestItem.pos.x,
-              closestItem.pos.y,
-              closestItem.pos.z
-            )
+          const gotoResult = await this.withNavLease(
+            'action:explore_item',
+            'normal',
+            async () => {
+              await this.bot.pathfinder.goto(
+                new Goals.GoalBlock(
+                  closestItem.pos.x,
+                  closestItem.pos.y,
+                  closestItem.pos.z
+                )
+              );
+              return { success: true };
+            },
+            { success: false, error: 'NAV_BUSY' },
           );
+          if (!gotoResult.success) {
+            return { success: false, error: 'Navigation busy — cannot reach item' };
+          }
 
           return await this.executePickup(
             {
@@ -3208,12 +3411,23 @@ export class ActionTranslator {
           continue;
         }
 
-        // Move to position
+        // Move to position (under nav lease)
         try {
           const Goals = await getGoals();
-          await this.bot.pathfinder.goto(
-            new Goals.GoalBlock(targetPos.x, targetPos.y, targetPos.z)
+          const gotoResult = await this.withNavLease(
+            'action:explore_spiral',
+            'normal',
+            async () => {
+              await this.bot.pathfinder.goto(
+                new Goals.GoalBlock(targetPos.x, targetPos.y, targetPos.z)
+              );
+              return { success: true };
+            },
+            { success: false, error: 'NAV_BUSY' },
           );
+          if (!gotoResult.success) {
+            continue; // Skip this waypoint, try the next direction
+          }
 
           // Look for items from this new position
           const itemsFound = Object.values(this.bot.entities).filter(
@@ -3935,13 +4149,24 @@ export class ActionTranslator {
       );
       if (distance > 3) {
         const Goals = await getGoals();
-        await this.bot.pathfinder.goto(
-          new Goals.GoalBlock(
-            targetEntity.position.x,
-            targetEntity.position.y,
-            targetEntity.position.z
-          )
+        const gotoResult = await this.withNavLease(
+          'action:attack',
+          'normal',
+          async () => {
+            await this.bot.pathfinder.goto(
+              new Goals.GoalBlock(
+                targetEntity!.position.x,
+                targetEntity!.position.y,
+                targetEntity!.position.z
+              )
+            );
+            return { success: true };
+          },
+          { success: false, error: 'NAV_BUSY' },
         );
+        if (!gotoResult.success) {
+          return { success: false, error: 'Navigation busy — cannot reach target entity' };
+        }
       }
 
       // Attack the entity

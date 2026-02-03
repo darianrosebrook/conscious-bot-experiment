@@ -9,7 +9,7 @@
 import { EventEmitter } from 'events';
 import { Bot } from 'mineflayer';
 import { Vec3 } from 'vec3';
-import { ActionTranslator } from './action-translator';
+import { ActionTranslator, type NavLeaseParams } from './action-translator';
 import { ThreatPerceptionManager } from './threat-perception-manager';
 import type { BeliefBus } from './entity-belief/belief-bus';
 import { assessReflexThreats } from './reflex/reflex-safety';
@@ -344,6 +344,14 @@ export class AutomaticSafetyMonitor extends EventEmitter {
       console.log('[SafetyMonitor] 🏃 Fleeing from threats...');
     }
 
+    // Lease context propagated through action parameters.
+    // executeNavigate() will acquire the lease as 'safety-monitor' with 'emergency'
+    // priority, which preempts any normal-priority holder. No pre-acquisition needed.
+    const leaseParams: NavLeaseParams = {
+      navLeaseHolder: 'safety-monitor',
+      navigationPriority: 'emergency',
+    };
+
     try {
       // Move away from current position
       const currentPos = this.bot.entity.position;
@@ -357,6 +365,7 @@ export class AutomaticSafetyMonitor extends EventEmitter {
             target: fleeTarget,
             range: 2,
             sprint: true,
+            ...leaseParams,
           },
           timeout: 12000,
         });
@@ -388,7 +397,11 @@ export class AutomaticSafetyMonitor extends EventEmitter {
     try {
       await this.actionTranslator.executeAction({
         type: 'find_shelter',
-        parameters: { priority: 'high' },
+        parameters: {
+          priority: 'high',
+          navLeaseHolder: 'safety-monitor',
+          navigationPriority: 'emergency',
+        },
         timeout: 15000,
       });
 

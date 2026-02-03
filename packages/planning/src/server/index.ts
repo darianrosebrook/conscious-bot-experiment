@@ -23,3 +23,21 @@ export {
   stopAutonomousExecutor,
   type AutonomousExecutorOptions,
 } from './autonomous-executor';
+
+export {
+  executeViaGateway,
+  onGatewayAudit,
+  type ExecutionOrigin,
+  type ExecutionPriority,
+  type ExecutionContext,
+  type GatewayAction,
+  type GatewayRequest,
+  type GatewayResponse,
+  type GatewayAuditEntry,
+  type GatewayAuditListener,
+} from './execution-gateway';
+
+export {
+  normalizeActionResponse,
+  type NormalizedActionResponse,
+} from './action-response';

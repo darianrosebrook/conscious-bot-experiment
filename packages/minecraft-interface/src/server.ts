@@ -52,7 +52,12 @@ import {
   GetLightLevelLeaf,
   FindResourceLeaf,
 } from './leaves/sensing-leaves';
-import { CraftRecipeLeaf, SmeltLeaf, PlaceWorkstationLeaf, IntrospectRecipeLeaf } from './leaves/crafting-leaves';
+import {
+  CraftRecipeLeaf,
+  SmeltLeaf,
+  PlaceWorkstationLeaf,
+  IntrospectRecipeLeaf,
+} from './leaves/crafting-leaves';
 import {
   OpenContainerLeaf,
   TransferItemsLeaf,
@@ -236,22 +241,17 @@ function startObservationBroadcast() {
       const bot = minecraftInterface.botAdapter.getBot();
       if (!bot.entity) return;
 
-      const worldState =
-        minecraftInterface.observationMapper.mapBotStateToPlanningContext(bot);
-      const healthPct = Math.round(
-        ((worldState.worldState?.health ?? 0) / 20) * 100
-      );
-      const hungerPct = Math.round(
-        ((worldState.worldState?.hunger ?? 0) / 20) * 100
-      );
-      const thought = `Health: ${healthPct}%, Hunger: ${hungerPct}%. Observing environment.`;
-
-      await minecraftInterface.observationMapper.sendThoughtToCognition(
-        thought,
-        'status'
-      );
-
-      if (cognitionState === 'down') {
+      // Status (health/hunger/inventory) must not be sent as "thoughts" to
+      // cognition: the cognitive stream and TTS are for the bot's actual
+      // thoughts (e.g. "My inventory is bare — I should gather wood"), not
+      // for periodic status lines. Status is available via bot-state/HUD and
+      // /inventory. Only check cognition reachability here.
+      const cognitionUrl =
+        process.env.COGNITION_SERVICE_URL || 'http://localhost:3003';
+      const healthRes = await resilientFetch(`${cognitionUrl}/health`, {
+        timeoutMs: 5000,
+      });
+      if (healthRes?.ok && cognitionState === 'down') {
         console.log('[Observation] Cognition service reachable');
         cognitionState = 'up';
       }
@@ -367,7 +367,9 @@ function setupBotStateWebSocket() {
     (global as any)._cachedActionTranslatorBot = undefined;
 
     // Start thought generation when bot spawns
-    console.log('🤖 Bot spawned, starting thought generation...');
+    console.log(
+      '[Minecraft Interface] Bot spawned, starting thought generation...'
+    );
     tryStartObservationBroadcast('bot spawned');
   });
 
@@ -413,6 +415,51 @@ function setupBotStateWebSocket() {
     }).catch((err) => {
       console.warn('Failed to call cognition stress reset:', err);
     });
+
+    // S8: Death/respawn signals — minecraft-interface emits signals only; memory service owns policy
+    const memoryUrl = process.env.MEMORY_ENDPOINT || 'http://localhost:3001';
+    // Replay-stable dedupe key: position is deterministic per death event.
+    // Two deaths at the exact same block are deduplicated (likely the same event double-reported).
+    const dx = Math.floor(data.position?.x ?? 0);
+    const dy = Math.floor(data.position?.y ?? 0);
+    const dz = Math.floor(data.position?.z ?? 0);
+    const deathDedupeKey = `death-${dx}-${dy}-${dz}`;
+
+    // Signal consolidation
+    resilientFetch(`${memoryUrl}/enhanced/consolidate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ trigger: 'death-respawn', dedupeKey: deathDedupeKey }),
+      label: 'memory/consolidate-death',
+    }).catch(() => {});
+
+    // Signal death reflection
+    // TODO [PLACEHOLDER]: Replace static death reflection with LLM-generated content
+    // 1. Death context: Gather circumstances of death
+    //    - Query recent combat/damage events from minecraft bot state
+    //    - Identify mob type, damage source, location, and what bot was doing
+    //    - Get inventory state at time of death (items lost)
+    // 2. LLM analysis: Call cognition service to analyze the death
+    //    - POST to cognition /generate-reflection with death context
+    //    - LLM produces analysis of what went wrong and how to avoid it
+    //    - Include specific tactical lessons (e.g., "don't mine at night without armor")
+    // 3. Structured lessons: Parse into actionable lessons[]
+    //    - Extract specific avoidance strategies
+    //    - Update risk assessment for the area/activity
+    resilientFetch(`${memoryUrl}/enhanced/reflections`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        type: 'failure',
+        content: '[PLACEHOLDER] Died and respawned. Need to reflect on what went wrong and be more careful.',
+        context: { emotionalState: 'cautious', recentEvents: ['death', 'respawn'], location: data.position, currentGoals: [], timeOfDay: 'unknown' },
+        lessons: ['Review what caused the death'],
+        insights: ['Safety should be prioritized'],
+        dedupeKey: deathDedupeKey,
+        isPlaceholder: true,
+      }),
+      label: 'memory/death-reflection',
+    }).catch(() => {});
 
     // Restart thought generation when bot respawns
     console.log('Bot respawned, restarting thought generation...');
@@ -818,7 +865,12 @@ async function registerCoreLeaves() {
     ];
 
     // Register crafting leaves
-    const craftingLeaves = [new CraftRecipeLeaf(), new SmeltLeaf(), new PlaceWorkstationLeaf(), new IntrospectRecipeLeaf()];
+    const craftingLeaves = [
+      new CraftRecipeLeaf(),
+      new SmeltLeaf(),
+      new PlaceWorkstationLeaf(),
+      new IntrospectRecipeLeaf(),
+    ];
 
     // Register container leaves
     const containerLeaves = [
@@ -913,7 +965,8 @@ async function attemptAutoConnect() {
     isConnecting = true;
 
     // Create minecraft interface (no local planning coordinator — execution flows through planning server)
-    minecraftInterface = await createMinecraftInterfaceWithoutConnect(botConfig);
+    minecraftInterface =
+      await createMinecraftInterfaceWithoutConnect(botConfig);
 
     // Manually initialize the plan executor to connect to Minecraft
     await minecraftInterface.planExecutor.initialize();
@@ -1639,19 +1692,36 @@ app.post('/action', async (req, res) => {
       throw new Error('Bot not available');
     }
 
-    // Reuse a single ActionTranslator per bot to avoid re-initializing pathfinder/Movements
-    const { ActionTranslator, ACTION_TYPE_TO_LEAF } = await import('./action-translator');
-    if (!(global as any)._cachedActionTranslator || (global as any)._cachedActionTranslatorBot !== bot) {
-      (global as any)._cachedActionTranslator = new ActionTranslator(bot, {
-        actionTimeout: 15000,
-        pathfindingTimeout: 30000,
-      });
-      (global as any)._cachedActionTranslatorBot = bot;
+    // Use the canonical ActionTranslator singleton (registered by PlanExecutor).
+    // Falls back to constructing a temporary one if PlanExecutor hasn't initialized yet.
+    const { getActionTranslator } =
+      await import('./action-translator-singleton');
+    const { ActionTranslator, ACTION_TYPE_TO_LEAF } =
+      await import('./action-translator');
+    let actionTranslator = getActionTranslator();
+    if (!actionTranslator) {
+      // PlanExecutor not initialized yet — create a temporary instance.
+      // This path should be rare (only during early startup before PlanExecutor.initialize()).
+      if (
+        !(global as any)._cachedActionTranslator ||
+        (global as any)._cachedActionTranslatorBot !== bot
+      ) {
+        (global as any)._cachedActionTranslator = new ActionTranslator(bot, {
+          actionTimeout: 15000,
+          pathfindingTimeout: 30000,
+        });
+        (global as any)._cachedActionTranslatorBot = bot;
+      }
+      actionTranslator = (global as any)._cachedActionTranslator;
     }
-    const actionTranslator = (global as any)._cachedActionTranslator;
 
     // For movement actions, ensure pathfinder is ready before dispatching
-    const MOVEMENT_ACTIONS = new Set(['move_to', 'navigate', 'follow', 'step_forward_safely']);
+    const MOVEMENT_ACTIONS = new Set([
+      'move_to',
+      'navigate',
+      'follow',
+      'step_forward_safely',
+    ]);
     if (MOVEMENT_ACTIONS.has(type)) {
       const ready = await actionTranslator.ensureReady(5000);
       if (!ready) {
@@ -1688,7 +1758,64 @@ app.post('/action', async (req, res) => {
     const abortController = new AbortController();
     res.on('close', () => abortController.abort());
 
-    const result = await actionTranslator.executeAction(action, abortController.signal);
+    const result = await actionTranslator.executeAction(
+      action,
+      abortController.signal
+    );
+
+    // S8: Post-sleep signals — minecraft-interface emits signals only; memory service owns policy
+    if (type === 'sleep' && result?.success) {
+      const memoryUrl = process.env.MEMORY_ENDPOINT || 'http://localhost:3001';
+      // Replay-stable dedupe key: wakeTime is a game tick from the action result,
+      // deterministic per sleep event. Retries of the same sleep produce the same key.
+      const sleepDedupeKey = `sleep-${result?.data?.wakeTime ?? 'unknown'}`;
+
+      // Signal consolidation (memory service decides what to do)
+      resilientFetch(`${memoryUrl}/enhanced/consolidate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ trigger: 'sleep-wake', dedupeKey: sleepDedupeKey }),
+        label: 'memory/consolidate-sleep',
+      }).catch(() => {});
+
+      // Signal reflection (memory service creates the entry with its own policy)
+      // TODO [PLACEHOLDER]: Replace static reflection text with LLM-generated content
+      // 1. Context gathering: Query memory service for recent experiences since last sleep
+      //    - Fetch recent episodic memories (last 20) from /enhanced/memories
+      //    - Fetch current goals from planning service /state
+      //    - Get interoception state from cognition service /intero/state
+      // 2. LLM reflection generation: Call cognition service to generate contextual reflection
+      //    - POST to cognition /generate-reflection with gathered context
+      //    - Cognition uses LLM to produce meaningful narrative about the day's events
+      //    - Include emotional tone, lessons learned, and goal progress assessment
+      // 3. Structured output: Parse LLM response into reflection fields
+      //    - Extract insights[] from LLM analysis of what went well/poorly
+      //    - Extract lessons[] from LLM-identified patterns and takeaways
+      //    - Determine emotionalState from overall sentiment of the day
+      resilientFetch(`${memoryUrl}/enhanced/reflections`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'narrative',
+          content: '[PLACEHOLDER] Woke up after sleeping through the night. A good time to reflect on recent experiences and consolidate what was learned.',
+          context: { emotionalState: 'rested', timeOfDay: 'morning', recentEvents: ['sleep'], currentGoals: [], location: null },
+          lessons: [],
+          insights: [],
+          dedupeKey: sleepDedupeKey,
+          isPlaceholder: true,
+        }),
+        label: 'memory/sleep-reflection',
+      }).catch(() => {});
+
+      // Also reset stress
+      const cognitionUrl = process.env.COGNITION_SERVICE_URL || 'http://localhost:3003';
+      resilientFetch(`${cognitionUrl}/stress/reset`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+        label: 'cognition/stress-reset-sleep',
+      }).catch(() => {});
+    }
 
     res.json({
       success: true,
@@ -1808,52 +1935,17 @@ app.get('/screenshots/nearest', (req, res) => {
   }
 });
 
-// Execute planning scenario
-app.post('/execute-scenario', async (req, res) => {
-  try {
-    const botStatus = minecraftInterface?.botAdapter.getStatus();
-    const isConnected =
-      botStatus?.connected && botStatus?.connectionState === 'spawned';
-
-    if (!isConnected) {
-      return res.status(503).json({
-        success: false,
-        message: 'Bot not connected',
-        status: 'disconnected',
-      });
-    }
-
-    const { scenario, signals } = req.body;
-
-    if (!scenario) {
-      return res.status(400).json({
-        success: false,
-        message: 'Scenario is required',
-      });
-    }
-
-    // Execute planning cycle with the scenario signals
-    if (!minecraftInterface) {
-      throw new Error('Minecraft interface not initialized');
-    }
-
-    const result = await minecraftInterface.planExecutor.executePlanningCycle(
-      signals || []
-    );
-
-    res.json({
-      success: true,
-      scenario,
-      result,
-    });
-  } catch (error) {
-    console.error(' Scenario execution failed:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to execute scenario',
-      error: error instanceof Error ? error.message : 'Unknown error',
-    });
-  }
+// Execute planning scenario — RETIRED
+// Planning execution now flows through the planning service (port 3002).
+// The PlanExecutor in this process has no planningCoordinator and always fails.
+// Kept as a stub for backward compatibility; returns 410 Gone.
+app.post('/execute-scenario', async (_req, res) => {
+  res.status(410).json({
+    success: false,
+    retired: true,
+    message:
+      'This endpoint is retired. Planning execution flows through the planning service (port 3002).',
+  });
 });
 
 // Test with simulation (no Minecraft server required)
@@ -2607,7 +2699,8 @@ app.get('/world-scan', (req, res) => {
 
     if ([x1, y1, z1, x2, y2, z2].some(Number.isNaN)) {
       return res.status(400).json({
-        error: 'Missing or invalid query params: x1, y1, z1, x2, y2, z2 (integers)',
+        error:
+          'Missing or invalid query params: x1, y1, z1, x2, y2, z2 (integers)',
       });
     }
 
@@ -2635,8 +2728,15 @@ app.get('/world-scan', (req, res) => {
 
     // Hazard block names for classification
     const HAZARD_BLOCKS = new Set([
-      'cactus', 'sweet_berry_bush', 'magma_block', 'fire', 'soul_fire',
-      'campfire', 'soul_campfire', 'wither_rose', 'powder_snow',
+      'cactus',
+      'sweet_berry_bush',
+      'magma_block',
+      'fire',
+      'soul_fire',
+      'campfire',
+      'soul_campfire',
+      'wither_rose',
+      'powder_snow',
     ]);
 
     for (let lx = 0; lx < dx; lx++) {
@@ -2646,9 +2746,14 @@ app.get('/world-scan', (req, res) => {
           const wy = minY + ly;
           const wz = minZ + lz;
           const block = bot.blockAt(new Vec3(wx, wy, wz));
-          const idx = ((lx * dy) + ly) * dz + lz;
+          const idx = (lx * dy + ly) * dz + lz;
 
-          if (!block || block.name === 'air' || block.name === 'cave_air' || block.name === 'void_air') {
+          if (
+            !block ||
+            block.name === 'air' ||
+            block.name === 'cave_air' ||
+            block.name === 'void_air'
+          ) {
             blocks[idx] = 0; // air
           } else if (block.name === 'water' || block.name === 'flowing_water') {
             blocks[idx] = 2; // water
