@@ -98,6 +98,25 @@ These are not “features.” They are certifiability gates that every rig must 
 8.	Multi-objective handling is explicit
 	If time vs risk vs resource burn tradeoffs exist, represent them explicitly (weighted scalar with declared weights, or Pareto set). Never smuggle objectives into ad hoc heuristics.
 
+### Identity chain and hash coupling (cross-cutting, partially wired)
+
+The three-step identity chain governs how CB and Sterling evidence artifacts reference each other without entangling identity computation. See [STERLING_INTEGRATION_REVIEW.md](./STERLING_INTEGRATION_REVIEW.md) for the full specification.
+
+| Step | When | Identity produced | Computed by | Status |
+|---|---|---|---|---|
+| A. Solve-time | Sterling returns `complete` | `trace_bundle_hash` | Sterling | **Wired** — emitted in `metrics` alongside `engine_commitment` and `operator_registry_hash` |
+| B. Execution-time | CB processes solve result | `bundleHash` | CB | **Wired** — content-addressed `sha256(canonical {input, output, compatReport})` |
+| C. Report-time | CB sends `report_episode` | `episode_hash` | Sterling | **Wired** — returned in `episode_reported` response |
+
+**Hash coupling policy**: Sterling's identity hashes are computed from Sterling-native commitments only. CB's `bundleHash` never participates in any Sterling hash computation. The cryptographic link between CB and Sterling evidence is `bindingHash = contentHash("binding:v1:" + traceBundleHash + ":" + bundleHash)`, computed on the CB side for regression tests. `contentHash` is `sha256(utf8(input))` truncated to 16 hex chars; the versioned prefix and colon separator make the encoding unambiguous. See [STERLING_INTEGRATION_REVIEW.md § Hash Coupling Policy](./STERLING_INTEGRATION_REVIEW.md) for rationale.
+
+**Wire-shape lock**: Identity fields (`trace_bundle_hash`, `engine_commitment`, `operator_registry_hash`) live in `result.metrics`, never top-level. CB calls `parseSterlingIdentity(result.metrics)`. Regression test in `solve-bundle.test.ts`.
+
+**Pending items**:
+- `completeness_declaration` in `complete` message (Sterling-authored, CB-forwarded verbatim) — additive, Phase 2
+- `failure_class` enum in `report_episode` request — additive, Phase 2
+- `bindingHash` persistence in SolveBundle output — additive, not yet wired
+
 ---
 
 ## Capability rig index (what we will prove)
@@ -106,31 +125,31 @@ Rigs are grouped as “minimal proving suites.” Each rig targets one or more p
 
 ### Rig A: Inventory transformation planning
 Proves primitives: Deterministic transformation planning (1), Representation invariance and state canonicalization (16), Credit assignment tied to execution, not plans (17), Audit-grade explanations (19), Adversarial robustness / "rule injection" hardening (20)
-Status: implemented baseline (crafting), needs certification harness tightening
+Status: CONTRACT-CERTIFIED | E2E-PROVEN `{crafting}`. See [tracker](./sterling-capability-tracker.md) for evidence.
 
 ### Rig B: Capability gating and legality
 Proves primitives: Capability gating and legality (2), Representation invariance and state canonicalization (16), Audit-grade explanations (19), Adversarial robustness / "rule injection" hardening (20)
-Status: planned (tool tiers + station gating)
+Status: CONTRACT-CERTIFIED | PARTIAL E2E `{crafting via per-tier delegation}`. Tier decomposition is TS-only; per-tier crafting solves hit Python.
 
 ### Rig C: Temporal planning with capacity and batching
 Proves primitives: Temporal planning with durations, batching, and capacity (3), Multi-objective optimization and preference articulation (18), Representation invariance and state canonicalization (16), Credit assignment tied to execution, not plans (17), Audit-grade explanations (19)
-Status: planned (furnaces + burn time + parallel slots)
+Status: CONTRACT-CERTIFIED | E2E: NONE — no furnace/temporal domain in Python. P03 capsule + FurnaceSchedulingSolver (C.1-C.7) all certified.
 
 ### Rig D: Multi-strategy acquisition with environment-conditioned priors
 Proves primitives: Multi-strategy acquisition (4), Credit assignment tied to execution, not plans (17), Multi-objective optimization and preference articulation (18), Audit-grade explanations (19), Adversarial robustness / "rule injection" hardening (20) (and optionally Risk-aware planning (10) if risk modeled)
-Status: planned (mine vs trade vs loot vs substitute)
+Status: CONTRACT-CERTIFIED | E2E-PROVEN `{mine, trade, loot, salvage}`. All strategies proven via `STERLING_E2E=1` (7/7 tests). mcData threaded from planner.
 
 ### Rig E: Hierarchical planning (macro over micro controllers)
 Proves primitives: Hierarchical planning (5), Representation invariance and state canonicalization (16), Credit assignment tied to execution, not plans (17), Audit-grade explanations (19)
-Status: planned (waypoints macro + Mineflayer micro)
+Status: CONTRACT-CERTIFIED | E2E: NONE — no hierarchical macro planner in Python. World graph builder + edge decomposer + feedback loop all certified.
 
 ### Rig F: Goal-conditioned valuation under scarcity
 Proves primitives: Goal-conditioned valuation under scarcity (6), Multi-objective optimization and preference articulation (18), Representation invariance and state canonicalization (16), Credit assignment tied to execution, not plans (17), Audit-grade explanations (19)
-Status: planned (keep/drop/store given goals)
+Status: CONTRACT-CERTIFIED | E2E: NONE (TS-local, no Sterling calls). Pure decision module with content-addressed hashing. 33 unit tests.
 
 ### Rig G: Feasibility + partial-order structure planning
 Proves primitives: Feasibility under constraints and partial-order structure (7), Representation invariance and state canonicalization (16), Credit assignment tied to execution, not plans (17), Audit-grade explanations (19)
-Status: planned (shelter build sequencing under support/reachability constraints)
+Status: CONTRACT-CERTIFIED | PARTIAL E2E `{building module sequencing}`. Python `building_domain.py` exists. DAG builder, constraint model, partial-order plan are TS additions.
 
 ### Rig H: Systems synthesis in a deterministic simulator
 Proves primitives: Systems synthesis (8), Program-level planning (14), Representation invariance and state canonicalization (16), Audit-grade explanations (19)
@@ -228,7 +247,7 @@ Re-run the same primitive with a non-Minecraft surface representation (e.g., “
 H) Footguns avoided
 State explosion via unbounded counts; learning on planned success; untrusted rule injection; implicit station semantics.
 
-Status: Implemented baseline. Next work is certification hardening: strict validation, trace bundle hashing, and execution-based credit updates.
+Status: CONTRACT-CERTIFIED | E2E-PROVEN `{crafting}`. All certification items complete. See [tracker](./sterling-capability-tracker.md#rig-a-inventory-transformation-planning) for evidence.
 
 ---
 
@@ -270,7 +289,7 @@ Map the same primitive to a non-Minecraft permission ladder (approval gates) usi
 H) Footguns avoided
 Gating hidden inside heuristics; legality checks that depend on external mutable world without being in state; “soft” legality.
 
-Status: Planned. This is the natural next rig after A.
+Status: CONTRACT-CERTIFIED | PARTIAL E2E `{crafting via per-tier delegation}`. Tier decomposition TS-only; per-tier crafting solves hit Python.
 
 ---
 
@@ -311,7 +330,7 @@ Same capability on a generic “job shop” scheduling toy surface using identic
 H) Footguns avoided
 Encoding time as continuous/unbounded; allowing “wait” to become a free loophole; concurrency ambiguity; learning that changes scheduling semantics.
 
-Status: Planned. Comes after B if you want “smelting chains” as a certified capability, not just a domain.
+Status: CONTRACT-CERTIFIED | E2E: NONE — no furnace domain in Python. P03 capsule + FurnaceSchedulingSolver (C.1-C.7) all certified.
 
 ---
 
@@ -349,7 +368,7 @@ Procurement-like toy surface: vendor A vs vendor B vs substitute, with availabil
 H) Footguns avoided
 Treating external availability as implicit and mutable; reinforcing planned success; strategies hidden as heuristic branches rather than first-class operators.
 
-Status: Planned.
+Status: CONTRACT-CERTIFIED | E2E-PROVEN `{mine, trade, loot, salvage}`. All strategies proven via `STERLING_E2E=1`. mcData threaded from planner.
 
 ---
 
@@ -388,7 +407,7 @@ Generic “zone routing vs local motion” surface; same macro/micro boundary se
 H) Footguns avoided
 Leaking micro state into macro hash; non-attributable failures; oscillation due to overreacting to one bad episode.
 
-Status: Planned.
+Status: CONTRACT-CERTIFIED | E2E: NONE — no hierarchical macro planner in Python. World graph builder + edge decomposer + feedback loop all certified.
 
 ---
 
@@ -426,7 +445,7 @@ Cache eviction / job scheduling analogy with the same utility model semantics.
 H) Footguns avoided
 Hardcoded item values; non-explainable trades; slot-permutation state explosion.
 
-Status: Planned.
+Status: CONTRACT-CERTIFIED | E2E: NONE (TS-local, no Sterling calls). Pure decision module with content-addressed hashing. 33 unit tests.
 
 ---
 
@@ -464,7 +483,7 @@ Construction scheduling / CI pipeline ordering surface, same “must precede” 
 H) Footguns avoided
 Block-level state explosion; hiding feasibility in executor; reinforcing plans that fail during placement.
 
-Status: Planned.
+Status: CONTRACT-CERTIFIED | PARTIAL E2E `{building module sequencing}`. Python `building_domain.py` exists. DAG builder, constraints, partial-order plan are TS additions.
 
 ---
 

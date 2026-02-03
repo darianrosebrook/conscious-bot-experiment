@@ -246,11 +246,17 @@ Why it matters: in embodied or evented environments, observations are intermitte
 
 Critical boundary: this primitive defines the perception → belief → delta contract; it does not mandate a particular filter algorithm (Kalman, particle, heuristic), only determinism + boundedness + saliency semantics.
 
+**Conformance structure**: P21 is split into two independently certifiable layers:
+- **P21-A (Track Maintenance)**: 9 invariants (+ 1 opt-in `id_robustness`) governing adapter-internal state management. Tested via `runP21AConformanceSuite` in `@conscious-bot/testkits`.
+- **P21-B (Emission Protocol)**: 4 invariants governing how deltas are packaged into envelopes. Tested via `runP21BConformanceSuite` in `@conscious-bot/testkits`.
+
 **Formal signature**:
 - **Belief state**: bounded TrackSet of entity hypotheses (track_id; class belief distribution incl. unknown; kinematic belief with uncertainty; last_seen bucket; visibility mode {visible/inferred/lost}; derived threat/opportunity scores with declared weights).
+- **Belief mode**: `conservative` (suppresses risk under uncertainty) or `predictive` (allows risk to persist). Mode-aware monotonicity in P21-A conformance.
 - **Observations**: EvidenceBatch of time-stamped evidence items with sensor metadata (FOV/LOS flags, distance, occlusion markers, association features).
 - **Operators**: TRACK_UPDATE (deterministic association + fusion), DECAY (uncertainty growth; confidence drifts toward unknown), SALIENCY_DIFF (bounded typed deltas with hysteresis + cooldown), ACTIVE_SENSE_REQUEST (turn/scan/reacquire), optional FIELD_SYNTHESIZE (compressed hazard/opportunity regions).
 - **Resource model**: explicit AttentionBudget (compute + sensing budgets are state, not hidden heuristics).
+- **Risk decomposition** (optional): `classifyRiskDetailed` decomposes risk into `classificationRisk` and `presenceRisk` for finer-grained conformance assertions.
 
 **Prove in the rig**:
 - Persistent identity under intermittent observations (occlusion → reappearance associates to the same track; no "novel spawn" spam).
@@ -279,3 +285,9 @@ We will treat each primitive as a "certifiable capability," you can define a min
 - 1.	Signature tests: does it satisfy the formal constraints (legality, boundedness, determinism)?
 - 2.	Performance tests: does it improve over episodes without destabilizing correctness?
 - 3.	Transfer tests: same primitive, different surface domain, same invariants.
+
+---
+
+### Cross-cutting infrastructure (not a primitive)
+
+The **identity chain** (`trace_bundle_hash` → `bundleHash` → `episode_hash` with `bindingHash` as regression anchor) is cross-cutting infrastructure that underpins every primitive's evidence trail. It is not a capability primitive itself — it is mechanism. See [sterling-capability-tracker.md § Identity chain infrastructure](./sterling-capability-tracker.md) and [STERLING_INTEGRATION_REVIEW.md § Hash Coupling Policy](./STERLING_INTEGRATION_REVIEW.md) for specification and implementation status.

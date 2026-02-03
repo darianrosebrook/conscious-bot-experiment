@@ -66,6 +66,19 @@ The bridge between namespaces is `SterlingDomainDeclaration.implementsPrimitives
 - Navigation solver certified as foundational E2E surface: declaration registered (ST-P01), solve + bundle invariants proven, registry round-trip verified
 - The claim registry plumbing is wired end-to-end; production solvers do not yet register declarations by default
 
+**Declaration registration plan** (Phase 2, from [STERLING_INTEGRATION_REVIEW.md § Review 4](./STERLING_INTEGRATION_REVIEW.md)):
+
+| Solver | solverId | Primitives to claim | Priority | Status |
+|---|---|---|---|---|
+| `MinecraftNavigationSolver` | `minecraft.navigation` | ST-P01 | Done | Declaration registered + E2E verified |
+| `MinecraftCraftingSolver` | `minecraft.crafting` | CB-P01 (→ ST-P01) | High | Not yet registered |
+| `MinecraftToolProgressionSolver` | `minecraft.tool_progression` | CB-P01, CB-P02 (→ ST-P01) | High | Not yet registered |
+| `MinecraftAcquisitionSolver` | `minecraft.acquisition` | CB-P01, CB-P04 (→ ST-P01) | Medium | Not yet registered |
+| `MinecraftBuildingSolver` | `minecraft.building` | CB-P07 (→ ST-P01) | Medium | Not yet registered |
+| `FurnaceSchedulingSolver` | `minecraft.furnace` | CB-P03 (→ ST-P01, ST-P02) | Low | Not yet registered; no Python domain |
+
+Enforcement progression: DEV (structural_only=true, no rejections) → DEV+claims (log warnings) → CERTIFYING (reject unverified). See integration review for details.
+
 **Intentional schema constraints** (documented for future reference):
 - Primitive ID regex `^(CB|ST)-P\d{2}$` limits to 99 entries per namespace. If the taxonomy outgrows this, widen the regex.
 - `consumesFields` and `producesFields` must be non-empty. Marker solvers or administrative domains would need a sentinel field or a V2 relaxation.
@@ -89,7 +102,7 @@ These are certifiability gates. Every rig must satisfy all of them before it can
 
 | # | Invariant | Status | Evidence | Gaps |
 |---|-----------|--------|----------|------|
-| 1 | **Deterministic replay** — same payload + same version = identical trace bundle hash | DONE | `solve-bundle.ts` canonicalization contract; `solve-bundle.test.ts` determinism suite; E2E two-solve identity test | None |
+| 1 | **Deterministic replay** — same payload + same version = identical trace bundle hash (Regime A); cost/legality invariants under learning (Regime B) | DONE | `solve-bundle.ts` canonicalization contract; `solve-bundle.test.ts` determinism suite; E2E two-solve identity test. See "Two replay regimes" below. | Regime B tests (learning-sensitive, cost within epsilon) not yet implemented — tracked as M1 prerequisite |
 | 2 | **Typed operators, fail-closed legality** — operators have type/preconditions/effects; unproven legality = illegal | DONE | `compat-linter.ts` 14-check validation (11 structural + 3 acquisition-gated); `cap:` token gating in tool progression; Sterling backend fail-closed expansion | None |
 | 3 | **Canonical state hashing + equivalence reduction** — stable under irrelevant variation; count-capping; symmetry | DONE | `hashInventoryState()` zero-omission + key sorting + count-capping (`INVENTORY_HASH_CAP=64`); `hashDefinition()` order-invariant; 3 unit tests prove cap semantics | Symmetry reduction only in building `siteCaps` (acceptable for current rigs) |
 | 4 | **Learning never changes semantics** — ordering/priors only; no invented transitions | DONE | Rules frozen at solve time; path algebra weights update per episode; reachable set unchanged; **negative test**: wire payload byte-equivalent before and after `reportEpisodeResult()` (2 tests in `solver-golden-master.test.ts`) | None |
@@ -106,6 +119,58 @@ These are certifiability gates. Every rig must satisfy all of them before it can
 - [x] **Explanation infrastructure** (invariant 6): `SolveRationale` type with structured fields: `boundingConstraints` (maxNodes, objectiveWeights), `searchEffort` (nodesExpanded, frontierPeak, branchingEstimate — direct from searchHealth, no derived arithmetic), `searchTermination` (terminationReason, degeneracy), `shapingEvidence` (compat validity/issues).
 - [x] **Cost caps** (invariant 7): `INVALID_BASE_COST` check in `compat-linter.ts`. `MAX_BASE_COST = 1000`. Rejects NaN, Infinity, -Infinity, 0, negatives, above-max. 9 tests.
 - [x] **Multi-objective declaration** (invariant 8): `ObjectiveWeights` with `costWeight?`, `timeWeight?`, `riskWeight?`. `DEFAULT_OBJECTIVE_WEIGHTS = {1.0, 0.0, 0.0}`. `SolveBundleInput` captures `objectiveWeightsProvided`, `objectiveWeightsEffective`, `objectiveWeightsSource`. 3 tests.
+
+### Two replay regimes (invariant 1 refinement)
+
+"Replay verifies identical plan" is a stronger condition than needed for most benefits, and becomes false as soon as learning produces different tie-breaking. The correct discipline is two regimes (from [STERLING_INTEGRATION_REVIEW.md § Review 3](./STERLING_INTEGRATION_REVIEW.md)):
+
+**Regime A — Structural determinism (certification runs)**: With the same payload + same `engine_commitment` + same `operator_registry_hash` + same value model ref, Sterling returns the same `trace_bundle_hash`. This is what certification and golden-master tests use.
+
+**Regime B — Semantic determinism (learning-enabled runs)**: With learning enabled, plan variation among cost-equal solutions is allowed. Enforce:
+- **Reachable set unchanged**: `definitionHash` equality + operator closure hash equality across all episodes
+- **Optimality unchanged**: plan cost within epsilon (or exactly equal if costs are integers)
+- **Legality unchanged**: every step in the returned plan verifies against the operator set
+
+Regime A tests use `trace_bundle_hash` equality. Regime B tests use cost/legality invariants. Current tests (A.5 convergence) prove Regime A stability. Regime B tests require the M1 learning-sensitive benchmark (problems with multiple near-tied plans).
+
+### Failure taxonomy (from integration review, not yet wired)
+
+The integration review defines a unified failure taxonomy with 9 typed classes and update channels. This is the canonical `EpisodeFailureClass` enum (from [STERLING_INTEGRATION_REVIEW.md § Review 5](./STERLING_INTEGRATION_REVIEW.md)). The `failure_class` field is Phase 2 wire work.
+
+| `EpisodeFailureClass` value | Where it lives | Update channel | Currently represented in CB |
+|---|---|---|---|
+| `EXECUTION_SUCCESS` | Executor (runtime) | `cost_update_channel` | `solved: true` + `report_episode` |
+| `ILLEGAL_TRANSITION` | Planner (preflight) | None — solve never starts | `CompatReport.issues` with `severity: 'error'` |
+| `PRECONDITION_UNSATISFIED` | Planner (search) | None — no plan to execute | `solved: false` + `terminationReason: 'frontier_exhausted'` |
+| `SEARCH_EXHAUSTED` | Planner (search) | `ordering_hint_channel` (future) | `terminationReason: 'max_nodes'` |
+| `EXECUTION_FAILURE` | Executor (runtime) | `cost_update_channel` | Task-level failure (`task.status = 'failed'`) |
+| `STRATEGY_INFEASIBLE` | Planner (Rig D) | None — filtered before solve | `CompatReport` issue code `ACQUISITION_NO_VIABLE_STRATEGY` |
+| `DECOMPOSITION_GAP` | Planner (Rig E) | None — macro level, not search | `decomposition_gap` in edge decomposer |
+| `SUPPORT_INFEASIBLE` | Planner (Rig G) | None — structural constraint | `RigGSignals.feasibilityViolations` |
+| `HEURISTIC_DEGENERACY` | Planner (diagnostic) | `ordering_hint_channel` (future) | `DegeneracyReport.isDegenerate` + `reasons` |
+
+**Update channels** (from integration review):
+
+| Channel | What it accepts | What it changes | Invariant preserved |
+|---|---|---|---|
+| `cost_update_channel` | Execution-grounded outcomes only | Strategy priors, transition cost estimates | Invariant 5: only executed outcomes update priors |
+| `ordering_hint_channel` (future) | Planner-level signals (repeated `SEARCH_EXHAUSTED`, `HEURISTIC_DEGENERACY`) | Priority queue ordering, exploration bias | Invariant 4: no invented transitions, no changed semantics |
+
+The `ordering_hint_channel` is named but not implemented. Even without implementation, naming it in the taxonomy prevents future ambiguity about where planner feedback should flow.
+
+### Typed bridge edges (Phase 3, from integration review)
+
+Cross-domain orchestration today is TS-level stitching (Rigs B, D, E, G). The integration review defines 5 typed bridge edges as first-class evidence artifacts:
+
+| Bridge | From → To | Status |
+|--------|-----------|--------|
+| `acquire_for_craft` | acquisition (D) → crafting (A) | Implicit in acquisition solver delegation |
+| `craft_for_build` | crafting (A) → building (G) | Implicit in building material acquisition |
+| `navigate_for_acquire` | navigation (E) → acquisition (D) | Not wired |
+| `craft_for_tier` | crafting (A) → tool progression (B) | Implicit in tier decomposition |
+| `acquire_for_tier` | acquisition (D) → tool progression (B) | Not wired |
+
+Formalizing these as content-addressed artifacts (precondition/postcondition witnesses, referenced `trace_bundle_hash` per segment) is Phase 3 work. The acceptance test: "single solve call emits a plan with mixed-domain steps; replay verifies identical plan under fixed seed/inputs."
 
 ---
 
@@ -135,9 +200,9 @@ Sterling's capability absorption pipeline infrastructure (Layers 1–5) is now i
 | **A**: Inventory transformation | CB-P1, 16, 17, 19, 20 | CONTRACT-CERTIFIED | E2E-PROVEN | {crafting} | Track 1 |
 | **B**: Capability gating | CB-P2, 16, 19, 20 | CONTRACT-CERTIFIED | PARTIAL | {crafting via delegation}. Tier decomposition is TS-only; per-tier crafting solves hit Python. | Track 1 |
 | **C**: Temporal planning | CB-P3, 16, 17, 18, 19 | CONTRACT-CERTIFIED | NONE | No furnace domain in Python. All temporal enrichment, batching, parallel slot proofs are TS-only with mocked Sterling. | Track 1 |
-| **D**: Multi-strategy acquisition | CB-P4, 17, 18, 19, 20 | IN PROGRESS | PARTIAL | {mine proven, trade/loot/salvage E2E tests exist}. Context tokens injected into wire inventory. Awaiting `STERLING_E2E=1` validation. | Track 2 |
+| **D**: Multi-strategy acquisition | CB-P4, 17, 18, 19, 20 | CONTRACT-CERTIFIED | E2E-PROVEN | {mine, trade, loot, salvage}. All strategies proven via `STERLING_E2E=1` (7/7 tests). mcData threaded from planner. | Track 2 |
 | **E**: Hierarchical planning | CB-P5, 16, 17, 19 | CONTRACT-CERTIFIED | NONE | No hierarchical macro planner in Python. World graph, edge decomposition, feedback loop all TS-only. | Track 2 |
-| **F**: Valuation under scarcity | CB-P6, 16, 17, 18, 19 | NOT STARTED | NONE | — | Track 2 |
+| **F**: Valuation under scarcity | CB-P6, 16, 17, 18, 19 | CONTRACT-CERTIFIED | NONE | TS-local (no Sterling backend). Pure decision module with content-addressed hashing. | Track 2 |
 | **G**: Feasibility + partial order | CB-P7, 16, 17, 19 | CONTRACT-CERTIFIED | PARTIAL | {building via module sequencing}. Python `building_domain.py` exists; E2E building test in `solver-class-e2e.test.ts`. DAG builder, constraint model, partial-order plan are TS additions not exercised by Python search. | Track 2 |
 | **H**: Systems synthesis | CB-P8, 14, 16, 19 | NOT STARTED | NONE | — | Track 2 |
 | **I**: Epistemic planning | CB-P11, 13, 17, 19 | NOT STARTED | NONE | — | Track 2 |
@@ -300,6 +365,85 @@ Completed in the P0–P2 hardening sprint (2026-01-29). This underpins every rig
 | SolveRationale wired into solvers | DONE | All 3 solver files (7 call sites) | `buildDefaultRationaleContext()` helper; 3 tests (1/solver) |
 | Inventory count-capping | DONE | `solve-bundle.ts` `INVENTORY_HASH_CAP=64` | Prevents state explosion from stockpiling |
 | Performance baselines (A.5) | DONE | `performance-baseline-e2e.test.ts` | 6 E2E tests: 3 baseline + 3 convergence; artifacts in `__artifacts__/` |
+
+---
+
+## Identity chain infrastructure (cross-cutting, 2026-02-02)
+
+The three-step identity chain connects CB solve evidence to Sterling search evidence without entangling identity computation. This is the Phase 1 deliverable from [STERLING_INTEGRATION_REVIEW.md](./STERLING_INTEGRATION_REVIEW.md).
+
+### What's wired
+
+| Component | Status | Location (CB) | Location (Sterling) | Evidence |
+|-----------|--------|---------------|--------------------|---------|
+| `trace_bundle_hash` emission | DONE | `parseSterlingIdentity()` in `solve-bundle.ts` | `minecraft_domain.py`, `building_domain.py`, `navigation_domain.py` — emitted in `metrics` dict | E2E: 13 tests under `STERLING_E2E=1`; wire-shape lock test in `solve-bundle.test.ts` |
+| `engine_commitment` emission | DONE | Parsed via `parseSterlingIdentity()` | All 3 domain solvers | Same E2E coverage |
+| `operator_registry_hash` emission | DONE | Parsed via `parseSterlingIdentity()` | All 3 domain solvers | Same E2E coverage |
+| `episode_hash` in `report_episode` response | DONE | `reportEpisodeResult()` in `base-domain-solver.ts` | `sterling_unified_server.py` + episode chain | E2E identity loop test: solve → report → verify hash |
+| `bundleHash` content addressing | DONE | `computeBundleHash()` in `solve-bundle.ts` | N/A (CB-only artifact) | Determinism suite in `solve-bundle.test.ts` |
+| Wire-shape lock | DONE | `solve-bundle.test.ts` | N/A | Identity fields in `metrics` only, not top-level. `parseSterlingIdentity(result.metrics)` finds them; `parseSterlingIdentity(result)` does not. |
+| `bindingHash` computed | DONE | `contentHash("binding:v1:" + traceBundleHash + ":" + bundleHash)` in `solve-bundle.ts` | N/A | Unit test: deterministic given same inputs |
+| `bindingHash` persisted/exported | PENDING | Will be stored in `SolveBundleOutput.sterlingIdentity.bindingHash` | N/A | Computation exists; storage not yet wired to persistent output |
+| `SterlingIdentity` type + `attachSterlingIdentity` | DONE | `solve-bundle.ts` | N/A | `sterlingIdentity` excluded from `bundleHash` computation (test) |
+
+### Hash coupling policy
+
+Sterling's identity hashes (`trace_bundle_hash`, `episode_hash`) are computed from Sterling-native commitments only. CB's `bundleHash` never participates in any Sterling hash computation. Sterling stores `bundle_hash` as an `external_ref` alongside the episode record.
+
+The cryptographic link is `bindingHash = contentHash("binding:v1:" + traceBundleHash + ":" + bundleHash)`, computed on the CB side. `contentHash` is `sha256(utf8(input))` truncated to 16 hex chars. The `"binding:v1:"` prefix and `":"` separator make the encoding unambiguous and version-tagged. This is the regression test anchor. It is not sent to Sterling.
+
+**Drift classification** (from integration review):
+- `bundleHash` changed → CB solver change (intentional refactor or regression)
+- `trace_bundle_hash` changed with same `bundleHash` → Sterling search drift
+- `episode_hash` changed with same `trace_bundle_hash` → Sterling execution chain drift
+- `bindingHash` changed → either side; decompose via above
+
+### Pending items
+
+| Item | Priority | Blocking? |
+|------|----------|-----------|
+| `completeness_declaration` in `complete` message | Phase 2 | No — additive field, Sterling-authored |
+| `failure_class` enum in `report_episode` | Phase 2 | No — additive field, 9-value enum (see failure taxonomy below) |
+| `bundle_hash` + `trace_bundle_hash` in `report_episode` request body | Phase 2 | No — Sterling already accepts extra fields |
+
+---
+
+## Episode resilience infrastructure (cross-cutting, 2026-02-02)
+
+The `report_episode` path is hardened against failures at two levels: domain-level learning failures and server-level handler exceptions.
+
+### Domain-level: learning is best-effort
+
+All three Python solver domains wrap `path_algebra.process_path()` and `penalize_dead_end_edge()` in try/except guards. Learning failures produce warnings but never prevent `episode_reported` + `episode_hash` from being returned.
+
+| Domain | File | Guarded calls in `apply_episode_result()` | Evidence |
+|--------|------|------------------------------------------|----------|
+| Minecraft crafting | `scripts/eval/minecraft_domain.py` | `process_path()`, `penalize_dead_end_edge()` | 2 tests in `test_episode_identity.py` |
+| Building | `scripts/eval/building_domain.py` | `process_path()`, `penalize_dead_end_edge()` | 1 test in `test_episode_identity.py` |
+| Navigation | `scripts/eval/navigation_domain.py` | `process_path()` | 1 test in `test_episode_identity.py` |
+
+Root cause addressed: `ValueError: Node {id} not found` when `path_algebra.process_path()` encounters action-suffixed node IDs (e.g., `oak_planks:4|action:5ce4fed12345`) not registered in the KG. The warning message logged is `"path_algebra.process_path skipped for plan %s: %s"`. Previously this exception propagated to `handle_connection()`, closing the WebSocket.
+
+### Server-level: exception → error response + connection liveness
+
+`sterling_unified_server.py` wraps the entire `report_episode` domain dispatch in try/except. On exception:
+1. Logs error with traceback (`logger.error(..., exc_info=True)`)
+2. Sends `{"type": "error", "code": "episode_error", "message": "...", "domain": "..."}` to the client
+3. Continues the message loop (`continue`) — connection stays alive
+
+### Regression tests
+
+| Test | File | What it proves |
+|------|------|---------------|
+| `test_minecraft_report_succeeds_despite_learning_crash` | `tests/unit/test_episode_identity.py` | Minecraft domain: `episode_hash` returned despite KG node miss |
+| `test_building_report_succeeds_despite_learning_crash` | `tests/unit/test_episode_identity.py` | Building domain: same invariant |
+| `test_navigation_report_succeeds_despite_learning_crash` | `tests/unit/test_episode_identity.py` | Navigation domain: same invariant |
+| `test_minecraft_failure_penalize_survives_missing_nodes` | `tests/unit/test_episode_identity.py` | Failure path with `penalize_dead_end_edge` |
+| `test_report_episode_exception_returns_episode_error` | `tests/integration/test_report_episode_resilience.py` | Monkeypatched solver raises → `episode_error` response |
+| `test_connection_stays_alive_after_episode_error` | `tests/integration/test_report_episode_resilience.py` | After error, ping on same socket → pong |
+| `test_valid_report_after_failed_report_succeeds` | `tests/integration/test_report_episode_resilience.py` | Valid report succeeds after failed report on same connection |
+
+All 7 tests run in CI via `python -m pytest tests/` (the `test` job in `ci.yml`). Integration tests are additionally marked `@pytest.mark.integration` for selective execution.
 
 ---
 
@@ -497,8 +641,8 @@ Completed in the P0–P2 hardening sprint (2026-01-29). This underpins every rig
 
 ## Rig D: Multi-strategy acquisition (mine/trade/loot/salvage)
 
-**Contract**: IN PROGRESS — coordinator solver + strategy enumeration + ranking + priors + hardening + golden-master + transfer test implemented. Review round 2 complete. Context token injection is observation-derived (not rule-scanning). `contextTokensInjected` audit field on child bundles.
-**E2E**: PARTIAL → `{trade, loot, salvage}` E2E-PROVEN; `{mine}` strategy-selection proven, solve-path blocked (needs mcData). Run 2026-02-01 with `STERLING_E2E=1`: 686/686 pass. Context tokens derived from `nearbyEntities` observations, injected only when both required by rules AND observed. E2E tests assert on both `contextTokensInjected` (audit field) and `initialStateHash` (material inventory fact). Child bundles found by `solverId`, not hardcoded index. Python solver handles all `acq:*` rules natively via generic `requires` multiset check.
+**Contract**: CONTRACT-CERTIFIED — coordinator solver + strategy enumeration + ranking + priors + hardening + golden-master + transfer test implemented. mcData threaded from planner → acquisition solver → crafting solver (same ownership pattern as Rig A). Mine strategy gated on mcData structural validity via `isValidMcData()` predicate (dependency gate, not world constraint). `buildCraftingRules` has fail-fast `MISSING_MCDATA` guard using the same predicate — truthy-but-malformed values (`{}`) are rejected identically to `undefined`. Context token injection is observation-derived (not rule-scanning). `contextTokensInjected` audit field on child bundles.
+**E2E**: E2E-PROVEN — `{mine, trade, loot, salvage}` all proven (mine: 2026-02-02, trade/loot/salvage: 2026-02-01). 7/7 E2E tests pass under `STERLING_E2E=1`. Mine delegation exercises crafting solver → Python with mcData injected. Fail-closed behavior proven at both unit and E2E level: mine gated when mcData absent (no crash, deterministic fallback, candidateSetDigest reflects filtered set). Context tokens derived from `nearbyEntities` observations, injected only when both required by rules AND observed. E2E tests assert on both `contextTokensInjected` (audit field) and `initialStateHash` (material inventory fact). Child bundles found by `solverId`, not hardcoded index. Python solver handles all `acq:*` rules natively via generic `requires` multiset check.
 
 ### What's done
 
@@ -507,7 +651,7 @@ Completed in the P0–P2 hardening sprint (2026-01-29). This underpins every rig
 | Acquisition types + context hashing | `minecraft-acquisition-types.ts` | `AcquisitionContextV1`, `AcquisitionCandidate`, `computeCandidateSetDigest()`, `lexCmp()`, `costToMillis()`. 21 tests |
 | Strategy enumeration + ranking | `minecraft-acquisition-rules.ts` | `buildAcquisitionStrategies()`, `rankStrategies()` with quantized scoring, deterministic tie-break. 42 tests |
 | Prior store (EMA learning) | `minecraft-acquisition-priors.ts` | `StrategyPriorStore` with alpha=0.2, bounds [PRIOR_MIN=0.05, PRIOR_MAX=0.95], planId-required updates. 13 tests |
-| Coordinator solver class | `minecraft-acquisition-solver.ts` | `MinecraftAcquisitionSolver` extends `BaseDomainSolver`. Delegates mine/craft to crafting solver, trade/loot/salvage to Sterling via `acq:` prefix rules. `parentBundleId` first-class field. Strategy-specific child solverId. 24 tests |
+| Coordinator solver class | `minecraft-acquisition-solver.ts` | `MinecraftAcquisitionSolver` extends `BaseDomainSolver`. Delegates mine/craft to crafting solver, trade/loot/salvage to Sterling via `acq:` prefix rules. `parentBundleId` first-class field. Strategy-specific child solverId. 28 tests (incl. 4 mcData gate + `{}` malformed metadata) |
 | Compat linter (3 acquisition checks) | `compat-linter.ts` | `TRADE_REQUIRES_ENTITY` (exact `proximity:villager`), `ACQ_FREE_PRODUCTION` (per-strategy), `ACQUISITION_NO_VIABLE_STRATEGY` (uses `candidateCount`, not `rules.length`). Gated behind `enableAcqHardening` flag or `solverId`. 31 hardening tests |
 | SolveBundle wiring (parent + child) | `minecraft-acquisition-solver.ts` | Parent bundle captures `candidateSetDigest`, `strategySelected`, `candidateCount`. Child bundles appended after parent with strategy-specific solverId. |
 | Deterministic digest + ranking | `minecraft-acquisition-types.ts`, `minecraft-acquisition-rules.ts` | `lexCmp()` replaces `localeCompare`, `costToMillis()` quantizes floats. Digest stable under reordering. |
@@ -519,7 +663,8 @@ Completed in the P0–P2 hardening sprint (2026-01-29). This underpins every rig
 | Planner integration | `sterling-planner.ts` | `case 'D'` dispatches to acquisition solver. Steps tagged with `source: 'rig-d-acquisition'`. |
 | Mine/craft delegation regression | `acquisition-solver-unit.test.ts` | Parent bundle `compatReport.valid` when `candidateCount > 0` and `rules=[]`. 3 regression tests |
 | Context token injection (observation-derived) | `minecraft-acquisition-solver.ts:522-553`, `acquisition-solver-unit.test.ts` | `dispatchSterlingRules` derives `observedTokens` from `nearbyEntities`, then only injects tokens that are BOTH required by rules AND observed in the world. Fail-closed: unknown-feasibility strategies are dispatchable, but Python fails them unless the context token is present. `Math.max()` for count handling. `contextTokensInjected: string[]` audit field on `SolveBundleInput` tracks exactly which tokens were injected (sorted). 6 unit tests: trade injects when villager observed, trade does NOT inject when no villager, loot injects when chest observed, salvage has no proximity tokens, child bundle captures `contextTokensInjected`, child bundle omits field for salvage. |
-| E2E test suite (all strategies) | `acquisition-solver-e2e.test.ts` | 6 E2E tests gated behind `STERLING_E2E=1`: trade, loot, salvage, mine delegation, multi-strategy context sensitivity, deterministic identity. Child bundle assertions: trade child has `contextTokensInjected: ['proximity:villager']`, loot child has `['proximity:container:chest']`, salvage child has `undefined`. Deterministic identity test verifies identical `contextTokensInjected` across repeated solves. |
+| mcData dependency threading | `minecraft-acquisition-solver.ts`, `sterling-planner.ts`, `minecraft-crafting-rules.ts` | Planner loads mcData (same precedence as Rig A: metadata override ‖ cache). Threaded as parameter through `solveAcquisition` → `dispatchStrategy` → `dispatchMineCraft` → `solveCraftingGoal`. No instance storage (pure threading). `isValidMcData()` predicate validates structural shape (recipes, items, itemsByName all present and non-null). Both `buildCraftingRules` guard and mine gate use `isValidMcData` — `{}` behaves identically to `undefined`. 8 predicate + gate tests. |
+| E2E test suite (all strategies) | `acquisition-solver-e2e.test.ts` | 7 E2E tests gated behind `STERLING_E2E=1`: trade, loot, salvage, mine success path (with mcData), mine fail-closed (without mcData), multi-strategy context sensitivity, deterministic identity. Mine success test asserts: parent bundle with definitionHash, child crafting bundle with stepsDigest, compatReport.valid on both. Fail-closed test asserts: mine filtered, no crash, structured result. |
 
 ### Certification checklist
 
@@ -531,25 +676,70 @@ Completed in the P0–P2 hardening sprint (2026-01-29). This underpins every rig
 - [x] **D.6 — Golden-master + transfer test**: Rule shape snapshots, payload stability, deterministic identity, supply chain transfer test.
 - [x] **D.7 — Learning benchmark (M1)**: CandidateSetDigest unchanged after N episodes. Strategy ranking shifts. Prior stabilization. Operator set immutability.
 - [x] **D.8 — Closeout doc**: Update capability tracker to reflect Rig D status. Two-axis certification model (contract vs E2E), primitive namespace separation (ST-Pxx vs CB-Pxx), explicit E2E coverage sets, dependency edge declarations.
-- [ ] **D.E2E — Trade/loot/salvage against Python**: No new Python domain needed. Investigation of `minecraft_domain.py` confirms:
-  - **State = inventory multiset + station booleans.** `MinecraftInventoryState.inventory: Dict[str, int]` + `StationState(table_placed, furnace_placed)`. No raw coordinates or entity IDs in state.
-  - **`requires` tokens are generic inventory checks** (line 281–284): `for name, count in rule.requires: if self.inventory.get(name, 0) < count: return False`. Not consumed on apply. Any token name works — `proximity:villager`, `proximity:container:chest`, etc. — as long as it's in the initial inventory dict.
-  - **`acq:*` action strings are opaque labels** for `actionType: 'craft'`. The Python solver only parses action strings for `mine` (nearby-block gating) and `place` (station placement). `craft` actions dispatch purely on consumes/produces/requires.
-  - **Approach**: Inject context tokens (`proximity:villager: 1`, `proximity:container:chest: 1`) into the initial `inventory` dict sent to Sterling. Zero Python code changes. The existing `minecraft_domain.py` solver handles `acq:trade:*`, `acq:loot:*`, `acq:salvage:*` rules natively.
+- [x] **D.E2E — All strategies against Python**: mcData threaded from planner; mine delegation exercises crafting solver → Python end-to-end. Fail-closed behavior proven (mine gated when mcData absent). Trade/loot/salvage context token injection E2E-PROVEN. No new Python domain needed — `minecraft_domain.py` handles all `acq:*` rules natively via generic `requires` multiset check. 7 E2E tests (was 6).
 
 ### E2E coverage detail
 
 | Strategy | E2E status | How | Blocker |
 |----------|-----------|-----|---------|
-| mine | STRATEGY-PROVEN | Strategy selection correct (mine chosen when ore nearby + tool cap). Solve path blocked: `dispatchMineCraft` passes `mcData=null` to `buildCraftingRules`, which crashes. Graceful error handling proven. | Needs mcData injection from Minecraft interface layer. |
-| craft | PROVEN (via Rig A) | Covered by Rig A E2E: `MinecraftCraftingSolver` → Python `minecraft_domain.py`. Not exercised via acquisition delegation (see mine blocker). | — |
+| mine | **E2E-PROVEN** (2026-02-02) | `mine:cobblestone` with mcData injected from planner. Crafting solver builds rules from recipe tree, Sterling Python solves (nodes=2, goal_found). E2E test asserts: parent bundle `definitionHash` + `compatReport.valid`, child crafting bundle `stepsDigest` + `compatReport` (allows `MINE_TIERGATED_NO_INVARIANT` lint on raw mine rules). Fail-closed E2E: mcData absent → mine gated, no crash, `solved=false`, empty `strategyRanking`. Unit-level gate proof: 3 tests (mine excluded without mcData, included with mcData, candidateSetDigest differs). | — |
+| craft | PROVEN (via Rig A + mine delegation) | Covered by Rig A E2E and now also exercised via mine delegation path with mcData. | — |
 | trade | **E2E-PROVEN** (2026-02-01) | `acq:trade:iron_ingot` with observed villager entity. Python solved (nodes=2, goal_found). Child bundle asserts: `contextTokensInjected: ['proximity:villager']`, `initialStateHash` matches `hashInventoryState({emerald:5, 'proximity:villager':1})`. | — |
 | loot | **E2E-PROVEN** (2026-02-01) | `acq:loot:saddle` with observed chest entity. Python solved (nodes=2, goal_found). Child bundle asserts: `contextTokensInjected: ['proximity:container:chest']`, `initialStateHash` matches `hashInventoryState({'proximity:container:chest':1})`. | — |
 | salvage | **E2E-PROVEN** (2026-02-01) | `acq:salvage:stick:from:oak_planks` consuming `oak_planks`. Python solved (nodes=2, goal_found). Child bundle asserts: `contextTokensInjected: undefined`, `initialStateHash` matches `hashInventoryState({oak_planks:2})`. | — |
 
 ---
 
-## Rigs F, H–N: Not started
+## Rig F: Valuation under scarcity (keep/drop/store)
+
+**Contract**: CONTRACT-CERTIFIED — pure TS-local certified decision module. Content-addressed hashing, deterministic scoring, fail-closed unknown-item policy, order-insensitive decision digest. Explicit versioned policy knobs (slotModel, unknownItemPolicy, countPolicy) bound into rulesetDigest with fail-closed runtime guards. Shared `deriveEffectiveInventory()` prevents digest/solver normalization drift. Ruleset lint for shadowing hazards with deduped issue codes in witness. Input normalization (sort+dedupe set-semantic arrays). reasonCodes are decision-binding (sorted+deduped). storeTokenMatched is lexicographic-min (stable under permutation). 33 unit tests.
+**E2E**: NONE — TS-local (no Sterling backend calls). No E2E test needed.
+
+### What's done
+
+| Item | File | Evidence |
+|------|------|----------|
+| Valuation types + digest computation | `minecraft-valuation-types.ts` | `ValuationInput`, `ValuationPlanV1`, `InventoryActionV1` (with `countBasis`), `ValuationWitnessV1` (with `slotModel`, `unknownItemPolicy`, `countPolicy`, `storeEligible`, `storeTokenMatched`, `rulesetLintClean`, `rulesetLintIssueCodes`), `deriveEffectiveInventory()` (shared normalization: cap: filtering + zero removal), `computeValuationInputDigest()` (uses `deriveEffectiveInventory`, sort+dedupe arrays), `computeDecisionDigest()` (reasonCodes sorted+deduped), `lexCmp()`, `LintIssueCode` type. Policy knob types: `SlotModel`, `UnknownItemPolicy`, `CountPolicy`. CAP_PREFIX inlined locally. |
+| Classification table + scoring + lint | `minecraft-valuation-rules.ts` | `DEFAULT_CLASSIFICATION_TABLE` (~35 entries, 5 classes), `scoreItem()` (first-match-wins, exact+suffix), `buildDefaultRuleset()` (includes policy knobs), `computeRulesetDigest()`, `lintClassificationTable()` (3 check codes: `DUPLICATE_EXACT`, `SUFFIX_SHADOWS_EXACT`, `DUPLICATE_SUFFIX`). |
+| Valuation solver (pure function) | `minecraft-valuation.ts` | `computeValuationPlan()` — fail-closed policy guards (`UNSUPPORTED_POLICY` on unrecognized knob values), shared `deriveEffectiveInventory()` for cap: filtering, lint computation with deduped issue codes, protected item enforcement, under-budget pass-through, fail-closed unknown policy, store eligibility as first-class boolean (lexicographic-min token selection via `lexCmp`), score-sorted eviction, whole-stack actions, full witness generation with policy knobs + store context + lint issue codes. |
+| Unit tests (33 tests) | `valuation-unit.test.ts` | 14 original invariant tests + 19 hardening tests: policy knob digest binding, policy knob witness presence, countBasis enforcement, score-invariance of decisionDigest, store eligibility witness (lexicographic-min), default table lint clean, lint hazard detection (3 codes), lint-dirty plan with issue codes, input normalization (permuted arrays same digest, duplicates same digest, zero-count/cap: filtering), reasonCodes normalization (reorder+dedupe same digest), lint issue codes in witness (empty for clean, deduped for dirty), storeTokenMatched permutation stability, policy guard fail-closed (unsupported slotModel/unknownItemPolicy/countPolicy → UNSUPPORTED_POLICY), shared normalization helper (deriveEffectiveInventory), multi-issue-type lint dedup. |
+
+### Design decisions (reviewer-binding)
+
+- **D1. Unknown-item fail-closed**: Over-budget + unknown items → `solved: false`, `UNKNOWN_ITEM_VALUATION`. Under-budget unknowns pass through with `UNKNOWN_ITEM_KEPT`. Policy is explicit: `unknownItemPolicy: 'fail-closed-v1'` in ruleset, bound into rulesetDigest. Callers must treat `solved:false` as recoverable (expand table, query metadata, defer).
+- **D2. Order-insensitive decision digest**: Actions sorted by `(item, actionType)` before hashing. Score excluded from digest. **reasonCodes are decision-binding** (sorted+deduped before hashing) — codes like `LOW_VALUE_DROP` vs `LOW_VALUE_STORE` carry distinct executor semantics. Harmless reorder or accidental duplicate in construction doesn't fork the digest. Tests #10, #18, #26 lock this intent.
+- **D3. Whole-stack actions only**: `count === inventory[item]` for all action types. `countPolicy: 'whole-stack-v1'` in ruleset, bound into rulesetDigest. `countBasis: 'all'` on every action (test #17). Adding partial-stack requires bumping countPolicy version.
+- **D4. Pattern matching**: `matchKind: 'exact' | 'suffix'`. First match in table order wins. `lintClassificationTable()` detects shadowing hazards (test #21).
+- **D5. CAP_PREFIX inlined**: `const CAP_PREFIX = 'cap:' as const` local to valuation types. cap: tokens filtered at boundary via `deriveEffectiveInventory()`.
+- **D6. Ruleset hashed as unit**: `rulesetDigest = contentHash(canonicalize(ruleset))`. All policy knobs bound — `slotModel`, `unknownItemPolicy`, `countPolicy`, `classificationTable`, `storeProximityPrefix`, `storeMinScoreBp`.
+- **D7. Slot model is explicit**: `slotModel: 'distinct-item-keys-v1'` — counts distinct inventory keys with value > 0, excluding cap: tokens. NOT Minecraft's real slot constraint. Witness records the model version to prevent silent reinterpretation during integration.
+- **D8. Store eligibility is first-class**: `storeEligible: boolean` and `storeTokenMatched: string | undefined` in witness. `storeTokenMatched` is the lexicographic-min matching token (stable under permutation of observedTokens — test #28). Ordering function is `lexCmp`, which is the same function used for digest normalization. Derived from observedTokens at compute time, not fabricated.
+- **D9. Input normalization via shared helper**: `deriveEffectiveInventory()` is the single source of truth for inventory normalization (cap: filtering + zero removal). Both `computeValuationInputDigest()` and `computeValuationPlan()` call it, preventing drift between "what the solver reasons over" and "what the digest claims was reasoned over." Set-semantic arrays (`protectedItems`, `protectedPrefixes`, `observedTokens`) are sort+deduped in the digest function. Tests #23, #24, #25, #32 lock this.
+- **D10. Lint issue codes in witness**: `rulesetLintIssueCodes: LintIssueCode[]` in witness — deduped and sorted list of issue codes that fired. Tells callers *what* to fix without re-running lint or inspecting the ruleset. Complements `rulesetLintClean: boolean`. Test #33 proves multi-issue-type deduplication.
+- **D11. Fail-closed policy guards**: Runtime checks reject unsupported policy knob values with `UNSUPPORTED_POLICY` error. Guards `slotModel !== 'distinct-item-keys-v1'`, `unknownItemPolicy !== 'fail-closed-v1'`, `countPolicy !== 'whole-stack-v1'`. Turns "digest says X but behavior is Y" into an explicit failure rather than undetected mismatch. Tests #29, #30, #31 lock this. Witness records the unsupported knob value for diagnostics.
+
+### Certification checklist
+
+- [x] **F.1 — Determinism**: Same input → identical output (deep-equal on two runs). Test #1.
+- [x] **F.2 — Tie-breaking**: Tied scores break by item name ascending via `lexCmp`. Test #2.
+- [x] **F.3 — Explicit scarcity**: Under-budget → all kept (test #3). Over-budget → lowest-scored dropped first (test #4).
+- [x] **F.6 — Store gating**: Store action only when `proximity:container:*` token present (test #8). No store when absent (test #9). Store eligibility recorded in witness with lexicographic-min token (test #19). Permutation stability (test #28).
+- [x] **F.7 — Fail-closed**: Over-budget + unknowns → `solved: false`, `UNKNOWN_ITEM_VALUATION` (test #5). Under-budget + unknowns → `solved: true`, `UNKNOWN_ITEM_KEPT` (test #6). Policy explicit and versioned as `fail-closed-v1`.
+- [x] **F.8 — Protected items**: Protected item never dropped even when lowest scored (test #7).
+- [x] **D2 — Order-insensitive digest**: Permuted actions produce same `decisionDigest` (test #10). Score changes don't affect digest when actions identical (test #18). reasonCodes reorder/dedupe don't fork digest (test #26).
+- [x] **D5 — cap: boundary filtering**: cap: tokens excluded from slot count and emitted actions (test #13). Shared `deriveEffectiveInventory()` used by both solver and digest (test #32).
+- [x] **Digest stability**: Changing classification table changes rulesetDigest (test #11). `valuationInputDigest` binds rulesetDigest (test #12). Changing slotModel changes rulesetDigest (test #15).
+- [x] **Error path**: Protected items exceeding budget → `INSUFFICIENT_CAPACITY_PROTECTED` (test #14).
+- [x] **Policy knobs in witness**: slotModel, unknownItemPolicy, countPolicy present in witness (test #16).
+- [x] **Policy knob fail-closed guards**: Unsupported slotModel → `UNSUPPORTED_POLICY` (test #29). Unsupported unknownItemPolicy → `UNSUPPORTED_POLICY` (test #30). Unsupported countPolicy → `UNSUPPORTED_POLICY` (test #31).
+- [x] **countBasis enforcement**: All actions have `countBasis: 'all'` under whole-stack-v1 (test #17).
+- [x] **Ruleset lint**: Default table clean (test #20). Detects DUPLICATE_EXACT, SUFFIX_SHADOWS_EXACT, DUPLICATE_SUFFIX (test #21). Lint-dirty ruleset still produces plan with `rulesetLintClean: false` and deduped `rulesetLintIssueCodes` (test #22). Issue codes empty for clean ruleset (test #27). Multi-issue-type deduplication (test #33).
+- [x] **Input normalization**: Permuted set-semantic arrays produce same `valuationInputDigest` (test #23). Duplicate entries don't fork digest (test #24). Inventory zero-count and cap: tokens excluded from digest (test #25). Shared `deriveEffectiveInventory()` helper proven (test #32).
+- [x] **reasonCodes normalization**: Reordered/duplicated reasonCodes produce same `decisionDigest` (test #26).
+
+---
+
+## Rigs H–N: Not started
 
 These rigs are documented in [sterling-minecraft-domains.md](./sterling-minecraft-domains.md) with full rig templates. Implementation follows Track 2 (D–K) and Later (L–N) priority ordering.
 
@@ -561,10 +751,11 @@ These rigs are documented in [sterling-minecraft-domains.md](./sterling-minecraf
 > Track 3 = representational widening); this list orders them by dependency
 > and implementation priority within those tracks.
 
-1. **Rig D** — Multi-strategy acquisition (IN PROGRESS — contract close to certified, E2E: trade+loot+salvage proven, mine strategy-selection only)
+1. **Rig D** — Multi-strategy acquisition (CONTRACT-CERTIFIED, E2E-PROVEN: `{mine, trade, loot, salvage}` all proven)
    - Requires contract: A (crafting solver contract)
    - Requires E2E: A `{crafting}` (mine path delegates to crafting solver)
-2. **Rig F** — Valuation under scarcity (keep/drop/store)
+   - Dependency gate: mine strategy requires mcData injection from planner (resolved 2026-02-02)
+2. **Rig F** — Valuation under scarcity (CONTRACT-CERTIFIED, E2E: NONE — TS-local)
    - Requires contract: D
    - Requires E2E: D `{mine}` if delegating acquisition
 3. **Rig H** — Systems synthesis (farm layout first)
@@ -615,6 +806,34 @@ Example: Rig F depends on D contract-certified. If F delegates mine/craft to D's
 ---
 
 ## Recently completed work
+
+### Sprint 1: Identity Chain + Episode Resilience (2026-02-02)
+
+Wired the three-step identity chain (`trace_bundle_hash` → `bundleHash` → `episode_hash`) end-to-end across both repos and hardened `report_episode` against failures at both domain and server levels.
+
+**Sterling (Python) commits**:
+- `8a533417` feat: Solve-scoped identity emission + report_episode linkage (Sprint 1 PR A)
+- `3fbf8e74` fix: Defensive error handling in report_episode to prevent connection drops
+- `6c743eda` test: Add navigation domain contamination regression tests
+- `c7b0bcdc` fix: Learning guards across all domains + resilience regression tests
+- `77cafda0` test: Server-level report_episode resilience integration tests
+- `a107b8fa` fix: Convert async fixture to pytest_asyncio.fixture for STRICT mode
+
+**CB (TypeScript) commits**:
+- Solver-level linkage: `parseSterlingIdentity()`, `attachSterlingIdentity()`, `SterlingIdentity` type, `bindingHash` computation
+- Wire-shape lock test: identity fields in `metrics` only, not top-level
+- E2E identity loop: solve → extract `trace_bundle_hash` → report → verify `episode_hash`
+
+**Test coverage added**:
+- Sterling: 4 domain-level resilience tests + 3 server-level integration tests + navigation contamination tests
+- CB: wire-shape lock test + identity contract tests (59 tests in `solve-bundle.test.ts`)
+- E2E: 13/13 tests pass under `STERLING_E2E=1` including full identity loop
+
+**Key design decisions**:
+- Identity fields live in `result.metrics`, not top-level (wire-shape lock)
+- `bundleHash` excluded from Sterling hashes (hash coupling policy)
+- Learning failures are best-effort (try/except around `process_path` in all 3 domains)
+- Server-level `report_episode` exceptions produce `{"type":"error","code":"episode_error"}` and keep the connection alive
 
 ### Rig C Temporal Enrichment Layer + E2E Test Suite (2026-02-01)
 
@@ -793,20 +1012,48 @@ This sprint implemented the observability infrastructure that underpins all rigs
 ## Verification commands
 
 ```bash
-# Python unit tests (sterling repo)
+# Python unit tests — episode identity + search health (sterling repo)
 cd /Users/darianrosebrook/Desktop/Projects/sterling
-python -m pytest tests/unit/test_search_health_accumulator.py -v
+python -m pytest tests/unit/test_episode_identity.py tests/unit/test_search_health_accumulator.py -v
 
-# TS unit tests (no server needed)
+# Python integration tests — report_episode resilience + building WS harness (sterling repo)
+cd /Users/darianrosebrook/Desktop/Projects/sterling
+python -m pytest tests/integration/ -m integration -v
+
+# Python full suite (sterling repo)
+cd /Users/darianrosebrook/Desktop/Projects/sterling
+python -m pytest tests/ -v --tb=short
+
+# TS unit tests — sterling/planning scope (no server needed)
 cd /Users/darianrosebrook/Desktop/Projects/conscious-bot
 npx vitest run packages/planning/src/sterling/__tests__/
 
 # TS typecheck
 npx tsc --noEmit
 
-# E2E (requires Sterling server on ws://localhost:8766)
+# E2E — solver-class tests (requires Sterling server on ws://localhost:8766)
 cd /Users/darianrosebrook/Desktop/Projects/sterling
 python scripts/utils/sterling_unified_server.py &
 cd /Users/darianrosebrook/Desktop/Projects/conscious-bot
 STERLING_E2E=1 npx vitest run packages/planning/src/sterling/__tests__/solver-class-e2e.test.ts
+
+# E2E — acquisition solver (requires Sterling server)
+STERLING_E2E=1 npx vitest run packages/planning/src/sterling/__tests__/acquisition-solver-e2e.test.ts
+
+# E2E — full identity loop (requires Sterling server)
+STERLING_E2E=1 npx vitest run packages/planning/src/sterling/__tests__/
 ```
+
+> **Note**: These commands assume no additional pytest plugins. Do not use `--timeout` (requires `pytest-timeout`, not installed). The `--tb=short` flag is set in `pytest.ini` and doesn't need repeating.
+
+---
+
+## Doc invariants (self-maintenance checklist)
+
+When editing this tracker or linked docs, verify:
+
+- [ ] **Status vocabulary is bounded**: Axis A = `CONTRACT-CERTIFIED` | `IN PROGRESS` | `NOT STARTED`. Axis B = `E2E-PROVEN` | `PARTIAL E2E` | `E2E: NONE`. Optional suffix: `{surface scope}`.
+- [ ] **Identity chain definitions match implementation**: `bindingHash = contentHash("binding:v1:" + traceBundleHash + ":" + bundleHash)`. Any encoding change must update all 3 docs (tracker, domains doc, integration review).
+- [ ] **Failure taxonomy enum matches integration review**: 9 values in `EpisodeFailureClass`. If a class is added/renamed, update both the taxonomy table here and the enum definition in the review.
+- [ ] **No line-number references to source code**: Use function names, class names, or grep-able strings (e.g., warning messages) as stable anchors.
+- [ ] **Rig status lines consistent across docs**: Index section and detailed template section in `sterling-minecraft-domains.md` must match each other and the summary table in this tracker.
