@@ -344,7 +344,7 @@ export const useDashboardStore = create<DashboardStore>()(
               }
             }
           } catch (error) {
-            if (process.env.NEXT_PUBLIC_DEBUG_DASHBOARD === '1') {
+            if (import.meta.env.VITE_DEBUG_DASHBOARD === '1') {
               console.warn('Failed to load thoughts from server:', error);
             }
           }

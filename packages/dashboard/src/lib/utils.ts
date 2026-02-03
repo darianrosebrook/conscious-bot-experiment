@@ -1,9 +1,9 @@
 import { type ClassValue, clsx } from 'clsx';
 import hudColors from '@/styles/hud-colors.module.scss';
 
-/** Only logs when NEXT_PUBLIC_DEBUG_DASHBOARD=1 to reduce browser console noise */
+/** Only logs when VITE_DEBUG_DASHBOARD=1 to reduce browser console noise */
 export function debugLog(...args: unknown[]): void {
-  if (process.env.NEXT_PUBLIC_DEBUG_DASHBOARD === '1') {
+  if (import.meta.env.VITE_DEBUG_DASHBOARD === '1') {
     console.log(...args);
   }
 }

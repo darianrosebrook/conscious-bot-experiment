@@ -320,13 +320,7 @@ class ServiceDiscovery {
    * Auto-discover service endpoints based on environment
    */
   async discoverServices(): Promise<ServiceEndpoints> {
-    const env =
-      (process.env.NODE_ENV as
-        | 'development'
-        | 'production'
-        | 'docker'
-        | 'kubernetes'
-        | 'test') || 'development';
+    const env = import.meta.env.MODE || 'development';
 
     switch (env) {
       case 'production':
@@ -384,19 +378,19 @@ class ServiceDiscovery {
     // In production, use environment variables or service registry
     const baseUrls = {
       minecraft:
-        process.env.MINECRAFT_SERVICE_URL ||
+        import.meta.env.VITE_MINECRAFT_SERVICE_URL ||
         `http://minecraft-interface:${this.DEFAULT_PORTS.minecraft}`,
       cognition:
-        process.env.COGNITION_SERVICE_URL ||
+        import.meta.env.VITE_COGNITION_SERVICE_URL ||
         `http://cognition:${this.DEFAULT_PORTS.cognition}`,
       memory:
-        process.env.MEMORY_SERVICE_URL ||
+        import.meta.env.VITE_MEMORY_SERVICE_URL ||
         `http://memory:${this.DEFAULT_PORTS.memory}`,
       planning:
-        process.env.PLANNING_SERVICE_URL ||
+        import.meta.env.VITE_PLANNING_SERVICE_URL ||
         `http://planning:${this.DEFAULT_PORTS.planning}`,
       world:
-        process.env.WORLD_SERVICE_URL ||
+        import.meta.env.VITE_WORLD_SERVICE_URL ||
         `http://world:${this.DEFAULT_PORTS.world}`,
     };
 
@@ -567,8 +561,7 @@ const defaultConfig: DashboardConfig = {
   // Legacy routes for backward compatibility
   routes: legacyRoutes,
 
-  environment:
-    (process.env.NODE_ENV as 'development' | 'production') || 'development',
+  environment: import.meta.env.PROD ? 'production' : 'development',
   serviceDiscovery: {
     enabled: true,
     healthCheckInterval: 30000, // 30 seconds
