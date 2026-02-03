@@ -11,7 +11,7 @@ overrides:
 
 patchedDependencies:
   prismarine-viewer@1.33.0:
-    hash: 22e3d4e219d3e3eabb66431c9c26119c8a0b6795bd6cdf7a8a0b5daaef1534d8
+    hash: 49fd9ccd1482791e9ee2119541c29ce868a83470ef4e70f7ae10a5b969ade413
     path: patches/prismarine-viewer@1.33.0.patch
 
 importers:
@@ -517,7 +517,7 @@ importers:
         version: 1.2.0
       prismarine-viewer:
         specifier: ^1.33.0
-        version: 1.33.0(patch_hash=22e3d4e219d3e3eabb66431c9c26119c8a0b6795bd6cdf7a8a0b5daaef1534d8)
+        version: 1.33.0(patch_hash=49fd9ccd1482791e9ee2119541c29ce868a83470ef4e70f7ae10a5b969ade413)
       three:
         specifier: ^0.179.1
         version: 0.179.1
@@ -8274,7 +8274,7 @@ snapshots:
   mineflayer-pathfinder@2.4.5:
     dependencies:
       minecraft-data: 3.103.0
-      prismarine-block: 1.22.0(prismarine-registry@1.11.0)
+      prismarine-block: 1.22.0
       prismarine-entity: 2.5.0
       prismarine-item: 1.17.0
       prismarine-nbt: 2.8.0
@@ -8298,7 +8298,7 @@ snapshots:
       mineflayer: 4.34.0
       mineflayer-pathfinder: 2.4.5
       node: 19.8.1
-      prismarine-block: 1.22.0(prismarine-registry@1.11.0)
+      prismarine-block: 1.22.0
       prismarine-entity: 2.5.0
       prismarine-item: 1.17.0
       socket.io: 4.8.3
@@ -8335,7 +8335,7 @@ snapshots:
       minecraft-data: 2.221.0
       minecraft-protocol: 1.63.0
       prismarine-biome: 1.3.0(minecraft-data@2.221.0)(prismarine-registry@1.11.0)
-      prismarine-block: 1.22.0(prismarine-registry@1.11.0)
+      prismarine-block: 1.22.0
       prismarine-chat: 1.12.0
       prismarine-chunk: 1.39.0(minecraft-data@2.221.0)
       prismarine-entity: 1.2.0
@@ -8357,7 +8357,7 @@ snapshots:
       minecraft-data: 3.103.0
       minecraft-protocol: 1.63.0
       prismarine-biome: 1.3.0(minecraft-data@3.103.0)(prismarine-registry@1.11.0)
-      prismarine-block: 1.22.0(prismarine-registry@1.11.0)
+      prismarine-block: 1.22.0
       prismarine-chat: 1.12.0
       prismarine-chunk: 1.39.0(minecraft-data@3.103.0)
       prismarine-entity: 2.5.0
@@ -8702,7 +8702,7 @@ snapshots:
       minecraft-data: 3.103.0
       prismarine-registry: 1.11.0
 
-  prismarine-block@1.22.0(prismarine-registry@1.11.0):
+  prismarine-block@1.22.0:
     dependencies:
       minecraft-data: 3.103.0
       prismarine-biome: 1.3.0(minecraft-data@3.103.0)(prismarine-registry@1.11.0)
@@ -8710,8 +8710,6 @@ snapshots:
       prismarine-item: 1.17.0
       prismarine-nbt: 2.8.0
       prismarine-registry: 1.11.0
-    transitivePeerDependencies:
-      - prismarine-registry
 
   prismarine-chat@1.12.0:
     dependencies:
@@ -8722,7 +8720,7 @@ snapshots:
   prismarine-chunk@1.39.0(minecraft-data@2.221.0):
     dependencies:
       prismarine-biome: 1.3.0(minecraft-data@2.221.0)(prismarine-registry@1.11.0)
-      prismarine-block: 1.22.0(prismarine-registry@1.11.0)
+      prismarine-block: 1.22.0
       prismarine-nbt: 2.8.0
       prismarine-registry: 1.11.0
       smart-buffer: 4.2.0
@@ -8735,7 +8733,7 @@ snapshots:
   prismarine-chunk@1.39.0(minecraft-data@3.103.0):
     dependencies:
       prismarine-biome: 1.3.0(minecraft-data@3.103.0)(prismarine-registry@1.11.0)
-      prismarine-block: 1.22.0(prismarine-registry@1.11.0)
+      prismarine-block: 1.22.0
       prismarine-nbt: 2.8.0
       prismarine-registry: 1.11.0
       smart-buffer: 4.2.0
@@ -8786,16 +8784,16 @@ snapshots:
   prismarine-registry@1.11.0:
     dependencies:
       minecraft-data: 3.103.0
-      prismarine-block: 1.22.0(prismarine-registry@1.11.0)
+      prismarine-block: 1.22.0
       prismarine-nbt: 2.8.0
 
-  prismarine-viewer@1.33.0(patch_hash=22e3d4e219d3e3eabb66431c9c26119c8a0b6795bd6cdf7a8a0b5daaef1534d8):
+  prismarine-viewer@1.33.0(patch_hash=49fd9ccd1482791e9ee2119541c29ce868a83470ef4e70f7ae10a5b969ade413):
     dependencies:
       '@tweenjs/tween.js': 23.1.3
       compression: 1.8.1
       express: 4.22.1
       minecraft-data: 3.103.0
-      prismarine-block: 1.22.0(prismarine-registry@1.11.0)
+      prismarine-block: 1.22.0
       prismarine-chunk: 1.39.0(minecraft-data@3.103.0)
       prismarine-world: 3.6.3
       socket.io: 4.8.3

@@ -3396,6 +3396,19 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
       }
     }
 
+    // ────────────────────────────────────────────────────────────────────────
+    // Clear-on-consume: Remove substrate after episode report to prevent:
+    // 1. Future episodes accidentally "reusing" stale substrate
+    // 2. Debugging confusion from long-lived substrate that looks relevant
+    // The substrate has served its purpose (classification); clear it.
+    // ────────────────────────────────────────────────────────────────────────
+    if (substrate && task.metadata.solver) {
+      delete task.metadata.solver.buildingSolveResultSubstrate;
+      if (process.env.STERLING_EPISODE_DEBUG === '1') {
+        console.log(`[Building] Cleared substrate after episode report (bundleHash=${substrate.bundleHash?.slice(0, 8)})`);
+      }
+    }
+
     // Prefer structured step.meta for module IDs; fall back to label parsing
     const completedModuleIds = task.steps
       .filter(
@@ -3442,6 +3455,17 @@ export class TaskIntegration extends EventEmitter implements ITaskIntegration {
     void reportPromise
       .then((ack) => this.persistEpisodeAck(taskId, 'building', ack))
       .catch(() => {}); // Swallow errors — episode reporting is best-effort
+
+    // ────────────────────────────────────────────────────────────────────
+    // Clear-on-consume: Delete substrate after episode report to prevent
+    // stale substrate from lingering and causing debugging confusion.
+    // Future episodes will get fresh substrate from the next solve.
+    // ────────────────────────────────────────────────────────────────────
+    if (task.metadata.solver?.buildingSolveResultSubstrate) {
+      delete task.metadata.solver.buildingSolveResultSubstrate;
+      task.metadata.updatedAt = Date.now();
+      this.taskStore.setTask(task);
+    }
 
     console.log(
       `[Building] Episode reported: planId=${planId}, success=${success}, modules=${completedModuleIds.length}, ` +

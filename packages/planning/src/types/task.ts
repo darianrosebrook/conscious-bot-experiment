@@ -156,15 +156,19 @@ export interface Task {
 
       // ────────────────────────────────────────────────────────────────────
       // Episode hash slots (Gap 1: persist episode_hash from report_episode ack)
+      //
+      // NOTE: Currently only `buildingEpisodeHash` is wired. Other slots are
+      // reserved for future use when those domains implement episode reporting.
+      // Do not rely on non-building slots being populated until explicitly wired.
       // ────────────────────────────────────────────────────────────────────
 
-      /** Last episode hash returned by Sterling for building domain */
+      /** Last episode hash returned by Sterling for building domain (WIRED) */
       buildingEpisodeHash?: string;
-      /** Last episode hash returned by Sterling for crafting domain */
+      /** Reserved: episode hash for crafting domain (NOT YET WIRED) */
       craftingEpisodeHash?: string;
-      /** Last episode hash returned by Sterling for tool progression domain */
+      /** Reserved: episode hash for tool progression domain (NOT YET WIRED) */
       toolProgressionEpisodeHash?: string;
-      /** Last episode hash returned by Sterling for acquisition domain */
+      /** Reserved: episode hash for acquisition domain (NOT YET WIRED) */
       acquisitionEpisodeHash?: string;
 
       // ────────────────────────────────────────────────────────────────────

@@ -1,11 +1,24 @@
 # Idle Introspection Design: Emergent Behavior through Memory-Driven Cognition
 
-## Status: Design Draft v2
+## Status: Design Draft v2 — Implementation Pending
 
 **Author**: Claude with @darianrosebrook
 **Created**: 2026-02-03
 **Updated**: 2026-02-03 (incorporated research-integrity pivots)
 **Goal**: Replace hardcoded idle behaviors with emergent, memory-grounded cognition
+
+### Implementation Note (2026-02-03)
+
+The previous `IdleBehaviorSelector` (`packages/planning/src/server/idle-behavior-selector.ts`) was deleted
+per this design's recommendation — it hardcoded fallback behaviors that violated the project's research
+philosophy. **This design document is the current source of truth for idle behavior.**
+
+Current state:
+- **Deleted**: `idle-behavior-selector.ts` and its tests (commit 3d7a883)
+- **Not yet implemented**: Memory-driven idle introspection per this design
+- **Consequence**: The bot currently has no idle behavior system; it waits for tasks without self-directed activity
+
+Next steps: Implement the `IdleIntrospectionController` per the architecture below, respecting invariants IDLE-1 through IDLE-5.
 
 ---
 

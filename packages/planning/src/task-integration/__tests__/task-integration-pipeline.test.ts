@@ -2637,4 +2637,48 @@ describe('Building episode reporting with join keys', () => {
     // Original fields should also survive
     expect(finalTask.metadata.solver?.buildingTemplateId).toBe('shelter-template');
   });
+
+  it('clears buildingSolveResultSubstrate after episode report (clear-on-consume)', async () => {
+    // This test verifies that substrate is deleted after episode reporting
+    // to prevent stale substrate from lingering and causing debugging confusion
+    const task = await ti.addTask(makeTaskData({
+      title: 'Build shelter',
+      type: 'building',
+      steps: [
+        { id: 'step-1', label: 'build_module:wall', done: true, order: 1, meta: { domain: 'building', moduleId: 'wall-1' } },
+      ],
+    }));
+
+    task.metadata.solver = {
+      buildingTemplateId: 'shelter-template',
+      buildingPlanId: 'plan-A',
+      buildingSolveJoinKeys: {
+        planId: 'plan-A',
+        bundleHash: 'hash-A',
+      },
+      // Substrate present before episode report
+      buildingSolveResultSubstrate: {
+        planId: 'plan-A',
+        bundleHash: 'hash-A',
+        solved: false,
+        searchHealth: { terminationReason: 'max_nodes' },
+        capturedAt: Date.now(),
+      },
+    };
+
+    const taskStore = (ti as any).taskStore;
+    taskStore.setTask(task);
+
+    // Verify substrate exists before
+    expect(taskStore.getTask(task.id).metadata.solver?.buildingSolveResultSubstrate).toBeDefined();
+
+    ti.updateTaskProgress(task.id, 100, 'completed');
+
+    // Substrate should be cleared after episode report (synchronous clear)
+    const finalTask = taskStore.getTask(task.id);
+    expect(finalTask.metadata.solver?.buildingSolveResultSubstrate).toBeUndefined();
+    // Other solver metadata should survive
+    expect(finalTask.metadata.solver?.buildingTemplateId).toBe('shelter-template');
+    expect(finalTask.metadata.solver?.buildingPlanId).toBe('plan-A');
+  });
 });
