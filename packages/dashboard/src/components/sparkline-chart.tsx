@@ -8,6 +8,7 @@
  */
 
 import  { useMemo } from 'react';
+import s from './sparkline-chart.module.scss';
 
 export interface SparklinePoint {
   ts: number;
@@ -55,11 +56,11 @@ export function SparklineChart({
   if (data.length === 0) {
     return (
       <div
-        className="flex flex-col items-center justify-center"
+        className={s.emptyWrapper}
         style={{ width, height }}
       >
         {label && (
-          <span className="text-[10px] text-zinc-500 mb-1">{label}</span>
+          <span className={s.label}>{label}</span>
         )}
         <svg
           width={width}
@@ -99,11 +100,11 @@ export function SparklineChart({
   const last = points[points.length - 1];
 
   return (
-    <div className="flex flex-col">
+    <div className={s.wrapper}>
       {label && (
-        <div className="flex items-center justify-between mb-0.5">
-          <span className="text-[10px] text-zinc-500">{label}</span>
-          <span className="text-[10px] font-medium text-zinc-300">
+        <div className={s.labelRow}>
+          <span className={s.label}>{label}</span>
+          <span className={s.labelValue}>
             {Math.round(data[data.length - 1].value)}
           </span>
         </div>

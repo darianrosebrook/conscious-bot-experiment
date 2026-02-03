@@ -134,7 +134,7 @@ export const InventoryDisplay: React.FC<InventoryDisplayProps> = ({
   return (
     <Section
       title="Inventory"
-      icon={<Package className="size-4" />}
+      icon={<Package className={s.icon4} />}
       className={className}
       actions={
         totalItems > 0 ? (

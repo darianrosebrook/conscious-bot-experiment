@@ -147,7 +147,7 @@ export function EvaluationPanel() {
 
   if (isLoading) {
     return (
-      <Section title="Evaluation" icon={<BarChart3 className="size-4" />}>
+      <Section title="Evaluation" icon={<BarChart3 className={s.icon4} />}>
         <div className={s.centerPy8}>
           <div className={s.loadingRow}>
             <div className={s.spinner} />
@@ -160,7 +160,7 @@ export function EvaluationPanel() {
 
   if (error) {
     return (
-      <Section title="Evaluation" icon={<BarChart3 className="size-4" />}>
+      <Section title="Evaluation" icon={<BarChart3 className={s.icon4} />}>
         <div className={s.centerPy8}>
           <div className={s.errorCenter}>
             <AlertTriangle className={s.errorIcon} />
@@ -176,7 +176,7 @@ export function EvaluationPanel() {
 
   if (!evaluationData) {
     return (
-      <Section title="Evaluation" icon={<BarChart3 className="size-4" />}>
+      <Section title="Evaluation" icon={<BarChart3 className={s.icon4} />}>
         <EmptyState
           icon={BarChart3}
           title="No evaluation data"
@@ -191,7 +191,7 @@ export function EvaluationPanel() {
       {/* System Health */}
       <Section
         title="System Health"
-        icon={<CheckCircle className="size-4" />}
+        icon={<CheckCircle className={s.icon4} />}
         tight
       >
         <div className={s.healthRow}>
@@ -219,7 +219,7 @@ export function EvaluationPanel() {
       </Section>
 
       {/* Key Metrics */}
-      <Section title="Performance Metrics" icon={<Target className="size-4" />}>
+      <Section title="Performance Metrics" icon={<Target className={s.icon4} />}>
         <div className={s.metricsGrid}>
           {evaluationData.metrics.map((metric) => (
             <div key={metric.name} className={s.metricCard}>
@@ -237,7 +237,7 @@ export function EvaluationPanel() {
       </Section>
 
       {/* Statistics */}
-      <Section title="Statistics" icon={<BarChart3 className="size-4" />} tight>
+      <Section title="Statistics" icon={<BarChart3 className={s.icon4} />} tight>
         <div className={s.statsGrid}>
           <div className={s.statRow}>
             <span className={s.statLabel}>Total Evaluations</span>
@@ -286,7 +286,7 @@ export function EvaluationPanel() {
       {/* Alerts */}
       <Section
         title="Active Alerts"
-        icon={<AlertTriangle className="size-4" />}
+        icon={<AlertTriangle className={s.icon4} />}
       >
         {evaluationData.alerts.length > 0 ? (
           <div className={s.alertSpacer}>

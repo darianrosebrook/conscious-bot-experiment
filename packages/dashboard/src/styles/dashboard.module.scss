@@ -6,9 +6,33 @@
   width: 100vw;
   background: linear-gradient(to bottom, rgb(9 9 11), rgb(9 9 11), rgb(0 0 0));
   color: rgb(244 244 245); // zinc-100
-  overflow: hidden;
+  overflow: hidden; // Keep hidden on root to prevent double scrollbars
   display: flex;
   flex-direction: column;
+}
+
+// Utility classes (replaces Tailwind utilities)
+.hFull {
+  height: 100%;
+}
+
+.wFull {
+  width: 100%;
+}
+
+.size4 {
+  width: 1rem;
+  height: 1rem;
+}
+
+.size5 {
+  width: 1.25rem;
+  height: 1.25rem;
+}
+
+.size6 {
+  width: 1.5rem;
+  height: 1.5rem;
 }
 
 // ── Header ──
@@ -180,6 +204,7 @@
 
   @include md {
     grid-column: span 3;
+    overflow-y: auto; // Enable vertical scroll on desktop
   }
 }
 
@@ -193,7 +218,7 @@
 
   @include md {
     grid-column: span 6;
-    overflow: hidden;
+    overflow-y: auto; // Enable vertical scroll on desktop
   }
 }
 
@@ -208,7 +233,7 @@
 
   @include md {
     grid-column: span 3;
-    overflow: hidden;
+    overflow-y: auto; // Enable vertical scroll on desktop
   }
 }
 

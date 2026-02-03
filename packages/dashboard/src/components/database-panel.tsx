@@ -338,12 +338,12 @@ export function DatabasePanel() {
   ];
 
   return (
-    <ScrollArea className="h-full">
+    <ScrollArea className={s.scrollRoot}>
       <div className={s.scrollContent}>
         {/* 4A: Overview Panel */}
         <CollapsibleSection
           title="Overview"
-          icon={<Database className="size-4" />}
+          icon={<Database className={s.icon4} />}
         >
           {overview ? (
             <div className={s.overviewSpacer}>
@@ -436,7 +436,7 @@ export function DatabasePanel() {
         {/* 4B: Memory Explorer */}
         <CollapsibleSection
           title="Memory Explorer"
-          icon={<Search className="size-4" />}
+          icon={<Search className={s.icon4} />}
           defaultOpen={false}
         >
           <div className={s.overviewSpacer}>
@@ -582,7 +582,7 @@ export function DatabasePanel() {
         {/* 4C: Knowledge Graph Stats */}
         <CollapsibleSection
           title="Knowledge Graph"
-          icon={<Network className="size-4" />}
+          icon={<Network className={s.icon4} />}
           defaultOpen={false}
         >
           {knowledgeGraph ? (
@@ -668,7 +668,7 @@ export function DatabasePanel() {
         {/* 4D: Reflections & Narrative */}
         <CollapsibleSection
           title="Reflections & Narrative"
-          icon={<BookOpen className="size-4" />}
+          icon={<BookOpen className={s.icon4} />}
           defaultOpen={false}
         >
           <div className={s.overviewSpacer}>
@@ -809,7 +809,7 @@ export function DatabasePanel() {
         {/* 4E: Embedding Health */}
         <CollapsibleSection
           title="Embedding Health"
-          icon={<Activity className="size-4" />}
+          icon={<Activity className={s.icon4} />}
           defaultOpen={false}
         >
           {embeddingHealth ? (
@@ -887,7 +887,7 @@ export function DatabasePanel() {
         {/* 4F: Embedding Space Visualization */}
         <CollapsibleSection
           title="Embedding Space Visualization"
-          icon={<ScatterChart className="size-4" />}
+          icon={<ScatterChart className={s.icon4} />}
           defaultOpen={false}
         >
           <Suspense fallback={<div className={s.loadingFallback}>Loading 3D visualization...</div>}>
@@ -898,7 +898,7 @@ export function DatabasePanel() {
         {/* 4G: Danger Zone */}
         <CollapsibleSection
           title="Danger Zone"
-          icon={<AlertTriangle className="size-4" />}
+          icon={<AlertTriangle className={s.icon4} />}
           defaultOpen={false}
         >
           <div className={s.dangerOuter}>
