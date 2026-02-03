@@ -18,6 +18,8 @@ import {
   computeBundleInput,
   computeBundleOutput,
   createSolveBundle,
+  parseSterlingIdentity,
+  attachSterlingIdentity,
   INVENTORY_HASH_CAP,
 } from '../solve-bundle';
 import type { CompatReport, ObjectiveWeights, SearchHealthMetrics } from '../solve-bundle-types';
@@ -383,6 +385,51 @@ describe('createSolveBundle', () => {
     const bundle2 = createSolveBundle(makeInput(), makeOutput(), makeCompatReport());
     expect(bundle.bundleHash).toBe(bundle2.bundleHash);
   });
+
+  it('sterlingIdentity does not participate in bundleHash', () => {
+    const input = makeInput();
+    const outputA = makeOutput();
+    const outputB = {
+      ...makeOutput(),
+      sterlingIdentity: {
+        traceBundleHash: 'abc123def456',
+        engineCommitment: 'def456abc789',
+        operatorRegistryHash: '0011223344556677',
+      },
+    };
+    const compat = makeCompatReport();
+
+    const bundleA = createSolveBundle(input, outputA, compat);
+    const bundleB = createSolveBundle(input, outputB, compat);
+
+    // Core invariant: bundleHash must be identical regardless of sterlingIdentity
+    expect(bundleA.bundleHash).toBe(bundleB.bundleHash);
+
+    // But sterlingIdentity is preserved on the bundle output
+    expect(bundleB.output.sterlingIdentity).toBeDefined();
+    expect(bundleB.output.sterlingIdentity!.traceBundleHash).toBe('abc123def456');
+  });
+
+  it('sterlingIdentity with completenessDeclaration does not affect bundleHash', () => {
+    const input = makeInput();
+    const outputA = makeOutput();
+    const outputB = {
+      ...makeOutput(),
+      sterlingIdentity: {
+        traceBundleHash: 'abc123def456',
+        completenessDeclaration: {
+          complete: true,
+          domain: 'minecraft',
+        },
+      },
+    };
+    const compat = makeCompatReport();
+
+    const bundleA = createSolveBundle(input, outputA, compat);
+    const bundleB = createSolveBundle(input, outputB, compat);
+
+    expect(bundleA.bundleHash).toBe(bundleB.bundleHash);
+  });
 });
 
 // ============================================================================
@@ -462,5 +509,170 @@ describe('computeBundleOutput rationale', () => {
       maxNodes: 5000,
     });
     expect(outputDefault.rationale!.boundingConstraints.objectiveWeightsSource).toBe('default');
+  });
+});
+
+// ============================================================================
+// parseSterlingIdentity
+// ============================================================================
+
+describe('parseSterlingIdentity', () => {
+  it('returns undefined when metrics is undefined', () => {
+    expect(parseSterlingIdentity(undefined)).toBeUndefined();
+  });
+
+  it('returns undefined when no identity fields are present', () => {
+    expect(parseSterlingIdentity({ planId: 'abc', totalNodes: 42 })).toBeUndefined();
+  });
+
+  it('parses trace_bundle_hash from metrics', () => {
+    const identity = parseSterlingIdentity({ trace_bundle_hash: 'abc123def456' });
+    expect(identity).toBeDefined();
+    expect(identity!.traceBundleHash).toBe('abc123def456');
+  });
+
+  it('parses all identity fields when present', () => {
+    const identity = parseSterlingIdentity({
+      trace_bundle_hash: 'tbh-123',
+      engine_commitment: 'ec-456',
+      operator_registry_hash: 'orh-789',
+      completeness_declaration: { complete: true, domain: 'minecraft' },
+    });
+    expect(identity).toBeDefined();
+    expect(identity!.traceBundleHash).toBe('tbh-123');
+    expect(identity!.engineCommitment).toBe('ec-456');
+    expect(identity!.operatorRegistryHash).toBe('orh-789');
+    expect(identity!.completenessDeclaration).toEqual({ complete: true, domain: 'minecraft' });
+  });
+
+  it('ignores non-string trace_bundle_hash', () => {
+    expect(parseSterlingIdentity({ trace_bundle_hash: 42 })).toBeUndefined();
+    expect(parseSterlingIdentity({ trace_bundle_hash: null })).toBeUndefined();
+  });
+
+  it('ignores non-object completeness_declaration', () => {
+    const identity = parseSterlingIdentity({
+      trace_bundle_hash: 'tbh-123',
+      completeness_declaration: 'not-an-object',
+    });
+    expect(identity!.completenessDeclaration).toBeUndefined();
+  });
+
+  it('wire-shape lock: identity fields at top-level (not in metrics) are ignored', () => {
+    // Simulates a hypothetical server refactor that moves identity fields
+    // to the top-level response instead of nesting them inside metrics.
+    // parseSterlingIdentity receives `result.metrics` — so top-level fields
+    // should never be visible to it.  This test locks that contract.
+    const topLevelResult = {
+      type: 'complete',
+      domain: 'minecraft',
+      solved: true,
+      // Identity fields at top-level (wrong placement)
+      trace_bundle_hash: 'top-level-tbh',
+      engine_commitment: 'top-level-ec',
+      operator_registry_hash: 'top-level-orh',
+      // metrics without identity fields
+      metrics: { planId: 'abc', totalNodes: 42 },
+    };
+
+    // parseSterlingIdentity is called with result.metrics, not result
+    const identity = parseSterlingIdentity(topLevelResult.metrics as Record<string, unknown>);
+    expect(identity).toBeUndefined();
+
+    // Contrast: if called with the full result (wrong), it would find them
+    const wrongIdentity = parseSterlingIdentity(topLevelResult as unknown as Record<string, unknown>);
+    expect(wrongIdentity).toBeDefined();
+    expect(wrongIdentity!.traceBundleHash).toBe('top-level-tbh');
+    // This proves the contract: only metrics-nested fields are parsed by solvers
+  });
+});
+
+// ============================================================================
+// attachSterlingIdentity + bindingHash
+// ============================================================================
+
+describe('attachSterlingIdentity', () => {
+  const makeBundle = () => {
+    const input = computeBundleInput({
+      solverId: 'test.solver',
+      contractVersion: 1,
+      definitions: [{ action: 'craft:test', produces: [] }],
+      inventory: {},
+      goal: { test: 1 },
+      nearbyBlocks: [],
+    });
+    const output = computeBundleOutput({
+      planId: 'plan-test',
+      solved: true,
+      steps: [{ action: 'craft:test' }],
+      totalNodes: 10,
+      durationMs: 50,
+      solutionPathLength: 1,
+    });
+    const compat: CompatReport = {
+      valid: true,
+      issues: [],
+      checkedAt: Date.now(),
+      definitionCount: 1,
+    };
+    return createSolveBundle(input, output, compat);
+  };
+
+  it('does nothing when identity is undefined', () => {
+    const bundle = makeBundle();
+    attachSterlingIdentity(bundle, undefined);
+    expect(bundle.output.sterlingIdentity).toBeUndefined();
+  });
+
+  it('attaches identity to bundle output', () => {
+    const bundle = makeBundle();
+    attachSterlingIdentity(bundle, {
+      traceBundleHash: 'tbh-123',
+      engineCommitment: 'ec-456',
+    });
+    expect(bundle.output.sterlingIdentity).toBeDefined();
+    expect(bundle.output.sterlingIdentity!.traceBundleHash).toBe('tbh-123');
+    expect(bundle.output.sterlingIdentity!.engineCommitment).toBe('ec-456');
+  });
+
+  it('computes bindingHash when traceBundleHash is available', () => {
+    const bundle = makeBundle();
+    attachSterlingIdentity(bundle, { traceBundleHash: 'tbh-123' });
+
+    const identity = bundle.output.sterlingIdentity!;
+    expect(identity.bindingHash).toBeDefined();
+    // bindingHash = contentHash(traceBundleHash + bundleHash)
+    const expected = contentHash('tbh-123' + bundle.bundleHash);
+    expect(identity.bindingHash).toBe(expected);
+  });
+
+  it('does not compute bindingHash when traceBundleHash is absent', () => {
+    const bundle = makeBundle();
+    attachSterlingIdentity(bundle, { engineCommitment: 'ec-456' });
+
+    const identity = bundle.output.sterlingIdentity!;
+    expect(identity.bindingHash).toBeUndefined();
+  });
+
+  it('bindingHash is deterministic for same inputs', () => {
+    const bundle1 = makeBundle();
+    const bundle2 = makeBundle();
+
+    attachSterlingIdentity(bundle1, { traceBundleHash: 'same-hash' });
+    attachSterlingIdentity(bundle2, { traceBundleHash: 'same-hash' });
+
+    expect(bundle1.output.sterlingIdentity!.bindingHash)
+      .toBe(bundle2.output.sterlingIdentity!.bindingHash);
+  });
+
+  it('different traceBundleHash produces different bindingHash', () => {
+    const bundle1 = makeBundle();
+    const bundle2 = makeBundle();
+
+    attachSterlingIdentity(bundle1, { traceBundleHash: 'hash-a' });
+    attachSterlingIdentity(bundle2, { traceBundleHash: 'hash-b' });
+
+    expect(bundle1.output.sterlingIdentity!.bindingHash)
+      .not.toBe(bundle2.output.sterlingIdentity!.bindingHash);
   });
 });
