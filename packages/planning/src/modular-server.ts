@@ -133,6 +133,10 @@ import {
   DEFAULT_BLOCKED_TTL_MS,
 } from './server/task-block-evaluator';
 import {
+  selectIdleBehavior,
+  type IdleContext,
+} from './server/idle-behavior-selector';
+import {
   isCircuitBreakerOpen,
   tripCircuitBreaker,
   recordSuccess,
@@ -1684,6 +1688,56 @@ async function autonomousTaskExecutor() {
           }
         );
       }
+
+      // Try to select an idle behavior when no tasks are available
+      try {
+        const idleContext: IdleContext = {
+          inventoryCount: 0, // TODO: fetch from bot state
+          timeSinceLastTask: global.lastIdleEvent ? now - global.lastIdleEvent : 0,
+          gameTimeOfDay: 'unknown',
+          hasInterruptedTasks: false, // TODO: check memory for interrupted tasks
+          consecutiveIdleCycles: 0,
+        };
+
+        const idleSelection = selectIdleBehavior(idleContext);
+        if (idleSelection) {
+          console.log(
+            `[AUTONOMOUS EXECUTOR] Creating idle task: ${idleSelection.behavior.name}`
+          );
+
+          // Create a low-priority idle task
+          const idleTask = {
+            title: idleSelection.task.title,
+            description: idleSelection.task.description,
+            type: idleSelection.task.type,
+            priority: idleSelection.task.priority,
+            urgency: 0.1,
+            status: 'pending' as const,
+            source: 'autonomous' as const,
+            progress: 0,
+            steps: [],
+            parameters: idleSelection.task.parameters,
+            metadata: {
+              createdAt: now,
+              updatedAt: now,
+              retryCount: 0,
+              maxRetries: 1, // Idle tasks don't need many retries
+              childTaskIds: [],
+              tags: idleSelection.task.metadata.tags,
+              category: idleSelection.task.metadata.category,
+            },
+          };
+
+          taskIntegration.addTask(idleTask);
+          console.log(
+            `[AUTONOMOUS EXECUTOR] Idle task created: ${idleTask.title}`
+          );
+        }
+      } catch (idleErr) {
+        // Don't let idle behavior selection break the main loop
+        console.warn('[AUTONOMOUS EXECUTOR] Idle behavior selection failed:', idleErr);
+      }
+
       return;
     } else {
       const pendingCount = activeTasks.filter((t) => t.status === 'pending').length;
